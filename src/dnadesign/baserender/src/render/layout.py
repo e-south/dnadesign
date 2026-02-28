@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Mapping, Sequence
@@ -34,9 +35,9 @@ def revcomp(seq: str) -> str:
 
 def _overlay_line_count(text: str | None) -> int:
     if text is None:
-        return 1
+        return 0
     lines = [line for line in str(text).splitlines() if line.strip()]
-    return max(1, len(lines))
+    return len(lines)
 
 
 def grid_x_left(layout: LayoutContext, col_idx: int) -> float:
@@ -179,9 +180,54 @@ def _overlap(a_start: int, a_end: int, b_start: int, b_end: int) -> bool:
     return not (a_end <= b_start or b_end <= a_start)
 
 
-def _assign_interval_lanes(items: Sequence[_IntervalItem], *, ctx: str) -> dict[int, int]:
+def _span_link_reservations_for_strand(record: Record, *, strand: str) -> tuple[tuple[int, int, int], ...]:
+    if strand not in {"fwd", "rev"}:
+        raise BoundsError(f"Unknown strand for span_link reservations: {strand!r}")
+
+    feature_by_id: dict[str, Feature] = {}
+    for feature in record.features:
+        if feature.id is None:
+            continue
+        feature_by_id[str(feature.id)] = feature
+
+    reservations: set[tuple[int, int, int]] = set()
+    for effect in record.effects:
+        if effect.kind != "span_link":
+            continue
+        from_id_raw = effect.target.get("from_feature_id")
+        to_id_raw = effect.target.get("to_feature_id")
+        if not isinstance(from_id_raw, str) or not isinstance(to_id_raw, str):
+            continue
+        left_feature = feature_by_id.get(from_id_raw)
+        right_feature = feature_by_id.get(to_id_raw)
+        if left_feature is None or right_feature is None:
+            continue
+        if left_feature.span.strand != strand or right_feature.span.strand != strand:
+            continue
+
+        lane_raw = effect.render.get("track", 0)
+        try:
+            lane = int(lane_raw)
+        except Exception as exc:
+            raise BoundsError("span_link effect.render.track must be int") from exc
+
+        if left_feature.span.start <= right_feature.span.start:
+            start = int(left_feature.span.end)
+            end = int(right_feature.span.start)
+        else:
+            start = int(right_feature.span.end)
+            end = int(left_feature.span.start)
+        if end <= start:
+            continue
+        reservations.add((start, end, lane))
+
+    return tuple(sorted(reservations, key=lambda item: (item[2], item[0], item[1])))
+
+
+def _assign_interval_lanes(items: Sequence[_IntervalItem], *, ctx: str, min_gap_bp: int = 0) -> dict[int, int]:
     lanes: dict[int, int] = {}
     per_lane_spans: dict[int, list[tuple[int, int, int]]] = {}
+    gap = max(0, int(min_gap_bp))
 
     for item in items:
         if item.fixed_lane is None:
@@ -202,9 +248,11 @@ def _assign_interval_lanes(items: Sequence[_IntervalItem], *, ctx: str) -> dict[
         key=lambda item: (item.priority, item.start, -(item.end - item.start), item.index),
     )
     for item in pending:
+        candidate_start = item.start - gap
+        candidate_end = item.end + gap
         placed = False
         for lane, spans in sorted(per_lane_spans.items(), key=lambda kv: kv[0]):
-            if all(not _overlap(item.start, item.end, s, e) for s, e, _ in spans):
+            if all(not _overlap(candidate_start, candidate_end, s, e) for s, e, _ in spans):
                 spans.append((item.start, item.end, item.index))
                 lanes[item.index] = lane
                 placed = True
@@ -219,20 +267,42 @@ def _assign_interval_lanes(items: Sequence[_IntervalItem], *, ctx: str) -> dict[
     return lanes
 
 
-def assign_tracks(features: Sequence[Feature]) -> list[int]:
-    lane_map = _assign_interval_lanes(
-        [
+def assign_tracks(
+    features: Sequence[Feature],
+    *,
+    reserved_intervals: Sequence[tuple[int, int, int]] | None = None,
+    min_gap_bp: int = 0,
+) -> list[int]:
+    items: list[_IntervalItem] = [
+        _IntervalItem(
+            index=idx,
+            priority=_feature_priority(feat),
+            start=feat.span.start,
+            end=feat.span.end,
+            fixed_lane=_feature_track(feat),
+        )
+        for idx, feat in enumerate(features)
+    ]
+    for reservation_idx, (start_raw, end_raw, lane_raw) in enumerate(tuple(reserved_intervals or ())):
+        try:
+            start = int(start_raw)
+            end = int(end_raw)
+            lane = int(lane_raw)
+        except Exception as exc:
+            raise BoundsError("reserved track interval must be (int start, int end, int lane)") from exc
+        if end <= start:
+            continue
+        items.append(
             _IntervalItem(
-                index=idx,
-                priority=_feature_priority(feat),
-                start=feat.span.start,
-                end=feat.span.end,
-                fixed_lane=_feature_track(feat),
+                index=len(features) + reservation_idx,
+                priority=-9999,
+                start=start,
+                end=end,
+                fixed_lane=lane,
             )
-            for idx, feat in enumerate(features)
-        ],
-        ctx="feature",
-    )
+        )
+
+    lane_map = _assign_interval_lanes(items, ctx="feature", min_gap_bp=min_gap_bp)
     return [lane_map[idx] for idx in range(len(features))]
 
 
@@ -399,8 +469,20 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
 
     up_features = [record.features[i] for i in up_indices]
     dn_features = [record.features[i] for i in dn_indices]
-    up_tracks = assign_tracks(up_features)
-    dn_tracks = assign_tracks(dn_features)
+    min_gap_bp = 0
+    if cw > 0:
+        min_gap_bp = int(math.ceil((2.0 * float(style.kmer.pad_x_px)) / float(cw)))
+
+    up_tracks = assign_tracks(
+        up_features,
+        reserved_intervals=_span_link_reservations_for_strand(record, strand="fwd"),
+        min_gap_bp=min_gap_bp,
+    )
+    dn_tracks = assign_tracks(
+        dn_features,
+        reserved_intervals=_span_link_reservations_for_strand(record, strand="rev"),
+        min_gap_bp=min_gap_bp,
+    )
 
     n_up_tracks = (max(up_tracks) + 1) if up_tracks else 0
     n_dn_tracks = (max(dn_tracks) + 1) if dn_tracks else 0
@@ -507,13 +589,21 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
         y_mins.append(y0)
         y_maxs.append(y0 + motif_logo_height)
 
-    content_bottom_raw = min(y_mins)
-    content_top_raw = max(y_maxs)
+    raw_content_bottom = min(y_mins)
+    raw_content_top = max(y_maxs)
+    centerline_base = (y_forward_base + y_reverse_base) / 2.0 if show_two else y_forward_base
+    top_extent = raw_content_top - centerline_base
+    bottom_extent = centerline_base - raw_content_bottom
+    content_radius = max(top_extent, bottom_extent)
+    content_bottom_raw = centerline_base - content_radius
+    content_top_raw = centerline_base + content_radius
     outer_pad = style.layout.outer_pad_cells * ch
     legend_mode = str(style.legend_mode).lower()
     draw_bottom_legend = bool(style.legend) and legend_mode == "bottom"
-    legend_space = (style.legend_height_px + style.legend_pad_px) if draw_bottom_legend else 0.0
-    desired_bottom = style.padding_y + outer_pad + legend_space
+    legend_space = (float(style.legend_height_px) + float(style.legend_pad_px)) if draw_bottom_legend else 0.0
+    label_height = style.font_size_label / 72.0 * style.dpi
+    header_margin = max(label_height * 0.9, ch * 0.55)
+    desired_bottom = style.padding_y + outer_pad + legend_space + header_margin
     shift = desired_bottom - content_bottom_raw
 
     shifted_placements: list[FeaturePlacement] = []
@@ -540,12 +630,13 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
     y_reverse = y_reverse_base + shift
     content_bottom = content_bottom_raw + shift
     content_top = content_top_raw + shift
-    label_height = style.font_size_label / 72.0 * style.dpi
-    title_space = max(label_height * 1.6, ch * 0.8)
     overlay_lines = _overlay_line_count(record.display.overlay_text)
-    if overlay_lines > 1:
-        title_space += (overlay_lines - 1) * max(label_height * 1.05, ch * 0.5)
-    height = content_top + style.padding_y + outer_pad + title_space
+    overlay_space = 0.0
+    if overlay_lines > 0:
+        overlay_space = header_margin
+        if overlay_lines > 1:
+            overlay_space += (overlay_lines - 1) * max(label_height * 1.05, ch * 0.5)
+    height = content_top + style.padding_y + outer_pad + header_margin + overlay_space + legend_space
 
     return LayoutContext(
         cw=cw,

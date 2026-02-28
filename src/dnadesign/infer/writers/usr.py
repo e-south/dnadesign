@@ -44,7 +44,7 @@ def write_back_usr(
 
     out_cols = {}
     for out_id, col in columnar.items():
-        col_name = f"{model_id}__{job_id}__{out_id}"
+        col_name = f"infer__{model_id}__{job_id}__{out_id}"
         out_cols[col_name] = col
 
     df = pd.DataFrame({"id": ids, **out_cols})
@@ -62,8 +62,9 @@ def write_back_usr(
         ds.attach(
             p,
             namespace="infer",
-            id_col="id",
+            key="id",
+            key_col="id",
             columns=list(out_cols.keys()),
-            allow_overwrite=bool(overwrite),
+            allow_overwrite=True,
             note=f"dnadesign.infer job={job_id} model={model_id}",
         )

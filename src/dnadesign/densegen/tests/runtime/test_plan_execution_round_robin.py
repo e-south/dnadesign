@@ -24,7 +24,13 @@ class _PlanItem:
     quota: int
 
 
-def test_round_robin_reuses_plan_started_at_per_plan() -> None:
+def test_round_robin_resets_plan_started_at_after_progress(monkeypatch) -> None:
+    monotonic_values = iter([100.0, 101.0, 102.0, 103.0, 104.0, 105.0])
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.core.pipeline.plan_execution.time.monotonic",
+        lambda: next(monotonic_values),
+    )
+
     plan_items = [_PlanItem(name="plan_a", quota=2), _PlanItem(name="plan_b", quota=2)]
     plan_pools = {
         "plan_a": SimpleNamespace(pool_name="pool_a", include_inputs=["a"], pool=object()),
@@ -71,5 +77,7 @@ def test_round_robin_reuses_plan_started_at_per_plan() -> None:
     assert result.per_plan[("pool_b", "plan_b")] == 2
     assert len(starts_by_plan["plan_a"]) >= 2
     assert len(starts_by_plan["plan_b"]) >= 2
-    assert len(set(starts_by_plan["plan_a"])) == 1
-    assert len(set(starts_by_plan["plan_b"])) == 1
+    assert starts_by_plan["plan_a"][0] == 100.0
+    assert starts_by_plan["plan_a"][1] == 101.0
+    assert starts_by_plan["plan_b"][0] == 102.0
+    assert starts_by_plan["plan_b"][1] == 103.0

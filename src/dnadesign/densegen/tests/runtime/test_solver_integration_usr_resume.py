@@ -78,13 +78,11 @@ def _write_config(path: Path) -> None:
 
               runtime:
                 round_robin: false
-                arrays_generated_before_resample: 1
+                max_accepted_per_library: 1
                 min_count_per_tf: 0
                 max_duplicate_solutions: 3
-                stall_seconds_before_resample: 5
-                stall_warning_every_seconds: 5
-                max_consecutive_failures: 10
-                max_seconds_per_plan: 20
+                no_progress_seconds_before_resample: 5
+                max_consecutive_no_progress_resamples: 10
                 max_failed_solutions: 0
                 random_seed: 1
 
@@ -153,13 +151,11 @@ def _write_config_usr_only(path: Path) -> None:
 
               runtime:
                 round_robin: false
-                arrays_generated_before_resample: 1
+                max_accepted_per_library: 1
                 min_count_per_tf: 0
                 max_duplicate_solutions: 3
-                stall_seconds_before_resample: 5
-                stall_warning_every_seconds: 5
-                max_consecutive_failures: 10
-                max_seconds_per_plan: 20
+                no_progress_seconds_before_resample: 5
+                max_consecutive_no_progress_resamples: 10
                 max_failed_solutions: 0
                 random_seed: 1
 

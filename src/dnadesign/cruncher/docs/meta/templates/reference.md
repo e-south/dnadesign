@@ -1,5 +1,9 @@
 ## <Reference title>
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 **Last updated by:** cruncher-maintainers on 2026-02-23
 
 ### Contents
@@ -15,7 +19,7 @@ Scope and intent.
 Strict behavior and invariants.
 
 ### Examples
-Minimal canonical examples.
+Minimal standard examples.
 
 ### Related references
-- [`../reference/doc_conventions.md`](../reference/doc_conventions.md)
+- [`../../reference/doc_conventions.md`](../../reference/doc_conventions.md)

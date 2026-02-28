@@ -63,8 +63,8 @@ def test_public_parquet_render_helper_renders_record_figure(tmp_path) -> None:
                 "id": "r1",
                 "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
                 "densegen__used_tfbs_detail": [
-                    {"tf": "lexA", "orientation": "fwd", "tfbs": "TTGACA", "offset": 0},
-                    {"tf": "cpxR", "orientation": "fwd", "tfbs": "TATAAT", "offset": 23},
+                    {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
+                    {"regulator": "cpxR", "orientation": "fwd", "sequence": "TATAAT", "offset": 23},
                 ],
                 "details": "row1",
             }
@@ -94,14 +94,14 @@ def test_public_batch_parquet_record_loader_returns_requested_order(tmp_path) ->
                 "id": "r1",
                 "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
                 "densegen__used_tfbs_detail": [
-                    {"tf": "lexA", "orientation": "fwd", "tfbs": "TTGACA", "offset": 0},
+                    {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
                 ],
             },
             {
                 "id": "r2",
                 "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
                 "densegen__used_tfbs_detail": [
-                    {"tf": "cpxR", "orientation": "fwd", "tfbs": "TATAAT", "offset": 23},
+                    {"regulator": "cpxR", "orientation": "fwd", "sequence": "TATAAT", "offset": 23},
                 ],
             },
         ],
@@ -127,7 +127,7 @@ def test_public_batch_parquet_record_loader_raises_on_missing_record_ids(tmp_pat
                 "id": "r1",
                 "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
                 "densegen__used_tfbs_detail": [
-                    {"tf": "lexA", "orientation": "fwd", "tfbs": "TTGACA", "offset": 0},
+                    {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
                 ],
             }
         ],
@@ -142,6 +142,34 @@ def test_public_batch_parquet_record_loader_raises_on_missing_record_ids(tmp_pat
                 "annotations": "densegen__used_tfbs_detail",
                 "id": "id",
             },
+        )
+
+
+def test_public_parquet_render_helper_rejects_legacy_densegen_tfbs_keys(tmp_path) -> None:
+    parquet = write_parquet(
+        tmp_path / "input.parquet",
+        [
+            {
+                "id": "r1",
+                "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+                "densegen__used_tfbs_detail": [
+                    {"tf": "lexA", "orientation": "fwd", "tfbs": "TTGACA", "offset": 0},
+                ],
+            }
+        ],
+    )
+
+    with pytest.raises(baserender.SchemaError, match="regulator"):
+        render_parquet_record_figure(
+            dataset_path=parquet,
+            record_id="r1",
+            adapter_kind="densegen_tfbs",
+            adapter_columns={
+                "sequence": "sequence",
+                "annotations": "densegen__used_tfbs_detail",
+                "id": "id",
+            },
+            adapter_policies={"on_invalid_row": "error"},
         )
 
 
@@ -200,7 +228,7 @@ def test_public_api_exposes_generic_job_entrypoints(tmp_path) -> None:
                 "id": "r1",
                 "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
                 "densegen__used_tfbs_detail": [
-                    {"tf": "lexA", "orientation": "fwd", "tfbs": "TTGACA", "offset": 0},
+                    {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
                 ],
                 "details": "",
             }
@@ -233,7 +261,7 @@ def test_public_api_accepts_in_memory_job_mapping(tmp_path) -> None:
                 "id": "r1",
                 "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
                 "densegen__used_tfbs_detail": [
-                    {"tf": "lexA", "orientation": "fwd", "tfbs": "TTGACA", "offset": 0},
+                    {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
                 ],
                 "details": "",
             }

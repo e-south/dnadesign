@@ -1,5 +1,9 @@
 ## Sampling model
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This concept page explains how DenseGen selects motif candidates before solving, across both Stage-A pool construction and Stage-B library sampling. Read it when you need to tune diversity, reduce failures, or reason about sampling-related runtime behavior.
 
 ### Two-stage sampling model

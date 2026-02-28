@@ -1,7 +1,7 @@
 ## Installation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-02-27
 
 This document covers initial repository setup for local development and CLI usage. Read it when bootstrapping a new environment; detailed dependency maintenance guidance lives in `docs/dependencies.md`.
 
@@ -43,21 +43,33 @@ This section installs lint/test tooling used during development.
 # Install optional dev dependencies.
 uv sync --locked --group dev
 
-# Confirm linter and test runner are available.
+# Confirm linter and test runner are available (not installed without --group dev).
 uv run ruff --version
-uv run pytest -q
+uv run pytest --version
 ```
 
 ### Run CLI entrypoints
 This section shows the standard non-activated workflow for project CLIs.
 
 ```bash
-# Show help for key repository CLIs.
+# Show help for repository CLIs.
 uv run usr --help
 uv run dense --help
 uv run notify --help
 uv run cruncher --help
 uv run baserender --help
+uv run infer --help
+uv run cluster --help
+uv run opal --help
+uv run permuter --help
+```
+
+### Environment note (matplotlib cache)
+Some CLI help paths import matplotlib. On systems where `~/.matplotlib` is not writable, set `MPLCONFIGDIR` to avoid cache warnings and slower first-run behavior.
+
+```bash
+# Use a writable cache location for matplotlib-backed CLI commands.
+export MPLCONFIGDIR="${TMPDIR:-/tmp}/matplotlib"
 ```
 
 ### BU SCC links

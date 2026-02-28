@@ -22,7 +22,12 @@ from dnadesign.baserender import (
     render_record_grid_figure,
 )
 from dnadesign.cruncher.analysis.plots._savefig import savefig
-from dnadesign.cruncher.analysis.plots.elites_showcase import build_elites_showcase_records
+from dnadesign.cruncher.analysis.plots.elites_showcase import (
+    _overlay_line_char_budget,
+    _wrap_overlay_score_tokens,
+    _wrap_overlay_text_line,
+    build_elites_showcase_records,
+)
 
 _NORM_SCORE_EPS = 1.0e-9
 
@@ -37,6 +42,8 @@ def _portfolio_overlay_text(
     elite_row: pd.Series,
     *,
     tf_names: list[str],
+    ncols: int,
+    max_chars: int = 80,
 ) -> str:
     source_label = str(elite_row.get("source_label") or elite_row.get("source_id") or "").strip()
     if not source_label:
@@ -44,6 +51,21 @@ def _portfolio_overlay_text(
     elite_id = str(elite_row.get("id") or elite_row.get("elite_id") or "").strip()
     if not elite_id:
         raise ValueError("Portfolio elite showcase requires elite id for overlay titles.")
+    sequence_length: int | None = None
+    sequence_length_value = elite_row.get("sequence_length")
+    if sequence_length_value is not None and not pd.isna(sequence_length_value):
+        parsed_length = pd.to_numeric(sequence_length_value, errors="coerce")
+        if pd.notna(parsed_length):
+            seq_len_int = int(parsed_length)
+            if seq_len_int > 0:
+                sequence_length = seq_len_int
+    if sequence_length is None:
+        sequence_text = str(elite_row.get("sequence") or "").strip()
+        if sequence_text:
+            sequence_length = len(sequence_text)
+
+    elite_title = elite_id if sequence_length is None else f"{elite_id} (L={sequence_length})"
+    line_chars = _overlay_line_char_budget(ncols=int(ncols), max_chars=int(max_chars))
     score_tokens: list[str] = []
     for tf_name in tf_names:
         score_column = f"norm_{tf_name}"
@@ -56,7 +78,10 @@ def _portfolio_overlay_text(
                 f"elite_id={elite_id!r} column={score_column!r}"
             )
         score_tokens.append(f"{tf_name}={float(score_value):.2f}")
-    return "\n".join([source_label, elite_id, " ".join(score_tokens)])
+    source_lines = _wrap_overlay_text_line(source_label, line_chars=line_chars)
+    elite_lines = _wrap_overlay_text_line(elite_title, line_chars=line_chars)
+    score_lines = _wrap_overlay_score_tokens(score_tokens, line_chars=line_chars)
+    return "\n".join([*source_lines, *elite_lines, *score_lines])
 
 
 def _validate_normalized_series(series: pd.Series, *, context: str) -> pd.Series:
@@ -170,6 +195,7 @@ def plot_portfolio_elite_showcase(
     if int(dpi) < 72:
         raise ValueError("Portfolio elite showcase dpi must be >= 72.")
 
+    showcase_cols = int(ncols)
     source_ids = selected_elites_df["source_id"].astype(str).drop_duplicates().tolist()
     records = []
     for source_id in source_ids:
@@ -187,7 +213,12 @@ def plot_portfolio_elite_showcase(
             tf_names=tf_names,
             pwms=source_pwms,
             max_panels=int(len(source_elites)),
-            overlay_text_fn=lambda elite_row, tf_list: _portfolio_overlay_text(elite_row, tf_names=tf_list),
+            overlay_text_fn=lambda elite_row, tf_list: _portfolio_overlay_text(
+                elite_row,
+                tf_names=tf_list,
+                ncols=showcase_cols,
+            ),
+            overlay_ncols=showcase_cols,
             meta_source="portfolio_elite_showcase",
         )
         records.extend(source_records)
@@ -196,7 +227,7 @@ def plot_portfolio_elite_showcase(
         raise ValueError("Portfolio elite showcase produced zero records.")
     fig = render_record_grid_figure(
         records,
-        ncols=int(ncols),
+        ncols=showcase_cols,
         style_overrides=cruncher_showcase_style_overrides(),
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)

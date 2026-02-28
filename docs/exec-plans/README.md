@@ -1,28 +1,28 @@
-# Execution Plans
+## Execution Plans
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-02-18
 
-## At a glance
+### At a glance
 Execution plans turn approved intent into checklisted implementation steps.
 Keep plans atomic, test-backed, and linked to proposals/PRs.
 Plans are living documents: update progress, discoveries, and decisions while work is in-flight.
 
-## Contents
+### Contents
 - [Active plans](active/README.md)
 - [Completed plans](completed/README.md)
 - [Plan template](../templates/exec-plan.md)
 - [Planning map](../../PLANS.md)
 - [Design proposals](../dev/plans)
 
-## Required metadata
+### Required metadata
 - Every non-README plan under `active/` or `completed/` must include:
   - `**Status:** active | paused | completed`
   - `**Owner:** <team-or-handle>`
   - `**Created:** <YYYY-MM-DD>`
 - Every plan must include at least one markdown link for traceability to a proposal, PR, or ADR.
 
-## Required sections
+### Required sections
 - `## Purpose / Big Picture`
 - `## Progress`
 - `## Surprises & Discoveries`

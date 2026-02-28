@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 import pyarrow.parquet as pq
+import pytest
 
 import dnadesign.usr as usr_pkg
 from dnadesign.densegen.src.adapters.outputs.parquet import ParquetSink
@@ -24,7 +25,7 @@ from dnadesign.densegen.src.core.metadata_schema import META_FIELDS
 from dnadesign.densegen.tests.meta_fixtures import output_meta
 
 
-def _make_usr_writer(tmp_path: Path, *, deduplicate: bool = True) -> tuple[Path, USRWriter]:
+def _make_usr_writer(tmp_path: Path, *, deduplicate: bool = True, chunk_size: int = 1) -> tuple[Path, USRWriter]:
     root = tmp_path / "usr"
     registry_src = Path(usr_pkg.__file__).resolve().parent / "datasets" / "registry.yaml"
     registry_dst = root / "registry.yaml"
@@ -34,7 +35,7 @@ def _make_usr_writer(tmp_path: Path, *, deduplicate: bool = True) -> tuple[Path,
         dataset="demo",
         root=root,
         namespace="densegen",
-        chunk_size=1,
+        chunk_size=int(chunk_size),
         deduplicate=deduplicate,
     )
     return root, writer
@@ -47,19 +48,32 @@ def test_parquet_and_usr_sinks_keep_same_metadata_and_stage_a_lineage(tmp_path: 
     meta = output_meta(library_hash="demo_hash", library_index=1)
     meta["used_tfbs_detail"] = [
         {
-            "tf": "lexA",
-            "tfbs": "AAA",
+            "part_kind": "tfbs",
+            "part_index": 0,
+            "regulator": "lexA",
+            "sequence": "AAA",
+            "core_sequence": "AAA",
             "orientation": "fwd",
             "offset": 0,
-            "stage_a_best_hit_score": 8.25,
-            "stage_a_rank_within_regulator": 2,
-            "stage_a_tier": 1,
-            "stage_a_fimo_start": 14,
-            "stage_a_fimo_stop": 17,
-            "stage_a_fimo_strand": "+",
-            "stage_a_selection_rank": 3,
-            "stage_a_selection_score_norm": 0.87,
-            "stage_a_tfbs_core": "AAA",
+            "offset_raw": 0,
+            "pad_left": 0,
+            "length": 3,
+            "end": 3,
+            "source": "unit",
+            "motif_id": "motif_1",
+            "tfbs_id": "tfbs_1",
+            "score_best_hit_raw": 8.25,
+            "score_theoretical_max": 9.50,
+            "score_relative_to_theoretical_max": 0.87,
+            "rank_among_mined_positive": 2,
+            "rank_among_selected": 3,
+            "selection_policy": "mmr",
+            "nearest_selected_similarity": 0.12,
+            "nearest_selected_distance": 4.0,
+            "nearest_selected_distance_norm": 0.50,
+            "matched_start": 14,
+            "matched_stop": 17,
+            "matched_strand": "+",
         }
     ]
     rec = OutputRecord.from_sequence(
@@ -88,15 +102,18 @@ def test_parquet_and_usr_sinks_keep_same_metadata_and_stage_a_lineage(tmp_path: 
     parquet_detail = parquet_table.column("densegen__used_tfbs_detail").to_pylist()[0][0]
     usr_detail = usr_table.column("densegen__used_tfbs_detail").to_pylist()[0][0]
     for detail in (parquet_detail, usr_detail):
-        assert detail["stage_a_best_hit_score"] == 8.25
-        assert detail["stage_a_rank_within_regulator"] == 2
-        assert detail["stage_a_tier"] == 1
-        assert detail["stage_a_fimo_start"] == 14
-        assert detail["stage_a_fimo_stop"] == 17
-        assert detail["stage_a_fimo_strand"] == "+"
-        assert detail["stage_a_selection_rank"] == 3
-        assert detail["stage_a_selection_score_norm"] == 0.87
-        assert detail["stage_a_tfbs_core"] == "AAA"
+        assert detail["score_best_hit_raw"] == 8.25
+        assert detail["score_theoretical_max"] == 9.50
+        assert detail["score_relative_to_theoretical_max"] == 0.87
+        assert detail["rank_among_mined_positive"] == 2
+        assert detail["rank_among_selected"] == 3
+        assert detail["selection_policy"] == "mmr"
+        assert detail["nearest_selected_similarity"] == 0.12
+        assert detail["nearest_selected_distance"] == 4.0
+        assert detail["nearest_selected_distance_norm"] == 0.50
+        assert detail["matched_start"] == 14
+        assert detail["matched_stop"] == 17
+        assert detail["matched_strand"] == "+"
 
 
 def test_usr_writer_dedupes_without_full_parquet_id_preload(tmp_path: Path, monkeypatch) -> None:
@@ -294,3 +311,46 @@ def test_usr_writer_flush_uses_batch_lookup_for_dedup(tmp_path: Path, monkeypatc
     )
     monkeypatch.setattr(writer._id_index, "contains_many", lambda ids: set(ids), raising=False)
     writer.flush()
+
+
+def test_usr_writer_replays_persisted_overlay_backlog_after_restart(tmp_path: Path, monkeypatch) -> None:
+    root, writer = _make_usr_writer(tmp_path, chunk_size=2)
+    meta = output_meta(library_hash="demo_hash", library_index=1)
+    meta["run_id"] = "run-backlog"
+    rec = OutputRecord.from_sequence(
+        sequence="ACGTACGTAA",
+        meta=meta,
+        source="unit",
+        bio_type="dna",
+        alphabet="dna_4",
+    )
+    assert writer.add(rec) is True
+
+    def _fail_overlay(_namespace, _table, **_kwargs):
+        raise RuntimeError("simulated overlay write failure")
+
+    monkeypatch.setattr(writer.ds, "write_overlay_part", _fail_overlay)
+    with pytest.raises(RuntimeError, match="simulated overlay write failure"):
+        writer.flush()
+
+    backlog_root = root / "demo" / "_artifacts" / "pending_overlay"
+    backlog_parts = sorted(backlog_root.glob("*.parquet"))
+    assert len(backlog_parts) == 1
+    assert pq.read_table(root / "demo" / "records.parquet").num_rows == 1
+    overlay_dir = root / "demo" / "_derived" / "densegen"
+    assert not sorted(overlay_dir.glob("part-*.parquet"))
+
+    replay_writer = USRWriter(
+        dataset="demo",
+        root=root,
+        namespace="densegen",
+        chunk_size=1,
+        deduplicate=True,
+    )
+    replay_writer.flush()
+
+    assert sorted(overlay_dir.glob("part-*.parquet"))
+    assert not sorted(backlog_root.glob("*.parquet"))
+    latest = sorted(overlay_dir.glob("part-*.parquet"))[-1]
+    overlay_ids = set(pq.read_table(latest, columns=["id"]).column("id").to_pylist())
+    assert rec.id in overlay_ids

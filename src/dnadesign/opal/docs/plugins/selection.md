@@ -1,5 +1,9 @@
 ## OPAL Selection Strategies
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This page documents selection plugin contracts, required config fields, and runtime output expectations.
 
 ### Built-in strategies

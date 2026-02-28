@@ -1,5 +1,9 @@
 ## OPAL Objective Plugins
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This page documents objective plugin wiring and channel reference rules. For detailed objective equations and behavior, use objective-specific pages.
 
 Source modules:

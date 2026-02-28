@@ -17,6 +17,7 @@ from typing import Protocol, Sequence
 import pandas as pd
 import pyarrow as pa
 
+from .duckdb_runtime import connect_duckdb_utc
 from .errors import SchemaError
 from .events import record_event
 from .overlays import overlay_dir_path, overlay_path
@@ -336,14 +337,12 @@ def get_state(
     if not overlay_exists:
         return _defaults()
 
-    try:
-        import duckdb  # type: ignore
-    except ImportError as exc:
-        raise SchemaError("get_state requires duckdb (install duckdb).") from exc
-
     ids_tbl = pa.table({"idx": list(range(len(ids_list))), "id": ids_list})
     overlay_sql = (str(state_dir / "part-*.parquet") if state_dir.exists() else str(state_path)).replace("'", "''")
-    con = duckdb.connect()
+    con = connect_duckdb_utc(
+        missing_dependency_message="get_state requires duckdb (install duckdb).",
+        error_context="get_state",
+    )
     try:
         con.register("ids_tbl", ids_tbl)
         con.execute(f"CREATE TEMP VIEW state AS SELECT * FROM read_parquet('{overlay_sql}')")

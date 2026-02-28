@@ -1,5 +1,9 @@
 ## Score-driven OPAL rounds (GP + SFXI + Top-n)
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This demo swaps the surrogate model from `random_forest` to `gaussian_process` but keeps deterministic `top_n` selection. It’s the “model changed, selection unchanged” bridge between the random-forest baseline and Expected Improvement.
 
 Campaign: `src/dnadesign/opal/campaigns/demo_gp_topn/`
@@ -42,7 +46,7 @@ selection:                          # Selection strategy over objective channels
   params:                           # Selection contract fields
     top_k: 5                        # Number of candidates to select
     score_ref: sfxi_v1/sfxi         # Objective score channel used for ranking
-    objective_mode: maximize
+    objective_mode: maximize  # Sets `objective_mode` for this example configuration.
     tie_handling: competition_rank  # Tie policy for ranking output
 ```
 

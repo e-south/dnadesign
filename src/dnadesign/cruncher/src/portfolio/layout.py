@@ -15,9 +15,10 @@ from pathlib import Path
 
 TABLE_FILE_PREFIX = "table__"
 PLOT_FILE_PREFIX = "plot__"
-PORTFOLIO_OUTPUT_ROOT = Path("outputs/portfolios")
-PORTFOLIO_EXPORT_ROOT = Path("outputs/export/portfolios")
-PORTFOLIO_PLOT_NAMESPACE = "portfolio"
+PORTFOLIO_OUTPUT_ROOT = Path("outputs")
+PORTFOLIO_META_DIR = "meta"
+PORTFOLIO_TABLES_DIR = "tables"
+PORTFOLIO_PLOTS_DIR = "plots"
 
 
 def _ensure_inside_workspace(path: Path, workspace_root: Path) -> Path:
@@ -34,22 +35,16 @@ def _resolve_portfolio_root(workspace_root: Path) -> Path:
     return _ensure_inside_workspace(workspace_root / PORTFOLIO_OUTPUT_ROOT, workspace_root)
 
 
-def _resolve_portfolio_export_root(workspace_root: Path) -> Path:
-    return _ensure_inside_workspace(workspace_root / PORTFOLIO_EXPORT_ROOT, workspace_root)
-
-
 def _portfolio_context(portfolio_run_dir: Path) -> tuple[Path, str, str]:
     resolved = portfolio_run_dir.resolve()
     portfolio_id = resolved.name
     portfolio_name = resolved.parent.name
-    portfolio_root = resolved.parent.parent
-    outputs_root = portfolio_root.parent
+    outputs_root = resolved.parent.parent
     workspace_root = outputs_root.parent
     expected_root = _resolve_portfolio_root(workspace_root)
-    if portfolio_root != expected_root:
+    if outputs_root != expected_root:
         raise ValueError(
-            "Portfolio run directory must be under <workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>: "
-            f"{resolved}"
+            f"Portfolio run directory must be under <workspace>/outputs/<portfolio_name>/<portfolio_id>: {resolved}"
         )
     return workspace_root, portfolio_name, portfolio_id
 
@@ -64,15 +59,15 @@ def resolve_portfolio_run_dir(
 
 
 def portfolio_meta_dir(portfolio_run_dir: Path) -> Path:
-    return portfolio_run_dir / "portfolio"
+    return portfolio_run_dir / PORTFOLIO_META_DIR
 
 
 def portfolio_manifest_path(portfolio_run_dir: Path) -> Path:
-    return portfolio_meta_dir(portfolio_run_dir) / "portfolio_manifest.json"
+    return portfolio_meta_dir(portfolio_run_dir) / "manifest.json"
 
 
 def portfolio_status_path(portfolio_run_dir: Path) -> Path:
-    return portfolio_meta_dir(portfolio_run_dir) / "portfolio_status.json"
+    return portfolio_meta_dir(portfolio_run_dir) / "status.json"
 
 
 def portfolio_logs_dir(portfolio_run_dir: Path) -> Path:
@@ -84,18 +79,13 @@ def portfolio_log_path(portfolio_run_dir: Path) -> Path:
 
 
 def portfolio_tables_dir(portfolio_run_dir: Path) -> Path:
-    workspace_root, portfolio_name, portfolio_id = _portfolio_context(portfolio_run_dir)
-    export_root = _resolve_portfolio_export_root(workspace_root)
-    return _ensure_inside_workspace(export_root / portfolio_name / portfolio_id, workspace_root)
+    workspace_root, _, _ = _portfolio_context(portfolio_run_dir)
+    return _ensure_inside_workspace(portfolio_run_dir.resolve() / PORTFOLIO_TABLES_DIR, workspace_root)
 
 
 def portfolio_plots_dir(portfolio_run_dir: Path) -> Path:
     workspace_root, _, _ = _portfolio_context(portfolio_run_dir)
-    return workspace_root / "outputs" / "plots"
-
-
-def portfolio_manifests_dir(portfolio_run_dir: Path) -> Path:
-    return portfolio_run_dir / "manifests"
+    return _ensure_inside_workspace(portfolio_run_dir.resolve() / PORTFOLIO_PLOTS_DIR, workspace_root)
 
 
 def portfolio_table_path(portfolio_run_dir: Path, key: str, table_format: str = "parquet") -> Path:
@@ -115,11 +105,10 @@ def portfolio_plot_path(portfolio_run_dir: Path, key: str, plot_format: str = "p
     ext = str(plot_format).strip().lstrip(".")
     if ext not in {"pdf", "png"}:
         raise ValueError(f"Unsupported portfolio plot format: {plot_format!r}")
-    _, portfolio_name, portfolio_id = _portfolio_context(portfolio_run_dir)
-    filename = f"{PORTFOLIO_PLOT_NAMESPACE}__{portfolio_name}__{portfolio_id}__{PLOT_FILE_PREFIX}{name}.{ext}"
+    filename = f"{PLOT_FILE_PREFIX}{name}.{ext}"
     return portfolio_plots_dir(portfolio_run_dir) / filename
 
 
 def portfolio_plot_glob(portfolio_run_dir: Path) -> str:
-    _, portfolio_name, portfolio_id = _portfolio_context(portfolio_run_dir)
-    return f"{PORTFOLIO_PLOT_NAMESPACE}__{portfolio_name}__{portfolio_id}__{PLOT_FILE_PREFIX}*"
+    _portfolio_context(portfolio_run_dir)
+    return f"{PLOT_FILE_PREFIX}*"

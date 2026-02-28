@@ -1,46 +1,18 @@
-[![CI](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml/badge.svg)](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml)
-[![Codecov](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg)](https://codecov.io/gh/e-south/dnadesign)
+[![CI](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml/badge.svg)](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml) [![Codecov](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg)](https://codecov.io/gh/e-south/dnadesign)
 
-# dnadesign
+![dnadesign banner](assets/dnadesign-banner.svg)
 
-`dnadesign` is a collection of modular bioinformatic pipelines and helper packages related to biological sequence design.
-It bundles reusable tool packages for sequence generation, inference, optimization, clustering, and workflow operations.
-
----
-
-## Repository layout
-
-```text
-dnadesign/
-├─ README.md            # High-level project documentation
-├─ docs/                # Canonical runbooks and operational docs
-├─ pyproject.toml
-├─ uv.lock
-├─ src/
-│  └── dnadesign/
-│      ├── permuter/    # in silico deep mutational scanning
-│      ├── infer/       # model-agnostic inference (Evo2 adapter)
-│      ├── densegen/    # string-packing nucleic acid assembly
-│      ├── opal/        # active-learning engine
-│      └── ...
-└─ .github/workflows/   # CI checks
-```
+`dnadesign` is a collection of modular bioinformatic pipelines and helper packages related to biological sequence design. It bundles reusable tool packages for sequence generation, inference, optimization, clustering, and workflow operations.
 
 ---
 
 ## Documentation
 
-- [Documentation index](docs/README.md): consolidated docs navigation.
-- [Installation guide](docs/installation.md): environment bootstrap.
-- [BU SCC operations guide](docs/bu-scc/README.md): cluster operations/runbooks.
-- [Notify operations guide](docs/notify/README.md): webhook watcher/operator workflows.
-- [Architecture map](ARCHITECTURE.md): repository boundaries, major flows, and invariants.
-- [Reliability model](RELIABILITY.md): runtime/CI reliability behavior and runbook entrypoints.
-- [Security policy](SECURITY.md): secrets, dependency locks, and incident handling.
-- [Design principles](DESIGN.md): parse-at-boundaries, fail-fast, and decoupling contracts.
-- [Planning map](PLANS.md): proposals, execution plans, ADRs, and journal workflow.
-- [Quality score scaffold](QUALITY_SCORE.md): test/CI/docs quality dimensions and improvement path.
-- [Developer documentation](docs/dev/README.md): maintainer notes, plans, and CI/test details.
+- [Docs index](docs/README.md): choose a workflow lane, then follow its verify step.
+- [Installation](docs/installation.md): bootstrap the environment and run baseline verification commands.
+- [Workflow lanes](docs/README.md#workflow-lanes): task-first routes for DenseGen, Infer, USR sync, and BU SCC operations.
+- [Architecture](ARCHITECTURE.md), [Design](DESIGN.md), [Reliability](RELIABILITY.md), [Security](SECURITY.md), [Plans](PLANS.md), [Quality score](QUALITY_SCORE.md): repository-level contracts, policies, and governance records.
+- [Developer docs](docs/dev/README.md): CI contracts, maintenance runbooks, and execution-planning references.
 
 ---
 
@@ -48,19 +20,19 @@ dnadesign/
 
 | Tool | Description | Coverage |
 | --- | --- | --- |
-| [**usr**](src/dnadesign/usr) | Universal Sequence Record utilities for inspecting datasets and Parquet files. | [![usr coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=usr)](https://codecov.io/gh/e-south/dnadesign?component=usr) |
-| [**notify**](src/dnadesign/notify) | Tool-agnostic webhook notifier for batch runs (Slack, Discord, generic webhooks). | [![notify coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=notify)](https://codecov.io/gh/e-south/dnadesign?component=notify) |
-| [**densegen**](src/dnadesign/densegen) | DNA sequence design pipeline built on the [`dense-arrays`](https://github.com/e-south/dense-arrays) framework. | [![densegen coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=densegen)](https://codecov.io/gh/e-south/dnadesign?component=densegen) |
-| [**infer**](src/dnadesign/infer) | Model-agnostic wrapper for DNA/protein language models such as [Evo2](https://github.com/ArcInstitute/evo2/tree/main). | [![infer coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=infer)](https://codecov.io/gh/e-south/dnadesign?component=infer) |
-| [**opal**](src/dnadesign/opal) | [EVOLVEpro-style](https://www.science.org/doi/10.1126/science.adr6006) active-learning tool for DNA/protein sequence design campaigns. | [![opal coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=opal)](https://codecov.io/gh/e-south/dnadesign?component=opal) |
-| [**cluster**](src/dnadesign/cluster) | Parquet/CSV-first toolkit for clustering, UMAP visualization, and related analyses. | [![cluster coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=cluster)](https://codecov.io/gh/e-south/dnadesign?component=cluster) |
-| [**billboard**](src/dnadesign/billboard) | Quantifies regulatory diversity of dense-array DNA libraries generated by `densegen`. | [![billboard coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=billboard)](https://codecov.io/gh/e-south/dnadesign?component=billboard) |
-| [**libshuffle**](src/dnadesign/libshuffle) | Iterative subsampling workflow that uses `billboard` as its analysis engine. | [![libshuffle coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=libshuffle)](https://codecov.io/gh/e-south/dnadesign?component=libshuffle) |
-| [**nmf**](src/dnadesign/nmf) | Applies NMF to sequence libraries to identify higher-order TFBS combinations. | [![nmf coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=nmf)](https://codecov.io/gh/e-south/dnadesign?component=nmf) |
-| [**latdna**](src/dnadesign/latdna) | Pipeline for latent-space analysis of DNA sequences. | [![latdna coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=latdna)](https://codecov.io/gh/e-south/dnadesign?component=latdna) |
-| [**cruncher**](src/dnadesign/cruncher) | PWM-driven sequence optimization pipeline with pluggable parsers and optimizers. | [![cruncher coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=cruncher)](https://codecov.io/gh/e-south/dnadesign?component=cruncher) |
-| [**tfkdanalysis**](src/dnadesign/tfkdanalysis) | Pipeline for TFKD analysis with PPTP-seq context ([Han et al., 2023](https://doi.org/10.1038/s41467-023-41572-4)). | [![tfkdanalysis coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=tfkdanalysis)](https://codecov.io/gh/e-south/dnadesign?component=tfkdanalysis) |
-| [**aligner**](src/dnadesign/aligner) | Wrapper around Biopython `PairwiseAligner` for Needleman-Wunsch-style global alignment scoring. | [![aligner coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=aligner)](https://codecov.io/gh/e-south/dnadesign?component=aligner) |
-| [**baserender**](src/dnadesign/baserender) | Contract-first sequence rendering runtime with strict schemas and adapter-based integration. | [![baserender coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=baserender)](https://codecov.io/gh/e-south/dnadesign?component=baserender) |
-| [**permuter**](src/dnadesign/permuter) | Pipeline for biological sequence permutation and downstream evaluation. | [![permuter coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=permuter)](https://codecov.io/gh/e-south/dnadesign?component=permuter) |
+| [**usr**](src/dnadesign/usr/README.md) | Universal Sequence Record utilities for inspecting datasets and Parquet files. | [![usr coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=usr)](https://codecov.io/gh/e-south/dnadesign?component=usr) |
+| [**notify**](src/dnadesign/notify/README.md) | Tool-agnostic webhook notifier for batch runs (Slack, Discord, generic webhooks). | [![notify coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=notify)](https://codecov.io/gh/e-south/dnadesign?component=notify) |
+| [**densegen**](src/dnadesign/densegen/README.md) | DNA sequence design pipeline built on the [`dense-arrays`](https://github.com/e-south/dense-arrays) framework. | [![densegen coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=densegen)](https://codecov.io/gh/e-south/dnadesign?component=densegen) |
+| [**infer**](src/dnadesign/infer/README.md) | Model-agnostic wrapper for DNA/protein language models such as [Evo2](https://github.com/ArcInstitute/evo2/tree/main). | [![infer coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=infer)](https://codecov.io/gh/e-south/dnadesign?component=infer) |
+| [**opal**](src/dnadesign/opal/README.md) | [EVOLVEpro-style](https://www.science.org/doi/10.1126/science.adr6006) active-learning tool for DNA/protein sequence design campaigns. | [![opal coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=opal)](https://codecov.io/gh/e-south/dnadesign?component=opal) |
+| [**cluster**](src/dnadesign/cluster/README.md) | Parquet/CSV-first toolkit for clustering, UMAP visualization, and related analyses. | [![cluster coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=cluster)](https://codecov.io/gh/e-south/dnadesign?component=cluster) |
+| [**billboard**](src/dnadesign/billboard/README.md) | Quantifies regulatory diversity of dense-array DNA libraries generated by `densegen`. | [![billboard coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=billboard)](https://codecov.io/gh/e-south/dnadesign?component=billboard) |
+| [**libshuffle**](src/dnadesign/libshuffle/README.md) | Iterative subsampling workflow that uses `billboard` as its analysis engine. | [![libshuffle coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=libshuffle)](https://codecov.io/gh/e-south/dnadesign?component=libshuffle) |
+| [**nmf**](src/dnadesign/nmf/README.md) | Applies NMF to sequence libraries to identify higher-order TFBS combinations. | [![nmf coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=nmf)](https://codecov.io/gh/e-south/dnadesign?component=nmf) |
+| [**latdna**](src/dnadesign/latdna/README.md) | Pipeline for latent-space analysis of DNA sequences. | [![latdna coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=latdna)](https://codecov.io/gh/e-south/dnadesign?component=latdna) |
+| [**cruncher**](src/dnadesign/cruncher/README.md) | PWM-driven sequence optimization pipeline with pluggable parsers and optimizers. | [![cruncher coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=cruncher)](https://codecov.io/gh/e-south/dnadesign?component=cruncher) |
+| [**tfkdanalysis**](src/dnadesign/tfkdanalysis/README.md) | Pipeline for TFKD analysis with PPTP-seq context ([Han et al., 2023](https://doi.org/10.1038/s41467-023-41572-4)). | [![tfkdanalysis coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=tfkdanalysis)](https://codecov.io/gh/e-south/dnadesign?component=tfkdanalysis) |
+| [**aligner**](src/dnadesign/aligner/README.md) | Wrapper around Biopython `PairwiseAligner` for Needleman-Wunsch-style global alignment scoring. | [![aligner coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=aligner)](https://codecov.io/gh/e-south/dnadesign?component=aligner) |
+| [**baserender**](src/dnadesign/baserender/README.md) | Contract-first sequence rendering runtime with strict schemas and adapter-based integration. | [![baserender coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=baserender)](https://codecov.io/gh/e-south/dnadesign?component=baserender) |
+| [**permuter**](src/dnadesign/permuter/README.md) | Pipeline for biological sequence permutation and downstream evaluation. | [![permuter coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=permuter)](https://codecov.io/gh/e-south/dnadesign?component=permuter) |
 ---

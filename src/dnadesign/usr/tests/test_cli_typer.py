@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -19,6 +20,12 @@ from dnadesign.usr.src.cli import app
 from dnadesign.usr.src.dataset import Dataset
 from dnadesign.usr.src.merge_datasets import MergePolicy, MergePreview
 from dnadesign.usr.tests.registry_helpers import ensure_registry
+
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+def _plain_output(text: str) -> str:
+    return ANSI_ESCAPE_RE.sub("", text)
 
 
 def _make_dataset(root: Path) -> None:
@@ -152,3 +159,71 @@ def test_merge_defaults_are_strict(tmp_path: Path, monkeypatch) -> None:
     assert result.exit_code == 0
     assert captured["duplicate_policy"] == MergePolicy.ERROR
     assert captured["overlap_coercion"] == "none"
+
+
+def test_pull_help_mentions_verify_sidecars_option() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["--no-rich", "pull", "--help"])
+    assert result.exit_code == 0
+    assert "--verify-sidecars" in _plain_output(result.stdout)
+
+
+def test_pull_help_mentions_no_verify_sidecars_option() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["--no-rich", "pull", "--help"])
+    assert result.exit_code == 0
+    assert "--no-verify-sidecars" in _plain_output(result.stdout)
+
+
+def test_pull_help_defaults_verify_to_hash() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["--no-rich", "pull", "--help"])
+    assert result.exit_code == 0
+    stdout = _plain_output(result.stdout)
+    assert "Verification mode:" in stdout
+    assert "hash|auto|size|parquet" in stdout
+    assert "[default: hash]" in stdout
+
+
+def test_pull_help_mentions_verify_derived_hashes_option() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["--no-rich", "pull", "--help"])
+    assert result.exit_code == 0
+    assert "--verify-derived-hashes" in _plain_output(result.stdout)
+
+
+def test_pull_help_mentions_no_verify_derived_hashes_option() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["--no-rich", "pull", "--help"])
+    assert result.exit_code == 0
+    assert "--no-verify-derived-hashes" in _plain_output(result.stdout)
+
+
+def test_pull_help_mentions_audit_json_output_option() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["--no-rich", "pull", "--help"])
+    assert result.exit_code == 0
+    assert "--audit-json-out" in _plain_output(result.stdout)
+
+
+def test_push_help_mentions_audit_json_output_option() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["--no-rich", "push", "--help"])
+    assert result.exit_code == 0
+    assert "--audit-json-out" in _plain_output(result.stdout)
+
+
+def test_diff_help_mentions_audit_json_output_option() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["--no-rich", "diff", "--help"])
+    assert result.exit_code == 0
+    assert "--audit-json-out" in _plain_output(result.stdout)
+
+
+def test_root_help_mentions_workflow_map_and_default_sync_contract() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["--no-rich", "--help"])
+    assert result.exit_code == 0
+    stdout = _plain_output(result.stdout)
+    assert "workflow-map.md" in stdout
+    assert "verify=hash" in stdout

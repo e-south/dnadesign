@@ -61,8 +61,9 @@ _COMPOSITION_METRIC_COLUMNS = [
     "plan_name",
     "library_index",
     "library_hash",
-    "tf",
-    "tfbs",
+    "part_kind",
+    "regulator",
+    "sequence",
 ]
 _DENSE_ARRAY_METRIC_COLUMNS = [
     "densegen__used_tfbs_detail",
@@ -158,8 +159,11 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
     placement_source = "none"
     placements_df = pd.DataFrame()
     if not composition_df.empty:
-        if "tf" in composition_df.columns and "tfbs" in composition_df.columns:
+        if "regulator" in composition_df.columns and "sequence" in composition_df.columns:
             placements_df = composition_df.copy()
+            if "part_kind" in placements_df.columns:
+                placements_df = placements_df[placements_df["part_kind"].astype(str).str.lower() == "tfbs"]
+            placements_df = placements_df.rename(columns={"regulator": "tf", "sequence": "tfbs"})
             placement_source = "composition"
         elif "used_tfbs_detail" in composition_df.columns:
             placements_df = _placements_from_composition(composition_df)

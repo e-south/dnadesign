@@ -73,7 +73,7 @@ def test_solver_time_limit_applies() -> None:
             self.model = _DummyModel()
 
     opt = _DummyOptimizer()
-    _apply_solver_controls(opt, time_limit_seconds=2, threads=3)
+    _apply_solver_controls(opt, solver_attempt_timeout_seconds=2, threads=3)
     opt.build_model()
     assert opt.model.time_limit_ms == 2000
     assert opt.model.threads == 3

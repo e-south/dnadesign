@@ -1,5 +1,9 @@
 ## DenseGen config reference
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 Use this page when you need exact YAML keys and constraints.
 Unknown keys are hard errors.
 All relative paths resolve from the config file directory.
@@ -21,9 +25,9 @@ This section covers contents.
 - [`densegen.run`](#densegenrun) - run identifier and root.
 - [`densegen.output`](#densegenoutput) - output targets and schema.
 - [`densegen.generation`](#densegengeneration) - plan and fixed elements.
-- [`densegen.motif_sets`](#densegenmotifsets) - reusable motif dictionaries.
+- [`densegen.motif_sets`](#densegenmotif_sets) - reusable motif dictionaries.
 - [`densegen.generation.plan[].fixed_elements.fixed_element_matrix`](#densegengenerationplanfixedelementsfixed_element_matrix) - deterministic matrix expansion.
-- [`densegen.generation.sequence_constraints`](#densegengenerationsequenceconstraints) - global final-sequence motif rules.
+- [`densegen.generation.sequence_constraints`](#densegengenerationsequence_constraints) - global final-sequence motif rules.
 - [`densegen.generation.sampling`](#densegengenerationsampling-stage-b-sampling) - Stage-B library building controls.
 - [`densegen.solver`](#densegensolver) - backend and strategy.
 - [`densegen.runtime`](#densegenruntime) - retry and guard rails.
@@ -232,7 +236,9 @@ This section covers densegen.generation.
   - Each item: `name`, `sequences`
   - Quota contract:
     - `sequences` is always required and must be `> 0`.
-    - For matrix plans, `sequences` is interpreted as the base-plan total and divided evenly across expanded variants.
+    - For matrix plans, `sequences` is interpreted as the base-plan total and distributed across expanded variants as evenly as possible.
+    - Distribution uses expansion order: each variant gets `floor(sequences / variants)`, and the first `sequences % variants` variants get one extra.
+    - If `sequences < variants`, DenseGen activates the first `sequences` variants with quota `1` and skips the rest.
     - Resume growth is runtime-only (`dense run --resume --extend-quota`) and does not change schema shape.
   - `sampling.include_inputs` (required) - input names that feed the plan‑scoped pool.
   - `fixed_elements.promoter_constraints[]` supports `name`, `upstream`, `downstream`,
@@ -267,7 +273,7 @@ This section describes plan-local deterministic matrix expansion for combinatori
 For a worked example, use **[constitutive sigma panel study tutorial](../tutorials/study_constitutive_sigma_panel.md)**.
 
 - Expansion is resolved at config load time.
-- Matrix plans treat `generation.plan[].sequences` as the base-plan target; DenseGen enforces an exact divisible split across expanded variants.
+- Matrix plans treat `generation.plan[].sequences` as the base-plan target and distribute that target across expanded variants in expansion order.
 - Expanded plans inherit:
   - `sampling.include_inputs`
   - `regulator_constraints`
@@ -348,10 +354,10 @@ This section covers densegen.solver.
 - `backend`: solver name string (required unless `strategy: approximate`).
   - Common values: `CBC`, `GUROBI` (depends on your dense-arrays install).
 - `strategy`: `iterate | diverse | optimal | approximate`
-- `time_limit_seconds` (float > 0, optional)
+- `solver_attempt_timeout_seconds` (float > 0, optional)
 - `threads` (int > 0, optional)
 - `strands`: `single | double` (default: `double`)
-  - `time_limit_seconds` and `threads` are invalid when `strategy: approximate`
+  - `solver_attempt_timeout_seconds` and `threads` are invalid when `strategy: approximate`
   - `threads` is rejected for CBC backends (OR-Tools does not apply it)
 
 ---
@@ -365,12 +371,16 @@ This section covers densegen.runtime.
   a single run to advance each plan in turn. This **does not** change Stage‑B sampling logic; it only
   changes scheduling. With `pool_strategy: iterative_subsample`, round‑robin can increase how often
   libraries are rebuilt, so expect additional compute if many plans are active.
-- `arrays_generated_before_resample` (int > 0)
+- `max_accepted_per_library` (int > 0)
 - `min_count_per_tf` (int >= 0)
-- `max_duplicate_solutions`, `stall_seconds_before_resample`, `stall_warning_every_seconds`
-  - `stall_seconds_before_resample` controls how long to wait with no new solutions before resampling; the timer resets on each new solution; `0` disables.
-- `max_consecutive_failures`, `max_seconds_per_plan`
-  - `max_consecutive_failures` stops the run after N consecutive libraries yield zero solutions; `0` disables.
+- `max_duplicate_solutions` (int >= 0)
+- `no_progress_seconds_before_resample` (int >= 0)
+  - controls how long Stage-B can run without accepting a new solution before resampling
+  - the timer resets each time Stage-B accepts a solution
+  - `0` disables
+- `max_consecutive_no_progress_resamples` (int >= 0)
+  - stops the plan after N consecutive no-progress resamples
+  - `0` disables
 - `max_failed_solutions` (int >= 0)
   - Absolute emergency cap on rejected solutions per plan. `0` disables the absolute cap.
 - `max_failed_solutions_per_target` (float >= 0)
@@ -467,6 +477,15 @@ This section covers plots.
     - `drilldown_plans` (int >= 0; optional per-plan overlays when grouped)
 - `style`: global style dict applied to every plot (can be overridden per plot). Common keys:
   - `seaborn_style` (bool; default `true`) — set to `false` if seaborn styles are unavailable.
+  - `run_health_plan_scope` (`per_plan|auto|per_group`) — scope control for `run_health.pdf` plan panels.
+  - `run_health_plan_max_labels` (int > 0) — label threshold used when `run_health_plan_scope=auto`.
+  - `run_health_outcomes_plan_scope` (`per_plan|auto|per_group`) — scope control for `outcomes_over_time.pdf`.
+  - `run_health_outcomes_plan_max_labels` (int > 0) — label threshold used when `run_health_outcomes_plan_scope=auto`.
+  - `run_health_outcomes_attempts_per_row` (int > 0) — attempts tiled per row within each plan column in `outcomes_over_time.pdf`.
+  - `run_health_outcomes_rows_per_block` (int > 0) — guide interval (attempt-index scale) for horizontal block lines in `outcomes_over_time.pdf`.
+  - `run_health_outcomes_max_yticks` (int >= 2) — max count of y tick labels for attempt indices in `outcomes_over_time.pdf`.
+  - `tfbs_usage_breakdown_figsize` (`[width, height]`) — explicit figure size for `tfbs_usage.pdf` two-panel layout.
+  - `tfbs_usage_legend_size` (float > 0) — legend font size for `tfbs_usage.pdf`.
 - `sample_rows`: optional cap on rows loaded for plotting (reads the first N rows for speed)
 
 ---
@@ -509,18 +528,16 @@ densegen:
   solver:
     backend: CBC
     strategy: diverse
-    time_limit_seconds: 5
+    solver_attempt_timeout_seconds: 10
     strands: double
 
   runtime:
     round_robin: true
-    arrays_generated_before_resample: 20
+    max_accepted_per_library: 20
     min_count_per_tf: 0
     max_duplicate_solutions: 3
-    stall_seconds_before_resample: 30
-    stall_warning_every_seconds: 15
-    max_consecutive_failures: 25
-    max_seconds_per_plan: 0
+    no_progress_seconds_before_resample: 30
+    max_consecutive_no_progress_resamples: 25
     max_failed_solutions: 100000
     max_failed_solutions_per_target: 2.0
     leaderboard_every: 50

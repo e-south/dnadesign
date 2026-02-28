@@ -133,6 +133,8 @@ def run_plan_schedule(
                 plan_started_at=started_at,
             )
             produced_counts[entry.key] = current + produced
+            if produced > 0:
+                plan_started_at[entry.key] = time.monotonic()
             leaderboard_latest = stats.get("leaderboard_latest")
             if leaderboard_latest is not None:
                 plan_leaderboards[entry.key] = leaderboard_latest

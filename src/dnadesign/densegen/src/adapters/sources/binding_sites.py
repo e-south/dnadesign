@@ -123,10 +123,14 @@ class BindingSitesDataSource(BaseDataSource):
 
         out = pd.DataFrame({"tf": tf_clean, "tfbs": seq_clean})
         out["tfbs_core"] = seq_clean
+        source_default = str(data_path)
         if site_id_col:
             out["site_id"] = df[site_id_col].astype(str).str.strip()
         if source_col:
-            out["source"] = df[source_col].astype(str).str.strip()
+            source_values = df[source_col].fillna("").astype(str).str.strip()
+            out["source"] = source_values.where(source_values != "", other=source_default)
+        else:
+            out["source"] = source_default
 
         motif_id_map = {tf: hash_label_motif(label=tf, source_kind="binding_sites") for tf in tf_clean.unique()}
         out["motif_id"] = tf_clean.map(motif_id_map)
@@ -140,11 +144,5 @@ class BindingSitesDataSource(BaseDataSource):
         ]
 
         out = out.reset_index(drop=True)
-        source_default = str(data_path)
-        src_vals = out.get("source")
-        if src_vals is not None:
-            src_list = [s if s else source_default for s in src_vals.tolist()]
-        else:
-            src_list = [source_default] * len(out)
-        entries = list(zip(out["tf"].tolist(), out["tfbs"].tolist(), src_list))
+        entries = list(zip(out["tf"].tolist(), out["tfbs"].tolist(), out["source"].tolist()))
         return entries, out, None

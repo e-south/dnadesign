@@ -4,11 +4,11 @@ description: This skill should be used when the user asks to "run on BU SCC", "s
 version: 0.1.0
 ---
 
-# BU SCC Ops Skill
+## BU SCC Ops Skill
 
 Use this skill to run `dnadesign` workloads on BU SCC with explicit scheduler resources, predictable job behavior, and clear Notify wiring.
 
-## Scope
+### Scope
 
 Use this skill for:
 - interactive SCC sessions (`qrsh`, OnDemand shell)
@@ -20,7 +20,7 @@ Do not use this skill for:
 - non-SCC environments
 - generic local development workflow decisions
 
-## Workflow
+### Workflow
 
 1. Identify workload class first.
 2. Pick interactive or batch mode.
@@ -30,7 +30,7 @@ Do not use this skill for:
 6. Submit and monitor with `qstat` + log tail.
 7. Keep interactive/OnDemand usage within BU policy limits for high-resource sessions.
 
-## Workload classes
+### Workload classes
 
 - DenseGen solver runs:
   - CPU only
@@ -46,7 +46,7 @@ Do not use this skill for:
   - transfer-node queue (`-l download`)
   - no compute-heavy workloads
 
-## Required checks
+### Required checks
 
 Before submitting DenseGen jobs:
 - `uv run dense validate-config --probe-solver -c <config.yaml>`
@@ -58,7 +58,7 @@ Before relying on Notify:
 - run resolver preflight: `uv run notify setup resolve-events --tool <tool> --config <config.yaml>`
 - ensure events are schema-valid (must include `event_version`)
 
-## Command references
+### Command references
 
 Load only the needed references:
 - `docs/bu-scc/agent-cheatsheet.md` for copy/paste commands

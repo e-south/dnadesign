@@ -1,9 +1,9 @@
-# BU SCC Batch + Notify Runbook (`dnadesign` platform workflows)
+## BU SCC Batch + Notify Runbook (`dnadesign` platform workflows)
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-02-18
 
-## At a glance
+### At a glance
 
 **Intent:** Run `dnadesign` workflows as SGE batch jobs on BU SCC with restart-safe logs and optional Notify webhooks.
 
@@ -22,7 +22,7 @@ Related docs:
 
 ---
 
-## 1) Scheduler rules that matter on BU SCC
+### 1) Scheduler rules that matter on BU SCC
 
 BU SCC uses SGE (`qsub` + `#$` directives).
 
@@ -39,7 +39,7 @@ BU references:
 
 ---
 
-## 2) Minimal `qsub` template (SGE)
+### 2) Minimal `qsub` template (SGE)
 
 ```bash
 #!/bin/bash -l
@@ -56,7 +56,7 @@ set -euo pipefail
 
 ---
 
-## 3) Canonical job scripts
+### 3) Canonical job scripts
 
 Use versioned templates from [BU SCC jobs README](jobs/README.md):
 - [DenseGen CPU batch template](jobs/densegen-cpu.qsub)
@@ -73,7 +73,7 @@ qsub -P <project> docs/bu-scc/jobs/notify-watch.qsub
 
 ---
 
-## 4) DenseGen + GUROBI: resource and time caps
+### 4) DenseGen + GUROBI: resource and time caps
 
 For DenseGen GUROBI runs, cap runtime at three layers:
 
@@ -113,6 +113,22 @@ qsub -P <project> \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
+Iterative contribution submit (resume + quota growth):
+
+```bash
+qsub -P <project> \
+  -pe omp 16 \
+  -l h_rt=08:00:00 \
+  -l mem_per_core=8G \
+  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--resume --extend-quota 8 --no-plot' \
+  docs/bu-scc/jobs/densegen-cpu.qsub
+```
+
+`densegen-cpu.qsub` defaults are:
+- validation: `--probe-solver`
+- run: `--no-plot`
+- override via `DENSEGEN_VALIDATE_ARGS` and `DENSEGEN_RUN_ARGS` at submit time.
+
 Before long runs:
 
 ```bash
@@ -125,7 +141,7 @@ DenseGen config references:
 
 ---
 
-## 5) Job arrays (parameter sweeps)
+### 5) Job arrays (parameter sweeps)
 
 ```bash
 #!/bin/bash -l
@@ -148,9 +164,9 @@ uv run dense run --no-plot -c "$CONFIG"
 
 ---
 
-## 6) Notify deployment patterns (BU SCC-safe)
+### 6) Notify deployment patterns (BU SCC-safe)
 
-### Mode A (recommended): dedicated watcher batch job
+#### Mode A (recommended): dedicated watcher batch job
 
 Use a lightweight watcher job with profile-driven wiring.
 This keeps webhook source, filters, cursor, and spool settings decoupled from submit commands.
@@ -175,7 +191,7 @@ qsub -P <project> \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
 
-### Mode B: explicit env wiring (no profile)
+#### Mode B: explicit env wiring (no profile)
 
 Use this when you intentionally do not want a profile file.
 If `EVENTS_PATH` is omitted, the script resolves it from `NOTIFY_TOOL` and `NOTIFY_CONFIG`.
@@ -188,14 +204,14 @@ qsub -P <project> \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
 
-### Mode C: short-lived validation in login/OnDemand shell
+#### Mode C: short-lived validation in login/OnDemand shell
 
 Use this only for setup checks (`profile doctor`, `--dry-run`) or troubleshooting.
 For durable delivery, keep watchers in batch.
 
 ---
 
-## 7) Large downloads and dataset/model transfer
+### 7) Large downloads and dataset/model transfer
 
 Recommended pattern:
 - Use BU Data Transfer Node for large model prefetch and large USR dataset push/pull.
@@ -217,7 +233,7 @@ set -euo pipefail
 
 # Example: transfer-only operations
 # uv run python scripts/prefetch_models.py
-# uv run usr pull densegen/demo_hpc --remote bu-scc -y
+# uv run usr pull densegen/demo_hpc bu-scc -y
 QSUB
 ```
 
@@ -226,7 +242,7 @@ Transfer reference:
 
 ---
 
-## 8) Package boundary reminders
+### 8) Package boundary reminders
 
 - DenseGen runtime diagnostics: `outputs/meta/events.jsonl` (DenseGen-only diagnostics)
 - Notify input: USR `<dataset>/.events.log`

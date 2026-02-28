@@ -10,28 +10,21 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class RuntimePolicy:
     pool_strategy: str
-    arrays_generated_before_resample: int
-    stall_seconds_before_resample: int
-    stall_warning_every_seconds: int
-    max_consecutive_failures: int
-    max_seconds_per_plan: int
+    max_accepted_per_library: int
+    no_progress_seconds_before_resample: int
+    max_consecutive_no_progress_resamples: int
 
     def allow_resample(self) -> bool:
         return self.pool_strategy in {"iterative_subsample", "subsample"}
 
     def should_trigger_stall(self, *, now: float, last_progress: float) -> bool:
-        if self.stall_seconds_before_resample <= 0:
+        if self.no_progress_seconds_before_resample <= 0:
             return False
-        return (now - last_progress) >= self.stall_seconds_before_resample
+        return (now - last_progress) >= self.no_progress_seconds_before_resample
 
     def should_warn_stall(self, *, now: float, last_warn: float, last_progress: float) -> bool:
-        if self.stall_warning_every_seconds <= 0:
+        if self.no_progress_seconds_before_resample <= 0:
             return False
-        if (now - last_progress) < self.stall_warning_every_seconds:
+        if (now - last_progress) < self.no_progress_seconds_before_resample:
             return False
-        return (now - last_warn) >= self.stall_warning_every_seconds
-
-    def plan_timed_out(self, *, now: float, plan_started: float) -> bool:
-        if self.max_seconds_per_plan <= 0:
-            return False
-        return (now - plan_started) >= float(self.max_seconds_per_plan)
+        return (now - last_warn) >= self.no_progress_seconds_before_resample

@@ -128,7 +128,7 @@ densegen:
       health_event_interval_seconds: 60
 
   generation:
-    sequence_length: 90
+    sequence_length: 60
     expansion:
       max_plans: 64
     sampling:
@@ -142,7 +142,7 @@ densegen:
 
     plan:
       - name: sigma70_panel
-        sequences: 48
+        sequences: 500
         expanded_name_template: "{base}__sig35={up}__sig10={down}"
         sampling:
           include_inputs: [background]
@@ -154,7 +154,7 @@ densegen:
             pairing:
               mode: cross_product
             spacer_length: [16, 18]
-            upstream_pos: [0, 90]
+            upstream_pos: [10, 25]
         regulator_constraints:
           groups: []
 
@@ -175,17 +175,15 @@ densegen:
   solver:
     backend: CBC
     strategy: iterate
-    time_limit_seconds: 5
+    solver_attempt_timeout_seconds: 10
 
   runtime:
     round_robin: true
-    arrays_generated_before_resample: 2
+    max_accepted_per_library: 2
     min_count_per_tf: 0
     max_duplicate_solutions: 3
-    stall_seconds_before_resample: 10
-    stall_warning_every_seconds: 10
-    max_consecutive_failures: 25
-    max_seconds_per_plan: 1800
+    no_progress_seconds_before_resample: 10
+    max_consecutive_no_progress_resamples: 25
     max_failed_solutions: 256
     random_seed: 42
 

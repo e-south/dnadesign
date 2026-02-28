@@ -1,6 +1,8 @@
-## Permuter
+![Permuter banner](assets/permuter-banner.svg)
 
 Mutate biological sequences, score them with pluggable evaluators, and export/plot the results — via a clean Typer CLI.
+
+See the [repository docs index](../../../docs/README.md) for workflow maps and operational references.
 
 - Run in‑silico deep mutational scans.
 - Keep storage simple: one Parquet file per run (plus plots).

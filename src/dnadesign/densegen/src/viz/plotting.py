@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Dict, Iterable, Optional
 
 import pandas as pd
+import pyarrow.parquet as pq
 from rich.console import Console
 from typing_extensions import Literal
 
@@ -73,6 +74,60 @@ def _read_columns(columns: Iterable[str] | None) -> list[str] | None:
         return None
     cleaned = sorted({str(col).strip() for col in columns if str(col).strip()})
     return cleaned or None
+
+
+def _resolve_composition_projection_columns(
+    path: Path,
+    columns: list[str] | None,
+) -> tuple[list[str] | None, dict[str, str]]:
+    if columns is None:
+        return None, {}
+    try:
+        available = set(pq.read_schema(path).names)
+    except Exception:
+        return columns, {}
+    read_cols: list[str] = []
+    aliases: dict[str, str] = {}
+    missing: list[str] = []
+    for col in columns:
+        if col == "tf":
+            if "regulator" in available:
+                read_cols.append("regulator")
+                aliases["tf"] = "regulator"
+            elif "tf" in available:
+                read_cols.append("tf")
+            else:
+                missing.append("tf")
+            continue
+        if col == "tfbs":
+            if "sequence" in available:
+                read_cols.append("sequence")
+                aliases["tfbs"] = "sequence"
+            elif "tfbs" in available:
+                read_cols.append("tfbs")
+            else:
+                missing.append("tfbs")
+            continue
+        if col in available:
+            read_cols.append(col)
+            continue
+        missing.append(col)
+    if missing:
+        raise ValueError(
+            "composition.parquet missing required columns: "
+            f"{sorted(set(missing))}. Available columns: {sorted(available)}"
+        )
+    return sorted(set(read_cols)), aliases
+
+
+def _read_composition_parquet(path: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame:
+    requested = _read_columns(columns)
+    read_columns, aliases = _resolve_composition_projection_columns(path, requested)
+    frame = pd.read_parquet(path, columns=read_columns)
+    for dest, source in aliases.items():
+        if dest not in frame.columns and source in frame.columns:
+            frame[dest] = frame[source]
+    return frame
 
 
 def _load_attempts(run_root: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame:
@@ -195,14 +250,14 @@ def _load_composition(run_root: Path, *, columns: Iterable[str] | None = None) -
     path = run_root / "outputs" / "tables" / "composition.parquet"
     if not path.exists():
         raise ValueError(f"composition.parquet not found: {path}")
-    return pd.read_parquet(path, columns=_read_columns(columns))
+    return _read_composition_parquet(path, columns=columns)
 
 
 def _maybe_load_composition(run_root: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame | None:
     path = run_root / "outputs" / "tables" / "composition.parquet"
     if not path.exists():
         return None
-    return pd.read_parquet(path, columns=_read_columns(columns))
+    return _read_composition_parquet(path, columns=columns)
 
 
 def _load_libraries(

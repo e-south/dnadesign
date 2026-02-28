@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import textwrap
 from pathlib import Path
 from typing import Callable, Iterable, Mapping
 
@@ -33,6 +34,59 @@ from dnadesign.cruncher.analysis.plots._savefig import savefig
 _DNA_COMP = str.maketrans("ACGTacgtNn", "TGCAtgcaNn")
 _OVERLAY_MAX_CHARS = 80
 _NORM_SCORE_EPS = 1.0e-9
+
+
+def _overlay_line_char_budget(*, ncols: int, max_chars: int) -> int:
+    if int(ncols) < 1:
+        raise ValueError("elites showcase title ncols must be >= 1")
+    if int(max_chars) < 6:
+        raise ValueError("elites showcase title max_chars must be >= 6")
+    adaptive_budget = int(round(84.0 / float(ncols) + 10.0))
+    return max(20, min(int(max_chars), min(72, adaptive_budget)))
+
+
+def _wrap_overlay_text_line(text: str, *, line_chars: int) -> list[str]:
+    normalized = str(text).strip()
+    if not normalized:
+        return []
+    lines = textwrap.wrap(
+        normalized,
+        width=int(line_chars),
+        break_long_words=True,
+        break_on_hyphens=False,
+    )
+    return [line.strip() for line in lines if line.strip()]
+
+
+def _wrap_overlay_score_tokens(tokens: list[str], *, line_chars: int) -> list[str]:
+    wrapped_lines: list[str] = []
+    current = ""
+    for token in tokens:
+        normalized = str(token).strip()
+        if not normalized:
+            continue
+        if len(normalized) > line_chars:
+            split_parts = textwrap.wrap(
+                normalized,
+                width=int(line_chars),
+                break_long_words=True,
+                break_on_hyphens=False,
+            )
+        else:
+            split_parts = [normalized]
+        for part in split_parts:
+            if not current:
+                current = part
+                continue
+            candidate = f"{current} {part}"
+            if len(candidate) <= line_chars:
+                current = candidate
+            else:
+                wrapped_lines.append(current)
+                current = part
+    if current:
+        wrapped_lines.append(current)
+    return wrapped_lines
 
 
 def _revcomp(seq: str) -> str:
@@ -111,35 +165,61 @@ def _overlay_text(
     *,
     tf_names: Iterable[str] | None = None,
     max_chars: int = _OVERLAY_MAX_CHARS,
+    ncols: int = 1,
 ) -> str:
-    if max_chars < 6:
-        raise ValueError("elites showcase title max_chars must be >= 6")
+    line_chars = _overlay_line_char_budget(ncols=int(ncols), max_chars=int(max_chars))
+    elite_id = str(elite_row.get("id") or "").strip()
+    rank_numeric: int | None = None
     rank_value = elite_row.get("rank")
-    subject = "Elite"
     if rank_value is not None and pd.notna(rank_value):
-        rank_numeric = pd.to_numeric(rank_value, errors="coerce")
-        if pd.notna(rank_numeric):
-            subject = f"Elite #{int(rank_numeric)}"
+        parsed_rank = pd.to_numeric(rank_value, errors="coerce")
+        if pd.notna(parsed_rank):
+            rank_numeric = int(parsed_rank)
+
+    subject = elite_id or "Elite"
+
+    sequence_length: int | None = None
+    sequence_length_value = elite_row.get("sequence_length")
+    if sequence_length_value is not None and not pd.isna(sequence_length_value):
+        parsed_length = pd.to_numeric(sequence_length_value, errors="coerce")
+        if pd.notna(parsed_length):
+            seq_len_int = int(parsed_length)
+            if seq_len_int > 0:
+                sequence_length = seq_len_int
+    if sequence_length is None and "sequence" in elite_row.index:
+        sequence_text = str(elite_row.get("sequence") or "").strip()
+        if sequence_text:
+            sequence_length = len(sequence_text)
+    if sequence_length is not None:
+        subject = f"{subject} (L={sequence_length})"
+
     hash_token: str | None = None
     hash_candidate = elite_row.get("hash_id")
     if isinstance(hash_candidate, str) and hash_candidate.strip():
         hash_token = hash_candidate.strip()
-    elif "sequence" in elite_row.index:
+    elif rank_numeric is not None and "sequence" in elite_row.index:
         sequence = str(elite_row.get("sequence") or "").strip().upper()
-        elite_id = str(elite_row.get("id") or "").strip()
         if sequence and elite_id:
             hash_token = hashlib.sha256(f"{elite_id}|{sequence}".encode("utf-8")).hexdigest()[:12]
+
+    rank_hash_tokens: list[str] = []
+    if rank_numeric is not None:
+        rank_hash_tokens.append(f"r={rank_numeric}")
     if hash_token:
-        subject = f"{subject} [{hash_token}]"
+        rank_hash_tokens.append(hash_token)
+    if rank_hash_tokens:
+        subject = f"{subject} [{'|'.join(rank_hash_tokens)}]"
+
     tf_list = [str(tf).strip() for tf in (tf_names or []) if str(tf).strip()]
+    subject_lines = _wrap_overlay_text_line(subject, line_chars=line_chars)
     if not tf_list:
-        return subject[:max_chars].rstrip()
+        return "\n".join(subject_lines)
     score_tokens: list[str] = []
     for tf_name in tf_list:
         score_value = _normalized_score_from_row(elite_row, tf_name=tf_name)
         score_tokens.append(f"{tf_name}={score_value:.2f}")
-    title = f"{subject}\n{' '.join(score_tokens)}"
-    return title[:max_chars].rstrip()
+    score_lines = _wrap_overlay_score_tokens(score_tokens, line_chars=line_chars)
+    return "\n".join([*subject_lines, *score_lines])
 
 
 _SHOWCASE_STYLE_OVERRIDES: Mapping[str, object] = cruncher_showcase_style_overrides()
@@ -164,6 +244,7 @@ def build_elites_showcase_records(
     pwms: Mapping[str, object],
     max_panels: int,
     overlay_text_fn: OverlayTextFn | None = None,
+    overlay_ncols: int | None = None,
     meta_source: str = "cruncher_elites_showcase",
 ) -> list[Record]:
     if elites_df is None or elites_df.empty:
@@ -192,10 +273,13 @@ def build_elites_showcase_records(
         )
 
     hit_by_key = _hits_index(hits_df)
+    overlay_cols = len(ordered) if overlay_ncols is None else int(overlay_ncols)
+    if overlay_cols < 1:
+        raise ValueError("elites showcase overlay_ncols must be >= 1")
     overlay_builder = (
         overlay_text_fn
         if overlay_text_fn is not None
-        else (lambda elite_row, tf_list_: _overlay_text(elite_row, tf_names=tf_list_))
+        else (lambda elite_row, tf_list_: _overlay_text(elite_row, tf_names=tf_list_, ncols=overlay_cols))
     )
     records: list[Record] = []
     for _, elite in ordered.iterrows():

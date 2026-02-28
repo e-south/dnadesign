@@ -46,6 +46,7 @@ class StageBLibraryRuntimeState:
     libraries_built: int
     libraries_built_start: int
     libraries_used: int = 0
+    last_accepted_progress: float | None = None
     failed_solutions: int = 0
     duplicate_records: int = 0
     stall_events: int = 0
@@ -54,6 +55,11 @@ class StageBLibraryRuntimeState:
     failed_min_count_by_regulator: int = 0
     failed_min_required_regulators: int = 0
     duplicate_solutions: int = 0
+    last_no_solution_reason: str | None = None
+    last_no_solution_solver_status: str | None = None
+    last_no_solution_solver_objective: float | None = None
+    last_no_solution_solver_solve_time_s: float | None = None
+    last_no_solution_detail: dict | None = None
 
 
 def build_next_library_callback(
@@ -95,7 +101,7 @@ class StageBLibraryRuntimeContext:
     pad_max_tries: int
     solver_strategy: str
     solver_strands: str
-    solver_time_limit_seconds: float | None
+    solver_attempt_timeout_seconds: float | None
     solver_threads: int | None
     extra_library_label: str | None
     fixed_elements: Any
@@ -180,7 +186,7 @@ class StageBLibraryRuntimeCallbacks:
             required_regulators=solver_required_regs,
             min_count_by_regulator=solver_min_counts,
             min_required_regulators=min_required_regulators_local,
-            solver_time_limit_seconds=self._context.solver_time_limit_seconds,
+            solver_attempt_timeout_seconds=self._context.solver_attempt_timeout_seconds,
             solver_threads=self._context.solver_threads,
             extra_label=self._context.extra_library_label,
         )
@@ -218,6 +224,13 @@ class StageBLibraryRuntimeCallbacks:
         stage_a_selection_rank_by_index = sampling_info.get("stage_a_selection_rank_by_index")
         stage_a_selection_score_norm_by_index = sampling_info.get("stage_a_selection_score_norm_by_index")
         stage_a_tfbs_core_by_index = sampling_info.get("stage_a_tfbs_core_by_index")
+        stage_a_score_theoretical_max_by_index = sampling_info.get("stage_a_score_theoretical_max_by_index")
+        stage_a_selection_policy_by_index = sampling_info.get("stage_a_selection_policy_by_index")
+        stage_a_nearest_selected_similarity_by_index = sampling_info.get("stage_a_nearest_selected_similarity_by_index")
+        stage_a_nearest_selected_distance_by_index = sampling_info.get("stage_a_nearest_selected_distance_by_index")
+        stage_a_nearest_selected_distance_norm_by_index = sampling_info.get(
+            "stage_a_nearest_selected_distance_norm_by_index"
+        )
 
         self._context.diagnostics.update_library(
             library_tfs=library_tfs,
@@ -282,42 +295,55 @@ class StageBLibraryRuntimeCallbacks:
         local_generated = 0
         produced_this_library = 0
         stall_triggered = False
-        last_progress = time.monotonic()
+        last_accepted_progress = self._state.last_accepted_progress
+        self._state.last_no_solution_reason = None
+        self._state.last_no_solution_solver_status = None
+        self._state.last_no_solution_solver_objective = None
+        self._state.last_no_solution_solver_solve_time_s = None
+        self._state.last_no_solution_detail = None
+        subsample_started = time.monotonic()
 
         if local_generated < max_per_subsample and global_generated < quota:
             fingerprints = set()
             consecutive_dup = 0
-            subsample_started = time.monotonic()
             last_log_warn = subsample_started
-            last_progress = subsample_started
+            if last_accepted_progress is None:
+                last_accepted_progress = subsample_started
+                self._state.last_accepted_progress = last_accepted_progress
             produced_this_library = 0
             stall_triggered = False
 
+            def _check_stall_after_candidate(now: float) -> bool:
+                nonlocal stall_triggered
+                if produced_this_library > 0:
+                    return False
+                if not self._context.policy.should_trigger_stall(
+                    now=now,
+                    last_progress=float(last_accepted_progress),
+                ):
+                    return False
+                self._state.stall_events, stall_triggered = mark_stall_detected(
+                    events_path=self._context.events_path,
+                    source_label=self._context.source_label,
+                    plan_name=self._context.plan_name,
+                    stall_seconds=self._context.stall_seconds,
+                    last_progress=float(last_accepted_progress),
+                    now=now,
+                    sampling_library_index=int(sampling_library_index),
+                    sampling_library_hash=str(sampling_library_hash),
+                    stall_events=self._state.stall_events,
+                    stall_triggered=stall_triggered,
+                    emit_event=self._context.emit_event,
+                    logger=self._context.logger,
+                )
+                return True
+
             for sol in generator:
                 now = time.monotonic()
-                if self._context.policy.should_trigger_stall(
-                    now=now,
-                    last_progress=last_progress,
-                ):
-                    self._state.stall_events, stall_triggered = mark_stall_detected(
-                        events_path=self._context.events_path,
-                        source_label=self._context.source_label,
-                        plan_name=self._context.plan_name,
-                        stall_seconds=self._context.stall_seconds,
-                        last_progress=last_progress,
-                        now=now,
-                        sampling_library_index=int(sampling_library_index),
-                        sampling_library_hash=str(sampling_library_hash),
-                        stall_events=self._state.stall_events,
-                        stall_triggered=stall_triggered,
-                        emit_event=self._context.emit_event,
-                        logger=self._context.logger,
-                    )
-                    break
                 if self._context.policy.should_warn_stall(
                     now=now,
                     last_warn=last_log_warn,
-                    last_progress=last_progress,
+                    last_progress=float(last_accepted_progress),
                 ):
                     self._context.logger.info(
                         "[%s/%s] Still working... %.1fs on current library.",
@@ -326,7 +352,6 @@ class StageBLibraryRuntimeCallbacks:
                         now - subsample_started,
                     )
                     last_log_warn = now
-                last_progress = now
 
                 if forbid_each:
                     opt.forbid(sol)
@@ -346,6 +371,8 @@ class StageBLibraryRuntimeCallbacks:
                 if should_break:
                     break
                 if should_continue:
+                    if _check_stall_after_candidate(now):
+                        break
                     continue
 
                 used_tfbs, used_tfbs_detail, used_tf_counts, used_tf_list = _compute_used_tf_info(
@@ -366,6 +393,11 @@ class StageBLibraryRuntimeCallbacks:
                     stage_a_selection_rank_by_index,
                     stage_a_selection_score_norm_by_index,
                     stage_a_tfbs_core_by_index,
+                    stage_a_score_theoretical_max_by_index,
+                    stage_a_selection_policy_by_index,
+                    stage_a_nearest_selected_similarity_by_index,
+                    stage_a_nearest_selected_distance_by_index,
+                    stage_a_nearest_selected_distance_norm_by_index,
                 )
                 solver_status, solver_objective, solver_solve_time_s = _extract_solver_metrics(sol)
 
@@ -407,6 +439,8 @@ class StageBLibraryRuntimeCallbacks:
                         failed_min_count_by_regulator=self._state.failed_min_count_by_regulator,
                         diagnostics=self._context.diagnostics,
                     )
+                    if _check_stall_after_candidate(now):
+                        break
                     continue
 
                 final_seq, pad_meta = _maybe_pad_sequence(
@@ -466,6 +500,8 @@ class StageBLibraryRuntimeCallbacks:
                         emit_event=self._context.emit_event,
                         logger=self._context.logger,
                     )
+                    if _check_stall_after_candidate(now):
+                        break
                     continue
 
                 global_generated, local_generated, produced_this_library, self._state.duplicate_records, accepted = (
@@ -512,20 +548,29 @@ class StageBLibraryRuntimeCallbacks:
                     )
                 )
                 if not accepted:
+                    if _check_stall_after_candidate(now):
+                        break
                     continue
+                last_accepted_progress = now
+                self._state.last_accepted_progress = last_accepted_progress
 
                 if local_generated >= max_per_subsample or global_generated >= quota:
                     break
 
-        if produced_this_library == 0 and not stall_triggered and self._context.stall_seconds > 0:
+        if (
+            produced_this_library == 0
+            and not stall_triggered
+            and self._context.stall_seconds > 0
+            and last_accepted_progress is not None
+        ):
             now = time.monotonic()
-            if (now - last_progress) >= self._context.stall_seconds:
+            if (now - float(last_accepted_progress)) >= self._context.stall_seconds:
                 self._state.stall_events, stall_triggered = mark_stall_detected(
                     events_path=self._context.events_path,
                     source_label=self._context.source_label,
                     plan_name=self._context.plan_name,
                     stall_seconds=self._context.stall_seconds,
-                    last_progress=last_progress,
+                    last_progress=float(last_accepted_progress),
                     now=now,
                     sampling_library_index=int(sampling_library_index),
                     sampling_library_hash=str(sampling_library_hash),
@@ -535,15 +580,51 @@ class StageBLibraryRuntimeCallbacks:
                     logger=self._context.logger,
                 )
 
+        library_elapsed = max(0.0, float(time.monotonic() - subsample_started))
+
+        if produced_this_library == 0:
+            no_solution_reason = "stall_no_solution" if stall_triggered else "no_solution"
+            no_solution_detail = {
+                "solver_status": no_solution_reason,
+                "solver_solve_time_s": library_elapsed,
+                "library_index": int(sampling_library_index),
+                "library_hash": str(sampling_library_hash),
+                "library_infeasible": bool(library_context.infeasible),
+                "library_slack_bp": int(library_context.slack_bp),
+                "library_min_required_len": int(library_context.min_required_len),
+            }
+            if stall_triggered:
+                no_solution_detail["stall_seconds"] = int(self._context.stall_seconds)
+            self._state.last_no_solution_reason = no_solution_reason
+            self._state.last_no_solution_solver_status = no_solution_reason
+            self._state.last_no_solution_solver_objective = None
+            self._state.last_no_solution_solver_solve_time_s = library_elapsed
+            self._state.last_no_solution_detail = no_solution_detail
+        else:
+            self._state.last_no_solution_reason = None
+            self._state.last_no_solution_solver_status = None
+            self._state.last_no_solution_solver_objective = None
+            self._state.last_no_solution_solver_solve_time_s = None
+            self._state.last_no_solution_detail = None
+
         return LibraryRunResult(
             produced=produced_this_library,
             stall_triggered=stall_triggered,
             global_generated=int(global_generated),
+            active_runtime_seconds=library_elapsed,
         )
 
     def on_no_solution(self, library_context: LibraryContext, reason: str) -> None:
         attempt_index = self._context.next_attempt_index()
-        detail = {"stall_seconds": self._context.stall_seconds} if reason == "stall_no_solution" else {}
+        solver_status = str(self._state.last_no_solution_solver_status or reason)
+        solver_objective = self._state.last_no_solution_solver_objective
+        solver_solve_time_s = self._state.last_no_solution_solver_solve_time_s
+        detail = dict(self._state.last_no_solution_detail or {})
+        if reason == "stall_no_solution":
+            detail.setdefault("stall_seconds", self._context.stall_seconds)
+        detail.setdefault("solver_status", solver_status)
+        if solver_solve_time_s is not None:
+            detail.setdefault("solver_solve_time_s", float(solver_solve_time_s))
         self._context.append_attempt(
             self._context.tables_root,
             run_id=self._context.run_id,
@@ -558,9 +639,9 @@ class StageBLibraryRuntimeCallbacks:
             used_tf_list=[],
             sampling_library_index=int(library_context.sampling_library_index),
             sampling_library_hash=str(library_context.sampling_library_hash),
-            solver_status=None,
-            solver_objective=None,
-            solver_solve_time_s=None,
+            solver_status=solver_status,
+            solver_objective=solver_objective,
+            solver_solve_time_s=solver_solve_time_s,
             dense_arrays_version=self._context.dense_arrays_version,
             dense_arrays_version_source=self._context.dense_arrays_version_source,
             library_tfbs=list(library_context.library_tfbs),
@@ -569,6 +650,11 @@ class StageBLibraryRuntimeCallbacks:
             library_sources=list(library_context.library_sources),
             attempts_buffer=self._context.rejection_context.attempts_buffer,
         )
+        self._state.last_no_solution_reason = None
+        self._state.last_no_solution_solver_status = None
+        self._state.last_no_solution_solver_objective = None
+        self._state.last_no_solution_solver_solve_time_s = None
+        self._state.last_no_solution_detail = None
 
     def on_resample(self, library_context: LibraryContext, reason: str, produced_this_library: int) -> None:
         if self._context.events_path is None:

@@ -1,6 +1,8 @@
-# Notify
+![Notify banner](assets/notify-banner.svg)
 
 Notify reads Universal Sequence Record mutation events and posts selected events to webhook providers.
+
+See the [repository docs index](../../../docs/README.md) for workflow routing across tool boundaries.
 
 ## Contents
 - [At a glance](#at-a-glance)

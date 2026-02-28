@@ -1,5 +1,9 @@
 ## Optimizer improvements plan
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 **Last updated by:** cruncher-maintainers on 2026-02-23
 
 ### Contents
@@ -12,7 +16,7 @@
 
 - Parallel tempering is the only optimizer and is treated as the default kernel.
 - Best-hit selection is deterministic (score, leftmost start, plus strand).
-- Elite selection is TFBS-core MMR with dsDNA canonicalization under bidirectional scoring.
+- Elite selection is TFBS-core MMR with dsDNA orientation normalization under bidirectional scoring.
 - Early stopping uses plateau detection and optional unique-success gating.
 - Run manifests record the effective PT ladder and resolved softmin settings for auditability.
 

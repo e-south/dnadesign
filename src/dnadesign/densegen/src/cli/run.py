@@ -25,12 +25,16 @@ import typer
 
 from ..core.artifacts.pool import pool_status_by_input
 from ..core.pipeline import resolve_plan, run_pipeline
+from ..core.run_lock import RunLockError, acquire_run_lock
 from ..core.run_paths import has_existing_run_outputs, run_outputs_root, run_state_path
 from ..core.run_state import load_run_state
 from ..utils import logging_utils
 from ..utils.logging_utils import install_native_stderr_filters, setup_logging
 from ..utils.mpl_utils import ensure_mpl_cache_dir
 from .context import CliContext
+from .workspace import _seed_usr_registry
+
+QUOTA_PLAN_INLINE_THRESHOLD = 8
 
 
 def _resolve_progress_style(log_cfg) -> tuple[str, str | None]:
@@ -55,6 +59,23 @@ def _active_stage_a_inputs(plan_items: list) -> set[str]:
             if value:
                 names.add(value)
     return names
+
+
+def _format_quota_plan_message(plan_items: list) -> str:
+    if len(plan_items) <= QUOTA_PLAN_INLINE_THRESHOLD:
+        return ", ".join(f"{item.name}={item.quota}" for item in plan_items)
+
+    quota_counts: dict[int, int] = {}
+    quota_order: list[int] = []
+    for item in plan_items:
+        quota_value = int(getattr(item, "quota", 0))
+        if quota_value not in quota_counts:
+            quota_order.append(quota_value)
+            quota_counts[quota_value] = 0
+        quota_counts[quota_value] += 1
+
+    quota_pattern = "; ".join(f"{quota_counts[value]} plans at {value} each" for value in quota_order)
+    return f"{len(plan_items)} plans (quota pattern: {quota_pattern})"
 
 
 def _model_to_dict(value) -> dict:
@@ -262,6 +283,55 @@ def _clear_outputs_preserving_notify(*, outputs_root: Path) -> None:
             shutil.rmtree(child)
         else:
             child.unlink()
+
+
+def _print_usr_registry_next_steps(*, console) -> None:
+    console.print("[bold]Next steps[/]:")
+    console.print("  - stage your run via `dense workspace init --output-mode usr|both` to seed registry.yaml")
+    console.print("  - or create `<output.usr.root>/registry.yaml` before running `dense run`")
+
+
+def _ensure_usr_registry_ready(
+    *,
+    cfg,
+    cfg_path: Path,
+    run_root: Path,
+    context: CliContext,
+    console,
+    ensure_usr_registry: bool,
+) -> None:
+    out_cfg = cfg.output
+    if "usr" not in out_cfg.targets or out_cfg.usr is None:
+        return
+    usr_root = context.resolve_outputs_path_or_exit(
+        cfg_path,
+        run_root,
+        Path(out_cfg.usr.root),
+        label="output.usr.root",
+    )
+    registry_path = usr_root / "registry.yaml"
+    if registry_path.exists() and registry_path.is_file():
+        return
+    if registry_path.exists() and not registry_path.is_file():
+        console.print(f"[bold red]USR registry path exists but is not a file:[/] {registry_path}")
+        raise typer.Exit(code=1)
+
+    if ensure_usr_registry:
+        _seed_usr_registry(
+            run_dir=run_root,
+            output=_model_to_dict(out_cfg),
+            console=console,
+            display_path=context.display_path,
+        )
+
+    if registry_path.exists() and registry_path.is_file():
+        return
+
+    console.print(
+        f"[bold red]USR registry not found at {registry_path}. Create registry.yaml before writing USR outputs.[/]"
+    )
+    _print_usr_registry_next_steps(console=console)
+    raise typer.Exit(code=1)
 
 
 def _resolve_resume_mode(
@@ -524,23 +594,9 @@ def _handle_run_runtime_error(
         raise typer.Exit(code=1)
     if "USR registry not found at " in message:
         console.print(f"[bold red]{message}[/]")
-        console.print("[bold]Next steps[/]:")
-        console.print("  - stage your run via `dense workspace init --output-mode usr|both` to seed registry.yaml")
-        console.print("  - or create `<output.usr.root>/registry.yaml` before running `dense run`")
+        _print_usr_registry_next_steps(console=console)
         raise typer.Exit(code=1)
-    if "Exceeded max_seconds_per_plan=" in message:
-        console.print(f"[bold red]{message}[/]")
-        console.print("[bold]Next steps[/]:")
-        inspect_cmd = context.workspace_command(
-            "dense inspect run --events --library",
-            cfg_path=cfg_path,
-            run_root=run_root,
-        )
-        console.print(f"  - {inspect_cmd}")
-        console.print("  - increase densegen.runtime.max_seconds_per_plan")
-        console.print("  - or reduce generation.plan[].sequences / Stage-B complexity")
-        raise typer.Exit(code=1)
-    if "Exceeded max_consecutive_failures=" in message or "Exceeded max_failed_solutions=" in message:
+    if "Exceeded max_consecutive_no_progress_resamples=" in message or "Exceeded max_failed_solutions=" in message:
         console.print(f"[bold red]{message}[/]")
         console.print("[bold]Next steps[/]:")
         inspect_cmd = context.workspace_command(
@@ -550,7 +606,8 @@ def _handle_run_runtime_error(
         )
         console.print(f"  - {inspect_cmd}")
         console.print(
-            "  - increase densegen.runtime.max_consecutive_failures, "
+            "  - increase densegen.runtime.no_progress_seconds_before_resample, "
+            "max_consecutive_no_progress_resamples, "
             "max_failed_solutions_per_target, or max_failed_solutions"
         )
         console.print("  - or relax constraints / lower quota for the affected plan")
@@ -585,6 +642,11 @@ def register_run_commands(
         ),
         show_tfbs: bool = typer.Option(False, "--show-tfbs", help="Show TFBS sequences in progress output."),
         show_solutions: bool = typer.Option(False, "--show-solutions", help="Show full solution sequences in output."),
+        ensure_usr_registry: bool = typer.Option(
+            True,
+            "--ensure-usr-registry/--no-ensure-usr-registry",
+            help="Auto-seed output.usr.root/registry.yaml from repository defaults when missing.",
+        ),
         config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
     ):
         cfg_path, is_default = context.resolve_config_path(ctx, config)
@@ -705,17 +767,39 @@ def register_run_commands(
             suppress_solver_stderr=bool(log_cfg.suppress_solver_stderr),
         )
 
+        _ensure_usr_registry_ready(
+            cfg=cfg,
+            cfg_path=cfg_path,
+            run_root=run_root,
+            context=context,
+            console=console,
+            ensure_usr_registry=ensure_usr_registry,
+        )
+
         # Plan & solver
-        console.print("[bold]Quota plan[/]: " + ", ".join(f"{p.name}={p.quota}" for p in pl))
+        console.print("[bold]Quota plan[/]: " + _format_quota_plan_message(pl))
         try:
-            summary = run_pipeline(
-                loaded,
-                resume=resume_run,
-                build_stage_a=build_stage_a,
-                show_tfbs=show_tfbs,
-                show_solutions=show_solutions,
-                allow_config_mismatch=allow_config_mismatch,
+            with acquire_run_lock(run_root=run_root, run_id=str(cfg.run.id)):
+                summary = run_pipeline(
+                    loaded,
+                    resume=resume_run,
+                    build_stage_a=build_stage_a,
+                    show_tfbs=show_tfbs,
+                    show_solutions=show_solutions,
+                    allow_config_mismatch=allow_config_mismatch,
+                )
+        except RunLockError as exc:
+            console.print(f"[bold red]{exc}[/]")
+            console.print("[bold]Next steps[/]:")
+            inspect_cmd = context.workspace_command(
+                "dense inspect run --events --library",
+                cfg_path=cfg_path,
+                run_root=run_root,
             )
+            console.print("  - wait for the active run to finish, then retry")
+            console.print("  - if this lock is stale, remove outputs/meta/run.lock and rerun")
+            console.print(f"  - {inspect_cmd}")
+            raise typer.Exit(code=1)
         except FileNotFoundError as exc:
             render_missing_input_hint(cfg_path, loaded, exc)
             raise typer.Exit(code=1)
@@ -749,6 +833,12 @@ def register_run_commands(
     @app.command("campaign-reset", help="Remove run outputs to reset a workspace.")
     def campaign_reset(
         ctx: typer.Context,
+        yes: bool = typer.Option(False, "--yes", help="Skip the danger-zone confirmation prompt."),
+        purge_usr_registry: bool = typer.Option(
+            False,
+            "--purge-usr-registry",
+            help="Also remove output.usr.root/registry.yaml instead of preserving it.",
+        ),
         config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
     ):
         cfg_path, is_default = context.resolve_config_path(ctx, config)
@@ -769,8 +859,34 @@ def register_run_commands(
                 f"{context.display_path(outputs_root, run_root, absolute=False)}"
             )
             raise typer.Exit(code=1)
+
+        if not yes:
+            prompt = (
+                "Danger zone: this will remove run outputs under "
+                f"{context.display_path(outputs_root, run_root, absolute=False)}. Continue?"
+            )
+            if not typer.confirm(prompt, default=False):
+                console.print("[yellow]Reset aborted.[/]")
+                raise typer.Exit(code=1)
+
+        registry_snapshots: dict[Path, str] = {}
+        if not purge_usr_registry:
+            registry_snapshots = _capture_usr_registry_snapshots(
+                cfg=loaded.root.densegen,
+                cfg_path=cfg_path,
+                run_root=run_root,
+                context=context,
+            )
+
         shutil.rmtree(outputs_root)
+        if registry_snapshots:
+            _restore_usr_registry_snapshots(snapshots=registry_snapshots)
         console.print(
             ":broom: [bold green]Removed outputs under[/] "
             f"{context.display_path(outputs_root, run_root, absolute=False)}"
         )
+        if registry_snapshots:
+            preserved = ", ".join(
+                context.display_path(path, run_root, absolute=False) for path in sorted(registry_snapshots)
+            )
+            console.print(f":bookmark_tabs: [bold green]Preserved USR registry[/]: {preserved}")

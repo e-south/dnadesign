@@ -1,6 +1,8 @@
-## libshuffle
+![libshuffle banner](assets/libshuffle-banner.svg)
 
 **libshuffle** is a lightweight subsampling engine designed to identify representative subsets of dense-array DNA sequence libraries by balancing high-dimensional embedding diversity with literal sequence diversity. It builds on the **billboard** pipeline for core metric computation and offers a clear three‐step filtering and ranking process.
+
+See the [repository docs index](../../../docs/README.md) for cross-tool workflows and operational runbooks.
 
 ### Overview
 

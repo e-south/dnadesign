@@ -17,6 +17,7 @@ import random
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import yaml
 
 from dnadesign.densegen.src.adapters.optimizer import OptimizerRun
@@ -73,7 +74,7 @@ class _DummyAdapter:
         required_regulators=None,
         min_count_by_regulator=None,
         min_required_regulators=None,
-        solver_time_limit_seconds=None,
+        solver_attempt_timeout_seconds=None,
         solver_threads=None,
         extra_label=None,
     ):
@@ -88,13 +89,14 @@ class _DummyAdapter:
 
 
 class _DummySource:
-    def __init__(self, entries: list[str]) -> None:
-        self.entries = entries
+    def __init__(self, df: pd.DataFrame) -> None:
+        self.df = df
         self.calls = 0
 
     def load_data(self, *, rng, outputs_root, run_id=None):
         self.calls += 1
-        return self.entries, None, None
+        entries = list(zip(self.df["tf"].tolist(), self.df["tfbs"].tolist(), self.df["source"].tolist()))
+        return entries, self.df.copy(), None
 
 
 def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
@@ -103,8 +105,8 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
     (run_dir / "outputs" / "parquet").mkdir(parents=True)
     (run_dir / "logs").mkdir()
 
-    seq_path = run_dir / "seqs.csv"
-    seq_path.write_text("sequence\nAAA\nCCC\nGGG\nTTT\n")
+    sites_path = run_dir / "sites.csv"
+    sites_path.write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\nTF3,GGG\nTF4,TTT\n")
 
     cfg = {
         "densegen": {
@@ -113,10 +115,9 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
             "inputs": [
                 {
                     "name": "demo",
-                    "type": "sequence_library",
-                    "path": str(seq_path),
+                    "type": "binding_sites",
+                    "path": str(sites_path),
                     "format": "csv",
-                    "sequence_column": "sequence",
                 }
             ],
             "output": {
@@ -147,13 +148,11 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
             "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {
                 "round_robin": True,
-                "arrays_generated_before_resample": 1,
+                "max_accepted_per_library": 1,
                 "min_count_per_tf": 0,
                 "max_duplicate_solutions": 5,
-                "stall_seconds_before_resample": 10,
-                "stall_warning_every_seconds": 10,
-                "max_consecutive_failures": 25,
-                "max_seconds_per_plan": 0,
+                "no_progress_seconds_before_resample": 10,
+                "max_consecutive_no_progress_resamples": 25,
                 "max_failed_solutions": 0,
                 "random_seed": 1,
             },
@@ -166,7 +165,18 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
     cfg_path.write_text(yaml.safe_dump(cfg))
     loaded = load_config(cfg_path)
 
-    dummy_source = _DummySource(entries=["AAA", "CCC", "GGG", "TTT"])
+    dummy_source = _DummySource(
+        pd.DataFrame(
+            {
+                "tf": ["TF1", "TF2", "TF3", "TF4"],
+                "tfbs": ["AAA", "CCC", "GGG", "TTT"],
+                "tfbs_core": ["AAA", "CCC", "GGG", "TTT"],
+                "source": ["demo_source"] * 4,
+                "motif_id": ["motif_1", "motif_2", "motif_3", "motif_4"],
+                "tfbs_id": ["tfbs_1", "tfbs_2", "tfbs_3", "tfbs_4"],
+            }
+        )
+    )
     sink = _DummySink()
     deps = PipelineDeps(
         source_factory=lambda _cfg, _path: dummy_source,

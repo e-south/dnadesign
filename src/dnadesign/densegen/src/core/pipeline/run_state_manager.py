@@ -26,6 +26,13 @@ class RunStateContext:
     accepted_config_sha256: list[str]
 
 
+@dataclass(frozen=True)
+class RunStateReconciliation:
+    updated: bool
+    state_total: int
+    durable_total: int
+
+
 def init_run_state(
     *,
     run_root: Path,
@@ -65,18 +72,68 @@ def init_run_state(
     return RunStateContext(path=state_path, created_at=state_created_at, accepted_config_sha256=accepted_hashes)
 
 
-def assert_state_matches_outputs(
+def reconcile_run_state_with_outputs(
     *,
-    state_path: Path,
+    path: Path,
+    run_id: str,
+    schema_version: str,
+    config_sha256: str,
+    accepted_config_sha256: list[str],
+    run_root: str,
+    created_at: str,
     existing_counts: dict[tuple[str, str], int],
-) -> None:
-    if state_path.exists() and not existing_counts:
-        existing_state = load_run_state(state_path)
-        if existing_state.items and sum(item.generated for item in existing_state.items) > 0:
-            raise RuntimeError(
-                "run_state.json indicates prior progress, but no outputs were found. "
-                "Restore outputs or delete run_state.json before resuming."
-            )
+) -> RunStateReconciliation:
+    durable_counts = {
+        (str(input_name), str(plan_name)): int(count)
+        for (input_name, plan_name), count in existing_counts.items()
+        if int(count) > 0
+    }
+    durable_total = int(sum(durable_counts.values()))
+    if not path.exists():
+        return RunStateReconciliation(updated=False, state_total=0, durable_total=durable_total)
+
+    existing_state = load_run_state(path)
+    if existing_state.run_id and existing_state.run_id != str(run_id):
+        raise RuntimeError(
+            "Existing run_state.json was created with a different run_id. "
+            "Remove run_state.json or stage a new run root to start fresh."
+        )
+
+    state_counts: dict[tuple[str, str], int] = {}
+    for item in existing_state.items:
+        input_name = str(item.input_name).strip()
+        plan_name = str(item.plan_name).strip()
+        if not input_name or not plan_name:
+            continue
+        key = (input_name, plan_name)
+        state_counts[key] = int(state_counts.get(key, 0)) + max(0, int(item.generated))
+    state_total = int(sum(state_counts.values()))
+    if state_counts == durable_counts:
+        return RunStateReconciliation(updated=False, state_total=state_total, durable_total=durable_total)
+
+    state_created_at = str(existing_state.created_at or created_at)
+    accepted_hashes = sorted(
+        set(
+            [
+                *[str(v) for v in existing_state.accepted_config_sha256 if str(v)],
+                *[str(v) for v in accepted_config_sha256 if str(v)],
+                str(existing_state.config_sha256 or ""),
+                str(config_sha256),
+            ]
+        )
+    )
+    accepted_hashes = [h for h in accepted_hashes if h]
+    write_run_state(
+        path=path,
+        run_id=str(run_id),
+        schema_version=str(schema_version),
+        config_sha256=str(config_sha256),
+        accepted_config_sha256=accepted_hashes,
+        run_root=str(run_root),
+        counts=durable_counts,
+        created_at=state_created_at,
+    )
+    return RunStateReconciliation(updated=True, state_total=state_total, durable_total=durable_total)
 
 
 def write_run_state(

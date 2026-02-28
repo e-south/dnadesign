@@ -1,5 +1,9 @@
 ## DenseGen to USR to Notify tutorial
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This tutorial shows the full event-driven operator path from DenseGen generation to USR mutation events to Notify webhook delivery. Read it when you need to verify watcher behavior end-to-end and avoid mixing DenseGen diagnostics with USR event streams; for campaign-scale runs use the stress-study workspace and apply the same watcher flow.
 
 ### What this tutorial demonstrates
@@ -69,6 +73,7 @@ This step stages a workspace that writes dataset mutation events for Notify to c
 ```bash
 # Resolve repo root and pin workspace root so paths are deterministic.
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+# Pin workspace root for deterministic init/output paths.
 WORKSPACE_ROOT="$REPO_ROOT/src/dnadesign/densegen/workspaces"
 
 # Create workspace from TFBS baseline in USR output mode.

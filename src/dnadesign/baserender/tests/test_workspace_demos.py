@@ -97,6 +97,9 @@ def test_curated_workspace_demos_are_self_contained() -> None:
             assert isinstance(ann, list) and ann
             assert any(str(entry.get("orientation")) == "rev" for entry in ann)
             assert any("motif_id" in entry for entry in ann)
+            tfbs_entries = [entry for entry in ann if entry.get("part_kind") != "fixed_element"]
+            assert all("regulator" in entry and "sequence" in entry for entry in tfbs_entries)
+            assert all("tf" not in entry and "tfbs" not in entry for entry in ann)
 
 
 def test_docs_cruncher_example_uses_local_examples_data() -> None:
@@ -131,6 +134,9 @@ def test_docs_densegen_example_matches_notebook_contract() -> None:
     ann = row["densegen__used_tfbs_detail"]
     assert isinstance(ann, list) and ann
     assert any("motif_id" in entry for entry in ann)
+    tfbs_entries = [entry for entry in ann if entry.get("part_kind") != "fixed_element"]
+    assert all("regulator" in entry and "sequence" in entry for entry in tfbs_entries)
+    assert all("tf" not in entry and "tfbs" not in entry for entry in ann)
 
 
 def test_curated_workspace_demos_run_in_isolated_copy(tmp_path: Path) -> None:

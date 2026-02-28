@@ -207,7 +207,9 @@ def test_report_outputs_section_uses_usr_records_path(tmp_path: Path, monkeypatc
                 "densegen__input_name": PLAN_POOL_LABEL,
                 "densegen__sampling_library_hash": "abc123",
                 "densegen__sampling_library_index": 1,
-                "densegen__used_tfbs_detail": [{"tf": "lexA", "tfbs": "AAAA"}],
+                "densegen__used_tfbs_detail": [
+                    {"part_kind": "tfbs", "regulator": "lexA", "sequence": "AAAA", "core_sequence": "AAAA"}
+                ],
                 "densegen__required_regulators": ["lexA"],
                 "densegen__covers_all_tfs_in_solution": True,
                 "densegen__used_tf_counts": [{"tf": "lexA", "count": 1}],
@@ -276,8 +278,8 @@ def test_collect_report_data_rejects_missing_record_library_hash(tmp_path: Path,
                 "densegen__input_name": PLAN_POOL_LABEL,
                 "densegen__sampling_library_index": 1,
                 "densegen__used_tfbs_detail": [
-                    {"tf": "TF1", "tfbs": "AAA"},
-                    {"tf": "TF2", "tfbs": "CCC"},
+                    {"part_kind": "tfbs", "regulator": "TF1", "sequence": "AAA", "core_sequence": "AAA"},
+                    {"part_kind": "tfbs", "regulator": "TF2", "sequence": "CCC", "core_sequence": "CCC"},
                 ],
                 "densegen__required_regulators": [],
                 "densegen__covers_all_tfs_in_solution": True,

@@ -164,7 +164,7 @@ def test_tfbs_baseline_demo_config_exists_and_loads() -> None:
     assert loaded.root.densegen.run.id == "demo_tfbs_baseline"
 
 
-def test_tfbs_baseline_demo_mock_sites_lengths_are_16_to_20_bp() -> None:
+def test_tfbs_baseline_demo_mock_sites_follow_length_and_gc_bands() -> None:
     cfg_path = _demo_config_path("demo_tfbs_baseline")
     cfg = load_config(cfg_path)
     sites_input = next(inp for inp in cfg.root.densegen.inputs if inp.type == "binding_sites")
@@ -173,25 +173,57 @@ def test_tfbs_baseline_demo_mock_sites_lengths_are_16_to_20_bp() -> None:
 
     with sites_path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
-        lengths = [len((row.get("tfbs") or "").strip()) for row in reader]
-    assert lengths
-    assert min(lengths) >= 16
-    assert max(lengths) <= 20
+        rows = list(reader)
+
+    assert len(rows) == 750
+    gc_ranges = {
+        "TF_A": (0.30, 0.40),
+        "TF_B": (0.40, 0.50),
+        "TF_C": (0.50, 0.60),
+    }
+    per_tf_counts = {key: 0 for key in gc_ranges}
+    unique_tfbs = set()
+
+    for row in rows:
+        tf = str(row.get("tf") or "").strip()
+        tfbs = str(row.get("tfbs") or "").strip().upper()
+        assert tf in gc_ranges
+        per_tf_counts[tf] += 1
+
+        assert 15 <= len(tfbs) <= 20
+        unique_tfbs.add(tfbs)
+
+        gc_fraction = (tfbs.count("G") + tfbs.count("C")) / float(len(tfbs))
+        lo, hi = gc_ranges[tf]
+        assert lo <= gc_fraction <= hi
+
+    assert per_tf_counts == {"TF_A": 250, "TF_B": 250, "TF_C": 250}
+    assert len(unique_tfbs) == 750
 
 
 def test_tfbs_baseline_demo_plan_compares_unconstrained_and_sigma70() -> None:
     cfg_path = _demo_config_path("demo_tfbs_baseline")
     cfg = load_config(cfg_path)
+    assert cfg.root.densegen.generation.sequence_length == 100
+    assert cfg.root.densegen.solver.backend == "CBC"
+    assert cfg.root.densegen.solver.strategy == "iterate"
+    sampling = cfg.root.densegen.generation.sampling
+    assert sampling.pool_strategy == "iterative_subsample"
+    assert sampling.library_size == 10
+    assert sampling.cover_all_regulators is True
+    assert sampling.iterative_max_libraries == 200
     plan = cfg.root.densegen.generation.plan
     assert plan
     plan_by_name = {item.name: item for item in plan}
     assert set(plan_by_name) == {"baseline", "baseline_sigma70"}
 
     baseline = plan_by_name["baseline"]
+    assert int(baseline.sequences) == 50
     assert list(baseline.regulator_constraints.groups or []) == []
     assert list(baseline.fixed_elements.promoter_constraints or []) == []
 
     sigma70 = plan_by_name["baseline_sigma70"]
+    assert int(sigma70.sequences) == 50
     assert list(sigma70.regulator_constraints.groups or []) == []
     pcs = list(sigma70.fixed_elements.promoter_constraints or [])
     assert len(pcs) == 1
@@ -200,6 +232,7 @@ def test_tfbs_baseline_demo_plan_compares_unconstrained_and_sigma70() -> None:
     assert pc.upstream == "TTGACA"
     assert pc.downstream == "TATAAT"
     assert tuple(pc.spacer_length or ()) == (16, 18)
+    assert tuple(pc.upstream_pos or ()) == ()
 
     for item in plan:
         side_biases = item.fixed_elements.side_biases
@@ -215,6 +248,9 @@ def test_tfbs_baseline_demo_uses_local_output_with_padding_enabled() -> None:
     output = cfg.root.densegen.output
     assert output.targets == ["parquet"]
     assert cfg.root.densegen.postprocess.pad.mode == "adaptive"
+    assert cfg.root.densegen.postprocess.pad.end == "5prime"
+    assert cfg.root.densegen.runtime.round_robin is True
+    assert cfg.root.densegen.runtime.max_accepted_per_library == 10
 
 
 def test_packaged_workspace_configs_track_latest_schema_version() -> None:
@@ -305,10 +341,18 @@ def test_gitignore_workspaces_allowlist_matches_packaged_workspace_names() -> No
     assert "!src/dnadesign/densegen/workspaces/demo_sampling_baseline/" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/README.md" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/demo_sampling_baseline/README.md" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/README.md" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/README.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/runbook.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_sampling_baseline/runbook.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/runbook.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/runbook.md" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/runbook.sh" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/demo_sampling_baseline/runbook.sh" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/runbook.sh" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/runbook.sh" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_binding_sites/" not in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_meme_three_tfs/" not in gitignore
 
@@ -363,14 +407,18 @@ def test_study_constitutive_sigma_panel_uses_bounded_total_quota_limits() -> Non
     cfg = load_config(_demo_config_path("study_constitutive_sigma_panel"))
     generation = cfg.root.densegen.generation
     assert generation.expansion.max_plans == 64
-    assert generation.total_quota() == 48
+    assert generation.total_quota() == 500
 
 
-def test_study_constitutive_sigma_panel_expansion_uses_uniform_quota_units() -> None:
+def test_study_constitutive_sigma_panel_expansion_distributes_quota_evenly() -> None:
     cfg = load_config(_demo_config_path("study_constitutive_sigma_panel"))
     plans = list(cfg.root.densegen.generation.plan or [])
     assert plans
-    assert all(int(item.sequences) == 1 for item in plans)
+    quotas = [int(item.sequences) for item in plans]
+    assert set(quotas) == {10, 11}
+    assert quotas.count(11) == 20
+    assert quotas.count(10) == 28
+    assert sum(quotas) == 500
     assert all("__sig35=" in item.name and "__sig10=" in item.name for item in plans)
     assert all("__up=" not in item.name and "__down=" not in item.name for item in plans)
 
@@ -378,11 +426,23 @@ def test_study_constitutive_sigma_panel_expansion_uses_uniform_quota_units() -> 
     assert len(panel_plans) == 48
 
 
+def test_packaged_workspace_sequence_lengths_and_constitutive_upstream_window() -> None:
+    sampling_cfg = load_config(_demo_config_path("demo_sampling_baseline"))
+    assert sampling_cfg.root.densegen.generation.sequence_length == 100
+
+    constitutive_cfg = load_config(_demo_config_path("study_constitutive_sigma_panel"))
+    assert constitutive_cfg.root.densegen.generation.sequence_length == 60
+    for item in constitutive_cfg.root.densegen.generation.plan:
+        pcs = list(item.fixed_elements.promoter_constraints or [])
+        assert len(pcs) == 1
+        assert tuple(pcs[0].upstream_pos or ()) == (10, 25)
+
+
 def test_study_constitutive_sigma_panel_runtime_allows_bounded_retries() -> None:
     cfg = load_config(_demo_config_path("study_constitutive_sigma_panel"))
     runtime = cfg.root.densegen.runtime
     assert runtime.max_failed_solutions >= 1
-    assert runtime.max_seconds_per_plan >= 300
+    assert runtime.max_consecutive_no_progress_resamples >= 1
 
 
 def test_packaged_workspace_plot_defaults_cover_primary_runtime_diagnostics() -> None:
@@ -529,16 +589,18 @@ def test_packaged_sampling_workspaces_allow_bounded_failed_solutions() -> None:
         assert cfg.root.densegen.runtime.max_failed_solutions_per_target > 0
 
 
-def test_packaged_workspace_runbooks_exist_with_fast_path_and_stepwise_flow() -> None:
+def test_packaged_workspace_runbooks_exist_with_workspace_local_happy_path() -> None:
     workspace_root = Path(__file__).resolve().parents[2] / "workspaces"
     required_tokens = (
         "**Workspace Path**",
         "**Regulators**",
         "**Purpose**",
-        "**Run This Single Command**",
-        "Run this single command to do everything below:",
+        "**Runbook command**",
+        "Run this command from the workspace root:",
+        "./runbook.sh",
         "### Step-by-Step Commands",
         "set -euo pipefail",
+        'CONFIG="$PWD/config.yaml"',
         "dense validate-config",
         "dense run",
         "dense inspect run",
@@ -556,8 +618,11 @@ def test_packaged_workspace_runbooks_exist_with_fast_path_and_stepwise_flow() ->
         )
         assert "### Regulators" not in content, f"{runbook_path}: Regulators should be a bold label, not a subheader"
         assert "### Purpose" not in content, f"{runbook_path}: Purpose should be a bold label, not a subheader"
-        assert "### Run This Single Command" not in content, (
-            f"{runbook_path}: Run This Single Command should be a bold label, not a subheader"
+        assert "### Runbook command" not in content, (
+            f"{runbook_path}: Runbook command should be a bold label, not a subheader"
+        )
+        assert "REPO_ROOT=" not in content, (
+            f"{runbook_path}: workspace-local runbook flow should not require REPO_ROOT exports"
         )
         for token in required_tokens:
             assert token in content, f"{runbook_path}: missing required runbook token: {token!r}"
@@ -567,10 +632,12 @@ def test_packaged_workspace_runbooks_exist_with_fast_path_and_stepwise_flow() ->
                 "**Workspace Path**",
                 "**Regulators**",
                 "**Purpose**",
-                "**Run This Single Command**",
-                "Run this single command to do everything below:",
+                "**Runbook command**",
+                "Run this command from the workspace root:",
+                "./runbook.sh",
                 "### Step-by-Step Commands",
                 "set -euo pipefail",
+                'CONFIG="$PWD/config.yaml"',
                 "dense validate-config",
                 "dense run",
                 "dense inspect run",
@@ -580,13 +647,16 @@ def test_packaged_workspace_runbooks_exist_with_fast_path_and_stepwise_flow() ->
             ],
             label=str(runbook_path),
         )
+        runbook_script = workspace_root / workspace_id / "runbook.sh"
+        assert runbook_script.exists(), f"Missing workspace runbook script: {runbook_script}"
+        script_content = runbook_script.read_text()
+        assert script_content.startswith("#!/usr/bin/env bash\n"), (
+            f"{runbook_script}: runbook script must use a standard bash shebang"
+        )
+        assert 'CONFIG="$PWD/config.yaml"' in script_content, (
+            f"{runbook_script}: runbook script must resolve config from current workspace directory"
+        )
         if workspace_id in USR_WORKSPACE_IDS:
-            assert "dense workspace init" in content, (
-                f"{runbook_path}: runbook must stage a workspace for USR outputs before dense run"
-            )
-            assert "--output-mode both" in content, (
-                f"{runbook_path}: runbook must create workspace with usr+parquet sink wiring"
-            )
             assert "cruncher catalog export-densegen" in content, (
                 f"{runbook_path}: runbook must include optional Cruncher artifact refresh command"
             )
@@ -598,7 +668,59 @@ def test_packaged_workspace_runbooks_exist_with_fast_path_and_stepwise_flow() ->
         )
 
 
-def test_workspace_tutorials_link_to_workspace_runbooks_for_fast_path() -> None:
+def test_packaged_workspace_runbook_scripts_use_shared_helper_with_workspace_policies() -> None:
+    workspace_root = Path(__file__).resolve().parents[2] / "workspaces"
+    helper_path = workspace_root / "_shared" / "runbook_lib.sh"
+    assert helper_path.exists(), f"Missing runbook helper: {helper_path}"
+    helper_content = helper_path.read_text()
+    required_helper_tokens = (
+        "densegen_runbook_main()",
+        "--fresh --no-plot",
+        "inspect run --events --library",
+        "notebook generate",
+        "marimo check",
+        "dense run exited with status",
+    )
+    for token in required_helper_tokens:
+        assert token in helper_content, f"{helper_path}: missing required helper token: {token!r}"
+
+    expected_runner_by_workspace = {
+        "demo_tfbs_baseline": "uv",
+        "demo_sampling_baseline": "pixi",
+        "study_constitutive_sigma_panel": "pixi",
+        "study_stress_ethanol_cipro": "pixi",
+    }
+    expected_usr_registry_by_workspace = {
+        "demo_tfbs_baseline": "false",
+        "demo_sampling_baseline": "true",
+        "study_constitutive_sigma_panel": "true",
+        "study_stress_ethanol_cipro": "true",
+    }
+    expected_fimo_by_workspace = {
+        "demo_tfbs_baseline": "false",
+        "demo_sampling_baseline": "true",
+        "study_constitutive_sigma_panel": "true",
+        "study_stress_ethanol_cipro": "true",
+    }
+    for workspace_id in PACKAGED_WORKSPACE_IDS:
+        script_path = workspace_root / workspace_id / "runbook.sh"
+        content = script_path.read_text()
+        assert 'source "$SCRIPT_DIR/../_shared/runbook_lib.sh"' in content, (
+            f"{script_path}: runbook script must source the shared runbook helper"
+        )
+        assert "densegen_runbook_main \\" in content, f"{script_path}: runbook script must call densegen_runbook_main"
+        assert f'--runner "{expected_runner_by_workspace[workspace_id]}"' in content, (
+            f"{script_path}: runbook script runner policy mismatch"
+        )
+        assert f'--ensure-usr-registry "{expected_usr_registry_by_workspace[workspace_id]}"' in content, (
+            f"{script_path}: runbook script usr-registry policy mismatch"
+        )
+        assert f'--require-fimo "{expected_fimo_by_workspace[workspace_id]}"' in content, (
+            f"{script_path}: runbook script FIMO policy mismatch"
+        )
+
+
+def test_workspace_tutorials_link_to_workspace_runbooks_for_workspace_local_happy_path() -> None:
     repo_root = Path(__file__).resolve().parents[5]
     for workspace_id, tutorial_rel_path in WORKSPACE_TUTORIAL_PATHS.items():
         tutorial_path = repo_root / tutorial_rel_path
@@ -606,14 +728,10 @@ def test_workspace_tutorials_link_to_workspace_runbooks_for_fast_path() -> None:
         content = tutorial_path.read_text()
         runbook_rel = f"../../workspaces/{workspace_id}/runbook.md"
         assert runbook_rel in content, f"{tutorial_path}: missing runbook link {runbook_rel}"
-        assert "Run this single command" in content, f"{tutorial_path}: missing single-command fast-path wording"
+        assert "./runbook.sh" in content, f"{tutorial_path}: missing runbook.sh workspace command"
+        assert "### Runbook command" in content, f"{tutorial_path}: missing runbook command section"
+        assert "### Fast path" not in content, f"{tutorial_path}: remove opaque fast-path wording"
         if workspace_id in USR_WORKSPACE_IDS:
-            assert "dense workspace init" in content, (
-                f"{tutorial_path}: fast path must stage a workspace before running USR-backed flow"
-            )
-            assert "--output-mode both" in content, (
-                f"{tutorial_path}: fast path must use workspace init with both sinks"
-            )
             assert "cruncher catalog export-densegen" in content, (
                 f"{tutorial_path}: tutorial must include Cruncher export refresh path"
             )

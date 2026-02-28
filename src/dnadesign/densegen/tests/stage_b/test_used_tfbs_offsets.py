@@ -54,9 +54,9 @@ def test_update_usage_summary_counts_tf_and_tfbs() -> None:
     usage_counts: dict[tuple[str, str], int] = {}
     tf_usage_counts: dict[str, int] = {}
     used_tfbs_detail = [
-        {"tf": "TF1", "tfbs": "AAA"},
-        {"tf": "TF1", "tfbs": "AAA"},
-        {"tf": "TF2", "tfbs": "CCC"},
+        {"part_kind": "tfbs", "regulator": "TF1", "sequence": "AAA"},
+        {"part_kind": "tfbs", "regulator": "TF1", "sequence": "AAA"},
+        {"part_kind": "tfbs", "regulator": "TF2", "sequence": "CCC"},
     ]
 
     _update_usage_summary(usage_counts, tf_usage_counts, used_tfbs_detail)
@@ -85,18 +85,29 @@ def test_used_tfbs_detail_includes_stage_a_lineage_fields() -> None:
         stage_a_selection_rank_by_index=[2],
         stage_a_selection_score_norm_by_index=[0.91],
         stage_a_tfbs_core_by_index=["TT"],
+        stage_a_score_theoretical_max_by_index=[8.0],
+        stage_a_selection_policy_by_index=["mmr"],
+        stage_a_nearest_selected_similarity_by_index=[0.25],
+        stage_a_nearest_selected_distance_by_index=[3.0],
+        stage_a_nearest_selected_distance_norm_by_index=[0.375],
     )
     assert len(used_detail) == 2
     for entry in used_detail:
-        assert entry["stage_a_best_hit_score"] == 7.25
-        assert entry["stage_a_rank_within_regulator"] == 3
-        assert entry["stage_a_tier"] == 1
-        assert entry["stage_a_fimo_start"] == 12
-        assert entry["stage_a_fimo_stop"] == 17
-        assert entry["stage_a_fimo_strand"] == "+"
-        assert entry["stage_a_selection_rank"] == 2
-        assert entry["stage_a_selection_score_norm"] == 0.91
-        assert entry["stage_a_tfbs_core"] == "TT"
+        assert entry["regulator"] == "TF1"
+        assert entry["sequence"] == "TT"
+        assert entry["core_sequence"] == "TT"
+        assert entry["score_best_hit_raw"] == 7.25
+        assert entry["score_theoretical_max"] == 8.0
+        assert entry["score_relative_to_theoretical_max"] == 0.91
+        assert entry["rank_among_mined_positive"] == 3
+        assert entry["rank_among_selected"] == 2
+        assert entry["selection_policy"] == "mmr"
+        assert entry["nearest_selected_similarity"] == 0.25
+        assert entry["nearest_selected_distance"] == 3.0
+        assert entry["nearest_selected_distance_norm"] == 0.375
+        assert entry["matched_start"] == 12
+        assert entry["matched_stop"] == 17
+        assert entry["matched_strand"] == "+"
 
 
 def test_parse_used_tfbs_detail_rejects_non_collection_values() -> None:

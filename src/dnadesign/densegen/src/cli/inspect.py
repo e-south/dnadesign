@@ -31,6 +31,11 @@ from .context import CliContext
 from .render import stage_a_plan_table
 from .sampling import stage_a_plan_rows
 
+_FAILURE_OUTCOME_DESCRIPTIONS = {
+    "no_solution": "solver search exhausted with no accepted solution",
+    "stall_no_solution": "stalled before any accepted solution and triggered resample",
+}
+
 
 def _input_kind_label(input_type: str) -> str:
     if str(input_type).startswith("pwm_"):
@@ -65,6 +70,53 @@ def _resolve_usr_events_log_path(loaded, *, context: CliContext) -> Path:
     if not dataset:
         raise ValueError("output.usr.dataset must be a non-empty string.")
     return (usr_root / dataset / ".events.log").resolve()
+
+
+def _failure_outcome_meaning(reason: str) -> str:
+    reason_key = str(reason or "").strip()
+    if reason_key in _FAILURE_OUTCOME_DESCRIPTIONS:
+        return _FAILURE_OUTCOME_DESCRIPTIONS[reason_key]
+    if reason_key:
+        return f"failed library outcome: {reason_key}"
+    return "-"
+
+
+def _print_failure_outcomes(
+    *,
+    context: CliContext,
+    run_root: Path,
+) -> None:
+    attempts_path = run_root / "outputs" / "tables" / "attempts.parquet"
+    if not attempts_path.exists():
+        return
+    try:
+        attempts_df = pd.read_parquet(attempts_path, columns=["plan_name", "status", "reason"])
+    except Exception:
+        return
+    if attempts_df.empty:
+        return
+    if "status" not in attempts_df.columns or "reason" not in attempts_df.columns:
+        return
+    failed_df = attempts_df[attempts_df["status"] == "failed"]
+    if failed_df.empty:
+        return
+    grouped = (
+        failed_df.groupby(["plan_name", "reason"], dropna=False)
+        .size()
+        .reset_index(name="count")
+        .sort_values(["plan_name", "count", "reason"], ascending=[True, False, True])
+    )
+    if grouped.empty:
+        return
+    table = context.make_table("plan", "outcome", "count", "meaning")
+    for _, row in grouped.iterrows():
+        plan_name = str(row.get("plan_name") or "-")
+        reason = str(row.get("reason") or "-")
+        count = int(row.get("count") or 0)
+        table.add_row(plan_name, reason, str(count), _failure_outcome_meaning(reason))
+    context.console.print("[bold]Failure outcomes[/]")
+    context.console.print(table)
+    context.console.print("Counts are per failed Stage-B library attempt.")
 
 
 def _print_inputs_summary(
@@ -330,6 +382,7 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
                     str(item.stall_events),
                 )
         context.console.print(table)
+        _print_failure_outcomes(context=context, run_root=run_root)
 
         if events:
             events_path = run_root / "outputs" / "meta" / "events.jsonl"
@@ -599,7 +652,9 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
                         context.console.print(f"  side_biases.right: {', '.join(sb.right)}")
 
         solver = context.make_table("backend", "strategy", "time_limit", "threads", "strands")
-        time_limit = "-" if cfg.solver.time_limit_seconds is None else str(cfg.solver.time_limit_seconds)
+        time_limit = (
+            "-" if cfg.solver.solver_attempt_timeout_seconds is None else str(cfg.solver.solver_attempt_timeout_seconds)
+        )
         threads = "-" if cfg.solver.threads is None else str(cfg.solver.threads)
         backend_display = str(cfg.solver.backend)
         solver.add_row(backend_display, str(cfg.solver.strategy), time_limit, threads, str(cfg.solver.strands))
@@ -621,8 +676,15 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
         if sampling.pool_strategy == "iterative_subsample":
             sampling_table.add_row("iterative_max_libraries", str(sampling.iterative_max_libraries))
             sampling_table.add_row("iterative_min_new_solutions", str(sampling.iterative_min_new_solutions))
-        sampling_table.add_row("arrays_generated_before_resample", str(cfg.runtime.arrays_generated_before_resample))
-        sampling_table.add_row("max_consecutive_failures", str(cfg.runtime.max_consecutive_failures))
+        sampling_table.add_row("max_accepted_per_library", str(cfg.runtime.max_accepted_per_library))
+        sampling_table.add_row(
+            "no_progress_seconds_before_resample",
+            str(cfg.runtime.no_progress_seconds_before_resample),
+        )
+        sampling_table.add_row(
+            "max_consecutive_no_progress_resamples",
+            str(cfg.runtime.max_consecutive_no_progress_resamples),
+        )
         sampling_table.add_row("max_failed_solutions", str(cfg.runtime.max_failed_solutions))
         sampling_table.add_row(
             "max_failed_solutions_per_target",

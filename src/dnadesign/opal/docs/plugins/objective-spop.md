@@ -1,5 +1,9 @@
 ## sponging_percent_of_positive `spop`
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This page documents the draft `spop` objective design and its proposed scoring equations.
 Status: draft objective note; it may not correspond to a built-in registered plugin yet.
 

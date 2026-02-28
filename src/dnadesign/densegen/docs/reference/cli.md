@@ -1,5 +1,9 @@
 ## DenseGen CLI reference
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 Use this page when you need exact command behavior and flag names.
 For end-to-end guided runs, use:
 - [binding-sites baseline demo](../tutorials/demo_tfbs_baseline.md)
@@ -194,6 +198,7 @@ Key options:
 - `--log-file PATH`
 - `--show-tfbs`
 - `--show-solutions`
+- `--ensure-usr-registry / --no-ensure-usr-registry`
 - `-c, --config PATH`
 
 Notes:
@@ -201,13 +206,20 @@ Notes:
 - Missing/stale Stage-A pools for plan-active `include_inputs` are rebuilt automatically.
 - Stale pools for configured-but-unused inputs are ignored with an explicit warning.
 - For FIMO-backed inputs, ensure `fimo` is available (for example via `pixi run ...`).
+- When `output.targets` includes `usr`, DenseGen auto-seeds `output.usr.root/registry.yaml` from the repo default seed when missing (unless `--no-ensure-usr-registry` is set).
 
 ### `dense campaign-reset`
 
 Deletes run outputs while preserving config and inputs.
 
 Key options:
+- `--yes` (skip confirmation prompt)
+- `--purge-usr-registry` (remove `output.usr.root/registry.yaml` instead of preserving it)
 - `-c, --config PATH`
+
+Notes:
+- Runs in danger-zone mode by default and prompts before deleting outputs.
+- Preserves workspace-local USR registry by default so post-reset `dense run` remains ergonomic.
 
 ### `dense plot`
 
@@ -242,6 +254,10 @@ Notes:
 - Source path resolution:
   - `parquet` source -> `output.parquet.path`
   - `usr` source -> `<output.usr.root>/<output.usr.dataset>/records.parquet`, with notebook preview materialized to `outputs/notebooks/records_with_overlays.parquet` when overlay columns are required.
+- First notebook markdown cell renders two deterministic sections from config + `outputs/meta/run_manifest.json`:
+  - `Run contract (what this run will try to do)` from validated config schema.
+  - `Run outcome (what happened)` from finalized manifest counters.
+  - Includes a collapsible lifecycle details block for Stage-B and guard semantics.
 
 ### `dense notebook run`
 
@@ -265,7 +281,7 @@ Notes:
 - Default launch mode is `run`; use `--mode edit` when editing notebook cells.
 - `--headless` suppresses browser auto-open for remote/non-GUI shells when `--mode run` is used.
 - In run mode, `--no-open` maps to headless marimo launch.
-- In run mode with default `--no-reuse-server`, if `--host:--port` is already serving the same notebook file, DenseGen reuses that server and prints the existing URL.
+- In run mode with default `--no-reuse-server`, if `--host:--port` is already serving any notebook (including the same file), DenseGen launches a fresh server on a free port.
 - If `--host:--port` is serving a different notebook, DenseGen starts a fresh notebook server on a free port and prints the new URL.
 - Use `--reuse-server` to attach to an already-running notebook server on `--host:--port`.
 - `--open-timeout` must be greater than `0` and is only valid for `--mode run` with `--open`.

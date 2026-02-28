@@ -116,6 +116,14 @@ def _emit_event(on_event: PortfolioEventCallback | None, name: str, **payload: o
     on_event(name, dict(payload))
 
 
+def _remove_finder_metadata(root: Path) -> None:
+    if not root.exists():
+        return
+    for path in root.rglob(".DS_Store"):
+        if path.is_file():
+            path.unlink()
+
+
 def portfolio_preflight_payload(spec_path: Path) -> dict[str, object]:
     resolved_spec = spec_path.expanduser().resolve()
     spec = load_portfolio_spec(resolved_spec)
@@ -306,6 +314,8 @@ def _mean_pairwise_hamming_bp(sequences: list[str]) -> float | None:
 
 def _load_source_rows(
     source: PortfolioSource,
+    *,
+    on_event: PortfolioEventCallback | None = None,
 ) -> tuple[
     list[dict[str, object]],
     list[dict[str, object]],
@@ -519,7 +529,7 @@ def _load_source_rows(
         "analysis_id": summary_payload.get("analysis_id"),
         "analysis_best_score_final": (summary_payload.get("objective_components") or {}).get("best_score_final"),
     }
-    study_summary_row = _load_source_study_summary(source, run_study_fn=run_study)
+    study_summary_row = _load_source_study_summary(source, run_study_fn=run_study, on_event=on_event)
     return source_windows_rows, source_elite_rows, source_summary_row, source_run, study_summary_row
 
 
@@ -621,25 +631,17 @@ def run_portfolio(
         workspace_root = resolved_spec.parent.parent
     portfolio_id = _portfolio_id(spec)
     run_dir = resolve_portfolio_run_dir(workspace_root, spec.name, portfolio_id)
+    _remove_finder_metadata(workspace_root / "outputs")
 
     if run_dir.exists():
         if force_overwrite:
             shutil.rmtree(run_dir)
         else:
             raise ValueError(f"Portfolio run directory already exists: {run_dir}. Use --force-overwrite.")
-    export_dir = portfolio_tables_dir(run_dir)
-    if export_dir.exists():
-        if force_overwrite:
-            shutil.rmtree(export_dir)
-        else:
-            raise ValueError(
-                f"Portfolio export directory already exists: {export_dir}. "
-                "Use --force-overwrite to recreate deterministic exports."
-            )
 
     portfolio_meta_dir(run_dir).mkdir(parents=True, exist_ok=True)
     portfolio_logs_dir(run_dir).mkdir(parents=True, exist_ok=True)
-    export_dir.mkdir(parents=True, exist_ok=True)
+    portfolio_tables_dir(run_dir).mkdir(parents=True, exist_ok=True)
     portfolio_plots_dir(run_dir).mkdir(parents=True, exist_ok=True)
     ensure_mpl_cache(workspace_root / ".cruncher")
 
@@ -665,7 +667,7 @@ def run_portfolio(
         if spec.execution.mode == "prepare_then_aggregate":
             ensured_study_runs: dict[tuple[str, str], Path] = {}
         else:
-            ensured_study_runs = _ensure_required_source_studies(spec, run_study_fn=run_study)
+            ensured_study_runs = _ensure_required_source_studies(spec, run_study_fn=run_study, on_event=on_event)
         all_window_rows: list[dict[str, object]] = []
         all_elite_rows: list[dict[str, object]] = []
         source_summary_rows: list[dict[str, object]] = []
@@ -738,7 +740,12 @@ def run_portfolio(
                         prepared_by_id[source_id] = prepared
                     prepared_sources.append(prepared)
                     ensured_study_runs.update(
-                        _ensure_required_source_studies_for_sources(spec, [source], run_study_fn=run_study)
+                        _ensure_required_source_studies_for_sources(
+                            spec,
+                            [source],
+                            run_study_fn=run_study,
+                            on_event=on_event,
+                        )
                     )
                     _emit_event(on_event, "aggregate_source_started", source_id=source_id)
                     (
@@ -747,7 +754,7 @@ def run_portfolio(
                         source_summary_row,
                         source_run,
                         source_study_summary,
-                    ) = _load_source_rows(source)
+                    ) = _load_source_rows(source, on_event=on_event)
                     all_window_rows.extend(source_windows_rows)
                     all_elite_rows.extend(source_elite_rows)
                     source_summary_rows.append(source_summary_row)
@@ -768,6 +775,7 @@ def run_portfolio(
                                 top_n_lengths=int(spec.studies.sequence_length_table.top_n_lengths),
                                 ensured_study_runs=ensured_study_runs,
                                 run_study_fn=run_study,
+                                on_event=on_event,
                             )
                         )
                     table_paths, plot_paths, elite_summary_df = _materialize_portfolio_outputs(
@@ -800,7 +808,7 @@ def run_portfolio(
                     source_summary_row,
                     source_run,
                     source_study_summary,
-                ) = _load_source_rows(source)
+                ) = _load_source_rows(source, on_event=on_event)
                 all_window_rows.extend(source_windows_rows)
                 all_elite_rows.extend(source_elite_rows)
                 source_summary_rows.append(source_summary_row)
@@ -821,6 +829,7 @@ def run_portfolio(
                             top_n_lengths=int(spec.studies.sequence_length_table.top_n_lengths),
                             ensured_study_runs=ensured_study_runs,
                             run_study_fn=run_study,
+                            on_event=on_event,
                         )
                     )
                 table_paths, plot_paths, elite_summary_df = _materialize_portfolio_outputs(

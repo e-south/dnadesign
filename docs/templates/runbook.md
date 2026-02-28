@@ -1,30 +1,30 @@
-# <Task> runbook
+## <Task> runbook
 
 **Type:** runbook
 **Owner:** <team-or-handle>
 **Last verified:** <YYYY-MM-DD or "never">
 
-## At a glance
+### At a glance
 **Intent:**
 **When to use:**
 **Not for:**
 
-## Preconditions
+### Preconditions
 - <what must be true before running steps>
 
-## Steps
+### Steps
 1. ...
 2. ...
 
-## Verification
+### Verification
 - Commands to confirm success:
   - `...`
 
-## Rollback / recovery
+### Rollback / recovery
 - If X fails:
   - ...
 
-## Common failures
+### Common failures
 - Symptom:
 - Cause:
 - Fix:

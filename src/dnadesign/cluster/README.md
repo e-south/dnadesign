@@ -1,10 +1,13 @@
-## cluster
+![cluster banner](assets/cluster-banner.svg)
+
 This CLI clusters sequences, computes UMAP embeddings, renders plots for many **hues** (cluster labels, GC, numeric/categorical columns, highlights), and runs post-hoc analyses (composition, diversity, differential, numeric summaries). It records everything in a **run store** (`results/`) and lets you reuse runs.
 
 The system is built around two *composable* concepts:
 
 - **Presets** — reusable partials by **kind** (`fit`, `umap`, `plot`, `analysis`) that capture algorithm knobs and plotting style;
 - **Jobs** — concrete, checked‑in invocations you can run repeatedly (dataset bindings, names, I/O, highlights, etc.).
+
+See the [repository docs index](../../../docs/README.md) for cross-tool workflow routes and runbooks.
 
 ---
 

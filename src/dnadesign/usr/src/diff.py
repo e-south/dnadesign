@@ -39,7 +39,7 @@ class FileStat:
 @dataclass
 class SnapshotStat:
     count: int
-    newest_ts: Optional[str]  # "YYYYMMDDThhmmss"
+    newest_ts: Optional[str]  # "YYYYMMDDThhmmss[ffffff]"
     newer_than_local: int  # computed relative to other side
 
 
@@ -53,13 +53,17 @@ class DiffSummary:
     events_local_lines: int
     events_remote_lines: int
     snapshots: SnapshotStat
+    derived_local_files: List[str]
+    derived_remote_files: List[str]
+    aux_local_files: List[str]
+    aux_remote_files: List[str]
     has_change: bool
     changes: dict
     verify_mode: str
     verify_notes: List[str]
 
 
-_PAT_TS = re.compile(r"records-(\d{8}T\d{6})\.parquet$")
+_PAT_TS = re.compile(r"records-(\d{8}T\d{6,})\.parquet$")
 
 
 def _sha256_file(path: Path, chunk: int = 1 << 16) -> str:
@@ -158,14 +162,33 @@ def parquet_stats(path: Path, *, include_sha: bool = True, include_parquet: bool
     p = Path(path)
     if not p.exists():
         return FileStat(False, None, None, None, None, None)
-    mtime = str(int(p.stat().st_mtime))
-    size = int(p.stat().st_size)
-    sha = _sha256_file(p) if include_sha else None
+    try:
+        stat = p.stat()
+    except FileNotFoundError:
+        return FileStat(False, None, None, None, None, None)
+    except OSError as exc:
+        raise VerificationError(f"Failed to stat local file: {p}") from exc
+    mtime = str(int(stat.st_mtime))
+    size = int(stat.st_size)
+    if include_sha:
+        try:
+            sha = _sha256_file(p)
+        except FileNotFoundError:
+            return FileStat(False, None, None, None, None, None)
+        except OSError as exc:
+            raise VerificationError(f"Failed to hash local file: {p}") from exc
+    else:
+        sha = None
     rows = cols = None
     if include_parquet:
-        pf = pq.ParquetFile(str(p))
-        meta = pf.metadata
-        rows, cols = meta.num_rows, meta.num_columns
+        try:
+            pf = pq.ParquetFile(str(p))
+            meta = pf.metadata
+            rows, cols = meta.num_rows, meta.num_columns
+        except FileNotFoundError:
+            return FileStat(False, None, None, None, None, None)
+        except Exception as exc:
+            raise VerificationError(f"Failed to read local parquet file: {p}") from exc
     return FileStat(True, size, sha, rows, cols, mtime)
 
 
@@ -173,13 +196,32 @@ def file_stats(path: Path, *, include_sha: bool = True, include_parquet: bool = 
     p = Path(path)
     if not p.exists():
         return FileStat(False, None, None, None, None, None)
-    mtime = str(int(p.stat().st_mtime))
-    size = int(p.stat().st_size)
-    sha = _sha256_file(p) if include_sha else None
+    try:
+        stat = p.stat()
+    except FileNotFoundError:
+        return FileStat(False, None, None, None, None, None)
+    except OSError as exc:
+        raise VerificationError(f"Failed to stat local file: {p}") from exc
+    mtime = str(int(stat.st_mtime))
+    size = int(stat.st_size)
+    if include_sha:
+        try:
+            sha = _sha256_file(p)
+        except FileNotFoundError:
+            return FileStat(False, None, None, None, None, None)
+        except OSError as exc:
+            raise VerificationError(f"Failed to hash local file: {p}") from exc
+    else:
+        sha = None
     rows = cols = None
     if include_parquet and p.suffix.lower() == ".parquet":
-        pf = pq.ParquetFile(str(p))
-        rows, cols = pf.metadata.num_rows, pf.metadata.num_columns
+        try:
+            pf = pq.ParquetFile(str(p))
+            rows, cols = pf.metadata.num_rows, pf.metadata.num_columns
+        except FileNotFoundError:
+            return FileStat(False, None, None, None, None, None)
+        except Exception as exc:
+            raise VerificationError(f"Failed to read local parquet file: {p}") from exc
     return FileStat(True, size, sha, rows, cols, mtime)
 
 
@@ -215,6 +257,7 @@ def compute_file_diff(
         "meta_mtime_diff": False,
         "events_new_remote_lines": 0,
         "snapshots_remote_newer": 0,
+        "derived_files_diff": False,
     }
     has_change = bool(changes["primary_sha_diff"])
     return DiffSummary(
@@ -226,6 +269,10 @@ def compute_file_diff(
         events_local_lines=0,
         events_remote_lines=0,
         snapshots=SnapshotStat(count=0, newest_ts=None, newer_than_local=0),
+        derived_local_files=[],
+        derived_remote_files=[],
+        aux_local_files=[],
+        aux_remote_files=[],
         has_change=has_change,
         changes=changes,
         verify_mode=verify_mode,
@@ -245,8 +292,13 @@ def events_tail_count(path: Path) -> int:
     if not p.exists():
         return 0
     # Efficient enough for logs that are typically small
-    with p.open("rb") as f:
-        return sum(1 for _ in f)
+    try:
+        with p.open("rb") as f:
+            return sum(1 for _ in f)
+    except FileNotFoundError:
+        return 0
+    except OSError as exc:
+        raise VerificationError(f"Failed to read local events log: {p}") from exc
 
 
 def _snap_ts_from_name(name: str) -> Optional[str]:
@@ -289,6 +341,36 @@ def snapshots_stat(dir_path: Path, remote_names: List[str]) -> SnapshotStat:
     )
 
 
+def _derived_file_inventory(derived_dir: Path) -> List[str]:
+    derived_dir = Path(derived_dir)
+    if not derived_dir.exists():
+        return []
+    files: list[str] = []
+    for item in sorted(derived_dir.rglob("*")):
+        if not item.is_file():
+            continue
+        files.append(item.relative_to(derived_dir).as_posix())
+    return files
+
+
+def _aux_file_inventory(dataset_dir: Path) -> List[str]:
+    dataset_dir = Path(dataset_dir)
+    if not dataset_dir.exists():
+        return []
+    files: list[str] = []
+    for item in sorted(dataset_dir.rglob("*")):
+        if not item.is_file():
+            continue
+        rel = item.relative_to(dataset_dir)
+        rel_text = rel.as_posix()
+        if rel_text in {"records.parquet", "meta.md", ".events.log", ".usr.lock"}:
+            continue
+        if rel.parts and rel.parts[0] in {"_snapshots", "_derived"}:
+            continue
+        files.append(rel_text)
+    return files
+
+
 def compute_diff(
     dataset_dir: Path,
     remote: RemoteDatasetStat,
@@ -305,6 +387,18 @@ def compute_diff(
     )
     meta_local = file_mtime(dataset_dir / "meta.md")
     events_local = events_tail_count(dataset_dir / ".events.log")
+    local_snapshot_names: list[str] = []
+    local_snapshot_dir = dataset_dir / "_snapshots"
+    if local_snapshot_dir.exists():
+        for item in local_snapshot_dir.iterdir():
+            if item.is_file() and _PAT_TS.match(item.name):
+                local_snapshot_names.append(item.name)
+    local_snapshot_names = sorted(local_snapshot_names)
+    remote_snapshot_names = sorted(remote.snapshot_names)
+    local_derived_files = _derived_file_inventory(dataset_dir / "_derived")
+    remote_derived_files = sorted(remote.derived_files)
+    local_aux_files = _aux_file_inventory(dataset_dir)
+    remote_aux_files = sorted(remote.aux_files)
 
     # Convert remote stat to FileStat for unified view
     primary_remote = FileStat(
@@ -322,14 +416,20 @@ def compute_diff(
         "primary_sha_diff": _primary_diff(primary_local, primary_remote, verify_mode),
         "meta_mtime_diff": (meta_local != remote.meta_mtime),
         "events_new_remote_lines": max(0, remote.events_lines - events_local),
+        "snapshots_name_diff": (local_snapshot_names != remote_snapshot_names),
         "snapshots_remote_newer": snaps.newer_than_local,
+        "derived_files_diff": (local_derived_files != remote_derived_files),
+        "aux_files_diff": (local_aux_files != remote_aux_files),
     }
 
     has_change = bool(
         changes["primary_sha_diff"]
         or changes["meta_mtime_diff"]
         or changes["events_new_remote_lines"] > 0
+        or changes["snapshots_name_diff"]
         or changes["snapshots_remote_newer"] > 0
+        or changes["derived_files_diff"]
+        or changes["aux_files_diff"]
     )
 
     return DiffSummary(
@@ -341,6 +441,10 @@ def compute_diff(
         events_local_lines=events_local,
         events_remote_lines=remote.events_lines,
         snapshots=snaps,
+        derived_local_files=local_derived_files,
+        derived_remote_files=remote_derived_files,
+        aux_local_files=local_aux_files,
+        aux_remote_files=remote_aux_files,
         has_change=has_change,
         changes=changes,
         verify_mode=verify_mode,

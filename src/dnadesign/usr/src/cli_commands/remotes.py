@@ -110,6 +110,10 @@ def cmd_remotes_doctor(args) -> None:
     if rc != 0:
         raise SystemExit(f"Remote rsync is unavailable on {cfg.ssh_target}.")
 
+    rc, _out, _err = remote._ssh_run("command -v flock >/dev/null 2>&1", check=False)
+    if rc != 0:
+        raise SystemExit(f"Remote flock is unavailable on {cfg.ssh_target}.")
+
     if bool(getattr(args, "check_base_dir", True)):
         base_dir = shlex.quote(cfg.base_dir)
         rc, _out, _err = remote._ssh_run(f"test -d {base_dir}", check=False)
@@ -119,6 +123,7 @@ def cmd_remotes_doctor(args) -> None:
     print(f"Remote: {cfg.name}")
     print(f"SSH: {cfg.ssh_target} (ok)")
     print("Remote rsync: ok")
+    print("Remote flock: ok")
     if bool(getattr(args, "check_base_dir", True)):
         print(f"base_dir: {cfg.base_dir} (ok)")
     print("Doctor checks passed.")

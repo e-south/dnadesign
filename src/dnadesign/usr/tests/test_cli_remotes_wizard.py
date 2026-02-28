@@ -83,7 +83,7 @@ def test_remotes_doctor_reports_success(tmp_path: Path, monkeypatch) -> None:
             pass
 
         def _ssh_run(self, remote_cmd: str, check: bool = True):
-            if "command -v rsync" in remote_cmd:
+            if "command -v rsync" in remote_cmd or "command -v flock" in remote_cmd:
                 return 0, "", ""
             if "test -d" in remote_cmd:
                 return 0, "", ""

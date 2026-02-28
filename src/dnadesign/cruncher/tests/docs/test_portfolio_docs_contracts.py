@@ -34,7 +34,7 @@ def test_cli_reference_lists_portfolio_commands() -> None:
     assert "cruncher portfolio show" in cli_ref
     assert "--prepare-ready {prompt|skip|rerun}" in cli_ref
     assert "--spec` must point to a `.portfolio.yaml` file path" in cli_ref
-    assert "outputs/export/portfolios/<portfolio_name>/<portfolio_id>" in cli_ref
+    assert "outputs/<portfolio_name>/<portfolio_id>/tables" in cli_ref
 
 
 def test_portfolio_guide_describes_export_then_aggregate_sequence() -> None:
@@ -51,7 +51,7 @@ def test_portfolio_guide_describes_export_then_aggregate_sequence() -> None:
     assert "ensure_specs" in guide
     assert "configs/studies/length_vs_score.study.yaml" in guide
     assert "configs/studies/diversity_vs_score.study.yaml" in guide
-    assert "outputs/export/portfolios/<portfolio_name>/<portfolio_id>" in guide
+    assert "outputs/<portfolio_name>/<portfolio_id>/tables" in guide
     assert "Passing `configs/` (directory only) fails fast." in guide
     assert (
         "step_ids: [fetch_sites_regulondb, discover_motifs, render_logos, lock_targets, "

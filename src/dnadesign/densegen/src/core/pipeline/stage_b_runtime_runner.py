@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 from ...config import ResolvedPlanItem
@@ -63,6 +64,7 @@ def _run_stage_b_sampling(
 ) -> tuple[int, dict]:
     source_label = settings.source_label
     plan_name = settings.plan_name
+    plan_key = (source_label, plan_name)
     quota = settings.quota
     seq_len = settings.seq_len
     sampling_cfg = settings.sampling_cfg
@@ -75,7 +77,6 @@ def _run_stage_b_sampling(
     policy_pad = settings.policy_pad
     policy_sampling = settings.policy_sampling
     policy_solver = settings.policy_solver
-    plan_start = settings.plan_start
 
     sinks = context.sinks
     chosen_solver = context.chosen_solver
@@ -105,6 +106,14 @@ def _run_stage_b_sampling(
     solution_rows = execution_state.solution_rows
     composition_rows = execution_state.composition_rows
     events_path = execution_state.events_path
+    consecutive_failures_by_plan = execution_state.consecutive_failures_by_plan
+    if consecutive_failures_by_plan is None:
+        consecutive_failures_by_plan = {}
+        execution_state.consecutive_failures_by_plan = consecutive_failures_by_plan
+    no_progress_seconds_by_plan = execution_state.no_progress_seconds_by_plan
+    if no_progress_seconds_by_plan is None:
+        no_progress_seconds_by_plan = {}
+        execution_state.no_progress_seconds_by_plan = no_progress_seconds_by_plan
 
     pool = input_state.pool
     input_meta = input_state.input_meta
@@ -123,7 +132,7 @@ def _run_stage_b_sampling(
     max_per_subsample = runtime.max_per_subsample
     min_count_per_tf = runtime.min_count_per_tf
     max_dupes = runtime.max_dupes
-    stall_seconds = runtime.stall_seconds
+    no_progress_seconds = runtime.no_progress_seconds_before_resample
     max_failed_solutions = runtime.max_failed_solutions
     leaderboard_every = runtime.leaderboard_every
     checkpoint_every = runtime.checkpoint_every
@@ -140,14 +149,14 @@ def _run_stage_b_sampling(
     pad_max_tries = pad.max_tries
     solver_strategy = solver.strategy
     solver_strands = solver.strands
-    solver_time_limit_seconds = solver.time_limit_seconds
+    solver_attempt_timeout_seconds = solver.solver_attempt_timeout_seconds
     solver_threads = solver.threads
     extra_library_label = settings.extra_library_label
 
     backend = str(chosen_solver) if chosen_solver is not None else "-"
     strategy = str(solver_strategy)
     strands = str(solver_strands)
-    time_limit = "-" if solver_time_limit_seconds is None else str(solver_time_limit_seconds)
+    time_limit = "-" if solver_attempt_timeout_seconds is None else str(solver_attempt_timeout_seconds)
     threads = "-" if solver_threads is None else str(solver_threads)
     progress_reporter.solver_settings = (
         f"backend={backend} strategy={strategy} strands={strands} "
@@ -156,7 +165,7 @@ def _run_stage_b_sampling(
     if progress_style == "stream":
         log.info(
             "Stage-B solver settings: backend=%s strategy=%s strands=%s "
-            "time_limit_seconds=%s threads=%s sequence_length=%s",
+            "solver_attempt_timeout_seconds=%s threads=%s sequence_length=%s",
             backend,
             strategy,
             strands,
@@ -246,6 +255,7 @@ def _run_stage_b_sampling(
     runtime_state = StageBLibraryRuntimeState(
         libraries_built=libraries_built,
         libraries_built_start=libraries_built_start,
+        last_accepted_progress=(time.monotonic() if int(already_generated) > 0 else None),
     )
     counters = SamplingCounters()
 
@@ -256,7 +266,7 @@ def _run_stage_b_sampling(
         fixed_elements_dump=fixed_elements_dump,
         chosen_solver=chosen_solver,
         solver_strategy=solver_strategy,
-        solver_time_limit_seconds=solver_time_limit_seconds,
+        solver_attempt_timeout_seconds=solver_attempt_timeout_seconds,
         solver_threads=solver_threads,
         solver_strands=solver_strands,
         seq_len=seq_len,
@@ -300,6 +310,10 @@ def _run_stage_b_sampling(
         next_attempt_index=next_attempt_index,
     )
 
+    def _flush_checkpoint_sinks() -> None:
+        for sink in sinks:
+            sink.flush()
+
     progress_context = StageBProgressContext(
         source_label=source_label,
         plan_name=plan_name,
@@ -319,6 +333,7 @@ def _run_stage_b_sampling(
         tf_usage_counts=tf_usage_counts,
         diagnostics=diagnostics,
         logger=log,
+        flush_sinks=_flush_checkpoint_sinks,
     )
 
     callback_context = StageBLibraryRuntimeContext(
@@ -328,7 +343,7 @@ def _run_stage_b_sampling(
         pool_strategy=pool_strategy,
         min_count_per_tf=min_count_per_tf,
         max_dupes=max_dupes,
-        stall_seconds=stall_seconds,
+        stall_seconds=no_progress_seconds,
         max_failed_solutions=max_failed_solutions,
         progress_style=progress_style,
         show_solutions=show_solutions,
@@ -344,7 +359,7 @@ def _run_stage_b_sampling(
         pad_max_tries=pad_max_tries,
         solver_strategy=solver_strategy,
         solver_strands=solver_strands,
-        solver_time_limit_seconds=solver_time_limit_seconds,
+        solver_attempt_timeout_seconds=solver_attempt_timeout_seconds,
         solver_threads=solver_threads,
         extra_library_label=extra_library_label,
         fixed_elements=fixed_elements,
@@ -393,47 +408,59 @@ def _run_stage_b_sampling(
         iterative_max_libraries=iterative_max_libraries,
         counters=counters,
     )
-    sampling_result = sampler.run(
-        build_next_library=callbacks.build_next_library,
-        run_library=callbacks.run_library,
-        on_no_solution=callbacks.on_no_solution,
-        on_resample=callbacks.on_resample,
-        already_generated=already_generated,
-        one_subsample_only=one_subsample_only,
-        plan_start=plan_start,
-    )
+    try:
+        sampling_result = sampler.run(
+            build_next_library=callbacks.build_next_library,
+            run_library=callbacks.run_library,
+            on_no_solution=callbacks.on_no_solution,
+            on_resample=callbacks.on_resample,
+            already_generated=already_generated,
+            one_subsample_only=one_subsample_only,
+            initial_consecutive_failures=int(consecutive_failures_by_plan.get(plan_key, 0)),
+            initial_no_progress_seconds=float(no_progress_seconds_by_plan.get(plan_key, 0.0)),
+        )
+    except Exception:
+        for sink in sinks:
+            sink.flush()
+        _flush_attempts(tables_root, attempts_buffer)
+        if solution_rows is not None:
+            _flush_solutions(tables_root, solution_rows)
+        _close_plan_dashboard(dashboard=dashboard, shared_dashboard=shared_dashboard)
+        raise
     produced_total_this_call = sampling_result.generated
     global_generated = int(already_generated) + int(produced_total_this_call)
     runtime_state = callbacks.state
+    consecutive_failures_by_plan[plan_key] = int(getattr(sampling_result, "consecutive_failures_end", 0))
+    no_progress_seconds_by_plan[plan_key] = float(getattr(sampling_result, "no_progress_seconds_end", 0.0))
     for sink in sinks:
         sink.flush()
 
-        if one_subsample_only:
-            _flush_attempts(tables_root, attempts_buffer)
-            if solution_rows is not None:
-                _flush_solutions(tables_root, solution_rows)
-            if state_counts is not None:
-                state_counts[(source_label, plan_name)] = int(global_generated)
-                if write_state is not None:
-                    write_state()
-            snapshot = diagnostics.snapshot()
-            if global_generated >= quota and (usage_counts or tf_usage_counts or failure_counts):
-                diagnostics.log_snapshot()
-            _close_plan_dashboard(dashboard=dashboard, shared_dashboard=shared_dashboard)
-            return produced_total_this_call, {
-                "generated": produced_total_this_call,
-                "duplicates_skipped": runtime_state.duplicate_records,
-                "failed_solutions": runtime_state.failed_solutions,
-                "total_resamples": counters.total_resamples,
-                "libraries_built": max(0, runtime_state.libraries_built - runtime_state.libraries_built_start),
-                "stall_events": runtime_state.stall_events,
-                "failed_min_count_per_tf": runtime_state.failed_min_count_per_tf,
-                "failed_required_regulators": runtime_state.failed_required_regulators,
-                "failed_min_count_by_regulator": runtime_state.failed_min_count_by_regulator,
-                "failed_min_required_regulators": runtime_state.failed_min_required_regulators,
-                "duplicate_solutions": runtime_state.duplicate_solutions,
-                "leaderboard_latest": snapshot,
-            }
+    if one_subsample_only:
+        _flush_attempts(tables_root, attempts_buffer)
+        if solution_rows is not None:
+            _flush_solutions(tables_root, solution_rows)
+        if state_counts is not None:
+            state_counts[(source_label, plan_name)] = int(global_generated)
+            if write_state is not None:
+                write_state()
+        snapshot = diagnostics.snapshot()
+        if global_generated >= quota and (usage_counts or tf_usage_counts or failure_counts):
+            diagnostics.log_snapshot()
+        _close_plan_dashboard(dashboard=dashboard, shared_dashboard=shared_dashboard)
+        return produced_total_this_call, {
+            "generated": produced_total_this_call,
+            "duplicates_skipped": runtime_state.duplicate_records,
+            "failed_solutions": runtime_state.failed_solutions,
+            "total_resamples": counters.total_resamples,
+            "libraries_built": max(0, runtime_state.libraries_built - runtime_state.libraries_built_start),
+            "stall_events": runtime_state.stall_events + counters.stall_events,
+            "failed_min_count_per_tf": runtime_state.failed_min_count_per_tf,
+            "failed_required_regulators": runtime_state.failed_required_regulators,
+            "failed_min_count_by_regulator": runtime_state.failed_min_count_by_regulator,
+            "failed_min_required_regulators": runtime_state.failed_min_required_regulators,
+            "duplicate_solutions": runtime_state.duplicate_solutions,
+            "leaderboard_latest": snapshot,
+        }
 
     _flush_attempts(tables_root, attempts_buffer)
     if solution_rows is not None:
@@ -453,7 +480,7 @@ def _run_stage_b_sampling(
         "failed_solutions": runtime_state.failed_solutions,
         "total_resamples": counters.total_resamples,
         "libraries_built": max(0, runtime_state.libraries_built - runtime_state.libraries_built_start),
-        "stall_events": runtime_state.stall_events,
+        "stall_events": runtime_state.stall_events + counters.stall_events,
         "failed_min_count_per_tf": runtime_state.failed_min_count_per_tf,
         "failed_required_regulators": runtime_state.failed_required_regulators,
         "failed_min_count_by_regulator": runtime_state.failed_min_count_by_regulator,

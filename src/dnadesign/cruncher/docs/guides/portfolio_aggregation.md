@@ -1,5 +1,9 @@
 ## Portfolio aggregation
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 **Last updated by:** cruncher-maintainers on 2026-02-23
 
 
@@ -7,7 +11,7 @@
 - [Why this exists](#why-this-exists)
 - [Required source readiness](#required-source-readiness)
 - [Spec layout](#spec-layout)
-- [Canonical command sequence](#canonical-command-sequence)
+- [Standard command sequence](#standard-command-sequence)
 - [Outputs](#outputs)
 
 ### Why this exists
@@ -114,7 +118,7 @@ Strict contracts:
 - in `aggregate_only`, `run_dir` must already exist; in `prepare_then_aggregate`, it is validated after prepare steps run
 - `prepare.runbook` must exist and remain inside its declared source workspace path
 
-### Canonical command sequence
+### Standard command sequence
 
 ```bash
 set -euo pipefail
@@ -123,7 +127,7 @@ set -euo pipefail
 #    In schema v3 prepare_then_aggregate mode, source runbooks are executed first.
 cd ../portfolios
 uv run cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml --prepare-ready skip
-uv run cruncher portfolio show --run outputs/portfolios/master_all_workspaces/<portfolio_id>
+uv run cruncher portfolio show --run outputs/master_all_workspaces/<portfolio_id>
 
 # 2) If some sources are already ready in prepare_then_aggregate mode,
 #    choose explicit behavior:
@@ -144,26 +148,21 @@ Those nudge commands use `--workspace <source_workspace_path>` so they work even
 Portfolio outputs are deterministic:
 
 ```text
-<portfolio-workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/
+<portfolio-workspace>/outputs/<portfolio_name>/<portfolio_id>/
 ```
-
-Canonical handoff table export root:
-
-- `<portfolio-workspace>/outputs/export/portfolios/<portfolio_name>/<portfolio_id>/`
 
 Primary artifacts:
 
-- `outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__handoff_windows_long.{csv|parquet}`
-- `outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__handoff_elites_summary.{csv|parquet}`
-- `outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__source_summary.{csv|parquet}`
-- `outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__study_summary.{csv|parquet}` (when one or more sources define `study_spec`)
-- `outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__handoff_sequence_length.{csv|parquet}` (when `studies.sequence_length_table.enabled: true`)
-- `<portfolio-workspace>/outputs/plots/portfolio__<portfolio_name>__<portfolio_id>__plot__source_tradeoff_score_vs_diversity.pdf` (when diversity metric is available)
-- `<portfolio-workspace>/outputs/plots/portfolio__<portfolio_name>__<portfolio_id>__plot__elite_showcase_cross_workspace.<pdf|png>` (when `plots.elite_showcase.enabled: true`)
-- `portfolio/portfolio_manifest.json`
-- `portfolio/portfolio_status.json`
-- `portfolio/logs/prepare__<source_id>.log` (prepare step logs per source, in `prepare_then_aggregate` mode)
-- `manifests/manifest.json` + `manifests/table_manifest.json` + `manifests/plot_manifest.json`
+- `outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_windows_long.{csv|parquet}`
+- `outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_elites_summary.{csv|parquet}`
+- `outputs/<portfolio_name>/<portfolio_id>/tables/table__source_summary.{csv|parquet}`
+- `outputs/<portfolio_name>/<portfolio_id>/tables/table__study_summary.{csv|parquet}` (when one or more sources define `study_spec`)
+- `outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_sequence_length.{csv|parquet}` (when `studies.sequence_length_table.enabled: true`)
+- `outputs/<portfolio_name>/<portfolio_id>/plots/plot__source_tradeoff_score_vs_diversity.pdf` (when diversity metric is available)
+- `outputs/<portfolio_name>/<portfolio_id>/plots/plot__elite_showcase_cross_workspace.<pdf|png>` (when `plots.elite_showcase.enabled: true`)
+- `outputs/<portfolio_name>/<portfolio_id>/meta/manifest.json`
+- `outputs/<portfolio_name>/<portfolio_id>/meta/status.json`
+- `outputs/<portfolio_name>/<portfolio_id>/meta/logs/prepare__<source_id>.log` (prepare step logs per source, in `prepare_then_aggregate` mode)
 
 Default portfolio table contract is single-format parquet (`artifacts.table_format: parquet`, `artifacts.write_csv: false`).
 Enable `write_csv: true` only when a downstream consumer explicitly requires CSV mirrors.

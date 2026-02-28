@@ -1,5 +1,9 @@
 # Notify: consuming Universal Sequence Record events
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This module-local page is a compact quick-operations guide.
 For full operator procedures, use the canonical runbook:
 - [docs/notify/usr-events.md](../../../../docs/notify/usr-events.md)
@@ -12,8 +16,11 @@ For full operator procedures, use the canonical runbook:
 ## Fast path
 
 ```bash
+# Pin config path for repeated CLI calls.
 CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
+# Resolve run root from the selected config path.
 RUN_ROOT="$(dirname "$CONFIG")"
+# Pin Notify output directory for profile and cursor files.
 NOTIFY_DIR="$RUN_ROOT/outputs/notify/densegen"
 
 # Validate profile fields and secret wiring.
@@ -32,8 +39,8 @@ uv run notify spool drain --profile "$NOTIFY_DIR/profile.json"
 ## Related stack docs
 
 - DenseGen local end-to-end demo: [../../densegen/docs/tutorials/demo_usr_notify.md](../../densegen/docs/tutorials/demo_usr_notify.md)
-- DenseGen event-boundary contract: [../../densegen/docs/reference/outputs.md#event-streams-and-consumers-densegen-vs-usr](../../densegen/docs/reference/outputs.md#event-streams-and-consumers-densegen-vs-usr)
-- Universal Sequence Record event schema: [../../usr/README.md#event-log-schema](../../usr/README.md#event-log-schema)
+- DenseGen event-boundary contract: [../../densegen/docs/reference/outputs.md#event-boundary-paths](../../densegen/docs/reference/outputs.md#event-boundary-paths)
+- Universal Sequence Record event schema: [../../usr/docs/reference/event-log.md](../../usr/docs/reference/event-log.md)
 - Setup command guide: [../../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack](../../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack)
 
 ## Boundary reminder

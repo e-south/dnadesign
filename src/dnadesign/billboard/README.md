@@ -1,9 +1,11 @@
-## billboard
+![billboard banner](assets/billboard-banner.svg)
 
 **billboard** quantifies regulatory diversity in dense‑array DNA libraries by extracting TFBS content and computing a small set of scalar “diversity” metrics and diagnostic plots.
 
 > **The pipeline helps to answer:**
 > *How broad, balanced, distinct, and spatially diffuse are the transcription‑factor binding sites across a library of sequences?*
+
+See the [repository docs index](../../../docs/README.md) for related workflows and operational runbooks.
 
 ### Quick Start
 

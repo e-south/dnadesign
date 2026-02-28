@@ -1,5 +1,9 @@
 ## OPAL Plots
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This document covers **plot plugins** and the `PlotContext` helper. Plots are bespoke by design: each plugin owns its data loading, joins, and styling.
 
 ### How it works

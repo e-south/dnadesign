@@ -264,14 +264,18 @@ def validate_sequence_constraints(
     fixed_elements_dump: dict | None,
 ) -> SequenceValidationResult:
     seq = _normalize_motif(sequence, label="final sequence")
+    fixed_dump = _as_dict(fixed_elements_dump) or {}
+    promoter_constraints = list(fixed_dump.get("promoter_constraints") or [])
+    placements: list[dict] = []
+    if promoter_constraints:
+        placements = _resolve_promoter_placements(sequence=seq, fixed_elements_dump=fixed_dump)
     if not compiled.has_rules():
         return SequenceValidationResult(
             validation_passed=True,
             violations=[],
-            promoter_detail={"placements": []},
+            promoter_detail={"placements": placements},
         )
 
-    placements = _resolve_promoter_placements(sequence=seq, fixed_elements_dump=fixed_elements_dump or {})
     windows = _allowed_windows(placements=placements, components=compiled.allow_components)
     if not windows:
         raise ValueError("sequence constraints require promoter allowlist windows but none were resolved.")

@@ -21,6 +21,7 @@ from __future__ import annotations
 import os
 import socket
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, List, Optional
@@ -74,6 +75,7 @@ class USRWriter:
     _resume_detected: bool = field(default=False, init=False, repr=False)
     _lifecycle_emitted: bool = field(default=False, init=False, repr=False)
     _default_run_id: str = field(default="", init=False, repr=False)
+    _overlay_backlog_dir: Optional[Path] = field(default=None, init=False, repr=False)
 
     def __post_init__(self):
         if self.root is None:
@@ -94,6 +96,7 @@ class USRWriter:
             self.ds.init(source="densegen init")
         self._configure_npz()
         self._configure_id_index()
+        self._overlay_backlog_dir = self.ds.dir / "_artifacts" / "pending_overlay"
         digest = self.alignment_digest()
         self._resume_detected = bool(digest is not None and int(digest.id_count) > 0)
 
@@ -162,6 +165,7 @@ class USRWriter:
         return True
 
     def flush(self) -> None:
+        self._replay_overlay_backlog()
         if not self._records and not self._pending_overlay_records:
             return
 
@@ -204,6 +208,8 @@ class USRWriter:
         tx.begin(rows_incoming=len(incoming_records), rows_new=len(rows_new))
         orphan_artifacts: list[OrphanArtifact] = []
         import_done = False
+        overlay_table: pa.Table | None = None
+        backlog_path: Path | None = None
 
         try:
             if rows_new:
@@ -219,13 +225,22 @@ class USRWriter:
                 self._add_ids_to_index(rec.id for rec in records_new)
 
             if records_for_overlay:
-                table, orphan_artifacts = tx.stage_artifacts(self._build_overlay_table(records_for_overlay))
-                tx.commit_overlay_part(table, key="id")
+                overlay_table, orphan_artifacts = tx.stage_artifacts(self._build_overlay_table(records_for_overlay))
+                backlog_path = self._persist_overlay_backlog(overlay_table)
+                tx.commit_overlay_part(overlay_table, key="id")
+                self._delete_overlay_backlog(backlog_path)
+                backlog_path = None
         except Exception as exc:
             if isinstance(exc, DensegenUsrFlushError):
                 orphan_artifacts = list(exc.orphan_artifacts)
             if records_for_overlay and (import_done or not rows_new):
-                self._pending_overlay_records = list(records_for_overlay)
+                if backlog_path is None and overlay_table is not None:
+                    try:
+                        backlog_path = self._persist_overlay_backlog(overlay_table)
+                    except Exception:
+                        self._pending_overlay_records = list(records_for_overlay)
+                elif backlog_path is not None:
+                    self._pending_overlay_records.clear()
             if import_done:
                 self._records.clear()
                 self._seen_ids.clear()
@@ -372,6 +387,76 @@ class USRWriter:
                 merged.append(rec.id)
             by_id[rec.id] = rec
         return [by_id[record_id] for record_id in merged]
+
+    def _overlay_backlog_parts(self) -> list[Path]:
+        if self._overlay_backlog_dir is None:
+            return []
+        if not self._overlay_backlog_dir.exists():
+            return []
+        return sorted(self._overlay_backlog_dir.glob("part-*.parquet"))
+
+    def _persist_overlay_backlog(self, table: pa.Table) -> Path:
+        if self._overlay_backlog_dir is None:
+            raise RuntimeError("USRWriter overlay backlog directory is not configured.")
+        self._overlay_backlog_dir.mkdir(parents=True, exist_ok=True)
+        part_path = self._overlay_backlog_dir / f"part-{time.time_ns()}-{uuid.uuid4().hex}.parquet"
+        tmp_path = part_path.with_suffix(".parquet.tmp")
+        try:
+            import pyarrow.parquet as pq
+        except Exception as exc:
+            raise RuntimeError(f"pyarrow.parquet is required to persist USR overlay backlog: {exc}") from exc
+        pq.write_table(table, tmp_path)
+        os.replace(tmp_path, part_path)
+        return part_path
+
+    @staticmethod
+    def _delete_overlay_backlog(path: Path | None) -> None:
+        if path is None:
+            return
+        path.unlink(missing_ok=True)
+
+    def _overlay_run_id_from_table(self, table: pa.Table) -> str:
+        run_col = f"{self.namespace}__run_id"
+        if run_col not in table.schema.names:
+            return self._resolve_run_id(None)
+        values = table.column(run_col).to_pylist()
+        for value in values:
+            run_id = str(value or "").strip()
+            if run_id:
+                return self._resolve_run_id(run_id)
+        return self._resolve_run_id(None)
+
+    def _replay_overlay_backlog(self) -> None:
+        backlog_parts = self._overlay_backlog_parts()
+        if not backlog_parts:
+            return
+        try:
+            import pyarrow.parquet as pq
+        except Exception as exc:
+            raise RuntimeError(f"pyarrow.parquet is required to replay USR overlay backlog: {exc}") from exc
+
+        for part_path in backlog_parts:
+            try:
+                table = pq.read_table(part_path)
+            except Exception as exc:
+                raise RuntimeError(f"Failed to read USR overlay backlog part: {part_path}") from exc
+
+            run_id = self._overlay_run_id_from_table(table)
+            actor = self._densegen_actor(run_id)
+            tx = DensegenUsrFlushTransaction(
+                self.ds,
+                self.namespace,
+                run_id=run_id,
+                actor=actor,
+            )
+            tx.begin(rows_incoming=int(table.num_rows), rows_new=int(table.num_rows))
+            try:
+                tx.commit_overlay_part(table, key="id")
+            except Exception as exc:
+                tx.on_failure(exc, orphan_artifacts=[])
+                raise
+            self._delete_overlay_backlog(part_path)
+        self._pending_overlay_records.clear()
 
     def _emit_densegen_health_event(
         self,

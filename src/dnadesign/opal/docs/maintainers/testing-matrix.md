@@ -1,5 +1,9 @@
 ## OPAL Workflow Pressure-Test Matrix
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This page is for maintainers and CI-style validation. New users should start at:
 
 - [Workflows](../index.md#workflows)

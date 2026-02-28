@@ -11,7 +11,7 @@ description: >
   For dnadesign workload specifics, load references/workload-dnadesign.md.
 ---
 
-# SGE HPC Ops
+## SGE HPC Ops
 
 A **site-agnostic**, operator-grade playbook for **SGE-family schedulers** (Sun Grid Engine / Univa Grid Engine / compatible).
 It is designed to be durable across clusters and future workloads.
@@ -20,7 +20,7 @@ In this repository, the skill is BU-hosted: keep generic scheduler behavior here
 **Core principle:** **Probe capabilities first**, then generate commands using a *capability map*.
 Do not emit cluster-specific flags (accounts, PE names, mem keys, GPU keys, special queues) until they are confirmed.
 
-## What this skill is for
+### What this skill is for
 
 Use when the user wants to:
 - start **interactive** compute sessions (e.g. `qrsh` / `qlogin`)
@@ -34,7 +34,7 @@ Not for:
 - Slurm/PBS-only instructions (unless translating concepts at a high level)
 - local-only development
 
-## Non-stale design (how to keep this future-proof)
+### Non-stale design (how to keep this future-proof)
 
 - **Keep core portable.** Keep platform policy and site keys in platform docs; keep workload-specific examples in `references/`.
 - **Prefer placeholders + probing** over hard-coded flags.
@@ -44,9 +44,9 @@ Not for:
 - **Re-probe when context changes.** If login host/site context changes, regenerate the capability map before new commands.
 - **Use an explicit interactive state machine.** Never "try again" silently; every submit/reattach decision must be state-driven and user-visible.
 
-## Operator objects to maintain
+### Operator objects to maintain
 
-### 1) Capability map (mandatory)
+#### 1) Capability map (mandatory)
 
 A small mapping that records what *this* cluster supports and the correct resource key names.
 
@@ -63,7 +63,7 @@ Minimum fields (extend as needed):
 - `policy`: `{ ssh_to_compute_allowed: "unknown"|"yes"|"no", notes }`
 - `probed`: `{ host, user, timestamp_utc }`
 
-### 2) Run handle (per job/session)
+#### 2) Run handle (per job/session)
 
 - `mode`: `interactive_cli_qrsh` | `interactive_ondemand_duo` | `batch`
 - `queue_safe`: `true|false` (default `true` for interactive)
@@ -82,7 +82,7 @@ Minimum fields (extend as needed):
 - `last_seen_utc`
 - `watchers`: list of watcher subprocesses with **timeout + teardown plan**
 
-### 3) Interactive request fingerprint (mandatory)
+#### 3) Interactive request fingerprint (mandatory)
 
 Define a request fingerprint before interactive submission:
 - `account_or_project` (exact selected accounting value)
@@ -98,7 +98,7 @@ Matching contract:
 - If multiple matches exist, stop and ask user which handle to continue with.
 - If no exact match exists, treat as non-match (do not reuse).
 
-### 4) Interactive state machine (mandatory)
+#### 4) Interactive state machine (mandatory)
 
 Use this finite-state flow for all interactive requests:
 
@@ -128,11 +128,11 @@ State-machine hard rules:
 - Never try queue-bypass/priority tricks unless user explicitly asks.
 - Always report the tracked handle (`mode`, `job_id/session_id`, `state`, `queue`, `exec_host`, `last_seen_utc`) in updates.
 
-## Step 0: Mandatory capability probe (before giving commands)
+### Step 0: Mandatory capability probe (before giving commands)
 
 Run the probe on the login node (or equivalent control host).
 
-### Probe A: confirm scheduler + available commands
+#### Probe A: confirm scheduler + available commands
 
 ```bash
 command -v qsub qstat qdel >/dev/null && echo "SGE-like tools present"
@@ -143,12 +143,12 @@ qsub -help 2>&1 | sed -n '1,120p'
 qstat -help 2>&1 | sed -n '1,120p'
 ```
 
-### Probe-fail contract (mandatory)
+#### Probe-fail contract (mandatory)
 
 If Probe A does not confirm `qsub` and `qstat`, stop command generation and ask the user for the correct scheduler context.
 Do not emit SGE-specific flags or templates when scheduler identity is unknown.
 
-### Probe B: discover parallel environments (PE) and queues (best effort)
+#### Probe B: discover parallel environments (PE) and queues (best effort)
 
 Some sites allow `qconf`; some restrict it. Treat failures as "unknown".
 
@@ -157,7 +157,7 @@ qconf -spl 2>/dev/null || echo "[warn] qconf -spl not permitted; PE list unknown
 qconf -sql 2>/dev/null || echo "[warn] qconf -sql not permitted; queue list unknown"
 ```
 
-### Probe C: discover resource keys (memory / gpu / special)
+#### Probe C: discover resource keys (memory / gpu / special)
 
 ```bash
 qconf -sc 2>/dev/null | sed -n '1,200p' || echo "[warn] qconf -sc not permitted; resource keys unknown"
@@ -171,7 +171,7 @@ qconf -sc 2>/dev/null | grep -i -E 'gpu|gpus|cuda' || true
 qconf -sc 2>/dev/null | grep -i -E 'download|transfer|globus' || true
 ```
 
-### Probe D: accounting/project flag detection (do not assume)
+#### Probe D: accounting/project flag detection (do not assume)
 
 Look for project/account flags in `qsub -help`. If not obvious, treat as unknown and avoid specifying.
 
@@ -185,7 +185,7 @@ qsub -help 2>&1 | grep -E ' -P | -A |project|account' || true
 - In this repository's BU SCC context, prefer `-P <project>`.
 - Outside BU SCC, ask for site docs or a known submit example and do not emit both `-P` and `-A`.
 
-### Account/project validity gate (hard-stop)
+#### Account/project validity gate (hard-stop)
 
 Do not run real `qsub` unless account/project validity is proven by at least one of:
 
@@ -196,7 +196,7 @@ Do not run real `qsub` unless account/project validity is proven by at least one
 If validity cannot be proven, stop and ask for a known-good example or corrected value.
 Never silently switch between `-P` and `-A`. Never emit both.
 
-### Probe E: lifecycle tooling detection (best effort)
+#### Probe E: lifecycle tooling detection (best effort)
 
 Treat unsupported or denied commands as optional capability gaps, not hard failures.
 
@@ -209,7 +209,7 @@ qmod -help 2>&1 | grep -E -- '-cj|clear' || true
 qacct -help 2>&1 | sed -n '1,60p' || true
 ```
 
-### Probe F: interactive command option capabilities (mandatory for interactive commands)
+#### Probe F: interactive command option capabilities (mandatory for interactive commands)
 
 Do not assume `qrsh` and `qlogin` share the same options. Build `interactive_cmd_capabilities` from help output.
 
@@ -218,7 +218,7 @@ qrsh -help 2>&1 | sed -n '1,120p' || true
 qlogin -help 2>&1 | sed -n '1,120p' || true
 ```
 
-## Step 0.5: Capability snapshot output (mandatory before command generation)
+### Step 0.5: Capability snapshot output (mandatory before command generation)
 
 Before proposing interactive or batch commands, print a compact capability snapshot for the current host.
 
@@ -242,9 +242,9 @@ Capability snapshot
 
 If unknowns remain, call them out and use the safe-default flow.
 
-## Step 1: Choose an execution mode (interactive vs batch)
+### Step 1: Choose an execution mode (interactive vs batch)
 
-### Choose interactive when:
+#### Choose interactive when:
 
 - debugging environment issues
 - iterating quickly
@@ -253,14 +253,14 @@ If unknowns remain, call them out and use the safe-default flow.
   - agent-controlled command execution (`interactive_cli_qrsh`)
   - user-authenticated reconnectability (`interactive_ondemand_duo`)
 
-### Choose batch when:
+#### Choose batch when:
 
 - runs are long
 - you need restart safety + durable logs
 - you want deterministic scheduler-managed resources
 - you want to run watchers/daemons without keeping an interactive terminal open
 
-### Interactive intent routing (mandatory)
+#### Interactive intent routing (mandatory)
 
 Route interactive requests by stated intent before generating commands:
 
@@ -273,7 +273,7 @@ Route interactive requests by stated intent before generating commands:
 - If intent is unclear:
   - ask one short routing question before submitting anything
 
-## Step 2: Pick a workload pattern (portable categories)
+### Step 2: Pick a workload pattern (portable categories)
 
 Use these categories; do not tie the core logic to any single tool:
 
@@ -283,11 +283,11 @@ Use these categories; do not tie the core logic to any single tool:
 - **Watcher/daemon**: lightweight, long walltime, minimal resources
 - **Transfer/download-only**: network-heavy, compute-light (site-specific)
 
-## Step 3: Build resource requests using the capability map
+### Step 3: Build resource requests using the capability map
 
 This skill covers requesting scheduler resources for jobs. It does not create scheduler objects such as queues, complexes, projects, or host groups.
 
-### Safe defaults (when uncertain)
+#### Safe defaults (when uncertain)
 
 If PE/memory keys are unknown, prefer **minimal** requests:
 
@@ -299,23 +299,23 @@ If PE/memory keys are unknown, prefer **minimal** requests:
 If the walltime key is unknown, rely on site default runtime and state that assumption explicitly.
 Then escalate once the site's resource vocabulary is confirmed.
 
-### Standard resource knobs (SGE concepts)
+#### Standard resource knobs (SGE concepts)
 
 - walltime: `-l <walltime_key>=HH:MM:SS` (for example `h_rt`; confirm via capability probe/site docs)
 - slots: `-pe <pe_name> <slots>` (requires PE name)
 - memory: site-defined (e.g. `-l mem_free=...` or `-l h_vmem=...` or per-core variants)
 - GPUs: site-defined (e.g. `-l gpu=1`, `-l gpus=1`, capability keys, etc.)
 
-## Interactive sessions (portable)
+### Interactive sessions (portable)
 
-### Interactive mode summary
+#### Interactive mode summary
 
 | User intent | Mode | Authentication path | Reconnectability | Primary control |
 |---|---|---|---|---|
 | agent executes commands directly in allocation | `interactive_cli_qrsh` | scheduler CLI (`qrsh`/`qlogin`) | lower (client interruption can break attach) | agent |
 | session should be rejoinable | `interactive_ondemand_duo` | browser + Duo via OnDemand | higher (portal-managed sessions) | user + portal |
 
-### Queue-safe policy (`queue_safe=true`, default)
+#### Queue-safe policy (`queue_safe=true`, default)
 
 Before any interactive submit:
 
@@ -331,7 +331,7 @@ Rules:
 - Never resubmit automatically on timeout.
 - If timeout/recovery is needed, use `guarded_retry_once` with explicit reason + same fingerprint + user confirmation.
 
-### Mode A: `interactive_cli_qrsh` (agent-controlled, less reconnectable)
+#### Mode A: `interactive_cli_qrsh` (agent-controlled, less reconnectable)
 
 Use when the user wants the agent to execute commands directly in the interactive allocation.
 
@@ -358,7 +358,7 @@ echo "TMPDIR=${TMPDIR:-unset}"
 Recovery note:
 - if the controlling client is interrupted, this mode may lose attachability; treat recovery as `detect_existing` + explicit `keep|qdel` decision.
 
-### Mode B: `interactive_ondemand_duo` (human-authenticated, reconnect-friendly)
+#### Mode B: `interactive_ondemand_duo` (human-authenticated, reconnect-friendly)
 
 Use when the user prioritizes reconnectability and accepts browser-based authentication.
 
@@ -378,7 +378,7 @@ Important constraints:
 - agent cannot inherit browser-authenticated session cookies
 - agent must wait for user confirmation before proceeding with OnDemand-dependent actions
 
-#### OnDemand verification rubric (mandatory)
+##### OnDemand verification rubric (mandatory)
 
 Purpose:
 - prevent false-positive "session started" claims
@@ -431,7 +431,7 @@ Post-confirmation verification rules:
 - Treat verification as successful only when threshold conditions are satisfied and attributable to this run handle.
 - If evidence is missing, keep `auth_state=pending_verification`, report failure code, and request one concrete next action.
 
-### Interruption recovery (mandatory)
+#### Interruption recovery (mandatory)
 
 At the start of every turn that touches interactive state:
 
@@ -444,9 +444,9 @@ Then:
 - if no tracked job exists, set interactive status to `ended_or_unknown`
 - if job exists but appears unusable/orphaned, ask user: `keep` or `qdel <job_id>`
 
-## Batch submission (portable)
+### Batch submission (portable)
 
-### Minimal robust script header (recommended)
+#### Minimal robust script header (recommended)
 
 ```bash
 #!/bin/bash -l
@@ -471,7 +471,7 @@ echo "JOB_ID=${JOB_ID:-unset}"
 echo "NSLOTS=${NSLOTS:-unset}"
 ```
 
-### Submit and capture the job id (prefer terse)
+#### Submit and capture the job id (prefer terse)
 
 ```bash
 JOB_ID="$(qsub -terse <ACCOUNT_ARG> <script_or_template>)" || exit 1
@@ -480,7 +480,7 @@ echo "submitted JOB_ID=$JOB_ID"
 
 If `-terse` is unsupported, capture stdout and parse the id from it.
 
-### Submit gate (mandatory before real `qsub`)
+#### Submit gate (mandatory before real `qsub`)
 
 Run this gate in order and stop on first failure:
 
@@ -513,7 +513,7 @@ echo "submitted JOB_ID=$JOB_ID"
 `qsub -verify` metadata can be misleading in some contexts (for example blank `owner` or `uid: 0` in dry runs).
 Do not treat verify metadata fields as proof of runtime readiness or account validity.
 
-### Per-template runtime precheck matrix (hard-stop)
+#### Per-template runtime precheck matrix (hard-stop)
 
 | Template | Required inputs | Validation checks | Hard-stop condition |
 |---|---|---|---|
@@ -525,23 +525,23 @@ Execution rule:
 - if any required check is `FAIL`, stop immediately and report exactly what is missing
 - do not submit while any check is unresolved
 
-## Monitoring and diagnosis (operations-friendly)
+### Monitoring and diagnosis (operations-friendly)
 
-### Job state quick reference
+#### Job state quick reference
 
 - `qw`: queued/waiting
 - `r`: running
 - `Eqw`: error/hold state (investigate immediately)
 - job disappears from `qstat`: finished or deleted (check logs/accounting)
 
-### Core commands
+#### Core commands
 
 ```bash
 qstat -u "$USER"
 qstat -j "$JOB_ID"
 ```
 
-### Eqw triage (portable)
+#### Eqw triage (portable)
 
 ```bash
 qstat -j "$JOB_ID" | sed -n '1,200p'
@@ -554,9 +554,9 @@ Look for:
 - missing paths / permissions for `-cwd` or `-o`
 - rejected queue/request policies
 
-## Session and lifecycle controls (portable)
+### Session and lifecycle controls (portable)
 
-### Check active sessions and jobs
+#### Check active sessions and jobs
 
 Use these checks before starting new work so existing runs are not duplicated:
 
@@ -589,7 +589,7 @@ Ambiguity contract (interactive-sensitive tasks):
 - if user explicitly requests to proceed despite unresolved status, allow one launch attempt with full risk note and fingerprint tracking
 - do not submit replacement interactive requests automatically while status is unresolved
 
-### Start and stop gracefully
+#### Start and stop gracefully
 
 Start:
 - interactive (agent-controlled): launch `qrsh`/`qlogin` per capability map and `queue_safe=true`
@@ -601,7 +601,7 @@ Stop:
 - batch job: `qdel "$JOB_ID"`
 - background watchers: stop by PID per teardown contract
 
-### Lifecycle safety gate (mandatory before `qdel` or `qmod -cj`)
+#### Lifecycle safety gate (mandatory before `qdel` or `qmod -cj`)
 
 Do not mutate job state unless all checks pass:
 
@@ -628,7 +628,7 @@ echo "owner=$owner user=$USER"
 test "$owner" = "$USER"
 ```
 
-### Optional Eqw recovery path
+#### Optional Eqw recovery path
 
 Use only after triage confirms a recoverable transient issue and site policy allows it.
 
@@ -640,7 +640,7 @@ qstat -j "$JOB_ID" | sed -n '1,120p'
 
 If `qmod` is unavailable or denied, do not force retries; fix request errors and resubmit.
 
-### Optional postmortem accounting path
+#### Optional postmortem accounting path
 
 When a job has finished and accounting is enabled:
 
@@ -650,11 +650,11 @@ qacct -j "$JOB_ID" | sed -n '1,200p' || true
 
 If `qacct` is unavailable, use scheduler output plus job logs as the postmortem source.
 
-## Watchers: bounded loops + teardown contract (mandatory)
+### Watchers: bounded loops + teardown contract (mandatory)
 
 **Why:** automation can accidentally leave infinite loops/subprocesses. This skill requires bounded watchers.
 
-### Default watcher policy
+#### Default watcher policy
 
 Unless the user explicitly asks "watch until completion":
 
@@ -662,7 +662,7 @@ Unless the user explicitly asks "watch until completion":
 - log watcher runs **until** the log file exists and shows first output OR **10 minutes**, then stops
 - after stopping, report how to restart watchers on demand
 
-### Queue watcher (bounded)
+#### Queue watcher (bounded)
 
 ```bash
 JOB_ID="<job_id>"
@@ -715,7 +715,7 @@ Array note:
 - some sites display array tasks as `<job_id>.<task_id>` or separate task columns.
 - this watcher aggregates states across matching tasks and does not rely on a first row.
 
-### Log watcher (bounded, no infinite tail)
+#### Log watcher (bounded, no infinite tail)
 
 ```bash
 LOG_PATH="outputs/logs/<job_name>.<job_id>.out"
@@ -738,7 +738,7 @@ if [ "$elapsed" -ge "$MAX_WAIT_SEC" ]; then
 fi
 ```
 
-### Teardown rule (execution contract)
+#### Teardown rule (execution contract)
 
 If a background watcher subprocess is started, it must:
 
@@ -746,7 +746,7 @@ If a background watcher subprocess is started, it must:
 - stop it when the watcher goal is reached or timeout triggers
 - report "watchers stopped" (or "watchers still running, PID=...") explicitly
 
-## "Step into the node" policy guardrails (do not assume SSH)
+### "Step into the node" policy guardrails (do not assume SSH)
 
 Attaching to a running batch job environment is not guaranteed.
 
@@ -762,7 +762,7 @@ Supported levels:
 - If attempted, do a harmless probe first (`ssh <host> hostname`) and stop if denied.
 - Prefer interactive sessions to avoid policy violations.
 
-## Repo paths and templates: never hard-code
+### Repo paths and templates: never hard-code
 
 If referring to repo-local job templates or docs:
 
@@ -807,7 +807,7 @@ If a template path is uncertain, do not guess; discover it.
 When selecting a template for submission, use `.qsub`/`.sge` files by default.
 Use `.sh` only when the task explicitly requests a shell harness and `ALLOW_SHELL_HARNESS=1` is set.
 
-## Progressive disclosure: site/workload references
+### Progressive disclosure: site/workload references
 
 This core skill stays portable. For specifics in this repository:
 
@@ -818,7 +818,7 @@ This core skill stays portable. For specifics in this repository:
 - BU SCC job templates: `../jobs/README.md`
 - dnadesign workload examples: `references/workload-dnadesign.md`
 
-## Additional resources discovery (site-agnostic pattern)
+### Additional resources discovery (site-agnostic pattern)
 
 Use this order when more detail is needed than the core skill provides:
 
@@ -829,7 +829,7 @@ Use this order when more detail is needed than the core skill provides:
 For this repository, start with `../README.md` and related `../` BU SCC docs.
 BU OnDemand discovery is documented in BU SCC links, not duplicated in this core skill.
 
-## User-facing response contract (mandatory UX output)
+### User-facing response contract (mandatory UX output)
 
 When executing this skill against a real cluster, return concise didactic updates in this order:
 

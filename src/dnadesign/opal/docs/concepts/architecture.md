@@ -1,5 +1,9 @@
 ## OPAL Architecture and Data Flow
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This page describes how OPAL executes one round and how config keys map to runtime behavior.
 
 ### Round lifecycle

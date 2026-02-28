@@ -74,3 +74,5 @@ class PlanExecutionState:
     composition_rows: list[dict] | None = None
     events_path: Path | None = None
     display_map_by_input: dict[str, dict[str, str]] | None = None
+    consecutive_failures_by_plan: dict["PlanKey", int] | None = None
+    no_progress_seconds_by_plan: dict["PlanKey", float] | None = None

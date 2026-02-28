@@ -7,59 +7,71 @@
 - [lexA, cpxR, baeR]
 
 **Purpose**
-- Run the stress study end to end with fixed-element matrix expansion, high-budget Stage-A pools, and dual parquet plus USR outputs.
-- Expanded plan names use semantic `__sig35=...` labels and Stage-B plots default to `scope: auto` (`max_plans: 12`) for compact diagnostics.
+- Run the stress campaign workspace with dual-sink outputs, expanded plans, and workspace-local plot/notebook generation.
 
-**Run This Single Command**
+**Sigma70 Literal Source**
+- DOI: 10.1038/s41467-017-02473-5 | www.nature.com/naturecommunications
 
-Run this single command to do everything below:
+**Runbook command**
 
-    REPO_ROOT="$(git rev-parse --show-toplevel)" && WORKSPACE_ROOT="$REPO_ROOT/src/dnadesign/densegen/workspaces" && WORKSPACE_ID="stress_campaign_trial" && uv run --project "$REPO_ROOT" dense workspace init --id "$WORKSPACE_ID" --root "$WORKSPACE_ROOT" --from-workspace study_stress_ethanol_cipro --copy-inputs --output-mode both && CONFIG="$WORKSPACE_ROOT/$WORKSPACE_ID/config.yaml" && pixi run fimo --version && pixi run dense validate-config --probe-solver -c "$CONFIG" && pixi run dense run --fresh --no-plot -c "$CONFIG" && pixi run dense inspect run --events --library -c "$CONFIG" && pixi run dense plot -c "$CONFIG" && pixi run dense notebook generate -c "$CONFIG"
+Run this command from the workspace root:
 
-If `WORKSPACE_ID` already exists, choose a new id and rerun the command.
+    # Execute the packaged workspace runbook sequence.
+    ./runbook.sh
 
 ### Step-by-Step Commands
 
+    # Enable strict shell behavior for fail-fast execution.
     set -euo pipefail
-    REPO_ROOT="$(git rev-parse --show-toplevel)"
-    WORKSPACE_ROOT="$REPO_ROOT/src/dnadesign/densegen/workspaces"
-    WORKSPACE_ID="stress_campaign_trial"
+    # Pin the workspace config path for repeated CLI calls.
+    CONFIG="$PWD/config.yaml"
+    # Pin the workspace-local USR registry destination.
+    USR_REGISTRY="$PWD/outputs/usr_datasets/registry.yaml"
+    # Resolve the repo-level baseline USR registry path.
+    ROOT_REGISTRY="$(git rev-parse --show-toplevel)/src/dnadesign/usr/datasets/registry.yaml"
 
-    # Stage a local workspace so outputs/usr_datasets/registry.yaml is initialized.
-    # If this id already exists, choose a new WORKSPACE_ID.
-    uv run --project "$REPO_ROOT" dense workspace init --id "$WORKSPACE_ID" --root "$WORKSPACE_ROOT" --from-workspace study_stress_ethanol_cipro --copy-inputs --output-mode both
-    WORKSPACE="$WORKSPACE_ROOT/$WORKSPACE_ID"
-    CONFIG="$WORKSPACE/config.yaml"
+    # Seed a workspace-local USR registry when one is not present.
+    if [ ! -f "$USR_REGISTRY" ]; then
+      # Create the destination directory for workspace-local USR artifacts.
+      mkdir -p "$(dirname "$USR_REGISTRY")"
+      # Copy baseline USR registry into the workspace-local path.
+      cp "$ROOT_REGISTRY" "$USR_REGISTRY"
+    fi
 
-    # Validate config, FIMO availability, and solver.
+    # Verify FIMO is available before PWM-backed sampling and validation.
     pixi run fimo --version
+    # Validate config schema and probe solver availability.
     pixi run dense validate-config --probe-solver -c "$CONFIG"
-
-    # Run generation from a clean output state.
+    # Start a fresh run from a clean output state (sequence generation only).
+    # Plot rendering is explicit in the next step for clearer failure isolation.
     pixi run dense run --fresh --no-plot -c "$CONFIG"
-
-    # Inspect runtime events and library summaries.
+    # If running only `dense run`, omit `--no-plot` to auto-render configured plots.
+    # pixi run dense run --fresh -c "$CONFIG"
+    # Inspect run diagnostics and per-plan library progress.
     pixi run dense inspect run --events --library -c "$CONFIG"
-
-    # Render plots and notebook output.
+    # Render DenseGen plots from current run artifacts.
     pixi run dense plot -c "$CONFIG"
+    # Generate the run-overview marimo notebook artifact.
     pixi run dense notebook generate -c "$CONFIG"
+    # Validate the generated notebook before opening or sharing it.
+    uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
+
+### Optional analysis-only mode (existing outputs)
+
+    # Rebuild plots/notebook from existing run artifacts without regenerating sequences.
+    ./runbook.sh --analysis-only
 
 ### Optional notebook open
 
-    # Launch notebook run mode (opens a browser tab by default).
-    # If the requested port already serves this notebook, DenseGen reuses it.
-    # If it serves a different notebook, DenseGen starts a fresh server on a free port.
-    # Use --reuse-server to force attach to whatever is already running on host/port.
-    # If running in a headless shell, open the printed Notebook URL manually.
+    # Launch the generated notebook in marimo app mode.
     pixi run dense notebook run -c "$CONFIG"
 
 ### Optional artifact refresh from Cruncher
 
-    # Refresh LexA/CpxR/BaeR motif artifacts from Cruncher into this workspace before Stage-A.
-    uv run --project "$REPO_ROOT" cruncher catalog export-densegen --set 1 --source demo_merged_meme_oops_multitf --densegen-workspace "$WORKSPACE" -c "$REPO_ROOT/src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml"
+    # Export Cruncher motif artifacts into this DenseGen workspace.
+    uv run cruncher catalog export-densegen --set 1 --source demo_merged_meme_oops_multitf --densegen-workspace "$PWD" -c "$(git rev-parse --show-toplevel)/src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml"
 
 ### Optional workspace reset
 
-    # Remove outputs and run state while keeping config and inputs.
+    # Remove run artifacts to return the workspace to a clean state.
     pixi run dense campaign-reset -c "$CONFIG"

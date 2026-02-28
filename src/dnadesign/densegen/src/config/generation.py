@@ -693,6 +693,16 @@ def _validate_unique_plan_names(plan: List[PlanItem]) -> None:
         raise ValueError(f"generation.plan expansion produced duplicate plan names: {preview}")
 
 
+def _distribute_expanded_quotas(*, total_sequences: int, variant_count: int) -> List[int]:
+    if variant_count <= 0:
+        raise ValueError("variant_count must be > 0")
+    base, remainder = divmod(int(total_sequences), int(variant_count))
+    quotas = [int(base)] * int(variant_count)
+    for idx in range(int(remainder)):
+        quotas[idx] += 1
+    return quotas
+
+
 def expand_generation_plans(
     *,
     plan: List[PlanItem],
@@ -742,11 +752,23 @@ def expand_generation_plans(
                 f"generation expansion exceeds generation.expansion.max_plans ({next_plan_count} > {int(max_plans)})."
             )
         total_sequences = int(item.sequences)
-        if total_sequences % len(matrix_pairs) != 0:
-            raise ValueError("generation.plan[].sequences must divide evenly across expanded variants")
-        quotas = [int(total_sequences // len(matrix_pairs))] * len(matrix_pairs)
+        quotas = _distribute_expanded_quotas(total_sequences=total_sequences, variant_count=len(matrix_pairs))
+        allocated_pairs = [
+            (up_id, up_seq, down_id, down_seq, quota)
+            for (up_id, up_seq, down_id, down_seq), quota in zip(matrix_pairs, quotas)
+            if int(quota) > 0
+        ]
+        if not allocated_pairs:
+            raise ValueError(
+                f"generation.plan[{item.name!r}] expansion produced no active variants for sequences={total_sequences}"
+            )
+        next_plan_count = expanded_plan_count + len(allocated_pairs)
+        if next_plan_count > int(max_plans):
+            raise ValueError(
+                f"generation expansion exceeds generation.expansion.max_plans ({next_plan_count} > {int(max_plans)})."
+            )
 
-        for (up_id, up_seq, down_id, down_seq), quota in zip(matrix_pairs, quotas):
+        for up_id, up_seq, down_id, down_seq, quota in allocated_pairs:
             name = _expanded_plan_name(
                 plan=item,
                 matrix=matrix,

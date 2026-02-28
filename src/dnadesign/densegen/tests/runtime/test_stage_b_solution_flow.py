@@ -12,12 +12,14 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
 from dnadesign.densegen.src.core.pipeline.stage_b_solution_persistence import (
     persist_candidate_solution,
+    record_accepted_solution_progress,
 )
 from dnadesign.densegen.src.core.pipeline.stage_b_solution_rejections import (
     emit_sequence_validation_failed_event,
@@ -718,3 +720,65 @@ def test_persist_candidate_solution_records_progress_on_accept() -> None:
     )
     assert accepted is True
     assert (global_generated, local_generated, produced_this_library, duplicate_records) == (9, 7, 6, 4)
+
+
+def test_record_accepted_solution_progress_flushes_sinks_before_checkpoint_state(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    call_order: list[str] = []
+
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.core.pipeline.stage_b_solution_persistence._flush_attempts",
+        lambda _tables_root, _attempts_buffer: call_order.append("attempts"),
+    )
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.core.pipeline.stage_b_solution_persistence._flush_solutions",
+        lambda _tables_root, _solution_rows: call_order.append("solutions"),
+    )
+
+    progress_reporter = MagicMock()
+    diagnostics = MagicMock()
+    diagnostics.map_tf_usage.return_value = {}
+    diagnostics.map_tfbs_usage.return_value = {}
+    state_counts: dict[tuple[str, str], int] = {}
+    context = SimpleNamespace(
+        source_label="demo",
+        plan_name="baseline",
+        checkpoint_every=1,
+        tables_root=tmp_path,
+        attempts_buffer=[{"attempt_index": 1}],
+        solution_rows=[{"id": "solution-1"}],
+        state_counts=state_counts,
+        write_state=lambda: call_order.append("state"),
+        flush_sinks=lambda: call_order.append("sinks"),
+        total_quota=None,
+        progress_reporter=progress_reporter,
+        counters=SimpleNamespace(),
+        failure_counts={},
+        leaderboard_every=0,
+        show_solutions=False,
+        usage_counts={},
+        tf_usage_counts={},
+        diagnostics=diagnostics,
+        logger=MagicMock(),
+    )
+
+    record_accepted_solution_progress(
+        context=context,
+        global_generated=0,
+        local_generated=0,
+        produced_this_library=0,
+        sol=object(),
+        final_seq="ACGT",
+        used_tfbs_detail=[],
+        used_tf_list=[],
+        sampling_library_index=1,
+        library_tfs=["lexA"],
+        library_tfbs=["site-1"],
+        duplicate_records=0,
+        duplicate_solutions=0,
+        failed_solutions=0,
+        stall_events=0,
+    )
+
+    assert call_order == ["sinks", "attempts", "solutions", "state"]

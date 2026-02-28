@@ -86,6 +86,14 @@ def build_plan_pool(
             if "input_name" not in df.columns:
                 df.insert(0, "input_name", pool.name)
             df["input_source_name"] = df["input_name"]
+            if "source" in df.columns:
+                source_series = df["source"].astype(object)
+                source_series = source_series.where(source_series.notna(), df["input_source_name"])
+                source_series = source_series.replace("", None)
+                source_series = source_series.where(source_series.notna(), df["input_source_name"])
+                df["source"] = source_series
+            else:
+                df["source"] = df["input_source_name"]
             df["input_name"] = pool_name
             frames.append(df)
         combined = _aligned_pool_frames(frames)

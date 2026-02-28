@@ -1,9 +1,9 @@
-# BU SCC Install: `dnadesign` Interactive Bootstrap (CPU + Evo2 GPU)
+## BU SCC Install: `dnadesign` Interactive Bootstrap (CPU + Evo2 GPU)
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-02-18
 
-## At a glance
+### At a glance
 
 **Intent:** One-time environment bootstrap for running `dnadesign` on BU SCC for CPU workflows (for example DenseGen with CBC/Gurobi) and Linux GPU workflows (Evo2 inference stack).
 
@@ -17,7 +17,7 @@
 - Operational monitoring setup (use [BU SCC Batch + Notify runbook](batch-notify.md) and [Notify USR events operator manual](../notify/usr-events.md)).
 - Large model or dataset transfers on compute nodes (use BU data transfer node workflows).
 
-## Choose your path
+### Choose your path
 
 - Interactive install + smoke tests (this doc).
 - Batch usage + Notify setup ([BU SCC Batch + Notify runbook](batch-notify.md)).
@@ -28,7 +28,7 @@ Run this from an SCC login shell:
 
 ---
 
-## 0) Node and GPU requirements
+### 0) Node and GPU requirements
 
 Evo2 requirements are Linux + CUDA 12.1+, cuDNN 9.3+, Python 3.12, and GPU Compute Capability 8.9+ for FP8 workflows:
 - Evo2 repo: <https://github.com/ArcInstitute/evo2>
@@ -46,7 +46,7 @@ BU SCC scheduler and GPU docs:
 
 ---
 
-## 1) Install `uv` (once)
+### 1) Install `uv` (once)
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -54,7 +54,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ---
 
-## 2) Clone the repository
+### 2) Clone the repository
 
 ```bash
 git clone https://github.com/e-south/dnadesign.git
@@ -70,7 +70,7 @@ uv cache clean
 
 ---
 
-## 3) Configure environment location and caches
+### 3) Configure environment location and caches
 
 Use a persistent project location for the environment so expensive GPU builds are reusable.
 
@@ -96,7 +96,7 @@ printf 'SCC_SCRATCH=%s\n' "$SCC_SCRATCH"
 
 ---
 
-## 4) Load toolchain modules
+### 4) Load toolchain modules
 
 Use SCC modules that match your target workflow.
 
@@ -123,7 +123,7 @@ Use `#!/bin/bash -l` in batch scripts when relying on `module` commands:
 
 ---
 
-## 5) Sync dependencies
+### 5) Sync dependencies
 
 ```bash
 uv python install 3.12
@@ -135,9 +135,9 @@ uv sync --locked --extra infer-evo2
 
 ---
 
-## 6) Smoke tests
+### 6) Smoke tests
 
-### 6.1 Quick environment check
+#### 6.1 Quick environment check
 
 ```bash
 uv run python - <<'PY'
@@ -152,7 +152,7 @@ if torch.cuda.is_available():
 PY
 ```
 
-### 6.2 Extended TE/FlashAttention/Evo2 check
+#### 6.2 Extended TE/FlashAttention/Evo2 check
 
 ```bash
 uv run python - <<'PY'
@@ -182,14 +182,14 @@ PY
 
 ---
 
-## 7) Next step
+### 7) Next step
 
 For long jobs, arrays, Notify watchers, and transfer-node workflows, use:
 - [BU SCC Batch + Notify runbook](batch-notify.md)
 
 ---
 
-## Troubleshooting and build throttles
+### Troubleshooting and build throttles
 
 Use conservative build caps when TE/flash-attn builds fail due to memory pressure:
 
@@ -208,7 +208,7 @@ If CUDA headers are not discovered during Transformer Engine builds:
 export NVTE_CUDA_INCLUDE_PATH="${NVTE_CUDA_INCLUDE_PATH:-$CUDA_HOME/include}"
 ```
 
-### Optional deep diagnostics (full import + extension checks)
+#### Optional deep diagnostics (full import + extension checks)
 
 ```bash
 uv run python - <<'PY'
@@ -300,7 +300,7 @@ print("\\nAll deep diagnostics passed.")
 PY
 ```
 
-### Optional Evo2 callable check
+#### Optional Evo2 callable check
 
 ```bash
 uv run python - <<'PY'

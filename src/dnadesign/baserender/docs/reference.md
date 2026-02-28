@@ -1,5 +1,9 @@
 # baserender Reference
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 Single technical reference for operators and integrators.
 
 ## Documentation Policy (YAGNI + Kaizen)

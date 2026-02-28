@@ -33,6 +33,7 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("cluster", "aligner"),
     ("cluster", "usr"),
     ("cruncher", "baserender"),
+    ("densegen", "baserender"),
     ("densegen", "cruncher"),
     ("densegen", "usr"),
     ("infer", "usr"),

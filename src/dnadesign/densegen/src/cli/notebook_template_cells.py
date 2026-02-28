@@ -15,33 +15,32 @@ from __future__ import annotations
 def records_export_cell_template() -> str:
     return """
 @app.cell
-def _(Path, df_window_filtered, export_button, export_format, export_path, mo, require, run_root):
+def _(
+    df_window_filtered,
+    export_button,
+    export_format,
+    export_path,
+    mo,
+    repo_root,
+    resolve_records_export_destination,
+    run_root,
+):
     click_count = int(export_button.value or 0)
     status_text = ""
     if click_count > 0:
-        selected_format = str(export_format.value or "").strip()
-        require(
-            selected_format not in {"parquet", "csv"},
-            f"Export format must be parquet or csv, got `{selected_format}`.",
-        )
         raw_path = str(export_path.value or "").strip()
-        if not raw_path:
-            raw_path = "outputs/notebooks/records_preview"
-
-        destination = Path(raw_path).expanduser()
-        if not destination.is_absolute():
-            destination = run_root / destination
-
-        if selected_format == "csv":
-            if destination.suffix.lower() != ".csv":
-                destination = destination.with_suffix(".csv")
-        else:
-            if destination.suffix.lower() != ".parquet":
-                destination = destination.with_suffix(".parquet")
+        selected_format = str(export_format.value or "").strip()
+        destination = run_root / "outputs" / "notebooks" / "records_preview"
 
         try:
+            destination = resolve_records_export_destination(
+                raw_path=raw_path,
+                selected_format=selected_format,
+                run_root=run_root,
+                repo_root=repo_root,
+            )
             destination.parent.mkdir(parents=True, exist_ok=True)
-            if selected_format == "csv":
+            if destination.suffix.lower() == ".csv":
                 df_window_filtered.to_csv(destination, index=False)
             else:
                 df_window_filtered.to_parquet(destination, index=False)
@@ -50,6 +49,52 @@ def _(Path, df_window_filtered, export_button, export_format, export_path, mo, r
 
         status_text = f"Saved to `{destination}`."
     mo.md(status_text)
+    return
+"""
+
+
+def baserender_export_cell_template() -> str:
+    return """
+@app.cell
+def _(
+    active_record,
+    active_record_core_summary,
+    baserender_export_button,
+    baserender_export_format,
+    baserender_export_path,
+    build_baserender_figure,
+    mo,
+    repo_root,
+    resolve_baserender_export_destination,
+    run_root,
+):
+    _click_count = int(baserender_export_button.value or 0)
+    _status_text = ""
+    if _click_count > 0:
+        _selected_format = str(baserender_export_format.value or "").strip().lower()
+        _raw_path = str(baserender_export_path.value or "").strip()
+        _destination = run_root / "outputs" / "notebooks" / "baserender_preview.png"
+        try:
+            _destination = resolve_baserender_export_destination(
+                raw_path=_raw_path,
+                selected_format=_selected_format,
+                run_root=run_root,
+                repo_root=repo_root,
+            )
+            _destination.parent.mkdir(parents=True, exist_ok=True)
+            _figure = build_baserender_figure(
+                active_record,
+                core_summary=active_record_core_summary,
+            )
+            _figure.savefig(
+                _destination,
+                format=_selected_format,
+                dpi=_figure.dpi if _selected_format == "png" else None,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"BaseRender export failed while writing `{_destination}`: {exc}") from exc
+        _status_text = f"Saved BaseRender preview to `{_destination}`."
+    mo.md(_status_text)
     return
 """
 

@@ -110,6 +110,15 @@ def _normalize_plan_name(value: object) -> str | None:
     return label
 
 
+def _humanize_scope_label(value: object) -> str:
+    label = _normalize_plan_name(value) or ""
+    if not label:
+        return ""
+    if label.startswith("plan_pool__"):
+        label = label[len("plan_pool__") :]
+    return label.replace("__", "; ").replace("_", " ").strip()
+
+
 def _ellipsize(label: object, max_len: int = 18) -> str:
     text = str(label or "")
     if len(text) <= max_len:

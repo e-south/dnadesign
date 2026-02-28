@@ -36,7 +36,7 @@ class StageBSolutionOutputContext:
     fixed_elements_dump: dict
     chosen_solver: str | None
     solver_strategy: str
-    solver_time_limit_seconds: float | None
+    solver_attempt_timeout_seconds: float | None
     solver_threads: int | None
     solver_strands: str
     seq_len: int
@@ -89,3 +89,4 @@ class StageBProgressContext:
     tf_usage_counts: dict[str, int]
     diagnostics: Any
     logger: Any
+    flush_sinks: Callable[[], None] | None = None

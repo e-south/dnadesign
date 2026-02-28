@@ -1,5 +1,9 @@
 ## DenseGen quick checklist
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This concept page is a compact contract checklist for correct DenseGen execution and artifact interpretation. Read it when you need quick command recall and clear output-path expectations.
 
 For full walkthroughs, use the **[TFBS baseline tutorial](../tutorials/demo_tfbs_baseline.md)** or **[sampling baseline tutorial](../tutorials/demo_sampling_baseline.md)**.

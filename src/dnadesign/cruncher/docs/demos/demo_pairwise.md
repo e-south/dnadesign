@@ -1,5 +1,9 @@
 ## Pairwise Demo (end-to-end)
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 **Last updated by:** cruncher-maintainers on 2026-02-23
 
 ### Contents
@@ -15,7 +19,7 @@
 
 ### Overview
 
-This is the canonical two-regulator Cruncher walkthrough for `lexA` + `cpxR`.
+This is the standard two-regulator Cruncher walkthrough for `lexA` + `cpxR`.
 
 You will run the full lifecycle in order:
 1. fetch site data from explicit sources,
@@ -37,7 +41,9 @@ You will run the full lifecycle in order:
 Run from the workspace and define a shell helper:
 
 ```bash
+# Enter the workspace directory so relative paths resolve correctly.
 cd src/dnadesign/cruncher/workspaces/demo_pairwise
+# Pin config path for repeated CLI calls.
 CONFIG="$PWD/configs/config.yaml"
 cruncher() { uv run cruncher "$@"; }
 ```
@@ -45,6 +51,7 @@ cruncher() { uv run cruncher "$@"; }
 Run this single command to do everything in this demo:
 
 ```bash
+# Execute the Cruncher machine runbook for this workspace.
 uv run cruncher workspaces run --runbook configs/runbook.yaml
 ```
 
@@ -53,6 +60,7 @@ This full runbook also executes two study sweeps at the end, so runtime is longe
 Quick smoke path (base lifecycle only):
 
 ```bash
+# Execute the Cruncher machine runbook for this workspace.
 uv run cruncher workspaces run --runbook configs/runbook.yaml --step reset_workspace --step config_summary --step fetch_sites_demo_local_meme --step fetch_sites_regulondb --step discover_motifs --step lock_targets --step parse_run --step sample_run --step analyze_summary --step export_sequences_latest --step render_logos
 ```
 
@@ -66,7 +74,9 @@ cruncher discover check -c "$CONFIG"
 
 # Optional explicit path setup if tools are not found on PATH.
 export MEME_BIN="$(cd ../../../../../.pixi/envs/default/bin && pwd)"
+# Export environment variables consumed by later commands.
 export PATH="$MEME_BIN:$PATH"
+# Confirm MEME/FIMO executables are available on PATH.
 command -v meme streme fimo
 ```
 
@@ -96,8 +106,11 @@ Consistency contract:
 Optional source introspection:
 
 ```bash
+# List configured source definitions for this workspace.
 cruncher sources list -c "$CONFIG"
+# Inspect cached source summary for this source id.
 cruncher sources summary --source demo_local_meme --scope cache -c "$CONFIG"
+# Inspect cached source summary for this source id.
 cruncher sources summary --source regulondb --scope cache -c "$CONFIG"
 ```
 
@@ -119,10 +132,10 @@ cruncher:
     combine_sites: true             # merge all cached sites per TF before discovery
 
   discover:
-    enabled: true
-    tool: meme
+    enabled: true                       # Boolean switch for `enabled`.
+    tool: meme                          # Sets `tool` for this example configuration.
     meme_mod: oops                  # one occurrence per input sequence during motif discovery
-    source_id: demo_merged_meme_oops
+    source_id: demo_merged_meme_oops    # Sets `source_id` for this example configuration.
 
   sample:
     sequence_length: 16             # fixed-length optimization contract
@@ -131,20 +144,20 @@ cruncher:
       draws: 150000                 # optimization sweeps after tune
     objective:
       combine: min                  # optimize weakest TF first (joint fairness)
-      score_scale: normalized-llr
-      bidirectional: true
+      score_scale: normalized-llr       # Sets `score_scale` for this example configuration.
+      bidirectional: true               # Boolean switch for `bidirectional`.
     optimizer:
-      kind: gibbs_anneal
+      kind: gibbs_anneal                # Sets `kind` for this example configuration.
       chains: 8                     # tuned default chain count
     elites:
-      k: 8
+      k: 8                              # Sets `k` for this example configuration.
       select:
         diversity: 0.05             # low but non-zero diversity pressure
-        pool_size: 32000
+        pool_size: 32000                # Sets `pool_size` for this example configuration.
 
   analysis:
     pairwise: [lexA, cpxR]          # fixed two-axis score-space projection
-    trajectory_sweep_mode: best_so_far
+    trajectory_sweep_mode: best_so_far  # Sets `trajectory_sweep_mode` for this example configuration.
     fimo_compare:
       enabled: true                 # emit optimizer_vs_fimo plot (requires fimo)
 ```
@@ -154,12 +167,14 @@ cruncher:
 #### 0) Reset generated workspace state
 
 ```bash
+# Reset workspace outputs before a fresh Cruncher run.
 uv run cruncher workspaces reset --root . --confirm
 ```
 
 #### 1) Check resolved config
 
 ```bash
+# Print resolved Cruncher config to confirm active knobs.
 uv run cruncher config summary -c "$CONFIG"
 ```
 
@@ -170,7 +185,9 @@ Intent:
 - avoid accidental hidden source mixing.
 
 ```bash
+# Fetch TF binding sites from the configured source.
 uv run cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+# Fetch TF binding sites from the configured source.
 uv run cruncher fetch sites --source regulondb      --tf lexA --tf cpxR --update -c "$CONFIG"
 ```
 
@@ -181,6 +198,7 @@ Intent:
 - pin that source in downstream lock/sample/analyze.
 
 ```bash
+# Run motif discovery over fetched site evidence.
 uv run cruncher discover motifs --set 1 --tool meme --meme-mod oops --source-id demo_merged_meme_oops -c "$CONFIG"
 ```
 
@@ -192,7 +210,9 @@ Intent:
 - If you change `catalog.source_preference` or discovery `--source-id`, re-run `cruncher lock -c "$CONFIG"` before parse.
 
 ```bash
+# Freeze motif/source provenance for deterministic downstream steps.
 uv run cruncher lock -c "$CONFIG"
+# Parse inputs into normalized Cruncher artifacts.
 uv run cruncher parse --force-overwrite -c "$CONFIG"
 ```
 
@@ -203,25 +223,29 @@ Intent:
 - `analyze`: generate reports/tables/plots from artifacts only.
 
 ```bash
+# Generate candidate sequences from parsed motif artifacts.
 uv run cruncher sample --force-overwrite -c "$CONFIG"
+# Compute analysis summaries for generated sequence sets.
 uv run cruncher analyze --summary -c "$CONFIG"
 ```
 
 #### 6) Export sequence-facing tables
 
 ```bash
+# Export latest elite sequences for downstream use.
 uv run cruncher export sequences --latest -c "$CONFIG"
 ```
 
 #### 7) Generate motif logos
 
 ```bash
+# Render motif logos for visual QC of discovered motifs.
 uv run cruncher catalog logos --source demo_merged_meme_oops --set 1 -c "$CONFIG"
 ```
 
 ### Workspace studies
 
-These workspace-local studies are the canonical sweep layer used by portfolio aggregation:
+These workspace-local studies are the standard sweep layer used by portfolio aggregation:
 
 - `length_vs_score`: sweeps `sample.sequence_length` with step-2 spacing and always includes the base `sample.sequence_length` from `config.yaml` as an anchor trial.
 - `diversity_vs_score`: sweeps diversity from `0.00` to `1.00` at fixed workspace sequence length and writes diversity tradeoff tables/plots.
@@ -229,14 +253,18 @@ These workspace-local studies are the canonical sweep layer used by portfolio ag
 Run them:
 
 ```bash
+# Run the configured Cruncher parameter-sweep study.
 uv run cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite
+# Run the configured Cruncher parameter-sweep study.
 uv run cruncher study run --spec configs/studies/diversity_vs_score.study.yaml --force-overwrite
 ```
 
 Inspect study outputs:
 
 ```bash
+# Inspect study outputs and resolved sweep metadata.
 uv run cruncher study show --run outputs/studies/length_vs_score/<study_id>
+# Inspect study outputs and resolved sweep metadata.
 uv run cruncher study show --run outputs/studies/diversity_vs_score/<study_id>
 ```
 

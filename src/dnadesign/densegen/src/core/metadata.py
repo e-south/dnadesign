@@ -16,35 +16,134 @@ from typing import List
 
 from .metadata_schema import validate_metadata
 
-BINDING_SITES_ONLY_FIELDS = {
-    "input_tf_tfbs_pair_count",
-    "sampling_fraction_pairs",
-}
+PWM_ONLY_FIELDS = {"input_pwm_ids"}
 
 
 def _apply_retention_policy(meta: dict) -> None:
-    input_mode = str(meta.get("input_mode") or "")
+    input_mode = str(meta.get("input_mode") or "").strip()
+    allowed_modes = {"binding_sites", "sequence_library", "pwm_sampled", "plan_pool"}
+    if input_mode not in allowed_modes:
+        allowed = ", ".join(sorted(allowed_modes))
+        raise ValueError(f"Unsupported input_mode '{input_mode}'. Supported values: {allowed}.")
     if input_mode != "pwm_sampled":
-        meta["input_pwm_ids"] = []
-    if input_mode != "binding_sites":
-        for field in BINDING_SITES_ONLY_FIELDS:
-            meta[field] = None
+        for field in PWM_ONLY_FIELDS:
+            meta[field] = []
 
 
-def _promoter_constraint_name(fixed_elements) -> str | None:
-    if fixed_elements is None:
+def _coerce_promoter_placements(promoter_detail: dict | None) -> list[dict]:
+    detail = promoter_detail if isinstance(promoter_detail, dict) else {}
+    placements = detail.get("placements", [])
+    if hasattr(placements, "tolist"):
+        placements = placements.tolist()
+    if not isinstance(placements, (list, tuple)):
+        return []
+    out: list[dict] = []
+    for item in placements:
+        if isinstance(item, dict):
+            out.append(dict(item))
+    return out
+
+
+def _merge_parts_detail(used_tfbs_detail: List[dict], promoter_detail: dict | None, *, pad_meta: dict) -> list[dict]:
+    parts: list[dict] = []
+    pad_left = 0
+    if bool(pad_meta.get("used")) and str(pad_meta.get("end") or "").strip().lower() == "5prime":
+        pad_left = int(pad_meta.get("bases") or 0)
+
+    for item in used_tfbs_detail or []:
+        if not isinstance(item, dict):
+            continue
+        entry = dict(item)
+        part_kind = str(entry.get("part_kind") or "tfbs").strip().lower() or "tfbs"
+        entry["part_kind"] = part_kind
+        if part_kind == "tfbs":
+            sequence_literal = str(entry.get("sequence") or "").strip().upper()
+            if sequence_literal:
+                entry["sequence"] = sequence_literal
+            if sequence_literal and not str(entry.get("core_sequence") or "").strip():
+                entry["core_sequence"] = sequence_literal
+            if str(entry.get("core_sequence") or "").strip():
+                entry["core_sequence"] = str(entry.get("core_sequence")).strip().upper()
+        parts.append(entry)
+
+    for placement_index, placement in enumerate(_coerce_promoter_placements(promoter_detail)):
+        name = str(placement.get("name") or "promoter").strip() or "promoter"
+        spacer_length = placement.get("spacer_length")
+        try:
+            spacer_value = int(spacer_length) if spacer_length is not None else None
+        except Exception:
+            spacer_value = None
+        variant_ids = placement.get("variant_ids")
+        if hasattr(variant_ids, "as_py"):
+            variant_ids = variant_ids.as_py()
+        if not isinstance(variant_ids, dict):
+            variant_ids = {}
+        up_variant = str(variant_ids.get("up_id") or "").strip() or None
+        down_variant = str(variant_ids.get("down_id") or "").strip() or None
+
+        upstream_seq = str(placement.get("upstream_seq") or "").strip().upper()
+        if upstream_seq:
+            upstream_offset_raw = int(placement.get("upstream_start"))
+            upstream_offset = upstream_offset_raw + pad_left
+            parts.append(
+                {
+                    "part_kind": "fixed_element",
+                    "role": "upstream",
+                    "constraint_name": name,
+                    "sequence": upstream_seq,
+                    "offset_raw": upstream_offset_raw,
+                    "pad_left": pad_left,
+                    "offset": upstream_offset,
+                    "length": len(upstream_seq),
+                    "end": upstream_offset + len(upstream_seq),
+                    "variant_id": up_variant,
+                    "spacer_length": spacer_value,
+                    "placement_index": int(placement_index),
+                }
+            )
+
+        downstream_seq = str(placement.get("downstream_seq") or "").strip().upper()
+        if downstream_seq:
+            downstream_offset_raw = int(placement.get("downstream_start"))
+            downstream_offset = downstream_offset_raw + pad_left
+            parts.append(
+                {
+                    "part_kind": "fixed_element",
+                    "role": "downstream",
+                    "constraint_name": name,
+                    "sequence": downstream_seq,
+                    "offset_raw": downstream_offset_raw,
+                    "pad_left": pad_left,
+                    "offset": downstream_offset,
+                    "length": len(downstream_seq),
+                    "end": downstream_offset + len(downstream_seq),
+                    "variant_id": down_variant,
+                    "spacer_length": spacer_value,
+                    "placement_index": int(placement_index),
+                }
+            )
+    return parts
+
+
+def _pad_literal(final_sequence: str, pad_meta: dict) -> str | None:
+    if not bool(pad_meta.get("used", False)):
         return None
-    if hasattr(fixed_elements, "promoter_constraints"):
-        pcs = getattr(fixed_elements, "promoter_constraints") or []
-    else:
-        pcs = (fixed_elements or {}).get("promoter_constraints") or []
-    if not pcs:
+    seq = str(final_sequence or "").strip().upper()
+    if not seq:
         return None
-    pc0 = pcs[0]
-    if hasattr(pc0, "name"):
-        return getattr(pc0, "name")
-    if isinstance(pc0, dict):
-        return pc0.get("name")
+    bases = pad_meta.get("bases")
+    try:
+        n = int(bases)
+    except Exception:
+        return None
+    if n <= 0:
+        return None
+    n = min(n, len(seq))
+    end = str(pad_meta.get("end") or "").strip().lower()
+    if end == "5prime":
+        return seq[:n]
+    if end == "3prime":
+        return seq[-n:]
     return None
 
 
@@ -58,7 +157,7 @@ def build_metadata(
     fixed_elements,
     chosen_solver: str | None,
     solver_strategy: str,
-    solver_time_limit_seconds: float | None,
+    solver_attempt_timeout_seconds: float | None,
     solver_threads: int | None,
     solver_strands: str,
     seq_len: int,
@@ -104,9 +203,10 @@ def build_metadata(
     solver_status: str | None,
     solver_objective: float | None,
     solver_solve_time_s: float | None,
+    final_sequence: str = "",
 ) -> dict:
-    tf_list = sorted(set(regulator_labels or []))
     library_unique_tfbs = len(set(library_for_opt)) if library_for_opt else 0
+    library_unique_tf = len({part.split(":", 1)[0] for part in (library_for_opt or []) if ":" in str(part)})
     if promoter_detail is None:
         promoter_detail = {"placements": []}
     if sequence_validation is None:
@@ -122,37 +222,18 @@ def build_metadata(
         "schema_version": schema_version,
         "created_at": created_at,
         "run_id": run_id,
-        "run_config_path": run_config_path,
         "length": int(actual_length),
-        "random_seed": int(random_seed),
-        "policy_sampling": policy_sampling,
-        "solver_backend": chosen_solver,
-        "solver_strands": solver_strands,
-        "dense_arrays_version": dense_arrays_version,
         "plan": plan_name,
-        "tf_list": tf_list,
-        "tfbs_parts": tfbs_parts or [],
-        "used_tfbs": used_tfbs,
-        "used_tfbs_detail": used_tfbs_detail,
-        "used_tf_counts": used_tf_counts_list,
-        "covers_all_tfs_in_solution": bool(covers_all_tfs_in_solution),
         "input_name": input_meta.get("input_name"),
         "input_mode": input_meta.get("input_mode"),
-        "input_pwm_ids": input_meta.get("input_pwm_ids") or [],
-        "input_tf_tfbs_pair_count": input_tf_tfbs_pair_count,
-        "sampling_fraction": sampling_fraction,
-        "sampling_fraction_pairs": sampling_fraction_pairs,
-        "fixed_elements": fixed_elements_dump,
-        "visual": str(sol),
+        "input_pwm_ids": list(input_meta.get("input_pwm_ids") or []),
+        "used_tfbs": used_tfbs,
+        "used_tfbs_detail": _merge_parts_detail(used_tfbs_detail, promoter_detail, pad_meta=pad_meta),
+        "used_tf_counts": used_tf_counts_list,
+        "library_unique_tf_count": int(library_unique_tf),
+        "library_unique_tfbs_count": int(library_unique_tfbs),
+        "covers_all_tfs_in_solution": bool(covers_all_tfs_in_solution),
         "compression_ratio": getattr(sol, "compression_ratio", None),
-        "library_size": len(library_for_opt),
-        "library_unique_tf_count": len(tf_list),
-        "library_unique_tfbs_count": library_unique_tfbs,
-        "promoter_constraint": _promoter_constraint_name(fixed_elements),
-        "sampling_pool_strategy": sampling_meta.get("pool_strategy"),
-        "sampling_library_size": sampling_meta.get("library_size"),
-        "sampling_library_strategy": sampling_meta.get("library_sampling_strategy"),
-        "sampling_iterative_max_libraries": sampling_meta.get("iterative_max_libraries"),
         "sampling_library_hash": str(sampling_library_hash),
         "sampling_library_index": int(sampling_library_index),
         "required_regulators": required_regulators,
@@ -160,9 +241,9 @@ def build_metadata(
         "pad_used": pad_meta.get("used", False),
         "pad_bases": pad_meta.get("bases"),
         "pad_end": pad_meta.get("end"),
+        "pad_literal": _pad_literal(final_sequence, pad_meta),
         "gc_total": gc_total,
         "gc_core": gc_core,
-        "promoter_detail": promoter_detail,
         "sequence_validation": sequence_validation,
     }
     _apply_retention_policy(meta)

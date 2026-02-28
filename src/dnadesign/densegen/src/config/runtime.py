@@ -19,13 +19,11 @@ from pydantic import BaseModel, ConfigDict, field_validator
 class RuntimeConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     round_robin: bool = False
-    arrays_generated_before_resample: int = 1
+    max_accepted_per_library: int = 1
     min_count_per_tf: int = 0
     max_duplicate_solutions: int = 3
-    stall_seconds_before_resample: int = 30
-    stall_warning_every_seconds: int = 15
-    max_consecutive_failures: int = 25
-    max_seconds_per_plan: int = 0
+    no_progress_seconds_before_resample: int = 30
+    max_consecutive_no_progress_resamples: int = 25
     max_failed_solutions: int = 0
     max_failed_solutions_per_target: float = 0.0
     leaderboard_every: int = 50
@@ -33,13 +31,11 @@ class RuntimeConfig(BaseModel):
     random_seed: int = 1337
 
     @field_validator(
-        "arrays_generated_before_resample",
+        "max_accepted_per_library",
         "min_count_per_tf",
         "max_duplicate_solutions",
-        "stall_seconds_before_resample",
-        "stall_warning_every_seconds",
-        "max_consecutive_failures",
-        "max_seconds_per_plan",
+        "no_progress_seconds_before_resample",
+        "max_consecutive_no_progress_resamples",
         "max_failed_solutions",
         "leaderboard_every",
         "checkpoint_every",
@@ -50,11 +46,11 @@ class RuntimeConfig(BaseModel):
             raise ValueError(f"{info.field_name} must be >= 0")
         return v
 
-    @field_validator("arrays_generated_before_resample")
+    @field_validator("max_accepted_per_library")
     @classmethod
     def _arrays_positive(cls, v: int):
         if v <= 0:
-            raise ValueError("arrays_generated_before_resample must be > 0")
+            raise ValueError("max_accepted_per_library must be > 0")
         return v
 
     @field_validator("max_failed_solutions_per_target")

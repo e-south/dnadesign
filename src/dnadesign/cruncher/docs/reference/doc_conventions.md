@@ -1,5 +1,9 @@
 ## Cruncher Doc Conventions
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 **Last updated by:** cruncher-maintainers on 2026-02-23
 
 ### Contents
@@ -9,7 +13,7 @@
 - [Generated section markers](#generated-section-markers)
 
 ### Command conventions
-- Canonical command prefix: `uv run cruncher ...`
+- Standard command prefix: `uv run cruncher ...`
 - Optional shell helper is allowed in tutorials:
   - `cruncher() { uv run cruncher "$@"; }`
 - Use config path placeholders where practical:

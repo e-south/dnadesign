@@ -1,5 +1,9 @@
 ## DenseGen outputs reference
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This page defines what DenseGen writes, where it writes it, and which event stream each
 consumer should read.
 
@@ -86,53 +90,35 @@ Keys are namespaced as `densegen__<key>`.
 Retention labels in the table:
 - `record_keep`: keep at record level for downstream analysis/provenance.
 - `record_conditional`: keep at record level when applicable.
-- `artifact_candidate`: better suited for run/library artifacts to avoid per-record redundancy.
 
 Curated record fields:
 
 | Field | Retention | Meaning |
 |---|---|---|
-| `densegen__schema_version` | artifact_candidate | DenseGen schema version (for example, 2.9). |
+| `densegen__schema_version` | record_keep | DenseGen schema version (for example, 2.9). |
 | `densegen__created_at` | record_keep | UTC ISO8601 timestamp for record creation. |
 | `densegen__run_id` | record_keep | Run identifier (`densegen.run.id`). |
-| `densegen__run_config_path` | artifact_candidate | Run config path (relative to run root when possible). |
 | `densegen__length` | record_keep | Actual output sequence length. |
-| `densegen__random_seed` | artifact_candidate | Global RNG seed used for the run. |
-| `densegen__policy_sampling` | artifact_candidate | Stage-B sampling policy label (pool strategy). |
-| `densegen__solver_backend` | artifact_candidate | Solver backend name (null when approximate). |
-| `densegen__solver_strands` | artifact_candidate | Solver strands mode (`single`/`double`). |
-| `densegen__dense_arrays_version` | artifact_candidate | `dense-arrays` package version. |
-| `densegen__plan` | record_keep | Plan item name. |
-| `densegen__tf_list` | record_keep | All TFs present in the Stage-B sampled library. |
-| `densegen__tfbs_parts` | record_keep | `TF:TFBS` strings used to build the Stage-B library. |
+| `densegen__plan` | record_keep | Plan item name from `generation.plan[*].name`. |
+| `densegen__input_name` | record_keep | Stage-B sampled pool/source id for that plan (typically `plan_pool__<plan>`). |
+| `densegen__input_mode` | record_keep | Input mode (`binding_sites`/`sequence_library`/`pwm_sampled`/`plan_pool`). Unknown modes fail fast. |
+| `densegen__input_pwm_ids` | record_conditional | Stage-A PWM motif IDs used for sampling (`pwm_*` inputs). |
 | `densegen__used_tfbs` | record_keep | `TF:TFBS` strings used in the final sequence. |
-| `densegen__used_tfbs_detail` | record_keep | Per-placement detail: `tf`/`tfbs`/`motif_id`/`tfbs_id`/orientation/offset plus Stage-A lineage fields. |
+| `densegen__used_tfbs_detail` | record_keep | Consolidated per-placement detail for all sequence parts. TFBS entries use explicit keys (`part_index`, `regulator`, `sequence`, `core_sequence`, `orientation`, `offset_raw`, `pad_left`, `offset`, `length`, `end`, `source`, `motif_id`, `tfbs_id`). PWM-sampled runs additionally include lineage fields (`score_best_hit_raw`, `score_theoretical_max`, `score_relative_to_theoretical_max`, `rank_among_mined_positive`, `rank_among_selected`, `selection_policy`, `nearest_selected_*`, `matched_start`, `matched_stop`, `matched_strand`). Fixed-element entries keep `role`, `sequence`, normalized geometry, and optional variant/spacer metadata. |
 | `densegen__used_tf_counts` | record_keep | Per-TF placement counts (`{tf, count}`). |
+| `densegen__library_unique_tf_count` | record_keep | Unique TF count in sampled library. |
+| `densegen__library_unique_tfbs_count` | record_keep | Unique TFBS count in sampled library. |
 | `densegen__covers_all_tfs_in_solution` | record_keep | Whether min-count TF coverage was satisfied. |
 | `densegen__required_regulators` | record_keep | Regulators required for this library. |
 | `densegen__min_count_by_regulator` | record_keep | Per-regulator minimum counts (`{tf, min_count}`). |
-| `densegen__input_name` | record_keep | Input source name. |
-| `densegen__input_mode` | record_keep | Input mode (`binding_sites`/`sequence_library`/`pwm_sampled`). |
-| `densegen__input_pwm_ids` | record_conditional | Stage-A PWM motif IDs used for sampling (`pwm_*` inputs). |
-| `densegen__input_tf_tfbs_pair_count` | record_conditional | Unique `(TF, TFBS)` pair count in the input pool. |
-| `densegen__sampling_fraction` | record_conditional | Stage-B unique TFBS / input TFBS fraction. |
-| `densegen__sampling_fraction_pairs` | record_conditional | Stage-B unique pair / input pair fraction. |
-| `densegen__fixed_elements` | record_keep | Fixed-element constraints (promoters + side biases). |
-| `densegen__visual` | record_keep | ASCII visual layout of placements. |
 | `densegen__compression_ratio` | record_keep | Solution compression ratio. |
-| `densegen__library_size` | record_keep | Number of motifs in the Stage-B sampled library. |
-| `densegen__library_unique_tf_count` | record_keep | Unique TF count in sampled library. |
-| `densegen__library_unique_tfbs_count` | record_keep | Unique TFBS count in sampled library. |
-| `densegen__promoter_constraint` | record_conditional | Primary promoter constraint name. |
-| `densegen__sampling_pool_strategy` | artifact_candidate | Stage-B sampling pool strategy. |
-| `densegen__sampling_library_size` | artifact_candidate | Configured Stage-B library size. |
-| `densegen__sampling_library_strategy` | artifact_candidate | Stage-B library sampling strategy. |
-| `densegen__sampling_iterative_max_libraries` | artifact_candidate | Stage-B max libraries for iterative subsampling. |
 | `densegen__sampling_library_hash` | record_keep | Stage-B stable sampled-library hash. |
 | `densegen__sampling_library_index` | record_keep | Stage-B 1-based sampled library index. |
+| `densegen__sequence_validation` | record_keep | Final-sequence validation summary (`validation_passed`, `violations`). |
 | `densegen__pad_used` | record_keep | Whether pad bases were applied. |
 | `densegen__pad_bases` | record_conditional | Number of bases padded. |
 | `densegen__pad_end` | record_conditional | Pad end (`5prime`/`3prime`). |
+| `densegen__pad_literal` | record_conditional | Literal pad sequence written into the final output. |
 | `densegen__gc_total` | record_keep | GC fraction of final sequence. |
 | `densegen__gc_core` | record_keep | GC fraction of pre-pad core sequence. |
 | `densegen__npz_ref` | record_conditional | Relative NPZ artifact reference when `output.usr.npz_fields` is enabled (USR sink only). |
@@ -169,7 +155,7 @@ This section points to stream-boundary docs and keeps this file focused on artif
 
 See also:
 - DenseGen boundary and mistakes: **[observability and events](../concepts/observability_and_events.md)**
-- USR event schema: `../../../usr/README.md#event-log-schema`
+- USR event schema: `../../../usr/docs/reference/event-log.md`
 - Notify operators doc: `../../../../../docs/notify/usr-events.md`
 - DenseGen watcher walkthrough: **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)**
 
@@ -212,6 +198,7 @@ The notebook reads run artifacts (`outputs/meta/*`, `outputs/tables/*`, `outputs
 DenseGen -> BaseRender contract for the scaffolded notebook:
 
 - Contract source: `dnadesign.densegen:densegen_notebook_render_contract`
+- Adapter policy contract: `on_invalid_row=error` (invalid rows fail instead of skipping)
 - Records source path: resolved from output sink selection:
   - single sink in `output.targets` -> that sink (`parquet` or `usr`)
   - multiple sinks in `output.targets` -> `plots.source`
@@ -220,17 +207,30 @@ DenseGen -> BaseRender contract for the scaffolded notebook:
 - BaseRender API surface used by the notebook:
   - `dnadesign.baserender.load_records_from_parquet(...)`
   - `dnadesign.baserender.render_record_figure(...)`
+- Notebook records preview/export contract:
+  - The notebook preview/export table is a curated projection of `records.parquet` focused on row-level signal.
+  - Notebook preview fields are read directly from persisted records; the notebook does not reconstruct fixed elements or pad literals.
+- `densegen__parts_detail` is copied from `densegen__used_tfbs_detail` so preview/export matches Parquet and USR output rows.
+- DenseGen does not provide back-compat shims for old part-detail keys (`tf`, `tfbs`, `stage_a_*`); mismatched payloads fail validation.
+  - `densegen__pad_literal` is read from the persisted `densegen__pad_literal` column.
 - Rendering style preset: `presentation_default` (fixed in the DenseGen contract)
 - Notebook record preview window limit: `500` rows
 - Required parquet columns for the default contract:
   - `id`
   - `sequence`
   - `densegen__used_tfbs_detail`
+- Required TFBS entry keys inside `densegen__used_tfbs_detail`:
+  - `regulator`
+  - `sequence`
+  - `orientation`
+  - `offset`
 - Notebook layout (run mode):
   - `Workspace context`: workspace/config/output provenance and records path.
   - `Run summary`: compact status (`run_id`, `quota status`, `plans at quota`, solver backend/strategy).
   - `Records preview`: plan-filtered table with explicit dataset export controls (`parquet|csv`, output path).
+  - `Records export path behavior`: relative paths resolve from the workspace run root, empty paths default to `outputs/notebooks/records_preview`, and file suffixes are normalized to the selected format (`.parquet` or `.csv`).
   - `BaseRender preview`: `Prev`/`Next` controls with centered index/id status (`i / N | id: ...`).
+  - `BaseRender export path behavior`: export path is required, relative paths resolve from the workspace run root, and file suffixes are normalized to the selected format (`.png` or `.pdf`).
 - `Selected plot`: scope/type/plot controls stacked above the rendered plot.
 - `Plot gallery`: filtered inventory table for browsing and audit.
 - `Plot export`: export `selected|filtered|all` plots to one format (`pdf|png|svg`) under a target directory.
@@ -255,11 +255,12 @@ Core diagnostics plots:
   accepted sequences from `plots.source`, with overlaid categories for regulators and fixed elements (e.g., promoter -35/-10),
   showing where motifs land along the sequence.
 - `run_health` — adaptive run diagnostics dashboard:
-  outcome timeline by plan (discrete attempts for small runs, binned fractions for large runs),
-  acceptance/waste/duplicate rates, rejected/failed reason Pareto, quota-aware accepted progress by plan,
+  attempt outcomes panel, acceptance/waste/duplicate rates, rejected/failed reason Pareto, quota-aware accepted progress by plan,
   compression-ratio distribution by plan, and regulator-by-length TFBS usage counts.
+  `outcomes_over_time` specifically renders an attempt-by-plan matrix (`x=plan`, `y=attempt index descending`) with status markers,
+  intermittent attempt-index ticks, and optional block guides for long runs.
 - `tfbs_usage` — TFBS usage diagnostics from accepted placements: specific TFBS rank-count curve
-  plus cumulative share by regulator.
+  plus a per-regulator rank-share heatmap.
 
 Packaged DenseGen workspaces default to all four core plot families (`stage_a_summary`, `placement_map`, `run_health`, `tfbs_usage`).
 
@@ -298,7 +299,9 @@ With `scope: auto`, DenseGen emits per-plan outputs for small plan sets and swit
 `outputs/tables/attempts.parquet` and plan quotas from
 `outputs/meta/effective_config.json` (`generation.plan[].sequences`).
 `summary.csv` is a compact numeric table with run-level totals and per-plan accepted/quota ratios.
-For large expanded runs, run-health plan rows auto-collapse to base plan groups unless overridden with plot style options (`run_health_plan_scope: per_plan|auto|per_group`, `run_health_plan_max_labels`).
+For large expanded runs, `run_health.pdf` plan rows auto-collapse to base plan groups unless overridden with plot style options (`run_health_plan_scope: per_plan|auto|per_group`, `run_health_plan_max_labels`).
+`outcomes_over_time.pdf` has independent plan scoping controls (`run_health_outcomes_plan_scope: per_plan|auto|per_group`, `run_health_outcomes_plan_max_labels`).
+`outcomes_over_time.pdf` tiles attempts into per-plan rows (first attempts at top) with optional packing controls (`run_health_outcomes_attempts_per_row`, `run_health_outcomes_rows_per_block`).
 
 See `../concepts/sampling.md` for plot interpretation context.
 
@@ -366,7 +369,7 @@ The `source` column is always present and encodes provenance as:
 densegen:{input_name}:{plan_name}
 ```
 
-Per-placement provenance (TFBS, offsets, orientations) is recorded in `densegen__used_tfbs_detail` (including `motif_id`/`tfbs_id`), `outputs/tables/composition.parquet`, and the attempts log.
+Per-placement provenance (regulator/sequence identity, offsets, orientations, and IDs) is recorded in `densegen__used_tfbs_detail` (including `motif_id`/`tfbs_id`), `outputs/tables/composition.parquet`, and the attempts log.
 
 ---
 

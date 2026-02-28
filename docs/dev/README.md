@@ -1,11 +1,11 @@
-# Developer Documentation
+## Developer Documentation
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-02-19
 
 This directory contains developer-facing planning and maintenance notes.
 
-## Contents
+### Contents
 
 - `journal.md`: implementation journal and decision history.
 - `monorepo-organization-audit.md`: information architecture and layout audit notes.
@@ -13,13 +13,13 @@ This directory contains developer-facing planning and maintenance notes.
 - `../../PLANS.md`: planning lifecycle map and pointers to execution plans/ADRs.
 - `../../docs/architecture/decisions/README.md`: ADR conventions and numbering policy.
 
-## Naming convention
+### Naming convention
 
 - Use kebab-case for markdown files.
 - Prefix plan documents with `YYYY-MM-DD-`.
 - Keep archived plans under `plans/archive/`.
 
-## CI test markers
+### CI test markers
 
 - `fimo`: tests requiring MEME/FIMO tooling.
 - `integration`: cross-component integration tests.

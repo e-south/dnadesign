@@ -1,5 +1,9 @@
 ## Workspace Runbook Steps
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 **Last updated by:** cruncher-maintainers on 2026-02-23
 
 ### Contents
@@ -7,7 +11,7 @@
 - [Generated step table](#generated-step-table)
 
 ### Overview
-This table is generated from workspace machine runbooks and is the canonical cross-workspace step inventory.
+This table is generated from workspace machine runbooks and is the standard cross-workspace step inventory.
 
 ### Generated step table
 <!-- docs:runbook-steps:start -->

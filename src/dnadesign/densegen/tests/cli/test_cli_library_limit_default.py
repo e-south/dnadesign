@@ -44,7 +44,7 @@ def test_inspect_run_library_summary_is_aggregated(tmp_path: Path) -> None:
         "seed_solver": 0,
         "solver_backend": "CBC",
         "solver_strategy": "iterate",
-        "solver_time_limit_seconds": None,
+        "solver_attempt_timeout_seconds": None,
         "solver_threads": None,
         "solver_strands": "double",
         "dense_arrays_version": None,

@@ -1,5 +1,9 @@
 ## Studies guide
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 **Last updated by:** cruncher-maintainers on 2026-02-23
 
 ### Contents
@@ -8,7 +12,7 @@
 - [Choosing sweep styles](#choosing-sweep-styles)
 - [Artifact strategy](#artifact-strategy)
 - [Outputs](#outputs)
-- [Canonical command sequence](#canonical-command-sequence)
+- [Standard command sequence](#standard-command-sequence)
 
 ### Why studies exist
 
@@ -159,7 +163,7 @@ Both tradeoff plots annotate the base-config x-value with:
 When `study summarize --allow-partial` is used, aggregate tables include `n_missing_*` columns and status warnings record the missing-data breakdown (`non_success`, `missing_run_dirs`, `missing_metric_artifacts`, `missing_mmr_tables`).
 If the frozen Study spec uses `execution.exit_code_policy: nonzero_if_any_error`, partial summarize exits non-zero after writing outputs.
 
-### Canonical command sequence
+### Standard command sequence
 
 ```bash
 set -euo pipefail
@@ -179,7 +183,7 @@ open outputs/plots/study__diversity_vs_score__<study_id>__plot__mmr_diversity_tr
 - Study outputs live in `<workspace>/outputs/studies/`.
 - Studies are not separate top-level workspace roots.
 
-Two canonical two-TF examples:
+Two standard two-TF examples:
 
 - [Study: length vs score](study_length_vs_score.md)
 - [Study: diversity vs score](study_diversity_vs_score.md)

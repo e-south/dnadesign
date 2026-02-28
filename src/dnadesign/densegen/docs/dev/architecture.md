@@ -1,5 +1,9 @@
 ## DenseGen architecture guide
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This page is maintainer-focused. It maps DenseGen runtime behavior to the key files you should start from when debugging or extending the system.
 
 ### Contents

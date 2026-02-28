@@ -131,6 +131,27 @@ def test_elites_showcase_style_uses_match_window_coloring() -> None:
     assert str(letter_coloring.get("mode")) == "match_window_seq"
 
 
+def test_elites_showcase_style_covers_canonical_workspace_tf_palette_tags() -> None:
+    overrides = cruncher_showcase_style_overrides()
+    palette = dict(overrides.get("palette", {}))
+    expected_tags = {
+        "tf:acrR",
+        "tf:araC",
+        "tf:baeR",
+        "tf:cpxR",
+        "tf:fnr",
+        "tf:fur",
+        "tf:lacI",
+        "tf:lexA",
+        "tf:lrp",
+        "tf:rcdA",
+        "tf:soxR",
+        "tf:soxS",
+    }
+    missing = sorted(tag for tag in expected_tags if tag not in palette)
+    assert missing == []
+
+
 def test_elites_showcase_fails_fast_when_panel_limit_exceeded(tmp_path) -> None:
     elites_df = pd.DataFrame(
         [
@@ -178,7 +199,7 @@ def test_elites_showcase_overlay_title_is_succinct_and_ranked() -> None:
     text = _overlay_text(row, tf_names=["tfA", "tfB"], max_chars=80)
     expected_hash = hashlib.sha256("elite_showcase_1234567890|ACGTACGTACGT".encode("utf-8")).hexdigest()[:12]
     assert len(text) <= 80
-    assert text.startswith(f"Elite #12 [{expected_hash}]\n")
+    assert text.startswith(f"elite_showcase_1234567890 (L=12) [r=12|{expected_hash}]\n")
     assert text.count("\n") == 1
     score_line = text.splitlines()[1]
     assert "tfA=0.91" in score_line
@@ -188,7 +209,7 @@ def test_elites_showcase_overlay_title_is_succinct_and_ranked() -> None:
 def test_elites_showcase_overlay_title_prefers_explicit_hash_id() -> None:
     row = pd.Series({"id": "elite_showcase_1", "rank": 1, "hash_id": "abc123def456", "norm_tfA": 0.7})
     text = _overlay_text(row, tf_names=["tfA"], max_chars=80)
-    assert text.startswith("Elite #1 [abc123def456]")
+    assert text.startswith("elite_showcase_1 [r=1|abc123def456]")
 
 
 def test_elites_showcase_overlay_title_prefers_normalized_score_columns() -> None:
@@ -217,10 +238,44 @@ def test_elites_showcase_overlay_title_fails_when_norm_score_out_of_bounds() -> 
 
 
 def test_elites_showcase_overlay_title_handles_missing_rank() -> None:
-    row = pd.Series({"id": "elite_showcase_1"})
+    row = pd.Series({"id": "elite_showcase_1", "sequence": "ACGTAC"})
     text = _overlay_text(row, max_chars=40)
     assert len(text) <= 40
-    assert text == "Elite"
+    assert text == "elite_showcase_1 (L=6)"
+
+
+def test_elites_showcase_overlay_wraps_multi_tf_scores_for_dense_columns() -> None:
+    row = pd.Series(
+        {
+            "id": "elite_showcase_1",
+            "rank": 1,
+            "sequence": "ACGTACGTACGTACGTACGT",
+            "norm_lexA_regulator": 0.91,
+            "norm_cpxR_regulator": 0.88,
+            "norm_baeR_regulator": 0.86,
+            "norm_soxR_regulator": 0.85,
+            "norm_soxS_regulator": 0.83,
+            "norm_marA_regulator": 0.82,
+        }
+    )
+    text = _overlay_text(
+        row,
+        tf_names=[
+            "lexA_regulator",
+            "cpxR_regulator",
+            "baeR_regulator",
+            "soxR_regulator",
+            "soxS_regulator",
+            "marA_regulator",
+        ],
+        max_chars=80,
+        ncols=6,
+    )
+    lines = text.splitlines()
+    assert len(lines) >= 4
+    assert max(len(line) for line in lines) <= 30
+    assert "lexA_regulator=0.91" in text
+    assert "marA_regulator=0.82" in text
 
 
 def test_elites_showcase_uses_single_row_layout(monkeypatch, tmp_path) -> None:

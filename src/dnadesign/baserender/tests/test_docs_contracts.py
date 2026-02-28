@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dnadesign.baserender import DENSEGEN_TFBS_REQUIRED_KEYS
+
 
 def _pkg_root() -> Path:
     return Path(__file__).resolve().parents[1]
@@ -50,3 +52,11 @@ def test_workspace_demo_guide_matches_output_contract() -> None:
     text = (_pkg_root() / "docs" / "demos" / "workspaces.md").read_text()
     assert "outputs/plots/" in text
     assert "run.emit_report: true" in text
+
+
+def test_densegen_integration_doc_declares_strict_tfbs_contract() -> None:
+    text = (_pkg_root() / "docs" / "integrations" / "densegen.md").read_text()
+    for key in DENSEGEN_TFBS_REQUIRED_KEYS:
+        assert f"`{key}`" in text
+    assert "Legacy TFBS keys (`tf`, `tfbs`, `stage_a_*`) are not accepted" in text
+    assert "`on_invalid_row=error`" in text

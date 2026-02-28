@@ -1,5 +1,9 @@
 ## Cruncher Docs Style Guide
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 **Last updated by:** cruncher-maintainers on 2026-02-23
 
 ### Contents
@@ -21,7 +25,7 @@ Use this guide to keep Cruncher docs legible, deterministic, and runnable for cr
 - Keep one “happy path” command near the top.
 - Follow with “customize/deep dive” sections.
 - Add explicit “Stop here if you only need the happy path” notes for long guides.
-- Route repeated details to canonical references instead of repeating long lists.
+- Route repeated details to standard references instead of repeating long lists.
 
 ### Runbook coupling rules
 - Demos and workspace guides should point to `configs/runbook.yaml`.

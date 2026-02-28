@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+import yaml
 from typer.testing import CliRunner
 
 from dnadesign.densegen.src.cli import run as run_command
@@ -80,6 +81,54 @@ def _write_config(run_root: Path) -> Path:
         """.strip()
         + "\n"
     )
+    return cfg_path
+
+
+def _write_many_plan_config(run_root: Path, *, plan_count: int, quota: int = 1) -> Path:
+    if plan_count <= 0:
+        raise ValueError("plan_count must be positive")
+    cfg_path = run_root / "config.yaml"
+    plan_items = []
+    for idx in range(plan_count):
+        plan_name = f"demo_plan_{idx + 1}"
+        plan_items.append(
+            {
+                "name": plan_name,
+                "sequences": int(quota),
+                "sampling": {"include_inputs": ["demo_input"]},
+                "regulator_constraints": {"groups": [{"name": "all", "members": ["lexA"], "min_required": 1}]},
+            }
+        )
+    payload = {
+        "densegen": {
+            "schema_version": "2.9",
+            "run": {"id": "demo", "root": "."},
+            "inputs": [{"name": "demo_input", "type": "binding_sites", "path": "inputs.csv"}],
+            "output": {
+                "targets": ["parquet"],
+                "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+                "parquet": {"path": "outputs/tables/records.parquet"},
+            },
+            "generation": {"sequence_length": 10, "plan": plan_items},
+            "solver": {"backend": "CBC", "strategy": "iterate"},
+            "postprocess": {
+                "pad": {
+                    "mode": "adaptive",
+                    "end": "5prime",
+                    "gc": {
+                        "mode": "range",
+                        "min": 0.4,
+                        "max": 0.6,
+                        "target": 0.5,
+                        "tolerance": 0.1,
+                        "min_pad_length": 4,
+                    },
+                }
+            },
+            "logging": {"log_dir": "outputs/logs"},
+        }
+    }
+    cfg_path.write_text(yaml.safe_dump(payload, sort_keys=False))
     return cfg_path
 
 
@@ -466,6 +515,12 @@ def test_campaign_reset_removes_outputs(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["campaign-reset", "-c", str(cfg_path)])
 
+    assert result.exit_code == 1, result.output
+    assert "Danger zone" in result.output
+    assert outputs_dir.exists()
+
+    result = runner.invoke(app, ["campaign-reset", "--yes", "-c", str(cfg_path)])
+
     assert result.exit_code == 0, result.output
     assert not outputs_dir.exists()
     assert (run_root / "inputs.csv").exists()
@@ -564,7 +619,7 @@ def test_run_handles_screen_progress_runtime_errors_with_actionable_next_steps(
     assert "progress_style: stream" in result.output
 
 
-def test_run_handles_max_seconds_runtime_errors_with_actionable_next_steps(
+def test_run_handles_max_consecutive_no_progress_runtime_errors_with_actionable_next_steps(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -574,7 +629,7 @@ def test_run_handles_max_seconds_runtime_errors_with_actionable_next_steps(
     cfg_path = _write_config(run_root)
 
     def _fake_run_pipeline(*_args, **_kwargs):
-        raise RuntimeError("[plan_pool__demo/demo_plan] Exceeded max_seconds_per_plan=120.")
+        raise RuntimeError("[plan_pool__demo/demo_plan] Exceeded max_consecutive_no_progress_resamples=120.")
 
     monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
     runner = CliRunner()
@@ -582,9 +637,9 @@ def test_run_handles_max_seconds_runtime_errors_with_actionable_next_steps(
 
     assert result.exit_code != 0, result.output
     normalized = result.output.replace("\n", " ")
-    assert "Exceeded max_seconds_per_plan=120" in normalized
+    assert "Exceeded max_consecutive_no_progress_resamples=120" in normalized
     assert "inspect run --events --library" in normalized
-    assert "increase densegen.runtime.max_seconds_per_plan" in normalized
+    assert "increase densegen.runtime.no_progress_seconds_before_resample" in normalized
     assert "Traceback" not in result.output
 
 
@@ -613,6 +668,38 @@ def test_run_handles_missing_usr_registry_runtime_errors_with_actionable_next_st
     assert "workspace init --output-mode usr|both" in normalized
     assert "registry.yaml" in normalized
     assert "Traceback" not in result.output
+
+
+def test_run_fails_fast_when_workspace_lock_is_held(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+
+    called = {"run_pipeline": False}
+
+    def _fake_run_pipeline(*_args, **_kwargs):
+        called["run_pipeline"] = True
+
+    class _FailingLock:
+        def __enter__(self):
+            raise run_command.RunLockError(
+                "Run lock is held for this workspace. lock=/tmp/run.lock owner_pid=123 owner_host=node."
+            )
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    monkeypatch.setattr(run_command, "acquire_run_lock", lambda **_kwargs: _FailingLock())
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "--fresh", "--no-plot", "-c", str(cfg_path)])
+
+    assert result.exit_code == 1, result.output
+    assert "Run lock is held for this workspace" in result.output
+    assert "campaign-reset" not in result.output
+    assert "Traceback" not in result.output
+    assert called["run_pipeline"] is False
 
 
 def test_run_fresh_rebuilds_stage_a(tmp_path: Path, monkeypatch) -> None:
@@ -655,6 +742,98 @@ def test_run_fresh_preserves_usr_registry(tmp_path: Path, monkeypatch) -> None:
     assert result.exit_code == 0, result.output
     assert registry_path.exists()
     assert registry_path.read_text() == "namespaces: {}\n"
+
+
+def test_campaign_reset_preserves_usr_registry_by_default(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_usr_config(run_root)
+    outputs_dir = run_root / "outputs"
+    registry_path = outputs_dir / "usr_datasets" / "registry.yaml"
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text("namespaces: {}\n")
+    stale_table = outputs_dir / "tables" / "records.parquet"
+    stale_table.parent.mkdir(parents=True, exist_ok=True)
+    stale_table.write_text("seed")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["campaign-reset", "--yes", "-c", str(cfg_path)])
+
+    assert result.exit_code == 0, result.output
+    assert registry_path.exists()
+    assert registry_path.read_text() == "namespaces: {}\n"
+    assert not stale_table.exists()
+
+
+def test_campaign_reset_purge_usr_registry_removes_registry(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_usr_config(run_root)
+    outputs_dir = run_root / "outputs"
+    registry_path = outputs_dir / "usr_datasets" / "registry.yaml"
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text("namespaces: {}\n")
+    stale_table = outputs_dir / "tables" / "records.parquet"
+    stale_table.parent.mkdir(parents=True, exist_ok=True)
+    stale_table.write_text("seed")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["campaign-reset", "--yes", "--purge-usr-registry", "-c", str(cfg_path)])
+
+    assert result.exit_code == 0, result.output
+    assert not registry_path.exists()
+    assert not stale_table.exists()
+    assert not outputs_dir.exists()
+
+
+def test_run_auto_seeds_missing_usr_registry_when_enabled(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_usr_config(run_root)
+    registry_path = run_root / "outputs" / "usr_datasets" / "registry.yaml"
+    assert not registry_path.exists()
+
+    captured = {"called": False}
+
+    def _fake_run_pipeline(_loaded, **_kwargs):
+        captured["called"] = True
+        return None
+
+    runner = CliRunner()
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    result = runner.invoke(app, ["run", "--fresh", "--no-plot", "-c", str(cfg_path)])
+
+    assert result.exit_code == 0, result.output
+    assert captured["called"] is True
+    assert registry_path.exists()
+    assert "Seeded USR registry" in result.output
+
+
+def test_run_fails_fast_when_usr_registry_missing_and_auto_seed_disabled(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_usr_config(run_root)
+    registry_path = run_root / "outputs" / "usr_datasets" / "registry.yaml"
+    assert not registry_path.exists()
+
+    captured = {"called": False}
+
+    def _fake_run_pipeline(_loaded, **_kwargs):
+        captured["called"] = True
+        return None
+
+    runner = CliRunner()
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    result = runner.invoke(app, ["run", "--fresh", "--no-plot", "--no-ensure-usr-registry", "-c", str(cfg_path)])
+
+    assert result.exit_code == 1, result.output
+    assert captured["called"] is False
+    assert "USR registry not found" in result.output
+    assert "workspace init --output-mode usr|both" in result.output
 
 
 def test_run_fresh_preserves_notify_profile_and_cursor(tmp_path: Path, monkeypatch) -> None:
@@ -784,6 +963,25 @@ def test_run_extend_quota_increases_plan_target_before_pipeline(tmp_path: Path, 
     assert captured["quota"] == 4
     assert "Quota plan" in result.output
     assert "demo_plan=4" in result.output
+
+
+def test_run_quota_plan_output_is_grouped_for_large_plan_sets(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_many_plan_config(run_root, plan_count=9, quota=1)
+
+    def _fake_run_pipeline(*_args, **_kwargs):
+        return SimpleNamespace(total_generated=9, per_plan={}, generated_this_run=9)
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "-c", str(cfg_path), "--fresh", "--no-plot"])
+
+    assert result.exit_code == 0, result.output
+    assert "Quota plan" in result.output
+    assert "9 plans (quota pattern: 9 plans at 1 each)" in result.output
+    assert "demo_plan_9=1" not in result.output
 
 
 def test_run_extend_quota_rejects_non_positive_values(tmp_path: Path) -> None:

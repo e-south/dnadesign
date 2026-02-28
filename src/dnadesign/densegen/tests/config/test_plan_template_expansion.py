@@ -160,15 +160,34 @@ def test_plan_templates_accept_large_targets_without_global_quota_cap(tmp_path: 
     assert sum(int(item.quota) for item in loaded.root.densegen.generation.resolve_plan()) == 6000
 
 
-def test_plan_fixed_element_matrix_uniform_requires_even_division(tmp_path: Path) -> None:
+def test_plan_fixed_element_matrix_distributes_non_divisible_quota_evenly(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
     cfg["densegen"]["generation"]["plan"][0]["fixed_elements"]["fixed_element_matrix"]["pairing"] = {
         "mode": "cross_product"
     }
     cfg["densegen"]["generation"]["plan"][0]["sequences"] = 10
     cfg_path = _write(cfg, tmp_path / "config.yaml")
-    with pytest.raises(ConfigError, match="must divide evenly"):
-        load_config(cfg_path)
+    loaded = load_config(cfg_path)
+    plans = list(loaded.root.densegen.generation.plan)
+    assert [item.sequences for item in plans] == [3, 3, 2, 2]
+    assert sum(int(item.sequences) for item in plans) == 10
+
+
+def test_plan_fixed_element_matrix_uses_partial_expansion_when_quota_is_smaller(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
+    cfg["densegen"]["generation"]["plan"][0]["fixed_elements"]["fixed_element_matrix"]["pairing"] = {
+        "mode": "cross_product"
+    }
+    cfg["densegen"]["generation"]["plan"][0]["sequences"] = 2
+    cfg_path = _write(cfg, tmp_path / "config.yaml")
+    loaded = load_config(cfg_path)
+    plans = list(loaded.root.densegen.generation.plan)
+    assert [item.name for item in plans] == [
+        "sigma70__up=consensus__down=consensus",
+        "sigma70__up=consensus__down=shift",
+    ]
+    assert [item.sequences for item in plans] == [1, 1]
+    assert sum(int(item.sequences) for item in plans) == 2
 
 
 def test_generation_rejects_legacy_plan_templates_key(tmp_path: Path) -> None:

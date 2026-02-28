@@ -1,23 +1,23 @@
-# ADR <NNNN>: <Decision title>
+## ADR <NNNN>: <Decision title>
 
 **Status:** proposed | accepted | superseded
 **Date:** <YYYY-MM-DD>
 **Owner:** <team-or-handle>
 
-## Context
+### Context
 <what problem forced a decision>
 
-## Decision
+### Decision
 <what we decided>
 
-## Rationale
+### Rationale
 - Why this over alternatives
 
-## Consequences
+### Consequences
 - What becomes easier
 - What becomes harder
 
-## Links
+### Links
 - Proposal: <link>
 - PR(s): <link>
 - Follow-ups: <link>

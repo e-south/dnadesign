@@ -1,4 +1,4 @@
-# BU SCC Resource Profiles (`dnadesign`)
+## BU SCC Resource Profiles (`dnadesign`)
 
 Resource defaults derived from:
 - `docs/bu-scc/quickstart.md`
@@ -10,9 +10,9 @@ Resource defaults derived from:
 Tune from these baselines after measuring runtime, memory, and queue wait.
 When feasible, keep walltime requests at or below 12 hours for better shared-cluster scheduling access.
 
-## Profiles
+### Profiles
 
-## DenseGen interactive debug
+### DenseGen interactive debug
 
 - mode: `qrsh` interactive CPU
 - request:
@@ -26,7 +26,7 @@ When feasible, keep walltime requests at or below 12 hours for better shared-clu
   - short smoke runs
   - debugging runtime behavior
 
-## DenseGen batch production (CPU)
+### DenseGen batch production (CPU)
 
 - mode: `qsub` CPU batch
 - request baseline:
@@ -37,7 +37,7 @@ When feasible, keep walltime requests at or below 12 hours for better shared-clu
   - `densegen.solver.threads <= 16` (or requested slot count)
   - set solver time limits and per-plan runtime limits in config
 
-## Notify watcher
+### Notify watcher
 
 - mode: `qsub` CPU batch
 - request baseline:
@@ -48,7 +48,7 @@ When feasible, keep walltime requests at or below 12 hours for better shared-clu
   - long-running webhook monitoring
   - low-resource event tailing
 
-## Evo2 GPU inference
+### Evo2 GPU inference
 
 - mode: `qsub` GPU batch
 - request baseline:
@@ -61,7 +61,7 @@ When feasible, keep walltime requests at or below 12 hours for better shared-clu
   - load compatible CUDA and GCC modules
   - keep this profile for GPU workloads only
 
-## Large transfer / model prefetch
+### Large transfer / model prefetch
 
 - mode: transfer-node queue
 - request baseline:

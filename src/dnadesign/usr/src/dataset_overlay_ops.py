@@ -23,6 +23,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from .duckdb_runtime import connect_duckdb_utc
 from .errors import NamespaceError, SchemaError
 from .overlays import (
     OVERLAY_META_CREATED,
@@ -261,6 +262,7 @@ def attach_dataset(
                 if col == key:
                     continue
                 if col in combined.columns:
+                    combined = combined.reindex(combined.index.union(new_df.index))
                     combined.loc[new_df.index, col] = new_df[col]
                 else:
                     combined = combined.join(new_df[[col]], how="outer")
@@ -317,10 +319,6 @@ def attach_duckdb_dataset(
     """Attach derived columns using DuckDB for large parquet inputs."""
     if path.suffix.lower() != ".parquet":
         raise SchemaError("duckdb backend requires parquet input.")
-    try:
-        import duckdb  # type: ignore
-    except ImportError as e:
-        raise SchemaError("duckdb backend requires duckdb (install duckdb).") from e
 
     pf_in = pq.ParquetFile(str(path))
     incoming_cols = list(pf_in.schema_arrow.names)
@@ -379,7 +377,10 @@ def attach_duckdb_dataset(
 
     def _write_overlay_duckdb() -> int:
         dataset._auto_freeze_registry()
-        con = duckdb.connect()
+        con = connect_duckdb_utc(
+            missing_dependency_message="duckdb backend requires duckdb (install duckdb).",
+            error_context="attach duckdb backend",
+        )
         try:
             base_sql = str(dataset.records_path).replace("'", "''")
             con.execute(
@@ -680,11 +681,6 @@ def write_overlay_part_dataset(
     dataset._validate_registry_schema(namespace=namespace, schema=tbl.schema, key=key)
 
     def _write_part() -> int:
-        try:
-            import duckdb  # type: ignore
-        except ImportError as e:
-            raise SchemaError("write_overlay_part requires duckdb (install duckdb).") from e
-
         def _sql_ident(name: str) -> str:
             escaped = str(name).replace('"', '""')
             return f'"{escaped}"'
@@ -694,7 +690,10 @@ def write_overlay_part_dataset(
                 return f"NULLIF(UPPER(TRIM(CAST({expr} AS VARCHAR))), '')"
             return f"NULLIF(TRIM(CAST({expr} AS VARCHAR)), '')"
 
-        con = duckdb.connect()
+        con = connect_duckdb_utc(
+            missing_dependency_message="write_overlay_part requires duckdb (install duckdb).",
+            error_context="write_overlay_part",
+        )
         try:
             base_sql = str(dataset.records_path).replace("'", "''")
             con.execute(f"CREATE TEMP VIEW base AS SELECT * FROM read_parquet('{base_sql}')")

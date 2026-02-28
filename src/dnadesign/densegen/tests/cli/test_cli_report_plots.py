@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 import os
 import socket
 import subprocess
@@ -18,10 +19,16 @@ import sys
 import textwrap
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from dnadesign.densegen.src.cli.main import app
 from dnadesign.densegen.tests.config_fixtures import write_minimal_config
+
+
+@pytest.fixture(autouse=True)
+def _clear_codex_sandbox_env(monkeypatch) -> None:
+    monkeypatch.delenv("CODEX_SANDBOX", raising=False)
 
 
 def test_report_command_removed() -> None:
@@ -43,43 +50,85 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
     assert notebook_path.exists()
     content = notebook_path.read_text()
     expected_literals = [
-        'app = marimo.App(width="compact")',
-        "workspace-scoped run dashboard for DenseGen outputs",
+        'app = marimo.App(width="medium")',
+        "workspace_heading = ",
+        "workspace_run_details_payload = ",
         "from dnadesign.baserender import load_records_from_parquet",
         "from dnadesign.baserender import render_record_figure",
         "from dnadesign.densegen import PLOT_SPECS, densegen_notebook_render_contract",
-        "from dnadesign.densegen import build_run_summary_tables",
+        "from dnadesign.densegen.src.cli.notebook_export_paths import (",
+        "resolve_baserender_export_destination,",
+        "resolve_records_export_destination,",
+        "from dnadesign.densegen.src.cli.notebook_records_projection import (",
+        "build_records_preview_table,",
+        "from functools import lru_cache",
         "record_window_limit = int(contract.record_window_limit)",
         "workspace_name = str(config_path.parent.name or run_root.name)",
         "Failed to parse `run_manifest.json`",
         "Failed to parse `plot_manifest.json`",
-        "plan_quota_table, run_summary_table = build_run_summary_tables(",
-        "run_manifest=run_manifest,",
-        "run_items=run_items,",
-        'mo.md("#### Plan quota breakdown")',
-        '{"Field": "Records path", "Value": _records_path_display}',
         'contract.adapter_columns["id"]',
         'contract.adapter_columns["sequence"]',
         'contract.adapter_columns["annotations"]',
         "Duplicate record ids detected in the notebook preview window",
-        'record_plan_filter = mo.ui.dropdown(options=_plan_options, value=_plan_options[0], label="Record plan")',
+        '_default_plan_value = "all"',
+        'record_plan_filter = mo.ui.dropdown(options=_plan_options, value=_default_plan_value, label="Record plan")',
         "prev_record_button = mo.ui.button(",
         "next_record_button = mo.ui.button(",
-        'export_format = mo.ui.dropdown(options=["parquet", "csv"], value="parquet", label="Dataset export format")',
-        'export_path = mo.ui.text(value=str(default_export_path), label="Dataset export path", full_width=True)',
+        'export_format = mo.ui.dropdown(options=["parquet", "csv"], value="parquet", label="")',
+        'export_path = mo.ui.text(value=str(default_export_path_text), label="", full_width=True)',
         'export_button = mo.ui.run_button(label="Export", kind="neutral")',
+        'mo.md("Dataset export path")',
+        "export_controls = mo.hstack(",
+        "[export_format, export_path, export_button],",
         "Export writes the currently filtered records table from this notebook",
-        "mo.ui.table(df_window_filtered.loc[:, list(df_window_filtered.columns)], page_size=10)",
-        'if selected_format == "csv":',
+        "mo.ui.table(df_window_filtered.loc[:, list(df_window_filtered.columns)])",
+        "destination = resolve_records_export_destination(",
+        'if destination.suffix.lower() == ".csv":',
         "df_window_filtered.to_csv(destination, index=False)",
         "df_window_filtered.to_parquet(destination, index=False)",
         'raise RuntimeError(f"Export failed while writing `{destination}`: {exc}")',
-        "baserender_figure.suptitle(_title_text, y=0.995, fontsize=11)",
-        'active_record_plan = str(active_row.get("densegen__plan") or "unscoped").strip() or "unscoped"',
-        'active_record_core_summary = _promoter_site_summary(active_row.get("densegen__promoter_detail"))',
+        "style_overrides={",
+        '"legend_patch_w": 28.0,',
+        '"legend_font_size": 14,',
+        '"legend_gap_patch_text": 11.0,',
+        '"legend_gap_x": 44.0,',
+        "_title_font_size = 14",
+        '_record_id = str(getattr(record, "id", "") or "unknown")',
+        "_record_display_id = _record_id",
+        "if len(_record_display_id) > 16:",
+        '_record_display_id = f"{_record_display_id[:8]}...{_record_display_id[-4:]}"',
+        '_workspace_title = str(workspace_heading or "").strip()',
+        '_header_text = f"{_workspace_title} | Sequence {_record_display_id}"',
+        "_legend_pad_px = 24.0",
+        '"padding_y": 12.0,',
+        "_figure.text(",
+        "fontsize=_title_font_size,",
+        "@lru_cache(maxsize=64)",
+        'preview_cache_dir = run_root / "outputs" / "notebooks" / ".baserender_preview_cache"',
+        "def _cache_path(record_id: str) -> Path:",
+        'hashlib.sha1(str(record_id).encode("utf-8"))',
+        "def render_baserender_preview_path(record_id: str) -> str:",
+        "prefetch_indices = (active_row_index, active_row_index - 1, active_row_index + 1)",
+        "render_baserender_preview_path(_prefetch_id)",
+        "_baserender_image = mo.image(",
+        "render_baserender_preview_path(active_record_id)",
+        '"width": "100%",',
+        '"height": "auto",',
+        '"object-fit": "contain",',
+        '"display": "block",',
+        'baserender_export_format = mo.ui.dropdown(options=["png", "pdf"], value="png", label="")',
+        "baserender_export_path = mo.ui.text(",
+        "default_baserender_export_path_text",
+        'baserender_export_button = mo.ui.run_button(label="Export", kind="neutral")',
+        'mo.md("BaseRender export path")',
+        "_baserender_export_controls = mo.hstack(",
+        "_destination = resolve_baserender_export_destination(",
+        'raise RuntimeError(f"BaseRender export failed while writing `{_destination}`: {exc}")',
+        "Saved BaseRender preview to `",
+        "df_window_filtered = build_records_preview_table(df_window_filtered)",
+        'active_record_core_summary = summarize_promoter_sites(active_row.get("densegen__parts_detail"))',
         "mo.hstack(",
         "_nav_row = mo.hstack(",
-        'mo.vstack([_nav_row, baserender_figure], align="stretch")',
         'mo.md("### Plot gallery")',
         "def compact_plan_label(plan_name: str) -> str:",
         'if "=" in _token:',
@@ -92,7 +141,6 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         'plot_filter_message = ""',
         "if not _filtered_entries:",
         "No plots found for scope `",
-        "Scope has plot types:",
         "(no plots for current filters)",
         'active_plot_error = str(plot_filter_message or "").strip()',
         "active_plot_entry = None",
@@ -100,13 +148,23 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         "resolve_plot_preview_image",
         'ghostscript = shutil.which("gs")',
         "plot_filter_message,",
-        "mo.image(str(_preview_path))",
+        "mo.image(",
+        "rounded=True,",
         "mo.pdf(str(_plot_path))",
+        'hidden_plot_types = {"run_health/summary_table"}',
+        "if _plot_id in hidden_plot_types:",
         "plot_export_target = mo.ui.dropdown(",
         'plot_export_format = mo.ui.dropdown(options=["pdf", "png", "svg"], value="png", label="")',
+        '"Dataset export details": mo.md(',
+        "_filters_summary = mo.md(",
+        '"Plot availability": mo.ui.table(plot_availability_table),',
+        '"Selected plot metadata": mo.md(',
+        '"Export behavior": mo.md(',
+        "Export selected, filtered, or all plots into one format. selected = currently visible plot, ",
+        '"filtered = every plot matching current gallery filters, all = all plots in this run."',
         'plot_export_button = mo.ui.run_button(label="Export", kind="neutral")',
         "plot(s) to `",
-        'baserender_figure.patch.set_facecolor("white")',
+        '_figure.patch.set_facecolor("white")',
     ]
     for literal in expected_literals:
         assert literal in content
@@ -118,6 +176,9 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         "__OUTPUT_SOURCE__",
         "__USR_ROOT__",
         "__USR_DATASET__",
+        "__WORKSPACE_HEADING__",
+        "__WORKSPACE_RUN_DETAILS_PAYLOAD__",
+        "Dataset export format",
         "Use **Refresh**",
         'refresh = mo.ui.run_button(label="Refresh", kind="neutral")',
         "mo.stop(",
@@ -126,7 +187,18 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         'status_message = ""',
         'status_message = f"Export failed',
         "return baserender_figure",
+        "baserender_preview_png_by_id = {}",
+        "_buffer = BytesIO()",
+        "def render_baserender_preview_png(record_id: str) -> bytes:",
+        "build_run_summary_tables",
+        "plan_quota_table",
+        "run_summary_table",
+        "### Workspace context",
+        "### Plan quota breakdown",
+        '{"Field": "Records path", "Value": _records_path_display}',
         "### Records summary",
+        'mo.md("### Run summary")',
+        "mo.ui.table(run_summary_table)",
         "### Selected plot",
         "Plan id",
         "_selected_plot_meta = mo.md(",
@@ -135,11 +207,35 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         'label="Plot"',
         'label="Plot export set"',
         'label="Plot export format"',
+        '"Scope definitions": mo.md(',
+        "Configured plot types in selected scope:",
         'plot_id_options = ["all"]',
         'default_plot_id = "all"',
+        " | Plan: ",
     ]
     for literal in absent_literals:
         assert literal not in content
+    assert 'bbox_inches="tight"' not in content
+    assert "pad_inches=0.06" not in content
+
+
+def test_notebook_generate_uses_repo_relative_defaults_for_export_path_boxes(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    assert "repo_root = _find_repo_root(run_root)" in content
+    assert "default_export_path_text = to_repo_relative_path(default_export_path)" in content
+    assert "default_baserender_export_path_text = to_repo_relative_path(default_baserender_export_path)" in content
+    assert "default_plot_export_dir_text = to_repo_relative_path(default_plot_export_dir)" in content
+    assert "- Path behavior: relative export paths resolve from the repository root." in content
+    assert "repo_root=repo_root," in content
 
 
 def test_notebook_generate_handles_empty_plot_filter_intersection_without_error(tmp_path: Path) -> None:
@@ -157,7 +253,184 @@ def test_notebook_generate_handles_empty_plot_filter_intersection_without_error(
     assert "if not _filtered_entries:" in content
     assert "active_plot_entry = None" in content
     assert "No plots found for scope `" in content
-    assert "Scope has plot types:" in content
+    assert "Configured plot types in selected scope:" not in content
+
+
+def test_notebook_generate_shows_plot_gallery_notice_when_plots_are_missing(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    assert 'plot_gallery_notice = ""' in content
+    assert "Run `uv run dense plot` to generate plot artifacts for this run." in content
+    assert "require(\n        not plot_entries," not in content
+
+
+def test_notebook_generate_includes_available_plot_ids_even_when_not_generated(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    assert "known_plot_ids = sorted([str(_name) for _name in PLOT_SPECS.keys()])" in content
+    assert "generated_plot_ids_by_scope: dict[str, list[str]] = {}" in content
+    assert 'plot_ids_by_scope["all"] = _ordered_unique(_plot_ids_all_generated)' in content
+    assert "No generated plots for scope `" in content
+    assert "Run `uv run dense plot --only " in content
+    assert "def _infer_plot_id_from_path(relative_parts: tuple[str, ...], stem: str) -> str:" in content
+
+
+def test_notebook_generate_formats_plot_availability_in_gallery_filters(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    assert "plot_id_label_to_id = {}" in content
+    assert '_label = f"{_plot_id} [{_status}]"' in content
+    assert "plot_availability_rows = []" in content
+    assert "plot_availability_table = pd.DataFrame(" in content
+    assert '"Plot type"' in content
+    assert '"Status"' in content
+    assert '"Generated files"' in content
+    assert '"Gallery filters": mo.vstack(' not in content
+    assert '"Plot availability": mo.ui.table(plot_availability_table),' in content
+    assert "_selected_plot_type = str(plot_id_label_to_id.get(" in content
+
+
+def test_notebook_generate_uses_first_class_visual_plot_types_in_gallery_filters(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    assert "def _visual_plot_type(plot_id: str, *, plot_name: str, variant: str, stem: str) -> str:" in content
+    assert '"visual_plot_type": _visual_plot_type(' in content
+    assert "if _base and _variant and _variant != _base:" in content
+    assert 'return f"{_base}/{_variant}"' in content
+    assert "if _base:" in content
+    assert "return _base" in content
+    assert '_variant = str(_entry.get("variant") or _candidate.stem or "")' in content
+    assert "_variant = str(_resolved.stem)" in content
+    assert 'if _stem.endswith("__background_logo"):' in content
+    assert "def _entry_matches_selected_plot_id(_entry: dict[str, object]) -> bool:" in content
+    assert "return _visual_plot_type == selected_plot_id" in content
+
+
+def test_notebook_generate_constrains_plot_preview_image_size(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    assert "mo.image(" in content
+    assert '"max-width": "860px",' in content
+    assert '"max-height": "560px",' in content
+    assert '"margin": "0 auto",' in content
+    assert '"width": "100%",' in content
+
+
+def test_notebook_generate_uses_real_newlines_in_plot_metadata_and_export_help(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    selected_metadata_tail = content.split('"Selected plot metadata": mo.md(', 1)[1]
+    selected_metadata_block = selected_metadata_tail.split(")", 1)[0]
+    assert '"\\n".join(' in selected_metadata_block
+    assert '"\\\\n".join(' not in selected_metadata_block
+
+    export_behavior_tail = content.split('"Export behavior": mo.md(', 1)[1]
+    export_behavior_block = export_behavior_tail.split(")", 1)[0]
+    assert '"\\n".join(' in export_behavior_block
+    assert '"\\\\n".join(' not in export_behavior_block
+
+    dataset_export_tail = content.split('"Dataset export details": mo.md(', 1)[1]
+    dataset_export_block = dataset_export_tail.split(")", 1)[0]
+    assert '"\\n".join(' in dataset_export_block
+    assert '"\\\\n".join(' not in dataset_export_block
+
+
+def test_notebook_generate_skips_hidden_plot_cache_directories(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    assert 'if any(str(_part).startswith(".") for _part in _relative_parts):' in content
+
+
+def test_notebook_generate_treats_variant_plots_as_generated_for_base_plot_types(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    assert "_generated_base_plot_ids = {" in content
+    assert "and selected_plot_id not in _generated_base_plot_ids" in content
+
+
+def test_notebook_generate_baserender_preview_adds_title_and_legend_clearance(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    assert '"padding_y": 12.0,' in content
+    assert "_legend_pad_px = 24.0" in content
+    assert '"legend_pad_px": _legend_pad_px,' in content
+    assert "_figure.text(" in content
+    assert '_record_id = str(getattr(record, "id", "") or "unknown")' in content
+    assert '_workspace_title = str(workspace_heading or "").strip()' in content
+    assert '_header_text = f"{_workspace_title} | Sequence {_record_display_id}"' in content
+    assert '_header_text = f"{workspace_name} | sequence {_record_display_id}"' not in content
 
 
 def test_notebook_generate_streamlines_summary_and_adds_plot_export_controls(tmp_path: Path) -> None:
@@ -171,10 +444,14 @@ def test_notebook_generate_streamlines_summary_and_adds_plot_export_controls(tmp
     notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
     content = notebook_path.read_text()
 
-    assert '{"Field": "Records path", "Value": _records_path_display}' in content
-    assert "plan_quota_table, run_summary_table = build_run_summary_tables(" in content
-    assert "run_manifest=run_manifest," in content
-    assert "run_items=run_items," in content
+    assert '{"Field": "Records path", "Value": _records_path_display}' not in content
+    assert "plan_quota_table, run_summary_table = build_run_summary_tables(" not in content
+    assert "run_manifest=run_manifest," not in content
+    assert "run_items=run_items," not in content
+    assert 'mo.md("### Run summary")' not in content
+    assert "mo.ui.table(run_summary_table)" not in content
+    assert 'mo.md("### Workspace context")' not in content
+    assert 'mo.md("### Plan quota breakdown")' not in content
     assert "### Records summary" not in content
     assert '{"Field": "Generated total", "Value": str(run_manifest.get("total_generated", "-"))}' not in content
     assert '{"Field": "Quota total", "Value": str(run_manifest.get("total_quota", "-"))}' not in content
@@ -188,6 +465,30 @@ def test_notebook_generate_streamlines_summary_and_adds_plot_export_controls(tmp
     assert 'plot_export_button = mo.ui.run_button(label="Export", kind="neutral")' in content
     assert "plot(s) to `" in content
     assert '"No plots found for scope `' in content
+
+    assert (
+        "mo.ui.table(df_window_filtered.loc[:, list(df_window_filtered.columns)]),\n"
+        '            mo.md("Dataset export path"),\n'
+        "            export_controls,\n"
+        "            export_details,"
+    ) in content
+    assert (
+        'mo.md("### Plot export"),\n'
+        "            mo.hstack(\n"
+        "                [\n"
+        "                    plot_export_target,\n"
+        "                    plot_export_format,\n"
+        "                    plot_export_path,\n"
+        "                    plot_export_button,\n"
+        "                ],\n"
+        '                justify="start",\n'
+        '                align="end",\n'
+        "                gap=0.2,\n"
+        "                widths=[1.0, 1.0, 8.0, 0.9],\n"
+        "                wrap=False,\n"
+        "            ),\n"
+        "            plot_export_details,"
+    ) in content
 
 
 def test_notebook_generate_uses_configured_parquet_path(tmp_path: Path) -> None:
@@ -392,7 +693,9 @@ def test_notebook_generate_exports_html_without_cell_execution_errors(tmp_path: 
                 "id": "row1",
                 "sequence": "AAAAAA",
                 "densegen__plan": "demo_plan",
-                "densegen__used_tfbs_detail": [{"tf": "lexA", "orientation": "fwd", "tfbs": "AAA", "offset": 0}],
+                "densegen__used_tfbs_detail": [
+                    {"regulator": "lexA", "orientation": "fwd", "sequence": "AAA", "offset": 0}
+                ],
             }
         ]
     ).to_parquet(tables_dir / "records.parquet", index=False)
@@ -418,6 +721,48 @@ def test_notebook_generate_exports_html_without_cell_execution_errors(tmp_path: 
     assert export_result.returncode == 0, output_text
     assert "MarimoExceptionRaisedError" not in output_text
     assert "cells failed to execute" not in output_text.lower()
+    assert html_out.exists()
+    assert html_out.stat().st_size > 0
+
+
+def test_notebook_generate_exports_html_without_plots_and_without_cell_errors(tmp_path: Path) -> None:
+    import pandas as pd
+
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+    tables_dir = tmp_path / "outputs" / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "id": "row1",
+                "sequence": "AAAAAA",
+                "densegen__plan": "demo_plan",
+                "densegen__used_tfbs_detail": [
+                    {"regulator": "lexA", "orientation": "fwd", "sequence": "AAA", "offset": 0}
+                ],
+            }
+        ]
+    ).to_parquet(tables_dir / "records.parquet", index=False)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    assert notebook_path.exists()
+
+    html_out = tmp_path / "densegen_run_overview_no_plots.html"
+    export_result = subprocess.run(
+        [sys.executable, "-m", "marimo", "export", "html", str(notebook_path), "-o", str(html_out)],
+        capture_output=True,
+        text=True,
+    )
+    output_text = export_result.stdout + export_result.stderr
+    assert export_result.returncode == 0, output_text
+    assert "MarimoExceptionRaisedError" not in output_text
+    assert "cells failed to execute" not in output_text.lower()
+    assert "No `outputs/plots/plot_manifest.json` plots found yet. Run `uv run dense plot`." not in output_text
     assert html_out.exists()
     assert html_out.stat().st_size > 0
 
@@ -456,13 +801,50 @@ def test_notebook_run_uses_marimo_run_mode_by_default(tmp_path: Path, monkeypatc
     run_result = runner.invoke(app, ["notebook", "run", "--reuse-server", "-c", str(cfg_path)])
     assert run_result.exit_code == 0, run_result.output
     assert captured["command"][:2] == ["marimo", "run"]
-    assert "--headless" in captured["command"]
+    assert "--headless" not in captured["command"]
     env = captured["env"]
     assert isinstance(env, dict)
     assert env.get("MARIMO_SKIP_UPDATE_CHECK") == "1"
-    assert captured["browser_url"] == "http://127.0.0.1:2718"
+    assert captured["browser_url"] is None
     assert "Notebook URL" in run_result.output
     assert "press Ctrl+C to stop the notebook server" in run_result.output
+
+
+def test_notebook_run_auto_opens_when_codex_sandbox_is_set(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert gen_result.exit_code == 0, gen_result.output
+
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    monkeypatch.setenv("CODEX_SANDBOX", "seatbelt")
+    monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
+    monkeypatch.setattr(notebook_commands, "_port_is_available", lambda host, port: True)
+    captured: dict[str, object] = {}
+
+    def _fake_run_marimo_command(
+        *,
+        command,
+        env,
+        browser_url=None,
+        open_timeout_seconds=12.0,
+        on_browser_open_failure=None,
+    ):
+        captured["command"] = command
+        captured["browser_url"] = browser_url
+        return True
+
+    monkeypatch.setattr(notebook_commands, "_run_marimo_command", _fake_run_marimo_command)
+    run_result = runner.invoke(app, ["notebook", "run", "-c", str(cfg_path)])
+
+    assert run_result.exit_code == 0, run_result.output
+    assert "--headless" not in captured["command"]
+    assert captured["browser_url"] is None
+    assert "Notebook URL" in run_result.output
 
 
 def test_notebook_run_refreshes_stale_default_notebook_template(tmp_path: Path, monkeypatch) -> None:
@@ -499,13 +881,14 @@ def test_notebook_run_refreshes_stale_default_notebook_template(tmp_path: Path, 
 
     assert run_result.exit_code == 0, run_result.output
     refreshed_content = notebook_path.read_text()
-    assert "workspace-scoped run dashboard for DenseGen outputs" in refreshed_content
+    assert "workspace_heading = " in refreshed_content
+    assert "workspace_run_details_payload = " in refreshed_content
     assert "Notebook URL" in run_result.output
     assert "Notebook template refreshed" in run_result.output
     assert captured["command"][:2] == ["marimo", "run"]
 
 
-def test_notebook_run_wsl_open_uses_manual_browser_open_flow(tmp_path: Path, monkeypatch) -> None:
+def test_notebook_run_wsl_open_uses_marimo_native_open_flow(tmp_path: Path, monkeypatch) -> None:
     cfg_path = tmp_path / "config.yaml"
     write_minimal_config(cfg_path)
     (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
@@ -541,8 +924,9 @@ def test_notebook_run_wsl_open_uses_manual_browser_open_flow(tmp_path: Path, mon
 
     assert run_result.exit_code == 0, run_result.output
     assert captured["command"][:2] == ["marimo", "run"]
-    assert "--headless" in captured["command"]
-    assert captured["browser_url"] == "http://127.0.0.1:2718"
+    assert "--headless" not in captured["command"]
+    assert captured["browser_url"] is None
+    assert "Notebook URL" in run_result.output
 
 
 def test_notebook_run_wsl_open_warns_when_browser_does_not_open(tmp_path: Path, monkeypatch) -> None:
@@ -560,17 +944,18 @@ def test_notebook_run_wsl_open_warns_when_browser_does_not_open(tmp_path: Path, 
     monkeypatch.setattr(notebook_commands, "_is_wsl", lambda: True)
     monkeypatch.setattr(notebook_commands, "_port_is_available", lambda host, port: True)
 
+    observed: dict[str, object] = {}
+
     def _fake_run_marimo_command(**kwargs):
-        callback = kwargs.get("on_browser_open_failure")
-        if callable(callback):
-            callback("browser-open-failed")
+        observed["on_browser_open_failure"] = kwargs.get("on_browser_open_failure")
         return False
 
     monkeypatch.setattr(notebook_commands, "_run_marimo_command", _fake_run_marimo_command)
     run_result = runner.invoke(app, ["notebook", "run", "--reuse-server", "-c", str(cfg_path)])
 
     assert run_result.exit_code == 0, run_result.output
-    assert "Browser did not open automatically" in run_result.output
+    assert observed["on_browser_open_failure"] is None
+    assert "Browser did not open automatically" not in run_result.output
 
 
 def test_notebook_run_wsl_reuses_running_server_and_opens_browser(tmp_path: Path, monkeypatch) -> None:
@@ -588,6 +973,8 @@ def test_notebook_run_wsl_reuses_running_server_and_opens_browser(tmp_path: Path
     monkeypatch.setattr(notebook_commands, "_is_wsl", lambda: True)
     monkeypatch.setattr(notebook_commands, "_port_is_available", lambda host, port: False)
     monkeypatch.setattr(notebook_commands, "_url_is_reachable", lambda url: True)
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    monkeypatch.setattr(notebook_commands, "_running_notebook_filename", lambda url: str(notebook_path))
     opened: dict[str, str] = {}
 
     def _fake_open_browser_tab(url: str) -> bool:
@@ -598,7 +985,7 @@ def test_notebook_run_wsl_reuses_running_server_and_opens_browser(tmp_path: Path
     run_result = runner.invoke(app, ["notebook", "run", "--reuse-server", "-c", str(cfg_path)])
 
     assert run_result.exit_code == 0, run_result.output
-    assert "already serving a notebook" in run_result.output
+    assert "already serving this notebook" in run_result.output
     assert opened["url"] == "http://127.0.0.1:2718"
 
 
@@ -635,10 +1022,10 @@ def test_notebook_run_explicit_open_keeps_marimo_auto_open_behavior(tmp_path: Pa
 
     assert run_result.exit_code == 0, run_result.output
     assert captured["command"][:2] == ["marimo", "run"]
-    assert "--headless" in captured["command"]
+    assert "--headless" not in captured["command"]
     env = captured.get("env")
     assert isinstance(env, dict)
-    assert captured["browser_url"] == "http://127.0.0.1:2718"
+    assert captured["browser_url"] is None
     assert "Notebook URL" in run_result.output
 
 
@@ -876,11 +1263,130 @@ def test_notebook_run_passes_open_timeout_override(tmp_path: Path, monkeypatch) 
     run_result = runner.invoke(app, ["notebook", "run", "--open-timeout", "5.5", "-c", str(cfg_path)])
 
     assert run_result.exit_code == 0, run_result.output
-    assert captured["browser_url"] == "http://127.0.0.1:2718"
+    assert captured["browser_url"] is None
     assert captured["open_timeout_seconds"] == 5.5
 
 
-def test_notebook_run_reuses_running_server_when_requested_port_is_in_use(tmp_path: Path, monkeypatch) -> None:
+def test_notebook_run_default_open_uses_marimo_native_auto_open(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert gen_result.exit_code == 0, gen_result.output
+
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
+    monkeypatch.setattr(notebook_commands, "_port_is_available", lambda host, port: True)
+    captured: dict[str, object] = {}
+
+    def _fake_run_marimo_command(
+        *,
+        command,
+        env,
+        browser_url=None,
+        open_timeout_seconds=12.0,
+        on_browser_open_failure=None,
+        on_process_start=None,
+    ):
+        captured["command"] = command
+        captured["browser_url"] = browser_url
+        captured["on_browser_open_failure"] = on_browser_open_failure
+        captured["on_process_start"] = on_process_start
+        return True
+
+    monkeypatch.setattr(notebook_commands, "_run_marimo_command", _fake_run_marimo_command)
+    run_result = runner.invoke(app, ["notebook", "run", "-c", str(cfg_path)])
+
+    assert run_result.exit_code == 0, run_result.output
+    assert captured["command"][:2] == ["marimo", "run"]
+    assert "--headless" not in captured["command"]
+    assert captured["browser_url"] is None
+    assert captured["on_browser_open_failure"] is None
+    assert callable(captured["on_process_start"])
+    assert "Notebook URL" in run_result.output
+
+
+def test_notebook_run_sets_browser_launcher_on_macos_for_auto_open(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert gen_result.exit_code == 0, gen_result.output
+
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
+    monkeypatch.setattr(notebook_commands, "_port_is_available", lambda host, port: True)
+    monkeypatch.setattr(notebook_commands.sys, "platform", "darwin")
+    captured: dict[str, object] = {}
+
+    def _fake_run_marimo_command(
+        *,
+        command,
+        env,
+        browser_url=None,
+        open_timeout_seconds=12.0,
+        on_browser_open_failure=None,
+        on_process_start=None,
+    ):
+        captured["env"] = env
+        return True
+
+    monkeypatch.setattr(notebook_commands, "_run_marimo_command", _fake_run_marimo_command)
+    run_result = runner.invoke(app, ["notebook", "run", "-c", str(cfg_path)])
+
+    assert run_result.exit_code == 0, run_result.output
+    env = captured.get("env")
+    assert isinstance(env, dict)
+    assert env.get("BROWSER") == "open"
+
+
+def test_notebook_run_keeps_existing_browser_launcher_on_macos(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert gen_result.exit_code == 0, gen_result.output
+
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
+    monkeypatch.setattr(notebook_commands, "_port_is_available", lambda host, port: True)
+    monkeypatch.setattr(notebook_commands.sys, "platform", "darwin")
+    monkeypatch.setenv("BROWSER", "custom-browser")
+    captured: dict[str, object] = {}
+
+    def _fake_run_marimo_command(
+        *,
+        command,
+        env,
+        browser_url=None,
+        open_timeout_seconds=12.0,
+        on_browser_open_failure=None,
+        on_process_start=None,
+    ):
+        captured["env"] = env
+        return True
+
+    monkeypatch.setattr(notebook_commands, "_run_marimo_command", _fake_run_marimo_command)
+    run_result = runner.invoke(app, ["notebook", "run", "-c", str(cfg_path)])
+
+    assert run_result.exit_code == 0, run_result.output
+    env = captured.get("env")
+    assert isinstance(env, dict)
+    assert env.get("BROWSER") == "custom-browser"
+
+
+def test_notebook_run_reuses_running_server_when_requested_port_is_in_use_for_same_notebook(
+    tmp_path: Path, monkeypatch
+) -> None:
     cfg_path = tmp_path / "config.yaml"
     write_minimal_config(cfg_path)
     (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
@@ -894,6 +1400,8 @@ def test_notebook_run_reuses_running_server_when_requested_port_is_in_use(tmp_pa
     monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
     monkeypatch.setattr(notebook_commands, "_port_is_available", lambda host, port: False)
     monkeypatch.setattr(notebook_commands, "_url_is_reachable", lambda url: True)
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    monkeypatch.setattr(notebook_commands, "_running_notebook_filename", lambda url: str(notebook_path))
     opened: dict[str, object] = {}
 
     def _fake_open_browser(url: str) -> bool:
@@ -910,8 +1418,110 @@ def test_notebook_run_reuses_running_server_when_requested_port_is_in_use(tmp_pa
 
     assert run_result.exit_code == 0
     assert "Notebook URL" in run_result.output
-    assert "already serving a notebook" in run_result.output
+    assert "already serving this notebook" in run_result.output
     assert opened["url"] == "http://127.0.0.1:2718"
+
+
+def test_notebook_run_does_not_reuse_mismatched_notebook_when_reuse_server_enabled(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert gen_result.exit_code == 0, gen_result.output
+
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
+    monkeypatch.setattr(notebook_commands, "_port_is_available", lambda host, port: False if port == 2718 else True)
+    monkeypatch.setattr(notebook_commands, "_url_is_reachable", lambda url: True)
+    monkeypatch.setattr(notebook_commands, "_running_notebook_filename", lambda url: "/tmp/other-notebook.py")
+    monkeypatch.setattr(notebook_commands, "_find_available_port", lambda host: 3031)
+
+    captured: dict[str, object] = {}
+
+    def _fake_run_marimo_command(
+        *,
+        command,
+        env,
+        browser_url=None,
+        open_timeout_seconds=12.0,
+        on_browser_open_failure=None,
+    ):
+        captured["command"] = command
+        captured["browser_url"] = browser_url
+        return True
+
+    monkeypatch.setattr(notebook_commands, "_run_marimo_command", _fake_run_marimo_command)
+    run_result = runner.invoke(app, ["notebook", "run", "--reuse-server", "-c", str(cfg_path)])
+
+    assert run_result.exit_code == 0, run_result.output
+    assert "serves a different notebook" in run_result.output
+    assert "launching a fresh server on a free port" in run_result.output
+    assert captured["command"][:2] == ["marimo", "run"]
+    assert "--port" in captured["command"]
+    assert captured["command"][captured["command"].index("--port") + 1] == "3031"
+
+
+def test_notebook_run_does_not_reuse_same_notebook_after_template_refresh(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert gen_result.exit_code == 0, gen_result.output
+
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    notebook_path.write_text("import marimo\napp = marimo.App()\nif __name__ == '__main__':\n    app.run()\n")
+
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
+    port_checks: list[int] = []
+
+    def _fake_port_is_available(host: str, port: int) -> bool:
+        if port != 2718:
+            return True
+        port_checks.append(port)
+        return len(port_checks) >= 2
+
+    monkeypatch.setattr(notebook_commands, "_port_is_available", _fake_port_is_available)
+    monkeypatch.setattr(notebook_commands, "_url_is_reachable", lambda url: True)
+    monkeypatch.setattr(notebook_commands, "_running_notebook_filename", lambda url: str(notebook_path))
+    monkeypatch.setattr(notebook_commands, "_release_workspace_notebook_port", lambda **kwargs: True)
+    monkeypatch.setattr(
+        notebook_commands,
+        "_find_available_port",
+        lambda host: (_ for _ in ()).throw(
+            AssertionError("replacement port should not be used when stale port is released")
+        ),
+    )
+
+    captured: dict[str, object] = {}
+
+    def _fake_run_marimo_command(
+        *,
+        command,
+        env,
+        browser_url=None,
+        open_timeout_seconds=12.0,
+        on_browser_open_failure=None,
+    ):
+        captured["command"] = command
+        captured["browser_url"] = browser_url
+        return True
+
+    monkeypatch.setattr(notebook_commands, "_run_marimo_command", _fake_run_marimo_command)
+    run_result = runner.invoke(app, ["notebook", "run", "--reuse-server", "-c", str(cfg_path)])
+
+    assert run_result.exit_code == 0, run_result.output
+    assert "Notebook template refreshed" in run_result.output
+    assert "stale workspace server on --port 2718 was stopped; restarting on the same port" in run_result.output
+    assert captured["command"][:2] == ["marimo", "run"]
+    assert "--port" in captured["command"]
+    assert captured["command"][captured["command"].index("--port") + 1] == "2718"
 
 
 def test_notebook_run_switches_to_free_port_when_requested_port_is_in_use(tmp_path: Path, monkeypatch) -> None:
@@ -949,11 +1559,11 @@ def test_notebook_run_switches_to_free_port_when_requested_port_is_in_use(tmp_pa
     assert run_result.exit_code == 0, run_result.output
     assert "switching to 3031" in run_result.output
     assert captured["command"][:2] == ["marimo", "run"]
-    assert "--headless" in captured["command"]
+    assert "--headless" not in captured["command"]
     assert "--port" in captured["command"]
     port_index = captured["command"].index("--port")
     assert captured["command"][port_index + 1] == "3031"
-    assert captured["browser_url"] == "http://127.0.0.1:3031"
+    assert captured["browser_url"] is None
 
 
 def test_notebook_run_prefers_fresh_server_by_default_when_port_is_in_use(tmp_path: Path, monkeypatch) -> None:
@@ -993,14 +1603,16 @@ def test_notebook_run_prefers_fresh_server_by_default_when_port_is_in_use(tmp_pa
     assert "launching a fresh server on a free port" in run_result.output
     assert "currently serves `/tmp/other-notebook.py`" in run_result.output
     assert captured["command"][:2] == ["marimo", "run"]
-    assert "--headless" in captured["command"]
+    assert "--headless" not in captured["command"]
     assert "--port" in captured["command"]
     port_index = captured["command"].index("--port")
     assert captured["command"][port_index + 1] == "3031"
-    assert captured["browser_url"] == "http://127.0.0.1:3031"
+    assert captured["browser_url"] is None
 
 
-def test_notebook_run_reuses_same_notebook_server_by_default(tmp_path: Path, monkeypatch) -> None:
+def test_notebook_run_starts_fresh_server_by_default_when_same_notebook_already_serving(
+    tmp_path: Path, monkeypatch
+) -> None:
     cfg_path = tmp_path / "config.yaml"
     write_minimal_config(cfg_path)
     (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
@@ -1012,27 +1624,48 @@ def test_notebook_run_reuses_same_notebook_server_by_default(tmp_path: Path, mon
     import dnadesign.densegen.src.cli.notebook as notebook_commands
 
     monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
-    monkeypatch.setattr(notebook_commands, "_port_is_available", lambda host, port: False)
+    port_checks: list[int] = []
+
+    def _fake_port_is_available(host: str, port: int) -> bool:
+        if port != 2718:
+            return True
+        port_checks.append(port)
+        return len(port_checks) >= 2
+
+    monkeypatch.setattr(notebook_commands, "_port_is_available", _fake_port_is_available)
     monkeypatch.setattr(notebook_commands, "_url_is_reachable", lambda url: True)
     notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
     monkeypatch.setattr(notebook_commands, "_running_notebook_filename", lambda url: str(notebook_path))
-    opened: dict[str, str] = {}
+    monkeypatch.setattr(notebook_commands, "_release_workspace_notebook_port", lambda **kwargs: True)
+    monkeypatch.setattr(
+        notebook_commands,
+        "_find_available_port",
+        lambda host: (_ for _ in ()).throw(
+            AssertionError("replacement port should not be used when stale port is released")
+        ),
+    )
+    captured: dict[str, object] = {}
 
-    def _fake_open_browser_tab(url: str) -> bool:
-        opened["url"] = url
+    def _fake_run_marimo_command(
+        *,
+        command,
+        env,
+        browser_url=None,
+        open_timeout_seconds=12.0,
+        on_browser_open_failure=None,
+    ):
+        captured["command"] = command
+        captured["browser_url"] = browser_url
         return True
 
-    monkeypatch.setattr(notebook_commands, "_open_browser_tab", _fake_open_browser_tab)
-
-    def _unexpected_run(*args, **kwargs):
-        raise AssertionError("subprocess.run should not be called when reusing an existing same-notebook server")
-
-    monkeypatch.setattr(subprocess, "run", _unexpected_run)
+    monkeypatch.setattr(notebook_commands, "_run_marimo_command", _fake_run_marimo_command)
     run_result = runner.invoke(app, ["notebook", "run", "-c", str(cfg_path)])
 
     assert run_result.exit_code == 0, run_result.output
-    assert "already serving this notebook" in run_result.output
-    assert opened["url"] == "http://127.0.0.1:2718"
+    assert "stale workspace server on --port 2718 was stopped; restarting on the same port" in run_result.output
+    assert captured["command"][:2] == ["marimo", "run"]
+    assert "--port" in captured["command"]
+    assert captured["command"][captured["command"].index("--port") + 1] == "2718"
 
 
 def test_notebook_run_fails_when_no_available_port_can_be_found(tmp_path: Path, monkeypatch) -> None:
@@ -1093,11 +1726,11 @@ def test_notebook_run_strips_host_before_launch(tmp_path: Path, monkeypatch) -> 
 
     assert run_result.exit_code == 0, run_result.output
     assert captured["command"][:2] == ["marimo", "run"]
-    assert "--headless" in captured["command"]
+    assert "--headless" not in captured["command"]
     assert "--host" in captured["command"]
     host_index = captured["command"].index("--host")
     assert captured["command"][host_index + 1] == "127.0.0.1"
-    assert captured["browser_url"] == "http://127.0.0.1:2718"
+    assert captured["browser_url"] is None
     assert "http://127.0.0.1:2718" in run_result.output
 
 
@@ -1132,7 +1765,7 @@ def test_notebook_run_formats_ipv6_browser_url(tmp_path: Path, monkeypatch) -> N
     run_result = runner.invoke(app, ["notebook", "run", "--host", "::1", "-c", str(cfg_path)])
 
     assert run_result.exit_code == 0, run_result.output
-    assert captured["browser_url"] == "http://[::1]:2718"
+    assert captured["browser_url"] is None
     assert "http://[::1]:2718" in run_result.output
 
 
@@ -1170,7 +1803,7 @@ def test_notebook_run_maps_wildcard_host_to_localhost_browser_url(tmp_path: Path
     assert "--host" in captured["command"]
     host_index = captured["command"].index("--host")
     assert captured["command"][host_index + 1] == "0.0.0.0"
-    assert captured["browser_url"] == "http://localhost:2718"
+    assert captured["browser_url"] is None
     assert "http://localhost:2718" in run_result.output
 
 
@@ -1470,6 +2103,133 @@ def test_run_marimo_command_reachable_open_failure_warns_once(monkeypatch) -> No
     assert opened is False
     assert browser_attempts == ["http://127.0.0.1:2718"]
     assert warnings == ["browser-open-failed"]
+
+
+def test_release_workspace_notebook_port_clears_corrupt_state_file(tmp_path: Path) -> None:
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    run_root = tmp_path
+    notebook_path = run_root / "outputs" / "notebooks" / "densegen_run_overview.py"
+    state_path = notebook_commands._notebook_server_state_path(run_root)
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text("{broken-json")
+
+    released = notebook_commands._release_workspace_notebook_port(
+        run_root=run_root,
+        host="127.0.0.1",
+        port=2718,
+        notebook_path=notebook_path,
+    )
+
+    assert released is False
+    assert state_path.exists() is False
+
+
+def test_release_workspace_notebook_port_clears_state_when_pid_is_dead(tmp_path: Path, monkeypatch) -> None:
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    run_root = tmp_path
+    notebook_path = run_root / "outputs" / "notebooks" / "densegen_run_overview.py"
+    state_path = notebook_commands._notebook_server_state_path(run_root)
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(
+        json.dumps(
+            {
+                "pid": 731,
+                "host": "127.0.0.1",
+                "port": 2718,
+                "notebook_path": str(notebook_path.resolve()),
+            }
+        )
+    )
+    monkeypatch.setattr(notebook_commands, "_process_is_running", lambda pid: False)
+
+    released = notebook_commands._release_workspace_notebook_port(
+        run_root=run_root,
+        host="127.0.0.1",
+        port=2718,
+        notebook_path=notebook_path,
+    )
+
+    assert released is False
+    assert state_path.exists() is False
+
+
+def test_release_workspace_notebook_port_keeps_state_when_terminate_fails(tmp_path: Path, monkeypatch) -> None:
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    run_root = tmp_path
+    notebook_path = run_root / "outputs" / "notebooks" / "densegen_run_overview.py"
+    state_path = notebook_commands._notebook_server_state_path(run_root)
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(
+        json.dumps(
+            {
+                "pid": 944,
+                "host": "127.0.0.1",
+                "port": 2718,
+                "notebook_path": str(notebook_path.resolve()),
+            }
+        )
+    )
+    monkeypatch.setattr(notebook_commands, "_process_is_running", lambda pid: True)
+    monkeypatch.setattr(notebook_commands, "_terminate_process_tree", lambda pid: False)
+
+    released = notebook_commands._release_workspace_notebook_port(
+        run_root=run_root,
+        host="127.0.0.1",
+        port=2718,
+        notebook_path=notebook_path,
+    )
+
+    assert released is False
+    assert state_path.exists() is True
+
+
+def test_notebook_run_switches_to_free_port_when_reclaim_does_not_free_port(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert gen_result.exit_code == 0, gen_result.output
+
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
+    monkeypatch.setattr(notebook_commands, "_port_is_available", lambda host, port: False if port == 2718 else True)
+    monkeypatch.setattr(notebook_commands, "_url_is_reachable", lambda url: True)
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    monkeypatch.setattr(notebook_commands, "_running_notebook_filename", lambda url: str(notebook_path))
+    monkeypatch.setattr(notebook_commands, "_release_workspace_notebook_port", lambda **kwargs: True)
+    monkeypatch.setattr(notebook_commands, "_find_available_port", lambda host: 3031)
+
+    captured: dict[str, object] = {}
+
+    def _fake_run_marimo_command(
+        *,
+        command,
+        env,
+        browser_url=None,
+        open_timeout_seconds=12.0,
+        on_browser_open_failure=None,
+        on_process_start=None,
+    ):
+        captured["command"] = command
+        captured["browser_url"] = browser_url
+        return True
+
+    monkeypatch.setattr(notebook_commands, "_run_marimo_command", _fake_run_marimo_command)
+    run_result = runner.invoke(app, ["notebook", "run", "-c", str(cfg_path)])
+
+    assert run_result.exit_code == 0, run_result.output
+    assert "stale workspace server on --port 2718 was stopped, but the port is still busy" in run_result.output
+    assert "switching to 3031" in run_result.output
+    assert captured["command"][:2] == ["marimo", "run"]
+    assert "--port" in captured["command"]
+    assert captured["command"][captured["command"].index("--port") + 1] == "3031"
+    assert captured["browser_url"] is None
 
 
 def test_plot_missing_records_reports_actionable_error(tmp_path: Path) -> None:

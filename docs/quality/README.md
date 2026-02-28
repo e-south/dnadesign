@@ -1,12 +1,12 @@
-# Quality Docs
+## Quality Docs
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-02-18
 
-## At a glance
+### At a glance
 This index tracks quality expectations for tests, CI signal, coverage gates, and documentation parity.
 
-## Contents
+### Contents
 - [Root quality score (SOR)](../../QUALITY_SCORE.md): grading model, evidence rules, scorecard, and gap tracker.
 - [CI workflow](../../.github/workflows/ci.yaml): lane semantics and gating contracts.
 - [Devtools modules](../../src/dnadesign/devtools): executable checks for docs, scope, and coverage.

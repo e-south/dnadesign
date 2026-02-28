@@ -1,4 +1,4 @@
-# BU SCC Agent Cheat Sheet (`dnadesign`)
+## BU SCC Agent Cheat Sheet (`dnadesign`)
 
 Pragmatic command + resource defaults for BU SCC runs.
 
@@ -7,7 +7,7 @@ Use this with:
 - `docs/bu-scc/batch-notify.md`
 - `docs/bu-scc/jobs/README.md`
 
-## Core rules
+### Core rules
 
 - Always set `-P <project>`.
 - Always set `h_rt` explicitly.
@@ -21,7 +21,7 @@ Use this with:
 - Use transfer-node queue (`-l download`) for large model/data transfers.
 - OnDemand policy: sessions requesting >12h and/or extra resources count toward the 5 active-session limit.
 
-## Task to resource mapping
+### Task to resource mapping
 
 | Task | Queue type | Starter resources | Notes |
 | --- | --- | --- | --- |
@@ -31,15 +31,15 @@ Use this with:
 | Evo2 inference/smoke | batch GPU | `-l h_rt=04:00:00 -pe omp 4 -l mem_per_core=8G -l gpus=1 -l gpu_c=8.9` | Load matching CUDA/GCC modules in job script. |
 | Large downloads / model prefetch / dataset transfer | transfer-node | `-l download -l h_rt=24:00:00 -pe omp 1` | Do not run compute-heavy tasks here. |
 
-## Copy/paste commands
+### Copy/paste commands
 
-### 1) Interactive CPU shell (1 hour)
+#### 1) Interactive CPU shell (1 hour)
 
 ```bash
 qrsh -P <project> -l h_rt=01:00:00 -pe omp 8 -l mem_per_core=8G -cwd -now n
 ```
 
-### 2) DenseGen CPU batch submit
+#### 2) DenseGen CPU batch submit
 
 ```bash
 qsub -P <project> \
@@ -50,14 +50,14 @@ qsub -P <project> \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
-### 3) DenseGen config preflight (before long runs)
+#### 3) DenseGen config preflight (before long runs)
 
 ```bash
 uv run dense validate-config --probe-solver -c <config.yaml>
 uv run dense inspect config --probe-solver -c <config.yaml>
 ```
 
-### 4) Evo2 GPU submit
+#### 4) Evo2 GPU submit
 
 ```bash
 qsub -P <project> \
@@ -65,7 +65,7 @@ qsub -P <project> \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
 ```
 
-### 5) Notify profile setup + watcher submit
+#### 5) Notify profile setup + watcher submit
 
 ```bash
 CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
@@ -88,7 +88,7 @@ qsub -P <project> \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
 
-### 6) Transfer-node job for large artifacts
+#### 6) Transfer-node job for large artifacts
 
 ```bash
 qsub -l download <<'QSUB'
@@ -104,7 +104,7 @@ set -euo pipefail
 QSUB
 ```
 
-## Monitoring quick commands
+### Monitoring quick commands
 
 ```bash
 qstat -u "$USER"

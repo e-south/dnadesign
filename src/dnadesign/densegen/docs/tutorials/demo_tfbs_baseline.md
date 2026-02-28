@@ -1,155 +1,105 @@
 ## DenseGen TFBS baseline tutorial
 
-This tutorial is the smallest end-to-end DenseGen walkthrough. Read it when you want to learn the DenseGen lifecycle without PWM mining complexity, and finish with a runnable workspace, plots, and notebook outputs.
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
 
-For the stage-by-stage model behind these commands, use **[DenseGen pipeline lifecycle](../concepts/pipeline-lifecycle.md)**.
 
-### Fast path
-For a command-only runbook mirror of this tutorial, use **[`demo_tfbs_baseline/runbook.md`](../../workspaces/demo_tfbs_baseline/runbook.md)**.
+This tutorial runs the smallest DenseGen workflow with binding-site inputs and local parquet outputs.
 
-Run this single command from the repository root:
+### Runbook command
+
+Use the workspace runbook for the command sequence: [demo_tfbs_baseline/runbook.md](../../workspaces/demo_tfbs_baseline/runbook.md).
 
 ```bash
-REPO_ROOT="$(git rev-parse --show-toplevel)" && WORKSPACE_ROOT="$REPO_ROOT/src/dnadesign/densegen/workspaces" && WORKSPACE_ID="tfbs_baseline_trial" && uv run --project "$REPO_ROOT" dense workspace init --id "$WORKSPACE_ID" --root "$WORKSPACE_ROOT" --from-workspace demo_tfbs_baseline --copy-inputs --output-mode local && CONFIG="$WORKSPACE_ROOT/$WORKSPACE_ID/config.yaml" && uv run --project "$REPO_ROOT" dense validate-config --probe-solver -c "$CONFIG" && uv run --project "$REPO_ROOT" dense run --fresh --no-plot -c "$CONFIG" && uv run --project "$REPO_ROOT" dense inspect run --events --library -c "$CONFIG" && uv run --project "$REPO_ROOT" dense plot -c "$CONFIG" && uv run --project "$REPO_ROOT" dense notebook generate -c "$CONFIG"
+# Enter the workspace directory so relative paths resolve correctly.
+cd src/dnadesign/densegen/workspaces/demo_tfbs_baseline
+# Execute the packaged workspace runbook sequence.
+./runbook.sh
 ```
-
-If `WORKSPACE_ID` already exists, choose a new id and rerun the command.
-
-### What this tutorial demonstrates
-This section states the learning outcomes so you can decide whether this is the right starting point.
-
-- Workspace initialization from a packaged demo.
-- Config validation and plan inspection.
-- Stage-A plus solve execution for two simple plans.
-- No `fixed_element_matrix` expansion (this tutorial uses explicit non-expanded plans only).
-- Artifact inspection, plotting, notebook generation, and workspace reset.
 
 ### Prerequisites
-This section ensures your environment is ready before creating a workspace.
 
 ```bash
-# Install locked Python dependencies for reproducible command behavior.
+# Install locked Python dependencies for reproducible execution.
 uv sync --locked
-
-# Confirm DenseGen CLI is available.
-uv run --project "$(git rev-parse --show-toplevel)" dense --help
-
-# Confirm the baseline workspace config validates in the packaged location.
-uv run --project "$(git rev-parse --show-toplevel)" dense validate-config --probe-solver -c src/dnadesign/densegen/workspaces/demo_tfbs_baseline/config.yaml
+# Confirm the DenseGen CLI is installed and discoverable.
+uv run dense --help
+# Validate config schema and probe solver availability.
+uv run dense validate-config --probe-solver -c src/dnadesign/densegen/workspaces/demo_tfbs_baseline/config.yaml
 ```
 
-### Key config knobs
-This section highlights the highest-signal keys in `src/dnadesign/densegen/workspaces/demo_tfbs_baseline/config.yaml`.
+### Key config sections
 
-- `densegen.run.id`: Names the run for manifests and logs.
-- `densegen.inputs[0].type`: Uses `binding_sites` input from `inputs/sites.csv`.
-- `densegen.generation.plan`: Defines `baseline` and `baseline_sigma70` plan behavior.
-- `densegen.generation.sequence_length`: Fixes sequence length at `60`.
-- `densegen.solver.backend`: Selects solver backend (`CBC` by default).
-- `densegen.runtime.max_consecutive_failures`: Stops on sustained zero-yield libraries.
-- `densegen.runtime.max_failed_solutions`: Absolute emergency rejection cap (`0` disables).
-- `densegen.postprocess.pad.mode`: Uses adaptive pad behavior.
-- `densegen.output.parquet.path`: Writes records to `outputs/tables/records.parquet`.
+```yaml
+# src/dnadesign/densegen/workspaces/demo_tfbs_baseline/config.yaml
+densegen:
+  output:
+    targets: [parquet]                   # Write local records table only.
+  generation:
+    sequence_length: 100                 # Final sequence length for both plans.
+    sampling:
+      pool_strategy: iterative_subsample  # Stage-A/Stage-B pool sampling strategy.
+      iterative_max_libraries: 200        # Upper bound on Stage-B library resamples.
+    plan:
+      - name: baseline                    # Plan identifier.
+        sequences: 50                     # Unconstrained plan quota.
+      - name: baseline_sigma70            # Plan identifier.
+        sequences: 50                     # Sigma70-constrained plan quota.
+        fixed_elements:
+          promoter_constraints:
+            - name: sigma70_consensus     # Constraint identifier.
+              spacer_length: [16, 18]     # Enforce spacing between -35 and -10 motifs.
+  solver:
+    backend: CBC                          # Dense-arrays backend.
+    strategy: iterate                     # Iterative solve strategy.
+  runtime:
+    round_robin: true                     # Keep sampling rounds until quotas are met.
+    max_accepted_per_library: 10          # Stage-B attempts before resampling.
+    max_failed_solutions: 0               # Disable failed-solution accumulation.
+```
 
-### Walkthrough
-This section executes the lifecycle in the same order DenseGen runs internally.
-
-#### 1) Create a workspace
-This step creates an isolated workspace so you can run and reset safely without modifying the packaged template.
+### Step-by-step commands
 
 ```bash
-# Resolve repo root and pin workspace root so paths are deterministic.
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-WORKSPACE_ROOT="$REPO_ROOT/src/dnadesign/densegen/workspaces"
-
-# Create a new workspace from the packaged TFBS baseline template.
-uv run --project "$REPO_ROOT" dense workspace init --id tfbs_baseline_trial --root "$WORKSPACE_ROOT" --from-workspace demo_tfbs_baseline --copy-inputs --output-mode local
-
-# Change into the workspace so all relative output paths resolve locally.
-cd "$WORKSPACE_ROOT/tfbs_baseline_trial"
-
-# Store the config path once for the rest of the tutorial.
+# Enter the workspace directory so relative paths resolve correctly.
+cd src/dnadesign/densegen/workspaces/demo_tfbs_baseline
+# Pin config path for repeated CLI calls.
 CONFIG="$PWD/config.yaml"
+
+# Validate config schema and probe solver availability.
+uv run dense validate-config --probe-solver -c "$CONFIG"
+# Start a fresh run from a clean output state.
+uv run dense run --fresh --no-plot -c "$CONFIG"
+# Inspect run diagnostics and per-plan library progress.
+uv run dense inspect run --events --library -c "$CONFIG"
+# Render DenseGen plots from current run artifacts.
+uv run dense plot -c "$CONFIG"
+# Generate the run-overview marimo notebook artifact.
+uv run dense notebook generate -c "$CONFIG"
+# Run notebook validation before opening or sharing it.
+uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
 ```
 
-#### 2) Validate and inspect resolved config
-This step confirms strict schema validity and shows which plans and inputs DenseGen will actually run.
+### If outputs already exist (analysis-only)
 
 ```bash
-# Validate config structure and probe solver availability.
-uv run --project "$REPO_ROOT" dense validate-config --probe-solver -c "$CONFIG"
-
-# Inspect resolved Stage-A inputs.
-uv run --project "$REPO_ROOT" dense inspect inputs -c "$CONFIG"
-
-# Inspect resolved plan and quota settings.
-uv run --project "$REPO_ROOT" dense inspect plan -c "$CONFIG"
-```
-
-#### 3) Run DenseGen
-This step executes Stage-A and solve-to-quota from a clean output state.
-
-```bash
-# Run from a fresh output directory and skip plot rendering for faster iteration.
-uv run --project "$REPO_ROOT" dense run --fresh --no-plot -c "$CONFIG"
-```
-
-#### 4) Inspect runtime artifacts
-This step verifies run health and confirms the records table was materialized.
-
-```bash
-# Print event and library summaries to understand run outcomes.
-uv run --project "$REPO_ROOT" dense inspect run --events --library -c "$CONFIG"
-
-# Verify the records table exists.
-ls -la outputs/tables/records.parquet
-```
-
-#### 5) Generate plots and notebook
-This step produces the default visual outputs and a marimo notebook for interactive review.
-
-```bash
-# Render all registered plot types; stage_a_summary will be skipped because this workspace has no Stage-A pool artifacts.
-uv run --project "$REPO_ROOT" dense plot -c "$CONFIG"
-
-# Generate the notebook file from run outputs.
-uv run --project "$REPO_ROOT" dense notebook generate -c "$CONFIG"
-
-# Launch notebook in app mode.
-# If no tab opens in your shell environment, open the printed Notebook URL manually.
-# Keep this command running while using the notebook; stop with Ctrl+C.
-uv run --project "$REPO_ROOT" dense notebook run -c "$CONFIG"
-
-# For subprocess automation, run headless and stop explicitly.
-uv run --project "$REPO_ROOT" dense notebook run --headless --port 2718 -c "$CONFIG" &
-NOTEBOOK_PID=$!
-# ... interact via http://127.0.0.1:2718 ...
-kill "$NOTEBOOK_PID"
-wait "$NOTEBOOK_PID" || true
-```
-
-#### 6) Reset the workspace
-This step clears outputs while preserving config and inputs for repeatable reruns.
-
-```bash
-# Remove outputs and run state while keeping config and inputs.
-uv run --project "$REPO_ROOT" dense campaign-reset -c "$CONFIG"
+# Enter the workspace directory so relative paths resolve correctly.
+cd src/dnadesign/densegen/workspaces/demo_tfbs_baseline
+# Rebuild plots/notebook from existing run artifacts without regenerating sequences.
+./runbook.sh --analysis-only
+# Open the generated notebook in marimo app mode.
+uv run dense notebook run -c "$PWD/config.yaml"
 ```
 
 ### Expected outputs
-This section lists the key artifacts you should confirm after a successful run.
 
 - `outputs/tables/records.parquet`
 - `outputs/meta/events.jsonl`
-- `outputs/meta/run_manifest.json`
-- `outputs/plots/stage_b/<plan>/occupancy.pdf`
-- `outputs/plots/stage_b/<plan>/tfbs_usage.pdf`
-- `outputs/plots/run_health/*.pdf`
+- `outputs/plots/`
 - `outputs/notebooks/densegen_run_overview.py`
 
-### Troubleshooting
-This section covers the highest-frequency failures for this baseline tutorial.
+### Related docs
 
-- Solver probe fails: rerun `uv run --project "$REPO_ROOT" dense validate-config --probe-solver -c "$CONFIG"` and install a supported solver backend.
-- Workspace already exists: pick a different `--id` or remove the previous workspace directory.
-- Notebook launch fails on remote shell: run `uv run --project "$REPO_ROOT" dense notebook run --headless -c "$CONFIG"` and open the printed URL manually.
+- [Pipeline lifecycle](../concepts/pipeline-lifecycle.md)
+- [Outputs reference](../reference/outputs.md)
+- [Workspace catalog](../../workspaces/catalog.md)

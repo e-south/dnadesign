@@ -15,9 +15,10 @@ import os
 import re
 import shlex
 import subprocess
-from dataclasses import dataclass
-from pathlib import Path
-from typing import List, Optional, Tuple
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
+from typing import Iterator, List, Optional, Tuple
 
 from .config import SSHRemoteConfig
 from .errors import RemoteUnavailableError, TransferError
@@ -38,7 +39,11 @@ class RemoteDatasetStat:
     primary: RemotePrimaryStat
     meta_mtime: Optional[str]
     events_lines: int
-    snapshot_names: List[str]  # e.g., ["records-20250101T120030.parquet", ...]
+    snapshot_names: List[str] = field(default_factory=list)
+    derived_files: List[str] = field(default_factory=list)
+    derived_hashes: dict[str, str] = field(default_factory=dict)
+    aux_files: List[str] = field(default_factory=list)
+    aux_hashes: dict[str, str] = field(default_factory=dict)
 
 
 class SSHRemote:
@@ -88,6 +93,80 @@ class SSHRemote:
         if check and proc.returncode != 0:
             raise RemoteUnavailableError(f"ssh failed ({proc.returncode}): {remote_cmd}\n{proc.stderr.strip()}")
         return proc.returncode, proc.stdout, proc.stderr
+
+    def _dataset_lock_script(self, dataset: str, *, timeout_seconds: int) -> str:
+        dataset_dir = shlex.quote(self.cfg.dataset_path(dataset))
+        lock_path = shlex.quote(str(Path(self.cfg.dataset_path(dataset)) / ".usr.lock"))
+        timeout = max(1, int(timeout_seconds))
+        return (
+            "set -eu; "
+            f"mkdir -p {dataset_dir}; "
+            f"exec 9>>{lock_path}; "
+            f"if ! flock -x -w {timeout} 9; then echo USR_REMOTE_LOCK_TIMEOUT; exit 73; fi; "
+            "echo USR_REMOTE_LOCK_ACQUIRED; "
+            "IFS= read -r _usr_sync_unlock || true"
+        )
+
+    @contextmanager
+    def dataset_transfer_lock(self, dataset: str, *, timeout_seconds: int = 300) -> Iterator[None]:
+        script = self._dataset_lock_script(dataset, timeout_seconds=timeout_seconds)
+        proc = subprocess.Popen(
+            self._ssh_cmd() + ["sh", "-lc", script],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        marker = ""
+        if proc.stdout is not None:
+            marker = proc.stdout.readline().strip()
+        if marker != "USR_REMOTE_LOCK_ACQUIRED":
+            stderr_text = ""
+            if proc.stderr is not None:
+                stderr_text = proc.stderr.read().strip()
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=2)
+            if marker == "USR_REMOTE_LOCK_TIMEOUT":
+                raise TransferError(
+                    f"Remote dataset lock timeout for '{dataset}' on {self.cfg.ssh_target} "
+                    f"after {max(1, int(timeout_seconds))} seconds."
+                )
+            detail = stderr_text or marker or "missing lock handshake marker"
+            raise TransferError(
+                f"Failed to acquire remote dataset lock for '{dataset}' on {self.cfg.ssh_target}: {detail}"
+            )
+
+        release_error: str | None = None
+        body_raised = False
+        try:
+            yield
+        except Exception:
+            body_raised = True
+            raise
+        finally:
+            if proc.poll() is None:
+                try:
+                    if proc.stdin is not None:
+                        proc.stdin.write("release\n")
+                        proc.stdin.flush()
+                        proc.stdin.close()
+                except (BrokenPipeError, OSError):
+                    pass
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=2)
+            if proc.returncode not in (0, None):
+                stderr_text = ""
+                if proc.stderr is not None:
+                    stderr_text = proc.stderr.read().strip()
+                release_error = stderr_text or f"remote lock session exited with code {proc.returncode}"
+            if release_error is not None and not body_raised:
+                raise TransferError(
+                    f"Remote dataset lock release failed for '{dataset}' on {self.cfg.ssh_target}: {release_error}"
+                )
 
     # ---- STAT helpers on remote ----
 
@@ -141,22 +220,91 @@ class SSHRemote:
         return 0
 
     def _remote_list_snapshots(self, snap_dir: str) -> List[str]:
-        # Names like records-YYYYMMDDThhmmss.parquet
+        # Names like records-YYYYMMDDThhmmss.parquet or records-YYYYMMDDThhmmssffffff.parquet
         rc, out, _ = self._ssh_run(f"ls -1 {shlex.quote(snap_dir)} 2>/dev/null", check=False)
         if rc != 0 or not out.strip():
             return []
         names = [ln.strip() for ln in out.splitlines() if ln.strip()]
-        pat = re.compile(r"^records-\d{8}T\d{6}\.parquet$")
+        pat = re.compile(r"^records-\d{8}T\d{6,}\.parquet$")
         return [n for n in names if pat.match(n)]
+
+    def _remote_list_derived_files(self, derived_dir: str) -> List[str]:
+        # Returns file inventory relative to _derived for overlay-fidelity diffing.
+        rc, out, _ = self._ssh_run(
+            f"cd {shlex.quote(derived_dir)} 2>/dev/null && find . -type f -print",
+            check=False,
+        )
+        if rc != 0 or not out.strip():
+            return []
+        files = [line.strip() for line in out.splitlines() if line.strip()]
+        return self._normalize_inventory_paths(files, context="remote derived inventory")
+
+    def _remote_list_aux_files(self, dataset_dir: str) -> List[str]:
+        # Returns non-core file inventory relative to dataset root for full-fidelity sync planning.
+        rc, out, _ = self._ssh_run(
+            "cd "
+            + shlex.quote(dataset_dir)
+            + " 2>/dev/null && find . -type f "
+            + "! -path './records.parquet' "
+            + "! -path './meta.md' "
+            + "! -path './.events.log' "
+            + "! -path './.usr.lock' "
+            + "! -path './_snapshots/*' "
+            + "! -path './_derived/*' "
+            + "-print",
+            check=False,
+        )
+        if rc != 0 or not out.strip():
+            return []
+        files = [line.strip() for line in out.splitlines() if line.strip()]
+        return self._normalize_inventory_paths(files, context="remote auxiliary inventory")
+
+    def _normalize_inventory_paths(self, entries: List[str], *, context: str) -> List[str]:
+        normalized: List[str] = []
+        for raw in entries:
+            entry = raw[2:] if raw.startswith("./") else raw
+            entry = entry.strip()
+            path = PurePosixPath(entry)
+            if not entry or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+                raise RemoteUnavailableError(f"{context} contains unsafe relative path '{raw}'.")
+            normalized.append(path.as_posix())
+        return sorted(normalized)
+
+    def _remote_hash_derived_files(self, derived_dir: str, derived_files: List[str]) -> dict[str, str]:
+        hashes: dict[str, str] = {}
+        for rel in derived_files:
+            full_path = str(PurePosixPath(derived_dir).joinpath(rel))
+            sha = self._remote_sha256(full_path)
+            if not sha:
+                raise RemoteUnavailableError(
+                    "verify-derived-hashes requires remote sha256 support (sha256sum or shasum)."
+                )
+            hashes[rel] = sha
+        return hashes
+
+    def _remote_hash_aux_files(self, dataset_dir: str, aux_files: List[str]) -> dict[str, str]:
+        hashes: dict[str, str] = {}
+        for rel in aux_files:
+            full_path = str(PurePosixPath(dataset_dir).joinpath(rel))
+            sha = self._remote_sha256(full_path)
+            if not sha:
+                raise RemoteUnavailableError(
+                    "verify-derived-hashes requires remote sha256 support (sha256sum or shasum)."
+                )
+            hashes[rel] = sha
+        return hashes
 
     # ---- Public: stat/pull/push ----
 
-    def stat_dataset(self, dataset: str, *, verify: str = "auto") -> RemoteDatasetStat:
+    def stat_dataset(
+        self, dataset: str, *, verify: str = "auto", include_derived_hashes: bool = False
+    ) -> RemoteDatasetStat:
         base = self.cfg.dataset_path(dataset)
         primary = f"{base}/records.parquet"
         meta = f"{base}/meta.md"
         events = f"{base}/.events.log"
         snaps_d = f"{base}/_snapshots"
+        derived_d = f"{base}/_derived"
 
         exists, size_b, mtime = self._remote_stat_file(primary)
         sha = rows = cols = None
@@ -174,6 +322,10 @@ class SSHRemote:
         evt_lines = self._remote_wc_lines(events)
 
         snapshot_names = self._remote_list_snapshots(snaps_d)
+        derived_files = self._remote_list_derived_files(derived_d)
+        derived_hashes = self._remote_hash_derived_files(derived_d, derived_files) if include_derived_hashes else {}
+        aux_files = self._remote_list_aux_files(base)
+        aux_hashes = self._remote_hash_aux_files(base, aux_files) if include_derived_hashes else {}
 
         return RemoteDatasetStat(
             primary=RemotePrimaryStat(
@@ -187,6 +339,10 @@ class SSHRemote:
             meta_mtime=meta_mtime,
             events_lines=evt_lines,
             snapshot_names=snapshot_names,
+            derived_files=derived_files,
+            derived_hashes=derived_hashes,
+            aux_files=aux_files,
+            aux_hashes=aux_hashes,
         )
 
     def stat_file(self, remote_path: str, *, verify: str = "auto") -> RemotePrimaryStat:

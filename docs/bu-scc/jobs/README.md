@@ -1,4 +1,4 @@
-# BU SCC job templates
+## BU SCC job templates
 
 These scripts are submit-ready templates for BU SCC SGE jobs:
 
@@ -6,7 +6,7 @@ These scripts are submit-ready templates for BU SCC SGE jobs:
 - `evo2-gpu-infer.qsub`: Evo2 GPU smoke/inference job shell
 - `notify-watch.qsub`: Notify watcher for USR `.events.log`
 
-## Quick start
+### Quick start
 
 Use project (`-P`) and runtime/config overrides at submit time.
 
@@ -16,13 +16,30 @@ qsub -P <project> docs/bu-scc/jobs/evo2-gpu-infer.qsub
 qsub -P <project> docs/bu-scc/jobs/notify-watch.qsub
 ```
 
-## DenseGen CPU submissions
+### DenseGen CPU submissions
 
 Default template run:
 
 ```bash
 qsub -P <project> \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
+  docs/bu-scc/jobs/densegen-cpu.qsub
+```
+
+`densegen-cpu.qsub` command defaults:
+- validation: `uv run dense validate-config --probe-solver -c "$DENSEGEN_CONFIG"`
+- run: `uv run dense run --no-plot -c "$DENSEGEN_CONFIG"`
+- actor tags: `USR_ACTOR_TOOL=densegen`, `USR_ACTOR_RUN_ID=$JOB_ID.$SGE_TASK_ID`
+
+Override command args at submit time when needed:
+- `DENSEGEN_VALIDATE_ARGS` (example: `--probe-solver`)
+- `DENSEGEN_RUN_ARGS` (example: `--resume --extend-quota 8 --no-plot`)
+
+Resume + quota extension submission:
+
+```bash
+qsub -P <project> \
+  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--resume --extend-quota 8 --no-plot' \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
@@ -42,7 +59,7 @@ When using GUROBI, keep config aligned with scheduler slots:
 - set `densegen.solver.time_limit_seconds` for per-solve limits
 - set `densegen.runtime.max_seconds_per_plan` for per-plan runtime limits
 
-## Evo2 GPU submissions
+### Evo2 GPU submissions
 
 ```bash
 qsub -P <project> \
@@ -50,7 +67,7 @@ qsub -P <project> \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
 ```
 
-## Notify watcher submissions
+### Notify watcher submissions
 
 Preferred mode (profile-driven, secure by default):
 
@@ -95,7 +112,7 @@ qsub -P <project> \
 - you can override policy defaults with explicit `NOTIFY_ACTIONS` and `NOTIFY_TOOLS`
 - env-mode default state paths are namespaced: `outputs/notify/<namespace>/cursor` and `outputs/notify/<namespace>/spool`
 
-## Local qsub-like smoke harness
+### Local qsub-like smoke harness
 
 Run a real watcher flow locally without SCC scheduler access:
 
@@ -120,7 +137,7 @@ What it does:
 - verifies at least one success payload was delivered
 - keeps all runtime artifacts under the specified `--workdir`
 
-## Logs
+### Logs
 
 Each script writes logs to:
 
@@ -132,19 +149,19 @@ Tail logs:
 tail -f outputs/logs/<job_name>.<job_id>.out
 ```
 
-## Arrays
+### Arrays
 
 For arrays, use `qsub -t ...` and consume `SGE_TASK_ID` inside scripts.
 
 Reference: [BU SCC Batch + Notify runbook: Job arrays](../batch-notify.md#5-job-arrays-parameter-sweeps)
 
-## Edit vs submit-time overrides
+### Edit vs submit-time overrides
 
 - Prefer `qsub -P ... -v ... -l ... -pe ...` for run-specific values.
 - Keep template scripts stable and versioned.
 - Avoid one-off manual edits in production submissions.
 
-## References
+### References
 
 - Runbook: [BU SCC Batch + Notify runbook](../batch-notify.md)
 - BU scheduler docs: <https://www.bu.edu/tech/support/research/system-usage/running-jobs/submitting-jobs/>

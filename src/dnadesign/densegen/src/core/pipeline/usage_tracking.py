@@ -35,6 +35,11 @@ def _compute_used_tf_info(
     stage_a_selection_rank_by_index=None,
     stage_a_selection_score_norm_by_index=None,
     stage_a_tfbs_core_by_index=None,
+    stage_a_score_theoretical_max_by_index=None,
+    stage_a_selection_policy_by_index=None,
+    stage_a_nearest_selected_similarity_by_index=None,
+    stage_a_nearest_selected_distance_by_index=None,
+    stage_a_nearest_selected_distance_norm_by_index=None,
 ):
     promoter_motifs = set()
     if fixed_elements is not None:
@@ -84,16 +89,19 @@ def _compute_used_tf_info(
         tf_label = (
             regulator_labels[base_idx] if regulator_labels is not None and base_idx < len(regulator_labels) else ""
         )
-        tfbs = motif
-        used_simple.append(f"{tf_label}:{tfbs}" if tf_label else tfbs)
+        sequence = motif
+        used_simple.append(f"{tf_label}:{sequence}" if tf_label else sequence)
         entry = {
-            "tf": tf_label,
-            "tfbs": tfbs,
+            "part_kind": "tfbs",
+            "part_index": int(base_idx),
+            "regulator": tf_label,
+            "sequence": sequence,
+            "core_sequence": sequence,
             "orientation": orientation,
             "offset": int(offset),
             "offset_raw": int(offset),
-            "length": len(tfbs),
-            "end": int(offset) + len(tfbs),
+            "length": len(sequence),
+            "end": int(offset) + len(sequence),
             "pad_left": 0,
         }
         if site_id_by_index is not None and base_idx < len(site_id_by_index):
@@ -114,31 +122,46 @@ def _compute_used_tf_info(
                 entry["motif_id"] = motif_id
         best_hit_score = _value(stage_a_best_hit_score_by_index, base_idx)
         if best_hit_score is not None:
-            entry["stage_a_best_hit_score"] = float(best_hit_score)
+            entry["score_best_hit_raw"] = float(best_hit_score)
+        score_theoretical_max = _value(stage_a_score_theoretical_max_by_index, base_idx)
+        if score_theoretical_max is not None:
+            entry["score_theoretical_max"] = float(score_theoretical_max)
         rank_within_regulator = _value(stage_a_rank_within_regulator_by_index, base_idx)
         if rank_within_regulator is not None:
-            entry["stage_a_rank_within_regulator"] = int(rank_within_regulator)
+            entry["rank_among_mined_positive"] = int(rank_within_regulator)
         tier = _value(stage_a_tier_by_index, base_idx)
         if tier is not None:
-            entry["stage_a_tier"] = int(tier)
+            entry["tier"] = int(tier)
         fimo_start = _value(stage_a_fimo_start_by_index, base_idx)
         if fimo_start is not None:
-            entry["stage_a_fimo_start"] = int(fimo_start)
+            entry["matched_start"] = int(fimo_start)
         fimo_stop = _value(stage_a_fimo_stop_by_index, base_idx)
         if fimo_stop is not None:
-            entry["stage_a_fimo_stop"] = int(fimo_stop)
+            entry["matched_stop"] = int(fimo_stop)
         fimo_strand = _value(stage_a_fimo_strand_by_index, base_idx)
         if fimo_strand is not None:
-            entry["stage_a_fimo_strand"] = str(fimo_strand)
+            entry["matched_strand"] = str(fimo_strand)
         selection_rank = _value(stage_a_selection_rank_by_index, base_idx)
         if selection_rank is not None:
-            entry["stage_a_selection_rank"] = int(selection_rank)
+            entry["rank_among_selected"] = int(selection_rank)
         selection_score_norm = _value(stage_a_selection_score_norm_by_index, base_idx)
         if selection_score_norm is not None:
-            entry["stage_a_selection_score_norm"] = float(selection_score_norm)
+            entry["score_relative_to_theoretical_max"] = float(selection_score_norm)
         tfbs_core = _value(stage_a_tfbs_core_by_index, base_idx)
         if tfbs_core is not None:
-            entry["stage_a_tfbs_core"] = str(tfbs_core)
+            entry["core_sequence"] = str(tfbs_core)
+        selection_policy = _value(stage_a_selection_policy_by_index, base_idx)
+        if selection_policy is not None:
+            entry["selection_policy"] = str(selection_policy)
+        nearest_similarity = _value(stage_a_nearest_selected_similarity_by_index, base_idx)
+        if nearest_similarity is not None:
+            entry["nearest_selected_similarity"] = float(nearest_similarity)
+        nearest_distance = _value(stage_a_nearest_selected_distance_by_index, base_idx)
+        if nearest_distance is not None:
+            entry["nearest_selected_distance"] = float(nearest_distance)
+        nearest_distance_norm = _value(stage_a_nearest_selected_distance_norm_by_index, base_idx)
+        if nearest_distance_norm is not None:
+            entry["nearest_selected_distance_norm"] = float(nearest_distance_norm)
         used_detail.append(entry)
         if tf_label:
             counts[tf_label] = counts.get(tf_label, 0) + 1
@@ -171,11 +194,11 @@ def _update_usage_counts(
     used_tfbs_detail: list[dict],
 ) -> None:
     for entry in used_tfbs_detail:
-        tf = str(entry.get("tf") or "").strip()
-        tfbs = str(entry.get("tfbs") or "").strip()
-        if not tf or not tfbs:
+        regulator = str(entry.get("regulator") or "").strip()
+        sequence = str(entry.get("sequence") or "").strip()
+        if not regulator or not sequence:
             continue
-        key = (tf, tfbs)
+        key = (regulator, sequence)
         usage_counts[key] = int(usage_counts.get(key, 0)) + 1
 
 
@@ -186,7 +209,7 @@ def _update_usage_summary(
 ) -> None:
     _update_usage_counts(usage_counts, used_tfbs_detail)
     for entry in used_tfbs_detail:
-        tf = str(entry.get("tf") or "").strip()
-        if not tf:
+        regulator = str(entry.get("regulator") or "").strip()
+        if not regulator:
             continue
-        tf_usage_counts[tf] = int(tf_usage_counts.get(tf, 0)) + 1
+        tf_usage_counts[regulator] = int(tf_usage_counts.get(regulator, 0)) + 1

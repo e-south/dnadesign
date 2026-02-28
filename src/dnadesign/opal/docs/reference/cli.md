@@ -1,5 +1,9 @@
 ## OPAL Command Line Interface
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 The OPAL CLI is a thin layer over OPAL’s application modules. It lets you initialize a campaign, ingest labeled samples, train/score/select for a round, inspect records and models, validate your dataset, and generate plots.
 
 Commands are registry-driven and plugin‑agnostic: they operate on the configured plugin names and enforce only declared contracts.

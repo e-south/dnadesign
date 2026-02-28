@@ -1,5 +1,9 @@
 ## Cruncher architecture
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 **Last updated by:** cruncher-maintainers on 2026-02-23
 
 ### Contents
@@ -45,7 +49,7 @@ Core contract:
 
 #### `ingest/` (ports/adapters)
 - source adapters (RegulonDB first)
-- normalization into canonical records (motifs + sites)
+- normalization into standard records (motifs + sites)
 - optional hydration (coordinates -> sequences) via genome providers
 
 #### `store/` (local persistence)
@@ -166,7 +170,7 @@ parse/inputs/{lockfile.json,parse_manifest.json,pwm_summary.json}
 
 #### Run outputs (`out_dir`, e.g. `outputs/`)
 
-Each regulator set gets one canonical run directory:
+Each regulator set gets one standard run directory:
 
 - single regulator set: `<workspace>/<out_dir>/`
 - multiple regulator sets: `<workspace>/<out_dir>/setN_<tf-slug>/`
@@ -193,7 +197,7 @@ A typical **sample** run directory contains:
 - `provenance/lockfile.json` - pinned input snapshot (reproducibility boundary)
 - `optimize/tables/sequences.parquet`, `optimize/tables/elites*`, `optimize/tables/random_baseline*` - sampling tables (`random_baseline*` defaults on with `sample.output.save_random_baseline=true`, `sample.output.random_baseline_n=10000`)
 - `optimize/state/trace.nc`, `optimize/state/metrics.jsonl`, `optimize/state/elites.{json,yaml}` - sampling metadata
-- `analysis/reports/summary.json` - canonical analysis summary
+- `analysis/reports/summary.json` - standard analysis summary
 - `analysis/reports/report.json` + `analysis/reports/report.md` - analysis report outputs from `cruncher analyze`
 - `analysis/manifests/plot_manifest.json` + `analysis/manifests/table_manifest.json` + `analysis/manifests/manifest.json` - analysis inventories
 - `export/table__elites.csv` + `export/table__*.{parquet|csv}` + `export/export_manifest.json` - sequence-export tables from `cruncher export sequences`
@@ -248,10 +252,10 @@ Portfolio specs live under:
 Portfolio outputs live under:
 
 ```
-<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/
-  portfolio/
+<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/
+  meta/
   tables/
-  manifests/
+  plots/
 ```
 
 Key points:
@@ -259,8 +263,8 @@ Key points:
 - `portfolio_id` is deterministic from the frozen Portfolio spec payload.
 - Source run selection is explicit in spec (`workspace`, `run_dir` per source).
 - Source elite count is contract-driven from source run manifest `top_k` and `elites.parquet`.
-- Portfolio plots are workspace-flat under `outputs/plots/` as namespaced files
-  (`portfolio__<portfolio_name>__<portfolio_id>__plot__*`).
+- Portfolio plots are run-scoped under
+  `<portfolio_run_dir>/plots/plot__*`.
 - No implicit latest-run fallback is used during portfolio aggregation.
 - Handoff tables are source-provenance-first (`table__handoff_windows_long`, `table__handoff_elites_summary`, `table__source_summary`).
 

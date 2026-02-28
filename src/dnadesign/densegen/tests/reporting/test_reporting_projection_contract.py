@@ -92,3 +92,29 @@ def test_collect_report_data_reads_projected_parquet_columns(tmp_path: Path, mon
     assert requested_columns.get("attempts.parquet") is not None
     assert requested_columns.get("solutions.parquet") is not None
     assert requested_columns.get("composition.parquet") is not None
+
+
+def test_read_composition_projection_maps_regulator_sequence_columns(tmp_path: Path) -> None:
+    composition_path = tmp_path / "composition.parquet"
+    pd.DataFrame(
+        [
+            {
+                "solution_id": "sol-1",
+                "input_name": "demo_input",
+                "plan_name": "demo_plan",
+                "regulator": "TF_A",
+                "sequence": "AAAA",
+                "length": 4,
+            }
+        ]
+    ).to_parquet(composition_path, index=False)
+
+    frame = reporting_data_module._read_composition_parquet(
+        composition_path,
+        columns=["solution_id", "input_name", "plan_name", "tf", "tfbs", "length"],
+    )
+
+    assert "tf" in frame.columns
+    assert "tfbs" in frame.columns
+    assert frame.loc[0, "tf"] == "TF_A"
+    assert frame.loc[0, "tfbs"] == "AAAA"

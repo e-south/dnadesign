@@ -1,4 +1,4 @@
-# baserender
+![baserender banner](assets/baserender-banner.svg)
 
 Contract-first sequence rendering with strict schemas and explicit adapters.
 
@@ -7,6 +7,8 @@ Contract-first sequence rendering with strict schemas and explicit adapters.
 - no silent fallbacks
 - stable public API at `dnadesign.baserender`
 - tool-agnostic renderer with adapter-based integration
+
+See the [repository docs index](../../../docs/README.md) for broader workflow routing and operational references.
 
 ## What It Is
 

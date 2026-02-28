@@ -25,10 +25,19 @@ from .plot_run_helpers import (
     _bin_attempts,
     _ellipsize,
     _first_existing_column,
+    _humanize_scope_label,
     _normalize_plan_name,
     _usage_available_unique,
     _usage_category_label,
 )
+
+
+def _capitalize_first(text: str) -> str:
+    token = str(text)
+    for idx, char in enumerate(token):
+        if char.isalpha():
+            return token[:idx] + char.upper() + token[idx + 1 :]
+    return token
 
 
 def _build_tfbs_usage_breakdown_figure(
@@ -75,40 +84,47 @@ def _build_tfbs_usage_breakdown_figure(
     top10 = all_values[: min(10, len(all_values))].sum() / total if total > 0 else 0.0
     top50 = all_values[: min(50, len(all_values))].sum() / total if total > 0 else 0.0
 
-    fig, (ax_usage, ax_cum) = plt.subplots(2, 1, figsize=(8.8, 6.0), sharex=False)
+    fig_size = style.get("tfbs_usage_breakdown_figsize")
+    if fig_size is None:
+        fig_size = (10.8, 5.8)
+    fig, (ax_usage, ax_cum) = plt.subplots(1, 2, figsize=(float(fig_size[0]), float(fig_size[1])), sharex=False)
     palette = _palette(style, max(1, len(category_order) + 1))
     category_colors = {label: palette[idx + 1] for idx, label in enumerate(category_order)}
-    ax_usage.axhline(0.0, color="#999999", linewidth=0.8, alpha=0.8, zorder=1)
+    ax_usage.plot(
+        counts["global_rank"].astype(float).to_numpy(),
+        counts["count"].astype(float).to_numpy(),
+        color=palette[0],
+        linewidth=1.3,
+        alpha=0.86,
+        zorder=2,
+    )
     for label in category_order:
-        cat_points = counts[counts["category_label"] == label]
+        cat_points = counts[counts["category_label"] == label].sort_values(by=["global_rank"], ascending=[True])
         if cat_points.empty:
             continue
         x_vals = cat_points["global_rank"].astype(float).to_numpy()
         y_vals = cat_points["count"].astype(float).to_numpy()
         color = category_colors[label]
-        ax_usage.vlines(
+        ax_usage.plot(
             x_vals,
-            0.0,
             y_vals,
             color=color,
             linewidth=1.0,
-            alpha=0.55,
-            zorder=2,
-        )
-        ax_usage.scatter(
-            x_vals,
-            y_vals,
-            color=color,
-            s=18,
-            edgecolors="white",
-            linewidths=0.45,
-            alpha=0.95,
+            alpha=0.9,
             zorder=3,
         )
     ax_usage.set_ylabel("Usage count")
-    ax_usage.set_xlabel("TFBS rank (specific sequence)")
-    ax_usage.set_title(f"TFBS usage breakdown - {input_name}/{plan_name}")
+    ax_usage.set_xlabel("Global TFBS rank (descending count)")
+    input_label = _humanize_scope_label(input_name) or str(input_name)
+    plan_label = _humanize_scope_label(plan_name) or str(plan_name)
+    if input_label == plan_label:
+        scope_label = plan_label
+    else:
+        scope_label = f"{plan_label} / {input_label}"
+    ax_usage.set_title(f"TFBS usage distribution for {scope_label}")
+    rank_share_rows: list[tuple[str, np.ndarray]] = []
     max_rank_within_regulator = 1
+    max_rank_share = 0.0
     for label in category_order:
         cat_points = counts[counts["category_label"] == label].sort_values(
             by=["count", "tfbs"],
@@ -118,24 +134,52 @@ def _build_tfbs_usage_breakdown_figure(
             continue
         cat_values = cat_points["count"].astype(float).to_numpy()
         cat_total = float(cat_values.sum())
-        cat_ranks = np.arange(1, len(cat_values) + 1, dtype=float)
-        cat_cum = np.cumsum(cat_values) / cat_total if cat_total > 0 else np.zeros_like(cat_values)
-        max_rank_within_regulator = max(max_rank_within_regulator, int(cat_ranks[-1]))
-        ax_cum.plot(
-            cat_ranks,
-            cat_cum,
-            color=category_colors[label],
-            linewidth=1.4,
-            marker="o",
-            markersize=2.8,
-            alpha=0.9,
-            zorder=3,
-        )
-    ax_cum.set_ylabel("Cumulative share within regulator")
+        cat_share = cat_values / cat_total if cat_total > 0 else np.zeros_like(cat_values)
+        max_rank_within_regulator = max(max_rank_within_regulator, int(cat_share.shape[0]))
+        if cat_share.size > 0:
+            max_rank_share = max(max_rank_share, float(np.nanmax(cat_share)))
+        rank_share_rows.append((label, cat_share))
+    rank_heatmap = np.full((len(category_order), max_rank_within_regulator), np.nan, dtype=float)
+    for row_idx, label in enumerate(category_order):
+        share_values = next((shares for category, shares in rank_share_rows if category == label), np.array([]))
+        if share_values.size > 0:
+            rank_heatmap[row_idx, : share_values.size] = share_values
+    vmax = max(0.01, min(1.0, max_rank_share if np.isfinite(max_rank_share) else 1.0))
+    heatmap_image = ax_cum.imshow(
+        rank_heatmap,
+        cmap="magma",
+        interpolation="nearest",
+        origin="upper",
+        aspect="auto",
+        vmin=0.0,
+        vmax=vmax,
+    )
+    if max_rank_within_regulator <= 10:
+        tick_positions = np.arange(max_rank_within_regulator, dtype=float)
+    else:
+        tick_step = max(1, int(np.ceil(float(max_rank_within_regulator) / 8.0)))
+        tick_positions = np.arange(0, max_rank_within_regulator, tick_step, dtype=float)
+        if (max_rank_within_regulator - 1) not in tick_positions:
+            tick_positions = np.append(tick_positions, float(max_rank_within_regulator - 1))
+    ax_cum.set_xticks(tick_positions)
+    ax_cum.set_xticklabels([str(int(pos) + 1) for pos in tick_positions.tolist()])
+    ax_cum.set_yticks(np.arange(len(category_order), dtype=float))
+    ax_cum.set_yticklabels([_capitalize_first(_ellipsize(label, max_len=16)) for label in category_order])
     ax_cum.set_xlabel("TFBS rank within regulator")
-    ax_cum.set_ylim(0.0, 1.03)
-    ax_cum.set_xlim(0.7, float(max_rank_within_regulator) + 0.3)
-    ax_cum.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=6))
+    ax_cum.set_ylabel("")
+    ax_cum.set_title("Rank-share heatmap within regulator", pad=8.0)
+    ax_usage.set_box_aspect(1.0)
+    ax_cum.set_box_aspect(1.0)
+    colorbar = fig.colorbar(
+        heatmap_image,
+        ax=ax_cum,
+        fraction=0.046,
+        pad=0.04,
+    )
+    colorbar.set_label("Share within regulator")
+    colorbar.ax.tick_params(
+        labelsize=float(style.get("tick_size", style.get("font_size", 13.0) * 0.72)),
+    )
 
     if all_values.size > 0:
         y_max = float(np.nanmax(all_values)) * 1.08
@@ -144,15 +188,25 @@ def _build_tfbs_usage_breakdown_figure(
         ax_usage.set_ylim(0.0, y_max)
 
     summary_lines = [
-        f"placements in outputs: {int(total)}",
-        f"unique TFBS-pairs in outputs: {len(counts)}",
-        f"top10 share (specific TFBS rank): {top10:.1%}",
-        f"top50 share (specific TFBS rank): {top50:.1%}",
+        f"Placements in outputs: {int(total)}",
+        f"Unique TFBS-pairs in outputs: {len(counts)}",
+        f"Top10 share (specific TFBS rank): {top10:.1%}",
+        f"Top50 share (specific TFBS rank): {top50:.1%}",
     ]
     if available_total > 0:
         summary_lines.append(
-            f"unique TFBS-pairs used / available: {len(counts)}/{available_total} ({len(counts) / available_total:.1%})"
+            f"Unique TFBS-pairs used / available: {len(counts)}/{available_total} ({len(counts) / available_total:.1%})"
         )
+    summary_lines = [_capitalize_first(line) for line in summary_lines]
+    summary_font_size = float(
+        style.get(
+            "tfbs_usage_summary_size",
+            max(
+                10.8,
+                float(style.get("label_size", style.get("font_size", 13.0))) * 0.86,
+            ),
+        )
+    )
     ax_usage.text(
         0.98,
         0.95,
@@ -160,8 +214,7 @@ def _build_tfbs_usage_breakdown_figure(
         transform=ax_usage.transAxes,
         ha="right",
         va="top",
-        fontsize=8,
-        bbox=dict(boxstyle="round", facecolor="white", alpha=0.7, linewidth=0.5),
+        fontsize=summary_font_size,
     )
     ax_usage.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=8))
 
@@ -185,20 +238,29 @@ def _build_tfbs_usage_breakdown_figure(
             )
         )
         legend_labels.append(
-            f"{label}: placements {cat_total}/{int(total)} ({share:.1%}), "
+            f"{_capitalize_first(label)}: placements {cat_total}/{int(total)} ({share:.1%}), "
             f"unique {used_unique}/{max(1, available_unique)}"
         )
     if legend_handles:
+        legend_font_size = float(
+            style.get(
+                "tfbs_usage_legend_size",
+                max(
+                    float(style.get("label_size", style.get("font_size", 13.0))),
+                    float(style.get("font_size", 13.0) * 0.95),
+                ),
+            )
+        )
         fig.legend(
             legend_handles,
             legend_labels,
             loc="lower center",
             bbox_to_anchor=(0.5, 0.01),
             ncol=2,
-            frameon=bool(style.get("legend_frame", False)),
-            fontsize=float(style.get("tick_size", style.get("font_size", 13.0) * 0.62)),
+            frameon=False,
+            fontsize=legend_font_size,
         )
-    fig.tight_layout(rect=(0.0, 0.15, 1.0, 1.0))
+    fig.tight_layout(rect=(0.0, 0.17, 1.0, 1.0))
     return fig, {"usage": ax_usage, "cum": ax_cum}
 
 
@@ -287,7 +349,7 @@ def _build_run_health_compression_ratio_figure(
     labeled_plans = set(plan_names[:legend_max])
     fig_size = style.get("run_health_compression_figsize")
     if fig_size is None:
-        fig_size = (8.0, 4.6)
+        fig_size = (7.2, 4.0)
     fig, ax = plt.subplots(
         figsize=(float(fig_size[0]), float(fig_size[1])),
         constrained_layout=False,
@@ -315,9 +377,10 @@ def _build_run_health_compression_ratio_figure(
         ax.set_title("Compression ratio distribution by plan group")
     else:
         ax.set_title("Compression ratio distribution by plan")
-    legend_ncol = 1 if len(labeled_plans) <= 8 else 2
+    legend_ncol = 1
     ax.legend(
-        loc="upper left",
+        loc="center left",
+        bbox_to_anchor=(1.02, 0.5),
         frameon=False,
         ncol=legend_ncol,
         fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.88)),
@@ -334,6 +397,7 @@ def _build_run_health_compression_ratio_figure(
             fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.82)),
             alpha=0.86,
         )
+    fig.subplots_adjust(right=0.74)
     _apply_style(ax, style)
     return fig, {"compression": ax}
 
@@ -383,7 +447,10 @@ def _build_run_health_tfbs_length_by_regulator_figure(
     lengths = [int(v) for v in pivot.columns.tolist()]
     fig_size = style.get("run_health_tfbs_length_figsize")
     if fig_size is None:
-        fig_size = (10.4, 4.9)
+        if len(regulators) == 1:
+            fig_size = (4.6, 4.6)
+        else:
+            fig_size = (7.2, 3.5)
     fig, ax = plt.subplots(
         figsize=(float(fig_size[0]), float(fig_size[1])),
         constrained_layout=False,
@@ -391,18 +458,6 @@ def _build_run_health_tfbs_length_by_regulator_figure(
     x = np.arange(len(regulators), dtype=float)
     width = 0.82 / max(1, len(lengths))
     palette = _palette(style, max(1, len(lengths)))
-    for idx, length in enumerate(lengths):
-        offset = (float(idx) - (float(len(lengths) - 1) / 2.0)) * width
-        y = pivot[length].to_numpy(dtype=float)
-        ax.bar(
-            x + offset,
-            y,
-            width=width * 0.92,
-            color=palette[idx],
-            edgecolor="white",
-            linewidth=0.5,
-            label=f"{length} bp",
-        )
     candidate_pool_sizes: dict[str, int] = {}
     if library_members_df is not None and not library_members_df.empty:
         lib = library_members_df.copy()
@@ -424,26 +479,73 @@ def _build_run_health_tfbs_length_by_regulator_figure(
         candidate_pool_sizes = (
             frame[["regulator", "tfbs"]].drop_duplicates().groupby("regulator")["tfbs"].nunique().astype(int).to_dict()
         )
-    x_labels = [
-        f"{_ellipsize(label, max_len=20)}\n(n={int(candidate_pool_sizes.get(label, 0))})" for label in regulators
-    ]
-    rotate = 20 if len(regulators) > 4 else 0
-    ax.set_xticks(x)
-    ax.set_xticklabels(
-        x_labels,
-        rotation=rotate,
-        ha="right" if rotate else "center",
-    )
-    ax.set_xlabel("Regulator")
-    ax.set_ylabel("Count in accepted outputs")
-    ax.set_title("TFBS length counts by regulator across accepted outputs")
-    ax.legend(
-        loc="upper right",
-        title="TFBS length",
-        frameon=False,
-        fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.86)),
-        title_fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.9)),
-    )
+    if len(regulators) == 1:
+        regulator = regulators[0]
+        regulator_counts = (
+            counts[counts["regulator"] == regulator]
+            .sort_values(by=["tfbs_length"], ascending=[True])
+            .reset_index(drop=True)
+        )
+        lengths_single = regulator_counts["tfbs_length"].astype(int).to_numpy()
+        values_single = regulator_counts["count"].astype(float).to_numpy()
+        single_color = "#7a7a7a"
+        ax.bar(
+            lengths_single.astype(float),
+            values_single,
+            width=0.8,
+            color=single_color,
+            edgecolor="white",
+            linewidth=0.6,
+        )
+        ax.set_xticks(lengths_single.astype(float))
+        ax.set_xticklabels([str(item) for item in lengths_single.tolist()])
+        ax.set_xlabel("TFBS length (bp)")
+        ax.set_ylabel("Count in accepted outputs")
+        ax.set_title("TFBS length distribution across accepted outputs")
+        ax.text(
+            0.99,
+            0.96,
+            f"Regulator: {_ellipsize(regulator, max_len=24)}\n"
+            f"unique available: {int(candidate_pool_sizes.get(regulator, 0))}",
+            transform=ax.transAxes,
+            ha="right",
+            va="top",
+            fontsize=max(8.0, float(style.get("tick_size", style.get("font_size", 13.0) * 0.62))),
+            color="#333333",
+        )
+    else:
+        for idx, length in enumerate(lengths):
+            offset = (float(idx) - (float(len(lengths) - 1) / 2.0)) * width
+            y = pivot[length].to_numpy(dtype=float)
+            ax.bar(
+                x + offset,
+                y,
+                width=width * 0.92,
+                color=palette[idx],
+                edgecolor="white",
+                linewidth=0.5,
+                label=f"{length} bp",
+            )
+        x_labels = [
+            f"{_ellipsize(label, max_len=20)}\n(n={int(candidate_pool_sizes.get(label, 0))})" for label in regulators
+        ]
+        rotate = 20 if len(regulators) > 4 else 0
+        ax.set_xticks(x)
+        ax.set_xticklabels(
+            x_labels,
+            rotation=rotate,
+            ha="right" if rotate else "center",
+        )
+        ax.set_xlabel("Regulator")
+        ax.set_ylabel("Count in accepted outputs")
+        ax.set_title("TFBS length counts by regulator across accepted outputs")
+        ax.legend(
+            loc="upper right",
+            title="TFBS length",
+            frameon=False,
+            fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.86)),
+            title_fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.9)),
+        )
     ax.margins(y=0.08)
     _apply_style(ax, style)
     return fig, {"length": ax}

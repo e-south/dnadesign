@@ -1,5 +1,9 @@
 ## Motif artifact JSON contract
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 DenseGen can consume one JSON file per motif.
 This keeps producer tooling and DenseGen decoupled:
 - producer tools own parsing and conversion

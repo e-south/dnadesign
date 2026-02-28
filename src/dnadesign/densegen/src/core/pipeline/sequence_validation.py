@@ -20,7 +20,7 @@ def _apply_pad_offsets(used_tfbs_detail: list[dict], pad_meta: dict) -> list[dic
         pad_left = int(pad_meta.get("bases") or 0)
     for entry in used_tfbs_detail:
         offset_raw = int(entry.get("offset_raw", entry.get("offset", 0)))
-        length = int(entry.get("length", len(entry.get("tfbs") or "")))
+        length = int(entry.get("length", len(entry.get("sequence") or "")))
         offset = offset_raw + pad_left
         entry["offset_raw"] = offset_raw
         entry["pad_left"] = pad_left

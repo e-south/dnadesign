@@ -99,9 +99,27 @@ class SequenceRowsRenderer:
                 tone_strengths=tone_rev,
                 row_id="rev",
             )
-            _draw_connectors(ax, len(record.sequence), x0, layout.cw, layout.y_forward, layout.y_reverse, style)
+            _draw_connectors(ax, len(record.sequence), x0, layout.cw, layout, style)
 
         feature_boxes = dict(layout.feature_boxes)
+        promoter_source = "densegen_promoter"
+        feature_box_pad = float(style.kmer.pad_x_px)
+        promoter_feature_boxes: list[tuple[float, float, float, float]] = []
+        for placement in layout.placements:
+            feature = record.features[placement.feature_index]
+            source = str(feature.attrs.get("source", "")).strip().lower()
+            if source != promoter_source:
+                continue
+            x0 = placement.x - feature_box_pad
+            x1 = placement.x + placement.w + feature_box_pad
+            promoter_feature_boxes.append(
+                (
+                    x0,
+                    placement.y - placement.h / 2.0,
+                    x1,
+                    placement.y + placement.h / 2.0,
+                )
+            )
 
         # Draw feature boxes first.
         for placement in layout.placements:
@@ -111,6 +129,18 @@ class SequenceRowsRenderer:
             label = feature.label or ""
             if not placement.above:
                 label = label[::-1]
+            source = str(feature.attrs.get("source", "")).strip().lower()
+            placement_box = (
+                placement.x - feature_box_pad,
+                placement.y - placement.h / 2.0,
+                placement.x + placement.w + feature_box_pad,
+                placement.y + placement.h / 2.0,
+            )
+            draw_label = True
+            if source != promoter_source and any(
+                _boxes_overlap(placement_box, promoter_box) for promoter_box in promoter_feature_boxes
+            ):
+                draw_label = False
             _draw_feature_box(
                 ax,
                 placement.x,
@@ -122,6 +152,7 @@ class SequenceRowsRenderer:
                 style,
                 cw=layout.cw,
                 ch=layout.ch,
+                draw_label=draw_label,
             )
 
             feature_boxes[placement.feature_id] = (
@@ -134,6 +165,8 @@ class SequenceRowsRenderer:
         # Draw effects with strict unknown-kind failure from registry.
         for effect in record.effects:
             draw_effect(ax, effect, record, layout, style, palette, feature_boxes)
+
+        _draw_fixed_element_annotations(ax, record, layout, palette, style)
 
         legend_mode = str(style.legend_mode).lower()
         if style.legend and legend_mode == "inline":
@@ -314,11 +347,236 @@ def _mix_colors(light_hex: str, dark_hex: str, strength: float) -> tuple[float, 
     )
 
 
+def _darken_rgb(color: object, *, factor: float) -> tuple[float, float, float]:
+    r, g, b = mcolors.to_rgb(color)
+    scale = min(1.0, max(0.0, float(factor)))
+    return (r * scale, g * scale, b * scale)
+
+
 def _capitalize_first(text: str) -> str:
     t = text.strip()
     if not t:
         return t
     return t[0].upper() + t[1:]
+
+
+def _boxes_overlap(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> bool:
+    ax0, ay0, ax1, ay1 = a
+    bx0, by0, bx1, by1 = b
+    return max(ax0, bx0) < min(ax1, bx1) and max(ay0, by0) < min(ay1, by1)
+
+
+def _span_link_label_boxes(
+    record: Record, layout: LayoutContext, style: Style
+) -> list[tuple[float, float, float, float]]:
+    boxes: list[tuple[float, float, float, float]] = []
+    feature_boxes = layout.feature_boxes
+    for effect in record.effects:
+        if effect.kind != "span_link":
+            continue
+
+        target = effect.target
+        if "from_feature_id" in target and "to_feature_id" in target:
+            left = feature_boxes.get(str(target["from_feature_id"]))
+            right = feature_boxes.get(str(target["to_feature_id"]))
+            if left is None or right is None:
+                continue
+            x1 = float(left[2])
+            x2 = float(right[0])
+            if x1 > x2:
+                x1, x2 = x2, x1
+        elif "from_span" in target and "to_span" in target:
+            from_raw = target["from_span"]
+            to_raw = target["to_span"]
+            if not isinstance(from_raw, dict) or not isinstance(to_raw, dict):
+                continue
+            x1 = layout.x_left + ((int(from_raw["start"]) + int(from_raw["end"])) / 2.0) * layout.cw
+            x2 = layout.x_left + ((int(to_raw["start"]) + int(to_raw["end"])) / 2.0) * layout.cw
+            if x1 > x2:
+                x1, x2 = x2, x1
+        else:
+            continue
+
+        lane = str(effect.params.get("lane", "top")).lower()
+        if lane not in {"top", "bottom"}:
+            continue
+        try:
+            track = int(effect.render.get("track", 0))
+        except Exception:
+            continue
+        if lane == "top":
+            y = layout.y_forward + layout.feature_track_base_offset_up + track * layout.feature_track_step
+        else:
+            y = layout.y_reverse - layout.feature_track_base_offset_down - track * layout.feature_track_step
+
+        inner_margin_bp = effect.params.get("inner_margin_bp", style.span_link_inner_margin_bp)
+        try:
+            inner_margin_bp = float(inner_margin_bp)
+        except Exception:
+            inner_margin_bp = float(style.span_link_inner_margin_bp)
+        if inner_margin_bp < 0:
+            inner_margin_bp = 0.0
+        inner_margin_px = inner_margin_bp * layout.cw
+        x1 = x1 + inner_margin_px
+        x2 = x2 - inner_margin_px
+        if x2 <= x1:
+            continue
+
+        base_fs = max(6, style.font_size_label - 2)
+        avail = max(4.0, x2 - x1)
+        label = str(effect.params.get("label", "")).strip()
+        fs = base_fs
+        text_h = max(8.0, (float(fs) / 72.0) * float(style.dpi))
+        line_half_h = max(2.0, text_h * 0.33)
+        tick_half_h = 4.0
+        tick_half_w = 1.2
+        if label == "":
+            boxes.append((x1, y - line_half_h, x2, y + line_half_h))
+            boxes.append((x1 - tick_half_w, y - tick_half_h, x1 + tick_half_w, y + tick_half_h))
+            boxes.append((x2 - tick_half_w, y - tick_half_h, x2 + tick_half_w, y + tick_half_h))
+            continue
+
+        label_w = _text_px_width(label, style.font_label, fs, style.dpi)
+        if label_w + 12.0 > 0.85 * avail:
+            scale = (0.85 * avail) / max(1.0, label_w)
+            fs = max(6, int(base_fs * min(1.0, scale)))
+            label_w = _text_px_width(label, style.font_label, fs, style.dpi)
+            text_h = max(8.0, (float(fs) / 72.0) * float(style.dpi))
+            line_half_h = max(2.0, text_h * 0.33)
+        gap = min(avail * 0.9, label_w + 12.0)
+        mid = (x1 + x2) / 2.0
+        left_end = mid - gap / 2.0
+        right_start = mid + gap / 2.0
+        if left_end > x1:
+            boxes.append((x1, y - line_half_h, left_end, y + line_half_h))
+        if x2 > right_start:
+            boxes.append((right_start, y - line_half_h, x2, y + line_half_h))
+        boxes.append((x1 - tick_half_w, y - tick_half_h, x1 + tick_half_w, y + tick_half_h))
+        boxes.append((x2 - tick_half_w, y - tick_half_h, x2 + tick_half_w, y + tick_half_h))
+        boxes.append((mid - gap / 2.0, y - text_h / 2.0, mid + gap / 2.0, y + text_h / 2.0))
+    return boxes
+
+
+def _compact_fixed_element_annotation_label(raw_label: str) -> str:
+    text = str(raw_label).strip()
+    lowered = text.lower()
+    for token in ("-35 site", "-10 site"):
+        idx = lowered.find(token)
+        if idx >= 0:
+            return text[idx:].strip()
+    return text
+
+
+def _fixed_element_annotation_font_size(style: Style) -> float:
+    return float(max(6, style.font_size_label - 2))
+
+
+def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, palette: Palette, style: Style) -> None:
+    if not layout.placements:
+        return
+
+    labels = dict(record.display.tag_labels)
+    margin = max(float(style.legend_inline_margin_cells) * layout.cw, float(style.kmer.pad_x_px) + 4.0)
+    x_min = float(style.padding_x)
+    x_max = float(layout.width - style.padding_x)
+
+    feature_box_pad = float(style.kmer.pad_x_px)
+    occupied_boxes: list[tuple[float, float, float, float]] = []
+    for placement in layout.placements:
+        occupied_boxes.append(
+            (
+                placement.x - feature_box_pad,
+                placement.y - placement.h / 2.0,
+                placement.x + placement.w + feature_box_pad,
+                placement.y + placement.h / 2.0,
+            )
+        )
+    occupied_boxes.extend(_span_link_label_boxes(record, layout, style))
+
+    placed_label_boxes: list[tuple[float, float, float, float]] = []
+
+    def _candidate_box(
+        *,
+        x_anchor: float,
+        y_anchor: float,
+        ha: str,
+        text_w: float,
+        text_h: float,
+    ) -> tuple[float, float, float, float]:
+        if ha == "left":
+            x0 = float(x_anchor)
+            x1 = float(x_anchor) + float(text_w)
+        elif ha == "right":
+            x0 = float(x_anchor) - float(text_w)
+            x1 = float(x_anchor)
+        else:
+            x0 = float(x_anchor) - float(text_w) / 2.0
+            x1 = float(x_anchor) + float(text_w) / 2.0
+        y0 = float(y_anchor) - float(text_h) / 2.0
+        y1 = float(y_anchor) + float(text_h) / 2.0
+        return (x0, y0, x1, y1)
+
+    for placement in layout.placements:
+        feature = record.features[placement.feature_index]
+        source = str(feature.attrs.get("source", "")).strip().lower()
+        if source != "densegen_promoter":
+            continue
+
+        tag = feature.tags[0] if feature.tags else feature.kind
+        fallback = tag.split(":")[-1] if ":" in tag else tag
+        raw_label = str(labels.get(tag, fallback))
+        text = _compact_fixed_element_annotation_label(raw_label)
+        if not text:
+            continue
+
+        text_size = _fixed_element_annotation_font_size(style)
+        text_w = _text_px_width(text, style.font_label, text_size, style.dpi)
+        text_h = max(8.0, (float(text_size) / 72.0) * float(style.dpi))
+
+        center_x = placement.x + placement.w / 2.0
+        top_gap = max(4.0, feature_box_pad + text_h * 0.25)
+        top_y = placement.y + placement.h / 2.0 + top_gap + text_h / 2.0
+        right_x = placement.x + placement.w + margin
+        left_x = placement.x - margin
+
+        candidates = (
+            (center_x, top_y, "center"),
+            (right_x, placement.y, "left"),
+            (left_x, placement.y, "right"),
+        )
+
+        selected: tuple[float, float, str, tuple[float, float, float, float]] | None = None
+        for x_anchor, y_anchor, ha in candidates:
+            bbox = _candidate_box(x_anchor=x_anchor, y_anchor=y_anchor, ha=ha, text_w=text_w, text_h=text_h)
+            if bbox[0] < x_min or bbox[2] > x_max:
+                continue
+            if bbox[1] < 0.0 or bbox[3] > float(layout.height):
+                continue
+            if any(_boxes_overlap(bbox, occupied) for occupied in occupied_boxes):
+                continue
+            if any(_boxes_overlap(bbox, occupied) for occupied in placed_label_boxes):
+                continue
+            selected = (x_anchor, y_anchor, ha, bbox)
+            break
+
+        if selected is None:
+            continue
+
+        x_anchor, y_anchor, ha, bbox = selected
+        annotation_color = _darken_rgb(palette.color_for(tag), factor=0.6)
+        ax.text(
+            x_anchor,
+            y_anchor,
+            text,
+            ha=ha,
+            va="center",
+            fontsize=text_size,
+            family=style.font_label,
+            color=annotation_color,
+            zorder=6.2,
+            clip_on=False,
+        )
+        placed_label_boxes.append(bbox)
 
 
 def _draw_inline_feature_labels(ax, record: Record, layout: LayoutContext, palette: Palette, style: Style) -> None:
@@ -365,6 +623,9 @@ def _draw_inline_feature_labels(ax, record: Record, layout: LayoutContext, palet
 
     for placement in layout.placements:
         feature = record.features[placement.feature_index]
+        source = str(feature.attrs.get("source", "")).strip().lower()
+        if source == "densegen_promoter":
+            continue
         tag = feature.tags[0] if feature.tags else feature.kind
         fallback = tag.split(":")[-1] if ":" in tag else tag
         raw_label = str(labels.get(tag, fallback))
@@ -443,11 +704,23 @@ def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
     )
 
 
-def _draw_connectors(ax, n: int, x0: float, cw: float, y_top: float, y_bottom: float, style: Style) -> None:
+def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, style: Style) -> None:
+    y_top = float(layout.y_forward)
+    y_bottom = float(layout.y_reverse)
     if not style.connectors or y_top <= y_bottom:
         return
-    y1 = y_bottom + 0.35 * (y_top - y_bottom)
-    y2 = y_top - 0.35 * (y_top - y_bottom)
+    top_row_boundary = y_top - float(layout.sequence_extent_down)
+    bottom_row_boundary = y_bottom + float(layout.sequence_extent_up)
+    available_gap = top_row_boundary - bottom_row_boundary
+    if available_gap <= 0:
+        return
+    connector_span = max(0.0, available_gap * 0.5)
+    center_y = (top_row_boundary + bottom_row_boundary) / 2.0
+    y1 = max(bottom_row_boundary, center_y - connector_span / 2.0)
+    y2 = min(top_row_boundary, center_y + connector_span / 2.0)
+    if y2 <= y1:
+        return
+    dash_pattern = tuple(float(value) for value in style.connector_dash)
     for i in range(n):
         x = x0 + i * cw + cw / 2.0
         (ln,) = ax.plot(
@@ -458,7 +731,8 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, y_top: float, y_bottom: f
             alpha=style.connector_alpha,
             zorder=1,
         )
-        ln.set_dashes(style.connector_dash)
+        if dash_pattern:
+            ln.set_dashes(dash_pattern)
 
 
 def _draw_sequence(
@@ -534,9 +808,11 @@ def _draw_feature_box(
     *,
     cw: float,
     ch: float,
+    draw_label: bool = True,
 ) -> None:
     r = style.kmer.round_px
     pad_x = float(style.kmer.pad_x_px)
+    edge_color = _darken_rgb(facecolor, factor=0.78)
 
     ax.add_patch(
         FancyBboxPatch(
@@ -547,11 +823,14 @@ def _draw_feature_box(
             linewidth=style.kmer.edge_width,
             facecolor=facecolor,
             alpha=style.kmer.fill_alpha,
-            edgecolor=facecolor,
+            edgecolor=edge_color,
             zorder=3,
             clip_on=False,
         )
     )
+
+    if not draw_label or not label:
+        return
 
     px_per_pt = style.dpi / 72.0
 
@@ -681,23 +960,30 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
         text_total += w
 
     n = len(entries)
-    total = n * style.legend_patch_w + n * style.legend_gap_patch_text + text_total + (n - 1) * style.legend_gap_x
+    fixed_total = n * style.legend_patch_w + n * style.legend_gap_patch_text + text_total
+    available_width = max(0.0, float(total_width) - (2.0 * float(style.padding_x)))
+    legend_gap_x = float(style.legend_gap_x)
+    if n > 1:
+        max_gap_x = max(0.0, (available_width - fixed_total) / float(n - 1))
+        legend_gap_x = min(legend_gap_x, max_gap_x)
+    total = fixed_total + (n - 1) * legend_gap_x
     x = (total_width - total) / 2.0 if style.legend_center else style.padding_x
     x = max(x, style.padding_x)
     y = style.legend_pad_px
 
     for i, (tag, label, w) in enumerate(entries):
         color = palette.color_for(tag)
+        edge_color = _darken_rgb(color, factor=0.76)
         ax.add_patch(
             FancyBboxPatch(
                 (x, y),
                 style.legend_patch_w,
                 style.legend_patch_h,
                 boxstyle="round,pad=0.0,rounding_size=2.5",
-                linewidth=0.0,
+                linewidth=0.7,
                 facecolor=color,
                 alpha=1.0,
-                edgecolor=color,
+                edgecolor=edge_color,
                 zorder=10,
                 clip_on=False,
             )
@@ -716,4 +1002,4 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
         )
         x += style.legend_patch_w + style.legend_gap_patch_text + w
         if i < n - 1:
-            x += style.legend_gap_x
+            x += legend_gap_x
