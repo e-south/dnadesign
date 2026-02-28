@@ -10,6 +10,7 @@
 
 - [Docs index](docs/README.md): choose a workflow lane, then follow its verify step.
 - [Installation](docs/installation.md): bootstrap the environment and run baseline verification commands.
+- [Platform support](docs/installation.md#platform-support): Linux x86_64 and macOS are supported directly; Windows users should run the Linux path in WSL2.
 - [Workflow lanes](docs/README.md#workflow-lanes): task-first routes for DenseGen, Infer, USR sync, and BU SCC operations.
 - [Architecture](ARCHITECTURE.md), [Design](DESIGN.md), [Reliability](RELIABILITY.md), [Security](SECURITY.md), [Plans](PLANS.md), [Quality score](QUALITY_SCORE.md): repository-level contracts, policies, and governance records.
 - [Developer docs](docs/dev/README.md): CI contracts, maintenance runbooks, and execution-planning references.
