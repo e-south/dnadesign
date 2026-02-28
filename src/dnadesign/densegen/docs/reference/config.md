@@ -464,6 +464,25 @@ This section covers plots.
 - `out_dir` (optional; default `outputs/plots`; must be inside `outputs/` under `densegen.run.root`)
 - `format` (optional; `png | pdf | svg`, default `pdf`)
 - `default`: list of plot names to run when `dense plot` is invoked
+- `video` (optional; strict nested config for `dense_array_video_showcase`)
+  - `enabled` (bool; default `false`)
+  - `mode`: `all_plans_round_robin_single_video | single_plan_single_video`
+    - default `all_plans_round_robin_single_video` renders one MP4 across all plans in round-robin order
+    - `single_plan_single_video` requires `single_plan_name`
+  - `single_plan_name` (required only when `mode=single_plan_single_video`)
+  - `output_name` (flat filename ending in `.mp4`, default `showcase.mp4`)
+  - `sampling`
+    - `stride` (int >= 1, default `5`)
+    - `max_source_rows` (int >= 1, default `20000`)
+    - `max_snapshots` (int >= 1, default `120`)
+  - `playback`
+    - `target_duration_sec` (float in `[3, 20]`, default `8`)
+    - `fps` (int in `[8, 20]`, default `12`)
+  - `limits`
+    - `max_total_frames` (int >= 2, default `180`)
+    - `max_estimated_render_sec` (float > 0, default `30`)
+  - guardrail invariant: `round(target_duration_sec * fps) <= max_total_frames`
+  - the video artifact remains workspace-scoped under `outputs/plots/stage_b/...`
 - `options`: dict keyed by plot name (strict; unknown options error)
   - `placement_map`:
     - `occupancy_alpha` (float in `(0, 1]`)

@@ -56,7 +56,7 @@ def test_sequence_rows_renders_corner_trajectory_inset_with_current_point() -> N
         assert not any(text.get_text() == "Best-so-far" for text in inset_ax.texts)
         assert inset_ax.get_xlabel() == "Sweep"
         assert inset_ax.get_ylabel() == "Best score"
-        assert inset_ax.xaxis.get_label().get_position()[1] < 0.0
+        assert inset_ax.xaxis.get_label().get_position()[1] <= -0.16
         assert inset_ax.yaxis.get_label().get_position()[0] < 0.0
         assert inset_ax.get_zorder() < 10.0
         bounds = inset_ax.get_position().bounds

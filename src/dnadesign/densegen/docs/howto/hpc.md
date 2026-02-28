@@ -40,8 +40,13 @@ uv run dense run --no-plot -c "$CONFIG"
 # Inspect run diagnostics and library summaries.
 uv run dense inspect run --events --library -c "$CONFIG"
 
-# Render plots and notebook after core generation succeeds.
+# Render DenseGen analysis artifacts after core generation succeeds.
+# `dense plot` is the analysis entry point; static plots always render.
+# Set plots.video.enabled: true in config to also emit a sampled Stage-B showcase video
+# at outputs/plots/stage_b/all_plans/showcase.mp4.
 uv run dense plot -c "$CONFIG"
+# Optional analysis shortcut: render only the Stage-B showcase video artifact.
+# uv run dense plot --only dense_array_video_showcase -c "$CONFIG"
 # Generate the run-overview marimo notebook artifact.
 uv run dense notebook generate -c "$CONFIG"
 ```

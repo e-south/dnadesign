@@ -80,8 +80,13 @@ This section verifies artifacts and generates analysis surfaces.
 # Inspect run events and library summaries.
 uv run dense inspect run --events --library
 
-# Render plots.
+# Render DenseGen analysis artifacts.
+# `dense plot` is the analysis entry point; static plots always render.
+# Set plots.video.enabled: true in config to also emit a sampled Stage-B showcase video
+# at outputs/plots/stage_b/all_plans/showcase.mp4.
 uv run dense plot
+# Optional analysis shortcut: render only the Stage-B showcase video artifact.
+# uv run dense plot --only dense_array_video_showcase
 
 # Generate notebook.
 uv run dense notebook generate
