@@ -134,8 +134,8 @@ shasum inputs/local_motifs/cpxR.txt ../demo_pairwise/inputs/local_motifs/cpxR.tx
 
 ### Current workspace defaults (operational)
 
-- `sample.sequence_length: 15`
+- `sample.sequence_length: 60`
 - `sample.budget.tune: 50000`
-- `sample.budget.draws: 300000`
+- `sample.budget.draws: 600000`
 - `optimizer.chains: 8`
 - `analysis.pairwise: all_pairs_grid` (render all TF-pair score-space panels in one figure)
