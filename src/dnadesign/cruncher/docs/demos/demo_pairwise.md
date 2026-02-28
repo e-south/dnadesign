@@ -227,6 +227,9 @@ Intent:
 uv run cruncher sample --force-overwrite -c "$CONFIG"
 # Compute analysis summaries for generated sequence sets.
 uv run cruncher analyze --summary -c "$CONFIG"
+
+# Optional: enable trajectory video in analysis config to emit plots/chain_trajectory_video.mp4.
+# Default best-of chain timeline is monotonic (timeline_mode: best_so_far).
 ```
 
 #### 6) Export sequence-facing tables

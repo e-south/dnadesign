@@ -96,14 +96,14 @@ cruncher:
 
   sample:
     seed: 42
-    sequence_length: 18
+    sequence_length: 60
     motif_width:
       minw: null
       maxw: null
       strategy: max_info
     budget:
       tune: 50000
-      draws: 300000
+      draws: 600000
     objective:
       bidirectional: true
       score_scale: normalized-llr
@@ -180,15 +180,15 @@ cruncher:
       cooling:
         kind: piecewise
         stages:
-          - sweeps: 70000
+          - sweeps: 140000
             beta: 0.2
-          - sweeps: 180000
+          - sweeps: 360000
             beta: 1.2
-          - sweeps: 276000
+          - sweeps: 552000
             beta: 6.0
-          - sweeps: 292000
+          - sweeps: 584000
             beta: 12.0
-          - sweeps: 300000
+          - sweeps: 600000
             beta: 24.0
       early_stop:
         enabled: false
@@ -218,6 +218,11 @@ cruncher:
     trajectory_sweep_mode: best_so_far
     trajectory_chain_overlay: false
     trajectory_particle_alpha_max: 0.45
+    trajectory_video:
+      enabled: true
+      sweep_inset:
+        enabled: true
+        corner: bottom_left
     elites_showcase:
       max_panels: 12
     fimo_compare:
