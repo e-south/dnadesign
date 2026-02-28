@@ -1396,6 +1396,7 @@ def test_analyze_plot_manifest_single_tf_showcase_and_trace_skip(tmp_path: Path)
     assert set(plots_by_key) == {
         "elite_score_space_context",
         "chain_trajectory_sweep",
+        "chain_trajectory_video",
         "elites_nn_distance",
         "elites_showcase",
         "health_panel",
@@ -1406,10 +1407,78 @@ def test_analyze_plot_manifest_single_tf_showcase_and_trace_skip(tmp_path: Path)
     assert plots_by_key["elites_nn_distance"]["generated"] is True
     assert plots_by_key["elites_showcase"]["generated"] is True
     assert plots_by_key["elites_showcase"].get("skip_reason") is None
+    assert plots_by_key["chain_trajectory_video"]["generated"] is False
+    assert plots_by_key["chain_trajectory_video"].get("skip_reason") == "analysis.trajectory_video.enabled=false"
     assert plots_by_key["health_panel"]["generated"] is False
     assert plots_by_key["health_panel"].get("skip_reason") == "trace disabled"
     assert plots_by_key["optimizer_vs_fimo"]["generated"] is False
     assert plots_by_key["optimizer_vs_fimo"].get("skip_reason") == "analysis.fimo_compare.enabled=false"
+
+
+def test_analyze_trajectory_video_generates_video_when_enabled(tmp_path: Path, monkeypatch) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = _base_config(
+        catalog_root=catalog_root,
+        regulator_sets=[["lexA"]],
+        sample=_sample_block(save_trace=False, top_k=1, draws=6, tune=2),
+        analysis={
+            "run_selector": "explicit",
+            "runs": ["sample_single_tf_video"],
+            "pairwise": "auto",
+            "plot_format": "png",
+            "plot_dpi": 72,
+            "table_format": "parquet",
+            "max_points": 2000,
+            "trajectory_video": {
+                "enabled": True,
+                "playback": {"target_duration_sec": 5.0, "fps": 10},
+            },
+        },
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = _make_sample_run_dir(tmp_path, "sample_single_tf_video")
+    lock_dir = tmp_path / ".cruncher" / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / "config.lock.json"
+    lock_path.write_text("{}")
+    lock_sha = sha256_path(lock_path)
+
+    _write_basic_run_artifacts(
+        run_dir=run_dir,
+        config=config,
+        config_path=config_path,
+        lock_path=lock_path,
+        lock_sha=lock_sha,
+        tf_names=["lexA"],
+        include_trace=False,
+        top_k=1,
+        draws=6,
+        tune=2,
+    )
+
+    def _fake_video_renderer(*, out_path: Path, **kwargs: object) -> dict[str, object]:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(b"fake-mp4")
+        return {"snapshot_count": 2, "frame_budget": 50}
+
+    monkeypatch.setattr(
+        "dnadesign.cruncher.analysis.trajectory_video.render_chain_trajectory_video",
+        _fake_video_renderer,
+    )
+
+    cfg = load_config(config_path)
+    analysis_runs = run_analyze(cfg, config_path)
+    assert analysis_runs
+    analysis_dir = analysis_runs[0]
+
+    video_path = analysis_plot_path(analysis_dir, "chain_trajectory_video", "mp4")
+    assert video_path.exists()
+    plot_manifest = json.loads(plot_manifest_path(analysis_dir).read_text())
+    plots_by_key = {entry.get("key"): entry for entry in plot_manifest.get("plots", [])}
+    assert plots_by_key["chain_trajectory_video"]["generated"] is True
+    assert plots_by_key["chain_trajectory_video"].get("skip_reason") is None
 
 
 def test_analyze_showcase_fails_when_elites_count_exceeds_max_panels(tmp_path: Path) -> None:

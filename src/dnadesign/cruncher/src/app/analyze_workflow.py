@@ -313,6 +313,73 @@ def _render_trajectory_analysis_plots(
     )
 
 
+def _render_trajectory_video_plot(
+    *,
+    run_dir: Path,
+    tmp_root: Path,
+    trajectory_df: pd.DataFrame,
+    tf_names: list[str],
+    pwms: dict[str, object],
+    analysis_cfg: object,
+    bidirectional: bool,
+    pwm_pseudocounts: float,
+    log_odds_clip: float | None,
+    plot_entries: list[dict[str, object]],
+    plot_artifacts: list[dict[str, object]],
+) -> None:
+    video_name = str(analysis_cfg.trajectory_video.output_name)
+    video_stem = Path(video_name).stem
+    video_ext = Path(video_name).suffix.lstrip(".")
+    if not video_ext:
+        video_ext = "mp4"
+    plot_video_path = analysis_plot_path(tmp_root, video_stem, video_ext)
+    if not analysis_cfg.trajectory_video.enabled:
+        _record_analysis_plot(
+            plot_entries=plot_entries,
+            plot_artifacts=plot_artifacts,
+            spec_key="chain_trajectory_video",
+            output=plot_video_path,
+            generated=False,
+            skip_reason="analysis.trajectory_video.enabled=false",
+            run_dir=run_dir,
+        )
+        return
+    if trajectory_df.empty:
+        _record_analysis_plot(
+            plot_entries=plot_entries,
+            plot_artifacts=plot_artifacts,
+            spec_key="chain_trajectory_video",
+            output=plot_video_path,
+            generated=False,
+            skip_reason="trajectory table is empty",
+            run_dir=run_dir,
+        )
+        return
+
+    from dnadesign.cruncher.analysis.trajectory_video import render_chain_trajectory_video
+
+    render_chain_trajectory_video(
+        trajectory_df=trajectory_df,
+        tf_names=tf_names,
+        pwms=pwms,
+        out_path=plot_video_path,
+        config=analysis_cfg.trajectory_video,
+        bidirectional=bidirectional,
+        pwm_pseudocounts=float(pwm_pseudocounts),
+        log_odds_clip=log_odds_clip,
+        tmp_root=tmp_root / "_trajectory_video_tmp",
+    )
+    _record_analysis_plot(
+        plot_entries=plot_entries,
+        plot_artifacts=plot_artifacts,
+        spec_key="chain_trajectory_video",
+        output=plot_video_path,
+        generated=True,
+        skip_reason=None,
+        run_dir=run_dir,
+    )
+
+
 def _render_static_analysis_plots(
     *,
     run_dir: Path,
@@ -695,6 +762,10 @@ def _run_analyze_for_run(
             "trajectory_sweep_y_column": analysis_cfg.trajectory_sweep_y_column,
             "trajectory_sweep_mode": analysis_cfg.trajectory_sweep_mode,
             "trajectory_summary_overlay": analysis_cfg.trajectory_summary_overlay,
+            "trajectory_video_enabled": analysis_cfg.trajectory_video.enabled,
+            "trajectory_video_timeline_mode": analysis_cfg.trajectory_video.timeline_mode,
+            "trajectory_video_duration_sec": analysis_cfg.trajectory_video.playback.target_duration_sec,
+            "trajectory_video_fps": analysis_cfg.trajectory_video.playback.fps,
             "require_random_baseline": require_random_baseline,
         },
     )
@@ -719,6 +790,19 @@ def _run_analyze_for_run(
         plot_artifacts=plot_artifacts,
         plot_chain_trajectory_sweep=plot_chain_trajectory_sweep,
         plot_elite_score_space_context=plot_elite_score_space_context,
+    )
+    _render_trajectory_video_plot(
+        run_dir=run_dir,
+        tmp_root=tmp_root,
+        trajectory_df=trajectory_df,
+        tf_names=tf_names,
+        pwms=pwms,
+        analysis_cfg=analysis_cfg,
+        bidirectional=bidirectional,
+        pwm_pseudocounts=pseudocounts_raw,
+        log_odds_clip=log_odds_clip_raw,
+        plot_entries=plot_entries,
+        plot_artifacts=plot_artifacts,
     )
     _render_static_analysis_plots(
         run_dir=run_dir,
