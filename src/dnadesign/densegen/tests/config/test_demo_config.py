@@ -407,7 +407,7 @@ def test_study_constitutive_sigma_panel_uses_bounded_total_quota_limits() -> Non
     cfg = load_config(_demo_config_path("study_constitutive_sigma_panel"))
     generation = cfg.root.densegen.generation
     assert generation.expansion.max_plans == 64
-    assert generation.total_quota() == 100
+    assert generation.total_quota() == 500
 
 
 def test_study_constitutive_sigma_panel_expansion_distributes_quota_evenly() -> None:
@@ -415,10 +415,10 @@ def test_study_constitutive_sigma_panel_expansion_distributes_quota_evenly() -> 
     plans = list(cfg.root.densegen.generation.plan or [])
     assert plans
     quotas = [int(item.sequences) for item in plans]
-    assert set(quotas) == {2, 3}
-    assert quotas.count(3) == 4
-    assert quotas.count(2) == 44
-    assert sum(quotas) == 100
+    assert set(quotas) == {10, 11}
+    assert quotas.count(11) == 20
+    assert quotas.count(10) == 28
+    assert sum(quotas) == 500
     assert all("__sig35=" in item.name and "__sig10=" in item.name for item in plans)
     assert all("__up=" not in item.name and "__down=" not in item.name for item in plans)
 

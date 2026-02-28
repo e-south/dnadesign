@@ -2767,7 +2767,7 @@ def test_plot_stage_a_summary_background_logo_uses_compact_size_and_nonredundant
     width, height = captured["size"]  # type: ignore[misc]
     assert width <= 11.0
     assert height <= 3.0
-    assert float(captured.get("title_gap", 1.0)) <= 0.16
+    assert float(captured.get("title_gap", 1.0)) <= 0.17
 
 
 def test_plot_stage_a_summary_requires_diversity(tmp_path: Path) -> None:

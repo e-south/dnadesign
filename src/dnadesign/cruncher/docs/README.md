@@ -36,7 +36,7 @@
 - [CLI Reference](reference/cli.md): command/flag contracts and invocation patterns.
 - [Architecture](reference/architecture.md): dataflow and module boundaries.
 - [Glossary](reference/glossary.md): shared vocabulary for models, metrics, and artifacts.
-- [Runbook Step Reference](reference/runbook_steps.md): canonical runbook stage names and meanings.
+- [Runbook Step Reference](reference/runbook_steps.md): shared runbook stage names and meanings.
 - [Doc Conventions](reference/doc_conventions.md): documentation structure and writing contracts.
 
 #### Maintainer Internals
