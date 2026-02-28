@@ -24,6 +24,7 @@ Use this page as the route map; deep watcher procedures live in `docs/notify/usr
 | If the user asks... | Run this first | Then verify with |
 | --- | --- | --- |
 | "start a densegen workspace watcher and send to slack" | `notify setup slack --tool densegen --workspace <workspace> --secret-source auto --policy densegen` | `notify profile doctor --profile <config-dir>/outputs/notify/densegen/profile.json` |
+| "start an infer_evo2 workspace watcher and send to slack" | `notify setup slack --tool infer_evo2 --workspace <workspace> --secret-source auto --policy infer_evo2` | `notify profile doctor --profile <config-dir>/outputs/notify/infer_evo2/profile.json` |
 | "i already have a profile, just validate wiring" | `notify profile doctor --profile <profile.json>` | `notify usr-events watch --profile <profile.json> --dry-run` |
 | "resume failed deliveries from spool" | `notify spool drain --profile <profile.json>` | `notify spool drain --profile <profile.json> --fail-fast` |
 | "watch this workspace without passing profile path" | `notify usr-events watch --tool <tool> --workspace <workspace> --follow` | `notify setup resolve-events --tool <tool> --workspace <workspace>` |
@@ -84,7 +85,7 @@ uv run notify usr-events watch --tool densegen --workspace "$WORKSPACE" --follow
 - CLI router/group wiring: `src/dnadesign/notify/cli/__init__.py`.
 - Command binding layer:
   - `src/dnadesign/notify/cli/bindings/__init__.py`: binding surface and handler wiring.
-  - `src/dnadesign/notify/cli/bindings/deps.py`: dependency exports used by handlers and tests.
+  - `src/dnadesign/notify/cli/bindings/deps/`: dependency exports used by handlers and tests, split by domain (`profile`, `setup`, `runtime`, `send`).
   - `src/dnadesign/notify/cli/bindings/registry.py`: Typer command registration wiring.
 - Option declarations and command registration: `src/dnadesign/notify/cli/commands/`.
 - Command execution handlers:

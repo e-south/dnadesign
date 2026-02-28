@@ -1225,6 +1225,72 @@ def test_usr_events_watch_can_autoload_profile_from_tool_config(tmp_path: Path, 
     assert '"usr_action": "materialize"' in result.stdout
 
 
+def test_usr_events_watch_can_autoload_profile_from_infer_tool_config(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "usr" / "infer_demo" / ".events.log"
+    events.parent.mkdir(parents=True, exist_ok=True)
+    infer_event = _event(action="materialize")
+    infer_event["actor"] = {"tool": "infer_evo2", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    _write_events(events, [infer_event])
+    config_path = tmp_path / "workspaces" / "infer_demo" / "infer.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "model:",
+                "  id: evo2",
+                "  device: cpu",
+                "  precision: fp32",
+                "  alphabet: dna",
+                "jobs:",
+                "  - id: j1",
+                "    operation: generate",
+                "    ingest:",
+                "      source: usr",
+                "      dataset: infer_demo",
+                f"      root: {tmp_path / 'usr'}",
+                "    params:",
+                "      max_new_tokens: 8",
+                "    io:",
+                "      write_back: true",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    profile = config_path.parent / "outputs" / "notify" / "infer_evo2" / "profile.json"
+    profile.parent.mkdir(parents=True, exist_ok=True)
+    profile.write_text(
+        json.dumps(
+            {
+                "profile_version": 2,
+                "provider": "generic",
+                "events": str(events.resolve()),
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
+                "events_source": {"tool": "infer_evo2", "config": str(config_path.resolve())},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("INFER_WEBHOOK", "http://example.com/webhook")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--tool",
+            "infer_evo2",
+            "--config",
+            str(config_path),
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    assert '"usr_action": "materialize"' in result.stdout
+    assert "infer_evo2" in result.stdout
+
+
 def test_usr_events_watch_autoload_rejects_profile_events_source_mismatch(tmp_path: Path, monkeypatch) -> None:
     cli_events = tmp_path / "usr" / "cli" / ".events.log"
     stale_events = tmp_path / "usr" / "stale" / ".events.log"

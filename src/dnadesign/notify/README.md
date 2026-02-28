@@ -42,7 +42,7 @@ This page is not the long-form operator manual.
 Command surface:
 - `src/dnadesign/notify/cli/__init__.py`: thin Typer router and command-group registration.
 - `src/dnadesign/notify/cli/bindings/__init__.py`: binding surface used by CLI handlers and tests.
-- `src/dnadesign/notify/cli/bindings/deps.py`: exported dependency surface for handler injection and test patch points.
+- `src/dnadesign/notify/cli/bindings/deps/`: exported dependency surface for handler injection and test patch points, organized by domain (`profile`, `setup`, `runtime`, `send`).
 - `src/dnadesign/notify/cli/bindings/registry.py`: command registration wiring for CLI groups.
 - `src/dnadesign/notify/cli/commands/`: CLI option/command registration modules.
 - `src/dnadesign/notify/cli/commands/profile/`: profile command registration modules.
