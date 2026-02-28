@@ -122,6 +122,13 @@ ENTRYPOINT_MARKDOWN_FILES = ("README.md", "docs/README.md")
 ENTRYPOINT_LOCAL_PATH_PATTERN = re.compile(
     r"(?<![A-Za-z0-9_./-])(?P<path>(?:\.\./|\.\/)?(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+)(?![A-Za-z0-9_./-])"
 )
+DENSEGEN_DOC_LANGUAGE_PATHS = (
+    "src/dnadesign/densegen/README.md",
+    "src/dnadesign/densegen/AGENTS.md",
+    "src/dnadesign/densegen/docs",
+    "src/dnadesign/densegen/workspaces",
+)
+DENSEGEN_DISALLOWED_TERM_PATTERN = re.compile(r"\bcanonical\b", flags=re.IGNORECASE)
 
 
 def _collect_markdown_files(repo_root: Path) -> tuple[list[Path], list[Path]]:
@@ -154,6 +161,21 @@ def _collect_tool_docs_markdown_files(repo_root: Path) -> list[Path]:
         for path in docs_root.rglob("*.md"):
             tool_docs.add(path)
     return sorted(tool_docs)
+
+
+def _collect_markdown_files_from_relative_paths(repo_root: Path, *, relative_paths: tuple[str, ...]) -> list[Path]:
+    files: set[Path] = set()
+    for rel in relative_paths:
+        target = repo_root / rel
+        if not target.exists():
+            continue
+        if target.is_file() and target.suffix == ".md":
+            files.add(target)
+            continue
+        if target.is_dir():
+            for path in target.rglob("*.md"):
+                files.add(path)
+    return sorted(files)
 
 
 def _find_bad_doc_names(docs_md_files: list[Path]) -> list[Path]:
@@ -454,6 +476,19 @@ def _find_entrypoint_local_path_literal_issues(repo_root: Path) -> list[str]:
                 issues.append(
                     f"{path}:{line_no}: local path literal '{token}' should be a markdown hyperlink for navigation."
                 )
+    return issues
+
+
+def _find_densegen_disallowed_term_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    targets = _collect_markdown_files_from_relative_paths(repo_root, relative_paths=DENSEGEN_DOC_LANGUAGE_PATHS)
+    for path in targets:
+        content = path.read_text(encoding="utf-8")
+        match = DENSEGEN_DISALLOWED_TERM_PATTERN.search(content)
+        if match is None:
+            continue
+        line_no = content[: match.start()].count("\n") + 1
+        issues.append(f"{path}:{line_no}: term '{match.group(0)}' is not allowed in DenseGen docs.")
     return issues
 
 
@@ -1118,6 +1153,13 @@ def main(argv: list[str] | None = None) -> int:
     if interface_doc_issues:
         print("Public interface docs contract check failed:")
         for issue in interface_doc_issues:
+            print(f" - {issue}")
+        return 1
+
+    densegen_disallowed_term_issues = _find_densegen_disallowed_term_issues(repo_root)
+    if densegen_disallowed_term_issues:
+        print("DenseGen docs language check failed:")
+        for issue in densegen_disallowed_term_issues:
             print(f" - {issue}")
         return 1
 
