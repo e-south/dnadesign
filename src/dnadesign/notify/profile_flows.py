@@ -23,7 +23,7 @@ from .errors import NotifyConfigError
 from .events_source import normalize_tool_name, resolve_tool_events_path
 from .profile_ops import sanitize_profile_name, wizard_next_steps
 from .profile_schema import PROFILE_VERSION
-from .secrets import is_secret_backend_available, resolve_secret_ref, store_secret_ref
+from .secrets import is_secret_backend_available, parse_secret_ref, resolve_secret_ref, store_secret_ref
 from .spool_ops import ensure_private_directory
 from .workflow_policy import (
     DEFAULT_PROFILE_PATH,
@@ -46,6 +46,32 @@ class SetupEventsResolution:
 
 def _default_file_secret_path(secret_name: str) -> Path:
     return (Path(__file__).resolve().parent / ".secrets" / f"{secret_name}.webhook").resolve()
+
+
+def _path_is_within(*, parent: Path, child: Path) -> bool:
+    try:
+        child.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
+def _enforce_file_secret_ref_scope(secret_ref: str) -> None:
+    parsed = parse_secret_ref(secret_ref)
+    if parsed.backend != "file" or parsed.file_path is None:
+        return
+
+    repo_root = Path(__file__).resolve().parents[3]
+    if not (repo_root / ".git").exists():
+        return
+
+    allowed_secret_root = (Path(__file__).resolve().parent / ".secrets").resolve()
+    resolved_file_path = parsed.file_path.resolve()
+    if _path_is_within(parent=repo_root, child=resolved_file_path) and not _path_is_within(
+        parent=allowed_secret_root,
+        child=resolved_file_path,
+    ):
+        raise NotifyConfigError(f"file secret_ref inside the repository must be under {allowed_secret_root}")
 
 
 def _validate_progress_step_pct(value: int | None) -> int | None:
@@ -119,6 +145,9 @@ def resolve_webhook_config(
             secret_refs = [secret_path.as_uri()]
         else:
             secret_refs = [f"{mode}://dnadesign.notify/{secret_name}"]
+
+    for value in secret_refs:
+        _enforce_file_secret_ref_scope(value)
 
     if not store_webhook:
         return {"source": "secret_ref", "ref": secret_refs[0]}

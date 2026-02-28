@@ -116,3 +116,35 @@ def test_resolve_webhook_config_auto_file_mode_defaults_to_notify_package_secret
     )
     expected = (Path(profile_flows_module.__file__).resolve().parent / ".secrets" / "densegen-shared.webhook").resolve()
     assert webhook == {"source": "secret_ref", "ref": expected.as_uri()}
+
+
+def test_resolve_webhook_config_rejects_file_secret_ref_inside_repo_outside_allowed_secret_dir() -> None:
+    repo_root = Path(profile_flows_module.__file__).resolve().parents[3]
+    disallowed_ref = (repo_root / "README.md").resolve().as_uri()
+
+    with pytest.raises(NotifyConfigError, match="file secret_ref inside the repository must be under"):
+        resolve_webhook_config(
+            secret_source="file",  # pragma: allowlist secret
+            url_env=None,
+            secret_ref=disallowed_ref,
+            webhook_url=None,
+            store_webhook=False,
+            secret_name="densegen-shared",  # pragma: allowlist secret
+            secret_backend_available_fn=lambda backend: backend == "file",
+        )
+
+
+def test_resolve_webhook_config_accepts_file_secret_ref_outside_repo() -> None:
+    outside_ref = Path("/tmp/dnadesign-notify-secret.webhook").as_uri()
+
+    webhook = resolve_webhook_config(
+        secret_source="file",  # pragma: allowlist secret
+        url_env=None,
+        secret_ref=outside_ref,
+        webhook_url=None,
+        store_webhook=False,
+        secret_name="densegen-shared",  # pragma: allowlist secret
+        secret_backend_available_fn=lambda backend: backend == "file",
+    )
+
+    assert webhook == {"source": "secret_ref", "ref": outside_ref}
