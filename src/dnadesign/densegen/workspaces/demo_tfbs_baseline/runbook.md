@@ -34,8 +34,9 @@ Run this command from the workspace root:
     uv run dense inspect run --events --library -c "$CONFIG"
     # Render DenseGen analysis artifacts from current run outputs.
     # `dense plot` is the analysis entry point; static plots always render.
-    # Set plots.video.enabled: true in config to also emit a sampled Stage-B showcase video
-    # at outputs/plots/stage_b/all_plans/showcase.mp4.
+    # This workspace enables plots.video.enabled: true by default, emitting a sampled
+    # Stage-B showcase video at outputs/plots/stage_b/all_plans/showcase.mp4.
+    # Disable by setting plots.video.enabled: false in config.
     uv run dense plot -c "$CONFIG"
     # Optional analysis shortcut: render only the Stage-B showcase video artifact.
     # uv run dense plot --only dense_array_video_showcase -c "$CONFIG"

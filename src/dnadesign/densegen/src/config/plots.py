@@ -21,7 +21,7 @@ class PlotVideoSamplingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     stride: int = 5
     max_source_rows: int = 20_000
-    max_snapshots: int = 120
+    max_snapshots: int = 140
 
     @field_validator("stride")
     @classmethod
@@ -47,7 +47,7 @@ class PlotVideoSamplingConfig(BaseModel):
 
 class PlotVideoPlaybackConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    target_duration_sec: float = 8.0
+    target_duration_sec: float = 14.0
     fps: int = 12
 
     @field_validator("target_duration_sec")

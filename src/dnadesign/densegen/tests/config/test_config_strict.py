@@ -100,6 +100,8 @@ def test_plots_video_defaults_disabled(tmp_path: Path) -> None:
     assert loaded.root.plots is not None
     assert loaded.root.plots.video.enabled is False
     assert loaded.root.plots.video.mode == "all_plans_round_robin_single_video"
+    assert loaded.root.plots.video.sampling.max_snapshots == 140
+    assert loaded.root.plots.video.playback.target_duration_sec == 14
 
 
 def test_plots_video_single_plan_requires_name(tmp_path: Path) -> None:
