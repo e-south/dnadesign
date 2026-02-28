@@ -6,6 +6,11 @@
 
 **Last updated by:** cruncher-maintainers on 2026-02-23
 
+### Progressive disclosure route
+1. Start with one demo from **Run End-to-End Workflows**.
+2. Move to one guide in **Optimize and Analyze Outputs** for your immediate task.
+3. Use **Reference Contracts** when you need strict schema, CLI, or artifact details.
+
 <!-- docs:toc:off -->
 
 ### Documentation by workflow
