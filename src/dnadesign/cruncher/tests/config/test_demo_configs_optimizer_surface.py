@@ -130,8 +130,8 @@ def test_project_workspace_defaults_match_tuned_surface() -> None:
     cruncher = payload["cruncher"]
     sample = cruncher["sample"]
 
-    assert sample["sequence_length"] == 18
-    assert sample["budget"]["draws"] == 300000
+    assert sample["sequence_length"] == 60
+    assert sample["budget"]["draws"] == 600000
     assert sample["budget"]["tune"] == 50000
     assert sample["optimizer"]["chains"] == 8
     assert sample["optimizer"]["cooling"]["kind"] == "piecewise"
