@@ -44,6 +44,9 @@ def test_notify_non_cli_packages_importable() -> None:
     assert importlib.import_module("dnadesign.notify.profiles.flow_profile")
     assert importlib.import_module("dnadesign.notify.profiles.ops")
     assert importlib.import_module("dnadesign.notify.profiles.schema")
+    assert importlib.import_module("dnadesign.notify.profiles.schema.contract")
+    assert importlib.import_module("dnadesign.notify.profiles.schema.reader")
+    assert importlib.import_module("dnadesign.notify.profiles.schema.resolver")
     assert importlib.import_module("dnadesign.notify.profiles.policy")
     assert importlib.import_module("dnadesign.notify.profiles.workspace")
     assert importlib.import_module("dnadesign.notify.tool_events")
@@ -68,6 +71,7 @@ def test_notify_monolith_files_removed() -> None:
     notify_root = _notify_root()
     assert not (notify_root / "delivery" / "secrets.py").exists()
     assert not (notify_root / "runtime" / "cursor.py").exists()
+    assert not (notify_root / "profiles" / "schema.py").exists()
 
 
 def test_notify_legacy_top_level_module_paths_are_not_importable() -> None:

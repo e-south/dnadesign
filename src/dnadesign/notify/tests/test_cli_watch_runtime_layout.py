@@ -25,6 +25,7 @@ def _notify_root() -> Path:
 def test_notify_watch_runtime_module_importable() -> None:
     assert importlib.import_module("dnadesign.notify.runtime.runner")
     assert importlib.import_module("dnadesign.notify.runtime.watch_runner")
+    assert importlib.import_module("dnadesign.notify.runtime.watch_runner_inputs")
     assert importlib.import_module("dnadesign.notify.runtime.watch_runner_contract")
     assert importlib.import_module("dnadesign.notify.runtime.watch_runner_resolution")
     assert importlib.import_module("dnadesign.notify.runtime.watch_events")
@@ -48,9 +49,11 @@ def test_notify_cli_watch_and_spool_delegate_to_runtime_module() -> None:
     bindings_source = inspect.getsource(importlib.import_module("dnadesign.notify.cli.bindings"))
     registry_source = inspect.getsource(importlib.import_module("dnadesign.notify.cli.bindings.registry"))
     runtime_bindings_source = inspect.getsource(importlib.import_module("dnadesign.notify.cli.bindings.runtime"))
+    watch_runner_source = inspect.getsource(importlib.import_module("dnadesign.notify.runtime.watch_runner"))
     assert "register_notify_cli_bindings(" in router_source
     assert "_register_notify_cli_bindings(" in bindings_source
     assert "register_usr_events_watch_command(" in registry_source
     assert "register_spool_drain_command(" in registry_source
     assert "run_usr_events_watch_command(" in runtime_bindings_source
     assert "run_spool_drain_command(" in runtime_bindings_source
+    assert "resolve_watch_runner_inputs(" in watch_runner_source
