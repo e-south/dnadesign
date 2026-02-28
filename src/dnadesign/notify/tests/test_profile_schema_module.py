@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from dnadesign.notify.errors import NotifyConfigError
-from dnadesign.notify.profile_schema import read_profile, resolve_profile_events_source, resolve_profile_webhook_source
+from dnadesign.notify.profiles.schema import read_profile, resolve_profile_events_source, resolve_profile_webhook_source
 
 
 def test_read_profile_valid_v2_returns_data(tmp_path: Path) -> None:

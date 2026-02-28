@@ -1,148 +1,118 @@
 ![Notify banner](assets/notify-banner.svg)
 
-Notify reads Universal Sequence Record mutation events and posts selected events to webhook providers.
+Notify is the observer-plane package that watches Universal Sequence Record events and sends selected notifications to webhook providers.
 
-See the [repository docs index](../../../docs/README.md) for workflow routing across tool boundaries.
+For cross-tool routing, start at the [repository docs index](../../../docs/README.md).
 
-## Contents
-- [At a glance](#at-a-glance)
-- [Fast operator path](#fast-operator-path)
-- [Read order](#read-order)
-- [Maintainer code map](#maintainer-code-map)
-- [Key boundary](#key-boundary)
-- [Observer Contract](#observer-contract)
+## What belongs here
 
-## At a glance
+- Package-level architecture map for `dnadesign.notify`.
+- Maintainer code boundaries and extension points.
+- Pointers to canonical operator runbooks.
 
-Use Notify when you want:
-- restart-safe event watching with cursor offsets
-- action/tool filtering before delivery
-- spool-and-drain behavior for unstable network environments
+This page is not the long-form operator manual.
 
-Do not use Notify for:
-- DenseGen runtime telemetry (`outputs/meta/events.jsonl`)
-- generic log shipping
+## Directory layout
 
-Contract:
-- input stream is Universal Sequence Record `<dataset>/.events.log` newline-delimited JSON
-- Notify treats Universal Sequence Record events as an external, versioned contract
-- without `--profile`, choose exactly one webhook source:
-  - `--url`
-  - `--url-env`
-  - `--secret-ref`
-
-Default profile privacy is strict:
-- `include_args=false`
-- `include_context=false`
-- `include_raw_event=false`
-
-Artifact placement default:
-- keep Notify artifacts with the run workspace being watched (relative to the tool config directory):
-  - `<config-dir>/outputs/notify/<tool>/profile.json`
-  - `<config-dir>/outputs/notify/<tool>/cursor`
-  - `<config-dir>/outputs/notify/<tool>/spool/`
-
-## Fast operator path
-
-```bash
-WORKSPACE=<workspace>
-CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/$WORKSPACE/config.yaml
-PROFILE=<dnadesign_repo>/src/dnadesign/densegen/workspaces/$WORKSPACE/outputs/notify/densegen/profile.json
-
-# 1) Discover available workspace names for your tool.
-uv run notify setup list-workspaces --tool densegen
-
-# 2) Configure webhook secret once (config-agnostic) and keep webhook ref.
-WEBHOOK_REF="$(uv run notify setup webhook --secret-source auto --name densegen-shared --json | python -c 'import json,sys; print(json.load(sys.stdin)[\"webhook\"][\"ref\"])')"
-
-# 3) Create/update watcher profile (default path: outputs/notify/densegen/profile.json).
-uv run notify setup slack \
-  --tool densegen \
-  --workspace "$WORKSPACE" \
-  --secret-source auto \
-  --secret-ref "$WEBHOOK_REF" \
-  --policy densegen \
-  --progress-step-pct 25 \
-  --progress-min-seconds 60
-
-# 4) Validate profile wiring and secret resolution.
-uv run notify profile doctor --profile "$PROFILE"
-
-# 5) Preview payload mapping without posting (cursor stays unchanged).
-uv run notify usr-events watch \
-  --tool densegen \
-  --workspace "$WORKSPACE" \
-  --dry-run \
-  --no-advance-cursor-on-dry-run
-
-# 6) Run live watcher (start before tool run if you want STARTED events).
-uv run notify usr-events watch \
-  --tool densegen \
-  --workspace "$WORKSPACE" \
-  --follow \
-  --wait-for-events \
-  --stop-on-terminal-status \
-  --idle-timeout 900
-
-# 7) Retry failed payloads from spool.
-uv run notify spool drain --profile "$PROFILE"
-```
+- `cli/`: CLI package boundary.
+- `cli/__init__.py`: router-only Typer app/group wiring.
+- `cli/bindings/`: dependency surface and registration modules (`deps`, `registry`) plus command binding adapters (`send`, `profile`, `setup`, `runtime`).
+- `cli/commands/`: Typer option declarations and command registration.
+- `cli/commands/profile/`: profile command registration modules (`init_cmd`, `wizard_cmd`, `show_cmd`, `doctor_cmd`).
+- `cli/commands/setup/`: setup command registration modules (`slack_cmd`, `webhook_cmd`, `resolve_events_cmd`, `list_workspaces_cmd`).
+- `cli/handlers/`: command execution handlers (`send`) and command-scoped packages (`profile/`, `setup/`, `runtime/`).
+- `cli/resolve.py`: shared CLI option resolution helpers.
+- `delivery/`: webhook transport, payload construction, webhook validation, and secret-backend logic.
+- `events/`: tool events-source resolution and event transform logic.
+- `profiles/`: profile schema, setup/profile flows, workflow policy, workspace-name resolution, and flow submodules.
+- `runtime/`: watch/spool runners, watch loop primitives, cursor primitives, and spool primitives.
+- `tool_events/`: tool-event pack registration, evaluation state, and DenseGen handler submodules.
+- `providers/`: provider-specific payload formatting.
+- `tests/`: unit/integration/contract coverage for CLI/runtime/docs boundaries.
 
 ## Read order
 
-- Canonical operators runbook: [docs/notify/usr-events.md](../../../docs/notify/usr-events.md)
-- Module-local quick ops page: [docs/usr-events.md](docs/usr-events.md)
-- Command anatomy: [notify setup webhook flags and expectations](../../../docs/notify/usr-events.md#command-anatomy-notify-setup-webhook)
-- Command anatomy: [notify setup slack flags and expectations](../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack)
-- Setup onboarding: [Slack setup onboarding](../../../docs/notify/usr-events.md#slack-setup-onboarding-3-minutes)
-- End-to-end stack demo: [DenseGen -> Universal Sequence Record -> Notify demo](../densegen/docs/tutorials/demo_usr_notify.md)
-- Universal Sequence Record event schema source: [Universal Sequence Record event log schema](../usr/README.md#event-log-schema)
+1. Operator runbook (canonical): [docs/notify/usr-events.md](../../../docs/notify/usr-events.md)
+2. Docs index route map: [docs/notify/README.md](../../../docs/notify/README.md)
+3. Module-local quick operations page: [docs/usr-events.md](docs/usr-events.md)
+4. DenseGen integration walkthrough: [DenseGen -> USR -> Notify demo](../densegen/docs/tutorials/demo_usr_notify.md)
 
-## Maintainer code map
+## Maintainer architecture map
 
-Runtime and option resolution:
-- `src/dnadesign/notify/cli.py`: Typer command surface and handler wiring.
-- `src/dnadesign/notify/cli_runtime.py`: watch and spool runtime execution logic.
-- `src/dnadesign/notify/cli_resolve.py`: profile and path resolution helpers.
-- `src/dnadesign/notify/profile_flows.py`: setup and wizard profile construction.
+Command surface:
+- `src/dnadesign/notify/cli/__init__.py`: thin Typer router and command-group registration.
+- `src/dnadesign/notify/cli/bindings/__init__.py`: binding surface used by CLI handlers and tests.
+- `src/dnadesign/notify/cli/bindings/deps.py`: exported dependency surface for handler injection and test patch points.
+- `src/dnadesign/notify/cli/bindings/registry.py`: command registration wiring for CLI groups.
+- `src/dnadesign/notify/cli/commands/`: CLI option/command registration modules.
+- `src/dnadesign/notify/cli/commands/profile/`: profile command registration modules.
+- `src/dnadesign/notify/cli/commands/setup/`: setup command registration modules.
+- `src/dnadesign/notify/cli/handlers/`: command execution implementations.
+- `src/dnadesign/notify/cli/handlers/profile/`: per-command profile handlers (`init_cmd`, `wizard_cmd`, `show_cmd`, `doctor_cmd`).
+- `src/dnadesign/notify/cli/handlers/setup/`: per-command setup handlers (`slack_cmd`, `webhook_cmd`, `resolve_events_cmd`, `list_workspaces_cmd`).
+- `src/dnadesign/notify/cli/handlers/runtime/`: per-command runtime handlers (`watch_cmd`, `spool_cmd`).
 
-Tool and workflow extension points:
-- `src/dnadesign/notify/events_source.py`: tool resolver registry.
-- `src/dnadesign/notify/events_source_builtin.py`: built-in resolver installs (`densegen`, `infer_evo2`).
-- `src/dnadesign/notify/workspace_source.py`: workspace-name to config-path resolver registry.
-- `src/dnadesign/notify/tool_events.py`: tool-event override and evaluator registry.
-- `src/dnadesign/notify/tool_event_packs_builtin.py`: built-in tool-event pack installs.
-- `src/dnadesign/notify/workflow_policy.py`: policy defaults and profile-path defaults.
+Event-source and policy boundaries:
+- `src/dnadesign/notify/events/source.py`: tool resolver registry.
+- `src/dnadesign/notify/events/source_builtin.py`: built-in resolvers (`densegen`, `infer_evo2`).
+- `src/dnadesign/notify/profiles/flow_events.py`: setup event-source resolution (`--events` vs resolver mode).
+- `src/dnadesign/notify/profiles/flow_webhook.py`: webhook secret-source selection and secure ref storage.
+- `src/dnadesign/notify/profiles/flow_profile.py`: profile path defaults and profile payload materialization.
+- `src/dnadesign/notify/profiles/workspace.py`: workspace-name to config-path resolver registry.
+- `src/dnadesign/notify/profiles/policy.py`: policy defaults and profile-path defaults.
 
-## Key boundary
+Event transformation and tool-specific logic:
+- `src/dnadesign/notify/events/transforms.py`: status/message/meta transforms for USR events.
+- `src/dnadesign/notify/tool_events/core.py`: tool-event evaluator registry.
+- `src/dnadesign/notify/tool_events/packs_builtin.py`: built-in tool-event pack installers.
+- `src/dnadesign/notify/tool_events/densegen.py`: DenseGen pack registration surface.
+- `src/dnadesign/notify/tool_events/densegen_metrics.py`: DenseGen health metric extraction and gating.
+- `src/dnadesign/notify/tool_events/densegen_messages.py`: DenseGen status/message rendering.
+- `src/dnadesign/notify/tool_events/densegen_eval.py`: DenseGen per-run emission state machine.
 
-Notify reads:
-- `<usr_root>/<dataset>/.events.log` (Universal Sequence Record event stream)
+Delivery/runtime primitives:
+- `src/dnadesign/notify/runtime/runner.py`: public runner exports for watch/spool orchestration.
+- `src/dnadesign/notify/runtime/watch_runner.py`: watch command orchestration entrypoint.
+- `src/dnadesign/notify/runtime/watch_runner_contract.py`: watch CLI contract validation and option coercion.
+- `src/dnadesign/notify/runtime/watch_runner_resolution.py`: profile/events/webhook source resolution helpers.
+- `src/dnadesign/notify/runtime/watch_events.py`: event parsing, event filtering, and payload preparation helpers.
+- `src/dnadesign/notify/runtime/watch_delivery.py`: dry-run output and live delivery/spool outcome helpers.
+- `src/dnadesign/notify/runtime/spool_runner.py`: spool drain runtime orchestration.
+- `src/dnadesign/notify/runtime/cursor/`: cursor lock, offset, and iteration primitives.
+- `src/dnadesign/notify/runtime/watch.py`: event-loop execution and delivery hooks.
+- `src/dnadesign/notify/runtime/spool.py`: spool write/private-dir operations.
+- `src/dnadesign/notify/delivery/http.py`: webhook HTTP posting.
+- `src/dnadesign/notify/delivery/secrets/`: secret reference contracts plus keyring/file/shell backend operations.
+- `src/dnadesign/notify/delivery/payload.py`: payload construction.
+- `src/dnadesign/notify/delivery/validation.py`: webhook source/URL/TLS validation.
+- `src/dnadesign/notify/providers/`: payload adapters for `generic`, `slack`, and `discord`.
 
-Notify does not read:
-- `densegen/.../outputs/meta/events.jsonl`
+Module import contract:
+- Use canonical subpackage paths (`delivery/*`, `events/*`, `profiles/*`, `tool_events/*`) for runtime code and tests.
+- Top-level legacy module aliases are not part of the supported import surface.
 
-## Observer Contract
+## Observer contract
 
 Notify is an observer control plane:
 - it does not launch tool runs
 - it does not mutate tool command-line arguments, environment variables, or runtime behavior
 - it only resolves where Universal Sequence Record events are expected and watches that stream
 
-Tool integration contract:
-- `notify setup slack --tool <tool> --config <workspace-config.yaml>` resolves expected Universal Sequence Record `.events.log` destination
-- `notify setup slack --tool <tool> --workspace <workspace-name>` resolves config path from tool workspace root and then resolves expected Universal Sequence Record `.events.log` destination
-- `notify setup list-workspaces --tool <tool>` lists discoverable workspace names for shorthand mode
-- `notify usr-events watch --tool <tool> --config <workspace-config.yaml>` auto-loads profile from `<config-dir>/outputs/notify/<tool>/profile.json`
-- `notify usr-events watch --tool <tool> --workspace <workspace-name>` uses workspace shorthand for the same auto-profile flow
-- auto-profile mode is fail-fast: if profile `events_source` exists and does not match `--tool/--config` or `--tool/--workspace`, watch exits with a mismatch error
-- `notify setup resolve-events --tool <tool> --config <config.yaml>` resolves events path/policy without writing a profile
-- supported resolvers: `densegen`, `infer_evo2`
-- profile stores `events_source` metadata (`tool`, `config`) so watcher restarts can re-resolve paths and avoid stale bindings
-- unsupported tools fail fast with explicit errors (no implicit tool fallback)
+Input/output boundary contract:
+- input stream is Universal Sequence Record `"<dataset>/.events.log"` JSONL
+- Notify treats Universal Sequence Record events as an external, versioned contract
+- without `--profile`, choose exactly one webhook source:
+  - `--url`
+  - `--url-env`
+  - `--secret-ref`
+- profile schema contract is `profile_version: 2`
+- default profile privacy is strict (`include_args=false`, `include_context=false`, `include_raw_event=false`)
 
-Webhook contract:
-- `notify setup webhook` configures webhook secret references without requiring tool/workspace/profile paths
-- secure mode `--secret-source auto|keychain|secretservice|file`
-- env mode supports `--url-env <ENV_VAR>` and defaults to `NOTIFY_WEBHOOK` when omitted
-- Python keyring support is included in the project lockfile; Notify uses it first and falls back to OS commands (`security`/`secret-tool`) when needed
+Default artifact placement (resolver mode):
+- `<config-dir>/outputs/notify/<tool>/profile.json`
+- `<config-dir>/outputs/notify/<tool>/cursor`
+- `<config-dir>/outputs/notify/<tool>/spool/`
+
+## Key boundary reminder
+
+Notify reads Universal Sequence Record `<dataset>/.events.log` and does not consume DenseGen runtime telemetry (`outputs/meta/events.jsonl`).

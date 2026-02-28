@@ -1,120 +1,107 @@
 ## Notify Operations
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-02-28
 
-`dnadesign` includes a tool-agnostic notifier CLI for webhook delivery from local and batch workflows.
+`notify` is the observer-plane CLI for webhook delivery from local runs and batch workflows.
+Use this page as the route map; deep watcher procedures live in `docs/notify/usr-events.md`.
 
 ### Choose a workflow
 
-- Send one-off notifications from scripts, notebooks, or jobs: use `notify send` on this page.
-- Run long-lived USR `.events.log` watcher operations: [Notify USR events operator manual](usr-events.md).
-- Deploy watcher loops under SCC scheduler patterns: [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md).
+- Send one-off run status messages: use `notify send`.
+- Run long-lived Universal Sequence Record watcher loops: use [Notify USR events operator manual](usr-events.md).
+- Run watcher loops under BU SCC scheduler patterns: use [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md).
 
-### `notify send` quick usage
+### Progressive disclosure path
 
-```bash
-notify send \
-  --provider <slack|discord|generic> \
-  --status success \
-  --tool <tool-name> \
-  --run-id <run-id> \
-  --url-env <WEBHOOK_ENV_VAR> \
-  --message "Run complete"
-```
+1. Start with the 2-minute path on this page.
+2. Use `notify profile doctor` before first live watch to validate profile, event source, webhook source, and TLS settings.
+3. Move to [Notify USR events operator manual](usr-events.md) for setup/run/recover command anatomy and failure handling.
+4. Use [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md) only when running under scheduler-managed loops.
 
-Supported providers:
-- `generic` (JSON payload)
-- `slack` (text payload)
-- `discord` (text payload)
-
-Exactly one of `--url`, `--url-env`, or `--secret-ref` is required.
-Live HTTPS delivery requires trust roots via `--tls-ca-bundle` or `SSL_CERT_FILE` and fails fast when neither is provided.
-`--dry-run` does not post to the webhook and does not require a CA bundle.
-
-### Metadata payloads
-
-Attach metadata with a JSON file:
+### 2-minute operator path
 
 ```bash
-notify send \
-  --provider generic \
-  --status failure \
-  --tool <tool-name> \
-  --run-id <run-id> \
-  --url-env <WEBHOOK_ENV_VAR> \
-  --meta /abs/path/to/metadata.json
+WORKSPACE=<workspace>
+
+# 1) Provision a reusable secret ref.
+WEBHOOK_REF="$(uv run notify setup webhook --secret-source auto --name densegen-shared --json | python -c 'import json,sys; print(json.load(sys.stdin)["webhook"]["ref"])')"
+
+# 2) Create or refresh the workspace profile.
+uv run notify setup slack \
+  --tool densegen \
+  --workspace "$WORKSPACE" \
+  --secret-source auto \
+  --secret-ref "$WEBHOOK_REF" \
+  --policy densegen
+
+# 3) Validate profile wiring before watch.
+uv run notify profile doctor --profile src/dnadesign/densegen/workspaces/$WORKSPACE/outputs/notify/densegen/profile.json
+
+# 4) Run the watcher.
+uv run notify usr-events watch --tool densegen --workspace "$WORKSPACE" --follow --wait-for-events
 ```
 
-The metadata file must contain a JSON object, which is attached as `meta`.
+### Interface contract summary
 
-### Practical patterns
+- Notify consumes Universal Sequence Record `"<dataset>/.events.log"` JSONL only.
+- DenseGen runtime telemetry (`outputs/meta/events.jsonl`) is not a Notify input.
+- Profile schema contract is `profile_version: 2`.
+- Exactly one webhook source is required: `--url`, `--url-env`, or `--secret-ref`.
+- Live HTTPS delivery requires trust roots via `--tls-ca-bundle` or `SSL_CERT_FILE`.
+- No silent fallback: invalid profile, missing secrets, or invalid event source exits with actionable errors.
+- `notify setup slack` mode contract:
+  - explicit mode: `--events`
+  - resolver mode: `--tool` with exactly one of `--workspace` or `--config`
+  - mixed explicit+resolver flags are invalid
+- `notify usr-events watch` mode contract:
+  - one of `--profile`, `--events`, or resolver mode (`--tool` + exactly one of `--workspace` or `--config`)
+  - if resolver-mode auto-profile is missing, watch exits with setup guidance instead of creating implicit state
 
-Wrap pipeline execution with success/failure notifications:
+### Command surface map
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
+| Command | Use when | Output contract |
+| --- | --- | --- |
+| `notify send` | One-off notifications from scripts or jobs | Immediate post (or formatted payload with `--dry-run`) |
+| `notify setup webhook` | Provision or resolve webhook secret refs | Machine-readable `webhook.ref` with `--json` |
+| `notify setup slack` | Build workspace-bound watcher profile | Profile JSON + cursor/spool path defaults |
+| `notify setup resolve-events` | Verify resolved `.events.log` path without writing profile | Path/policy resolution output |
+| `notify profile doctor` | Validate profile wiring and secret resolution | Human-readable status or JSON diagnostics |
+| `notify usr-events watch` | Stream `.events.log` to webhook | Restart-safe watch loop with cursor support |
+| `notify spool drain` | Retry failed deliveries from spool | Replayed payloads with fail-fast option |
 
-CONFIG="/path/to/config.yaml"
-TOOL_NAME="tool"
-TOOL_CLI="tool-cli"
-RUN_ID="run-001"
-WEBHOOK_ENV="NOTIFY_WEBHOOK"
+### Maintainer route map
 
-if uv run "$TOOL_CLI" run -c "$CONFIG"; then
-  notify send \
-    --provider slack \
-    --status success \
-    --tool "$TOOL_NAME" \
-    --run-id "$RUN_ID" \
-    --url-env "$WEBHOOK_ENV" \
-    --message "Run completed"
-else
-  notify send \
-    --provider slack \
-    --status failure \
-    --tool "$TOOL_NAME" \
-    --run-id "$RUN_ID" \
-    --url-env "$WEBHOOK_ENV" \
-    --message "Run failed"
-  exit 1
-fi
-```
+- CLI router/group wiring: `src/dnadesign/notify/cli/__init__.py`.
+- Command binding layer:
+  - `src/dnadesign/notify/cli/bindings/__init__.py`: binding surface and handler wiring.
+  - `src/dnadesign/notify/cli/bindings/deps.py`: dependency exports used by handlers and tests.
+  - `src/dnadesign/notify/cli/bindings/registry.py`: Typer command registration wiring.
+- Option declarations and command registration: `src/dnadesign/notify/cli/commands/`.
+- Command execution handlers:
+  - `src/dnadesign/notify/cli/handlers/profile/`: `init_cmd`, `wizard_cmd`, `show_cmd`, `doctor_cmd`
+  - `src/dnadesign/notify/cli/handlers/setup/`: `slack_cmd`, `webhook_cmd`, `resolve_events_cmd`, `list_workspaces_cmd`
+  - `src/dnadesign/notify/cli/handlers/runtime/`: `watch_cmd`, `spool_cmd`
+  - `src/dnadesign/notify/cli/handlers/send.py`
+- Runtime and event-processing primitives:
+  - `src/dnadesign/notify/runtime/watch_runner.py`: watch runner entrypoint.
+  - `src/dnadesign/notify/runtime/watch_runner_contract.py`: watch option contract checks.
+  - `src/dnadesign/notify/runtime/watch_runner_resolution.py`: watch source and webhook resolution.
+  - `src/dnadesign/notify/runtime/watch_events.py`: event parsing/filtering and payload preparation.
+  - `src/dnadesign/notify/runtime/watch_delivery.py`: dry-run output and webhook/spool delivery outcomes.
+  - `src/dnadesign/notify/runtime/cursor/`: cursor offset, lock, and follow-loop iteration modules.
+  - `src/dnadesign/notify/delivery/secrets/`: secret reference contracts plus keyring/file/shell backend operations.
+  - `src/dnadesign/notify/runtime/`, `src/dnadesign/notify/events/`, `src/dnadesign/notify/tool_events/`, `src/dnadesign/notify/delivery/`.
 
-Send milestone notifications across stages:
+### Troubleshooting and recovery
 
-```bash
-notify send --provider generic --status started --tool <tool-name> --run-id <run-id> --url-env <WEBHOOK_ENV_VAR> \
-  --message "Pipeline stage started"
-notify send --provider generic --status running --tool <tool-name> --run-id <run-id> --url-env <WEBHOOK_ENV_VAR> \
-  --message "Pipeline stage running"
-notify send --provider generic --status success --tool <tool-name> --run-id <run-id> --url-env <WEBHOOK_ENV_VAR> \
-  --message "Run finished"
-```
+- `profile doctor` fails on missing webhook env var: confirm `--url-env` target is exported.
+- `usr-events watch` reports events-source mismatch: rerun setup with matching `--tool` + `--workspace` and use `--force`.
+- HTTPS delivery fails with CA errors: set `--tls-ca-bundle` or export `SSL_CERT_FILE`.
+- Repeated delivery failures: run `notify spool drain --profile <profile.json>` after restoring connectivity.
 
 ### Canonical runbooks
 
-- USR watcher onboarding, run lifecycle, and recovery flow: [usr-events.md](usr-events.md).
-- BU SCC batch submission patterns for Notify deployments: [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md).
-- Repository workload examples that compose SCC + Notify contracts: [SGE HPC Ops workload reference](../bu-scc/sge-hpc-ops/references/workload-dnadesign.md).
-
-### Documentation ownership
-
-- Keep watcher semantics and setup flow in `docs/notify/usr-events.md`.
-- Keep platform-specific submission examples in `docs/bu-scc/`.
-- Keep `src/dnadesign/notify/README.md` as module-local package documentation.
-
-### Dry run
-
-Preview payloads without sending:
-
-```bash
-notify send \
-  --provider slack \
-  --status running \
-  --tool <tool-name> \
-  --run-id <run-id> \
-  --url https://example.com/webhook \
-  --dry-run
-```
+- Watcher onboarding and lifecycle: [Notify USR events operator manual](usr-events.md).
+- BU SCC qsub patterns and notify wiring: [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md).
+- DenseGen submit-ready cluster flow: [BU SCC quickstart](../bu-scc/quickstart.md).

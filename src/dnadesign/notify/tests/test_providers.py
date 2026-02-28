@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.notify.payload import build_payload
+from dnadesign.notify.delivery.payload import build_payload
 from dnadesign.notify.providers import format_payload
 
 

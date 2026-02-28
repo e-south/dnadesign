@@ -14,7 +14,7 @@ from __future__ import annotations
 import pytest
 
 from dnadesign.notify.errors import NotifyConfigError
-from dnadesign.notify.event_transforms import event_message, event_meta, status_for_action, validate_usr_event
+from dnadesign.notify.events.transforms import event_message, event_meta, status_for_action, validate_usr_event
 
 
 def test_status_for_action_maps_fail_and_init() -> None:

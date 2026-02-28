@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.notify.cli_resolve import resolve_cli_optional_string, resolve_path_value, resolve_usr_events_path
+from dnadesign.notify.cli.resolve import resolve_cli_optional_string, resolve_path_value, resolve_usr_events_path
 from dnadesign.notify.errors import NotifyConfigError
 
 

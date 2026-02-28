@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.notify.usr_events_watch import watch_usr_events_loop
+from dnadesign.notify.runtime.watch import watch_usr_events_loop
 
 
 def test_watch_usr_events_loop_exported() -> None:

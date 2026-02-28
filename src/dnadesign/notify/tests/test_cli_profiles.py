@@ -18,9 +18,10 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from dnadesign.notify.cli import _ensure_private_directory, app
+from dnadesign.notify.cli import app
+from dnadesign.notify.delivery.secrets import resolve_secret_ref
 from dnadesign.notify.errors import NotifyConfigError
-from dnadesign.notify.secrets import resolve_secret_ref
+from dnadesign.notify.runtime.spool import ensure_private_directory as _ensure_private_directory
 
 
 def _event(action: str = "write_overlay_part") -> dict:
@@ -449,9 +450,9 @@ def test_profile_wizard_stores_secret_ref_when_requested(tmp_path: Path, monkeyp
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     captured: list[tuple[str, str]] = []
 
-    monkeypatch.setattr("dnadesign.notify.cli.is_secret_backend_available", lambda _backend: True)
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.is_secret_backend_available", lambda _backend: True)
     monkeypatch.setattr(
-        "dnadesign.notify.cli.store_secret_ref",
+        "dnadesign.notify.cli.bindings.store_secret_ref",
         lambda secret_ref, secret_value: captured.append((secret_ref, secret_value)),
     )
 
@@ -492,7 +493,7 @@ def test_profile_wizard_auto_falls_back_to_file_secret_ref(tmp_path: Path, monke
     profile = tmp_path / "notify.profile.json"
     _write_events(events, [_event()])
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
-    monkeypatch.setattr("dnadesign.notify.cli.is_secret_backend_available", lambda backend: backend == "file")
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.is_secret_backend_available", lambda backend: backend == "file")
 
     runner = CliRunner()
     result = runner.invoke(
@@ -554,7 +555,7 @@ def test_profile_wizard_reports_actionable_cursor_directory_error(tmp_path: Path
     def _fail_private_dir(path: Path, *, label: str) -> None:
         raise NotifyConfigError(f"failed to set secure permissions on {label}: {path}")
 
-    monkeypatch.setattr("dnadesign.notify.cli._ensure_private_directory", _fail_private_dir)
+    monkeypatch.setattr("dnadesign.notify.cli.bindings._ensure_private_directory", _fail_private_dir)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -630,7 +631,7 @@ def test_setup_slack_can_resolve_densegen_events_from_config_without_existing_ev
     config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (resolved_events, "densegen"),
     )
 
@@ -670,7 +671,7 @@ def test_setup_slack_next_steps_use_tool_config_watch_when_events_exist(tmp_path
     config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (resolved_events, "densegen"),
     )
 
@@ -708,7 +709,7 @@ def test_setup_slack_next_steps_quote_paths_with_spaces(tmp_path: Path, monkeypa
     config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (resolved_events, "densegen"),
     )
 
@@ -742,7 +743,7 @@ def test_setup_slack_defaults_to_tool_namespaced_profile_and_runtime_paths(tmp_p
     config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (resolved_events, "densegen"),
     )
 
@@ -779,7 +780,7 @@ def test_setup_slack_defaults_profile_under_config_directory(tmp_path: Path, mon
     outside_cwd.mkdir(parents=True, exist_ok=True)
     monkeypatch.chdir(outside_cwd)
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (resolved_events, "densegen"),
     )
 
@@ -811,11 +812,11 @@ def test_setup_slack_accepts_workspace_shorthand_for_config(tmp_path: Path, monk
     config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_workspace_config_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_workspace_config_path",
         lambda *, tool, workspace, search_start: config_path,
     )
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (resolved_events, "densegen"),
     )
 
@@ -847,7 +848,7 @@ def test_setup_slack_stores_tls_ca_bundle_path(tmp_path: Path, monkeypatch) -> N
     ca_bundle.write_text("dummy", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (resolved_events, "densegen"),
     )
 
@@ -879,7 +880,7 @@ def test_setup_slack_persists_progress_tunables(tmp_path: Path, monkeypatch) -> 
     config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (resolved_events, "densegen"),
     )
 
@@ -913,7 +914,7 @@ def test_setup_resolve_events_emits_plain_events_path(tmp_path: Path, monkeypatc
     resolved_events = tmp_path / "usr" / "demo" / ".events.log"
     config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (resolved_events, "densegen"),
     )
 
@@ -941,11 +942,11 @@ def test_setup_resolve_events_accepts_workspace_shorthand(tmp_path: Path, monkey
     config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_workspace_config_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_workspace_config_path",
         lambda *, tool, workspace, search_start: config_path,
     )
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (resolved_events, "densegen"),
     )
 
@@ -970,7 +971,7 @@ def test_setup_resolve_events_can_emit_json_output(tmp_path: Path, monkeypatch) 
     resolved_events = tmp_path / "usr" / "demo" / ".events.log"
     config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (resolved_events, "densegen"),
     )
 
@@ -999,7 +1000,7 @@ def test_setup_resolve_events_can_emit_json_output(tmp_path: Path, monkeypatch) 
 def test_setup_list_workspaces_emits_names_and_json(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "dnadesign.notify.cli._list_tool_workspaces",
+        "dnadesign.notify.cli.bindings._list_tool_workspaces",
         lambda *, tool, search_start: ["demo_a", "demo_b"],
     )
 
@@ -1037,7 +1038,7 @@ def test_setup_resolve_events_can_print_policy_only(tmp_path: Path, monkeypatch)
     resolved_events = tmp_path / "usr" / "demo" / ".events.log"
     config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (resolved_events, "densegen"),
     )
 
@@ -1060,7 +1061,7 @@ def test_setup_resolve_events_can_print_policy_only(tmp_path: Path, monkeypatch)
 
 def test_setup_webhook_auto_falls_back_to_file_secret_ref(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str((tmp_path / "config_home").resolve()))
-    monkeypatch.setattr("dnadesign.notify.cli.is_secret_backend_available", lambda backend: backend == "file")
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.is_secret_backend_available", lambda backend: backend == "file")
 
     runner = CliRunner()
     result = runner.invoke(
@@ -1089,18 +1090,18 @@ def test_setup_webhook_auto_falls_back_to_file_secret_ref(tmp_path: Path, monkey
 def test_setup_webhook_auto_falls_back_to_file_when_secretservice_write_fails(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str((tmp_path / "config_home").resolve()))
     monkeypatch.setattr(
-        "dnadesign.notify.cli.is_secret_backend_available",
+        "dnadesign.notify.cli.bindings.is_secret_backend_available",
         lambda backend: backend in {"secretservice", "file"},
     )
 
     def _store(secret_ref: str, secret_value: str) -> None:
         if secret_ref.startswith("secretservice://"):
             raise NotifyConfigError("secret backend keyring write failed")
-        from dnadesign.notify.secrets import store_secret_ref as _store_secret_ref
+        from dnadesign.notify.delivery.secrets import store_secret_ref as _store_secret_ref
 
         _store_secret_ref(secret_ref, secret_value)
 
-    monkeypatch.setattr("dnadesign.notify.cli.store_secret_ref", _store)
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.store_secret_ref", _store)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -1128,7 +1129,7 @@ def test_setup_webhook_auto_falls_back_to_file_when_secretservice_write_fails(tm
 
 def test_setup_webhook_auto_reuses_existing_secret_without_prompt(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str((tmp_path / "config_home").resolve()))
-    monkeypatch.setattr("dnadesign.notify.cli.is_secret_backend_available", lambda backend: backend == "file")
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.is_secret_backend_available", lambda backend: backend == "file")
     runner = CliRunner()
     first = runner.invoke(
         app,
@@ -1146,7 +1147,7 @@ def test_setup_webhook_auto_reuses_existing_secret_without_prompt(tmp_path: Path
     )
     assert first.exit_code == 0
     monkeypatch.setattr(
-        "dnadesign.notify.profile_flows.typer.prompt",
+        "dnadesign.notify.profiles.flow_webhook.typer.prompt",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("prompt should not be called")),
     )
     second = runner.invoke(
@@ -1261,7 +1262,7 @@ def test_setup_slack_env_uses_default_webhook_env_when_not_set(tmp_path: Path, m
     config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (tmp_path / "usr" / "demo" / ".events.log", "densegen"),
     )
 
@@ -1292,10 +1293,10 @@ def test_setup_slack_auto_falls_back_to_file_secret_ref(tmp_path: Path, monkeypa
     config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (tmp_path / "usr" / "demo" / ".events.log", "densegen"),
     )
-    monkeypatch.setattr("dnadesign.notify.cli.is_secret_backend_available", lambda backend: backend == "file")
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.is_secret_backend_available", lambda backend: backend == "file")
 
     runner = CliRunner()
     result = runner.invoke(
@@ -1327,10 +1328,10 @@ def test_setup_slack_auto_reuses_existing_secret_without_prompt(tmp_path: Path, 
     config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (tmp_path / "usr" / "demo" / ".events.log", "densegen"),
     )
-    monkeypatch.setattr("dnadesign.notify.cli.is_secret_backend_available", lambda backend: backend == "file")
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.is_secret_backend_available", lambda backend: backend == "file")
     stored: dict[str, str] = {}
 
     def _store(secret_ref: str, secret_value: str) -> None:
@@ -1341,10 +1342,10 @@ def test_setup_slack_auto_reuses_existing_secret_without_prompt(tmp_path: Path, 
             raise NotifyConfigError("missing secret")
         return stored[secret_ref]
 
-    monkeypatch.setattr("dnadesign.notify.cli.store_secret_ref", _store)
-    monkeypatch.setattr("dnadesign.notify.cli.resolve_secret_ref", _resolve)
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.store_secret_ref", _store)
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.resolve_secret_ref", _resolve)
     monkeypatch.setattr(
-        "dnadesign.notify.profile_flows.typer.prompt",
+        "dnadesign.notify.profiles.flow_webhook.typer.prompt",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("prompt should not be called")),
     )
 
@@ -1556,7 +1557,7 @@ def test_profile_doctor_rejects_non_usr_events_file_v2_secret_ref(tmp_path: Path
         encoding="utf-8",
     )
     monkeypatch.setattr(
-        "dnadesign.notify.validation.resolve_secret_ref", lambda _ref: "https://example.invalid/webhook"
+        "dnadesign.notify.delivery.validation.resolve_secret_ref", lambda _ref: "https://example.invalid/webhook"
     )
 
     runner = CliRunner()
@@ -1755,7 +1756,8 @@ def test_profile_doctor_passes_with_secret_ref_profile(tmp_path: Path, monkeypat
         encoding="utf-8",
     )
     monkeypatch.setattr(
-        "dnadesign.notify.validation.resolve_secret_ref", lambda _ref: "https://hooks.slack.com/services/T000/B000/XXX"
+        "dnadesign.notify.delivery.validation.resolve_secret_ref",
+        lambda _ref: "https://hooks.slack.com/services/T000/B000/XXX",
     )
     _set_ssl_cert_file(monkeypatch, tmp_path)
 
@@ -1908,9 +1910,9 @@ def test_usr_events_watch_can_use_profile_secret_ref(tmp_path: Path, monkeypatch
         sent.append(body)
 
     monkeypatch.setattr(
-        "dnadesign.notify.validation.resolve_secret_ref", lambda _ref: "https://example.invalid/webhook"
+        "dnadesign.notify.delivery.validation.resolve_secret_ref", lambda _ref: "https://example.invalid/webhook"
     )
-    monkeypatch.setattr("dnadesign.notify.cli.post_json", _fake_post)
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.post_json", _fake_post)
     _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
@@ -1996,7 +1998,7 @@ def test_spool_drain_can_use_profile_defaults(tmp_path: Path, monkeypatch) -> No
     def _fake_post(_url: str, body: dict, **_kwargs) -> None:
         sent.append(body)
 
-    monkeypatch.setattr("dnadesign.notify.cli.post_json", _fake_post)
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.post_json", _fake_post)
     monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
     _set_ssl_cert_file(monkeypatch, tmp_path)
 

@@ -15,8 +15,8 @@ import re
 
 import pytest
 
+from dnadesign.notify.delivery.payload import build_payload
 from dnadesign.notify.errors import NotifyValidationError
-from dnadesign.notify.payload import build_payload
 
 
 def test_build_payload_includes_required_fields() -> None:

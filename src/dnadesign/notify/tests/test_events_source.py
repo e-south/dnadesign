@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from dnadesign.notify.errors import NotifyConfigError
-from dnadesign.notify.events_source import register_tool_events_source, resolve_tool_events_path
+from dnadesign.notify.events.source import register_tool_events_source, resolve_tool_events_path
 
 
 def test_resolve_tool_events_path_infer_evo2_from_single_usr_writeback_job(tmp_path: Path) -> None:
@@ -222,7 +222,7 @@ def test_register_tool_events_source_rejects_duplicate_alias() -> None:
 
 
 def test_events_source_module_is_registry_only() -> None:
-    import dnadesign.notify.events_source as events_source_module
+    import dnadesign.notify.events.source as events_source_module
 
     parsed = ast.parse(inspect.getsource(events_source_module))
     imported_modules: set[str] = set()

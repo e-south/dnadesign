@@ -20,7 +20,7 @@ from typer.testing import CliRunner
 
 from dnadesign.notify.cli import app
 from dnadesign.notify.errors import NotifyConfigError, NotifyDeliveryError
-from dnadesign.notify.watch_ops import iter_file_lines as _iter_file_lines
+from dnadesign.notify.runtime.cursor import iter_file_lines as _iter_file_lines
 from dnadesign.usr import USR_EVENT_VERSION
 
 
@@ -203,7 +203,7 @@ def test_usr_events_watch_accepts_tls_ca_bundle_override(tmp_path: Path, monkeyp
         sent_payloads.append(payload)
         captured.append(kwargs)
 
-    monkeypatch.setattr("dnadesign.notify.cli.post_json", _fake_post)
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.post_json", _fake_post)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -289,7 +289,7 @@ def test_usr_events_watch_cursor_prevents_duplicate_sends(tmp_path: Path, monkey
     def _fake_post(_url: str, payload: dict, **_kwargs) -> None:
         sent_payloads.append(payload)
 
-    monkeypatch.setattr("dnadesign.notify.cli.post_json", _fake_post)
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.post_json", _fake_post)
 
     runner = CliRunner()
     args = [
@@ -433,7 +433,7 @@ def test_iter_file_lines_follow_restarts_after_midstream_truncate(tmp_path: Path
             return
         raise RuntimeError("follow loop did not recover from truncation")
 
-    monkeypatch.setattr("dnadesign.notify.watch_ops.time.sleep", _fake_sleep)
+    monkeypatch.setattr("dnadesign.notify.runtime.cursor.iteration.time.sleep", _fake_sleep)
 
     rows = _iter_file_lines(
         events,
@@ -462,7 +462,7 @@ def test_iter_file_lines_follow_errors_after_midstream_truncate(tmp_path: Path, 
             return
         raise RuntimeError("follow loop did not report truncation")
 
-    monkeypatch.setattr("dnadesign.notify.watch_ops.time.sleep", _fake_sleep)
+    monkeypatch.setattr("dnadesign.notify.runtime.cursor.iteration.time.sleep", _fake_sleep)
 
     rows = _iter_file_lines(
         events,
@@ -486,7 +486,7 @@ def test_iter_file_lines_waits_for_events_file_when_configured(tmp_path: Path, m
             return
         raise RuntimeError("wait-for-events did not observe created events file")
 
-    monkeypatch.setattr("dnadesign.notify.watch_ops.time.sleep", _fake_sleep)
+    monkeypatch.setattr("dnadesign.notify.runtime.cursor.iteration.time.sleep", _fake_sleep)
 
     rows = _iter_file_lines(
         events,
@@ -509,8 +509,8 @@ def test_iter_file_lines_follow_exits_after_idle_timeout(tmp_path: Path, monkeyp
     def _fake_sleep(_seconds: float) -> None:
         now["value"] += 0.11
 
-    monkeypatch.setattr("dnadesign.notify.watch_ops.time.sleep", _fake_sleep)
-    monkeypatch.setattr("dnadesign.notify.watch_ops.time.monotonic", lambda: now["value"])
+    monkeypatch.setattr("dnadesign.notify.runtime.cursor.iteration.time.sleep", _fake_sleep)
+    monkeypatch.setattr("dnadesign.notify.runtime.cursor.iteration.time.monotonic", lambda: now["value"])
 
     rows = _iter_file_lines(
         events,
@@ -535,8 +535,8 @@ def test_usr_events_watch_spools_after_delivery_failures(tmp_path: Path, monkeyp
         calls["n"] += 1
         raise NotifyDeliveryError("network down")
 
-    monkeypatch.setattr("dnadesign.notify.cli.post_json", _always_fail)
-    monkeypatch.setattr("dnadesign.notify.cli.time.sleep", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.post_json", _always_fail)
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.time.sleep", lambda *_args, **_kwargs: None)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -586,7 +586,7 @@ def test_spool_drain_sends_and_deletes_successful_files(tmp_path: Path, monkeypa
     def _fake_post(_url: str, body: dict, **_kwargs) -> None:
         sent.append(body)
 
-    monkeypatch.setattr("dnadesign.notify.cli.post_json", _fake_post)
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.post_json", _fake_post)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -630,7 +630,7 @@ def test_spool_drain_uses_spooled_provider_when_not_overridden(tmp_path: Path, m
     def _fake_post(_url: str, body: dict, **_kwargs) -> None:
         sent.append(body)
 
-    monkeypatch.setattr("dnadesign.notify.cli.post_json", _fake_post)
+    monkeypatch.setattr("dnadesign.notify.cli.bindings.post_json", _fake_post)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -1162,7 +1162,7 @@ def test_usr_events_watch_profile_can_reresolve_events_from_tool_config(tmp_path
         encoding="utf-8",
     )
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (live_events, "densegen"),
     )
 
@@ -1204,7 +1204,7 @@ def test_usr_events_watch_can_autoload_profile_from_tool_config(tmp_path: Path, 
     )
     monkeypatch.setenv("DENSEGEN_WEBHOOK", "http://example.com/webhook")
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (events, "densegen"),
     )
 
@@ -1263,7 +1263,7 @@ def test_usr_events_watch_autoload_rejects_profile_events_source_mismatch(tmp_pa
             return (stale_events, "densegen")
         raise AssertionError(f"unexpected config path: {config}")
 
-    monkeypatch.setattr("dnadesign.notify.cli._resolve_tool_events_path", _resolve_events)
+    monkeypatch.setattr("dnadesign.notify.cli.bindings._resolve_tool_events_path", _resolve_events)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -1313,7 +1313,7 @@ def test_usr_events_watch_autoload_uses_cli_events_when_profile_events_field_is_
     )
     monkeypatch.setenv("DENSEGEN_WEBHOOK", "http://example.com/webhook")
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (cli_events, "densegen"),
     )
 
@@ -1342,7 +1342,7 @@ def test_usr_events_watch_autoload_prompts_setup_when_profile_missing(tmp_path: 
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (tmp_path / "usr" / "demo" / ".events.log", "densegen"),
     )
 
@@ -1387,11 +1387,11 @@ def test_usr_events_watch_autoload_supports_workspace_shorthand(tmp_path: Path, 
     )
     monkeypatch.setenv("DENSEGEN_WEBHOOK", "http://example.com/webhook")
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_workspace_config_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_workspace_config_path",
         lambda *, tool, workspace, search_start: config_path,
     )
     monkeypatch.setattr(
-        "dnadesign.notify.cli._resolve_tool_events_path",
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
         lambda *, tool, config: (events, "densegen"),
     )
 
