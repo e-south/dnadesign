@@ -7,17 +7,18 @@
 - [lexA, cpxR, baeR]
 
 **Purpose**
-- Run the stress campaign workspace with dual-sink outputs, expanded plans, and workspace-local plot/notebook generation.
+- Run the stress campaign workspace with dual-sink outputs, expanded plans, GUROBI solver defaults, and workspace-local plot/notebook generation.
 
-**Sigma70 Literal Source**
-- Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors. DOI: 10.1038/s41467-017-02473-5 | https://www.nature.com/articles/s41467-017-02473-5
+**σ70 promoter context**
+- This workspace keeps a constitutive σ70 promoter core and uses RNAP -35 and -10 hexamer sets from *Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors* (DOI: 10.1038/s41467-017-02473-5; source: https://www.nature.com/articles/s41467-017-02473-5).
 
 **Runbook command**
 
 Run this command from the workspace root:
 
-    # Execute the packaged workspace runbook sequence.
-    ./runbook.sh
+    ./runbook.sh --mode fresh
+
+Use `--mode resume` to continue generation without wiping outputs, or `--mode analysis` to rebuild plots/notebook only.
 
 ### Step-by-Step Commands
 
@@ -25,18 +26,7 @@ Run this command from the workspace root:
     set -euo pipefail
     # Pin the workspace config path for repeated CLI calls.
     CONFIG="$PWD/config.yaml"
-    # Pin the workspace-local USR registry destination.
-    USR_REGISTRY="$PWD/outputs/usr_datasets/registry.yaml"
-    # Resolve the repo-level baseline USR registry path.
-    ROOT_REGISTRY="$(git rev-parse --show-toplevel)/src/dnadesign/usr/datasets/registry.yaml"
-
-    # Seed a workspace-local USR registry when one is not present.
-    if [ ! -f "$USR_REGISTRY" ]; then
-      # Create the destination directory for workspace-local USR artifacts.
-      mkdir -p "$(dirname "$USR_REGISTRY")"
-      # Copy baseline USR registry into the workspace-local path.
-      cp "$ROOT_REGISTRY" "$USR_REGISTRY"
-    fi
+    # dense run auto-seeds outputs/usr_datasets/registry.yaml when missing.
 
     # Verify FIMO is available before PWM-backed sampling and validation.
     pixi run fimo --version
@@ -45,6 +35,10 @@ Run this command from the workspace root:
     # Start a fresh run from a clean output state (sequence generation only).
     # Plot rendering is explicit in the next step for clearer failure isolation.
     pixi run dense run --fresh --no-plot -c "$CONFIG"
+    # Resume generation in-place for iterative quota accumulation.
+    pixi run dense run --resume --no-plot -c "$CONFIG"
+    # Increase total quota target without editing config.yaml.
+    pixi run dense run --resume --extend-quota 50000 --no-plot -c "$CONFIG"
     # If running only `dense run`, omit `--no-plot` to auto-render configured plots.
     # pixi run dense run --fresh -c "$CONFIG"
     # Inspect run diagnostics and per-plan library progress.
@@ -62,10 +56,38 @@ Run this command from the workspace root:
     # Validate the generated notebook before opening or sharing it.
     uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
 
-### Optional analysis-only mode (existing outputs)
+### Mode B: BU SCC batch loop (generation only)
+
+    # Check current scheduler pressure before submitting additional jobs.
+    qstat -u "$USER"
+    # Summarize running, queued, and Eqw jobs for submit gating.
+    qstat -u "$USER" | awk '
+      $1 ~ /^[0-9]+$/ {
+        running += ($5 ~ /r/)
+        queued += ($5 ~ /q/)
+        eqw += ($5 ~ /Eqw/)
+      }
+      END { printf "running_jobs=%d queued_jobs=%d eqw_jobs=%d\n", running, queued, eqw }
+    '
+    # Submit generation-only batch run against this workspace config.
+    qsub -P <project> \
+      -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --no-plot' \
+      docs/bu-scc/jobs/densegen-cpu.qsub
+    # Submit an extension pass when additional quota is required.
+    qsub -P <project> \
+      -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --extend-quota 50000 --no-plot' \
+      docs/bu-scc/jobs/densegen-cpu.qsub
+
+Queue contract:
+- If `running_jobs > 3`, confirm before adding more jobs and prefer arrays or `-hold_jid` chains.
+- Do not skip the queue line with bypass-style flags.
+
+### Optional analysis mode (existing outputs)
+
+Mode C: post-run analysis only.
 
     # Rebuild plots/notebook from existing run artifacts without regenerating sequences.
-    ./runbook.sh --analysis-only
+    ./runbook.sh --mode analysis
 
 ### Optional notebook open
 

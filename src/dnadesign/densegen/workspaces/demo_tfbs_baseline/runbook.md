@@ -13,8 +13,9 @@
 
 Run this command from the workspace root:
 
-    # Execute the packaged workspace runbook sequence.
-    ./runbook.sh
+    ./runbook.sh --mode fresh
+
+Use `--mode resume` to continue generation without wiping outputs, or `--mode analysis` to rebuild plots/notebook only.
 
 ### Step-by-Step Commands
 
@@ -45,10 +46,10 @@ Run this command from the workspace root:
     # Validate the generated notebook before opening or sharing it.
     uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
 
-### Optional analysis-only mode (existing outputs)
+### Optional analysis mode (existing outputs)
 
     # Rebuild plots/notebook from existing run artifacts without regenerating sequences.
-    ./runbook.sh --analysis-only
+    ./runbook.sh --mode analysis
 
 ### Optional notebook open
 

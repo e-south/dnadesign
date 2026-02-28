@@ -29,9 +29,10 @@ WORKSPACE_IDS = (
     "study_stress_ethanol_cipro",
 )
 SIGMA70_LITERAL_SOURCE_CITATION = (
-    "Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors. "
-    "DOI: 10.1038/s41467-017-02473-5 | https://www.nature.com/articles/s41467-017-02473-5"
+    "Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors"
 )
+SIGMA70_DOI = "10.1038/s41467-017-02473-5"
+SIGMA70_NATURE_URL = "https://www.nature.com/articles/s41467-017-02473-5"
 
 
 def _read(path: Path) -> str:
@@ -110,9 +111,9 @@ def test_densegen_docs_entry_links_to_doc_index() -> None:
     assert "index.md" in content
 
 
-def test_densegen_docs_entry_links_to_workspace_catalog_in_workspaces_dir() -> None:
+def test_densegen_docs_entry_links_to_workspace_docs_in_workspaces_dir() -> None:
     content = _read(DOCS_ROOT / "README.md")
-    assert "../workspaces/catalog.md" in content
+    assert "../workspaces/README.md" in content
     assert "workspaces.md" not in content
 
 
@@ -121,8 +122,8 @@ def test_densegen_top_level_readme_points_to_docs_entry() -> None:
     assert "docs/README.md" in content
 
 
-def test_densegen_workspace_catalog_exists_in_workspaces_dir_and_covers_packaged_workspaces() -> None:
-    catalog = _read(WORKSPACES / "catalog.md")
+def test_densegen_workspaces_readme_exists_in_workspaces_dir_and_covers_packaged_workspaces() -> None:
+    catalog = _read(WORKSPACES / "README.md")
     for workspace_id in WORKSPACE_IDS:
         assert workspace_id in catalog
 
@@ -134,7 +135,7 @@ def test_densegen_top_level_readme_has_banner_and_ordered_documentation_map() ->
         content,
         [
             "docs/README.md",
-            "workspaces/catalog.md",
+            "workspaces/README.md",
             "docs/tutorials/demo_tfbs_baseline.md",
             "docs/tutorials/demo_sampling_baseline.md",
             "docs/tutorials/study_constitutive_sigma_panel.md",
@@ -182,7 +183,7 @@ def test_densegen_docs_are_reachable_from_docs_entry() -> None:
 
 def test_densegen_agents_points_to_docs_entry() -> None:
     content = _read(ROOT / "AGENTS.md")
-    assert "src/dnadesign/densegen/docs/README.md" in content
+    assert "[Docs index by workflow](docs/README.md)" in content
 
 
 def test_densegen_docs_use_plain_direct_language() -> None:
@@ -215,7 +216,9 @@ def test_sigma70_literal_docs_include_source_citation() -> None:
     )
     for path in targets:
         content = _read(path)
-        assert SIGMA70_LITERAL_SOURCE_CITATION in content, f"{path}: missing sigma70 literal source citation"
+        assert SIGMA70_LITERAL_SOURCE_CITATION in content, f"{path}: missing sigma70 source title"
+        assert SIGMA70_DOI in content, f"{path}: missing sigma70 source DOI"
+        assert SIGMA70_NATURE_URL in content, f"{path}: missing sigma70 source URL"
 
 
 def test_outputs_reference_documents_strict_notebook_render_contract() -> None:

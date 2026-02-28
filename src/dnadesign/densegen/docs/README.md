@@ -1,10 +1,7 @@
 ## DenseGen documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
-
-
-This directory is the DenseGen documentation index. Start here, then open the workflow or reference page you need.
+**Last verified:** 2026-02-28
 
 ### Documentation by workflow
 
@@ -37,7 +34,6 @@ This directory is the DenseGen documentation index. Start here, then open the wo
 
 ### Workspace documentation
 - [DenseGen workspaces directory](../workspaces/README.md): workspace layout and package-local expectations.
-- [Packaged workspace catalog](../workspaces/catalog.md): available packaged workspaces and their usage notes.
 
 ### Documentation by type
 - [docs index](index.md): type-based index for concept, how-to, tutorial, and reference docs.

@@ -16,6 +16,7 @@ from pathlib import Path
 
 from dnadesign.devtools.docs_checks import (
     _find_broken_links,
+    _find_densegen_disallowed_term_issues,
     _find_deprecated_docs_entrypoint_issues,
     _find_docs_root_heading_style_issues,
     _find_entrypoint_local_path_literal_issues,
@@ -276,6 +277,26 @@ def test_entrypoint_local_path_link_check_allows_hyperlinked_local_paths(tmp_pat
     )
 
     issues = _find_entrypoint_local_path_literal_issues(tmp_path)
+
+    assert issues == []
+
+
+def test_densegen_docs_language_check_flags_canonical_term(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "densegen" / "README.md", "This is the canonical densegen guide.\n")
+
+    issues = _find_densegen_disallowed_term_issues(tmp_path)
+
+    assert any("term 'canonical'" in issue for issue in issues)
+
+
+def test_densegen_docs_language_check_accepts_plain_language(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "densegen" / "README.md", "DenseGen guide.\n")
+    _write(
+        tmp_path / "src" / "dnadesign" / "densegen" / "docs" / "tutorials" / "demo.md",
+        "## Demo\n\nUse this tutorial to run the workflow.\n",
+    )
+
+    issues = _find_densegen_disallowed_term_issues(tmp_path)
 
     assert issues == []
 

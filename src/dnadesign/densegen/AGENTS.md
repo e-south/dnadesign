@@ -3,18 +3,22 @@
 Use this file as a short map. Keep detailed operating and architecture material in linked docs.
 
 ### Entry points
-- Package overview: `src/dnadesign/densegen/README.md`
-- Docs index by workflow: `src/dnadesign/densegen/docs/README.md`
-- Workspace catalog: `src/dnadesign/densegen/workspaces/catalog.md`
-- Workspace directory policy: `src/dnadesign/densegen/workspaces/README.md`
+- [Package overview](README.md)
+- [Docs index by workflow](docs/README.md)
+- [Docs index by type](docs/index.md)
+- [Workspaces guide](workspaces/README.md)
+- [Stress ethanol and ciprofloxacin tutorial](docs/tutorials/study_stress_ethanol_cipro.md)
+- [DenseGen to USR to Notify tutorial](docs/tutorials/demo_usr_notify.md)
 
 ### Pick a path
-- Run a packaged workspace: open the workspace directory and execute `./runbook.sh`.
-- Debug run behavior: use `docs/concepts/quick-checklist.md`, then `docs/concepts/pipeline-lifecycle.md`.
-- Check CLI behavior: `docs/reference/cli.md`.
-- Check config fields: `docs/reference/config.md`.
-- Check outputs and contracts: `docs/reference/outputs.md`.
-- Run on clusters: `docs/howto/hpc.md` and `docs/howto/bu-scc.md`.
+- Run a packaged workspace: open the workspace directory and execute `./runbook.sh --mode fresh`.
+- Continue a prior generation run: execute `./runbook.sh --mode resume`.
+- Rebuild analysis from existing outputs only: execute `./runbook.sh --mode analysis`.
+- Debug run behavior: start with [Quick checklist](docs/concepts/quick-checklist.md), then [Pipeline lifecycle](docs/concepts/pipeline-lifecycle.md).
+- Check CLI behavior: [CLI reference](docs/reference/cli.md).
+- Check config fields: [Config reference](docs/reference/config.md).
+- Check outputs and contracts: [Outputs reference](docs/reference/outputs.md).
+- Run on clusters: [HPC runbook](docs/howto/hpc.md), [BU SCC guide](docs/howto/bu-scc.md), and [BU SCC quickstart](../../../docs/bu-scc/quickstart.md).
 
 ### Workspace conventions
 - Packaged templates: `demo_tfbs_baseline`, `demo_sampling_baseline`, `study_constitutive_sigma_panel`, `study_stress_ethanol_cipro`.

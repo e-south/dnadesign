@@ -207,10 +207,11 @@ src/dnadesign/opal/campaigns/**/inputs/**/.DS_Store
 !src/dnadesign/densegen/src/adapters/outputs/**
 src/dnadesign/densegen/src/adapters/outputs/**/__pycache__/
 src/dnadesign/densegen/src/adapters/outputs/**/*.pyc
-# DenseGen workspaces: ignore everything by default, allow demo + README
+# DenseGen workspaces: ignore everything by default, allow packaged templates and shared runbook flow
 src/dnadesign/densegen/workspaces/**
 !src/dnadesign/densegen/workspaces/README.md
-!src/dnadesign/densegen/workspaces/catalog.md
+!src/dnadesign/densegen/workspaces/_shared/
+!src/dnadesign/densegen/workspaces/_shared/workspace_runbook_flow.sh
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/README.md
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/config.yaml

@@ -9,15 +9,16 @@
 **Purpose**
 - Run the constitutive sigma70 panel with fixed-element expansion and plot/notebook outputs from one workspace.
 
-**Sigma70 Literal Source**
-- Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors. DOI: 10.1038/s41467-017-02473-5 | https://www.nature.com/articles/s41467-017-02473-5
+**σ70 promoter context**
+- This workspace composes constitutive σ70 promoters by pairing RNAP -35 and -10 hexamer sets from *Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors* (DOI: 10.1038/s41467-017-02473-5; source: https://www.nature.com/articles/s41467-017-02473-5).
 
 **Runbook command**
 
 Run this command from the workspace root:
 
-    # Execute the packaged workspace runbook sequence.
-    ./runbook.sh
+    ./runbook.sh --mode fresh
+
+Use `--mode resume` to continue generation without wiping outputs, or `--mode analysis` to rebuild plots/notebook only.
 
 ### Step-by-Step Commands
 
@@ -25,18 +26,7 @@ Run this command from the workspace root:
     set -euo pipefail
     # Pin the workspace config path for repeated CLI calls.
     CONFIG="$PWD/config.yaml"
-    # Pin the workspace-local USR registry destination.
-    USR_REGISTRY="$PWD/outputs/usr_datasets/registry.yaml"
-    # Resolve the repo-level baseline USR registry path.
-    ROOT_REGISTRY="$(git rev-parse --show-toplevel)/src/dnadesign/usr/datasets/registry.yaml"
-
-    # Seed a workspace-local USR registry when one is not present.
-    if [ ! -f "$USR_REGISTRY" ]; then
-      # Create the destination directory for workspace-local USR artifacts.
-      mkdir -p "$(dirname "$USR_REGISTRY")"
-      # Copy baseline USR registry into the workspace-local path.
-      cp "$ROOT_REGISTRY" "$USR_REGISTRY"
-    fi
+    # dense run auto-seeds outputs/usr_datasets/registry.yaml when missing.
 
     # Verify FIMO is available before PWM-backed sampling and validation.
     pixi run fimo --version
@@ -62,10 +52,10 @@ Run this command from the workspace root:
     # Validate the generated notebook before opening or sharing it.
     uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
 
-### Optional analysis-only mode (existing outputs)
+### Optional analysis mode (existing outputs)
 
     # Rebuild plots/notebook from existing run artifacts without regenerating sequences.
-    ./runbook.sh --analysis-only
+    ./runbook.sh --mode analysis
 
 ### Optional notebook open
 

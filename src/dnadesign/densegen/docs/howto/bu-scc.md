@@ -1,7 +1,7 @@
 ## DenseGen on BU SCC
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-02-28
 
 
 This how-to guide captures BU SCC specifics that differ from the base DenseGen HPC runbook. Read it when running DenseGen on BU SCC and you need the correct scheduler flags, certificate setup, and BU docs.
@@ -13,6 +13,7 @@ This section lists the operational details that are specific to BU SCC.
 
 - Scheduler is SGE (`qsub`, `qrsh`, `qstat`).
 - Project/account flags are required (typically `-P <project>`).
+- DenseGen GUROBI workloads are supported when your SCC environment has GUROBI available and `densegen.solver.backend: GUROBI` is set in config.
 - Webhook delivery may require explicit certificate bundle export.
 
 ### Minimal environment setup

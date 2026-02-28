@@ -1,9 +1,7 @@
 ## Motif artifact JSON contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
-
-
+**Last verified:** 2026-02-28
 DenseGen can consume one JSON file per motif.
 This keeps producer tooling and DenseGen decoupled:
 - producer tools own parsing and conversion
@@ -13,7 +11,6 @@ Cruncher can emit these artifacts with `cruncher catalog export-densegen`.
 
 ### Contents
 
-This section covers contents.
 - [When to use this](#when-to-use-this) - where artifacts fit in DenseGen runs.
 - [Contract rules](#contract-rules) - invariants DenseGen validates.
 - [Required fields](#required-fields) - strict JSON keys.
@@ -31,7 +28,6 @@ Artifact‑first PWM inputs are a decoupling contract: producers generate stable
 
 ### Contract rules
 
-This section lists the rules DenseGen enforces for artifact ingestion.
 
 - **One file per motif** (explicit paths; no directory scanning).
 - **JSON-first**, no sidecar schema files.
@@ -73,7 +69,6 @@ before emitting artifacts.
 
 ### Example artifact
 
-This section shows a minimal valid motif artifact payload.
 
 ```json
 {

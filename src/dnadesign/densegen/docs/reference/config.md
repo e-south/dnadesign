@@ -1,9 +1,7 @@
 ## DenseGen config reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
-
-
+**Last verified:** 2026-02-28
 Use this page when you need exact YAML keys and constraints.
 Unknown keys are hard errors.
 All relative paths resolve from the config file directory.
@@ -19,7 +17,6 @@ If you want concepts first, read:
 
 ### Contents
 
-This section covers contents.
 - [Top-level keys](#top-level-keys) - required roots and plotting.
 - [`densegen.inputs[]`](#densegeninputs) - input sources and Stage‑A sampling.
 - [`densegen.run`](#densegenrun) - run identifier and root.
@@ -40,7 +37,6 @@ This section covers contents.
 
 ### Top-level keys
 
-This section covers top-level.
 
 - `densegen` (required)
 - `densegen.schema_version` (required; supported: `2.9`)
@@ -196,7 +192,6 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
 
 ### `densegen.run`
 
-This section covers densegen.run.
 
 - `id` - run identifier (string; required; must not contain path separators)
 - `root` - run root directory (required; must exist on disk)
@@ -205,7 +200,6 @@ This section covers densegen.run.
 
 ### `densegen.output`
 
-This section covers densegen.output.
 
 - `schema`: shared output schema (`bio_type`, `alphabet`) used for IDs and validation (required).
 - `targets`: list of sinks to write (`usr`, `parquet`)
@@ -224,7 +218,6 @@ This section covers densegen.output.
 
 ### `densegen.generation`
 
-This section covers densegen.generation.
 
 - `sequence_length` (int > 0)
 - `sequence_length` should be >= the widest required motif (library TFBS or fixed elements); if it
@@ -268,7 +261,6 @@ This section covers densegen.generation.
       - DenseGen uses the maximum of this value and `runtime.min_count_per_tf`.
 
 #### `densegen.generation.plan[].fixed_elements.fixed_element_matrix`
-This section describes plan-local deterministic matrix expansion for combinatorial studies.
 
 For a worked example, use **[constitutive sigma panel study tutorial](../tutorials/study_constitutive_sigma_panel.md)**.
 
@@ -281,7 +273,6 @@ For a worked example, use **[constitutive sigma panel study tutorial](../tutoria
 - Expanded plan names default to `{base}__up={up}__down={down}` unless `expanded_name_template` is set.
 
 #### `densegen.generation.sequence_constraints`
-This section describes global final-sequence checks applied after layout assembly.
 
 For conceptual behavior and troubleshooting, use **[generation model](../concepts/generation.md)**.
 
@@ -301,7 +292,6 @@ For conceptual behavior and troubleshooting, use **[generation model](../concept
 
 ### `densegen.motif_sets`
 
-This section covers densegen.motifsets.
 
 - Optional dictionary used by:
   - `generation.plan[].fixed_elements.fixed_element_matrix`
@@ -349,7 +339,6 @@ Notes:
 
 ### `densegen.solver`
 
-This section covers densegen.solver.
 
 - `backend`: solver name string (required unless `strategy: approximate`).
   - Common values: `CBC`, `GUROBI` (depends on your dense-arrays install).
@@ -364,7 +353,6 @@ This section covers densegen.solver.
 
 ### `densegen.runtime`
 
-This section covers densegen.runtime.
 
 - `round_robin` (bool) - interleave plan items across inputs (one subsample per plan per pass).
   Use this when you have multiple distinct constraint sets (e.g., different fixed sequences) and want
@@ -394,7 +382,6 @@ This section covers densegen.runtime.
 
 ### `densegen.postprocess.pad`
 
-This section covers densegen.postprocess.pad.
 
 - `mode`: `off | strict | adaptive`
 - `end`: `5prime | 3prime`
@@ -410,7 +397,6 @@ This section covers densegen.postprocess.pad.
 
 ### `densegen.logging`
 
-This section covers densegen.logging.
 
 - `log_dir` (required) - directory for log files (relative to config path, must be inside
   `outputs/` under `densegen.run.root`).
@@ -458,7 +444,6 @@ densegen:
 
 ### `plots`
 
-This section covers plots.
 
 - `source`: `usr | parquet` (required if `output.targets` has multiple sinks)
 - `out_dir` (optional; default `outputs/plots`; must be inside `outputs/` under `densegen.run.root`)
@@ -511,7 +496,6 @@ This section covers plots.
 
 ### Minimal example
 
-This section covers minimal example.
 
 ```yaml
 densegen:

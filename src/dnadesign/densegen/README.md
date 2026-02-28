@@ -11,7 +11,7 @@ DenseGen wraps the [dense-arrays](https://github.com/e-south/dense-arrays) optim
 ## Documentation map
 
 1. [Docs overview](docs/README.md): route to tutorials, runbooks, concepts, and references by task.
-2. [Workspace catalog](workspaces/catalog.md): choose a packaged workspace and expected inputs before running.
+2. [Workspaces guide](workspaces/README.md): choose a packaged workspace and expected inputs before running.
 3. [TFBS baseline tutorial](docs/tutorials/demo_tfbs_baseline.md): run the default TFBS workflow end to end.
 4. [Sampling baseline tutorial](docs/tutorials/demo_sampling_baseline.md): run the sampling-enabled workflow and outputs.
 5. [Constitutive sigma panel tutorial](docs/tutorials/study_constitutive_sigma_panel.md): reproduce a multi-condition sigma study workflow.

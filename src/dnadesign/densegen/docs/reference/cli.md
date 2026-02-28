@@ -1,9 +1,7 @@
 ## DenseGen CLI reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
-
-
+**Last verified:** 2026-02-28
 Use this page when you need exact command behavior and flag names.
 For end-to-end guided runs, use:
 - [binding-sites baseline demo](../tutorials/demo_tfbs_baseline.md)
@@ -12,7 +10,6 @@ For end-to-end guided runs, use:
 For lifecycle context around these commands, use **[DenseGen pipeline lifecycle](../concepts/pipeline-lifecycle.md)**.
 
 ### Contents
-This section indexes the command surfaces covered in this reference.
 
 - [Quick command discovery](#quick-command-discovery)
 - [Config resolution](#config-resolution)
@@ -33,7 +30,6 @@ This section indexes the command surfaces covered in this reference.
 - [`dense notebook run`](#dense-notebook-run)
 
 ### Quick command discovery
-This section shows how to discover active command groups and flags.
 
 ```bash
 # Show top-level commands.
@@ -47,7 +43,6 @@ uv run dense notebook run --help
 ```
 
 ### Config resolution
-This section defines how DenseGen resolves config paths when `-c/--config` is present or omitted.
 
 - `-c, --config PATH` is supported globally and on command groups.
 - If `--config` is omitted, DenseGen resolves config in this order:
