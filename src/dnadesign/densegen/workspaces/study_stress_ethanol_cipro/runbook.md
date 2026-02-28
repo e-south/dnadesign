@@ -49,8 +49,13 @@ Run this command from the workspace root:
     # pixi run dense run --fresh -c "$CONFIG"
     # Inspect run diagnostics and per-plan library progress.
     pixi run dense inspect run --events --library -c "$CONFIG"
-    # Render DenseGen plots from current run artifacts.
+    # Render DenseGen analysis artifacts from current run outputs.
+    # `dense plot` is the analysis entry point; static plots always render.
+    # Set plots.video.enabled: true in config to also emit a sampled Stage-B showcase video
+    # at outputs/plots/stage_b/all_plans/showcase.mp4.
     pixi run dense plot -c "$CONFIG"
+    # Optional analysis shortcut: render only the Stage-B showcase video artifact.
+    # pixi run dense plot --only dense_array_video_showcase -c "$CONFIG"
     # Generate the run-overview marimo notebook artifact.
     pixi run dense notebook generate -c "$CONFIG"
     # Validate the generated notebook before opening or sharing it.

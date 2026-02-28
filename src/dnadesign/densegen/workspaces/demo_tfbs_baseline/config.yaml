@@ -87,3 +87,14 @@ plots:
   out_dir: outputs/plots
   format: pdf
   default: [stage_a_summary, placement_map, run_health, tfbs_usage]
+  # Optional Stage-B showcase video (single all-plan MP4 by default):
+  # video:
+  #   enabled: true
+  #   mode: all_plans_round_robin_single_video
+  #   sampling:
+  #     stride: 5
+  #     max_source_rows: 20000
+  #     max_snapshots: 120
+  #   playback:
+  #     target_duration_sec: 8
+  #     fps: 12

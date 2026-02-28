@@ -230,6 +230,10 @@ Key options:
 - `--absolute`
 - `-c, --config PATH`
 
+Video notes:
+- `--only dense_array_video_showcase` renders only the Stage-B showcase MP4.
+- Setting `plots.video.enabled: true` appends `dense_array_video_showcase` to default plot execution.
+
 ### `dense ls-plots`
 
 Lists available plot names and descriptions.
