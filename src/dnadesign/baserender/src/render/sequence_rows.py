@@ -14,7 +14,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Sequence
+from typing import Mapping, Sequence
 
 import matplotlib
 
@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 from matplotlib.patches import FancyBboxPatch, PathPatch
 from matplotlib.textpath import TextPath
+from matplotlib.ticker import MaxNLocator
 from matplotlib.transforms import Affine2D
 
 from ..config import Style
@@ -39,7 +40,15 @@ class SequenceRowsRenderer:
     def render(self, record: Record, style: Style, palette: Palette):
         record = record.validate()
         show_two = bool(style.show_reverse_complement and record.alphabet == "DNA")
-        layout = compute_layout(record, style)
+        fixed_content_radius_px: float | None = None
+        if isinstance(record.meta, Mapping):
+            raw_radius = record.meta.get("fixed_content_radius_px")
+            if raw_radius is not None:
+                try:
+                    fixed_content_radius_px = float(raw_radius)
+                except Exception as exc:
+                    raise RenderingError("record.meta.fixed_content_radius_px must be numeric when set") from exc
+        layout = compute_layout(record, style, fixed_content_radius_px=fixed_content_radius_px)
 
         motif_geometries: list[MotifLogoGeometry] = []
         for effect_index, effect in enumerate(record.effects):
@@ -181,6 +190,8 @@ class SequenceRowsRenderer:
 
         if record.display.overlay_text:
             _draw_overlay(ax, layout, style, record.display.overlay_text)
+        if record.display.trajectory_inset is not None:
+            _draw_trajectory_inset(ax, record.display.trajectory_inset, style)
 
         ax.set_xlim(0, layout.width)
         ax.set_ylim(0, layout.height)
@@ -702,6 +713,59 @@ def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
         zorder=15,
         clip_on=False,
     )
+
+
+def _draw_trajectory_inset(ax, inset, style: Style) -> None:
+    width = 0.22
+    height = 0.14
+    pad_x = 0.05
+    pad_y = 0.10
+    corner = str(inset.corner).strip().lower()
+    if corner == "top_left":
+        x0, y0 = pad_x, 1.0 - pad_y - height
+    elif corner == "top_right":
+        x0, y0 = 1.0 - pad_x - width, 1.0 - pad_y - height
+    elif corner == "bottom_left":
+        x0, y0 = pad_x, pad_y
+    else:
+        x0, y0 = 1.0 - pad_x - width, pad_y
+
+    inset_ax = ax.inset_axes([x0, y0, width, height], transform=ax.transAxes, zorder=5.4)
+    inset_ax.set_facecolor("#ffffff")
+    inset_ax.patch.set_alpha(0.72)
+    for spine_name, spine in inset_ax.spines.items():
+        if spine_name in {"top", "right"}:
+            spine.set_visible(False)
+            continue
+        spine.set_color("#d1d5db")
+        spine.set_linewidth(0.8)
+
+    x = tuple(float(v) for v in inset.x)
+    y = tuple(float(v) for v in inset.y)
+    inset_ax.plot(x, y, color="#475569", lw=1.6, zorder=1)
+    point_index = int(inset.point_index)
+    inset_ax.scatter([x[point_index]], [y[point_index]], color="#dc2626", s=18, zorder=2)
+    inset_ax.grid(True, alpha=0.2, lw=0.5, color="#9ca3af")
+    inset_ax.set_xlabel("Sweep", fontsize=max(6, int(style.font_size_label) - 7), color="#334155", labelpad=1.5)
+    inset_ax.set_ylabel("Best score", fontsize=max(6, int(style.font_size_label) - 7), color="#334155", labelpad=1.5)
+    inset_ax.xaxis.set_label_coords(0.5, -0.13)
+    inset_ax.yaxis.set_label_coords(-0.14, 0.5)
+    inset_ax.xaxis.label.set_clip_on(False)
+    inset_ax.yaxis.label.set_clip_on(False)
+    inset_ax.xaxis.label.set_zorder(6.0)
+    inset_ax.yaxis.label.set_zorder(6.0)
+    inset_ax.tick_params(
+        axis="both",
+        labelsize=max(5, int(style.font_size_label) - 9),
+        colors="#475569",
+        length=2.0,
+        pad=2.5,
+    )
+    inset_ax.xaxis.set_major_locator(MaxNLocator(nbins=3, integer=True, min_n_ticks=2))
+    inset_ax.yaxis.set_major_locator(MaxNLocator(nbins=3, min_n_ticks=2))
+    inset_ax.margins(x=0.05, y=0.16)
+    for label in [*inset_ax.get_xticklabels(), *inset_ax.get_yticklabels()]:
+        label.set_clip_on(False)
 
 
 def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, style: Style) -> None:
