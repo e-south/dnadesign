@@ -53,6 +53,7 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
         label="docs/notify/README.md",
     )
     assert "start a densegen workspace watcher and send to slack" in text
+    assert "start an infer_evo2 workspace watcher and send to slack" in text
     assert "i already have a profile, just validate wiring" in text
     assert "resume failed deliveries from spool" in text
     assert "`notify setup slack` mode contract" in text
@@ -89,3 +90,13 @@ def test_notify_module_readme_is_router_first_and_links_canonical_runbook() -> N
     )
     assert "docs/notify/usr-events.md" in text
     assert "Universal Sequence Record `<dataset>/.events.log`" in text
+
+
+def test_notify_maintainer_docs_use_deps_package_paths_not_removed_monolith() -> None:
+    docs_readme = _read(_repo_root() / "docs" / "notify" / "README.md")
+    module_readme = _read(_repo_root() / "src" / "dnadesign" / "notify" / "README.md")
+
+    assert "src/dnadesign/notify/cli/bindings/deps/" in docs_readme
+    assert "src/dnadesign/notify/cli/bindings/deps/" in module_readme
+    assert "src/dnadesign/notify/cli/bindings/deps.py" not in docs_readme
+    assert "src/dnadesign/notify/cli/bindings/deps.py" not in module_readme
