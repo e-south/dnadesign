@@ -3,27 +3,36 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-02-28
 
-This document is the setup path for new machines. It starts with the shortest runnable install, then adds optional paths for development tools, pixi-managed system binaries, and Linux GPU extras.
+This guide is the first-run setup path for local development and CLI usage. Complete the required path once, then choose optional branches only when you need them.
 
-### Platform support
-Use this table to pick the correct setup path before running commands.
+### Guide structure
+Use this order for progressive setup:
 
-| Environment | Status | Notes |
+1. Confirm your platform lane and version contracts.
+2. Run the required install path and baseline verification.
+3. Add optional branches only after the baseline passes.
+
+### 1) Choose your platform lane
+
+| Environment | Status | Required lane |
 | --- | --- | --- |
-| macOS (`arm64`, `x86_64`) | Supported | Run the quick install path below. |
-| Linux (`x86_64`) | Supported | Primary `uv.lock` target. |
-| Windows 10/11 via WSL2 | Supported | Run all commands inside your WSL Linux shell. |
-| Native Windows (PowerShell/CMD) | Not supported | `pyproject.toml` `tool.uv.environments` and `pixi.toml` platforms do not include Windows. |
+| macOS (`arm64`, `x86_64`) | Supported | Use this guide directly. |
+| Linux (`x86_64`) | Supported | Use this guide directly. |
+| Windows 10/11 via WSL2 | Supported | Run all commands inside the WSL Linux shell. |
+| Native Windows (PowerShell/CMD) | Not supported | Use WSL2 instead. |
 
-### Version contracts
-These versions are constrained by repository configuration and should be treated as installation requirements.
+Reason:
+- `pyproject.toml` `[tool.uv] environments` targets `darwin` and `linux x86_64`.
+- `pixi.toml` `[workspace] platforms` targets `osx-arm64`, `osx-64`, and `linux-64`.
+
+### 2) Confirm version contracts
+Treat these as installation requirements:
 
 - Python: `>=3.12,<3.13` (`pyproject.toml` `[project] requires-python`)
 - uv: `>=0.9.18,<0.10` (`pyproject.toml` `[tool.uv] required-version`)
-- pixi platforms: `osx-arm64`, `osx-64`, `linux-64` (`pixi.toml` `[workspace] platforms`)
 
-### Quick install (Linux/macOS/WSL)
-Run this path first. It sets up a reproducible base environment from committed lockfiles.
+### 3) Required path: install and baseline verify
+Run this full block in order:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -41,16 +50,12 @@ uv run python -c "import dnadesign, pandas, pyarrow; print('ok')"
 uv run usr --help
 ```
 
-### Environment note (matplotlib cache)
-Some CLI help paths import matplotlib. On systems where `~/.matplotlib` is not writable, set `MPLCONFIGDIR` to avoid cache warnings and slower first-run behavior.
+You are done with base installation when:
+- the import check prints `ok`
+- `uv run usr --help` exits successfully
 
-```bash
-# Use a writable cache location for matplotlib-backed CLI commands.
-export MPLCONFIGDIR="${TMPDIR:-/tmp}/matplotlib"
-```
-
-### Optional dev-tool setup
-Install this only when you will run lint/test commands locally.
+### 4) Optional branch: development tools
+Run this only when you will lint or test locally.
 
 ```bash
 uv sync --locked --group dev
@@ -58,29 +63,35 @@ uv run ruff --version
 uv run pytest --version
 ```
 
-### Optional pixi system dependencies
-Use this when workflows need system binaries such as MEME/FIMO.
+### 5) Optional branch: system binaries with pixi
+Run this only when a workflow needs pixi-managed tools such as MEME/FIMO.
 
 ```bash
 pixi install --locked
 pixi run cruncher -- doctor -c src/dnadesign/cruncher/workspaces/demo_pairwise/configs/config.yaml
 ```
 
-### Optional GPU extra (`infer-evo2`)
-This extra is Linux `x86_64` only.
+Dependency maintenance operations (add/update/remove) are documented in **[docs/dependencies.md](dependencies.md)**.
+
+### 6) Optional branch: GPU extra (`infer-evo2`)
+This branch is Linux `x86_64` only.
 
 ```bash
 uv sync --locked --extra infer-evo2
 ```
 
-### BU SCC links
-This section points to the canonical BU SCC setup docs.
+### 7) Troubleshooting quick checks
+Use these checks before deeper debugging:
 
-- **[BU SCC quickstart](bu-scc/quickstart.md)**
-- **[BU SCC install bootstrap](bu-scc/install.md)**
-- **[BU SCC batch plus Notify runbook](bu-scc/batch-notify.md)**
+- If `uv` is not found after install, start a new shell and rerun `uv --version`.
+- If matplotlib cache warnings appear, set `MPLCONFIGDIR` to a writable path:
 
-### System dependencies note
-This section keeps installation concise and defers pixi specifics to the canonical dependency doc.
+```bash
+export MPLCONFIGDIR="${TMPDIR:-/tmp}/matplotlib"
+```
 
-System dependencies managed with pixi are documented in **[docs/dependencies.md](dependencies.md)**.
+- If you are on Windows, confirm commands are running inside WSL2 (`uname -a` should report Linux).
+
+### 8) Next paths by goal
+- For workflow execution paths, use [docs/README.md](README.md).
+- For BU SCC workflows, use [BU SCC quickstart](bu-scc/quickstart.md), [BU SCC install bootstrap](bu-scc/install.md), and [BU SCC batch plus Notify runbook](bu-scc/batch-notify.md).
