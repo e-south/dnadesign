@@ -1,7 +1,7 @@
 ## DenseGen TFBS baseline tutorial
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-02-28
 
 
 This tutorial runs the smallest DenseGen workflow with binding-site inputs and local parquet outputs.
@@ -60,29 +60,43 @@ densegen:
 
 ### Step-by-step commands
 
+Set workspace-local paths first so each command resolves against the same config.
+
 ```bash
 # Enter the workspace directory so relative paths resolve correctly.
 cd src/dnadesign/densegen/workspaces/demo_tfbs_baseline
 # Pin config path for repeated CLI calls.
 CONFIG="$PWD/config.yaml"
+```
 
+Run generation first, then inspect progress before rendering analysis artifacts.
+
+```bash
 # Validate config schema and probe solver availability.
 uv run dense validate-config --probe-solver -c "$CONFIG"
 # Start a fresh run from a clean output state.
 uv run dense run --fresh --no-plot -c "$CONFIG"
 # Inspect run diagnostics and per-plan library progress.
 uv run dense inspect run --events --library -c "$CONFIG"
+```
+
+Render plots and notebook outputs only after the run passes validation and inspection.
+
+```bash
 # Render DenseGen analysis artifacts from current run outputs.
 # `dense plot` is the analysis entry point; static plots always render.
 # Set plots.video.enabled: true in config to also emit a sampled Stage-B showcase video
 # at outputs/plots/stage_b/all_plans/showcase.mp4.
 uv run dense plot -c "$CONFIG"
-# Optional analysis shortcut: render only the Stage-B showcase video artifact.
-# uv run dense plot --only dense_array_video_showcase -c "$CONFIG"
 # Generate the run-overview marimo notebook artifact.
 uv run dense notebook generate -c "$CONFIG"
 # Run notebook validation before opening or sharing it.
 uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
+```
+
+```bash
+# Optional analysis shortcut: render only the Stage-B showcase video artifact.
+# uv run dense plot --only dense_array_video_showcase -c "$CONFIG"
 ```
 
 ### If outputs already exist (analysis-only)

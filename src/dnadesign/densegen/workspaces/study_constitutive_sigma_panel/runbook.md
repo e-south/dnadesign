@@ -9,8 +9,8 @@
 **Purpose**
 - Run the constitutive sigma70 panel with fixed-element expansion and plot/notebook outputs from one workspace.
 
-**Sigma70 Literal Source**
-- Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors. DOI: 10.1038/s41467-017-02473-5 | https://www.nature.com/articles/s41467-017-02473-5
+**σ70 promoter context**
+- This workspace composes constitutive σ70 promoters by pairing RNAP -35/-10 site literals from [Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors](https://www.nature.com/articles/s41467-017-02473-5) (DOI: [10.1038/s41467-017-02473-5](https://doi.org/10.1038/s41467-017-02473-5)).
 
 **Runbook command**
 

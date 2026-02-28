@@ -1,10 +1,7 @@
 ## DenseGen documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
-
-
-This directory is the DenseGen documentation index. Start here, then open the workflow or reference page you need.
+**Last verified:** 2026-02-28
 
 ### Documentation by workflow
 

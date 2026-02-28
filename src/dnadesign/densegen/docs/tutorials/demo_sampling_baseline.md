@@ -1,7 +1,7 @@
 ## DenseGen sampling baseline tutorial
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-02-28
 
 
 This tutorial runs the sampling baseline with PWM artifacts, Stage-A mining, Stage-B generation, and dual-sink outputs.
@@ -70,6 +70,8 @@ inputs:
 
 ### Step-by-step commands
 
+Start by pinning workspace-local paths used across the run.
+
 ```bash
 # Enter the workspace directory so relative paths resolve correctly.
 cd src/dnadesign/densegen/workspaces/demo_sampling_baseline
@@ -79,7 +81,11 @@ CONFIG="$PWD/config.yaml"
 USR_REGISTRY="$PWD/outputs/usr_datasets/registry.yaml"
 # Resolve repo-level baseline USR registry path.
 ROOT_REGISTRY="$(git rev-parse --show-toplevel)/src/dnadesign/usr/datasets/registry.yaml"
+```
 
+Seed the workspace-local USR registry once so downstream USR output writes are deterministic.
+
+```bash
 # Seed a workspace-local USR registry when one is not present.
 if [ ! -f "$USR_REGISTRY" ]; then
   # Create the target directory if it does not already exist.
@@ -87,7 +93,11 @@ if [ ! -f "$USR_REGISTRY" ]; then
   # Copy baseline artifacts into the workspace-local location.
   cp "$ROOT_REGISTRY" "$USR_REGISTRY"
 fi
+```
 
+Validate dependencies and run generation before rendering analysis artifacts.
+
+```bash
 # Verify FIMO is available before PWM-backed sampling/validation.
 pixi run fimo --version
 # Validate config schema and probe solver availability.
@@ -96,17 +106,25 @@ pixi run dense validate-config --probe-solver -c "$CONFIG"
 pixi run dense run --fresh --no-plot -c "$CONFIG"
 # Inspect run diagnostics and per-plan library progress.
 pixi run dense inspect run --events --library -c "$CONFIG"
+```
+
+Render plots and notebook outputs after the generation pass succeeds.
+
+```bash
 # Render DenseGen analysis artifacts from current run outputs.
 # `dense plot` is the analysis entry point; static plots always render.
 # Set plots.video.enabled: true in config to also emit a sampled Stage-B showcase video
 # at outputs/plots/stage_b/all_plans/showcase.mp4.
 pixi run dense plot -c "$CONFIG"
-# Optional analysis shortcut: render only the Stage-B showcase video artifact.
-# pixi run dense plot --only dense_array_video_showcase -c "$CONFIG"
 # Generate the run-overview marimo notebook artifact.
 pixi run dense notebook generate -c "$CONFIG"
 # Run notebook validation before opening or sharing it.
 uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
+```
+
+```bash
+# Optional analysis shortcut: render only the Stage-B showcase video artifact.
+# pixi run dense plot --only dense_array_video_showcase -c "$CONFIG"
 ```
 
 ### If outputs already exist (analysis-only)

@@ -29,9 +29,10 @@ WORKSPACE_IDS = (
     "study_stress_ethanol_cipro",
 )
 SIGMA70_LITERAL_SOURCE_CITATION = (
-    "Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors. "
-    "DOI: 10.1038/s41467-017-02473-5 | https://www.nature.com/articles/s41467-017-02473-5"
+    "Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors"
 )
+SIGMA70_DOI = "10.1038/s41467-017-02473-5"
+SIGMA70_NATURE_URL = "https://www.nature.com/articles/s41467-017-02473-5"
 
 
 def _read(path: Path) -> str:
@@ -182,7 +183,7 @@ def test_densegen_docs_are_reachable_from_docs_entry() -> None:
 
 def test_densegen_agents_points_to_docs_entry() -> None:
     content = _read(ROOT / "AGENTS.md")
-    assert "src/dnadesign/densegen/docs/README.md" in content
+    assert "[Docs index by workflow](docs/README.md)" in content
 
 
 def test_densegen_docs_use_plain_direct_language() -> None:
@@ -215,7 +216,9 @@ def test_sigma70_literal_docs_include_source_citation() -> None:
     )
     for path in targets:
         content = _read(path)
-        assert SIGMA70_LITERAL_SOURCE_CITATION in content, f"{path}: missing sigma70 literal source citation"
+        assert SIGMA70_LITERAL_SOURCE_CITATION in content, f"{path}: missing sigma70 source title"
+        assert SIGMA70_DOI in content, f"{path}: missing sigma70 source DOI"
+        assert SIGMA70_NATURE_URL in content, f"{path}: missing sigma70 source URL"
 
 
 def test_outputs_reference_documents_strict_notebook_render_contract() -> None:
