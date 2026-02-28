@@ -154,6 +154,39 @@ def test_select_chain_rows_rejects_negative_chain_or_sweep() -> None:
         select_chain_rows(frame, config=cfg)
 
 
+def test_select_chain_rows_requires_phase_column_for_scope_filtering() -> None:
+    frame = pd.DataFrame(
+        {
+            "chain": [0, 0, 1, 1],
+            "sweep": [0, 1, 0, 1],
+            "objective_scalar": [0.2, 0.3, 0.4, 1.1],
+        }
+    )
+    cfg = AnalysisTrajectoryVideoConfig(selection={"phase_scope": "draw_only"})
+    with np.testing.assert_raises_regex(
+        ValueError,
+        "requires trajectory column 'phase'",
+    ):
+        select_chain_rows(frame, config=cfg)
+
+
+def test_select_chain_rows_rejects_non_finite_chain_sweep_or_objective_values() -> None:
+    frame = pd.DataFrame(
+        {
+            "chain": [0, np.inf, 1],
+            "sweep": [0, 1, 2],
+            "phase": ["draw", "draw", "draw"],
+            "objective_scalar": [0.2, 0.3, np.nan],
+        }
+    )
+    cfg = AnalysisTrajectoryVideoConfig()
+    with np.testing.assert_raises_regex(
+        ValueError,
+        "non-finite chain/sweep/objective values",
+    ):
+        select_chain_rows(frame, config=cfg)
+
+
 def test_select_chain_rows_explicit_chain_must_exist() -> None:
     frame = pd.DataFrame(
         {
@@ -367,3 +400,45 @@ def test_render_chain_trajectory_video_supports_pandas_str_dtype_mode(tmp_path, 
 
     assert out_path.exists()
     assert result["snapshot_count"] >= 2
+
+
+def test_render_chain_trajectory_video_requires_sequence_column(tmp_path) -> None:
+    pwm = PWM(
+        name="lexA",
+        matrix=np.asarray(
+            [
+                [0.7, 0.1, 0.1, 0.1],
+                [0.1, 0.7, 0.1, 0.1],
+                [0.1, 0.1, 0.7, 0.1],
+                [0.1, 0.1, 0.1, 0.7],
+            ],
+            dtype=float,
+        ),
+    )
+    trajectory_df = pd.DataFrame(
+        {
+            "chain": [0, 0, 0],
+            "sweep": [0, 1, 2],
+            "phase": ["draw", "draw", "draw"],
+            "objective_scalar": [0.2, 0.4, 0.6],
+        }
+    )
+    cfg = AnalysisTrajectoryVideoConfig(
+        playback={"target_duration_sec": 4.0, "fps": 8},
+        limits={"max_total_frames": 32, "max_snapshots": 16, "max_estimated_render_sec": 30.0},
+    )
+    with np.testing.assert_raises_regex(
+        ValueError,
+        "requires trajectory column 'sequence'",
+    ):
+        render_chain_trajectory_video(
+            trajectory_df=trajectory_df,
+            tf_names=["lexA"],
+            pwms={"lexA": pwm},
+            out_path=tmp_path / "video.mp4",
+            config=cfg,
+            bidirectional=True,
+            pwm_pseudocounts=0.0,
+            log_odds_clip=None,
+            tmp_root=tmp_path / "_tmp",
+        )

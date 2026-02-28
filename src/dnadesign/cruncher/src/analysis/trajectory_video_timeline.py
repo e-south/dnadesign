@@ -20,18 +20,21 @@ from dnadesign.cruncher.config.schema_v3 import AnalysisTrajectoryVideoConfig
 
 
 def _best_update_indices(values: np.ndarray) -> list[int]:
-    updates: list[int] = []
-    best = float("-inf")
-    for idx, raw in enumerate(values.tolist()):
-        value = float(raw)
-        if not math.isfinite(value):
-            continue
-        if value > best + 1.0e-12:
-            updates.append(int(idx))
-            best = value
+    sequence = np.asarray(values, dtype=float)
+    if sequence.size == 0:
+        return []
+
+    finite = np.isfinite(sequence)
+    safe = np.where(finite, sequence, -np.inf)
+    running_best = np.maximum.accumulate(safe)
+    previous_best = np.empty_like(running_best)
+    previous_best[0] = -np.inf
+    previous_best[1:] = running_best[:-1]
+    updates = np.flatnonzero(finite & (safe > (previous_best + 1.0e-12))).astype(int).tolist()
+
     if not updates:
         updates = [0]
-    last = int(values.size - 1)
+    last = int(sequence.size - 1)
     if last not in updates:
         updates.append(last)
     return updates
@@ -71,7 +74,7 @@ def filter_rows_by_phase_scope(
     if trajectory_df.empty:
         return trajectory_df
     if "phase" not in trajectory_df.columns:
-        return trajectory_df
+        raise ValueError("Trajectory video requires trajectory column 'phase' for phase_scope filtering.")
     phase = trajectory_df["phase"].astype(str).str.strip().str.lower()
     has_tune = bool((phase == "tune").any())
     if phase_scope == "draw_only":
@@ -123,6 +126,9 @@ def select_chain_rows(
     rows = rows.dropna(subset=["chain", "sweep", objective_column])
     if rows.empty:
         raise ValueError("Trajectory video has no rows with numeric chain/sweep/objective values.")
+    numeric = rows[["chain", "sweep", objective_column]].to_numpy(dtype=float, copy=False)
+    if not bool(np.isfinite(numeric).all()):
+        raise ValueError("Trajectory video rows contain non-finite chain/sweep/objective values.")
     rows["chain"] = rows["chain"].astype(int)
     rows["sweep"] = rows["sweep"].astype(int)
     if bool((rows["chain"] < 0).any()) or bool((rows["sweep"] < 0).any()):
@@ -142,16 +148,10 @@ def select_chain_rows(
             raise ValueError(f"Trajectory video explicit chain {explicit + 1} was not found in trajectory rows.")
         return chain_rows.reset_index(drop=True), explicit
 
-    best_chain = None
-    best_score = float("-inf")
-    grouped = rows.groupby("chain", sort=True, dropna=False)
-    for chain_id, chain_rows in grouped:
-        chain_best = float(chain_rows[objective_column].max())
-        if chain_best > best_score + 1.0e-12:
-            best_score = chain_best
-            best_chain = int(chain_id)
-    if best_chain is None:
+    best_by_chain = rows.groupby("chain", sort=True, dropna=False)[objective_column].max()
+    if best_by_chain.empty:
         raise ValueError("Trajectory video could not select a best chain.")
+    best_chain = int(best_by_chain.idxmax())
     selected = rows.loc[rows["chain"] == best_chain].copy()
     if selected.empty:
         raise ValueError("Trajectory video selected chain has no rows.")

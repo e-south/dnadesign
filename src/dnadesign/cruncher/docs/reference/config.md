@@ -385,6 +385,7 @@ Notes:
   - default timeline is `best_so_far` on the selected chain (`selection.chain_policy=best`), which produces monotonic objective progression in frame-to-frame motif snapshots.
   - `timeline_mode=raw_chain` renders sweep-ordered sampled states directly.
   - tune rows are eligible by default (`phase_scope=tune_and_draw_if_present`) to show early bad-to-good progression when tune rows exist.
+  - trajectory rows must include `phase` and `sequence`; video generation fails fast when either column is missing.
   - guardrails are strict by schema: bounded duration, bounded fps, bounded frame/snapshot caps, and fail-fast budget checks (no unbounded video generation).
   - `playback.pause_on_best_update_sec` is opt-in; default is `0.0` (no pause events).
 - Required analysis plots fail fast on plotting/data contract errors (`elite_score_space_context`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`); only explicitly optional plots can be skipped by policy.

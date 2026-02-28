@@ -78,6 +78,8 @@ def render_chain_trajectory_video(
 ) -> dict[str, object]:
     if not tf_names:
         raise ValueError("Trajectory video requires at least one TF name.")
+    if "sequence" not in trajectory_df.columns:
+        raise ValueError("Trajectory video requires trajectory column 'sequence'.")
     missing_pwms = [tf for tf in tf_names if tf not in pwms]
     if missing_pwms:
         raise ValueError(f"Trajectory video missing PWMs for TFs: {missing_pwms}")
