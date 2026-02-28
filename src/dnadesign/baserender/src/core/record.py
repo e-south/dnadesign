@@ -11,8 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
-from typing import Mapping
+from typing import Mapping, Sequence
 
 from .contracts import ensure
 from .errors import AlphabetError, ContractError
@@ -89,9 +90,72 @@ class Effect:
 
 
 @dataclass(frozen=True)
+class TrajectoryInset:
+    x: tuple[float, ...]
+    y: tuple[float, ...]
+    point_index: int
+    corner: str = "top_right"
+    label: str | None = None
+
+    def validate(self) -> "TrajectoryInset":
+        ensure(len(self.x) >= 2, "display.trajectory_inset.x must contain at least 2 points")
+        ensure(len(self.y) == len(self.x), "display.trajectory_inset.y must match display.trajectory_inset.x length")
+        ensure(
+            isinstance(self.point_index, int) and 0 <= self.point_index < len(self.x),
+            "display.trajectory_inset.point_index is out of bounds",
+        )
+        ensure(
+            str(self.corner).strip().lower() in {"top_left", "top_right", "bottom_left", "bottom_right"},
+            "display.trajectory_inset.corner must be top_left|top_right|bottom_left|bottom_right",
+        )
+        if self.label is not None:
+            ensure(
+                isinstance(self.label, str) and self.label.strip() != "",
+                "display.trajectory_inset.label must be a non-empty string when set",
+            )
+        for idx, value in enumerate(self.x):
+            ensure(
+                isinstance(value, (int, float)) and math.isfinite(float(value)),
+                f"display.trajectory_inset.x[{idx}] must be finite numeric",
+            )
+        for idx, value in enumerate(self.y):
+            ensure(
+                isinstance(value, (int, float)) and math.isfinite(float(value)),
+                f"display.trajectory_inset.y[{idx}] must be finite numeric",
+            )
+        return self
+
+    @staticmethod
+    def from_mapping(raw: Mapping[str, object]) -> "TrajectoryInset":
+        x_raw = raw.get("x")
+        y_raw = raw.get("y")
+        point_index_raw = raw.get("point_index")
+        ensure(
+            isinstance(x_raw, Sequence) and not isinstance(x_raw, (str, bytes)),
+            "display.trajectory_inset.x must be a list",
+        )
+        ensure(
+            isinstance(y_raw, Sequence) and not isinstance(y_raw, (str, bytes)),
+            "display.trajectory_inset.y must be a list",
+        )
+        ensure(point_index_raw is not None, "display.trajectory_inset.point_index is required")
+        corner = str(raw.get("corner", "top_right"))
+        label_raw = raw.get("label")
+        label = None if label_raw is None else str(label_raw)
+        return TrajectoryInset(
+            x=tuple(float(v) for v in x_raw),
+            y=tuple(float(v) for v in y_raw),
+            point_index=int(point_index_raw),
+            corner=corner,
+            label=label,
+        ).validate()
+
+
+@dataclass(frozen=True)
 class Display:
     overlay_text: str | None = None
     tag_labels: Mapping[str, str] = field(default_factory=dict)
+    trajectory_inset: TrajectoryInset | None = None
 
     def validate(self) -> "Display":
         ensure(isinstance(self.tag_labels, Mapping), "display.tag_labels must be a mapping/dict")
@@ -100,6 +164,12 @@ class Display:
             ensure(isinstance(v, str) and v.strip() != "", "display.tag_labels values must be non-empty strings")
         if self.overlay_text is not None:
             ensure(isinstance(self.overlay_text, str), "display.overlay_text must be a string or null")
+        if self.trajectory_inset is not None:
+            ensure(
+                isinstance(self.trajectory_inset, TrajectoryInset),
+                "display.trajectory_inset must be a trajectory inset object or null",
+            )
+            self.trajectory_inset.validate()
         return self
 
 

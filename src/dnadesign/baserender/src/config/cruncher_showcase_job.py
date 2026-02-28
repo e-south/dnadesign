@@ -102,6 +102,9 @@ class VideoOutputCfg:
     height_px: int | None
     aspect_ratio: float | None
     total_duration: float | None
+    title_text: str | None = None
+    title_font_size: int | None = None
+    title_align: str = "center"
 
 
 OutputCfg = ImagesOutputCfg | VideoOutputCfg
@@ -503,6 +506,9 @@ def _parse_outputs(job_path: Path, results_root: Path, raw: Any) -> tuple[Output
                 "height_px",
                 "aspect",
                 "total_duration",
+                "title_text",
+                "title_font_size",
+                "title_align",
             },
             f"outputs[{i}]",
         )
@@ -541,6 +547,19 @@ def _parse_outputs(job_path: Path, results_root: Path, raw: Any) -> tuple[Output
         if total_duration is not None:
             ensure(total_duration > 0, f"outputs[{i}].total_duration must be > 0", SchemaError)
 
+        title_text_raw = data.get("title_text")
+        title_text = None if title_text_raw is None else str(title_text_raw).strip()
+        if title_text == "":
+            title_text = None
+
+        title_font_size_raw = data.get("title_font_size")
+        title_font_size = None if title_font_size_raw is None else int(title_font_size_raw)
+        if title_font_size is not None:
+            ensure(title_font_size >= 6, f"outputs[{i}].title_font_size must be >= 6", SchemaError)
+
+        title_align = str(data.get("title_align", "center")).strip().lower()
+        require_one_of(title_align, {"left", "center", "right"}, f"outputs[{i}].title_align")
+
         raw_path = data.get("path")
         out_path = _resolve_output_file(job_path, results_root, None if raw_path is None else str(raw_path))
 
@@ -556,6 +575,9 @@ def _parse_outputs(job_path: Path, results_root: Path, raw: Any) -> tuple[Output
                 height_px=height_px,
                 aspect_ratio=aspect_ratio,
                 total_duration=total_duration,
+                title_text=title_text,
+                title_font_size=title_font_size,
+                title_align=title_align,
             )
         )
 

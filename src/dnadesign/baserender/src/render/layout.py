@@ -430,7 +430,13 @@ def assign_motif_logo_lanes(
     return lane_by_effect, above_by_effect, up_count, dn_count
 
 
-def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) -> LayoutContext:
+def compute_layout(
+    record: Record,
+    style: Style,
+    *,
+    fixed_n: int | None = None,
+    fixed_content_radius_px: float | None = None,
+) -> LayoutContext:
     cell = measure_char_cell(style.font_mono, style.font_size_seq, style.dpi)
     cw, ch = cell.width, cell.height
     n = len(record.sequence) if fixed_n is None else max(len(record.sequence), int(fixed_n))
@@ -595,6 +601,11 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
     top_extent = raw_content_top - centerline_base
     bottom_extent = centerline_base - raw_content_bottom
     content_radius = max(top_extent, bottom_extent)
+    if fixed_content_radius_px is not None:
+        fixed_radius = float(fixed_content_radius_px)
+        if not math.isfinite(fixed_radius) or fixed_radius <= 0:
+            raise BoundsError("fixed_content_radius_px must be finite and > 0")
+        content_radius = max(content_radius, fixed_radius)
     content_bottom_raw = centerline_base - content_radius
     content_top_raw = centerline_base + content_radius
     outer_pad = style.layout.outer_pad_cells * ch

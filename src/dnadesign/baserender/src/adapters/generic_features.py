@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from ..core import ContractError, Record, SchemaError, Span, reject_unknown_keys
-from ..core.record import Display, Effect, Feature
+from ..core.record import Display, Effect, Feature, TrajectoryInset
 
 
 def _to_mapping(value: Any, *, ctx: str) -> Mapping[str, Any]:
@@ -123,7 +123,7 @@ class GenericFeaturesAdapter:
         if raw is None:
             return Display()
         display = _to_mapping(raw, ctx="display")
-        reject_unknown_keys(display, {"overlay_text", "tag_labels"}, "display")
+        reject_unknown_keys(display, {"overlay_text", "tag_labels", "trajectory_inset"}, "display")
 
         overlay = display.get("overlay_text")
         if overlay is not None:
@@ -136,7 +136,18 @@ class GenericFeaturesAdapter:
             raise SchemaError("display.tag_labels must be a mapping")
         tag_labels = {str(k): str(v) for k, v in tag_labels_raw.items()}
 
-        return Display(overlay_text=overlay, tag_labels=tag_labels)
+        trajectory_inset_raw = display.get("trajectory_inset")
+        trajectory_inset = None
+        if trajectory_inset_raw is not None:
+            inset_mapping = _to_mapping(trajectory_inset_raw, ctx="display.trajectory_inset")
+            reject_unknown_keys(
+                inset_mapping,
+                {"x", "y", "point_index", "corner", "label"},
+                "display.trajectory_inset",
+            )
+            trajectory_inset = TrajectoryInset.from_mapping(inset_mapping)
+
+        return Display(overlay_text=overlay, tag_labels=tag_labels, trajectory_inset=trajectory_inset)
 
     def apply(self, row: dict, *, row_index: int) -> Record:
         seq_col = str(self.columns.get("sequence"))
