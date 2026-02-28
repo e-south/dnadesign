@@ -1,7 +1,7 @@
 ## BU SCC Quickstart: dnadesign (Interactive -> Batch -> Notify)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-02-28
 
 ### At a glance
 
@@ -26,6 +26,7 @@
 - [4) Load modules](#4-load-modules)
 - [5) Sync dependencies](#5-sync-dependencies)
 - [6) Smoke tests](#6-smoke-tests)
+- [6.5) Submission pressure gate (status-first)](#65-submission-pressure-gate-status-first)
 - [7) Submit first jobs](#7-submit-first-jobs)
 - [8) Add Notify](#8-add-notify)
 
@@ -120,6 +121,36 @@ PY
 
 For extended TE/FlashAttention/Evo2 checks:
 [BU SCC Install bootstrap: Smoke tests](install.md#6-smoke-tests)
+
+### 6.5) Submission pressure gate (status-first)
+
+Run this check before new batch submissions:
+
+```bash
+qstat -u "$USER"
+qstat -u "$USER" | awk '
+  $1 ~ /^[0-9]+$/ {
+    state=$5
+    if (state ~ /r/) running++
+    if (state ~ /q/) queued++
+    if (state ~ /Eqw/) eqw++
+  }
+  END { printf "running_jobs=%d queued_jobs=%d eqw_jobs=%d\n", running, queued, eqw }
+'
+```
+
+Queue-fair submit policy:
+- if `running_jobs > 3`, do not burst-submit many independent jobs
+- prefer arrays (`qsub -t`) for independent fanout
+- prefer dependency chains (`-hold_jid`) when order is required
+- respect the queue and do not skip the line
+
+Ordered-chain example:
+
+```bash
+JOB_A="$(qsub -terse -P <project> docs/bu-scc/jobs/densegen-cpu.qsub)"
+qsub -P <project> -hold_jid "$JOB_A" docs/bu-scc/jobs/densegen-cpu.qsub
+```
 
 ### 7) Submit first jobs
 

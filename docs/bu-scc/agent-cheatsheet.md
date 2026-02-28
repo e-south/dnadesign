@@ -111,3 +111,22 @@ qstat -u "$USER"
 qstat -j <job_id>
 tail -f outputs/logs/<job_name>.<job_id>.out
 ```
+
+### Submission pressure quick check
+
+```bash
+qstat -u "$USER" | awk '
+  $1 ~ /^[0-9]+$/ {
+    state=$5
+    if (state ~ /r/) running++
+    if (state ~ /q/) queued++
+    if (state ~ /Eqw/) eqw++
+  }
+  END { printf "running_jobs=%d queued_jobs=%d eqw_jobs=%d\n", running, queued, eqw }
+'
+```
+
+- if `running_jobs > 3`, avoid burst submits and confirm before adding jobs
+- choose `qsub -t` arrays for independent workloads
+- choose `-hold_jid` chains for ordered stages
+- respect the queue and do not skip the line
