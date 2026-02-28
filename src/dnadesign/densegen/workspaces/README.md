@@ -33,3 +33,16 @@ From inside a packaged workspace:
 
 `runbook.sh` executes the same sequence documented in `runbook.md` step-by-step commands.
 Packaged runbooks share the helper at `_shared/runbook_lib.sh` so command sequencing, preflight checks, and failure diagnostics stay aligned across demo/study workspaces.
+
+### Optional Stage-B Showcase Video
+Enable this in a workspace `config.yaml` under `plots`:
+
+```yaml
+plots:
+  video:
+    enabled: true  # opt in to video rendering
+    mode: all_plans_round_robin_single_video  # single round-robin MP4 across plans
+```
+
+Then run `dense plot` (or `dense plot --only dense_array_video_showcase`) to produce:
+`outputs/plots/stage_b/all_plans/showcase.mp4`.

@@ -72,7 +72,11 @@ def _with_overlay(record: Record, text: str | None) -> Record:
         sequence=record.sequence,
         features=record.features,
         effects=record.effects,
-        display=Display(overlay_text=text, tag_labels=dict(record.display.tag_labels)),
+        display=Display(
+            overlay_text=text,
+            tag_labels=dict(record.display.tag_labels),
+            trajectory_inset=record.display.trajectory_inset,
+        ),
         meta=dict(record.meta),
     ).validate()
 

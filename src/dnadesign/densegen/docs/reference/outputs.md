@@ -261,8 +261,11 @@ Core diagnostics plots:
   intermittent attempt-index ticks, and optional block guides for long runs.
 - `tfbs_usage` — TFBS usage diagnostics from accepted placements: specific TFBS rank-count curve
   plus a per-regulator rank-share heatmap.
+- `dense_array_video_showcase` — optional Stage-B MP4 montage from sampled accepted outputs.
+  Default video mode is a single all-plan round-robin timeline (`plots.video.mode: all_plans_round_robin_single_video`).
 
 Packaged DenseGen workspaces default to all four core plot families (`stage_a_summary`, `placement_map`, `run_health`, `tfbs_usage`).
+Video output is opt-in via `plots.video.enabled: true`.
 
 `stage_a_summary` consolidates PWM inputs into one image per plot type (one row per input),
 with outputs under `outputs/plots/stage_a/`:
@@ -278,6 +281,10 @@ with outputs under `outputs/plots/stage_a/`:
 
 `tfbs_usage` writes one image into the same plan directory:
 `outputs/plots/stage_b/<plan>/tfbs_usage.pdf` (or under `<input>/` for multi-input plans)
+
+`dense_array_video_showcase` writes one MP4 under:
+- all-plan mode: `outputs/plots/stage_b/all_plans/showcase.mp4`
+- single-plan mode: `outputs/plots/stage_b/<plan>/showcase.mp4`
 
 Stage-B scoping options are strict and per-plot:
 - `plots.options.placement_map.scope: auto|per_plan|per_group`

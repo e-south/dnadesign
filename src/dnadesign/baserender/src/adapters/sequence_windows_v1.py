@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from ..core import ContractError, Record, SchemaError, Span, reject_unknown_keys
-from ..core.record import Display, Effect, Feature
+from ..core.record import Display, Effect, Feature, TrajectoryInset
 
 _RECORD_KEYS = {"id", "sequence", "regulator_windows", "motifs", "display"}
 _SEQUENCE_KEYS = {"sense_5to3", "alphabet"}
@@ -25,7 +25,7 @@ _WINDOW_KEYS = {"window_id", "tf", "span", "strand", "window_seq_5to3", "score",
 _WINDOW_SPAN_KEYS = {"start", "end"}
 _MOTIF_KEYS = {"tf", "motif_ref", "matrix"}
 _MOTIF_REF_KEYS = {"source", "motif_id"}
-_DISPLAY_KEYS = {"title", "overlay_text", "tag_labels"}
+_DISPLAY_KEYS = {"title", "overlay_text", "tag_labels", "trajectory_inset"}
 
 
 def _to_mapping(value: Any, *, ctx: str) -> Mapping[str, Any]:
@@ -106,7 +106,17 @@ class SequenceWindowsV1Adapter:
         overlay_text = None if overlay is None else str(overlay).strip()
         if overlay_text == "":
             overlay_text = None
-        return Display(overlay_text=overlay_text, tag_labels=merged_labels)
+        trajectory_inset_raw = data.get("trajectory_inset")
+        trajectory_inset = None
+        if trajectory_inset_raw is not None:
+            inset_mapping = _to_mapping(trajectory_inset_raw, ctx="display.trajectory_inset")
+            reject_unknown_keys(
+                inset_mapping,
+                {"x", "y", "point_index", "corner", "label"},
+                "display.trajectory_inset",
+            )
+            trajectory_inset = TrajectoryInset.from_mapping(inset_mapping)
+        return Display(overlay_text=overlay_text, tag_labels=merged_labels, trajectory_inset=trajectory_inset)
 
     def _parse_motifs(self, raw: Any, *, ctx: str) -> dict[str, dict[str, object]]:
         if raw is None:

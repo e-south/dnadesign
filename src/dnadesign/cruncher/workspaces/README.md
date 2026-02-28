@@ -79,6 +79,7 @@ cruncher parse --force-overwrite -c "$CONFIG"
 # Generate candidate sequences from parsed motif artifacts.
 cruncher sample --force-overwrite -c "$CONFIG"
 # Compute analysis summaries for generated sequence sets.
+# Optional video output: set analysis.trajectory_video.enabled=true in configs/config.yaml.
 cruncher analyze --summary -c "$CONFIG"
 # Export latest elite sequences for downstream use.
 cruncher export sequences --latest -c "$CONFIG"
@@ -158,6 +159,7 @@ Portfolio source precondition per included workspace run:
 
 ```bash
 # Compute analysis summaries for generated sequence sets.
+# Optional video output: set analysis.trajectory_video.enabled=true in the source workspace config.
 cruncher analyze --summary -c <source_workspace>/configs/config.yaml
 # Export latest elite sequences for downstream use.
 cruncher export sequences --run <source_run_dir> -c <source_workspace>/configs/config.yaml

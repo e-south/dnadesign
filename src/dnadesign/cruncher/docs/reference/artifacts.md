@@ -1,10 +1,10 @@
 ## Cruncher Artifacts Reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-02-28
 
 
-**Last updated by:** cruncher-maintainers on 2026-02-23
+**Last updated by:** cruncher-maintainers on 2026-02-28
 
 ### Contents
 - [Overview](#overview)
@@ -62,6 +62,7 @@ Produces:
 - `analysis/manifests/table_manifest.json`
 - `analysis/tables/table__*.parquet`
 - `plots/*.pdf` (or configured format)
+- `plots/chain_trajectory_video.mp4` (optional, when `analysis.trajectory_video.enabled=true`)
 
 #### `cruncher export sequences`
 Consumes:

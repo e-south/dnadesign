@@ -27,6 +27,7 @@ from ..adapters.outputs import load_records_from_config
 from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
 from ..core.artifacts.pool import POOL_MODE_TFBS, TFBSPoolArtifact, load_pool_artifact
 from ..utils.rich_style import make_panel, make_table
+from .dense_array_video import plot_dense_array_video_showcase
 from .plot_common import (  # noqa: F401
     _apply_style,
     _draw_tier_markers,
@@ -311,6 +312,7 @@ def _load_dense_arrays(run_root: Path, *, columns: Iterable[str] | None = None) 
 
 
 _PLOT_FNS = {
+    "dense_array_video_showcase": plot_dense_array_video_showcase,
     "placement_map": plot_placement_map,
     "tfbs_usage": plot_tfbs_usage,
     "run_health": plot_run_health,
@@ -333,6 +335,7 @@ for _name, _spec in PLOT_SPECS.items():
 
 # Options explicitly supported by each plot; unknown options raise errors (strict).
 _ALLOWED_OPTIONS = {
+    "dense_array_video_showcase": set(),
     "placement_map": {"occupancy_alpha", "occupancy_max_categories", "scope", "max_plans", "drilldown_plans"},
     "tfbs_usage": {"scope", "max_plans", "drilldown_plans"},
     "run_health": set(),
@@ -402,6 +405,7 @@ def _plot_required_sources(selected: Iterable[str]) -> set[str]:
 
 
 _OUTPUT_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
+    "dense_array_video_showcase": {"id", "sequence", "densegen__plan", "densegen__used_tfbs_detail"},
     "placement_map": {"id", "sequence", "densegen__input_name", "densegen__plan"},
     "run_health": {"densegen__compression_ratio", "densegen__plan"},
 }
@@ -611,6 +615,13 @@ def _manifest_path_fields(name: str, rel_path: Path) -> dict:
     fields: dict[str, str] = {"plot_id": str(name)}
     parts = rel_path.parts
     stem = rel_path.stem
+    if name == "dense_array_video_showcase":
+        fields["group"] = "stage_b"
+        fields["family"] = "showcase"
+        if len(parts) >= 2:
+            fields["plan_name"] = parts[1]
+        fields["variant"] = stem
+        return fields
     if name == "stage_a_summary":
         fields["group"] = "stage_a"
         fields["family"] = "stage_a"
@@ -665,6 +676,13 @@ def run_plots_from_config(
     out_dir = _ensure_out_dir(plots_cfg, cfg_path, run_root)
     plot_format = plots_cfg.format if plots_cfg and getattr(plots_cfg, "format", None) else "pdf"
     default_list = plots_cfg.default if (plots_cfg and plots_cfg.default) else ["stage_a_summary", "placement_map"]
+    if (
+        only is None
+        and plots_cfg is not None
+        and bool(plots_cfg.video.enabled)
+        and "dense_array_video_showcase" not in set(default_list)
+    ):
+        default_list = [*list(default_list), "dense_array_video_showcase"]
     selected = _resolve_selected_plot_names(only=only, default_list=list(default_list))
     options = plots_cfg.options if plots_cfg else {}
     global_style = plots_cfg.style if plots_cfg else {}
@@ -805,7 +823,16 @@ def run_plots_from_config(
 
         out_path = out_dir / f"{name}.{plot_format}"
         try:
-            if name == "placement_map":
+            if name == "dense_array_video_showcase":
+                if plots_cfg is None:
+                    raise ValueError("dense_array_video_showcase requires plots.video configuration.")
+                result = fn(
+                    df,
+                    out_path,
+                    video_cfg=plots_cfg.video,
+                    **kwargs,
+                )
+            elif name == "placement_map":
                 placement_dense_arrays_df = dense_arrays_df if dense_arrays_df is not None else df
                 plan_names = (
                     placement_dense_arrays_df["densegen__plan"].astype(str).dropna().unique().tolist()

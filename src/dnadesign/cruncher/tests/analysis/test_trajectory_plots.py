@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <cruncher project>
-src/dnadesign/cruncher/tests/analysis/test_opt_trajectory_plot.py
+src/dnadesign/cruncher/tests/analysis/test_trajectory_plots.py
 
 Validate optimization trajectory scatter and sweep plot semantics and metadata.
 
@@ -16,10 +16,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from dnadesign.cruncher.analysis.plots.opt_trajectory import (
-    plot_chain_trajectory_sweep,
-    plot_elite_score_space_context,
-)
+from dnadesign.cruncher.analysis.plots.trajectory_score_space_plot import plot_elite_score_space_context
+from dnadesign.cruncher.analysis.plots.trajectory_sweep import plot_chain_trajectory_sweep
 
 
 def test_chain_trajectory_scatter_requires_scale_columns(tmp_path: Path) -> None:

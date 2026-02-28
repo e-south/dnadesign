@@ -92,6 +92,82 @@ def test_plots_format_defaults_to_pdf(tmp_path: Path) -> None:
     assert loaded.root.plots.format == "pdf"
 
 
+def test_plots_video_defaults_disabled(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.plots is not None
+    assert loaded.root.plots.video.enabled is False
+    assert loaded.root.plots.video.mode == "all_plans_round_robin_single_video"
+
+
+def test_plots_video_single_plan_requires_name(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "video": {
+            "enabled": True,
+            "mode": "single_plan_single_video",
+        }
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="single_plan_name"):
+        load_config(cfg_path)
+
+
+def test_plots_video_fps_bounds_enforced(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "video": {
+            "enabled": True,
+            "playback": {"fps": 30},
+        }
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="playback.fps"):
+        load_config(cfg_path)
+
+
+def test_plots_video_budget_rejects_over_frame_limit(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "video": {
+            "enabled": True,
+            "playback": {"target_duration_sec": 20, "fps": 20},
+            "limits": {"max_total_frames": 120},
+        }
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="max_total_frames"):
+        load_config(cfg_path)
+
+
+def test_plots_video_output_name_rejects_path_segments(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "video": {
+            "enabled": True,
+            "output_name": "../escape.mp4",
+        }
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="flat filename"):
+        load_config(cfg_path)
+
+
+def test_plots_video_sampling_stride_rejects_zero(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "video": {
+            "enabled": True,
+            "sampling": {"stride": 0},
+        }
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="sampling.stride"):
+        load_config(cfg_path)
+
+
 def test_sampling_defaults_cover_all_regulators_false(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")

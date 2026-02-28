@@ -254,7 +254,7 @@
 - Added scatter metadata fields `elite_unique_coordinates` and `elite_coordinate_collisions` for explicit diagnostics and regression testing.
 - Added a fail-fast uniqueness validation in sampling (`run_set.py`) to raise if duplicate elite sequence keys survive selection/output assembly.
 - Refined `plot__chain_trajectory_scatter` elite rendering for coordinate-collision cases: colliding elites now render as separate markers arranged around the true score coordinate with faint spokes, preventing single-marker information collapse while preserving score-space semantics.
-- Added scatter metadata field `elite_rendered_points` and regression coverage in `test_opt_trajectory_plot.py` to ensure each elite is visually represented even when coordinates collide.
+- Added scatter metadata field `elite_rendered_points` and regression coverage in `test_trajectory_plots.py` to ensure each elite is visually represented even when coordinates collide.
 - Added a diversity-first elite selection surface under `sample.elites.select` with macro knob `diversity` (`0..1`) plus advanced constrained-MMR controls (`distance_metric`, `min_hamming_bp`, `min_core_hamming_bp`, `constraint_policy`, `relax_step_bp`, `relax_min_bp`, `pool_strategy`).
 - Implemented constrained MMR in `core/selection/mmr.py` with deterministic hard-distance feasibility checks, strict/relax policies, hybrid/full/core distance modes, and persisted threshold outcomes (`*_requested`, `*_final`, `relax_steps_used`).
 - Added deterministic full-sequence/core tie handling and expanded MMR metadata (`nearest_distance_core`, `nearest_distance_core_bp`) for better auditability.
