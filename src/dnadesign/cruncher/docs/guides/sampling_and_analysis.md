@@ -198,7 +198,7 @@ Elite selection is aligned with the optimization objective:
 2. Run MMR selection on that pool using `sample.elites.select.diversity` (`0..1`) as the primary quality-vs-diversity control.
 3. Postprocess selected elites with strict hit-window invariants:
    - iterative single-owner nucleotide polish,
-   - contiguous uncovered prefix/suffix trim,
+   - contiguous uncovered-region trim (prefix/suffix always; internal spans when `sample.elites.postprocess.trim_uncovered_internal=true`),
    - final dedupe over standard/full sequence identity.
 4. Return the postprocessed elite set.
 

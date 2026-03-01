@@ -734,9 +734,14 @@ class SampleEliteSelectConfig(StrictBaseModel):
         return v
 
 
+class SampleElitesPostprocessConfig(StrictBaseModel):
+    trim_uncovered_internal: bool = True
+
+
 class SampleElitesConfig(StrictBaseModel):
     k: int = 10
     select: SampleEliteSelectConfig = SampleEliteSelectConfig()
+    postprocess: SampleElitesPostprocessConfig = SampleElitesPostprocessConfig()
 
     @field_validator("k")
     @classmethod

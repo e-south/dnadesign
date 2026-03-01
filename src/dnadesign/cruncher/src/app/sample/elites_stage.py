@@ -306,6 +306,42 @@ def _hits_match_contract(
     return True
 
 
+def _removed_bp_before(*, removed_segments: list[tuple[int, int]], position: int) -> int:
+    removed = 0
+    for start, end in removed_segments:
+        if int(end) <= int(position):
+            removed += int(end) - int(start)
+    return int(removed)
+
+
+def _hits_match_trim_contract(
+    *,
+    per_tf_hits: dict[str, dict[str, object]],
+    expected_windows: dict[str, tuple[int, int, str]],
+    removed_segments: list[tuple[int, int]],
+) -> bool:
+    for tf_name, (expected_start, expected_width, expected_strand) in expected_windows.items():
+        hit = per_tf_hits.get(tf_name)
+        if not isinstance(hit, dict):
+            return False
+        start = hit.get("best_start")
+        width = hit.get("width")
+        strand = hit.get("strand")
+        if not isinstance(start, int) or not isinstance(width, int) or not isinstance(strand, str):
+            return False
+        shifted_expected_start = int(expected_start) - _removed_bp_before(
+            removed_segments=removed_segments,
+            position=int(expected_start),
+        )
+        if int(start) != int(shifted_expected_start):
+            return False
+        if int(width) != int(expected_width):
+            return False
+        if str(strand) != str(expected_strand):
+            return False
+    return True
+
+
 def _hits_match_polish_contract(
     *,
     per_tf_hits: dict[str, dict[str, object]],
@@ -358,6 +394,50 @@ def _candidate_payload(
     min_norm = float(min(norm_map.values())) if norm_map else 0.0
     sum_norm = float(sum(norm_map.values())) if norm_map else 0.0
     return per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm
+
+
+def _uncovered_segments(
+    *,
+    windows: dict[str, tuple[int, int, str]],
+    seq_length: int,
+) -> list[tuple[int, int]]:
+    coverage: list[bool] = [False for _ in range(int(seq_length))]
+    for tf_name, (start, width, _strand) in windows.items():
+        end = int(start) + int(width)
+        if start < 0 or width < 1 or end > int(seq_length):
+            raise ValueError(f"Elite hit window is out of bounds for TF '{tf_name}' during postprocessing.")
+        for pos in range(int(start), int(end)):
+            coverage[pos] = True
+    segments: list[tuple[int, int]] = []
+    idx = 0
+    while idx < int(seq_length):
+        if coverage[idx]:
+            idx += 1
+            continue
+        end = idx + 1
+        while end < int(seq_length) and not coverage[end]:
+            end += 1
+        segments.append((int(idx), int(end)))
+        idx = end
+    return segments
+
+
+def _normalize_removed_segments(
+    *,
+    removed_segments: list[tuple[int, int]],
+    seq_length: int,
+) -> list[tuple[int, int]]:
+    ordered = sorted((int(start), int(end)) for start, end in removed_segments)
+    normalized: list[tuple[int, int]] = []
+    prev_end = -1
+    for start, end in ordered:
+        if start < 0 or end > int(seq_length) or end <= start:
+            raise ValueError("Elite trim segments must be valid non-empty in-bounds ranges.")
+        if start < prev_end:
+            raise ValueError("Elite trim segments must be disjoint and sorted.")
+        normalized.append((int(start), int(end)))
+        prev_end = int(end)
+    return normalized
 
 
 def _remaining_single_owner_polish_improvements(
@@ -433,6 +513,55 @@ def _apply_edge_trim(
     ):
         raise ValueError("Elite edge trim violated hit-window validity contract.")
     candidate.seq_arr = trimmed
+    candidate.per_tf_map = per_tf_map
+    candidate.per_tf_hits = per_tf_hits
+    candidate.norm_map = norm_map
+    candidate.min_norm = float(min_norm)
+    candidate.sum_norm = float(sum_norm)
+
+
+def _apply_uncovered_trim(
+    *,
+    candidate: _EliteCandidate,
+    scorer: Scorer,
+    removed_segments: list[tuple[int, int]],
+) -> None:
+    if not removed_segments:
+        return
+    source = np.asarray(candidate.seq_arr, dtype=np.int8)
+    normalized_segments = _normalize_removed_segments(
+        removed_segments=removed_segments,
+        seq_length=int(source.size),
+    )
+    expected_windows = _hit_window_map(per_tf_hits=candidate.per_tf_hits, scorer=scorer)
+    for tf_name, (start, width, _strand) in expected_windows.items():
+        end = int(start) + int(width)
+        for seg_start, seg_end in normalized_segments:
+            overlap_start = max(int(start), int(seg_start))
+            overlap_end = min(int(end), int(seg_end))
+            if overlap_start < overlap_end:
+                raise ValueError(f"Elite trim segment overlaps hit window for TF '{tf_name}'.")
+    kept_ranges: list[tuple[int, int]] = []
+    cursor = 0
+    for seg_start, seg_end in normalized_segments:
+        if int(cursor) < int(seg_start):
+            kept_ranges.append((int(cursor), int(seg_start)))
+        cursor = int(seg_end)
+    if int(cursor) < int(source.size):
+        kept_ranges.append((int(cursor), int(source.size)))
+    if not kept_ranges:
+        raise ValueError("Elite uncovered trim would remove the full sequence.")
+    trimmed = np.concatenate([source[int(start) : int(end)] for start, end in kept_ranges]).astype(np.int8, copy=False)
+    if int(trimmed.size) < 1:
+        raise ValueError("Elite uncovered trim produced empty sequence.")
+    per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm = _candidate_payload(seq_arr=trimmed, scorer=scorer)
+    if not _hits_match_trim_contract(
+        per_tf_hits=per_tf_hits,
+        expected_windows=expected_windows,
+        removed_segments=normalized_segments,
+    ):
+        raise ValueError("Elite uncovered trim violated hit-window validity contract.")
+    candidate.seq_arr = np.asarray(trimmed, dtype=np.int8)
     candidate.per_tf_map = per_tf_map
     candidate.per_tf_hits = per_tf_hits
     candidate.norm_map = norm_map
@@ -539,11 +668,14 @@ def _postprocess_elite_candidates(
     candidates: list[_EliteCandidate],
     scorer: Scorer,
     dsdna_mode: bool,
+    trim_uncovered_internal: bool = True,
 ) -> tuple[list[_EliteCandidate], dict[str, int]]:
     stats = {
         "polish_edits": 0,
         "trim_left": 0,
         "trim_right": 0,
+        "trim_internal_bp": 0,
+        "trim_internal_segments": 0,
         "dedup_dropped": 0,
     }
     if not candidates:
@@ -563,19 +695,27 @@ def _postprocess_elite_candidates(
         cand.min_norm = float(min_norm)
         cand.sum_norm = float(sum_norm)
         expected_windows = _hit_window_map(per_tf_hits=per_tf_hits, scorer=scorer)
-        starts = [int(start) for start, _width, _strand in expected_windows.values()]
-        ends = [int(start) + int(width) for start, width, _strand in expected_windows.values()]
-        trim_left = min(starts) if starts else 0
-        trim_right = max(0, int(seq_arr.size) - max(ends)) if ends else 0
-        if trim_left > 0 or trim_right > 0:
-            _apply_edge_trim(
+        removed_segments: list[tuple[int, int]] = []
+        for seg_start, seg_end in _uncovered_segments(windows=expected_windows, seq_length=int(seq_arr.size)):
+            segment_bp = int(seg_end) - int(seg_start)
+            if int(seg_start) == 0:
+                removed_segments.append((int(seg_start), int(seg_end)))
+                stats["trim_left"] += int(segment_bp)
+                continue
+            if int(seg_end) == int(seq_arr.size):
+                removed_segments.append((int(seg_start), int(seg_end)))
+                stats["trim_right"] += int(segment_bp)
+                continue
+            if bool(trim_uncovered_internal):
+                removed_segments.append((int(seg_start), int(seg_end)))
+                stats["trim_internal_bp"] += int(segment_bp)
+                stats["trim_internal_segments"] += 1
+        if removed_segments:
+            _apply_uncovered_trim(
                 candidate=cand,
                 scorer=scorer,
-                left_trim=int(trim_left),
-                right_trim=int(trim_right),
+                removed_segments=removed_segments,
             )
-            stats["trim_left"] += int(trim_left)
-            stats["trim_right"] += int(trim_right)
             (
                 trimmed_seq_arr,
                 trimmed_per_tf_map,
@@ -616,6 +756,26 @@ def _postprocess_elite_candidates(
     deduped, dropped = _dedupe_postprocessed_candidates(candidates=candidates, dsdna_mode=bool(dsdna_mode))
     stats["dedup_dropped"] = int(dropped)
     return deduped, stats
+
+
+def _refresh_candidate_combined_scores(
+    *,
+    candidates: list[_EliteCandidate],
+    evaluator: object,
+    beta_softmin_final: float | None,
+) -> None:
+    combine_from_scores = getattr(evaluator, "combined_from_scores", None)
+    if not callable(combine_from_scores):
+        raise ValueError("Evaluator must expose callable combined_from_scores for elite postprocess score refresh.")
+    for cand in candidates:
+        seq_arr = np.asarray(cand.seq_arr, dtype=np.int8)
+        cand.combined_score = float(
+            combine_from_scores(
+                cand.per_tf_map,
+                beta=beta_softmin_final,
+                length=int(seq_arr.size),
+            )
+        )
 
 
 def _write_elite_tables(
@@ -756,6 +916,8 @@ def _build_elites_metadata(
             "polish_edits": int(postprocess_stats.get("polish_edits", 0)),
             "trim_left": int(postprocess_stats.get("trim_left", 0)),
             "trim_right": int(postprocess_stats.get("trim_right", 0)),
+            "trim_internal_bp": int(postprocess_stats.get("trim_internal_bp", 0)),
+            "trim_internal_segments": int(postprocess_stats.get("trim_internal_segments", 0)),
             "dedup_dropped": int(postprocess_stats.get("dedup_dropped", 0)),
         }
     return meta
@@ -888,6 +1050,12 @@ def select_and_persist_elites(
         candidates=kept_elites,
         scorer=scorer,
         dsdna_mode=bool(dsdna_mode),
+        trim_uncovered_internal=bool(sample_cfg.elites.postprocess.trim_uncovered_internal),
+    )
+    _refresh_candidate_combined_scores(
+        candidates=kept_elites,
+        evaluator=evaluator,
+        beta_softmin_final=beta_softmin_final,
     )
     if postprocess_stats["polish_edits"] > 0:
         run_logger("Elite polish edits applied: %d", int(postprocess_stats["polish_edits"]))
@@ -896,6 +1064,12 @@ def select_and_persist_elites(
             "Elite edge trim applied across elites: left=%d right=%d",
             int(postprocess_stats["trim_left"]),
             int(postprocess_stats["trim_right"]),
+        )
+    if postprocess_stats["trim_internal_segments"] > 0:
+        run_logger(
+            "Elite internal trim applied across elites: segments=%d bp=%d",
+            int(postprocess_stats["trim_internal_segments"]),
+            int(postprocess_stats["trim_internal_bp"]),
         )
     if postprocess_stats["dedup_dropped"] > 0:
         run_logger("Elite dedup dropped %d postprocessed duplicates.", int(postprocess_stats["dedup_dropped"]))

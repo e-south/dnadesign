@@ -121,6 +121,8 @@ cruncher:
       select:
         diversity: 0.05
         pool_size: 32000
+      postprocess:
+        trim_uncovered_internal: true
     moves:
       profile: balanced
       overrides:
