@@ -26,6 +26,7 @@ from dnadesign.cruncher.analysis.diversity import (
     summarize_elite_distances,
 )
 from dnadesign.cruncher.analysis.hits import load_baseline_hits, load_elites_hits
+from dnadesign.cruncher.analysis.objective_labels import objective_scale_label
 from dnadesign.cruncher.analysis.parquet import read_parquet, write_parquet
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_yaml
 from dnadesign.cruncher.artifacts.layout import (
@@ -160,11 +161,7 @@ def _write_analysis_used(
 
 
 def _objective_axis_label(objective_cfg: dict[str, object]) -> str:
-    score_scale = str(objective_cfg.get("score_scale") or "normalized-llr").strip().lower()
-    if score_scale in {"llr", "raw-llr", "raw_llr"}:
-        scale_label = "raw-LLR"
-    else:
-        scale_label = "norm-LLR"
+    scale_label = objective_scale_label(objective_cfg, unknown_fallback="norm-LLR")
     combine = str(objective_cfg.get("combine") or "min").strip().lower()
     softmin_cfg = objective_cfg.get("softmin")
     softmin_enabled = isinstance(softmin_cfg, dict) and bool(softmin_cfg.get("enabled"))

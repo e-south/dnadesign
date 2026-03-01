@@ -17,6 +17,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from dnadesign.cruncher.analysis.objective_labels import (
+    objective_scalar_semantics,
+)
 from dnadesign.cruncher.analysis.plots._savefig import savefig
 from dnadesign.cruncher.analysis.plots._style import apply_axes_style
 
@@ -25,29 +28,8 @@ def _safe_numeric(series: pd.Series) -> pd.Series:
     return pd.to_numeric(series, errors="coerce")
 
 
-def _score_scale_label(objective_config: dict[str, object] | None) -> str:
-    cfg = objective_config if isinstance(objective_config, dict) else {}
-    scale = str(cfg.get("score_scale") or "normalized-llr").strip().lower()
-    if scale in {"llr", "raw-llr", "raw_llr"}:
-        return "raw-LLR"
-    if scale in {"normalized-llr", "norm-llr", "norm_llr"}:
-        return "norm-LLR"
-    if scale == "logp":
-        return "logp"
-    return scale
-
-
 def _objective_scalar_semantics(objective_config: dict[str, object] | None) -> str:
-    cfg = objective_config if isinstance(objective_config, dict) else {}
-    combine = str(cfg.get("combine") or "min").strip().lower()
-    softmin_cfg = cfg.get("softmin")
-    softmin_enabled = isinstance(softmin_cfg, dict) and bool(softmin_cfg.get("enabled"))
-    scale_label = _score_scale_label(cfg)
-    if combine == "sum":
-        return f"sum TF best-window {scale_label}"
-    if combine == "min" and softmin_enabled:
-        return f"soft-min TF best-window {scale_label}"
-    return f"min TF best-window {scale_label}"
+    return objective_scalar_semantics(objective_config)
 
 
 def _resolve_joint_score(
