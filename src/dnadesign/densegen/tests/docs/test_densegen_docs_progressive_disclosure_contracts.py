@@ -94,3 +94,40 @@ def test_densegen_tutorials_include_analysis_only_existing_outputs_path() -> Non
         assert "### If outputs already exist (analysis-only)" in text
         assert "./runbook.sh --analysis-only" in text
         assert ANALYSIS_NOTEBOOK_COMMAND[name] in text
+
+
+def test_stress_tutorial_exposes_core_batch_analysis_modes_and_resume_guardrails() -> None:
+    path = TUTORIALS / "study_stress_ethanol_cipro.md"
+    text = _read(path)
+    _assert_token_order(
+        text,
+        [
+            "#### Mode 1: Core generation run (interactive or OnDemand shell)",
+            "#### Mode 2: BU SCC batch loop (target quota)",
+            "#### Mode 3: Post-run analysis only",
+        ],
+        label=path.name,
+    )
+    assert "backend: GUROBI" in text
+    assert "1,000,000" in text
+    assert "Config changed beyond plan quotas." in text
+    assert "dense run --resume --no-plot" in text
+    assert "outputs/meta/run.lock" in text
+    assert "usr maintenance merge" in text
+
+
+def test_hpc_howto_exposes_core_batch_and_analysis_flows() -> None:
+    path = HOWTO / "hpc.md"
+    text = _read(path)
+    _assert_token_order(
+        text,
+        [
+            "### Core generation flow (run shell or interactive session)",
+            "### Scheduler submission flow (batch wrapper)",
+            "### Post-run analysis flow",
+        ],
+        label=path.name,
+    )
+    assert "### Config-change guardrails for resume safety" in text
+    assert "Config changed beyond plan quotas." in text
+    assert "outputs/meta/run.lock" in text

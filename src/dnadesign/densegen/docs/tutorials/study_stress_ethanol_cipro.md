@@ -4,7 +4,7 @@
 **Last verified:** 2026-02-28
 
 
-This tutorial runs the largest packaged DenseGen campaign with expanded stress-condition plans and USR-ready outputs while preserving a constitutive σ70 promoter core.
+This tutorial runs the largest packaged DenseGen campaign with expanded stress-condition plans, a GUROBI solver backend, and USR-ready outputs while preserving a constitutive σ70 promoter core.
 σ70 -35/-10 literals in this workspace follow [Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors](https://www.nature.com/articles/s41467-017-02473-5) (DOI: [10.1038/s41467-017-02473-5](https://doi.org/10.1038/s41467-017-02473-5)).
 
 ### Runbook command
@@ -36,44 +36,47 @@ pixi run dense validate-config --probe-solver -c src/dnadesign/densegen/workspac
 ```yaml
 # src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/config.yaml
 densegen:
-  output:
+  output:                                 # Output sink configuration.
     targets: [parquet, usr]               # Keep analysis tables and USR events for Notify.
-  generation:
+  generation:                             # Generation-stage controls.
     sequence_length: 60                   # Final designed sequence length in base pairs.
-    expansion:
+    expansion:                            # Plan expansion controls.
       max_plans: 64                       # Upper bound on expanded plan variants.
-    sampling:
+    sampling:                             # Stage-B library sampling controls.
       library_size: 10                    # Sampled library breadth per plan.
-    plan:
+    plan:                                 # Base plans expanded by σ70 variant matrix.
       - name: ethanol                     # Plan identifier.
-        sequences: 60                     # Requested sequence quota for this plan.
+        sequences: 300000                 # Base-plan quota before 5x expansion.
       - name: ciprofloxacin               # Plan identifier.
-        sequences: 60                     # Requested sequence quota for this plan.
+        sequences: 300000                 # Base-plan quota before 5x expansion.
       - name: ethanol_ciprofloxacin       # Plan identifier.
-        sequences: 80                     # Requested sequence quota for this plan.
-  runtime:
+        sequences: 400000                 # Base-plan quota before 5x expansion.
+  solver:                                 # Dense-array optimizer backend.
+    backend: GUROBI                       # Workspace default for SCC-scale runs.
+    strategy: iterate                     # Solve strategy.
+  runtime:                                # Runtime stall and retry limits.
     max_failed_solutions_per_target: 2.0  # Failed-solve tolerance scaled by target count.
 ```
 
 ```yaml
 # Stage-A campaign mining profile (same config file)
-inputs:
+inputs:                                   # Stage-A input definitions.
   - name: lexA_pwm                        # Input identifier.
-    sampling:
-      n_sites: 250                         # Number of retained sampled sites.
-      mining:
-        batch_size: 5000                   # Candidate count evaluated per mining batch.
-        budget:
-          mode: fixed_candidates           # Budget policy for mining candidates.
-          candidates: 1000000              # PWM mining effort per regulator.
+    sampling:                             # Sampling controls for this input.
+      n_sites: 250                        # Number of retained sampled sites.
+      mining:                             # Candidate mining controls.
+        batch_size: 5000                  # Candidate count evaluated per mining batch.
+        budget:                           # Candidate mining budget.
+          mode: fixed_candidates          # Budget policy for mining candidates.
+          candidates: 1000000             # PWM mining effort per regulator.
   - name: background                      # Input identifier.
-    sampling:
-      n_sites: 500                         # Number of retained sampled sites.
-      mining:
-        batch_size: 20000                  # Candidate count evaluated per mining batch.
-        budget:
-          mode: fixed_candidates           # Budget policy for mining candidates.
-          candidates: 5000000              # Background mining budget under exclusion filters.
+    sampling:                             # Sampling controls for this input.
+      n_sites: 500                        # Number of retained sampled sites.
+      mining:                             # Candidate mining controls.
+        batch_size: 20000                 # Candidate count evaluated per mining batch.
+        budget:                           # Candidate mining budget.
+          mode: fixed_candidates          # Budget policy for mining candidates.
+          candidates: 5000000             # Background mining budget under exclusion filters.
 ```
 
 ### Step-by-step commands
@@ -103,37 +106,73 @@ if [ ! -f "$USR_REGISTRY" ]; then
 fi
 ```
 
-Validate dependencies and run generation before rendering analysis artifacts.
+#### Mode 1: Core generation run (interactive or OnDemand shell)
+
+Use this mode when you are running in a shell directly (local terminal or interactive remote shell) and want generation-only passes without scheduler wrappers.
 
 ```bash
 # Verify FIMO is available before PWM-backed sampling/validation.
 pixi run fimo --version
 # Validate config schema and probe solver availability.
 pixi run dense validate-config --probe-solver -c "$CONFIG"
-# Start a fresh run from a clean output state.
+# Start a fresh run when beginning a new campaign branch.
 pixi run dense run --fresh --no-plot -c "$CONFIG"
-# Inspect run diagnostics and per-plan library progress.
+# Resume without wiping outputs on subsequent passes.
+pixi run dense run --resume --no-plot -c "$CONFIG"
+# Increase total target by a bounded amount without editing config.yaml.
+pixi run dense run --resume --extend-quota 50000 --no-plot -c "$CONFIG"
+# Inspect run diagnostics and current per-plan progress toward quota.
 pixi run dense inspect run --events --library -c "$CONFIG"
 ```
 
-Render plots and notebook outputs after the generation pass succeeds.
+#### Mode 2: BU SCC batch loop (target quota)
+
+Use this mode for asynchronous SCC execution. The workspace default target is 1,000,000 total sequences (after expansion), so multiple submissions are expected.
+
+```bash
+# Check scheduler pressure before new submissions.
+qstat -u "$USER"
+# Summarize running, queued, and Eqw jobs for submit gating.
+qstat -u "$USER" | awk '$1 ~ /^[0-9]+$/ { running += ($5 ~ /r/); queued += ($5 ~ /q/); eqw += ($5 ~ /Eqw/) } END { printf "running_jobs=%d queued_jobs=%d eqw_jobs=%d\n", running, queued, eqw }'
+# Submit generation-only DenseGen batch against this workspace config.
+qsub -P <project> -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --no-plot' docs/bu-scc/jobs/densegen-cpu.qsub
+# Submit a quota-extension pass when additional rows are required.
+qsub -P <project> -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --extend-quota 50000 --no-plot' docs/bu-scc/jobs/densegen-cpu.qsub
+```
+
+Queue-fair policy for SCC: if `running_jobs > 3`, avoid burst submits, prefer arrays or `-hold_jid` chains, and do not skip the line.
+
+Million-scale execution model:
+- Treat each SCC batch as a contribution pass, not the full campaign.
+- For one workspace/run root, keep a single active writer; DenseGen enforces `outputs/meta/run.lock` and concurrent submits on the same workspace exit with a lock-held error.
+- For repeated contributions against the same workspace, prefer `-hold_jid` chains over blind parallel submits.
+- If you need Stage-A mining/diversity edits, branch to a new workspace (or run root) and separate USR dataset, then merge approved datasets with `uv run usr maintenance merge`.
+- Avoid `--fresh` when preserving accumulated rows; `--fresh` clears `outputs/` (except `outputs/notify`).
+
+#### Mode 3: Post-run analysis only
+
+Use this mode when sequence generation is complete (or paused) and you only need plots/notebooks refreshed from existing outputs.
 
 ```bash
 # Render DenseGen analysis artifacts from current run outputs.
-# `dense plot` is the analysis entry point; static plots always render.
-# Set plots.video.enabled: true in config to also emit a sampled Stage-B showcase video
-# at outputs/plots/stage_b/all_plans/showcase.mp4.
 pixi run dense plot -c "$CONFIG"
+# Optional analysis shortcut: render only the Stage-B showcase video artifact.
+# pixi run dense plot --only dense_array_video_showcase -c "$CONFIG"
 # Generate the run-overview marimo notebook artifact.
 pixi run dense notebook generate -c "$CONFIG"
 # Run notebook validation before opening or sharing it.
 uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
 ```
 
-```bash
-# Optional analysis shortcut: render only the Stage-B showcase video artifact.
-# pixi run dense plot --only dense_array_video_showcase -c "$CONFIG"
-```
+Resume safety contract:
+- In-place resume accepts quota-only config changes (for example `sequences` increases).
+- Changes to Stage-A mining/selection knobs, sequence length, fixed elements, or other non-quota config keys are blocked in-place with `Config changed beyond plan quotas.`.
+- For those broader changes, start a new run root (or run `--fresh`) to avoid mixing incompatible state.
+
+Durability knobs for interruption tolerance:
+- `densegen.runtime.checkpoint_every` controls how often run state and sink buffers are checkpointed.
+- `densegen.output.parquet.chunk_size` and `densegen.output.usr.chunk_size` control buffered write size per flush.
+- Lower values reduce in-memory exposure on hard interruption, with higher I/O overhead.
 
 ### If outputs already exist (analysis-only)
 

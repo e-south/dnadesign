@@ -55,6 +55,16 @@ def test_notify_docs_avoid_external_skill_link_dependency() -> None:
     assert "https://github.com/e-south/agent-skills/tree/main/sge-hpc-ops" not in text
 
 
+def test_bu_scc_docs_use_current_densegen_runtime_field_names() -> None:
+    batch_notify = _read(BU_SCC_DOCS / "batch-notify.md")
+    jobs_readme = _read(BU_SCC_DOCS / "jobs" / "README.md")
+    docs_bundle = "\n".join((batch_notify, jobs_readme))
+
+    assert "densegen.solver.solver_attempt_timeout_seconds" in docs_bundle
+    assert "densegen.solver.time_limit_seconds" not in docs_bundle
+    assert "densegen.runtime.max_seconds_per_plan" not in docs_bundle
+
+
 def test_status_first_queue_fair_guidance_matches_operator_brief_high_pressure_fixture() -> None:
     if not SGE_OPERATOR_BRIEF_SCRIPT.exists():
         pytest.skip(f"Missing centralized sge operator brief script: {SGE_OPERATOR_BRIEF_SCRIPT}")

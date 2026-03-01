@@ -7,7 +7,7 @@
 - [lexA, cpxR, baeR]
 
 **Purpose**
-- Run the stress campaign workspace with dual-sink outputs, expanded plans, and workspace-local plot/notebook generation.
+- Run the stress campaign workspace with dual-sink outputs, expanded plans, GUROBI solver defaults, and workspace-local plot/notebook generation.
 
 **σ70 promoter context**
 - This workspace keeps a constitutive σ70 promoter core and uses RNAP -35/-10 site literals from [Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors](https://www.nature.com/articles/s41467-017-02473-5) (DOI: [10.1038/s41467-017-02473-5](https://doi.org/10.1038/s41467-017-02473-5)).
@@ -45,6 +45,10 @@ Run this command from the workspace root:
     # Start a fresh run from a clean output state (sequence generation only).
     # Plot rendering is explicit in the next step for clearer failure isolation.
     pixi run dense run --fresh --no-plot -c "$CONFIG"
+    # Resume generation in-place for iterative quota accumulation.
+    pixi run dense run --resume --no-plot -c "$CONFIG"
+    # Increase total quota target without editing config.yaml.
+    pixi run dense run --resume --extend-quota 50000 --no-plot -c "$CONFIG"
     # If running only `dense run`, omit `--no-plot` to auto-render configured plots.
     # pixi run dense run --fresh -c "$CONFIG"
     # Inspect run diagnostics and per-plan library progress.
@@ -62,7 +66,35 @@ Run this command from the workspace root:
     # Validate the generated notebook before opening or sharing it.
     uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
 
+### Mode B: BU SCC batch loop (generation only)
+
+    # Check current scheduler pressure before submitting additional jobs.
+    qstat -u "$USER"
+    # Summarize running, queued, and Eqw jobs for submit gating.
+    qstat -u "$USER" | awk '
+      $1 ~ /^[0-9]+$/ {
+        running += ($5 ~ /r/)
+        queued += ($5 ~ /q/)
+        eqw += ($5 ~ /Eqw/)
+      }
+      END { printf "running_jobs=%d queued_jobs=%d eqw_jobs=%d\n", running, queued, eqw }
+    '
+    # Submit generation-only batch run against this workspace config.
+    qsub -P <project> \
+      -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --no-plot' \
+      docs/bu-scc/jobs/densegen-cpu.qsub
+    # Submit an extension pass when additional quota is required.
+    qsub -P <project> \
+      -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --extend-quota 50000 --no-plot' \
+      docs/bu-scc/jobs/densegen-cpu.qsub
+
+Queue contract:
+- If `running_jobs > 3`, confirm before adding more jobs and prefer arrays or `-hold_jid` chains.
+- Do not skip the queue line with bypass-style flags.
+
 ### Optional analysis-only mode (existing outputs)
+
+Mode C: post-run analysis only.
 
     # Rebuild plots/notebook from existing run artifacts without regenerating sequences.
     ./runbook.sh --analysis-only

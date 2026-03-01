@@ -106,10 +106,11 @@ For DenseGen GUROBI runs, cap runtime at three layers:
 
 2. Solver-level cap (DenseGen config):
 - `densegen.solver.threads` (set `<= N`)
-- `densegen.solver.time_limit_seconds` (per-solve cap)
+- `densegen.solver.solver_attempt_timeout_seconds` (per-solve cap)
 
-3. Runtime policy cap (DenseGen config):
-- `densegen.runtime.max_seconds_per_plan` (per-plan run cap)
+3. Runtime durability cadence (DenseGen config):
+- `densegen.runtime.checkpoint_every` (flush/checkpoint cadence)
+- Overall walltime remains controlled by scheduler `-l h_rt=...`
 
 Example config fragment:
 
@@ -119,9 +120,9 @@ densegen:
     backend: GUROBI
     strategy: iterate
     threads: 16
-    time_limit_seconds: 60
+    solver_attempt_timeout_seconds: 60
   runtime:
-    max_seconds_per_plan: 21600
+    checkpoint_every: 50
 ```
 
 Example submit command:

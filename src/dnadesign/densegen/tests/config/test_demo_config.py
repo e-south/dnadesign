@@ -475,11 +475,14 @@ def test_matrix_studies_use_auto_scoped_stage_b_plot_defaults() -> None:
 def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
     output = cfg.root.densegen.output
+    solver = cfg.root.densegen.solver
     assert output.targets == ["parquet", "usr"]
     assert output.usr is not None
     assert output.usr.dataset == "densegen/study_stress_ethanol_cipro"
     assert output.usr.root == "outputs/usr_datasets"
     assert float(output.usr.health_event_interval_seconds) > 0
+    assert solver.backend == "GUROBI"
+    assert solver.strategy == "iterate"
 
     input_types = [inp.type for inp in cfg.root.densegen.inputs]
     assert input_types.count("pwm_artifact") == 3
@@ -522,10 +525,10 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
             if item.name.startswith("ethanol_ciprofloxacin__sig35=")
         ],
     }
-    assert set(quotas_by_base["ethanol"]) == {12}
-    assert set(quotas_by_base["ciprofloxacin"]) == {12}
-    assert set(quotas_by_base["ethanol_ciprofloxacin"]) == {16}
-    assert cfg.root.densegen.generation.total_quota() == 200
+    assert set(quotas_by_base["ethanol"]) == {60_000}
+    assert set(quotas_by_base["ciprofloxacin"]) == {60_000}
+    assert set(quotas_by_base["ethanol_ciprofloxacin"]) == {80_000}
+    assert cfg.root.densegen.generation.total_quota() == 1_000_000
     assert cfg.root.densegen.generation.sequence_constraints is not None
     assert "validate_final_sequence" not in cfg.root.densegen.postprocess.model_dump(exclude_none=False)
 
