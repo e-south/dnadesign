@@ -180,6 +180,221 @@ def _resolve_config_maybe(config: Path | None, config_option: Path | None):
     return None
 
 
+def _load_discovery_config(*, config: Path | None, config_option: Path | None):
+    try:
+        config_path = resolve_config_path(config_option or config)
+    except ConfigResolutionError as exc:
+        console.print(str(exc))
+        raise typer.Exit(code=1) from exc
+    try:
+        cfg = load_config(config_path)
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+    if not cfg.discover.enabled:
+        console.print("Error: discover.enabled=false; set discover.enabled=true to run motif discovery.")
+        raise typer.Exit(code=1)
+    return config_path, cfg
+
+
+def _resolve_discovery_settings(
+    *,
+    cfg,
+    config_path: Path,
+    source_id: str | None,
+    tool: str | None,
+    tool_path: Path | None,
+    window_sites: bool | None,
+    replace_existing: bool | None,
+    minw: int | None,
+    maxw: int | None,
+    nmotifs: int | None,
+    meme_mod: str | None,
+    meme_prior: str | None,
+) -> dict[str, object]:
+    resolved_tool = (tool or cfg.discover.tool).lower()
+    resolved_tool_path = resolve_tool_path(
+        tool_path or cfg.discover.tool_path,
+        config_path=config_path,
+    )
+    resolved_minw = minw if minw is not None else cfg.discover.minw
+    resolved_maxw = maxw if maxw is not None else cfg.discover.maxw
+    resolved_nmotifs = nmotifs or cfg.discover.nmotifs
+    resolved_meme_mod = meme_mod or cfg.discover.meme_mod
+    resolved_meme_prior = meme_prior or cfg.discover.meme_prior
+
+    if resolved_tool not in {"auto", "streme", "meme"}:
+        raise typer.BadParameter("--tool must be auto, streme, or meme.")
+    if resolved_minw is not None and resolved_minw < 1:
+        raise typer.BadParameter("--minw must be >= 1.")
+    if resolved_maxw is not None and resolved_maxw < 1:
+        raise typer.BadParameter("--maxw must be >= 1.")
+    if resolved_minw is not None and resolved_maxw is not None and resolved_maxw < resolved_minw:
+        raise typer.BadParameter("--maxw must be >= --minw.")
+    if resolved_nmotifs < 1:
+        raise typer.BadParameter("--nmotifs must be >= 1.")
+    if resolved_meme_mod is not None and resolved_meme_mod.lower() not in {"oops", "zoops", "anr"}:
+        raise typer.BadParameter("--meme-mod must be oops, zoops, or anr.")
+    if resolved_meme_prior is not None and resolved_meme_prior.lower() not in {
+        "dirichlet",
+        "dmix",
+        "mega",
+        "megap",
+        "addone",
+    }:
+        raise typer.BadParameter("--meme-prior must be dirichlet, dmix, mega, megap, or addone.")
+
+    return {
+        "tool": resolved_tool,
+        "tool_path": resolved_tool_path,
+        "minw": resolved_minw,
+        "maxw": resolved_maxw,
+        "nmotifs": int(resolved_nmotifs),
+        "meme_mod": (resolved_meme_mod.lower() if resolved_meme_mod is not None else None),
+        "meme_prior": (resolved_meme_prior.lower() if resolved_meme_prior is not None else None),
+        "streme_threshold": int(cfg.discover.min_sequences_for_streme),
+        "window_sites": (cfg.discover.window_sites if window_sites is None else window_sites),
+        "replace_existing": (cfg.discover.replace_existing if replace_existing is None else replace_existing),
+        "source_id": (source_id or cfg.discover.source_id),
+    }
+
+
+def _resolve_discovery_targets_with_sites(
+    *,
+    cfg,
+    config_path: Path,
+    tf: list[str],
+    ref: list[str],
+    set_index: int | None,
+    source: str | None,
+) -> list[object]:
+    try:
+        cfg_for_sites = cfg.model_copy(deep=True)
+        cfg_for_sites.catalog.pwm_source = "sites"
+        targets, _ = _resolve_targets(
+            cfg=cfg_for_sites,
+            config_path=config_path,
+            tfs=tf,
+            refs=ref,
+            set_index=set_index,
+            source_filter=source,
+        )
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"Error: {exc}")
+        console.print("Hint: run cruncher fetch sites before discovery.")
+        raise typer.Exit(code=1) from exc
+    return list(targets)
+
+
+def _resolve_discovery_command(
+    *,
+    chosen_tool: str,
+    requested_tool: str,
+    tool_path: Path | None,
+    run_dir: Path,
+    fasta_path: Path,
+    minw: int | None,
+    maxw: int | None,
+    nmotifs: int,
+    meme_mod: str | None,
+    meme_prior: str | None,
+) -> tuple[Path, list[str], Path, str | None]:
+    try:
+        exe = resolve_executable(chosen_tool, tool_path=tool_path)
+    except FileNotFoundError as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+    if exe is None:
+        available = [name for name in ("streme", "meme") if resolve_executable(name, tool_path=None)]
+        if requested_tool == "auto" and available:
+            hint = f"Auto selected {chosen_tool}. Install it or re-run with --tool {available[0]}."
+        elif available:
+            hint = f"Available tools on PATH: {', '.join(available)}. Use --tool to select one."
+        else:
+            hint = "Install MEME Suite and set MEME_BIN or discover.tool_path."
+        console.print(f"Error: {chosen_tool} not available. {hint} (Run `cruncher discover check`.)")
+        raise typer.Exit(code=1)
+
+    if chosen_tool == "streme":
+        cmd = [
+            str(exe),
+            "--dna",
+            "--p",
+            str(fasta_path),
+            "--oc",
+            str(run_dir),
+            "--nmotifs",
+            str(nmotifs),
+        ]
+        if minw is not None:
+            cmd.extend(["--minw", str(minw)])
+        if maxw is not None:
+            cmd.extend(["--maxw", str(maxw)])
+        output_path = run_dir / "streme.txt"
+    else:
+        cmd = build_meme_command(
+            exe=Path(exe),
+            fasta_path=fasta_path,
+            run_dir=run_dir,
+            minw=minw,
+            maxw=maxw,
+            nmotifs=nmotifs,
+            meme_mod=meme_mod,
+            meme_prior=meme_prior,
+        )
+        output_path = run_dir / "meme.txt"
+    return Path(exe), cmd, output_path, tool_version(Path(exe))
+
+
+def _iter_target_sequences(
+    *,
+    target: object,
+    catalog_root: Path,
+    cfg,
+    window_sites: bool,
+) -> tuple[list[str], str, dict[str, int]]:
+    if not target.site_entries:
+        console.print(f"Error: no cached site entries for {target.tf_name}.")
+        raise typer.Exit(code=1)
+    if window_sites:
+        missing = []
+        for entry in target.site_entries:
+            window_length = resolve_window_length(
+                tf_name=entry.tf_name,
+                dataset_id=entry.dataset_id,
+                window_lengths=cfg.catalog.site_window_lengths,
+            )
+            if window_length is None:
+                missing.append(f"{entry.source}:{entry.motif_id}")
+        if missing:
+            console.print(f"Error: window_sites is enabled but no site_window_lengths entry for TF '{target.tf_name}'.")
+            console.print(
+                "Hint: set cruncher.catalog.site_window_lengths for this TF (or dataset:<id>) "
+                "or run with --no-window-sites."
+            )
+            raise typer.Exit(code=1)
+    site_window_lengths = cfg.catalog.site_window_lengths if window_sites else {}
+    sequences = list(
+        iter_site_sequences(
+            root=catalog_root,
+            entries=target.site_entries,
+            site_window_lengths=site_window_lengths,
+            site_window_center=cfg.catalog.site_window_center,
+            allow_variable_lengths=True,
+        )
+    )
+    if not sequences:
+        console.print(f"Error: no site sequences available for {target.tf_name}.")
+        raise typer.Exit(code=1)
+    source_labels = sorted({entry.source for entry in target.site_entries})
+    source_text = ", ".join(source_labels) if source_labels else "-"
+    console.print(
+        f"INFO {target.tf_name}: discovery input n_sites={len(sequences)} "
+        f"from {len(target.site_entries)} site set(s) across source(s): {source_text}."
+    )
+    return sequences, source_text, site_window_lengths
+
+
 @app.command("check", help="Check MEME Suite availability (streme/meme).")
 def check_tools(
     config: Path | None = typer.Argument(
@@ -327,69 +542,29 @@ def discover_motifs(
         help="MEME -prior setting: dirichlet, dmix, mega, megap, or addone (MEME only).",
     ),
 ) -> None:
-    try:
-        config_path = resolve_config_path(config_option or config)
-    except ConfigResolutionError as exc:
-        console.print(str(exc))
-        raise typer.Exit(code=1)
-    try:
-        cfg = load_config(config_path)
-    except (ValueError, FileNotFoundError) as exc:
-        console.print(f"Error: {exc}")
-        raise typer.Exit(code=1)
-    if not cfg.discover.enabled:
-        console.print("Error: discover.enabled=false; set discover.enabled=true to run motif discovery.")
-        raise typer.Exit(code=1)
-
-    tool = (tool or cfg.discover.tool).lower()
-    resolved_tool_path = resolve_tool_path(
-        tool_path or cfg.discover.tool_path,
+    config_path, cfg = _load_discovery_config(config=config, config_option=config_option)
+    settings = _resolve_discovery_settings(
+        cfg=cfg,
         config_path=config_path,
+        source_id=source_id,
+        tool=tool,
+        tool_path=tool_path,
+        window_sites=window_sites,
+        replace_existing=replace_existing,
+        minw=minw,
+        maxw=maxw,
+        nmotifs=nmotifs,
+        meme_mod=meme_mod,
+        meme_prior=meme_prior,
     )
-    minw = minw if minw is not None else cfg.discover.minw
-    maxw = maxw if maxw is not None else cfg.discover.maxw
-    nmotifs = nmotifs or cfg.discover.nmotifs
-    meme_mod = meme_mod or cfg.discover.meme_mod
-    meme_prior = meme_prior or cfg.discover.meme_prior
-    streme_threshold = cfg.discover.min_sequences_for_streme
-    window_sites = cfg.discover.window_sites if window_sites is None else window_sites
-    replace_existing = cfg.discover.replace_existing if replace_existing is None else replace_existing
-
-    if tool not in {"auto", "streme", "meme"}:
-        raise typer.BadParameter("--tool must be auto, streme, or meme.")
-    if minw is not None and minw < 1:
-        raise typer.BadParameter("--minw must be >= 1.")
-    if maxw is not None and maxw < 1:
-        raise typer.BadParameter("--maxw must be >= 1.")
-    if minw is not None and maxw is not None and maxw < minw:
-        raise typer.BadParameter("--maxw must be >= --minw.")
-    if nmotifs < 1:
-        raise typer.BadParameter("--nmotifs must be >= 1.")
-    if meme_mod is not None and meme_mod.lower() not in {"oops", "zoops", "anr"}:
-        raise typer.BadParameter("--meme-mod must be oops, zoops, or anr.")
-    if meme_mod is not None:
-        meme_mod = meme_mod.lower()
-    if meme_prior is not None and meme_prior.lower() not in {"dirichlet", "dmix", "mega", "megap", "addone"}:
-        raise typer.BadParameter("--meme-prior must be dirichlet, dmix, mega, megap, or addone.")
-    if meme_prior is not None:
-        meme_prior = meme_prior.lower()
-
-    resolved_source_id = source_id or cfg.discover.source_id
-    try:
-        cfg_for_sites = cfg.model_copy(deep=True)
-        cfg_for_sites.catalog.pwm_source = "sites"
-        targets, _ = _resolve_targets(
-            cfg=cfg_for_sites,
-            config_path=config_path,
-            tfs=tf,
-            refs=ref,
-            set_index=set_index,
-            source_filter=source,
-        )
-    except (ValueError, FileNotFoundError) as exc:
-        console.print(f"Error: {exc}")
-        console.print("Hint: run cruncher fetch sites before discovery.")
-        raise typer.Exit(code=1)
+    targets = _resolve_discovery_targets_with_sites(
+        cfg=cfg,
+        config_path=config_path,
+        tf=tf,
+        ref=ref,
+        set_index=set_index,
+        source=source,
+    )
 
     catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     catalog_root.mkdir(parents=True, exist_ok=True)
@@ -407,119 +582,42 @@ def discover_motifs(
 
     base = resolve_workspace_root(config_path)
     for target in targets:
-        if not target.site_entries:
-            console.print(f"Error: no cached site entries for {target.tf_name}.")
-            raise typer.Exit(code=1)
-        if window_sites:
-            missing = []
-            for entry in target.site_entries:
-                window_length = resolve_window_length(
-                    tf_name=entry.tf_name,
-                    dataset_id=entry.dataset_id,
-                    window_lengths=cfg.catalog.site_window_lengths,
-                )
-                if window_length is None:
-                    missing.append(f"{entry.source}:{entry.motif_id}")
-            if missing:
-                console.print(
-                    f"Error: window_sites is enabled but no site_window_lengths entry for TF '{target.tf_name}'."
-                )
-                console.print(
-                    "Hint: set cruncher.catalog.site_window_lengths for this TF (or dataset:<id>) "
-                    "or run with --no-window-sites."
-                )
-                raise typer.Exit(code=1)
+        sequences, source_text, site_window_lengths = _iter_target_sequences(
+            target=target,
+            catalog_root=catalog_root,
+            cfg=cfg,
+            window_sites=bool(settings["window_sites"]),
+        )
+        chosen_tool = _choose_tool(
+            str(settings["tool"]),
+            nseq=len(sequences),
+            streme_threshold=int(settings["streme_threshold"]),
+        )
+        resolved_minw = settings["minw"]
+        resolved_maxw = settings["maxw"]
+        if resolved_minw is None and resolved_maxw is None:
+            console.print(f"INFO {target.tf_name}: discovery width bounds unset; using {chosen_tool} defaults.")
         run_dir = out_root / build_run_name("discover", [target.tf_name])
         run_dir.mkdir(parents=True, exist_ok=True)
         fasta_path = run_dir / f"{_safe_id(target.tf_name)}_sites.fasta"
-        site_window_lengths = cfg.catalog.site_window_lengths if window_sites else {}
-        sequences = list(
-            iter_site_sequences(
-                root=catalog_root,
-                entries=target.site_entries,
-                site_window_lengths=site_window_lengths,
-                site_window_center=cfg.catalog.site_window_center,
-                allow_variable_lengths=True,
-            )
-        )
-        if not sequences:
-            console.print(f"Error: no site sequences available for {target.tf_name}.")
-            raise typer.Exit(code=1)
-        source_labels = sorted({entry.source for entry in target.site_entries})
-        source_text = ", ".join(source_labels) if source_labels else "-"
-        console.print(
-            f"INFO {target.tf_name}: discovery input n_sites={len(sequences)} "
-            f"from {len(target.site_entries)} site set(s) across source(s): {source_text}."
-        )
-        resolved_minw = minw if minw is not None else None
-        resolved_maxw = maxw if maxw is not None else None
-        if resolved_minw is not None and resolved_minw < 1:
-            console.print(f"Error: invalid motif width lower bound for {target.tf_name}: minw={resolved_minw}.")
-            raise typer.Exit(code=1)
-        if resolved_maxw is not None and resolved_maxw < 1:
-            console.print(f"Error: invalid motif width upper bound for {target.tf_name}: maxw={resolved_maxw}.")
-            raise typer.Exit(code=1)
-        if resolved_minw is not None and resolved_maxw is not None and resolved_maxw < resolved_minw:
-            console.print(
-                f"Error: invalid motif width range for {target.tf_name}: minw={resolved_minw}, maxw={resolved_maxw}."
-            )
-            raise typer.Exit(code=1)
-        chosen_tool = _choose_tool(tool, nseq=len(sequences), streme_threshold=streme_threshold)
-        if resolved_minw is None and resolved_maxw is None:
-            console.print(f"INFO {target.tf_name}: discovery width bounds unset; using {chosen_tool} defaults.")
         _write_fasta(fasta_path, sequences)
-
-        try:
-            exe = resolve_executable(chosen_tool, tool_path=resolved_tool_path)
-        except FileNotFoundError as exc:
-            console.print(f"Error: {exc}")
-            raise typer.Exit(code=1)
-        if exe is None:
-            available = [name for name in ("streme", "meme") if resolve_executable(name, tool_path=None)]
-            if tool == "auto" and available:
-                hint = f"Auto selected {chosen_tool}. Install it or re-run with --tool {available[0]}."
-            elif available:
-                hint = f"Available tools on PATH: {', '.join(available)}. Use --tool to select one."
-            else:
-                hint = "Install MEME Suite and set MEME_BIN or discover.tool_path."
-            console.print(f"Error: {chosen_tool} not available. {hint} (Run `cruncher discover check`.)")
-            raise typer.Exit(code=1)
-
-        if chosen_tool == "streme":
-            cmd = [
-                str(exe),
-                "--dna",
-                "--p",
-                str(fasta_path),
-                "--oc",
-                str(run_dir),
-                "--nmotifs",
-                str(nmotifs),
-            ]
-            if resolved_minw is not None:
-                cmd.extend(["--minw", str(resolved_minw)])
-            if resolved_maxw is not None:
-                cmd.extend(["--maxw", str(resolved_maxw)])
-            output_path = run_dir / "streme.txt"
-        else:
-            cmd = build_meme_command(
-                exe=Path(exe),
-                fasta_path=fasta_path,
-                run_dir=run_dir,
-                minw=resolved_minw,
-                maxw=resolved_maxw,
-                nmotifs=nmotifs,
-                meme_mod=meme_mod,
-                meme_prior=meme_prior,
-            )
-            output_path = run_dir / "meme.txt"
-
-        version = tool_version(Path(exe))
+        exe, cmd, output_path, version = _resolve_discovery_command(
+            chosen_tool=chosen_tool,
+            requested_tool=str(settings["tool"]),
+            tool_path=settings["tool_path"],
+            run_dir=run_dir,
+            fasta_path=fasta_path,
+            minw=resolved_minw,
+            maxw=resolved_maxw,
+            nmotifs=int(settings["nmotifs"]),
+            meme_mod=settings["meme_mod"],
+            meme_prior=settings["meme_prior"],
+        )
         try:
             _run_command(cmd, cwd=run_dir)
         except RuntimeError as exc:
             console.print(f"Error: {exc}")
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from exc
         if not output_path.exists():
             console.print(f"Error: expected MEME output at {output_path}")
             raise typer.Exit(code=1)
@@ -528,29 +626,28 @@ def discover_motifs(
             run_dir=run_dir,
             config_path=config_path,
             tool=chosen_tool,
-            exe=Path(exe),
+            exe=exe,
             version=version,
             command=cmd,
             tf_name=target.tf_name,
-            motif_source=resolved_source_id,
-            window_sites=window_sites,
+            motif_source=str(settings["source_id"]),
+            window_sites=bool(settings["window_sites"]),
             site_window_lengths=site_window_lengths,
         )
-
         result = parse_meme_file(output_path)
         raw_payload = output_path.read_text()
-        if replace_existing:
+        if bool(settings["replace_existing"]):
             removed = _purge_discovered_entries(
                 catalog_root=catalog_root,
                 catalog=catalog,
-                source_id=resolved_source_id,
+                source_id=str(settings["source_id"]),
                 tf_name=target.tf_name,
             )
             if removed:
                 console.print(
-                    f"INFO {target.tf_name}: replaced {removed} cached motif(s) in source '{resolved_source_id}'."
+                    f"INFO {target.tf_name}: replaced {removed} cached motif(s) in source '{settings['source_id']}'."
                 )
-        for motif in result.motifs[:nmotifs]:
+        for motif in result.motifs[: int(settings["nmotifs"])]:
             motif_id = f"{_safe_id(target.tf_name)}_{_safe_id(motif.motif_id)}"
             tags = {
                 "matrix_source": chosen_tool,
@@ -563,10 +660,10 @@ def discover_motifs(
                 "discovery_site_sources": source_text,
                 "discovery_minw": str(resolved_minw) if resolved_minw is not None else "tool_default",
                 "discovery_maxw": str(resolved_maxw) if resolved_maxw is not None else "tool_default",
-                "discovery_nmotifs": str(nmotifs),
+                "discovery_nmotifs": str(int(settings["nmotifs"])),
             }
             record = build_motif_record(
-                source=resolved_source_id,
+                source=str(settings["source_id"]),
                 motif_id=motif_id,
                 tf_name=target.tf_name,
                 matrix=motif.prob_matrix,
@@ -585,7 +682,7 @@ def discover_motifs(
             table.add_row(
                 target.tf_name,
                 chosen_tool,
-                f"{resolved_source_id}:{motif_id}",
+                f"{settings['source_id']}:{motif_id}",
                 str(len(motif.prob_matrix)),
                 format_discovery_width_bounds(minw=resolved_minw, maxw=resolved_maxw),
                 render_path(output_path, base=base),
