@@ -40,7 +40,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
 ## Where to go deeper
 - Maintainer index: `docs/dev/README.md`
 - Monorepo organization audit: `docs/dev/monorepo-organization-audit.md`
-- BU SCC operational source of truth: `docs/bu-scc/README.md`, `docs/bu-scc/quickstart.md`, and `docs/bu-scc/batch-notify.md`
+- BU SCC operator references: `docs/bu-scc/README.md`, `docs/bu-scc/quickstart.md`, `docs/bu-scc/batch-notify.md`, and `docs/bu-scc/jobs/README.md`
 - Notify event contract: `docs/notify/usr-events.md`
 - Reliability operations: `RELIABILITY.md`
 - Security policy and secrets handling: `SECURITY.md`

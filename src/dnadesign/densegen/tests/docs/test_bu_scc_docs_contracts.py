@@ -11,19 +11,23 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
-
-import pytest
 
 DENSEGEN_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = Path(__file__).resolve().parents[5]
 DENSEGEN_TUTORIALS = DENSEGEN_ROOT / "docs" / "tutorials"
 BU_SCC_DOCS = REPO_ROOT / "docs" / "bu-scc"
 NOTIFY_DOCS = REPO_ROOT / "docs" / "notify"
-FIXTURES = BU_SCC_DOCS / "fixtures"
-QSTAT_HIGH_PRESSURE_FIXTURE = FIXTURES / "qstat_high_pressure.fixture"
-SGE_OPERATOR_BRIEF_SCRIPT = Path.home() / ".agents" / "skills" / "sge-hpc-ops" / "scripts" / "sge-operator-brief.sh"
+TOP_LEVEL_SYSTEM_DOCS = (
+    REPO_ROOT / "README.md",
+    REPO_ROOT / "ARCHITECTURE.md",
+    REPO_ROOT / "DESIGN.md",
+    REPO_ROOT / "RELIABILITY.md",
+    REPO_ROOT / "SECURITY.md",
+    REPO_ROOT / "PLANS.md",
+    REPO_ROOT / "QUALITY_SCORE.md",
+    REPO_ROOT / "docs" / "README.md",
+)
 
 
 def _read(path: Path) -> str:
@@ -65,28 +69,7 @@ def test_bu_scc_docs_use_current_densegen_runtime_field_names() -> None:
     assert "densegen.runtime.max_seconds_per_plan" not in docs_bundle
 
 
-def test_status_first_queue_fair_guidance_matches_operator_brief_high_pressure_fixture() -> None:
-    if not SGE_OPERATOR_BRIEF_SCRIPT.exists():
-        pytest.skip(f"Missing centralized sge operator brief script: {SGE_OPERATOR_BRIEF_SCRIPT}")
-
-    assert QSTAT_HIGH_PRESSURE_FIXTURE.exists(), f"Missing fixture: {QSTAT_HIGH_PRESSURE_FIXTURE}"
-    command = [
-        str(SGE_OPERATOR_BRIEF_SCRIPT),
-        "--qstat-file",
-        str(QSTAT_HIGH_PRESSURE_FIXTURE),
-        "--planned-submits",
-        "8",
-        "--warn-over-running",
-        "3",
-    ]
-    result = subprocess.run(command, check=True, capture_output=True, text=True)
-    operator_brief = result.stdout
-
-    assert "Submit Gate: confirm" in operator_brief
-    assert "Advisor: array" in operator_brief
-    assert "Queue Policy: respect queue, do not skip the line" in operator_brief
-    assert "Next Action: Ask for explicit user confirmation" in operator_brief
-
+def test_status_first_queue_fair_guidance_present_in_bu_scc_docs_bundle() -> None:
     quickstart = _read(BU_SCC_DOCS / "quickstart.md")
     batch_notify = _read(BU_SCC_DOCS / "batch-notify.md")
     cheat_sheet = _read(BU_SCC_DOCS / "agent-cheatsheet.md")
@@ -96,3 +79,10 @@ def test_status_first_queue_fair_guidance_matches_operator_brief_high_pressure_f
     assert "qsub -t" in docs_bundle
     assert "-hold_jid" in docs_bundle
     assert "respect the queue and do not skip the line" in docs_bundle
+
+
+def test_top_level_docs_do_not_reference_removed_repo_local_sge_skill_path() -> None:
+    removed_repo_local_path = "docs/bu-scc/sge-hpc-ops/SKILL.md"
+    for path in TOP_LEVEL_SYSTEM_DOCS:
+        text = _read(path)
+        assert removed_repo_local_path not in text

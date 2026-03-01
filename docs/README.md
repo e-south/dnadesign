@@ -12,7 +12,7 @@ This is the central documentation map for workflows, tool references, and reposi
 3. Follow the lane's "Verify next" target before moving to downstream tools.
 4. Use [Tool docs](#tool-docs) when you need package-level commands and data contracts.
 5. Use [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for policy, operations, and governance detail.
-6. Return to this page as the single docs entrypoint.
+6. Return to this page as the central docs map.
 
 ### Workflow lanes
 

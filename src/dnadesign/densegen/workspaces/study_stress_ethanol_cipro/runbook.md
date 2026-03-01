@@ -16,6 +16,7 @@
 
 Run this command from the workspace root:
 
+    # Execute the full runbook flow from a clean output state.
     ./runbook.sh --mode fresh
 
 Use `--mode resume` to continue generation without wiping outputs, or `--mode analysis` to rebuild plots/notebook only.

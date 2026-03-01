@@ -56,6 +56,10 @@ This section covers non-Python binaries pinned via `pixi.toml`.
 
 Use pixi for toolchains such as MEME Suite that are required by some workflows but are not Python packages.
 
+Cruncher dependency checks in this repository use:
+`src/dnadesign/cruncher/workspaces/demo_pairwise/configs/config.yaml`
+as the reference workspace config path.
+
 ```bash
 # Install or update the pinned pixi environment.
 pixi install --locked
