@@ -10,7 +10,9 @@
 
 - [Docs index](docs/README.md): choose a workflow lane, then follow its verify step.
 - [Installation](docs/installation.md): bootstrap the environment and run baseline verification commands.
-- [Workflow lanes](docs/README.md#workflow-lanes): task-first routes for DenseGen, Infer, USR sync, and BU SCC operations.
+- [Workflow lanes](docs/README.md#workflow-lanes): task-first routes for DenseGen, Infer, Notify, USR sync, and BU SCC operations.
+- [Notify operations](docs/notify/README.md): route map for watcher setup, webhook delivery, and recovery.
+- [Notify package docs index](src/dnadesign/notify/docs/README.md): Notify workflow/reference/internal maps by task and document type.
 - [Architecture](ARCHITECTURE.md), [Design](DESIGN.md), [Reliability](RELIABILITY.md), [Security](SECURITY.md), [Plans](PLANS.md), [Quality score](QUALITY_SCORE.md): repository-level contracts, policies, and governance records.
 - [Developer docs](docs/dev/README.md): CI contracts, maintenance runbooks, and execution-planning references.
 

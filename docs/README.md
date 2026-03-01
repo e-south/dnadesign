@@ -1,7 +1,7 @@
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-03-01
 
 This is the central documentation map for workflows, tool references, and repository policy.
 
@@ -20,7 +20,8 @@ This is the central documentation map for workflows, tool references, and reposi
 | --- | --- | --- |
 | Design a sequence library in a workspace | [DenseGen docs overview](../src/dnadesign/densegen/docs/README.md) | Verify generated artifacts and metadata with [DenseGen outputs reference](../src/dnadesign/densegen/docs/reference/outputs.md). |
 | Run model inference and write outputs back to datasets | [Infer README](../src/dnadesign/infer/README.md) | Verify write-back columns and types with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
-| Operate Notify for local event watching and webhook setup | [Notify docs index](notify/README.md) | Verify event stream contract in [Notify USR events contract](notify/usr-events.md). |
+| Operate Notify for local event watching and webhook setup | [Notify docs index](notify/README.md) | Verify mode and delivery contracts in [Notify command contracts](../src/dnadesign/notify/docs/reference/command-contracts.md). |
+| Inspect Notify package internals or extension seams | [Notify package docs index](../src/dnadesign/notify/docs/README.md) | Verify module boundaries in [Notify maintainer architecture map](../src/dnadesign/notify/docs/dev/architecture.md). |
 | Sync iterative HPC outputs to local analysis safely | [USR workflow map](../src/dnadesign/usr/docs/operations/workflow-map.md) -> [USR HPC sync flow](../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md) | Verify transfer parity with [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync-audit-loop.md). |
 | Run cross-machine sync with stricter failure checks | [USR sync command contract](../src/dnadesign/usr/docs/operations/sync.md) | Verify sidecar and overlay fidelity with [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync-fidelity-drills.md). |
 | Chain DenseGen -> USR -> Infer -> USR updates | [Chained workflow demo](../src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md) | Verify downstream dataset state with [Infer docs](../src/dnadesign/infer/README.md). |
@@ -61,6 +62,7 @@ This is the central documentation map for workflows, tool references, and reposi
 - [BU SCC docs index](bu-scc/README.md): cluster setup, submission, and operations runbooks.
 - [Notify docs index](notify/README.md): notifier setup, runtime behavior, and operator guidance.
 - [Notify USR event contract](notify/usr-events.md): USR `.events.log` consumption contract for downstream notifications.
+- [Notify package docs index](../src/dnadesign/notify/docs/README.md): package-local references and maintainer internals.
 
 ### Maintainer references
 
