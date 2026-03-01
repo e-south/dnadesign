@@ -20,9 +20,3 @@ Use the workflow docs first, then targeted references:
 8. [MEME Suite guide](docs/guides/meme_suite.md): run MEME/FIMO integration paths and expected artifacts.
 9. [Studies guide](docs/guides/studies.md): orchestrate repeatable study runs.
 10. [Portfolio aggregation](docs/guides/portfolio_aggregation.md): combine study outputs into portfolio-level summaries.
-
-Interface contracts:
-
-- Repository-level: [Architecture](../../../ARCHITECTURE.md), [Design](../../../DESIGN.md), [Reliability](../../../RELIABILITY.md), [Security](../../../SECURITY.md)
-- Tool-level: [Config reference](docs/reference/config.md), [CLI reference](docs/reference/cli.md), [Artifacts reference](docs/reference/artifacts.md), [Architecture reference](docs/reference/architecture.md)
-- Cross-tool routing: [Repository docs index](../../../docs/README.md)

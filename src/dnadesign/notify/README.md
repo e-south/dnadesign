@@ -19,9 +19,9 @@ Read in this order for progressive disclosure:
 
 ## Entrypoint contract
 
-- Audience: Notify operators and maintainers working in this package.
-- Prerequisites: workspace config and one webhook source (`--url`, `--url-env`, or `--secret-ref`).
-- Verify next: [watch command contract](docs/reference/command-contracts.md#notify-usr-events-watch).
+8. Audience: Notify operators and maintainers working in this package.
+9. Prerequisites: workspace config and one webhook source (`--url`, `--url-env`, or `--secret-ref`).
+10. Verify next: [watch command contract](docs/reference/command-contracts.md#notify-usr-events-watch).
 
 ## Boundary reminder
 
