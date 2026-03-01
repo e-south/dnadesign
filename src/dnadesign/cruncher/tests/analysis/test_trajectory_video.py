@@ -462,6 +462,73 @@ def test_render_chain_trajectory_video_supports_pandas_str_dtype_mode(tmp_path, 
     assert result["snapshot_count"] >= 2
 
 
+def test_render_chain_trajectory_video_scores_repeated_best_so_far_sources_once(tmp_path, monkeypatch) -> None:
+    pwm = PWM(
+        name="lexA",
+        matrix=np.asarray(
+            [
+                [0.7, 0.1, 0.1, 0.1],
+                [0.1, 0.7, 0.1, 0.1],
+                [0.1, 0.1, 0.7, 0.1],
+                [0.1, 0.1, 0.1, 0.7],
+            ],
+            dtype=float,
+        ),
+    )
+    trajectory_df = pd.DataFrame(
+        {
+            "chain": [0, 0, 0, 0, 0],
+            "sweep": [0, 1, 2, 3, 4],
+            "phase": ["draw", "draw", "draw", "draw", "draw"],
+            "objective_scalar": [0.2, 0.6, 0.5, 0.7, 0.65],
+            "sequence": ["ACGTACGT", "ACGTTCGT", "ACGTACGT", "ACGTTTGT", "ACGTTCGT"],
+        }
+    )
+    cfg = AnalysisTrajectoryVideoConfig(
+        playback={"target_duration_sec": 5.0, "fps": 8, "pause_on_best_update_sec": 0.0},
+        sampling={"stride": 1, "include_best_updates": True},
+        limits={"max_total_frames": 64, "max_snapshots": 32, "max_estimated_render_sec": 60.0},
+    )
+    out_path = tmp_path / "video_cached_scoring.mp4"
+    score_calls = 0
+
+    def _fake_compute_all_per_pwm_and_hits(self, sequence, sequence_len):  # noqa: ANN001
+        del self, sequence, sequence_len
+        nonlocal score_calls
+        score_calls += 1
+        return (
+            {"lexA": 0.5},
+            {"lexA": {"best_start": 0, "best_window_seq": "ACGT", "strand": "+"}},
+        )
+
+    def _fake_run_job(job_mapping: dict[str, object], *, kind: str, caller_root: Path) -> None:
+        del kind, caller_root
+        out = Path(str(job_mapping["outputs"][0]["path"]))
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"fake-mp4")
+
+    monkeypatch.setattr(
+        "dnadesign.cruncher.analysis.trajectory_video.Scorer.compute_all_per_pwm_and_hits",
+        _fake_compute_all_per_pwm_and_hits,
+    )
+    monkeypatch.setattr("dnadesign.cruncher.analysis.trajectory_video.run_job", _fake_run_job)
+    result = render_chain_trajectory_video(
+        trajectory_df=trajectory_df,
+        tf_names=["lexA"],
+        pwms={"lexA": pwm},
+        out_path=out_path,
+        config=cfg,
+        bidirectional=True,
+        pwm_pseudocounts=0.0,
+        log_odds_clip=None,
+        tmp_root=tmp_path / "_tmp",
+    )
+
+    assert out_path.exists()
+    assert result["snapshot_count"] == 5
+    assert score_calls == 3
+
+
 def test_render_chain_trajectory_video_requires_sequence_column(tmp_path) -> None:
     pwm = PWM(
         name="lexA",

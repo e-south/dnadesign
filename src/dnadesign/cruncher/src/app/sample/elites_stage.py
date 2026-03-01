@@ -282,30 +282,6 @@ def _hit_raw_score(*, per_tf_hits: dict[str, dict[str, object]], tf_name: str) -
     return float(raw_score)
 
 
-def _hits_match_contract(
-    *,
-    per_tf_hits: dict[str, dict[str, object]],
-    expected_windows: dict[str, tuple[int, int, str]],
-    left_shift: int = 0,
-) -> bool:
-    for tf_name, (expected_start, expected_width, expected_strand) in expected_windows.items():
-        hit = per_tf_hits.get(tf_name)
-        if not isinstance(hit, dict):
-            return False
-        start = hit.get("best_start")
-        width = hit.get("width")
-        strand = hit.get("strand")
-        if not isinstance(start, int) or not isinstance(width, int) or not isinstance(strand, str):
-            return False
-        if int(start) != int(expected_start) - int(left_shift):
-            return False
-        if int(width) != int(expected_width):
-            return False
-        if str(strand) != str(expected_strand):
-            return False
-    return True
-
-
 def _removed_bp_before(*, removed_segments: list[tuple[int, int]], position: int) -> int:
     removed = 0
     for start, end in removed_segments:
@@ -488,36 +464,6 @@ def _remaining_single_owner_polish_improvements(
                 )
                 break
     return remaining
-
-
-def _apply_edge_trim(
-    *,
-    candidate: _EliteCandidate,
-    scorer: Scorer,
-    left_trim: int,
-    right_trim: int,
-) -> None:
-    if left_trim <= 0 and right_trim <= 0:
-        return
-    source = np.asarray(candidate.seq_arr, dtype=np.int8)
-    end_idx = int(source.size) - int(right_trim) if int(right_trim) > 0 else int(source.size)
-    if end_idx <= int(left_trim):
-        raise ValueError("Elite edge trim would remove the full sequence.")
-    expected_windows = _hit_window_map(per_tf_hits=candidate.per_tf_hits, scorer=scorer)
-    trimmed = source[int(left_trim) : end_idx].copy()
-    per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm = _candidate_payload(seq_arr=trimmed, scorer=scorer)
-    if not _hits_match_contract(
-        per_tf_hits=per_tf_hits,
-        expected_windows=expected_windows,
-        left_shift=int(left_trim),
-    ):
-        raise ValueError("Elite edge trim violated hit-window validity contract.")
-    candidate.seq_arr = trimmed
-    candidate.per_tf_map = per_tf_map
-    candidate.per_tf_hits = per_tf_hits
-    candidate.norm_map = norm_map
-    candidate.min_norm = float(min_norm)
-    candidate.sum_norm = float(sum_norm)
 
 
 def _apply_uncovered_trim(

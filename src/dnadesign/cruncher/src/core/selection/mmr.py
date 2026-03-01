@@ -106,36 +106,6 @@ def _percentile_ranks(values: Sequence[float]) -> list[float]:
     return ranks.tolist()
 
 
-def _pairwise_distances(
-    selected: list[MmrCandidate],
-    *,
-    tf_names: Sequence[str],
-    weights_by_tf: dict[str, np.ndarray],
-    core_maps: dict[str, dict[str, np.ndarray]],
-    distance_metric: str,
-    hybrid_full_weight: float,
-    hybrid_core_weight: float,
-) -> list[float]:
-    if len(selected) < 2:
-        return []
-    distances: list[float] = []
-    for idx, cand_a in enumerate(selected):
-        for cand_b in selected[idx + 1 :]:
-            core_a = core_maps[_candidate_id(cand_a)]
-            core_b = core_maps[_candidate_id(cand_b)]
-            core_dist = compute_core_distance(core_a, core_b, weights=weights_by_tf, tf_names=tf_names)
-            full_dist = _full_sequence_distance(cand_a.seq_arr, cand_b.seq_arr)
-            if distance_metric == "full":
-                dist = full_dist
-            elif distance_metric == "hybrid":
-                denom = hybrid_full_weight + hybrid_core_weight
-                dist = ((hybrid_full_weight * full_dist) + (hybrid_core_weight * core_dist)) / denom
-            else:
-                dist = core_dist
-            distances.append(dist)
-    return distances
-
-
 def _dedupe_pool(
     pool: Sequence[MmrCandidate],
     *,

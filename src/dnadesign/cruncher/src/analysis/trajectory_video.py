@@ -65,6 +65,13 @@ class _PanelPayload:
     point_index_by_source: dict[int, int]
 
 
+@dataclass(frozen=True)
+class _ScoredSourceState:
+    sequence: str
+    per_tf_map: Mapping[str, float]
+    hit_map: Mapping[str, Mapping[str, object]]
+
+
 def _revcomp(seq: str) -> str:
     return seq.translate(_DNA_COMP)[::-1]
 
@@ -243,16 +250,32 @@ def _score_source_sequences(
     frame_sequences: list[str] = []
     frame_per_tf_maps: list[Mapping[str, float]] = []
     frame_hit_maps: list[Mapping[str, Mapping[str, object]]] = []
+    scored_by_source_idx: dict[int, _ScoredSourceState] = {}
+    sequence_values = chain_rows["sequence"].to_numpy(dtype=object, copy=False)
+    sequence_count = int(sequence_values.size)
     for source_idx in source_indices:
-        source_row = chain_rows.iloc[int(source_idx)]
-        sequence = str(source_row.get("sequence", "")).strip().upper()
-        if not sequence:
-            raise ValueError("Trajectory video source row is missing sequence.")
-        seq_arr = _encode_sequence(sequence)
-        per_tf_map, hit_map = scorer.compute_all_per_pwm_and_hits(seq_arr, int(seq_arr.size))
-        frame_sequences.append(sequence)
-        frame_per_tf_maps.append(per_tf_map)
-        frame_hit_maps.append(hit_map)
+        source_key = int(source_idx)
+        scored = scored_by_source_idx.get(source_key)
+        if scored is None:
+            if source_key < 0 or source_key >= sequence_count:
+                raise ValueError(
+                    f"Trajectory video source index {source_key} out of bounds for selected chain with "
+                    f"{sequence_count} rows."
+                )
+            sequence = str(sequence_values[source_key]).strip().upper()
+            if not sequence:
+                raise ValueError("Trajectory video source row is missing sequence.")
+            seq_arr = _encode_sequence(sequence)
+            per_tf_map, hit_map = scorer.compute_all_per_pwm_and_hits(seq_arr, int(seq_arr.size))
+            scored = _ScoredSourceState(
+                sequence=sequence,
+                per_tf_map=per_tf_map,
+                hit_map=hit_map,
+            )
+            scored_by_source_idx[source_key] = scored
+        frame_sequences.append(scored.sequence)
+        frame_per_tf_maps.append(scored.per_tf_map)
+        frame_hit_maps.append(scored.hit_map)
     return frame_sequences, frame_per_tf_maps, frame_hit_maps
 
 
@@ -271,16 +294,17 @@ def _build_panel_payload(
         budget=line_budget,
         required_indices=[int(idx) for idx in source_indices],
     )
-    panel_x = [float(chain_rows.iloc[int(idx)]["sweep"]) for idx in line_indices]
+    line_index_arr = np.asarray(line_indices, dtype=int)
+    sweep_values = chain_rows["sweep"].to_numpy(dtype=float, copy=False)
+    panel_x = [float(value) for value in sweep_values[line_index_arr].tolist()]
     best_curve = np.maximum.accumulate(objective_values)
-    panel_y = [float(best_curve[int(idx)]) for idx in line_indices]
+    panel_y = [float(value) for value in best_curve[line_index_arr].tolist()]
     panel_y_label = _panel_y_label(
         objective_column=objective_column,
         objective_config=objective_config,
     )
     panel_point_index_by_source: dict[int, int] = {}
     index_by_source = {int(idx): pos for pos, idx in enumerate(line_indices)}
-    line_index_arr = np.asarray(line_indices, dtype=int)
     for source_idx in source_indices:
         key = int(source_idx)
         if key in index_by_source:

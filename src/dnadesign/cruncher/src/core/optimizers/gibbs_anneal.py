@@ -11,7 +11,6 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
-import importlib
 import logging
 from collections import Counter
 from typing import Any, Dict, List, Tuple
@@ -20,6 +19,20 @@ import numpy as np
 
 from dnadesign.cruncher.core.optimizers.base import Optimizer
 from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
+from dnadesign.cruncher.core.optimizers.gibbs_postprocess import (
+    build_trace_idata,
+    make_move_stat_entry,
+    select_diverse_elites,
+)
+from dnadesign.cruncher.core.optimizers.gibbs_runtime import (
+    accept_metropolis,
+    gibbs_stay_probability,
+    maybe_log_progress,
+    move_adaptation_frozen,
+    move_detail,
+    proposal_adaptation_frozen,
+    sample_move_kind,
+)
 from dnadesign.cruncher.core.optimizers.gibbs_summary import (
     build_objective_schedule_summary,
     build_stats,
@@ -28,7 +41,6 @@ from dnadesign.cruncher.core.optimizers.gibbs_summary import (
 )
 from dnadesign.cruncher.core.optimizers.helpers import _replace_block, slide_window, swap_block
 from dnadesign.cruncher.core.optimizers.policies import (
-    MOVE_KINDS,
     AdaptiveMoveController,
     AdaptiveProposalController,
     MoveSchedule,
@@ -39,7 +51,7 @@ from dnadesign.cruncher.core.optimizers.policies import (
 from dnadesign.cruncher.core.optimizers.progress import ProgressAdapter, passthrough_progress
 from dnadesign.cruncher.core.optimizers.telemetry import NullTelemetry, OptimizerTelemetry
 from dnadesign.cruncher.core.scoring import LocalScanCache
-from dnadesign.cruncher.core.sequence import canon_int, hamming_distance, revcomp_int
+from dnadesign.cruncher.core.sequence import canon_int, revcomp_int
 from dnadesign.cruncher.core.state import SequenceState, make_seed
 
 logger = logging.getLogger(__name__)
@@ -255,13 +267,7 @@ class GibbsAnnealOptimizer(Optimizer):
         beta_now = float(self.mcmc_beta_of(int(sweep_idx)))
         return [beta_now for _ in range(self.chains)]
 
-    def optimise(self) -> List[SequenceState]:  # noqa: C901  (long but readable)
-        """Run Gibbs annealing and return *k* diverse elite sequences."""
-
-        rng = self.rng
-        evaluator = self.scorer  # SequenceEvaluator
-        C, T, D = self.chains, self.tune, self.draws
-        logger.debug("Starting Gibbs annealing: chains=%d  tune=%d  draws=%d", C, T, D)
+    def _reset_optimise_state(self) -> None:
         self.all_samples.clear()
         self.all_meta.clear()
         self.all_trace_meta.clear()
@@ -273,250 +279,303 @@ class GibbsAnnealOptimizer(Optimizer):
             self._unique_success_set.clear()
             self.unique_successes = 0
 
-        def _perturb_seed(seed_arr: np.ndarray, n_mutations: int) -> np.ndarray:
-            """Return a lightly perturbed copy of the seed for chain-diverse starts."""
-            mutated = seed_arr.copy()
-            if n_mutations <= 0 or mutated.size == 0:
-                return mutated
-            n_mutations = min(n_mutations, mutated.size)
-            positions = rng.choice(mutated.size, size=n_mutations, replace=False)
-            for pos in positions:
-                current = int(mutated[pos])
-                # Sample from {0,1,2,3} \ {current} uniformly.
-                pick = int(rng.integers(0, 3))
-                if pick >= current:
-                    pick += 1
-                mutated[pos] = np.int8(pick)
+    def _perturb_seed(
+        self,
+        seed_arr: np.ndarray,
+        *,
+        n_mutations: int,
+        rng: np.random.Generator,
+    ) -> np.ndarray:
+        mutated = seed_arr.copy()
+        if n_mutations <= 0 or mutated.size == 0:
             return mutated
+        n_mutations = min(n_mutations, mutated.size)
+        positions = rng.choice(mutated.size, size=n_mutations, replace=False)
+        for pos in positions:
+            current = int(mutated[pos])
+            pick = int(rng.integers(0, 3))
+            if pick >= current:
+                pick += 1
+            mutated[pos] = np.int8(pick)
+        return mutated
 
-        # Seed each chain from a shared base with light perturbations.
+    def _initialize_chain_runtime(
+        self,
+        *,
+        rng: np.random.Generator,
+        evaluator: Any,
+    ) -> tuple[
+        list[np.ndarray],
+        list[SequenceState],
+        list[LocalScanCache | None],
+        list[Dict[str, float]],
+    ]:
         if self.init_cfg is None:
             base_seed = SequenceState.random(self.sequence_length, rng).seq.copy()
         else:
             base_seed = make_seed(self.init_cfg, self.pwms, rng, sequence_length=self.sequence_length).seq.copy()
-        chain_states = [base_seed.copy() for _ in range(C)]
-        if C > 1:
+        chain_states = [base_seed.copy() for _ in range(self.chains)]
+        if self.chains > 1:
             n_mutations = max(1, int(round(base_seed.size * 0.02)))
-            for c in range(1, C):
-                chain_states[c] = _perturb_seed(base_seed, n_mutations)
-        chain_state_objs: List[SequenceState] = [SequenceState(chain_states[c], particle_id=c) for c in range(C)]
+            for c in range(1, self.chains):
+                chain_states[c] = self._perturb_seed(base_seed, n_mutations=n_mutations, rng=rng)
+        chain_state_objs: List[SequenceState] = [
+            SequenceState(chain_states[c], particle_id=c) for c in range(self.chains)
+        ]
         scan_caches: List[LocalScanCache | None] = []
         scorer = getattr(evaluator, "scorer", None)
-        for c in range(C):
+        for c in range(self.chains):
             cache = None
             if scorer is not None and getattr(scorer, "scale", None) in LocalScanCache.SUPPORTED_SCALES:
                 cache = scorer.make_local_cache(chain_states[c])
             scan_caches.append(cache)
-        current_per_tf_maps: List[Dict[str, float]] = [evaluator(chain_state_objs[c]) for c in range(C)]
+        current_per_tf_maps: List[Dict[str, float]] = [evaluator(chain_state_objs[c]) for c in range(self.chains)]
+        return chain_states, chain_state_objs, scan_caches, current_per_tf_maps
 
-        # For trace: only *draw* phase (not tune) is stored per ArviZ convention.
-        chain_scores: List[List[float]] = [[] for _ in range(C)]
+    def _record_state(
+        self,
+        *,
+        slot_id: int,
+        sweep_idx: int,
+        seq_arr: np.ndarray,
+        per_tf: Dict[str, float],
+        phase: str,
+        beta: float,
+        particle_id: int | None,
+    ) -> Dict[str, float]:
+        if particle_id is None:
+            raise RuntimeError(f"Gibbs trace invariant violated: missing particle_id for slot {slot_id}.")
+        self.all_samples.append(seq_arr.copy())
+        self.all_scores.append(per_tf)
+        self.all_meta.append((slot_id, sweep_idx))
+        self.all_trace_meta.append(
+            {
+                "chain": int(slot_id),
+                "slot_id": int(slot_id),
+                "particle_id": int(particle_id),
+                "beta": float(beta),
+                "sweep_idx": int(sweep_idx),
+                "phase": str(phase),
+            }
+        )
+        return per_tf
 
-        # Helper to record a state
-        def _record(
-            slot_id: int,
-            sweep_idx: int,
-            seq_arr: np.ndarray,
-            per_tf: Dict[str, float],
-            *,
-            phase: str,
-            beta: float,
-            particle_id: int | None,
-        ) -> Dict[str, float]:
-            if particle_id is None:
-                raise RuntimeError(f"Gibbs trace invariant violated: missing particle_id for slot {slot_id}.")
-            self.all_samples.append(seq_arr.copy())
-            self.all_scores.append(per_tf)
-            self.all_meta.append((slot_id, sweep_idx))
-            self.all_trace_meta.append(
-                {
-                    "chain": int(slot_id),
-                    "slot_id": int(slot_id),
-                    "particle_id": int(particle_id),
-                    "beta": float(beta),
-                    "sweep_idx": int(sweep_idx),
-                    "phase": str(phase),
-                }
+    def _record_unique_success(
+        self,
+        *,
+        seq_arr: np.ndarray,
+        per_tf: Dict[str, float],
+        evaluator: Any,
+    ) -> None:
+        if self._unique_success_set is None:
+            return
+        if self.score_scale == "normalized-llr":
+            norm_values = list(per_tf.values())
+        else:
+            scorer = getattr(evaluator, "scorer", None)
+            if scorer is None:
+                raise RuntimeError("early_stop.require_min_unique requires a scorer to compute normalized scores.")
+            norm_values = list(scorer.normalized_llr_map(seq_arr).values())
+        min_norm = min(norm_values) if norm_values else 0.0
+        if min_norm < self.early_stop_success_min_norm:
+            return
+        if self.dsdna_canonicalize:
+            key = SequenceState(canon_int(seq_arr)).to_string()
+        else:
+            key = SequenceState(seq_arr).to_string()
+        if key not in self._unique_success_set:
+            self._unique_success_set.add(key)
+            self.unique_successes = len(self._unique_success_set)
+
+    def _configure_sweep(
+        self,
+        *,
+        sweep_idx: int,
+    ) -> tuple[float | None, np.ndarray, bool, bool]:
+        beta_now = float(self.mcmc_beta_of(sweep_idx))
+        beta_softmin = self.softmin_of(sweep_idx) if self.softmin_of else None
+        base_move_probs = self.move_schedule.probs(sweep_idx / max(self.total_sweeps - 1, 1))
+        move_adapt_frozen = move_adaptation_frozen(
+            sweep_idx=sweep_idx,
+            beta_now=beta_now,
+            freeze_after_sweep=self.move_adapt_freeze_after_sweep,
+            freeze_after_beta=self.move_adapt_freeze_after_beta,
+        )
+        proposal_adapt_frozen = proposal_adaptation_frozen(
+            sweep_idx=sweep_idx,
+            beta_now=beta_now,
+            freeze_after_sweep=self.proposal_adapt_freeze_after_sweep,
+            freeze_after_beta=self.proposal_adapt_freeze_after_beta,
+        )
+        move_probs = base_move_probs if move_adapt_frozen else self.move_controller.adapt(base_move_probs)
+        if proposal_adapt_frozen:
+            block_range, multi_range = self._base_block_len_range, self._base_multi_k_range
+        else:
+            block_range, multi_range = self.proposal_controller.current_ranges(
+                self._base_block_len_range,
+                self._base_multi_k_range,
+                sequence_length=self.sequence_length,
             )
-            return per_tf
+        self.move_cfg["block_len_range"] = block_range
+        self.move_cfg["multi_k_range"] = multi_range
+        self.beta_ladder = self._current_beta_ladder(sweep_idx)
+        return beta_softmin, move_probs, move_adapt_frozen, proposal_adapt_frozen
 
-        def _record_unique_success(seq_arr: np.ndarray, per_tf: Dict[str, float]) -> None:
-            if self._unique_success_set is None:
-                return
-            if self.score_scale == "normalized-llr":
-                norm_values = list(per_tf.values())
-            else:
-                scorer = getattr(evaluator, "scorer", None)
-                if scorer is None:
-                    raise RuntimeError("early_stop.require_min_unique requires a scorer to compute normalized scores.")
-                norm_values = list(scorer.normalized_llr_map(seq_arr).values())
-            min_norm = min(norm_values) if norm_values else 0.0
-            if min_norm < self.early_stop_success_min_norm:
-                return
-            if self.dsdna_canonicalize:
-                key = SequenceState(canon_int(seq_arr)).to_string()
-            else:
-                key = SequenceState(seq_arr).to_string()
-            if key not in self._unique_success_set:
-                self._unique_success_set.add(key)
-                self.unique_successes = len(self._unique_success_set)
+    def _run_chain_sweep_moves(
+        self,
+        *,
+        phase: str,
+        sweep_idx: int,
+        beta_softmin: float | None,
+        move_probs: np.ndarray,
+        move_adapt_frozen: bool,
+        proposal_adapt_frozen: bool,
+        evaluator: Any,
+        rng: np.random.Generator,
+        chain_states: list[np.ndarray],
+        chain_state_objs: list[SequenceState],
+        scan_caches: list[LocalScanCache | None],
+        current_per_tf_maps: list[Dict[str, float]],
+    ) -> list[float]:
+        current_scores: list[float] = []
+        for c in range(self.chains):
+            per_tf_map = current_per_tf_maps[c]
+            current_score = evaluator.combined_from_scores(
+                per_tf_map,
+                beta=beta_softmin,
+                length=chain_states[c].size,
+            )
+            move_kind, accepted, per_tf_map, new_score, move_detail_payload = self._single_chain_move(
+                chain_states[c],
+                current_score,
+                self.beta_ladder[c],
+                beta_softmin,
+                evaluator,
+                rng,
+                move_probs,
+                state=chain_state_objs[c],
+                scan_cache=scan_caches[c],
+                per_tf=per_tf_map,
+                sweep_idx=sweep_idx,
+            )
+            current_per_tf_maps[c] = per_tf_map
+            current_scores.append(new_score)
+            if not move_adapt_frozen:
+                self.move_controller.record(move_kind, accepted=accepted)
+            if not proposal_adapt_frozen:
+                self.proposal_controller.record(move_kind, accepted=accepted)
+            self.move_stats.append(
+                make_move_stat_entry(
+                    sweep_idx=sweep_idx,
+                    phase=phase,
+                    chain_index=c,
+                    move_kind=move_kind,
+                    accepted=accepted,
+                    move_detail_payload=move_detail_payload,
+                )
+            )
+        return current_scores
+
+    def optimise(self) -> List[SequenceState]:  # noqa: C901  (long but readable)
+        """Run Gibbs annealing and return *k* diverse elite sequences."""
+
+        rng = self.rng
+        evaluator = self.scorer  # SequenceEvaluator
+        C, T, D = self.chains, self.tune, self.draws
+        logger.debug("Starting Gibbs annealing: chains=%d  tune=%d  draws=%d", C, T, D)
+        self._reset_optimise_state()
+        chain_states, chain_state_objs, scan_caches, current_per_tf_maps = self._initialize_chain_runtime(
+            rng=rng,
+            evaluator=evaluator,
+        )
+        chain_scores: List[List[float]] = [[] for _ in range(C)]
 
         # Burn‑in sweeps (record like Gibbs for consistency)
         for t in self.progress(range(T), desc="burn-in", leave=False, disable=not self.progress_bar):
             sweep_idx = t
-            beta_now = float(self.mcmc_beta_of(sweep_idx))
-            beta_softmin = self.softmin_of(sweep_idx) if self.softmin_of else None
-            base_move_probs = self.move_schedule.probs(sweep_idx / max(self.total_sweeps - 1, 1))
-            move_adapt_frozen = self._is_move_adaptation_frozen(sweep_idx, beta_now)
-            proposal_adapt_frozen = self._is_proposal_adaptation_frozen(sweep_idx, beta_now)
-            move_probs = base_move_probs if move_adapt_frozen else self.move_controller.adapt(base_move_probs)
-            if proposal_adapt_frozen:
-                block_range, multi_range = self._base_block_len_range, self._base_multi_k_range
-            else:
-                block_range, multi_range = self.proposal_controller.current_ranges(
-                    self._base_block_len_range,
-                    self._base_multi_k_range,
-                    sequence_length=self.sequence_length,
-                )
-            self.move_cfg["block_len_range"] = block_range
-            self.move_cfg["multi_k_range"] = multi_range
-            self.beta_ladder = self._current_beta_ladder(sweep_idx)
-            current_scores: list[float] = []
-            for c in range(C):
-                per_tf_map = current_per_tf_maps[c]
-                current_score = evaluator.combined_from_scores(
-                    per_tf_map,
-                    beta=beta_softmin,
-                    length=chain_states[c].size,
-                )
-                move_kind, accepted, per_tf_map, new_score, move_detail = self._single_chain_move(
-                    chain_states[c],
-                    current_score,
-                    self.beta_ladder[c],
-                    beta_softmin,
-                    evaluator,
-                    rng,
-                    move_probs,
-                    state=chain_state_objs[c],
-                    scan_cache=scan_caches[c],
-                    per_tf=per_tf_map,
-                    sweep_idx=sweep_idx,
-                )
-                current_per_tf_maps[c] = per_tf_map
-                current_scores.append(new_score)
-                if not move_adapt_frozen:
-                    self.move_controller.record(move_kind, accepted=accepted)
-                if not proposal_adapt_frozen:
-                    self.proposal_controller.record(move_kind, accepted=accepted)
-                self.move_stats.append(
-                    {
-                        "sweep_idx": int(sweep_idx),
-                        "phase": "tune",
-                        "chain": int(c),
-                        "move_kind": move_kind,
-                        "attempted": 1,
-                        "accepted": int(bool(accepted)),
-                        "delta": move_detail.get("delta"),
-                        "score_old": move_detail.get("score_old"),
-                        "score_new": move_detail.get("score_new"),
-                        "delta_hamming": move_detail.get("delta_hamming"),
-                        "gibbs_changed": move_detail.get("gibbs_changed"),
-                    }
-                )
+            beta_softmin, move_probs, move_adapt_frozen, proposal_adapt_frozen = self._configure_sweep(
+                sweep_idx=sweep_idx
+            )
+            self._run_chain_sweep_moves(
+                phase="tune",
+                sweep_idx=sweep_idx,
+                beta_softmin=beta_softmin,
+                move_probs=move_probs,
+                move_adapt_frozen=move_adapt_frozen,
+                proposal_adapt_frozen=proposal_adapt_frozen,
+                evaluator=evaluator,
+                rng=rng,
+                chain_states=chain_states,
+                chain_state_objs=chain_state_objs,
+                scan_caches=scan_caches,
+                current_per_tf_maps=current_per_tf_maps,
+            )
 
             if self.record_tune:
                 for c in range(C):
-                    _record(
-                        c,
-                        t,
-                        chain_states[c],
-                        current_per_tf_maps[c],
+                    self._record_state(
+                        slot_id=c,
+                        sweep_idx=t,
+                        seq_arr=chain_states[c],
+                        per_tf=current_per_tf_maps[c],
                         phase="tune",
                         beta=self.beta_ladder[c],
                         particle_id=chain_state_objs[c].particle_id,
                     )
 
-            self._maybe_log_progress("burn-in", t + 1, T)
+            maybe_log_progress(
+                logger=logger,
+                telemetry=self.telemetry,
+                progress_every=self.progress_every,
+                phase="burn-in",
+                step=t + 1,
+                total=T,
+                move_tally=self.move_tally,
+                accept_tally=self.accept_tally,
+                best_score=self.best_score,
+                best_meta=self.best_meta,
+                beta_ladder=self.beta_ladder,
+            )
 
         # Sampling sweeps + swap attempts
         no_improve = 0
         best_global: float | None = None
         for d in self.progress(range(D), desc="sampling", leave=False, disable=not self.progress_bar):
             sweep_idx = T + d
-            beta_now = float(self.mcmc_beta_of(sweep_idx))
-            beta_softmin = self.softmin_of(sweep_idx) if self.softmin_of else None
-            base_move_probs = self.move_schedule.probs(sweep_idx / max(self.total_sweeps - 1, 1))
-            move_adapt_frozen = self._is_move_adaptation_frozen(sweep_idx, beta_now)
-            proposal_adapt_frozen = self._is_proposal_adaptation_frozen(sweep_idx, beta_now)
-            move_probs = base_move_probs if move_adapt_frozen else self.move_controller.adapt(base_move_probs)
-            if proposal_adapt_frozen:
-                block_range, multi_range = self._base_block_len_range, self._base_multi_k_range
-            else:
-                block_range, multi_range = self.proposal_controller.current_ranges(
-                    self._base_block_len_range,
-                    self._base_multi_k_range,
-                    sequence_length=self.sequence_length,
-                )
-            self.move_cfg["block_len_range"] = block_range
-            self.move_cfg["multi_k_range"] = multi_range
-            self.beta_ladder = self._current_beta_ladder(sweep_idx)
-
-            # Within‑chain proposals
-            current_scores: list[float] = []
-            for c in range(C):
-                per_tf_map = current_per_tf_maps[c]
-                current_score = evaluator.combined_from_scores(
-                    per_tf_map,
-                    beta=beta_softmin,
-                    length=chain_states[c].size,
-                )
-                move_kind, accepted, per_tf_map, new_score, move_detail = self._single_chain_move(
-                    chain_states[c],
-                    current_score,
-                    self.beta_ladder[c],
-                    beta_softmin,
-                    evaluator,
-                    rng,
-                    move_probs,
-                    state=chain_state_objs[c],
-                    scan_cache=scan_caches[c],
-                    per_tf=per_tf_map,
-                    sweep_idx=sweep_idx,
-                )
-                current_per_tf_maps[c] = per_tf_map
-                current_scores.append(new_score)
-                if not move_adapt_frozen:
-                    self.move_controller.record(move_kind, accepted=accepted)
-                if not proposal_adapt_frozen:
-                    self.proposal_controller.record(move_kind, accepted=accepted)
-                self.move_stats.append(
-                    {
-                        "sweep_idx": int(sweep_idx),
-                        "phase": "draw",
-                        "chain": int(c),
-                        "move_kind": move_kind,
-                        "attempted": 1,
-                        "accepted": int(bool(accepted)),
-                        "delta": move_detail.get("delta"),
-                        "score_old": move_detail.get("score_old"),
-                        "score_new": move_detail.get("score_new"),
-                        "delta_hamming": move_detail.get("delta_hamming"),
-                        "gibbs_changed": move_detail.get("gibbs_changed"),
-                    }
-                )
+            beta_softmin, move_probs, move_adapt_frozen, proposal_adapt_frozen = self._configure_sweep(
+                sweep_idx=sweep_idx
+            )
+            current_scores = self._run_chain_sweep_moves(
+                phase="draw",
+                sweep_idx=sweep_idx,
+                beta_softmin=beta_softmin,
+                move_probs=move_probs,
+                move_adapt_frozen=move_adapt_frozen,
+                proposal_adapt_frozen=proposal_adapt_frozen,
+                evaluator=evaluator,
+                rng=rng,
+                chain_states=chain_states,
+                chain_state_objs=chain_state_objs,
+                scan_caches=scan_caches,
+                current_per_tf_maps=current_per_tf_maps,
+            )
 
             for c in range(C):
-                _record(
-                    c,
-                    T + d,
-                    chain_states[c],
-                    current_per_tf_maps[c],
+                self._record_state(
+                    slot_id=c,
+                    sweep_idx=T + d,
+                    seq_arr=chain_states[c],
+                    per_tf=current_per_tf_maps[c],
                     phase="draw",
                     beta=self.beta_ladder[c],
                     particle_id=chain_state_objs[c].particle_id,
                 )
                 if self._unique_success_set is not None:
-                    _record_unique_success(chain_states[c], current_per_tf_maps[c])
+                    self._record_unique_success(
+                        seq_arr=chain_states[c],
+                        per_tf=current_per_tf_maps[c],
+                        evaluator=evaluator,
+                    )
                 comb = current_scores[c]
                 if self.build_trace:
                     chain_scores[c].append(comb)
@@ -527,10 +586,18 @@ class GibbsAnnealOptimizer(Optimizer):
             score_mean = float(np.mean(current_scores)) if current_scores else None
             score_std = float(np.std(current_scores)) if current_scores else None
             current_best = float(max(current_scores)) if current_scores else None
-            self._maybe_log_progress(
-                "sampling",
-                d + 1,
-                D,
+            maybe_log_progress(
+                logger=logger,
+                telemetry=self.telemetry,
+                progress_every=self.progress_every,
+                phase="sampling",
+                step=d + 1,
+                total=D,
+                move_tally=self.move_tally,
+                accept_tally=self.accept_tally,
+                best_score=self.best_score,
+                best_meta=self.best_meta,
+                beta_ladder=self.beta_ladder,
                 current_score=current_best,
                 score_mean=score_mean,
                 score_std=score_std,
@@ -565,43 +632,22 @@ class GibbsAnnealOptimizer(Optimizer):
                         break
 
         logger.debug("Gibbs annealing finished. Move utilisation: %s", dict(self.move_tally))
-
-        # Build ArviZ trace from draw phase only when trace output is enabled.
-        if self.build_trace:
-            if chain_scores:
-                max_len = max(len(scores) for scores in chain_scores)
-                for scores in chain_scores:
-                    if len(scores) < max_len:
-                        scores.extend([float("nan")] * (max_len - len(scores)))
-            score_arr = np.asarray(chain_scores, dtype=float)  # (C, D)
-            az = importlib.import_module("arviz")
-            self.trace_idata = az.from_dict(posterior={"score": score_arr})
-        else:
-            self.trace_idata = None
-
-        if self.top_k <= 0:
-            self.elites_meta = []
-            return []
-
-        # Rank all recorded sequences by combined fitness
+        self.trace_idata = build_trace_idata(build_trace=self.build_trace, chain_scores=chain_scores)
         beta_softmin_final = self.softmin_of(self.total_sweeps - 1) if self.softmin_of else None
-        ranked: List[Tuple[float, np.ndarray, int]] = []
-        for idx, (seq, per_tf_map) in enumerate(zip(self.all_samples, self.all_scores)):
-            val = evaluator.combined_from_scores(per_tf_map, beta=beta_softmin_final, length=int(seq.size))
-            ranked.append((val, seq.copy(), idx))
-        ranked.sort(key=lambda x: x[0], reverse=True)
-
-        dist_fn = hamming_distance
-        elites: List[SequenceState] = []
-        picked_idx: List[int] = []
-        for val, seq, idx in ranked:
-            if len(elites) >= self.top_k:
-                break
-            if any(dist_fn(seq, e.seq) < self.min_dist for e in elites):
-                continue
-            elites.append(SequenceState(seq))
-            picked_idx.append(idx)
-        self.elites_meta = [self.all_meta[i] for i in picked_idx]
+        elites, elites_meta = select_diverse_elites(
+            top_k=self.top_k,
+            min_dist=self.min_dist,
+            all_samples=self.all_samples,
+            all_scores=self.all_scores,
+            all_meta=self.all_meta,
+            beta_softmin_final=beta_softmin_final,
+            combined_from_scores=lambda per_tf_map, beta, length: evaluator.combined_from_scores(
+                per_tf_map,
+                beta=beta,
+                length=length,
+            ),
+        )
+        self.elites_meta = elites_meta
         return elites
 
     # Low‑level helpers
@@ -626,31 +672,9 @@ class GibbsAnnealOptimizer(Optimizer):
         seq_before = seq.copy()
         if per_tf is None:
             per_tf = evaluator(state)
-        move_kind = self._sample_move_kind(rng, move_probs)
+        move_kind = sample_move_kind(rng=rng, move_probs=move_probs)
         self.move_tally[move_kind] += 1
-        accepted = False
         score_old = float(current_combined)
-
-        def _detail(
-            score_new: float,
-            *,
-            accepted_flag: bool,
-            gibbs_changed: bool | None = None,
-        ) -> Dict[str, object]:
-            delta_hamming = int(np.count_nonzero(seq != seq_before)) if accepted_flag else 0
-            payload: Dict[str, object] = {
-                "delta": float(score_new - score_old),
-                "score_old": score_old,
-                "score_new": float(score_new),
-                "delta_hamming": int(delta_hamming),
-            }
-            payload["gibbs_changed"] = bool(gibbs_changed) if gibbs_changed is not None else None
-            return payload
-
-        def _gibbs_detail(score_new: float, *, gibbs_changed: bool) -> Dict[str, object]:
-            return {
-                **_detail(score_new, accepted_flag=True, gibbs_changed=gibbs_changed),
-            }
 
         target = self.targeting.maybe_target(
             seq_len=L,
@@ -662,174 +686,457 @@ class GibbsAnnealOptimizer(Optimizer):
         target_tf = target[0] if target else None
         target_window = (target[1], target[2]) if target else None
 
-        # Single‑base flip
         if move_kind == "S":
-            if target_window is not None:
-                i = rng.integers(target_window[0], target_window[1])
-            else:
-                i = rng.integers(L)
-            old = int(seq[i])
-            lods = np.empty(4, float)
-            combined_vals = np.empty(4, float)
-            raw_candidates: list[Dict[str, float]] | None = None
-            per_tf_candidates: list[Dict[str, float]] = []
-            if scan_cache is not None:
-                raw_candidates = scan_cache.candidate_raw_llr_maps(i, old)
-                for b in range(4):
-                    comb_b = evaluator.combined_from_raw_llr(raw_candidates[b], beta=beta_softmin, length=L)
-                    combined_vals[b] = comb_b
-                    lods[b] = β * comb_b
-            else:
-                for b in range(4):
-                    seq[i] = b
-                    per_tf_b, comb_b = evaluator.evaluate(state, beta=beta_softmin, length=L)
-                    per_tf_candidates.append(per_tf_b)
-                    combined_vals[b] = comb_b
-                    lods[b] = β * comb_b
-                seq[i] = old
-            lods -= lods.max()
-            probs = np.exp(lods)
-            probs = probs / probs.sum()
-            p_stay = self._gibbs_stay_probability(sweep_idx)
-            if p_stay > 0:
-                one_hot = np.zeros(4, dtype=float)
-                one_hot[old] = 1.0
-                probs = (1.0 - p_stay) * probs + p_stay * one_hot
-                probs = probs / probs.sum()
-            new_base = rng.choice(4, p=probs)
-            seq[i] = new_base
-            if scan_cache is not None:
-                scan_cache.apply_base_change(i, old, int(new_base))
-                assert raw_candidates is not None
-                selected_per_tf = evaluator.scorer.scaled_from_raw_llr(raw_candidates[int(new_base)], L)
-            else:
-                selected_per_tf = per_tf_candidates[int(new_base)]
-            self.accept_tally[move_kind] += 1
-            accepted = True
-            gibbs_changed = int(new_base) != int(old)
-            return (
-                move_kind,
-                accepted,
-                selected_per_tf,
-                float(combined_vals[new_base]),
-                _gibbs_detail(float(combined_vals[new_base]), gibbs_changed=gibbs_changed),
+            return self._run_single_base_move(
+                seq=seq,
+                score_old=score_old,
+                β=β,
+                beta_softmin=beta_softmin,
+                evaluator=evaluator,
+                rng=rng,
+                state=state,
+                scan_cache=scan_cache,
+                sweep_idx=sweep_idx,
+                target_window=target_window,
+                seq_before=seq_before,
             )
-
-        # Contiguous block replace
         if move_kind == "B":
-            mn, mx = self.move_cfg["block_len_range"]
-            length = rng.integers(mn, mx + 1)
-            if length > L:
-                return move_kind, False, per_tf, current_combined, _detail(current_combined, accepted_flag=False)
-            start = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
-            proposal = rng.integers(0, 4, size=length)
-            old_block = seq[start : start + length].copy()
-
-            _replace_block(seq, start, length, proposal)
-            new_per_tf, new_f = evaluator.evaluate(state, beta=beta_softmin, length=L)
-            _replace_block(seq, start, length, old_block)
-            Δ = β * (new_f - current_combined)
-            if Δ >= 0 or np.log(rng.random()) < Δ:
-                _replace_block(seq, start, length, proposal)
-                self.accept_tally[move_kind] += 1
-                accepted = True
-                if scan_cache is not None:
-                    scan_cache.rebuild(seq)
-                return move_kind, accepted, new_per_tf, new_f, _detail(new_f, accepted_flag=True)
-            return move_kind, accepted, per_tf, current_combined, _detail(new_f, accepted_flag=False)
-
-        # Multi‑site flip
+            return self._run_block_move(
+                seq=seq,
+                score_old=score_old,
+                current_combined=current_combined,
+                β=β,
+                beta_softmin=beta_softmin,
+                evaluator=evaluator,
+                rng=rng,
+                state=state,
+                scan_cache=scan_cache,
+                per_tf=per_tf,
+                target_window=target_window,
+                seq_before=seq_before,
+            )
         if move_kind == "M":
-            kmin, kmax = self.move_cfg["multi_k_range"]
-            k = rng.integers(kmin, kmax + 1)
-            if k > L:
-                k = L
-            if target_window is not None and (target_window[1] - target_window[0]) >= k:
-                idxs = rng.choice(np.arange(target_window[0], target_window[1]), size=k, replace=False)
-            else:
-                idxs = rng.choice(L, size=k, replace=False)
-            old_bases = seq[idxs].copy()
-            proposal = rng.integers(0, 4, size=k)
-
-            seq[idxs] = proposal
-            new_per_tf, new_f = evaluator.evaluate(state, beta=beta_softmin, length=L)
-            seq[idxs] = old_bases
-            Δ = β * (new_f - current_combined)
-            if Δ >= 0 or np.log(rng.random()) < Δ:
-                seq[idxs] = proposal
-                self.accept_tally[move_kind] += 1
-                accepted = True
-                if scan_cache is not None:
-                    scan_cache.rebuild(seq)
-                return move_kind, accepted, new_per_tf, new_f, _detail(new_f, accepted_flag=True)
-            return move_kind, accepted, per_tf, current_combined, _detail(new_f, accepted_flag=False)
-
+            return self._run_multi_move(
+                seq=seq,
+                score_old=score_old,
+                current_combined=current_combined,
+                β=β,
+                beta_softmin=beta_softmin,
+                evaluator=evaluator,
+                rng=rng,
+                state=state,
+                scan_cache=scan_cache,
+                per_tf=per_tf,
+                target_window=target_window,
+                seq_before=seq_before,
+            )
         if move_kind == "L":
-            min_len, max_len = self.move_cfg["swap_len_range"]
-            length = rng.integers(min_len, max_len + 1)
-            max_shift = int(self.move_cfg["slide_max_shift"])
-            if max_shift < 1 or length >= L:
-                return move_kind, False, per_tf, current_combined, _detail(current_combined, accepted_flag=False)
-            shift = rng.integers(-max_shift, max_shift + 1)
-            if shift == 0:
-                shift = 1 if rng.random() < 0.5 else -1
-            if shift > 0:
-                min_start, max_start = 0, L - length - shift
-            else:
-                min_start, max_start = -shift, L - length
-            if max_start < min_start:
-                return move_kind, False, per_tf, current_combined, _detail(current_combined, accepted_flag=False)
-            start = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
-            start = max(min_start, min(max_start, start))
-            slide_window(seq, start, length, int(shift))
-            new_per_tf, new_f = evaluator.evaluate(state, beta=beta_softmin, length=L)
-            slide_window(seq, start + int(shift), length, int(-shift))
-            Δ = β * (new_f - current_combined)
-            if Δ >= 0 or np.log(rng.random()) < Δ:
-                slide_window(seq, start, length, int(shift))
-                self.accept_tally[move_kind] += 1
-                accepted = True
-                if scan_cache is not None:
-                    scan_cache.rebuild(seq)
-                return move_kind, accepted, new_per_tf, new_f, _detail(new_f, accepted_flag=True)
-            return move_kind, accepted, per_tf, current_combined, _detail(new_f, accepted_flag=False)
-
+            return self._run_slide_move(
+                seq=seq,
+                score_old=score_old,
+                current_combined=current_combined,
+                β=β,
+                beta_softmin=beta_softmin,
+                evaluator=evaluator,
+                rng=rng,
+                state=state,
+                scan_cache=scan_cache,
+                per_tf=per_tf,
+                target_window=target_window,
+                seq_before=seq_before,
+            )
         if move_kind == "W":
-            min_len, max_len = self.move_cfg["swap_len_range"]
-            length = rng.integers(min_len, max_len + 1)
-            if length >= L:
-                return move_kind, False, per_tf, current_combined, _detail(current_combined, accepted_flag=False)
-            start_a = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
-            max_tries = 10
-            start_b = start_a
-            for _ in range(max_tries):
-                start_b = rng.integers(0, L - length + 1)
-                if abs(start_b - start_a) >= length:
-                    break
-            if abs(start_b - start_a) < length:
-                return move_kind, False, per_tf, current_combined, _detail(current_combined, accepted_flag=False)
-            swap_block(seq, start_a, start_b, length)
-            new_per_tf, new_f = evaluator.evaluate(state, beta=beta_softmin, length=L)
-            swap_block(seq, start_a, start_b, length)
-            Δ = β * (new_f - current_combined)
-            if Δ >= 0 or np.log(rng.random()) < Δ:
-                swap_block(seq, start_a, start_b, length)
-                self.accept_tally[move_kind] += 1
-                accepted = True
-                if scan_cache is not None:
-                    scan_cache.rebuild(seq)
-                return move_kind, accepted, new_per_tf, new_f, _detail(new_f, accepted_flag=True)
-            return move_kind, accepted, per_tf, current_combined, _detail(new_f, accepted_flag=False)
+            return self._run_swap_move(
+                seq=seq,
+                score_old=score_old,
+                current_combined=current_combined,
+                β=β,
+                beta_softmin=beta_softmin,
+                evaluator=evaluator,
+                rng=rng,
+                state=state,
+                scan_cache=scan_cache,
+                per_tf=per_tf,
+                target_window=target_window,
+                seq_before=seq_before,
+            )
+        return self._run_insertion_move(
+            seq=seq,
+            score_old=score_old,
+            current_combined=current_combined,
+            β=β,
+            beta_softmin=beta_softmin,
+            evaluator=evaluator,
+            rng=rng,
+            state=state,
+            scan_cache=scan_cache,
+            per_tf=per_tf,
+            target_tf=target_tf,
+            target_window=target_window,
+            seq_before=seq_before,
+        )
 
-        # Motif insertion proposal
+    def _run_single_base_move(
+        self,
+        *,
+        seq: np.ndarray,
+        score_old: float,
+        β: float,
+        beta_softmin: float | None,
+        evaluator: Any,
+        rng: np.random.Generator,
+        state: SequenceState,
+        scan_cache: LocalScanCache | None,
+        sweep_idx: int,
+        target_window: tuple[int, int] | None,
+        seq_before: np.ndarray,
+    ) -> tuple[str, bool, Dict[str, float], float, Dict[str, object]]:
+        L = int(seq.size)
+        i = rng.integers(target_window[0], target_window[1]) if target_window is not None else rng.integers(L)
+        old = int(seq[i])
+        lods = np.empty(4, float)
+        combined_vals = np.empty(4, float)
+        raw_candidates: list[Dict[str, float]] | None = None
+        per_tf_candidates: list[Dict[str, float]] = []
+        if scan_cache is not None:
+            raw_candidates = scan_cache.candidate_raw_llr_maps(i, old)
+            for b in range(4):
+                comb_b = evaluator.combined_from_raw_llr(raw_candidates[b], beta=beta_softmin, length=L)
+                combined_vals[b] = comb_b
+                lods[b] = β * comb_b
+        else:
+            for b in range(4):
+                seq[i] = b
+                per_tf_b, comb_b = evaluator.evaluate(state, beta=beta_softmin, length=L)
+                per_tf_candidates.append(per_tf_b)
+                combined_vals[b] = comb_b
+                lods[b] = β * comb_b
+            seq[i] = old
+        lods -= lods.max()
+        probs = np.exp(lods)
+        probs = probs / probs.sum()
+        p_stay = gibbs_stay_probability(
+            sweep_idx=sweep_idx,
+            enabled=self.gibbs_inertia_enabled,
+            inertia_kind=self.gibbs_inertia_kind,
+            total_sweeps=self.total_sweeps,
+            p_stay_start=self.gibbs_inertia_p_stay_start,
+            p_stay_end=self.gibbs_inertia_p_stay_end,
+        )
+        if p_stay > 0:
+            one_hot = np.zeros(4, dtype=float)
+            one_hot[old] = 1.0
+            probs = (1.0 - p_stay) * probs + p_stay * one_hot
+            probs = probs / probs.sum()
+        new_base = int(rng.choice(4, p=probs))
+        seq[i] = new_base
+        if scan_cache is not None:
+            scan_cache.apply_base_change(i, old, new_base)
+            assert raw_candidates is not None
+            selected_per_tf = evaluator.scorer.scaled_from_raw_llr(raw_candidates[new_base], L)
+        else:
+            selected_per_tf = per_tf_candidates[new_base]
+        self.accept_tally["S"] += 1
+        score_new = float(combined_vals[new_base])
+        detail = move_detail(
+            seq=seq,
+            seq_before=seq_before,
+            score_old=score_old,
+            score_new=score_new,
+            accepted=True,
+            gibbs_changed=(new_base != old),
+        )
+        return "S", True, selected_per_tf, score_new, detail
+
+    def _run_block_move(
+        self,
+        *,
+        seq: np.ndarray,
+        score_old: float,
+        current_combined: float,
+        β: float,
+        beta_softmin: float | None,
+        evaluator: Any,
+        rng: np.random.Generator,
+        state: SequenceState,
+        scan_cache: LocalScanCache | None,
+        per_tf: Dict[str, float],
+        target_window: tuple[int, int] | None,
+        seq_before: np.ndarray,
+    ) -> tuple[str, bool, Dict[str, float], float, Dict[str, object]]:
+        L = int(seq.size)
+        mn, mx = self.move_cfg["block_len_range"]
+        length = rng.integers(mn, mx + 1)
+        if length > L:
+            detail = move_detail(
+                seq=seq,
+                seq_before=seq_before,
+                score_old=score_old,
+                score_new=float(current_combined),
+                accepted=False,
+            )
+            return "B", False, per_tf, current_combined, detail
+        start = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
+        proposal = rng.integers(0, 4, size=length)
+        old_block = seq[start : start + length].copy()
+        _replace_block(seq, start, length, proposal)
+        new_per_tf, new_score = evaluator.evaluate(state, beta=beta_softmin, length=L)
+        _replace_block(seq, start, length, old_block)
+        if accept_metropolis(beta=β, new_score=float(new_score), current_combined=current_combined, rng=rng):
+            _replace_block(seq, start, length, proposal)
+            self.accept_tally["B"] += 1
+            if scan_cache is not None:
+                scan_cache.rebuild(seq)
+            detail = move_detail(
+                seq=seq,
+                seq_before=seq_before,
+                score_old=score_old,
+                score_new=float(new_score),
+                accepted=True,
+            )
+            return "B", True, new_per_tf, new_score, detail
+        detail = move_detail(
+            seq=seq,
+            seq_before=seq_before,
+            score_old=score_old,
+            score_new=float(new_score),
+            accepted=False,
+        )
+        return "B", False, per_tf, current_combined, detail
+
+    def _run_multi_move(
+        self,
+        *,
+        seq: np.ndarray,
+        score_old: float,
+        current_combined: float,
+        β: float,
+        beta_softmin: float | None,
+        evaluator: Any,
+        rng: np.random.Generator,
+        state: SequenceState,
+        scan_cache: LocalScanCache | None,
+        per_tf: Dict[str, float],
+        target_window: tuple[int, int] | None,
+        seq_before: np.ndarray,
+    ) -> tuple[str, bool, Dict[str, float], float, Dict[str, object]]:
+        L = int(seq.size)
+        kmin, kmax = self.move_cfg["multi_k_range"]
+        k = rng.integers(kmin, kmax + 1)
+        if k > L:
+            k = L
+        if target_window is not None and (target_window[1] - target_window[0]) >= k:
+            idxs = rng.choice(np.arange(target_window[0], target_window[1]), size=k, replace=False)
+        else:
+            idxs = rng.choice(L, size=k, replace=False)
+        old_bases = seq[idxs].copy()
+        proposal = rng.integers(0, 4, size=k)
+        seq[idxs] = proposal
+        new_per_tf, new_score = evaluator.evaluate(state, beta=beta_softmin, length=L)
+        seq[idxs] = old_bases
+        if accept_metropolis(beta=β, new_score=float(new_score), current_combined=current_combined, rng=rng):
+            seq[idxs] = proposal
+            self.accept_tally["M"] += 1
+            if scan_cache is not None:
+                scan_cache.rebuild(seq)
+            detail = move_detail(
+                seq=seq,
+                seq_before=seq_before,
+                score_old=score_old,
+                score_new=float(new_score),
+                accepted=True,
+            )
+            return "M", True, new_per_tf, new_score, detail
+        detail = move_detail(
+            seq=seq,
+            seq_before=seq_before,
+            score_old=score_old,
+            score_new=float(new_score),
+            accepted=False,
+        )
+        return "M", False, per_tf, current_combined, detail
+
+    def _run_slide_move(
+        self,
+        *,
+        seq: np.ndarray,
+        score_old: float,
+        current_combined: float,
+        β: float,
+        beta_softmin: float | None,
+        evaluator: Any,
+        rng: np.random.Generator,
+        state: SequenceState,
+        scan_cache: LocalScanCache | None,
+        per_tf: Dict[str, float],
+        target_window: tuple[int, int] | None,
+        seq_before: np.ndarray,
+    ) -> tuple[str, bool, Dict[str, float], float, Dict[str, object]]:
+        L = int(seq.size)
+        min_len, max_len = self.move_cfg["swap_len_range"]
+        length = rng.integers(min_len, max_len + 1)
+        max_shift = int(self.move_cfg["slide_max_shift"])
+        if max_shift < 1 or length >= L:
+            detail = move_detail(
+                seq=seq,
+                seq_before=seq_before,
+                score_old=score_old,
+                score_new=float(current_combined),
+                accepted=False,
+            )
+            return "L", False, per_tf, current_combined, detail
+        shift = rng.integers(-max_shift, max_shift + 1)
+        if shift == 0:
+            shift = 1 if rng.random() < 0.5 else -1
+        if shift > 0:
+            min_start, max_start = 0, L - length - shift
+        else:
+            min_start, max_start = -shift, L - length
+        if max_start < min_start:
+            detail = move_detail(
+                seq=seq,
+                seq_before=seq_before,
+                score_old=score_old,
+                score_new=float(current_combined),
+                accepted=False,
+            )
+            return "L", False, per_tf, current_combined, detail
+        start = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
+        start = max(min_start, min(max_start, start))
+        slide_window(seq, start, length, int(shift))
+        new_per_tf, new_score = evaluator.evaluate(state, beta=beta_softmin, length=L)
+        slide_window(seq, start + int(shift), length, int(-shift))
+        if accept_metropolis(beta=β, new_score=float(new_score), current_combined=current_combined, rng=rng):
+            slide_window(seq, start, length, int(shift))
+            self.accept_tally["L"] += 1
+            if scan_cache is not None:
+                scan_cache.rebuild(seq)
+            detail = move_detail(
+                seq=seq,
+                seq_before=seq_before,
+                score_old=score_old,
+                score_new=float(new_score),
+                accepted=True,
+            )
+            return "L", True, new_per_tf, new_score, detail
+        detail = move_detail(
+            seq=seq,
+            seq_before=seq_before,
+            score_old=score_old,
+            score_new=float(new_score),
+            accepted=False,
+        )
+        return "L", False, per_tf, current_combined, detail
+
+    def _run_swap_move(
+        self,
+        *,
+        seq: np.ndarray,
+        score_old: float,
+        current_combined: float,
+        β: float,
+        beta_softmin: float | None,
+        evaluator: Any,
+        rng: np.random.Generator,
+        state: SequenceState,
+        scan_cache: LocalScanCache | None,
+        per_tf: Dict[str, float],
+        target_window: tuple[int, int] | None,
+        seq_before: np.ndarray,
+    ) -> tuple[str, bool, Dict[str, float], float, Dict[str, object]]:
+        L = int(seq.size)
+        min_len, max_len = self.move_cfg["swap_len_range"]
+        length = rng.integers(min_len, max_len + 1)
+        if length >= L:
+            detail = move_detail(
+                seq=seq,
+                seq_before=seq_before,
+                score_old=score_old,
+                score_new=float(current_combined),
+                accepted=False,
+            )
+            return "W", False, per_tf, current_combined, detail
+        start_a = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
+        max_tries = 10
+        start_b = start_a
+        for _ in range(max_tries):
+            start_b = rng.integers(0, L - length + 1)
+            if abs(start_b - start_a) >= length:
+                break
+        if abs(start_b - start_a) < length:
+            detail = move_detail(
+                seq=seq,
+                seq_before=seq_before,
+                score_old=score_old,
+                score_new=float(current_combined),
+                accepted=False,
+            )
+            return "W", False, per_tf, current_combined, detail
+        swap_block(seq, start_a, start_b, length)
+        new_per_tf, new_score = evaluator.evaluate(state, beta=beta_softmin, length=L)
+        swap_block(seq, start_a, start_b, length)
+        if accept_metropolis(beta=β, new_score=float(new_score), current_combined=current_combined, rng=rng):
+            swap_block(seq, start_a, start_b, length)
+            self.accept_tally["W"] += 1
+            if scan_cache is not None:
+                scan_cache.rebuild(seq)
+            detail = move_detail(
+                seq=seq,
+                seq_before=seq_before,
+                score_old=score_old,
+                score_new=float(new_score),
+                accepted=True,
+            )
+            return "W", True, new_per_tf, new_score, detail
+        detail = move_detail(
+            seq=seq,
+            seq_before=seq_before,
+            score_old=score_old,
+            score_new=float(new_score),
+            accepted=False,
+        )
+        return "W", False, per_tf, current_combined, detail
+
+    def _run_insertion_move(
+        self,
+        *,
+        seq: np.ndarray,
+        score_old: float,
+        current_combined: float,
+        β: float,
+        beta_softmin: float | None,
+        evaluator: Any,
+        rng: np.random.Generator,
+        state: SequenceState,
+        scan_cache: LocalScanCache | None,
+        per_tf: Dict[str, float],
+        target_tf: str | None,
+        target_window: tuple[int, int] | None,
+        seq_before: np.ndarray,
+    ) -> tuple[str, bool, Dict[str, float], float, Dict[str, object]]:
+        L = int(seq.size)
         tf_names = list(self.pwms.keys())
         if not tf_names:
-            return move_kind, False, per_tf, current_combined, _detail(current_combined, accepted_flag=False)
+            detail = move_detail(
+                seq=seq,
+                seq_before=seq_before,
+                score_old=score_old,
+                score_new=float(current_combined),
+                accepted=False,
+            )
+            return "I", False, per_tf, current_combined, detail
         tf_name = target_tf if target_tf in self.pwms else rng.choice(tf_names)
         pwm = self.pwms[tf_name]
         width = pwm.length
         if width > L:
-            return move_kind, False, per_tf, current_combined, _detail(current_combined, accepted_flag=False)
+            detail = move_detail(
+                seq=seq,
+                seq_before=seq_before,
+                score_old=score_old,
+                score_new=float(current_combined),
+                accepted=False,
+            )
+            return "I", False, per_tf, current_combined, detail
         start = targeted_start(seq_len=L, block_len=width, target=target_window, rng=rng)
         if rng.random() < self.insertion_consensus_prob:
             proposal = self._insertion_consensus[tf_name].copy()
@@ -840,113 +1147,29 @@ class GibbsAnnealOptimizer(Optimizer):
             proposal = revcomp_int(proposal)
         old_block = seq[start : start + width].copy()
         _replace_block(seq, start, width, proposal)
-        new_per_tf, new_f = evaluator.evaluate(state, beta=beta_softmin, length=L)
+        new_per_tf, new_score = evaluator.evaluate(state, beta=beta_softmin, length=L)
         _replace_block(seq, start, width, old_block)
-        Δ = β * (new_f - current_combined)
-        if Δ >= 0 or np.log(rng.random()) < Δ:
+        if accept_metropolis(beta=β, new_score=float(new_score), current_combined=current_combined, rng=rng):
             _replace_block(seq, start, width, proposal)
-            self.accept_tally[move_kind] += 1
-            accepted = True
+            self.accept_tally["I"] += 1
             if scan_cache is not None:
                 scan_cache.rebuild(seq)
-            return move_kind, accepted, new_per_tf, new_f, _detail(new_f, accepted_flag=True)
-        return move_kind, accepted, per_tf, current_combined, _detail(new_f, accepted_flag=False)
-
-    def _is_move_adaptation_frozen(self, sweep_idx: int, beta_now: float) -> bool:
-        if self.move_adapt_freeze_after_sweep is not None and int(sweep_idx) >= int(self.move_adapt_freeze_after_sweep):
-            return True
-        if self.move_adapt_freeze_after_beta is not None and float(beta_now) >= float(
-            self.move_adapt_freeze_after_beta
-        ):
-            return True
-        return False
-
-    def _is_proposal_adaptation_frozen(self, sweep_idx: int, beta_now: float) -> bool:
-        if self.proposal_adapt_freeze_after_sweep is not None and int(sweep_idx) >= int(
-            self.proposal_adapt_freeze_after_sweep
-        ):
-            return True
-        if self.proposal_adapt_freeze_after_beta is not None and float(beta_now) >= float(
-            self.proposal_adapt_freeze_after_beta
-        ):
-            return True
-        return False
-
-    def _gibbs_stay_probability(self, sweep_idx: int) -> float:
-        if not self.gibbs_inertia_enabled:
-            return 0.0
-        if self.gibbs_inertia_kind == "fixed" or self.total_sweeps <= 1:
-            return float(np.clip(self.gibbs_inertia_p_stay_end, 0.0, 1.0))
-        frac = min(max(float(sweep_idx) / float(max(self.total_sweeps - 1, 1)), 0.0), 1.0)
-        value = self.gibbs_inertia_p_stay_start + frac * (
-            self.gibbs_inertia_p_stay_end - self.gibbs_inertia_p_stay_start
+            detail = move_detail(
+                seq=seq,
+                seq_before=seq_before,
+                score_old=score_old,
+                score_new=float(new_score),
+                accepted=True,
+            )
+            return "I", True, new_per_tf, new_score, detail
+        detail = move_detail(
+            seq=seq,
+            seq_before=seq_before,
+            score_old=score_old,
+            score_new=float(new_score),
+            accepted=False,
         )
-        return float(np.clip(value, 0.0, 1.0))
-
-    def _sample_move_kind(self, rng: np.random.Generator, move_probs: np.ndarray) -> str:
-        return str(rng.choice(MOVE_KINDS, p=move_probs))
-
-    def _maybe_log_progress(
-        self,
-        phase: str,
-        step: int,
-        total: int,
-        *,
-        beta_softmin: float | None = None,
-        current_score: float | None = None,
-        score_mean: float | None = None,
-        score_std: float | None = None,
-    ) -> None:
-        if not self.progress_every:
-            return
-        if step % self.progress_every != 0 and step != total:
-            return
-        totals = dict(self.move_tally)
-        accepted = dict(self.accept_tally)
-        acceptance_rate = {k: (accepted.get(k, 0) / totals[k]) if totals.get(k, 0) else 0.0 for k in totals}
-        acc_label = ", ".join(f"{k}={acceptance_rate[k]:.2f}" for k in sorted(acceptance_rate))
-        mh_kinds = [k for k in totals if k != "S"]
-        mh_total = sum(totals.get(k, 0) for k in mh_kinds)
-        mh_accept = sum(accepted.get(k, 0) for k in mh_kinds)
-        acceptance_rate_mh = (mh_accept / mh_total) if mh_total else 0.0
-        all_total = sum(totals.values())
-        all_accept = sum(accepted.values())
-        acceptance_rate_all = (all_accept / all_total) if all_total else 0.0
-        pct = (step / total) * 100 if total else 100.0
-        score_blob = ""
-        if current_score is not None:
-            score_blob = f" score={current_score:.3f}"
-        if score_mean is not None and score_std is not None:
-            score_blob += f" mean={score_mean:.3f}±{score_std:.3f}"
-        if self.best_score is not None:
-            score_blob += f" best={self.best_score:.3f}"
-        logger.info(
-            "Progress: %s %d/%d (%.1f%%) accept={%s}%s",
-            phase,
-            step,
-            total,
-            pct,
-            acc_label,
-            score_blob,
-        )
-        self.telemetry.update(
-            phase=phase,
-            step=step,
-            total=total,
-            progress_pct=round(pct, 2),
-            acceptance_rate=acceptance_rate,
-            acceptance_rate_mh=acceptance_rate_mh,
-            acceptance_rate_all=acceptance_rate_all,
-            current_score=current_score,
-            score_mean=score_mean,
-            score_std=score_std,
-            beta_softmin=beta_softmin,
-            beta_min=min(self.beta_ladder) if self.beta_ladder else None,
-            beta_max=max(self.beta_ladder) if self.beta_ladder else None,
-            best_score=self.best_score,
-            best_chain=(self.best_meta[0] + 1) if self.best_meta else None,
-            best_draw=(self.best_meta[1]) if self.best_meta else None,
-        )
+        return "I", False, per_tf, current_combined, detail
 
     def stats(self) -> Dict[str, object]:
         return build_stats(self)

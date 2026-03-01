@@ -17,6 +17,7 @@ import logging
 import multiprocessing
 import shutil
 import time
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -38,6 +39,14 @@ from dnadesign.cruncher.app.study.helpers import (
     _TargetSet,
     _trial_key,
     validate_study_factor_alignment,
+)
+from dnadesign.cruncher.app.study.trial_progress import (
+    _emit_study_trial_progress,
+    _log_parallel_trial_progress,
+    _mark_pending_as_skipped,
+    _shutdown_trial_worker_process,
+    _trial_run_is_complete,
+    _TrialWorkerProcess,
 )
 from dnadesign.cruncher.app.study_summary import summarize_study_run
 from dnadesign.cruncher.app.target_service import has_blocking_target_errors, target_statuses
@@ -339,13 +348,6 @@ def _run_one_trial_worker(
     return str(run_dir.resolve())
 
 
-@dataclass(frozen=True)
-class _TrialWorkerProcess:
-    process: multiprocessing.Process
-    result_path: Path
-    trial_index: int
-
-
 def _trial_worker_result_path(*, study_run_dir: Path, trial_run: StudyTrialRun) -> Path:
     return trial_seed_root(study_run_dir, trial_id=trial_run.trial_id, seed=trial_run.seed) / "worker_result.json"
 
@@ -406,15 +408,6 @@ def _load_worker_result(result_path: Path, *, exitcode: int | None) -> tuple[boo
             raise RuntimeError(f"Study trial worker failed with no error payload: {result_path}")
         raise RuntimeError(f"Study trial worker exited with code {int(exitcode)} and no error payload: {result_path}")
     return False, error
-
-
-def _mark_pending_as_skipped(manifest: StudyManifestV1, *, reason: str) -> None:
-    for idx, trial_run in enumerate(manifest.trial_runs):
-        if trial_run.status == "pending":
-            trial_run.status = "skipped"
-            trial_run.error = reason
-            trial_run.finished_at = utc_now_iso()
-            manifest.trial_runs[idx] = trial_run
 
 
 @dataclass(frozen=True)
@@ -566,82 +559,6 @@ def _run_study_trials(
     )
 
 
-def _trial_run_is_complete(trial_run: StudyTrialRun) -> bool:
-    return trial_run.status == "success" and bool(trial_run.run_dir)
-
-
-def _log_parallel_trial_progress(
-    *,
-    status: StudyStatusV1,
-    total_runs: int,
-    queued_count: int,
-) -> None:
-    completed = int(status.success_runs + status.error_runs + status.skipped_runs)
-    logger.info(
-        "Study trial progress: completed=%d/%d success=%d error=%d running=%d queued=%d.",
-        completed,
-        int(total_runs),
-        int(status.success_runs),
-        int(status.error_runs),
-        int(status.running_runs),
-        int(queued_count),
-    )
-
-
-def _study_trial_progress_payload(
-    *,
-    status: StudyStatusV1,
-    total_runs: int,
-    queued_count: int,
-    worker_count: int,
-    active_trial_ids: list[str],
-) -> dict[str, object]:
-    completed = int(status.success_runs + status.error_runs + status.skipped_runs)
-    return {
-        "completed_runs": int(completed),
-        "total_runs": int(total_runs),
-        "success_runs": int(status.success_runs),
-        "error_runs": int(status.error_runs),
-        "running_runs": int(status.running_runs),
-        "queued_runs": int(queued_count),
-        "worker_count": int(worker_count),
-        "active_trial_ids": list(active_trial_ids),
-    }
-
-
-def _emit_study_trial_progress(
-    on_event: StudyEventCallback | None,
-    *,
-    status: StudyStatusV1,
-    total_runs: int,
-    queued_count: int,
-    worker_count: int,
-    active_trial_ids: list[str],
-) -> None:
-    _emit_study_event(
-        on_event,
-        "study_trial_progress",
-        **_study_trial_progress_payload(
-            status=status,
-            total_runs=total_runs,
-            queued_count=queued_count,
-            worker_count=worker_count,
-            active_trial_ids=active_trial_ids,
-        ),
-    )
-
-
-def _shutdown_trial_worker_process(process: multiprocessing.Process, *, terminate: bool) -> None:
-    if terminate and process.is_alive():
-        process.terminate()
-        process.join(timeout=5.0)
-        if process.is_alive():
-            process.kill()
-            process.join()
-        return
-    process.join()
-
-
 def _run_study_trials_serial(
     *,
     bootstrap: _StudyBootstrap,
@@ -743,6 +660,131 @@ def _run_study_trials_serial(
     return any_errors, aborted
 
 
+def _emit_parallel_progress(
+    *,
+    on_event: StudyEventCallback | None,
+    status: StudyStatusV1,
+    manifest: StudyManifestV1,
+    queued_count: int,
+    worker_count: int,
+    in_flight: dict[int, _TrialWorkerProcess],
+) -> None:
+    if on_event is None:
+        return
+    active_trial_ids = sorted(str(manifest.trial_runs[item].trial_id) for item in in_flight)
+    _emit_study_trial_progress(
+        on_event,
+        status=status,
+        total_runs=len(manifest.trial_runs),
+        queued_count=int(queued_count),
+        worker_count=worker_count,
+        active_trial_ids=active_trial_ids,
+    )
+
+
+def _spawn_parallel_trial_worker(
+    *,
+    bootstrap: _StudyBootstrap,
+    manifest: StudyManifestV1,
+    status: StudyStatusV1,
+    trial_index: int,
+    ctx: multiprocessing.context.BaseContext,
+    worker_target: Callable[..., None],
+) -> _TrialWorkerProcess:
+    trial_run = manifest.trial_runs[trial_index]
+    trial_run.status = "running"
+    trial_run.error = None
+    trial_run.started_at = utc_now_iso()
+    trial_run.finished_at = None
+    manifest.trial_runs[trial_index] = trial_run
+    _refresh_status(status, manifest)
+    _persist_study_state(
+        manifest_file=bootstrap.manifest_file,
+        status_file=bootstrap.status_file,
+        manifest=manifest,
+        status=status,
+    )
+    _append_log(
+        bootstrap.study_run_dir,
+        f"RUN trial={trial_run.trial_id} seed={trial_run.seed} target_set={trial_run.target_set_index}",
+    )
+    result_path = _trial_worker_result_path(study_run_dir=bootstrap.study_run_dir, trial_run=trial_run)
+    if result_path.exists():
+        result_path.unlink()
+    process = ctx.Process(
+        target=worker_target,
+        kwargs={
+            "base_config_path": str(bootstrap.base_config_path),
+            "workspace_root": str(bootstrap.workspace_root),
+            "study_run_dir": str(bootstrap.study_run_dir),
+            "trial_run_payload": trial_run.model_dump(mode="python"),
+            "seed_path": str(bootstrap.spec.replicates.seed_path),
+            "profile": str(bootstrap.spec.artifacts.trial_output_profile),
+            "progress_bar": False,
+            "quiet_logs": True,
+            "result_path": str(result_path),
+        },
+    )
+    process.start()
+    return _TrialWorkerProcess(process=process, result_path=result_path, trial_index=trial_index)
+
+
+def _finalize_parallel_trial_worker(
+    *,
+    bootstrap: _StudyBootstrap,
+    manifest: StudyManifestV1,
+    status: StudyStatusV1,
+    trial_index: int,
+    worker_state: _TrialWorkerProcess,
+) -> tuple[bool, bool]:
+    any_errors = False
+    aborted = False
+    _shutdown_trial_worker_process(worker_state.process, terminate=False)
+    trial_run = manifest.trial_runs[trial_index]
+    try:
+        ok, payload = _load_worker_result(worker_state.result_path, exitcode=worker_state.process.exitcode)
+        if ok:
+            trial_run.run_dir = payload
+            trial_run.status = "success"
+            _append_log(
+                bootstrap.study_run_dir,
+                f"RUN_DONE trial={trial_run.trial_id} seed={trial_run.seed} target_set={trial_run.target_set_index}",
+            )
+        else:
+            trial_run.status = "error"
+            trial_run.error = payload
+            any_errors = True
+            _append_log(
+                bootstrap.study_run_dir,
+                "ERROR "
+                f"trial={trial_run.trial_id} seed={trial_run.seed} "
+                f"target_set={trial_run.target_set_index}: {payload}",
+            )
+            if bootstrap.spec.execution.on_trial_error == "abort":
+                aborted = True
+    except Exception as exc:
+        trial_run.status = "error"
+        trial_run.error = str(exc)
+        any_errors = True
+        _append_log(
+            bootstrap.study_run_dir,
+            f"ERROR trial={trial_run.trial_id} seed={trial_run.seed} target_set={trial_run.target_set_index}: {exc}",
+        )
+        if bootstrap.spec.execution.on_trial_error == "abort":
+            aborted = True
+    finally:
+        trial_run.finished_at = utc_now_iso()
+        manifest.trial_runs[trial_index] = trial_run
+        _refresh_status(status, manifest)
+        _persist_study_state(
+            manifest_file=bootstrap.manifest_file,
+            status_file=bootstrap.status_file,
+            manifest=manifest,
+            status=status,
+        )
+    return any_errors, aborted
+
+
 def _run_study_trials_parallel(
     *,
     bootstrap: _StudyBootstrap,
@@ -771,7 +813,7 @@ def _run_study_trials_parallel(
         bootstrap.study_run_dir,
         f"RUN_PARALLEL_START workers={worker_count} total={len(pending_indexes)}",
     )
-    queued_indexes = list(pending_indexes)
+    queued_indexes: deque[int] = deque(pending_indexes)
     in_flight: dict[int, _TrialWorkerProcess] = {}
     ctx = multiprocessing.get_context("spawn")
     worker_module = importlib.import_module("dnadesign.cruncher.app.study_workflow")
@@ -782,54 +824,22 @@ def _run_study_trials_parallel(
     try:
         while queued_indexes or in_flight:
             while not aborted and queued_indexes and len(in_flight) < worker_count:
-                idx = queued_indexes.pop(0)
-                trial_run = manifest.trial_runs[idx]
-                trial_run.status = "running"
-                trial_run.error = None
-                trial_run.started_at = utc_now_iso()
-                trial_run.finished_at = None
-                manifest.trial_runs[idx] = trial_run
-                _refresh_status(status, manifest)
-                _persist_study_state(
-                    manifest_file=bootstrap.manifest_file,
-                    status_file=bootstrap.status_file,
+                idx = queued_indexes.popleft()
+                in_flight[idx] = _spawn_parallel_trial_worker(
+                    bootstrap=bootstrap,
                     manifest=manifest,
                     status=status,
-                )
-                _append_log(
-                    bootstrap.study_run_dir,
-                    f"RUN trial={trial_run.trial_id} seed={trial_run.seed} target_set={trial_run.target_set_index}",
-                )
-                result_path = _trial_worker_result_path(study_run_dir=bootstrap.study_run_dir, trial_run=trial_run)
-                if result_path.exists():
-                    result_path.unlink()
-                process = ctx.Process(
-                    target=worker_target,
-                    kwargs={
-                        "base_config_path": str(bootstrap.base_config_path),
-                        "workspace_root": str(bootstrap.workspace_root),
-                        "study_run_dir": str(bootstrap.study_run_dir),
-                        "trial_run_payload": trial_run.model_dump(mode="python"),
-                        "seed_path": str(bootstrap.spec.replicates.seed_path),
-                        "profile": str(bootstrap.spec.artifacts.trial_output_profile),
-                        "progress_bar": False,
-                        "quiet_logs": True,
-                        "result_path": str(result_path),
-                    },
-                )
-                process.start()
-                in_flight[idx] = _TrialWorkerProcess(
-                    process=process,
-                    result_path=result_path,
                     trial_index=idx,
+                    ctx=ctx,
+                    worker_target=worker_target,
                 )
-                _emit_study_trial_progress(
-                    on_event,
+                _emit_parallel_progress(
+                    on_event=on_event,
                     status=status,
-                    total_runs=len(manifest.trial_runs),
+                    manifest=manifest,
                     queued_count=len(queued_indexes),
                     worker_count=worker_count,
-                    active_trial_ids=sorted(str(manifest.trial_runs[item].trial_id) for item in in_flight),
+                    in_flight=in_flight,
                 )
 
             if not in_flight:
@@ -840,17 +850,18 @@ def _run_study_trials_parallel(
                 now = time.monotonic()
                 if now - last_progress_heartbeat >= 30.0:
                     _log_parallel_trial_progress(
+                        logger=logger,
                         status=status,
                         total_runs=len(manifest.trial_runs),
                         queued_count=len(queued_indexes),
                     )
-                    _emit_study_trial_progress(
-                        on_event,
+                    _emit_parallel_progress(
+                        on_event=on_event,
                         status=status,
-                        total_runs=len(manifest.trial_runs),
+                        manifest=manifest,
                         queued_count=len(queued_indexes),
                         worker_count=worker_count,
-                        active_trial_ids=sorted(str(manifest.trial_runs[item].trial_id) for item in in_flight),
+                        in_flight=in_flight,
                     )
                     last_progress_heartbeat = now
                 time.sleep(0.05)
@@ -858,64 +869,28 @@ def _run_study_trials_parallel(
 
             for idx in completed_indexes:
                 state = in_flight.pop(idx)
-                _shutdown_trial_worker_process(state.process, terminate=False)
-                trial_run = manifest.trial_runs[idx]
-                try:
-                    ok, payload = _load_worker_result(state.result_path, exitcode=state.process.exitcode)
-                    if ok:
-                        trial_run.run_dir = payload
-                        trial_run.status = "success"
-                        _append_log(
-                            bootstrap.study_run_dir,
-                            "RUN_DONE "
-                            f"trial={trial_run.trial_id} seed={trial_run.seed} target_set={trial_run.target_set_index}",
-                        )
-                    else:
-                        trial_run.status = "error"
-                        trial_run.error = payload
-                        any_errors = True
-                        _append_log(
-                            bootstrap.study_run_dir,
-                            "ERROR "
-                            f"trial={trial_run.trial_id} seed={trial_run.seed} "
-                            f"target_set={trial_run.target_set_index}: {payload}",
-                        )
-                        if bootstrap.spec.execution.on_trial_error == "abort":
-                            aborted = True
-                except Exception as exc:
-                    trial_run.status = "error"
-                    trial_run.error = str(exc)
-                    any_errors = True
-                    _append_log(
-                        bootstrap.study_run_dir,
-                        "ERROR "
-                        f"trial={trial_run.trial_id} seed={trial_run.seed} "
-                        f"target_set={trial_run.target_set_index}: {exc}",
-                    )
-                    if bootstrap.spec.execution.on_trial_error == "abort":
-                        aborted = True
-                finally:
-                    trial_run.finished_at = utc_now_iso()
-                    manifest.trial_runs[idx] = trial_run
-                    _refresh_status(status, manifest)
-                    _persist_study_state(
-                        manifest_file=bootstrap.manifest_file,
-                        status_file=bootstrap.status_file,
-                        manifest=manifest,
-                        status=status,
-                    )
+                trial_has_error, trial_aborted = _finalize_parallel_trial_worker(
+                    bootstrap=bootstrap,
+                    manifest=manifest,
+                    status=status,
+                    trial_index=idx,
+                    worker_state=state,
+                )
+                any_errors = any_errors or trial_has_error
+                aborted = aborted or trial_aborted
             _log_parallel_trial_progress(
+                logger=logger,
                 status=status,
                 total_runs=len(manifest.trial_runs),
                 queued_count=len(queued_indexes),
             )
-            _emit_study_trial_progress(
-                on_event,
+            _emit_parallel_progress(
+                on_event=on_event,
                 status=status,
-                total_runs=len(manifest.trial_runs),
                 queued_count=len(queued_indexes),
                 worker_count=worker_count,
-                active_trial_ids=sorted(str(manifest.trial_runs[item].trial_id) for item in in_flight),
+                manifest=manifest,
+                in_flight=in_flight,
             )
             last_progress_heartbeat = time.monotonic()
     except Exception:

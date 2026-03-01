@@ -26,7 +26,7 @@ def _workspace_names() -> list[str]:
 
 
 def _non_portfolio_workspaces() -> list[str]:
-    excluded = {"portfolio", "portfolios"}
+    excluded = {"archived", "portfolio", "portfolios"}
     return [name for name in _workspace_names() if name not in excluded]
 
 
