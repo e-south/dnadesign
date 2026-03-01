@@ -222,9 +222,6 @@ cruncher:
     trajectory_particle_alpha_max: 0.45
     trajectory_video:
       enabled: true
-      sweep_inset:
-        enabled: true
-        corner: bottom_left
     elites_showcase:
       max_panels: 12
     fimo_compare:

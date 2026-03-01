@@ -23,7 +23,7 @@ from dnadesign.baserender import run_job
 from dnadesign.cruncher.analysis.trajectory_video_contract import build_sequence_rows_video_job
 from dnadesign.cruncher.analysis.trajectory_video_timeline import (
     allocate_taper_extra_frames,
-    build_inset_line_indices,
+    build_panel_line_indices,
     sample_frame_indices,
     select_chain_rows,
     source_indices_for_best_so_far_timeline,
@@ -34,6 +34,7 @@ from dnadesign.cruncher.core.scoring import Scorer
 
 _DNA_BASE_TO_INT = {"A": 0, "C": 1, "G": 2, "T": 3}
 _DNA_COMP = str.maketrans("ACGTacgtNn", "TGCAtgcaNn")
+_VIDEO_SUBTITLE_LINE_CHARS = 68
 
 __all__ = [
     "render_chain_trajectory_video",
@@ -64,6 +65,104 @@ def _matrix_from_pwm(pwm_obj: PWM) -> list[list[float]]:
     return [[float(v) for v in row[:4]] for row in arr.tolist()]
 
 
+def _clamp_normalized_score(value: float) -> float:
+    numeric = float(value)
+    if not np.isfinite(numeric):
+        raise ValueError("Trajectory video subtitle scores must be finite.")
+    if numeric < 0.0:
+        return 0.0
+    if numeric > 1.0:
+        return 1.0
+    return numeric
+
+
+def _wrap_subtitle_tokens(tokens: list[str], *, line_chars: int) -> str:
+    lines: list[str] = []
+    current = ""
+    for token in tokens:
+        text = str(token).strip()
+        if not text:
+            continue
+        if not current:
+            current = text
+            continue
+        candidate = f"{current} {text}"
+        if len(candidate) <= int(line_chars):
+            current = candidate
+            continue
+        lines.append(current)
+        current = text
+    if current:
+        lines.append(current)
+    return "\n".join(lines)
+
+
+def _video_subtitle_text(*, tf_names: list[str], per_tf_map: Mapping[str, float]) -> str:
+    tokens: list[str] = []
+    for tf_name in tf_names:
+        if tf_name not in per_tf_map:
+            raise ValueError(f"Trajectory video subtitle missing normalized score for TF '{tf_name}'.")
+        score_value = _clamp_normalized_score(float(per_tf_map[tf_name]))
+        tokens.append(f"{tf_name}={score_value:.2f}")
+    return _wrap_subtitle_tokens(tokens, line_chars=_VIDEO_SUBTITLE_LINE_CHARS)
+
+
+def _objective_scale_label(objective_config: Mapping[str, object] | None) -> str:
+    cfg = objective_config if isinstance(objective_config, Mapping) else {}
+    score_scale = str(cfg.get("score_scale") or "normalized-llr").strip().lower()
+    if score_scale in {"llr", "raw-llr", "raw_llr"}:
+        return "raw-LLR"
+    if score_scale in {"normalized-llr", "norm-llr", "norm_llr"}:
+        return "norm-LLR"
+    if score_scale == "logp":
+        return "logp"
+    if score_scale == "z":
+        return "z"
+    return score_scale
+
+
+def _panel_y_label(*, objective_column: str, objective_config: Mapping[str, object] | None) -> str:
+    column = str(objective_column).strip()
+    if column == "raw_llr_objective":
+        return "Best objective (raw-LLR)"
+    if column == "norm_llr_objective":
+        return "Best objective (norm-LLR)"
+    if column != "objective_scalar":
+        return f"Best objective ({column})"
+    cfg = objective_config if isinstance(objective_config, Mapping) else {}
+    combine = str(cfg.get("combine") or "min").strip().lower()
+    scale_label = _objective_scale_label(cfg)
+    softmin_cfg = cfg.get("softmin")
+    softmin_enabled = isinstance(softmin_cfg, Mapping) and bool(softmin_cfg.get("enabled"))
+    if combine == "sum":
+        return f"Best sum-TF {scale_label}"
+    if combine == "min" and softmin_enabled:
+        return f"Best soft-min TF {scale_label}"
+    return f"Best min-TF {scale_label}"
+
+
+def _parse_hit_fields(*, hit: Mapping[str, object], tf_name: str, sequence_len: int) -> tuple[int, int, str, str]:
+    start = int(hit["best_start"])
+    window_seq = str(hit["best_window_seq"]).upper()
+    width = len(window_seq)
+    if width < 1:
+        raise ValueError(f"Trajectory video hit width is invalid for TF '{tf_name}'.")
+    strand_raw = str(hit["strand"]).strip()
+    if strand_raw == "+":
+        strand = "fwd"
+    elif strand_raw == "-":
+        strand = "rev"
+    else:
+        raise ValueError(f"Trajectory video hit has invalid strand for TF '{tf_name}': {strand_raw!r}")
+    end = start + width
+    if start < 0 or end > int(sequence_len):
+        raise ValueError(
+            f"Trajectory video hit span is out of bounds for TF '{tf_name}': [{start}, {end}) "
+            f"for sequence length {int(sequence_len)}."
+        )
+    return start, end, strand, window_seq
+
+
 def render_chain_trajectory_video(
     *,
     trajectory_df: pd.DataFrame,
@@ -75,6 +174,8 @@ def render_chain_trajectory_video(
     pwm_pseudocounts: float,
     log_odds_clip: float | None,
     tmp_root: Path,
+    polished_final_sequence: str | None = None,
+    objective_from_manifest: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     if not tf_names:
         raise ValueError("Trajectory video requires at least one TF name.")
@@ -132,29 +233,6 @@ def render_chain_trajectory_video(
     if len(source_indices) > int(config.limits.max_snapshots):
         raise ValueError("Trajectory video selected snapshots exceed limits.max_snapshots.")
 
-    inset_x: list[float] | None = None
-    inset_y: list[float] | None = None
-    inset_point_index_by_source: dict[int, int] = {}
-    if bool(config.sweep_inset.enabled):
-        line_budget = min(240, max(2, int(config.limits.max_snapshots) * 2))
-        line_indices = build_inset_line_indices(
-            point_count=int(objective_values.size),
-            budget=line_budget,
-            required_indices=list(source_indices),
-        )
-        inset_x = [float(chain_rows.iloc[int(idx)]["sweep"]) for idx in line_indices]
-        best_curve = np.maximum.accumulate(objective_values)
-        inset_y = [float(best_curve[int(idx)]) for idx in line_indices]
-        index_by_source = {int(idx): pos for pos, idx in enumerate(line_indices)}
-        for source_idx in source_indices:
-            key = int(source_idx)
-            if key in index_by_source:
-                inset_point_index_by_source[key] = int(index_by_source[key])
-                continue
-            fallback = int(np.searchsorted(np.asarray(line_indices, dtype=int), key, side="right") - 1)
-            fallback = max(0, min(fallback, len(line_indices) - 1))
-            inset_point_index_by_source[key] = fallback
-
     scorer = Scorer(
         dict(pwms),
         background=(0.25, 0.25, 0.25, 0.25),
@@ -164,6 +242,43 @@ def render_chain_trajectory_video(
         log_odds_clip=log_odds_clip,
     )
     pwm_matrices = {tf: _matrix_from_pwm(pwms[tf]) for tf in tf_names}
+    frame_sequences: list[str] = []
+    frame_per_tf_maps: list[Mapping[str, float]] = []
+    frame_hit_maps: list[Mapping[str, Mapping[str, object]]] = []
+    for source_idx in source_indices:
+        source_row = chain_rows.iloc[int(source_idx)]
+        sequence = str(source_row.get("sequence", "")).strip().upper()
+        if not sequence:
+            raise ValueError("Trajectory video source row is missing sequence.")
+        seq_arr = _encode_sequence(sequence)
+        per_tf_map, hit_map = scorer.compute_all_per_pwm_and_hits(seq_arr, int(seq_arr.size))
+        frame_sequences.append(sequence)
+        frame_per_tf_maps.append(per_tf_map)
+        frame_hit_maps.append(hit_map)
+
+    line_budget = min(240, max(2, int(config.limits.max_snapshots) * 2))
+    line_indices = build_panel_line_indices(
+        point_count=int(objective_values.size),
+        budget=line_budget,
+        required_indices=list(source_indices),
+    )
+    panel_x = [float(chain_rows.iloc[int(idx)]["sweep"]) for idx in line_indices]
+    best_curve = np.maximum.accumulate(objective_values)
+    panel_y = [float(best_curve[int(idx)]) for idx in line_indices]
+    panel_y_label = _panel_y_label(
+        objective_column=objective_column,
+        objective_config=objective_from_manifest,
+    )
+    panel_point_index_by_source: dict[int, int] = {}
+    index_by_source = {int(idx): pos for pos, idx in enumerate(line_indices)}
+    for source_idx in source_indices:
+        key = int(source_idx)
+        if key in index_by_source:
+            panel_point_index_by_source[key] = int(index_by_source[key])
+            continue
+        fallback = int(np.searchsorted(np.asarray(line_indices, dtype=int), key, side="right") - 1)
+        fallback = max(0, min(fallback, len(line_indices) - 1))
+        panel_point_index_by_source[key] = fallback
 
     snapshot_rows: list[dict[str, object]] = []
     pauses: dict[str, float] = {}
@@ -173,14 +288,17 @@ def render_chain_trajectory_video(
         overlay_title = "Best-so-far motif placement improves over sweeps"
     else:
         overlay_title = "Sampled motif placement across sweeps"
-    for frame_no, (sampled_idx, source_idx) in enumerate(zip(sampled_indices, source_indices), start=1):
-        source_row = chain_rows.iloc[int(source_idx)]
-        sequence = str(source_row.get("sequence", "")).strip().upper()
-        if not sequence:
-            raise ValueError("Trajectory video source row is missing sequence.")
-        seq_arr = _encode_sequence(sequence)
-        _, hit_map = scorer.compute_all_per_pwm_and_hits(seq_arr, int(seq_arr.size))
 
+    def _build_snapshot_row(
+        *,
+        frame_id: str,
+        frame_no: int,
+        source_idx: int,
+        sequence: str,
+        per_tf_map: Mapping[str, float],
+        hit_map: Mapping[str, Mapping[str, object]],
+    ) -> dict[str, object]:
+        frame_subtitle = _video_subtitle_text(tf_names=tf_names, per_tf_map=per_tf_map)
         feature_rows: list[dict[str, object]] = []
         effect_rows: list[dict[str, object]] = []
         tag_labels: dict[str, str] = {}
@@ -188,24 +306,8 @@ def render_chain_trajectory_video(
             hit = hit_map.get(tf_name)
             if hit is None:
                 raise ValueError(f"Trajectory video missing hit for TF '{tf_name}'.")
-            start = int(hit["best_start"])
-            window_seq = str(hit["best_window_seq"]).upper()
-            width = len(window_seq)
-            if width < 1:
-                raise ValueError(f"Trajectory video hit width is invalid for TF '{tf_name}'.")
-            strand_raw = str(hit["strand"]).strip()
-            if strand_raw == "+":
-                strand = "fwd"
-            elif strand_raw == "-":
-                strand = "rev"
-            else:
-                raise ValueError(f"Trajectory video hit has invalid strand for TF '{tf_name}': {strand_raw!r}")
-            end = start + width
-            if start < 0 or end > len(sequence):
-                raise ValueError(
-                    f"Trajectory video hit span is out of bounds for TF '{tf_name}': [{start}, {end}) "
-                    f"for sequence length {len(sequence)}."
-                )
+            start, end, strand, window_seq = _parse_hit_fields(hit=hit, tf_name=tf_name, sequence_len=len(sequence))
+            width = int(end - start)
             label = window_seq if strand == "fwd" else _revcomp(window_seq)
             feature_id = f"frame_{frame_no}:best_window:{tf_name}:{tf_idx}"
             tag = f"tf:{tf_name}"
@@ -236,33 +338,66 @@ def render_chain_trajectory_video(
             )
             tag_labels[tag] = tf_name
 
+        display_payload: dict[str, object] = {
+            "overlay_text": None,
+            "video_subtitle": frame_subtitle,
+            "tag_labels": tag_labels,
+            "trajectory_panel": {
+                "x": panel_x,
+                "y": panel_y,
+                "point_index": int(panel_point_index_by_source.get(int(source_idx), 0)),
+                "x_label": "Sweep",
+                "y_label": panel_y_label,
+            },
+        }
+        return {
+            "id": frame_id,
+            "sequence": sequence,
+            "features": json.dumps(feature_rows, separators=(",", ":")),
+            "effects": json.dumps(effect_rows, separators=(",", ":")),
+            "display": json.dumps(display_payload, separators=(",", ":")),
+        }
+
+    for frame_no, (sampled_idx, source_idx, sequence, per_tf_map, hit_map) in enumerate(
+        zip(sampled_indices, source_indices, frame_sequences, frame_per_tf_maps, frame_hit_maps),
+        start=1,
+    ):
         frame_id = f"chain_{int(selected_chain) + 1}_frame_{frame_no:04d}"
         if str(config.timeline_mode) == "best_so_far":
             is_best_update_frame = previous_source_idx is None or int(source_idx) != int(previous_source_idx)
         else:
             is_best_update_frame = int(sampled_idx) in best_update_set
         previous_source_idx = int(source_idx)
-
-        display_payload: dict[str, object] = {"overlay_text": None, "tag_labels": tag_labels}
-        if inset_x is not None and inset_y is not None:
-            display_payload["trajectory_inset"] = {
-                "x": inset_x,
-                "y": inset_y,
-                "point_index": int(inset_point_index_by_source.get(int(source_idx), 0)),
-                "corner": str(config.sweep_inset.corner),
-            }
-
         snapshot_rows.append(
-            {
-                "id": frame_id,
-                "sequence": sequence,
-                "features": json.dumps(feature_rows, separators=(",", ":")),
-                "effects": json.dumps(effect_rows, separators=(",", ":")),
-                "display": json.dumps(display_payload, separators=(",", ":")),
-            }
+            _build_snapshot_row(
+                frame_id=frame_id,
+                frame_no=int(frame_no),
+                source_idx=int(source_idx),
+                sequence=str(sequence),
+                per_tf_map=per_tf_map,
+                hit_map=hit_map,
+            )
         )
         if is_best_update_frame and float(config.playback.pause_on_best_update_sec) > 0:
             pauses[frame_id] = float(config.playback.pause_on_best_update_sec)
+
+    polished_sequence = str(polished_final_sequence or "").strip().upper()
+    if polished_sequence and snapshot_rows:
+        final_seq_now = str(snapshot_rows[-1]["sequence"]).strip().upper()
+        if polished_sequence != final_seq_now:
+            seq_arr = _encode_sequence(polished_sequence)
+            per_tf_map, hit_map = scorer.compute_all_per_pwm_and_hits(seq_arr, int(seq_arr.size))
+            source_idx = int(source_indices[-1])
+            frame_no = int(len(snapshot_rows))
+            frame_id = str(snapshot_rows[-1]["id"])
+            snapshot_rows[-1] = _build_snapshot_row(
+                frame_id=frame_id,
+                frame_no=frame_no,
+                source_idx=source_idx,
+                sequence=polished_sequence,
+                per_tf_map=per_tf_map,
+                hit_map=hit_map,
+            )
 
     existing_pause_frames = int(sum(int(round(float(sec) * float(config.playback.fps))) for sec in pauses.values()))
     remaining_frames_for_taper = max(0, int(target_total_frames - len(snapshot_rows) - existing_pause_frames))

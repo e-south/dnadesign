@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from ..core import ContractError, Record, SchemaError, Span, reject_unknown_keys
-from ..core.record import Display, Effect, Feature, TrajectoryInset
+from ..core.record import Display, Effect, Feature, TrajectoryPanel
 
 
 def _to_mapping(value: Any, *, ctx: str) -> Mapping[str, Any]:
@@ -123,11 +123,14 @@ class GenericFeaturesAdapter:
         if raw is None:
             return Display()
         display = _to_mapping(raw, ctx="display")
-        reject_unknown_keys(display, {"overlay_text", "tag_labels", "trajectory_inset"}, "display")
+        reject_unknown_keys(display, {"overlay_text", "video_subtitle", "tag_labels", "trajectory_panel"}, "display")
 
         overlay = display.get("overlay_text")
         if overlay is not None:
             overlay = str(overlay)
+        video_subtitle = display.get("video_subtitle")
+        if video_subtitle is not None:
+            video_subtitle = str(video_subtitle)
 
         tag_labels_raw = display.get("tag_labels", {})
         if tag_labels_raw is None:
@@ -136,18 +139,23 @@ class GenericFeaturesAdapter:
             raise SchemaError("display.tag_labels must be a mapping")
         tag_labels = {str(k): str(v) for k, v in tag_labels_raw.items()}
 
-        trajectory_inset_raw = display.get("trajectory_inset")
-        trajectory_inset = None
-        if trajectory_inset_raw is not None:
-            inset_mapping = _to_mapping(trajectory_inset_raw, ctx="display.trajectory_inset")
+        trajectory_panel_raw = display.get("trajectory_panel")
+        trajectory_panel = None
+        if trajectory_panel_raw is not None:
+            panel_mapping = _to_mapping(trajectory_panel_raw, ctx="display.trajectory_panel")
             reject_unknown_keys(
-                inset_mapping,
-                {"x", "y", "point_index", "corner", "label"},
-                "display.trajectory_inset",
+                panel_mapping,
+                {"x", "y", "point_index", "x_label", "y_label"},
+                "display.trajectory_panel",
             )
-            trajectory_inset = TrajectoryInset.from_mapping(inset_mapping)
+            trajectory_panel = TrajectoryPanel.from_mapping(panel_mapping)
 
-        return Display(overlay_text=overlay, tag_labels=tag_labels, trajectory_inset=trajectory_inset)
+        return Display(
+            overlay_text=overlay,
+            video_subtitle=video_subtitle,
+            tag_labels=tag_labels,
+            trajectory_panel=trajectory_panel,
+        )
 
     def apply(self, row: dict, *, row_index: int) -> Record:
         seq_col = str(self.columns.get("sequence"))

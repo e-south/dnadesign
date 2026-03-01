@@ -78,7 +78,6 @@ def build_sequence_rows_video_job(
                 "frames_per_record": 1,
                 "pauses": dict(pauses),
                 "total_duration": float(config.playback.target_duration_sec),
-                "height_px": 820,
                 "title_text": str(title_text),
                 "title_font_size": 12,
                 "title_align": "center",

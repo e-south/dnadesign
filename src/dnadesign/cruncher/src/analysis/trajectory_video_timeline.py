@@ -76,32 +76,72 @@ def filter_rows_by_phase_scope(
     if "phase" not in trajectory_df.columns:
         raise ValueError("Trajectory video requires trajectory column 'phase' for phase_scope filtering.")
     phase = trajectory_df["phase"].astype(str).str.strip().str.lower()
+    keep = _resolve_phase_scope_mask(phase=phase, phase_scope=phase_scope)
+    out = trajectory_df.loc[keep].copy()
+    if out.empty and phase_scope == "draw_only":
+        raise ValueError("Trajectory video draw_only scope has no draw-phase rows.")
+    if out.empty:
+        raise ValueError("Trajectory video has no tune/draw rows after phase filtering.")
+    return out
+
+
+def _resolve_phase_scope_mask(*, phase: pd.Series, phase_scope: str) -> pd.Series:
     has_tune = bool((phase == "tune").any())
     if phase_scope == "draw_only":
-        out = trajectory_df.loc[phase == "draw"].copy()
-        if out.empty:
-            raise ValueError("Trajectory video draw_only scope has no draw-phase rows.")
-        return out
+        return phase == "draw"
     if phase_scope == "tune_and_draw_required":
         if not has_tune:
             raise ValueError(
                 "Trajectory video requires tune rows for phase_scope=tune_and_draw_required, but none were found."
             )
-        keep = phase.isin({"tune", "draw"})
-        out = trajectory_df.loc[keep].copy()
-        if out.empty:
-            raise ValueError("Trajectory video has no tune/draw rows after phase filtering.")
-        return out
+        return phase.isin({"tune", "draw"})
     if has_tune:
-        keep = phase.isin({"tune", "draw"})
-        out = trajectory_df.loc[keep].copy()
-        if out.empty:
-            raise ValueError("Trajectory video has no tune/draw rows after phase filtering.")
-        return out
-    out = trajectory_df.loc[phase == "draw"].copy()
+        return phase.isin({"tune", "draw"})
+    return phase == "draw"
+
+
+def _coerce_chain_sweep_objective_rows(rows: pd.DataFrame, *, objective_column: str) -> pd.DataFrame:
+    out = rows.copy()
+    out["chain"] = pd.to_numeric(out["chain"], errors="coerce")
+    out["sweep"] = pd.to_numeric(out["sweep"], errors="coerce")
+    out[objective_column] = pd.to_numeric(out[objective_column], errors="coerce")
+    out = out.dropna(subset=["chain", "sweep", objective_column])
     if out.empty:
-        raise ValueError("Trajectory video has no tune/draw rows after phase filtering.")
+        raise ValueError("Trajectory video has no rows with numeric chain/sweep/objective values.")
+    numeric = out[["chain", "sweep", objective_column]].to_numpy(dtype=float, copy=False)
+    if not bool(np.isfinite(numeric).all()):
+        raise ValueError("Trajectory video rows contain non-finite chain/sweep/objective values.")
+    out["chain"] = out["chain"].astype(int)
+    out["sweep"] = out["sweep"].astype(int)
+    if bool((out["chain"] < 0).any()) or bool((out["sweep"] < 0).any()):
+        raise ValueError("Trajectory video rows contain negative chain/sweep values.")
     return out
+
+
+def _select_chain_by_policy(
+    *,
+    rows: pd.DataFrame,
+    objective_column: str,
+    chain_policy: str,
+    explicit_chain_1based: int | None,
+) -> tuple[pd.DataFrame, int]:
+    if chain_policy == "explicit":
+        explicit = int(explicit_chain_1based or 0) - 1
+        if explicit < 0:
+            raise ValueError("Trajectory video explicit chain index must be >= 1.")
+        chain_rows = rows.loc[rows["chain"] == explicit].copy()
+        if chain_rows.empty:
+            raise ValueError(f"Trajectory video explicit chain {explicit + 1} was not found in trajectory rows.")
+        return chain_rows.reset_index(drop=True), explicit
+
+    best_by_chain = rows.groupby("chain", sort=True, dropna=False)[objective_column].max()
+    if best_by_chain.empty:
+        raise ValueError("Trajectory video could not select a best chain.")
+    best_chain = int(best_by_chain.idxmax())
+    selected = rows.loc[rows["chain"] == best_chain].copy()
+    if selected.empty:
+        raise ValueError("Trajectory video selected chain has no rows.")
+    return selected.reset_index(drop=True), best_chain
 
 
 def select_chain_rows(
@@ -119,43 +159,19 @@ def select_chain_rows(
     if objective_column not in trajectory_df.columns:
         raise ValueError(f"Trajectory video objective column '{objective_column}' is missing.")
 
-    rows = trajectory_df.copy()
-    rows["chain"] = pd.to_numeric(rows["chain"], errors="coerce")
-    rows["sweep"] = pd.to_numeric(rows["sweep"], errors="coerce")
-    rows[objective_column] = pd.to_numeric(rows[objective_column], errors="coerce")
-    rows = rows.dropna(subset=["chain", "sweep", objective_column])
-    if rows.empty:
-        raise ValueError("Trajectory video has no rows with numeric chain/sweep/objective values.")
-    numeric = rows[["chain", "sweep", objective_column]].to_numpy(dtype=float, copy=False)
-    if not bool(np.isfinite(numeric).all()):
-        raise ValueError("Trajectory video rows contain non-finite chain/sweep/objective values.")
-    rows["chain"] = rows["chain"].astype(int)
-    rows["sweep"] = rows["sweep"].astype(int)
-    if bool((rows["chain"] < 0).any()) or bool((rows["sweep"] < 0).any()):
-        raise ValueError("Trajectory video rows contain negative chain/sweep values.")
+    rows = _coerce_chain_sweep_objective_rows(trajectory_df, objective_column=objective_column)
 
     rows = filter_rows_by_phase_scope(rows, phase_scope=str(config.selection.phase_scope))
     if rows.empty:
         raise ValueError("Trajectory video has no rows after phase filtering.")
     rows = rows.sort_values(["chain", "sweep"]).reset_index(drop=True)
 
-    if str(config.selection.chain_policy) == "explicit":
-        explicit = int(config.selection.explicit_chain_1based or 0) - 1
-        if explicit < 0:
-            raise ValueError("Trajectory video explicit chain index must be >= 1.")
-        chain_rows = rows.loc[rows["chain"] == explicit].copy()
-        if chain_rows.empty:
-            raise ValueError(f"Trajectory video explicit chain {explicit + 1} was not found in trajectory rows.")
-        return chain_rows.reset_index(drop=True), explicit
-
-    best_by_chain = rows.groupby("chain", sort=True, dropna=False)[objective_column].max()
-    if best_by_chain.empty:
-        raise ValueError("Trajectory video could not select a best chain.")
-    best_chain = int(best_by_chain.idxmax())
-    selected = rows.loc[rows["chain"] == best_chain].copy()
-    if selected.empty:
-        raise ValueError("Trajectory video selected chain has no rows.")
-    return selected.reset_index(drop=True), int(best_chain)
+    return _select_chain_by_policy(
+        rows=rows,
+        objective_column=objective_column,
+        chain_policy=str(config.selection.chain_policy),
+        explicit_chain_1based=config.selection.explicit_chain_1based,
+    )
 
 
 def sample_frame_indices(
@@ -229,7 +245,7 @@ def source_indices_for_best_so_far_timeline(
     return state_indices
 
 
-def build_inset_line_indices(*, point_count: int, budget: int, required_indices: list[int]) -> list[int]:
+def build_panel_line_indices(*, point_count: int, budget: int, required_indices: list[int]) -> list[int]:
     if point_count < 2:
         return [0]
     if budget < 2:
@@ -285,7 +301,7 @@ def allocate_taper_extra_frames(*, point_count: int, total_extra_frames: int) ->
 
 __all__ = [
     "allocate_taper_extra_frames",
-    "build_inset_line_indices",
+    "build_panel_line_indices",
     "filter_rows_by_phase_scope",
     "sample_frame_indices",
     "select_chain_rows",

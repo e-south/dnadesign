@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 from matplotlib.patches import FancyBboxPatch, PathPatch
 from matplotlib.textpath import TextPath
-from matplotlib.ticker import MaxNLocator
+from matplotlib.ticker import FuncFormatter, MaxNLocator
 from matplotlib.transforms import Affine2D
 
 from ..config import Style
@@ -40,15 +40,45 @@ class SequenceRowsRenderer:
     def render(self, record: Record, style: Style, palette: Palette):
         record = record.validate()
         show_two = bool(style.show_reverse_complement and record.alphabet == "DNA")
+        fixed_content_top_extent_px: float | None = None
+        fixed_content_bottom_extent_px: float | None = None
         fixed_content_radius_px: float | None = None
+        extra_bottom_padding_px: float = 0.0
         if isinstance(record.meta, Mapping):
+            raw_top_extent = record.meta.get("fixed_content_top_extent_px")
+            if raw_top_extent is not None:
+                try:
+                    fixed_content_top_extent_px = float(raw_top_extent)
+                except Exception as exc:
+                    raise RenderingError("record.meta.fixed_content_top_extent_px must be numeric when set") from exc
+            raw_bottom_extent = record.meta.get("fixed_content_bottom_extent_px")
+            if raw_bottom_extent is not None:
+                try:
+                    fixed_content_bottom_extent_px = float(raw_bottom_extent)
+                except Exception as exc:
+                    raise RenderingError("record.meta.fixed_content_bottom_extent_px must be numeric when set") from exc
             raw_radius = record.meta.get("fixed_content_radius_px")
             if raw_radius is not None:
                 try:
                     fixed_content_radius_px = float(raw_radius)
                 except Exception as exc:
                     raise RenderingError("record.meta.fixed_content_radius_px must be numeric when set") from exc
-        layout = compute_layout(record, style, fixed_content_radius_px=fixed_content_radius_px)
+            raw_extra_bottom_padding = record.meta.get("video_extra_bottom_padding_px")
+            if raw_extra_bottom_padding is not None:
+                try:
+                    extra_bottom_padding_px = float(raw_extra_bottom_padding)
+                except Exception as exc:
+                    raise RenderingError("record.meta.video_extra_bottom_padding_px must be numeric when set") from exc
+                if not math.isfinite(extra_bottom_padding_px) or extra_bottom_padding_px < 0.0:
+                    raise RenderingError("record.meta.video_extra_bottom_padding_px must be finite and >= 0")
+        layout = compute_layout(
+            record,
+            style,
+            fixed_content_top_extent_px=fixed_content_top_extent_px,
+            fixed_content_bottom_extent_px=fixed_content_bottom_extent_px,
+            fixed_content_radius_px=fixed_content_radius_px,
+            extra_bottom_padding_px=extra_bottom_padding_px,
+        )
 
         motif_geometries: list[MotifLogoGeometry] = []
         for effect_index, effect in enumerate(record.effects):
@@ -75,11 +105,45 @@ class SequenceRowsRenderer:
             )
 
         fig_scale = float(style.figure_scale)
-        fig = plt.figure(
-            figsize=((layout.width / style.dpi) * fig_scale, (layout.height / style.dpi) * fig_scale),
-            dpi=style.dpi,
-        )
-        ax = fig.add_axes([0, 0, 1, 1])
+        has_trajectory_panel = record.display.trajectory_panel is not None
+        sequence_width_px = float(layout.width) * fig_scale
+        sequence_height_px = float(layout.height) * fig_scale
+        if has_trajectory_panel:
+            panel_side_px = min(
+                max(sequence_height_px * 0.46, 96.0),
+                max(88.0, sequence_height_px * 0.64),
+            )
+            panel_left_pad_px = max(80.0, panel_side_px * 0.55)
+            panel_gap_px = max(20.0, sequence_height_px * 0.08)
+            sequence_right_pad_px = max(6.0, sequence_height_px * 0.03)
+            total_width_px = (
+                panel_left_pad_px + panel_side_px + panel_gap_px + sequence_width_px + sequence_right_pad_px
+            )
+            fig = plt.figure(
+                figsize=(total_width_px / style.dpi, sequence_height_px / style.dpi),
+                dpi=style.dpi,
+            )
+            panel_y0_px = (sequence_height_px - panel_side_px) / 2.0
+            panel_y0_px = min(panel_y0_px + max(6.0, sequence_height_px * 0.03), sequence_height_px - panel_side_px)
+            panel_ax = fig.add_axes(
+                [
+                    panel_left_pad_px / total_width_px,
+                    panel_y0_px / sequence_height_px,
+                    panel_side_px / total_width_px,
+                    panel_side_px / sequence_height_px,
+                ],
+                zorder=5.0,
+            )
+            panel_ax.set_box_aspect(1.0)
+            sequence_x0_px = panel_left_pad_px + panel_side_px + panel_gap_px
+            ax = fig.add_axes([sequence_x0_px / total_width_px, 0.0, sequence_width_px / total_width_px, 1.0])
+        else:
+            fig = plt.figure(
+                figsize=(sequence_width_px / style.dpi, sequence_height_px / style.dpi),
+                dpi=style.dpi,
+            )
+            panel_ax = None
+            ax = fig.add_axes([0, 0, 1, 1])
         ax.set_axis_off()
 
         x0 = layout.x_left
@@ -190,8 +254,8 @@ class SequenceRowsRenderer:
 
         if record.display.overlay_text:
             _draw_overlay(ax, layout, style, record.display.overlay_text)
-        if record.display.trajectory_inset is not None:
-            _draw_trajectory_inset(ax, record.display.trajectory_inset, style)
+        if panel_ax is not None and record.display.trajectory_panel is not None:
+            _draw_trajectory_panel(panel_ax, record.display.trajectory_panel, style)
 
         ax.set_xlim(0, layout.width)
         ax.set_ylim(0, layout.height)
@@ -689,6 +753,18 @@ def _draw_inline_feature_labels(ax, record: Record, layout: LayoutContext, palet
         )
 
 
+def _actual_content_top(layout: LayoutContext) -> float:
+    top = max(
+        float(layout.y_forward + layout.sequence_extent_up),
+        float(layout.y_reverse + layout.sequence_extent_up),
+    )
+    for placement in layout.placements:
+        top = max(top, float(placement.y + (placement.h / 2.0)))
+    for y0 in layout.motif_logo_y0_by_effect.values():
+        top = max(top, float(y0 + layout.motif_logo_height))
+    return float(top)
+
+
 def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
     align = str(style.overlay_align).lower()
     if align == "center":
@@ -700,9 +776,10 @@ def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
     else:
         x = style.padding_x
         ha = "left"
+    synthetic_top_pad = max(0.0, float(layout.content_top) - _actual_content_top(layout))
     ax.text(
         x,
-        layout.height - max(4.0, style.padding_y * 0.5),
+        layout.height - max(4.0, style.padding_y * 0.5) - synthetic_top_pad,
         text,
         ha=ha,
         va="top",
@@ -715,56 +792,211 @@ def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
     )
 
 
-def _draw_trajectory_inset(ax, inset, style: Style) -> None:
-    width = 0.22
-    height = 0.14
-    pad_x = 0.05
-    pad_y = 0.10
-    corner = str(inset.corner).strip().lower()
-    if corner == "top_left":
-        x0, y0 = pad_x, 1.0 - pad_y - height
-    elif corner == "top_right":
-        x0, y0 = 1.0 - pad_x - width, 1.0 - pad_y - height
-    elif corner == "bottom_left":
-        x0, y0 = pad_x, pad_y
-    else:
-        x0, y0 = 1.0 - pad_x - width, pad_y
+def _window_bboxes_overlap(a, b) -> bool:
+    return float(max(a.x0, b.x0)) < float(min(a.x1, b.x1)) and float(max(a.y0, b.y0)) < float(min(a.y1, b.y1))
 
-    inset_ax = ax.inset_axes([x0, y0, width, height], transform=ax.transAxes, zorder=5.4)
-    inset_ax.set_facecolor("#ffffff")
-    inset_ax.patch.set_alpha(0.72)
-    for spine_name, spine in inset_ax.spines.items():
+
+def _axis_label_overlaps_ticks(label_artist, tick_artists, *, renderer) -> bool:
+    label_box = label_artist.get_window_extent(renderer=renderer)
+    for tick_artist in tick_artists:
+        if not str(tick_artist.get_text()).strip():
+            continue
+        if _window_bboxes_overlap(label_box, tick_artist.get_window_extent(renderer=renderer)):
+            return True
+    return False
+
+
+def _tick_labels_overlap_each_other(tick_artists, *, renderer) -> bool:
+    boxes = [
+        tick_artist.get_window_extent(renderer=renderer)
+        for tick_artist in tick_artists
+        if str(tick_artist.get_text()).strip()
+    ]
+    for index, box in enumerate(boxes):
+        for other in boxes[index + 1 :]:
+            if _window_bboxes_overlap(box, other):
+                return True
+    return False
+
+
+def _format_compact_axis_value(value: float, _position: int) -> str:
+    numeric = float(value)
+    magnitude = abs(numeric)
+    if magnitude >= 1_000_000.0:
+        scaled = numeric / 1_000_000.0
+        text = f"{scaled:.1f}".rstrip("0").rstrip(".")
+        return f"{text}M"
+    if magnitude >= 1_000.0:
+        scaled = numeric / 1_000.0
+        precision = 0 if abs(scaled) >= 100.0 else 1
+        if precision == 0:
+            text = f"{scaled:.0f}"
+        else:
+            text = f"{scaled:.1f}".rstrip("0").rstrip(".")
+        return f"{text}k"
+    if magnitude >= 1.0:
+        rounded = round(numeric)
+        if abs(numeric - rounded) < 1.0e-6:
+            return f"{int(rounded)}"
+        return f"{numeric:.2f}".rstrip("0").rstrip(".")
+    return f"{numeric:.3g}"
+
+
+def _draw_trajectory_panel(panel_ax, panel, style: Style) -> None:
+    x = tuple(float(v) for v in panel.x)
+    y = tuple(float(v) for v in panel.y)
+    point_index = int(panel.point_index)
+    panel_ax.set_axisbelow(True)
+    panel_ax.set_facecolor("#ffffff")
+    for spine_name, spine in panel_ax.spines.items():
         if spine_name in {"top", "right"}:
             spine.set_visible(False)
             continue
         spine.set_color("#d1d5db")
-        spine.set_linewidth(0.8)
+        spine.set_linewidth(0.9)
+    panel_ax.plot(x, y, color="#475569", lw=1.8, zorder=2)
+    panel_ax.scatter([x[point_index]], [y[point_index]], color="#dc2626", s=26, zorder=3)
+    panel_ax.grid(True, alpha=0.20, lw=0.6, color="#9ca3af", zorder=0)
 
-    x = tuple(float(v) for v in inset.x)
-    y = tuple(float(v) for v in inset.y)
-    inset_ax.plot(x, y, color="#475569", lw=1.6, zorder=1)
-    point_index = int(inset.point_index)
-    inset_ax.scatter([x[point_index]], [y[point_index]], color="#dc2626", s=18, zorder=2)
-    inset_ax.grid(True, alpha=0.2, lw=0.5, color="#9ca3af")
-    inset_ax.set_xlabel("Sweep", fontsize=max(6, int(style.font_size_label) - 7), color="#334155", labelpad=2.2)
-    inset_ax.set_ylabel("Best score", fontsize=max(6, int(style.font_size_label) - 7), color="#334155", labelpad=1.5)
-    inset_ax.xaxis.set_label_coords(0.5, -0.17)
-    inset_ax.yaxis.set_label_coords(-0.14, 0.5)
-    inset_ax.xaxis.label.set_clip_on(False)
-    inset_ax.yaxis.label.set_clip_on(False)
-    inset_ax.xaxis.label.set_zorder(6.0)
-    inset_ax.yaxis.label.set_zorder(6.0)
-    inset_ax.tick_params(
-        axis="both",
-        labelsize=max(5, int(style.font_size_label) - 9),
+    label_size = float(max(9, min(13, int(round(float(style.font_size_label) * 0.7)))))
+    tick_size = float(max(8, min(12, label_size - 1.0)))
+    x_label = str(panel.x_label).strip() if panel.x_label is not None else ""
+    y_label = str(panel.y_label).strip() if panel.y_label is not None else ""
+    if not x_label:
+        x_label = "Sweep"
+    if not y_label:
+        y_label = "Best objective"
+    panel_ax.set_xlabel(x_label, fontsize=label_size, color="#334155", labelpad=4.0)
+    panel_ax.set_ylabel(y_label, fontsize=label_size, color="#334155", labelpad=1.5)
+    panel_ax.xaxis.set_label_position("bottom")
+    panel_ax.yaxis.set_label_position("left")
+    x_tick_pad = 3.0
+    y_tick_pad = 2.5
+    panel_ax.tick_params(
+        axis="x",
+        labelsize=tick_size,
         colors="#475569",
         length=2.0,
-        pad=2.5,
+        pad=x_tick_pad,
+        direction="out",
+        bottom=True,
+        labelbottom=True,
+        top=False,
+        labeltop=False,
     )
-    inset_ax.xaxis.set_major_locator(MaxNLocator(nbins=3, integer=True, min_n_ticks=2))
-    inset_ax.yaxis.set_major_locator(MaxNLocator(nbins=3, min_n_ticks=2))
-    inset_ax.margins(x=0.05, y=0.16)
-    for label in [*inset_ax.get_xticklabels(), *inset_ax.get_yticklabels()]:
+    panel_ax.tick_params(
+        axis="y",
+        labelsize=tick_size,
+        colors="#475569",
+        length=2.0,
+        pad=y_tick_pad,
+        direction="out",
+        left=True,
+        labelleft=True,
+        right=False,
+        labelright=False,
+    )
+    panel_ax.xaxis.set_major_formatter(FuncFormatter(_format_compact_axis_value))
+    panel_ax.xaxis.set_major_locator(MaxNLocator(nbins=5, min_n_ticks=2))
+    panel_ax.yaxis.set_major_locator(MaxNLocator(nbins=4, min_n_ticks=2))
+
+    x_min = float(min(x))
+    x_max = float(max(x))
+    if x_max <= x_min:
+        x_max = x_min + 1.0
+    x_span = max(x_max - x_min, 1.0)
+    x_pad = max(1.0, 0.02 * x_span)
+    y_min = float(min(y))
+    y_max = float(max(y))
+    y_span = max(y_max - y_min, 1.0e-6)
+    panel_ax.set_xlim(x_min - x_pad, x_max + x_pad)
+    panel_ax.set_ylim(y_min - (0.05 * y_span), y_max + (0.12 * y_span))
+
+    figure = panel_ax.figure
+    for _ in range(12):
+        figure.canvas.draw()
+        renderer = figure.canvas.get_renderer()
+        panel_bbox = panel_ax.get_window_extent(renderer=renderer)
+        x_tick_labels = [tick for tick in panel_ax.get_xticklabels() if str(tick.get_text()).strip()]
+        y_tick_labels = [tick for tick in panel_ax.get_yticklabels() if str(tick.get_text()).strip()]
+        x_tick_bboxes = [tick.get_window_extent(renderer=renderer) for tick in x_tick_labels]
+        y_tick_bboxes = [tick.get_window_extent(renderer=renderer) for tick in y_tick_labels]
+        x_label_bbox = panel_ax.xaxis.label.get_window_extent(renderer=renderer)
+        y_label_bbox = panel_ax.yaxis.label.get_window_extent(renderer=renderer)
+        x_ticks_below_plot = not x_tick_bboxes or (
+            max(float(box.y1) for box in x_tick_bboxes) <= float(panel_bbox.y0) + 1.0
+        )
+        x_label_below_ticks = not x_tick_bboxes or (
+            float(x_label_bbox.y1) <= min(float(box.y0) for box in x_tick_bboxes) + 1.0
+        )
+        y_ticks_left_plot = not y_tick_bboxes or (
+            max(float(box.x1) for box in y_tick_bboxes) <= float(panel_bbox.x0) + 1.0
+        )
+        y_label_left_ticks = not y_tick_bboxes or (
+            float(y_label_bbox.x1) <= min(float(box.x0) for box in y_tick_bboxes) + 1.0
+        )
+        x_ticks_overlap = _tick_labels_overlap_each_other(x_tick_labels, renderer=renderer)
+        y_ticks_overlap = _tick_labels_overlap_each_other(y_tick_labels, renderer=renderer)
+        x_label_overlap = _axis_label_overlaps_ticks(panel_ax.xaxis.label, x_tick_labels, renderer=renderer)
+        y_label_overlap = _axis_label_overlaps_ticks(panel_ax.yaxis.label, y_tick_labels, renderer=renderer)
+        x_label_inside_figure = float(x_label_bbox.y0) >= 0.0
+        y_label_inside_figure = float(y_label_bbox.x0) >= 0.0
+
+        changed = False
+        if not x_label_inside_figure:
+            new_x_labelpad = max(1.0, float(panel_ax.xaxis.labelpad) - 0.6)
+            if new_x_labelpad < float(panel_ax.xaxis.labelpad):
+                panel_ax.xaxis.labelpad = new_x_labelpad
+                changed = True
+            new_x_tick_pad = max(1.0, x_tick_pad - 0.4)
+            if new_x_tick_pad < x_tick_pad:
+                x_tick_pad = new_x_tick_pad
+                panel_ax.tick_params(axis="x", pad=x_tick_pad)
+                changed = True
+        if not y_label_inside_figure:
+            new_y_labelpad = max(1.0, float(panel_ax.yaxis.labelpad) - 0.6)
+            if new_y_labelpad < float(panel_ax.yaxis.labelpad):
+                panel_ax.yaxis.labelpad = new_y_labelpad
+                changed = True
+            new_y_tick_pad = max(1.0, y_tick_pad - 0.4)
+            if new_y_tick_pad < y_tick_pad:
+                y_tick_pad = new_y_tick_pad
+                panel_ax.tick_params(axis="y", pad=y_tick_pad)
+                changed = True
+        if not x_ticks_below_plot:
+            x_tick_pad = min(12.0, x_tick_pad + 0.8)
+            panel_ax.tick_params(axis="x", pad=x_tick_pad)
+            changed = True
+        if not y_ticks_left_plot:
+            y_tick_pad = min(12.0, y_tick_pad + 0.8)
+            panel_ax.tick_params(axis="y", pad=y_tick_pad)
+            changed = True
+        if not x_label_below_ticks:
+            panel_ax.xaxis.labelpad = min(12.0, float(panel_ax.xaxis.labelpad) + 0.8)
+            changed = True
+        if not y_label_left_ticks:
+            panel_ax.yaxis.labelpad = min(14.0, float(panel_ax.yaxis.labelpad) + 0.8)
+            changed = True
+        if x_ticks_overlap:
+            panel_ax.xaxis.set_major_locator(MaxNLocator(nbins=4, min_n_ticks=2))
+            changed = True
+        if y_ticks_overlap:
+            panel_ax.yaxis.set_major_locator(MaxNLocator(nbins=3, min_n_ticks=2))
+            changed = True
+        if x_label_overlap or y_label_overlap:
+            new_tick_size = max(5.0, tick_size - 0.5)
+            if new_tick_size < tick_size:
+                tick_size = new_tick_size
+                panel_ax.tick_params(axis="x", labelsize=tick_size)
+                panel_ax.tick_params(axis="y", labelsize=tick_size)
+                changed = True
+        if not changed:
+            break
+
+    figure.canvas.draw()
+    panel_ax.xaxis.label.set_clip_on(False)
+    panel_ax.yaxis.label.set_clip_on(False)
+    for label in [*panel_ax.get_xticklabels(), *panel_ax.get_yticklabels()]:
         label.set_clip_on(False)
 
 

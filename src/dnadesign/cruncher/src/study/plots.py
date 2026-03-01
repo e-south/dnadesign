@@ -173,7 +173,10 @@ def plot_mmr_diversity_tradeoff(df: pd.DataFrame, out_path: Path) -> None:
     ax_score.set_ylabel("Median selected score", color=score_color, fontsize=_AXIS_LABEL_FONT_SIZE)
     metric_label = str(df["diversity_metric_label"].iloc[0])
     ax_div.set_ylabel(metric_label, color=div_color, fontsize=_AXIS_LABEL_FONT_SIZE)
+    ax_score.set_axisbelow(True)
     ax_score.grid(True, alpha=0.2)
+    for grid_line in [*ax_score.get_xgridlines(), *ax_score.get_ygridlines()]:
+        grid_line.set_zorder(0)
     handles_a, labels_a = ax_score.get_legend_handles_labels()
     handles_b, labels_b = ax_div.get_legend_handles_labels()
     _finalize_axes(
@@ -286,7 +289,10 @@ def plot_sequence_length_tradeoff(df: pd.DataFrame, out_path: Path) -> None:
     ax_score.set_ylabel("Median elite score", color=score_color, fontsize=_AXIS_LABEL_FONT_SIZE)
     metric_label = str(df["diversity_metric_label"].iloc[0])
     ax_div.set_ylabel(metric_label, color=div_color, fontsize=_AXIS_LABEL_FONT_SIZE)
+    ax_score.set_axisbelow(True)
     ax_score.grid(True, alpha=0.2)
+    for grid_line in [*ax_score.get_xgridlines(), *ax_score.get_ygridlines()]:
+        grid_line.set_zorder(0)
     handles_a, labels_a = ax_score.get_legend_handles_labels()
     handles_b, labels_b = ax_div.get_legend_handles_labels()
     _finalize_axes(

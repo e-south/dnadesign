@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import pytest
 
+from dnadesign.cruncher.analysis.plots._style import apply_axes_style
 from dnadesign.cruncher.analysis.plots.trajectory_score_space_panel import (
     _render_score_space_panel,
     _resolve_grid_pairs,
@@ -78,3 +79,15 @@ def test_render_score_space_panel_honors_edge_only_axis_labels() -> None:
     assert legend_labels == []
     assert ax.get_xlabel() == ""
     assert ax.get_ylabel() == ""
+
+
+def test_apply_axes_style_keeps_gridlines_behind_scatter_points() -> None:
+    fig, ax = plt.subplots(figsize=(4.0, 3.0))
+    try:
+        points = ax.scatter([0.0, 1.0], [0.0, 1.0], s=20.0, c="#bdbdbd", alpha=0.28)
+        apply_axes_style(ax, ygrid=True, xgrid=True, tick_labelsize=12, title_size=14, label_size=14)
+        grid_zorders = [line.get_zorder() for line in [*ax.get_xgridlines(), *ax.get_ygridlines()]]
+        assert grid_zorders
+        assert max(grid_zorders) < points.get_zorder()
+    finally:
+        plt.close(fig)

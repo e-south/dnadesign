@@ -889,11 +889,6 @@ class AnalysisTrajectoryVideoPlaybackConfig(StrictBaseModel):
         return fraction
 
 
-class AnalysisTrajectoryVideoSweepInsetConfig(StrictBaseModel):
-    enabled: bool = False
-    corner: Literal["top_left", "top_right", "bottom_left", "bottom_right"] = "top_right"
-
-
 class AnalysisTrajectoryVideoLimitsConfig(StrictBaseModel):
     max_snapshots: int = 120
     max_total_frames: int = 180
@@ -924,7 +919,6 @@ class AnalysisTrajectoryVideoConfig(StrictBaseModel):
     selection: AnalysisTrajectoryVideoSelectionConfig = AnalysisTrajectoryVideoSelectionConfig()
     sampling: AnalysisTrajectoryVideoSamplingConfig = AnalysisTrajectoryVideoSamplingConfig()
     playback: AnalysisTrajectoryVideoPlaybackConfig = AnalysisTrajectoryVideoPlaybackConfig()
-    sweep_inset: AnalysisTrajectoryVideoSweepInsetConfig = AnalysisTrajectoryVideoSweepInsetConfig()
     limits: AnalysisTrajectoryVideoLimitsConfig = AnalysisTrajectoryVideoLimitsConfig()
 
     @field_validator("output_name")

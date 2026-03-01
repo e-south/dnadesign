@@ -1481,6 +1481,132 @@ def test_analyze_trajectory_video_generates_video_when_enabled(tmp_path: Path, m
     assert plots_by_key["chain_trajectory_video"].get("skip_reason") is None
 
 
+def test_analyze_trajectory_video_anchors_final_frame_to_ranked_polished_elite(tmp_path: Path, monkeypatch) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = _base_config(
+        catalog_root=catalog_root,
+        regulator_sets=[["lexA"]],
+        sample=_sample_block(save_trace=False, top_k=2, draws=6, tune=2),
+        analysis={
+            "run_selector": "explicit",
+            "runs": ["sample_single_tf_video_polished"],
+            "pairwise": "auto",
+            "plot_format": "png",
+            "plot_dpi": 72,
+            "table_format": "parquet",
+            "max_points": 2000,
+            "trajectory_video": {"enabled": True},
+        },
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = _make_sample_run_dir(tmp_path, "sample_single_tf_video_polished")
+    lock_dir = tmp_path / ".cruncher" / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / "config.lock.json"
+    lock_path.write_text("{}")
+    lock_sha = sha256_path(lock_path)
+
+    _write_basic_run_artifacts(
+        run_dir=run_dir,
+        config=config,
+        config_path=config_path,
+        lock_path=lock_path,
+        lock_sha=lock_sha,
+        tf_names=["lexA"],
+        include_trace=False,
+        top_k=2,
+        draws=6,
+        tune=2,
+    )
+
+    pd.DataFrame(
+        [
+            {
+                "id": "elite-2",
+                "sequence": "acgtacgtacgt",
+                "rank": 2,
+                "norm_sum": 0.9,
+                "score_lexA": 1.0,
+                "norm_lexA": 0.9,
+            },
+            {
+                "id": "elite-1",
+                "sequence": "tgcATGcATgca",
+                "rank": 1,
+                "norm_sum": 1.0,
+                "score_lexA": 1.1,
+                "norm_lexA": 1.0,
+            },
+        ]
+    ).to_parquet(elites_path(run_dir), engine="fastparquet")
+    pd.DataFrame(
+        [
+            {
+                "elite_id": "elite-1",
+                "tf": "lexA",
+                "rank": 1,
+                "chain": 0,
+                "draw_idx": 0,
+                "best_start": 0,
+                "best_core_offset": 0,
+                "best_strand": "+",
+                "best_window_seq": "TGCA",
+                "best_core_seq": "TGCA",
+                "best_score_raw": 1.0,
+                "best_score_scaled": 1.0,
+                "best_score_norm": 1.0,
+                "tiebreak_rule": "max_leftmost_plus",
+                "pwm_ref": "demo:lexA",
+                "pwm_hash": "sha256",
+                "pwm_width": 4,
+                "core_width": 4,
+                "core_def_hash": "corehash",
+            },
+            {
+                "elite_id": "elite-2",
+                "tf": "lexA",
+                "rank": 2,
+                "chain": 0,
+                "draw_idx": 1,
+                "best_start": 0,
+                "best_core_offset": 0,
+                "best_strand": "+",
+                "best_window_seq": "ACGT",
+                "best_core_seq": "ACGT",
+                "best_score_raw": 0.9,
+                "best_score_scaled": 0.9,
+                "best_score_norm": 0.9,
+                "tiebreak_rule": "max_leftmost_plus",
+                "pwm_ref": "demo:lexA",
+                "pwm_hash": "sha256",
+                "pwm_width": 4,
+                "core_width": 4,
+                "core_def_hash": "corehash",
+            },
+        ]
+    ).to_parquet(elites_hits_path(run_dir), engine="fastparquet")
+
+    captured: dict[str, object] = {}
+
+    def _fake_video_renderer(*, out_path: Path, polished_final_sequence: str, **kwargs: object) -> dict[str, object]:
+        captured["polished_final_sequence"] = polished_final_sequence
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(b"fake-mp4")
+        return {"snapshot_count": 2, "frame_budget": 50}
+
+    monkeypatch.setattr(
+        "dnadesign.cruncher.analysis.trajectory_video.render_chain_trajectory_video",
+        _fake_video_renderer,
+    )
+
+    cfg = load_config(config_path)
+    analysis_runs = run_analyze(cfg, config_path)
+    assert analysis_runs
+    assert captured["polished_final_sequence"] == "TGCATGCATGCA"
+
+
 def test_analyze_showcase_fails_when_elites_count_exceeds_max_panels(tmp_path: Path) -> None:
     catalog_root = tmp_path / ".cruncher"
     config = _base_config(

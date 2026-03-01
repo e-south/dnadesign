@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from dnadesign.baserender.src.adapters import required_source_columns
+from dnadesign.baserender.src.adapters import build_adapter, required_source_columns
 from dnadesign.baserender.src.config import AdapterCfg
 from dnadesign.baserender.src.core import SchemaError
 
@@ -72,3 +72,31 @@ def test_required_source_columns_densegen_accepts_overlay_text_optional_key() ->
         policies={},
     )
     assert required_source_columns(cfg) == ["sequence", "densegen__used_tfbs_detail", "id", "details"]
+
+
+def test_generic_features_adapter_accepts_display_video_subtitle() -> None:
+    cfg = AdapterCfg(
+        kind="generic_features",
+        columns={
+            "id": "id",
+            "sequence": "sequence",
+            "features": "features",
+            "display": "display",
+        },
+        policies={},
+    )
+    adapter = build_adapter(cfg, alphabet="DNA")
+    record = adapter.apply(
+        {
+            "id": "row-1",
+            "sequence": "ACGT",
+            "features": [],
+            "display": {
+                "overlay_text": None,
+                "tag_labels": {"tf:lexA": "lexA"},
+                "video_subtitle": "lexA=0.80 cpxR=0.71",
+            },
+        },
+        row_index=0,
+    )
+    assert record.display.video_subtitle == "lexA=0.80 cpxR=0.71"

@@ -25,6 +25,7 @@ from dnadesign.baserender.src.render.layout import compute_layout
 from dnadesign.baserender.src.render.layout import span_to_x as layout_span_to_x
 from dnadesign.baserender.src.render.palette import Palette
 from dnadesign.baserender.src.render.sequence_rows import SequenceRowsRenderer
+from dnadesign.baserender.src.runtime import initialize_runtime
 
 
 def _logo_matrix(length: int) -> list[list[float]]:
@@ -515,6 +516,119 @@ def test_multiline_overlay_text_reserves_additional_title_space() -> None:
 
     one_line_px = max((style.font_size_label / 72.0 * style.dpi) * 1.05, single_layout.ch * 0.5)
     assert (multiline_layout.height - single_layout.height) >= (one_line_px * 0.9)
+
+
+def test_overlay_title_gap_is_stable_when_only_antisense_layers_increase() -> None:
+    sequence = "TTGACAAAAAAAAAAAAAAAATATAATCGCGCGCGCG"
+    style = resolve_style(
+        preset=None,
+        overrides={
+            "show_reverse_complement": True,
+            "motif_logo": {"layout": "stack", "lane_mode": "follow_feature_track"},
+        },
+    )
+    overlay_text = "Overlay Title"
+
+    base = Record(
+        id="overlay_base",
+        alphabet="DNA",
+        sequence=sequence,
+        features=(
+            Feature(
+                id="top",
+                kind="kmer",
+                span=Span(start=0, end=6, strand="fwd"),
+                label=sequence[0:6],
+                tags=("tf:lexA",),
+                attrs={},
+                render={"track": 0},
+            ),
+            Feature(
+                id="bottom1",
+                kind="kmer",
+                span=Span(start=20, end=26, strand="rev"),
+                label=revcomp(sequence[20:26]),
+                tags=("tf:cpxR",),
+                attrs={},
+                render={"track": 0},
+            ),
+        ),
+        effects=(
+            Effect(kind="motif_logo", target={"feature_id": "top"}, params={"matrix": _logo_matrix(6)}, render={}),
+            Effect(kind="motif_logo", target={"feature_id": "bottom1"}, params={"matrix": _logo_matrix(6)}, render={}),
+        ),
+        display=Display(overlay_text=overlay_text),
+        meta={},
+    )
+    stacked_antisense = Record(
+        id="overlay_stacked_antisense",
+        alphabet="DNA",
+        sequence=sequence,
+        features=(
+            Feature(
+                id="top",
+                kind="kmer",
+                span=Span(start=0, end=6, strand="fwd"),
+                label=sequence[0:6],
+                tags=("tf:lexA",),
+                attrs={},
+                render={"track": 0},
+            ),
+            Feature(
+                id="bottom1",
+                kind="kmer",
+                span=Span(start=20, end=26, strand="rev"),
+                label=revcomp(sequence[20:26]),
+                tags=("tf:cpxR",),
+                attrs={},
+                render={"track": 0},
+            ),
+            Feature(
+                id="bottom2",
+                kind="kmer",
+                span=Span(start=28, end=34, strand="rev"),
+                label=revcomp(sequence[28:34]),
+                tags=("tf:araC",),
+                attrs={},
+                render={"track": 1},
+            ),
+        ),
+        effects=(
+            Effect(kind="motif_logo", target={"feature_id": "top"}, params={"matrix": _logo_matrix(6)}, render={}),
+            Effect(kind="motif_logo", target={"feature_id": "bottom1"}, params={"matrix": _logo_matrix(6)}, render={}),
+            Effect(kind="motif_logo", target={"feature_id": "bottom2"}, params={"matrix": _logo_matrix(6)}, render={}),
+        ),
+        display=Display(overlay_text=overlay_text),
+        meta={},
+    )
+
+    def _actual_content_top(layout) -> float:
+        top = max(
+            float(layout.y_forward + layout.sequence_extent_up),
+            float(layout.y_reverse + layout.sequence_extent_up),
+        )
+        for placement in layout.placements:
+            top = max(top, float(placement.y + (placement.h / 2.0)))
+        for y0 in layout.motif_logo_y0_by_effect.values():
+            top = max(top, float(y0 + layout.motif_logo_height))
+        return float(top)
+
+    def _overlay_y(record: Record) -> float:
+        initialize_runtime()
+        fig = SequenceRowsRenderer().render(record, style, Palette(style.palette))
+        ax = fig.axes[0]
+        try:
+            overlays = [text for text in ax.texts if text.get_text() == overlay_text]
+            assert len(overlays) == 1
+            return float(overlays[0].get_position()[1])
+        finally:
+            plt.close(fig)
+
+    base_layout = compute_layout(base, style)
+    stacked_layout = compute_layout(stacked_antisense, style)
+    base_gap = _overlay_y(base) - _actual_content_top(base_layout)
+    stacked_gap = _overlay_y(stacked_antisense) - _actual_content_top(stacked_layout)
+    assert stacked_gap == pytest.approx(base_gap, abs=1e-6)
 
 
 def test_style_accepts_new_logo_coloring_and_scale_bar_location() -> None:
