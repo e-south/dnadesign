@@ -83,12 +83,12 @@ def test_readme_routes_to_demos_not_quickstart() -> None:
     assert "pixi run cruncher --" not in readme
 
 
-def test_readme_surfaces_repo_contract_docs_for_progressive_disclosure() -> None:
+def test_readme_omits_repo_contract_docs_block() -> None:
     readme = (_package_root() / "README.md").read_text()
-    assert "ARCHITECTURE.md" in readme
-    assert "DESIGN.md" in readme
-    assert "RELIABILITY.md" in readme
-    assert "SECURITY.md" in readme
+    assert "ARCHITECTURE.md" not in readme
+    assert "DESIGN.md" not in readme
+    assert "RELIABILITY.md" not in readme
+    assert "SECURITY.md" not in readme
 
 
 def test_root_dependencies_doc_references_existing_cruncher_workspace_config() -> None:
