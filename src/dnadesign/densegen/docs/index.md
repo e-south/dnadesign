@@ -15,7 +15,6 @@ Use **[docs/README.md](README.md)** as the primary docs entry. This page is a co
 
 ### Workspace docs
 - **[Workspaces directory guide](../workspaces/README.md)**
-- **[Packaged workspace catalog](../workspaces/catalog.md)**
 
 ### How-to guides
 - **[Cruncher to DenseGen PWM handoff](howto/cruncher_pwm_pipeline.md)**

@@ -55,11 +55,12 @@ portfolio:
     mode: prepare_then_aggregate
     max_parallel_sources: 4
   studies:
+    enabled: false
     ensure_specs:
       - configs/studies/length_vs_score.study.yaml
       - configs/studies/diversity_vs_score.study.yaml
     sequence_length_table:
-      enabled: true
+      enabled: false
       study_spec: configs/studies/length_vs_score.study.yaml
       top_n_lengths: 6
   artifacts:
@@ -104,8 +105,9 @@ Strict contracts:
 - every source must set explicit `workspace` and `run_dir`
 - in `prepare_then_aggregate` mode, every source must set `prepare.runbook` and non-empty `prepare.step_ids`
 - `execution.max_parallel_sources` defaults to `4` and must be `>= 1`
-- `studies.ensure_specs` entries are validated for every source workspace and auto-run when missing/incomplete
-- `studies.sequence_length_table` is a global portfolio option; it writes one extra table keyed by `sequence_length`
+- `studies.enabled` defaults to `false`; set it to `true` to enable study orchestration and study-derived tables
+- `studies.ensure_specs` entries are enforced only when `studies.enabled: true`; missing/incomplete runs are auto-run/resumed
+- `studies.sequence_length_table` writes one extra table keyed by `sequence_length` when both `studies.enabled: true` and `studies.sequence_length_table.enabled: true`
 - `plots.elite_showcase` is enabled by default and writes a cross-workspace elite showcase plot using all selected source elites
 - set `plots.elite_showcase.top_n_per_source` to cap how many elites per source are rendered
 - cross-workspace showcase score tokens are sourced from `best_score_norm` and must remain normalized in `[0,1]` per TF
@@ -135,9 +137,14 @@ uv run cruncher portfolio show --run outputs/master_all_workspaces/<portfolio_id
 #    - rerun: run prepare steps for every source
 uv run cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml --prepare-ready skip
 uv run cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml --prepare-ready rerun
+
+# 3) Runtime studies override (one run only, no spec edits):
+uv run cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml --studies
+uv run cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml --no-studies
 ```
 
 `--spec` must point to the `.portfolio.yaml` file path. Passing `configs/` (directory only) fails fast.
+`--studies` and `--no-studies` override `portfolio.studies.enabled` for a single invocation.
 
 `aggregate_only` now performs a source preflight and reports all missing/invalid source artifacts in one error with source IDs and workspace/run paths.
 When missing artifacts indicate the source run itself is not bootstrapped (for example missing run manifest/elites), the error includes a full-runbook nudge (no `--step`) so preparation can build the run from scratch.
@@ -156,8 +163,8 @@ Primary artifacts:
 - `outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_windows_long.{csv|parquet}`
 - `outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_elites_summary.{csv|parquet}`
 - `outputs/<portfolio_name>/<portfolio_id>/tables/table__source_summary.{csv|parquet}`
-- `outputs/<portfolio_name>/<portfolio_id>/tables/table__study_summary.{csv|parquet}` (when one or more sources define `study_spec`)
-- `outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_sequence_length.{csv|parquet}` (when `studies.sequence_length_table.enabled: true`)
+- `outputs/<portfolio_name>/<portfolio_id>/tables/table__study_summary.{csv|parquet}` (when `studies.enabled: true` and one or more sources define `study_spec`)
+- `outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_sequence_length.{csv|parquet}` (when `studies.enabled: true` and `studies.sequence_length_table.enabled: true`)
 - `outputs/<portfolio_name>/<portfolio_id>/plots/plot__source_tradeoff_score_vs_diversity.pdf` (when diversity metric is available)
 - `outputs/<portfolio_name>/<portfolio_id>/plots/plot__elite_showcase_cross_workspace.<pdf|png>` (when `plots.elite_showcase.enabled: true`)
 - `outputs/<portfolio_name>/<portfolio_id>/meta/manifest.json`

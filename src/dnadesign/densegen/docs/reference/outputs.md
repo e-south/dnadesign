@@ -1,9 +1,7 @@
 ## DenseGen outputs reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
-
-
+**Last verified:** 2026-02-28
 This page defines what DenseGen writes, where it writes it, and which event stream each
 consumer should read.
 
@@ -13,7 +11,6 @@ For a compact run-and-artifact checklist, use **[DenseGen quick checklist](../co
 
 ### Contents
 
-This section covers contents.
 - [Deterministic IDs](#deterministic-ids) - deterministic sequence identifiers.
 - [Parquet](#parquet) - dataset layout and deduplication.
 - [USR](#usr) - attach semantics and optional dependency.
@@ -27,8 +24,7 @@ This section covers contents.
 
 ### Event boundary paths
 
-This section records event artifact paths only; the boundary explanation lives in
-**[observability and events](../concepts/observability_and_events.md)**.
+Use **[observability and events](../concepts/observability_and_events.md)** for stream-boundary behavior; this section lists only artifact paths.
 
 - DenseGen runtime diagnostics: `outputs/meta/events.jsonl`
 - USR mutation events: `<usr_root>/<dataset>/.events.log`
@@ -37,7 +33,6 @@ This section records event artifact paths only; the boundary explanation lives i
 
 ### Deterministic IDs
 
-This section covers deterministic ids.
 
 - Sequence IDs use USR's algorithm:
   - `normalize_sequence(sequence, bio_type, alphabet)`
@@ -151,7 +146,6 @@ DenseGen writes `outputs/meta/events.jsonl` (JSON lines) with structured events 
 
 ### Related event docs
 
-This section points to stream-boundary docs and keeps this file focused on artifact contracts.
 
 See also:
 - DenseGen boundary and mistakes: **[observability and events](../concepts/observability_and_events.md)**
@@ -261,8 +255,11 @@ Core diagnostics plots:
   intermittent attempt-index ticks, and optional block guides for long runs.
 - `tfbs_usage` — TFBS usage diagnostics from accepted placements: specific TFBS rank-count curve
   plus a per-regulator rank-share heatmap.
+- `dense_array_video_showcase` — optional Stage-B MP4 montage from sampled accepted outputs.
+  Default video mode is a single all-plan round-robin timeline (`plots.video.mode: all_plans_round_robin_single_video`).
 
 Packaged DenseGen workspaces default to all four core plot families (`stage_a_summary`, `placement_map`, `run_health`, `tfbs_usage`).
+Video output is opt-in via `plots.video.enabled: true`.
 
 `stage_a_summary` consolidates PWM inputs into one image per plot type (one row per input),
 with outputs under `outputs/plots/stage_a/`:
@@ -278,6 +275,10 @@ with outputs under `outputs/plots/stage_a/`:
 
 `tfbs_usage` writes one image into the same plan directory:
 `outputs/plots/stage_b/<plan>/tfbs_usage.pdf` (or under `<input>/` for multi-input plans)
+
+`dense_array_video_showcase` writes one MP4 under:
+- all-plan mode: `outputs/plots/stage_b/all_plans/showcase.mp4`
+- single-plan mode: `outputs/plots/stage_b/<plan>/showcase.mp4`
 
 Stage-B scoping options are strict and per-plot:
 - `plots.options.placement_map.scope: auto|per_plan|per_group`

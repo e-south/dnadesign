@@ -56,8 +56,9 @@ qsub -P <project> \
 
 When using GUROBI, keep config aligned with scheduler slots:
 - `densegen.solver.threads <= pe omp slots`
-- set `densegen.solver.time_limit_seconds` for per-solve limits
-- set `densegen.runtime.max_seconds_per_plan` for per-plan runtime limits
+- set `densegen.solver.solver_attempt_timeout_seconds` for per-solve limits
+- set `densegen.runtime.checkpoint_every` for flush/checkpoint cadence
+- keep overall job runtime bounded via scheduler `-l h_rt=...`
 
 ### Evo2 GPU submissions
 

@@ -190,6 +190,80 @@ def test_portfolio_run_prepare_ready_skip_passes_policy_to_workflow(tmp_path: Pa
     assert captured["prepare_ready_policy"] == "skip"
 
 
+def test_portfolio_run_studies_flag_passes_override_to_workflow(tmp_path: Path, monkeypatch) -> None:
+    repo_root = tmp_path / "repo"
+    workspace = repo_root / "workspaces" / "portfolio_workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    expected_spec = workspace / "handoff.portfolio.yaml"
+    expected_spec.write_text(
+        "portfolio: {schema_version: 3, name: handoff, execution: {mode: aggregate_only}, sources: []}\n"
+    )
+    emitted_run_dir = workspace / "outputs" / "portfolios" / "handoff" / "abc123"
+
+    captured: dict[str, object] = {}
+
+    def _fake_run_portfolio(
+        spec_path: Path,
+        *,
+        force_overwrite: bool = False,
+        prepare_ready_policy: str = "rerun",
+        studies_enabled: bool | None = None,
+        on_event=None,
+    ) -> Path:
+        _ = spec_path
+        _ = force_overwrite
+        _ = prepare_ready_policy
+        _ = on_event
+        captured["studies_enabled"] = studies_enabled
+        return emitted_run_dir
+
+    monkeypatch.setattr(portfolio_cli, "run_portfolio", _fake_run_portfolio)
+    monkeypatch.setattr(
+        portfolio_cli,
+        "portfolio_preflight_payload",
+        lambda path: {
+            "spec_path": str(path),
+            "execution_mode": "aggregate_only",
+            "ready_source_ids": [],
+            "unready_source_ids": [],
+            "source_count": 0,
+            "sources": [],
+        },
+    )
+    monkeypatch.setattr(
+        portfolio_cli,
+        "portfolio_show_payload",
+        lambda path: {
+            "portfolio_name": "handoff",
+            "portfolio_id": "abc123",
+            "status": "completed",
+            "manifest_path": str(path / "meta" / "manifest.json"),
+            "status_path": str(path / "meta" / "status.json"),
+            "table_paths": [str(path / "tables" / "table__handoff_windows_long.parquet")],
+            "plot_paths": [],
+            "n_sources": 0,
+            "n_selected_elites": 0,
+        },
+    )
+    monkeypatch.chdir(repo_root)
+
+    enabled_result = runner.invoke(
+        app,
+        ["portfolio", "run", "--spec", "handoff.portfolio.yaml", "--studies"],
+        env={"INIT_CWD": str(workspace)},
+    )
+    assert enabled_result.exit_code == 0
+    assert captured["studies_enabled"] is True
+
+    disabled_result = runner.invoke(
+        app,
+        ["portfolio", "run", "--spec", "handoff.portfolio.yaml", "--no-studies"],
+        env={"INIT_CWD": str(workspace)},
+    )
+    assert disabled_result.exit_code == 0
+    assert captured["studies_enabled"] is False
+
+
 def test_portfolio_run_prepare_ready_skip_progress_totals_match_events(tmp_path: Path, monkeypatch) -> None:
     repo_root = tmp_path / "repo"
     workspace = repo_root / "workspaces" / "portfolio_workspace"

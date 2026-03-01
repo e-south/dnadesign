@@ -31,7 +31,7 @@ EXPECTED_SEQUENCE_LENGTHS = {
     "pairwise_cpxr_soxr": 18,
     "pairwise_laci_arac": 19,
     "pairwise_soxr_soxs": 18,
-    "project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs": 18,
+    "project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs": 60,
 }
 
 

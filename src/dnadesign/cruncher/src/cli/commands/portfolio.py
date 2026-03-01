@@ -150,6 +150,11 @@ def run_cmd(
         "--prepare-ready",
         help=("When execution.mode=prepare_then_aggregate and some sources are already ready: prompt, rerun, or skip."),
     ),
+    studies: bool | None = typer.Option(
+        None,
+        "--studies/--no-studies",
+        help="Override portfolio.studies.enabled for this run only.",
+    ),
 ) -> None:
     resolved_spec = _resolve_cli_path(spec)
     try:
@@ -310,14 +315,17 @@ def run_cmd(
                     progress.console.print(line, soft_wrap=True)
 
         with progress:
-            return _run_with_noninteractive_env(
-                lambda: run_portfolio(
-                    resolved_spec,
-                    force_overwrite=force_flag,
-                    prepare_ready_policy=prepare_ready_policy,
-                    on_event=_on_event,
-                )
-            )
+            return _run_with_noninteractive_env(lambda: _invoke_run_portfolio(force_flag, on_event=_on_event))
+
+    def _invoke_run_portfolio(force_flag: bool, *, on_event=None) -> Path:
+        kwargs: dict[str, object] = {
+            "force_overwrite": force_flag,
+            "prepare_ready_policy": prepare_ready_policy,
+            "on_event": on_event,
+        }
+        if studies is not None:
+            kwargs["studies_enabled"] = studies
+        return run_portfolio(resolved_spec, **kwargs)
 
     def _run_without_progress(force_flag: bool) -> Path:
         def _on_event(name: str, payload: dict[str, object]) -> None:
@@ -353,12 +361,7 @@ def run_cmd(
                 if line:
                     console.print(line, soft_wrap=True)
 
-        return run_portfolio(
-            resolved_spec,
-            force_overwrite=force_flag,
-            prepare_ready_policy=prepare_ready_policy,
-            on_event=_on_event,
-        )
+        return _invoke_run_portfolio(force_flag, on_event=_on_event)
 
     run_portfolio_call = _run_with_progress if _progress_enabled() else _run_without_progress
 

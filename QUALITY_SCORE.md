@@ -51,7 +51,7 @@ Each score uses a `0-4` rubric:
   - core/external integration Codecov uploads: `coverage-core.xml`, `coverage-external-integration.xml` (when coverage scope is active)
   - baseline contract: `.github/tool-coverage-baseline.json`
   - workflow lane outcomes: detect/core/external-integration/quality-score-inputs/ci-gate job results
-- On scoped PR runs (`run_full_core=false`), CI enforces per-tool coverage gates and uploads core-lane coverage, but skips canonical quality-score artifact generation by contract.
+- On scoped PR runs (`run_full_core=false`), CI enforces per-tool coverage gates and uploads core-lane coverage, but skips full quality-score artifact generation by contract.
 - Published signal endpoints: `https://codecov.io/gh/e-south/dnadesign`, `codecov/project`, `codecov/patch`
 - Manual narrative in this doc explains interpretation and improvement priorities; baseline enforcement remains CI-executable in-repo.
 

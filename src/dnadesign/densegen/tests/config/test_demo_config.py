@@ -475,11 +475,14 @@ def test_matrix_studies_use_auto_scoped_stage_b_plot_defaults() -> None:
 def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
     output = cfg.root.densegen.output
+    solver = cfg.root.densegen.solver
     assert output.targets == ["parquet", "usr"]
     assert output.usr is not None
     assert output.usr.dataset == "densegen/study_stress_ethanol_cipro"
     assert output.usr.root == "outputs/usr_datasets"
     assert float(output.usr.health_event_interval_seconds) > 0
+    assert solver.backend == "GUROBI"
+    assert solver.strategy == "iterate"
 
     input_types = [inp.type for inp in cfg.root.densegen.inputs]
     assert input_types.count("pwm_artifact") == 3
@@ -494,16 +497,16 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     pwm_inputs = [inp for inp in cfg.root.densegen.inputs if inp.type == "pwm_artifact"]
     assert len(pwm_inputs) == 3
     for inp in pwm_inputs:
-        assert inp.sampling.n_sites == 250
+        assert inp.sampling.n_sites == 500
         assert inp.sampling.mining.batch_size == 5000
         assert inp.sampling.mining.budget.mode == "fixed_candidates"
-        assert inp.sampling.mining.budget.candidates == 1_000_000
+        assert inp.sampling.mining.budget.candidates == 10_000_000
 
     background = next(inp for inp in cfg.root.densegen.inputs if inp.type == "background_pool")
     assert background.sampling.n_sites == 500
     assert background.sampling.mining.batch_size == 20000
     assert background.sampling.mining.budget.mode == "fixed_candidates"
-    assert background.sampling.mining.budget.candidates == 5_000_000
+    assert background.sampling.mining.budget.candidates == 10_000_000
     sampling = cfg.root.densegen.generation.sampling
     assert sampling.library_size == 10
     assert cfg.root.densegen.generation.expansion.max_plans == 64
@@ -522,10 +525,10 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
             if item.name.startswith("ethanol_ciprofloxacin__sig35=")
         ],
     }
-    assert set(quotas_by_base["ethanol"]) == {12}
-    assert set(quotas_by_base["ciprofloxacin"]) == {12}
-    assert set(quotas_by_base["ethanol_ciprofloxacin"]) == {16}
-    assert cfg.root.densegen.generation.total_quota() == 200
+    assert set(quotas_by_base["ethanol"]) == {60_000}
+    assert set(quotas_by_base["ciprofloxacin"]) == {60_000}
+    assert set(quotas_by_base["ethanol_ciprofloxacin"]) == {80_000}
+    assert cfg.root.densegen.generation.total_quota() == 1_000_000
     assert cfg.root.densegen.generation.sequence_constraints is not None
     assert "validate_final_sequence" not in cfg.root.densegen.postprocess.model_dump(exclude_none=False)
 
@@ -656,6 +659,9 @@ def test_packaged_workspace_runbooks_exist_with_workspace_local_happy_path() -> 
         assert 'CONFIG="$PWD/config.yaml"' in script_content, (
             f"{runbook_script}: runbook script must resolve config from current workspace directory"
         )
+        assert 'MODE="${DENSEGEN_RUNBOOK_MODE:-fresh}"' in script_content, (
+            f"{runbook_script}: runbook script must expose explicit run mode policy"
+        )
         if workspace_id in USR_WORKSPACE_IDS:
             assert "cruncher catalog export-densegen" in content, (
                 f"{runbook_path}: runbook must include optional Cruncher artifact refresh command"
@@ -670,16 +676,16 @@ def test_packaged_workspace_runbooks_exist_with_workspace_local_happy_path() -> 
 
 def test_packaged_workspace_runbook_scripts_use_shared_helper_with_workspace_policies() -> None:
     workspace_root = Path(__file__).resolve().parents[2] / "workspaces"
-    helper_path = workspace_root / "_shared" / "runbook_lib.sh"
+    helper_path = workspace_root / "_shared" / "workspace_runbook_flow.sh"
     assert helper_path.exists(), f"Missing runbook helper: {helper_path}"
     helper_content = helper_path.read_text()
     required_helper_tokens = (
-        "densegen_runbook_main()",
+        "densegen_workspace_runbook_flow()",
         "--fresh --no-plot",
         "inspect run --events --library",
         "notebook generate",
         "marimo check",
-        "dense run exited with status",
+        "exited with status",
     )
     for token in required_helper_tokens:
         assert token in helper_content, f"{helper_path}: missing required helper token: {token!r}"
@@ -705,10 +711,13 @@ def test_packaged_workspace_runbook_scripts_use_shared_helper_with_workspace_pol
     for workspace_id in PACKAGED_WORKSPACE_IDS:
         script_path = workspace_root / workspace_id / "runbook.sh"
         content = script_path.read_text()
-        assert 'source "$SCRIPT_DIR/../_shared/runbook_lib.sh"' in content, (
+        assert 'source "$SCRIPT_DIR/../_shared/workspace_runbook_flow.sh"' in content, (
             f"{script_path}: runbook script must source the shared runbook helper"
         )
-        assert "densegen_runbook_main \\" in content, f"{script_path}: runbook script must call densegen_runbook_main"
+        assert "densegen_workspace_runbook_flow \\" in content, (
+            f"{script_path}: runbook script must call densegen_workspace_runbook_flow"
+        )
+        assert '--mode "$MODE"' in content, f"{script_path}: runbook script must pass explicit --mode"
         assert f'--runner "{expected_runner_by_workspace[workspace_id]}"' in content, (
             f"{script_path}: runbook script runner policy mismatch"
         )

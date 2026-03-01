@@ -32,7 +32,8 @@ It summarizes what must fail fast, what should be observable, and where recovery
 
 ## Operational runbook map
 - SCC quickstart and batch guidance: `docs/bu-scc/quickstart.md`, `docs/bu-scc/batch-notify.md`
-- SCC operational source of truth: `docs/bu-scc/sge-hpc-ops/SKILL.md`
+- SCC status-first and queue-fair operator guidance: `docs/bu-scc/quickstart.md`, `docs/bu-scc/batch-notify.md`, `docs/bu-scc/agent-cheatsheet.md`
+- Repo BU SCC docs are the operational baseline; external agent skills are optional overlays, not required dependencies.
 - Notify operator runbook and event contracts: `docs/notify/README.md`, `docs/notify/usr-events.md`
 - Maintainer CI/test details: `docs/dev/README.md`
 

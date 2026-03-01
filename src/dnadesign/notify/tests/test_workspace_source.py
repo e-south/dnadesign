@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from dnadesign.notify.errors import NotifyConfigError
-from dnadesign.notify.workspace_source import (
+from dnadesign.notify.profiles.workspace import (
     list_tool_workspaces,
     resolve_tool_workspace_config_path,
 )

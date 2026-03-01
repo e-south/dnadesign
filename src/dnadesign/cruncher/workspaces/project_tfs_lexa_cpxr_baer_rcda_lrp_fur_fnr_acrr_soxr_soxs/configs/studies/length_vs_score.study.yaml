@@ -23,7 +23,6 @@ study:
       sample.sequence_length:
       - 15
       - 17
-      - 18
       - 19
       - 21
       - 23
@@ -40,6 +39,7 @@ study:
       - 45
       - 47
       - 49
+      - 60
   replays:
     mmr_sweep:
       enabled: false

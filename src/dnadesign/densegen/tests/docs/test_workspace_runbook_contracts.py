@@ -50,7 +50,7 @@ def _read_runbook_script(workspace_id: str) -> str:
 
 
 def _read_shared_runbook_lib() -> str:
-    lib_path = WORKSPACES / "_shared" / "runbook_lib.sh"
+    lib_path = WORKSPACES / "_shared" / "workspace_runbook_flow.sh"
     assert lib_path.exists(), f"Missing shared runbook library: {lib_path}"
     return lib_path.read_text()
 
@@ -150,10 +150,12 @@ def test_workspace_runbooks_include_workspace_local_runbook_script() -> None:
                 "set -euo pipefail",
                 'CONFIG="$PWD/config.yaml"',
                 'NOTEBOOK="$PWD/outputs/notebooks/densegen_run_overview.py"',
-                'source "$SCRIPT_DIR/../_shared/runbook_lib.sh"',
-                "densegen_runbook_main",
+                'MODE="${DENSEGEN_RUNBOOK_MODE:-fresh}"',
+                'source "$SCRIPT_DIR/../_shared/workspace_runbook_flow.sh"',
+                "densegen_workspace_runbook_flow",
                 '--config "$CONFIG"',
                 '--notebook "$NOTEBOOK"',
+                '--mode "$MODE"',
                 f'--runner "{expected_runner[workspace_id]}"',
                 f'--ensure-usr-registry "{expected_usr_registry[workspace_id]}"',
                 f'--require-fimo "{expected_require_fimo[workspace_id]}"',
@@ -163,16 +165,13 @@ def test_workspace_runbooks_include_workspace_local_runbook_script() -> None:
         )
 
 
-def test_usr_workspace_runbooks_seed_registry_before_dense_run() -> None:
+def test_usr_workspace_runbooks_document_usr_registry_auto_seed() -> None:
     for workspace_id in USR_WORKSPACE_IDS:
         script = _read_runbook_script(workspace_id)
         assert '--ensure-usr-registry "true"' in script
 
         runbook_text = _read_runbook(workspace_id)
-        assert 'USR_REGISTRY="$PWD/outputs/usr_datasets/registry.yaml"' in runbook_text
-        assert (
-            'ROOT_REGISTRY="$(git rev-parse --show-toplevel)/src/dnadesign/usr/datasets/registry.yaml"' in runbook_text
-        )
+        assert "auto-seeds outputs/usr_datasets/registry.yaml when missing." in runbook_text
 
 
 def test_shared_runbook_lib_keeps_canonical_dense_command_sequence() -> None:
@@ -190,7 +189,7 @@ def test_shared_runbook_lib_keeps_canonical_dense_command_sequence() -> None:
             '"${dense_cmd[@]}" plot -c "$config"',
             '"${dense_cmd[@]}" notebook generate -c "$config"',
         ],
-        label="workspaces/_shared/runbook_lib.sh canonical sequence",
+        label="workspaces/_shared/workspace_runbook_flow.sh canonical sequence",
     )
 
 
@@ -209,23 +208,23 @@ def test_shared_runbook_lib_enforces_config_and_notebook_artifact_guards() -> No
             'echo "DenseGen notebook was not generated at: $notebook" >&2',
             'uv run marimo check "$notebook"',
         ],
-        label="workspaces/_shared/runbook_lib.sh guardrails",
+        label="workspaces/_shared/workspace_runbook_flow.sh guardrails",
     )
 
 
 def test_workspace_runbooks_single_command_matches_step_sequence() -> None:
     single_command_tokens_by_workspace = {
         "demo_tfbs_baseline": [
-            "./runbook.sh",
+            "./runbook.sh --mode fresh",
         ],
         "demo_sampling_baseline": [
-            "./runbook.sh",
+            "./runbook.sh --mode fresh",
         ],
         "study_constitutive_sigma_panel": [
-            "./runbook.sh",
+            "./runbook.sh --mode fresh",
         ],
         "study_stress_ethanol_cipro": [
-            "./runbook.sh",
+            "./runbook.sh --mode fresh",
         ],
     }
     step_tokens_by_workspace = {
@@ -277,11 +276,27 @@ def test_workspace_runbooks_single_command_matches_step_sequence() -> None:
         )
 
 
-def test_workspace_runbooks_include_analysis_only_shortcut() -> None:
+def test_shared_runbook_lib_exposes_help_for_mode_discovery() -> None:
+    script = _read_shared_runbook_lib()
+    _assert_token_order(
+        script,
+        [
+            "_densegen_workspace_runbook_usage() {",
+            "Usage: ./runbook.sh [--mode fresh|resume|analysis]",
+            "Runbook modes:",
+            "--help|-h)",
+            "_densegen_workspace_runbook_usage",
+            "return 0",
+        ],
+        label="workspaces/_shared/workspace_runbook_flow.sh help surface",
+    )
+
+
+def test_workspace_runbooks_include_analysis_mode_shortcut() -> None:
     for workspace_id in WORKSPACE_IDS:
         text = _read_runbook(workspace_id)
-        assert "### Optional analysis-only mode (existing outputs)" in text
-        assert "./runbook.sh --analysis-only" in text
+        assert "### Optional analysis mode (existing outputs)" in text
+        assert "./runbook.sh --mode analysis" in text
 
 
 def test_workspace_runbooks_keep_optional_commands_outside_canonical_step_block() -> None:
@@ -295,24 +310,26 @@ def test_workspace_runbooks_keep_optional_commands_outside_canonical_step_block(
             assert "### Optional artifact refresh from Cruncher" in text
 
 
-def test_shared_runbook_lib_analysis_only_mode_requires_existing_outputs() -> None:
+def test_shared_runbook_lib_analysis_mode_requires_existing_outputs() -> None:
     script = _read_shared_runbook_lib()
     _assert_token_order(
         script,
         [
-            'local analysis_only="false"',
-            "--analysis-only)",
-            'analysis_only="true"',
-            'if [[ "$analysis_only" == "true" ]]; then',
+            'local run_mode="fresh"',
+            "--mode)",
+            'run_mode="$2"',
+            'if [[ "$run_mode" != "fresh" && "$run_mode" != "resume" && "$run_mode" != "analysis" ]]; then',
+            'echo "Unsupported --mode value: $run_mode (expected fresh|resume|analysis)" >&2',
+            'if [[ "$run_mode" == "analysis" ]]; then',
             'records_table="$(dirname "$config")/outputs/tables/records.parquet"',
             'if [[ ! -f "$records_table" ]]; then',
-            'echo "Analysis-only mode requires existing outputs at: $records_table" >&2',
-            'echo "Run ./runbook.sh first to generate artifacts, then rerun with --analysis-only." >&2',
+            'echo "Analysis mode requires existing outputs at: $records_table" >&2',
+            'echo "Run ./runbook.sh --mode fresh first to generate artifacts, then rerun with --mode analysis." >&2',
             "local inspect_status=$?",
             "if [[ $inspect_status -ne 0 ]]; then",
-            'echo "Analysis-only inspection failed. Existing artifacts may be stale or schema-incompatible." >&2',
-            'echo "Run ./runbook.sh for a fresh generation, then retry --analysis-only." >&2',
+            'echo "Analysis mode inspection failed. Existing artifacts may be stale or schema-incompatible." >&2',
+            'echo "Run ./runbook.sh --mode fresh, then retry --mode analysis." >&2',
             '"${dense_cmd[@]}" notebook generate --force -c "$config"',
         ],
-        label="workspaces/_shared/runbook_lib.sh analysis-only guardrails",
+        label="workspaces/_shared/workspace_runbook_flow.sh analysis-mode guardrails",
     )

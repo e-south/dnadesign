@@ -36,6 +36,8 @@ Run this single command to do everything below:
     cruncher lock -c "$CONFIG"
     cruncher parse --force-overwrite -c "$CONFIG"
     cruncher sample --force-overwrite -c "$CONFIG"
+    # Optional video output: set analysis.trajectory_video.enabled: true in configs/config.yaml.
+    # Default best-of chain video is monotonic (timeline_mode: best_so_far) and writes plots/chain_trajectory_video.mp4.
     cruncher analyze --summary -c "$CONFIG"
     cruncher export sequences --latest -c "$CONFIG"
     cruncher catalog logos --source pairwise_cpxr_soxr_merged_meme_oops --set 1 -c "$CONFIG"

@@ -1,10 +1,10 @@
 ## Sampling + analysis
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-02-28
 
 
-**Last updated by:** cruncher-maintainers on 2026-02-23
+**Last updated by:** cruncher-maintainers on 2026-02-28
 
 ### Contents
 - [Overview](#overview)
@@ -251,6 +251,7 @@ Plots (always generated when data is available):
   - `analysis.pairwise=all_pairs_grid` renders every TF pair in one score-space figure, with edge-only axis labels.
   - all-pairs grid shares panel limits automatically when `analysis.trajectory_scatter_scale=normalized-llr`; raw-LLR grids keep panel-local limits.
 - `plots/chain_trajectory_sweep.*` (optimizer scalar score over sweeps by chain, with `best_so_far|raw|all` modes, step rendering for best-so-far, and tune/cooling boundary markers when available; scalar semantics follow `sample.objective.combine` and optional soft-min shaping)
+- `plots/chain_trajectory_video.mp4` (optional via `analysis.trajectory_video.enabled=true`: selected-chain motif snapshots rendered through BaseRender, with `best_so_far` default timeline, tune+draw eligibility by default, and strict duration/fps/frame guardrails)
 - `plots/elites_nn_distance.*` (elite diversity panel: y-axis is final optimizer scalar score, x-axis is full-sequence nearest-neighbor Hamming distance in bp to each elite's closest other selected elite, plus pairwise full-sequence distance matrix; core-distance context retained)
 - `plots/elites_showcase.*` (baserender-backed elite panels with sense/antisense sequence rows, TF best-window placement, and per-window motif logos)
   - motif-logo matrices are sourced from the locked optimization motif library (resolved by Cruncher during analysis) rather than inferred from elite strings.

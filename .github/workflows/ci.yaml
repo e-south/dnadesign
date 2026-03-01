@@ -98,6 +98,36 @@ jobs:
         if: steps.entropy.outcome == 'failure'
         run: exit 1
 
+  secrets-hygiene:
+    name: Secrets hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies (locked)
+        run: uv sync --locked --dev
+
+      - name: Detect-secrets baseline path hygiene
+        run: |
+          uv run python -m dnadesign.devtools.secrets_baseline_check \
+            --repo-root . \
+            --baseline .secrets.baseline
+
+      - name: Detect-secrets full-tree check
+        run: uv run pre-commit run detect-secrets --all-files
+
   core-lint-test-build:
     name: Core lint/test/build lane
     runs-on: ubuntu-latest
@@ -388,18 +418,24 @@ jobs:
     name: CI gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [detect-ci-scope, core-lint-test-build, external-integration, quality-score-inputs]
+    needs: [detect-ci-scope, secrets-hygiene, core-lint-test-build, external-integration, quality-score-inputs]
     if: always()
 
     steps:
       - name: Enforce lane outcomes
         shell: bash
         run: |
+          secrets_result="${{ needs.secrets-hygiene.result }}"
           core_result="${{ needs.core-lint-test-build.result }}"
           external_integration_result="${{ needs.external-integration.result }}"
           quality_result="${{ needs.quality-score-inputs.result }}"
           run_external_integration="${{ needs.detect-ci-scope.outputs.run-external-integration }}"
           run_full_core="${{ needs.detect-ci-scope.outputs.run-full-core }}"
+
+          if [ "$secrets_result" != "success" ]; then
+            echo "Secrets hygiene lane failed: $secrets_result"
+            exit 1
+          fi
 
           if [ "$core_result" != "success" ]; then
             echo "Core lane failed: $core_result"

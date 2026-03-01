@@ -102,7 +102,9 @@ def test_length_vs_score_studies_follow_workspace_study_range_policy() -> None:
             f"{workspace.name}: length_vs_score minimum {lengths[0]} must match study minimum policy "
             f"{expected_min_length}"
         )
-        assert lengths[-1] <= 50, f"{workspace.name}: length_vs_score maximum must be <= 50"
+        assert lengths[-1] <= max(50, base_sequence_length), (
+            f"{workspace.name}: length_vs_score maximum must be <= max(50, base sequence length={base_sequence_length})"
+        )
         expected_ladder = list(range(expected_min_length, 51, 2))
         assert all(item in lengths for item in expected_ladder), (
             f"{workspace.name}: length_vs_score must include every step-2 length from {expected_min_length} to 50"

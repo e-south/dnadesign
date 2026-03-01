@@ -42,6 +42,7 @@ def _base_payload_v2() -> dict:
             "name": "pairwise_handoff",
             "execution": {"mode": "prepare_then_aggregate"},
             "studies": {
+                "enabled": True,
                 "ensure_specs": [
                     "configs/studies/length_vs_score.study.yaml",
                     "configs/studies/diversity_vs_score.study.yaml",
@@ -157,6 +158,14 @@ def test_schema_v3_defaults_max_parallel_sources_to_four() -> None:
     assert model.portfolio.execution.max_parallel_sources == 4
 
 
+def test_schema_v3_defaults_studies_to_disabled() -> None:
+    payload = _base_payload()
+    model = PortfolioRoot.model_validate(payload)
+    assert model.portfolio.studies.enabled is False
+    assert model.portfolio.studies.ensure_specs == []
+    assert model.portfolio.studies.sequence_length_table.enabled is False
+
+
 def test_schema_v3_defaults_portfolio_elite_showcase_plot_contract() -> None:
     payload = _base_payload()
     model = PortfolioRoot.model_validate(payload)
@@ -217,6 +226,13 @@ def test_schema_v3_requires_sequence_length_table_study_to_be_ensured() -> None:
         "configs/studies/diversity_vs_score.study.yaml",
     ]
     with pytest.raises(ValidationError, match="must be listed in portfolio.studies.ensure_specs"):
+        PortfolioRoot.model_validate(payload)
+
+
+def test_schema_v3_requires_studies_enabled_when_sequence_length_table_enabled() -> None:
+    payload = _base_payload_v2()
+    payload["portfolio"]["studies"]["enabled"] = False
+    with pytest.raises(ValidationError, match="requires portfolio.studies.enabled: true"):
         PortfolioRoot.model_validate(payload)
 
 

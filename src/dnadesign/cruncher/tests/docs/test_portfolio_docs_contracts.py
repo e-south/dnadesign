@@ -33,6 +33,7 @@ def test_cli_reference_lists_portfolio_commands() -> None:
     assert "cruncher portfolio run" in cli_ref
     assert "cruncher portfolio show" in cli_ref
     assert "--prepare-ready {prompt|skip|rerun}" in cli_ref
+    assert "--studies / --no-studies" in cli_ref
     assert "--spec` must point to a `.portfolio.yaml` file path" in cli_ref
     assert "outputs/<portfolio_name>/<portfolio_id>/tables" in cli_ref
 
@@ -49,6 +50,7 @@ def test_portfolio_guide_describes_export_then_aggregate_sequence() -> None:
     assert "--prepare-ready skip" in guide
     assert "aggregate_only" in guide
     assert "ensure_specs" in guide
+    assert "--studies" in guide
     assert "configs/studies/length_vs_score.study.yaml" in guide
     assert "configs/studies/diversity_vs_score.study.yaml" in guide
     assert "outputs/<portfolio_name>/<portfolio_id>/tables" in guide
@@ -88,13 +90,14 @@ def test_portfolio_workspace_template_spec_exists_and_uses_prepare_mode_with_exp
     assert spec["execution"]["mode"] == "prepare_then_aggregate"
     studies = spec.get("studies")
     assert isinstance(studies, dict)
+    assert studies.get("enabled") is False
     assert studies.get("ensure_specs") == [
         "configs/studies/length_vs_score.study.yaml",
         "configs/studies/diversity_vs_score.study.yaml",
     ]
     sequence_length_table = studies.get("sequence_length_table")
     assert isinstance(sequence_length_table, dict)
-    assert sequence_length_table.get("enabled") is True
+    assert sequence_length_table.get("enabled") is False
     assert sequence_length_table.get("top_n_lengths") == 6
     assert len(spec["sources"]) >= 1
     for source in spec["sources"]:

@@ -804,6 +804,147 @@ class AnalysisElitesShowcaseConfig(StrictBaseModel):
         return value
 
 
+class AnalysisTrajectoryVideoSelectionConfig(StrictBaseModel):
+    chain_policy: Literal["best", "explicit"] = "best"
+    explicit_chain_1based: int | None = None
+    phase_scope: Literal["draw_only", "tune_and_draw_if_present", "tune_and_draw_required"] = "tune_and_draw_if_present"
+    objective_column: Literal["raw_llr_objective", "objective_scalar", "norm_llr_objective"] = "objective_scalar"
+
+    @field_validator("explicit_chain_1based")
+    @classmethod
+    def _check_explicit_chain_1based(cls, value: int | None) -> int | None:
+        if value is None:
+            return None
+        if not isinstance(value, int) or value < 1:
+            raise ValueError("analysis.trajectory_video.selection.explicit_chain_1based must be >= 1")
+        return int(value)
+
+    @model_validator(mode="after")
+    def _check_explicit_chain_required(self) -> "AnalysisTrajectoryVideoSelectionConfig":
+        if self.chain_policy == "explicit" and self.explicit_chain_1based is None:
+            raise ValueError(
+                "analysis.trajectory_video.selection.explicit_chain_1based is required when chain_policy='explicit'"
+            )
+        return self
+
+
+class AnalysisTrajectoryVideoSamplingConfig(StrictBaseModel):
+    stride: int = 5
+    include_best_updates: bool = True
+
+    @field_validator("stride")
+    @classmethod
+    def _check_stride(cls, value: int) -> int:
+        if not isinstance(value, int) or value < 1:
+            raise ValueError("analysis.trajectory_video.sampling.stride must be >= 1")
+        return int(value)
+
+
+class AnalysisTrajectoryVideoPlaybackConfig(StrictBaseModel):
+    target_duration_sec: float = 8.0
+    fps: int = 12
+    pause_on_best_update_sec: float = 0.0
+    sweep_taper_fraction: float = 0.25
+
+    @field_validator("target_duration_sec")
+    @classmethod
+    def _check_target_duration_sec(cls, value: float) -> float:
+        if not isinstance(value, (int, float)):
+            raise ValueError("analysis.trajectory_video.playback.target_duration_sec must be numeric")
+        duration = float(value)
+        if duration < 3.0 or duration > 20.0:
+            raise ValueError("analysis.trajectory_video.playback.target_duration_sec must be between 3 and 20")
+        return duration
+
+    @field_validator("fps")
+    @classmethod
+    def _check_fps(cls, value: int) -> int:
+        if not isinstance(value, int) or value < 8 or value > 20:
+            raise ValueError("analysis.trajectory_video.playback.fps must be between 8 and 20")
+        return int(value)
+
+    @field_validator("pause_on_best_update_sec")
+    @classmethod
+    def _check_pause_on_best_update_sec(cls, value: float) -> float:
+        if not isinstance(value, (int, float)):
+            raise ValueError("analysis.trajectory_video.playback.pause_on_best_update_sec must be numeric")
+        pause = float(value)
+        if pause < 0.0 or pause > 2.0:
+            raise ValueError("analysis.trajectory_video.playback.pause_on_best_update_sec must be between 0 and 2")
+        return pause
+
+    @field_validator("sweep_taper_fraction")
+    @classmethod
+    def _check_sweep_taper_fraction(cls, value: float) -> float:
+        if not isinstance(value, (int, float)):
+            raise ValueError("analysis.trajectory_video.playback.sweep_taper_fraction must be numeric")
+        fraction = float(value)
+        if fraction < 0.0 or fraction > 0.8:
+            raise ValueError("analysis.trajectory_video.playback.sweep_taper_fraction must be between 0 and 0.8")
+        return fraction
+
+
+class AnalysisTrajectoryVideoSweepInsetConfig(StrictBaseModel):
+    enabled: bool = False
+    corner: Literal["top_left", "top_right", "bottom_left", "bottom_right"] = "top_right"
+
+
+class AnalysisTrajectoryVideoLimitsConfig(StrictBaseModel):
+    max_snapshots: int = 120
+    max_total_frames: int = 180
+    max_estimated_render_sec: float = 30.0
+
+    @field_validator("max_snapshots", "max_total_frames")
+    @classmethod
+    def _check_positive_int_limits(cls, value: int, info) -> int:
+        if not isinstance(value, int) or value < 2:
+            raise ValueError(f"analysis.trajectory_video.limits.{info.field_name} must be >= 2")
+        return int(value)
+
+    @field_validator("max_estimated_render_sec")
+    @classmethod
+    def _check_max_estimated_render_sec(cls, value: float) -> float:
+        if not isinstance(value, (int, float)):
+            raise ValueError("analysis.trajectory_video.limits.max_estimated_render_sec must be numeric")
+        seconds = float(value)
+        if seconds <= 0:
+            raise ValueError("analysis.trajectory_video.limits.max_estimated_render_sec must be > 0")
+        return seconds
+
+
+class AnalysisTrajectoryVideoConfig(StrictBaseModel):
+    enabled: bool = False
+    timeline_mode: Literal["best_so_far", "raw_chain"] = "best_so_far"
+    output_name: str = "chain_trajectory_video.mp4"
+    selection: AnalysisTrajectoryVideoSelectionConfig = AnalysisTrajectoryVideoSelectionConfig()
+    sampling: AnalysisTrajectoryVideoSamplingConfig = AnalysisTrajectoryVideoSamplingConfig()
+    playback: AnalysisTrajectoryVideoPlaybackConfig = AnalysisTrajectoryVideoPlaybackConfig()
+    sweep_inset: AnalysisTrajectoryVideoSweepInsetConfig = AnalysisTrajectoryVideoSweepInsetConfig()
+    limits: AnalysisTrajectoryVideoLimitsConfig = AnalysisTrajectoryVideoLimitsConfig()
+
+    @field_validator("output_name")
+    @classmethod
+    def _check_output_name(cls, value: str) -> str:
+        name = str(value).strip()
+        if not name:
+            raise ValueError("analysis.trajectory_video.output_name must be a non-empty filename")
+        if "/" in name or "\\" in name:
+            raise ValueError("analysis.trajectory_video.output_name must be a flat filename")
+        if not name.lower().endswith(".mp4"):
+            raise ValueError("analysis.trajectory_video.output_name must end with '.mp4'")
+        return name
+
+    @model_validator(mode="after")
+    def _check_budget_limits(self) -> "AnalysisTrajectoryVideoConfig":
+        frame_budget = int(round(self.playback.target_duration_sec * self.playback.fps))
+        if frame_budget > self.limits.max_total_frames:
+            raise ValueError(
+                "analysis.trajectory_video.playback target frames exceed limits.max_total_frames; "
+                "reduce duration/fps or raise limits.max_total_frames"
+            )
+        return self
+
+
 class SampleOutputConfig(StrictBaseModel):
     save_sequences: bool = True
     save_trace: bool = True
@@ -899,6 +1040,7 @@ class AnalysisConfig(StrictBaseModel):
     trajectory_particle_alpha_max: float = 0.45
     trajectory_chain_overlay: bool = False
     trajectory_summary_overlay: bool = False
+    trajectory_video: AnalysisTrajectoryVideoConfig = AnalysisTrajectoryVideoConfig()
     elites_showcase: AnalysisElitesShowcaseConfig = AnalysisElitesShowcaseConfig()
     mmr_sweep: AnalysisMmrSweepConfig = AnalysisMmrSweepConfig()
     fimo_compare: AnalysisFimoCompareConfig = AnalysisFimoCompareConfig()

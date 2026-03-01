@@ -27,6 +27,8 @@ Run this single command to do everything in this demo:
 uv run cruncher workspaces run --runbook configs/runbook.yaml
 ```
 
+Stop here if you only need the happy path.
+
 Or run the same flow step by step with context below.
 
 Joint regulator set:
@@ -134,8 +136,8 @@ shasum inputs/local_motifs/cpxR.txt ../demo_pairwise/inputs/local_motifs/cpxR.tx
 
 ### Current workspace defaults (operational)
 
-- `sample.sequence_length: 15`
-- `sample.budget.tune: 50000`
-- `sample.budget.draws: 300000`
+- `sample.sequence_length: 60`
+- `sample.budget.tune: 100000`
+- `sample.budget.draws: 1200000`
 - `optimizer.chains: 8`
 - `analysis.pairwise: all_pairs_grid` (render all TF-pair score-space panels in one figure)

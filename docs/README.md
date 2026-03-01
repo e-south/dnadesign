@@ -1,17 +1,18 @@
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-02-28
 
 This is the central documentation map for workflows, tool references, and repository policy.
 
 ### Use this index
 
-1. Start in [Workflow lanes](#workflow-lanes) to choose a preflight -> run -> verify path by outcome.
-2. Follow the lane's "Verify next" target before moving to downstream tools.
-3. Use [Tool docs](#tool-docs) when you need package-level commands and data contracts.
-4. Use [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for policy, operations, and governance detail.
-5. Return to this page as the single docs entrypoint.
+1. If this is a new machine, start with [Installation](installation.md) first.
+2. Continue to [Workflow lanes](#workflow-lanes) to choose a preflight -> run -> verify path by outcome.
+3. Follow the lane's "Verify next" target before moving to downstream tools.
+4. Use [Tool docs](#tool-docs) when you need package-level commands and data contracts.
+5. Use [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for policy, operations, and governance detail.
+6. Return to this page as the central docs map.
 
 ### Workflow lanes
 
@@ -19,6 +20,7 @@ This is the central documentation map for workflows, tool references, and reposi
 | --- | --- | --- |
 | Design a sequence library in a workspace | [DenseGen docs overview](../src/dnadesign/densegen/docs/README.md) | Verify generated artifacts and metadata with [DenseGen outputs reference](../src/dnadesign/densegen/docs/reference/outputs.md). |
 | Run model inference and write outputs back to datasets | [Infer README](../src/dnadesign/infer/README.md) | Verify write-back columns and types with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
+| Operate Notify for local event watching and webhook setup | [Notify docs index](notify/README.md) | Verify event stream contract in [Notify USR events contract](notify/usr-events.md). |
 | Sync iterative HPC outputs to local analysis safely | [USR workflow map](../src/dnadesign/usr/docs/operations/workflow-map.md) -> [USR HPC sync flow](../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md) | Verify transfer parity with [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync-audit-loop.md). |
 | Run cross-machine sync with stricter failure checks | [USR sync command contract](../src/dnadesign/usr/docs/operations/sync.md) | Verify sidecar and overlay fidelity with [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync-fidelity-drills.md). |
 | Chain DenseGen -> USR -> Infer -> USR updates | [Chained workflow demo](../src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md) | Verify downstream dataset state with [Infer docs](../src/dnadesign/infer/README.md). |

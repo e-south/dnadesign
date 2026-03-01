@@ -225,10 +225,11 @@ portfolio:
       - analyze_summary
       - export_sequences_latest
   studies:
+    enabled: false
     ensure_specs:
     - configs/studies/length_vs_score.study.yaml
     - configs/studies/diversity_vs_score.study.yaml
     sequence_length_table:
-      enabled: true
+      enabled: false
       study_spec: configs/studies/length_vs_score.study.yaml
       top_n_lengths: 6

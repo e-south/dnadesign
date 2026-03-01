@@ -3,10 +3,14 @@
 Run from this directory:
 
 ```bash
-# Execute the packaged workspace runbook sequence.
-./runbook.sh
+# Start a clean generation pass (default mode if omitted).
+./runbook.sh --mode fresh
+# Continue generation without wiping prior outputs.
+./runbook.sh --mode resume
+# Rebuild plots/notebook from existing outputs only.
+./runbook.sh --mode analysis
 ```
 
 - Runbook: [runbook.md](runbook.md)
 - Config: [config.yaml](config.yaml)
-- Workspace catalog: [../catalog.md](../catalog.md)
+- All workspaces: [../README.md](../README.md)

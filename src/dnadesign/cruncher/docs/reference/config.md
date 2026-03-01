@@ -1,10 +1,10 @@
 ## Cruncher config
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-02-28
 
 
-**Last updated by:** cruncher-maintainers on 2026-02-23
+**Last updated by:** cruncher-maintainers on 2026-02-28
 
 ### Contents
 - [Overview](#overview)
@@ -324,6 +324,30 @@ analysis:
   trajectory_particle_alpha_max: 0.45
   trajectory_chain_overlay: false
   trajectory_summary_overlay: false
+  trajectory_video:
+    enabled: false
+    timeline_mode: best_so_far     # best_so_far | raw_chain
+    output_name: chain_trajectory_video.mp4
+    selection:
+      chain_policy: best           # best | explicit
+      explicit_chain_1based: null
+      phase_scope: tune_and_draw_if_present  # draw_only | tune_and_draw_if_present | tune_and_draw_required
+      objective_column: objective_scalar      # objective_scalar | raw_llr_objective | norm_llr_objective
+    sampling:
+      stride: 5
+      include_best_updates: true
+    playback:
+      target_duration_sec: 8.0
+      fps: 12
+      pause_on_best_update_sec: 0.0
+      sweep_taper_fraction: 0.25
+    sweep_inset:
+      enabled: false
+      corner: top_right            # top_left | top_right | bottom_left | bottom_right
+    limits:
+      max_snapshots: 120
+      max_total_frames: 180
+      max_estimated_render_sec: 30.0
   elites_showcase:
     max_panels: 12
   fimo_compare:
@@ -357,6 +381,13 @@ Notes:
   - Overlay renders only when at least two chains are present; default is disabled.
 - Trajectory plots are chain-centric: scatter backbones follow visited states; best markers highlight record updates without replacing the backbone.
 - `analysis.trajectory_chain_overlay=true` adds diagnostic chain markers (scatter: sampled points, sweep: start/end markers).
+- `analysis.trajectory_video.enabled=true` emits a short mp4 in `plots/` (for example `plots/chain_trajectory_video.mp4`) using BaseRender:
+  - default timeline is `best_so_far` on the selected chain (`selection.chain_policy=best`), which produces monotonic objective progression in frame-to-frame motif snapshots.
+  - `timeline_mode=raw_chain` renders sweep-ordered sampled states directly.
+  - tune rows are eligible by default (`phase_scope=tune_and_draw_if_present`) to show early bad-to-good progression when tune rows exist.
+  - trajectory rows must include `phase` and `sequence`; video generation fails fast when either column is missing.
+  - guardrails are strict by schema: bounded duration, bounded fps, bounded frame/snapshot caps, and fail-fast budget checks (no unbounded video generation).
+  - `playback.pause_on_best_update_sec` is opt-in; default is `0.0` (no pause events).
 - Required analysis plots fail fast on plotting/data contract errors (`elite_score_space_context`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`); only explicitly optional plots can be skipped by policy.
 - `analysis.elites_showcase.max_panels` sets a hard cap for the baserender-backed elites showcase panel count; analyze fails fast when elites exceed this cap.
   - Cruncher-to-baserender handoff is contract-first: Cruncher emits `Record` primitives and baserender renders them.

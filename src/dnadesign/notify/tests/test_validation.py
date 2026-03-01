@@ -15,8 +15,12 @@ from pathlib import Path
 
 import pytest
 
+from dnadesign.notify.delivery.validation import (
+    resolve_tls_ca_bundle,
+    resolve_webhook_url,
+    validate_provider_webhook_url,
+)
 from dnadesign.notify.errors import NotifyConfigError
-from dnadesign.notify.validation import resolve_tls_ca_bundle, resolve_webhook_url, validate_provider_webhook_url
 
 
 def test_resolve_webhook_url_requires_source(monkeypatch) -> None:
@@ -38,7 +42,9 @@ def test_resolve_webhook_url_from_env(monkeypatch) -> None:
 
 
 def test_resolve_webhook_url_from_secret_ref(monkeypatch) -> None:
-    monkeypatch.setattr("dnadesign.notify.validation.resolve_secret_ref", lambda _ref: "https://example.com/hook")
+    monkeypatch.setattr(
+        "dnadesign.notify.delivery.validation.resolve_secret_ref", lambda _ref: "https://example.com/hook"
+    )
     resolved = resolve_webhook_url(  # pragma: allowlist secret
         url=None,
         url_env=None,

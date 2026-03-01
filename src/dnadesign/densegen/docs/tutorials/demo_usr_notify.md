@@ -1,13 +1,12 @@
 ## DenseGen to USR to Notify tutorial
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-02-28
 
 
 This tutorial shows the full event-driven operator path from DenseGen generation to USR mutation events to Notify webhook delivery. Read it when you need to verify watcher behavior end-to-end and avoid mixing DenseGen diagnostics with USR event streams; for campaign-scale runs use the stress-study workspace and apply the same watcher flow.
 
 ### What this tutorial demonstrates
-This section defines the core workflow outcomes for this integration tutorial.
 
 - Running DenseGen in USR output mode.
 - Locating the resolved USR `.events.log` path from workspace outputs.
@@ -15,7 +14,6 @@ This section defines the core workflow outcomes for this integration tutorial.
 - Validating webhook delivery with a local receiver.
 
 ### Prerequisites
-This section ensures the runtime stack is available before wiring watchers.
 
 ```bash
 # Install locked Python dependencies.
@@ -32,7 +30,6 @@ uv run dense validate-config --probe-solver -c src/dnadesign/densegen/workspaces
 ```
 
 ### Key config knobs
-This section highlights the keys that determine where events are written and how watchers resolve them.
 
 - `densegen.output.targets`: Must include `usr` for Notify workflows.
 - `densegen.output.usr.root`: Defines dataset root under workspace outputs.
@@ -42,10 +39,9 @@ This section highlights the keys that determine where events are written and how
 - `plots.source`: Matters when notebook/plot source selection occurs in multi-sink runs.
 
 ### Walkthrough
-This section runs a local end-to-end validation with two terminals.
 
 #### 1) Start a local webhook receiver (terminal A)
-This step gives you a local endpoint so Notify delivery can be tested without external services.
+Create a local endpoint so Notify delivery can be tested without external services.
 
 ```bash
 # Start a local HTTP receiver that prints webhook payloads.
@@ -68,7 +64,7 @@ PY
 ```
 
 #### 2) Create a USR-mode DenseGen workspace (terminal B)
-This step stages a workspace that writes dataset mutation events for Notify to consume.
+Stage a workspace that writes dataset mutation events for Notify to consume.
 
 ```bash
 # Resolve repo root and pin workspace root so paths are deterministic.
@@ -87,7 +83,7 @@ CONFIG="$PWD/config.yaml"
 ```
 
 #### 3) Run DenseGen and inspect event paths
-This step executes the run and prints the USR event path that Notify must consume.
+Execute the run and print the USR event path that Notify must consume.
 
 ```bash
 # Run generation from a fresh output state.
@@ -101,7 +97,7 @@ uv run dense inspect run --usr-events-path -c "$CONFIG"
 ```
 
 #### 4) Configure Notify profile from DenseGen config
-This step creates a profile without manual path guessing and binds it to your local webhook endpoint.
+Create a profile without manual path guessing and bind it to the local webhook endpoint.
 
 ```bash
 # Export local webhook URL for env-backed secret resolution.
@@ -115,7 +111,7 @@ PROFILE="outputs/notify/densegen/profile.json"
 ```
 
 #### 5) Validate and watch events
-This step verifies profile correctness, previews payloads, then starts live delivery.
+Verify profile correctness, preview payloads, then start live delivery.
 
 ```bash
 # Validate profile and event-source resolution.
@@ -129,7 +125,7 @@ uv run notify usr-events watch --profile "$PROFILE" --follow --wait-for-events -
 ```
 
 #### 6) Emit additional events on demand
-This step proves live watcher behavior by generating new events after watcher startup.
+Generate additional events after watcher startup to validate live watcher behavior.
 
 ```bash
 # Resume run and extend quota to generate additional USR mutation events.
@@ -137,7 +133,6 @@ uv run dense run --resume --extend-quota 2 --no-plot -c "$CONFIG"
 ```
 
 ### Expected outputs
-This section lists the artifacts that confirm each boundary in the flow.
 
 - DenseGen diagnostics: `outputs/meta/events.jsonl`
 - USR dataset table: `outputs/usr_datasets/<dataset>/records.parquet`
@@ -146,7 +141,6 @@ This section lists the artifacts that confirm each boundary in the flow.
 - Notify cursor and spool: `outputs/notify/densegen/cursor`, `outputs/notify/densegen/spool/`
 
 ### Troubleshooting
-This section captures the common watcher integration footguns.
 
 - No webhook posts appear: confirm terminal A receiver is running and `NOTIFY_WEBHOOK` is exported.
 - `notify profile doctor` fails: recreate profile with `notify setup slack --force ...`.

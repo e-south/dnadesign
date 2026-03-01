@@ -137,7 +137,9 @@ def test_analysis_tables_and_plots_use_structured_semantic_filenames(tmp_path: P
     assert analysis_table_path(analysis_dir, "scores_summary", "parquet") == (
         analysis_dir / "tables" / "table__scores_summary.parquet"
     )
-    assert analysis_plot_path(analysis_dir, "opt_trajectory", "png") == (run_dir / "plots" / "opt_trajectory.png")
-    assert analysis_plot_path(analysis_dir, "opt_trajectory_sweep", "png") == (
-        run_dir / "plots" / "opt_trajectory_sweep.png"
+    assert analysis_plot_path(analysis_dir, "elite_score_space_context", "png") == (
+        run_dir / "plots" / "elite_score_space_context.png"
+    )
+    assert analysis_plot_path(analysis_dir, "chain_trajectory_sweep", "png") == (
+        run_dir / "plots" / "chain_trajectory_sweep.png"
     )

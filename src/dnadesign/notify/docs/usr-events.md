@@ -41,7 +41,7 @@ uv run notify spool drain --profile "$NOTIFY_DIR/profile.json"
 - DenseGen local end-to-end demo: [../../densegen/docs/tutorials/demo_usr_notify.md](../../densegen/docs/tutorials/demo_usr_notify.md)
 - DenseGen event-boundary contract: [../../densegen/docs/reference/outputs.md#event-boundary-paths](../../densegen/docs/reference/outputs.md#event-boundary-paths)
 - Universal Sequence Record event schema: [../../usr/docs/reference/event-log.md](../../usr/docs/reference/event-log.md)
-- Setup command guide: [../../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack](../../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack)
+- Setup command guide: [../../../../docs/notify/usr-events.md#setup-flow](../../../../docs/notify/usr-events.md#setup-flow)
 
 ## Boundary reminder
 

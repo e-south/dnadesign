@@ -14,7 +14,7 @@ from __future__ import annotations
 import pytest
 
 from dnadesign.notify.errors import NotifyConfigError
-from dnadesign.notify.workflow_policy import (
+from dnadesign.notify.profiles.policy import (
     default_profile_path_for_tool,
     policy_defaults,
     register_workflow_policy,

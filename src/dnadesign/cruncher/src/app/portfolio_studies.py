@@ -186,6 +186,8 @@ def _ensure_required_source_studies_for_sources(
     on_event: PortfolioStudyEventCallback | None = None,
 ) -> dict[tuple[str, str], Path]:
     ensured: dict[tuple[str, str], Path] = {}
+    if not spec.studies.enabled:
+        return ensured
     if not spec.studies.ensure_specs:
         return ensured
 
@@ -209,9 +211,12 @@ def _ensure_required_source_studies_for_sources(
 def _load_source_study_summary(
     source: PortfolioSource,
     *,
+    studies_enabled: bool,
     run_study_fn: RunStudyFn,
     on_event: PortfolioStudyEventCallback | None = None,
 ) -> dict[str, object] | None:
+    if not studies_enabled:
+        return None
     study_spec = getattr(source, "study_spec", None)
     if study_spec is None:
         return None

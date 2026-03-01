@@ -13,8 +13,10 @@
 
 Run this command from the workspace root:
 
-    # Execute the packaged workspace runbook sequence.
-    ./runbook.sh
+    # Execute the full runbook flow from a clean output state.
+    ./runbook.sh --mode fresh
+
+Use `--mode resume` to continue generation without wiping outputs, or `--mode analysis` to rebuild plots/notebook only.
 
 ### Step-by-Step Commands
 
@@ -22,18 +24,7 @@ Run this command from the workspace root:
     set -euo pipefail
     # Pin the workspace config path for repeated CLI calls.
     CONFIG="$PWD/config.yaml"
-    # Pin the workspace-local USR registry destination.
-    USR_REGISTRY="$PWD/outputs/usr_datasets/registry.yaml"
-    # Resolve the repo-level baseline USR registry path.
-    ROOT_REGISTRY="$(git rev-parse --show-toplevel)/src/dnadesign/usr/datasets/registry.yaml"
-
-    # Seed a workspace-local USR registry when one is not present.
-    if [ ! -f "$USR_REGISTRY" ]; then
-      # Create the destination directory for workspace-local USR artifacts.
-      mkdir -p "$(dirname "$USR_REGISTRY")"
-      # Copy baseline USR registry into the workspace-local path.
-      cp "$ROOT_REGISTRY" "$USR_REGISTRY"
-    fi
+    # dense run auto-seeds outputs/usr_datasets/registry.yaml when missing.
 
     # Verify FIMO is available before PWM-backed sampling and validation.
     pixi run fimo --version
@@ -46,17 +37,23 @@ Run this command from the workspace root:
     # pixi run dense run --fresh -c "$CONFIG"
     # Inspect run diagnostics and per-plan library progress.
     pixi run dense inspect run --events --library -c "$CONFIG"
-    # Render DenseGen plots from current run artifacts.
+    # Render DenseGen analysis artifacts from current run outputs.
+    # `dense plot` is the analysis entry point; static plots always render.
+    # This workspace enables plots.video.enabled: true by default, emitting a sampled
+    # Stage-B showcase video at outputs/plots/stage_b/all_plans/showcase.mp4.
+    # Disable by setting plots.video.enabled: false in config.
     pixi run dense plot -c "$CONFIG"
+    # Optional analysis shortcut: render only the Stage-B showcase video artifact.
+    # pixi run dense plot --only dense_array_video_showcase -c "$CONFIG"
     # Generate the run-overview marimo notebook artifact.
     pixi run dense notebook generate -c "$CONFIG"
     # Validate the generated notebook before opening or sharing it.
     uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
 
-### Optional analysis-only mode (existing outputs)
+### Optional analysis mode (existing outputs)
 
     # Rebuild plots/notebook from existing run artifacts without regenerating sequences.
-    ./runbook.sh --analysis-only
+    ./runbook.sh --mode analysis
 
 ### Optional notebook open
 

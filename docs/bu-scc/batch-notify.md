@@ -1,7 +1,7 @@
 ## BU SCC Batch + Notify Runbook (`dnadesign` platform workflows)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-02-28
 
 ### At a glance
 
@@ -36,6 +36,28 @@ BU references:
 - Submitting jobs: <https://www.bu.edu/tech/support/research/system-usage/running-jobs/submitting-jobs/>
 - Interactive jobs: <https://www.bu.edu/tech/support/research/system-usage/running-jobs/interactive-jobs/>
 - Advanced batch: <https://www.bu.edu/tech/support/research/system-usage/running-jobs/advanced-batch/>
+
+### 1.1) Queue-fair pressure gate before new submits
+
+Run this check before proposing additional `qsub` calls:
+
+```bash
+qstat -u "$USER" | awk '
+  $1 ~ /^[0-9]+$/ {
+    state=$5
+    if (state ~ /r/) running++
+    if (state ~ /q/) queued++
+    if (state ~ /Eqw/) eqw++
+  }
+  END { printf "running_jobs=%d queued_jobs=%d eqw_jobs=%d\n", running, queued, eqw }
+'
+```
+
+Policy:
+- if `running_jobs > 3`, warn before additional submissions and confirm intent
+- use `qsub -t` arrays for independent multi-batch fanout
+- use `-hold_jid` chains for ordered multi-stage flows
+- respect the queue and do not skip the line
 
 ---
 
@@ -84,10 +106,11 @@ For DenseGen GUROBI runs, cap runtime at three layers:
 
 2. Solver-level cap (DenseGen config):
 - `densegen.solver.threads` (set `<= N`)
-- `densegen.solver.time_limit_seconds` (per-solve cap)
+- `densegen.solver.solver_attempt_timeout_seconds` (per-solve cap)
 
-3. Runtime policy cap (DenseGen config):
-- `densegen.runtime.max_seconds_per_plan` (per-plan run cap)
+3. Runtime durability cadence (DenseGen config):
+- `densegen.runtime.checkpoint_every` (flush/checkpoint cadence)
+- Overall walltime remains controlled by scheduler `-l h_rt=...`
 
 Example config fragment:
 
@@ -97,9 +120,9 @@ densegen:
     backend: GUROBI
     strategy: iterate
     threads: 16
-    time_limit_seconds: 60
+    solver_attempt_timeout_seconds: 60
   runtime:
-    max_seconds_per_plan: 21600
+    checkpoint_every: 50
 ```
 
 Example submit command:

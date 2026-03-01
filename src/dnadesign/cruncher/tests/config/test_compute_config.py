@@ -195,6 +195,133 @@ def test_analysis_trajectory_defaults_prefer_best_so_far_and_dense_lineage(tmp_p
     assert cfg.analysis.trajectory_particle_alpha_max == pytest.approx(0.45)
     assert cfg.analysis.mmr_sweep.enabled is False
     assert cfg.analysis.fimo_compare.enabled is False
+    assert cfg.analysis.trajectory_video.enabled is False
+    assert cfg.analysis.trajectory_video.timeline_mode == "best_so_far"
+    assert cfg.analysis.trajectory_video.selection.chain_policy == "best"
+    assert cfg.analysis.trajectory_video.selection.phase_scope == "tune_and_draw_if_present"
+    assert cfg.analysis.trajectory_video.sampling.stride == 5
+    assert cfg.analysis.trajectory_video.playback.target_duration_sec == pytest.approx(8.0)
+    assert cfg.analysis.trajectory_video.playback.fps == 12
+    assert cfg.analysis.trajectory_video.playback.pause_on_best_update_sec == pytest.approx(0.0)
+    assert cfg.analysis.trajectory_video.playback.sweep_taper_fraction == pytest.approx(0.25)
+    assert cfg.analysis.trajectory_video.sweep_inset.enabled is False
+    assert cfg.analysis.trajectory_video.sweep_inset.corner == "top_right"
+
+
+def test_analysis_trajectory_video_explicit_chain_requires_chain_id(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["analysis"] = {
+        "enabled": True,
+        "trajectory_video": {
+            "enabled": True,
+            "selection": {"chain_policy": "explicit"},
+        },
+    }
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError, match="analysis.trajectory_video.selection.explicit_chain_1based"):
+        load_config(config_path)
+
+
+def test_analysis_trajectory_video_duration_bounds_reject_ux_footguns(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["analysis"] = {
+        "enabled": True,
+        "trajectory_video": {
+            "enabled": True,
+            "playback": {"target_duration_sec": 120.0},
+        },
+    }
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError, match="analysis.trajectory_video.playback.target_duration_sec"):
+        load_config(config_path)
+
+
+def test_analysis_trajectory_video_rejects_non_flat_output_name(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["analysis"] = {
+        "enabled": True,
+        "trajectory_video": {
+            "enabled": True,
+            "output_name": "nested/clip.mp4",
+        },
+    }
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError, match="analysis.trajectory_video.output_name"):
+        load_config(config_path)
+
+
+def test_analysis_trajectory_video_budget_rejects_frame_overflow(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["analysis"] = {
+        "enabled": True,
+        "trajectory_video": {
+            "enabled": True,
+            "playback": {"target_duration_sec": 10.0, "fps": 20},
+            "limits": {"max_total_frames": 100},
+        },
+    }
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError, match="target frames exceed limits.max_total_frames"):
+        load_config(config_path)
+
+
+@pytest.mark.parametrize("fps_value", [0, 40])
+def test_analysis_trajectory_video_fps_bounds_rejected(tmp_path: Path, fps_value: int) -> None:
+    payload = _base_config()
+    payload["cruncher"]["analysis"] = {
+        "enabled": True,
+        "trajectory_video": {
+            "enabled": True,
+            "playback": {"fps": fps_value},
+        },
+    }
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError, match="analysis.trajectory_video.playback.fps"):
+        load_config(config_path)
+
+
+@pytest.mark.parametrize("fraction_value", [-0.1, 1.1])
+def test_analysis_trajectory_video_sweep_taper_fraction_bounds_rejected(tmp_path: Path, fraction_value: float) -> None:
+    payload = _base_config()
+    payload["cruncher"]["analysis"] = {
+        "enabled": True,
+        "trajectory_video": {
+            "enabled": True,
+            "playback": {"sweep_taper_fraction": fraction_value},
+        },
+    }
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError, match="analysis.trajectory_video.playback.sweep_taper_fraction"):
+        load_config(config_path)
+
+
+def test_analysis_trajectory_video_unknown_key_is_rejected(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["analysis"] = {
+        "enabled": True,
+        "trajectory_video": {
+            "enabled": True,
+            "unknown_key": "bad",
+        },
+    }
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+    assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
+
+
+def test_analysis_trajectory_video_sweep_inset_rejects_invalid_corner(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["analysis"] = {
+        "enabled": True,
+        "trajectory_video": {
+            "enabled": True,
+            "sweep_inset": {"enabled": True, "corner": "middle"},
+        },
+    }
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError, match="analysis.trajectory_video.sweep_inset.corner"):
+        load_config(config_path)
 
 
 @pytest.mark.parametrize(

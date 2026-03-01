@@ -16,27 +16,27 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.notify.errors import NotifyConfigError
-from dnadesign.notify.secrets import (
+from dnadesign.notify.delivery.secrets import (
     is_secret_backend_available,
     parse_secret_ref,
     resolve_secret_ref,
     store_secret_ref,
 )
+from dnadesign.notify.errors import NotifyConfigError
 
 
 def test_secretservice_unavailable_without_dbus_session(monkeypatch) -> None:
-    monkeypatch.setattr("dnadesign.notify.secrets.shutil.which", lambda _cmd: "/usr/bin/secret-tool")
+    monkeypatch.setattr("dnadesign.notify.delivery.secrets.ops.shutil.which", lambda _cmd: "/usr/bin/secret-tool")
     monkeypatch.delenv("DBUS_SESSION_BUS_ADDRESS", raising=False)
 
     assert is_secret_backend_available("secretservice") is False
 
 
 def test_secretservice_available_with_probeable_runtime(monkeypatch) -> None:
-    monkeypatch.setattr("dnadesign.notify.secrets.shutil.which", lambda _cmd: "/usr/bin/secret-tool")
+    monkeypatch.setattr("dnadesign.notify.delivery.secrets.ops.shutil.which", lambda _cmd: "/usr/bin/secret-tool")
     monkeypatch.setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/tmp/dbus-test")
     monkeypatch.setattr(
-        "dnadesign.notify.secrets.subprocess.run",
+        "dnadesign.notify.delivery.secrets.shell_backend.subprocess.run",
         lambda *_args, **_kwargs: subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr=""),
     )
 
@@ -44,9 +44,9 @@ def test_secretservice_available_with_probeable_runtime(monkeypatch) -> None:
 
 
 def test_keychain_availability_uses_runtime_probe(monkeypatch) -> None:
-    monkeypatch.setattr("dnadesign.notify.secrets.shutil.which", lambda _cmd: "/usr/bin/security")
+    monkeypatch.setattr("dnadesign.notify.delivery.secrets.ops.shutil.which", lambda _cmd: "/usr/bin/security")
     monkeypatch.setattr(
-        "dnadesign.notify.secrets.subprocess.run",
+        "dnadesign.notify.delivery.secrets.shell_backend.subprocess.run",
         lambda *_args, **_kwargs: subprocess.CompletedProcess(args=[], returncode=44, stdout="", stderr="not found"),
     )
 
@@ -67,8 +67,11 @@ def test_secretservice_available_with_keyring_without_external_binary(monkeypatc
         def set_password(self, _service: str, _account: str, _value: str):
             return None
 
-    monkeypatch.setattr("dnadesign.notify.secrets._load_keyring_module", lambda: _FakeKeyringModule())
-    monkeypatch.setattr("dnadesign.notify.secrets.shutil.which", lambda _cmd: None)
+    monkeypatch.setattr(
+        "dnadesign.notify.delivery.secrets.keyring_backend.load_keyring_module",
+        lambda: _FakeKeyringModule(),
+    )
+    monkeypatch.setattr("dnadesign.notify.delivery.secrets.ops.shutil.which", lambda _cmd: None)
     monkeypatch.delenv("DBUS_SESSION_BUS_ADDRESS", raising=False)
 
     assert is_secret_backend_available("secretservice") is True
@@ -88,11 +91,14 @@ def test_secretservice_keyring_probe_failure_falls_back_to_command(monkeypatch) 
         def set_password(self, _service: str, _account: str, _value: str):
             return None
 
-    monkeypatch.setattr("dnadesign.notify.secrets._load_keyring_module", lambda: _FakeKeyringModule())
-    monkeypatch.setattr("dnadesign.notify.secrets.shutil.which", lambda _cmd: "/usr/bin/secret-tool")
+    monkeypatch.setattr(
+        "dnadesign.notify.delivery.secrets.keyring_backend.load_keyring_module",
+        lambda: _FakeKeyringModule(),
+    )
+    monkeypatch.setattr("dnadesign.notify.delivery.secrets.ops.shutil.which", lambda _cmd: "/usr/bin/secret-tool")
     monkeypatch.setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/tmp/dbus-test")
     monkeypatch.setattr(
-        "dnadesign.notify.secrets.subprocess.run",
+        "dnadesign.notify.delivery.secrets.shell_backend.subprocess.run",
         lambda *_args, **_kwargs: subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr=""),
     )
 
@@ -117,8 +123,8 @@ def test_secretservice_store_and_resolve_use_keyring_without_external_binary(mon
             self.values[(service, account)] = value
 
     fake_keyring = _FakeKeyringModule()
-    monkeypatch.setattr("dnadesign.notify.secrets._load_keyring_module", lambda: fake_keyring)
-    monkeypatch.setattr("dnadesign.notify.secrets.shutil.which", lambda _cmd: None)
+    monkeypatch.setattr("dnadesign.notify.delivery.secrets.keyring_backend.load_keyring_module", lambda: fake_keyring)
+    monkeypatch.setattr("dnadesign.notify.delivery.secrets.ops.shutil.which", lambda _cmd: None)
     monkeypatch.delenv("DBUS_SESSION_BUS_ADDRESS", raising=False)
 
     secret_ref = "secretservice://dnadesign.notify/default"  # pragma: allowlist secret

@@ -1,7 +1,7 @@
 ## BU SCC Operations
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-02-28
 
 This directory is the canonical source for BU SCC platform policy, submission vocabulary, and job templates for `dnadesign`.
 
@@ -12,15 +12,13 @@ This directory is the canonical source for BU SCC platform policy, submission vo
 - Run batch patterns, arrays, Notify deployment, and transfer-node flows: [BU SCC Batch + Notify runbook](batch-notify.md).
 - Start from submit-ready scripts and override patterns: [BU SCC job templates](jobs/README.md).
 - Launch web interactive sessions through SCC OnDemand: [BU SCC OnDemand sessions](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/sessions/).
-- Apply scheduler-generic execution contracts used by this repo: [SGE HPC Ops skill package](sge-hpc-ops/SKILL.md).
+- Use status-first queue checks and operator defaults: [BU SCC Agent Cheat Sheet](agent-cheatsheet.md).
 
 ### Semantic boundaries
 
 - BU-specific scheduler keys, examples, and constraints belong in this `bu-scc/` directory.
-- Execution flow and probe-first operating rules belong in `sge-hpc-ops/SKILL.md`.
-- Skill ownership model is BU-hosted generic core: scheduler-generic guidance is kept in the skill core, and BU policy remains in this `bu-scc/` directory.
+- Execution flow, queue fairness guidance, and status-first checks are documented in `quickstart.md`, `batch-notify.md`, and `agent-cheatsheet.md`.
 - Notify watcher semantics and onboarding belong in `../notify/usr-events.md`.
-- Skill package layout is intentionally minimal: `sge-hpc-ops/SKILL.md`, `sge-hpc-ops/agents/openai.yaml`, and `sge-hpc-ops/references/`.
 
 ### Fast links
 
