@@ -605,6 +605,14 @@ def compute_layout(
     bottom_extent = centerline_base - raw_content_bottom
     content_top_extent = float(top_extent)
     content_bottom_extent = float(bottom_extent)
+    if (
+        fixed_content_top_extent_px is None
+        and fixed_content_bottom_extent_px is None
+        and fixed_content_radius_px is None
+    ):
+        content_radius = max(content_top_extent, content_bottom_extent)
+        content_top_extent = content_radius
+        content_bottom_extent = content_radius
     if fixed_content_top_extent_px is not None:
         fixed_top_extent = float(fixed_content_top_extent_px)
         if not math.isfinite(fixed_top_extent) or fixed_top_extent <= 0:
