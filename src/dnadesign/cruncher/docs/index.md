@@ -4,8 +4,6 @@
 **Last verified:** 2026-02-27
 
 
-**Last updated by:** cruncher-maintainers on 2026-02-23
-
 ### Contents
 - [Overview](#overview)
 - [Choose your path](#choose-your-path)
@@ -16,7 +14,7 @@
 - [Internals and dev notes](#internals-and-dev-notes)
 
 ### Overview
-This index is the maintainers’ entrypoint for Cruncher docs. Start with [`README.md`](README.md) for the short operational map, then route into task-specific docs.
+This index is a browsing map for Cruncher docs. Start with the package-level [Cruncher README](../README.md) for the short operational map, then route into task-specific docs.
 
 ### Choose your path
 - Run a demo end-to-end: [`demos/demo_pairwise.md`](demos/demo_pairwise.md)

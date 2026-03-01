@@ -94,15 +94,15 @@ def test_demo_configs_use_tuned_gibbs_annealing_defaults() -> None:
             "chains": 8,
             "cooling_kind": "piecewise",
             "final_beta": 24.0,
-            "draws": 150000,
-            "tune": 25000,
+            "draws": 300000,
+            "tune": 50000,
         },
         root / "demo_multitf" / "configs" / "config.yaml": {
             "chains": 8,
             "cooling_kind": "piecewise",
             "final_beta": 24.0,
-            "draws": 150000,
-            "tune": 25000,
+            "draws": 300000,
+            "tune": 50000,
         },
     }
     for config_path, values in expected.items():
@@ -131,8 +131,8 @@ def test_project_workspace_defaults_match_tuned_surface() -> None:
     sample = cruncher["sample"]
 
     assert sample["sequence_length"] == 60
-    assert sample["budget"]["draws"] == 600000
-    assert sample["budget"]["tune"] == 50000
+    assert sample["budget"]["draws"] == 1200000
+    assert sample["budget"]["tune"] == 100000
     assert sample["optimizer"]["chains"] == 8
     assert sample["optimizer"]["cooling"]["kind"] == "piecewise"
     assert sample["optimizer"]["cooling"]["stages"][-1]["sweeps"] == sample["budget"]["draws"]

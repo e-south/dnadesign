@@ -1250,6 +1250,7 @@ def test_run_portfolio_writes_study_summary_table_when_study_specs_are_declared(
                     "name": "master",
                     "execution": {"mode": "aggregate_only"},
                     "artifacts": {"table_format": "parquet", "write_csv": True},
+                    "studies": {"enabled": True},
                     "sources": [
                         {
                             "id": "pairwise_cpxr_baer",
@@ -1270,6 +1271,10 @@ def test_run_portfolio_writes_study_summary_table_when_study_specs_are_declared(
     assert len(study_summary_df) == 1
     assert study_summary_df.iloc[0]["source_id"] == "pairwise_cpxr_baer"
     assert study_summary_df.iloc[0]["study_name"] == "diversity_vs_score"
+
+    run_dir_no_studies = run_portfolio(spec_path, force_overwrite=True, studies_enabled=False)
+    study_summary_path_no_studies = portfolio_table_path(run_dir_no_studies, "study_summary", "parquet")
+    assert not study_summary_path_no_studies.exists()
 
 
 def test_run_portfolio_schema_v3_prepare_mode_runs_source_runbooks(
@@ -2265,6 +2270,7 @@ def test_run_portfolio_ensures_missing_studies_and_writes_sequence_length_table(
                     "execution": {"mode": "prepare_then_aggregate"},
                     "artifacts": {"table_format": "parquet", "write_csv": True},
                     "studies": {
+                        "enabled": True,
                         "ensure_specs": [
                             "configs/studies/length_vs_score.study.yaml",
                             "configs/studies/diversity_vs_score.study.yaml",
@@ -2428,11 +2434,11 @@ def test_run_portfolio_materializes_outputs_before_later_source_failure(
 
     load_source_rows = portfolio_workflow._load_source_rows
 
-    def _fail_second_source(source, *, on_event=None):
+    def _fail_second_source(source, *, studies_enabled: bool, on_event=None):
         _ = on_event
         if str(source.id) == "pairwise_cpxr_lexa":
             raise RuntimeError("synthetic second source failure")
-        return load_source_rows(source, on_event=on_event)
+        return load_source_rows(source, studies_enabled=studies_enabled, on_event=on_event)
 
     monkeypatch.setattr(portfolio_workflow, "_load_source_rows", _fail_second_source)
 
@@ -2637,9 +2643,10 @@ def test_run_portfolio_prepare_mode_runs_prepare_before_ensured_studies(
                     "execution": {"mode": "prepare_then_aggregate"},
                     "artifacts": {"table_format": "parquet", "write_csv": False},
                     "studies": {
+                        "enabled": True,
                         "ensure_specs": [
                             "configs/studies/length_vs_score.study.yaml",
-                        ]
+                        ],
                     },
                     "sources": [
                         {
@@ -2729,3 +2736,73 @@ def test_run_portfolio_prepare_mode_runs_prepare_before_ensured_studies(
     assert "study_ensure_completed" in event_names
     progress_payload = next(payload for name, payload in events if name == "study_trial_progress")
     assert progress_payload["source_id"] == "pairwise_cpxr_baer"
+
+
+def test_run_portfolio_skips_studies_by_default_even_when_source_study_spec_is_declared(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    roots = tmp_path / "workspaces"
+    source = roots / "pairwise_cpxr_baer"
+    source.mkdir(parents=True, exist_ok=True)
+    _seed_source_run(
+        workspace=source,
+        run_rel="outputs/set1_cpxr_baer",
+        source_tag="cpxr_baer",
+        tf_names=["cpxR", "baeR"],
+        n_elites=4,
+    )
+    source_config = source / "configs" / "config.yaml"
+    source_config.parent.mkdir(parents=True, exist_ok=True)
+    source_config.write_text(
+        "cruncher: {schema_version: 3, workspace: {out_dir: outputs, regulator_sets: [[cpxR, baeR]]}}\n"
+    )
+    study_spec = source / "configs" / "studies" / "diversity_vs_score.study.yaml"
+    study_spec.parent.mkdir(parents=True, exist_ok=True)
+    study_spec.write_text(
+        yaml.safe_dump(
+            {
+                "study": {
+                    "schema_version": 3,
+                    "name": "diversity_vs_score",
+                    "base_config": "config.yaml",
+                    "target": {"kind": "regulator_set", "set_index": 1},
+                    "replicates": {"seed_path": "sample.seed", "seeds": [1]},
+                    "trials": [{"id": "BASE", "factors": {}}],
+                }
+            }
+        )
+    )
+    portfolio_workspace = roots / "portfolio_pairwise_handoff"
+    portfolio_workspace.mkdir(parents=True, exist_ok=True)
+    spec_path = portfolio_workspace / "configs" / "master.portfolio.yaml"
+    spec_path.parent.mkdir(parents=True, exist_ok=True)
+    spec_path.write_text(
+        yaml.safe_dump(
+            {
+                "portfolio": {
+                    "schema_version": 3,
+                    "name": "master",
+                    "execution": {"mode": "aggregate_only"},
+                    "artifacts": {"table_format": "parquet", "write_csv": False},
+                    "sources": [
+                        {
+                            "id": "pairwise_cpxr_baer",
+                            "workspace": "../pairwise_cpxr_baer",
+                            "run_dir": "outputs/set1_cpxr_baer",
+                            "study_spec": "configs/studies/diversity_vs_score.study.yaml",
+                        }
+                    ],
+                }
+            }
+        )
+    )
+
+    def _fail_if_study_called(*args, **kwargs):
+        _ = (args, kwargs)
+        raise AssertionError("run_study should not be called when portfolio.studies.enabled is false")
+
+    monkeypatch.setattr(portfolio_workflow, "run_study", _fail_if_study_called)
+
+    run_dir = run_portfolio(spec_path)
+    assert run_dir.exists()
+    assert not portfolio_table_path(run_dir, "study_summary", "parquet").exists()

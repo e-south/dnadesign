@@ -58,7 +58,7 @@ src/dnadesign/cruncher/workspaces/
     outputs/                  # portfolio run outputs
 ```
 
-For the nine pairwise/multitf optimization slices above, keep one shared
+For the ten pairwise/multitf optimization slices above, keep one shared
 `sample`/optimizer hyperparameter profile and vary only:
 `workspace.regulator_sets`, discovery/catalog source IDs, and analysis pairwise
 projection.

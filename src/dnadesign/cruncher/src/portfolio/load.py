@@ -157,6 +157,8 @@ def _resolve_source_workspace_file(
 
 
 def _validate_global_study_specs(spec: PortfolioSpec, *, source_payloads: list[dict[str, object]]) -> None:
+    if not spec.studies.enabled:
+        return
     required_specs = list(spec.studies.ensure_specs)
     table_cfg = spec.studies.sequence_length_table
     if table_cfg.enabled:

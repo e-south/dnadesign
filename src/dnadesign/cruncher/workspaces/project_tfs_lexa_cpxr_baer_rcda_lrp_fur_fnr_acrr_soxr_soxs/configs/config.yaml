@@ -102,8 +102,8 @@ cruncher:
       maxw: null
       strategy: max_info
     budget:
-      tune: 50000
-      draws: 600000
+      tune: 100000
+      draws: 1200000
     objective:
       bidirectional: true
       score_scale: normalized-llr
@@ -180,15 +180,15 @@ cruncher:
       cooling:
         kind: piecewise
         stages:
-          - sweeps: 140000
+          - sweeps: 280000
             beta: 0.2
-          - sweeps: 360000
+          - sweeps: 720000
             beta: 1.2
-          - sweeps: 552000
+          - sweeps: 1104000
             beta: 6.0
-          - sweeps: 584000
+          - sweeps: 1168000
             beta: 12.0
-          - sweeps: 600000
+          - sweeps: 1200000
             beta: 24.0
       early_stop:
         enabled: false

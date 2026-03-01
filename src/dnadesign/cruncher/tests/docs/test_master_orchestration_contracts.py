@@ -71,13 +71,14 @@ def test_master_portfolio_spec_exists_and_covers_every_non_portfolio_workspace()
     assert portfolio["execution"]["mode"] == "prepare_then_aggregate"
     studies = portfolio.get("studies")
     assert isinstance(studies, dict)
+    assert studies.get("enabled") is False
     assert studies.get("ensure_specs") == [
         "configs/studies/length_vs_score.study.yaml",
         "configs/studies/diversity_vs_score.study.yaml",
     ]
     sequence_length_table = studies.get("sequence_length_table")
     assert isinstance(sequence_length_table, dict)
-    assert sequence_length_table.get("enabled") is True
+    assert sequence_length_table.get("enabled") is False
     assert sequence_length_table.get("study_spec") == "configs/studies/length_vs_score.study.yaml"
     assert sequence_length_table.get("top_n_lengths") == 6
 

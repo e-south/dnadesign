@@ -439,6 +439,7 @@ Inputs:
 * required `--spec <portfolio_workspace>/configs/<name>.portfolio.yaml`
 * optional `--force-overwrite` to delete/recreate the deterministic portfolio run dir
 * optional `--prepare-ready {prompt|skip|rerun}` for `prepare_then_aggregate` when some sources are already ready
+* optional `--studies / --no-studies` to override `portfolio.studies.enabled` for this run only
 
 Network:
 
@@ -449,6 +450,8 @@ Examples:
 * `cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml`
 * `cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml --force-overwrite`
 * `cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml --prepare-ready skip`
+* `cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml --studies`
+* `cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml --no-studies`
 
 Source preconditions (per source entry in spec):
 
@@ -463,8 +466,8 @@ Outputs:
 * `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_windows_long.<csv|parquet>`
 * `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_elites_summary.<csv|parquet>`
 * `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__source_summary.<csv|parquet>`
-* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__study_summary.<csv|parquet>` (when source `study_spec` is declared)
-* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_sequence_length.<csv|parquet>` (when `studies.sequence_length_table.enabled: true`)
+* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__study_summary.<csv|parquet>` (when `studies.enabled: true` and source `study_spec` is declared)
+* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_sequence_length.<csv|parquet>` (when `studies.enabled: true` and `studies.sequence_length_table.enabled: true`)
 * `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/plots/plot__source_tradeoff_score_vs_diversity.pdf` (when source diversity metrics are available)
 * `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/plots/plot__elite_showcase_cross_workspace.<pdf|png>` (when `plots.elite_showcase.enabled: true`)
 
@@ -485,10 +488,12 @@ Notes:
   * `prepare_then_aggregate`: execute each source `prepare.runbook` + `prepare.step_ids` before aggregation
 * `execution.max_parallel_sources` controls source preparation concurrency in `prepare_then_aggregate` (default `4`, must be `>= 1`).
 * In `prepare_then_aggregate`, every source must provide a runbook path inside its source workspace and a non-empty step list.
-* Optional source `study_spec` adds deterministic study summary rows into `table__study_summary`.
-* If `study_spec` is declared, the deterministic study run and `table__trial_metrics_agg.parquet` must exist (or be produced by prepare steps).
-* Optional `studies.ensure_specs` enforces workspace-scoped study specs per source and auto-runs/resumes those study runs when missing/incomplete.
-* Optional `studies.sequence_length_table` is global at portfolio scope and selects the first `top_n_lengths` shortest `sequence_length` rows per source.
+* `studies.enabled` defaults to `false`; set `studies.enabled: true` to include study orchestration in portfolio runs.
+* `--studies / --no-studies` overrides `studies.enabled` at runtime for one invocation without editing the spec file.
+* Optional source `study_spec` adds deterministic study summary rows into `table__study_summary` only when `studies.enabled: true`.
+* If `studies.enabled: true` and `study_spec` is declared, the deterministic study run and `table__trial_metrics_agg.parquet` must exist (or be produced by prepare steps).
+* Optional `studies.ensure_specs` is enforced only when `studies.enabled: true`, and auto-runs/resumes missing/incomplete study runs.
+* Optional `studies.sequence_length_table` is global at portfolio scope and selects the first `top_n_lengths` shortest `sequence_length` rows per source when enabled.
 * `plots.elite_showcase` is enabled by default and renders a cross-workspace showcase using all processed source elites.
 * Set `plots.elite_showcase.top_n_per_source` to a positive integer when you want to cap elites per source.
 * `plots.elite_showcase.source_selectors` supports per-source multi-elite selection, with exactly one of `elite_ids` or `elite_ranks` per source selector.

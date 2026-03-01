@@ -19,9 +19,9 @@
 
 ### Overview
 
-This is the standard two-regulator Cruncher walkthrough for `lexA` + `cpxR`.
+This demo is the default two-regulator Cruncher flow for `lexA` and `cpxR`.
 
-You will run the full lifecycle in order:
+You run one strict lifecycle in order:
 1. fetch site data from explicit sources,
 2. discover MEME OOPS motifs,
 3. lock exact motif artifacts,
@@ -55,9 +55,11 @@ Run this single command to do everything in this demo:
 uv run cruncher workspaces run --runbook configs/runbook.yaml
 ```
 
-This full runbook also executes two study sweeps at the end, so runtime is longer than the base sample/analyze flow.
+Stop here if you only need the happy path.
 
-Quick smoke path (base lifecycle only):
+This full runbook also executes the two workspace study sweeps at the end, so runtime is longer than the base sample/analyze flow.
+
+Quick smoke path (base lifecycle only, no study sweeps):
 
 ```bash
 # Execute the Cruncher machine runbook for this workspace.
@@ -120,46 +122,48 @@ This excerpt captures the key intent from `workspaces/demo_pairwise/configs/conf
 
 ```yaml
 cruncher:
+  schema_version: 3                            # strict config schema contract
   workspace:
-    out_dir: outputs                # all run artifacts are written here
+    out_dir: outputs                           # write run artifacts under workspace outputs/
     regulator_sets:
-      - [lexA, cpxR]                # optimize both TFs jointly in one set
+      - [lexA, cpxR]                           # optimize this regulator set jointly
 
   catalog:
-    root: .cruncher/demo_pairwise   # workspace-local cache/state root
-    source_preference: [demo_merged_meme_oops]  # lock must resolve motifs from this discovered source
-    pwm_source: matrix              # sample from motif matrices, not raw site windows
-    combine_sites: true             # merge all cached sites per TF before discovery
+    root: .cruncher/demo_pairwise              # workspace-local cache, lock, and parsed artifacts
+    source_preference:
+      - demo_merged_meme_oops                  # lock resolves motifs only from this discovered source
+    pwm_source: matrix                         # sample from motif matrices, not raw site windows
+    combine_sites: true                        # merge cached sites per TF before motif discovery
 
   discover:
-    enabled: true                       # Boolean switch for `enabled`.
-    tool: meme                          # Sets `tool` for this example configuration.
-    meme_mod: oops                  # one occurrence per input sequence during motif discovery
-    source_id: demo_merged_meme_oops    # Sets `source_id` for this example configuration.
+    enabled: true                              # enable discovery stage in the runbook flow
+    tool: meme                                 # use MEME for motif discovery
+    meme_mod: oops                             # one occurrence per sequence during motif discovery
+    source_id: demo_merged_meme_oops           # write discovered motifs under this source id
 
   sample:
-    sequence_length: 16             # fixed-length optimization contract
+    sequence_length: 18                        # design fixed-length 18 bp sequences
     budget:
-      tune: 25000                   # adaptation / warmup sweeps
-      draws: 150000                 # optimization sweeps after tune
+      tune: 50000                              # warmup sweeps
+      draws: 300000                            # optimization sweeps after warmup
     objective:
-      combine: min                  # optimize weakest TF first (joint fairness)
-      score_scale: normalized-llr       # Sets `score_scale` for this example configuration.
-      bidirectional: true               # Boolean switch for `bidirectional`.
+      combine: min                             # optimize the weakest TF score in the set
+      score_scale: normalized-llr              # use normalized LLR scaling for comparability
+      bidirectional: true                      # evaluate best motif hit across both strands
     optimizer:
-      kind: gibbs_anneal                # Sets `kind` for this example configuration.
-      chains: 8                     # tuned default chain count
+      kind: gibbs_anneal                       # run hybrid Gibbs annealing optimization
+      chains: 8                                # use 8 independent optimizer chains
     elites:
-      k: 8                              # Sets `k` for this example configuration.
+      k: 8                                     # persist the top 8 elite sequences
       select:
-        diversity: 0.05             # low but non-zero diversity pressure
-        pool_size: 32000                # Sets `pool_size` for this example configuration.
+        diversity: 0.05                        # apply low-but-nonzero MMR diversity pressure
+        pool_size: 32000                       # evaluate this many candidates before MMR selection
 
   analysis:
-    pairwise: [lexA, cpxR]          # fixed two-axis score-space projection
-    trajectory_sweep_mode: best_so_far  # Sets `trajectory_sweep_mode` for this example configuration.
+    pairwise: [lexA, cpxR]                     # render a two-axis score-space for this TF pair
+    trajectory_sweep_mode: best_so_far         # show monotonic best-so-far chain trajectories
     fimo_compare:
-      enabled: true                 # emit optimizer_vs_fimo plot (requires fimo)
+      enabled: true                            # emit optimizer_vs_fimo plot (requires fimo)
 ```
 
 ### Step-by-step flow

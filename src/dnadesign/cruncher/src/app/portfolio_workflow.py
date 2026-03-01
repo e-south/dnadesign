@@ -93,6 +93,22 @@ def _portfolio_id(spec: PortfolioSpec) -> str:
     return digest[:12]
 
 
+def _apply_studies_override(spec: PortfolioSpec, studies_enabled: bool | None) -> PortfolioSpec:
+    if studies_enabled is None:
+        return spec
+    payload = spec.model_dump(mode="python")
+    studies_payload = dict(payload.get("studies", {}))
+    studies_payload["enabled"] = bool(studies_enabled)
+    if not studies_enabled:
+        sequence_length_payload = studies_payload.get("sequence_length_table")
+        if isinstance(sequence_length_payload, dict):
+            updated_sequence_length_payload = dict(sequence_length_payload)
+            updated_sequence_length_payload["enabled"] = False
+            studies_payload["sequence_length_table"] = updated_sequence_length_payload
+    payload["studies"] = studies_payload
+    return PortfolioSpec.model_validate(payload)
+
+
 def run_study(*args, **kwargs):
     from dnadesign.cruncher.app.study_workflow import run_study as _run_study
 
@@ -315,6 +331,7 @@ def _mean_pairwise_hamming_bp(sequences: list[str]) -> float | None:
 def _load_source_rows(
     source: PortfolioSource,
     *,
+    studies_enabled: bool,
     on_event: PortfolioEventCallback | None = None,
 ) -> tuple[
     list[dict[str, object]],
@@ -529,7 +546,9 @@ def _load_source_rows(
         "analysis_id": summary_payload.get("analysis_id"),
         "analysis_best_score_final": (summary_payload.get("objective_components") or {}).get("best_score_final"),
     }
-    study_summary_row = _load_source_study_summary(source, run_study_fn=run_study, on_event=on_event)
+    study_summary_row = _load_source_study_summary(
+        source, studies_enabled=studies_enabled, run_study_fn=run_study, on_event=on_event
+    )
     return source_windows_rows, source_elite_rows, source_summary_row, source_run, study_summary_row
 
 
@@ -609,6 +628,7 @@ def run_portfolio(
     *,
     force_overwrite: bool = False,
     prepare_ready_policy: PrepareReadyPolicy = "rerun",
+    studies_enabled: bool | None = None,
     on_event: PortfolioEventCallback | None = None,
 ) -> Path:
     if prepare_ready_policy not in {"rerun", "skip"}:
@@ -616,6 +636,7 @@ def run_portfolio(
     resolved_spec = spec_path.expanduser().resolve()
     _emit_event(on_event, "portfolio_started", spec_path=str(resolved_spec))
     spec = load_portfolio_spec(resolved_spec)
+    spec = _apply_studies_override(spec, studies_enabled)
     readiness = _collect_source_readiness(spec)
     _emit_event(
         on_event,
@@ -667,7 +688,11 @@ def run_portfolio(
         if spec.execution.mode == "prepare_then_aggregate":
             ensured_study_runs: dict[tuple[str, str], Path] = {}
         else:
-            ensured_study_runs = _ensure_required_source_studies(spec, run_study_fn=run_study, on_event=on_event)
+            ensured_study_runs = (
+                _ensure_required_source_studies(spec, run_study_fn=run_study, on_event=on_event)
+                if spec.studies.enabled
+                else {}
+            )
         all_window_rows: list[dict[str, object]] = []
         all_elite_rows: list[dict[str, object]] = []
         source_summary_rows: list[dict[str, object]] = []
@@ -739,14 +764,15 @@ def run_portfolio(
                         )
                         prepared_by_id[source_id] = prepared
                     prepared_sources.append(prepared)
-                    ensured_study_runs.update(
-                        _ensure_required_source_studies_for_sources(
-                            spec,
-                            [source],
-                            run_study_fn=run_study,
-                            on_event=on_event,
+                    if spec.studies.enabled:
+                        ensured_study_runs.update(
+                            _ensure_required_source_studies_for_sources(
+                                spec,
+                                [source],
+                                run_study_fn=run_study,
+                                on_event=on_event,
+                            )
                         )
-                    )
                     _emit_event(on_event, "aggregate_source_started", source_id=source_id)
                     (
                         source_windows_rows,
@@ -754,7 +780,7 @@ def run_portfolio(
                         source_summary_row,
                         source_run,
                         source_study_summary,
-                    ) = _load_source_rows(source, on_event=on_event)
+                    ) = _load_source_rows(source, studies_enabled=spec.studies.enabled, on_event=on_event)
                     all_window_rows.extend(source_windows_rows)
                     all_elite_rows.extend(source_elite_rows)
                     source_summary_rows.append(source_summary_row)
@@ -767,7 +793,7 @@ def run_portfolio(
                     )
                     if source_study_summary is not None:
                         study_summary_rows.append(source_study_summary)
-                    if spec.studies.sequence_length_table.enabled:
+                    if spec.studies.enabled and spec.studies.sequence_length_table.enabled:
                         sequence_length_rows.extend(
                             _load_source_sequence_length_rows(
                                 source,
@@ -808,7 +834,7 @@ def run_portfolio(
                     source_summary_row,
                     source_run,
                     source_study_summary,
-                ) = _load_source_rows(source, on_event=on_event)
+                ) = _load_source_rows(source, studies_enabled=spec.studies.enabled, on_event=on_event)
                 all_window_rows.extend(source_windows_rows)
                 all_elite_rows.extend(source_elite_rows)
                 source_summary_rows.append(source_summary_row)
@@ -821,7 +847,7 @@ def run_portfolio(
                 )
                 if source_study_summary is not None:
                     study_summary_rows.append(source_study_summary)
-                if spec.studies.sequence_length_table.enabled:
+                if spec.studies.enabled and spec.studies.sequence_length_table.enabled:
                     sequence_length_rows.extend(
                         _load_source_sequence_length_rows(
                             source,

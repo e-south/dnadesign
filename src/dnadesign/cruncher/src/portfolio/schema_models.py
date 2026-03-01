@@ -245,6 +245,7 @@ class PortfolioSequenceLengthTable(StrictBaseModel):
 
 
 class PortfolioStudies(StrictBaseModel):
+    enabled: bool = False
     ensure_specs: list[Path] = Field(default_factory=list)
     sequence_length_table: PortfolioSequenceLengthTable = PortfolioSequenceLengthTable()
 
@@ -266,6 +267,8 @@ class PortfolioStudies(StrictBaseModel):
 
     @model_validator(mode="after")
     def _check_sequence_length_table_contract(self) -> "PortfolioStudies":
+        if not self.enabled and self.sequence_length_table.enabled:
+            raise ValueError("portfolio.studies.sequence_length_table.enabled requires portfolio.studies.enabled: true")
         if not self.sequence_length_table.enabled:
             return self
         table_spec = str(self.sequence_length_table.study_spec)

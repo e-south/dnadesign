@@ -20,8 +20,7 @@
 
 ### Overview
 
-This demo extends the pairwise flow from two regulators to three:
-`lexA`, `cpxR`, and `baeR`.
+This demo extends the pairwise flow from two regulators to three: `lexA`, `cpxR`, and `baeR`.
 
 Lifecycle is unchanged (fetch -> discover -> lock -> parse -> sample -> analyze),
 but this workspace adds a third-TF site source (`baer_chip_exo`) and renders
@@ -49,6 +48,8 @@ Run this single command to do everything in this demo:
 # Execute the Cruncher machine runbook for this workspace.
 uv run cruncher workspaces run --runbook configs/runbook.yaml
 ```
+
+Stop here if you only need the happy path.
 
 Or run the same flow step by step with context below.
 Each step corresponds to the same runbook flow, but split for inspection and debugging.
@@ -111,40 +112,48 @@ This excerpt captures the key intent from `workspaces/demo_multitf/configs/confi
 
 ```yaml
 cruncher:
+  schema_version: 3                            # strict config schema contract
   workspace:
-    out_dir: outputs                          # Sets `out_dir` for this example configuration.
+    out_dir: outputs                           # write run artifacts under workspace outputs/
     regulator_sets:
-      - [lexA, cpxR, baeR]          # optimize all three TFs together
+      - [lexA, cpxR, baeR]                     # optimize this three-TF set jointly
 
   catalog:
-    root: .cruncher/demo_multitf              # Root directory used by this run/workspace.
-    source_preference: [demo_merged_meme_oops_multitf]  # lock must resolve only discovered motifs
-    pwm_source: matrix                        # Sets `pwm_source` for this example configuration.
-    combine_sites: true                       # Boolean switch for `combine_sites`.
+    root: .cruncher/demo_multitf                # workspace-local cache, lock, and parsed artifacts
+    source_preference:
+      - demo_merged_meme_oops_multitf           # lock resolves motifs only from this discovered source
+    pwm_source: matrix                           # sample from motif matrices, not raw site windows
+    combine_sites: true                          # merge cached sites per TF before motif discovery
 
   discover:
-    tool: meme                                # Sets `tool` for this example configuration.
-    meme_mod: oops                            # Sets `meme_mod` for this example configuration.
-    source_id: demo_merged_meme_oops_multitf  # Sets `source_id` for this example configuration.
+    enabled: true                               # enable discovery stage in the runbook flow
+    tool: meme                                  # use MEME for motif discovery
+    meme_mod: oops                              # one occurrence per sequence during motif discovery
+    source_id: demo_merged_meme_oops_multitf    # write discovered motifs under this source id
 
   sample:
-    sequence_length: 16             # same fixed length as pairwise demo
+    sequence_length: 18                         # design fixed-length 18 bp sequences
     budget:
-      tune: 25000                             # Sets `tune` for this example configuration.
-      draws: 150000                           # Sets `draws` for this example configuration.
-    optimizer:
-      kind: gibbs_anneal                      # Sets `kind` for this example configuration.
-      chains: 8                     # same tuned optimizer defaults as pairwise
+      tune: 50000                              # warmup sweeps
+      draws: 300000                            # optimization sweeps after warmup
     objective:
-      combine: min                            # Sets `combine` for this example configuration.
-      score_scale: normalized-llr             # Sets `score_scale` for this example configuration.
-      bidirectional: true                     # Boolean switch for `bidirectional`.
+      combine: min                             # optimize the weakest TF score in the set
+      score_scale: normalized-llr              # use normalized LLR scaling for comparability
+      bidirectional: true                      # evaluate best motif hit across both strands
+    optimizer:
+      kind: gibbs_anneal                       # run hybrid Gibbs annealing optimization
+      chains: 8                                # use 8 independent optimizer chains
+    elites:
+      k: 8                                     # persist the top 8 elite sequences
+      select:
+        diversity: 0.05                        # apply low-but-nonzero MMR diversity pressure
+        pool_size: 32000                       # evaluate this many candidates before MMR selection
 
   analysis:
-    pairwise: all_pairs_grid        # render every TF pair panel in one score-space figure
-    trajectory_sweep_mode: best_so_far        # Sets `trajectory_sweep_mode` for this example configuration.
+    pairwise: all_pairs_grid                    # render every TF pair panel in one score-space figure
+    trajectory_sweep_mode: best_so_far          # show monotonic best-so-far chain trajectories
     fimo_compare:
-      enabled: false                # enable true if you want optimizer_vs_fimo here
+      enabled: false                           # keep optimizer_vs_fimo disabled for default runtime
 ```
 
 ### Step-by-step flow

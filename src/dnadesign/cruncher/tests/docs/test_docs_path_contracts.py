@@ -41,6 +41,28 @@ def _assert_substrings_in_order(text: str, substrings: list[str], *, label: str)
         cursor = idx
 
 
+def _extract_yaml_block_after_anchor(*, text: str, anchor: str, label: str) -> dict:
+    anchor_idx = text.find(anchor)
+    assert anchor_idx >= 0, f"{label}: missing anchor: {anchor}"
+    fence_start = text.find("```yaml", anchor_idx)
+    assert fence_start >= 0, f"{label}: missing yaml block after anchor: {anchor}"
+    body_start = fence_start + len("```yaml")
+    fence_end = text.find("```", body_start)
+    assert fence_end >= 0, f"{label}: unterminated yaml block after anchor: {anchor}"
+    payload = yaml.safe_load(text[body_start:fence_end].strip())
+    assert isinstance(payload, dict), f"{label}: yaml block must parse to mapping"
+    return payload
+
+
+def _value_at_path(payload: dict, dotted_path: str, *, label: str):
+    cursor: object = payload
+    for key in dotted_path.split("."):
+        assert isinstance(cursor, dict), f"{label}: expected mapping at {dotted_path}"
+        assert key in cursor, f"{label}: missing key path: {dotted_path}"
+        cursor = cursor[key]
+    return cursor
+
+
 def test_artifacts_reference_uses_analysis_subdir_contract() -> None:
     artifacts = (_package_root() / "docs" / "reference" / "artifacts.md").read_text()
     assert "analysis/reports/summary.json" in artifacts
@@ -249,6 +271,62 @@ def test_demo_docs_explain_workspace_studies_and_invocation() -> None:
         assert "study run --spec configs/studies/diversity_vs_score.study.yaml --force-overwrite" in text
         assert "length_vs_score" in text
         assert "diversity_vs_score" in text
+
+
+def test_demo_config_gist_yaml_examples_match_workspace_configs() -> None:
+    docs_root = _package_root() / "docs" / "demos"
+    workspaces_root = _package_root() / "workspaces"
+    cases = (
+        ("demo_pairwise.md", "demo_pairwise"),
+        ("demo_multitf.md", "demo_multitf"),
+    )
+    key_paths = (
+        "cruncher.schema_version",
+        "cruncher.workspace.out_dir",
+        "cruncher.workspace.regulator_sets",
+        "cruncher.catalog.root",
+        "cruncher.catalog.source_preference",
+        "cruncher.catalog.pwm_source",
+        "cruncher.catalog.combine_sites",
+        "cruncher.discover.enabled",
+        "cruncher.discover.tool",
+        "cruncher.discover.meme_mod",
+        "cruncher.discover.source_id",
+        "cruncher.sample.sequence_length",
+        "cruncher.sample.budget.tune",
+        "cruncher.sample.budget.draws",
+        "cruncher.sample.objective.combine",
+        "cruncher.sample.objective.score_scale",
+        "cruncher.sample.objective.bidirectional",
+        "cruncher.sample.optimizer.kind",
+        "cruncher.sample.optimizer.chains",
+        "cruncher.sample.elites.k",
+        "cruncher.sample.elites.select.diversity",
+        "cruncher.sample.elites.select.pool_size",
+        "cruncher.analysis.pairwise",
+        "cruncher.analysis.trajectory_sweep_mode",
+        "cruncher.analysis.fimo_compare.enabled",
+    )
+
+    for doc_name, workspace_name in cases:
+        doc_text = (docs_root / doc_name).read_text()
+        snippet_payload = _extract_yaml_block_after_anchor(
+            text=doc_text,
+            anchor="### Config gist (annotated)",
+            label=doc_name,
+        )
+        workspace_payload = yaml.safe_load((workspaces_root / workspace_name / "configs" / "config.yaml").read_text())
+        assert isinstance(workspace_payload, dict), f"{workspace_name}: config.yaml must parse to mapping"
+        for path in key_paths:
+            assert _value_at_path(
+                snippet_payload,
+                path,
+                label=f"{doc_name} snippet",
+            ) == _value_at_path(
+                workspace_payload,
+                path,
+                label=f"{workspace_name} config",
+            ), f"{doc_name}: config gist drifted from {workspace_name}/configs/config.yaml at {path}"
 
 
 def test_demo_docs_reference_elites_csv_export_contract() -> None:
