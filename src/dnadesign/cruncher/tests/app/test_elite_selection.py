@@ -23,7 +23,9 @@ from dnadesign.cruncher.app.sample.elites_mmr import (
 from dnadesign.cruncher.app.sample.elites_stage import (
     _candidate_payload,
     _hits_match_polish_contract,
+    _hits_match_trim_contract,
     _postprocess_elite_candidates,
+    _refresh_candidate_combined_scores,
     _remaining_single_owner_polish_improvements,
 )
 from dnadesign.cruncher.config.schema_v3 import SampleConfig
@@ -622,6 +624,101 @@ def test_postprocess_converges_after_edge_trim_reexposes_single_owner_edits() ->
         scorer=scorer,
     )
     assert remaining == []
+
+
+def test_postprocess_trims_internal_uncovered_segments_when_enabled() -> None:
+    scorer = Scorer(
+        {
+            "tfA": _make_pwm("tfA", "ATGC"),
+            "tfB": _make_pwm("tfB", "CGTA"),
+        },
+        bidirectional=False,
+        scale="normalized-llr",
+    )
+    candidate = _elite_candidate("ATGCAAAAACGTA", scorer)
+
+    processed, stats = _postprocess_elite_candidates(
+        candidates=[candidate],
+        scorer=scorer,
+        dsdna_mode=False,
+        trim_uncovered_internal=True,
+    )
+
+    assert len(processed) == 1
+    assert _seq_str(processed[0].seq_arr) == "ATGCCGTA"
+    assert stats["trim_internal_segments"] == 1
+    assert stats["trim_internal_bp"] == 5
+    assert int(processed[0].per_tf_hits["tfA"]["best_start"]) == 0
+    assert int(processed[0].per_tf_hits["tfB"]["best_start"]) == 4
+
+
+def test_postprocess_keeps_internal_uncovered_segments_when_disabled() -> None:
+    scorer = Scorer(
+        {
+            "tfA": _make_pwm("tfA", "ATGC"),
+            "tfB": _make_pwm("tfB", "CGTA"),
+        },
+        bidirectional=False,
+        scale="normalized-llr",
+    )
+    candidate = _elite_candidate("ATGCAAAAACGTA", scorer)
+
+    processed, stats = _postprocess_elite_candidates(
+        candidates=[candidate],
+        scorer=scorer,
+        dsdna_mode=False,
+        trim_uncovered_internal=False,
+    )
+
+    assert len(processed) == 1
+    assert _seq_str(processed[0].seq_arr) == "ATGCAAAAACGTA"
+    assert stats["trim_internal_segments"] == 0
+    assert stats["trim_internal_bp"] == 0
+    assert stats["trim_left"] == 0
+    assert stats["trim_right"] == 0
+
+
+def test_hits_match_trim_contract_rejects_start_shift_mismatch() -> None:
+    expected = {
+        "tfA": (0, 4, "+"),
+        "tfB": (9, 4, "+"),
+    }
+    per_tf_hits = {
+        "tfA": {"best_start": 0, "width": 4, "strand": "+"},
+        "tfB": {"best_start": 6, "width": 4, "strand": "+"},
+    }
+    removed_segments = [(4, 9)]
+
+    assert not _hits_match_trim_contract(
+        per_tf_hits=per_tf_hits,
+        expected_windows=expected,
+        removed_segments=removed_segments,
+    )
+
+
+def test_refresh_candidate_combined_scores_uses_postprocessed_length() -> None:
+    scorer = Scorer(
+        {"tfA": _make_pwm("tfA", "ATGC")},
+        bidirectional=False,
+        scale="normalized-llr",
+    )
+    candidate = _elite_candidate("ATGCAAAAAT", scorer)
+    candidate.seq_arr = _seq_arr("ATGC")
+    candidate.per_tf_map = {"tfA": float(candidate.per_tf_map["tfA"])}
+
+    class _DummyEvaluator:
+        @staticmethod
+        def combined_from_scores(per_tf_scores, beta, *, length):
+            _ = (per_tf_scores, beta)
+            return float(length)
+
+    _refresh_candidate_combined_scores(
+        candidates=[candidate],
+        evaluator=_DummyEvaluator(),
+        beta_softmin_final=2.5,
+    )
+
+    assert candidate.combined_score == pytest.approx(4.0)
 
 
 def test_hits_match_polish_contract_rejects_reverse_flip_even_when_owner_score_improves() -> None:

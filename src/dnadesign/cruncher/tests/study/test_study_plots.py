@@ -131,6 +131,10 @@ def test_sequence_length_tradeoff_plot_uses_integer_x_locator(tmp_path: Path, mo
     assert any(kwargs.get("linestyle") == "--" for kwargs in captured_vlines)
     assert captured_scatter
     assert any(str(kwargs.get("edgecolors")) == "black" for kwargs in captured_scatter)
+    grid_lines = [*captured.ax_score.get_xgridlines(), *captured.ax_score.get_ygridlines()]
+    grid_zorders = [line.get_zorder() for line in grid_lines]
+    assert grid_zorders
+    assert max(grid_zorders) <= 0
 
 
 def test_mmr_diversity_tradeoff_plot_uses_square_figure_and_frameless_legend(tmp_path: Path, monkeypatch) -> None:
@@ -238,3 +242,7 @@ def test_mmr_diversity_tradeoff_plot_uses_square_figure_and_frameless_legend(tmp
     assert any(kwargs.get("linestyle") == "--" for kwargs in captured_vlines)
     assert captured_scatter
     assert any(str(kwargs.get("edgecolors")) == "black" for kwargs in captured_scatter)
+    grid_lines = [*captured.ax_score.get_xgridlines(), *captured.ax_score.get_ygridlines()]
+    grid_zorders = [line.get_zorder() for line in grid_lines]
+    assert grid_zorders
+    assert max(grid_zorders) <= 0

@@ -95,28 +95,16 @@ def _ordered_unique(values: Iterable[object]) -> list[object]:
     return out
 
 
-def run_mmr_sweep(
+def _prepare_points_for_mmr(
     *,
     sequences_df: pd.DataFrame,
-    elites_df: pd.DataFrame,
-    tf_names: Sequence[str],
-    pwms: dict[str, PWM],
+    tf_list: list[str],
     objective_config: dict[str, object],
+    pwms: dict[str, PWM],
     bidirectional: bool,
-    elite_k: int,
     pwm_pseudocounts: float,
     log_odds_clip: float | None,
-    pool_size_values: Sequence[str | int],
-    diversity_values: Sequence[float],
-    baseline_pool_size: str | int | None,
-    baseline_diversity: float | None,
 ) -> pd.DataFrame:
-    if sequences_df is None or sequences_df.empty:
-        return pd.DataFrame()
-    tf_list = [str(tf) for tf in tf_names]
-    if not tf_list:
-        raise ValueError("MMR sweep requires at least one TF.")
-
     points = build_trajectory_points(
         sequences_df,
         tf_list,
@@ -124,12 +112,11 @@ def run_mmr_sweep(
         objective_config=objective_config,
     )
     if points.empty:
-        return pd.DataFrame()
+        return points
     if "phase" in points.columns:
         points = points[points["phase"].astype(str) == "draw"].copy()
     if points.empty:
-        return pd.DataFrame()
-
+        return points
     points = add_raw_llr_objective(
         points,
         tf_list,
@@ -139,21 +126,35 @@ def run_mmr_sweep(
         pwm_pseudocounts=pwm_pseudocounts,
         log_odds_clip=log_odds_clip,
     )
-
     score_cols = [f"score_{tf}" for tf in tf_list]
     norm_cols = [f"norm_llr_{tf}" for tf in tf_list]
     required = {"chain", "sweep_idx", "sequence", "objective_scalar", *score_cols, *norm_cols}
     missing = [column for column in sorted(required) if column not in points.columns]
     if missing:
         raise ValueError(f"MMR sweep missing required columns: {missing}")
-
     points = points.sort_values(["chain", "sweep_idx"]).reset_index(drop=True)
     chain_values = pd.to_numeric(points["chain"], errors="coerce")
     sweep_values = pd.to_numeric(points["sweep_idx"], errors="coerce")
     objective_values = pd.to_numeric(points["objective_scalar"], errors="coerce")
     if chain_values.isna().any() or sweep_values.isna().any() or objective_values.isna().any():
         raise ValueError("MMR sweep requires numeric chain, sweep_idx, and objective_scalar columns.")
+    return points
 
+
+def _candidate_artifacts_from_points(
+    *,
+    points: pd.DataFrame,
+    tf_list: list[str],
+    pwms: dict[str, PWM],
+    bidirectional: bool,
+    pwm_pseudocounts: float,
+    log_odds_clip: float | None,
+) -> tuple[list[MmrCandidate], dict[str, dict[str, np.ndarray]], int, int]:
+    score_cols = [f"score_{tf}" for tf in tf_list]
+    norm_cols = [f"norm_llr_{tf}" for tf in tf_list]
+    chain_values = pd.to_numeric(points["chain"], errors="coerce")
+    sweep_values = pd.to_numeric(points["sweep_idx"], errors="coerce")
+    objective_values = pd.to_numeric(points["objective_scalar"], errors="coerce")
     score_matrix = points[score_cols].to_numpy(dtype=float)
     norm_matrix = points[norm_cols].to_numpy(dtype=float)
     scorer_llr = Scorer(
@@ -186,19 +187,197 @@ def run_mmr_sweep(
             )
         )
         core_maps[candidate_id] = tfbs_cores_from_scorer(seq_arr, scorer=scorer_llr, tf_names=tf_list)
-
     if not candidates:
-        return pd.DataFrame()
+        return [], {}, 0, 0
     sequence_length = int(candidates[0].seq_arr.size)
     first_core_map = next(iter(core_maps.values()))
     core_width = int(sum(int(np.asarray(first_core_map[tf]).size) for tf in tf_list))
+    return candidates, core_maps, sequence_length, core_width
 
+
+def _baseline_ids_from_elites(elites_df: pd.DataFrame) -> set[str]:
     baseline_ids: set[str] = set()
-    if elites_df is not None and not elites_df.empty and {"chain", "draw_idx"}.issubset(set(elites_df.columns)):
-        chain = pd.to_numeric(elites_df["chain"], errors="coerce")
-        draw = pd.to_numeric(elites_df["draw_idx"], errors="coerce")
-        mask = chain.notna() & draw.notna()
-        baseline_ids = {f"{int(c)}:{int(d)}" for c, d in zip(chain[mask], draw[mask])}
+    if elites_df is None or elites_df.empty or not {"chain", "draw_idx"}.issubset(set(elites_df.columns)):
+        return baseline_ids
+    chain = pd.to_numeric(elites_df["chain"], errors="coerce")
+    draw = pd.to_numeric(elites_df["draw_idx"], errors="coerce")
+    mask = chain.notna() & draw.notna()
+    return {f"{int(c)}:{int(d)}" for c, d in zip(chain[mask], draw[mask])}
+
+
+def _pool_matches_baseline(
+    *,
+    pool_input: str | int,
+    pool_resolved: int | None,
+    baseline_pool_size: str | int | None,
+) -> bool:
+    if baseline_pool_size is None:
+        return False
+    if baseline_pool_size == "auto":
+        return pool_input == "auto"
+    if baseline_pool_size == "all":
+        return pool_input == "all"
+    if pool_input in {"auto", "all"}:
+        return False
+    if pool_resolved is None:
+        return False
+    try:
+        return int(pool_resolved) == int(baseline_pool_size)
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
+def _sweep_row(
+    *,
+    candidates: list[MmrCandidate],
+    tf_list: list[str],
+    pwms: dict[str, PWM],
+    core_maps: dict[str, dict[str, np.ndarray]],
+    bidirectional: bool,
+    elite_k: int,
+    sequence_length: int,
+    core_width: int,
+    diversity: float,
+    pool_size_value: str | int,
+    pool_size_resolved: int,
+    baseline_ids: set[str],
+    baseline_pool_size: str | int | None,
+    baseline_diversity: float | None,
+) -> dict[str, object]:
+    score_only = float(diversity) <= 0.0
+    score_weight = 1.0 if score_only else float(max(0.0, 1.0 - float(diversity)))
+    diversity_weight = 0.0 if score_only else float(diversity)
+    effective_distance_metric = "none" if score_only else "hybrid"
+    min_hamming_bp = int(round(float(diversity) * max(0, int(sequence_length) // 4))) if not score_only else None
+    min_core_hamming_bp = int(round(float(diversity) * max(0, int(core_width) // 4))) if not score_only else None
+    selection_error = None
+    result = None
+    try:
+        if score_only:
+            result = select_score_elites(
+                candidates,
+                k=int(elite_k),
+                pool_size=int(pool_size_resolved),
+                dsdna=bool(bidirectional),
+            )
+        else:
+            result = select_mmr_elites(
+                candidates,
+                k=int(elite_k),
+                pool_size=int(pool_size_resolved),
+                alpha=score_weight,
+                relevance="min_tf_score",
+                dsdna=bool(bidirectional),
+                tf_names=tf_list,
+                pwms=pwms,
+                core_maps=core_maps,
+                distance_metric=effective_distance_metric,
+                min_hamming_bp=min_hamming_bp,
+                min_core_hamming_bp=min_core_hamming_bp,
+                constraint_policy="relax",
+                relax_step_bp=1,
+                relax_min_bp=0,
+            )
+    except ValueError as exc:
+        selection_error = str(exc)
+
+    selected = result.selected if result is not None else []
+    selected_ids = {f"{cand.chain_id}:{cand.draw_idx}" for cand in selected}
+    selected_min_norm = [float(cand.min_norm) for cand in selected]
+    selected_joint_score = [float(cand.combined_score) for cand in selected]
+    full_mean, full_min, full_nn_median = _full_distance_metrics(selected)
+    jaccard = None
+    if baseline_ids:
+        union = baseline_ids | selected_ids
+        if union:
+            jaccard = float(len(baseline_ids & selected_ids)) / float(len(union))
+
+    return {
+        "score_weight": score_weight,
+        "diversity_weight": diversity_weight,
+        "diversity": float(diversity),
+        "distance_metric": effective_distance_metric,
+        "constraint_policy": ("disabled" if score_only else "relax"),
+        "min_hamming_bp_requested": min_hamming_bp,
+        "min_hamming_bp_final": (result.min_hamming_bp_final if result is not None else None),
+        "min_core_hamming_bp_requested": min_core_hamming_bp,
+        "min_core_hamming_bp_final": (result.min_core_hamming_bp_final if result is not None else None),
+        "relax_steps_used": result.relax_steps_used if result is not None else None,
+        "selection_error": selection_error,
+        "pool_size_input": pool_size_value,
+        "pool_size_resolved": int(pool_size_resolved),
+        "candidate_count": int(len(candidates)),
+        "selected_count": int(len(selected)),
+        "median_relevance_raw": (result.median_relevance_raw if result is not None else None),
+        "mean_pairwise_core_distance": (result.mean_pairwise_distance if result is not None else None),
+        "min_pairwise_core_distance": (result.min_pairwise_distance if result is not None else None),
+        "mean_pairwise_full_distance": full_mean,
+        "min_pairwise_full_distance": full_min,
+        "median_nn_full_distance": full_nn_median,
+        "median_min_tf_score_selected": (
+            float(np.median(np.asarray(selected_min_norm, dtype=float))) if selected_min_norm else None
+        ),
+        "median_joint_score_selected": (
+            float(np.median(np.asarray(selected_joint_score, dtype=float))) if selected_joint_score else None
+        ),
+        "jaccard_vs_current_elites": jaccard,
+        "is_current_config": (
+            _pool_matches_baseline(
+                pool_input=pool_size_value,
+                pool_resolved=int(pool_size_resolved),
+                baseline_pool_size=baseline_pool_size,
+            )
+            and (
+                (baseline_diversity is None and abs(float(diversity)) <= 1.0e-12)
+                or (baseline_diversity is not None and abs(float(baseline_diversity) - float(diversity)) <= 1.0e-12)
+            )
+        ),
+    }
+
+
+def run_mmr_sweep(
+    *,
+    sequences_df: pd.DataFrame,
+    elites_df: pd.DataFrame,
+    tf_names: Sequence[str],
+    pwms: dict[str, PWM],
+    objective_config: dict[str, object],
+    bidirectional: bool,
+    elite_k: int,
+    pwm_pseudocounts: float,
+    log_odds_clip: float | None,
+    pool_size_values: Sequence[str | int],
+    diversity_values: Sequence[float],
+    baseline_pool_size: str | int | None,
+    baseline_diversity: float | None,
+) -> pd.DataFrame:
+    if sequences_df is None or sequences_df.empty:
+        return pd.DataFrame()
+    tf_list = [str(tf) for tf in tf_names]
+    if not tf_list:
+        raise ValueError("MMR sweep requires at least one TF.")
+    points = _prepare_points_for_mmr(
+        sequences_df=sequences_df,
+        tf_list=tf_list,
+        objective_config=objective_config,
+        pwms=pwms,
+        bidirectional=bidirectional,
+        pwm_pseudocounts=pwm_pseudocounts,
+        log_odds_clip=log_odds_clip,
+    )
+    if points.empty:
+        return pd.DataFrame()
+    candidates, core_maps, sequence_length, core_width = _candidate_artifacts_from_points(
+        points=points,
+        tf_list=tf_list,
+        pwms=pwms,
+        bidirectional=bidirectional,
+        pwm_pseudocounts=pwm_pseudocounts,
+        log_odds_clip=log_odds_clip,
+    )
+    if not candidates:
+        return pd.DataFrame()
+    baseline_ids = _baseline_ids_from_elites(elites_df)
 
     pool_grid: list[str | int] = []
     for value in _ordered_unique(pool_size_values):
@@ -207,162 +386,32 @@ def run_mmr_sweep(
             continue
         pool_grid.append(int(value))
     diversity_grid = [float(value) for value in _ordered_unique(diversity_values)]
-    relevance = "min_tf_score"
-    distance_metric = "hybrid"
-    constraint_policy = "relax"
-
     rows: list[dict[str, object]] = []
 
-    def _pool_matches_baseline(pool_input: str | int, pool_resolved: int | None) -> bool:
-        if baseline_pool_size is None:
-            return False
-        if baseline_pool_size == "auto":
-            return pool_input == "auto"
-        if baseline_pool_size == "all":
-            return pool_input == "all"
-        if pool_input in {"auto", "all"}:
-            return False
-        if pool_resolved is None:
-            return False
-        try:
-            return int(pool_resolved) == int(baseline_pool_size)
-        except (TypeError, ValueError, OverflowError):
-            return False
-
     for pool_size_value in pool_grid:
-        candidate_count = len(candidates)
-        if candidate_count == 0:
-            for diversity in diversity_grid:
-                score_only = float(diversity) <= 0.0
-                rows.append(
-                    {
-                        "score_weight": float(max(0.0, 1.0 - float(diversity))),
-                        "diversity_weight": (0.0 if score_only else float(diversity)),
-                        "diversity": float(diversity),
-                        "distance_metric": ("none" if score_only else distance_metric),
-                        "constraint_policy": ("disabled" if score_only else constraint_policy),
-                        "min_hamming_bp_requested": None,
-                        "min_hamming_bp_final": None,
-                        "min_core_hamming_bp_requested": None,
-                        "min_core_hamming_bp_final": None,
-                        "relax_steps_used": None,
-                        "selection_error": None,
-                        "pool_size_input": pool_size_value,
-                        "pool_size_resolved": None,
-                        "candidate_count": 0,
-                        "selected_count": 0,
-                        "median_relevance_raw": None,
-                        "mean_pairwise_core_distance": None,
-                        "min_pairwise_core_distance": None,
-                        "mean_pairwise_full_distance": None,
-                        "min_pairwise_full_distance": None,
-                        "median_nn_full_distance": None,
-                        "median_min_tf_score_selected": None,
-                        "median_joint_score_selected": None,
-                        "jaccard_vs_current_elites": None,
-                        "is_current_config": False,
-                    }
-                )
-            continue
         pool_size_resolved = _resolve_pool_size(
             pool_size_value,
             elite_k=elite_k,
-            candidate_count=candidate_count,
+            candidate_count=len(candidates),
         )
         for diversity in diversity_grid:
-            score_only = float(diversity) <= 0.0
-            score_weight = 1.0 if score_only else float(max(0.0, 1.0 - float(diversity)))
-            diversity_weight = 0.0 if score_only else float(diversity)
-            effective_distance_metric = "none" if score_only else distance_metric
-            min_hamming_bp = (
-                int(round(float(diversity) * max(0, int(sequence_length) // 4))) if not score_only else None
-            )
-            min_core_hamming_bp = (
-                int(round(float(diversity) * max(0, int(core_width) // 4))) if not score_only else None
-            )
-            selection_error = None
-            result = None
-            try:
-                if score_only:
-                    result = select_score_elites(
-                        candidates,
-                        k=int(elite_k),
-                        pool_size=int(pool_size_resolved),
-                        dsdna=bool(bidirectional),
-                    )
-                else:
-                    result = select_mmr_elites(
-                        candidates,
-                        k=int(elite_k),
-                        pool_size=int(pool_size_resolved),
-                        alpha=score_weight,
-                        relevance=relevance,
-                        dsdna=bool(bidirectional),
-                        tf_names=tf_list,
-                        pwms=pwms,
-                        core_maps=core_maps,
-                        distance_metric=effective_distance_metric,
-                        min_hamming_bp=min_hamming_bp,
-                        min_core_hamming_bp=min_core_hamming_bp,
-                        constraint_policy=constraint_policy,
-                        relax_step_bp=1,
-                        relax_min_bp=0,
-                    )
-            except ValueError as exc:
-                selection_error = str(exc)
-            selected = result.selected if result is not None else []
-            selected_ids = {f"{cand.chain_id}:{cand.draw_idx}" for cand in selected}
-            selected_min_norm = [float(cand.min_norm) for cand in selected]
-            selected_joint_score = [float(cand.combined_score) for cand in selected]
-            full_mean, full_min, full_nn_median = _full_distance_metrics(selected)
-            jaccard = None
-            if baseline_ids:
-                union = baseline_ids | selected_ids
-                if union:
-                    jaccard = float(len(baseline_ids & selected_ids)) / float(len(union))
             rows.append(
-                {
-                    "score_weight": score_weight,
-                    "diversity_weight": diversity_weight,
-                    "diversity": float(diversity),
-                    "distance_metric": effective_distance_metric,
-                    "constraint_policy": ("disabled" if score_only else constraint_policy),
-                    "min_hamming_bp_requested": min_hamming_bp,
-                    "min_hamming_bp_final": (result.min_hamming_bp_final if result is not None else None),
-                    "min_core_hamming_bp_requested": min_core_hamming_bp,
-                    "min_core_hamming_bp_final": (result.min_core_hamming_bp_final if result is not None else None),
-                    "relax_steps_used": result.relax_steps_used if result is not None else None,
-                    "selection_error": selection_error,
-                    "pool_size_input": pool_size_value,
-                    "pool_size_resolved": int(pool_size_resolved),
-                    "candidate_count": int(candidate_count),
-                    "selected_count": int(len(selected)),
-                    "median_relevance_raw": (result.median_relevance_raw if result is not None else None),
-                    "mean_pairwise_core_distance": (result.mean_pairwise_distance if result is not None else None),
-                    "min_pairwise_core_distance": (result.min_pairwise_distance if result is not None else None),
-                    "mean_pairwise_full_distance": full_mean,
-                    "min_pairwise_full_distance": full_min,
-                    "median_nn_full_distance": full_nn_median,
-                    "median_min_tf_score_selected": (
-                        float(np.median(np.asarray(selected_min_norm, dtype=float))) if selected_min_norm else None
-                    ),
-                    "median_joint_score_selected": (
-                        float(np.median(np.asarray(selected_joint_score, dtype=float)))
-                        if selected_joint_score
-                        else None
-                    ),
-                    "jaccard_vs_current_elites": jaccard,
-                    "is_current_config": (
-                        _pool_matches_baseline(pool_size_value, int(pool_size_resolved))
-                        and (
-                            (baseline_diversity is None and abs(float(diversity)) <= 1.0e-12)
-                            or (
-                                baseline_diversity is not None
-                                and abs(float(baseline_diversity) - float(diversity)) <= 1.0e-12
-                            )
-                        )
-                    ),
-                }
+                _sweep_row(
+                    candidates=candidates,
+                    tf_list=tf_list,
+                    pwms=pwms,
+                    core_maps=core_maps,
+                    bidirectional=bidirectional,
+                    elite_k=elite_k,
+                    sequence_length=sequence_length,
+                    core_width=core_width,
+                    diversity=float(diversity),
+                    pool_size_value=pool_size_value,
+                    pool_size_resolved=int(pool_size_resolved),
+                    baseline_ids=baseline_ids,
+                    baseline_pool_size=baseline_pool_size,
+                    baseline_diversity=baseline_diversity,
+                )
             )
     out = pd.DataFrame(rows)
     if out.empty:

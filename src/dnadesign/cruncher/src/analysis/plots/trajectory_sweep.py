@@ -18,6 +18,9 @@ import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
 
+from dnadesign.cruncher.analysis.objective_labels import (
+    objective_scalar_semantics,
+)
 from dnadesign.cruncher.analysis.plots._savefig import savefig
 from dnadesign.cruncher.analysis.plots._style import apply_axes_style
 from dnadesign.cruncher.analysis.plots.trajectory_common import (
@@ -30,31 +33,6 @@ from dnadesign.cruncher.analysis.plots.trajectory_common import (
 )
 
 
-def _score_scale_label(objective_config: dict[str, object] | None) -> str:
-    cfg = objective_config if isinstance(objective_config, dict) else {}
-    scale = str(cfg.get("score_scale") or "normalized-llr").strip().lower()
-    if scale in {"llr", "raw-llr", "raw_llr"}:
-        return "raw-LLR"
-    if scale in {"normalized-llr", "norm-llr", "norm_llr"}:
-        return "norm-LLR"
-    if scale == "logp":
-        return "logp"
-    return scale
-
-
-def _objective_scalar_semantics(objective_config: dict[str, object] | None) -> str:
-    cfg = objective_config if isinstance(objective_config, dict) else {}
-    combine = str(cfg.get("combine") or "min").strip().lower()
-    scale_label = _score_scale_label(cfg)
-    softmin_cfg = cfg.get("softmin")
-    softmin_enabled = isinstance(softmin_cfg, dict) and bool(softmin_cfg.get("enabled"))
-    if combine == "sum":
-        return f"sum TF best-window {scale_label}"
-    if combine == "min" and softmin_enabled:
-        return f"soft-min TF best-window {scale_label}"
-    return f"min TF best-window {scale_label}"
-
-
 def _sweep_ylabel(
     y_column: str,
     mode: str,
@@ -64,7 +42,7 @@ def _sweep_ylabel(
     if mode not in {"raw", "best_so_far", "all"}:
         raise ValueError(f"Unsupported sweep mode '{mode}'.")
     if y_column == "objective_scalar":
-        semantics = _objective_scalar_semantics(objective_config)
+        semantics = objective_scalar_semantics(objective_config)
         return semantics[:1].upper() + semantics[1:]
     if y_column == "raw_llr_objective":
         return "Replay objective (raw-LLR)"
@@ -134,6 +112,157 @@ def _chain_sweep_arrays(
     return sweeps, raw_values, best_values
 
 
+def _append_summary_rows(
+    *,
+    summary_rows: list[dict[str, float]],
+    sweeps: np.ndarray,
+    values: np.ndarray,
+) -> None:
+    for sweep_value, y_value in zip(sweeps, values):
+        summary_rows.append({"sweep_idx": float(sweep_value), "y": float(y_value)})
+
+
+def _plot_chain_curve(
+    *,
+    ax: plt.Axes,
+    mode: str,
+    sweeps: np.ndarray,
+    raw_values: np.ndarray,
+    best_values: np.ndarray,
+    color: str,
+    alpha_lo: float,
+    alpha_hi: float,
+) -> np.ndarray:
+    if mode == "raw":
+        plot_values = raw_values
+        ax.plot(sweeps, plot_values, color=color, linewidth=1.5, alpha=alpha_hi, zorder=3)
+        return plot_values
+    if mode == "best_so_far":
+        plot_values = best_values
+        ax.step(
+            sweeps,
+            plot_values,
+            where="post",
+            color=color,
+            linewidth=1.8,
+            alpha=alpha_hi,
+            zorder=4,
+        )
+        return plot_values
+    plot_values = best_values
+    ax.plot(sweeps, raw_values, color=color, linewidth=1.0, alpha=max(0.08, alpha_lo * 0.6), zorder=2)
+    ax.step(
+        sweeps,
+        plot_values,
+        where="post",
+        color=color,
+        linewidth=1.9,
+        alpha=alpha_hi,
+        zorder=4,
+    )
+    return plot_values
+
+
+def _plot_chain_endpoints(
+    *,
+    ax: plt.Axes,
+    sweeps: np.ndarray,
+    plot_values: np.ndarray,
+    marker: str,
+    color: str,
+) -> None:
+    ax.scatter(
+        [float(sweeps[0])],
+        [float(plot_values[0])],
+        s=34,
+        marker=marker,
+        facecolors="none",
+        edgecolors=color,
+        linewidths=1.0,
+        zorder=5,
+    )
+    ax.scatter(
+        [float(sweeps[-1])],
+        [float(plot_values[-1])],
+        s=42,
+        marker=marker,
+        c=color,
+        edgecolors="#111111",
+        linewidths=0.6,
+        zorder=5,
+    )
+
+
+def _add_summary_overlay(
+    *,
+    ax: plt.Axes,
+    summary_rows: list[dict[str, float]],
+    stride: int,
+    summary_source: str,
+    legend_handles: list[Line2D],
+) -> tuple[bool, int, float | None]:
+    summary_plot, summary_peak_value = _build_sweep_summary(summary_rows, stride=max(1, int(stride)))
+    if summary_plot.empty:
+        return False, 0, summary_peak_value
+    sweeps_summary = summary_plot["sweep_idx"].astype(float).to_numpy()
+    q25_summary = summary_plot["q25"].astype(float).to_numpy()
+    q75_summary = summary_plot["q75"].astype(float).to_numpy()
+    median_summary = summary_plot["median"].astype(float).to_numpy()
+    ax.fill_between(
+        sweeps_summary,
+        q25_summary,
+        q75_summary,
+        color="#6f6f6f",
+        alpha=0.10,
+        linewidth=0.0,
+        zorder=1,
+    )
+    ax.plot(
+        sweeps_summary,
+        median_summary,
+        color="#5a5a5a",
+        linewidth=1.1,
+        linestyle="--",
+        alpha=0.72,
+        zorder=1,
+    )
+    if summary_source == "best_so_far":
+        summary_label = "Median best-so-far across chains"
+    else:
+        summary_label = "Median across chains"
+    legend_handles.append(
+        Line2D(
+            [0],
+            [0],
+            color="#5a5a5a",
+            linewidth=1.1,
+            linestyle="--",
+            label=summary_label,
+        )
+    )
+    legend_handles.append(
+        Line2D(
+            [0],
+            [0],
+            color="#6f6f6f",
+            linewidth=6.0,
+            alpha=0.20,
+            label="IQR across chains",
+        )
+    )
+    return True, int(len(summary_plot)), summary_peak_value
+
+
+def _sweep_title_base(y_column: str) -> str:
+    if y_column == "objective_scalar":
+        return "Soft-min TF best-window score over sweeps"
+    if y_column == "raw_llr_objective":
+        return "Replay objective over sweeps (raw-LLR)"
+    if y_column == "norm_llr_objective":
+        return "Replay objective over sweeps (normalized-LLR)"
+    return "Objective over sweeps"
+
+
 def _sample_chain_sweep_arrays(
     chain_df: pd.DataFrame,
     *,
@@ -150,6 +279,107 @@ def _sample_chain_sweep_arrays(
         priority.extend(_best_update_indices(raw_values))
     keep_idx = _stride_indices(raw_values.size, stride=max(1, int(stride)), priority_indices=priority)
     return sweeps[keep_idx], raw_values[keep_idx], best_values[keep_idx]
+
+
+def _process_chain_plot(
+    *,
+    ax: plt.Axes,
+    chain_df: pd.DataFrame,
+    chain_id: int,
+    chain_idx: int,
+    y_column: str,
+    stride: int,
+    mode: str,
+    alpha_lo: float,
+    alpha_hi: float,
+    marker: str,
+    chain_overlay: bool,
+    summary_overlay: bool,
+    summary_source: str,
+    summary_rows: list[dict[str, float]],
+    legend_handles: list[Line2D],
+) -> tuple[list[int], float | None]:
+    full_sweeps, full_raw_values, full_best_values = _chain_sweep_arrays(chain_df, y_column=y_column)
+    if summary_overlay:
+        summary_values = full_raw_values if summary_source == "raw" else full_best_values
+        _append_summary_rows(summary_rows=summary_rows, sweeps=full_sweeps, values=summary_values)
+    sweeps, raw_values, best_values = _sample_chain_sweep_arrays(
+        chain_df,
+        y_column=y_column,
+        stride=max(1, int(stride)),
+        retain_best_updates=mode in {"best_so_far", "all"},
+    )
+    color = _CHAIN_COLORS[chain_idx % len(_CHAIN_COLORS)]
+    plot_values = _plot_chain_curve(
+        ax=ax,
+        mode=mode,
+        sweeps=sweeps,
+        raw_values=raw_values,
+        best_values=best_values,
+        color=color,
+        alpha_lo=alpha_lo,
+        alpha_hi=alpha_hi,
+    )
+    legend_handles.append(
+        Line2D(
+            [0],
+            [0],
+            color=color,
+            linewidth=1.8,
+            label=f"Chain {chain_id}",
+        )
+    )
+    if chain_overlay and sweeps.size:
+        _plot_chain_endpoints(
+            ax=ax,
+            sweeps=sweeps,
+            plot_values=plot_values,
+            marker=marker,
+            color=color,
+        )
+    best_final = float(best_values[-1]) if best_values.size else None
+    return [int(v) for v in sweeps.tolist()], best_final
+
+
+def _annotate_tune_boundary(ax: plt.Axes, tune_sweeps: int | None) -> int | None:
+    if not isinstance(tune_sweeps, int) or tune_sweeps <= 0:
+        return None
+    tune_boundary = int(tune_sweeps)
+    ax.axvline(tune_boundary, color="#777777", linestyle="--", linewidth=1.0, alpha=0.75)
+    y_min, y_max = ax.get_ylim()
+    x_min, x_max = ax.get_xlim()
+    y_text = y_min + ((y_max - y_min) * 0.12)
+    x_text = tune_boundary + ((x_max - x_min) * 0.008)
+    ax.text(
+        x_text,
+        y_text,
+        "Tune end",
+        ha="left",
+        va="bottom",
+        fontsize=10,
+        color="#555555",
+    )
+    return tune_boundary
+
+
+def _annotate_cooling_markers(ax: plt.Axes, cooling_config: dict[str, object] | None) -> list[tuple[int, float]]:
+    cooling_markers = _cooling_markers(cooling_config)
+    if not cooling_markers:
+        return cooling_markers
+    y_min, y_max = ax.get_ylim()
+    y_text = y_min + ((y_max - y_min) * 0.02)
+    for sweep_boundary, beta_value in cooling_markers[:-1]:
+        ax.axvline(sweep_boundary, color="#aaaaaa", linestyle=":", linewidth=0.9, alpha=0.7)
+        ax.text(
+            sweep_boundary,
+            y_text,
+            f" β={beta_value:g}",
+            ha="left",
+            va="bottom",
+            fontsize=10,
+            color="#666666",
+        )
+    return cooling_markers
 
 
 def plot_chain_trajectory_sweep(
@@ -198,131 +428,36 @@ def plot_chain_trajectory_sweep(
     best_drawstyle = "steps-post" if mode in {"best_so_far", "all"} else "default"
     for idx, chain_id in enumerate(chain_ids):
         chain_df = plot_df[plot_df["chain"].astype(int) == chain_id].sort_values("sweep_idx")
-        full_sweeps, full_raw_values, full_best_values = _chain_sweep_arrays(chain_df, y_column=y_column)
-        if summary_overlay:
-            summary_values = full_raw_values if summary_source == "raw" else full_best_values
-            for sweep_value, y_value in zip(full_sweeps, summary_values):
-                summary_rows.append({"sweep_idx": float(sweep_value), "y": float(y_value)})
-        sweeps, raw_values, best_values = _sample_chain_sweep_arrays(
-            chain_df,
-            y_column=y_column,
-            stride=max(1, int(stride)),
-            retain_best_updates=mode in {"best_so_far", "all"},
-        )
-        sampled_sweep_indices_by_chain[int(chain_id)] = [int(v) for v in sweeps.tolist()]
-        if best_values.size:
-            best_final_by_chain[int(chain_id)] = float(best_values[-1])
-        color = _CHAIN_COLORS[idx % len(_CHAIN_COLORS)]
         marker = marker_map[int(chain_id)]
-        if mode == "raw":
-            plot_values = raw_values
-            ax.plot(sweeps, plot_values, color=color, linewidth=1.5, alpha=alpha_hi, zorder=3)
-        elif mode == "best_so_far":
-            plot_values = best_values
-            ax.step(
-                sweeps,
-                plot_values,
-                where="post",
-                color=color,
-                linewidth=1.8,
-                alpha=alpha_hi,
-                zorder=4,
-            )
-        else:
-            plot_values = best_values
-            ax.plot(sweeps, raw_values, color=color, linewidth=1.0, alpha=max(0.08, alpha_lo * 0.6), zorder=2)
-            ax.step(
-                sweeps,
-                plot_values,
-                where="post",
-                color=color,
-                linewidth=1.9,
-                alpha=alpha_hi,
-                zorder=4,
-            )
-
-        legend_handles.append(
-            Line2D(
-                [0],
-                [0],
-                color=color,
-                linewidth=1.8,
-                label=f"Chain {chain_id}",
-            )
+        sampled_sweeps, best_final = _process_chain_plot(
+            ax=ax,
+            chain_df=chain_df,
+            chain_id=int(chain_id),
+            chain_idx=idx,
+            y_column=y_column,
+            mode=mode,
+            stride=max(1, int(stride)),
+            alpha_lo=alpha_lo,
+            alpha_hi=alpha_hi,
+            marker=marker,
+            chain_overlay=chain_overlay,
+            summary_overlay=summary_overlay,
+            summary_source=summary_source,
+            summary_rows=summary_rows,
+            legend_handles=legend_handles,
         )
-        if chain_overlay and sweeps.size:
-            ax.scatter(
-                [float(sweeps[0])],
-                [float(plot_values[0])],
-                s=34,
-                marker=marker,
-                facecolors="none",
-                edgecolors=color,
-                linewidths=1.0,
-                zorder=5,
-            )
-            ax.scatter(
-                [float(sweeps[-1])],
-                [float(plot_values[-1])],
-                s=42,
-                marker=marker,
-                c=color,
-                edgecolors="#111111",
-                linewidths=0.6,
-                zorder=5,
-            )
+        sampled_sweep_indices_by_chain[int(chain_id)] = sampled_sweeps
+        if best_final is not None:
+            best_final_by_chain[int(chain_id)] = best_final
 
     if summary_overlay and len(chain_ids) >= 2:
-        summary_plot, summary_peak_value = _build_sweep_summary(summary_rows, stride=max(1, int(stride)))
-        if not summary_plot.empty:
-            sweeps_summary = summary_plot["sweep_idx"].astype(float).to_numpy()
-            q25_summary = summary_plot["q25"].astype(float).to_numpy()
-            q75_summary = summary_plot["q75"].astype(float).to_numpy()
-            median_summary = summary_plot["median"].astype(float).to_numpy()
-            ax.fill_between(
-                sweeps_summary,
-                q25_summary,
-                q75_summary,
-                color="#6f6f6f",
-                alpha=0.10,
-                linewidth=0.0,
-                zorder=1,
-            )
-            ax.plot(
-                sweeps_summary,
-                median_summary,
-                color="#5a5a5a",
-                linewidth=1.1,
-                linestyle="--",
-                alpha=0.72,
-                zorder=1,
-            )
-            summary_overlay_enabled = True
-            summary_points = int(len(summary_plot))
-            if summary_source == "best_so_far":
-                summary_label = "Median best-so-far across chains"
-            else:
-                summary_label = "Median across chains"
-            legend_handles.append(
-                Line2D(
-                    [0],
-                    [0],
-                    color="#5a5a5a",
-                    linewidth=1.1,
-                    linestyle="--",
-                    label=summary_label,
-                )
-            )
-            legend_handles.append(
-                Line2D(
-                    [0],
-                    [0],
-                    color="#6f6f6f",
-                    linewidth=6.0,
-                    alpha=0.20,
-                    label="IQR across chains",
-                )
-            )
+        summary_overlay_enabled, summary_points, summary_peak_value = _add_summary_overlay(
+            ax=ax,
+            summary_rows=summary_rows,
+            stride=max(1, int(stride)),
+            summary_source=summary_source,
+            legend_handles=legend_handles,
+        )
 
     ylabel = _sweep_ylabel(y_column, mode, objective_config=objective_config)
     ax.set_xlabel("Sweep index", fontsize=13)
@@ -332,49 +467,11 @@ def plot_chain_trajectory_sweep(
         "best_so_far": "best-so-far",
         "all": "raw + best-so-far",
     }[mode]
-    if y_column == "objective_scalar":
-        title_base = "Soft-min TF best-window score over sweeps"
-    elif y_column == "raw_llr_objective":
-        title_base = "Replay objective over sweeps (raw-LLR)"
-    elif y_column == "norm_llr_objective":
-        title_base = "Replay objective over sweeps (normalized-LLR)"
-    else:
-        title_base = "Objective over sweeps"
+    title_base = _sweep_title_base(y_column)
     ax.set_title(f"{title_base} ({title_suffix})", fontsize=14)
 
-    tune_boundary = None
-    if isinstance(tune_sweeps, int) and tune_sweeps > 0:
-        tune_boundary = int(tune_sweeps)
-        ax.axvline(tune_boundary, color="#777777", linestyle="--", linewidth=1.0, alpha=0.75)
-        y_min, y_max = ax.get_ylim()
-        x_min, x_max = ax.get_xlim()
-        y_text = y_min + ((y_max - y_min) * 0.12)
-        x_text = tune_boundary + ((x_max - x_min) * 0.008)
-        ax.text(
-            x_text,
-            y_text,
-            "Tune end",
-            ha="left",
-            va="bottom",
-            fontsize=10,
-            color="#555555",
-        )
-
-    cooling_markers = _cooling_markers(cooling_config)
-    if cooling_markers:
-        y_min, y_max = ax.get_ylim()
-        y_text = y_min + ((y_max - y_min) * 0.02)
-        for sweep_boundary, beta_value in cooling_markers[:-1]:
-            ax.axvline(sweep_boundary, color="#aaaaaa", linestyle=":", linewidth=0.9, alpha=0.7)
-            ax.text(
-                sweep_boundary,
-                y_text,
-                f" β={beta_value:g}",
-                ha="left",
-                va="bottom",
-                fontsize=10,
-                color="#666666",
-            )
+    tune_boundary = _annotate_tune_boundary(ax, tune_sweeps)
+    cooling_markers = _annotate_cooling_markers(ax, cooling_config)
 
     apply_axes_style(ax, ygrid=True, xgrid=False, tick_labelsize=12, title_size=14, label_size=14)
     if legend_handles:

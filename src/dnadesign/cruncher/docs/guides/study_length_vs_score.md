@@ -62,7 +62,7 @@ Primary artifacts:
 - `plots/plot__sequence_length_tradeoff.pdf`
 
 The sequence-length tradeoff plot reports score trend plus diversity trend as length changes.
-The x-axis uses the configured trial factor (`sample.sequence_length`) so sweep intent stays stable even when elite postprocess trims uncovered edges.
+The x-axis uses the configured trial factor (`sample.sequence_length`) so sweep intent stays stable even when elite postprocess trims uncovered regions.
 The plot marks the base-config sequence length with a subtle vertical line and highlighted baseline point.
 Use this to choose a default length for future workspaces with similar TF combinations.
 

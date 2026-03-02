@@ -145,6 +145,15 @@ def generate_notebook(
 
 
 def _render_template(default_analysis_id: str | None) -> str:
+    return (
+        _render_template_header(default_analysis_id)
+        + _render_template_controls_and_tables()
+        + _render_template_plots_and_artifacts()
+        + _render_template_layout_tabs()
+    )
+
+
+def _render_template_header(default_analysis_id: str | None) -> str:
     return f"""import marimo
 
 __generated_with = "unknown"
@@ -197,8 +206,12 @@ def _(Path, json, mo, refresh_button):
     if default_label is None and analysis_labels:
         default_label = analysis_labels[0]
     return run_dir, analysis_root, analysis_entries, analysis_labels, default_label
+"""
 
 
+def _render_template_controls_and_tables() -> str:
+    noop = ""
+    return f"""{noop}
 @app.cell
 def _(mo):
     refresh_button = mo.ui.button(label="Refresh analysis list", kind="neutral")
@@ -328,8 +341,11 @@ def _(topk_df, topk_slider):
     else:
         topk_view = topk_df.head(int(topk_slider.value))
     return topk_view
+"""
 
 
+def _render_template_plots_and_artifacts() -> str:
+    return f"""
 @app.cell
 def _(analysis_dir, pd, plot_manifest, run_dir):
     plot_entries = plot_manifest.get("plots", []) if isinstance(plot_manifest, dict) else []
@@ -468,8 +484,12 @@ def _(analysis_dir, manifest, run_dir):
             a for a in artifacts if isinstance(a, dict) and str(a.get("path", "")).startswith(prefix)
         ]
     return filtered_artifacts
+"""
 
 
+def _render_template_layout_tabs() -> str:
+    noop = ""
+    return f"""{noop}
 @app.cell
 def _(
     analysis_id,

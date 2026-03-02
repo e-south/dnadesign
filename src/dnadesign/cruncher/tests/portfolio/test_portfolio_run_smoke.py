@@ -2501,6 +2501,12 @@ def test_write_tradeoff_plot_hides_top_and_right_spines(
     ax = captured["ax"]
     assert ax.spines["top"].get_visible() is False
     assert ax.spines["right"].get_visible() is False
+    grid_zorders = [line.get_zorder() for line in [*ax.get_xgridlines(), *ax.get_ygridlines()]]
+    assert grid_zorders
+    assert max(grid_zorders) <= 0
+    point_zorders = [collection.get_zorder() for collection in ax.collections]
+    assert point_zorders
+    assert max(grid_zorders) < min(point_zorders)
     plt.close(captured["fig"])
 
 

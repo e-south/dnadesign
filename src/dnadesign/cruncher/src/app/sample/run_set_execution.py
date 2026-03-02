@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -61,6 +62,32 @@ from dnadesign.cruncher.store.lockfile import read_lockfile
 from dnadesign.cruncher.utils.paths import resolve_lock_path
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class _RunExecutionContext:
+    out_dir: Path
+    run_group: str
+    stage_label: str
+    status_writer: object
+    telemetry: RunTelemetry
+    progress: object
+    run_logger: Callable[..., None]
+
+
+@dataclass(frozen=True)
+class _SamplingPreparation:
+    pwms: dict[str, object]
+    pwm_ref_by_tf: dict[str, str | None]
+    pwm_hash_by_tf: dict[str, str | None]
+    core_def_by_tf: dict[str, str]
+    parse_signature: str
+    parse_inputs: dict[str, object]
+    scorer: Scorer
+    evaluator: SequenceEvaluator
+    combine_resolved: str
+    adapt_sweeps: int
+    optimizer: object
 
 
 def _sum_combine(values: Iterable[float]) -> float:
@@ -660,6 +687,255 @@ def _write_random_baseline_tables(
     baseline_hits_tmp_path.replace(baseline_hits_path)
 
 
+def _finish_failed_and_raise(
+    *,
+    exc: Exception,
+    status_writer: object,
+    register_run_in_index: bool,
+    config_path: Path,
+    out_dir: Path,
+    catalog_root: Path,
+) -> None:
+    status_writer.finish(status="failed", status_message="failed", error=str(exc))
+    _update_run_index_if_enabled(
+        register_run_in_index=register_run_in_index,
+        config_path=config_path,
+        out_dir=out_dir,
+        status_payload=status_writer.payload,
+        catalog_root=catalog_root,
+    )
+    raise exc
+
+
+def _prepare_run_execution_context(
+    *,
+    cfg: CruncherConfig,
+    config_path: Path,
+    sample_cfg: SampleConfig,
+    tfs: list[str],
+    set_index: int,
+    set_count: int,
+    include_set_index: bool,
+    stage: str,
+    run_kind: str | None,
+    chain_count: int,
+    optimizer_kind: str,
+    force_overwrite: bool,
+    register_run_in_index: bool,
+    progress_bar: bool,
+) -> _RunExecutionContext:
+    layout = prepare_run_layout(
+        cfg=cfg,
+        config_path=config_path,
+        sample_cfg=sample_cfg,
+        tfs=tfs,
+        set_index=set_index,
+        set_count=set_count,
+        include_set_index=include_set_index,
+        stage=stage,
+        run_kind=run_kind,
+        chain_count=chain_count,
+        optimizer_kind=optimizer_kind,
+        force_overwrite=force_overwrite,
+        register_run_in_index=register_run_in_index,
+    )
+    run_logger = logger.info
+    run_logger("=== RUN %s: %s ===", layout.stage_label, layout.run_dir)
+    logger.debug("Full sample config: %s", sample_cfg.model_dump_json())
+    status_writer = layout.status_writer
+    return _RunExecutionContext(
+        out_dir=layout.run_dir,
+        run_group=layout.run_group,
+        stage_label=layout.stage_label,
+        status_writer=status_writer,
+        telemetry=RunTelemetry(status_writer),
+        progress=progress_adapter(progress_bar),
+        run_logger=run_logger,
+    )
+
+
+def _prepare_sampling(
+    *,
+    cfg: CruncherConfig,
+    config_path: Path,
+    sample_cfg: SampleConfig,
+    tfs: list[str],
+    lockmap: dict[str, object],
+    set_index: int,
+    chain_count: int,
+    optimizer_kind: str,
+    progress_bar: bool,
+    progress_every: int,
+    load_pwms_for_set: Callable[..., dict[str, object]],
+    telemetry: RunTelemetry,
+    progress: object,
+    run_logger: Callable[..., None],
+) -> _SamplingPreparation:
+    pwms = load_pwms_for_set(cfg=cfg, config_path=config_path, tfs=tfs, lockmap=lockmap)
+    _assert_init_length_fits_pwms(sample_cfg, pwms)
+    pwm_ref_by_tf, pwm_hash_by_tf, core_def_by_tf = _build_pwm_provenance(
+        tfs=tfs,
+        pwms=pwms,
+        lockmap=lockmap,
+    )
+    lockfile = read_lockfile(resolve_lock_path(config_path))
+    parse_signature, parse_inputs = compute_parse_signature(
+        cfg=cfg,
+        lockfile=lockfile,
+        tfs=tfs,
+    )
+    adapt_sweeps = int(sample_cfg.budget.tune)
+    draws = int(sample_cfg.budget.draws)
+    scorer, evaluator, combine_resolved = _build_scorer_and_evaluator(
+        pwms=pwms,
+        sample_cfg=sample_cfg,
+        tfs=tfs,
+    )
+    opt_cfg = _build_optimizer_cfg(
+        sample_cfg=sample_cfg,
+        chain_count=chain_count,
+        draws=draws,
+        adapt_sweeps=adapt_sweeps,
+        progress_bar=progress_bar,
+        progress_every=progress_every,
+    )
+    logger.debug("Optimizer config flattened: %s", opt_cfg)
+    optimizer = _instantiate_optimizer(
+        optimizer_kind=optimizer_kind,
+        evaluator=evaluator,
+        opt_cfg=opt_cfg,
+        sample_cfg=sample_cfg,
+        set_index=set_index,
+        pwms=pwms,
+        telemetry=telemetry,
+        progress=progress,
+        run_logger=run_logger,
+    )
+    return _SamplingPreparation(
+        pwms=pwms,
+        pwm_ref_by_tf=pwm_ref_by_tf,
+        pwm_hash_by_tf=pwm_hash_by_tf,
+        core_def_by_tf=core_def_by_tf,
+        parse_signature=parse_signature,
+        parse_inputs=parse_inputs,
+        scorer=scorer,
+        evaluator=evaluator,
+        combine_resolved=combine_resolved,
+        adapt_sweeps=adapt_sweeps,
+        optimizer=optimizer,
+    )
+
+
+def _persist_run_outputs(
+    *,
+    cfg: CruncherConfig,
+    config_path: Path,
+    sample_cfg: SampleConfig,
+    tfs: list[str],
+    set_index: int,
+    set_count: int,
+    run_group: str,
+    run_kind: str | None,
+    stage: str,
+    out_dir: Path,
+    lockmap: dict[str, object],
+    optimizer_kind: str,
+    preparation: _SamplingPreparation,
+    status_writer: object,
+    run_logger: Callable[..., None],
+    register_run_in_index: bool,
+    save_config: Callable[..., None],
+) -> None:
+    save_config(cfg, out_dir, config_path, tfs=tfs, set_index=set_index, sample_cfg=sample_cfg, log_fn=run_logger)
+    artifacts = _init_artifacts(out_dir=out_dir, stage=stage)
+    _save_trace_artifact(
+        sample_cfg=sample_cfg,
+        optimizer=preparation.optimizer,
+        out_dir=out_dir,
+        stage=stage,
+        artifacts=artifacts,
+    )
+    beta_softmin_final: float | None = _resolve_final_softmin_beta(preparation.optimizer, sample_cfg)
+    _write_sequences_artifact(
+        optimizer=preparation.optimizer,
+        out_dir=out_dir,
+        tfs=tfs,
+        sample_cfg=sample_cfg,
+        adapt_sweeps=preparation.adapt_sweeps,
+        beta_softmin_final=beta_softmin_final,
+        scorer=preparation.scorer,
+        evaluator=preparation.evaluator,
+        stage=stage,
+        artifacts=artifacts,
+    )
+    _write_random_baseline_artifacts(
+        out_dir=out_dir,
+        sample_cfg=sample_cfg,
+        set_index=set_index,
+        tfs=tfs,
+        scorer=preparation.scorer,
+        pwms=preparation.pwms,
+        pwm_ref_by_tf=preparation.pwm_ref_by_tf,
+        pwm_hash_by_tf=preparation.pwm_hash_by_tf,
+        core_def_by_tf=preparation.core_def_by_tf,
+        stage=stage,
+        artifacts=artifacts,
+    )
+
+    def _finish_failed(exc: Exception) -> None:
+        _finish_failed_and_raise(
+            exc=exc,
+            status_writer=status_writer,
+            register_run_in_index=register_run_in_index,
+            config_path=config_path,
+            out_dir=out_dir,
+            catalog_root=cfg.catalog.catalog_root,
+        )
+
+    select_and_persist_elites(
+        optimizer=preparation.optimizer,
+        evaluator=preparation.evaluator,
+        scorer=preparation.scorer,
+        sample_cfg=sample_cfg,
+        pwms=preparation.pwms,
+        tfs=tfs,
+        out_dir=out_dir,
+        pwm_ref_by_tf=preparation.pwm_ref_by_tf,
+        pwm_hash_by_tf=preparation.pwm_hash_by_tf,
+        core_def_by_tf=preparation.core_def_by_tf,
+        beta_softmin_final=beta_softmin_final,
+        combine_resolved=preparation.combine_resolved,
+        stage=stage,
+        status_writer=status_writer,
+        run_logger=run_logger,
+        artifacts=artifacts,
+        finish_failed=_finish_failed,
+    )
+    manifest_path_out = write_run_manifest_and_update(
+        cfg=cfg,
+        config_path=config_path,
+        sample_cfg=sample_cfg,
+        tfs=tfs,
+        set_index=set_index,
+        set_count=set_count,
+        run_group=run_group,
+        run_kind=run_kind,
+        stage=stage,
+        run_dir=out_dir,
+        lockmap=lockmap,
+        artifacts=artifacts,
+        optimizer=preparation.optimizer,
+        optimizer_kind=optimizer_kind,
+        combine_resolved=preparation.combine_resolved,
+        beta_softmin_final=beta_softmin_final,
+        parse_signature=preparation.parse_signature,
+        parse_inputs=preparation.parse_inputs,
+        status_writer=status_writer,
+        register_run_in_index=register_run_in_index,
+    )
+    logger.debug("Wrote run manifest -> %s", manifest_path_out.relative_to(out_dir.parent))
+
+
 def run_sample_for_set(
     cfg: CruncherConfig,
     config_path: Path,
@@ -685,7 +961,7 @@ def run_sample_for_set(
     """
     optimizer_kind = resolve_optimizer_kind(sample_cfg.optimizer.kind, context="sample.optimizer.kind")
     chain_count = int(sample_cfg.optimizer.chains)
-    layout = prepare_run_layout(
+    runtime = _prepare_run_execution_context(
         cfg=cfg,
         config_path=config_path,
         sample_cfg=sample_cfg,
@@ -699,176 +975,50 @@ def run_sample_for_set(
         optimizer_kind=optimizer_kind,
         force_overwrite=force_overwrite,
         register_run_in_index=register_run_in_index,
+        progress_bar=progress_bar,
     )
-    out_dir = layout.run_dir
-    run_group = layout.run_group
-    stage_label = layout.stage_label
-    run_logger = logger.info
-    run_logger("=== RUN %s: %s ===", stage_label, out_dir)
-    logger.debug("Full sample config: %s", sample_cfg.model_dump_json())
-
-    status_writer = layout.status_writer
-    telemetry = RunTelemetry(status_writer)
-    progress = progress_adapter(progress_bar)
-
-    def _finish_failed(exc: Exception) -> None:
-        status_writer.finish(status="failed", status_message="failed", error=str(exc))
-        _update_run_index_if_enabled(
-            register_run_in_index=register_run_in_index,
-            config_path=config_path,
-            out_dir=out_dir,
-            status_payload=status_writer.payload,
-            catalog_root=cfg.catalog.catalog_root,
-        )
-        raise exc
-
-    # 1) LOAD all required PWMs
-    pwms = load_pwms_for_set(cfg=cfg, config_path=config_path, tfs=tfs, lockmap=lockmap)
-    _assert_init_length_fits_pwms(sample_cfg, pwms)
-    pwm_ref_by_tf, pwm_hash_by_tf, core_def_by_tf = _build_pwm_provenance(
-        tfs=tfs,
-        pwms=pwms,
-        lockmap=lockmap,
-    )
-    lockfile = read_lockfile(resolve_lock_path(config_path))
-    parse_signature, parse_inputs = compute_parse_signature(
+    preparation = _prepare_sampling(
         cfg=cfg,
-        lockfile=lockfile,
-        tfs=tfs,
-    )
-
-    # 2) INSTANTIATE SCORER and SequenceEvaluator
-    adapt_sweeps = int(sample_cfg.budget.tune)
-    draws = int(sample_cfg.budget.draws)
-    scorer, evaluator, combine_resolved = _build_scorer_and_evaluator(
-        pwms=pwms,
+        config_path=config_path,
         sample_cfg=sample_cfg,
         tfs=tfs,
-    )
-
-    # 3) FLATTEN optimizer config
-    opt_cfg = _build_optimizer_cfg(
-        sample_cfg=sample_cfg,
+        lockmap=lockmap,
+        set_index=set_index,
         chain_count=chain_count,
-        draws=draws,
-        adapt_sweeps=adapt_sweeps,
+        optimizer_kind=optimizer_kind,
         progress_bar=progress_bar,
         progress_every=progress_every,
+        load_pwms_for_set=load_pwms_for_set,
+        telemetry=runtime.telemetry,
+        progress=runtime.progress,
+        run_logger=runtime.run_logger,
     )
-    logger.debug("Optimizer config flattened: %s", opt_cfg)
-
-    # 4) INSTANTIATE OPTIMIZER
-    optimizer = _instantiate_optimizer(
-        optimizer_kind=optimizer_kind,
-        evaluator=evaluator,
-        opt_cfg=opt_cfg,
-        sample_cfg=sample_cfg,
-        set_index=set_index,
-        pwms=pwms,
-        telemetry=telemetry,
-        progress=progress,
-        run_logger=run_logger,
-    )
-
-    # 5) RUN the MCMC sampling
     _run_optimizer(
-        optimizer=optimizer,
-        status_writer=status_writer,
-        run_logger=run_logger,
+        optimizer=preparation.optimizer,
+        status_writer=runtime.status_writer,
+        run_logger=runtime.run_logger,
         register_run_in_index=register_run_in_index,
         config_path=config_path,
-        out_dir=out_dir,
+        out_dir=runtime.out_dir,
         catalog_root=cfg.catalog.catalog_root,
     )
-
-    # 6) SAVE enriched config
-    save_config(cfg, out_dir, config_path, tfs=tfs, set_index=set_index, sample_cfg=sample_cfg, log_fn=run_logger)
-    artifacts = _init_artifacts(out_dir=out_dir, stage=stage)
-
-    # 7) SAVE trace.nc
-    _save_trace_artifact(
-        sample_cfg=sample_cfg,
-        optimizer=optimizer,
-        out_dir=out_dir,
-        stage=stage,
-        artifacts=artifacts,
-    )
-
-    # Resolve final soft-min beta for elite ranking (from optimizer schedule)
-    beta_softmin_final: float | None = _resolve_final_softmin_beta(optimizer, sample_cfg)
-
-    # 8) SAVE sequences.parquet (chain, draw, phase, sequence_string, per-TF scaled scores)
-    _write_sequences_artifact(
-        optimizer=optimizer,
-        out_dir=out_dir,
-        tfs=tfs,
-        sample_cfg=sample_cfg,
-        adapt_sweeps=adapt_sweeps,
-        beta_softmin_final=beta_softmin_final,
-        scorer=scorer,
-        evaluator=evaluator,
-        stage=stage,
-        artifacts=artifacts,
-    )
-
-    # 8b) SAVE random baseline cloud + hits (artifact-only analysis)
-    _write_random_baseline_artifacts(
-        out_dir=out_dir,
-        sample_cfg=sample_cfg,
-        set_index=set_index,
-        tfs=tfs,
-        scorer=scorer,
-        pwms=pwms,
-        pwm_ref_by_tf=pwm_ref_by_tf,
-        pwm_hash_by_tf=pwm_hash_by_tf,
-        core_def_by_tf=core_def_by_tf,
-        stage=stage,
-        artifacts=artifacts,
-    )
-
-    # 9) BUILD elites list — score-driven candidates, then MMR diversity selection
-    select_and_persist_elites(
-        optimizer=optimizer,
-        evaluator=evaluator,
-        scorer=scorer,
-        sample_cfg=sample_cfg,
-        pwms=pwms,
-        tfs=tfs,
-        out_dir=out_dir,
-        pwm_ref_by_tf=pwm_ref_by_tf,
-        pwm_hash_by_tf=pwm_hash_by_tf,
-        core_def_by_tf=core_def_by_tf,
-        beta_softmin_final=beta_softmin_final,
-        combine_resolved=combine_resolved,
-        stage=stage,
-        status_writer=status_writer,
-        run_logger=run_logger,
-        artifacts=artifacts,
-        finish_failed=_finish_failed,
-    )
-
-    # 10) RUN MANIFEST (for reporting + provenance)
-    manifest_path_out = write_run_manifest_and_update(
+    _persist_run_outputs(
         cfg=cfg,
         config_path=config_path,
         sample_cfg=sample_cfg,
         tfs=tfs,
         set_index=set_index,
         set_count=set_count,
-        run_group=run_group,
+        run_group=runtime.run_group,
         run_kind=run_kind,
         stage=stage,
-        run_dir=out_dir,
+        out_dir=runtime.out_dir,
         lockmap=lockmap,
-        artifacts=artifacts,
-        optimizer=optimizer,
         optimizer_kind=optimizer_kind,
-        combine_resolved=combine_resolved,
-        beta_softmin_final=beta_softmin_final,
-        parse_signature=parse_signature,
-        parse_inputs=parse_inputs,
-        status_writer=status_writer,
+        preparation=preparation,
+        status_writer=runtime.status_writer,
+        run_logger=runtime.run_logger,
         register_run_in_index=register_run_in_index,
+        save_config=save_config,
     )
-    logger.debug("Wrote run manifest -> %s", manifest_path_out.relative_to(out_dir.parent))
-    return out_dir
+    return runtime.out_dir

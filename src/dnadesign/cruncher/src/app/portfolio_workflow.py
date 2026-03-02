@@ -15,6 +15,7 @@ import hashlib
 import json
 import shutil
 from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal
 
@@ -623,6 +624,300 @@ def _prepare_source(
     )
 
 
+@dataclass
+class _PortfolioAggregationState:
+    ensured_study_runs: dict[tuple[str, str], Path]
+    all_window_rows: list[dict[str, object]]
+    all_elite_rows: list[dict[str, object]]
+    source_summary_rows: list[dict[str, object]]
+    study_summary_rows: list[dict[str, object]]
+    sequence_length_rows: list[dict[str, object]]
+    table_paths: list[Path]
+    plot_paths: list[Path]
+    source_runs: list[PortfolioSourceRun]
+    prepared_sources: list[PortfolioPreparedSource]
+    elite_summary_df: pd.DataFrame
+
+
+def _new_portfolio_aggregation_state(
+    *,
+    ensured_study_runs: dict[tuple[str, str], Path],
+) -> _PortfolioAggregationState:
+    return _PortfolioAggregationState(
+        ensured_study_runs=ensured_study_runs,
+        all_window_rows=[],
+        all_elite_rows=[],
+        source_summary_rows=[],
+        study_summary_rows=[],
+        sequence_length_rows=[],
+        table_paths=[],
+        plot_paths=[],
+        source_runs=[],
+        prepared_sources=[],
+        elite_summary_df=pd.DataFrame(),
+    )
+
+
+def _resolve_workspace_root(spec_path: Path) -> Path:
+    workspace_root = spec_path.parent
+    if spec_path.parent.name == "configs":
+        workspace_root = spec_path.parent.parent
+    return workspace_root
+
+
+def _ensure_portfolio_run_dirs(
+    *,
+    run_dir: Path,
+    workspace_root: Path,
+    force_overwrite: bool,
+) -> None:
+    _remove_finder_metadata(workspace_root / "outputs")
+    if run_dir.exists():
+        if force_overwrite:
+            shutil.rmtree(run_dir)
+        else:
+            raise ValueError(f"Portfolio run directory already exists: {run_dir}. Use --force-overwrite.")
+    portfolio_meta_dir(run_dir).mkdir(parents=True, exist_ok=True)
+    portfolio_logs_dir(run_dir).mkdir(parents=True, exist_ok=True)
+    portfolio_tables_dir(run_dir).mkdir(parents=True, exist_ok=True)
+    portfolio_plots_dir(run_dir).mkdir(parents=True, exist_ok=True)
+    ensure_mpl_cache(workspace_root / ".cruncher")
+
+
+def _create_running_status(*, spec: PortfolioSpec, portfolio_id: str) -> PortfolioStatusV1:
+    return PortfolioStatusV1(
+        portfolio_name=spec.name,
+        portfolio_id=portfolio_id,
+        status="running",
+        n_sources=len(spec.sources),
+        n_selected_elites=0,
+        warnings=[],
+        started_at=utc_now_iso(),
+        updated_at=utc_now_iso(),
+    )
+
+
+def _initial_ensured_study_runs(
+    *,
+    spec: PortfolioSpec,
+    on_event: PortfolioEventCallback | None,
+) -> dict[tuple[str, str], Path]:
+    if spec.execution.mode == "prepare_then_aggregate":
+        return {}
+    if not spec.studies.enabled:
+        return {}
+    return _ensure_required_source_studies(spec, run_study_fn=run_study, on_event=on_event)
+
+
+def _aggregate_source_into_state(
+    *,
+    source: PortfolioSource,
+    spec: PortfolioSpec,
+    run_dir: Path,
+    state: _PortfolioAggregationState,
+    on_event: PortfolioEventCallback | None,
+) -> None:
+    source_id = str(source.id)
+    _emit_event(on_event, "aggregate_source_started", source_id=source_id)
+    (
+        source_windows_rows,
+        source_elite_rows,
+        source_summary_row,
+        source_run,
+        source_study_summary,
+    ) = _load_source_rows(source, studies_enabled=spec.studies.enabled, on_event=on_event)
+    state.all_window_rows.extend(source_windows_rows)
+    state.all_elite_rows.extend(source_elite_rows)
+    state.source_summary_rows.append(source_summary_row)
+    state.source_runs.append(source_run)
+    _emit_event(
+        on_event,
+        "aggregate_source_completed",
+        source_id=source_id,
+        selected_elites=int(source_summary_row["n_selected_elites"]),
+    )
+    if source_study_summary is not None:
+        state.study_summary_rows.append(source_study_summary)
+    if spec.studies.enabled and spec.studies.sequence_length_table.enabled:
+        state.sequence_length_rows.extend(
+            _load_source_sequence_length_rows(
+                source,
+                study_spec=spec.studies.sequence_length_table.study_spec,
+                top_n_lengths=int(spec.studies.sequence_length_table.top_n_lengths),
+                ensured_study_runs=state.ensured_study_runs,
+                run_study_fn=run_study,
+                on_event=on_event,
+            )
+        )
+    state.table_paths, state.plot_paths, state.elite_summary_df = _materialize_portfolio_outputs(
+        run_dir=run_dir,
+        spec=spec,
+        all_window_rows=state.all_window_rows,
+        all_elite_rows=state.all_elite_rows,
+        source_summary_rows=state.source_summary_rows,
+        study_summary_rows=state.study_summary_rows,
+        sequence_length_rows=state.sequence_length_rows,
+    )
+    _emit_event(
+        on_event,
+        "aggregate_source_outputs_updated",
+        source_id=source_id,
+        completed_sources=len(state.source_runs),
+        table_count=len(state.table_paths),
+        plot_count=len(state.plot_paths),
+    )
+
+
+def _run_prepare_then_aggregate(
+    *,
+    spec: PortfolioSpec,
+    run_dir: Path,
+    state: _PortfolioAggregationState,
+    readiness: dict[str, dict[str, object]],
+    prepare_ready_policy: PrepareReadyPolicy,
+    on_event: PortfolioEventCallback | None,
+) -> None:
+    _emit_event(on_event, "prepare_phase_started", source_count=len(spec.sources))
+    max_workers = min(int(spec.execution.max_parallel_sources), len(spec.sources))
+    prepared_by_id: dict[str, PortfolioPreparedSource] = {}
+    pending_by_id: dict[str, tuple[Future[PortfolioPreparedSource], Path]] = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for source in spec.sources:
+            source_id = str(source.id)
+            source_readiness = readiness.get(source_id)
+            is_ready = bool(source_readiness and source_readiness.get("ready"))
+            if is_ready and prepare_ready_policy == "skip":
+                _emit_event(
+                    on_event,
+                    "prepare_source_skipped",
+                    source_id=source_id,
+                    reason="source already ready",
+                )
+                if source.prepare is None:
+                    raise ValueError(
+                        "portfolio.execution.mode=prepare_then_aggregate requires prepare for every source: "
+                        f"missing source={source.id!r}"
+                    )
+                prepared_by_id[source_id] = PortfolioPreparedSource(
+                    source_id=source_id,
+                    runbook_path=str(source.prepare.runbook),
+                    step_ids=[],
+                )
+                continue
+            log_path = _prepare_source_log_path(run_dir, source_id)
+            _emit_event(
+                on_event,
+                "prepare_source_started",
+                source_id=source_id,
+                runbook=str(source.prepare.runbook if source.prepare is not None else ""),
+                log_path=str(log_path),
+            )
+            future = executor.submit(
+                _prepare_source,
+                source,
+                readiness=readiness,
+                prepare_ready_policy=prepare_ready_policy,
+                prepare_log_path=log_path,
+            )
+            pending_by_id[source_id] = (future, log_path)
+
+        _emit_event(on_event, "aggregate_phase_started", source_count=len(spec.sources))
+        for source in spec.sources:
+            source_id = str(source.id)
+            prepared = prepared_by_id.get(source_id)
+            if prepared is None:
+                future, log_path = pending_by_id[source_id]
+                try:
+                    prepared = future.result()
+                except Exception:
+                    for queued, _ in pending_by_id.values():
+                        queued.cancel()
+                    raise
+                _emit_event(
+                    on_event,
+                    "prepare_source_completed",
+                    source_id=source_id,
+                    executed_steps=list(prepared.step_ids),
+                    log_path=str(log_path),
+                )
+                prepared_by_id[source_id] = prepared
+            state.prepared_sources.append(prepared)
+            if spec.studies.enabled:
+                state.ensured_study_runs.update(
+                    _ensure_required_source_studies_for_sources(
+                        spec,
+                        [source],
+                        run_study_fn=run_study,
+                        on_event=on_event,
+                    )
+                )
+            _aggregate_source_into_state(
+                source=source,
+                spec=spec,
+                run_dir=run_dir,
+                state=state,
+                on_event=on_event,
+            )
+    _emit_event(on_event, "prepare_phase_completed", prepared_count=len(state.prepared_sources))
+    _emit_event(on_event, "aggregate_phase_completed", source_count=len(spec.sources))
+
+
+def _run_aggregate_only(
+    *,
+    spec: PortfolioSpec,
+    run_dir: Path,
+    state: _PortfolioAggregationState,
+    on_event: PortfolioEventCallback | None,
+) -> None:
+    _emit_event(on_event, "aggregate_phase_started", source_count=len(spec.sources))
+    for source in spec.sources:
+        _aggregate_source_into_state(
+            source=source,
+            spec=spec,
+            run_dir=run_dir,
+            state=state,
+            on_event=on_event,
+        )
+    _emit_event(on_event, "aggregate_phase_completed", source_count=len(spec.sources))
+
+
+def _write_portfolio_manifest_and_status(
+    *,
+    run_dir: Path,
+    resolved_spec: Path,
+    spec: PortfolioSpec,
+    portfolio_id: str,
+    state: _PortfolioAggregationState,
+    status: PortfolioStatusV1,
+) -> None:
+    manifest = PortfolioManifestV1(
+        portfolio_name=spec.name,
+        portfolio_id=portfolio_id,
+        spec_path=str(resolved_spec),
+        spec_sha256=sha256_path(resolved_spec),
+        created_at=utc_now_iso(),
+        execution_mode=spec.execution.mode,
+        source_runs=state.source_runs,
+        prepared_sources=state.prepared_sources,
+        table_paths=[str(path.resolve()) for path in state.table_paths],
+        plot_paths=[str(path.resolve()) for path in state.plot_paths],
+    )
+    write_portfolio_manifest(portfolio_manifest_path(run_dir), manifest)
+    status.status = "completed"
+    status.n_sources = len(state.source_runs)
+    status.n_selected_elites = int(len(state.elite_summary_df))
+    status.updated_at = utc_now_iso()
+    status.finished_at = utc_now_iso()
+    write_portfolio_status(portfolio_status_path(run_dir), status)
+
+
+def _mark_portfolio_failed(*, run_dir: Path, status: PortfolioStatusV1) -> None:
+    status.status = "failed"
+    status.updated_at = utc_now_iso()
+    status.finished_at = utc_now_iso()
+    write_portfolio_status(portfolio_status_path(run_dir), status)
+
+
 def run_portfolio(
     spec_path: Path,
     *,
@@ -647,263 +942,46 @@ def run_portfolio(
     if spec.execution.mode == "aggregate_only":
         _raise_aggregate_only_preflight(spec, readiness)
 
-    workspace_root = resolved_spec.parent
-    if resolved_spec.parent.name == "configs":
-        workspace_root = resolved_spec.parent.parent
+    workspace_root = _resolve_workspace_root(resolved_spec)
     portfolio_id = _portfolio_id(spec)
     run_dir = resolve_portfolio_run_dir(workspace_root, spec.name, portfolio_id)
-    _remove_finder_metadata(workspace_root / "outputs")
+    _ensure_portfolio_run_dirs(run_dir=run_dir, workspace_root=workspace_root, force_overwrite=force_overwrite)
 
-    if run_dir.exists():
-        if force_overwrite:
-            shutil.rmtree(run_dir)
-        else:
-            raise ValueError(f"Portfolio run directory already exists: {run_dir}. Use --force-overwrite.")
-
-    portfolio_meta_dir(run_dir).mkdir(parents=True, exist_ok=True)
-    portfolio_logs_dir(run_dir).mkdir(parents=True, exist_ok=True)
-    portfolio_tables_dir(run_dir).mkdir(parents=True, exist_ok=True)
-    portfolio_plots_dir(run_dir).mkdir(parents=True, exist_ok=True)
-    ensure_mpl_cache(workspace_root / ".cruncher")
-
-    status = PortfolioStatusV1(
-        portfolio_name=spec.name,
-        portfolio_id=portfolio_id,
-        status="running",
-        n_sources=len(spec.sources),
-        n_selected_elites=0,
-        warnings=[],
-        started_at=utc_now_iso(),
-        updated_at=utc_now_iso(),
-    )
+    status = _create_running_status(spec=spec, portfolio_id=portfolio_id)
     write_portfolio_status(portfolio_status_path(run_dir), status)
 
-    table_paths: list[Path] = []
-    plot_paths: list[Path] = []
-    source_runs: list[PortfolioSourceRun] = []
-    prepared_sources: list[PortfolioPreparedSource] = []
-    elite_summary_df = pd.DataFrame()
-
     try:
+        ensured_study_runs = _initial_ensured_study_runs(spec=spec, on_event=on_event)
+        state = _new_portfolio_aggregation_state(ensured_study_runs=ensured_study_runs)
         if spec.execution.mode == "prepare_then_aggregate":
-            ensured_study_runs: dict[tuple[str, str], Path] = {}
-        else:
-            ensured_study_runs = (
-                _ensure_required_source_studies(spec, run_study_fn=run_study, on_event=on_event)
-                if spec.studies.enabled
-                else {}
+            _run_prepare_then_aggregate(
+                spec=spec,
+                run_dir=run_dir,
+                state=state,
+                readiness=readiness,
+                prepare_ready_policy=prepare_ready_policy,
+                on_event=on_event,
             )
-        all_window_rows: list[dict[str, object]] = []
-        all_elite_rows: list[dict[str, object]] = []
-        source_summary_rows: list[dict[str, object]] = []
-        study_summary_rows: list[dict[str, object]] = []
-        sequence_length_rows: list[dict[str, object]] = []
-        if spec.execution.mode == "prepare_then_aggregate":
-            _emit_event(on_event, "prepare_phase_started", source_count=len(spec.sources))
-            max_workers = min(int(spec.execution.max_parallel_sources), len(spec.sources))
-            prepared_by_id: dict[str, PortfolioPreparedSource] = {}
-            pending_by_id: dict[str, tuple[Future[PortfolioPreparedSource], Path]] = {}
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                for source in spec.sources:
-                    source_id = str(source.id)
-                    source_readiness = readiness.get(source_id)
-                    is_ready = bool(source_readiness and source_readiness.get("ready"))
-                    if is_ready and prepare_ready_policy == "skip":
-                        _emit_event(
-                            on_event,
-                            "prepare_source_skipped",
-                            source_id=source_id,
-                            reason="source already ready",
-                        )
-                        if source.prepare is None:
-                            raise ValueError(
-                                "portfolio.execution.mode=prepare_then_aggregate requires prepare for every source: "
-                                f"missing source={source.id!r}"
-                            )
-                        prepared_by_id[source_id] = PortfolioPreparedSource(
-                            source_id=source_id,
-                            runbook_path=str(source.prepare.runbook),
-                            step_ids=[],
-                        )
-                        continue
-                    log_path = _prepare_source_log_path(run_dir, source_id)
-                    _emit_event(
-                        on_event,
-                        "prepare_source_started",
-                        source_id=source_id,
-                        runbook=str(source.prepare.runbook if source.prepare is not None else ""),
-                        log_path=str(log_path),
-                    )
-                    future = executor.submit(
-                        _prepare_source,
-                        source,
-                        readiness=readiness,
-                        prepare_ready_policy=prepare_ready_policy,
-                        prepare_log_path=log_path,
-                    )
-                    pending_by_id[source_id] = (future, log_path)
-
-                _emit_event(on_event, "aggregate_phase_started", source_count=len(spec.sources))
-                for source in spec.sources:
-                    source_id = str(source.id)
-                    prepared = prepared_by_id.get(source_id)
-                    if prepared is None:
-                        future, log_path = pending_by_id[source_id]
-                        try:
-                            prepared = future.result()
-                        except Exception:
-                            for queued, _ in pending_by_id.values():
-                                queued.cancel()
-                            raise
-                        _emit_event(
-                            on_event,
-                            "prepare_source_completed",
-                            source_id=source_id,
-                            executed_steps=list(prepared.step_ids),
-                            log_path=str(log_path),
-                        )
-                        prepared_by_id[source_id] = prepared
-                    prepared_sources.append(prepared)
-                    if spec.studies.enabled:
-                        ensured_study_runs.update(
-                            _ensure_required_source_studies_for_sources(
-                                spec,
-                                [source],
-                                run_study_fn=run_study,
-                                on_event=on_event,
-                            )
-                        )
-                    _emit_event(on_event, "aggregate_source_started", source_id=source_id)
-                    (
-                        source_windows_rows,
-                        source_elite_rows,
-                        source_summary_row,
-                        source_run,
-                        source_study_summary,
-                    ) = _load_source_rows(source, studies_enabled=spec.studies.enabled, on_event=on_event)
-                    all_window_rows.extend(source_windows_rows)
-                    all_elite_rows.extend(source_elite_rows)
-                    source_summary_rows.append(source_summary_row)
-                    source_runs.append(source_run)
-                    _emit_event(
-                        on_event,
-                        "aggregate_source_completed",
-                        source_id=source_id,
-                        selected_elites=int(source_summary_row["n_selected_elites"]),
-                    )
-                    if source_study_summary is not None:
-                        study_summary_rows.append(source_study_summary)
-                    if spec.studies.enabled and spec.studies.sequence_length_table.enabled:
-                        sequence_length_rows.extend(
-                            _load_source_sequence_length_rows(
-                                source,
-                                study_spec=spec.studies.sequence_length_table.study_spec,
-                                top_n_lengths=int(spec.studies.sequence_length_table.top_n_lengths),
-                                ensured_study_runs=ensured_study_runs,
-                                run_study_fn=run_study,
-                                on_event=on_event,
-                            )
-                        )
-                    table_paths, plot_paths, elite_summary_df = _materialize_portfolio_outputs(
-                        run_dir=run_dir,
-                        spec=spec,
-                        all_window_rows=all_window_rows,
-                        all_elite_rows=all_elite_rows,
-                        source_summary_rows=source_summary_rows,
-                        study_summary_rows=study_summary_rows,
-                        sequence_length_rows=sequence_length_rows,
-                    )
-                    _emit_event(
-                        on_event,
-                        "aggregate_source_outputs_updated",
-                        source_id=source_id,
-                        completed_sources=len(source_runs),
-                        table_count=len(table_paths),
-                        plot_count=len(plot_paths),
-                    )
-            _emit_event(on_event, "prepare_phase_completed", prepared_count=len(prepared_sources))
-            _emit_event(on_event, "aggregate_phase_completed", source_count=len(spec.sources))
         else:
-            _emit_event(on_event, "aggregate_phase_started", source_count=len(spec.sources))
-            for source in spec.sources:
-                source_id = str(source.id)
-                _emit_event(on_event, "aggregate_source_started", source_id=source_id)
-                (
-                    source_windows_rows,
-                    source_elite_rows,
-                    source_summary_row,
-                    source_run,
-                    source_study_summary,
-                ) = _load_source_rows(source, studies_enabled=spec.studies.enabled, on_event=on_event)
-                all_window_rows.extend(source_windows_rows)
-                all_elite_rows.extend(source_elite_rows)
-                source_summary_rows.append(source_summary_row)
-                source_runs.append(source_run)
-                _emit_event(
-                    on_event,
-                    "aggregate_source_completed",
-                    source_id=source_id,
-                    selected_elites=int(source_summary_row["n_selected_elites"]),
-                )
-                if source_study_summary is not None:
-                    study_summary_rows.append(source_study_summary)
-                if spec.studies.enabled and spec.studies.sequence_length_table.enabled:
-                    sequence_length_rows.extend(
-                        _load_source_sequence_length_rows(
-                            source,
-                            study_spec=spec.studies.sequence_length_table.study_spec,
-                            top_n_lengths=int(spec.studies.sequence_length_table.top_n_lengths),
-                            ensured_study_runs=ensured_study_runs,
-                            run_study_fn=run_study,
-                            on_event=on_event,
-                        )
-                    )
-                table_paths, plot_paths, elite_summary_df = _materialize_portfolio_outputs(
-                    run_dir=run_dir,
-                    spec=spec,
-                    all_window_rows=all_window_rows,
-                    all_elite_rows=all_elite_rows,
-                    source_summary_rows=source_summary_rows,
-                    study_summary_rows=study_summary_rows,
-                    sequence_length_rows=sequence_length_rows,
-                )
-                _emit_event(
-                    on_event,
-                    "aggregate_source_outputs_updated",
-                    source_id=source_id,
-                    completed_sources=len(source_runs),
-                    table_count=len(table_paths),
-                    plot_count=len(plot_paths),
-                )
-            _emit_event(on_event, "aggregate_phase_completed", source_count=len(spec.sources))
+            _run_aggregate_only(
+                spec=spec,
+                run_dir=run_dir,
+                state=state,
+                on_event=on_event,
+            )
 
-        manifest = PortfolioManifestV1(
-            portfolio_name=spec.name,
+        _write_portfolio_manifest_and_status(
+            run_dir=run_dir,
+            resolved_spec=resolved_spec,
+            spec=spec,
             portfolio_id=portfolio_id,
-            spec_path=str(resolved_spec),
-            spec_sha256=sha256_path(resolved_spec),
-            created_at=utc_now_iso(),
-            execution_mode=spec.execution.mode,
-            source_runs=source_runs,
-            prepared_sources=prepared_sources,
-            table_paths=[str(path.resolve()) for path in table_paths],
-            plot_paths=[str(path.resolve()) for path in plot_paths],
+            state=state,
+            status=status,
         )
-        write_portfolio_manifest(portfolio_manifest_path(run_dir), manifest)
-
-        status.status = "completed"
-        status.n_sources = len(source_runs)
-        status.n_selected_elites = int(len(elite_summary_df))
-        status.updated_at = utc_now_iso()
-        status.finished_at = utc_now_iso()
-        write_portfolio_status(portfolio_status_path(run_dir), status)
         _emit_event(on_event, "portfolio_completed", run_dir=str(run_dir))
         return run_dir
     except Exception:
-        status.status = "failed"
-        status.updated_at = utc_now_iso()
-        status.finished_at = utc_now_iso()
-        write_portfolio_status(portfolio_status_path(run_dir), status)
+        _mark_portfolio_failed(run_dir=run_dir, status=status)
         _emit_event(on_event, "portfolio_failed")
         raise
 

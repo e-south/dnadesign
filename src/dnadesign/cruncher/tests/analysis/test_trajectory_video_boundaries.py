@@ -47,7 +47,6 @@ def test_timeline_sampling_retains_endpoints_and_monotonic_source_progression() 
 def test_sequence_rows_video_job_contract_is_strict_and_explicit(tmp_path: Path) -> None:
     cfg = AnalysisTrajectoryVideoConfig(
         playback={"target_duration_sec": 6.0, "fps": 10},
-        sweep_inset={"enabled": True, "corner": "bottom_left"},
     )
     job = build_sequence_rows_video_job(
         records_path=tmp_path / "records.parquet",
@@ -67,7 +66,7 @@ def test_sequence_rows_video_job_contract_is_strict_and_explicit(tmp_path: Path)
     assert str(output_cfg["fmt"]) == "mp4"
     assert int(output_cfg["fps"]) == 10
     assert float(output_cfg["total_duration"]) == 6.0
-    assert int(output_cfg["height_px"]) == 820
+    assert "height_px" not in output_cfg
     assert str(output_cfg["title_text"]) == "Best-so-far motif placement improves over sweeps"
     assert str(output_cfg["title_align"]) == "center"
     style_cfg = dict(job["render"]["style"]["overrides"])

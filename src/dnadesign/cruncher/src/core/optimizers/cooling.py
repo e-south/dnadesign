@@ -51,7 +51,6 @@ def make_beta_scheduler(cooling_cfg: Dict[str, Any], total_sweeps: int):
 
         return beta_of
 
-    # kind == "piecewise"
     stages = sorted(cooling_cfg["stages"], key=lambda s: s["sweeps"])
     sweep_pts = [s["sweeps"] for s in stages]
     betas = [s["beta"] for s in stages]

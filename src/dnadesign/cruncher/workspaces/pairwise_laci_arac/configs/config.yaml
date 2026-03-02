@@ -106,6 +106,8 @@ cruncher:
       select:
         diversity: 0.05
         pool_size: 32000
+      postprocess:
+        trim_uncovered_internal: true
     moves:
       profile: balanced
       overrides:
@@ -202,6 +204,8 @@ cruncher:
     trajectory_scatter_scale: llr
     trajectory_sweep_mode: best_so_far
     trajectory_chain_overlay: false
+    trajectory_video:
+      enabled: true
     trajectory_particle_alpha_max: 0.45
     elites_showcase:
       max_panels: 12

@@ -59,6 +59,96 @@ def _select_targets(
     return cfg, "Configured targets", True
 
 
+def _resolve_status_selection(
+    *,
+    config: Path | None,
+    config_option: Path | None,
+    category: Optional[str],
+) -> tuple[Path, object, object, str, bool]:
+    try:
+        config_path = resolve_config_path(config_option or config)
+    except ConfigResolutionError as exc:
+        console.print(str(exc))
+        raise typer.Exit(code=1) from exc
+    cfg = _load_config_or_exit(config_path)
+    try:
+        target_cfg, title, use_lockfile = _select_targets(
+            cfg=cfg,
+            category=category,
+        )
+    except ValueError as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+    return config_path, cfg, target_cfg, title, use_lockfile
+
+
+def _resolve_status_source(
+    *,
+    cfg,
+    pwm_source: Optional[str],
+    site_kinds: List[str],
+) -> tuple[str, List[str] | None]:
+    if pwm_source is not None and pwm_source not in {"matrix", "sites"}:
+        raise typer.BadParameter("--pwm-source must be 'matrix' or 'sites'.")
+    resolved_pwm_source = pwm_source or cfg.catalog.pwm_source
+    if site_kinds and resolved_pwm_source != "sites":
+        raise typer.BadParameter(
+            "--site-kind requires pwm_source=sites (set cruncher.catalog.pwm_source or pass --pwm-source sites)."
+        )
+    return resolved_pwm_source, (site_kinds or None)
+
+
+def _status_label(value: str) -> str:
+    if value == "ready":
+        return f"[green]{value}[/green]"
+    if value == "warning":
+        return f"[yellow]{value}[/yellow]"
+    return f"[red]{value}[/red]"
+
+
+def _render_status_table(*, title: str, statuses: list[object], combine_sites: bool) -> None:
+    site_label = "Sites (seq/total)"
+    if combine_sites:
+        site_label = "Sites (merged seq/total)"
+    table = Table(title=title, header_style="bold")
+    table.add_column("Set", style="dim", justify="right")
+    table.add_column("TF")
+    table.add_column("Source")
+    table.add_column("Motif ID")
+    table.add_column("Organism")
+    table.add_column("Matrix")
+    table.add_column(site_label)
+    table.add_column("Site kind")
+    table.add_column("Dataset")
+    table.add_column("PWM source")
+    table.add_column("Status")
+    for status in statuses:
+        organism = "-"
+        if status.organism:
+            organism = status.organism.get("name") or status.organism.get("strain") or "-"
+        matrix = "yes" if status.has_matrix else "no"
+        if status.matrix_source:
+            matrix = f"{matrix} ({status.matrix_source})"
+        if status.has_sites:
+            sites = f"{status.site_count}/{status.site_total}"
+        else:
+            sites = "no"
+        table.add_row(
+            str(status.set_index),
+            status.tf_name,
+            status.source or "-",
+            status.motif_id or "-",
+            organism,
+            matrix,
+            sites,
+            status.site_kind or "-",
+            status.dataset_id or "-",
+            status.pwm_source,
+            _status_label(status.status),
+        )
+    console.print(table)
+
+
 @app.command("list", help="List configured TF targets from regulator_sets.")
 def list_config_targets(
     config: Path | None = typer.Argument(
@@ -129,81 +219,28 @@ def targets_status(
         help="Report status for targets in a named regulator category.",
     ),
 ) -> None:
-    try:
-        config_path = resolve_config_path(config_option or config)
-    except ConfigResolutionError as exc:
-        console.print(str(exc))
-        raise typer.Exit(code=1)
-    cfg = _load_config_or_exit(config_path)
-    try:
-        target_cfg, title, use_lockfile = _select_targets(
-            cfg=cfg,
-            category=category,
-        )
-    except ValueError as exc:
-        console.print(f"Error: {exc}")
-        raise typer.Exit(code=1)
-    if pwm_source is not None and pwm_source not in {"matrix", "sites"}:
-        raise typer.BadParameter("--pwm-source must be 'matrix' or 'sites'.")
-    resolved_pwm_source = pwm_source or cfg.catalog.pwm_source
-    if site_kinds and resolved_pwm_source != "sites":
-        raise typer.BadParameter(
-            "--site-kind requires pwm_source=sites (set cruncher.catalog.pwm_source or pass --pwm-source sites)."
-        )
+    config_path, cfg, target_cfg, title, use_lockfile = _resolve_status_selection(
+        config=config,
+        config_option=config_option,
+        category=category,
+    )
+    resolved_pwm_source, resolved_site_kinds = _resolve_status_source(
+        cfg=cfg,
+        pwm_source=pwm_source,
+        site_kinds=site_kinds,
+    )
     statuses = target_statuses(
         cfg=target_cfg,
         config_path=config_path,
         pwm_source=resolved_pwm_source,
-        site_kinds=site_kinds or None,
+        site_kinds=resolved_site_kinds,
         use_lockfile=use_lockfile,
     )
-    site_label = "Sites (seq/total)"
-    if target_cfg.catalog.combine_sites:
-        site_label = "Sites (merged seq/total)"
-    table = Table(title=title, header_style="bold")
-    table.add_column("Set", style="dim", justify="right")
-    table.add_column("TF")
-    table.add_column("Source")
-    table.add_column("Motif ID")
-    table.add_column("Organism")
-    table.add_column("Matrix")
-    table.add_column(site_label)
-    table.add_column("Site kind")
-    table.add_column("Dataset")
-    table.add_column("PWM source")
-    table.add_column("Status")
-    for status in statuses:
-        organism = "-"
-        if status.organism:
-            organism = status.organism.get("name") or status.organism.get("strain") or "-"
-        matrix = "yes" if status.has_matrix else "no"
-        if status.matrix_source:
-            matrix = f"{matrix} ({status.matrix_source})"
-        if status.has_sites:
-            sites = f"{status.site_count}/{status.site_total}"
-        else:
-            sites = "no"
-        label = status.status
-        if status.status == "ready":
-            label = f"[green]{status.status}[/green]"
-        elif status.status == "warning":
-            label = f"[yellow]{status.status}[/yellow]"
-        else:
-            label = f"[red]{status.status}[/red]"
-        table.add_row(
-            str(status.set_index),
-            status.tf_name,
-            status.source or "-",
-            status.motif_id or "-",
-            organism,
-            matrix,
-            sites,
-            status.site_kind or "-",
-            status.dataset_id or "-",
-            status.pwm_source,
-            label,
-        )
-    console.print(table)
+    _render_status_table(
+        title=title,
+        statuses=list(statuses),
+        combine_sites=bool(target_cfg.catalog.combine_sites),
+    )
     for status in statuses:
         if status.message:
             console.print(f"- {status.tf_name}: {status.message}")

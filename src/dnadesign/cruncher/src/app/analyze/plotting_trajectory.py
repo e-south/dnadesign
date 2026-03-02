@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Mapping
 
 import pandas as pd
 
@@ -20,6 +21,52 @@ from dnadesign.cruncher.app.analyze.plotting_registry import _record_analysis_pl
 from dnadesign.cruncher.app.analyze_score_space import _ScoreSpaceContext
 
 __all__ = ["_render_trajectory_analysis_plots", "_render_trajectory_video_plot"]
+
+
+def _resolve_trajectory_video_output_path(*, tmp_root: Path, output_name: str) -> Path:
+    video_stem = Path(output_name).stem
+    video_ext = Path(output_name).suffix.lstrip(".")
+    if not video_ext:
+        video_ext = "mp4"
+    return analysis_plot_path(tmp_root, video_stem, video_ext)
+
+
+def _record_trajectory_video_plot(
+    *,
+    plot_entries: list[dict[str, object]],
+    plot_artifacts: list[dict[str, object]],
+    run_dir: Path,
+    output: Path,
+    generated: bool,
+    skip_reason: str | None,
+) -> None:
+    _record_analysis_plot(
+        plot_entries=plot_entries,
+        plot_artifacts=plot_artifacts,
+        spec_key="chain_trajectory_video",
+        output=output,
+        generated=generated,
+        skip_reason=skip_reason,
+        run_dir=run_dir,
+    )
+
+
+def _resolve_polished_final_sequence(elites_df: pd.DataFrame) -> str:
+    if elites_df is None or elites_df.empty:
+        raise ValueError("Trajectory video requires at least one elite sequence to anchor the polished final frame.")
+    if "sequence" not in elites_df.columns:
+        raise ValueError("Trajectory video requires elites column 'sequence' for polished final frame anchoring.")
+    ordered = elites_df.copy()
+    if "rank" in ordered.columns:
+        ordered["rank"] = pd.to_numeric(ordered["rank"], errors="coerce")
+        if ordered["rank"].isna().any():
+            raise ValueError("Trajectory video requires numeric elite 'rank' values when rank column is present.")
+        ordered = ordered.sort_values(["rank"]).reset_index(drop=True)
+    for seq_value in ordered["sequence"].astype(str).tolist():
+        clean = str(seq_value).strip().upper()
+        if clean:
+            return clean
+    raise ValueError("Trajectory video could not resolve a non-empty polished elite sequence.")
 
 
 def _render_trajectory_analysis_plots(
@@ -123,26 +170,25 @@ def _render_trajectory_video_plot(
     run_dir: Path,
     tmp_root: Path,
     trajectory_df: pd.DataFrame,
+    elites_df: pd.DataFrame,
     tf_names: list[str],
     pwms: dict[str, object],
     analysis_cfg: object,
+    objective_from_manifest: Mapping[str, object] | None,
     bidirectional: bool,
     pwm_pseudocounts: float,
     log_odds_clip: float | None,
     plot_entries: list[dict[str, object]],
     plot_artifacts: list[dict[str, object]],
 ) -> None:
-    video_name = str(analysis_cfg.trajectory_video.output_name)
-    video_stem = Path(video_name).stem
-    video_ext = Path(video_name).suffix.lstrip(".")
-    if not video_ext:
-        video_ext = "mp4"
-    plot_video_path = analysis_plot_path(tmp_root, video_stem, video_ext)
+    plot_video_path = _resolve_trajectory_video_output_path(
+        tmp_root=tmp_root,
+        output_name=str(analysis_cfg.trajectory_video.output_name),
+    )
     if not analysis_cfg.trajectory_video.enabled:
-        _record_analysis_plot(
+        _record_trajectory_video_plot(
             plot_entries=plot_entries,
             plot_artifacts=plot_artifacts,
-            spec_key="chain_trajectory_video",
             output=plot_video_path,
             generated=False,
             skip_reason="analysis.trajectory_video.enabled=false",
@@ -150,16 +196,17 @@ def _render_trajectory_video_plot(
         )
         return
     if trajectory_df.empty:
-        _record_analysis_plot(
+        _record_trajectory_video_plot(
             plot_entries=plot_entries,
             plot_artifacts=plot_artifacts,
-            spec_key="chain_trajectory_video",
             output=plot_video_path,
             generated=False,
             skip_reason="trajectory table is empty",
             run_dir=run_dir,
         )
         return
+
+    polished_final_sequence = _resolve_polished_final_sequence(elites_df)
 
     from dnadesign.cruncher.analysis.trajectory_video import render_chain_trajectory_video
 
@@ -173,11 +220,12 @@ def _render_trajectory_video_plot(
         pwm_pseudocounts=float(pwm_pseudocounts),
         log_odds_clip=log_odds_clip,
         tmp_root=tmp_root / "_trajectory_video_tmp",
+        polished_final_sequence=polished_final_sequence,
+        objective_from_manifest=objective_from_manifest,
     )
-    _record_analysis_plot(
+    _record_trajectory_video_plot(
         plot_entries=plot_entries,
         plot_artifacts=plot_artifacts,
-        spec_key="chain_trajectory_video",
         output=plot_video_path,
         generated=True,
         skip_reason=None,

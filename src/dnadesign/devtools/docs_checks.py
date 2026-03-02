@@ -952,8 +952,6 @@ def _is_runbook_demo_doc(*, path: Path, repo_root: Path) -> bool:
     rel = path.relative_to(repo_root).as_posix()
     if "/archived/" in rel or "/prototypes/" in rel:
         return False
-    if rel == "src/dnadesign/notify/docs/usr-events.md":
-        return True
     if rel.endswith("/runbook.md"):
         return True
     if "/docs/demos/" in rel:

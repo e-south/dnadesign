@@ -39,6 +39,8 @@ def apply_axes_style(
         else:
             grid_axis = "x"
         ax.grid(axis=grid_axis, linestyle="-", linewidth=0.7, color="#d7d7d7", alpha=0.9)
+        for grid_line in [*ax.get_xgridlines(), *ax.get_ygridlines()]:
+            grid_line.set_zorder(0)
     else:
         ax.grid(False)
 

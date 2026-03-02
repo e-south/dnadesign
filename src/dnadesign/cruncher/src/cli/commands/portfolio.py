@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -133,6 +134,426 @@ def _format_active_trials(active_trial_ids: list[str], *, max_items: int = 3) ->
     return ",".join(preview) + suffix
 
 
+@dataclass(frozen=True)
+class _PortfolioRunRequest:
+    resolved_spec: Path
+    execution_mode: str
+    source_count: int
+    prepare_ready_policy: Literal["rerun", "skip"]
+
+
+@dataclass
+class _StudyProgressTracker:
+    snapshots: dict[tuple[str, str], tuple[int, int, int, int, int, int, tuple[str, ...]]] = field(default_factory=dict)
+
+    def render_progress_line(self, payload: dict[str, object]) -> str | None:
+        source_id = _study_source_from_payload(payload)
+        study_name = _study_name_from_payload(payload)
+        worker_count = max(_as_int(payload, "worker_count", default=1), 1)
+        running_runs = max(_as_int(payload, "running_runs", default=0), 0)
+        completed_runs = max(_as_int(payload, "completed_runs", default=0), 0)
+        total_runs = max(_as_int(payload, "total_runs", default=0), 0)
+        error_runs = max(_as_int(payload, "error_runs", default=0), 0)
+        queued_runs = max(_as_int(payload, "queued_runs", default=0), 0)
+        active_trials = _active_trial_ids(payload)
+        snapshot = (
+            running_runs,
+            worker_count,
+            completed_runs,
+            total_runs,
+            error_runs,
+            queued_runs,
+            tuple(active_trials),
+        )
+        key = (source_id, study_name)
+        if self.snapshots.get(key) == snapshot:
+            return None
+        self.snapshots[key] = snapshot
+        return (
+            "Study progress: "
+            f"source={source_id} "
+            f"study={study_name} "
+            f"workers={running_runs}/{worker_count} "
+            f"done={completed_runs}/{total_runs} "
+            f"error={error_runs} "
+            f"queued={queued_runs} "
+            f"active={_format_active_trials(active_trials)}"
+        )
+
+    @staticmethod
+    def render_ensure_line(name: str, payload: dict[str, object]) -> str | None:
+        source_id = _study_source_from_payload(payload)
+        study_name = _study_name_from_payload(payload)
+        if name == "study_ensure_started":
+            mode = "resume" if bool(payload.get("resume")) else "fresh"
+            return f"Study ensure: source={source_id} study={study_name} mode={mode}"
+        if name == "study_ensure_completed":
+            status = str(payload.get("study_status", "completed"))
+            return f"Study ensure complete: source={source_id} study={study_name} status={status}"
+        if name == "study_ensure_ready":
+            status = str(payload.get("study_status", "completed"))
+            return f"Study ready: source={source_id} study={study_name} status={status}"
+        return None
+
+
+@dataclass
+class _PortfolioProgressState:
+    prepare_total: int
+    aggregate_total: int
+    prepare_task: int | None
+    aggregate_task: int
+    prepare_done: int = 0
+    aggregate_done: int = 0
+
+
+def _render_source_label(source_id: str) -> str:
+    source_id = source_id.strip()
+    if len(source_id) <= 56:
+        return source_id
+    return source_id[:53] + "..."
+
+
+def _resolve_prepare_ready_policy(
+    *,
+    execution_mode: str,
+    ready_source_ids: list[str],
+    prepare_ready: PrepareReadyOption,
+) -> Literal["rerun", "skip"]:
+    prepare_ready_policy: Literal["rerun", "skip"] = "rerun"
+    if execution_mode != "prepare_then_aggregate" or not ready_source_ids:
+        return prepare_ready_policy
+    if prepare_ready == "prompt":
+        if not sys.stdin.isatty():
+            raise RuntimeError(
+                "ready sources detected but interactive prompt is unavailable. Re-run with --prepare-ready skip|rerun."
+            )
+        preview = ", ".join(ready_source_ids[:8])
+        if len(ready_source_ids) > 8:
+            preview = f"{preview}, ..."
+        console.print(
+            f"Ready sources detected ({len(ready_source_ids)}): {preview}. Skip these and prepare only missing sources?"
+        )
+        skip_ready = typer.confirm("Choose skip for ready sources", default=True)
+        return "skip" if skip_ready else "rerun"
+    return "skip" if prepare_ready == "skip" else "rerun"
+
+
+def _prepare_run_request(*, spec: Path, prepare_ready: PrepareReadyOption) -> _PortfolioRunRequest:
+    resolved_spec = _resolve_cli_path(spec)
+    preflight = portfolio_preflight_payload(resolved_spec)
+    execution_mode = str(preflight.get("execution_mode", "aggregate_only"))
+    ready_source_ids = [str(item) for item in preflight.get("ready_source_ids", [])]
+    source_count = int(preflight.get("source_count", 0))
+    prepare_ready_policy = _resolve_prepare_ready_policy(
+        execution_mode=execution_mode,
+        ready_source_ids=ready_source_ids,
+        prepare_ready=prepare_ready,
+    )
+    return _PortfolioRunRequest(
+        resolved_spec=resolved_spec,
+        execution_mode=execution_mode,
+        source_count=source_count,
+        prepare_ready_policy=prepare_ready_policy,
+    )
+
+
+def _invoke_run_portfolio(
+    *,
+    request: _PortfolioRunRequest,
+    force_overwrite: bool,
+    studies: bool | None,
+    on_event,
+) -> Path:
+    kwargs: dict[str, object] = {
+        "force_overwrite": force_overwrite,
+        "prepare_ready_policy": request.prepare_ready_policy,
+        "on_event": on_event,
+    }
+    if studies is not None:
+        kwargs["studies_enabled"] = studies
+    return run_portfolio(request.resolved_spec, **kwargs)
+
+
+def _handle_progress_event(
+    *,
+    name: str,
+    payload: dict[str, object],
+    progress: Progress,
+    state: _PortfolioProgressState,
+    study_progress: _StudyProgressTracker,
+) -> None:
+    source_id = str(payload.get("source_id", "")).strip()
+    source_label = _render_source_label(source_id)
+    if _handle_progress_status_event(
+        name=name,
+        source_label=source_label,
+        progress=progress,
+        state=state,
+    ):
+        return
+    if _handle_progress_count_event(
+        name=name,
+        progress=progress,
+        state=state,
+    ):
+        return
+    _handle_progress_study_event(
+        name=name,
+        payload=payload,
+        progress=progress,
+        study_progress=study_progress,
+    )
+
+
+def _handle_progress_status_event(
+    *,
+    name: str,
+    source_label: str,
+    progress: Progress,
+    state: _PortfolioProgressState,
+) -> bool:
+    if name == "prepare_source_started" and state.prepare_task is not None and source_label:
+        progress.update(
+            state.prepare_task,
+            description=f"Prepare source {state.prepare_done + 1}/{state.prepare_total}: {source_label}",
+        )
+        return True
+    if name == "prepare_source_skipped" and state.prepare_task is not None:
+        state.prepare_done += 1
+        progress.advance(state.prepare_task, 1)
+        if source_label:
+            progress.update(
+                state.prepare_task,
+                description=f"Prepare sources ({state.prepare_done}/{state.prepare_total}) [skip {source_label}]",
+            )
+        else:
+            progress.update(
+                state.prepare_task,
+                description=f"Prepare sources ({state.prepare_done}/{state.prepare_total})",
+            )
+        return True
+    if name == "aggregate_source_started" and source_label:
+        progress.update(
+            state.aggregate_task,
+            description=f"Aggregate source {state.aggregate_done + 1}/{state.aggregate_total}: {source_label}",
+        )
+        return True
+    if name == "aggregate_phase_started":
+        progress.update(
+            state.aggregate_task,
+            visible=True,
+            description=f"Aggregate sources ({state.aggregate_done}/{state.aggregate_total})",
+        )
+        return True
+    if name == "prepare_phase_completed" and state.prepare_task is not None:
+        progress.update(state.prepare_task, visible=False)
+        return True
+    return False
+
+
+def _handle_progress_count_event(
+    *,
+    name: str,
+    progress: Progress,
+    state: _PortfolioProgressState,
+) -> bool:
+    if name == "prepare_source_completed" and state.prepare_task is not None:
+        state.prepare_done += 1
+        progress.advance(state.prepare_task, 1)
+        progress.update(
+            state.prepare_task,
+            description=f"Prepare sources ({state.prepare_done}/{state.prepare_total})",
+        )
+        return True
+    if name == "aggregate_source_completed":
+        state.aggregate_done += 1
+        progress.advance(state.aggregate_task, 1)
+        progress.update(
+            state.aggregate_task,
+            description=f"Aggregate sources ({state.aggregate_done}/{state.aggregate_total})",
+        )
+        return True
+    return False
+
+
+def _handle_progress_study_event(
+    *,
+    name: str,
+    payload: dict[str, object],
+    progress: Progress,
+    study_progress: _StudyProgressTracker,
+) -> None:
+    if name in {"study_ensure_started", "study_ensure_completed", "study_ensure_ready"}:
+        line = study_progress.render_ensure_line(name, payload)
+        if line:
+            progress.console.print(line, soft_wrap=True)
+        return
+    if name == "study_trial_progress":
+        line = study_progress.render_progress_line(payload)
+        if line:
+            progress.console.print(line, soft_wrap=True)
+
+
+def _handle_plain_event(*, name: str, payload: dict[str, object], study_progress: _StudyProgressTracker) -> None:
+    phase_line = _plain_phase_line(name=name, payload=payload)
+    if phase_line is not None:
+        console.print(phase_line, soft_wrap=True)
+        return
+    source_line = _plain_source_outputs_line(name=name, payload=payload)
+    if source_line is not None:
+        console.print(source_line, soft_wrap=True)
+        return
+    if name in {"study_ensure_started", "study_ensure_completed", "study_ensure_ready"}:
+        line = study_progress.render_ensure_line(name, payload)
+        if line:
+            console.print(line, soft_wrap=True)
+        return
+    if name == "study_trial_progress":
+        line = study_progress.render_progress_line(payload)
+        if line:
+            console.print(line, soft_wrap=True)
+
+
+def _plain_phase_line(*, name: str, payload: dict[str, object]) -> str | None:
+    if name == "prepare_phase_started":
+        total = int(payload.get("source_count", 0))
+        return f"Prepare phase: {total} source(s)."
+    if name == "prepare_phase_completed":
+        total = int(payload.get("prepared_count", 0))
+        return f"Prepare phase complete: {total} source(s)."
+    if name == "aggregate_phase_started":
+        total = int(payload.get("source_count", 0))
+        return f"Aggregate phase: {total} source(s)."
+    if name == "aggregate_phase_completed":
+        total = int(payload.get("source_count", 0))
+        return f"Aggregate phase complete: {total} source(s)."
+    return None
+
+
+def _plain_source_outputs_line(*, name: str, payload: dict[str, object]) -> str | None:
+    if name != "aggregate_source_outputs_updated":
+        return None
+    source_id = str(payload.get("source_id", ""))
+    completed = int(payload.get("completed_sources", 0))
+    table_count = int(payload.get("table_count", 0))
+    plot_count = int(payload.get("plot_count", 0))
+    if not source_id:
+        return None
+    return f"Aggregate source complete: {source_id} ({completed} done, tables={table_count}, plots={plot_count})."
+
+
+def _run_with_progress(
+    *,
+    request: _PortfolioRunRequest,
+    force_overwrite: bool,
+    studies: bool | None,
+    study_progress: _StudyProgressTracker,
+) -> Path:
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+        transient=True,
+    )
+    prepare_total = request.source_count
+    prepare_task = None
+    if request.execution_mode == "prepare_then_aggregate":
+        prepare_task = progress.add_task(f"Prepare sources (0/{prepare_total})", total=max(prepare_total, 1))
+    aggregate_total = request.source_count
+    aggregate_task = progress.add_task(
+        f"Aggregate sources (0/{aggregate_total})",
+        total=max(aggregate_total, 1),
+        visible=request.execution_mode != "prepare_then_aggregate",
+    )
+    progress_state = _PortfolioProgressState(
+        prepare_total=prepare_total,
+        aggregate_total=aggregate_total,
+        prepare_task=prepare_task,
+        aggregate_task=aggregate_task,
+    )
+
+    def _on_event(name: str, payload: dict[str, object]) -> None:
+        _handle_progress_event(
+            name=name,
+            payload=payload,
+            progress=progress,
+            state=progress_state,
+            study_progress=study_progress,
+        )
+
+    with progress:
+        return _run_with_noninteractive_env(
+            lambda: _invoke_run_portfolio(
+                request=request,
+                force_overwrite=force_overwrite,
+                studies=studies,
+                on_event=_on_event,
+            )
+        )
+
+
+def _run_without_progress(
+    *,
+    request: _PortfolioRunRequest,
+    force_overwrite: bool,
+    studies: bool | None,
+    study_progress: _StudyProgressTracker,
+) -> Path:
+    def _on_event(name: str, payload: dict[str, object]) -> None:
+        _handle_plain_event(name=name, payload=payload, study_progress=study_progress)
+
+    return _invoke_run_portfolio(
+        request=request,
+        force_overwrite=force_overwrite,
+        studies=studies,
+        on_event=_on_event,
+    )
+
+
+def _execute_run(
+    *,
+    request: _PortfolioRunRequest,
+    force_overwrite: bool,
+    studies: bool | None,
+    study_progress: _StudyProgressTracker,
+) -> Path:
+    run_call = _run_with_progress if _progress_enabled() else _run_without_progress
+    try:
+        return run_call(
+            request=request,
+            force_overwrite=force_overwrite,
+            studies=studies,
+            study_progress=study_progress,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        message = str(exc)
+        if (
+            not force_overwrite
+            and "already exists" in message
+            and sys.stdin.isatty()
+            and typer.confirm("Portfolio aggregate already exists. Overwrite and rerun?", default=False)
+        ):
+            return run_call(
+                request=request,
+                force_overwrite=True,
+                studies=studies,
+                study_progress=study_progress,
+            )
+        raise
+
+
+def _report_run(run_dir: Path) -> None:
+    payload = portfolio_show_payload(run_dir)
+    console.print(f"Portfolio outputs -> {render_path(run_dir)}", soft_wrap=True)
+    console.print(f"  status: {payload['status']}")
+    console.print(f"  sources: {payload['n_sources']}")
+    console.print(f"  selected elites: {payload['n_selected_elites']}")
+    _print_source_run_counts(payload)
+    console.print(f"  manifest: {render_path(Path(str(payload['manifest_path'])))}", soft_wrap=True)
+
+
 @app.command("run", help="Execute a Portfolio spec and write aggregate handoff outputs.")
 def run_cmd(
     spec: Path = typer.Option(
@@ -156,237 +577,19 @@ def run_cmd(
         help="Override portfolio.studies.enabled for this run only.",
     ),
 ) -> None:
-    resolved_spec = _resolve_cli_path(spec)
     try:
-        preflight = portfolio_preflight_payload(resolved_spec)
+        request = _prepare_run_request(spec=spec, prepare_ready=prepare_ready)
+        study_progress = _StudyProgressTracker()
+        run_dir = _execute_run(
+            request=request,
+            force_overwrite=force_overwrite,
+            studies=studies,
+            study_progress=study_progress,
+        )
+        _report_run(run_dir)
     except (RuntimeError, ValueError, FileNotFoundError) as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
-
-    execution_mode = str(preflight.get("execution_mode", "aggregate_only"))
-    ready_source_ids = [str(item) for item in preflight.get("ready_source_ids", [])]
-    source_count = int(preflight.get("source_count", 0))
-    prepare_ready_policy: Literal["rerun", "skip"] = "rerun"
-    if execution_mode == "prepare_then_aggregate" and ready_source_ids:
-        if prepare_ready == "prompt":
-            if not sys.stdin.isatty():
-                console.print(
-                    "Error: ready sources detected but interactive prompt is unavailable. "
-                    "Re-run with --prepare-ready skip|rerun."
-                )
-                raise typer.Exit(code=1)
-            preview = ", ".join(ready_source_ids[:8])
-            if len(ready_source_ids) > 8:
-                preview = f"{preview}, ..."
-            console.print(
-                f"Ready sources detected ({len(ready_source_ids)}): {preview}. "
-                "Skip these and prepare only missing sources?"
-            )
-            skip_ready = typer.confirm("Choose skip for ready sources", default=True)
-            prepare_ready_policy = "skip" if skip_ready else "rerun"
-        else:
-            prepare_ready_policy = "skip" if prepare_ready == "skip" else "rerun"
-
-    study_progress_snapshots: dict[tuple[str, str], tuple[int, int, int, int, int, int, tuple[str, ...]]] = {}
-
-    def _render_study_progress_line(payload: dict[str, object]) -> str | None:
-        source_id = _study_source_from_payload(payload)
-        study_name = _study_name_from_payload(payload)
-        worker_count = max(_as_int(payload, "worker_count", default=1), 1)
-        running_runs = max(_as_int(payload, "running_runs", default=0), 0)
-        completed_runs = max(_as_int(payload, "completed_runs", default=0), 0)
-        total_runs = max(_as_int(payload, "total_runs", default=0), 0)
-        error_runs = max(_as_int(payload, "error_runs", default=0), 0)
-        queued_runs = max(_as_int(payload, "queued_runs", default=0), 0)
-        active_trials = _active_trial_ids(payload)
-        snapshot = (
-            running_runs,
-            worker_count,
-            completed_runs,
-            total_runs,
-            error_runs,
-            queued_runs,
-            tuple(active_trials),
-        )
-        key = (source_id, study_name)
-        if study_progress_snapshots.get(key) == snapshot:
-            return None
-        study_progress_snapshots[key] = snapshot
-        return (
-            "Study progress: "
-            f"source={source_id} "
-            f"study={study_name} "
-            f"workers={running_runs}/{worker_count} "
-            f"done={completed_runs}/{total_runs} "
-            f"error={error_runs} "
-            f"queued={queued_runs} "
-            f"active={_format_active_trials(active_trials)}"
-        )
-
-    def _render_study_ensure_line(name: str, payload: dict[str, object]) -> str | None:
-        source_id = _study_source_from_payload(payload)
-        study_name = _study_name_from_payload(payload)
-        if name == "study_ensure_started":
-            mode = "resume" if bool(payload.get("resume")) else "fresh"
-            return f"Study ensure: source={source_id} study={study_name} mode={mode}"
-        if name == "study_ensure_completed":
-            status = str(payload.get("study_status", "completed"))
-            return f"Study ensure complete: source={source_id} study={study_name} status={status}"
-        if name == "study_ensure_ready":
-            status = str(payload.get("study_status", "completed"))
-            return f"Study ready: source={source_id} study={study_name} status={status}"
-        return None
-
-    def _run_with_progress(force_flag: bool) -> Path:
-        def _render_source_label(source_id: str) -> str:
-            source_id = source_id.strip()
-            if len(source_id) <= 56:
-                return source_id
-            return source_id[:53] + "..."
-
-        progress = Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            console=console,
-            transient=True,
-        )
-        prepare_total = source_count
-        prepare_task = None
-        prepare_done = 0
-        if execution_mode == "prepare_then_aggregate":
-            prepare_task = progress.add_task(f"Prepare sources (0/{prepare_total})", total=max(prepare_total, 1))
-        aggregate_done = 0
-        aggregate_total = source_count
-        aggregate_task = progress.add_task(
-            f"Aggregate sources (0/{aggregate_total})",
-            total=max(source_count, 1),
-            visible=execution_mode != "prepare_then_aggregate",
-        )
-
-        def _on_event(name: str, payload: dict[str, object]) -> None:
-            nonlocal prepare_done, aggregate_done
-            source_id = str(payload.get("source_id", "")).strip()
-            source_label = _render_source_label(source_id)
-            if name == "prepare_source_started" and prepare_task is not None and source_label:
-                progress.update(
-                    prepare_task,
-                    description=f"Prepare source {prepare_done + 1}/{prepare_total}: {source_label}",
-                )
-            elif name == "prepare_source_skipped" and prepare_task is not None:
-                prepare_done += 1
-                progress.advance(prepare_task, 1)
-                if source_label:
-                    progress.update(
-                        prepare_task,
-                        description=f"Prepare sources ({prepare_done}/{prepare_total}) [skip {source_label}]",
-                    )
-                else:
-                    progress.update(prepare_task, description=f"Prepare sources ({prepare_done}/{prepare_total})")
-            elif name == "aggregate_source_started" and source_label:
-                progress.update(
-                    aggregate_task,
-                    description=f"Aggregate source {aggregate_done + 1}/{aggregate_total}: {source_label}",
-                )
-            elif name == "aggregate_phase_started":
-                progress.update(
-                    aggregate_task,
-                    visible=True,
-                    description=f"Aggregate sources ({aggregate_done}/{aggregate_total})",
-                )
-            elif name == "prepare_phase_completed" and prepare_task is not None:
-                progress.update(prepare_task, visible=False)
-            if name == "prepare_source_completed" and prepare_task is not None:
-                prepare_done += 1
-                progress.advance(prepare_task, 1)
-                progress.update(prepare_task, description=f"Prepare sources ({prepare_done}/{prepare_total})")
-            elif name == "aggregate_source_completed":
-                aggregate_done += 1
-                progress.advance(aggregate_task, 1)
-                progress.update(aggregate_task, description=f"Aggregate sources ({aggregate_done}/{aggregate_total})")
-            elif name in {"study_ensure_started", "study_ensure_completed", "study_ensure_ready"}:
-                line = _render_study_ensure_line(name, payload)
-                if line:
-                    progress.console.print(line, soft_wrap=True)
-            elif name == "study_trial_progress":
-                line = _render_study_progress_line(payload)
-                if line:
-                    progress.console.print(line, soft_wrap=True)
-
-        with progress:
-            return _run_with_noninteractive_env(lambda: _invoke_run_portfolio(force_flag, on_event=_on_event))
-
-    def _invoke_run_portfolio(force_flag: bool, *, on_event=None) -> Path:
-        kwargs: dict[str, object] = {
-            "force_overwrite": force_flag,
-            "prepare_ready_policy": prepare_ready_policy,
-            "on_event": on_event,
-        }
-        if studies is not None:
-            kwargs["studies_enabled"] = studies
-        return run_portfolio(resolved_spec, **kwargs)
-
-    def _run_without_progress(force_flag: bool) -> Path:
-        def _on_event(name: str, payload: dict[str, object]) -> None:
-            if name == "prepare_phase_started":
-                total = int(payload.get("source_count", 0))
-                console.print(f"Prepare phase: {total} source(s).", soft_wrap=True)
-            elif name == "prepare_phase_completed":
-                total = int(payload.get("prepared_count", 0))
-                console.print(f"Prepare phase complete: {total} source(s).", soft_wrap=True)
-            elif name == "aggregate_phase_started":
-                total = int(payload.get("source_count", 0))
-                console.print(f"Aggregate phase: {total} source(s).", soft_wrap=True)
-            elif name == "aggregate_phase_completed":
-                total = int(payload.get("source_count", 0))
-                console.print(f"Aggregate phase complete: {total} source(s).", soft_wrap=True)
-            elif name == "aggregate_source_outputs_updated":
-                source_id = str(payload.get("source_id", ""))
-                completed = int(payload.get("completed_sources", 0))
-                table_count = int(payload.get("table_count", 0))
-                plot_count = int(payload.get("plot_count", 0))
-                if source_id:
-                    console.print(
-                        "Aggregate source complete: "
-                        f"{source_id} ({completed} done, tables={table_count}, plots={plot_count}).",
-                        soft_wrap=True,
-                    )
-            elif name in {"study_ensure_started", "study_ensure_completed", "study_ensure_ready"}:
-                line = _render_study_ensure_line(name, payload)
-                if line:
-                    console.print(line, soft_wrap=True)
-            elif name == "study_trial_progress":
-                line = _render_study_progress_line(payload)
-                if line:
-                    console.print(line, soft_wrap=True)
-
-        return _invoke_run_portfolio(force_flag, on_event=_on_event)
-
-    run_portfolio_call = _run_with_progress if _progress_enabled() else _run_without_progress
-
-    try:
-        run_dir = run_portfolio_call(force_overwrite)
-    except (RuntimeError, ValueError, FileNotFoundError) as exc:
-        message = str(exc)
-        if (
-            not force_overwrite
-            and "already exists" in message
-            and sys.stdin.isatty()
-            and typer.confirm("Portfolio aggregate already exists. Overwrite and rerun?", default=False)
-        ):
-            run_dir = run_portfolio_call(True)
-        else:
-            console.print(f"Error: {message}")
-            raise typer.Exit(code=1) from exc
-
-    payload = portfolio_show_payload(run_dir)
-    console.print(f"Portfolio outputs -> {render_path(run_dir)}", soft_wrap=True)
-    console.print(f"  status: {payload['status']}")
-    console.print(f"  sources: {payload['n_sources']}")
-    console.print(f"  selected elites: {payload['n_selected_elites']}")
-    _print_source_run_counts(payload)
-    console.print(f"  manifest: {render_path(Path(str(payload['manifest_path'])))}", soft_wrap=True)
 
 
 @app.command("show", help="Print Portfolio run status and key artifact paths.")

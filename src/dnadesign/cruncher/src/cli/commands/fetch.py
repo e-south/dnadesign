@@ -47,6 +47,30 @@ logger = logging.getLogger(__name__)
 console = Console()
 
 
+def _resolve_config_or_exit(config: Path | None, config_option: Path | None):
+    try:
+        config_path = resolve_config_path(config_option or config)
+    except ConfigResolutionError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    try:
+        cfg = load_config(config_path)
+    except (ValueError, FileNotFoundError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    return config_path, cfg
+
+
+def _emit_fetch_paths(*, written: list[Path], summary: bool, paths: bool, empty_msg: str, summary_fn) -> None:
+    if not written:
+        console.print(empty_msg)
+    if summary and written:
+        summary_fn(written)
+    if paths or not summary:
+        for path in written:
+            typer.echo(str(path))
+
+
 def _resolve_fetch_source(
     source: str | None,
     source_preference: list[str],
@@ -152,6 +176,247 @@ def _render_sites_summary(catalog_root: Path, paths: Iterable[Path]) -> None:
     console.print(table)
 
 
+def _validate_sites_inputs(
+    *,
+    effective_tfs: list[str],
+    motif_id: list[str],
+    hydrate: bool,
+    offline: bool,
+    update: bool,
+    dry_run: bool,
+) -> None:
+    if not effective_tfs and not motif_id and not hydrate:
+        raise typer.BadParameter(
+            "Provide at least one --tf or --motif-id. Hint: cruncher fetch sites --tf lexA <config>"
+        )
+    if offline and update:
+        raise typer.BadParameter(
+            "--offline and --update are mutually exclusive. Hint: use --offline to verify cache or --update to refresh."
+        )
+    if dry_run and update:
+        raise typer.BadParameter("--dry-run does not write cache; remove --update.")
+    if dry_run and offline:
+        raise typer.BadParameter("--dry-run cannot be combined with --offline.")
+    if hydrate and update:
+        raise typer.BadParameter("--hydrate cannot be combined with --update.")
+    if hydrate and dry_run:
+        raise typer.BadParameter("--hydrate cannot be combined with --dry-run.")
+
+
+def _resolve_sites_adapter(
+    *,
+    cfg,
+    config_path: Path,
+    source: str | None,
+    dataset_id: str | None,
+) -> tuple[str, object, Path]:
+    registry = default_registry(
+        cfg.ingest,
+        config_path=config_path,
+        extra_parser_modules=cfg.io.parsers.extra_modules,
+    )
+    available_sources = {spec.source_id for spec in registry.list_sources()}
+    resolved_source = _resolve_fetch_source(
+        source,
+        cfg.catalog.source_preference,
+        available_sources=available_sources,
+    )
+    ingest_cfg = cfg.ingest
+    if dataset_id and resolved_source == "regulondb" and not cfg.ingest.regulondb.ht_sites:
+        ingest_cfg = cfg.ingest.model_copy(deep=True)
+        ingest_cfg.regulondb.ht_sites = True
+        console.print("Note: enabling HT dataset access for this request (--dataset-id).")
+    adapter = registry.create(resolved_source, ingest_cfg)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
+    return resolved_source, adapter, catalog_root
+
+
+def _render_sites_dry_run(
+    *,
+    adapter: object,
+    effective_tfs: list[str],
+    dataset_id: str | None,
+) -> None:
+    if not effective_tfs:
+        raise typer.BadParameter("--dry-run requires --tf to resolve HT datasets.")
+    if not hasattr(adapter, "list_datasets"):
+        raise typer.BadParameter("Source does not support dataset discovery.")
+    rows: list[tuple[str, str, str, str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for name in effective_tfs:
+        datasets = adapter.list_datasets(DatasetQuery(tf_name=name))
+        if dataset_id:
+            datasets = [ds for ds in datasets if ds.dataset_id == dataset_id]
+        if not datasets:
+            raise ValueError(f"No HT datasets found for TF {name}")
+        for ds in datasets:
+            key = (name, ds.dataset_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            method = ds.method or "-"
+            genome = ds.reference_genome or "-"
+            rows.append((name, ds.dataset_id, ds.dataset_source or "-", method, genome))
+    table = Table(title="HT datasets", header_style="bold")
+    table.add_column("TF")
+    table.add_column("Dataset ID")
+    table.add_column("Source")
+    table.add_column("Method")
+    table.add_column("Genome")
+    for row in rows:
+        table.add_row(*row)
+    console.print(table)
+
+
+def _build_sequence_provider(
+    *,
+    cfg,
+    config_path: Path,
+    genome_fasta: Path | None,
+    refresh: bool,
+    offline: bool,
+) -> SequenceProvider | None:
+    workspace_root = resolve_workspace_root(config_path)
+    genome_path = genome_fasta or cfg.ingest.genome_fasta
+    if genome_path is not None:
+        if not genome_path.is_absolute():
+            genome_path = (workspace_root / genome_path).resolve()
+        return FastaSequenceProvider(
+            genome_path,
+            assembly_id=cfg.ingest.genome_assembly,
+            contig_aliases=cfg.ingest.contig_aliases,
+        )
+    if cfg.ingest.genome_source == "fasta":
+        raise typer.BadParameter("genome_source=fasta requires ingest.genome_fasta or --genome-fasta.")
+    if cfg.ingest.genome_source == "ncbi":
+        genome_cache = cfg.ingest.genome_cache
+        if not genome_cache.is_absolute():
+            genome_cache = (workspace_root / genome_cache).resolve()
+        return NCBISequenceProvider(
+            cache_root=genome_cache,
+            email=cfg.ingest.ncbi_email,
+            tool=cfg.ingest.ncbi_tool,
+            api_key=cfg.ingest.ncbi_api_key,
+            timeout_seconds=cfg.ingest.ncbi_timeout_seconds,
+            retry_policy=HttpRetryPolicy(
+                retries=cfg.ingest.http.retries,
+                backoff_seconds=cfg.ingest.http.backoff_seconds,
+                max_backoff_seconds=cfg.ingest.http.max_backoff_seconds,
+                retry_statuses=tuple(cfg.ingest.http.retry_statuses),
+                respect_retry_after=cfg.ingest.http.respect_retry_after,
+            ),
+            refresh=refresh,
+            offline=offline,
+            contig_aliases=cfg.ingest.contig_aliases,
+        )
+    return None
+
+
+def _run_sites_operation(
+    *,
+    hydrate: bool,
+    provider: SequenceProvider | None,
+    source: str,
+    effective_tfs: list[str],
+    motif_id: list[str],
+    adapter: object,
+    catalog_root: Path,
+    limit: int | None,
+    dataset_id: str | None,
+    update: bool,
+    offline: bool,
+) -> list[Path]:
+    if hydrate:
+        if provider is None:
+            raise ValueError("Hydration requires genome_source or --genome-fasta.")
+        logger.info(
+            "Hydrating cached sites for TFs=%s motif_ids=%s",
+            effective_tfs,
+            motif_id,
+        )
+        return hydrate_sites(
+            catalog_root,
+            names=effective_tfs,
+            motif_ids=motif_id,
+            sequence_provider=provider,
+        )
+    logger.info(
+        "Fetching binding sites from %s for TFs=%s motif_ids=%s",
+        source,
+        effective_tfs,
+        motif_id,
+    )
+    return fetch_sites(
+        adapter,
+        catalog_root,
+        names=effective_tfs,
+        motif_ids=motif_id,
+        limit=limit,
+        dataset_id=dataset_id,
+        update=update,
+        offline=offline,
+        sequence_provider=provider,
+    )
+
+
+def _execute_sites_request(
+    *,
+    cfg,
+    config_path: Path,
+    source: str | None,
+    dataset_id: str | None,
+    dry_run: bool,
+    effective_tfs: list[str],
+    genome_fasta: Path | None,
+    update: bool,
+    offline: bool,
+    hydrate: bool,
+    motif_id: list[str],
+    limit: int | None,
+) -> tuple[list[Path], Path]:
+    provider: SequenceProvider | None = None
+    try:
+        resolved_source, adapter, catalog_root = _resolve_sites_adapter(
+            cfg=cfg,
+            config_path=config_path,
+            source=source,
+            dataset_id=dataset_id,
+        )
+        if dry_run:
+            if not hasattr(adapter, "list_datasets"):
+                raise typer.BadParameter(f"Source '{resolved_source}' does not support dataset discovery.")
+            _render_sites_dry_run(
+                adapter=adapter,
+                effective_tfs=effective_tfs,
+                dataset_id=dataset_id,
+            )
+            return [], catalog_root
+        provider = _build_sequence_provider(
+            cfg=cfg,
+            config_path=config_path,
+            genome_fasta=genome_fasta,
+            refresh=update,
+            offline=offline,
+        )
+        written = _run_sites_operation(
+            hydrate=hydrate,
+            provider=provider,
+            source=resolved_source,
+            effective_tfs=effective_tfs,
+            motif_id=motif_id,
+            adapter=adapter,
+            catalog_root=catalog_root,
+            limit=limit,
+            dataset_id=dataset_id,
+            update=update,
+            offline=offline,
+        )
+        return written, catalog_root
+    finally:
+        if provider is not None:
+            provider.close()
+
+
 @app.command("motifs", help="Fetch motif matrices into the local cache.")
 def motifs(
     config: Path | None = typer.Argument(
@@ -180,16 +445,7 @@ def motifs(
     summary: bool = typer.Option(True, "--summary/--no-summary", help="Show summary table of fetched motifs."),
     paths: bool = typer.Option(False, "--paths", help="Print raw cache paths (for scripting)."),
 ) -> None:
-    try:
-        config_path = resolve_config_path(config_option or config)
-    except ConfigResolutionError as exc:
-        typer.echo(str(exc), err=True)
-        raise typer.Exit(code=1)
-    try:
-        cfg = load_config(config_path)
-    except (ValueError, FileNotFoundError) as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=1)
+    config_path, cfg = _resolve_config_or_exit(config, config_option)
     effective_tfs = list(tf)
     if not effective_tfs and not motif_id:
         raise typer.BadParameter(
@@ -258,13 +514,13 @@ def motifs(
         typer.echo(f"Error: {exc}", err=True)
         typer.echo("Hint: run cruncher fetch motifs --help for examples.", err=True)
         raise typer.Exit(code=1)
-    if not written:
-        console.print("No new motifs cached (all matches already present). Use --update to refresh.")
-    if summary and written:
-        _render_motif_summary(catalog_root, written)
-    if paths or not summary:
-        for path in written:
-            typer.echo(str(path))
+    _emit_fetch_paths(
+        written=written,
+        summary=summary,
+        paths=paths,
+        empty_msg="No new motifs cached (all matches already present). Use --update to refresh.",
+        summary_fn=lambda rows: _render_motif_summary(catalog_root, rows),
+    )
 
 
 @app.command("sites", help="Fetch binding-site sequences into the local cache.")
@@ -309,162 +565,43 @@ def sites(
     summary: bool = typer.Option(True, "--summary/--no-summary", help="Show summary table of fetched sites."),
     paths: bool = typer.Option(False, "--paths", help="Print raw cache paths (for scripting)."),
 ) -> None:
-    try:
-        config_path = resolve_config_path(config_option or config)
-    except ConfigResolutionError as exc:
-        typer.echo(str(exc), err=True)
-        raise typer.Exit(code=1)
-    try:
-        cfg = load_config(config_path)
-    except (ValueError, FileNotFoundError) as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=1)
+    config_path, cfg = _resolve_config_or_exit(config, config_option)
     effective_tfs = list(tf)
-    if not effective_tfs and not motif_id and not hydrate:
-        raise typer.BadParameter(
-            "Provide at least one --tf or --motif-id. Hint: cruncher fetch sites --tf lexA <config>"
-        )
-    if offline and update:
-        raise typer.BadParameter(
-            "--offline and --update are mutually exclusive. Hint: use --offline to verify cache or --update to refresh."
-        )
-    if dry_run and update:
-        raise typer.BadParameter("--dry-run does not write cache; remove --update.")
-    if dry_run and offline:
-        raise typer.BadParameter("--dry-run cannot be combined with --offline.")
-    if hydrate and update:
-        raise typer.BadParameter("--hydrate cannot be combined with --update.")
-    if hydrate and dry_run:
-        raise typer.BadParameter("--hydrate cannot be combined with --dry-run.")
+    _validate_sites_inputs(
+        effective_tfs=effective_tfs,
+        motif_id=motif_id,
+        hydrate=hydrate,
+        offline=offline,
+        update=update,
+        dry_run=dry_run,
+    )
     if hydrate and not effective_tfs and not motif_id:
         console.print("Hydrating all cached site sets (no --tf/--motif-id provided).")
-    provider: Optional[SequenceProvider] = None
     try:
-        registry = default_registry(
-            cfg.ingest,
+        written, catalog_root = _execute_sites_request(
+            cfg=cfg,
             config_path=config_path,
-            extra_parser_modules=cfg.io.parsers.extra_modules,
+            source=source,
+            dataset_id=dataset_id,
+            dry_run=dry_run,
+            effective_tfs=effective_tfs,
+            genome_fasta=genome_fasta,
+            update=update,
+            offline=offline,
+            hydrate=hydrate,
+            motif_id=motif_id,
+            limit=limit,
         )
-        available_sources = {spec.source_id for spec in registry.list_sources()}
-        source = _resolve_fetch_source(
-            source,
-            cfg.catalog.source_preference,
-            available_sources=available_sources,
-        )
-        ingest_cfg = cfg.ingest
-        if dataset_id and source == "regulondb" and not cfg.ingest.regulondb.ht_sites:
-            ingest_cfg = cfg.ingest.model_copy(deep=True)
-            ingest_cfg.regulondb.ht_sites = True
-            console.print("Note: enabling HT dataset access for this request (--dataset-id).")
-        adapter = registry.create(source, ingest_cfg)
-        catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
         if dry_run:
-            if not effective_tfs:
-                raise typer.BadParameter("--dry-run requires --tf to resolve HT datasets.")
-            if not hasattr(adapter, "list_datasets"):
-                raise typer.BadParameter(f"Source '{source}' does not support dataset discovery.")
-            rows: list[tuple[str, str, str, str, str]] = []
-            seen: set[tuple[str, str]] = set()
-            for name in effective_tfs:
-                datasets = adapter.list_datasets(DatasetQuery(tf_name=name))
-                if dataset_id:
-                    datasets = [ds for ds in datasets if ds.dataset_id == dataset_id]
-                if not datasets:
-                    raise ValueError(f"No HT datasets found for TF {name}")
-                for ds in datasets:
-                    key = (name, ds.dataset_id)
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    method = ds.method or "-"
-                    genome = ds.reference_genome or "-"
-                    rows.append((name, ds.dataset_id, ds.dataset_source or "-", method, genome))
-            table = Table(title="HT datasets", header_style="bold")
-            table.add_column("TF")
-            table.add_column("Dataset ID")
-            table.add_column("Source")
-            table.add_column("Method")
-            table.add_column("Genome")
-            for row in rows:
-                table.add_row(*row)
-            console.print(table)
             return
-        genome_path = genome_fasta or cfg.ingest.genome_fasta
-        workspace_root = resolve_workspace_root(config_path)
-        if genome_path is not None:
-            if not genome_path.is_absolute():
-                genome_path = (workspace_root / genome_path).resolve()
-            provider = FastaSequenceProvider(
-                genome_path,
-                assembly_id=cfg.ingest.genome_assembly,
-                contig_aliases=cfg.ingest.contig_aliases,
-            )
-        elif cfg.ingest.genome_source == "fasta":
-            raise typer.BadParameter("genome_source=fasta requires ingest.genome_fasta or --genome-fasta.")
-        elif cfg.ingest.genome_source == "ncbi":
-            genome_cache = cfg.ingest.genome_cache
-            if not genome_cache.is_absolute():
-                genome_cache = (workspace_root / genome_cache).resolve()
-            provider = NCBISequenceProvider(
-                cache_root=genome_cache,
-                email=cfg.ingest.ncbi_email,
-                tool=cfg.ingest.ncbi_tool,
-                api_key=cfg.ingest.ncbi_api_key,
-                timeout_seconds=cfg.ingest.ncbi_timeout_seconds,
-                retry_policy=HttpRetryPolicy(
-                    retries=cfg.ingest.http.retries,
-                    backoff_seconds=cfg.ingest.http.backoff_seconds,
-                    max_backoff_seconds=cfg.ingest.http.max_backoff_seconds,
-                    retry_statuses=tuple(cfg.ingest.http.retry_statuses),
-                    respect_retry_after=cfg.ingest.http.respect_retry_after,
-                ),
-                refresh=update,
-                offline=offline,
-                contig_aliases=cfg.ingest.contig_aliases,
-            )
-        if hydrate:
-            if provider is None:
-                raise ValueError("Hydration requires genome_source or --genome-fasta.")
-            logger.info(
-                "Hydrating cached sites for TFs=%s motif_ids=%s",
-                effective_tfs,
-                motif_id,
-            )
-            written = hydrate_sites(
-                catalog_root,
-                names=effective_tfs,
-                motif_ids=motif_id,
-                sequence_provider=provider,
-            )
-        else:
-            logger.info(
-                "Fetching binding sites from %s for TFs=%s motif_ids=%s",
-                source,
-                effective_tfs,
-                motif_id,
-            )
-            written = fetch_sites(
-                adapter,
-                catalog_root,
-                names=effective_tfs,
-                motif_ids=motif_id,
-                limit=limit,
-                dataset_id=dataset_id,
-                update=update,
-                offline=offline,
-                sequence_provider=provider,
-            )
     except (ValueError, FileNotFoundError, HTTPError, URLError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         typer.echo("Hint: run cruncher fetch sites --help for examples.", err=True)
         raise typer.Exit(code=1)
-    finally:
-        if provider is not None:
-            provider.close()
-    if not written:
-        console.print("No new sites cached (all matches already present). Use --update to refresh.")
-    if summary and written:
-        _render_sites_summary(catalog_root, written)
-    if paths or not summary:
-        for path in written:
-            typer.echo(str(path))
+    _emit_fetch_paths(
+        written=written,
+        summary=summary,
+        paths=paths,
+        empty_msg="No new sites cached (all matches already present). Use --update to refresh.",
+        summary_fn=lambda rows: _render_sites_summary(catalog_root, rows),
+    )

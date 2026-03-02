@@ -204,8 +204,6 @@ def test_analysis_trajectory_defaults_prefer_best_so_far_and_dense_lineage(tmp_p
     assert cfg.analysis.trajectory_video.playback.fps == 12
     assert cfg.analysis.trajectory_video.playback.pause_on_best_update_sec == pytest.approx(0.0)
     assert cfg.analysis.trajectory_video.playback.sweep_taper_fraction == pytest.approx(0.25)
-    assert cfg.analysis.trajectory_video.sweep_inset.enabled is False
-    assert cfg.analysis.trajectory_video.sweep_inset.corner == "top_right"
 
 
 def test_analysis_trajectory_video_explicit_chain_requires_chain_id(tmp_path: Path) -> None:
@@ -310,18 +308,19 @@ def test_analysis_trajectory_video_unknown_key_is_rejected(tmp_path: Path) -> No
     assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
 
 
-def test_analysis_trajectory_video_sweep_inset_rejects_invalid_corner(tmp_path: Path) -> None:
+def test_analysis_trajectory_video_rejects_removed_sweep_inset_key(tmp_path: Path) -> None:
     payload = _base_config()
     payload["cruncher"]["analysis"] = {
         "enabled": True,
         "trajectory_video": {
             "enabled": True,
-            "sweep_inset": {"enabled": True, "corner": "middle"},
+            "sweep_inset": {"enabled": True, "corner": "auto"},
         },
     }
     config_path = _write_config(tmp_path, payload)
-    with pytest.raises(ValidationError, match="analysis.trajectory_video.sweep_inset.corner"):
+    with pytest.raises(ValidationError) as exc:
         load_config(config_path)
+    assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
 
 
 @pytest.mark.parametrize(

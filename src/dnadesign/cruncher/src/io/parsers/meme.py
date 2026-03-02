@@ -10,7 +10,7 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
 from typing import Optional
@@ -179,142 +179,194 @@ def _parse_meme_xml_text(text: str, path: Path) -> MemeFileParseResult:
     return MemeFileParseResult(motifs=motifs_out, meta=MemeFileMeta())
 
 
-def parse_meme_text(text: str, path: Path) -> MemeFileParseResult:
-    meta = MemeFileMeta()
-    motifs_out: list[MemeMotif] = []
+@dataclass(slots=True)
+class _MemeTextParseContext:
+    meta: MemeFileMeta = field(default_factory=MemeFileMeta)
+    motifs_out: list[MemeMotif] = field(default_factory=list)
     current: dict[str, object] | None = None
     state: Optional[str] = None
-    bg_next = False
+    bg_next: bool = False
+
+
+def _handle_separator_line(*, ctx: _MemeTextParseContext, stripped: str) -> bool:
+    if not stripped:
+        if ctx.state in {"prob_matrix", "log_odds", "blocks", "pvalues"}:
+            ctx.state = None
+        if ctx.bg_next:
+            ctx.bg_next = False
+        return True
+    if stripped == "//":
+        if ctx.state in {"prob_matrix", "log_odds", "blocks", "pvalues"}:
+            ctx.state = None
+        return True
+    return False
+
+
+def _handle_header_line(*, ctx: _MemeTextParseContext, stripped: str, lower: str, path: Path) -> bool:
+    version_match = _VERSION_RE.match(stripped)
+    if version_match:
+        ctx.meta = _replace_meta(ctx.meta, version=version_match.group("version").strip())
+        return True
+
+    cmd_match = _CMD_RE.match(stripped)
+    if cmd_match:
+        ctx.meta = _replace_meta(ctx.meta, command_line=cmd_match.group("cmd").strip())
+        return True
+
+    train_match = _TRAINING_RE.match(stripped)
+    if train_match:
+        ctx.meta = _replace_meta(ctx.meta, training_set=train_match.group("path").strip())
+        return True
+
+    alpha_match = _ALPHABET_RE.match(stripped)
+    if alpha_match:
+        alphabet = alpha_match.group(1).strip().replace(" ", "")
+        if alphabet.upper() != "ACGT":
+            raise ValueError(f"Unsupported MEME alphabet '{alphabet}' in {path}. Expected ACGT.")
+        ctx.meta = _replace_meta(ctx.meta, alphabet=alphabet.upper())
+        return True
+
+    if "background letter frequencies" in lower:
+        ctx.bg_next = True
+        return True
+
+    if ctx.bg_next:
+        freq_match = _BG_FREQ_RE.search(stripped)
+        if freq_match:
+            freqs = tuple(float(val) for val in freq_match.groups())
+            ctx.meta = _replace_meta(ctx.meta, background_freqs=freqs)
+        ctx.bg_next = False
+        return True
+
+    return False
+
+
+def _handle_section_start(*, ctx: _MemeTextParseContext, stripped: str, lower: str, path: Path) -> bool:
+    if _start_motif_section(ctx=ctx, stripped=stripped, path=path):
+        return True
+    if _start_matrix_section(ctx=ctx, stripped=stripped, lower=lower, path=path):
+        return True
+    return _start_sites_section(ctx=ctx, lower=lower, path=path)
+
+
+def _start_motif_section(*, ctx: _MemeTextParseContext, stripped: str, path: Path) -> bool:
+    if not stripped.startswith("MOTIF "):
+        return False
+    if ctx.current is not None:
+        ctx.motifs_out.append(_finalize_motif(ctx.current, path))
+    ctx.current = _init_motif(stripped)
+    ctx.state = None
+    return True
+
+
+def _start_matrix_section(*, ctx: _MemeTextParseContext, stripped: str, lower: str, path: Path) -> bool:
+    if lower.startswith("letter-probability matrix"):
+        if ctx.current is None:
+            raise ValueError(f"Found letter-probability matrix before MOTIF in {path}.")
+        _update_matrix_meta(ctx.current, stripped, path)
+        ctx.state = "prob_matrix"
+        return True
+    if lower.startswith("log-odds matrix"):
+        if ctx.current is None:
+            raise ValueError(f"Found log-odds matrix before MOTIF in {path}.")
+        _update_matrix_meta(ctx.current, stripped, path, log_odds=True)
+        ctx.state = "log_odds"
+        return True
+    return False
+
+
+def _start_sites_section(*, ctx: _MemeTextParseContext, lower: str, path: Path) -> bool:
+    if "sites sorted by position" in lower and "p-value" in lower:
+        if ctx.current is None:
+            raise ValueError(f"Found sites table before MOTIF in {path}.")
+        ctx.state = "pvalues"
+        return True
+    if "blocks format" not in lower:
+        return False
+    if ctx.current is None:
+        raise ValueError(f"Found BLOCKS section before MOTIF in {path}.")
+    ctx.state = "blocks"
+    return True
+
+
+def _consume_section_line(*, ctx: _MemeTextParseContext, stripped: str, lower: str, path: Path) -> bool:
+    if _consume_matrix_line(ctx=ctx, stripped=stripped, path=path):
+        return True
+    if _consume_pvalues_line(ctx=ctx, stripped=stripped, lower=lower):
+        return True
+    return _consume_blocks_line(ctx=ctx, stripped=stripped, lower=lower, path=path)
+
+
+def _consume_matrix_line(*, ctx: _MemeTextParseContext, stripped: str, path: Path) -> bool:
+    if ctx.state == "prob_matrix":
+        if stripped.startswith("---"):
+            return True
+        ctx.current["prob_rows"].append(_parse_matrix_row(stripped, path))
+        return True
+    if ctx.state == "log_odds":
+        if stripped.startswith("---"):
+            return True
+        ctx.current["logodds_rows"].append(_parse_matrix_row(stripped, path))
+        return True
+    return False
+
+
+def _consume_pvalues_line(*, ctx: _MemeTextParseContext, stripped: str, lower: str) -> bool:
+    if ctx.state != "pvalues":
+        return False
+    if stripped.startswith("---") or lower.startswith("sequence"):
+        return True
+    match = _PVAL_RE.match(stripped)
+    if match:
+        key = (match.group("name"), int(match.group("start")))
+        pval = float(match.group("pval"))
+        _store_pvalue(ctx.current, key, pval)
+    return True
+
+
+def _consume_blocks_line(*, ctx: _MemeTextParseContext, stripped: str, lower: str, path: Path) -> bool:
+    if ctx.state != "blocks":
+        return False
+    if stripped.startswith("---") or lower.startswith("sequence"):
+        return True
+    if lower.startswith("bl") and "motif" in lower:
+        return True
+    match = _BLOCK_SITE_RE.match(stripped)
+    if not match:
+        raise ValueError(f"Unrecognized BLOCKS line in {path}: '{stripped}'")
+    _add_block_site(
+        ctx.current,
+        match.group("name"),
+        int(match.group("start")),
+        match.group("seq"),
+        path,
+    )
+    return True
+
+
+def parse_meme_text(text: str, path: Path) -> MemeFileParseResult:
+    ctx = _MemeTextParseContext()
 
     for raw_line in text.splitlines():
         stripped = raw_line.strip()
         lower = stripped.lower()
 
-        if not stripped:
-            if state in {"prob_matrix", "log_odds", "blocks", "pvalues"}:
-                state = None
-            if bg_next:
-                bg_next = False
+        if _handle_separator_line(ctx=ctx, stripped=stripped):
             continue
-        if stripped == "//":
-            if state in {"prob_matrix", "log_odds", "blocks", "pvalues"}:
-                state = None
+        if _handle_header_line(ctx=ctx, stripped=stripped, lower=lower, path=path):
+            continue
+        if _handle_section_start(ctx=ctx, stripped=stripped, lower=lower, path=path):
+            continue
+        if _consume_section_line(ctx=ctx, stripped=stripped, lower=lower, path=path):
             continue
 
-        version_match = _VERSION_RE.match(stripped)
-        if version_match:
-            meta = _replace_meta(meta, version=version_match.group("version").strip())
-            continue
+    if ctx.current is not None:
+        ctx.motifs_out.append(_finalize_motif(ctx.current, path))
 
-        cmd_match = _CMD_RE.match(stripped)
-        if cmd_match:
-            meta = _replace_meta(meta, command_line=cmd_match.group("cmd").strip())
-            continue
-
-        train_match = _TRAINING_RE.match(stripped)
-        if train_match:
-            meta = _replace_meta(meta, training_set=train_match.group("path").strip())
-            continue
-
-        alpha_match = _ALPHABET_RE.match(stripped)
-        if alpha_match:
-            alphabet = alpha_match.group(1).strip().replace(" ", "")
-            if alphabet.upper() != "ACGT":
-                raise ValueError(f"Unsupported MEME alphabet '{alphabet}' in {path}. Expected ACGT.")
-            meta = _replace_meta(meta, alphabet=alphabet.upper())
-            continue
-
-        if "background letter frequencies" in lower:
-            bg_next = True
-            continue
-
-        if bg_next:
-            freq_match = _BG_FREQ_RE.search(stripped)
-            if freq_match:
-                freqs = tuple(float(val) for val in freq_match.groups())
-                meta = _replace_meta(meta, background_freqs=freqs)
-            bg_next = False
-            continue
-
-        if stripped.startswith("MOTIF "):
-            if current is not None:
-                motifs_out.append(_finalize_motif(current, path))
-            current = _init_motif(stripped)
-            state = None
-            continue
-
-        if lower.startswith("letter-probability matrix"):
-            if current is None:
-                raise ValueError(f"Found letter-probability matrix before MOTIF in {path}.")
-            _update_matrix_meta(current, stripped, path)
-            state = "prob_matrix"
-            continue
-
-        if lower.startswith("log-odds matrix"):
-            if current is None:
-                raise ValueError(f"Found log-odds matrix before MOTIF in {path}.")
-            _update_matrix_meta(current, stripped, path, log_odds=True)
-            state = "log_odds"
-            continue
-
-        if "sites sorted by position" in lower and "p-value" in lower:
-            if current is None:
-                raise ValueError(f"Found sites table before MOTIF in {path}.")
-            state = "pvalues"
-            continue
-
-        if "blocks format" in lower:
-            if current is None:
-                raise ValueError(f"Found BLOCKS section before MOTIF in {path}.")
-            state = "blocks"
-            continue
-
-        if state == "prob_matrix":
-            if stripped.startswith("---"):
-                continue
-            current["prob_rows"].append(_parse_matrix_row(stripped, path))
-            continue
-
-        if state == "log_odds":
-            if stripped.startswith("---"):
-                continue
-            current["logodds_rows"].append(_parse_matrix_row(stripped, path))
-            continue
-
-        if state == "pvalues":
-            if stripped.startswith("---") or lower.startswith("sequence"):
-                continue
-            match = _PVAL_RE.match(stripped)
-            if match:
-                key = (match.group("name"), int(match.group("start")))
-                pval = float(match.group("pval"))
-                _store_pvalue(current, key, pval)
-            continue
-
-        if state == "blocks":
-            if stripped.startswith("---") or lower.startswith("sequence"):
-                continue
-            if lower.startswith("bl") and "motif" in lower:
-                continue
-            match = _BLOCK_SITE_RE.match(stripped)
-            if not match:
-                raise ValueError(f"Unrecognized BLOCKS line in {path}: '{stripped}'")
-            _add_block_site(
-                current,
-                match.group("name"),
-                int(match.group("start")),
-                match.group("seq"),
-                path,
-            )
-            continue
-
-    if current is not None:
-        motifs_out.append(_finalize_motif(current, path))
-
-    if not motifs_out:
+    if not ctx.motifs_out:
         raise ValueError(f"No motifs parsed from MEME file {path}.")
 
-    return MemeFileParseResult(motifs=motifs_out, meta=meta)
+    return MemeFileParseResult(motifs=ctx.motifs_out, meta=ctx.meta)
 
 
 def _replace_meta(meta: MemeFileMeta, **kwargs) -> MemeFileMeta:

@@ -79,7 +79,10 @@ def _write_tradeoff_plot(source_summary_df: pd.DataFrame, out_path: Path) -> Pat
     ax.set_title("Source-level tradeoff: score vs sequence diversity")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+    ax.set_axisbelow(True)
     ax.grid(alpha=0.25)
+    for grid_line in [*ax.get_xgridlines(), *ax.get_ygridlines()]:
+        grid_line.set_zorder(0)
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=250, bbox_inches="tight")

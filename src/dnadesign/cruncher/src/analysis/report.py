@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import math
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -129,25 +130,14 @@ def _plot_path_from_manifest(base: Path, key: str) -> str | None:
     return None
 
 
-def build_report_payload(
-    *,
-    analysis_root: Path,
-    summary_payload: dict,
-    diagnostics_payload: dict | None = None,
-    objective_components: dict | None = None,
-    overlap_summary: dict | None = None,
-    analysis_used_payload: dict | None = None,
-) -> dict[str, object]:
-    diagnostics_payload = diagnostics_payload or summary_payload.get("diagnostics")
-    objective_components = objective_components or summary_payload.get("objective_components")
-    overlap_summary = overlap_summary or summary_payload.get("overlap_summary")
+def _first_non_none(*values: object) -> object | None:
+    for value in values:
+        if value is not None:
+            return value
+    return None
 
-    def _first_non_none(*values: object) -> object | None:
-        for value in values:
-            if value is not None:
-                return value
-        return None
 
+def _resolve_analysis_formats(analysis_used_payload: dict | None) -> tuple[str, str]:
     analysis_cfg = {}
     if isinstance(analysis_used_payload, dict):
         analysis_cfg = analysis_used_payload.get("analysis") or analysis_used_payload.get("analysis_base") or {}
@@ -156,8 +146,21 @@ def build_report_payload(
     if isinstance(analysis_cfg, dict):
         table_format = str(analysis_cfg.get("table_format") or table_format)
         plot_format = str(analysis_cfg.get("plot_format") or plot_format)
-    start_here_key = "elite_score_space_context"
+    return table_format, plot_format
 
+
+@dataclass(frozen=True)
+class _DiagnosticsContext:
+    status: object
+    warnings: object
+    trace_metrics: dict[str, object]
+    optimizer_metrics: dict[str, object]
+    seq_metrics: dict[str, object]
+    elites_metrics: dict[str, object]
+    sample_metrics: dict[str, object]
+
+
+def _build_diagnostics_context(diagnostics_payload: dict | None) -> _DiagnosticsContext:
     metrics = {}
     warnings = []
     status = None
@@ -165,102 +168,148 @@ def build_report_payload(
         metrics = diagnostics_payload.get("metrics") or {}
         warnings = diagnostics_payload.get("warnings") or []
         status = diagnostics_payload.get("status")
-
     trace_metrics = metrics.get("trace") if isinstance(metrics, dict) else {}
     optimizer_metrics = metrics.get("optimizer") if isinstance(metrics, dict) else {}
     seq_metrics = metrics.get("sequences") if isinstance(metrics, dict) else {}
     elites_metrics = metrics.get("elites") if isinstance(metrics, dict) else {}
     sample_metrics = metrics.get("sample") if isinstance(metrics, dict) else {}
+    return _DiagnosticsContext(
+        status=status,
+        warnings=warnings,
+        trace_metrics=trace_metrics if isinstance(trace_metrics, dict) else {},
+        optimizer_metrics=optimizer_metrics if isinstance(optimizer_metrics, dict) else {},
+        seq_metrics=seq_metrics if isinstance(seq_metrics, dict) else {},
+        elites_metrics=elites_metrics if isinstance(elites_metrics, dict) else {},
+        sample_metrics=sample_metrics if isinstance(sample_metrics, dict) else {},
+    )
 
-    tf_names = summary_payload.get("tf_names") if isinstance(summary_payload, dict) else None
-    run_name = summary_payload.get("run") if isinstance(summary_payload, dict) else None
-    analysis_id = summary_payload.get("analysis_id") if isinstance(summary_payload, dict) else None
 
-    highlights_objective = {}
-    if isinstance(objective_components, dict):
-        highlights_objective = {
-            "best_score_final": _safe_float(objective_components.get("best_score_final")),
-            "top_k_median_final": _safe_float(objective_components.get("top_k_median_final")),
-            "median_min_scaled_tf": _safe_float(objective_components.get("median_min_scaled_tf")),
-            "worst_tf_frequency": objective_components.get("worst_tf_frequency"),
-        }
-    highlights_diversity = {
+def _build_highlights_objective(objective_components: dict | None) -> dict[str, object]:
+    if not isinstance(objective_components, dict):
+        return {}
+    return {
+        "best_score_final": _safe_float(objective_components.get("best_score_final")),
+        "top_k_median_final": _safe_float(objective_components.get("top_k_median_final")),
+        "median_min_scaled_tf": _safe_float(objective_components.get("median_min_scaled_tf")),
+        "worst_tf_frequency": objective_components.get("worst_tf_frequency"),
+    }
+
+
+def _build_highlights_diversity(
+    *,
+    objective_components: dict | None,
+    seq_metrics: dict[str, object],
+    elites_metrics: dict[str, object],
+) -> dict[str, object]:
+    objective_data = objective_components if isinstance(objective_components, dict) else {}
+    return {
         "unique_fraction": _safe_float(
             _first_non_none(
-                (objective_components or {}).get("unique_fraction_canonical"),
-                (objective_components or {}).get("unique_fraction_raw"),
-                (seq_metrics or {}).get("unique_fraction"),
+                objective_data.get("unique_fraction_canonical"),
+                objective_data.get("unique_fraction_raw"),
+                seq_metrics.get("unique_fraction"),
             )
         ),
-        "n_elites": _safe_int((elites_metrics or {}).get("n_elites")),
-        "diversity_hamming": _safe_float((elites_metrics or {}).get("diversity_hamming")),
+        "n_elites": _safe_int(elites_metrics.get("n_elites")),
+        "diversity_hamming": _safe_float(elites_metrics.get("diversity_hamming")),
     }
-    highlights_overlap = {
+
+
+def _build_highlights_overlap(
+    *,
+    overlap_summary: dict | None,
+    objective_components: dict | None,
+    elites_metrics: dict[str, object],
+) -> dict[str, object]:
+    overlap_data = overlap_summary if isinstance(overlap_summary, dict) else {}
+    objective_data = objective_components if isinstance(objective_components, dict) else {}
+    return {
         "overlap_rate_median": _safe_float(
             _first_non_none(
-                (overlap_summary or {}).get("overlap_rate_median"),
-                (elites_metrics or {}).get("overlap_rate_median"),
+                overlap_data.get("overlap_rate_median"),
+                elites_metrics.get("overlap_rate_median"),
             )
         ),
         "overlap_total_bp_median": _safe_float(
             _first_non_none(
-                (overlap_summary or {}).get("overlap_total_bp_median"),
-                (objective_components or {}).get("overlap_total_bp_median"),
+                overlap_data.get("overlap_total_bp_median"),
+                objective_data.get("overlap_total_bp_median"),
             )
         ),
     }
-    highlights_sampling = {
-        "rhat": _safe_float((trace_metrics or {}).get("rhat")),
-        "ess": _safe_float((trace_metrics or {}).get("ess")),
-        "ess_ratio": _safe_float((trace_metrics or {}).get("ess_ratio")),
-        "acceptance_rate_non_s_tail": _safe_float((optimizer_metrics or {}).get("acceptance_rate_non_s_tail")),
-        "acceptance_tail_rugged": _safe_float((optimizer_metrics or {}).get("acceptance_tail_rugged")),
-        "downhill_accept_tail_rugged": _safe_float((optimizer_metrics or {}).get("downhill_accept_tail_rugged")),
-        "gibbs_flip_rate_tail": _safe_float((optimizer_metrics or {}).get("gibbs_flip_rate_tail")),
+
+
+def _build_highlights_sampling(
+    *,
+    trace_metrics: dict[str, object],
+    optimizer_metrics: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "rhat": _safe_float(trace_metrics.get("rhat")),
+        "ess": _safe_float(trace_metrics.get("ess")),
+        "ess_ratio": _safe_float(trace_metrics.get("ess_ratio")),
+        "acceptance_rate_non_s_tail": _safe_float(optimizer_metrics.get("acceptance_rate_non_s_tail")),
+        "acceptance_tail_rugged": _safe_float(optimizer_metrics.get("acceptance_tail_rugged")),
+        "downhill_accept_tail_rugged": _safe_float(optimizer_metrics.get("downhill_accept_tail_rugged")),
+        "gibbs_flip_rate_tail": _safe_float(optimizer_metrics.get("gibbs_flip_rate_tail")),
     }
-    highlights_learning = {}
-    if isinstance(objective_components, dict):
-        learning_payload = objective_components.get("learning")
-        if isinstance(learning_payload, dict):
-            early_payload = learning_payload.get("early_stop") if isinstance(learning_payload, dict) else None
-            early_payload = early_payload if isinstance(early_payload, dict) else {}
-            highlights_learning = {
-                "best_score_draw": _safe_int(learning_payload.get("best_score_draw")),
-                "best_score_chain": _safe_int(learning_payload.get("best_score_chain")),
-                "last_improvement_draw": _safe_int(learning_payload.get("last_improvement_draw")),
-                "plateau_draws": _safe_int(learning_payload.get("plateau_draws")),
-                "early_stop_earliest_draw": _safe_int(early_payload.get("earliest_draw")),
-                "early_stop_stopped_chains": _safe_int(early_payload.get("stopped_chains")),
-            }
 
-    autopicks = None
-    if isinstance(analysis_used_payload, dict):
-        autopicks = analysis_used_payload.get("analysis_autopicks")
 
-    run_block = {
+def _build_highlights_learning(objective_components: dict | None) -> dict[str, object]:
+    if not isinstance(objective_components, dict):
+        return {}
+    learning_payload = objective_components.get("learning")
+    if not isinstance(learning_payload, dict):
+        return {}
+    early_payload = learning_payload.get("early_stop") if isinstance(learning_payload.get("early_stop"), dict) else {}
+    return {
+        "best_score_draw": _safe_int(learning_payload.get("best_score_draw")),
+        "best_score_chain": _safe_int(learning_payload.get("best_score_chain")),
+        "last_improvement_draw": _safe_int(learning_payload.get("last_improvement_draw")),
+        "plateau_draws": _safe_int(learning_payload.get("plateau_draws")),
+        "early_stop_earliest_draw": _safe_int(early_payload.get("earliest_draw")),
+        "early_stop_stopped_chains": _safe_int(early_payload.get("stopped_chains")),
+    }
+
+
+def _build_run_block(
+    *,
+    summary_payload: dict,
+    diagnostics: _DiagnosticsContext,
+) -> dict[str, object]:
+    run_name = summary_payload.get("run") if isinstance(summary_payload, dict) else None
+    analysis_id = summary_payload.get("analysis_id") if isinstance(summary_payload, dict) else None
+    tf_names = summary_payload.get("tf_names") if isinstance(summary_payload, dict) else None
+    optimizer_kind = diagnostics.optimizer_metrics.get("kind")
+    chains = _safe_int(
+        _first_non_none(
+            diagnostics.sample_metrics.get("chains"),
+            diagnostics.trace_metrics.get("chains"),
+        )
+    )
+    draws = _safe_int(
+        _first_non_none(
+            diagnostics.sample_metrics.get("draws"),
+            diagnostics.trace_metrics.get("draws"),
+        )
+    )
+    return {
         "run": run_name,
         "analysis_id": analysis_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "tf_names": tf_names,
-        "optimizer_kind": optimizer_metrics.get("kind") if isinstance(optimizer_metrics, dict) else None,
-        "chains": _safe_int(
-            _first_non_none(
-                sample_metrics.get("chains") if isinstance(sample_metrics, dict) else None,
-                trace_metrics.get("chains") if isinstance(trace_metrics, dict) else None,
-            )
-        ),
-        "draws": _safe_int(
-            _first_non_none(
-                sample_metrics.get("draws") if isinstance(sample_metrics, dict) else None,
-                trace_metrics.get("draws") if isinstance(trace_metrics, dict) else None,
-            )
-        ),
-        "tune": _safe_int(sample_metrics.get("tune")) if isinstance(sample_metrics, dict) else None,
-        "n_sequences": _safe_int(seq_metrics.get("n_sequences")) if isinstance(seq_metrics, dict) else None,
-        "n_elites": _safe_int(elites_metrics.get("n_elites")) if isinstance(elites_metrics, dict) else None,
+        "optimizer_kind": optimizer_kind,
+        "chains": chains,
+        "draws": draws,
+        "tune": _safe_int(diagnostics.sample_metrics.get("tune")),
+        "n_sequences": _safe_int(diagnostics.seq_metrics.get("n_sequences")),
+        "n_elites": _safe_int(diagnostics.elites_metrics.get("n_elites")),
     }
 
-    pointers = {
+
+def _build_report_paths(*, analysis_root: Path, table_format: str, plot_format: str) -> dict[str, object]:
+    start_here_key = "elite_score_space_context"
+    return {
         "start_here_plot": _plot_path_from_manifest(analysis_root, start_here_key)
         or _plot_path(analysis_root, start_here_key, plot_format),
         "trajectory_plot": _plot_path_from_manifest(analysis_root, "elite_score_space_context")
@@ -278,11 +327,57 @@ def build_report_payload(
         "table_manifest": _relative_if_exists(analysis_root, table_manifest_path(analysis_root)),
     }
 
+
+def build_report_payload(
+    *,
+    analysis_root: Path,
+    summary_payload: dict,
+    diagnostics_payload: dict | None = None,
+    objective_components: dict | None = None,
+    overlap_summary: dict | None = None,
+    analysis_used_payload: dict | None = None,
+) -> dict[str, object]:
+    diagnostics_payload = diagnostics_payload or summary_payload.get("diagnostics")
+    objective_components = objective_components or summary_payload.get("objective_components")
+    overlap_summary = overlap_summary or summary_payload.get("overlap_summary")
+    diagnostics = _build_diagnostics_context(diagnostics_payload if isinstance(diagnostics_payload, dict) else None)
+    table_format, plot_format = _resolve_analysis_formats(
+        analysis_used_payload if isinstance(analysis_used_payload, dict) else None
+    )
+
+    highlights_objective = _build_highlights_objective(
+        objective_components if isinstance(objective_components, dict) else None
+    )
+    highlights_diversity = _build_highlights_diversity(
+        objective_components=objective_components if isinstance(objective_components, dict) else None,
+        seq_metrics=diagnostics.seq_metrics,
+        elites_metrics=diagnostics.elites_metrics,
+    )
+    highlights_overlap = _build_highlights_overlap(
+        overlap_summary=overlap_summary if isinstance(overlap_summary, dict) else None,
+        objective_components=objective_components if isinstance(objective_components, dict) else None,
+        elites_metrics=diagnostics.elites_metrics,
+    )
+    highlights_sampling = _build_highlights_sampling(
+        trace_metrics=diagnostics.trace_metrics,
+        optimizer_metrics=diagnostics.optimizer_metrics,
+    )
+    highlights_learning = _build_highlights_learning(
+        objective_components if isinstance(objective_components, dict) else None
+    )
+    autopicks = analysis_used_payload.get("analysis_autopicks") if isinstance(analysis_used_payload, dict) else None
+    run_block = _build_run_block(summary_payload=summary_payload, diagnostics=diagnostics)
+    pointers = _build_report_paths(
+        analysis_root=analysis_root,
+        table_format=table_format,
+        plot_format=plot_format,
+    )
+
     payload: dict[str, object] = {
         "report_version": "v1",
         "run": run_block,
-        "status": status,
-        "warnings": warnings,
+        "status": diagnostics.status,
+        "warnings": diagnostics.warnings,
         "highlights": {
             "objective": highlights_objective,
             "diversity": highlights_diversity,

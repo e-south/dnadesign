@@ -435,7 +435,10 @@ def compute_layout(
     style: Style,
     *,
     fixed_n: int | None = None,
+    fixed_content_top_extent_px: float | None = None,
+    fixed_content_bottom_extent_px: float | None = None,
     fixed_content_radius_px: float | None = None,
+    extra_bottom_padding_px: float = 0.0,
 ) -> LayoutContext:
     cell = measure_char_cell(style.font_mono, style.font_size_seq, style.dpi)
     cw, ch = cell.width, cell.height
@@ -600,21 +603,44 @@ def compute_layout(
     centerline_base = (y_forward_base + y_reverse_base) / 2.0 if show_two else y_forward_base
     top_extent = raw_content_top - centerline_base
     bottom_extent = centerline_base - raw_content_bottom
-    content_radius = max(top_extent, bottom_extent)
+    content_top_extent = float(top_extent)
+    content_bottom_extent = float(bottom_extent)
+    if (
+        fixed_content_top_extent_px is None
+        and fixed_content_bottom_extent_px is None
+        and fixed_content_radius_px is None
+    ):
+        content_radius = max(content_top_extent, content_bottom_extent)
+        content_top_extent = content_radius
+        content_bottom_extent = content_radius
+    if fixed_content_top_extent_px is not None:
+        fixed_top_extent = float(fixed_content_top_extent_px)
+        if not math.isfinite(fixed_top_extent) or fixed_top_extent <= 0:
+            raise BoundsError("fixed_content_top_extent_px must be finite and > 0")
+        content_top_extent = max(content_top_extent, fixed_top_extent)
+    if fixed_content_bottom_extent_px is not None:
+        fixed_bottom_extent = float(fixed_content_bottom_extent_px)
+        if not math.isfinite(fixed_bottom_extent) or fixed_bottom_extent <= 0:
+            raise BoundsError("fixed_content_bottom_extent_px must be finite and > 0")
+        content_bottom_extent = max(content_bottom_extent, fixed_bottom_extent)
     if fixed_content_radius_px is not None:
         fixed_radius = float(fixed_content_radius_px)
         if not math.isfinite(fixed_radius) or fixed_radius <= 0:
             raise BoundsError("fixed_content_radius_px must be finite and > 0")
-        content_radius = max(content_radius, fixed_radius)
-    content_bottom_raw = centerline_base - content_radius
-    content_top_raw = centerline_base + content_radius
+        content_top_extent = max(content_top_extent, fixed_radius)
+        content_bottom_extent = max(content_bottom_extent, fixed_radius)
+    content_bottom_raw = centerline_base - content_bottom_extent
+    content_top_raw = centerline_base + content_top_extent
     outer_pad = style.layout.outer_pad_cells * ch
     legend_mode = str(style.legend_mode).lower()
     draw_bottom_legend = bool(style.legend) and legend_mode == "bottom"
     legend_space = (float(style.legend_height_px) + float(style.legend_pad_px)) if draw_bottom_legend else 0.0
     label_height = style.font_size_label / 72.0 * style.dpi
     header_margin = max(label_height * 0.9, ch * 0.55)
-    desired_bottom = style.padding_y + outer_pad + legend_space + header_margin
+    extra_bottom = float(extra_bottom_padding_px)
+    if not math.isfinite(extra_bottom) or extra_bottom < 0.0:
+        raise BoundsError("extra_bottom_padding_px must be finite and >= 0")
+    desired_bottom = style.padding_y + outer_pad + legend_space + header_margin + extra_bottom
     shift = desired_bottom - content_bottom_raw
 
     shifted_placements: list[FeaturePlacement] = []

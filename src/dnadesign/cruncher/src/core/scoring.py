@@ -451,7 +451,7 @@ class Scorer:
 
             # If z-score requested:
             if self.scale == "z":
-                # z = (raw_llr - mean_null) / std_null
+                # z-score uses the null distribution mean and standard deviation.
                 z_val = (raw_llr - info.null_mean) / info.null_std
                 out[tf] = float(z_val)
                 continue

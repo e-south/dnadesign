@@ -73,7 +73,7 @@ runbook:
     - -c
     - configs/config.yaml
   - id: analyze_summary
-    description: Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4.
+    description: Analyze run outputs and emit plots/chain_trajectory_video.mp4 from the enabled trajectory_video config.
     run:
     - analyze
     - --summary

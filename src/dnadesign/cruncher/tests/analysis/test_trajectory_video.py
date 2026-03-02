@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -269,8 +270,8 @@ def test_render_chain_trajectory_video_uses_strict_baserender_run_contract(tmp_p
 
     output_cfg = dict(captured["job"]["outputs"][0])
     assert "width_px" not in output_cfg
+    assert "height_px" not in output_cfg
     assert "aspect" not in output_cfg
-    assert int(output_cfg["height_px"]) == 820
     assert str(output_cfg["title_text"]) == "Best-so-far motif placement improves over sweeps"
     assert int(output_cfg["title_font_size"]) == 12
     assert str(output_cfg["title_align"]) == "center"
@@ -279,13 +280,17 @@ def test_render_chain_trajectory_video_uses_strict_baserender_run_contract(tmp_p
     assert float(pauses.get("chain_1_frame_0003", 0.0)) > float(pauses.get("chain_1_frame_0001", 0.0))
 
     records_df = captured["records_df"]
-    overlays = [json.loads(str(raw)).get("overlay_text") for raw in records_df["display"].tolist()]
+    displays = [json.loads(str(raw)) for raw in records_df["display"].tolist()]
+    overlays = [display.get("overlay_text") for display in displays]
     assert all(overlay is None for overlay in overlays)
+    subtitles = [str(display.get("video_subtitle") or "") for display in displays]
+    assert all(re.fullmatch(r"lexA=\d\.\d{2}", subtitle) for subtitle in subtitles)
+    assert all(subtitles)
     assert not (tmp_path / "_tmp").exists()
     assert int(result["pause_events"]) >= 1
 
 
-def test_render_chain_trajectory_video_can_embed_you_are_here_inset_payload(tmp_path, monkeypatch) -> None:
+def test_render_chain_trajectory_video_embeds_side_panel_payload(tmp_path, monkeypatch) -> None:
     pwm = PWM(
         name="lexA",
         matrix=np.asarray(
@@ -308,7 +313,6 @@ def test_render_chain_trajectory_video_can_embed_you_are_here_inset_payload(tmp_
         }
     )
     cfg = AnalysisTrajectoryVideoConfig(
-        sweep_inset={"enabled": True, "corner": "bottom_left"},
         playback={"target_duration_sec": 4.0, "fps": 8},
         limits={"max_total_frames": 32, "max_snapshots": 16, "max_estimated_render_sec": 30.0},
     )
@@ -337,12 +341,68 @@ def test_render_chain_trajectory_video_can_embed_you_are_here_inset_payload(tmp_
     )
     assert result["snapshot_count"] >= 2
     records_df = captured["records_df"]
-    first_display = json.loads(str(records_df.iloc[0]["display"]))
-    inset = dict(first_display["trajectory_inset"])
-    assert inset["corner"] == "bottom_left"
-    assert "label" not in inset
-    assert len(inset["x"]) == len(inset["y"])
-    assert int(inset["point_index"]) >= 0
+    displays = [json.loads(str(raw)) for raw in records_df["display"].tolist()]
+    assert all("trajectory_panel" in display for display in displays)
+    first_panel = dict(displays[0]["trajectory_panel"])
+    assert len(first_panel["x"]) == len(first_panel["y"])
+    assert int(first_panel["point_index"]) >= 0
+    assert str(first_panel.get("y_label") or "").strip() != ""
+    assert "inset_corner" not in result
+
+
+def test_render_chain_trajectory_video_replaces_final_still_with_polished_sequence(tmp_path, monkeypatch) -> None:
+    pwm = PWM(
+        name="lexA",
+        matrix=np.asarray(
+            [
+                [0.7, 0.1, 0.1, 0.1],
+                [0.1, 0.7, 0.1, 0.1],
+                [0.1, 0.1, 0.7, 0.1],
+                [0.1, 0.1, 0.1, 0.7],
+            ],
+            dtype=float,
+        ),
+    )
+    trajectory_df = pd.DataFrame(
+        {
+            "chain": [0, 0, 0],
+            "sweep": [0, 1, 2],
+            "phase": ["draw", "draw", "draw"],
+            "objective_scalar": [0.2, 0.4, 0.6],
+            "sequence": ["ACGTACGT", "ACGTTCGT", "ACGTTTGT"],
+        }
+    )
+    cfg = AnalysisTrajectoryVideoConfig(
+        playback={"target_duration_sec": 4.0, "fps": 8},
+        limits={"max_total_frames": 32, "max_snapshots": 16, "max_estimated_render_sec": 30.0},
+    )
+    out_path = tmp_path / "video.mp4"
+    captured: dict[str, object] = {}
+
+    def _fake_run_job(job_mapping: dict[str, object], *, kind: str, caller_root: Path) -> None:
+        del kind, caller_root
+        captured["records_df"] = pd.read_parquet(Path(str(job_mapping["input"]["path"])))
+        out = Path(str(job_mapping["outputs"][0]["path"]))
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"fake-mp4")
+
+    monkeypatch.setattr("dnadesign.cruncher.analysis.trajectory_video.run_job", _fake_run_job)
+    render_chain_trajectory_video(
+        trajectory_df=trajectory_df,
+        tf_names=["lexA"],
+        pwms={"lexA": pwm},
+        out_path=out_path,
+        config=cfg,
+        bidirectional=True,
+        pwm_pseudocounts=0.0,
+        log_odds_clip=None,
+        tmp_root=tmp_path / "_tmp",
+        polished_final_sequence="CGTTTGT",
+    )
+
+    assert out_path.exists()
+    records_df = captured["records_df"]
+    assert str(records_df.iloc[-1]["sequence"]).strip().upper() == "CGTTTGT"
 
 
 def test_render_chain_trajectory_video_supports_pandas_str_dtype_mode(tmp_path, monkeypatch) -> None:
@@ -400,6 +460,73 @@ def test_render_chain_trajectory_video_supports_pandas_str_dtype_mode(tmp_path, 
 
     assert out_path.exists()
     assert result["snapshot_count"] >= 2
+
+
+def test_render_chain_trajectory_video_scores_repeated_best_so_far_sources_once(tmp_path, monkeypatch) -> None:
+    pwm = PWM(
+        name="lexA",
+        matrix=np.asarray(
+            [
+                [0.7, 0.1, 0.1, 0.1],
+                [0.1, 0.7, 0.1, 0.1],
+                [0.1, 0.1, 0.7, 0.1],
+                [0.1, 0.1, 0.1, 0.7],
+            ],
+            dtype=float,
+        ),
+    )
+    trajectory_df = pd.DataFrame(
+        {
+            "chain": [0, 0, 0, 0, 0],
+            "sweep": [0, 1, 2, 3, 4],
+            "phase": ["draw", "draw", "draw", "draw", "draw"],
+            "objective_scalar": [0.2, 0.6, 0.5, 0.7, 0.65],
+            "sequence": ["ACGTACGT", "ACGTTCGT", "ACGTACGT", "ACGTTTGT", "ACGTTCGT"],
+        }
+    )
+    cfg = AnalysisTrajectoryVideoConfig(
+        playback={"target_duration_sec": 5.0, "fps": 8, "pause_on_best_update_sec": 0.0},
+        sampling={"stride": 1, "include_best_updates": True},
+        limits={"max_total_frames": 64, "max_snapshots": 32, "max_estimated_render_sec": 60.0},
+    )
+    out_path = tmp_path / "video_cached_scoring.mp4"
+    score_calls = 0
+
+    def _fake_compute_all_per_pwm_and_hits(self, sequence, sequence_len):  # noqa: ANN001
+        del self, sequence, sequence_len
+        nonlocal score_calls
+        score_calls += 1
+        return (
+            {"lexA": 0.5},
+            {"lexA": {"best_start": 0, "best_window_seq": "ACGT", "strand": "+"}},
+        )
+
+    def _fake_run_job(job_mapping: dict[str, object], *, kind: str, caller_root: Path) -> None:
+        del kind, caller_root
+        out = Path(str(job_mapping["outputs"][0]["path"]))
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"fake-mp4")
+
+    monkeypatch.setattr(
+        "dnadesign.cruncher.analysis.trajectory_video.Scorer.compute_all_per_pwm_and_hits",
+        _fake_compute_all_per_pwm_and_hits,
+    )
+    monkeypatch.setattr("dnadesign.cruncher.analysis.trajectory_video.run_job", _fake_run_job)
+    result = render_chain_trajectory_video(
+        trajectory_df=trajectory_df,
+        tf_names=["lexA"],
+        pwms={"lexA": pwm},
+        out_path=out_path,
+        config=cfg,
+        bidirectional=True,
+        pwm_pseudocounts=0.0,
+        log_odds_clip=None,
+        tmp_root=tmp_path / "_tmp",
+    )
+
+    assert out_path.exists()
+    assert result["snapshot_count"] == 5
+    assert score_calls == 3
 
 
 def test_render_chain_trajectory_video_requires_sequence_column(tmp_path) -> None:

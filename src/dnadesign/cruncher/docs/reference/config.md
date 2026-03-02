@@ -341,9 +341,6 @@ analysis:
       fps: 12
       pause_on_best_update_sec: 0.0
       sweep_taper_fraction: 0.25
-    sweep_inset:
-      enabled: false
-      corner: top_right            # top_left | top_right | bottom_left | bottom_right
     limits:
       max_snapshots: 120
       max_total_frames: 180
@@ -384,6 +381,7 @@ Notes:
 - `analysis.trajectory_video.enabled=true` emits a short mp4 in `plots/` (for example `plots/chain_trajectory_video.mp4`) using BaseRender:
   - default timeline is `best_so_far` on the selected chain (`selection.chain_policy=best`), which produces monotonic objective progression in frame-to-frame motif snapshots.
   - `timeline_mode=raw_chain` renders sweep-ordered sampled states directly.
+  - frames render as two fixed side-by-side panels: left `best score vs sweep` (with current frame marker), right elite showcase.
   - tune rows are eligible by default (`phase_scope=tune_and_draw_if_present`) to show early bad-to-good progression when tune rows exist.
   - trajectory rows must include `phase` and `sequence`; video generation fails fast when either column is missing.
   - guardrails are strict by schema: bounded duration, bounded fps, bounded frame/snapshot caps, and fail-fast budget checks (no unbounded video generation).

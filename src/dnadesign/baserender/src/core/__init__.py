@@ -22,7 +22,7 @@ from .errors import (
     SchemaError,
     SkipRecord,
 )
-from .record import Display, Effect, Feature, Record, TrajectoryInset
+from .record import Display, Effect, Feature, Record, TrajectoryPanel
 from .registry import (
     clear_feature_effect_contracts,
     get_effect_contract,
@@ -41,7 +41,7 @@ __all__ = [
     "Feature",
     "Effect",
     "Display",
-    "TrajectoryInset",
+    "TrajectoryPanel",
     "Record",
     "BaseRenderError",
     "SchemaError",

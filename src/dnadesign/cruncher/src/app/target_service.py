@@ -175,6 +175,230 @@ def _status_for_entry(
     raise ValueError("pwm_source must be 'matrix' or 'sites'")
 
 
+def _status_stub(
+    *,
+    set_index: int,
+    tf_name: str,
+    pwm_source: str,
+    status: str,
+    message: str,
+    source: str | None = None,
+    motif_id: str | None = None,
+) -> TargetStatus:
+    return TargetStatus(
+        set_index=int(set_index),
+        tf_name=tf_name,
+        source=source,
+        motif_id=motif_id,
+        organism=None,
+        has_matrix=False,
+        has_sites=False,
+        site_count=0,
+        site_total=0,
+        site_kind=None,
+        dataset_id=None,
+        matrix_source=None,
+        pwm_source=pwm_source,
+        status=status,
+        message=message,
+    )
+
+
+def _lockfile_metadata(
+    *,
+    use_lockfile: bool,
+    lock_path: Path,
+) -> tuple[dict[str, LockedMotif], str | None, list[str] | None, bool | None]:
+    if not (use_lockfile and lock_path.exists()):
+        return {}, None, None, None
+    lockfile = read_lockfile(lock_path)
+    return lockfile.resolved, lockfile.pwm_source, lockfile.site_kinds, lockfile.combine_sites
+
+
+def _lockfile_mismatch_message(
+    *,
+    targets: list[tuple[int, str]],
+    lockmap: dict[str, LockedMotif],
+    lockfile_pwm: str | None,
+    lockfile_site_kinds: list[str] | None,
+    lockfile_combine_sites: bool | None,
+    expected_pwm_source: str,
+    expected_site_kinds: list[str] | None,
+    expected_combine_sites: bool,
+) -> str | None:
+    required = {tf for _, tf in targets}
+    missing = required - set(lockmap.keys())
+    extra = set(lockmap.keys()) - required
+    mismatch: str | None = None
+    if not lockfile_pwm:
+        mismatch = "Lockfile missing pwm_source; re-run `cruncher lock <config>`."
+    elif lockfile_pwm != expected_pwm_source:
+        mismatch = (
+            f"Lockfile pwm_source='{lockfile_pwm}' does not match expected pwm_source='{expected_pwm_source}'. "
+            "Re-run `cruncher lock <config>`."
+        )
+    if expected_pwm_source == "sites":
+        if expected_site_kinds is not None and lockfile_site_kinds is not None:
+            if sorted(expected_site_kinds) != sorted(lockfile_site_kinds):
+                mismatch = (
+                    f"Lockfile site_kinds={lockfile_site_kinds} does not match expected site_kinds="
+                    f"{expected_site_kinds}. "
+                    "Re-run `cruncher lock <config>`."
+                )
+        if lockfile_combine_sites is not None and lockfile_combine_sites != expected_combine_sites:
+            mismatch = (
+                f"Lockfile combine_sites={lockfile_combine_sites} does not match expected combine_sites="
+                f"{expected_combine_sites}. "
+                "Re-run `cruncher lock <config>`."
+            )
+    if not (missing or extra or mismatch):
+        return None
+    details: list[str] = []
+    if missing:
+        details.append(f"missing: {', '.join(sorted(missing))}")
+    if extra:
+        details.append(f"extra: {', '.join(sorted(extra))}")
+    if mismatch:
+        details.append(mismatch)
+    return " | ".join(details) if details else "Lockfile mismatch."
+
+
+def _aggregate_site_entry_stats(
+    entries: list[CatalogEntry],
+) -> tuple[int, int, str | None, str | None]:
+    if not entries:
+        return 0, 0, None, None
+    return (
+        sum(candidate.site_count for candidate in entries),
+        sum(candidate.site_total for candidate in entries),
+        _merge_text(candidate.site_kind for candidate in entries),
+        _merge_text(candidate.dataset_id for candidate in entries),
+    )
+
+
+def _resolve_target_catalog_entry(
+    *,
+    set_index: int,
+    tf_name: str,
+    cfg: CruncherConfig,
+    catalog: CatalogIndex,
+    lockmap: dict[str, LockedMotif],
+    use_lockfile: bool,
+    pwm_source: str,
+    site_kinds: list[str] | None,
+    combine_sites: bool,
+    config_path: Path,
+) -> tuple[CatalogEntry | None, LockedMotif | None, TargetStatus | None]:
+    locked = lockmap.get(tf_name) if use_lockfile else None
+    if locked is not None:
+        entry = catalog.entries.get(f"{locked.source}:{locked.motif_id}")
+        if entry is None:
+            return (
+                None,
+                locked,
+                _status_stub(
+                    set_index=set_index,
+                    tf_name=tf_name,
+                    source=locked.source,
+                    motif_id=locked.motif_id,
+                    pwm_source=pwm_source,
+                    status="missing-catalog",
+                    message=f"Catalog entry missing for {locked.source}:{locked.motif_id}.",
+                ),
+            )
+        return entry, locked, None
+    if use_lockfile:
+        return (
+            None,
+            None,
+            _status_stub(
+                set_index=set_index,
+                tf_name=tf_name,
+                pwm_source=pwm_source,
+                status="missing-lock",
+                message=f"Missing lock entry for '{tf_name}'. Run `cruncher lock -c {config_path.name}`.",
+            ),
+        )
+    try:
+        entry = select_catalog_entry(
+            catalog=catalog,
+            tf_name=tf_name,
+            pwm_source=pwm_source,
+            site_kinds=site_kinds,
+            combine_sites=combine_sites,
+            source_preference=cfg.catalog.source_preference,
+            dataset_preference=cfg.catalog.dataset_preference,
+            dataset_map=cfg.catalog.dataset_map,
+            allow_ambiguous=cfg.catalog.allow_ambiguous,
+        )
+    except ValueError as exc:
+        return (
+            None,
+            None,
+            _status_stub(
+                set_index=set_index,
+                tf_name=tf_name,
+                pwm_source=pwm_source,
+                status="unresolved-target",
+                message=str(exc),
+            ),
+        )
+    return entry, None, None
+
+
+def _status_from_site_counts(
+    *,
+    pwm_source: str,
+    site_entries: list[CatalogEntry],
+    site_count: int,
+    min_sites_for_pwm: int,
+    allow_low_sites: bool,
+) -> tuple[str, str | None]:
+    if pwm_source != "sites":
+        raise ValueError("site-count status resolution requires pwm_source='sites'")
+    if not site_entries:
+        return "missing-sites", "No cached binding-site sequences available."
+    if site_count < int(min_sites_for_pwm):
+        msg = f"Only {site_count} sites available (cruncher.catalog.min_sites_for_pwm={int(min_sites_for_pwm)})."
+        return ("warning", msg) if allow_low_sites else ("insufficient-sites", msg)
+    return "ready", None
+
+
+def _validate_status_artifacts(
+    *,
+    catalog_root: Path,
+    entry: CatalogEntry,
+    site_entries: list[CatalogEntry],
+    pwm_source: str,
+    status: str,
+    message: str | None,
+    site_entries_require_window: bool,
+) -> tuple[str, str | None]:
+    if status not in {"ready", "warning"}:
+        return status, message
+    if pwm_source == "matrix" and entry.has_matrix:
+        motif_path = catalog_root / "normalized" / "motifs" / entry.source / f"{entry.motif_id}.json"
+        if not motif_path.exists():
+            return "missing-matrix-file", f"Motif file missing: {motif_path}"
+        return status, message
+    if pwm_source != "sites":
+        return status, message
+    missing_paths: list[str] = []
+    for candidate in site_entries:
+        sites_path = catalog_root / "normalized" / "sites" / candidate.source / f"{candidate.motif_id}.jsonl"
+        if not sites_path.exists():
+            missing_paths.append(str(sites_path))
+    if missing_paths:
+        return "missing-sites-file", f"Sites file missing: {missing_paths[0]}"
+    if site_entries_require_window:
+        return (
+            "needs-window",
+            "Site lengths vary across cached entries; set cruncher.catalog.site_window_lengths for this TF "
+            "or each dataset before building PWMs.",
+        )
+    return status, message
+
+
 def select_catalog_entry(
     *,
     catalog: CatalogIndex,
@@ -241,6 +465,7 @@ def target_statuses(
 ) -> list[TargetStatus]:
     catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     lock_path = resolve_lock_path(config_path)
+    targets = list_targets(cfg)
     effective_pwm_source = pwm_source or cfg.catalog.pwm_source
     effective_site_kinds = site_kinds if site_kinds is not None else cfg.catalog.site_kinds
     effective_combine_sites = combine_sites if combine_sites is not None else cfg.catalog.combine_sites
@@ -248,156 +473,53 @@ def target_statuses(
         effective_window_lengths = site_window_lengths
     else:
         effective_window_lengths = cfg.catalog.site_window_lengths
-    lockmap: dict[str, LockedMotif] = {}
-    lockfile_pwm = None
-    lockfile_site_kinds: Optional[list[str]] = None
-    lockfile_combine_sites: Optional[bool] = None
+    lockmap, lockfile_pwm, lockfile_site_kinds, lockfile_combine_sites = _lockfile_metadata(
+        use_lockfile=use_lockfile,
+        lock_path=lock_path,
+    )
     if use_lockfile and lock_path.exists():
-        lockfile = read_lockfile(lock_path)
-        lockmap = lockfile.resolved
-        lockfile_pwm = lockfile.pwm_source
-        lockfile_site_kinds = lockfile.site_kinds
-        lockfile_combine_sites = lockfile.combine_sites
-
-    required = {tf for _, tf in list_targets(cfg)}
-    if use_lockfile and lock_path.exists():
-        missing = required - set(lockmap.keys())
-        extra = set(lockmap.keys()) - required
-        mismatch = None
-        if not lockfile_pwm:
-            mismatch = "Lockfile missing pwm_source; re-run `cruncher lock <config>`."
-        elif lockfile_pwm != effective_pwm_source:
-            mismatch = (
-                f"Lockfile pwm_source='{lockfile_pwm}' does not match expected pwm_source='{effective_pwm_source}'. "
-                "Re-run `cruncher lock <config>`."
-            )
-        if effective_pwm_source == "sites":
-            if effective_site_kinds is not None and lockfile_site_kinds is not None:
-                if sorted(effective_site_kinds) != sorted(lockfile_site_kinds):
-                    mismatch = (
-                        f"Lockfile site_kinds={lockfile_site_kinds} does not match expected site_kinds="
-                        f"{effective_site_kinds}. "
-                        "Re-run `cruncher lock <config>`."
-                    )
-            if lockfile_combine_sites is not None and lockfile_combine_sites != effective_combine_sites:
-                mismatch = (
-                    f"Lockfile combine_sites={lockfile_combine_sites} does not match expected combine_sites="
-                    f"{effective_combine_sites}. "
-                    "Re-run `cruncher lock <config>`."
-                )
-        if missing or extra or mismatch:
-            details = []
-            if missing:
-                details.append(f"missing: {', '.join(sorted(missing))}")
-            if extra:
-                details.append(f"extra: {', '.join(sorted(extra))}")
-            if mismatch:
-                details.append(mismatch)
-            msg = " | ".join(details) if details else "Lockfile mismatch."
+        lock_mismatch = _lockfile_mismatch_message(
+            targets=targets,
+            lockmap=lockmap,
+            lockfile_pwm=lockfile_pwm,
+            lockfile_site_kinds=lockfile_site_kinds,
+            lockfile_combine_sites=lockfile_combine_sites,
+            expected_pwm_source=effective_pwm_source,
+            expected_site_kinds=effective_site_kinds,
+            expected_combine_sites=effective_combine_sites,
+        )
+        if lock_mismatch is not None:
             return [
-                TargetStatus(
+                _status_stub(
                     set_index=set_index,
                     tf_name=tf,
-                    source=None,
-                    motif_id=None,
-                    organism=None,
-                    has_matrix=False,
-                    has_sites=False,
-                    site_count=0,
-                    site_total=0,
-                    site_kind=None,
-                    dataset_id=None,
-                    matrix_source=None,
                     pwm_source=effective_pwm_source,
                     status="mismatch-lock",
-                    message=msg,
+                    message=lock_mismatch,
                 )
-                for set_index, tf in list_targets(cfg)
+                for set_index, tf in targets
             ]
 
     catalog = CatalogIndex.load(catalog_root)
     statuses: list[TargetStatus] = []
-    for set_index, tf in list_targets(cfg):
-        entry = None
-        locked = lockmap.get(tf) if use_lockfile else None
-        if locked is not None:
-            entry = catalog.entries.get(f"{locked.source}:{locked.motif_id}")
-            if entry is None:
-                statuses.append(
-                    TargetStatus(
-                        set_index=set_index,
-                        tf_name=tf,
-                        source=locked.source,
-                        motif_id=locked.motif_id,
-                        organism=None,
-                        has_matrix=False,
-                        has_sites=False,
-                        site_count=0,
-                        site_total=0,
-                        site_kind=None,
-                        dataset_id=None,
-                        matrix_source=None,
-                        pwm_source=effective_pwm_source,
-                        status="missing-catalog",
-                        message=f"Catalog entry missing for {locked.source}:{locked.motif_id}.",
-                    )
-                )
-                continue
-        elif use_lockfile:
-            statuses.append(
-                TargetStatus(
-                    set_index=set_index,
-                    tf_name=tf,
-                    source=None,
-                    motif_id=None,
-                    organism=None,
-                    has_matrix=False,
-                    has_sites=False,
-                    site_count=0,
-                    site_total=0,
-                    site_kind=None,
-                    dataset_id=None,
-                    matrix_source=None,
-                    pwm_source=effective_pwm_source,
-                    status="missing-lock",
-                    message=f"Missing lock entry for '{tf}'. Run `cruncher lock -c {config_path.name}`.",
-                )
-            )
+    for set_index, tf in targets:
+        entry, locked, unresolved_status = _resolve_target_catalog_entry(
+            set_index=set_index,
+            tf_name=tf,
+            cfg=cfg,
+            catalog=catalog,
+            lockmap=lockmap,
+            use_lockfile=use_lockfile,
+            pwm_source=effective_pwm_source,
+            site_kinds=effective_site_kinds,
+            combine_sites=effective_combine_sites,
+            config_path=config_path,
+        )
+        if unresolved_status is not None:
+            statuses.append(unresolved_status)
             continue
-        else:
-            try:
-                entry = select_catalog_entry(
-                    catalog=catalog,
-                    tf_name=tf,
-                    pwm_source=effective_pwm_source,
-                    site_kinds=effective_site_kinds,
-                    combine_sites=effective_combine_sites,
-                    source_preference=cfg.catalog.source_preference,
-                    dataset_preference=cfg.catalog.dataset_preference,
-                    dataset_map=cfg.catalog.dataset_map,
-                    allow_ambiguous=cfg.catalog.allow_ambiguous,
-                )
-            except ValueError as exc:
-                statuses.append(
-                    TargetStatus(
-                        set_index=set_index,
-                        tf_name=tf,
-                        source=None,
-                        motif_id=None,
-                        organism=None,
-                        has_matrix=False,
-                        has_sites=False,
-                        site_count=0,
-                        site_total=0,
-                        site_kind=None,
-                        dataset_id=None,
-                        matrix_source=None,
-                        pwm_source=effective_pwm_source,
-                        status="unresolved-target",
-                        message=str(exc),
-                    )
-                )
-                continue
+        if entry is None:
+            raise ValueError(f"Target resolution failed for '{tf}' without status.")
         status_site_entries = [entry]
         if effective_combine_sites:
             status_site_entries = _site_entries_for_target(
@@ -406,41 +528,22 @@ def target_statuses(
                 combine_sites=effective_combine_sites,
                 site_kinds=effective_site_kinds,
             )
-        site_count = 0
-        site_total = 0
-        site_kind = None
-        dataset_id = None
-        if status_site_entries:
-            site_count = sum(candidate.site_count for candidate in status_site_entries)
-            site_total = sum(candidate.site_total for candidate in status_site_entries)
-            site_kind = _merge_text(candidate.site_kind for candidate in status_site_entries)
-            dataset_id = _merge_text(candidate.dataset_id for candidate in status_site_entries)
+        site_count, site_total, site_kind, dataset_id = _aggregate_site_entry_stats(status_site_entries)
         site_entries = status_site_entries
 
         if effective_pwm_source == "sites":
+            status, message = _status_from_site_counts(
+                pwm_source=effective_pwm_source,
+                site_entries=site_entries,
+                site_count=site_count,
+                min_sites_for_pwm=cfg.catalog.min_sites_for_pwm,
+                allow_low_sites=cfg.catalog.allow_low_sites,
+            )
             if not site_entries:
-                status = "missing-sites"
-                message = "No cached binding-site sequences available."
                 site_count = 0
                 site_total = 0
                 site_kind = None
                 dataset_id = None
-            else:
-                if site_count < cfg.catalog.min_sites_for_pwm:
-                    msg = (
-                        "Only "
-                        f"{site_count} sites available (cruncher.catalog.min_sites_for_pwm="
-                        f"{cfg.catalog.min_sites_for_pwm})."
-                    )
-                    if cfg.catalog.allow_low_sites:
-                        status = "warning"
-                        message = msg
-                    else:
-                        status = "insufficient-sites"
-                        message = msg
-                else:
-                    status = "ready"
-                    message = None
         else:
             status, message = _status_for_entry(
                 entry=entry,
@@ -458,29 +561,21 @@ def target_statuses(
             status = "missing-sequences"
             message = f"{message} {seq_msg}".strip() if message else seq_msg
 
-        if status in {"ready", "warning"}:
-            if effective_pwm_source == "matrix" and entry.has_matrix:
-                motif_path = catalog_root / "normalized" / "motifs" / entry.source / f"{entry.motif_id}.json"
-                if not motif_path.exists():
-                    status = "missing-matrix-file"
-                    message = f"Motif file missing: {motif_path}"
-            if effective_pwm_source == "sites":
-                missing_paths = []
-                for candidate in site_entries:
-                    sites_path = (
-                        catalog_root / "normalized" / "sites" / candidate.source / f"{candidate.motif_id}.jsonl"
-                    )
-                    if not sites_path.exists():
-                        missing_paths.append(str(sites_path))
-                if missing_paths:
-                    status = "missing-sites-file"
-                    message = f"Sites file missing: {missing_paths[0]}"
-                elif _needs_window_length(entries=site_entries, window_lengths=effective_window_lengths):
-                    status = "needs-window"
-                    message = (
-                        "Site lengths vary across cached entries; set cruncher.catalog.site_window_lengths for this TF "
-                        "or each dataset before building PWMs."
-                    )
+        site_entries_require_window = False
+        if effective_pwm_source == "sites" and status in {"ready", "warning"}:
+            site_entries_require_window = _needs_window_length(
+                entries=site_entries,
+                window_lengths=effective_window_lengths,
+            )
+        status, message = _validate_status_artifacts(
+            catalog_root=catalog_root,
+            entry=entry,
+            site_entries=site_entries,
+            pwm_source=effective_pwm_source,
+            status=status,
+            message=message,
+            site_entries_require_window=site_entries_require_window,
+        )
         statuses.append(
             TargetStatus(
                 set_index=set_index,
