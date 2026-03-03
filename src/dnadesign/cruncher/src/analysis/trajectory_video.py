@@ -22,6 +22,7 @@ import pandas as pd
 
 from dnadesign.baserender import run_job
 from dnadesign.cruncher.analysis.objective_labels import objective_scale_label
+from dnadesign.cruncher.analysis.trajectory import _resolve_objective_scalar
 from dnadesign.cruncher.analysis.trajectory_video_contract import build_sequence_rows_video_job
 from dnadesign.cruncher.analysis.trajectory_video_timeline import (
     allocate_taper_extra_frames,
@@ -332,6 +333,7 @@ def _build_snapshot_row(
     hit_map: Mapping[str, Mapping[str, object]],
     pwm_matrices: Mapping[str, list[list[float]]],
     panel_payload: _PanelPayload,
+    panel_y_override: float | None = None,
 ) -> dict[str, object]:
     frame_subtitle = _video_subtitle_text(tf_names=tf_names, per_tf_map=per_tf_map)
     feature_rows: list[dict[str, object]] = []
@@ -372,14 +374,19 @@ def _build_snapshot_row(
         )
         tag_labels[tag] = tf_name
 
+    panel_point_index = int(panel_payload.point_index_by_source.get(int(source_idx), 0))
+    panel_y = [float(value) for value in panel_payload.y]
+    if panel_y_override is not None and 0 <= panel_point_index < len(panel_y):
+        panel_y[panel_point_index] = float(panel_y_override)
+
     display_payload: dict[str, object] = {
         "overlay_text": None,
         "video_subtitle": frame_subtitle,
         "tag_labels": tag_labels,
         "trajectory_panel": {
             "x": panel_payload.x,
-            "y": panel_payload.y,
-            "point_index": int(panel_payload.point_index_by_source.get(int(source_idx), 0)),
+            "y": panel_y,
+            "point_index": panel_point_index,
             "x_label": "Sweep",
             "y_label": panel_payload.y_label,
         },
@@ -454,6 +461,9 @@ def _replace_final_snapshot_with_polished_sequence(
     tf_names: list[str],
     pwm_matrices: Mapping[str, list[list[float]]],
     panel_payload: _PanelPayload,
+    objective_column: str,
+    objective_config: Mapping[str, object] | None,
+    source_sweeps: list[int],
 ) -> None:
     polished_sequence = str(polished_final_sequence or "").strip().upper()
     if not polished_sequence or not snapshot_rows:
@@ -464,8 +474,18 @@ def _replace_final_snapshot_with_polished_sequence(
     seq_arr = _encode_sequence(polished_sequence)
     per_tf_map, hit_map = scorer.compute_all_per_pwm_and_hits(seq_arr, int(seq_arr.size))
     source_idx = int(source_indices[-1])
+    if source_idx < 0 or source_idx >= len(source_sweeps):
+        raise ValueError("Trajectory video final source index is out of bounds for sweep metadata.")
+    source_sweep = int(source_sweeps[source_idx])
     frame_no = int(len(snapshot_rows))
     frame_id = str(snapshot_rows[-1]["id"])
+    panel_y_override = _resolve_panel_objective_from_per_tf_map(
+        per_tf_map=per_tf_map,
+        tf_names=tf_names,
+        objective_column=objective_column,
+        objective_config=objective_config,
+        source_sweep=source_sweep,
+    )
     snapshot_rows[-1] = _build_snapshot_row(
         frame_id=frame_id,
         frame_no=frame_no,
@@ -476,7 +496,44 @@ def _replace_final_snapshot_with_polished_sequence(
         hit_map=hit_map,
         pwm_matrices=pwm_matrices,
         panel_payload=panel_payload,
+        panel_y_override=panel_y_override,
     )
+
+
+def _resolve_panel_objective_from_per_tf_map(
+    *,
+    per_tf_map: Mapping[str, float],
+    tf_names: list[str],
+    objective_column: str,
+    objective_config: Mapping[str, object] | None,
+    source_sweep: int,
+) -> float | None:
+    column = str(objective_column).strip().lower()
+    if column == "raw_llr_objective":
+        return None
+    if column == "objective_scalar":
+        scale_label = objective_scale_label(objective_config, unknown_fallback="")
+        if str(scale_label).strip().lower() == "raw-llr":
+            return None
+    if column not in {"objective_scalar", "norm_llr_objective"}:
+        return None
+    row: dict[str, float] = {"sweep": float(source_sweep)}
+    for tf_name in tf_names:
+        if tf_name not in per_tf_map:
+            raise ValueError(f"Trajectory video subtitle missing normalized score for TF '{tf_name}'.")
+        row[f"score_{tf_name}"] = float(per_tf_map[tf_name])
+    objective_frame = pd.DataFrame([row])
+    objective_series = _resolve_objective_scalar(
+        objective_frame,
+        tf_names,
+        objective_config=dict(objective_config) if isinstance(objective_config, Mapping) else None,
+    )
+    if objective_series.empty:
+        return None
+    objective_value = float(objective_series.iloc[0])
+    if not np.isfinite(objective_value):
+        raise ValueError("Trajectory video polished panel objective value is non-finite.")
+    return objective_value
 
 
 def _pause_frame_count(*, pauses: Mapping[str, float], fps: float) -> int:
@@ -639,6 +696,9 @@ def render_chain_trajectory_video(
         tf_names=tf_names,
         pwm_matrices=pwm_matrices,
         panel_payload=panel_payload,
+        objective_column=objective_column,
+        objective_config=objective_from_manifest,
+        source_sweeps=[int(v) for v in chain_rows["sweep"].astype(int).tolist()],
     )
 
     _apply_taper_pause_extension(

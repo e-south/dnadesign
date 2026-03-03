@@ -170,7 +170,9 @@ def _load_analysis_summary(run_dir: Path) -> dict[str, object]:
     return payload
 
 
-def _load_export_elites_and_windows(source: PortfolioSource) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _load_export_elites_windows_and_consensus(
+    source: PortfolioSource,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     manifest_file = run_export_sequences_manifest_path(source.run_dir)
     if not manifest_file.exists():
         raise FileNotFoundError(
@@ -183,17 +185,27 @@ def _load_export_elites_and_windows(source: PortfolioSource) -> tuple[pd.DataFra
     files = payload.get("files")
     if not isinstance(files, dict):
         raise ValueError(f"Export manifest missing files mapping: {manifest_file}")
-    rel = files.get("elites")
-    if not isinstance(rel, str) or not rel.strip():
+    elites_rel = files.get("elites")
+    if not isinstance(elites_rel, str) or not elites_rel.strip():
         raise ValueError(f"Export manifest missing elites file: {manifest_file}")
+    consensus_rel = files.get("consensus_sites")
+    if not isinstance(consensus_rel, str) or not consensus_rel.strip():
+        raise ValueError(f"Export manifest missing consensus_sites file: {manifest_file}")
 
-    table_path = (source.run_dir / rel).resolve()
+    table_path = (source.run_dir / elites_rel).resolve()
     try:
         table_path.relative_to(source.run_dir.resolve())
     except ValueError as exc:
         raise ValueError(f"Export table path escapes run directory: {table_path}") from exc
     if not table_path.exists():
         raise FileNotFoundError(f"Export table listed in manifest does not exist: {table_path}")
+    consensus_path = (source.run_dir / consensus_rel).resolve()
+    try:
+        consensus_path.relative_to(source.run_dir.resolve())
+    except ValueError as exc:
+        raise ValueError(f"Export table path escapes run directory: {consensus_path}") from exc
+    if not consensus_path.exists():
+        raise FileNotFoundError(f"Export table listed in manifest does not exist: {consensus_path}")
 
     if table_path.suffix == ".parquet":
         export_df = read_parquet(table_path)
@@ -201,6 +213,12 @@ def _load_export_elites_and_windows(source: PortfolioSource) -> tuple[pd.DataFra
         export_df = pd.read_csv(table_path)
     else:
         raise ValueError(f"Unsupported elites table format: {table_path.suffix}")
+    if consensus_path.suffix == ".parquet":
+        consensus_df = read_parquet(consensus_path)
+    elif consensus_path.suffix == ".csv":
+        consensus_df = pd.read_csv(consensus_path)
+    else:
+        raise ValueError(f"Unsupported consensus_sites table format: {consensus_path.suffix}")
 
     required_export_columns = [
         "elite_id",
@@ -310,7 +328,43 @@ def _load_export_elites_and_windows(source: PortfolioSource) -> tuple[pd.DataFra
     )
     if window_df.empty:
         raise ValueError(f"Portfolio source window records are empty after parsing: {table_path}")
-    return elites_export_df, window_df
+    required_consensus_columns = [
+        "tf",
+        "motif_source",
+        "motif_id",
+        "pwm_ref",
+        "pwm_hash",
+        "pwm_width",
+        "consensus_sequence",
+        "consensus_width",
+    ]
+    missing_consensus_columns = [name for name in required_consensus_columns if name not in consensus_df.columns]
+    if missing_consensus_columns:
+        raise ValueError(
+            f"Portfolio source consensus table ({consensus_path}) missing required columns: "
+            f"{missing_consensus_columns}. nudge: rerun `cruncher workspaces run --workspace <source_workspace> "
+            "--runbook configs/runbook.yaml --step export_sequences_latest` for this source and retry the "
+            "portfolio run."
+        )
+    consensus_df = consensus_df.loc[:, required_consensus_columns].copy()
+    if consensus_df.empty:
+        raise ValueError(f"Portfolio source consensus table is empty: {consensus_path}")
+    consensus_df["tf"] = consensus_df["tf"].astype(str)
+    consensus_df["motif_source"] = consensus_df["motif_source"].astype(str)
+    consensus_df["motif_id"] = consensus_df["motif_id"].astype(str)
+    consensus_df["pwm_ref"] = consensus_df["pwm_ref"].astype(str)
+    consensus_df["pwm_hash"] = consensus_df["pwm_hash"].astype(str)
+    consensus_df["consensus_sequence"] = consensus_df["consensus_sequence"].astype(str)
+    consensus_df["pwm_width"] = pd.to_numeric(consensus_df["pwm_width"], errors="coerce")
+    consensus_df["consensus_width"] = pd.to_numeric(consensus_df["consensus_width"], errors="coerce")
+    if consensus_df["pwm_width"].isna().any() or consensus_df["consensus_width"].isna().any():
+        raise ValueError(f"Portfolio source consensus table contains non-numeric widths: {consensus_path}")
+    consensus_df["pwm_width"] = consensus_df["pwm_width"].astype(int)
+    consensus_df["consensus_width"] = consensus_df["consensus_width"].astype(int)
+    if consensus_df["tf"].duplicated().any():
+        raise ValueError(f"Portfolio source consensus table contains duplicate tf rows: {consensus_path}")
+    consensus_df = consensus_df.sort_values("tf").reset_index(drop=True)
+    return elites_export_df, window_df, consensus_df
 
 
 def _mean_pairwise_hamming_bp(sequences: list[str]) -> float | None:
@@ -335,6 +389,7 @@ def _load_source_rows(
     studies_enabled: bool,
     on_event: PortfolioEventCallback | None = None,
 ) -> tuple[
+    list[dict[str, object]],
     list[dict[str, object]],
     list[dict[str, object]],
     dict[str, object],
@@ -364,7 +419,7 @@ def _load_source_rows(
 
     summary_payload = _load_analysis_summary(source.run_dir)
 
-    export_elites_df, windows_df = _load_export_elites_and_windows(source)
+    export_elites_df, windows_df, consensus_df = _load_export_elites_windows_and_consensus(source)
     export_elites_rows = int(len(export_elites_df))
     if export_elites_rows > source_top_k:
         raise ValueError(
@@ -416,6 +471,7 @@ def _load_source_rows(
 
     source_windows_rows: list[dict[str, object]] = []
     source_elite_rows: list[dict[str, object]] = []
+    source_consensus_rows: list[dict[str, object]] = []
     min_score_values: list[float] = []
     sequence_values: list[str] = []
     seen_elite_hashes: set[str] = set()
@@ -550,7 +606,33 @@ def _load_source_rows(
     study_summary_row = _load_source_study_summary(
         source, studies_enabled=studies_enabled, run_study_fn=run_study, on_event=on_event
     )
-    return source_windows_rows, source_elite_rows, source_summary_row, source_run, study_summary_row
+    for consensus in consensus_df.to_dict(orient="records"):
+        source_consensus_rows.append(
+            {
+                "source_id": str(source.id),
+                "source_label": _resolve_source_label(source),
+                "workspace_name": source.workspace.name,
+                "workspace_path": str(source.workspace),
+                "run_name": source.run_dir.name,
+                "run_dir": str(source.run_dir),
+                "tf": str(consensus["tf"]),
+                "motif_source": str(consensus["motif_source"]),
+                "motif_id": str(consensus["motif_id"]),
+                "pwm_ref": str(consensus["pwm_ref"]),
+                "pwm_hash": str(consensus["pwm_hash"]),
+                "pwm_width": int(consensus["pwm_width"]),
+                "consensus_sequence": str(consensus["consensus_sequence"]),
+                "consensus_width": int(consensus["consensus_width"]),
+            }
+        )
+    return (
+        source_windows_rows,
+        source_elite_rows,
+        source_consensus_rows,
+        source_summary_row,
+        source_run,
+        study_summary_row,
+    )
 
 
 _materialize_portfolio_outputs = _materialize_portfolio_outputs_helper
@@ -629,6 +711,7 @@ class _PortfolioAggregationState:
     ensured_study_runs: dict[tuple[str, str], Path]
     all_window_rows: list[dict[str, object]]
     all_elite_rows: list[dict[str, object]]
+    all_consensus_rows: list[dict[str, object]]
     source_summary_rows: list[dict[str, object]]
     study_summary_rows: list[dict[str, object]]
     sequence_length_rows: list[dict[str, object]]
@@ -647,6 +730,7 @@ def _new_portfolio_aggregation_state(
         ensured_study_runs=ensured_study_runs,
         all_window_rows=[],
         all_elite_rows=[],
+        all_consensus_rows=[],
         source_summary_rows=[],
         study_summary_rows=[],
         sequence_length_rows=[],
@@ -722,12 +806,14 @@ def _aggregate_source_into_state(
     (
         source_windows_rows,
         source_elite_rows,
+        source_consensus_rows,
         source_summary_row,
         source_run,
         source_study_summary,
     ) = _load_source_rows(source, studies_enabled=spec.studies.enabled, on_event=on_event)
     state.all_window_rows.extend(source_windows_rows)
     state.all_elite_rows.extend(source_elite_rows)
+    state.all_consensus_rows.extend(source_consensus_rows)
     state.source_summary_rows.append(source_summary_row)
     state.source_runs.append(source_run)
     _emit_event(
@@ -754,6 +840,7 @@ def _aggregate_source_into_state(
         spec=spec,
         all_window_rows=state.all_window_rows,
         all_elite_rows=state.all_elite_rows,
+        all_consensus_rows=state.all_consensus_rows,
         source_summary_rows=state.source_summary_rows,
         study_summary_rows=state.study_summary_rows,
         sequence_length_rows=state.sequence_length_rows,

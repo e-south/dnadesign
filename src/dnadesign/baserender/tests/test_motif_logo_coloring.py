@@ -31,6 +31,37 @@ def _motif_matrix(length: int) -> list[list[float]]:
     return [[0.70, 0.10, 0.10, 0.10] for _ in range(length)]
 
 
+def _text_box_for_artist(text_artist, *, style) -> tuple[float, float, float, float]:
+    text = str(text_artist.get_text())
+    prop = FontProperties(family=style.font_label, size=style.legend_font_size)
+    px_per_pt = style.dpi / 72.0
+    text_width = TextPath((0, 0), text, prop=prop).get_extents().width * px_per_pt
+    x_anchor, y_anchor = text_artist.get_position()
+    ha = str(text_artist.get_ha()).lower()
+    if ha == "left":
+        text_x0 = float(x_anchor)
+        text_x1 = float(x_anchor) + float(text_width)
+    elif ha == "right":
+        text_x0 = float(x_anchor) - float(text_width)
+        text_x1 = float(x_anchor)
+    else:
+        half = float(text_width) * 0.5
+        text_x0 = float(x_anchor) - half
+        text_x1 = float(x_anchor) + half
+    text_height = max(8.0, (float(style.legend_font_size) / 72.0) * float(style.dpi))
+    text_y0 = float(y_anchor) - text_height / 2.0
+    text_y1 = float(y_anchor) + text_height / 2.0
+    return text_x0, text_y0, text_x1, text_y1
+
+
+def _boxes_overlap(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> bool:
+    ax0, ay0, ax1, ay1 = a
+    bx0, by0, bx1, by1 = b
+    return max(float(ax0), float(bx0)) < min(float(ax1), float(bx1)) and max(float(ay0), float(by0)) < min(
+        float(ay1), float(by1)
+    )
+
+
 def test_reverse_strand_geometry_aligns_logo_columns_to_antisense_row() -> None:
     initialize_runtime()
     sequence = "ATACAGTT"
@@ -447,6 +478,295 @@ def test_inline_legend_labels_do_not_overlap_neighbor_kmer_boxes() -> None:
             overlaps = max(float(text_x0), float(bx0)) < min(float(text_x1), float(bx1))
             assert not overlaps, (label, (text_x0, text_x1), (bx0, bx1))
 
+    plt.close(fig)
+
+
+def test_inline_legend_dense_layout_avoids_neighbor_and_label_collisions() -> None:
+    initialize_runtime()
+    sequence = ("ACGT" * 40)[:118]
+    record = Record(
+        id="inline_dense_collision_guard",
+        alphabet="DNA",
+        sequence=sequence,
+        features=(
+            Feature(
+                id="k1",
+                kind="kmer",
+                span=Span(start=27, end=43, strand="fwd"),
+                label=sequence[27:43],
+                tags=("tf:fnr",),
+                attrs={},
+                render={},
+            ),
+            Feature(
+                id="k2",
+                kind="kmer",
+                span=Span(start=11, end=19, strand="fwd"),
+                label=sequence[11:19],
+                tags=("tf:lrp",),
+                attrs={},
+                render={},
+            ),
+            Feature(
+                id="k3",
+                kind="kmer",
+                span=Span(start=53, end=67, strand="fwd"),
+                label=sequence[53:67],
+                tags=("tf:lexA",),
+                attrs={},
+                render={},
+            ),
+            Feature(
+                id="k4",
+                kind="kmer",
+                span=Span(start=30, end=39, strand="fwd"),
+                label=sequence[30:39],
+                tags=("tf:cpxR",),
+                attrs={},
+                render={},
+            ),
+            Feature(
+                id="k5",
+                kind="kmer",
+                span=Span(start=70, end=79, strand="fwd"),
+                label=sequence[70:79],
+                tags=("tf:araC",),
+                attrs={},
+                render={},
+            ),
+            Feature(
+                id="k6",
+                kind="kmer",
+                span=Span(start=7, end=21, strand="fwd"),
+                label=sequence[7:21],
+                tags=("tf:baeR",),
+                attrs={},
+                render={},
+            ),
+            Feature(
+                id="k7",
+                kind="kmer",
+                span=Span(start=15, end=32, strand="fwd"),
+                label=sequence[15:32],
+                tags=("tf:soxS",),
+                attrs={},
+                render={},
+            ),
+            Feature(
+                id="k8",
+                kind="kmer",
+                span=Span(start=80, end=91, strand="fwd"),
+                label=sequence[80:91],
+                tags=("tf:lacI",),
+                attrs={},
+                render={},
+            ),
+        ),
+        effects=(),
+        display=Display(
+            tag_labels={
+                "tf:fnr": "fnr",
+                "tf:lrp": "lrp",
+                "tf:lexA": "lexA",
+                "tf:cpxR": "cpxR",
+                "tf:araC": "araC",
+                "tf:baeR": "baeR",
+                "tf:soxS": "soxS",
+                "tf:lacI": "lacI",
+            }
+        ),
+        meta={},
+    )
+    style = resolve_style(
+        preset=None,
+        overrides={
+            "connectors": False,
+            "legend": True,
+            "legend_mode": "inline",
+            "legend_inline_side": "auto",
+            "legend_inline_margin_cells": 0.28,
+            "legend_font_size": 10,
+            "figure_scale": 0.98,
+            "padding_y": 3.0,
+            "font_size_label": 15,
+            "overlay_align": "center",
+            "show_reverse_complement": True,
+            "baseline_spacing": 36.0,
+            "track_spacing": 10.0,
+            "layout": {"outer_pad_cells": 0.0},
+        },
+    )
+    layout = compute_layout(record, style)
+    fig = render_record(record, renderer_name="sequence_rows", style=style, palette=Palette(style.palette))
+    ax = fig.axes[0]
+    labels = {"Fnr", "Lrp", "LexA", "CpxR", "AraC", "BaeR", "SoxS", "LacI"}
+    text_artists = [t for t in ax.texts if str(t.get_text()) in labels]
+    assert text_artists
+
+    text_boxes = [_text_box_for_artist(text_artist, style=style) for text_artist in text_artists]
+    feature_boxes = [tuple(float(v) for v in box) for box in layout.feature_boxes.values()]
+
+    for text_box in text_boxes:
+        assert all(not _boxes_overlap(text_box, feature_box) for feature_box in feature_boxes), (
+            text_box,
+            feature_boxes,
+        )
+
+    for idx, text_box in enumerate(text_boxes):
+        for other_idx, other_box in enumerate(text_boxes):
+            if idx >= other_idx:
+                continue
+            assert not _boxes_overlap(text_box, other_box), (text_box, other_box)
+
+    plt.close(fig)
+
+
+def test_inline_legend_hides_unsatisfiable_long_label() -> None:
+    initialize_runtime()
+    long_label = "x" * 400
+    record = Record(
+        id="inline_unsat_long_label",
+        alphabet="DNA",
+        sequence="ACGT" * 20,
+        features=(
+            Feature(
+                id="k1",
+                kind="regulator_window",
+                span=Span(start=5, end=20, strand="fwd"),
+                label="ACGTACGTACGTACG",
+                tags=("tf:lexA",),
+                attrs={},
+                render={},
+            ),
+        ),
+        effects=(),
+        display=Display(tag_labels={"tf:lexA": long_label}),
+        meta={},
+    )
+    style = resolve_style(
+        preset=None,
+        overrides={
+            "connectors": False,
+            "legend": True,
+            "legend_mode": "inline",
+            "legend_inline_side": "auto",
+        },
+    )
+    fig = render_record(record, renderer_name="sequence_rows", style=style, palette=Palette(style.palette))
+    ax = fig.axes[0]
+    rendered_text = [str(t.get_text()) for t in ax.texts]
+    expected = long_label[:1].upper() + long_label[1:]
+    assert expected not in rendered_text
+    plt.close(fig)
+
+
+def test_inline_legend_hides_label_when_only_vertical_slot_is_available() -> None:
+    initialize_runtime()
+    sequence = ("ACGT" * 40)[:120]
+    center_label = "center_extremely_long_regulator_name"
+    center_text = center_label[:1].upper() + center_label[1:]
+    record = Record(
+        id="inline_vertical_slot_disallowed",
+        alphabet="DNA",
+        sequence=sequence,
+        features=(
+            Feature(
+                id="k1",
+                kind="kmer",
+                span=Span(start=8, end=24, strand="fwd"),
+                label=sequence[8:24],
+                tags=("tf:left",),
+                attrs={},
+                render={"track": 0},
+            ),
+            Feature(
+                id="k2",
+                kind="kmer",
+                span=Span(start=26, end=42, strand="fwd"),
+                label=sequence[26:42],
+                tags=("tf:center",),
+                attrs={},
+                render={"track": 0},
+            ),
+            Feature(
+                id="k3",
+                kind="kmer",
+                span=Span(start=44, end=60, strand="fwd"),
+                label=sequence[44:60],
+                tags=("tf:right",),
+                attrs={},
+                render={"track": 0},
+            ),
+        ),
+        effects=(),
+        display=Display(
+            tag_labels={
+                "tf:left": "left_anchor",
+                "tf:center": center_label,
+                "tf:right": "right_anchor",
+            }
+        ),
+        meta={},
+    )
+    style = resolve_style(
+        preset=None,
+        overrides={
+            "connectors": False,
+            "legend": True,
+            "legend_mode": "inline",
+            "legend_inline_side": "auto",
+            "legend_inline_margin_cells": 0.05,
+            "legend_font_size": 11,
+            "figure_scale": 0.98,
+            "padding_y": 3.0,
+            "font_size_label": 15,
+            "overlay_align": "center",
+            "show_reverse_complement": True,
+            "baseline_spacing": 36.0,
+            "track_spacing": 10.0,
+            "layout": {"outer_pad_cells": 0.0},
+        },
+    )
+    layout = compute_layout(record, style)
+    fig = render_record(record, renderer_name="sequence_rows", style=style, palette=Palette(style.palette))
+    ax = fig.axes[0]
+    artists_by_text = {str(t.get_text()): t for t in ax.texts}
+    expected_by_feature = {
+        "k1": "Left_anchor",
+        "k2": center_text,
+        "k3": "Right_anchor",
+    }
+    expected_y_by_text = {}
+    for placement in layout.placements:
+        feature = record.features[placement.feature_index]
+        text = expected_by_feature.get(str(feature.id))
+        if text is not None:
+            expected_y_by_text[text] = float(placement.y)
+
+    rendered_inline = [artists_by_text[text] for text in expected_y_by_text if text in artists_by_text]
+    assert rendered_inline
+    for text_artist in rendered_inline:
+        text = str(text_artist.get_text())
+        _, y_anchor = text_artist.get_position()
+        assert float(y_anchor) == pytest.approx(expected_y_by_text[text], abs=1e-6)
+
+        text_box = _text_box_for_artist(text_artist, style=style)
+        sequence_x0 = float(layout.x_left)
+        sequence_x1 = float(layout.x_left + len(record.sequence) * layout.cw)
+        forward_box = (
+            sequence_x0,
+            float(layout.y_forward - layout.sequence_extent_down),
+            sequence_x1,
+            float(layout.y_forward + layout.sequence_extent_up),
+        )
+        reverse_box = (
+            sequence_x0,
+            float(layout.y_reverse - layout.sequence_extent_down),
+            sequence_x1,
+            float(layout.y_reverse + layout.sequence_extent_up),
+        )
+        assert not _boxes_overlap(text_box, forward_box), (text_box, forward_box)
+        assert not _boxes_overlap(text_box, reverse_box), (text_box, reverse_box)
     plt.close(fig)
 
 

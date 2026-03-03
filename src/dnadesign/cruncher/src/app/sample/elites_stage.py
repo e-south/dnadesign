@@ -934,6 +934,7 @@ def select_and_persist_elites(
     pwms: dict[str, object],
     tfs: list[str],
     out_dir: Path,
+    workspace_slug: str,
     pwm_ref_by_tf: dict[str, str | None],
     pwm_hash_by_tf: dict[str, str | None],
     core_def_by_tf: dict[str, str],
@@ -1029,6 +1030,7 @@ def select_and_persist_elites(
         want_consensus=False,
         want_canonical=want_canonical,
         meta_source=out_dir.name,
+        workspace_slug=workspace_slug,
     )
     dedupe_key = "canonical_sequence" if want_canonical else "sequence"
     _validate_elite_uniqueness(

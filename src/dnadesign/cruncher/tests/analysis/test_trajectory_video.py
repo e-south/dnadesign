@@ -405,6 +405,94 @@ def test_render_chain_trajectory_video_replaces_final_still_with_polished_sequen
     assert str(records_df.iloc[-1]["sequence"]).strip().upper() == "CGTTTGT"
 
 
+def test_render_chain_trajectory_video_aligns_final_panel_point_with_polished_sequence_score(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    pwm = PWM(
+        name="lexA",
+        matrix=np.asarray(
+            [
+                [0.7, 0.1, 0.1, 0.1],
+                [0.1, 0.7, 0.1, 0.1],
+                [0.1, 0.1, 0.7, 0.1],
+                [0.1, 0.1, 0.1, 0.7],
+            ],
+            dtype=float,
+        ),
+    )
+    trajectory_df = pd.DataFrame(
+        {
+            "chain": [0, 0, 0],
+            "sweep": [0, 1, 2],
+            "phase": ["draw", "draw", "draw"],
+            "objective_scalar": [0.2, 0.4, 0.6],
+            "sequence": ["ACGTACGT", "ACGTTCGT", "ACGTTTGT"],
+        }
+    )
+    cfg = AnalysisTrajectoryVideoConfig(
+        playback={"target_duration_sec": 3.0, "fps": 8, "pause_on_best_update_sec": 0.0},
+        sampling={"stride": 1, "include_best_updates": True},
+        limits={"max_total_frames": 32, "max_snapshots": 16, "max_estimated_render_sec": 30.0},
+    )
+    out_path = tmp_path / "video.mp4"
+    captured: dict[str, object] = {}
+    polished_sequence = "CGTTTGT"
+
+    score_by_sequence = {
+        "ACGTACGT": 0.2,
+        "ACGTTCGT": 0.4,
+        "ACGTTTGT": 0.6,
+        polished_sequence: 0.95,
+    }
+
+    def _fake_compute_all_per_pwm_and_hits(self, sequence, sequence_len):  # noqa: ANN001
+        del self, sequence_len
+        seq = "".join("ACGT"[int(base)] for base in sequence.tolist())
+        score = float(score_by_sequence[seq])
+        return (
+            {"lexA": score},
+            {"lexA": {"best_start": 0, "best_window_seq": "ACGT", "strand": "+"}},
+        )
+
+    def _fake_run_job(job_mapping: dict[str, object], *, kind: str, caller_root: Path) -> None:
+        del kind, caller_root
+        captured["records_df"] = pd.read_parquet(Path(str(job_mapping["input"]["path"])))
+        out = Path(str(job_mapping["outputs"][0]["path"]))
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"fake-mp4")
+
+    monkeypatch.setattr(
+        "dnadesign.cruncher.analysis.trajectory_video.Scorer.compute_all_per_pwm_and_hits",
+        _fake_compute_all_per_pwm_and_hits,
+    )
+    monkeypatch.setattr("dnadesign.cruncher.analysis.trajectory_video.run_job", _fake_run_job)
+
+    render_chain_trajectory_video(
+        trajectory_df=trajectory_df,
+        tf_names=["lexA"],
+        pwms={"lexA": pwm},
+        out_path=out_path,
+        config=cfg,
+        bidirectional=True,
+        pwm_pseudocounts=0.0,
+        log_odds_clip=None,
+        tmp_root=tmp_path / "_tmp",
+        polished_final_sequence=polished_sequence,
+    )
+
+    assert out_path.exists()
+    records_df = captured["records_df"]
+    final_row = records_df.iloc[-1]
+    final_display = json.loads(str(final_row["display"]))
+    final_panel = dict(final_display["trajectory_panel"])
+    final_point_index = int(final_panel["point_index"])
+    final_panel_value = float(final_panel["y"][final_point_index])
+    assert str(final_row["sequence"]).strip().upper() == polished_sequence
+    assert str(final_display["video_subtitle"]) == "lexA=0.95"
+    assert abs(final_panel_value - 0.95) < 1.0e-12
+
+
 def test_render_chain_trajectory_video_supports_pandas_str_dtype_mode(tmp_path, monkeypatch) -> None:
     import pandas as pd
 

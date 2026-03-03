@@ -144,12 +144,12 @@ def test_schema_v3_accepts_global_sequence_length_table_options() -> None:
     assert model.portfolio.studies.sequence_length_table.top_n_lengths == 6
 
 
-def test_schema_v3_defaults_portfolio_tables_to_parquet_without_csv_mirror() -> None:
+def test_schema_v3_defaults_portfolio_tables_to_parquet_with_csv_mirror() -> None:
     payload = _base_payload()
     payload["portfolio"].pop("artifacts")
     model = PortfolioRoot.model_validate(payload)
     assert model.portfolio.artifacts.table_format == "parquet"
-    assert model.portfolio.artifacts.write_csv is False
+    assert model.portfolio.artifacts.write_csv is True
 
 
 def test_schema_v3_defaults_max_parallel_sources_to_four() -> None:

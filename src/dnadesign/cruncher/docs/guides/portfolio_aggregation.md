@@ -65,7 +65,7 @@ portfolio:
       top_n_lengths: 6
   artifacts:
     table_format: parquet
-    write_csv: false
+    write_csv: true
   plots:
     elite_showcase:
       enabled: true
@@ -77,7 +77,7 @@ portfolio:
         pairwise_cpxr_baer:
           elite_ranks: [1, 3]
         pairwise_cpxr_lexa:
-          elite_ids: [pairwise_cpxr_lexa_elite_1, pairwise_cpxr_lexa_elite_2]
+          elite_ranks: [1, 2]
   sources:
     - id: pairwise_cpxr_baer
       workspace: ../pairwise_cpxr_baer
@@ -113,7 +113,7 @@ Strict contracts:
 - cross-workspace showcase score tokens are sourced from `best_score_norm` and must remain normalized in `[0,1]` per TF
 - `plots.elite_showcase.source_selectors` supports per-source multi-elite selection; each selector must set exactly one of `elite_ids` or `elite_ranks`
 - `study_spec` is optional; when set, portfolio writes study summary rows from that deterministic study run
-- source selection uses source run manifest `top_k` and the export manifest `files.elites` table
+- source selection uses source run manifest `top_k` and export manifest tables `files.elites` and `files.consensus_sites`
 - source run manifest `top_k` must be `>= 1` and must match export elites row count
 - source run manifest stage must be `sample`
 - `run_dir` must remain inside its declared workspace path
@@ -162,6 +162,8 @@ Primary artifacts:
 
 - `outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_windows_long.{csv|parquet}`
 - `outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_elites_summary.{csv|parquet}`
+- `outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_consensus_sites_long.{csv|parquet}`
+- `outputs/<portfolio_name>/<portfolio_id>/tables/table__workspace_elites_consensus.md`
 - `outputs/<portfolio_name>/<portfolio_id>/tables/table__source_summary.{csv|parquet}`
 - `outputs/<portfolio_name>/<portfolio_id>/tables/table__study_summary.{csv|parquet}` (when `studies.enabled: true` and one or more sources define `study_spec`)
 - `outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_sequence_length.{csv|parquet}` (when `studies.enabled: true` and `studies.sequence_length_table.enabled: true`)
@@ -171,11 +173,13 @@ Primary artifacts:
 - `outputs/<portfolio_name>/<portfolio_id>/meta/status.json`
 - `outputs/<portfolio_name>/<portfolio_id>/meta/logs/prepare__<source_id>.log` (prepare step logs per source, in `prepare_then_aggregate` mode)
 
-Default portfolio table contract is single-format parquet (`artifacts.table_format: parquet`, `artifacts.write_csv: false`).
-Enable `write_csv: true` only when a downstream consumer explicitly requires CSV mirrors.
+Default portfolio table contract is parquet plus CSV mirrors (`artifacts.table_format: parquet`, `artifacts.write_csv: true`).
+Set `write_csv: false` only when you explicitly want parquet-only outputs.
 
 `table__handoff_windows_long` is the tidy handoff table (one row per elite/TF window with sequence, regulator, position, strand, score, and provenance).
 `table__handoff_elites_summary` is the minimal elite-level handoff table (one row per elite with deterministic hash ID and sequence-level summaries).
+`table__handoff_consensus_sites_long` is the source-scoped consensus table (one row per source/TF with motif provenance and consensus sequence).
+`table__workspace_elites_consensus.md` is the consolidated workspace-facing report that includes source metadata plus per-source elite and consensus tables.
 `table__source_summary` provides per-workspace context (selected count, score summaries, and diversity summary).
 `table__handoff_sequence_length` provides the first `top_n_lengths` shortest `sequence_length` rows per source from
 the configured length study, keeping the best median score row per length.
