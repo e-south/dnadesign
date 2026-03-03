@@ -665,36 +665,83 @@ def _draw_inline_feature_labels(ax, record: Record, layout: LayoutContext, palet
     x_min = style.padding_x
     x_max = layout.width - style.padding_x
 
-    def _candidate_position(
-        side: str, *, x_left: float, x_right: float, text_w: float
-    ) -> tuple[float, str, float, float]:
-        if side == "right":
-            x_text = min(x_right, x_max - text_w)
-            return x_text, "left", x_text, x_text + text_w
-        x_text = max(x_left, x_min + text_w)
-        return x_text, "right", x_text - text_w, x_text
+    text_h = max(8.0, (float(style.legend_font_size) / 72.0) * float(style.dpi))
+    lateral_step = max(8.0, box_pad + text_h * 0.75)
+    max_lateral_steps = max(4, int(math.ceil((x_max - x_min) / max(1.0, lateral_step))))
 
-    def _overlap_score(
+    occupied_boxes: list[tuple[float, float, float, float]] = []
+    for placement in layout.placements:
+        occupied_boxes.append(
+            (
+                placement.x - box_pad,
+                placement.y - placement.h / 2.0,
+                placement.x + placement.w + box_pad,
+                placement.y + placement.h / 2.0,
+            )
+        )
+    occupied_boxes.extend(_span_link_label_boxes(record, layout, style))
+    sequence_x0 = float(layout.x_left)
+    sequence_x1 = float(layout.x_left + len(record.sequence) * layout.cw)
+    occupied_boxes.append(
+        (
+            sequence_x0,
+            float(layout.y_forward - layout.sequence_extent_down),
+            sequence_x1,
+            float(layout.y_forward + layout.sequence_extent_up),
+        )
+    )
+    if bool(style.show_reverse_complement and record.alphabet == "DNA"):
+        occupied_boxes.append(
+            (
+                sequence_x0,
+                float(layout.y_reverse - layout.sequence_extent_down),
+                sequence_x1,
+                float(layout.y_reverse + layout.sequence_extent_up),
+            )
+        )
+
+    for effect_index, effect in enumerate(record.effects):
+        if effect.kind != "motif_logo":
+            continue
+        feature_id_raw = effect.target.get("feature_id")
+        if not isinstance(feature_id_raw, str) or not feature_id_raw:
+            continue
+        feature_box = layout.feature_boxes.get(feature_id_raw)
+        if feature_box is None:
+            continue
+        motif_y0 = layout.motif_logo_y0_by_effect.get(effect_index)
+        if motif_y0 is None:
+            continue
+        occupied_boxes.append(
+            (
+                float(feature_box[0]),
+                float(motif_y0),
+                float(feature_box[2]),
+                float(motif_y0 + layout.motif_logo_height),
+            )
+        )
+
+    placed_label_boxes: list[tuple[float, float, float, float]] = []
+
+    def _candidate_box(
         *,
-        interval_x0: float,
-        interval_x1: float,
+        x_anchor: float,
         y_anchor: float,
-        own_feature_index: int,
-    ) -> float:
-        score = 0.0
-        for other in layout.placements:
-            if other.feature_index == own_feature_index:
-                continue
-            y0 = other.y - other.h / 2.0
-            y1 = other.y + other.h / 2.0
-            if not (y0 <= y_anchor <= y1):
-                continue
-            bx0 = other.x - box_pad
-            bx1 = other.x + other.w + box_pad
-            overlap = min(interval_x1, bx1) - max(interval_x0, bx0)
-            if overlap > 0.0:
-                score += overlap
-        return score
+        ha: str,
+        text_w: float,
+    ) -> tuple[float, float, float, float]:
+        if ha == "left":
+            x0 = float(x_anchor)
+            x1 = float(x_anchor) + float(text_w)
+        elif ha == "right":
+            x0 = float(x_anchor) - float(text_w)
+            x1 = float(x_anchor)
+        else:
+            x0 = float(x_anchor) - float(text_w) / 2.0
+            x1 = float(x_anchor) + float(text_w) / 2.0
+        y0 = float(y_anchor) - text_h / 2.0
+        y1 = float(y_anchor) + text_h / 2.0
+        return (x0, y0, x1, y1)
 
     for placement in layout.placements:
         feature = record.features[placement.feature_index]
@@ -715,33 +762,41 @@ def _draw_inline_feature_labels(ax, record: Record, layout: LayoutContext, palet
         right_room = x_max - (x_right + text_w)
 
         if side_pref == "left":
-            side = "left"
+            side_order = ("left", "right")
         elif side_pref == "right":
-            side = "right"
+            side_order = ("right", "left")
         else:
-            side = "right" if right_room >= left_room else "left"
+            side_order = ("right", "left") if right_room >= left_room else ("left", "right")
 
-        preferred = _candidate_position(side, x_left=x_left, x_right=x_right, text_w=text_w)
-        alternate_side = "left" if side == "right" else "right"
-        alternate = _candidate_position(alternate_side, x_left=x_left, x_right=x_right, text_w=text_w)
-        preferred_score = _overlap_score(
-            interval_x0=preferred[2],
-            interval_x1=preferred[3],
-            y_anchor=placement.y,
-            own_feature_index=placement.feature_index,
-        )
-        alternate_score = _overlap_score(
-            interval_x0=alternate[2],
-            interval_x1=alternate[3],
-            y_anchor=placement.y,
-            own_feature_index=placement.feature_index,
-        )
-        chosen = preferred if preferred_score <= alternate_score else alternate
-        x_text, ha = chosen[0], chosen[1]
+        candidates: list[tuple[float, float, str]] = []
+        for step in range(0, max_lateral_steps + 1):
+            delta = lateral_step * float(step)
+            for side in side_order:
+                if side == "right":
+                    candidates.append((x_right + delta, placement.y, "left"))
+                else:
+                    candidates.append((x_left - delta, placement.y, "right"))
+
+        selected: tuple[float, float, str, tuple[float, float, float, float]] | None = None
+        for x_anchor, y_anchor, ha in candidates:
+            bbox = _candidate_box(x_anchor=x_anchor, y_anchor=y_anchor, ha=ha, text_w=text_w)
+            if bbox[0] < x_min or bbox[2] > x_max:
+                continue
+            if bbox[1] < 0.0 or bbox[3] > float(layout.height):
+                continue
+            if any(_boxes_overlap(bbox, occupied) for occupied in occupied_boxes):
+                continue
+            if any(_boxes_overlap(bbox, occupied) for occupied in placed_label_boxes):
+                continue
+            selected = (x_anchor, y_anchor, ha, bbox)
+            break
+        if selected is None:
+            continue
+        x_text, y_text, ha, bbox = selected
 
         ax.text(
             x_text,
-            placement.y,
+            y_text,
             text,
             ha=ha,
             va="center",
@@ -751,6 +806,7 @@ def _draw_inline_feature_labels(ax, record: Record, layout: LayoutContext, palet
             zorder=6.2,
             clip_on=False,
         )
+        placed_label_boxes.append(bbox)
 
 
 def _actual_content_top(layout: LayoutContext) -> float:
