@@ -24,7 +24,7 @@ _SOURCE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 class PortfolioArtifacts(StrictBaseModel):
     table_format: Literal["parquet", "csv"] = "parquet"
-    write_csv: bool = False
+    write_csv: bool = True
 
 
 class PortfolioEliteShowcaseSelector(StrictBaseModel):

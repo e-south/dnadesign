@@ -6,7 +6,7 @@ portfolio:
     max_parallel_sources: 4
   artifacts:
     table_format: parquet
-    write_csv: false
+    write_csv: true
   sources:
   - id: demo_multitf
     workspace: ../demo_multitf

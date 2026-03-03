@@ -915,15 +915,32 @@ def test_run_portfolio_writes_handoff_tables_and_payload(tmp_path: Path) -> None
     handoff_path = portfolio_table_path(run_dir, "handoff_windows_long", "parquet")
     elite_summary_path = portfolio_table_path(run_dir, "handoff_elites_summary", "parquet")
     source_summary_path = portfolio_table_path(run_dir, "source_summary", "parquet")
+    consensus_path = portfolio_table_path(run_dir, "handoff_consensus_sites_long", "parquet")
+    consolidated_doc_path = portfolio_table_path(run_dir, "workspace_elites_consensus", "csv").with_suffix(".md")
     assert handoff_path.exists()
     assert elite_summary_path.exists()
     assert source_summary_path.exists()
+    assert consensus_path.exists()
+    assert consolidated_doc_path.exists()
 
     handoff_df = read_parquet(handoff_path)
     elite_summary_df = read_parquet(elite_summary_path)
     source_summary_df = read_parquet(source_summary_path)
+    consensus_df = read_parquet(consensus_path)
     assert len(handoff_df) == (4 * 2) + (5 * 2)
     assert len(elite_summary_df) == 9
+    assert len(consensus_df) == 4
+    assert sorted(consensus_df["source_id"].astype(str).unique().tolist()) == [
+        "pairwise_cpxr_baer",
+        "pairwise_cpxr_lexa",
+    ]
+    assert sorted(consensus_df["tf"].astype(str).tolist()) == ["baeR", "cpxR", "cpxR", "lexA"]
+    consolidated_doc = consolidated_doc_path.read_text()
+    assert "Portfolio Workspace Handoff Summary" in consolidated_doc
+    assert "Source: pairwise_cpxr_baer" in consolidated_doc
+    assert "Source: pairwise_cpxr_lexa" in consolidated_doc
+    assert "cpxr_baer_elite_1" in consolidated_doc
+    assert str(consolidated_doc_path) in payload["table_paths"]
     assert handoff_df["elite_hash_id"].astype(str).str.len().eq(16).all()
     assert handoff_df["window_hash_id"].astype(str).str.len().eq(16).all()
     assert elite_summary_df["elite_hash_id"].astype(str).str.len().eq(16).all()
@@ -1016,6 +1033,92 @@ def test_run_portfolio_reads_elites_from_export_contract_only(tmp_path: Path) ->
     assert len(elite_summary_df) == 3
 
 
+def test_run_portfolio_fails_when_export_manifest_missing_consensus_file(tmp_path: Path) -> None:
+    roots = tmp_path / "workspaces"
+    source = roots / "pairwise_cpxr_baer"
+    source.mkdir(parents=True, exist_ok=True)
+    run_dir = _seed_source_run(
+        workspace=source,
+        run_rel="outputs/set1_cpxr_baer",
+        source_tag="cpxr_baer",
+        tf_names=["cpxR", "baeR"],
+        n_elites=3,
+    )
+    export_manifest_file = run_export_sequences_manifest_path(run_dir)
+    export_manifest = json.loads(export_manifest_file.read_text())
+    files = dict(export_manifest["files"])
+    files.pop("consensus_sites", None)
+    export_manifest["files"] = files
+    export_manifest_file.write_text(json.dumps(export_manifest))
+
+    portfolio_workspace = roots / "portfolio_pairwise_handoff"
+    portfolio_workspace.mkdir(parents=True, exist_ok=True)
+    spec_path = portfolio_workspace / "pairwise_handoff.portfolio.yaml"
+    spec_path.write_text(
+        yaml.safe_dump(
+            {
+                "portfolio": {
+                    "schema_version": 3,
+                    "name": "pairwise_handoff",
+                    "execution": {"mode": "aggregate_only"},
+                    "sources": [
+                        {
+                            "id": "pairwise_cpxr_baer",
+                            "workspace": "../pairwise_cpxr_baer",
+                            "run_dir": "outputs/set1_cpxr_baer",
+                        }
+                    ],
+                }
+            }
+        )
+    )
+
+    with pytest.raises(ValueError, match="missing consensus_sites file"):
+        run_portfolio(spec_path)
+
+
+def test_run_portfolio_fails_when_consensus_has_duplicate_tf_rows(tmp_path: Path) -> None:
+    roots = tmp_path / "workspaces"
+    source = roots / "pairwise_cpxr_baer"
+    source.mkdir(parents=True, exist_ok=True)
+    run_dir = _seed_source_run(
+        workspace=source,
+        run_rel="outputs/set1_cpxr_baer",
+        source_tag="cpxr_baer",
+        tf_names=["cpxR", "baeR"],
+        n_elites=3,
+    )
+    consensus_path = run_export_table_path(run_dir, table_name="consensus_sites", fmt="parquet")
+    consensus_df = read_parquet(consensus_path)
+    duplicate_tf_row = consensus_df.iloc[[0]].copy()
+    write_parquet(pd.concat([consensus_df, duplicate_tf_row], ignore_index=True), consensus_path)
+
+    portfolio_workspace = roots / "portfolio_pairwise_handoff"
+    portfolio_workspace.mkdir(parents=True, exist_ok=True)
+    spec_path = portfolio_workspace / "pairwise_handoff.portfolio.yaml"
+    spec_path.write_text(
+        yaml.safe_dump(
+            {
+                "portfolio": {
+                    "schema_version": 3,
+                    "name": "pairwise_handoff",
+                    "execution": {"mode": "aggregate_only"},
+                    "sources": [
+                        {
+                            "id": "pairwise_cpxr_baer",
+                            "workspace": "../pairwise_cpxr_baer",
+                            "run_dir": "outputs/set1_cpxr_baer",
+                        }
+                    ],
+                }
+            }
+        )
+    )
+
+    with pytest.raises(ValueError, match="duplicate tf rows"):
+        run_portfolio(spec_path)
+
+
 def test_run_portfolio_accepts_nondefault_export_elites_path_from_manifest(tmp_path: Path) -> None:
     roots = tmp_path / "workspaces"
     source = roots / "pairwise_cpxr_baer"
@@ -1064,7 +1167,7 @@ def test_run_portfolio_accepts_nondefault_export_elites_path_from_manifest(tmp_p
     assert handoff_path.exists()
 
 
-def test_run_portfolio_default_artifacts_write_single_table_format_only(tmp_path: Path) -> None:
+def test_run_portfolio_default_artifacts_write_csv_mirrors(tmp_path: Path) -> None:
     roots = tmp_path / "workspaces"
     source = roots / "pairwise_cpxr_baer"
     source.mkdir(parents=True, exist_ok=True)
@@ -1102,9 +1205,12 @@ def test_run_portfolio_default_artifacts_write_single_table_format_only(tmp_path
     assert portfolio_table_path(run_dir, "handoff_windows_long", "parquet").exists()
     assert portfolio_table_path(run_dir, "handoff_elites_summary", "parquet").exists()
     assert portfolio_table_path(run_dir, "source_summary", "parquet").exists()
-    assert not portfolio_table_path(run_dir, "handoff_windows_long", "csv").exists()
-    assert not portfolio_table_path(run_dir, "handoff_elites_summary", "csv").exists()
-    assert not portfolio_table_path(run_dir, "source_summary", "csv").exists()
+    assert portfolio_table_path(run_dir, "handoff_consensus_sites_long", "parquet").exists()
+    assert portfolio_table_path(run_dir, "workspace_elites_consensus", "csv").with_suffix(".md").exists()
+    assert portfolio_table_path(run_dir, "handoff_windows_long", "csv").exists()
+    assert portfolio_table_path(run_dir, "handoff_elites_summary", "csv").exists()
+    assert portfolio_table_path(run_dir, "source_summary", "csv").exists()
+    assert portfolio_table_path(run_dir, "handoff_consensus_sites_long", "csv").exists()
 
 
 def test_run_portfolio_flat_configs_spec_writes_outputs_under_workspace_root(tmp_path: Path) -> None:

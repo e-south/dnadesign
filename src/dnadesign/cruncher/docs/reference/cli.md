@@ -456,7 +456,7 @@ Examples:
 Source preconditions (per source entry in spec):
 
 * `analysis/reports/summary.json`
-* `export/export_manifest.json` (with valid `files.elites` path)
+* `export/export_manifest.json` (with valid `files.elites` and `files.consensus_sites` paths)
 
 Outputs:
 
@@ -465,19 +465,21 @@ Outputs:
 * `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/meta/logs/prepare__<source_id>.log` (when `execution.mode=prepare_then_aggregate`)
 * `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_windows_long.<csv|parquet>`
 * `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_elites_summary.<csv|parquet>`
+* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_consensus_sites_long.<csv|parquet>`
+* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__workspace_elites_consensus.md`
 * `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__source_summary.<csv|parquet>`
 * `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__study_summary.<csv|parquet>` (when `studies.enabled: true` and source `study_spec` is declared)
 * `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_sequence_length.<csv|parquet>` (when `studies.enabled: true` and `studies.sequence_length_table.enabled: true`)
 * `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/plots/plot__source_tradeoff_score_vs_diversity.pdf` (when source diversity metrics are available)
 * `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/plots/plot__elite_showcase_cross_workspace.<pdf|png>` (when `plots.elite_showcase.enabled: true`)
 
-Default portfolio table output is parquet without CSV mirrors (`artifacts.table_format=parquet`, `artifacts.write_csv=false`).
+Default portfolio table output is parquet with CSV mirrors (`artifacts.table_format=parquet`, `artifacts.write_csv=true`).
 
 Notes:
 
 * Portfolio specs are strict (`extra=forbid`); unknown keys and invalid paths fail fast.
 * Sources are explicit only: no latest-run fallback, no workspace auto-selection fallback.
-* Source selection uses source run manifest `top_k` and export manifest `files.elites`; there is no portfolio-level top-k setting.
+* Source selection uses source run manifest `top_k` and export manifest tables `files.elites` and `files.consensus_sites`; there is no portfolio-level top-k setting.
 * Source run manifest `top_k` must match export elites row count for each source.
 * Source run manifest stage must be `sample`.
 * `run_dir` must resolve inside its declared `workspace`.

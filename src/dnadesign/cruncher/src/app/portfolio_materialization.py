@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -52,6 +53,110 @@ def _write_table(df: pd.DataFrame, path: Path) -> None:
         df.to_csv(path, index=False)
     else:
         raise ValueError(f"Unsupported portfolio table format: {path.suffix}")
+
+
+def _markdown_cell(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float):
+        if pd.isna(value):
+            return ""
+        return f"{value:.6g}"
+    text = str(value)
+    if text.lower() == "nan":
+        return ""
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
+def _markdown_table(df: pd.DataFrame, *, columns: list[str], context: str) -> str:
+    _ensure_required_columns(df, columns, context=context)
+    if df.empty:
+        return "_No rows._\n"
+    table = df.loc[:, columns].copy()
+    header = "| " + " | ".join(columns) + " |"
+    separator = "| " + " | ".join(["---"] * len(columns)) + " |"
+    rows = [header, separator]
+    for row in table.to_dict(orient="records"):
+        rows.append("| " + " | ".join(_markdown_cell(row.get(column)) for column in columns) + " |")
+    return "\n".join(rows) + "\n"
+
+
+def _write_workspace_elites_consensus_doc(
+    *,
+    run_dir: Path,
+    source_summary_df: pd.DataFrame,
+    elite_summary_df: pd.DataFrame,
+    consensus_df: pd.DataFrame,
+) -> Path:
+    source_columns = [
+        "source_id",
+        "source_label",
+        "workspace_name",
+        "run_name",
+        "source_top_k",
+        "n_selected_elites",
+        "mean_min_best_score_norm",
+        "median_min_best_score_norm",
+        "mean_pairwise_hamming_bp",
+    ]
+    elite_columns = [
+        "elite_rank",
+        "elite_id",
+        "sequence_length",
+        "combined_score_final",
+        "min_best_score_norm",
+        "mean_best_score_norm",
+        "elite_hash_id",
+    ]
+    consensus_columns = [
+        "tf",
+        "motif_source",
+        "motif_id",
+        "consensus_sequence",
+        "consensus_width",
+        "pwm_ref",
+        "pwm_hash",
+    ]
+
+    out_path = portfolio_table_path(run_dir, "workspace_elites_consensus", "csv").with_suffix(".md")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    generated_at = datetime.now(timezone.utc).isoformat()
+    lines = [
+        "# Portfolio Workspace Handoff Summary",
+        "",
+        f"Generated at (UTC): `{generated_at}`",
+        "",
+        "## Source Summary",
+        "",
+        _markdown_table(source_summary_df, columns=source_columns, context="Portfolio source summary report table"),
+    ]
+    for source_id in source_summary_df["source_id"].astype(str).tolist():
+        source_elites = elite_summary_df[elite_summary_df["source_id"].astype(str) == source_id].copy()
+        source_elites = source_elites.sort_values(["elite_rank"]).reset_index(drop=True)
+        source_consensus = consensus_df[consensus_df["source_id"].astype(str) == source_id].copy()
+        source_consensus = source_consensus.sort_values(["tf"]).reset_index(drop=True)
+        lines.extend(
+            [
+                f"## Source: {source_id}",
+                "",
+                "### Elite Summary",
+                "",
+                _markdown_table(
+                    source_elites,
+                    columns=elite_columns,
+                    context=f"Portfolio elite summary report table ({source_id})",
+                ),
+                "### Consensus Sites",
+                "",
+                _markdown_table(
+                    source_consensus,
+                    columns=consensus_columns,
+                    context=f"Portfolio consensus report table ({source_id})",
+                ),
+            ]
+        )
+    out_path.write_text("\n".join(lines).rstrip() + "\n")
+    return out_path
 
 
 def _write_tradeoff_plot(source_summary_df: pd.DataFrame, out_path: Path) -> Path | None:
@@ -213,6 +318,7 @@ def _materialize_portfolio_outputs(
     spec: PortfolioSpec,
     all_window_rows: list[dict[str, object]],
     all_elite_rows: list[dict[str, object]],
+    all_consensus_rows: list[dict[str, object]],
     source_summary_rows: list[dict[str, object]],
     study_summary_rows: list[dict[str, object]],
     sequence_length_rows: list[dict[str, object]],
@@ -229,16 +335,29 @@ def _materialize_portfolio_outputs(
 
     source_summary_df = pd.DataFrame(source_summary_rows)
     source_summary_df = source_summary_df.sort_values(["source_id"]).reset_index(drop=True)
+    consensus_df = pd.DataFrame(all_consensus_rows)
+    if consensus_df.empty:
+        raise ValueError("Portfolio produced zero consensus rows across all sources.")
+    consensus_df = consensus_df.sort_values(["source_id", "tf"]).reset_index(drop=True)
 
     table_paths: list[Path] = []
     main_format = str(spec.artifacts.table_format)
     handoff_main = portfolio_table_path(run_dir, "handoff_windows_long", main_format)
     elite_summary_main = portfolio_table_path(run_dir, "handoff_elites_summary", main_format)
     summary_main = portfolio_table_path(run_dir, "source_summary", main_format)
+    consensus_main = portfolio_table_path(run_dir, "handoff_consensus_sites_long", main_format)
     _write_table(handoff_df, handoff_main)
     _write_table(elite_summary_df, elite_summary_main)
     _write_table(source_summary_df, summary_main)
-    table_paths.extend([handoff_main, elite_summary_main, summary_main])
+    _write_table(consensus_df, consensus_main)
+    table_paths.extend([handoff_main, elite_summary_main, summary_main, consensus_main])
+    workspace_doc = _write_workspace_elites_consensus_doc(
+        run_dir=run_dir,
+        source_summary_df=source_summary_df,
+        elite_summary_df=elite_summary_df,
+        consensus_df=consensus_df,
+    )
+    table_paths.append(workspace_doc)
 
     if study_summary_rows:
         study_summary_df = (
@@ -262,10 +381,12 @@ def _materialize_portfolio_outputs(
         handoff_csv = portfolio_table_path(run_dir, "handoff_windows_long", "csv")
         elite_summary_csv = portfolio_table_path(run_dir, "handoff_elites_summary", "csv")
         summary_csv = portfolio_table_path(run_dir, "source_summary", "csv")
+        consensus_csv = portfolio_table_path(run_dir, "handoff_consensus_sites_long", "csv")
         _write_table(handoff_df, handoff_csv)
         _write_table(elite_summary_df, elite_summary_csv)
         _write_table(source_summary_df, summary_csv)
-        table_paths.extend([handoff_csv, elite_summary_csv, summary_csv])
+        _write_table(consensus_df, consensus_csv)
+        table_paths.extend([handoff_csv, elite_summary_csv, summary_csv, consensus_csv])
         if study_summary_rows:
             study_summary_df = (
                 pd.DataFrame(study_summary_rows).sort_values(["source_id", "study_name"]).reset_index(drop=True)
