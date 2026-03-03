@@ -59,7 +59,7 @@ from dnadesign.cruncher.core.scoring import Scorer
 from dnadesign.cruncher.core.sequence import canon_int
 from dnadesign.cruncher.core.state import SequenceState
 from dnadesign.cruncher.store.lockfile import read_lockfile
-from dnadesign.cruncher.utils.paths import resolve_lock_path
+from dnadesign.cruncher.utils.paths import resolve_lock_path, resolve_workspace_root
 
 logger = logging.getLogger(__name__)
 
@@ -900,6 +900,7 @@ def _persist_run_outputs(
         pwms=preparation.pwms,
         tfs=tfs,
         out_dir=out_dir,
+        workspace_slug=resolve_workspace_root(config_path).name,
         pwm_ref_by_tf=preparation.pwm_ref_by_tf,
         pwm_hash_by_tf=preparation.pwm_hash_by_tf,
         core_def_by_tf=preparation.core_def_by_tf,

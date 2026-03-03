@@ -11,11 +11,14 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
+
 import numpy as np
 import pytest
 
 from dnadesign.cruncher.app.sample.diagnostics import _EliteCandidate, dsdna_equivalence_enabled, resolve_dsdna_mode
 from dnadesign.cruncher.app.sample.elites_mmr import (
+    build_elite_entries,
     build_elite_pool,
     hydrate_candidate_hits,
     select_elites_mmr,
@@ -31,6 +34,7 @@ from dnadesign.cruncher.app.sample.elites_stage import (
 from dnadesign.cruncher.config.schema_v3 import SampleConfig
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
+from dnadesign.cruncher.core.sequence import canon_int
 
 
 def _seq_arr(seq: str) -> np.ndarray:
@@ -66,6 +70,11 @@ def _elite_candidate(seq: str, scorer: Scorer, *, chain_id: int = 0, draw_idx: i
 
 def _seq_str(arr: np.ndarray) -> str:
     return "".join("ACGT"[int(v)] for v in arr.tolist())
+
+
+def _expected_elite_id(*, workspace_slug: str, sequence: str) -> str:
+    token = hashlib.sha256(sequence.encode("utf-8")).hexdigest()[:12]
+    return f"{workspace_slug}_elite_{token}"
 
 
 def test_resolve_dsdna_mode_tracks_bidirectional_flag() -> None:
@@ -241,6 +250,90 @@ def test_hydrate_candidate_hits_populates_missing_hits_once() -> None:
 
     hydrate_candidate_hits(candidates, scorer=scorer)
     assert scorer.best_hit_calls == 2
+
+
+def test_build_elite_entries_assigns_deterministic_workspace_scoped_ids() -> None:
+    scorer = Scorer(
+        {
+            "tfA": _make_pwm("tfA", "ATGC"),
+            "tfB": _make_pwm("tfB", "CGTA"),
+        },
+        bidirectional=False,
+        scale="normalized-llr",
+    )
+    sample_cfg = SampleConfig(
+        seed=11,
+        sequence_length=8,
+        budget={"tune": 0, "draws": 3},
+        objective={"bidirectional": False, "score_scale": "normalized-llr"},
+    )
+    cand_a = _elite_candidate("ATGTCGTT", scorer, draw_idx=1)
+    cand_b = _elite_candidate("ATGTCGTA", scorer, draw_idx=2)
+
+    first = build_elite_entries(
+        [cand_a, cand_b],
+        scorer=scorer,
+        sample_cfg=sample_cfg,
+        want_consensus=False,
+        want_canonical=False,
+        meta_source="set1",
+        workspace_slug="pairwise_cpxr_lexa",
+    )
+    second = build_elite_entries(
+        [cand_b, cand_a],
+        scorer=scorer,
+        sample_cfg=sample_cfg,
+        want_consensus=False,
+        want_canonical=False,
+        meta_source="set1",
+        workspace_slug="pairwise_cpxr_lexa",
+    )
+    first_by_sequence = {str(row["sequence"]): str(row["id"]) for row in first}
+    second_by_sequence = {str(row["sequence"]): str(row["id"]) for row in second}
+
+    assert first_by_sequence == second_by_sequence
+    assert first_by_sequence["ATGTCGTT"] == _expected_elite_id(
+        workspace_slug="pairwise_cpxr_lexa",
+        sequence="ATGTCGTT",
+    )
+    assert first_by_sequence["ATGTCGTA"] == _expected_elite_id(
+        workspace_slug="pairwise_cpxr_lexa",
+        sequence="ATGTCGTA",
+    )
+
+
+def test_build_elite_entries_uses_canonical_sequence_for_id_when_requested() -> None:
+    scorer = Scorer(
+        {
+            "tfA": _make_pwm("tfA", "ATGC"),
+        },
+        bidirectional=False,
+        scale="normalized-llr",
+    )
+    sample_cfg = SampleConfig(
+        seed=13,
+        sequence_length=8,
+        budget={"tune": 0, "draws": 2},
+        objective={"bidirectional": True, "score_scale": "normalized-llr"},
+    )
+    sequence = "TTCGACAA"
+    candidate = _elite_candidate(sequence, scorer, draw_idx=1)
+    canonical_sequence = _seq_str(canon_int(_seq_arr(sequence)))
+
+    entries = build_elite_entries(
+        [candidate],
+        scorer=scorer,
+        sample_cfg=sample_cfg,
+        want_consensus=False,
+        want_canonical=True,
+        meta_source="set1",
+        workspace_slug="pairwise_cpxr_lexa",
+    )
+    assert entries[0]["canonical_sequence"] == canonical_sequence
+    assert entries[0]["id"] == _expected_elite_id(
+        workspace_slug="pairwise_cpxr_lexa",
+        sequence=canonical_sequence,
+    )
 
 
 def test_postprocess_polishes_single_owner_positions_without_moving_hits() -> None:

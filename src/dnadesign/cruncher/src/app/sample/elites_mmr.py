@@ -11,8 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import logging
-import uuid
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -31,6 +32,7 @@ from dnadesign.cruncher.core.sequence import canon_int
 from dnadesign.cruncher.core.state import SequenceState
 
 logger = logging.getLogger(__name__)
+_WORKSPACE_SLUG_SAFE_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,20 @@ class EliteSelectionResult:
     mmr_meta_rows: list[dict[str, object]] | None
     mmr_summary: dict[str, object] | None
     kept_after_mmr: int
+
+
+def _normalize_workspace_slug(workspace_slug: str) -> str:
+    token = _WORKSPACE_SLUG_SAFE_RE.sub("_", str(workspace_slug).strip()).strip("_")
+    if not token:
+        raise ValueError("workspace_slug must resolve to a non-empty slug-safe token.")
+    return token
+
+
+def _deterministic_elite_id(*, workspace_slug: str, sequence_for_id: str) -> str:
+    if not sequence_for_id:
+        raise ValueError("Elite ID sequence payload must be non-empty.")
+    token = hashlib.sha256(sequence_for_id.encode("utf-8")).hexdigest()[:12]
+    return f"{workspace_slug}_elite_{token}"
 
 
 def hydrate_candidate_hits(candidates: list[_EliteCandidate], *, scorer: Scorer) -> None:
@@ -309,10 +325,12 @@ def build_elite_entries(
     want_consensus: bool,
     want_canonical: bool,
     meta_source: str,
+    workspace_slug: str,
 ) -> list[dict[str, object]]:
     entries: list[dict[str, object]] = []
     adapt_sweeps = int(sample_cfg.budget.tune)
     record_tune = bool(sample_cfg.output.include_tune_in_sequences)
+    workspace_token = _normalize_workspace_slug(workspace_slug)
     for rank, cand in enumerate(candidates, 1):
         seq_arr = cand.seq_arr
         seq_str = SequenceState(seq_arr).to_string()
@@ -348,8 +366,9 @@ def build_elite_entries(
         if record_tune and cand.draw_idx >= adapt_sweeps:
             draw_in_phase = cand.draw_idx - adapt_sweeps
 
+        id_sequence = canonical_seq if canonical_seq is not None else seq_str
         entry = {
-            "id": str(uuid.uuid4()),
+            "id": _deterministic_elite_id(workspace_slug=workspace_token, sequence_for_id=id_sequence),
             "sequence": seq_str,
             "rank": rank,
             "norm_sum": cand.sum_norm,
