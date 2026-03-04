@@ -261,4 +261,3 @@ def resolve_usr_producer_contract(*, tool: str, config_path: Path) -> USRProduce
         supported = ", ".join(sorted(_USR_PRODUCER_ADAPTERS))
         raise ValueError(f"unsupported usr producer tool: {tool_name} (supported: {supported})")
     return adapter(config_path)
-

@@ -19,4 +19,3 @@ WORKSPACE_AUDIT_RELATIVE_DIR = Path("outputs/logs/ops/audit")
 WORKSPACE_SGE_STDOUT_RELATIVE_DIR = Path("outputs/logs/ops/sge")
 WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR = Path("outputs/logs/ops/runtime")
 REPO_TRANSIENT_OPERATIONAL_DIR_NAMES = (".codex_tmp", ".tmp_ops", "tmp_ops")
-

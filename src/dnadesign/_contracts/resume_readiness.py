@@ -62,4 +62,3 @@ def resolve_resume_readiness_policy(tool: str) -> ResumeReadinessPolicy | None:
         return None
     supported = ", ".join(sorted(set(_RESUME_READINESS_POLICIES) | set(_TOOLS_WITHOUT_RESUME_POLICY)))
     raise ValueError(f"unsupported resume readiness policy tool: {tool_name} (supported: {supported})")
-

@@ -223,7 +223,11 @@ def compact_overlay_namespace(
 
         dataset._record_event(
             "compact_overlay",
-            args={"namespace": namespace, "archived": (str(archived) if archived is not None else None), "maintenance_reason": ctx.reason},
+            args={
+                "namespace": namespace,
+                "archived": (str(archived) if archived is not None else None),
+                "maintenance_reason": ctx.reason,
+            },
             maintenance={"reason": ctx.reason},
             target_path=file_path,
             actor=ctx.actor,

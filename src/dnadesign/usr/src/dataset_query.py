@@ -17,7 +17,6 @@ from typing import Any
 from .errors import SchemaError
 from .overlays import overlay_metadata, overlay_parts
 
-
 _OVERLAY_PART_CREATED_AT_CACHE: dict[str, tuple[int, int, str]] = {}
 _OVERLAY_PART_CREATED_AT_CACHE_MAX = 20_000
 _OVERLAY_KEY_UNIQUENESS_CACHE: dict[tuple[str, str], tuple[int, int]] = {}
@@ -98,8 +97,7 @@ def _assert_single_overlay_key_unique(
     if cached == stat_key:
         return
     dup_exists = con.execute(
-        f"SELECT 1 FROM read_parquet('{sql_str(str(resolved))}') "
-        f"GROUP BY {key_q} HAVING COUNT(*) > 1 LIMIT 1"
+        f"SELECT 1 FROM read_parquet('{sql_str(str(resolved))}') GROUP BY {key_q} HAVING COUNT(*) > 1 LIMIT 1"
     ).fetchone()
     if dup_exists is not None:
         raise SchemaError(f"Overlay part has duplicate keys for '{key}': {resolved}")
@@ -143,11 +141,7 @@ def create_overlay_view(
     source_sql = _read_parquet_with_filename_sql(parts)
     if cached_part_signature != part_signature:
         dup_row = con.execute(
-            "SELECT filename "
-            f"FROM {source_sql} "
-            f"GROUP BY filename, {key_q} "
-            "HAVING COUNT(*) > 1 "
-            "LIMIT 1"
+            f"SELECT filename FROM {source_sql} GROUP BY filename, {key_q} HAVING COUNT(*) > 1 LIMIT 1"
         ).fetchone()
         if dup_row is not None:
             raise SchemaError(f"Overlay part has duplicate keys for '{key}': {Path(str(dup_row[0]))}")
@@ -165,9 +159,7 @@ def create_overlay_view(
     )
     for offset in range(0, len(part_rows), 256):
         batch = tuple(part_rows[offset : offset + 256])
-        con.execute(
-            f"INSERT INTO {metadata_view} VALUES {_sql_values_rows(batch)}"
-        )
+        con.execute(f"INSERT INTO {metadata_view} VALUES {_sql_values_rows(batch)}")
     con.execute(
         f"CREATE TEMP TABLE {staging_view} AS "
         "SELECT p.* EXCLUDE(filename), "

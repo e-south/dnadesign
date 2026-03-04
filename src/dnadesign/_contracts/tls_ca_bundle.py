@@ -94,7 +94,9 @@ def resolve_tls_ca_bundle_path(
         except TLSCABundleResolutionError as exc:
             assert exc.path is not None
             if exc.reason in {"missing", "not_file"}:
-                raise ValueError(f"{source_label} from {env_var_name} does not exist or is not a file: {exc.path}") from exc
+                raise ValueError(
+                    f"{source_label} from {env_var_name} does not exist or is not a file: {exc.path}"
+                ) from exc
             if exc.reason == "unreadable":
                 raise ValueError(f"{source_label} from {env_var_name} is not readable: {exc.path}") from exc
             raise
@@ -110,4 +112,3 @@ def resolve_tls_ca_bundle_path(
                 continue
 
     raise ValueError(not_configured_error)
-

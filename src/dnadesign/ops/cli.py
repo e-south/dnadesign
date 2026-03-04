@@ -39,6 +39,7 @@ app = typer.Typer(
 runbook_app = typer.Typer(help="Runbook contract commands.")
 app.add_typer(runbook_app, name="runbook")
 
+
 def _load_runbook_or_exit(runbook_path: Path):
     try:
         return load_orchestration_runbook(runbook_path.expanduser())
@@ -83,16 +84,10 @@ def _validate_runbook_output_path_for_init(*, runbook_path: Path, repo_base: Pat
     except ValueError:
         return
     if relative_to_repo.parent == Path("."):
-        raise ValueError(
-            "runbook path must not be at repository root; "
-            f"use {_workspace_runbook_path_hint()}"
-        )
+        raise ValueError(f"runbook path must not be at repository root; use {_workspace_runbook_path_hint()}")
     for segment in REPO_TRANSIENT_OPERATIONAL_DIR_NAMES:
         if segment in relative_to_repo.parts:
-            raise ValueError(
-                f"runbook path must not use '{segment}'; "
-                f"use {_workspace_runbook_path_hint()}"
-            )
+            raise ValueError(f"runbook path must not use '{segment}'; use {_workspace_runbook_path_hint()}")
 
 
 def _discover_repo_base_for_path(path: Path) -> Path | None:
@@ -116,8 +111,7 @@ def _validate_audit_json_path_for_execute(*, audit_json_path: Path, workspace_ro
     expected_audit_dir = (workspace_root / WORKSPACE_AUDIT_RELATIVE_DIR).resolve()
     if resolved_audit_json.parent != expected_audit_dir:
         raise ValueError(
-            "audit-json path must be exactly "
-            f"<workspace-root>/{WORKSPACE_AUDIT_RELATIVE_DIR.as_posix()}/<file>.json"
+            f"audit-json path must be exactly <workspace-root>/{WORKSPACE_AUDIT_RELATIVE_DIR.as_posix()}/<file>.json"
         )
     if resolved_audit_json.suffix.lower() != ".json":
         raise ValueError("audit-json file extension must be .json")
@@ -362,10 +356,7 @@ def runbook_init(
 
 @runbook_app.command("precedents")
 def runbook_precedents() -> None:
-    precedents = [
-        {"name": path.stem, "path": str(path)}
-        for path in _packaged_precedent_paths()
-    ]
+    precedents = [{"name": path.stem, "path": str(path)} for path in _packaged_precedent_paths()]
     typer.echo(json.dumps({"precedents": precedents}, indent=2, sort_keys=True))
 
 

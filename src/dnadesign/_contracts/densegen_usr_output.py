@@ -101,8 +101,7 @@ def resolve_densegen_usr_output_contract(
     outputs_root = (run_root / "outputs").resolve()
     if not _is_relative_to(usr_root, outputs_root):
         raise ValueError(
-            "output.usr.root must be within outputs/ under "
-            f"densegen.run.root ({outputs_root}), got: {usr_root}"
+            f"output.usr.root must be within outputs/ under densegen.run.root ({outputs_root}), got: {usr_root}"
         )
 
     dataset_raw = _required_non_empty_string(usr_cfg.get("dataset"), label="densegen.output.usr.dataset")
@@ -119,4 +118,3 @@ def resolve_densegen_usr_output_contract(
         usr_root=usr_root,
         usr_dataset=usr_dataset,
     )
-

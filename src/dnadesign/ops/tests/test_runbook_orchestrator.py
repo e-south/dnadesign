@@ -11,8 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import os
 import json
+import os
 import shlex
 from pathlib import Path
 from typing import get_args
@@ -64,9 +64,7 @@ def _write_runbook(
     runbook_payload: dict[str, object] = {
         "schema_version": 1,
         "id": "study_stress_ethanol_cipro",
-        "workflow_id": (
-            "densegen_batch_with_notify_slack" if include_notify else "densegen_batch_submit"
-        ),
+        "workflow_id": ("densegen_batch_with_notify_slack" if include_notify else "densegen_batch_submit"),
         "project": "dunlop",
         "workspace_root": str(workspace_root),
         "logging": {
@@ -892,7 +890,7 @@ def test_batch_plan_includes_session_counts_gate_instead_of_qstat_shell_awk(tmp_
     preflight_block = _render_block(plan.preflight_commands)
 
     assert "dnadesign.ops.orchestrator.gates session-counts" in preflight_block
-    assert "qstat -u \"$USER\" | awk" not in preflight_block
+    assert 'qstat -u "$USER" | awk' not in preflight_block
 
 
 def test_densegen_notify_preflight_requires_usr_events_path_contract(tmp_path: Path) -> None:
@@ -1023,9 +1021,7 @@ def test_batch_plan_enforces_workspace_scoped_stdout_dir_for_verify_and_submit(t
     preflight_block = _render_block(plan.preflight_commands)
     submit_block = _render_block(plan.submit_commands)
 
-    expected_stdout_file = (
-        f"{runbook.workspace_root}/outputs/logs/ops/sge/{runbook.id}/$JOB_NAME.$JOB_ID.out"
-    )
+    expected_stdout_file = f"{runbook.workspace_root}/outputs/logs/ops/sge/{runbook.id}/$JOB_NAME.$JOB_ID.out"
     assert "dnadesign.ops.orchestrator.gates ensure-dir-writable" in preflight_block
     assert expected_stdout_file in preflight_block
     assert expected_stdout_file in submit_block
@@ -1612,9 +1608,7 @@ def test_cli_execute_help_includes_repo_root_option() -> None:
     assert "--repo-root" in result.output
 
 
-def test_cli_execute_defaults_timeout_to_300_seconds(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_cli_execute_defaults_timeout_to_300_seconds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     runbook_path = _write_runbook(tmp_path)
     audit_path = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "audit" / "result.json"
     captured: dict[str, object] = {}
@@ -1715,9 +1709,9 @@ def test_cli_runbook_init_creates_valid_densegen_contract(tmp_path: Path) -> Non
     assert loaded.notify.smoke == "dry"
     assert loaded.densegen is not None
     assert loaded.densegen.config == (workspace_root / "config.yaml").resolve()
-    assert loaded.logging.stdout_dir == (
-        workspace_root / "outputs" / "logs" / "ops" / "sge" / "densegen_demo"
-    ).resolve()
+    assert (
+        loaded.logging.stdout_dir == (workspace_root / "outputs" / "logs" / "ops" / "sge" / "densegen_demo").resolve()
+    )
     raw_payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
     assert raw_payload["runbook"]["logging"]["retention"]["keep_last"] == 20
     assert raw_payload["runbook"]["logging"]["retention"]["max_age_days"] == 14
@@ -1797,9 +1791,7 @@ def test_cli_runbook_init_uses_repo_root_for_template_contracts(tmp_path: Path) 
     repo_root = tmp_path / "repo"
     (repo_root / "docs" / "bu-scc" / "jobs").mkdir(parents=True, exist_ok=True)
     (repo_root / "docs" / "bu-scc" / "jobs" / "notify-watch.qsub").write_text("#!/bin/bash -l\n", encoding="utf-8")
-    (repo_root / "docs" / "bu-scc" / "jobs" / "densegen-cpu.qsub").write_text(
-        "#!/bin/bash -l\n", encoding="utf-8"
-    )
+    (repo_root / "docs" / "bu-scc" / "jobs" / "densegen-cpu.qsub").write_text("#!/bin/bash -l\n", encoding="utf-8")
     runner = CliRunner()
 
     result = runner.invoke(
@@ -1822,9 +1814,7 @@ def test_cli_runbook_init_uses_repo_root_for_template_contracts(tmp_path: Path) 
     loaded = load_orchestration_runbook(runbook_path)
     assert loaded.notify.qsub_template == (repo_root / "docs" / "bu-scc" / "jobs" / "notify-watch.qsub").resolve()
     assert loaded.densegen is not None
-    assert loaded.densegen.qsub_template == (
-        repo_root / "docs" / "bu-scc" / "jobs" / "densegen-cpu.qsub"
-    ).resolve()
+    assert loaded.densegen.qsub_template == (repo_root / "docs" / "bu-scc" / "jobs" / "densegen-cpu.qsub").resolve()
 
 
 def test_cli_runbook_init_resolves_relative_workspace_root_against_repo_root(tmp_path: Path) -> None:

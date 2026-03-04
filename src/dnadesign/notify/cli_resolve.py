@@ -12,4 +12,3 @@ Module Author(s): Eric J. South
 raise ModuleNotFoundError(
     "dnadesign.notify.cli_resolve is not importable; use dnadesign.notify.cli.bindings registry paths."
 )
-

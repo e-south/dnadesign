@@ -25,8 +25,8 @@ from .deps import DEPENDENCY_EXPORTS
 from .profile import (
     run_profile_doctor_impl,
     run_profile_init_impl,
-    run_profile_smoke_impl,
     run_profile_show_impl,
+    run_profile_smoke_impl,
     run_profile_wizard_impl,
 )
 from .registry import register_notify_cli_bindings as _register_notify_cli_bindings

@@ -1,6 +1,6 @@
 ## Orchestration runbooks
 
-**Owner:** dnadesign-maintainers  
+**Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-03
 
 This contract defines machine-readable runbooks for cross-tool BU SCC orchestration.

@@ -301,9 +301,7 @@ class OrchestrationRunbookV1(StrictBaseModel):
             if self.infer is not None:
                 raise ValueError("densegen workflow does not accept runbook.infer block")
             if self.resources.gpus is not None or self.resources.gpu_capability is not None:
-                raise ValueError(
-                    "densegen workflow does not accept resources.gpus or resources.gpu_capability"
-                )
+                raise ValueError("densegen workflow does not accept resources.gpus or resources.gpu_capability")
             if expects_notify:
                 if self.notify is None:
                     raise ValueError("densegen notify workflow requires runbook.notify block")
@@ -412,9 +410,7 @@ def _resolve_runbook_paths(runbook: OrchestrationRunbookV1, *, runbook_base_dir:
 
     logging = runbook.logging.model_copy(
         update={
-            "stdout_dir": _resolve_path_from_runbook_base(
-                runbook.logging.stdout_dir, runbook_base_dir=runbook_base_dir
-            )
+            "stdout_dir": _resolve_path_from_runbook_base(runbook.logging.stdout_dir, runbook_base_dir=runbook_base_dir)
         }
     )
 

@@ -17,8 +17,8 @@ from typing import Any, Callable
 
 from .watch_runner_contract import (
     normalize_on_invalid_event_mode,
-    resolve_progress_heartbeat_seconds,
     resolve_optional_profile_bool,
+    resolve_progress_heartbeat_seconds,
     resolve_progress_min_seconds,
     resolve_progress_step_pct,
 )

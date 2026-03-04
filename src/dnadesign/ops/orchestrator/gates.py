@@ -73,7 +73,9 @@ def _validate_stdout_dir_scope(*, stdout_dir: Path, runbook_id: str, log_kind: L
 
     if log_kind == "sge":
         expected_suffix = WORKSPACE_SGE_STDOUT_RELATIVE_DIR / runbook_id_value
-        scope_error = f"stdout_dir must be exactly workspace/{WORKSPACE_SGE_STDOUT_RELATIVE_DIR.as_posix()}/<runbook-id>"
+        scope_error = (
+            f"stdout_dir must be exactly workspace/{WORKSPACE_SGE_STDOUT_RELATIVE_DIR.as_posix()}/<runbook-id>"
+        )
     elif log_kind == "runtime":
         expected_suffix = WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR
         scope_error = f"stdout_dir must be exactly workspace/{WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR.as_posix()}"
@@ -112,11 +114,7 @@ def prune_ops_logs(
     now_epoch = time.time()
     cutoff_epoch = now_epoch - (max_age_days * 86400)
     manifest_name = resolved_manifest_path.name
-    candidates = [
-        path
-        for path in scoped_stdout_dir.iterdir()
-        if path.is_file() and path.name != manifest_name
-    ]
+    candidates = [path for path in scoped_stdout_dir.iterdir() if path.is_file() and path.name != manifest_name]
     candidates.sort(key=lambda path: (path.stat().st_mtime, path.name), reverse=True)
     protected = set(candidates[:keep_last])
     pruned_paths: list[Path] = []
@@ -788,7 +786,8 @@ def main(argv: list[str] | None = None) -> int:
                 if not args.auto_compact_existing_overlay_parts:
                     print(
                         "existing_overlay_parts exceeds threshold; "
-                        "run 'uv run usr --root <usr-root> maintenance overlay-compact <dataset> --namespace <namespace>' "
+                        "run 'uv run usr --root <usr-root> maintenance overlay-compact "
+                        "<dataset> --namespace <namespace>' "
                         "or set --auto-compact-existing-overlay-parts.",
                         file=sys.stderr,
                     )
@@ -816,9 +815,7 @@ def main(argv: list[str] | None = None) -> int:
                 namespace=args.overlay_namespace,
             )
             if projected_overlay_parts > args.max_projected_overlay_parts:
-                recommended_max_accepted = max(
-                    1, math.ceil(int(planned_rows) / int(args.max_projected_overlay_parts))
-                )
+                recommended_max_accepted = max(1, math.ceil(int(planned_rows) / int(args.max_projected_overlay_parts)))
                 print(
                     "projected_overlay_parts exceeds threshold; "
                     "increase runtime.max_accepted_per_library and/or output.usr.chunk_size before submit.",
@@ -958,9 +955,8 @@ def main(argv: list[str] | None = None) -> int:
             maintenance_reasons: list[str] = []
             if existing_records_parts_before > args.max_existing_records_parts:
                 maintenance_reasons.append("count_threshold")
-            if (
-                existing_records_parts_before > 0
-                and oldest_part_age_days_before > float(args.max_existing_records_part_age_days)
+            if existing_records_parts_before > 0 and oldest_part_age_days_before > float(
+                args.max_existing_records_part_age_days
             ):
                 maintenance_reasons.append("age_threshold")
             if maintenance_reasons:
@@ -990,9 +986,7 @@ def main(argv: list[str] | None = None) -> int:
             existing_records_parts_after = _existing_records_parts_count(records_path=records_path)
             oldest_part_age_days_after = _oldest_records_part_age_days(records_path=records_path)
             if projected_records_parts > args.max_projected_records_parts:
-                recommended_max_accepted = max(
-                    1, math.ceil(int(planned_rows) / int(args.max_projected_records_parts))
-                )
+                recommended_max_accepted = max(1, math.ceil(int(planned_rows) / int(args.max_projected_records_parts)))
                 print(
                     "projected_records_parts exceeds threshold; "
                     "increase runtime.max_accepted_per_library and/or output.parquet.chunk_size before submit.",

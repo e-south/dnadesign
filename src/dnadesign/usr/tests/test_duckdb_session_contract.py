@@ -12,8 +12,8 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import sys
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 

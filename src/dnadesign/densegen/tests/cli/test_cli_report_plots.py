@@ -282,12 +282,7 @@ def test_notebook_generate_keeps_navigation_state_out_of_preview_loading_cell(tm
     assert "def _(get_active_record_index, record_count, set_active_record_index):" in content
     assert "active_record_index_default = max(0, min(record_count - 1, _raw_active_index))" in content
     assert (
-        "def _(\n"
-        "    active_record_index_default,\n"
-        "    mo,\n"
-        "    record_count,\n"
-        "    set_active_record_index,\n"
-        "):"
+        "def _(\n    active_record_index_default,\n    mo,\n    record_count,\n    set_active_record_index,\n):"
     ) in content
 
 

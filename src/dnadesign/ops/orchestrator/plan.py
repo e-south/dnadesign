@@ -46,9 +46,7 @@ class CommandSpec:
             raise ValueError("command spec requires exactly one of argv or shell")
 
     def render_shell(self) -> str:
-        env_prefix = " ".join(
-            f"{name}={shlex.quote(value)}" for name, value in sorted(self.env.items())
-        )
+        env_prefix = " ".join(f"{name}={shlex.quote(value)}" for name, value in sorted(self.env.items()))
         if self.argv is not None:
             command_text = " ".join(shlex.quote(part) for part in self.argv)
         else:
@@ -123,14 +121,10 @@ def _require_notify_webhook_file_path(webhook_env_name: str, *, profile_path: Pa
         )
     if not os.path.isfile(webhook_file):
         raise ValueError(
-            "notify webhook secret file does not exist or is not a file: "
-            f"{webhook_file} (from {webhook_file_env_name})"
+            f"notify webhook secret file does not exist or is not a file: {webhook_file} (from {webhook_file_env_name})"
         )
     if not os.access(webhook_file, os.R_OK):
-        raise ValueError(
-            "notify webhook secret file is not readable: "
-            f"{webhook_file} (from {webhook_file_env_name})"
-        )
+        raise ValueError(f"notify webhook secret file is not readable: {webhook_file} (from {webhook_file_env_name})")
     return webhook_file
 
 
@@ -764,9 +758,7 @@ def build_batch_plan(
 ) -> BatchPlan:
     if runbook.notify is None and requested_smoke is not None:
         raise ValueError("notify smoke override is not valid when runbook.notify is absent")
-    selected_smoke: SmokeMode | None = requested_smoke or (
-        runbook.notify.smoke if runbook.notify is not None else None
-    )
+    selected_smoke: SmokeMode | None = requested_smoke or (runbook.notify.smoke if runbook.notify is not None else None)
     mode_decision = resolve_mode_decision(
         runbook=runbook,
         requested_mode=requested_mode,

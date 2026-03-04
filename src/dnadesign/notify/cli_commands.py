@@ -9,7 +9,4 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-raise ModuleNotFoundError(
-    "dnadesign.notify.cli_commands is not importable; use dnadesign.notify.cli.commands.*."
-)
-
+raise ModuleNotFoundError("dnadesign.notify.cli_commands is not importable; use dnadesign.notify.cli.commands.*.")

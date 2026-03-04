@@ -352,7 +352,9 @@ def test_overlay_parts_require_created_at_metadata(tmp_path: Path) -> None:
         ds.head(1)
 
 
-def test_overlay_view_construction_scales_without_per_part_temp_views(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_overlay_view_construction_scales_without_per_part_temp_views(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     ds = _make_dataset(tmp_path)
     target_id = ds.head(1)["id"].iloc[0]
     counter = {"step": 0}
@@ -762,5 +764,7 @@ def test_create_overlay_view_avoids_path_resolve_calls(tmp_path: Path) -> None:
             "resolve",
             lambda self: (_ for _ in ()).throw(AssertionError("resolve should not be called for overlay parts")),
         )
-        source = dataset_query_module.create_overlay_view(con, view_name="overlay_no_resolve", path=overlay_path, key="id")
+        source = dataset_query_module.create_overlay_view(
+            con, view_name="overlay_no_resolve", path=overlay_path, key="id"
+        )
     assert str(source)

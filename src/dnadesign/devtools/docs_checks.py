@@ -147,9 +147,7 @@ OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES = (
     Path("docs/templates"),
 )
 TRANSIENT_OPERATIONAL_ROOT_DIR_NAMES = REPO_TRANSIENT_OPERATIONAL_DIR_NAMES
-DISALLOWED_SHARED_UTILS_PATHS = (
-    Path("src/dnadesign/utils"),
-)
+DISALLOWED_SHARED_UTILS_PATHS = (Path("src/dnadesign/utils"),)
 OVERLAY_GUARD_DOC_PATHS = (
     "docs/operations/orchestration-runbooks.md",
     "docs/bu-scc/jobs/README.md",
@@ -1206,9 +1204,7 @@ def _find_shared_utils_path_issues(repo_root: Path) -> list[str]:
         candidate = repo_root / relative_path
         if not candidate.exists():
             continue
-        issues.append(
-            f"{candidate}: shared utils package is not allowed; keep utilities under src/dnadesign/<tool>/."
-        )
+        issues.append(f"{candidate}: shared utils package is not allowed; keep utilities under src/dnadesign/<tool>/.")
     return issues
 
 
@@ -1220,7 +1216,8 @@ def _find_stale_overlay_guard_term_issues(repo_root: Path) -> list[str]:
         for term in STALE_OVERLAY_GUARD_TERMS:
             if term in content:
                 issues.append(
-                    f"{path}: stale overlay guard term '{term}' is not allowed; use usr-overlay-guard and overlay_namespace."
+                    f"{path}: stale overlay guard term '{term}' is not allowed; "
+                    "use usr-overlay-guard and overlay_namespace."
                 )
     return issues
 

@@ -113,7 +113,8 @@ def load_resume_state(
             detail = str(exc).strip()
             detail_suffix = f" Source error: {detail}" if detail else ""
             raise ResumeStateLoadError(
-                f"Failed to parse scanned output records from `{source_label}` while preparing resume state.{detail_suffix}"
+                "Failed to parse scanned output records from "
+                f"`{source_label}` while preparing resume state.{detail_suffix}"
             ) from exc
         if run_ids and any(val != loaded.root.densegen.run.id for val in run_ids):
             raise RuntimeError(

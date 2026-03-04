@@ -101,4 +101,3 @@ def test_resolve_tls_ca_bundle_path_requires_configuration_when_no_candidates(
             not_configured_error="missing bundle",
             source_label="test bundle",
         )
-

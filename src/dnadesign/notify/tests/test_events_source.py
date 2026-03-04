@@ -217,9 +217,10 @@ def test_resolve_tool_events_path_densegen_from_usr_output_config(tmp_path: Path
 
     events_path, policy = resolve_tool_events_path(tool="densegen", config=config)
 
-    assert events_path == (
-        run_root / "outputs" / "usr_datasets" / "densegen" / "study_stress_ethanol_cipro" / ".events.log"
-    ).resolve()
+    assert (
+        events_path
+        == (run_root / "outputs" / "usr_datasets" / "densegen" / "study_stress_ethanol_cipro" / ".events.log").resolve()
+    )
     assert policy == "densegen"
 
 

@@ -291,10 +291,7 @@ def resolve_mode_decision(
         selected_mode = selected_requested_mode
 
     if selected_mode == "resume" and has_explicit_resume_policy and not resume_ready:
-        raise ValueError(
-            "resume mode blocked: workspace is not resume-ready "
-            f"({resume_readiness_reason})."
-        )
+        raise ValueError(f"resume mode blocked: workspace is not resume-ready ({resume_readiness_reason}).")
     if selected_mode == "fresh" and has_explicit_resume_policy and artifacts_found and not allow_fresh_reset:
         raise ValueError(
             "fresh mode blocked: workspace already has resume artifacts "

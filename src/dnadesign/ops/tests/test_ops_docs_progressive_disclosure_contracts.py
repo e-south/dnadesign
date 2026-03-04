@@ -135,7 +135,10 @@ def test_repo_root_readme_lists_ops_in_docs_and_tool_catalog() -> None:
     assert "[Ops operations](docs/operations/README.md)" not in text
     assert "[Notify operations](docs/notify/README.md)" not in text
     assert "[Workflow lanes](docs/README.md#workflow-lanes)" not in text
-    assert "[Cross-tool information architecture contract](ARCHITECTURE.md#cross-tool-information-architecture)" not in text
+    assert (
+        "[Cross-tool information architecture contract](ARCHITECTURE.md#cross-tool-information-architecture)"
+        not in text
+    )
     assert "[Boundary rules](DESIGN.md#toolpackage-boundaries)" not in text
     assert "| [**ops**](src/dnadesign/ops/README.md) |" in text
     assert "DenseGen/Infer + Notify batch workflows" not in text
@@ -143,7 +146,11 @@ def test_repo_root_readme_lists_ops_in_docs_and_tool_catalog() -> None:
 
 def test_root_ops_row_is_tool_agnostic() -> None:
     text = _read(_repo_root() / "README.md")
-    assert "| [**ops**](src/dnadesign/ops/README.md) | Runbook-driven orchestration for deterministic batch workflows across tools. |" in text
+    expected_row = (
+        "| [**ops**](src/dnadesign/ops/README.md) | "
+        "Runbook-driven orchestration for deterministic batch workflows across tools. |"
+    )
+    assert expected_row in text
 
 
 def test_dev_docs_index_is_action_oriented() -> None:

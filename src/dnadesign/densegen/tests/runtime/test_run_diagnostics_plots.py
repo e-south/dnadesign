@@ -33,10 +33,10 @@ from dnadesign.densegen.src.viz.plot_run import (
     _build_run_health_detail_figure,
     _build_run_health_figure,
     _build_run_health_outcomes_figure,
-    _outcomes_attempts_per_row_for_workload,
     _build_run_health_tfbs_length_by_regulator_figure,
     _build_tfbs_usage_breakdown_figure,
     _extract_plan_quotas,
+    _outcomes_attempts_per_row_for_workload,
     _progress_axis,
     _rate_series_from_counts,
     _render_run_health_summary_table_figure,
@@ -1021,8 +1021,7 @@ def test_run_health_outcomes_points_follow_actual_run_order() -> None:
         image_data = np.asarray(axes["outcome"].images[0].get_array(), dtype=int)
         row_positions, col_positions = np.where(image_data == 1)
         centers = [
-            (float(col_pos) + 0.5, float(row_pos) + 0.5)
-            for row_pos, col_pos in zip(row_positions, col_positions)
+            (float(col_pos) + 0.5, float(row_pos) + 0.5) for row_pos, col_pos in zip(row_positions, col_positions)
         ]
         assert len(centers) == 4
         y_values = {round(y, 3) for _, y in centers}
@@ -1058,8 +1057,7 @@ def test_run_health_outcomes_tiles_attempts_by_plan_row() -> None:
         image_data = np.asarray(axes["outcome"].images[0].get_array(), dtype=int)
         row_positions, col_positions = np.where(image_data == 1)
         centers = [
-            (float(col_pos) + 0.5, float(row_pos) + 0.5)
-            for row_pos, col_pos in zip(row_positions, col_positions)
+            (float(col_pos) + 0.5, float(row_pos) + 0.5) for row_pos, col_pos in zip(row_positions, col_positions)
         ]
         assert len(centers) == 12
         row_one = sorted(x for x, y in centers if y == pytest.approx(0.5))
@@ -2108,7 +2106,9 @@ def test_tfbs_usage_drops_nan_categories_from_heatmap_and_legend() -> None:
         library_members_df=_library_members_df(),
     )
     try:
-        y_labels = [tick.get_text().strip().lower() for tick in axes["cum"].get_yticklabels() if tick.get_text().strip()]
+        y_labels = [
+            tick.get_text().strip().lower() for tick in axes["cum"].get_yticklabels() if tick.get_text().strip()
+        ]
         assert y_labels
         assert not any(label in {"nan", "none"} for label in y_labels)
         legend_text = ""

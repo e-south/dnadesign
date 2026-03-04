@@ -91,9 +91,7 @@ def _run_command(
     commands: list[CommandExecution],
 ) -> int:
     if command_runner is None:
-        returncode, stdout, stderr = _default_command_runner(
-            command, timeout_seconds=command_timeout_seconds
-        )
+        returncode, stdout, stderr = _default_command_runner(command, timeout_seconds=command_timeout_seconds)
     else:
         returncode, stdout, stderr = command_runner(command)
     commands.append(
@@ -182,10 +180,7 @@ def execute_batch_plan(
             ok = False
             break
         if phase == "submit" and plan.orchestration_notify is not None:
-            started_message = (
-                f"ops submit requested workflow={plan.workflow_id} "
-                f"project={plan.project}"
-            )
+            started_message = f"ops submit requested workflow={plan.workflow_id} project={plan.project}"
             started_command = _orchestration_notify_command(
                 plan=plan,
                 status="started",
@@ -223,15 +218,13 @@ def execute_batch_plan(
             job_ids_text = ",".join(submit_job_ids) if submit_job_ids else "none"
             final_status = "success"
             final_message = (
-                f"ops submit accepted workflow={plan.workflow_id} "
-                f"project={plan.project} job_ids={job_ids_text}"
+                f"ops submit accepted workflow={plan.workflow_id} project={plan.project} job_ids={job_ids_text}"
             )
         else:
             final_status = "failure"
             final_phase = failed_phase or "unknown"
             final_message = (
-                f"ops orchestration failed workflow={plan.workflow_id} "
-                f"project={plan.project} phase={final_phase}"
+                f"ops orchestration failed workflow={plan.workflow_id} project={plan.project} phase={final_phase}"
             )
         final_notify_command = _orchestration_notify_command(
             plan=plan,

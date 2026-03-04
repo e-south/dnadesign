@@ -9,7 +9,4 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-raise ModuleNotFoundError(
-    "dnadesign.notify.cli_bindings is not importable; use dnadesign.notify.cli.bindings.*."
-)
-
+raise ModuleNotFoundError("dnadesign.notify.cli_bindings is not importable; use dnadesign.notify.cli.bindings.*.")

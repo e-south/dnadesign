@@ -1279,10 +1279,7 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
         patch_h = max(6.0, float(style.legend_patch_h) * scale)
         gap_patch_text = max(2.0, float(style.legend_gap_patch_text) * scale)
         gap_x_requested = max(0.0, float(style.legend_gap_x) * scale)
-        text_widths = [
-            _text_px_width(label, style.font_label, font_size, style.dpi)
-            for _tag, label in legend
-        ]
+        text_widths = [_text_px_width(label, style.font_label, font_size, style.dpi) for _tag, label in legend]
         entry_widths = [patch_w + gap_patch_text + width for width in text_widths]
         if any(width > available_width for width in entry_widths):
             continue
@@ -1322,10 +1319,7 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
         patch_h = max(6.0, float(style.legend_patch_h) * scale)
         gap_patch_text = max(2.0, float(style.legend_gap_patch_text) * scale)
         gap_x = max(0.0, float(style.legend_gap_x) * scale)
-        text_widths = [
-            _text_px_width(label, style.font_label, font_size, style.dpi)
-            for _tag, label in legend
-        ]
+        text_widths = [_text_px_width(label, style.font_label, font_size, style.dpi) for _tag, label in legend]
         entry_widths = [patch_w + gap_patch_text + width for width in text_widths]
         rows = _wrap_rows(entry_widths, gap_x=gap_x)
         row_height = max(patch_h, float(font_size) * 1.18)

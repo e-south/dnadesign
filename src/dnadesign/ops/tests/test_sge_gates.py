@@ -362,9 +362,7 @@ def test_main_prune_ops_logs_runtime_kind_rejects_invalid_scope(tmp_path: Path, 
     assert "must be exactly workspace/outputs/logs/ops/runtime" in captured.err
 
 
-def test_main_usr_overlay_guard_blocks_when_projected_overlay_parts_exceed_threshold(
-    tmp_path: Path, capsys
-) -> None:
+def test_main_usr_overlay_guard_blocks_when_projected_overlay_parts_exceed_threshold(tmp_path: Path, capsys) -> None:
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir(parents=True, exist_ok=True)
     config_path = workspace_root / "config.yaml"
@@ -399,9 +397,7 @@ def test_main_usr_overlay_guard_blocks_when_projected_overlay_parts_exceed_thres
     assert "max_accepted_per_library" in captured.err
 
 
-def test_main_usr_overlay_guard_auto_compacts_when_existing_parts_exceed_threshold(
-    tmp_path: Path, capsys
-) -> None:
+def test_main_usr_overlay_guard_auto_compacts_when_existing_parts_exceed_threshold(tmp_path: Path, capsys) -> None:
     pyarrow = pytest.importorskip("pyarrow")
 
     import dnadesign.usr as usr_pkg
@@ -690,9 +686,7 @@ def test_main_usr_records_part_guard_blocks_when_projected_records_parts_exceed_
     assert "output.parquet.chunk_size" in captured.err
 
 
-def test_main_usr_records_part_guard_auto_compacts_when_existing_parts_are_stale(
-    tmp_path: Path, capsys
-) -> None:
+def test_main_usr_records_part_guard_auto_compacts_when_existing_parts_are_stale(tmp_path: Path, capsys) -> None:
     pyarrow = pytest.importorskip("pyarrow")
     pyarrow_parquet = pytest.importorskip("pyarrow.parquet")
 
@@ -797,9 +791,7 @@ def test_main_usr_records_part_guard_blocks_when_existing_parts_are_stale_withou
     assert "auto-compact-existing-records-parts" in captured.err
 
 
-def test_main_usr_archived_overlay_guard_blocks_when_archived_entries_exceed_threshold(
-    tmp_path: Path, capsys
-) -> None:
+def test_main_usr_archived_overlay_guard_blocks_when_archived_entries_exceed_threshold(tmp_path: Path, capsys) -> None:
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir(parents=True, exist_ok=True)
     config_path = workspace_root / "config.yaml"
@@ -841,9 +833,7 @@ def test_main_usr_archived_overlay_guard_blocks_when_archived_entries_exceed_thr
     assert "archived_entries" in captured.err
 
 
-def test_main_usr_archived_overlay_guard_blocks_when_archived_bytes_exceed_threshold(
-    tmp_path: Path, capsys
-) -> None:
+def test_main_usr_archived_overlay_guard_blocks_when_archived_bytes_exceed_threshold(tmp_path: Path, capsys) -> None:
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir(parents=True, exist_ok=True)
     config_path = workspace_root / "config.yaml"
