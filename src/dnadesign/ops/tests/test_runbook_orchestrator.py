@@ -673,6 +673,63 @@ def test_densegen_preflight_verifies_post_run_analysis_template(tmp_path: Path) 
     assert "densegen-analysis.qsub" in preflight_block
 
 
+def test_densegen_post_run_can_use_dedicated_resources(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
+    payload["runbook"]["densegen"]["post_run"] = {
+        "qsub_template": "docs/bu-scc/jobs/densegen-analysis.qsub",
+        "resources": {
+            "pe_omp": 1,
+            "h_rt": "00:20:00",
+            "mem_per_core": "2G",
+        },
+    }
+    runbook = load_orchestration_runbook(runbook_path, raw=payload)
+
+    plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
+    post_run_verify = next(
+        command
+        for command in plan.preflight_commands
+        if command.argv is not None and command.argv[:2] == ("qsub", "-verify")
+        and command.argv[-1].endswith("densegen-analysis.qsub")
+    )
+    post_run_submit = next(
+        command
+        for command in plan.submit_commands
+        if command.argv is not None and command.argv[0] == "qsub"
+        and command.argv[-1].endswith("densegen-analysis.qsub")
+    )
+
+    post_run_verify_shell = post_run_verify.render_shell()
+    post_run_submit_shell = post_run_submit.render_shell()
+    assert "-pe omp 1" in post_run_verify_shell
+    assert "-l h_rt=00:20:00" in post_run_verify_shell
+    assert "-l mem_per_core=2G" in post_run_verify_shell
+    assert "-pe omp 1" in post_run_submit_shell
+    assert "-l h_rt=00:20:00" in post_run_submit_shell
+    assert "-l mem_per_core=2G" in post_run_submit_shell
+    assert "-hold_jid study_stress_ethanol_cipro_densegen_cpu" in post_run_submit_shell
+
+
+def test_densegen_post_run_defaults_to_small_analysis_resources(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
+    post_run_submit = next(
+        command
+        for command in plan.submit_commands
+        if command.argv is not None and command.argv[0] == "qsub"
+        and command.argv[-1].endswith("densegen-analysis.qsub")
+    )
+
+    post_run_submit_shell = post_run_submit.render_shell()
+    assert "-pe omp 4" in post_run_submit_shell
+    assert "-l h_rt=01:00:00" in post_run_submit_shell
+    assert "-l mem_per_core=4G" in post_run_submit_shell
+    assert "-hold_jid study_stress_ethanol_cipro_densegen_cpu" in post_run_submit_shell
+
+
 def test_notify_submit_uses_webhook_file_without_embedding_secret(
     tmp_path: Path,
 ) -> None:

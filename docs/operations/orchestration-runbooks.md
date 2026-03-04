@@ -136,6 +136,10 @@ runbook:
     qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub
     post_run:
       qsub_template: docs/bu-scc/jobs/densegen-analysis.qsub
+      resources:
+        pe_omp: 1
+        h_rt: 00:20:00
+        mem_per_core: 2G
     run_args:
       fresh: --fresh --no-plot
       resume: --resume --no-plot
@@ -169,6 +173,7 @@ Path behavior:
 4. `runbook.logging.stdout_dir` is required and is used for all scheduler stdout (`qsub -o`) in verify and submit phases.
 5. Notify-enabled runbooks accept `notify.orchestration_events` (default `true`) to control direct orchestration lifecycle notifications.
 6. DenseGen runbooks accept `densegen.post_run.qsub_template` for the dependent analysis submit that runs plots after CPU generation completes.
+7. DenseGen runbooks can set `densegen.post_run.resources` to size analysis submits (`pe_omp`, `h_rt`, `mem_per_core`); when omitted, the default post-run sizing is `pe_omp=4`, `h_rt=01:00:00`, `mem_per_core=4G`.
 
 ### Single-study accumulation contract
 
@@ -286,6 +291,7 @@ uv run ops runbook execute \
 32. `ops runbook execute --audit-json` must be exactly `<workspace-root>/outputs/logs/ops/audit/<file>.json`; non-workspace audit paths fail fast.
 33. transient operational working directories at repo root (for example `.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) are not allowed; place disposable operational working state under `/scratch` and keep durable orchestration artifacts under `<workspace-root>/outputs/logs/ops/`.
 34. DenseGen run args remain `--no-plot` by default for generation throughput; submit phase adds a dependent `densegen-analysis.qsub` job (`-hold_jid <densegen_cpu_job_name>`) that runs `dense plot`.
+35. DenseGen post-run submit always uses `densegen.post_run.resources`; default post-run resources are `pe_omp=4`, `h_rt=01:00:00`, `mem_per_core=4G`.
 
 ### Related docs
 

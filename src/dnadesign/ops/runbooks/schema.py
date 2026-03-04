@@ -69,8 +69,35 @@ class DensegenRunArgs(StrictBaseModel):
         return text
 
 
+class CpuResourceContract(StrictBaseModel):
+    pe_omp: int = Field(ge=1)
+    h_rt: str
+    mem_per_core: str
+
+    @field_validator("h_rt")
+    @classmethod
+    def _validate_h_rt(cls, value: str) -> str:
+        text = str(value).strip()
+        if not _HRT_PATTERN.match(text):
+            raise ValueError("resources.h_rt must match HH:MM:SS")
+        return text
+
+    @field_validator("mem_per_core")
+    @classmethod
+    def _validate_mem_per_core(cls, value: str) -> str:
+        text = str(value).strip()
+        if not text:
+            raise ValueError("resources.mem_per_core must be non-empty")
+        return text
+
+
+def _default_densegen_post_run_resources() -> CpuResourceContract:
+    return CpuResourceContract(pe_omp=4, h_rt="01:00:00", mem_per_core="4G")
+
+
 class DensegenPostRunContract(StrictBaseModel):
     qsub_template: Path = _DENSEGEN_POST_RUN_TEMPLATE_DEFAULT
+    resources: CpuResourceContract = Field(default_factory=_default_densegen_post_run_resources)
 
     @field_validator("qsub_template")
     @classmethod
@@ -196,28 +223,9 @@ class NotifyContract(StrictBaseModel):
         return text
 
 
-class ResourceContract(StrictBaseModel):
-    pe_omp: int = Field(ge=1)
-    h_rt: str
-    mem_per_core: str
+class ResourceContract(CpuResourceContract):
     gpus: int | None = Field(default=None, ge=1)
     gpu_capability: str | None = None
-
-    @field_validator("h_rt")
-    @classmethod
-    def _validate_h_rt(cls, value: str) -> str:
-        text = str(value).strip()
-        if not _HRT_PATTERN.match(text):
-            raise ValueError("resources.h_rt must match HH:MM:SS")
-        return text
-
-    @field_validator("mem_per_core")
-    @classmethod
-    def _validate_mem_per_core(cls, value: str) -> str:
-        text = str(value).strip()
-        if not text:
-            raise ValueError("resources.mem_per_core must be non-empty")
-        return text
 
     @field_validator("gpu_capability")
     @classmethod

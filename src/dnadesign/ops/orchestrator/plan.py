@@ -244,6 +244,16 @@ def _sge_job_name(*, runbook_id: str, suffix: str) -> str:
     return f"{runbook_token}_{suffix_token}"[:128]
 
 
+def _densegen_post_run_resource_values(runbook: OrchestrationRunbookV1) -> tuple[str, str, str]:
+    assert runbook.densegen is not None
+    post_run_resources = runbook.densegen.post_run.resources
+    return (
+        str(post_run_resources.pe_omp),
+        post_run_resources.h_rt,
+        post_run_resources.mem_per_core,
+    )
+
+
 def _preflight_commands(
     runbook: OrchestrationRunbookV1,
     *,
@@ -337,6 +347,7 @@ def _preflight_commands(
         config = str(runbook.densegen.config)
         densegen_template = str(runbook.densegen.qsub_template)
         densegen_post_run_template = str(runbook.densegen.post_run.qsub_template)
+        post_run_pe_omp, post_run_h_rt, post_run_mem_per_core = _densegen_post_run_resource_values(runbook)
         densegen_usr_contract_checks: list[CommandSpec] = []
         overlay_guard = runbook.densegen.overlay_guard
         overlay_guard_parts: list[str] = [
@@ -467,11 +478,11 @@ def _preflight_commands(
                 stdout_file,
                 "-pe",
                 "omp",
-                str(runbook.resources.pe_omp),
+                post_run_pe_omp,
                 "-l",
-                f"h_rt={runbook.resources.h_rt}",
+                f"h_rt={post_run_h_rt}",
                 "-l",
-                f"mem_per_core={runbook.resources.mem_per_core}",
+                f"mem_per_core={post_run_mem_per_core}",
                 "-v",
                 f"DENSEGEN_CONFIG={config}",
                 densegen_post_run_template,
@@ -668,6 +679,7 @@ def _submit_commands(runbook: OrchestrationRunbookV1, *, mode_decision: ModeDeci
 
     if is_densegen_workflow_id(runbook.workflow_id):
         assert runbook.densegen is not None
+        post_run_pe_omp, post_run_h_rt, post_run_mem_per_core = _densegen_post_run_resource_values(runbook)
         runtime_trace_dir = (runbook.workspace_root / WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR).resolve()
         densegen_job_name = _sge_job_name(runbook_id=runbook.id, suffix="densegen_cpu")
         densegen_post_run_job_name = _sge_job_name(runbook_id=runbook.id, suffix="densegen_postrun")
@@ -706,11 +718,11 @@ def _submit_commands(runbook: OrchestrationRunbookV1, *, mode_decision: ModeDeci
             stdout_file,
             "-pe",
             "omp",
-            str(runbook.resources.pe_omp),
+            post_run_pe_omp,
             "-l",
-            f"h_rt={runbook.resources.h_rt}",
+            f"h_rt={post_run_h_rt}",
             "-l",
-            f"mem_per_core={runbook.resources.mem_per_core}",
+            f"mem_per_core={post_run_mem_per_core}",
             "-v",
             f"DENSEGEN_CONFIG={runbook.densegen.config}",
             str(runbook.densegen.post_run.qsub_template),
