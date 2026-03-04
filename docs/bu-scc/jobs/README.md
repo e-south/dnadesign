@@ -151,6 +151,7 @@ qsub -P <project> \
 - profile mode requires a readable `WEBHOOK_FILE` (watcher loads secret from file each run)
 - env mode requires a readable `WEBHOOK_FILE` (watcher loads secret from file each run)
 - set `NOTIFY_TLS_CA_BUNDLE` (or `SSL_CERT_FILE`) for HTTPS webhook delivery
+- watcher follow mode uses `--on-truncate restart` by default; override with `NOTIFY_ON_TRUNCATE=error|restart`
 - watcher polling cadence is configurable via `NOTIFY_POLL_INTERVAL_SECONDS` (default `1.0`)
 - env mode requires a policy (`NOTIFY_POLICY`) unless resolver mode (`NOTIFY_TOOL` + `NOTIFY_CONFIG`) sets one
 - env mode requires a namespace (`NOTIFY_NAMESPACE`) unless resolver mode (`NOTIFY_TOOL` + `NOTIFY_CONFIG`) sets one

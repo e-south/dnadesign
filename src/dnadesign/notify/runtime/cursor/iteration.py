@@ -11,12 +11,17 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import errno
 import os
 import time
 from pathlib import Path
 from typing import Iterable
 
 from ...errors import NotifyConfigError
+
+
+def _is_stale_handle_error(exc: OSError) -> bool:
+    return exc.errno in {errno.ESTALE, errno.EBADF}
 
 
 def iter_file_lines(
@@ -64,7 +69,15 @@ def iter_file_lines(
         last_activity = time.monotonic()
         handle.seek(offset)
         while True:
-            line = handle.readline()
+            stale_handle_detected = False
+            try:
+                line = handle.readline()
+            except OSError as exc:
+                if _is_stale_handle_error(exc):
+                    line = ""
+                    stale_handle_detected = True
+                else:
+                    raise
             if line:
                 last_activity = time.monotonic()
                 yield handle.tell(), line
@@ -84,21 +97,47 @@ def iter_file_lines(
                 if timeout_value is not None and (time.monotonic() - last_activity) >= timeout_value:
                     return
                 continue
-            handle_stat = os.fstat(handle.fileno())
-            handle_pos = int(handle.tell())
-            path_changed = (int(path_stat.st_dev), int(path_stat.st_ino)) != (
-                int(handle_stat.st_dev),
-                int(handle_stat.st_ino),
-            )
-            truncated = handle_pos > int(path_stat.st_size)
+            try:
+                handle_pos = int(handle.tell())
+            except OSError as exc:
+                if _is_stale_handle_error(exc):
+                    stale_handle_detected = True
+                    handle_pos = 0
+                else:
+                    raise
+            if stale_handle_detected:
+                path_changed = True
+                truncated = False
+            else:
+                try:
+                    handle_stat = os.fstat(handle.fileno())
+                except OSError as exc:
+                    if _is_stale_handle_error(exc):
+                        stale_handle_detected = True
+                        path_changed = True
+                        truncated = False
+                    else:
+                        raise
+                else:
+                    path_changed = (int(path_stat.st_dev), int(path_stat.st_ino)) != (
+                        int(handle_stat.st_dev),
+                        int(handle_stat.st_ino),
+                    )
+                    truncated = handle_pos > int(path_stat.st_size)
             if not path_changed and not truncated:
                 continue
             if mode == "error":
-                reason = (
-                    "events file was replaced while following"
-                    if path_changed
-                    else f"events file was truncated while following (pos={handle_pos} size={int(path_stat.st_size)})"
-                )
+                if stale_handle_detected:
+                    reason = "events file handle became stale while following"
+                else:
+                    reason = (
+                        "events file was replaced while following"
+                        if path_changed
+                        else (
+                            "events file was truncated while following "
+                            f"(pos={handle_pos} size={int(path_stat.st_size)})"
+                        )
+                    )
                 raise NotifyConfigError(f"{reason}. Pass --on-truncate restart to resume from start.")
             handle.close()
             handle = events_path.open("r", encoding="utf-8")

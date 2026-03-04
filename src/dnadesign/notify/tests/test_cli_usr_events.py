@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 from pathlib import Path
@@ -521,6 +522,77 @@ def test_iter_file_lines_follow_exits_after_idle_timeout(tmp_path: Path, monkeyp
         idle_timeout_seconds=0.1,
     )
     with pytest.raises(StopIteration):
+        next(rows)
+
+
+def test_iter_file_lines_follow_restarts_after_stale_handle(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    original = json.dumps(_event(action="write_overlay_part")) + "\n"
+    events.write_text(original, encoding="utf-8")
+    replacement = json.dumps(_event(action="materialize")) + "\n"
+    sleep_calls = {"n": 0}
+    fstat_calls = {"n": 0}
+    real_fstat = os.fstat
+
+    def _fake_sleep(_seconds: float) -> None:
+        sleep_calls["n"] += 1
+        if sleep_calls["n"] == 1:
+            events.write_text(replacement, encoding="utf-8")
+            return
+        raise RuntimeError("follow loop did not recover stale handle")
+
+    def _fake_fstat(fd: int):  # type: ignore[no-untyped-def]
+        fstat_calls["n"] += 1
+        if fstat_calls["n"] == 1:
+            raise OSError(errno.ESTALE, "Stale file handle")
+        return real_fstat(fd)
+
+    monkeypatch.setattr("dnadesign.notify.runtime.cursor.iteration.time.sleep", _fake_sleep)
+    monkeypatch.setattr("dnadesign.notify.runtime.cursor.iteration.os.fstat", _fake_fstat)
+
+    rows = _iter_file_lines(
+        events,
+        start_offset=len(original),
+        on_truncate="restart",
+        follow=True,
+    )
+    _offset, line = next(rows)
+    parsed = json.loads(line)
+    assert parsed["action"] == "materialize"
+
+
+def test_iter_file_lines_follow_reports_stale_handle_in_error_mode(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    original = json.dumps(_event(action="write_overlay_part")) + "\n"
+    events.write_text(original, encoding="utf-8")
+    replacement = json.dumps(_event(action="materialize")) + "\n"
+    sleep_calls = {"n": 0}
+    fstat_calls = {"n": 0}
+    real_fstat = os.fstat
+
+    def _fake_sleep(_seconds: float) -> None:
+        sleep_calls["n"] += 1
+        if sleep_calls["n"] == 1:
+            events.write_text(replacement, encoding="utf-8")
+            return
+        raise RuntimeError("follow loop did not report stale handle")
+
+    def _fake_fstat(fd: int):  # type: ignore[no-untyped-def]
+        fstat_calls["n"] += 1
+        if fstat_calls["n"] == 1:
+            raise OSError(errno.ESTALE, "Stale file handle")
+        return real_fstat(fd)
+
+    monkeypatch.setattr("dnadesign.notify.runtime.cursor.iteration.time.sleep", _fake_sleep)
+    monkeypatch.setattr("dnadesign.notify.runtime.cursor.iteration.os.fstat", _fake_fstat)
+
+    rows = _iter_file_lines(
+        events,
+        start_offset=len(original),
+        on_truncate="error",
+        follow=True,
+    )
+    with pytest.raises(NotifyConfigError, match="stale while following"):
         next(rows)
 
 

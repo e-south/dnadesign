@@ -23,8 +23,18 @@ NOTIFY_ACTIONS="${NOTIFY_ACTIONS:-}"
 NOTIFY_TOOLS="${NOTIFY_TOOLS:-}"
 NOTIFY_IDLE_TIMEOUT_SECONDS="${NOTIFY_IDLE_TIMEOUT_SECONDS:-3600}"
 NOTIFY_POLL_INTERVAL_SECONDS="${NOTIFY_POLL_INTERVAL_SECONDS:-1.0}"
+NOTIFY_ON_TRUNCATE="${NOTIFY_ON_TRUNCATE:-restart}"
 NOTIFY_TLS_CA_BUNDLE="${NOTIFY_TLS_CA_BUNDLE:-${SSL_CERT_FILE:-}}"
 NOTIFY_ENFORCE_TERMINAL_ON_IDLE="${NOTIFY_ENFORCE_TERMINAL_ON_IDLE:-0}"
+
+case "$NOTIFY_ON_TRUNCATE" in
+  error|restart) ;;
+  *)
+    echo "Unsupported NOTIFY_ON_TRUNCATE: $NOTIFY_ON_TRUNCATE" >&2
+    echo "Supported values: error | restart" >&2
+    exit 2
+    ;;
+esac
 
 resolve_webhook_env() {
   if [[ ! "$WEBHOOK_ENV" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
@@ -169,6 +179,7 @@ if [[ -n "$NOTIFY_PROFILE" ]]; then
     --wait-for-events
     --idle-timeout "$NOTIFY_IDLE_TIMEOUT_SECONDS"
     --poll-interval-seconds "$NOTIFY_POLL_INTERVAL_SECONDS"
+    --on-truncate "$NOTIFY_ON_TRUNCATE"
     --stop-on-terminal-status
     --follow
   )
@@ -261,6 +272,7 @@ WATCH_ARGS=(
   --wait-for-events
   --idle-timeout "$NOTIFY_IDLE_TIMEOUT_SECONDS"
   --poll-interval-seconds "$NOTIFY_POLL_INTERVAL_SECONDS"
+  --on-truncate "$NOTIFY_ON_TRUNCATE"
   --stop-on-terminal-status
   --follow
 )

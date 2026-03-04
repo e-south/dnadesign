@@ -117,6 +117,7 @@ def test_qsub_script_profile_mode_uses_profile_and_follow(tmp_path: Path) -> Non
     assert "--wait-for-events" in calls
     assert "--poll-interval-seconds 1.0" in calls
     assert "--stop-on-terminal-status" in calls
+    assert "--on-truncate restart" in calls
     assert "--idle-timeout" in calls
 
 
@@ -240,6 +241,7 @@ def test_qsub_script_can_resolve_events_from_tool_config(tmp_path: Path) -> None
     assert "--wait-for-events" in calls
     assert "--poll-interval-seconds 1.0" in calls
     assert "--stop-on-terminal-status" in calls
+    assert "--on-truncate restart" in calls
     assert "--idle-timeout" in calls
     assert f"--cursor {tmp_path / 'outputs' / 'notify' / 'densegen' / 'cursor'}" in calls
     assert f"--spool-dir {tmp_path / 'outputs' / 'notify' / 'densegen' / 'spool'}" in calls
