@@ -28,6 +28,8 @@ uv run notify setup list-workspaces --tool densegen
 
 # Create or resolve webhook secret reference from a local secret file.
 WEBHOOK_SECRET_FILE=/abs/path/to/notify.webhook
+touch "$WEBHOOK_SECRET_FILE"
+chmod 600 "$WEBHOOK_SECRET_FILE"
 WEBHOOK_REF="$(uv run notify setup webhook --secret-source file --secret-ref "file://$WEBHOOK_SECRET_FILE" --name densegen-shared --json | python -c 'import json,sys; print(json.load(sys.stdin)["webhook"]["ref"])')"
 
 # Create or refresh watcher profile.
@@ -42,6 +44,11 @@ uv run notify usr-events watch --tool densegen --workspace "$WORKSPACE" --dry-ru
 # Live watch loop.
 uv run notify usr-events watch --tool densegen --workspace "$WORKSPACE" --follow --wait-for-events --stop-on-terminal-status --idle-timeout 900
 ```
+
+Follow-loop truncate behavior:
+- Default `--on-truncate error` fails fast on rotation/truncation/disappearance while following.
+- Use `--on-truncate restart` when log replacement should rewind and continue.
+- The BU SCC watcher wrapper (`docs/bu-scc/jobs/notify-watch.qsub`) defaults to `NOTIFY_ON_TRUNCATE=restart`.
 
 ### Command contract: setup vs watch
 

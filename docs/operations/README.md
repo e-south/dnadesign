@@ -58,4 +58,5 @@ uv run ops runbook execute --runbook <runbook.yaml> --repo-root <repo-root> --au
 
 - Keep runbooks workspace-scoped (for example `<workspace-root>/outputs/logs/ops/runbooks/<runbook-id>.yaml`).
 - Do not create transient operational working directories at repo root (`.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`); use `/scratch` for disposable state.
-- Notify-enabled routes require a readable `NOTIFY_WEBHOOK_FILE` before `ops runbook execute`.
+- Notify-enabled routes require a readable webhook file contract before `ops runbook execute`:
+  `NOTIFY_WEBHOOK_FILE` (`<webhook_env>_FILE`) or a profile webhook `secret_ref` that resolves to `file://...`.

@@ -79,12 +79,7 @@ if ! command -v uv >/dev/null 2>&1; then
   echo "uv is required but was not found on PATH." >&2
   exit 2
 fi
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "python3 is required but was not found on PATH." >&2
-  exit 2
-fi
-
-PYTHON_BIN="python3"
+PYTHON_BIN=(uv run python)
 
 if [[ -z "$WORKDIR" ]]; then
   WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/notify-watch-smoke.XXXXXX")"
@@ -105,7 +100,7 @@ SPOOL_DIR="$WORKDIR/outputs/notify/densegen/spool"
 
 mkdir -p "$(dirname "$EVENTS_PATH")" "$CAPTURE_DIR" "$SECRETS_DIR" "$(dirname "$PROFILE_PATH")"
 
-"$PYTHON_BIN" - "$EVENTS_PATH" <<'PY'
+"${PYTHON_BIN[@]}" - "$EVENTS_PATH" <<'PY'
 import json
 import pathlib
 import sys
@@ -140,7 +135,7 @@ event = {
 events_path.write_text(json.dumps(event) + "\n", encoding="utf-8")
 PY
 
-"$PYTHON_BIN" - "$CAPTURE_PATH" "$PORT_PATH" <<'PY' &
+"${PYTHON_BIN[@]}" - "$CAPTURE_PATH" "$PORT_PATH" <<'PY' &
 import pathlib
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -236,7 +231,7 @@ else
   )
 fi
 
-CAPTURE_COUNT="$("$PYTHON_BIN" - "$CAPTURE_PATH" <<'PY'
+CAPTURE_COUNT="$("${PYTHON_BIN[@]}" - "$CAPTURE_PATH" <<'PY'
 import json
 import pathlib
 import sys

@@ -117,6 +117,7 @@ def test_qsub_script_profile_mode_uses_profile_and_follow(tmp_path: Path) -> Non
     assert "--wait-for-events" in calls
     assert "--poll-interval-seconds 1.0" in calls
     assert "--stop-on-terminal-status" in calls
+    assert "--on-truncate restart" in calls
     assert "--idle-timeout" in calls
 
 
@@ -151,6 +152,23 @@ def test_qsub_script_profile_mode_rejects_invalid_webhook_env_name(tmp_path: Pat
     )
     assert result.returncode == 2
     assert "Invalid webhook environment variable name" in result.stderr
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
+def test_qsub_script_rejects_invalid_on_truncate_mode(tmp_path: Path) -> None:
+    repo_root = _repo_root()
+    script_path = repo_root / "docs/bu-scc/jobs/notify-watch.qsub"
+
+    result = subprocess.run(
+        ["bash", str(script_path)],
+        cwd=str(tmp_path),
+        env={**os.environ, "NOTIFY_ON_TRUNCATE": "banana"},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert "Unsupported NOTIFY_ON_TRUNCATE: banana" in result.stderr
 
 
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
@@ -240,6 +258,7 @@ def test_qsub_script_can_resolve_events_from_tool_config(tmp_path: Path) -> None
     assert "--wait-for-events" in calls
     assert "--poll-interval-seconds 1.0" in calls
     assert "--stop-on-terminal-status" in calls
+    assert "--on-truncate restart" in calls
     assert "--idle-timeout" in calls
     assert f"--cursor {tmp_path / 'outputs' / 'notify' / 'densegen' / 'cursor'}" in calls
     assert f"--spool-dir {tmp_path / 'outputs' / 'notify' / 'densegen' / 'spool'}" in calls
@@ -575,7 +594,7 @@ def test_qsub_script_can_enforce_terminal_status_on_idle_timeout(tmp_path: Path)
     assert result.returncode == 3
     calls = capture_path.read_text(encoding="utf-8")
     assert "run notify usr-events watch --events" in calls
-    assert "--dry-run --no-advance-cursor-on-dry-run --stop-on-terminal-status" in calls
+    assert "--dry-run --no-advance-cursor-on-dry-run --on-truncate restart --stop-on-terminal-status" in calls
     assert "run notify send --status failure" in calls
 
 
@@ -617,3 +636,42 @@ def test_qsub_script_terminal_enforcement_allows_terminal_probe_success(tmp_path
     calls = capture_path.read_text(encoding="utf-8")
     assert "run notify usr-events watch --events" in calls
     assert "run notify send --status failure" not in calls
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
+def test_qsub_script_propagates_on_truncate_override_to_watch_and_probe(tmp_path: Path) -> None:
+    repo_root = _repo_root()
+    script_path = repo_root / "docs/bu-scc/jobs/notify-watch.qsub"
+
+    events_path = tmp_path / "dataset" / ".events.log"
+    events_path.parent.mkdir(parents=True, exist_ok=True)
+    events_path.write_text('{"event":"running"}\n', encoding="utf-8")
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    capture_path = _write_fake_uv(bin_dir)
+    webhook_file = _write_webhook_secret(tmp_path)
+
+    env = dict(os.environ)
+    env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+    env["UV_CAPTURE"] = str(capture_path)
+    env["EVENTS_PATH"] = str(events_path)
+    env["WEBHOOK_ENV"] = "DENSEGEN_WEBHOOK"
+    env["WEBHOOK_FILE"] = str(webhook_file)
+    env["NOTIFY_POLICY"] = "generic"
+    env["NOTIFY_NAMESPACE"] = "densegen"
+    env["NOTIFY_ENFORCE_TERMINAL_ON_IDLE"] = "1"
+    env["NOTIFY_ON_TRUNCATE"] = "error"
+    env.pop("DENSEGEN_WEBHOOK", None)
+
+    result = subprocess.run(
+        ["bash", str(script_path)],
+        cwd=str(tmp_path),
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 3
+    calls = capture_path.read_text(encoding="utf-8")
+    assert calls.count("--on-truncate error") >= 2

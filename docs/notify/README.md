@@ -9,7 +9,7 @@ This page is a route map only. Operator steps live in [Notify USR events operato
 ### Entry contract
 
 - Audience: operators running watcher/replay loops, plus maintainers routing into package references.
-- Prerequisites: workspace config, USR `.events.log`, and one file-backed webhook secret reference (`--secret-source file` + `--secret-ref file://...`).
+- Prerequisites: workspace config, USR `.events.log`, and one file-backed webhook secret reference (`--secret-source file` + `--secret-ref file://...`) with owner-only permissions (`chmod 600`).
 - Verify next: [notify profile doctor contract](../../src/dnadesign/notify/docs/reference/command-contracts.md#notify-profile-doctor).
 
 ### Choose a workflow
