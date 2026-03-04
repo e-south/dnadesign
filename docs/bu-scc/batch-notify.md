@@ -121,7 +121,7 @@ densegen:
   solver:
     backend: GUROBI
     strategy: iterate
-    threads: 16
+    threads: 12
     solver_attempt_timeout_seconds: 60
   runtime:
     checkpoint_every: 50
@@ -131,7 +131,7 @@ Example submit command:
 
 ```bash
 qsub -P <project> \
-  -pe omp 16 \
+  -pe omp 12 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
@@ -142,7 +142,7 @@ Iterative contribution submit (resume + quota growth):
 
 ```bash
 qsub -P <project> \
-  -pe omp 16 \
+  -pe omp 12 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--resume --extend-quota 8 --no-plot' \

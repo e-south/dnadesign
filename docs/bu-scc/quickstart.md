@@ -162,20 +162,20 @@ qsub -P <project> \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
-#### 7.2 DenseGen + GUROBI (16-slot example)
+#### 7.2 DenseGen + GUROBI (12-slot baseline)
 
 Use this when your config sets `densegen.solver.backend: GUROBI`.
 
 ```bash
 qsub -P <project> \
-  -pe omp 16 \
+  -pe omp 12 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
-In config, keep `densegen.solver.threads <= 16`.
+In config, keep `densegen.solver.threads <= 12`.
 `densegen-cpu.qsub` bootstraps GUROBI runtime defaults for BU SCC and accepts overrides via
 `GUROBI_MODULE`, `GUROBI_HOME`, `GRB_LICENSE_FILE`, and `TOKENSERVER`.
 `DENSEGEN_RUN_ARGS` is required and must include exactly one of `--fresh` or `--resume`.

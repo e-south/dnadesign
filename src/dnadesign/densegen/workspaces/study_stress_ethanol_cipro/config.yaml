@@ -270,7 +270,7 @@ densegen:
     backend: GUROBI
     strategy: iterate
     solver_attempt_timeout_seconds: 5
-    threads: 16
+    threads: 12
 
   runtime:
     round_robin: true

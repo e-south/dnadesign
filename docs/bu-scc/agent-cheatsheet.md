@@ -13,7 +13,7 @@ Use this with:
 - Always set `h_rt` explicitly.
 - Prefer `h_rt <= 12:00:00` when feasible to improve scheduling access on shared nodes.
 - Keep `densegen.solver.threads <= -pe omp <slots>`.
-- On shared nodes, prefer `-pe omp` sizes from BU guidance: `1-4`, `8`, `16`, `28`, or `36`.
+- On shared nodes, start DenseGen at `-pe omp 12` and tune based on measured throughput.
 - DenseGen runs are CPU jobs (no GPU request).
 - DenseGen submit commands must pass `DENSEGEN_RUN_ARGS` with exactly one of `--fresh` or `--resume`.
 - Evo2 runs require GPU resources (`-l gpus=1 -l gpu_c=8.9`).
@@ -28,7 +28,7 @@ Use this with:
 | Task | Queue type | Starter resources | Notes |
 | --- | --- | --- | --- |
 | DenseGen interactive smoke/debug | interactive (`qrsh`) CPU | `-l h_rt=01:00:00 -pe omp 8 -l mem_per_core=8G` | Use for short validation and debugging only. |
-| DenseGen batch (CBC/GUROBI) | batch CPU | `-l h_rt=08:00:00 -pe omp 16 -l mem_per_core=8G` | Scale slots with plan complexity; keep solver threads aligned. |
+| DenseGen batch (CBC/GUROBI) | batch CPU | `-l h_rt=08:00:00 -pe omp 12 -l mem_per_core=8G` | Scale slots with plan complexity; keep solver threads aligned. |
 | Notify watcher | batch CPU | `-l h_rt=24:00:00 -pe omp 1 -l mem_per_core=2G` | Low-footprint long-running watcher. |
 | Evo2 inference/smoke | batch GPU | `-l h_rt=04:00:00 -pe omp 4 -l mem_per_core=8G -l gpus=1 -l gpu_c=8.9` | Load matching CUDA/GCC modules in job script. |
 | Large downloads / model prefetch / dataset transfer | transfer-node | `-l download -l h_rt=24:00:00 -pe omp 1` | Do not run compute-heavy tasks here. |
@@ -45,7 +45,7 @@ qrsh -P <project> -l h_rt=01:00:00 -pe omp 8 -l mem_per_core=8G -cwd -now n
 
 ```bash
 qsub -P <project> \
-  -pe omp 16 \
+  -pe omp 12 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \

@@ -39,7 +39,7 @@ uv run ops runbook init \
   --workspace-root <workspace-root> \
   --repo-root <repo-root> \
   --h-rt 02:00:00 \
-  --pe-omp 16 \
+  --pe-omp 12 \
   --mem-per-core 8G
 ```
 
@@ -157,7 +157,7 @@ runbook:
       max_archived_entries: 1000
       max_archived_bytes: 2147483648
   resources:
-    pe_omp: 16
+    pe_omp: 12
     h_rt: 08:00:00
     mem_per_core: 8G
   mode_policy:

@@ -1811,6 +1811,7 @@ def test_cli_runbook_init_creates_valid_densegen_contract(tmp_path: Path) -> Non
     assert loaded.id == "densegen_demo"
     assert loaded.notify.smoke == "dry"
     assert loaded.densegen is not None
+    assert loaded.resources.pe_omp == 12
     assert loaded.densegen.config == (workspace_root / "config.yaml").resolve()
     assert (
         loaded.logging.stdout_dir == (workspace_root / "outputs" / "logs" / "ops" / "sge" / "densegen_demo").resolve()

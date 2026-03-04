@@ -204,7 +204,7 @@ def _build_init_payload(
             },
         }
         payload["runbook"]["resources"] = {
-            "pe_omp": pe_omp if pe_omp is not None else 16,
+            "pe_omp": pe_omp if pe_omp is not None else 12,
             "h_rt": h_rt or "08:00:00",
             "mem_per_core": mem_per_core or "8G",
         }
