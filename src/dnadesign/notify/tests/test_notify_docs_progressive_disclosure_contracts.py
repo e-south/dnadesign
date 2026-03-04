@@ -41,14 +41,15 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
     _assert_token_order(
         text,
         [
+            "### Entry contract",
             "### Choose a workflow",
-            "### Progressive disclosure path",
+            "### Start here",
             "### Prompt-to-command router",
             "### 2-minute operator path",
             "### Interface contract summary",
             "### Command surface map",
             "### Troubleshooting and recovery",
-            "### Canonical runbooks",
+            "### Runbooks",
         ],
         label="docs/notify/README.md",
     )
@@ -103,7 +104,8 @@ def test_notify_module_docs_index_has_progressive_disclosure_workflow_and_type_m
     _assert_token_order(
         text,
         [
-            "### Progressive disclosure route",
+            "### Ownership boundary",
+            "### Start here",
             "### Audience and prerequisites",
             "### Documentation by workflow",
             "### Documentation by type",
