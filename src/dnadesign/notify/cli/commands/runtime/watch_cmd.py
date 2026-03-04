@@ -93,6 +93,11 @@ def register_usr_events_watch_command(
             "--progress-min-seconds",
             help="Minimum spacing between DenseGen progress heartbeats in seconds.",
         ),
+        progress_heartbeat_seconds: float | None = typer.Option(
+            None,
+            "--progress-heartbeat-seconds",
+            help="Maximum spacing between DenseGen running updates in seconds.",
+        ),
         on_invalid_event: str = typer.Option(
             "error",
             "--on-invalid-event",
@@ -149,6 +154,7 @@ def register_usr_events_watch_command(
             only_tools=only_tools,
             progress_step_pct=progress_step_pct,
             progress_min_seconds=progress_min_seconds,
+            progress_heartbeat_seconds=progress_heartbeat_seconds,
             on_invalid_event=on_invalid_event,
             allow_unknown_version=allow_unknown_version,
             tool=tool,

@@ -96,7 +96,7 @@ def test_usr_sync_docs_cover_iterative_hpc_clone_safety_loop() -> None:
 
 def test_docs_index_links_progressive_usr_sync_workflows() -> None:
     docs_index = _read("docs/README.md")
-    assert "Workflow lanes" in docs_index
+    assert "Workflow routes" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync-audit-loop.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md" in docs_index
@@ -106,7 +106,7 @@ def test_docs_index_links_progressive_usr_sync_workflows() -> None:
 
 def test_docs_index_exposes_task_first_workflow_map() -> None:
     docs_index = _read("docs/README.md")
-    assert "Workflow lanes" in docs_index
+    assert "Workflow routes" in docs_index
     assert "Sync iterative HPC outputs to local analysis safely" in docs_index
     assert "Run cross-machine sync with stricter failure checks" in docs_index
     assert "Chain DenseGen -> USR -> Infer -> USR updates" in docs_index
@@ -140,7 +140,7 @@ def test_top_level_readme_exposes_workflow_docs_map() -> None:
 def test_docs_index_includes_progressive_entrypoint_ladders() -> None:
     docs_index = _read("docs/README.md")
 
-    assert "Workflow lanes" in docs_index
+    assert "Workflow routes" in docs_index
     assert "Design a sequence library in a workspace" in docs_index
     assert "Run model inference and write outputs back to datasets" in docs_index
     assert "Sync iterative HPC outputs to local analysis safely" in docs_index

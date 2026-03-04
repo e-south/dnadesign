@@ -148,17 +148,17 @@ Queue-fair submit policy:
 Ordered-chain example:
 
 ```bash
-JOB_A="$(qsub -terse -P <project> docs/bu-scc/jobs/densegen-cpu.qsub)"
-qsub -P <project> -hold_jid "$JOB_A" docs/bu-scc/jobs/densegen-cpu.qsub
+JOB_A="$(qsub -terse -P <project> -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' docs/bu-scc/jobs/densegen-cpu.qsub)"
+qsub -P <project> -hold_jid "$JOB_A" -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--resume --extend-quota 8 --no-plot' docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
 ### 7) Submit first jobs
 
-#### 7.1 DenseGen CPU (template defaults)
+#### 7.1 DenseGen CPU (explicit fresh mode)
 
 ```bash
 qsub -P <project> \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
+  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
@@ -171,11 +171,14 @@ qsub -P <project> \
   -pe omp 16 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
+  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
 In config, keep `densegen.solver.threads <= 16`.
+`densegen-cpu.qsub` bootstraps GUROBI runtime defaults for BU SCC and accepts overrides via
+`GUROBI_MODULE`, `GUROBI_HOME`, `GRB_LICENSE_FILE`, and `TOKENSERVER`.
+`DENSEGEN_RUN_ARGS` is required and must include exactly one of `--fresh` or `--resume`.
 
 #### 7.2b DenseGen iterative resume + quota extension
 
@@ -212,6 +215,12 @@ Create a profile from workspace/run config before submitting watcher jobs:
 ```bash
 CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
 NOTIFY_DIR="<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/outputs/notify/densegen"
+WEBHOOK_FILE="$HOME/.config/dnadesign/notify_webhook.secret"
+
+mkdir -p "$(dirname "$WEBHOOK_FILE")"
+uv run notify setup webhook \
+  --secret-source file \
+  --secret-ref "file://$WEBHOOK_FILE"
 
 uv run notify setup slack \
   --tool densegen \
@@ -219,7 +228,9 @@ uv run notify setup slack \
   --profile "$NOTIFY_DIR/profile.json" \
   --cursor "$NOTIFY_DIR/cursor" \
   --spool-dir "$NOTIFY_DIR/spool" \
-  --secret-source auto \
+  --secret-source file \
+  --secret-ref "file://$WEBHOOK_FILE" \
+  --no-store-webhook \
   --policy densegen
 ```
 
@@ -227,7 +238,7 @@ Preferred mode (profile-driven, secure by default):
 
 ```bash
 qsub -P <project> \
-  -v NOTIFY_PROFILE="$NOTIFY_DIR/profile.json" \
+  -v NOTIFY_PROFILE="$NOTIFY_DIR/profile.json",WEBHOOK_FILE="$WEBHOOK_FILE" \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
 
@@ -235,7 +246,7 @@ Explicit env mode (no profile):
 
 ```bash
 qsub -P <project> \
-  -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK \
+  -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK,WEBHOOK_FILE="$WEBHOOK_FILE" \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
 

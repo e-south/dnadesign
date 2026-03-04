@@ -241,8 +241,15 @@ def _sanitize_fixed_label(label: str) -> str:
 
 
 def _normalize_tf_label(label: str, fixed_set: set[str]) -> str:
+    if label is None:
+        return ""
+    try:
+        if pd.isna(label):
+            return ""
+    except Exception:
+        pass
     label = str(label).strip()
-    if not label:
+    if not label or label.lower() in {"none", "nan"}:
         return ""
     if label in fixed_set or label.startswith("fixed:"):
         return label
@@ -308,10 +315,25 @@ def _truncate_tfbs(seq: str, *, head: int = 8, tail: int = 6) -> str:
 
 
 def _placement_bounds(row: pd.Series, seq_len: int) -> tuple[int, int] | None:
-    offset_val = row.get("offset")
-    offset_raw_val = row.get("offset_raw")
-    pad_left_val = row.get("pad_left")
+    return _placement_bounds_from_values(
+        offset_val=row.get("offset"),
+        offset_raw_val=row.get("offset_raw"),
+        pad_left_val=row.get("pad_left"),
+        length_val=(row.get("length") if "length" in row else None),
+        end_val=row.get("end"),
+        seq_len=seq_len,
+    )
 
+
+def _placement_bounds_from_values(
+    *,
+    offset_val: object,
+    offset_raw_val: object,
+    pad_left_val: object,
+    length_val: object,
+    end_val: object,
+    seq_len: int,
+) -> tuple[int, int] | None:
     has_offset = offset_val is not None and not pd.isna(offset_val)
     has_offset_raw = offset_raw_val is not None and not pd.isna(offset_raw_val)
     has_pad_left = pad_left_val is not None and not pd.isna(pad_left_val)
@@ -337,11 +359,9 @@ def _placement_bounds(row: pd.Series, seq_len: int) -> tuple[int, int] | None:
     else:
         raise ValueError("composition.parquet has placement row with missing offset/offset_raw.")
 
-    length_val = row.get("length") if "length" in row else None
     if length_val is not None and not pd.isna(length_val):
         end = start + int(length_val)
     else:
-        end_val = row.get("end")
         if end_val is None or pd.isna(end_val):
             raise ValueError("composition.parquet has placement row with missing length/end.")
         end = int(end_val)
@@ -408,18 +428,42 @@ def _build_occupancy(
             aggregate_fixed_components=aggregate_fixed_components,
         )
     )
-    regulator_labels = sorted(
-        {str(tf) for tf in sub["tf_label"].astype(str).tolist() if str(tf).strip() and str(tf) not in fixed_set}
-    )
+    tf_label_values = sub["tf_label"].astype(str).tolist()
+    regulator_labels = sorted({label for label in tf_label_values if label.strip() and label not in fixed_set})
+    row_count = int(len(sub))
+    offset_values = sub["offset"].tolist() if "offset" in sub.columns else [None] * row_count
+    offset_raw_values = sub["offset_raw"].tolist() if "offset_raw" in sub.columns else [None] * row_count
+    pad_left_values = sub["pad_left"].tolist() if "pad_left" in sub.columns else [None] * row_count
+    length_values = sub["length"].tolist() if "length" in sub.columns else [None] * row_count
+    end_values = sub["end"].tolist() if "end" in sub.columns else [None] * row_count
+
+    placement_spans: list[tuple[str, int, int]] = []
     tf_totals: dict[str, int] = {}
-    for _, row in sub.iterrows():
-        tf_label = str(row.get("tf_label") or "").strip()
-        if not tf_label or tf_label in fixed_set:
+    for tf_label, offset_val, offset_raw_val, pad_left_val, length_val, end_val in zip(
+        tf_label_values,
+        offset_values,
+        offset_raw_values,
+        pad_left_values,
+        length_values,
+        end_values,
+    ):
+        tf_label = str(tf_label).strip()
+        if not tf_label:
             continue
-        bounds = _placement_bounds(row, seq_len)
+        bounds = _placement_bounds_from_values(
+            offset_val=offset_val,
+            offset_raw_val=offset_raw_val,
+            pad_left_val=pad_left_val,
+            length_val=length_val,
+            end_val=end_val,
+            seq_len=seq_len,
+        )
         if bounds is None:
             continue
         lo, hi = bounds
+        placement_spans.append((tf_label, lo, hi))
+        if tf_label in fixed_set:
+            continue
         tf_totals[tf_label] = tf_totals.get(tf_label, 0) + max(0, hi - lo)
 
     max_regulators = max(0, max_categories - len(fixed_labels))
@@ -440,28 +484,25 @@ def _build_occupancy(
         categories.append("other")
     occupancy = {label: np.zeros(seq_len, dtype=float) for label in categories}
 
-    for _, row in sub.iterrows():
-        tf_label = str(row.get("tf_label") or "").strip()
-        if not tf_label:
-            continue
+    for tf_label, lo, hi in placement_spans:
         if tf_label in fixed_set:
             label = tf_label
         else:
             label = tf_label if tf_label in selected_tfs else ("other" if other_tfs else tf_label)
         if label not in occupancy:
             continue
-        bounds = _placement_bounds(row, seq_len)
-        if bounds is None:
-            continue
-        lo, hi = bounds
         occupancy[label][lo:hi] += 1.0
 
     fixed_from_composition = {
         _collapse_fixed_component_label(str(label), aggregate_fixed_components=aggregate_fixed_components)
-        for label in sub["tf_label"].astype(str).tolist()
+        for label in tf_label_values
         if str(label).strip().startswith("fixed:")
     }.intersection(fixed_set)
     missing_counts: dict[str, int] = {}
+    if "sequence" in solutions.columns:
+        solution_sequences = [str(seq or "") for seq in solutions["sequence"].tolist()]
+    else:
+        solution_sequences = [""] * int(len(solutions))
     for pc_idx, pc in enumerate(constraints):
         name = _fixed_label_name(pc, pc_idx, aggregate_fixed_components=aggregate_fixed_components)
         label_up = _fixed_component_label(
@@ -476,8 +517,7 @@ def _build_occupancy(
             "-10",
             aggregate_fixed_components=aggregate_fixed_components,
         )
-        for _, row in solutions.iterrows():
-            seq = str(row.get("sequence") or "")
+        for seq in solution_sequences:
             pair = _select_promoter_pair(seq, pc)
             if pair is None:
                 missing_counts[name] = missing_counts.get(name, 0) + 1

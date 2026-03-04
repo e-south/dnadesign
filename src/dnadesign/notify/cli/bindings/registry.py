@@ -38,6 +38,7 @@ def register_notify_cli_bindings(
     profile_wizard_handler: Callable[..., object],
     profile_show_handler: Callable[..., object],
     profile_doctor_handler: Callable[..., object],
+    profile_smoke_handler: Callable[..., object],
     setup_slack_handler: Callable[..., object],
     setup_webhook_handler: Callable[..., object],
     setup_resolve_events_handler: Callable[..., object],
@@ -52,6 +53,7 @@ def register_notify_cli_bindings(
         wizard_handler=profile_wizard_handler,
         show_handler=profile_show_handler,
         doctor_handler=profile_doctor_handler,
+        smoke_handler=profile_smoke_handler,
     )
     register_setup_commands(
         setup_app,

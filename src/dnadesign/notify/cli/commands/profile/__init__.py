@@ -18,6 +18,7 @@ import typer
 from .doctor_cmd import register_profile_doctor_command
 from .init_cmd import register_profile_init_command
 from .show_cmd import register_profile_show_command
+from .smoke_cmd import register_profile_smoke_command
 from .wizard_cmd import register_profile_wizard_command
 
 
@@ -28,11 +29,13 @@ def register_profile_commands(
     wizard_handler: Callable[..., None],
     show_handler: Callable[..., None],
     doctor_handler: Callable[..., None],
+    smoke_handler: Callable[..., None],
 ) -> None:
     register_profile_init_command(profile_app, init_handler=init_handler)
     register_profile_wizard_command(profile_app, wizard_handler=wizard_handler)
     register_profile_show_command(profile_app, show_handler=show_handler)
     register_profile_doctor_command(profile_app, doctor_handler=doctor_handler)
+    register_profile_smoke_command(profile_app, smoke_handler=smoke_handler)
 
 
 __all__ = ["register_profile_commands"]

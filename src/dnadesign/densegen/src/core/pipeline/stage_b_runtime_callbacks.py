@@ -107,6 +107,7 @@ class StageBLibraryRuntimeContext:
     fixed_elements: Any
     fixed_elements_dump: dict
     plan_min_count_by_regulator: dict[str, int]
+    plan_min_total_sites: int
     input_meta: dict
     input_tfbs_count: int
     input_tf_tfbs_pair_count: int | None
@@ -406,6 +407,7 @@ class StageBLibraryRuntimeCallbacks:
                     tf_list_from_library=tf_list_from_library,
                     required_regulators=required_regulators,
                     plan_min_count_by_regulator=self._context.plan_min_count_by_regulator,
+                    plan_min_total_sites=self._context.plan_min_total_sites,
                     used_tf_counts=used_tf_counts,
                 )
                 if rejection_reason is not None:

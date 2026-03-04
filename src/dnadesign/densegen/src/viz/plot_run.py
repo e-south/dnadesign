@@ -19,8 +19,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib import ticker as mticker
+from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
 
 from .plot_common import _apply_style, _palette, _save_figure, _style, plan_group_from_name
 from .plot_run_health_utils import (
@@ -78,6 +78,15 @@ def _capitalize_first(text: str) -> str:
 
 def _plan_markers(plan_names: list[str]) -> dict[str, str]:
     return {plan: _PLAN_MARKER_CYCLE[idx % len(_PLAN_MARKER_CYCLE)] for idx, plan in enumerate(plan_names)}
+
+
+def _outcomes_attempts_per_row_for_workload(max_plan_attempts: int) -> int:
+    attempts = max(1, int(max_plan_attempts))
+    if attempts < 10_000:
+        return 10
+    if attempts < 1_000_000:
+        return 100
+    return 1000
 
 
 def _prepare_run_health_inputs(
@@ -211,15 +220,19 @@ def _build_run_health_outcomes_figure(
         attempts_df,
         style=style,
     )
+    plan_counts = attempts_df["plan_name"].astype(str).value_counts()
+    max_plan_attempts = int(plan_counts.max()) if not plan_counts.empty else int(len(attempts_df))
     try:
-        attempts_per_row = max(1, int(_style_cfg.get("run_health_outcomes_attempts_per_row", 10)))
+        attempts_per_row_raw = _style_cfg.get("run_health_outcomes_attempts_per_row")
+        if attempts_per_row_raw is None:
+            attempts_per_row = _outcomes_attempts_per_row_for_workload(max_plan_attempts)
+        else:
+            attempts_per_row = max(1, int(attempts_per_row_raw))
     except Exception as exc:
         raise ValueError("run_health_outcomes_attempts_per_row must be an integer > 0") from exc
 
     fig_size = _style_cfg.get("run_health_outcomes_figsize")
     if fig_size is None:
-        plan_counts = attempts_df["plan_name"].astype(str).value_counts()
-        max_plan_attempts = int(plan_counts.max()) if not plan_counts.empty else int(len(attempts_df))
         max_rows_estimate = max(1, int(np.ceil(float(max_plan_attempts) / float(attempts_per_row))))
         max_cols_estimate = max(1, int(len(plan_names)) * int(attempts_per_row))
         fig_height = max(2.8, min(6.2, 0.11 * float(max_rows_estimate) + 2.1))
@@ -246,42 +259,40 @@ def _build_run_health_outcomes_figure(
     max_rows = int(plot_df["_attempt_row"].max()) if not plot_df.empty else 1
     total_columns = max(1, int(len(plan_names)) * int(attempts_per_row))
     status_groups = {"accepted": {"ok", "duplicate"}, "rejected": {"rejected"}, "failed": {"failed"}}
-    group_colors = {"accepted": "#d9d9d9", "rejected": "#D55E00", "failed": "#8f2a13"}
-    tile_margin = 0.1
-    tile_side = 1.0 - tile_margin
-    tile_offset = tile_margin / 2.0
     plan_col_idx = plot_df["_plan_col"].astype(int).to_numpy()
     row_idx = plot_df["_attempt_row"].astype(int).to_numpy() - 1
     slot_idx = plot_df["_attempt_slot"].astype(int).to_numpy()
     col_idx = plan_col_idx * int(attempts_per_row) + slot_idx
-    status_values = plot_df["status"].astype(str).to_numpy()
+    status_values = np.asarray(plot_df["status"].astype(str).to_numpy(), dtype=str)
     valid = (row_idx >= 0) & (row_idx < max_rows) & (col_idx >= 0) & (col_idx < total_columns)
-    failed_marker_points: list[tuple[float, float]] = []
-    for idx in np.flatnonzero(valid):
-        status_value = str(status_values[idx]).strip().lower()
-        status_group = "accepted"
-        for group_name, group_statuses in status_groups.items():
-            if status_value in group_statuses:
-                status_group = group_name
-                break
-        x_cell = float(col_idx[idx])
-        y_cell = float(row_idx[idx])
-        if status_group == "failed":
-            failed_marker_points.append((x_cell + 0.5, y_cell + 0.5))
-            continue
-        tile = Rectangle(
-            (x_cell + tile_offset, y_cell + tile_offset),
-            tile_side,
-            tile_side,
-            facecolor=group_colors[status_group],
-            edgecolor="none",
-            linewidth=0.0,
-            zorder=2,
-        )
-        ax.add_patch(tile)
-    if failed_marker_points:
-        failed_x = np.array([item[0] for item in failed_marker_points], dtype=float)
-        failed_y = np.array([item[1] for item in failed_marker_points], dtype=float)
+    normalized_status = np.char.lower(np.char.strip(status_values))
+    is_rejected = np.isin(normalized_status, list(status_groups["rejected"]))
+    is_failed = np.isin(normalized_status, list(status_groups["failed"]))
+    is_accepted = ~(is_rejected | is_failed)
+
+    tile_grid = np.zeros((max_rows, total_columns), dtype=np.uint8)
+    accepted_mask = valid & is_accepted
+    rejected_mask = valid & is_rejected
+    failed_mask = valid & is_failed
+    tile_grid[row_idx[accepted_mask], col_idx[accepted_mask]] = 1
+    tile_grid[row_idx[rejected_mask], col_idx[rejected_mask]] = 2
+
+    cmap = ListedColormap(["#ffffff", "#d9d9d9", "#D55E00"])
+    norm = BoundaryNorm(boundaries=[-0.5, 0.5, 1.5, 2.5], ncolors=cmap.N)
+    ax.imshow(
+        tile_grid,
+        cmap=cmap,
+        norm=norm,
+        interpolation="nearest",
+        origin="upper",
+        extent=(0.0, float(total_columns), float(max_rows), 0.0),
+        zorder=2,
+        aspect="equal",
+    )
+
+    if np.any(failed_mask):
+        failed_x = col_idx[failed_mask].astype(float) + 0.5
+        failed_y = row_idx[failed_mask].astype(float) + 0.5
         ax.scatter(
             failed_x,
             failed_y,
@@ -305,11 +316,10 @@ def _build_run_health_outcomes_figure(
         dtype=float,
     )
     ax.set_xticks(plan_centers)
-    rotate = 45 if len(plan_names) > 4 else 0
     ax.set_xticklabels(
         [_capitalize_first(_ellipsize(name, max_len=22)) for name in plan_names],
-        rotation=rotate,
-        ha="right" if rotate else "center",
+        rotation=45,
+        ha="right",
     )
     if max_attempt_rank > 0:
         try:

@@ -41,14 +41,15 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
     _assert_token_order(
         text,
         [
+            "### Entry contract",
             "### Choose a workflow",
-            "### Progressive disclosure path",
+            "### Start here",
             "### Prompt-to-command router",
             "### 2-minute operator path",
             "### Interface contract summary",
             "### Command surface map",
             "### Troubleshooting and recovery",
-            "### Canonical runbooks",
+            "### Runbooks",
         ],
         label="docs/notify/README.md",
     )
@@ -56,6 +57,9 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
     assert "start an infer_evo2 workspace watcher and send to slack" in text
     assert "i already have a profile, just validate wiring" in text
     assert "resume failed deliveries from spool" in text
+    assert "--secret-source file" in text
+    assert "--secret-ref file://" in text
+    assert "--secret-source auto" not in text
     assert "`notify setup slack` mode contract" in text
     assert "`notify usr-events watch` mode contract" in text
 
@@ -74,6 +78,9 @@ def test_notify_usr_events_manual_keeps_setup_run_recover_flow() -> None:
         ],
         label="docs/notify/usr-events.md",
     )
+    assert "--secret-source file" in text
+    assert "--secret-ref file://" in text
+    assert "--secret-source auto" not in text
 
 
 def test_notify_module_readme_is_lightweight_router_and_links_top_level_runbook() -> None:
@@ -97,7 +104,8 @@ def test_notify_module_docs_index_has_progressive_disclosure_workflow_and_type_m
     _assert_token_order(
         text,
         [
-            "### Progressive disclosure route",
+            "### Ownership boundary",
+            "### Start here",
             "### Audience and prerequisites",
             "### Documentation by workflow",
             "### Documentation by type",

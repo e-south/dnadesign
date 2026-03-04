@@ -283,12 +283,10 @@ def _(df_window, mo):
 def _(
     build_records_preview_table,
     df_window,
-    get_active_record_index,
     has_plan_column,
     record_id_column,
     record_plan_filter,
     require,
-    set_active_record_index,
 ):
     _selected_record_plan = str(record_plan_filter.value or "all")
     if _selected_record_plan == "all" or not has_plan_column:
@@ -301,19 +299,32 @@ def _(
         df_window_filtered.empty,
         f"No records found for plan `{_selected_record_plan}` in preview window.",
     )
-
-    _record_options = []
-    for _row_index, _record_id in enumerate(df_window_filtered[record_id_column].astype(str).tolist()):
-        _option = f"{_row_index + 1}. {_record_id}"
-        _record_options.append(_option)
-
-    record_count = len(_record_options)
+    record_count = int(len(df_window_filtered[record_id_column]))
     require(record_count <= 0, "No records are available in the selected preview window.")
+    return df_window_filtered, record_count, record_plan_filter
 
+
+@app.cell
+def _(get_active_record_index, record_count, set_active_record_index):
     _raw_active_index = int(get_active_record_index() or 0)
-    active_index = max(0, min(record_count - 1, _raw_active_index))
-    if active_index != _raw_active_index:
-        set_active_record_index(active_index)
+    active_record_index_default = max(0, min(record_count - 1, _raw_active_index))
+    if active_record_index_default != _raw_active_index:
+        set_active_record_index(active_record_index_default)
+    return active_record_index_default
+
+
+@app.cell
+def _(
+    active_record_index_default,
+    mo,
+    record_count,
+    set_active_record_index,
+):
+
+    record_index_slider = mo.ui.slider(
+        1, record_count, value=active_record_index_default + 1, step=1, label="Record"
+    )
+    record_index_jump = mo.ui.number(value=active_record_index_default + 1, label="Jump to")
 
     prev_record_button = mo.ui.button(
         label="Prev",
@@ -326,12 +337,34 @@ def _(
         on_click=lambda _: set_active_record_index(lambda index: (int(index) + 1) % record_count),
     )
     return (
-        df_window_filtered,
         next_record_button,
         prev_record_button,
-        record_count,
-        record_plan_filter,
+        record_index_jump,
+        record_index_slider,
     )
+
+
+@app.cell
+def _(
+    get_active_record_index,
+    record_count,
+    record_index_jump,
+    record_index_slider,
+    set_active_record_index,
+):
+    _raw_active_index = int(get_active_record_index() or 0)
+    synced_active_index = max(0, min(record_count - 1, _raw_active_index))
+    _slider_index = max(0, min(record_count - 1, int(record_index_slider.value or (synced_active_index + 1)) - 1))
+    _jump_raw = record_index_jump.value
+    try:
+        _jump_index = max(0, min(record_count - 1, int(_jump_raw) - 1))
+    except Exception:
+        _jump_index = synced_active_index
+    if _slider_index != synced_active_index:
+        set_active_record_index(_slider_index)
+    elif _jump_index != synced_active_index:
+        set_active_record_index(_jump_index)
+    return
 
 
 @app.cell
@@ -534,6 +567,8 @@ def _(
     mo,
     next_record_button,
     prev_record_button,
+    record_index_jump,
+    record_index_slider,
     render_baserender_preview_path,
     to_repo_relative_path,
 ):
@@ -542,10 +577,13 @@ def _(
         + f"`{active_row_index + 1} / {filtered_n}` | `id: {active_record_id}`"
         + "</div>"
     )
+    _slider_row = mo.hstack([record_index_slider], justify="start", align="center")
+    _jump_slot = mo.hstack([record_index_jump], justify="center", align="center")
+    _center_slot = mo.vstack([_record_status, _jump_slot], align="center", gap=0.2)
     _prev_slot = mo.hstack([prev_record_button], justify="start", align="center")
     _next_slot = mo.hstack([next_record_button], justify="end", align="center")
     _nav_row = mo.hstack(
-        [_prev_slot, _record_status, _next_slot],
+        [_prev_slot, _center_slot, _next_slot],
         justify="space-between",
         align="center",
         widths=[1, 6, 1],
@@ -578,6 +616,7 @@ def _(
     )
     mo.vstack(
         [
+            _slider_row,
             _nav_row,
             _baserender_image,
             mo.md("BaseRender export path"),

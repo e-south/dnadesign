@@ -35,6 +35,7 @@ def run_profile_init_command(
     include_raw_event: bool,
     progress_step_pct: int | None,
     progress_min_seconds: float | None,
+    progress_heartbeat_seconds: float | None,
     tls_ca_bundle: Path | None,
     policy: str | None,
     force: bool,
@@ -70,6 +71,11 @@ def run_profile_init_command(
             if progress_min_seconds_value <= 0.0:
                 raise NotifyError("progress_min_seconds must be a positive number")
             payload["progress_min_seconds"] = progress_min_seconds_value
+        if progress_heartbeat_seconds is not None:
+            progress_heartbeat_seconds_value = float(progress_heartbeat_seconds)
+            if progress_heartbeat_seconds_value <= 0.0:
+                raise NotifyError("progress_heartbeat_seconds must be a positive number")
+            payload["progress_heartbeat_seconds"] = progress_heartbeat_seconds_value
         if only_actions is not None:
             payload["only_actions"] = str(only_actions).strip()
         if only_tools is not None:

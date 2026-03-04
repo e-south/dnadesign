@@ -40,7 +40,7 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("libshuffle", "aligner"),
     ("libshuffle", "billboard"),
     ("libshuffle", "nmf"),
-    ("notify", "densegen"),
+    ("ops", "usr"),
     ("permuter", "infer"),
 }
 
@@ -102,6 +102,9 @@ def _iter_import_targets(module: ast.Module, *, package_parts: tuple[str, ...]) 
             if base is None:
                 continue
             if node.module is not None:
+                if node.level <= 0:
+                    targets.append(node.module)
+                    continue
                 module_parts = tuple(part for part in node.module.split(".") if part)
                 targets.append(".".join((*base.split("."), *module_parts)))
                 continue

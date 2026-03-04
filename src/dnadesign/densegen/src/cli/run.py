@@ -276,8 +276,9 @@ def _restore_usr_registry_snapshots(*, snapshots: dict[Path, str]) -> None:
 
 def _clear_outputs_preserving_notify(*, outputs_root: Path) -> None:
     notify_root = outputs_root / "notify"
+    logs_root = outputs_root / "logs"
     for child in outputs_root.iterdir():
-        if child == notify_root:
+        if child == notify_root or child == logs_root:
             continue
         if child.is_dir() and not child.is_symlink():
             shutil.rmtree(child)
@@ -595,6 +596,28 @@ def _handle_run_runtime_error(
     if "USR registry not found at " in message:
         console.print(f"[bold red]{message}[/]")
         _print_usr_registry_next_steps(console=console)
+        raise typer.Exit(code=1)
+    if "Failed to scan existing output records while preparing resume state." in message:
+        console.print(f"[bold red]{message}[/]")
+        console.print("[bold]Next steps[/]:")
+        inspect_cmd = context.workspace_command(
+            "dense inspect run --events --library",
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        fresh_cmd = context.workspace_command(
+            "dense run --fresh",
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        reset_cmd = context.workspace_command(
+            "dense campaign-reset",
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        console.print(f"  - {inspect_cmd}")
+        console.print(f"  - {fresh_cmd}")
+        console.print(f"  - {reset_cmd}")
         raise typer.Exit(code=1)
     if "Exceeded max_consecutive_no_progress_resamples=" in message or "Exceeded max_failed_solutions=" in message:
         console.print(f"[bold red]{message}[/]")

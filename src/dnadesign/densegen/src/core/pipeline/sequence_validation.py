@@ -35,6 +35,7 @@ def _validate_library_constraints(
     *,
     groups: list,
     min_count_by_regulator: dict[str, int],
+    min_total_sites: int,
     input_name: str,
     plan_name: str,
 ) -> None:
@@ -72,4 +73,12 @@ def _validate_library_constraints(
             raise RuntimeError(
                 f"Library artifact for {input_name}/{plan_name} (library_index={record.library_index}) "
                 f"has tf={tf} count={found} < min_count_by_regulator={min_count}."
+            )
+    min_sites = int(min_total_sites)
+    if min_sites > 0:
+        found_sites = len(list(record.library_tfbs or []))
+        if found_sites < min_sites:
+            raise RuntimeError(
+                f"Library artifact for {input_name}/{plan_name} (library_index={record.library_index}) "
+                f"has site_count={found_sites} < min_total_sites={min_sites}."
             )

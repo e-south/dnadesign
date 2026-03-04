@@ -60,6 +60,7 @@ cluster    = "dnadesign.cluster.cli:main"
 permuter   = "dnadesign.permuter.cli:main"
 baserender = "dnadesign.baserender.cli:app"
 cruncher   = "dnadesign.cruncher.cli.app:app"
+ops        = "dnadesign.ops.cli:main"
 
 [project.optional-dependencies]
 # GPU stack (Linux x86_64 only)

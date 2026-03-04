@@ -82,6 +82,27 @@ def resolve_progress_min_seconds(
     return parsed
 
 
+def resolve_progress_heartbeat_seconds(
+    *,
+    progress_heartbeat_seconds: float | None,
+    profile_data: dict[str, Any],
+) -> float | None:
+    raw_value: object
+    if progress_heartbeat_seconds is not None:
+        raw_value = progress_heartbeat_seconds
+    else:
+        raw_value = profile_data.get("progress_heartbeat_seconds")
+    if raw_value is None:
+        return None
+    try:
+        parsed = float(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise NotifyConfigError("progress_heartbeat_seconds must be a positive number") from exc
+    if parsed <= 0.0:
+        raise NotifyConfigError("progress_heartbeat_seconds must be a positive number")
+    return parsed
+
+
 def resolve_optional_profile_bool(
     *,
     cli_value: bool | None,

@@ -59,6 +59,45 @@ def test_read_profile_rejects_unknown_policy(tmp_path: Path) -> None:
         read_profile(profile_path)
 
 
+def test_read_profile_accepts_progress_heartbeat_seconds(tmp_path: Path) -> None:
+    profile_path = tmp_path / "profile.json"
+    profile_path.write_text(
+        json.dumps(
+            {
+                "profile_version": 2,
+                "provider": "slack",
+                "events": "/tmp/usr/.events.log",
+                "progress_heartbeat_seconds": 300,
+                "webhook": {"source": "env", "ref": "NOTIFY_WEBHOOK"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    data = read_profile(profile_path)
+
+    assert data["progress_heartbeat_seconds"] == 300
+
+
+def test_read_profile_rejects_non_positive_progress_heartbeat_seconds(tmp_path: Path) -> None:
+    profile_path = tmp_path / "profile.json"
+    profile_path.write_text(
+        json.dumps(
+            {
+                "profile_version": 2,
+                "provider": "slack",
+                "events": "/tmp/usr/.events.log",
+                "progress_heartbeat_seconds": 0,
+                "webhook": {"source": "env", "ref": "NOTIFY_WEBHOOK"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(NotifyConfigError, match="progress_heartbeat_seconds"):
+        read_profile(profile_path)
+
+
 def test_resolve_profile_webhook_source_env_returns_url_env() -> None:
     profile_data = {
         "profile_version": 2,
@@ -71,6 +110,20 @@ def test_resolve_profile_webhook_source_env_returns_url_env() -> None:
 
     assert url_env == "NOTIFY_WEBHOOK"
     assert secret_ref is None
+
+
+def test_resolve_profile_webhook_source_secret_ref_returns_secret_ref() -> None:
+    profile_data = {
+        "profile_version": 2,
+        "provider": "slack",
+        "events": "/tmp/usr/.events.log",
+        "webhook": {"source": "secret_ref", "ref": "file:///tmp/notify.webhook"},
+    }
+
+    url_env, secret_ref = resolve_profile_webhook_source(profile_data)
+
+    assert url_env is None
+    assert secret_ref == "file:///tmp/notify.webhook"  # pragma: allowlist secret
 
 
 def test_resolve_profile_events_source_resolves_relative_config_path(tmp_path: Path) -> None:

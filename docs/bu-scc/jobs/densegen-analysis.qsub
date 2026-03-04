@@ -1,0 +1,18 @@
+#!/bin/bash -l
+#$ -N dnadesign_densegen_postrun
+#$ -l h_rt=01:00:00
+#$ -pe omp 4
+#$ -l mem_per_core=4G
+#$ -j y
+#$ -o outputs/logs/$JOB_NAME.$JOB_ID.out
+
+set -euo pipefail
+
+DENSEGEN_CONFIG="${DENSEGEN_CONFIG:-$PWD/config.yaml}"
+
+if [[ ! -f "$DENSEGEN_CONFIG" ]]; then
+  echo "Missing DenseGen config: $DENSEGEN_CONFIG" >&2
+  exit 2
+fi
+
+uv run dense plot -c "$DENSEGEN_CONFIG"

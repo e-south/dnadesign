@@ -644,9 +644,10 @@ def write_overlay_part_dataset(
 
     file_path = overlay_path(dataset.dir, namespace)
     dir_path = overlay_dir_path(dataset.dir, namespace)
-    if file_path.exists():
+    if file_path.exists() and dir_path.exists():
         raise SchemaError(
-            f"Overlay file already exists for namespace '{namespace}'. Remove it or compact it before writing parts."
+            f"Overlay for namespace '{namespace}' has both file and directory sources. "
+            "Resolve by compacting or removing one source."
         )
 
     if isinstance(table_or_batches, pa.Table):
@@ -766,7 +767,13 @@ def write_overlay_part_dataset(
             registry_hash=reg_hash,
         )
 
-        dir_path.mkdir(parents=True, exist_ok=True)
+        if file_path.exists():
+            dir_path.mkdir(parents=True, exist_ok=True)
+            stamp = now_utc().replace(":", "").replace("-", "").replace(".", "")
+            promoted_path = dir_path / f"part-{stamp}-{uuid.uuid4().hex}.parquet"
+            os.replace(file_path, promoted_path)
+        else:
+            dir_path.mkdir(parents=True, exist_ok=True)
         stamp = now_utc().replace(":", "").replace("-", "").replace(".", "")
         part_path = dir_path / f"part-{stamp}-{uuid.uuid4().hex}.parquet"
         tmp_path = part_path.with_suffix(".parquet.tmp")

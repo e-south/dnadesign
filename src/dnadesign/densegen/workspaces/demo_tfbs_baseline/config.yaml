@@ -35,6 +35,7 @@ densegen:
         sampling:
           include_inputs: [basic_sites]
         regulator_constraints:
+          min_total_sites: 0
           groups: []
       - name: baseline_sigma70
         sequences: 50
@@ -47,6 +48,7 @@ densegen:
               downstream: TATAAT
               spacer_length: [16, 18]
         regulator_constraints:
+          min_total_sites: 0
           groups: []
 
   solver:

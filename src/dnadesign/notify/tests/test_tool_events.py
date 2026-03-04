@@ -82,6 +82,48 @@ def test_tool_event_status_override_is_none_for_unhandled_actions() -> None:
     assert tool_event_status_override("materialize", event) is None
 
 
+def test_tool_event_status_override_handles_infer_attach_events() -> None:
+    event = _event("attach")
+    event["actor"] = {"tool": "infer_evo2", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    event["args"] = {"rows_incoming": 10, "rows_matched": 10, "rows_missing": 0}
+
+    assert tool_event_status_override("attach", event) == "running"
+
+
+def test_tool_event_message_override_formats_infer_attach_message() -> None:
+    event = _event("attach")
+    event["actor"] = {"tool": "infer_evo2", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    event["args"] = {"rows_incoming": 12, "rows_matched": 11, "rows_missing": 1}
+
+    msg = tool_event_message_override("attach", event, run_id="infer-run-1", duration_seconds=None)
+
+    assert msg is not None
+    assert "Infer write-back progress | run=infer-run-1 | dataset=demo" in msg
+    assert "incoming=12 matched=11 missing=1" in msg
+    assert "- Workspace rows: 1" in msg
+
+
+def test_evaluate_tool_event_infer_attach_is_throttled_by_min_seconds() -> None:
+    state = ToolEventState()
+    first = _event("attach", timestamp="2026-02-06T00:00:00+00:00")
+    first["actor"] = {"tool": "infer_evo2", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    first["args"] = {"rows_incoming": 20, "rows_matched": 20, "rows_missing": 0}
+    second = _event("attach", timestamp="2026-02-06T00:00:10+00:00")
+    second["actor"] = {"tool": "infer_evo2", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    second["args"] = {"rows_incoming": 20, "rows_matched": 20, "rows_missing": 0}
+    third = _event("attach", timestamp="2026-02-06T00:01:10+00:00")
+    third["actor"] = {"tool": "infer_evo2", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    third["args"] = {"rows_incoming": 20, "rows_matched": 20, "rows_missing": 0}
+
+    first_decision = evaluate_tool_event("attach", first, run_id="infer-run-1", state=state)
+    second_decision = evaluate_tool_event("attach", second, run_id="infer-run-1", state=state)
+    third_decision = evaluate_tool_event("attach", third, run_id="infer-run-1", state=state)
+
+    assert first_decision.emit is True
+    assert second_decision.emit is False
+    assert third_decision.emit is True
+
+
 def test_evaluate_tool_event_densegen_running_is_gated_by_progress_step() -> None:
     state = ToolEventState()
     first = _event("densegen_health", status="running")
@@ -116,6 +158,49 @@ def test_evaluate_tool_event_densegen_running_uses_10pct_step_for_large_quotas()
     first["metrics"] = _densegen_metrics(run_quota=1000, quota_progress_pct=9.0)
     second = _event("densegen_health", status="running", timestamp="2026-02-06T00:10:00+00:00")
     second["metrics"] = _densegen_metrics(run_quota=1000, quota_progress_pct=10.0)
+
+    first_decision = evaluate_tool_event("densegen_health", first, run_id="run-1", state=state)
+    second_decision = evaluate_tool_event("densegen_health", second, run_id="run-1", state=state)
+
+    assert first_decision.emit is True
+    assert second_decision.emit is True
+
+
+def test_evaluate_tool_event_densegen_running_emits_heartbeat_after_30_minutes() -> None:
+    state = ToolEventState()
+    first = _event("densegen_health", status="running")
+    first["metrics"] = _densegen_metrics(run_quota=100, rows_written_session=1, quota_progress_pct=1.0)
+    second = _event("densegen_health", status="running", timestamp="2026-02-06T00:30:00+00:00")
+    second["metrics"] = _densegen_metrics(run_quota=100, rows_written_session=5, quota_progress_pct=5.0)
+
+    first_decision = evaluate_tool_event("densegen_health", first, run_id="run-1", state=state)
+    second_decision = evaluate_tool_event("densegen_health", second, run_id="run-1", state=state)
+
+    assert first_decision.emit is True
+    assert second_decision.emit is True
+
+
+def test_evaluate_tool_event_densegen_running_does_not_heartbeat_after_10_minutes_by_default() -> None:
+    state = ToolEventState()
+    first = _event("densegen_health", status="running")
+    first["metrics"] = _densegen_metrics(run_quota=100, rows_written_session=1, quota_progress_pct=1.0)
+    second = _event("densegen_health", status="running", timestamp="2026-02-06T00:10:00+00:00")
+    second["metrics"] = _densegen_metrics(run_quota=100, rows_written_session=5, quota_progress_pct=5.0)
+
+    first_decision = evaluate_tool_event("densegen_health", first, run_id="run-1", state=state)
+    second_decision = evaluate_tool_event("densegen_health", second, run_id="run-1", state=state)
+
+    assert first_decision.emit is True
+    assert second_decision.emit is False
+
+
+def test_evaluate_tool_event_densegen_running_uses_configured_heartbeat_seconds() -> None:
+    state = ToolEventState()
+    state.get_bucket("densegen_health")["notify_config"] = {"progress_heartbeat_seconds": 120.0}
+    first = _event("densegen_health", status="running")
+    first["metrics"] = _densegen_metrics(run_quota=100, rows_written_session=1, quota_progress_pct=1.0)
+    second = _event("densegen_health", status="running", timestamp="2026-02-06T00:03:00+00:00")
+    second["metrics"] = _densegen_metrics(run_quota=100, rows_written_session=2, quota_progress_pct=2.0)
 
     first_decision = evaluate_tool_event("densegen_health", first, run_id="run-1", state=state)
     second_decision = evaluate_tool_event("densegen_health", second, run_id="run-1", state=state)
@@ -232,7 +317,23 @@ def test_tool_event_message_override_formats_densegen_health_message() -> None:
 
     assert msg is not None
     assert "DenseGen progress | run=run-1 | dataset=demo" in msg
-    assert "- Quota: 10.0% (10/100 rows)" in msg
+    assert "- Quota (run session): 10.0% (10/100 rows)" in msg
+    assert "- Remaining to quota: 90 rows" in msg
+    assert "- Workspace rows: 1" in msg
+    assert "- Session throughput: 3000.0 rows/hour" in msg
+    assert "- ETA to quota: 00:01:48" in msg
+    assert "- Plan success:" not in msg
+
+
+def test_tool_event_message_override_suppresses_100pct_plan_yield_line() -> None:
+    event = _event("densegen_health", status="running")
+    event["metrics"] = _densegen_metrics(plans_attempted=10, plans_solved=10)
+
+    msg = tool_event_message_override("densegen_health", event, run_id="run-1", duration_seconds=12.0)
+
+    assert msg is not None
+    assert "- Plan success:" not in msg
+    assert "- Plan yield:" not in msg
 
 
 def test_tool_event_message_override_formats_densegen_flush_failed_message() -> None:

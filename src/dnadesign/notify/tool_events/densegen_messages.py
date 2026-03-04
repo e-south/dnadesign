@@ -17,6 +17,34 @@ from .densegen_common import _duration_hhmmss, _normalize_densegen_status, _to_f
 from .densegen_metrics import _densegen_metric_float, _densegen_metric_int, _densegen_metrics
 
 
+def _workspace_rows(event: dict[str, Any]) -> int | None:
+    fingerprint_raw = event.get("fingerprint")
+    fingerprint = fingerprint_raw if isinstance(fingerprint_raw, dict) else {}
+    return _to_int_or_none(fingerprint.get("rows"))
+
+
+def _throughput_rows_per_hour(*, rows_written: int, elapsed_seconds: float | None) -> float | None:
+    if elapsed_seconds is None:
+        return None
+    if elapsed_seconds <= 0.0 or rows_written <= 0:
+        return None
+    return float(rows_written) * 3600.0 / float(elapsed_seconds)
+
+
+def _eta_to_quota_seconds(*, rows_written: int, run_quota: int, elapsed_seconds: float | None) -> float | None:
+    if elapsed_seconds is None:
+        return None
+    if elapsed_seconds <= 0.0 or rows_written <= 0:
+        return None
+    remaining = int(run_quota) - int(rows_written)
+    if remaining <= 0:
+        return None
+    rows_per_second = float(rows_written) / float(elapsed_seconds)
+    if rows_per_second <= 0.0:
+        return None
+    return float(remaining) / rows_per_second
+
+
 def _densegen_health_status_override(event: dict[str, Any]) -> str | None:
     status = _normalize_densegen_status(event)
     if status in {"completed", "complete", "success", "succeeded"}:
@@ -60,7 +88,10 @@ def _densegen_health_message(
             rows_written = _to_int_or_none(densegen_data.get("rows_written_session"))
             run_quota = _to_int_or_none(densegen_data.get("run_quota"))
             if quota_progress is not None and rows_written is not None and run_quota is not None:
-                lines.append(f"- Progress: {quota_progress:.1f}% ({rows_written}/{run_quota} rows)")
+                lines.append(f"- Quota (run session): {quota_progress:.1f}% ({rows_written}/{run_quota} rows)")
+            workspace_rows = _workspace_rows(event)
+            if workspace_rows is not None:
+                lines.append(f"- Workspace rows: {workspace_rows}")
         return "\n".join(lines)
 
     if status in {"failed", "failure", "error"}:
@@ -106,9 +137,21 @@ def _densegen_health_message(
     if elapsed is None:
         elapsed = duration_seconds
     lines = [f"DenseGen progress | run={run_id} | dataset={dataset_name}"]
-    lines.append(f"- Quota: {quota_progress:.1f}% ({rows_written}/{run_quota} rows)")
-    lines.append(f"- Plan success: {plans_solved}/{plans_attempted} ({success_pct:.1f}%)")
+    lines.append(f"- Quota (run session): {quota_progress:.1f}% ({rows_written}/{run_quota} rows)")
+    remaining_rows = max(0, int(run_quota) - int(rows_written))
+    lines.append(f"- Remaining to quota: {remaining_rows} rows")
+    workspace_rows = _workspace_rows(event)
+    if workspace_rows is not None:
+        lines.append(f"- Workspace rows: {workspace_rows}")
+    if plans_attempted > 0 and plans_solved < plans_attempted:
+        lines.append(f"- Plan yield: {plans_solved}/{plans_attempted} ({success_pct:.1f}%)")
     lines.append(f"- TFBS coverage: {tfbs_coverage:.1f}% ({tfbs_used}/{tfbs_total})")
+    throughput_rows_per_hour = _throughput_rows_per_hour(rows_written=rows_written, elapsed_seconds=elapsed)
+    if throughput_rows_per_hour is not None:
+        lines.append(f"- Session throughput: {throughput_rows_per_hour:.1f} rows/hour")
+        eta_seconds = _eta_to_quota_seconds(rows_written=rows_written, run_quota=run_quota, elapsed_seconds=elapsed)
+        if eta_seconds is not None:
+            lines.append(f"- ETA to quota: {_duration_hhmmss(eta_seconds)}")
     if elapsed is not None:
         lines.append(f"- Runtime: {_duration_hhmmss(elapsed)}")
     return "\n".join(lines)

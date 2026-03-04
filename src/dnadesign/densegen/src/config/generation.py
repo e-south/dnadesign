@@ -155,11 +155,16 @@ class RegulatorConstraints(BaseModel):
     model_config = ConfigDict(extra="forbid")
     groups: List[RegulatorGroup]
     min_count_by_regulator: Dict[str, int] = Field(default_factory=dict)
+    min_total_sites: int = 0
 
     @model_validator(mode="after")
     def _constraints_ok(self):
         if not self.groups and self.min_count_by_regulator:
             raise ValueError("regulator_constraints.groups must be non-empty when min_count_by_regulator is set")
+        min_total_sites = int(self.min_total_sites)
+        if min_total_sites < 0:
+            raise ValueError("regulator_constraints.min_total_sites must be >= 0")
+        self.min_total_sites = min_total_sites
         if not self.groups:
             self.min_count_by_regulator = {}
             return self

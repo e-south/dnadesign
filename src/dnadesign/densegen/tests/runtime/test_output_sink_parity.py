@@ -156,6 +156,33 @@ def test_usr_writer_dedupes_without_full_parquet_id_preload(tmp_path: Path, monk
     assert writer.add(rec) is False
 
 
+def test_usr_writer_import_skips_full_existing_id_scan_when_ids_are_prevalidated(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _root, writer = _make_usr_writer(tmp_path, deduplicate=True, chunk_size=1)
+    rec = OutputRecord.from_sequence(
+        sequence="ACGTACGTAA",
+        meta=output_meta(library_hash="demo_hash", library_index=1),
+        source="unit",
+        bio_type="dna",
+        alphabet="dna_4",
+    )
+
+    import dnadesign.usr.src.dataset_ingest as dataset_ingest
+
+    original_iter = dataset_ingest.iter_parquet_batches
+
+    def _guard_iter(path, columns=None, batch_size=65536):
+        if columns == ["id"]:
+            raise AssertionError("full existing-id scan should be skipped for prevalidated DenseGen imports")
+        return original_iter(path, columns=columns, batch_size=batch_size)
+
+    monkeypatch.setattr(dataset_ingest, "iter_parquet_batches", _guard_iter)
+
+    assert writer.add(rec) is True
+    writer.finalize()
+
+
 def test_usr_writer_passes_explicit_actor_to_usr_mutations(tmp_path: Path, monkeypatch) -> None:
     _root, writer = _make_usr_writer(tmp_path)
     meta = output_meta(library_hash="demo_hash", library_index=1)

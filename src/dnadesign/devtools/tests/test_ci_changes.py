@@ -208,6 +208,18 @@ def test_discover_repo_tools_excludes_devtools_and_dunder_dirs(tmp_path: Path) -
     assert tool_names == {"densegen", "usr"}
 
 
+def test_discover_repo_tools_excludes_legacy_data_directories(tmp_path: Path) -> None:
+    src_root = tmp_path / "src" / "dnadesign"
+    (src_root / "usr").mkdir(parents=True, exist_ok=True)
+    (src_root / "densegen").mkdir(parents=True, exist_ok=True)
+    (src_root / "densehairpins").mkdir(parents=True, exist_ok=True)
+    (src_root / "evoinference").mkdir(parents=True, exist_ok=True)
+    (src_root / "sequences").mkdir(parents=True, exist_ok=True)
+
+    tool_names = discover_repo_tools(repo_root=tmp_path)
+    assert tool_names == {"densegen", "usr"}
+
+
 def test_discover_external_integration_tools_ignores_marker_text_in_comments(tmp_path: Path) -> None:
     src_root = tmp_path / "src" / "dnadesign"
     foo_test = src_root / "foo" / "tests" / "test_one.py"

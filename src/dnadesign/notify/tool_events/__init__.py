@@ -20,6 +20,7 @@ from .core import (
     tool_event_status_override,
 )
 from .densegen import register_densegen_handlers
+from .infer_evo2 import register_infer_evo2_handlers
 from .packs_builtin import register_builtin_tool_event_packs
 from .types import ToolEventDecision, ToolEventState
 
@@ -29,6 +30,7 @@ __all__ = [
     "ToolEventState",
     "activate_tool_event_pack",
     "evaluate_tool_event",
+    "register_infer_evo2_handlers",
     "register_builtin_tool_event_packs",
     "register_densegen_handlers",
     "register_tool_event_handlers",

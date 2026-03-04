@@ -108,6 +108,11 @@ USR_STATE_SCHEMA_TYPES = {
 }
 USR_STATE_QC_STATUS_ALLOWED = {"pass", "fail", "warn", "unknown"}
 USR_STATE_SPLIT_ALLOWED = {"train", "val", "test", "holdout"}
+_LOAD_OVERLAYS_CACHE: dict[
+    tuple[str, bool, tuple[str, ...] | None],
+    tuple[tuple[tuple[str, int, int], ...], tuple[int, int] | None, tuple[dict, ...]],
+] = {}
+_LOAD_OVERLAYS_CACHE_MAX = 4_096
 
 
 @dataclass(frozen=True)
@@ -501,18 +506,35 @@ class Dataset:
     ):
         overlays = []
         paths = list_overlays(self.dir)
+        path_entries = []
+        path_sig_rows: list[tuple[str, int, int]] = []
+        for path in paths:
+            path_stat = path.stat()
+            meta = overlay_metadata(path)
+            namespace = meta.get("namespace") or path.stem
+            path_entries.append((path, meta, namespace))
+            path_sig_rows.append((str(path), int(path_stat.st_mtime_ns), int(path_stat.st_size)))
         namespace_filter = set(namespaces) if namespaces else None
-        require_registry = any(
-            (overlay_metadata(p).get("namespace") or p.stem) not in RESERVED_NAMESPACES for p in paths
-        )
+        require_registry = any(namespace not in RESERVED_NAMESPACES for _, _, namespace in path_entries)
+        namespace_key = tuple(sorted(namespace_filter)) if namespace_filter else None
+        cache_key = (str(self.dir), bool(include_tombstone), namespace_key)
+        path_sig = tuple(path_sig_rows)
+        registry_sig: tuple[int, int] | None = None
+        if require_registry:
+            reg_path = self.dir / "_registry" / "registry.yaml"
+            if reg_path.exists():
+                reg_stat = reg_path.stat()
+                registry_sig = (int(reg_stat.st_mtime_ns), int(reg_stat.st_size))
+        cached = _LOAD_OVERLAYS_CACHE.get(cache_key)
+        if cached is not None and cached[0] == path_sig and cached[1] == registry_sig:
+            return [dict(overlay) for overlay in cached[2]]
+
         registry = self._registry(required=require_registry) if require_registry else {}
         seen: Dict[str, Path] = {}
-        for path in paths:
-            meta = overlay_metadata(path)
+        for path, meta, ns in path_entries:
             key = meta.get("key")
             if not key:
                 raise SchemaError(f"Overlay missing required metadata key: {path}")
-            ns = meta.get("namespace") or path.stem
             if ns in seen:
                 raise SchemaError(
                     f"Overlay namespace '{ns}' has multiple sources: {seen[ns]} and {path}. "
@@ -540,6 +562,9 @@ class Dataset:
                     "read_path": read_path,
                 }
             )
+        _LOAD_OVERLAYS_CACHE[cache_key] = (path_sig, registry_sig, tuple(dict(overlay) for overlay in overlays))
+        if len(_LOAD_OVERLAYS_CACHE) > _LOAD_OVERLAYS_CACHE_MAX:
+            _LOAD_OVERLAYS_CACHE.clear()
         return overlays
 
     @staticmethod
@@ -557,8 +582,8 @@ class Dataset:
         view_name: str,
         path: Path,
         key: str,
-    ) -> None:
-        create_overlay_view(con, view_name=view_name, path=path, key=key)
+    ) -> str:
+        return create_overlay_view(con, view_name=view_name, path=path, key=key)
 
     def _duckdb_query(
         self,
@@ -613,6 +638,7 @@ class Dataset:
         on_conflict: str,
         actor: Optional[dict] = None,
         return_ids: bool = False,
+        prevalidated_new_ids: bool = False,
     ) -> int | tuple[int, list[str], list[str]]:
         return write_import_df_dataset(
             self,
@@ -621,6 +647,7 @@ class Dataset:
             on_conflict=on_conflict,
             actor=actor,
             return_ids=return_ids,
+            prevalidated_new_ids=prevalidated_new_ids,
             write_lock=dataset_write_lock,
         )
 
@@ -633,6 +660,7 @@ class Dataset:
         source: Optional[str] = None,
         strict_id_check: bool = True,
         actor: Optional[dict] = None,
+        _prevalidated_new_ids: bool = False,
     ) -> int:
         """
         Import sequence rows (DataFrame or sequence of dicts).
@@ -660,6 +688,7 @@ class Dataset:
             source=source,
             strict_id_check=strict_id_check,
             actor=actor,
+            prevalidated_new_ids=_prevalidated_new_ids,
         )
 
     def add_sequences(

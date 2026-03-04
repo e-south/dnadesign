@@ -18,6 +18,7 @@ from typing import Any, Callable
 from .watch_runner_contract import (
     normalize_on_invalid_event_mode,
     resolve_optional_profile_bool,
+    resolve_progress_heartbeat_seconds,
     resolve_progress_min_seconds,
     resolve_progress_step_pct,
 )
@@ -38,6 +39,7 @@ class WatchRunnerInputs:
     tool_filter: set[str]
     progress_step_pct_value: int | None
     progress_min_seconds_value: float | None
+    progress_heartbeat_seconds_value: float | None
     spool_dir_value: Path | None
     include_args_value: bool
     include_context_value: bool
@@ -62,6 +64,7 @@ def resolve_watch_runner_inputs(
     only_tools: str | None,
     progress_step_pct: int | None,
     progress_min_seconds: float | None,
+    progress_heartbeat_seconds: float | None,
     on_invalid_event: str,
     spool_dir: Path | None,
     include_args: bool | None,
@@ -114,6 +117,10 @@ def resolve_watch_runner_inputs(
     )
     progress_min_seconds_value = resolve_progress_min_seconds(
         progress_min_seconds=progress_min_seconds,
+        profile_data=profile_data,
+    )
+    progress_heartbeat_seconds_value = resolve_progress_heartbeat_seconds(
+        progress_heartbeat_seconds=progress_heartbeat_seconds,
         profile_data=profile_data,
     )
     spool_dir_value = resolve_optional_path_value(
@@ -174,6 +181,7 @@ def resolve_watch_runner_inputs(
         tool_filter=set(split_csv(only_tools_value)),
         progress_step_pct_value=progress_step_pct_value,
         progress_min_seconds_value=progress_min_seconds_value,
+        progress_heartbeat_seconds_value=progress_heartbeat_seconds_value,
         spool_dir_value=spool_dir_value,
         include_args_value=include_args_value,
         include_context_value=include_context_value,

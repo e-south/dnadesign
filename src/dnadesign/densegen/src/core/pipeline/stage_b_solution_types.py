@@ -77,6 +77,7 @@ class StageBProgressContext:
     tables_root: Path
     attempts_buffer: list[dict]
     solution_rows: list[dict] | None
+    composition_rows: list[dict] | None
     state_counts: dict[tuple[str, str], int] | None
     write_state: Callable[[], None] | None
     total_quota: int | None

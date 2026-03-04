@@ -174,3 +174,4 @@ def evaluate_tool_event(action: str, event: dict[str, Any], *, run_id: str, stat
 
 register_builtin_tool_event_packs(register_tool_event_pack)
 activate_tool_event_pack("densegen")
+activate_tool_event_pack("infer_evo2")

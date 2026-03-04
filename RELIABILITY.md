@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-19
+**Last verified:** 2026-03-02
 
 ## At a glance
 This document defines reliability intent for runtime behavior, CI behavior, and operator workflows.
@@ -19,10 +19,12 @@ It summarizes what must fail fast, what should be observable, and where recovery
 - Missing hard prerequisites are fatal and explicit (for example absent required files/tools/config).
 - Runtime and CI behavior should avoid hidden fallback paths.
 - Long-running workflows should surface machine-readable state transitions and terminal outcomes.
+- Repeated campaign orchestration state is workspace-scoped (`<workspace-root>/outputs/logs/ops/*`) to avoid root-level runbook/log fan-out.
 
 ## Operational signals
 - USR event logs (`.events.log`) are the primary integration signal stream for watcher workflows.
 - Cursor/spool state in notifier workflows must be explicit, restart-safe, and scoped to the intended workspace/run.
+- DenseGen running heartbeats default to a 30-minute cadence (`progress_heartbeat_seconds=1800`) unless explicitly configured otherwise.
 - Failures should include actionable context, not generic error wrappers.
 
 ## CI reliability lanes
@@ -34,6 +36,7 @@ It summarizes what must fail fast, what should be observable, and where recovery
 - SCC quickstart and batch guidance: `docs/bu-scc/quickstart.md`, `docs/bu-scc/batch-notify.md`
 - SCC status-first and queue-fair operator guidance: `docs/bu-scc/quickstart.md`, `docs/bu-scc/batch-notify.md`, `docs/bu-scc/agent-cheatsheet.md`
 - Repo BU SCC docs are the operational baseline; external agent skills are optional overlays, not required dependencies.
+- Cross-tool orchestration and single-study accumulation contracts: `docs/operations/orchestration-runbooks.md`
 - Notify operator runbook and event contracts: `docs/notify/README.md`, `docs/notify/usr-events.md`
 - Maintainer CI/test details: `docs/dev/README.md`
 

@@ -26,6 +26,7 @@ from .profile import (
     run_profile_doctor_impl,
     run_profile_init_impl,
     run_profile_show_impl,
+    run_profile_smoke_impl,
     run_profile_wizard_impl,
 )
 from .registry import register_notify_cli_bindings as _register_notify_cli_bindings
@@ -78,6 +79,7 @@ _profile_init_impl = partial(run_profile_init_impl, deps=_DEPS)
 _profile_wizard_impl = partial(run_profile_wizard_impl, deps=_DEPS)
 _profile_show_impl = partial(run_profile_show_impl, deps=_DEPS)
 _profile_doctor_impl = partial(run_profile_doctor_impl, deps=_DEPS)
+_profile_smoke_impl = partial(run_profile_smoke_impl, deps=_DEPS)
 _setup_slack_impl = partial(run_setup_slack_impl, deps=_DEPS)
 _setup_webhook_impl = partial(run_setup_webhook_impl, deps=_DEPS)
 _setup_resolve_events_impl = partial(run_setup_resolve_events_impl, deps=_DEPS)
@@ -107,6 +109,7 @@ def register_notify_cli_bindings(
         profile_wizard_handler=_profile_wizard_impl,
         profile_show_handler=_profile_show_impl,
         profile_doctor_handler=_profile_doctor_impl,
+        profile_smoke_handler=_profile_smoke_impl,
         setup_slack_handler=_setup_slack_impl,
         setup_webhook_handler=_setup_webhook_impl,
         setup_resolve_events_handler=_setup_resolve_events_impl,

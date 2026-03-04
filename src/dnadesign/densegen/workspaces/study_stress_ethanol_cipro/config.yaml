@@ -21,12 +21,12 @@ densegen:
       path: inputs/motif_artifacts/lexA__demo_merged_meme_oops_multitf__lexA_CTGTATAWAWWHACA.json
       sampling:
         strategy: stochastic
-        n_sites: 500
+        n_sites: 1000
         mining:
           batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 10000000
+            candidates: 1000000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -49,12 +49,12 @@ densegen:
       path: inputs/motif_artifacts/cpxR__demo_merged_meme_oops_multitf__cpxR_MANWWHTTTAM.json
       sampling:
         strategy: stochastic
-        n_sites: 500
+        n_sites: 1000
         mining:
           batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 10000000
+            candidates: 1000000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -77,12 +77,12 @@ densegen:
       path: inputs/motif_artifacts/baeR__demo_merged_meme_oops_multitf__baeR_TTTCTSCVHNA.json
       sampling:
         strategy: stochastic
-        n_sites: 500
+        n_sites: 1000
         mining:
           batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 10000000
+            candidates: 1000000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -103,12 +103,12 @@ densegen:
     - name: background
       type: background_pool
       sampling:
-        n_sites: 500
+        n_sites: 1000
         mining:
           batch_size: 20000
           budget:
             mode: fixed_candidates
-            candidates: 10000000
+            candidates: 1000000
         length:
           policy: range
           range: [16, 20]
@@ -136,11 +136,11 @@ densegen:
     parquet:
       path: outputs/tables/records.parquet
       deduplicate: true
-      chunk_size: 128
+      chunk_size: 8192
     usr:
       root: outputs/usr_datasets
       dataset: densegen/study_stress_ethanol_cipro
-      chunk_size: 128
+      chunk_size: 8192
       health_event_interval_seconds: 60
 
   generation:
@@ -158,8 +158,27 @@ densegen:
       relax_on_exhaustion: false
 
     plan:
+      - name: background_only
+        sequences: 250000
+        expanded_name_template: "{base}__sig35={up}"
+        sampling:
+          include_inputs: [background]
+        fixed_elements:
+          fixed_element_matrix:
+            name: sigma70_core
+            upstream_from_set: sigma70_upstream_35
+            upstream_variant_ids: [f, b, e, d, c]
+            downstream_from_set: sigma70_downstream_10
+            downstream_variant_ids: [consensus]
+            pairing:
+              mode: cross_product
+            spacer_length: [16, 20]
+            upstream_pos: [0, 60]
+        regulator_constraints:
+          min_total_sites: 3
+          groups: []
       - name: ethanol
-        sequences: 300000
+        sequences: 250000
         expanded_name_template: "{base}__sig35={up}"
         sampling:
           include_inputs: [cpxR_pwm, baeR_pwm, background]
@@ -175,6 +194,7 @@ densegen:
             spacer_length: [16, 20]
             upstream_pos: [0, 60]
         regulator_constraints:
+          min_total_sites: 3
           groups:
             - name: ethanol_response
               members:
@@ -182,7 +202,7 @@ densegen:
                 - baeR_TTTCTSCVHNA
               min_required: 1
       - name: ciprofloxacin
-        sequences: 300000
+        sequences: 250000
         expanded_name_template: "{base}__sig35={up}"
         sampling:
           include_inputs: [lexA_pwm, background]
@@ -198,13 +218,14 @@ densegen:
             spacer_length: [16, 18]
             upstream_pos: [0, 60]
         regulator_constraints:
+          min_total_sites: 3
           groups:
             - name: ciprofloxacin_response
               members:
                 - lexA_CTGTATAWAWWHACA
               min_required: 1
       - name: ethanol_ciprofloxacin
-        sequences: 400000
+        sequences: 250000
         expanded_name_template: "{base}__sig35={up}"
         sampling:
           include_inputs: [lexA_pwm, cpxR_pwm, baeR_pwm, background]
@@ -220,6 +241,7 @@ densegen:
             spacer_length: [16, 20]
             upstream_pos: [0, 60]
         regulator_constraints:
+          min_total_sites: 3
           groups:
             - name: ethanol_response
               members:
@@ -247,17 +269,20 @@ densegen:
   solver:
     backend: GUROBI
     strategy: iterate
-    solver_attempt_timeout_seconds: 10
+    solver_attempt_timeout_seconds: 5
+    threads: 16
 
   runtime:
     round_robin: true
-    max_accepted_per_library: 2
+    max_accepted_per_library: 512
     min_count_per_tf: 0
     max_duplicate_solutions: 3
     no_progress_seconds_before_resample: 10
     max_consecutive_no_progress_resamples: 25
     max_failed_solutions: 100000
     max_failed_solutions_per_target: 2.0
+    leaderboard_every: 250
+    checkpoint_every: 2000
     random_seed: 42
 
   postprocess:

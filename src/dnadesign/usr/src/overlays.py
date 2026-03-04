@@ -23,6 +23,12 @@ OVERLAY_META_KEY = "usr:overlay_key"
 OVERLAY_META_CREATED = "usr:overlay_created_at"
 OVERLAY_META_REGISTRY_HASH = "usr:registry_hash"
 OVERLAY_PART_PREFIX = "part-"
+_OVERLAY_HEAD_CACHE: dict[str, tuple[int, int, dict[str, Optional[str]], pa.Schema]] = {}
+_OVERLAY_HEAD_CACHE_MAX = 20_000
+_OVERLAY_PARTS_CACHE: dict[str, tuple[int, int, tuple[str, ...]]] = {}
+_OVERLAY_PARTS_CACHE_MAX = 20_000
+_OVERLAY_LIST_CACHE: dict[str, tuple[tuple[tuple[str, bool, int, int], ...], tuple[str, ...]]] = {}
+_OVERLAY_LIST_CACHE_MAX = 4_000
 
 
 def derived_dir(dataset_dir: Path) -> Path:
@@ -41,22 +47,56 @@ def list_overlays(dataset_dir: Path) -> List[Path]:
     d = derived_dir(dataset_dir)
     if not d.exists():
         return []
-    overlays: List[Path] = []
+    if not d.is_dir():
+        return []
+
+    entry_signatures: list[tuple[str, bool, int, int]] = []
     for entry in d.iterdir():
-        if entry.is_file() and entry.suffix == ".parquet":
+        try:
+            stat = entry.stat()
+        except FileNotFoundError:
+            continue
+        entry_signatures.append((entry.name, entry.is_dir(), int(stat.st_mtime_ns), int(stat.st_size)))
+    signature = tuple(sorted(entry_signatures, key=lambda item: item[0]))
+
+    cache_key = str(d.absolute())
+    cached = _OVERLAY_LIST_CACHE.get(cache_key)
+    if cached is not None and cached[0] == signature:
+        return [Path(path) for path in cached[1]]
+
+    overlays: List[Path] = []
+    for name, is_dir, _mtime_ns, _size in signature:
+        entry = d / name
+        if not is_dir and entry.suffix == ".parquet":
             overlays.append(entry)
             continue
-        if entry.is_dir():
-            parts = sorted(entry.glob(f"{OVERLAY_PART_PREFIX}*.parquet"))
-            if parts:
-                overlays.append(entry)
-    return sorted(overlays, key=lambda p: p.name)
+        if is_dir and overlay_parts(entry):
+            overlays.append(entry)
+    overlays_sorted = sorted(overlays, key=lambda p: p.name)
+
+    _OVERLAY_LIST_CACHE[cache_key] = (signature, tuple(str(path) for path in overlays_sorted))
+    if len(_OVERLAY_LIST_CACHE) > _OVERLAY_LIST_CACHE_MAX:
+        _OVERLAY_LIST_CACHE.clear()
+    return overlays_sorted
 
 
 def overlay_parts(path: Path) -> List[Path]:
     p = Path(path)
     if p.is_dir():
-        return sorted(p.glob(f"{OVERLAY_PART_PREFIX}*.parquet"))
+        try:
+            stat = p.stat()
+        except FileNotFoundError:
+            return []
+        cache_key = str(p.absolute())
+        stat_key = (int(stat.st_mtime_ns), int(stat.st_size))
+        cached = _OVERLAY_PARTS_CACHE.get(cache_key)
+        if cached is not None and cached[0] == stat_key[0] and cached[1] == stat_key[1]:
+            return [Path(part_path) for part_path in cached[2]]
+        parts = tuple(str(part) for part in sorted(p.glob(f"{OVERLAY_PART_PREFIX}*.parquet")))
+        _OVERLAY_PARTS_CACHE[cache_key] = (stat_key[0], stat_key[1], parts)
+        if len(_OVERLAY_PARTS_CACHE) > _OVERLAY_PARTS_CACHE_MAX:
+            _OVERLAY_PARTS_CACHE.clear()
+        return [Path(part_path) for part_path in parts]
     if p.is_file():
         return [p]
     return []
@@ -71,26 +111,46 @@ def _meta_get(md: Optional[Dict[bytes, bytes]], key: str) -> Optional[str]:
     return raw.decode("utf-8")
 
 
-def overlay_metadata(path: Path) -> Dict[str, Optional[str]]:
+def _overlay_head(path: Path) -> tuple[dict[str, Optional[str]], pa.Schema]:
     parts = overlay_parts(path)
     if not parts:
         raise FileNotFoundError(f"Overlay has no parquet parts: {path}")
-    pf = pq.ParquetFile(str(parts[0]))
-    md = pf.schema_arrow.metadata
-    return {
+    part = Path(parts[0]).absolute()
+    try:
+        stat = part.stat()
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"Overlay has no parquet parts: {path}") from exc
+
+    cache_key = str(part)
+    cached = _OVERLAY_HEAD_CACHE.get(cache_key)
+    if cached is not None:
+        cached_mtime_ns, cached_size, cached_meta, cached_schema = cached
+        if cached_mtime_ns == int(stat.st_mtime_ns) and cached_size == int(stat.st_size):
+            return dict(cached_meta), cached_schema
+
+    pf = pq.ParquetFile(str(part))
+    schema = pf.schema_arrow
+    md = schema.metadata
+    meta = {
         "namespace": _meta_get(md, OVERLAY_META_NAMESPACE),
         "key": _meta_get(md, OVERLAY_META_KEY),
         "created_at": _meta_get(md, OVERLAY_META_CREATED),
         "registry_hash": _meta_get(md, OVERLAY_META_REGISTRY_HASH),
     }
+    _OVERLAY_HEAD_CACHE[cache_key] = (int(stat.st_mtime_ns), int(stat.st_size), dict(meta), schema)
+    if len(_OVERLAY_HEAD_CACHE) > _OVERLAY_HEAD_CACHE_MAX:
+        _OVERLAY_HEAD_CACHE.clear()
+    return meta, schema
+
+
+def overlay_metadata(path: Path) -> Dict[str, Optional[str]]:
+    meta, _ = _overlay_head(path)
+    return meta
 
 
 def overlay_schema(path: Path) -> pa.Schema:
-    parts = overlay_parts(path)
-    if not parts:
-        raise FileNotFoundError(f"Overlay has no parquet parts: {path}")
-    pf = pq.ParquetFile(str(parts[0]))
-    return pf.schema_arrow
+    _, schema = _overlay_head(path)
+    return schema
 
 
 def with_overlay_metadata(

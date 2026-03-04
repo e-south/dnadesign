@@ -10,7 +10,7 @@ Tool-local docs live here. Cross-tool workflows stay in top-level `docs/`.
 - Tool-local (`src/dnadesign/notify/docs/`): command/reference contracts and maintainer internals.
 - Top-level (`docs/notify/`): operator route map and shared workflow runbook.
 
-### Progressive disclosure route
+### Start here
 
 1. Choose one task under **Documentation by workflow** and run its first command.
 2. Confirm mode/schema rules in [command contracts](reference/command-contracts.md).
@@ -57,4 +57,4 @@ Tool-local docs live here. Cross-tool workflows stay in top-level `docs/`.
 - [Reference index](reference/README.md): strict command, schema, and boundary contracts.
 - [Maintainer internals](dev/architecture.md): architecture map for package extension work.
 - [Package entrypoint](../README.md): lightweight tool README for repo-level routing.
-- [Repository docs index](../../../../docs/README.md): cross-tool workflow lanes.
+- [Repository docs index](../../../../docs/README.md): cross-tool workflow routes.

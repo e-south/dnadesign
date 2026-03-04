@@ -16,7 +16,7 @@ from typing import Callable
 
 from ...utils.sequence_utils import gc_fraction
 from ..metadata import build_metadata
-from .attempts import _flush_attempts, _flush_solutions
+from .attempts import _flush_attempts, _flush_composition, _flush_solutions
 from .solution_outputs import record_solution_outputs
 from .stage_b_solution_types import StageBProgressContext, StageBSolutionOutputContext
 from .usage_tracking import _update_usage_summary
@@ -288,6 +288,9 @@ def record_accepted_solution_progress(
         _flush_attempts(context.tables_root, context.attempts_buffer)
         if context.solution_rows is not None:
             _flush_solutions(context.tables_root, context.solution_rows)
+        composition_rows = getattr(context, "composition_rows", None)
+        if composition_rows is not None:
+            _flush_composition(context.tables_root, composition_rows)
         if context.state_counts is not None:
             context.state_counts[(context.source_label, context.plan_name)] = int(global_generated)
             if context.write_state is not None:

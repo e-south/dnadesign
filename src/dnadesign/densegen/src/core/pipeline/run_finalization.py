@@ -70,6 +70,7 @@ def finalize_run_outputs(
     tables_root = run_tables_root(run_root)
     _consolidate_parts(tables_root, part_glob="attempts_part-*.parquet", final_name="attempts.parquet")
     _consolidate_parts(tables_root, part_glob="solutions_part-*.parquet", final_name="solutions.parquet")
+    _consolidate_parts(tables_root, part_glob="composition_part-*.parquet", final_name="composition.parquet")
 
     pool_manifest_hash = None
     pool_manifest_path = outputs_root / "pools" / "pool_manifest.json"

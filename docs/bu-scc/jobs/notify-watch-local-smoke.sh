@@ -97,11 +97,13 @@ EVENTS_PATH="$WORKDIR/usr/demo/.events.log"
 CAPTURE_DIR="$WORKDIR/captures"
 CAPTURE_PATH="$CAPTURE_DIR/requests.jsonl"
 PORT_PATH="$CAPTURE_DIR/server.port"
+SECRETS_DIR="$WORKDIR/secrets"
+WEBHOOK_FILE_PATH="$SECRETS_DIR/notify.webhook"
 PROFILE_PATH="$WORKDIR/outputs/notify/densegen/profile.json"
 CURSOR_PATH="$WORKDIR/outputs/notify/densegen/cursor"
 SPOOL_DIR="$WORKDIR/outputs/notify/densegen/spool"
 
-mkdir -p "$(dirname "$EVENTS_PATH")" "$CAPTURE_DIR" "$(dirname "$PROFILE_PATH")"
+mkdir -p "$(dirname "$EVENTS_PATH")" "$CAPTURE_DIR" "$SECRETS_DIR" "$(dirname "$PROFILE_PATH")"
 
 "$PYTHON_BIN" - "$EVENTS_PATH" <<'PY'
 import json
@@ -188,6 +190,7 @@ fi
 
 PORT="$(cat "$PORT_PATH")"
 export NOTIFY_WEBHOOK="http://127.0.0.1:${PORT}/webhook"
+printf '%s\n' "$NOTIFY_WEBHOOK" > "$WEBHOOK_FILE_PATH"
 
 QSUB_SCRIPT="$REPO_ROOT/docs/bu-scc/jobs/notify-watch.qsub"
 if [[ ! -x "$QSUB_SCRIPT" ]]; then
@@ -211,6 +214,7 @@ if [[ "$MODE" == "profile" ]]; then
   (
     cd "$REPO_ROOT"
     NOTIFY_PROFILE="$PROFILE_PATH" \
+    WEBHOOK_FILE="$WEBHOOK_FILE_PATH" \
     NOTIFY_IDLE_TIMEOUT_SECONDS="$IDLE_TIMEOUT_SECONDS" \
     NOTIFY_POLL_INTERVAL_SECONDS="$POLL_INTERVAL_SECONDS" \
     bash "$QSUB_SCRIPT"
@@ -225,6 +229,7 @@ else
     NOTIFY_POLICY="densegen" \
     NOTIFY_NAMESPACE="densegen" \
     WEBHOOK_ENV="NOTIFY_WEBHOOK" \
+    WEBHOOK_FILE="$WEBHOOK_FILE_PATH" \
     NOTIFY_IDLE_TIMEOUT_SECONDS="$IDLE_TIMEOUT_SECONDS" \
     NOTIFY_POLL_INTERVAL_SECONDS="$POLL_INTERVAL_SECONDS" \
     bash "$QSUB_SCRIPT"

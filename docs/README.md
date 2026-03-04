@@ -8,13 +8,13 @@ This is the central documentation map for workflows, tool references, and reposi
 ### Use this index
 
 1. If this is a new machine, start with [Installation](installation.md) first.
-2. Continue to [Workflow lanes](#workflow-lanes) to choose a preflight -> run -> verify path by outcome.
-3. Follow the lane's "Verify next" target before moving to downstream tools.
+2. Continue to [Workflow routes](#workflow-routes) to choose a preflight -> run -> verify path by outcome.
+3. Follow the route's "Verify next" target before moving to downstream tools.
 4. Use [Tool docs](#tool-docs) when you need package-level commands and data contracts.
 5. Use [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for policy, operations, and governance detail.
 6. Return to this page as the central docs map.
 
-### Workflow lanes
+### Workflow routes
 
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
@@ -26,6 +26,7 @@ This is the central documentation map for workflows, tool references, and reposi
 | Run cross-machine sync with stricter failure checks | [USR sync command contract](../src/dnadesign/usr/docs/operations/sync.md) | Verify sidecar and overlay fidelity with [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync-fidelity-drills.md). |
 | Chain DenseGen -> USR -> Infer -> USR updates | [Chained workflow demo](../src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md) | Verify downstream dataset state with [Infer docs](../src/dnadesign/infer/README.md). |
 | Run BU SCC batch jobs with notifications | [BU SCC batch + notify runbook](bu-scc/batch-notify.md) | Verify event delivery contract in [Notify USR events contract](notify/usr-events.md). |
+| Plan and execute deterministic HPC runbooks | [Ops operations index](operations/README.md) | Verify command ordering and outcomes in [orchestration audit contract](operations/orchestration-runbooks.md#contract-rules). |
 
 ### Tool docs
 
@@ -41,6 +42,7 @@ This is the central documentation map for workflows, tool references, and reposi
 | `latdna` | n/a | [latdna README](../src/dnadesign/latdna/README.md) |
 | `libshuffle` | n/a | [libshuffle README](../src/dnadesign/libshuffle/README.md) |
 | `nmf` | n/a | [nmf README](../src/dnadesign/nmf/README.md) |
+| `ops` | `uv run ops --help` | [ops README](../src/dnadesign/ops/README.md) |
 | `notify` | `uv run notify --help` | [notify README](../src/dnadesign/notify/README.md) |
 | `opal` | `uv run opal --help` | [opal README](../src/dnadesign/opal/README.md) |
 | `permuter` | `uv run permuter --help` | [permuter README](../src/dnadesign/permuter/README.md) |
@@ -55,14 +57,15 @@ This is the central documentation map for workflows, tool references, and reposi
 - [Security](../SECURITY.md): secrets, dependency, and supply-chain handling policy.
 - [Plans](../PLANS.md): proposal, execution-plan, and decision lifecycle.
 - [Quality score](../QUALITY_SCORE.md): quality rubric and improvement framework.
+- Cross-tool information architecture contract lives in [Architecture](../ARCHITECTURE.md#cross-tool-information-architecture), [Design](../DESIGN.md#information-architecture-invariants), and [Ops orchestration runbook contracts](operations/orchestration-runbooks.md#single-study-accumulation-contract).
 
 ### Operations
 
 - [Installation](installation.md): environment setup and verification baseline.
-- [BU SCC docs index](bu-scc/README.md): cluster setup, submission, and operations runbooks.
-- [Notify docs index](notify/README.md): notifier setup, runtime behavior, and operator guidance.
-- [Notify USR event contract](notify/usr-events.md): USR `.events.log` consumption contract for downstream notifications.
-- [Notify package docs index](../src/dnadesign/notify/docs/README.md): package-local references and maintainer internals.
+- [Ops operations index](operations/README.md): task-first runbook planning and execution routes.
+- [BU SCC docs index](bu-scc/README.md): cluster setup, submission, and operator runbooks.
+- [Notify docs index](notify/README.md): notifier setup, runtime behavior, and recovery routes.
+- [USR operations index](../src/dnadesign/usr/docs/operations/README.md): sync and transfer runbooks for iterative workspace updates.
 
 ### Maintainer references
 

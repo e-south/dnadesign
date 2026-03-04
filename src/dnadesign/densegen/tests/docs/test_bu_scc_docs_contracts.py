@@ -69,6 +69,13 @@ def test_bu_scc_docs_use_current_densegen_runtime_field_names() -> None:
     assert "densegen.runtime.max_seconds_per_plan" not in docs_bundle
 
 
+def test_densegen_analysis_qsub_is_plot_only_without_notebook_generation() -> None:
+    qsub_script = _read(BU_SCC_DOCS / "jobs" / "densegen-analysis.qsub")
+    assert 'uv run dense plot -c "$DENSEGEN_CONFIG"' in qsub_script
+    assert "dense notebook generate" not in qsub_script
+    assert "DENSEGEN_NOTEBOOK_FORCE" not in qsub_script
+
+
 def test_status_first_queue_fair_guidance_present_in_bu_scc_docs_bundle() -> None:
     quickstart = _read(BU_SCC_DOCS / "quickstart.md")
     batch_notify = _read(BU_SCC_DOCS / "batch-notify.md")

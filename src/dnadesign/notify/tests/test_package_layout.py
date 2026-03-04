@@ -56,6 +56,7 @@ def test_notify_non_cli_packages_importable() -> None:
     assert importlib.import_module("dnadesign.notify.tool_events.densegen_metrics")
     assert importlib.import_module("dnadesign.notify.tool_events.densegen_messages")
     assert importlib.import_module("dnadesign.notify.tool_events.densegen_eval")
+    assert importlib.import_module("dnadesign.notify.tool_events.infer_evo2")
     assert importlib.import_module("dnadesign.notify.tool_events.packs_builtin")
     assert importlib.import_module("dnadesign.notify.tool_events.types")
 

@@ -272,6 +272,8 @@ def reject_solution_requirement_failure(
         updated_failed_required_regulators += 1
     elif rejection_reason == "min_count_by_regulator":
         updated_failed_min_count_by_regulator += 1
+    elif rejection_reason == "min_total_sites":
+        pass
     else:
         raise RuntimeError(f"Unsupported requirement rejection reason: {rejection_reason}")
 

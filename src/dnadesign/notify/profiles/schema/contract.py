@@ -29,6 +29,7 @@ PROFILE_ALLOWED_KEYS = {
     "only_tools",
     "progress_step_pct",
     "progress_min_seconds",
+    "progress_heartbeat_seconds",
     "spool_dir",
     "include_args",
     "include_context",

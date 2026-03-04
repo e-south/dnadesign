@@ -102,4 +102,10 @@ def read_profile(profile_path: Path) -> dict[str, Any]:
             raise NotifyConfigError("profile field 'progress_min_seconds' must be numeric when provided")
         if float(progress_min_seconds) <= 0.0:
             raise NotifyConfigError("profile field 'progress_min_seconds' must be > 0 when provided")
+    progress_heartbeat_seconds = data.get("progress_heartbeat_seconds")
+    if progress_heartbeat_seconds is not None:
+        if not isinstance(progress_heartbeat_seconds, (int, float)):
+            raise NotifyConfigError("profile field 'progress_heartbeat_seconds' must be numeric when provided")
+        if float(progress_heartbeat_seconds) <= 0.0:
+            raise NotifyConfigError("profile field 'progress_heartbeat_seconds' must be > 0 when provided")
     return data

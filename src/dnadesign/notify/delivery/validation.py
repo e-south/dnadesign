@@ -15,6 +15,8 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
+from dnadesign._contracts.tls_ca_bundle import resolve_tls_ca_bundle_path
+
 from ..errors import NotifyConfigError
 from .secrets import resolve_secret_ref
 
@@ -56,22 +58,31 @@ def resolve_tls_ca_bundle(*, webhook_url: str, tls_ca_bundle: Path | None) -> Pa
             raise NotifyConfigError(f"CA bundle path is not a file: {resolved_http}")
         return resolved_http
 
-    candidate = tls_ca_bundle
-    if candidate is None:
-        env_value = os.environ.get("SSL_CERT_FILE", "").strip()
-        if env_value:
-            candidate = Path(env_value)
-    if candidate is None:
-        raise NotifyConfigError(
-            "HTTPS webhook delivery requires an explicit CA bundle. Pass --tls-ca-bundle or set SSL_CERT_FILE."
+    try:
+        return resolve_tls_ca_bundle_path(
+            explicit_path=tls_ca_bundle,
+            env_var_name="SSL_CERT_FILE",
+            allow_system_candidates=False,
+            not_configured_error=(
+                "HTTPS webhook delivery requires an explicit CA bundle. Pass --tls-ca-bundle or set SSL_CERT_FILE."
+            ),
+            source_label="CA bundle file",
         )
-
-    resolved = candidate.expanduser().resolve()
-    if not resolved.exists():
-        raise NotifyConfigError(f"CA bundle file not found: {resolved}")
-    if not resolved.is_file():
-        raise NotifyConfigError(f"CA bundle path is not a file: {resolved}")
-    return resolved
+    except ValueError as exc:
+        text = str(exc)
+        if text.startswith("CA bundle file does not exist or is not a file: "):
+            resolved = text.split(": ", maxsplit=1)[1]
+            raise NotifyConfigError(f"CA bundle file not found: {resolved}") from exc
+        if text.startswith("CA bundle file from SSL_CERT_FILE does not exist or is not a file: "):
+            resolved = text.split(": ", maxsplit=1)[1]
+            raise NotifyConfigError(f"CA bundle file not found: {resolved}") from exc
+        if text.startswith("CA bundle file from SSL_CERT_FILE is not readable: "):
+            resolved = text.split(": ", maxsplit=1)[1]
+            raise NotifyConfigError(f"CA bundle file is not readable: {resolved}") from exc
+        if text.startswith("CA bundle file is not readable: "):
+            resolved = text.split(": ", maxsplit=1)[1]
+            raise NotifyConfigError(f"CA bundle file is not readable: {resolved}") from exc
+        raise NotifyConfigError(text) from exc
 
 
 def validate_provider_webhook_url(*, provider: str, webhook_url: str) -> None:

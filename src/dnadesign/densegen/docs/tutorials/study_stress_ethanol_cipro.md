@@ -58,6 +58,7 @@ densegen:                                    # DenseGen runtime settings root.
   solver:                                    # Dense-array solver settings.
     backend: GUROBI                          # Solver backend; common backends include GUROBI and CBC.
     strategy: iterate                        # Solver strategy; iterate performs repeated bounded passes.
+    threads: 16                              # Keep aligned with BU SCC `-pe omp` slots.
   runtime:                                   # Runtime stop and retry settings.
     max_failed_solutions_per_target: 2.0     # Failed-solve budget scaled by target count.
 ```
@@ -67,20 +68,20 @@ densegen:                                    # DenseGen runtime settings root.
 inputs:                                      # Input definitions used by Stage-A and filters.
   - name: lexA_pwm                           # Input name referenced by plans and filters.
     sampling:                                # Sampling controls for this input.
-      n_sites: 500                           # Number of retained Stage-A sites for this input.
+      n_sites: 1000                          # Number of retained Stage-A sites for this input.
       mining:                                # Candidate-mining controls before retention.
         batch_size: 5000                     # Candidates evaluated per mining batch.
         budget:                              # Budget policy for Stage-A mining.
           mode: fixed_candidates             # Budget mode; fixed_candidates uses a hard candidate cap.
-          candidates: 10000000               # Total candidate budget for this input.
+          candidates: 1000000                # Total candidate budget for this input.
   - name: background                         # Input name referenced by plans and filters.
     sampling:                                # Sampling controls for this input.
-      n_sites: 500                           # Number of retained Stage-A sites for this input.
+      n_sites: 1000                          # Number of retained Stage-A sites for this input.
       mining:                                # Candidate-mining controls before retention.
         batch_size: 20000                    # Candidates evaluated per mining batch.
         budget:                              # Budget policy for Stage-A mining.
           mode: fixed_candidates             # Budget mode; fixed_candidates uses a hard candidate cap.
-          candidates: 10000000               # Total candidate budget for this input.
+          candidates: 1000000                # Total candidate budget for this input.
 ```
 
 ### Step-by-step commands
@@ -124,9 +125,9 @@ qstat -u "$USER"
 # Summarize running, queued, and Eqw jobs for submit gating.
 qstat -u "$USER" | awk '$1 ~ /^[0-9]+$/ { running += ($5 ~ /r/); queued += ($5 ~ /q/); eqw += ($5 ~ /Eqw/) } END { printf "running_jobs=%d queued_jobs=%d eqw_jobs=%d\n", running, queued, eqw }'
 # Submit generation-only DenseGen batch against this workspace config.
-qsub -P <project> -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --no-plot' docs/bu-scc/jobs/densegen-cpu.qsub
+qsub -P <project> -pe omp 16 -l h_rt=08:00:00 -l mem_per_core=8G -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --no-plot' docs/bu-scc/jobs/densegen-cpu.qsub
 # Submit a quota-extension pass when additional rows are required.
-qsub -P <project> -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --extend-quota 50000 --no-plot' docs/bu-scc/jobs/densegen-cpu.qsub
+qsub -P <project> -pe omp 16 -l h_rt=08:00:00 -l mem_per_core=8G -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --extend-quota 50000 --no-plot' docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
 Queue-fair policy for SCC: if `running_jobs > 3`, avoid burst submits, prefer arrays or `-hold_jid` chains, and do not skip the line.

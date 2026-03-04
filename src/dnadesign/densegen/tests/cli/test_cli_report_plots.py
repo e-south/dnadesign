@@ -238,6 +238,54 @@ def test_notebook_generate_uses_repo_relative_defaults_for_export_path_boxes(tmp
     assert "repo_root=repo_root," in content
 
 
+def test_notebook_generate_includes_slider_and_numeric_jump_for_record_navigation(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    assert "record_index_slider = mo.ui.slider(" in content
+    assert 'label="Record"' in content
+    assert "record_index_jump = mo.ui.number(" in content
+    assert 'label="Jump to"' in content
+    assert "_slider_row = mo.hstack(" in content
+    assert "[record_index_slider]," in content
+    assert "_nav_row = mo.hstack(" in content
+
+
+def test_notebook_generate_keeps_navigation_state_out_of_preview_loading_cell(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    assert (
+        "def _(\n"
+        "    build_records_preview_table,\n"
+        "    df_window,\n"
+        "    has_plan_column,\n"
+        "    record_id_column,\n"
+        "    record_plan_filter,\n"
+        "    require,\n"
+        "):"
+    ) in content
+    assert "def _(get_active_record_index, record_count, set_active_record_index):" in content
+    assert "active_record_index_default = max(0, min(record_count - 1, _raw_active_index))" in content
+    assert (
+        "def _(\n    active_record_index_default,\n    mo,\n    record_count,\n    set_active_record_index,\n):"
+    ) in content
+
+
 def test_notebook_generate_handles_empty_plot_filter_intersection_without_error(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.yaml"
     write_minimal_config(cfg_path)

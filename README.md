@@ -8,12 +8,9 @@
 
 ## Documentation
 
-- [Docs index](docs/README.md): choose a workflow lane, then follow its verify step.
+- [Docs index](docs/README.md): central route map for workflow and tool documentation.
 - [Installation](docs/installation.md): bootstrap the environment and run baseline verification commands.
-- [Workflow lanes](docs/README.md#workflow-lanes): task-first routes for DenseGen, Infer, Notify, USR sync, and BU SCC operations.
-- [Notify operations](docs/notify/README.md): route map for watcher setup, webhook delivery, and recovery.
-- [Notify package docs index](src/dnadesign/notify/docs/README.md): Notify workflow/reference/internal maps by task and document type.
-- [Architecture](ARCHITECTURE.md), [Design](DESIGN.md), [Reliability](RELIABILITY.md), [Security](SECURITY.md), [Plans](PLANS.md), [Quality score](QUALITY_SCORE.md): repository-level contracts, policies, and governance records.
+- [Architecture](ARCHITECTURE.md), [Design](DESIGN.md), [Reliability](RELIABILITY.md), [Security](SECURITY.md), [Plans](PLANS.md), [Quality score](QUALITY_SCORE.md): repository-level contracts and governance records.
 - [Developer docs](docs/dev/README.md): CI contracts, maintenance runbooks, and execution-planning references.
 
 ---
@@ -23,6 +20,7 @@
 | Tool | Description | Coverage |
 | --- | --- | --- |
 | [**usr**](src/dnadesign/usr/README.md) | Universal Sequence Record utilities for inspecting datasets and Parquet files. | [![usr coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=usr)](https://codecov.io/gh/e-south/dnadesign?component=usr) |
+| [**ops**](src/dnadesign/ops/README.md) | Runbook-driven orchestration for deterministic batch workflows across tools. | [![ops coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=ops)](https://codecov.io/gh/e-south/dnadesign?component=ops) |
 | [**notify**](src/dnadesign/notify/README.md) | Tool-agnostic webhook notifier for batch runs (Slack, Discord, generic webhooks). | [![notify coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=notify)](https://codecov.io/gh/e-south/dnadesign?component=notify) |
 | [**densegen**](src/dnadesign/densegen/README.md) | DNA sequence design pipeline built on the [`dense-arrays`](https://github.com/e-south/dense-arrays) framework. | [![densegen coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=densegen)](https://codecov.io/gh/e-south/dnadesign?component=densegen) |
 | [**infer**](src/dnadesign/infer/README.md) | Model-agnostic wrapper for DNA/protein language models such as [Evo2](https://github.com/ArcInstitute/evo2/tree/main). | [![infer coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=infer)](https://codecov.io/gh/e-south/dnadesign?component=infer) |

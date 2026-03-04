@@ -47,6 +47,28 @@ def test_find_undeclared_cross_tool_imports_reports_undeclared_edge(tmp_path: Pa
     assert violations[0].imported_tool == "bar"
 
 
+def test_find_undeclared_cross_tool_imports_reports_clean_absolute_import_target(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "foo" / "api.py", "from dnadesign.bar.api import run\n")
+    _write(tmp_path / "src" / "dnadesign" / "bar" / "api.py", "def run():\n    return 1\n")
+
+    violations = find_undeclared_cross_tool_imports(
+        repo_root=tmp_path,
+        allowed_edges=set(),
+    )
+
+    assert len(violations) == 1
+    assert violations[0].import_target == "dnadesign.bar.api"
+
+
+def test_find_undeclared_cross_tool_imports_allows_ops_to_usr_default_edge(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "ops" / "gates.py", "from dnadesign.usr import Dataset\n")
+    _write(tmp_path / "src" / "dnadesign" / "usr" / "__init__.py", "class Dataset:\n    pass\n")
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
 def test_find_undeclared_cross_tool_imports_reports_relative_cross_tool_edge(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "foo" / "subpkg" / "api.py", "from ...bar.api import run\n")
     _write(tmp_path / "src" / "dnadesign" / "bar" / "api.py", "def run():\n    return 1\n")

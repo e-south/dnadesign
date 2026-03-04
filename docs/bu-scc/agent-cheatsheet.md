@@ -15,8 +15,10 @@ Use this with:
 - Keep `densegen.solver.threads <= -pe omp <slots>`.
 - On shared nodes, prefer `-pe omp` sizes from BU guidance: `1-4`, `8`, `16`, `28`, or `36`.
 - DenseGen runs are CPU jobs (no GPU request).
+- DenseGen submit commands must pass `DENSEGEN_RUN_ARGS` with exactly one of `--fresh` or `--resume`.
 - Evo2 runs require GPU resources (`-l gpus=1 -l gpu_c=8.9`).
 - Notify watches USR `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
+- Prefer `WEBHOOK_FILE` for watcher submits so webhook values are not exposed in `qstat -j` env metadata.
 - Notify/USR contract requires structured events with `event_version`; legacy logs are rejected.
 - Use transfer-node queue (`-l download`) for large model/data transfers.
 - OnDemand policy: sessions requesting >12h and/or extra resources count toward the 5 active-session limit.
@@ -46,7 +48,7 @@ qsub -P <project> \
   -pe omp 16 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
+  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
@@ -70,6 +72,12 @@ qsub -P <project> \
 ```bash
 CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
 NOTIFY_DIR="<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/outputs/notify/densegen"
+WEBHOOK_FILE="$HOME/.config/dnadesign/notify_webhook.secret"
+
+mkdir -p "$(dirname "$WEBHOOK_FILE")"
+uv run notify setup webhook \
+  --secret-source file \
+  --secret-ref "file://$WEBHOOK_FILE"
 
 # Preflight resolver: fails fast if config is not wired for USR .events.log output.
 uv run notify setup resolve-events --tool densegen --config "$CONFIG"
@@ -80,11 +88,13 @@ uv run notify setup slack \
   --profile "$NOTIFY_DIR/profile.json" \
   --cursor "$NOTIFY_DIR/cursor" \
   --spool-dir "$NOTIFY_DIR/spool" \
-  --secret-source auto \
+  --secret-source file \
+  --secret-ref "file://$WEBHOOK_FILE" \
+  --no-store-webhook \
   --policy densegen
 
 qsub -P <project> \
-  -v NOTIFY_PROFILE="$NOTIFY_DIR/profile.json" \
+  -v NOTIFY_PROFILE="$NOTIFY_DIR/profile.json",WEBHOOK_FILE="$WEBHOOK_FILE" \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
 

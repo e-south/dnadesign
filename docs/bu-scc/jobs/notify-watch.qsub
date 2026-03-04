@@ -16,6 +16,7 @@ NOTIFY_NAMESPACE="${NOTIFY_NAMESPACE:-}"
 CURSOR_PATH="${CURSOR_PATH:-}"
 SPOOL_DIR="${SPOOL_DIR:-}"
 WEBHOOK_ENV="${WEBHOOK_ENV:-NOTIFY_WEBHOOK}"
+WEBHOOK_FILE="${WEBHOOK_FILE:-}"
 NOTIFY_PROVIDER="${NOTIFY_PROVIDER:-slack}"
 NOTIFY_POLICY="${NOTIFY_POLICY:-}"
 NOTIFY_ACTIONS="${NOTIFY_ACTIONS:-}"
@@ -23,6 +24,136 @@ NOTIFY_TOOLS="${NOTIFY_TOOLS:-}"
 NOTIFY_IDLE_TIMEOUT_SECONDS="${NOTIFY_IDLE_TIMEOUT_SECONDS:-3600}"
 NOTIFY_POLL_INTERVAL_SECONDS="${NOTIFY_POLL_INTERVAL_SECONDS:-1.0}"
 NOTIFY_TLS_CA_BUNDLE="${NOTIFY_TLS_CA_BUNDLE:-${SSL_CERT_FILE:-}}"
+NOTIFY_ENFORCE_TERMINAL_ON_IDLE="${NOTIFY_ENFORCE_TERMINAL_ON_IDLE:-0}"
+
+resolve_webhook_env() {
+  if [[ ! "$WEBHOOK_ENV" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    echo "Invalid webhook environment variable name: $WEBHOOK_ENV" >&2
+    exit 2
+  fi
+
+  if [[ -z "$WEBHOOK_FILE" ]]; then
+    echo "Missing WEBHOOK_FILE." >&2
+    echo "Set WEBHOOK_FILE to a readable file before qsub." >&2
+    exit 2
+  fi
+  if [[ ! -r "$WEBHOOK_FILE" ]]; then
+    echo "Webhook file is not readable: $WEBHOOK_FILE" >&2
+    exit 2
+  fi
+  webhook_value="$(head -n 1 "$WEBHOOK_FILE" | tr -d '\r\n')"
+  if [[ -z "$webhook_value" ]]; then
+    echo "Webhook file is empty: $WEBHOOK_FILE" >&2
+    exit 2
+  fi
+  printf -v "$WEBHOOK_ENV" "%s" "$webhook_value"
+  export "$WEBHOOK_ENV"
+}
+
+profile_json_field() {
+  local profile_path="$1"
+  local field_name="$2"
+  sed -n "s/^[[:space:]]*\"${field_name}\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" "$profile_path" | head -n 1
+}
+
+resolve_profile_path_field() {
+  local profile_path="$1"
+  local field_name="$2"
+  local value
+  value="$(profile_json_field "$profile_path" "$field_name")"
+  if [[ -z "$value" ]]; then
+    return 0
+  fi
+  if [[ "$value" == /* ]]; then
+    printf '%s\n' "$value"
+    return 0
+  fi
+  printf '%s/%s\n' "$(dirname "$profile_path")" "$value"
+}
+
+cursor_offset_or_zero() {
+  local cursor_path="$1"
+  if [[ -n "$cursor_path" && -f "$cursor_path" ]]; then
+    tr -dc '0-9' < "$cursor_path"
+  else
+    echo "0"
+  fi
+}
+
+probe_terminal_status_since_offset() {
+  local events_path="$1"
+  local offset="$2"
+  if [[ ! -f "$events_path" ]]; then
+    return 1
+  fi
+  local probe_cursor
+  probe_cursor="$(mktemp)"
+  printf '%s' "$offset" > "$probe_cursor"
+  local probe_output
+  probe_output="$(
+    uv run notify usr-events watch \
+      --provider generic \
+      --events "$events_path" \
+      --cursor "$probe_cursor" \
+      --only-actions densegen_health \
+      --only-tools densegen \
+      --dry-run \
+      --no-advance-cursor-on-dry-run \
+      --stop-on-terminal-status 2>/dev/null || true
+  )"
+  rm -f "$probe_cursor"
+  if grep -Eq '"status":[[:space:]]*"(success|failure)"' <<<"$probe_output"; then
+    return 0
+  fi
+  return 1
+}
+
+emit_timeout_notification() {
+  local notify_tool_value="${NOTIFY_TOOL:-${NOTIFY_NAMESPACE:-densegen}}"
+  local notify_run_id="${USR_ACTOR_RUN_ID:-notify-watch-${JOB_ID:-manual}}"
+  local notify_message="Notify watcher idle-timeout reached before terminal densegen_health status (idle_timeout=${NOTIFY_IDLE_TIMEOUT_SECONDS}s)."
+  local -a SEND_ARGS=(
+    --status failure
+    --tool "$notify_tool_value"
+    --run-id "$notify_run_id"
+    --provider "$NOTIFY_PROVIDER"
+    --url-env "$WEBHOOK_ENV"
+    --message "$notify_message"
+  )
+  if [[ -n "$NOTIFY_TLS_CA_BUNDLE" ]]; then
+    SEND_ARGS+=(--tls-ca-bundle "$NOTIFY_TLS_CA_BUNDLE")
+  fi
+  uv run notify send "${SEND_ARGS[@]}"
+}
+
+enforce_terminal_on_idle_if_enabled() {
+  local events_path="$1"
+  local cursor_path="$2"
+  local pre_watch_offset="$3"
+  if [[ "$NOTIFY_ENFORCE_TERMINAL_ON_IDLE" != "1" ]]; then
+    return 0
+  fi
+  if [[ -z "$events_path" ]]; then
+    return 0
+  fi
+  local post_watch_offset
+  post_watch_offset="$(cursor_offset_or_zero "$cursor_path")"
+  if [[ "$post_watch_offset" == "$pre_watch_offset" ]]; then
+    local events_size
+    events_size="$(wc -c < "$events_path" | tr -d '[:space:]')"
+    if [[ -z "$events_size" ]]; then
+      return 0
+    fi
+    if (( events_size <= pre_watch_offset )); then
+      return 0
+    fi
+  fi
+  if probe_terminal_status_since_offset "$events_path" "$pre_watch_offset"; then
+    return 0
+  fi
+  emit_timeout_notification
+  return 3
+}
 
 if [[ -n "$NOTIFY_PROFILE" ]]; then
   if [[ ! -f "$NOTIFY_PROFILE" ]]; then
@@ -30,6 +161,8 @@ if [[ -n "$NOTIFY_PROFILE" ]]; then
     echo "Set NOTIFY_PROFILE to an existing profile JSON path." >&2
     exit 2
   fi
+
+  resolve_webhook_env
 
   PROFILE_WATCH_ARGS=(
     --profile "$NOTIFY_PROFILE"
@@ -42,8 +175,12 @@ if [[ -n "$NOTIFY_PROFILE" ]]; then
   if [[ -n "$NOTIFY_TLS_CA_BUNDLE" ]]; then
     PROFILE_WATCH_ARGS+=(--tls-ca-bundle "$NOTIFY_TLS_CA_BUNDLE")
   fi
+  PROFILE_EVENTS_PATH="$(resolve_profile_path_field "$NOTIFY_PROFILE" "events")"
+  PROFILE_CURSOR_PATH="$(resolve_profile_path_field "$NOTIFY_PROFILE" "cursor")"
+  PRE_WATCH_OFFSET="$(cursor_offset_or_zero "$PROFILE_CURSOR_PATH")"
   uv run notify usr-events watch "${PROFILE_WATCH_ARGS[@]}"
-  exit 0
+  enforce_terminal_on_idle_if_enabled "$PROFILE_EVENTS_PATH" "$PROFILE_CURSOR_PATH" "$PRE_WATCH_OFFSET"
+  exit $?
 fi
 
 if [[ -z "$EVENTS_PATH" ]]; then
@@ -68,11 +205,7 @@ if [[ -e "$EVENTS_PATH" && ! -f "$EVENTS_PATH" ]]; then
   exit 2
 fi
 
-if [[ -z "${!WEBHOOK_ENV:-}" ]]; then
-  echo "Webhook environment variable is not set: $WEBHOOK_ENV" >&2
-  echo "Export it before qsub (for example: export $WEBHOOK_ENV=https://hooks.slack.com/services/...)." >&2
-  exit 2
-fi
+resolve_webhook_env
 
 if [[ -z "$NOTIFY_POLICY" ]]; then
   echo "Missing NOTIFY_POLICY." >&2
@@ -142,4 +275,6 @@ if [[ -n "$NOTIFY_TLS_CA_BUNDLE" ]]; then
   WATCH_ARGS+=(--tls-ca-bundle "$NOTIFY_TLS_CA_BUNDLE")
 fi
 
+PRE_WATCH_OFFSET="$(cursor_offset_or_zero "$CURSOR_PATH")"
 uv run notify usr-events watch "${WATCH_ARGS[@]}"
+enforce_terminal_on_idle_if_enabled "$EVENTS_PATH" "$CURSOR_PATH" "$PRE_WATCH_OFFSET"

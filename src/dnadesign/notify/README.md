@@ -7,7 +7,7 @@ For cross-tool routing, start at the [repository docs index](../../../docs/READM
 
 ## Documentation map
 
-Read in this order for progressive disclosure:
+Read in this order:
 
 1. [Notify docs index](docs/README.md): comprehensive table of contents for Notify workflows, references, and maintainer internals.
 2. [Notify USR events runbook](../../../docs/notify/usr-events.md): day-to-day setup, watch, and recovery commands for operator workflows.
@@ -15,7 +15,7 @@ Read in this order for progressive disclosure:
 4. [Reference index](docs/reference/README.md): strict command, profile, and boundary contracts to confirm behavior before automation.
 5. [Maintainer architecture map](docs/dev/architecture.md): package module map and extension seams for command/runtime changes.
 6. [BU SCC batch + notify](../../../docs/bu-scc/batch-notify.md): scheduler-oriented execution path for cluster submission and verification.
-7. [Repository docs index](../../../docs/README.md): cross-tool workflow lanes that connect DenseGen, USR, Infer, and Notify.
+7. [Repository docs index](../../../docs/README.md): cross-tool workflow routes that connect DenseGen, USR, Infer, and Notify.
 
 ## Entrypoint contract
 

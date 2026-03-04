@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pandas as pd
 import pytest
 
 from dnadesign.densegen.src.core.pipeline import run_finalization as run_finalization_module
@@ -66,3 +67,54 @@ def test_finalize_run_outputs_raises_on_invalid_existing_composition_parquet(
             library_member_rows=[],
             composition_rows=[{"solution_id": "sol-1", "placement_index": 0, "tf": "TF1", "tfbs": "AAAA"}],
         )
+
+
+def test_finalize_run_outputs_consolidates_composition_parts_when_buffer_empty(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = tmp_path
+    tables_root = run_root / "outputs" / "tables"
+    tables_root.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "solution_id": ["sol-1"],
+            "input_name": ["demo_input"],
+            "plan_name": ["demo_plan"],
+            "placement_index": [0],
+            "regulator": ["TF1"],
+            "sequence": ["AAAA"],
+        }
+    ).to_parquet(tables_root / "composition_part-unit.parquet", index=False)
+
+    monkeypatch.setattr(run_finalization_module, "write_library_artifacts", lambda **_kwargs: None)
+    monkeypatch.setattr(run_finalization_module, "write_run_metrics", lambda **_kwargs: None)
+
+    run_finalization_module.finalize_run_outputs(
+        cfg=_minimal_cfg(),
+        run_root=run_root,
+        run_root_str=str(run_root),
+        cfg_path=run_root / "config.yaml",
+        config_sha="abc123",
+        seed=1,
+        seeds={"stage_a": 1, "stage_b": 2, "solver": 3},
+        chosen_solver="CBC",
+        solver_attempt_timeout_seconds=5.0,
+        solver_threads=1,
+        dense_arrays_version="0.0.0",
+        dense_arrays_version_source="lock",
+        plan_stats={},
+        plan_order=[],
+        plan_leaderboards={},
+        plan_pools={},
+        plan_items=[],
+        inputs_manifest_entries={},
+        library_source="build",
+        library_artifact=None,
+        library_build_rows=[],
+        library_member_rows=[],
+        composition_rows=[],
+    )
+
+    assert (tables_root / "composition.parquet").exists()
+    assert not (tables_root / "composition_part-unit.parquet").exists()

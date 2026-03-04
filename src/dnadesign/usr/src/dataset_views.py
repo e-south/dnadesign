@@ -19,10 +19,31 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .errors import SchemaError, SequencesError
+from .overlays import list_overlays
 from .storage.parquet import PARQUET_COMPRESSION
 
 if TYPE_CHECKING:
     from .dataset import Dataset
+
+
+_HEAD_CACHE: dict[tuple[str, int, tuple[str, ...] | None, bool, bool], tuple[tuple[object, ...], pd.DataFrame]] = {}
+_HEAD_CACHE_MAX = 64
+
+
+def _path_signature(path: Path) -> tuple[int, int]:
+    stat = path.stat()
+    return int(stat.st_mtime_ns), int(stat.st_size)
+
+
+def _head_state_signature(dataset: Dataset, *, include_derived: bool) -> tuple[object, ...]:
+    records_sig = _path_signature(dataset.records_path)
+    if not include_derived:
+        return (records_sig,)
+    overlay_sigs: list[tuple[str, int, int]] = []
+    for overlay in list_overlays(dataset.dir):
+        sig = _path_signature(overlay)
+        overlay_sigs.append((str(overlay), sig[0], sig[1]))
+    return (records_sig, tuple(overlay_sigs))
 
 
 def scan_dataset(
@@ -32,6 +53,7 @@ def scan_dataset(
     include_overlays: Union[bool, Sequence[str]] = True,
     include_deleted: bool = False,
     batch_size: int = 65536,
+    limit: int | None = None,
 ):
     """
     Stream record batches with optional overlay merge.
@@ -42,6 +64,7 @@ def scan_dataset(
         columns=columns,
         include_overlays=include_overlays,
         include_deleted=include_deleted,
+        limit=limit,
     )
     try:
         con.execute(query, params)
@@ -61,6 +84,19 @@ def head_dataset(
     include_deleted: bool = False,
 ):
     """Return the first N rows as a pandas DataFrame."""
+    columns_key = tuple(columns) if columns is not None else None
+    cache_key = (
+        str(dataset.dir.resolve()),
+        int(n),
+        columns_key,
+        bool(include_derived),
+        bool(include_deleted),
+    )
+    state_sig = _head_state_signature(dataset, include_derived=include_derived)
+    cached = _HEAD_CACHE.get(cache_key)
+    if cached is not None and cached[0] == state_sig:
+        return cached[1].copy(deep=True)
+
     batches = []
     rows = 0
     for batch in scan_dataset(
@@ -69,17 +105,26 @@ def head_dataset(
         include_overlays=include_derived,
         include_deleted=include_deleted,
         batch_size=max(int(n), 1),
+        limit=int(n),
     ):
         batches.append(batch)
         rows += batch.num_rows
         if rows >= n:
             break
     if not batches:
-        return pd.DataFrame(columns=columns or dataset.schema().names)
+        empty = pd.DataFrame(columns=columns or dataset.schema().names)
+        _HEAD_CACHE[cache_key] = (state_sig, empty.copy(deep=True))
+        if len(_HEAD_CACHE) > _HEAD_CACHE_MAX:
+            _HEAD_CACHE.clear()
+        return empty
     tbl = pa.Table.from_batches(batches)
     if tbl.num_rows > n:
         tbl = tbl.slice(0, n)
-    return tbl.to_pandas()
+    out = tbl.to_pandas()
+    _HEAD_CACHE[cache_key] = (state_sig, out.copy(deep=True))
+    if len(_HEAD_CACHE) > _HEAD_CACHE_MAX:
+        _HEAD_CACHE.clear()
+    return out
 
 
 def get_dataset(

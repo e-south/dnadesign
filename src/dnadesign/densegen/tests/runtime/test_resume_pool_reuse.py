@@ -643,7 +643,7 @@ def test_load_resume_state_fails_fast_when_record_scan_errors(monkeypatch, tmp_p
         _scan_records_from_config,
     )
 
-    with pytest.raises(RuntimeError, match="Failed to scan existing output records"):
+    with pytest.raises(RuntimeError) as exc_info:
         load_resume_state(
             resume=True,
             loaded=loaded,
@@ -651,6 +651,9 @@ def test_load_resume_state_fails_fast_when_record_scan_errors(monkeypatch, tmp_p
             config_sha="abc123",
             allowed_config_sha256=None,
         )
+    message = str(exc_info.value)
+    assert "Failed to scan existing output records while preparing resume state." in message
+    assert "broken output schema" in message
 
 
 def test_load_failure_counts_fails_fast_on_corrupt_attempts_artifact(tmp_path: Path) -> None:
