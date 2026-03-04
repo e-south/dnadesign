@@ -155,6 +155,23 @@ def test_qsub_script_profile_mode_rejects_invalid_webhook_env_name(tmp_path: Pat
 
 
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
+def test_qsub_script_rejects_invalid_on_truncate_mode(tmp_path: Path) -> None:
+    repo_root = _repo_root()
+    script_path = repo_root / "docs/bu-scc/jobs/notify-watch.qsub"
+
+    result = subprocess.run(
+        ["bash", str(script_path)],
+        cwd=str(tmp_path),
+        env={**os.environ, "NOTIFY_ON_TRUNCATE": "banana"},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert "Unsupported NOTIFY_ON_TRUNCATE: banana" in result.stderr
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
 def test_qsub_script_profile_mode_can_load_webhook_from_file_when_env_is_unset(tmp_path: Path) -> None:
     repo_root = _repo_root()
     script_path = repo_root / "docs/bu-scc/jobs/notify-watch.qsub"

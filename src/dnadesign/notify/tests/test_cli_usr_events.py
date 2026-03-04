@@ -596,6 +596,52 @@ def test_iter_file_lines_follow_reports_stale_handle_in_error_mode(tmp_path: Pat
         next(rows)
 
 
+def test_iter_file_lines_follow_reports_stale_handle_when_path_disappears(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    original = json.dumps(_event(action="write_overlay_part")) + "\n"
+    events.write_text(original, encoding="utf-8")
+
+    class _StaleReadHandle:
+        def __init__(self, inner) -> None:  # type: ignore[no-untyped-def]
+            self._inner = inner
+            self._raised = False
+
+        def readline(self) -> str:
+            if not self._raised:
+                self._raised = True
+                raise OSError(errno.ESTALE, "Stale file handle")
+            return self._inner.readline()
+
+        def __getattr__(self, name: str):  # type: ignore[no-untyped-def]
+            return getattr(self._inner, name)
+
+    real_open = Path.open
+
+    def _fake_open(path: Path, *args, **kwargs):  # type: ignore[no-untyped-def]
+        handle = real_open(path, *args, **kwargs)
+        if path == events:
+            return _StaleReadHandle(handle)
+        return handle
+
+    def _fake_sleep(_seconds: float) -> None:
+        if events.exists():
+            events.unlink()
+
+    monkeypatch.setattr("dnadesign.notify.runtime.cursor.iteration.Path.open", _fake_open)
+    monkeypatch.setattr("dnadesign.notify.runtime.cursor.iteration.time.sleep", _fake_sleep)
+
+    rows = _iter_file_lines(
+        events,
+        start_offset=len(original),
+        on_truncate="error",
+        follow=True,
+        idle_timeout_seconds=0.1,
+        poll_interval_seconds=0.01,
+    )
+    with pytest.raises(NotifyConfigError, match="stale while following"):
+        next(rows)
+
+
 def test_usr_events_watch_spools_after_delivery_failures(tmp_path: Path, monkeypatch) -> None:
     events = tmp_path / "events.log"
     spool_dir = tmp_path / "spool"

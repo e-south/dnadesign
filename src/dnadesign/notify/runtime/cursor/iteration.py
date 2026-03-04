@@ -78,6 +78,10 @@ def iter_file_lines(
                     stale_handle_detected = True
                 else:
                     raise
+            if stale_handle_detected and mode == "error":
+                raise NotifyConfigError(
+                    "events file handle became stale while following. Pass --on-truncate restart to resume from start."
+                )
             if line:
                 last_activity = time.monotonic()
                 yield handle.tell(), line
