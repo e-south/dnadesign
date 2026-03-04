@@ -364,6 +364,7 @@ def build_library_for_plan(
     constraints = plan_item.regulator_constraints
     groups = list(constraints.groups or [])
     plan_min_count_by_regulator = dict(constraints.min_count_by_regulator or {})
+    plan_min_total_sites = int(getattr(constraints, "min_total_sites", 0) or 0)
     side_left, side_right = _extract_side_biases(fixed_elements)
     required_bias_motifs = list(dict.fromkeys([*side_left, *side_right]))
 
@@ -419,6 +420,12 @@ def build_library_for_plan(
         return library, parts, reg_labels, info
 
     if meta_df is not None and isinstance(meta_df, pd.DataFrame):
+        if pool_strategy in {"subsample", "iterative_subsample"} and plan_min_total_sites > 0:
+            if int(library_size) < int(plan_min_total_sites):
+                raise ValueError(
+                    f"library_size={library_size} is smaller than regulator_constraints.min_total_sites="
+                    f"{plan_min_total_sites}. Increase library_size or lower min_total_sites."
+                )
         if unique_binding_cores and "tfbs_core" not in meta_df.columns:
             raise ValueError(
                 "generation.sampling.unique_binding_cores=true requires tfbs_core in the Stage-A pool. "
@@ -571,6 +578,11 @@ def build_library_for_plan(
                 "iterative_min_new_solutions": iterative_min_new_solutions,
                 "required_regulators_selected": required_regulators_selected,
             }
+            if plan_min_total_sites > 0 and len(library) < plan_min_total_sites:
+                raise ValueError(
+                    "pool_strategy=full library has fewer motifs than regulator_constraints.min_total_sites "
+                    f"({len(library)} < {plan_min_total_sites})."
+                )
             return _finalize(
                 library,
                 parts,
@@ -609,6 +621,11 @@ def build_library_for_plan(
                     f"+ required_tfs={len(required_tfs_for_library)} "
                     "(regulator constraints). "
                     "Increase library_size or relax required constraints."
+                )
+            if plan_min_total_sites > 0 and library_size < plan_min_total_sites:
+                raise ValueError(
+                    f"library_size={library_size} is smaller than regulator_constraints.min_total_sites="
+                    f"{plan_min_total_sites}. Increase library_size or lower min_total_sites."
                 )
         library, parts, reg_labels, info = sampler.generate_binding_site_library(
             library_size,
@@ -715,9 +732,19 @@ def build_library_for_plan(
                 preview = ", ".join(missing[:10])
                 raise ValueError(f"Required side-bias motifs not found in sequences input: {preview}")
         library = pool
+        if plan_min_total_sites > 0 and len(library) < plan_min_total_sites:
+            raise ValueError(
+                "pool_strategy=full library has fewer motifs than regulator_constraints.min_total_sites "
+                f"({len(library)} < {plan_min_total_sites})."
+            )
     else:
         if library_size > len(pool):
             raise ValueError(f"library_size={library_size} exceeds available unique sequences ({len(pool)}).")
+        if plan_min_total_sites > 0 and library_size < plan_min_total_sites:
+            raise ValueError(
+                f"library_size={library_size} is smaller than regulator_constraints.min_total_sites="
+                f"{plan_min_total_sites}. Increase library_size or lower min_total_sites."
+            )
         take = min(max(1, int(library_size)), len(pool))
         if required_bias_motifs:
             missing = [m for m in required_bias_motifs if m not in pool]

@@ -220,6 +220,7 @@ class USRWriter:
                     source=None,
                     strict_id_check=True,
                     actor=actor,
+                    _prevalidated_new_ids=bool(self.deduplicate and self._id_index is not None),
                 )
                 import_done = True
                 self._add_ids_to_index(rec.id for rec in records_new)

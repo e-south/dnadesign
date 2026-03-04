@@ -156,6 +156,7 @@ densegen:
             spacer_length: [16, 18]
             upstream_pos: [10, 25]
         regulator_constraints:
+          min_total_sites: 0
           groups: []
 
     sequence_constraints:

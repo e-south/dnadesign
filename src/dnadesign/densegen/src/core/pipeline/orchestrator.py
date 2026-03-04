@@ -345,6 +345,43 @@ def run_pipeline(
         )
     except Exception as exc:
         raise RuntimeError("Failed to write effective_config.json.") from exc
+    ensure_run_meta_dir(run_root)
+    state_ctx = init_run_state(
+        run_root=run_root,
+        run_id=str(cfg.run.id),
+        schema_version=str(cfg.schema_version),
+        config_sha256=config_sha,
+        allow_config_mismatch=allow_config_mismatch,
+    )
+
+    if resume:
+        _replay_usr_overlay_backlog_for_resume(
+            cfg=cfg,
+            cfg_path=loaded.path,
+            run_root=run_root,
+        )
+
+    resume_state = load_resume_state(
+        resume=resume,
+        loaded=loaded,
+        tables_root=tables_root,
+        config_sha=config_sha,
+        allowed_config_sha256=state_ctx.accepted_config_sha256,
+    )
+    existing_counts = resume_state.existing_counts
+    existing_usage_by_plan = resume_state.existing_usage_by_plan
+    site_failure_counts = resume_state.site_failure_counts
+    attempt_counters = resume_state.attempt_counters
+    library_build_counts = resume_state.library_build_counts
+    if existing_counts:
+        total = sum(existing_counts.values())
+        per_plan = dict(existing_counts)
+        log.info(
+            "Resuming from existing outputs: %d sequences across %d plan(s).",
+            total,
+            len(existing_counts),
+        )
+
     stage_a_state = prepare_stage_a_pools(
         cfg=cfg,
         cfg_path=loaded.path,
@@ -382,42 +419,6 @@ def run_pipeline(
     library_artifact = library_state.artifact
     library_records = library_state.records
     library_cursor = library_state.cursor
-    ensure_run_meta_dir(run_root)
-    state_ctx = init_run_state(
-        run_root=run_root,
-        run_id=str(cfg.run.id),
-        schema_version=str(cfg.schema_version),
-        config_sha256=config_sha,
-        allow_config_mismatch=allow_config_mismatch,
-    )
-
-    if resume:
-        _replay_usr_overlay_backlog_for_resume(
-            cfg=cfg,
-            cfg_path=loaded.path,
-            run_root=run_root,
-        )
-
-    resume_state = load_resume_state(
-        resume=resume,
-        loaded=loaded,
-        tables_root=tables_root,
-        config_sha=config_sha,
-        allowed_config_sha256=state_ctx.accepted_config_sha256,
-    )
-    existing_counts = resume_state.existing_counts
-    existing_usage_by_plan = resume_state.existing_usage_by_plan
-    site_failure_counts = resume_state.site_failure_counts
-    attempt_counters = resume_state.attempt_counters
-    library_build_counts = resume_state.library_build_counts
-    if existing_counts:
-        total = sum(existing_counts.values())
-        per_plan = dict(existing_counts)
-        log.info(
-            "Resuming from existing outputs: %d sequences across %d plan(s).",
-            total,
-            len(existing_counts),
-        )
     reconciliation = reconcile_run_state_with_outputs(
         path=state_ctx.path,
         run_id=str(cfg.run.id),

@@ -325,6 +325,14 @@ _SOLVER_STDERR_PATTERNS = [
         "CBC backend does not support SetSolverSpecificParametersAsString; "
         "continuing without solver-specific parameter strings.",
     ),
+    (
+        r"^Set parameter TokenServer to value",
+        "Gurobi TokenServer banner detected; suppressing repeated parameter-banner lines.",
+    ),
+    (
+        r"^Set parameter [A-Za-z0-9_]+ to value",
+        None,
+    ),
 ]
 
 

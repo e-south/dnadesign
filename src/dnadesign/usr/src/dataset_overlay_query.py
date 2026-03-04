@@ -44,7 +44,7 @@ class DatasetOverlayQueryHost(Protocol):
         view_name: str,
         path: Path,
         key: str,
-    ) -> None: ...
+    ) -> str: ...
 
 
 def build_overlay_query(
@@ -149,7 +149,7 @@ def build_overlay_query(
                 raise NamespaceError(f"Derived columns must be namespaced (got '{col}').")
 
         view_name = f"overlay_{idx}"
-        dataset._create_overlay_view(con, view_name=view_name, path=overlay["path"], key=key)
+        overlay_source = dataset._create_overlay_view(con, view_name=view_name, path=overlay["path"], key=key)
 
         if key in {"sequence", "sequence_norm", "sequence_ci"}:
             bio_type_count = int(con.execute(f"SELECT COUNT(DISTINCT bio_type) FROM {base_view}").fetchone()[0])
@@ -174,7 +174,7 @@ def build_overlay_query(
             base_key_expr = _key_expr(f"b.{dataset._sql_ident('id')}", key=key)
 
         overlay_key_expr = _key_expr(f"o{idx}.{dataset._sql_ident(key)}", key=key)
-        join_clauses.append(f"LEFT JOIN {view_name} o{idx} ON {base_key_expr} = {overlay_key_expr}")
+        join_clauses.append(f"LEFT JOIN {overlay_source} o{idx} ON {base_key_expr} = {overlay_key_expr}")
         for col in derived_cols:
             col_ident = dataset._sql_ident(col)
             overlay_expr = f"o{idx}.{col_ident}"

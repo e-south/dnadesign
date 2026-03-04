@@ -34,6 +34,7 @@ def test_notify_cli_command_modules_importable() -> None:
     assert importlib.import_module("dnadesign.notify.cli.commands.profile.wizard_cmd")
     assert importlib.import_module("dnadesign.notify.cli.commands.profile.show_cmd")
     assert importlib.import_module("dnadesign.notify.cli.commands.profile.doctor_cmd")
+    assert importlib.import_module("dnadesign.notify.cli.commands.profile.smoke_cmd")
     assert importlib.import_module("dnadesign.notify.cli.commands.runtime")
     assert importlib.import_module("dnadesign.notify.cli.commands.runtime.watch_cmd")
     assert importlib.import_module("dnadesign.notify.cli.commands.runtime.spool_cmd")

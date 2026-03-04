@@ -31,8 +31,17 @@ def _bin_attempts(values: np.ndarray, bins: int) -> tuple[np.ndarray, np.ndarray
 
 
 def _usage_category_label(value: object) -> str:
-    label = str(value or "").strip()
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    label = str(value).strip()
     if not label:
+        return ""
+    if label.lower() in {"none", "nan"}:
         return ""
     if label.startswith("fixed:"):
         return label
@@ -65,6 +74,9 @@ def _usage_available_unique(
             return {}, 0
         offered["category_label"] = offered["tf"].map(_usage_category_label)
         offered["tfbs"] = offered["tfbs"].astype(str)
+        offered = offered[offered["category_label"].astype(str).str.strip() != ""].copy()
+        if offered.empty:
+            return {}, 0
         unique_pairs = offered[["category_label", "tfbs"]].drop_duplicates()
         by_category = (
             unique_pairs.groupby("category_label")[["tfbs"]].nunique().rename(columns={"tfbs": "unique_available"})
@@ -82,6 +94,9 @@ def _usage_available_unique(
             category_label=pool_df["tf"].map(_usage_category_label),
             tfbs=pool_df[tfbs_col].astype(str),
         )[["category_label", "tfbs"]]
+        offered = offered[offered["category_label"].astype(str).str.strip() != ""].copy()
+        if offered.empty:
+            return {}, 0
         unique_pairs = offered.drop_duplicates()
         by_category = (
             unique_pairs.groupby("category_label")[["tfbs"]].nunique().rename(columns={"tfbs": "unique_available"})

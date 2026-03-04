@@ -167,6 +167,41 @@ def test_densegen_cpu_qsub_requires_existing_config(tmp_path: Path) -> None:
     assert "Set DENSEGEN_CONFIG=/abs/path/to/config.yaml" in combined
 
 
+def test_densegen_cpu_qsub_includes_trace_filter_for_repeated_solver_banners() -> None:
+    repo_root = _repo_root()
+    script_path = repo_root / "docs/bu-scc/jobs/densegen-cpu.qsub"
+    script_text = script_path.read_text(encoding="utf-8")
+
+    assert "DENSEGEN_TRACE_FILTER_AWK" in script_text
+    assert "Set parameter [A-Za-z0-9_]+ to value" in script_text
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
+def test_densegen_cpu_qsub_requires_explicit_mode_arg(tmp_path: Path) -> None:
+    repo_root = _repo_root()
+    script_path = repo_root / "docs/bu-scc/jobs/densegen-cpu.qsub"
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+
+    env = dict(os.environ)
+    env["DENSEGEN_CONFIG"] = str(config_path)
+    env["DENSEGEN_RUN_ARGS"] = ""
+
+    result = subprocess.run(
+        ["bash", str(script_path)],
+        cwd=str(tmp_path),
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    combined = result.stdout + result.stderr
+    assert "DENSEGEN_RUN_ARGS must include exactly one of --fresh or --resume." in combined
+
+
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
 def test_densegen_cpu_qsub_passes_configured_validate_and_run_args(tmp_path: Path) -> None:
     repo_root = _repo_root()
@@ -350,6 +385,7 @@ def test_densegen_cpu_qsub_real_local_resume_extend_flow(tmp_path: Path) -> None
 
     env = dict(os.environ)
     env["DENSEGEN_CONFIG"] = str(cfg_path)
+    env["DENSEGEN_RUN_ARGS"] = "--fresh --no-plot"
     env["JOB_ID"] = "9001"
     env["SGE_TASK_ID"] = "3"
 

@@ -72,6 +72,16 @@ def _resolve_progress_min_seconds(*, notify_config: dict[str, Any]) -> float:
     return float(value)
 
 
+def _resolve_progress_heartbeat_seconds(*, notify_config: dict[str, Any]) -> float:
+    configured = notify_config.get("progress_heartbeat_seconds")
+    if configured is None:
+        return float(_DENSEGEN_HEALTH_HEARTBEAT_SECONDS)
+    value = _to_float_or_none(configured)
+    if value is None or value <= 0.0:
+        raise NotifyConfigError("progress_heartbeat_seconds must be a positive number")
+    return float(value)
+
+
 def _densegen_health_signature(densegen_metrics: dict[str, Any], *, progress_step_pct: int) -> tuple[Any, ...]:
     quota_progress = _densegen_metric_float(densegen_metrics, key="quota_progress_pct")
     rows_written = _densegen_metric_int(densegen_metrics, key="rows_written_session")
@@ -92,6 +102,7 @@ def _should_emit_densegen_running_health(
 ) -> bool:
     progress_step_pct = _resolve_progress_step_pct(densegen_metrics=densegen_metrics, notify_config=notify_config)
     progress_min_seconds = _resolve_progress_min_seconds(notify_config=notify_config)
+    progress_heartbeat_seconds = _resolve_progress_heartbeat_seconds(notify_config=notify_config)
     quota_progress = _densegen_metric_float(densegen_metrics, key="quota_progress_pct")
     quota_step = int(max(0.0, min(100.0, quota_progress)) // float(progress_step_pct))
     now_seconds = float(event_ts_seconds) if event_ts_seconds is not None else float(time.time())
@@ -104,7 +115,7 @@ def _should_emit_densegen_running_health(
     step_trigger = quota_step > last_step
     if step_trigger and last_sent is not None and (now_seconds - last_sent) < progress_min_seconds:
         step_trigger = False
-    heartbeat_trigger = last_sent is None or (now_seconds - last_sent) >= float(_DENSEGEN_HEALTH_HEARTBEAT_SECONDS)
+    heartbeat_trigger = last_sent is None or (now_seconds - last_sent) >= progress_heartbeat_seconds
     if not step_trigger and not heartbeat_trigger:
         return False
 

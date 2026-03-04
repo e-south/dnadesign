@@ -20,12 +20,21 @@ from dnadesign.devtools.docs_checks import (
     _find_deprecated_docs_entrypoint_issues,
     _find_docs_root_heading_style_issues,
     _find_entrypoint_local_path_literal_issues,
+    _find_packaged_runbook_variant_issues,
+    _find_operational_runbook_path_issues,
     _find_root_docs_entrypoint_issues,
     _find_runbook_demo_snippet_issues,
+    _find_stale_overlay_guard_term_issues,
+    _find_shared_utils_path_issues,
+    _find_transient_operational_artifact_path_issues,
     _find_tool_docs_metadata_issues,
     _find_tool_readme_banner_issues,
     _find_tool_readme_structure_issues,
     main,
+)
+from dnadesign.ops.runbooks.path_policy import (
+    PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
+    REPO_TRANSIENT_OPERATIONAL_DIR_NAMES,
 )
 
 
@@ -485,6 +494,252 @@ def test_main_passes_when_selected_runbook_has_required_metadata(tmp_path: Path)
 
     rc = main(["--repo-root", str(tmp_path)])
     assert rc == 0
+
+
+def test_main_fails_when_operations_runbook_docs_missing_required_metadata(tmp_path: Path) -> None:
+    today = dt.date.today().isoformat()
+    _write(
+        tmp_path / "docs" / "operations" / "README.md",
+        "## Ops operations index\n\nMissing metadata.\n",
+    )
+    _write(
+        tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
+        "## Orchestration runbooks\n\nMissing metadata.\n",
+    )
+    _write(
+        tmp_path / "ARCHITECTURE.md",
+        f"# ARCHITECTURE\n\n**Type:** system-of-record\n**Owner:** maintainers\n**Last verified:** {today}\n",
+    )
+
+    rc = main(["--repo-root", str(tmp_path)])
+    assert rc == 1
+
+
+def test_find_operational_runbook_path_issues_flags_repo_root_runbook(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "stress_ethanol_cipro.yaml",
+        "\n".join(
+            [
+                "runbook:",
+                "  schema_version: 1",
+                "  id: study_stress_ethanol_cipro",
+                "  workflow_id: densegen_batch_submit",
+                "  project: dunlop",
+                "  workspace_root: /tmp/workspace",
+                "  logging:",
+                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/study_stress_ethanol_cipro",
+                "  densegen:",
+                "    config: /tmp/workspace/config.yaml",
+                "    qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub",
+                "  resources:",
+                "    pe_omp: 16",
+                "    h_rt: 08:00:00",
+                "    mem_per_core: 8G",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_operational_runbook_path_issues(tmp_path)
+
+    assert any("operational runbook path is outside allowed locations" in issue for issue in issues)
+
+
+def test_find_operational_runbook_path_issues_allows_packaged_presets(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "ops" / "runbooks" / "presets" / "densegen_demo.yaml",
+        "\n".join(
+            [
+                "runbook:",
+                "  schema_version: 1",
+                "  id: study_stress_ethanol_cipro",
+                "  workflow_id: densegen_batch_submit",
+                "  project: dunlop",
+                "  workspace_root: /tmp/workspace",
+                "  logging:",
+                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/study_stress_ethanol_cipro",
+                "  densegen:",
+                "    config: /tmp/workspace/config.yaml",
+                "    qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub",
+                "  resources:",
+                "    pe_omp: 16",
+                "    h_rt: 08:00:00",
+                "    mem_per_core: 8G",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_operational_runbook_path_issues(tmp_path)
+
+    assert issues == []
+
+
+def test_find_packaged_runbook_variant_issues_flags_duration_suffixed_preset(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "ops" / "runbooks" / "presets" / "densegen_demo_with_notify_6h.yaml",
+        "\n".join(
+            [
+                "runbook:",
+                "  schema_version: 1",
+                "  id: densegen_demo_with_notify_6h",
+                "  workflow_id: densegen_batch_with_notify_slack",
+                "  project: dunlop",
+                "  workspace_root: /tmp/workspace",
+                "  logging:",
+                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/densegen_demo_with_notify_6h",
+                "  densegen:",
+                "    config: /tmp/workspace/config.yaml",
+                "    qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub",
+                "  resources:",
+                "    pe_omp: 16",
+                "    h_rt: 06:00:00",
+                "    mem_per_core: 8G",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_packaged_runbook_variant_issues(tmp_path)
+
+    assert any("duration-suffixed operational variants are not allowed in presets" in issue for issue in issues)
+
+
+def test_find_packaged_runbook_variant_issues_allows_base_preset_name(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "ops" / "runbooks" / "presets" / "densegen_demo_with_notify.yaml",
+        "\n".join(
+            [
+                "runbook:",
+                "  schema_version: 1",
+                "  id: densegen_demo_with_notify",
+                "  workflow_id: densegen_batch_with_notify_slack",
+                "  project: dunlop",
+                "  workspace_root: /tmp/workspace",
+                "  logging:",
+                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/densegen_demo_with_notify",
+                "  densegen:",
+                "    config: /tmp/workspace/config.yaml",
+                "    qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub",
+                "  resources:",
+                "    pe_omp: 16",
+                "    h_rt: 08:00:00",
+                "    mem_per_core: 8G",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_packaged_runbook_variant_issues(tmp_path)
+
+    assert issues == []
+
+
+def test_find_shared_utils_path_issues_flags_top_level_utils_package(tmp_path: Path) -> None:
+    disallowed_utils_path = tmp_path / "src" / "dnadesign" / "utils"
+    disallowed_utils_path.mkdir(parents=True, exist_ok=True)
+
+    issues = _find_shared_utils_path_issues(tmp_path)
+
+    assert any("shared utils package is not allowed" in issue for issue in issues)
+
+
+def test_find_shared_utils_path_issues_allows_tool_local_utils(tmp_path: Path) -> None:
+    allowed_tool_utils_path = tmp_path / "src" / "dnadesign" / "densegen" / "src" / "utils"
+    allowed_tool_utils_path.mkdir(parents=True, exist_ok=True)
+
+    issues = _find_shared_utils_path_issues(tmp_path)
+
+    assert issues == []
+
+
+def test_docs_checks_reuses_ops_path_policy_contract_constants() -> None:
+    from dnadesign.devtools import docs_checks
+
+    assert docs_checks.TRANSIENT_OPERATIONAL_ROOT_DIR_NAMES == REPO_TRANSIENT_OPERATIONAL_DIR_NAMES
+    assert docs_checks.OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES[0] == PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR
+
+
+def test_find_transient_operational_artifact_path_issues_flags_repo_root_codex_tmp(tmp_path: Path) -> None:
+    _write(tmp_path / ".codex_tmp" / "audit_notify" / "records.parquet", "placeholder\n")
+
+    issues = _find_transient_operational_artifact_path_issues(tmp_path)
+
+    assert any("transient operational artifact directory is not allowed at repo root" in issue for issue in issues)
+
+
+def test_find_transient_operational_artifact_path_issues_allows_workspace_nested_temp_dirs(tmp_path: Path) -> None:
+    _write(
+        tmp_path
+        / "src"
+        / "dnadesign"
+        / "densegen"
+        / "workspaces"
+        / "study"
+        / "outputs"
+        / "tmp"
+        / ".codex_tmp"
+        / "state.json",
+        "{}\n",
+    )
+
+    issues = _find_transient_operational_artifact_path_issues(tmp_path)
+
+    assert issues == []
+
+
+def test_main_fails_when_repo_root_contains_transient_operational_dir(tmp_path: Path) -> None:
+    _write(tmp_path / "docs" / "index.md", "## Index\n")
+    _write(tmp_path / ".tmp_ops" / "scratch.log", "placeholder\n")
+
+    rc = main(["--repo-root", str(tmp_path)])
+
+    assert rc == 1
+
+
+def test_find_stale_overlay_guard_term_issues_flags_old_ops_guard_terms(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
+        "\n".join(
+            [
+                "## Orchestration runbooks",
+                "",
+                "**Owner:** maintainers",
+                f"**Last verified:** {dt.date.today().isoformat()}",
+                "",
+                "Use densegen-overlay-guard with densegen.overlay_guard.namespace.",
+                "",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_stale_overlay_guard_term_issues(tmp_path)
+
+    assert any("densegen-overlay-guard" in issue for issue in issues)
+    assert any("densegen.overlay_guard.namespace" in issue for issue in issues)
+
+
+def test_find_stale_overlay_guard_term_issues_accepts_usr_overlay_guard_terms(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
+        "\n".join(
+            [
+                "## Orchestration runbooks",
+                "",
+                "**Owner:** maintainers",
+                f"**Last verified:** {dt.date.today().isoformat()}",
+                "",
+                "Use usr-overlay-guard with densegen.overlay_guard.overlay_namespace.",
+                "",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_stale_overlay_guard_term_issues(tmp_path)
+
+    assert issues == []
 
 
 def test_main_fails_when_exec_plan_missing_required_metadata(tmp_path: Path) -> None:

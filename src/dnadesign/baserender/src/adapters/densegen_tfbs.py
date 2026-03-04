@@ -69,6 +69,14 @@ def _append_variant_suffix(label: str, variant_id: str | None) -> str:
     return f"{label} ({variant})"
 
 
+def _promoter_component_display_label(name: str, component: str, variant_id: str | None) -> str:
+    label = _promoter_component_label(name, component)
+    variant = str(variant_id or "").strip()
+    if str(component).strip().lower() == "downstream" and variant.lower() == "consensus":
+        return label
+    return _append_variant_suffix(label, variant)
+
+
 def _title_case_first(value: str) -> str:
     raw = str(value).strip()
     if raw == "":
@@ -304,11 +312,11 @@ class DensegenTfbsAdapter:
             downstream_tag = f"promoter:{name}:downstream"
             labels.setdefault(
                 upstream_tag,
-                _append_variant_suffix(_promoter_component_label(name, "upstream"), upstream.get("variant_id")),
+                _promoter_component_display_label(name, "upstream", upstream.get("variant_id")),
             )
             labels.setdefault(
                 downstream_tag,
-                _append_variant_suffix(_promoter_component_label(name, "downstream"), downstream.get("variant_id")),
+                _promoter_component_display_label(name, "downstream", downstream.get("variant_id")),
             )
 
             upstream_feature_id = f"{record_id}:promoter:{name}:{placement_index}:upstream"
@@ -451,11 +459,11 @@ class DensegenTfbsAdapter:
             downstream_tag = f"promoter:{name}:downstream"
             promoter_labels.setdefault(
                 upstream_tag,
-                _append_variant_suffix(_promoter_component_label(name, "upstream"), upstream_variant_id),
+                _promoter_component_display_label(name, "upstream", upstream_variant_id),
             )
             promoter_labels.setdefault(
                 downstream_tag,
-                _append_variant_suffix(_promoter_component_label(name, "downstream"), downstream_variant_id),
+                _promoter_component_display_label(name, "downstream", downstream_variant_id),
             )
             placement_track = int(placement_index)
             upstream_feature_id = f"{record_id}:promoter:{name}:{placement_index}:upstream"

@@ -19,6 +19,11 @@ from urllib.parse import parse_qs, urlparse
 
 import yaml
 
+from dnadesign.ops.runbooks.path_policy import (
+    PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
+    REPO_TRANSIENT_OPERATIONAL_DIR_NAMES,
+)
+
 from .ci_changes import discover_repo_tools
 
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
@@ -82,6 +87,8 @@ RUNBOOK_MARKDOWN_FILES = (
     "docs/dependencies.md",
     "docs/notebooks.md",
     "docs/marimo-reference.md",
+    "docs/operations/README.md",
+    "docs/operations/orchestration-runbooks.md",
     "docs/bu-scc/quickstart.md",
     "docs/bu-scc/install.md",
     "docs/bu-scc/batch-notify.md",
@@ -129,6 +136,30 @@ DENSEGEN_DOC_LANGUAGE_PATHS = (
     "src/dnadesign/densegen/workspaces",
 )
 DENSEGEN_DISALLOWED_TERM_PATTERN = re.compile(r"\bcanonical\b", flags=re.IGNORECASE)
+OPS_OPERATIONAL_WORKFLOW_IDS = {
+    "densegen_batch_submit",
+    "densegen_batch_with_notify_slack",
+    "infer_batch_submit",
+    "infer_batch_with_notify_slack",
+}
+OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES = (
+    PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
+    Path("docs/templates"),
+)
+TRANSIENT_OPERATIONAL_ROOT_DIR_NAMES = REPO_TRANSIENT_OPERATIONAL_DIR_NAMES
+DISALLOWED_SHARED_UTILS_PATHS = (
+    Path("src/dnadesign/utils"),
+)
+OVERLAY_GUARD_DOC_PATHS = (
+    "docs/operations/orchestration-runbooks.md",
+    "docs/bu-scc/jobs/README.md",
+    "src/dnadesign/ops/README.md",
+)
+STALE_OVERLAY_GUARD_TERMS = (
+    "densegen-overlay-guard",
+    "densegen.overlay_guard.namespace",
+)
+PACKAGED_RUNBOOK_DURATION_SUFFIX_PATTERN = re.compile(r"_(?:\d+)(?:h|hr|hrs|hour|hours)$", re.IGNORECASE)
 
 
 def _collect_markdown_files(repo_root: Path) -> tuple[list[Path], list[Path]]:
@@ -1088,6 +1119,112 @@ def _find_runbook_demo_snippet_issues(repo_root: Path) -> list[str]:
     return issues
 
 
+def _is_ops_operational_runbook_contract(path: Path) -> bool:
+    try:
+        payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    runbook = payload.get("runbook")
+    if not isinstance(runbook, dict):
+        return False
+    workflow_id = runbook.get("workflow_id")
+    if not isinstance(workflow_id, str):
+        return False
+    return workflow_id in OPS_OPERATIONAL_WORKFLOW_IDS
+
+
+def _is_allowed_operational_runbook_path(*, relative_path: Path) -> bool:
+    for prefix in OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES:
+        if relative_path == prefix or prefix in relative_path.parents:
+            return True
+    parts = relative_path.parts
+    if "outputs" in parts and "logs" in parts and "ops" in parts and "runbooks" in parts:
+        return True
+    return False
+
+
+def _find_operational_runbook_path_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    for suffix in ("*.yaml", "*.yml"):
+        for path in sorted(repo_root.rglob(suffix)):
+            if not path.is_file():
+                continue
+            if not _is_ops_operational_runbook_contract(path):
+                continue
+            relative_path = path.relative_to(repo_root)
+            if _is_allowed_operational_runbook_path(relative_path=relative_path):
+                continue
+            issues.append(
+                f"{path}: operational runbook path is outside allowed locations; "
+                "use workspace outputs/logs/ops/runbooks/ or src/dnadesign/ops/runbooks/presets/."
+            )
+    return issues
+
+
+def _find_packaged_runbook_variant_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    preset_root = repo_root / PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR
+    if not preset_root.exists():
+        return issues
+    for suffix in ("*.yaml", "*.yml"):
+        for path in sorted(preset_root.rglob(suffix)):
+            if not path.is_file():
+                continue
+            if not _is_ops_operational_runbook_contract(path):
+                continue
+            if PACKAGED_RUNBOOK_DURATION_SUFFIX_PATTERN.search(path.stem) is None:
+                continue
+            issues.append(
+                f"{path}: duration-suffixed operational variants are not allowed in presets; "
+                "use workspace outputs/logs/ops/runbooks/."
+            )
+    return issues
+
+
+def _find_transient_operational_artifact_path_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    for dir_name in TRANSIENT_OPERATIONAL_ROOT_DIR_NAMES:
+        candidate = repo_root / dir_name
+        if not candidate.exists():
+            continue
+        if not candidate.is_dir():
+            continue
+        if not any(candidate.iterdir()):
+            continue
+        issues.append(
+            f"{candidate}: transient operational artifact directory is not allowed at repo root; "
+            "use workspace-scoped outputs/logs/ops paths or /scratch for disposable working state."
+        )
+    return issues
+
+
+def _find_shared_utils_path_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    for relative_path in DISALLOWED_SHARED_UTILS_PATHS:
+        candidate = repo_root / relative_path
+        if not candidate.exists():
+            continue
+        issues.append(
+            f"{candidate}: shared utils package is not allowed; keep utilities under src/dnadesign/<tool>/."
+        )
+    return issues
+
+
+def _find_stale_overlay_guard_term_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    target_files = _collect_markdown_files_from_relative_paths(repo_root, relative_paths=OVERLAY_GUARD_DOC_PATHS)
+    for path in target_files:
+        content = path.read_text(encoding="utf-8")
+        for term in STALE_OVERLAY_GUARD_TERMS:
+            if term in content:
+                issues.append(
+                    f"{path}: stale overlay guard term '{term}' is not allowed; use usr-overlay-guard and overlay_namespace."
+                )
+    return issues
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check docs markdown naming and local links.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
@@ -1163,6 +1300,41 @@ def main(argv: list[str] | None = None) -> int:
     if runbook_demo_snippet_issues:
         print("Runbook/demo snippet annotation check failed:")
         for issue in runbook_demo_snippet_issues:
+            print(f" - {issue}")
+        return 1
+
+    operational_runbook_path_issues = _find_operational_runbook_path_issues(repo_root)
+    if operational_runbook_path_issues:
+        print("Operational runbook path check failed:")
+        for issue in operational_runbook_path_issues:
+            print(f" - {issue}")
+        return 1
+
+    packaged_runbook_variant_issues = _find_packaged_runbook_variant_issues(repo_root)
+    if packaged_runbook_variant_issues:
+        print("Packaged runbook variant check failed:")
+        for issue in packaged_runbook_variant_issues:
+            print(f" - {issue}")
+        return 1
+
+    transient_operational_artifact_path_issues = _find_transient_operational_artifact_path_issues(repo_root)
+    if transient_operational_artifact_path_issues:
+        print("Transient operational artifact placement check failed:")
+        for issue in transient_operational_artifact_path_issues:
+            print(f" - {issue}")
+        return 1
+
+    shared_utils_path_issues = _find_shared_utils_path_issues(repo_root)
+    if shared_utils_path_issues:
+        print("Shared utils path check failed:")
+        for issue in shared_utils_path_issues:
+            print(f" - {issue}")
+        return 1
+
+    stale_overlay_guard_term_issues = _find_stale_overlay_guard_term_issues(repo_root)
+    if stale_overlay_guard_term_issues:
+        print("Overlay guard terminology check failed:")
+        for issue in stale_overlay_guard_term_issues:
             print(f" - {issue}")
         return 1
 

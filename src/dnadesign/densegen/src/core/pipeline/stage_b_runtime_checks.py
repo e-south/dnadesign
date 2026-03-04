@@ -21,6 +21,7 @@ def _evaluate_solution_requirements(
     tf_list_from_library: list[str],
     required_regulators: list[str],
     plan_min_count_by_regulator: dict[str, int],
+    plan_min_total_sites: int,
     used_tf_counts: dict[str, int],
 ) -> tuple[bool, bool, str | None, dict]:
     covers_all = True
@@ -67,6 +68,19 @@ def _evaluate_solution_requirements(
                         }
                         for tf in missing
                     ]
+                },
+            )
+    min_total_sites = int(plan_min_total_sites)
+    if min_total_sites > 0:
+        found = int(sum(int(value) for value in used_tf_counts.values()))
+        if found < min_total_sites:
+            return (
+                covers_all,
+                covers_required,
+                "min_total_sites",
+                {
+                    "min_total_sites": min_total_sites,
+                    "found": found,
                 },
             )
     return covers_all, covers_required, None, {}

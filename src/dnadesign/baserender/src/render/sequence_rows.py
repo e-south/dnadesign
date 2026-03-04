@@ -1248,54 +1248,140 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
     if not legend:
         return
 
-    entries: list[tuple[str, str, float]] = []
-    text_total = 0.0
-    for tag, label in legend:
-        w = _text_px_width(label, style.font_label, style.legend_font_size, style.dpi)
-        entries.append((tag, label, w))
-        text_total += w
-
-    n = len(entries)
-    fixed_total = n * style.legend_patch_w + n * style.legend_gap_patch_text + text_total
     available_width = max(0.0, float(total_width) - (2.0 * float(style.padding_x)))
-    legend_gap_x = float(style.legend_gap_x)
-    if n > 1:
-        max_gap_x = max(0.0, (available_width - fixed_total) / float(n - 1))
-        legend_gap_x = min(legend_gap_x, max_gap_x)
-    total = fixed_total + (n - 1) * legend_gap_x
-    x = (total_width - total) / 2.0 if style.legend_center else style.padding_x
-    x = max(x, style.padding_x)
-    y = style.legend_pad_px
+    if available_width <= 0.0:
+        return
 
-    for i, (tag, label, w) in enumerate(entries):
-        color = palette.color_for(tag)
-        edge_color = _darken_rgb(color, factor=0.76)
-        ax.add_patch(
-            FancyBboxPatch(
-                (x, y),
-                style.legend_patch_w,
-                style.legend_patch_h,
-                boxstyle="round,pad=0.0,rounding_size=2.5",
-                linewidth=0.7,
-                facecolor=color,
-                alpha=1.0,
-                edgecolor=edge_color,
+    def _wrap_rows(entry_widths: list[float], *, gap_x: float) -> list[list[int]]:
+        rows: list[list[int]] = []
+        current: list[int] = []
+        current_width = 0.0
+        for idx, width in enumerate(entry_widths):
+            add_width = width if not current else (gap_x + width)
+            if current and (current_width + add_width) > available_width:
+                rows.append(current)
+                current = [idx]
+                current_width = width
+                continue
+            current.append(idx)
+            current_width += add_width
+        if current:
+            rows.append(current)
+        return rows
+
+    base_font_size = max(6, int(style.legend_font_size))
+    min_font_size = 6
+    selected_layout: tuple[int, float, float, float, float, float, float, list[float], list[list[int]]] | None = None
+
+    for font_size in range(base_font_size, min_font_size - 1, -1):
+        scale = float(font_size) / float(base_font_size)
+        patch_w = max(8.0, float(style.legend_patch_w) * scale)
+        patch_h = max(6.0, float(style.legend_patch_h) * scale)
+        gap_patch_text = max(2.0, float(style.legend_gap_patch_text) * scale)
+        gap_x_requested = max(0.0, float(style.legend_gap_x) * scale)
+        text_widths = [
+            _text_px_width(label, style.font_label, font_size, style.dpi)
+            for _tag, label in legend
+        ]
+        entry_widths = [patch_w + gap_patch_text + width for width in text_widths]
+        if any(width > available_width for width in entry_widths):
+            continue
+
+        rows = _wrap_rows(entry_widths, gap_x=gap_x_requested)
+        gap_x = gap_x_requested
+        per_row_max_gap: list[float] = []
+        for row in rows:
+            if len(row) <= 1:
+                continue
+            row_fixed_width = sum(entry_widths[idx] for idx in row)
+            per_row_max_gap.append(max(0.0, (available_width - row_fixed_width) / float(len(row) - 1)))
+        if per_row_max_gap:
+            gap_x = min(gap_x_requested, min(per_row_max_gap))
+
+        row_height = max(patch_h, float(font_size) * 1.18)
+        row_gap_y = max(2.0, min(8.0, row_height * 0.22))
+        rows_height = (len(rows) * row_height) + (max(0, len(rows) - 1) * row_gap_y)
+        if rows_height <= float(style.legend_height_px):
+            selected_layout = (
+                font_size,
+                patch_w,
+                patch_h,
+                gap_patch_text,
+                gap_x,
+                row_height,
+                row_gap_y,
+                entry_widths,
+                rows,
+            )
+            break
+
+    if selected_layout is None:
+        font_size = min_font_size
+        scale = float(font_size) / float(base_font_size)
+        patch_w = max(8.0, float(style.legend_patch_w) * scale)
+        patch_h = max(6.0, float(style.legend_patch_h) * scale)
+        gap_patch_text = max(2.0, float(style.legend_gap_patch_text) * scale)
+        gap_x = max(0.0, float(style.legend_gap_x) * scale)
+        text_widths = [
+            _text_px_width(label, style.font_label, font_size, style.dpi)
+            for _tag, label in legend
+        ]
+        entry_widths = [patch_w + gap_patch_text + width for width in text_widths]
+        rows = _wrap_rows(entry_widths, gap_x=gap_x)
+        row_height = max(patch_h, float(font_size) * 1.18)
+        row_gap_y = max(2.0, min(8.0, row_height * 0.22))
+    else:
+        (
+            font_size,
+            patch_w,
+            patch_h,
+            gap_patch_text,
+            gap_x,
+            row_height,
+            row_gap_y,
+            entry_widths,
+            rows,
+        ) = selected_layout
+
+    total_rows_height = (len(rows) * row_height) + (max(0, len(rows) - 1) * row_gap_y)
+    y = float(style.legend_pad_px) + max(0.0, (float(style.legend_height_px) - total_rows_height) / 2.0)
+    for row in rows:
+        row_total = sum(entry_widths[idx] for idx in row)
+        if len(row) > 1:
+            row_total += float(len(row) - 1) * gap_x
+        x = (total_width - row_total) / 2.0 if style.legend_center else float(style.padding_x)
+        x = max(x, float(style.padding_x))
+        for position, idx in enumerate(row):
+            tag, label = legend[idx]
+            color = palette.color_for(tag)
+            edge_color = _darken_rgb(color, factor=0.76)
+            ax.add_patch(
+                FancyBboxPatch(
+                    (x, y),
+                    patch_w,
+                    patch_h,
+                    boxstyle="round,pad=0.0,rounding_size=2.5",
+                    linewidth=0.7,
+                    facecolor=color,
+                    alpha=1.0,
+                    edgecolor=edge_color,
+                    zorder=10,
+                    clip_on=False,
+                )
+            )
+            ax.text(
+                x + patch_w + gap_patch_text,
+                y + patch_h / 2.0,
+                label,
+                va="center",
+                ha="left",
+                fontsize=font_size,
+                family=style.font_label,
+                color=style.color_sequence,
                 zorder=10,
                 clip_on=False,
             )
-        )
-        ax.text(
-            x + style.legend_patch_w + style.legend_gap_patch_text,
-            y + style.legend_patch_h / 2.0,
-            label,
-            va="center",
-            ha="left",
-            fontsize=style.legend_font_size,
-            family=style.font_label,
-            color=style.color_sequence,
-            zorder=10,
-            clip_on=False,
-        )
-        x += style.legend_patch_w + style.legend_gap_patch_text + w
-        if i < n - 1:
-            x += legend_gap_x
+            x += entry_widths[idx]
+            if position < (len(row) - 1):
+                x += gap_x
+        y += row_height + row_gap_y

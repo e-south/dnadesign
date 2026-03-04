@@ -33,6 +33,9 @@ from .storage.locking import dataset_write_lock
 from .storage.parquet import now_utc, write_parquet_atomic_batches
 from .types import Fingerprint, OverlayInfo
 
+_REMOVE_ARCHIVE_KEEP_LAST = 1
+_COMPACT_ARCHIVE_KEEP_LAST = 0
+
 
 class DatasetOverlayMaintenanceHost(Protocol):
     dir: Path
@@ -59,6 +62,21 @@ class DatasetOverlayMaintenanceHost(Protocol):
         registry_hash: str | None = None,
         actor: dict | None = None,
     ) -> None: ...
+
+
+def _prune_archive_entries(archive_dir: Path, *, pattern: str, keep_last: int) -> int:
+    if keep_last < 0:
+        raise SchemaError(f"archive keep_last must be >= 0 (got {keep_last})")
+    entries = sorted(path for path in archive_dir.glob(pattern) if path.exists())
+    if len(entries) <= keep_last:
+        return 0
+    to_remove = entries[: len(entries) - keep_last]
+    for path in to_remove:
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+    return len(to_remove)
 
 
 def list_overlay_infos(dataset: DatasetOverlayMaintenanceHost) -> list[OverlayInfo]:
@@ -120,6 +138,11 @@ def remove_overlay_namespace(
             suffix = ".parquet" if path.is_file() else ""
             archived = archive_dir / f"{path.stem}-{stamp}{suffix}"
             path.replace(archived)
+            _prune_archive_entries(
+                archive_dir,
+                pattern=f"{path.stem}-*",
+                keep_last=_REMOVE_ARCHIVE_KEEP_LAST,
+            )
             dataset._record_event(
                 "archive_overlay",
                 args={"namespace": namespace, "archived": str(archived)},
@@ -187,15 +210,20 @@ def compact_overlay_namespace(
             metadata=metadata,
         )
 
-        archive_dir = dir_path.parent / "_archived" / namespace
-        archive_dir.mkdir(parents=True, exist_ok=True)
-        stamp = now_utc().replace(":", "").replace("-", "").replace(".", "")
-        archived = archive_dir / stamp
-        shutil.move(str(dir_path), str(archived))
+        archived = None
+        if _COMPACT_ARCHIVE_KEEP_LAST > 0:
+            archive_dir = dir_path.parent / "_archived" / namespace
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            stamp = now_utc().replace(":", "").replace("-", "").replace(".", "")
+            archived = archive_dir / stamp
+            shutil.move(str(dir_path), str(archived))
+            _prune_archive_entries(archive_dir, pattern="*", keep_last=_COMPACT_ARCHIVE_KEEP_LAST)
+        else:
+            shutil.rmtree(dir_path)
 
         dataset._record_event(
             "compact_overlay",
-            args={"namespace": namespace, "archived": str(archived), "maintenance_reason": ctx.reason},
+            args={"namespace": namespace, "archived": (str(archived) if archived is not None else None), "maintenance_reason": ctx.reason},
             maintenance={"reason": ctx.reason},
             target_path=file_path,
             actor=ctx.actor,

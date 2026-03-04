@@ -259,6 +259,10 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
     - `min_count_by_regulator` (dict, optional) - per-regulator minimum counts
       - Keys must match group members.
       - DenseGen uses the maximum of this value and `runtime.min_count_per_tf`.
+    - `min_total_sites` (int, optional; default `0`) - minimum total number of sampled Stage-B sites per accepted sequence.
+      - Count is computed from `used_tf_counts` in accepted placements.
+      - Background sites count toward this minimum when background inputs are part of the plan library.
+      - Fixed promoter elements (`-35`, `-10`, etc.) are not part of this count.
 
 #### `densegen.generation.plan[].fixed_elements.fixed_element_matrix`
 

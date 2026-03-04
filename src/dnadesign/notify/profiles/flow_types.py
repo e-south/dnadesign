@@ -42,3 +42,12 @@ def _validate_progress_min_seconds(value: float | None) -> float | None:
     if minimum <= 0.0:
         raise NotifyConfigError("progress_min_seconds must be a positive number")
     return minimum
+
+
+def _validate_progress_heartbeat_seconds(value: float | None) -> float | None:
+    if value is None:
+        return None
+    heartbeat = float(value)
+    if heartbeat <= 0.0:
+        raise NotifyConfigError("progress_heartbeat_seconds must be a positive number")
+    return heartbeat

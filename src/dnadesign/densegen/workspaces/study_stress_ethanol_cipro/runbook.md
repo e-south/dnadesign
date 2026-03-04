@@ -72,16 +72,23 @@ Use `--mode resume` to continue generation without wiping outputs, or `--mode an
     '
     # Submit generation-only batch run against this workspace config.
     qsub -P <project> \
+      -pe omp 16 \
+      -l h_rt=08:00:00 \
+      -l mem_per_core=8G \
       -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --no-plot' \
       docs/bu-scc/jobs/densegen-cpu.qsub
     # Submit an extension pass when additional quota is required.
     qsub -P <project> \
+      -pe omp 16 \
+      -l h_rt=08:00:00 \
+      -l mem_per_core=8G \
       -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --extend-quota 50000 --no-plot' \
       docs/bu-scc/jobs/densegen-cpu.qsub
 
 Queue contract:
 - If `running_jobs > 3`, confirm before adding more jobs and prefer arrays or `-hold_jid` chains.
 - Do not skip the queue line with bypass-style flags.
+- Keep `densegen.solver.threads` aligned with `-pe omp` slots (this workspace uses `16`).
 
 ### Optional analysis mode (existing outputs)
 

@@ -193,6 +193,7 @@ def write_import_df_dataset(
     on_conflict: str,
     actor: Optional[dict] = None,
     return_ids: bool = False,
+    prevalidated_new_ids: bool = False,
     write_lock=dataset_write_lock,
 ) -> int | tuple[int, list[str], list[str]]:
     incoming = pa.Table.from_pandas(out_df, schema=ARROW_SCHEMA, preserve_index=False)
@@ -200,53 +201,63 @@ def write_import_df_dataset(
 
     def _write_dataset() -> int | tuple[int, list[str], list[str]]:
         if dataset.records_path.exists():
-            with tempfile.TemporaryDirectory() as tmpdir:
-                db_path = Path(tmpdir) / "import.sqlite"
-                conn = sqlite3.connect(db_path)
-                try:
-                    conn.execute("CREATE TABLE seen (val TEXT PRIMARY KEY)")
-                    for batch in iter_parquet_batches(dataset.records_path, columns=["id"]):
-                        for rid in batch.column("id").to_pylist():
-                            conn.execute("INSERT OR IGNORE INTO seen(val) VALUES (?)", (str(rid),))
+            if prevalidated_new_ids:
+                if on_conflict != "error":
+                    raise SchemaError("prevalidated_new_ids requires on_conflict='error'.")
+                out_df_local = out_df
+                incoming_local = incoming
+                ids_added = list(ids_all)
+                ids_skipped = []
+            else:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    db_path = Path(tmpdir) / "import.sqlite"
+                    conn = sqlite3.connect(db_path)
+                    try:
+                        conn.execute("CREATE TABLE seen (val TEXT PRIMARY KEY)")
+                        for batch in iter_parquet_batches(dataset.records_path, columns=["id"]):
+                            for rid in batch.column("id").to_pylist():
+                                conn.execute("INSERT OR IGNORE INTO seen(val) VALUES (?)", (str(rid),))
 
-                    conflicts = []
-                    keep_mask: List[bool] = []
-                    for rid in ids_all:
-                        cur = conn.execute("INSERT OR IGNORE INTO seen(val) VALUES (?)", (str(rid),))
-                        if cur.rowcount == 0:
-                            if on_conflict == "ignore":
-                                keep_mask.append(False)
+                        conflicts = []
+                        keep_mask: List[bool] = []
+                        for rid in ids_all:
+                            cur = conn.execute("INSERT OR IGNORE INTO seen(val) VALUES (?)", (str(rid),))
+                            if cur.rowcount == 0:
+                                if on_conflict == "ignore":
+                                    keep_mask.append(False)
+                                else:
+                                    conflicts.append(str(rid))
+                                    if len(conflicts) >= 5:
+                                        break
                             else:
-                                conflicts.append(str(rid))
-                                if len(conflicts) >= 5:
-                                    break
+                                keep_mask.append(True)
+                        if conflicts and on_conflict != "ignore":
+                            sample = ", ".join(conflicts[:5])
+                            raise DuplicateIDError(
+                                f"Duplicate ids already present in dataset (sample: {sample}).",
+                                hint=(
+                                    "These sequences already exist in this dataset. "
+                                    "Remove them from your import file or put new rows in a separate dataset."
+                                ),
+                            )
+                        if on_conflict == "ignore":
+                            if not any(keep_mask):
+                                if return_ids:
+                                    return 0, [], ids_all
+                                return 0
+                            out_df_local = out_df.loc[keep_mask].reset_index(drop=True)
+                            incoming_local = pa.Table.from_pandas(
+                                out_df_local, schema=ARROW_SCHEMA, preserve_index=False
+                            )
+                            ids_added = [rid for rid, keep in zip(ids_all, keep_mask) if keep]
+                            ids_skipped = [rid for rid, keep in zip(ids_all, keep_mask) if not keep]
                         else:
-                            keep_mask.append(True)
-                    if conflicts and on_conflict != "ignore":
-                        sample = ", ".join(conflicts[:5])
-                        raise DuplicateIDError(
-                            f"Duplicate ids already present in dataset (sample: {sample}).",
-                            hint=(
-                                "These sequences already exist in this dataset. "
-                                "Remove them from your import file or put new rows in a separate dataset."
-                            ),
-                        )
-                    if on_conflict == "ignore":
-                        if not any(keep_mask):
-                            if return_ids:
-                                return 0, [], ids_all
-                            return 0
-                        out_df_local = out_df.loc[keep_mask].reset_index(drop=True)
-                        incoming_local = pa.Table.from_pandas(out_df_local, schema=ARROW_SCHEMA, preserve_index=False)
-                        ids_added = [rid for rid, keep in zip(ids_all, keep_mask) if keep]
-                        ids_skipped = [rid for rid, keep in zip(ids_all, keep_mask) if not keep]
-                    else:
-                        out_df_local = out_df
-                        incoming_local = incoming
-                        ids_added = list(ids_all)
-                        ids_skipped = []
-                finally:
-                    conn.close()
+                            out_df_local = out_df
+                            incoming_local = incoming
+                            ids_added = list(ids_all)
+                            ids_skipped = []
+                    finally:
+                        conn.close()
 
             def _batch_iter():
                 for batch in iter_parquet_batches(dataset.records_path):
@@ -300,6 +311,7 @@ def import_rows_dataset(
     source: Optional[str] = None,
     strict_id_check: bool = True,
     actor: Optional[dict] = None,
+    prevalidated_new_ids: bool = False,
 ) -> int:
     dataset._require_exists()  # noqa: SLF001
     out_df = dataset._prepare_import_rows(  # noqa: SLF001
@@ -314,6 +326,7 @@ def import_rows_dataset(
         source=source,
         on_conflict="error",
         actor=actor,
+        prevalidated_new_ids=prevalidated_new_ids,
     )
 
 

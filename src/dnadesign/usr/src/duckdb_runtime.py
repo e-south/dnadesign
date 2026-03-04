@@ -13,6 +13,23 @@ from __future__ import annotations
 
 from .errors import SchemaError
 
+_DUCKDB_ROOT_SESSION = None
+
+
+def _duckdb_session_cursor(duckdb_module):
+    global _DUCKDB_ROOT_SESSION
+    if _DUCKDB_ROOT_SESSION is None:
+        _DUCKDB_ROOT_SESSION = duckdb_module.connect()
+    try:
+        return _DUCKDB_ROOT_SESSION.cursor()
+    except Exception:
+        try:
+            _DUCKDB_ROOT_SESSION.close()
+        except Exception:
+            pass
+        _DUCKDB_ROOT_SESSION = duckdb_module.connect()
+        return _DUCKDB_ROOT_SESSION.cursor()
+
 
 def connect_duckdb_utc(
     *,
@@ -24,7 +41,7 @@ def connect_duckdb_utc(
     except ImportError as exc:
         raise SchemaError(str(missing_dependency_message)) from exc
 
-    con = duckdb.connect()
+    con = _duckdb_session_cursor(duckdb)
     try:
         con.execute("SET TimeZone='UTC'")
         row = con.execute("SELECT current_setting('TimeZone')").fetchone()

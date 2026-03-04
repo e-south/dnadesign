@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #$ -N dnadesign_densegen_cpu
 #$ -l h_rt=08:00:00
-#$ -pe omp 8
+#$ -pe omp 16
 #$ -l mem_per_core=8G
 #$ -j y
 #$ -o outputs/logs/$JOB_NAME.$JOB_ID.out
@@ -10,9 +10,23 @@ set -euo pipefail
 
 # Notify boundary reminder: Notify watches USR <dataset>/.events.log, not DenseGen outputs/meta/events.jsonl.
 
+JOB_ID_VALUE="${JOB_ID:-manual}"
+DENSEGEN_TRACE_DIR="${DENSEGEN_TRACE_DIR:-$PWD/outputs/logs/ops/runtime}"
+mkdir -p "$DENSEGEN_TRACE_DIR"
+DENSEGEN_TRACE_FILE="${DENSEGEN_TRACE_DIR}/dnadesign_densegen_cpu.${JOB_ID_VALUE}.trace.log"
+DENSEGEN_TRACE_FILTER_AWK='
+/^Set parameter [A-Za-z0-9_]+ to value/ {
+  if (seen[$0]++) next
+}
+{ print }
+'
+exec > >(awk "$DENSEGEN_TRACE_FILTER_AWK" | tee -a "$DENSEGEN_TRACE_FILE")
+exec 2> >(awk "$DENSEGEN_TRACE_FILTER_AWK" | tee -a "$DENSEGEN_TRACE_FILE" >&2)
+echo "DenseGen runtime trace: $DENSEGEN_TRACE_FILE"
+
 DENSEGEN_CONFIG="${DENSEGEN_CONFIG:-$PWD/config.yaml}"
 DENSEGEN_VALIDATE_ARGS="${DENSEGEN_VALIDATE_ARGS:---probe-solver}"
-DENSEGEN_RUN_ARGS="${DENSEGEN_RUN_ARGS:---no-plot}"
+DENSEGEN_RUN_ARGS="${DENSEGEN_RUN_ARGS:-}"
 
 VALIDATE_ARGS=()
 RUN_ARGS=()
@@ -29,8 +43,51 @@ if [[ ! -f "$DENSEGEN_CONFIG" ]]; then
   exit 2
 fi
 
-export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-densegen}"
-export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-${JOB_ID}.${SGE_TASK_ID:-0}}"
+has_fresh=0
+has_resume=0
+for arg in "${RUN_ARGS[@]}"; do
+  if [[ "$arg" == "--fresh" ]]; then
+    has_fresh=1
+  fi
+  if [[ "$arg" == "--resume" ]]; then
+    has_resume=1
+  fi
+done
+if [[ "$has_fresh" -eq "$has_resume" ]]; then
+  echo "DENSEGEN_RUN_ARGS must include exactly one of --fresh or --resume." >&2
+  echo "Received DENSEGEN_RUN_ARGS='${DENSEGEN_RUN_ARGS}'" >&2
+  echo "Example: DENSEGEN_RUN_ARGS='--fresh --no-plot'" >&2
+  echo "Example: DENSEGEN_RUN_ARGS='--resume --no-plot'" >&2
+  exit 2
+fi
 
-uv run dense validate-config "${VALIDATE_ARGS[@]}" -c "$DENSEGEN_CONFIG"
-uv run dense run "${RUN_ARGS[@]}" -c "$DENSEGEN_CONFIG"
+export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-densegen}"
+export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-${JOB_ID_VALUE}.${SGE_TASK_ID:-0}}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-${NSLOTS:-1}}"
+
+DENSEGEN_GUROBI_BOOTSTRAP="${DENSEGEN_GUROBI_BOOTSTRAP:-1}"
+GUROBI_MODULE="${GUROBI_MODULE:-gurobi/10.0.1}"
+if [[ "$DENSEGEN_GUROBI_BOOTSTRAP" == "1" ]]; then
+  if command -v module >/dev/null 2>&1; then
+    module load "$GUROBI_MODULE" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "${SCC_GUROBI_DIR:-}" ]]; then
+    export GUROBI_HOME="${GUROBI_HOME:-$SCC_GUROBI_DIR}"
+  else
+    export GUROBI_HOME="${GUROBI_HOME:-/share/pkg.7/gurobi/10.0.1/install}"
+  fi
+  export GRB_LICENSE_FILE="${GRB_LICENSE_FILE:-/usr/local/gurobi/gurobi.lic}"
+  export TOKENSERVER="${TOKENSERVER:-sccsvc.bu.edu}"
+  export LD_LIBRARY_PATH="${GUROBI_HOME}/lib:${LD_LIBRARY_PATH:-}"
+fi
+
+uv run dense validate-config "${VALIDATE_ARGS[@]}" -c "$DENSEGEN_CONFIG" || {
+  rc=$?
+  echo "dense validate-config failed rc=$rc config=$DENSEGEN_CONFIG args='$DENSEGEN_VALIDATE_ARGS'" >&2
+  exit "$rc"
+}
+uv run dense run "${RUN_ARGS[@]}" -c "$DENSEGEN_CONFIG" || {
+  rc=$?
+  echo "dense run failed rc=$rc config=$DENSEGEN_CONFIG args='$DENSEGEN_RUN_ARGS'" >&2
+  exit "$rc"
+}

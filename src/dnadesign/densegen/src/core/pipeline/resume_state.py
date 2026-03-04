@@ -86,8 +86,10 @@ def load_resume_state(
             )
         except Exception as exc:
             if not _is_missing_or_empty_output_error(exc):
+                detail = str(exc).strip()
+                detail_suffix = f" Source error: {detail}" if detail else ""
                 raise ResumeStateLoadError(
-                    "Failed to scan existing output records while preparing resume state."
+                    f"Failed to scan existing output records while preparing resume state.{detail_suffix}"
                 ) from exc
         try:
             for row in rows:
@@ -108,8 +110,10 @@ def load_resume_state(
                 used = _parse_used_tfbs_detail(row.get("densegen__used_tfbs_detail"))
                 _update_usage_counts(counts, used)
         except Exception as exc:
+            detail = str(exc).strip()
+            detail_suffix = f" Source error: {detail}" if detail else ""
             raise ResumeStateLoadError(
-                f"Failed to parse scanned output records from `{source_label}` while preparing resume state."
+                f"Failed to parse scanned output records from `{source_label}` while preparing resume state.{detail_suffix}"
             ) from exc
         if run_ids and any(val != loaded.root.densegen.run.id for val in run_ids):
             raise RuntimeError(

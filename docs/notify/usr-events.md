@@ -1,7 +1,7 @@
 ## Notify: consuming Universal Sequence Record events
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-01
+**Last verified:** 2026-03-03
 
 Use this runbook to set up, run, and recover `notify` watcher loops.
 Notify consumes USR `.events.log` only. It does not consume DenseGen telemetry (`outputs/meta/events.jsonl`).
@@ -9,7 +9,7 @@ Notify consumes USR `.events.log` only. It does not consume DenseGen telemetry (
 ### Entry contract
 
 - Audience: operators running local or scheduler-backed Notify watch loops.
-- Prerequisites: workspace config, USR `.events.log`, and one webhook source (`--url`, `--url-env`, or `--secret-ref`).
+- Prerequisites: workspace config, USR `.events.log`, and one file-backed webhook secret reference (`--secret-source file` + `--secret-ref file://...`).
 - Verify next: `uv run notify profile doctor --profile <profile.json>` before live delivery.
 
 ### Minimal operator quickstart
@@ -26,11 +26,12 @@ export SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
 # Confirm workspace names.
 uv run notify setup list-workspaces --tool densegen
 
-# Create or resolve webhook secret reference.
-WEBHOOK_REF="$(uv run notify setup webhook --secret-source auto --name densegen-shared --json | python -c 'import json,sys; print(json.load(sys.stdin)["webhook"]["ref"])')"
+# Create or resolve webhook secret reference from a local secret file.
+WEBHOOK_SECRET_FILE=/abs/path/to/notify.webhook
+WEBHOOK_REF="$(uv run notify setup webhook --secret-source file --secret-ref "file://$WEBHOOK_SECRET_FILE" --name densegen-shared --json | python -c 'import json,sys; print(json.load(sys.stdin)["webhook"]["ref"])')"
 
 # Create or refresh watcher profile.
-uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --secret-ref "$WEBHOOK_REF" --secret-source auto --policy densegen
+uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --secret-ref "$WEBHOOK_REF" --secret-source file --policy densegen
 
 # Validate before watch.
 uv run notify profile doctor --profile "$PROFILE"
@@ -68,10 +69,10 @@ Default resolver-mode artifact paths:
 uv run notify setup resolve-events --tool densegen --workspace "$WORKSPACE"
 
 # Create profile from workspace resolver mode.
-uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --secret-source auto --policy densegen
+uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --secret-source file --secret-ref file://<abs-path-to-webhook-secret> --policy densegen
 
 # Create profile from explicit config path.
-uv run notify setup slack --tool densegen --config "$CONFIG" --secret-source auto --policy densegen
+uv run notify setup slack --tool densegen --config "$CONFIG" --secret-source file --secret-ref file://<abs-path-to-webhook-secret> --policy densegen
 ```
 
 ### Run flow
@@ -114,6 +115,18 @@ uv run notify spool drain --profile "$PROFILE" --fail-fast
 - Running live HTTPS delivery without trust roots.
 - Expecting Notify to consume DenseGen telemetry (`outputs/meta/events.jsonl`).
 - Sharing one cursor or spool path across unrelated runs.
+
+### DenseGen progress semantics
+
+`densegen_health` progress messages are rendered from `metrics.densegen.*` in the USR event stream.
+
+- `Quota (run session)` uses `rows_written_session/run_quota`; this is independent of watcher start time.
+- `Remaining to quota` reports `run_quota - rows_written_session`.
+- `Workspace rows` comes from event `fingerprint.rows` (dataset total rows at emit time).
+- `Runtime` is DenseGen run-session elapsed time from emitted metrics.
+- `Plan yield` is shown only when solved/attempted is below 100% to avoid low-signal noise.
+- `Session throughput` and `ETA to quota` are computed from `rows_written_session` and `run_elapsed_seconds`.
+- Running updates emit on quota-step changes or heartbeat cadence (`progress_heartbeat_seconds`, default 1800 seconds).
 
 ### Event schema source of truth
 

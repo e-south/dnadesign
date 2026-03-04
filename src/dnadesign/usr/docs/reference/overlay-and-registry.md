@@ -18,6 +18,9 @@ Operational implications:
 - Join keys in a single overlay part must be unique.
 - Re-attaching the same namespace/columns in a newer part overrides older values.
 - Compact parts periodically with `uv run usr maintenance overlay-compact ...` to reduce read overhead.
+- After compaction, future overlay-part appends are allowed; USR promotes the compact file into part form before appending.
+- Compact overlay snapshots are not retained by default.
+- Explicit `remove_overlay(..., mode=\"archive\")` retention is bounded: only the latest archived snapshot is kept.
 
 ## Namespace registry (required)
 

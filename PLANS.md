@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-19
+**Last verified:** 2026-03-02
 
 ## At a glance
 This file is the top-level map for change planning and decision capture.
@@ -19,6 +19,7 @@ Use it to navigate proposals, execution plans, accepted decisions, and implement
 3. Implement via PR with tests/docs updated together.
 4. Capture accepted architectural decisions in ADR form.
 5. Record notable implementation outcomes in the development journal.
+6. When cross-tool workflow contracts change, align `ARCHITECTURE.md`, `DESIGN.md`, `QUALITY_SCORE.md`, and `docs/operations/orchestration-runbooks.md` in the same change.
 
 Execution plans are living records during implementation, not static TODO lists. Keep progress, discoveries, and decisions current as work evolves.
 

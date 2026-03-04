@@ -78,6 +78,11 @@ def register_setup_slack_command(
             "--progress-min-seconds",
             help="Minimum spacing between DenseGen progress heartbeats in seconds.",
         ),
+        progress_heartbeat_seconds: float | None = typer.Option(
+            None,
+            "--progress-heartbeat-seconds",
+            help="Maximum spacing between DenseGen running updates in seconds.",
+        ),
         tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
         secret_source: str = typer.Option(
             "auto",
@@ -121,6 +126,7 @@ def register_setup_slack_command(
             include_raw_event=include_raw_event,
             progress_step_pct=progress_step_pct,
             progress_min_seconds=progress_min_seconds,
+            progress_heartbeat_seconds=progress_heartbeat_seconds,
             tls_ca_bundle=tls_ca_bundle,
             secret_source=secret_source,
             url_env=url_env,

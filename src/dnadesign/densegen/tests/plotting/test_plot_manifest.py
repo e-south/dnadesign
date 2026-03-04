@@ -705,6 +705,66 @@ def test_tfbs_usage_does_not_eager_load_stage_a_pools(tmp_path: Path, monkeypatc
     run_plots_from_config(loaded.root, cfg_path, only="tfbs_usage")
 
 
+def test_load_composition_reads_part_files_when_final_file_missing(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    tables_dir = run_root / "outputs" / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "solution_id": ["sol-1"],
+            "input_name": ["demo_input"],
+            "plan_name": ["demo_plan"],
+            "placement_index": [0],
+            "regulator": ["TF_A"],
+            "sequence": ["AAAA"],
+        }
+    ).to_parquet(tables_dir / "composition_part-a.parquet", index=False)
+    pd.DataFrame(
+        {
+            "solution_id": ["sol-2"],
+            "input_name": ["demo_input"],
+            "plan_name": ["demo_plan"],
+            "placement_index": [0],
+            "regulator": ["TF_B"],
+            "sequence": ["CCCC"],
+        }
+    ).to_parquet(tables_dir / "composition_part-b.parquet", index=False)
+
+    composition_df = plotting_module._load_composition(run_root, columns=["solution_id", "tf", "tfbs"])
+    assert set(composition_df["solution_id"].astype(str)) == {"sol-1", "sol-2"}
+    assert set(composition_df["tf"].astype(str)) == {"TF_A", "TF_B"}
+    assert set(composition_df["tfbs"].astype(str)) == {"AAAA", "CCCC"}
+
+
+def test_load_attempts_reads_part_files_when_final_file_missing(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    tables_dir = run_root / "outputs" / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "status": ["ok"],
+            "reason": [None],
+            "plan_name": ["demo_plan"],
+            "created_at": ["2026-03-01T00:00:00+00:00"],
+            "detail_json": [None],
+        }
+    ).to_parquet(tables_dir / "attempts_part-a.parquet", index=False)
+    pd.DataFrame(
+        {
+            "status": ["rejected"],
+            "reason": ["duplicate"],
+            "plan_name": ["demo_plan"],
+            "created_at": ["2026-03-01T00:01:00+00:00"],
+            "detail_json": [None],
+        }
+    ).to_parquet(tables_dir / "attempts_part-b.parquet", index=False)
+
+    attempts_df = plotting_module._load_attempts(
+        run_root, columns=["status", "reason", "plan_name", "created_at", "detail_json"]
+    )
+    assert sorted(attempts_df["status"].astype(str).tolist()) == ["ok", "rejected"]
+
+
 def test_stage_a_summary_reads_projected_pool_columns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)

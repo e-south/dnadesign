@@ -57,6 +57,9 @@ def _build_tfbs_usage_breakdown_figure(
     if sub.empty:
         raise ValueError(f"tfbs_usage found no placements for {input_name}/{plan_name}.")
     sub["category_label"] = sub["tf"].map(_usage_category_label)
+    sub = sub[sub["category_label"].astype(str).str.strip() != ""].copy()
+    if sub.empty:
+        raise ValueError(f"tfbs_usage found no regulator TFBS counts for {input_name}/{plan_name}.")
     sub["tfbs"] = sub["tfbs"].astype(str)
     counts = (
         sub.groupby(["category_label", "tfbs"])
@@ -421,6 +424,7 @@ def _build_run_health_tfbs_length_by_regulator_figure(
     frame = composition_df.copy()
     frame["regulator"] = frame["tf"].map(_usage_category_label).astype(str)
     frame = frame[~frame["regulator"].str.startswith("fixed:")].copy()
+    frame = frame[~frame["regulator"].str.lower().isin({"", "nan", "none"})].copy()
     if frame.empty:
         raise ValueError("run_health tfbs_length_by_regulator found no regulator TFBS placements.")
     if "length" in frame.columns:
@@ -466,6 +470,7 @@ def _build_run_health_tfbs_length_by_regulator_figure(
         if tf_col is not None and tfbs_col is not None:
             lib["regulator"] = lib[tf_col].map(_usage_category_label).astype(str)
             lib = lib[~lib["regulator"].str.startswith("fixed:")].copy()
+            lib = lib[~lib["regulator"].str.lower().isin({"", "nan", "none"})].copy()
             if not lib.empty:
                 candidate_pool_sizes = (
                     lib[["regulator", tfbs_col]]
@@ -540,12 +545,14 @@ def _build_run_health_tfbs_length_by_regulator_figure(
         ax.set_ylabel("Count in accepted outputs")
         ax.set_title("TFBS length counts by regulator across accepted outputs")
         ax.legend(
-            loc="upper right",
+            loc="center left",
+            bbox_to_anchor=(1.02, 0.5),
             title="TFBS length",
             frameon=False,
             fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.86)),
             title_fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.9)),
         )
+        fig.subplots_adjust(right=0.78)
     ax.margins(y=0.08)
     _apply_style(ax, style)
     return fig, {"length": ax}

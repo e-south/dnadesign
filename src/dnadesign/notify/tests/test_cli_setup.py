@@ -320,6 +320,8 @@ def test_setup_slack_persists_progress_tunables(tmp_path: Path, monkeypatch) -> 
             "18",
             "--progress-min-seconds",
             "120",
+            "--progress-heartbeat-seconds",
+            "300",
         ],
     )
     assert result.exit_code == 0
@@ -327,6 +329,7 @@ def test_setup_slack_persists_progress_tunables(tmp_path: Path, monkeypatch) -> 
     data = json.loads(profile.read_text(encoding="utf-8"))
     assert data["progress_step_pct"] == 18
     assert data["progress_min_seconds"] == 120.0
+    assert data["progress_heartbeat_seconds"] == 300.0
 
 
 def test_setup_resolve_events_emits_plain_events_path(tmp_path: Path, monkeypatch) -> None:

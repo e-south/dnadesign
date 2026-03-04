@@ -41,6 +41,7 @@ def watch_usr_events_loop(
     tool_filter: set[str],
     progress_step_pct: int | None,
     progress_min_seconds: float | None,
+    progress_heartbeat_seconds: float | None,
     tool: str | None,
     run_id: str | None,
     provider_value: str,
@@ -69,6 +70,12 @@ def watch_usr_events_loop(
     densegen_bucket["notify_config"] = {
         "progress_step_pct": progress_step_pct,
         "progress_min_seconds": progress_min_seconds,
+        "progress_heartbeat_seconds": progress_heartbeat_seconds,
+    }
+    infer_bucket = tool_event_state.get_bucket("infer_attach")
+    infer_bucket["notify_config"] = {
+        "progress_min_seconds": progress_min_seconds,
+        "progress_heartbeat_seconds": progress_heartbeat_seconds,
     }
 
     def _save_cursor_if_enabled(next_offset: int) -> None:

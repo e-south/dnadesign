@@ -77,6 +77,7 @@ class LibraryBuilder:
         constraints = self.plan_item.regulator_constraints
         groups = list(constraints.groups or [])
         plan_min_count_by_regulator = dict(constraints.min_count_by_regulator or {})
+        plan_min_total_sites = int(getattr(constraints, "min_total_sites", 0) or 0)
 
         if self.library_source_label == "artifact":
             library_for_opt, tfbs_parts, regulator_labels, sampling_info = self._select_library_from_artifact(
@@ -84,6 +85,7 @@ class LibraryBuilder:
                 library_sampling_strategy=library_sampling_strategy,
                 groups=groups,
                 plan_min_count_by_regulator=plan_min_count_by_regulator,
+                plan_min_total_sites=plan_min_total_sites,
             )
         else:
             library_for_opt, tfbs_parts, regulator_labels, sampling_info = build_library_for_plan(
@@ -176,6 +178,7 @@ class LibraryBuilder:
         library_sampling_strategy: str,
         groups: list,
         plan_min_count_by_regulator: dict[str, int],
+        plan_min_total_sites: int,
     ) -> tuple[list[str], list[str], list[str], dict]:
         if self.library_records is None or self.library_cursor is None:
             raise RuntimeError("Library artifacts requested but no library records were provided.")
@@ -219,6 +222,7 @@ class LibraryBuilder:
             record,
             groups=groups,
             min_count_by_regulator=plan_min_count_by_regulator,
+            min_total_sites=plan_min_total_sites,
             input_name=self.source_label,
             plan_name=self.plan_item.name,
         )

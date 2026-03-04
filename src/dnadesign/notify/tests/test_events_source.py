@@ -190,6 +190,68 @@ def test_resolve_tool_events_path_infer_evo2_requires_usr_writeback_job(tmp_path
         resolve_tool_events_path(tool="infer_evo2", config=config)
 
 
+def test_resolve_tool_events_path_densegen_from_usr_output_config(tmp_path: Path) -> None:
+    run_root = tmp_path / "workspace"
+    run_root.mkdir(parents=True, exist_ok=True)
+    config = run_root / "config.yaml"
+    config.write_text(
+        "\n".join(
+            [
+                "densegen:",
+                "  run:",
+                f"    root: {run_root}",
+                "    id: stress_ethanol_cipro",
+                "  output:",
+                "    targets: [usr]",
+                "    usr:",
+                "      dataset: densegen/study_stress_ethanol_cipro",
+                "      root: outputs/usr_datasets",
+                "    schema:",
+                "      bio_type: dna",
+                "      alphabet: dna_4",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    events_path, policy = resolve_tool_events_path(tool="densegen", config=config)
+
+    assert events_path == (
+        run_root / "outputs" / "usr_datasets" / "densegen" / "study_stress_ethanol_cipro" / ".events.log"
+    ).resolve()
+    assert policy == "densegen"
+
+
+def test_resolve_tool_events_path_densegen_rejects_usr_root_outside_outputs(tmp_path: Path) -> None:
+    run_root = tmp_path / "workspace"
+    run_root.mkdir(parents=True, exist_ok=True)
+    config = run_root / "config.yaml"
+    config.write_text(
+        "\n".join(
+            [
+                "densegen:",
+                "  run:",
+                f"    root: {run_root}",
+                "    id: stress_ethanol_cipro",
+                "  output:",
+                "    targets: [usr]",
+                "    usr:",
+                "      dataset: densegen/study_stress_ethanol_cipro",
+                f"      root: {tmp_path / 'external_usr'}",
+                "    schema:",
+                "      bio_type: dna",
+                "      alphabet: dna_4",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(NotifyConfigError, match="output\\.usr\\.root must be within outputs/"):
+        resolve_tool_events_path(tool="densegen", config=config)
+
+
 def test_register_tool_events_source_supports_custom_tool(tmp_path: Path) -> None:
     config = tmp_path / "custom.yaml"
     config.write_text("x: 1\n", encoding="utf-8")
@@ -234,3 +296,17 @@ def test_events_source_module_is_registry_only() -> None:
 
     assert "yaml" not in imported_modules
     assert "os" not in imported_modules
+
+
+def test_source_builtin_module_does_not_import_densegen() -> None:
+    import dnadesign.notify.events.source_builtin as source_builtin_module
+
+    parsed = ast.parse(inspect.getsource(source_builtin_module))
+    imported_modules: set[str] = set()
+    for node in ast.walk(parsed):
+        if isinstance(node, ast.Import):
+            imported_modules.update(alias.name for alias in node.names)
+        if isinstance(node, ast.ImportFrom):
+            imported_modules.add(str(node.module or ""))
+
+    assert not any(module.startswith("dnadesign.densegen") for module in imported_modules)

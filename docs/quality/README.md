@@ -1,13 +1,14 @@
 ## Quality Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-03-02
 
 ### At a glance
 This index tracks quality expectations for tests, CI signal, coverage gates, and documentation parity.
 
 ### Contents
 - [Root quality score (SOR)](../../QUALITY_SCORE.md): grading model, evidence rules, scorecard, and gap tracker.
+- [Cross-tool IA quality row](../../QUALITY_SCORE.md#quality-scorecard): tracks ops/notify/usr/densegen/infer path-boundary hardening and anti-sprawl enforcement maturity.
 - [CI workflow](../../.github/workflows/ci.yaml): lane semantics and gating contracts.
 - [Devtools modules](../../src/dnadesign/devtools): executable checks for docs, scope, and coverage.
 - [Coverage dashboard](https://codecov.io/gh/e-south/dnadesign): project and PR diff coverage signal.

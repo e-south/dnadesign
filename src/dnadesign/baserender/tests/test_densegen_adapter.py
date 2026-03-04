@@ -393,6 +393,53 @@ def test_densegen_adapter_appends_variant_ids_to_promoter_legend_labels() -> Non
     assert "σ70 -10 site (H)" in legend_labels
 
 
+def test_densegen_adapter_omits_downstream_consensus_suffix_in_display_labels() -> None:
+    row = {
+        "id": "row1",
+        "sequence": "AAAAATTTGGGCCCCCCAAAATTTGGG",
+        "densegen__used_tfbs_detail": [
+            {"regulator": "lexA", "orientation": "fwd", "sequence": "AAA", "offset": 0},
+        ],
+        "densegen__promoter_detail": {
+            "placements": [
+                {
+                    "name": "sigma70_core",
+                    "upstream_seq": "TTTGGG",
+                    "downstream_seq": "AAAATT",
+                    "upstream_start": 5,
+                    "downstream_start": 17,
+                    "spacer_length": 6,
+                    "variant_ids": {"up_id": "a", "down_id": "consensus"},
+                }
+            ]
+        },
+    }
+
+    adapter = DensegenTfbsAdapter(
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+        },
+        policies={},
+        alphabet="DNA",
+    )
+
+    record = adapter.apply(row, row_index=0)
+    assert record.display.tag_labels["promoter:sigma70_core:upstream"] == "σ70 -35 site (a)"
+    assert record.display.tag_labels["promoter:sigma70_core:downstream"] == "σ70 -10 site"
+
+    promoter_features = [feature for feature in record.features if feature.attrs.get("source") == "densegen_promoter"]
+    by_component = {str(feature.attrs.get("component")): feature for feature in promoter_features}
+    assert by_component["downstream"].attrs.get("variant_id") == "consensus"
+
+    legend = legend_entries_for_record(record)
+    legend_labels = {label for _, label in legend}
+    assert "σ70 -35 site (a)" in legend_labels
+    assert "σ70 -10 site" in legend_labels
+    assert "σ70 -10 site (consensus)" not in legend_labels
+
+
 def test_densegen_adapter_emits_promoter_spacer_effect_with_shared_track() -> None:
     row = {
         "id": "row1",
@@ -795,6 +842,84 @@ def test_densegen_bottom_legend_stays_within_plot_width_with_large_requested_gap
         )
         x_max = float(axis.get_xlim()[1])
         assert max(max_patch_x, max_text_x) <= (x_max + 1e-6)
+    finally:
+        plt.close(fig)
+
+
+def test_densegen_bottom_legend_wraps_rows_for_long_labels() -> None:
+    sequence = ("AACCGG" + "TTTT" + "CCGTTA" + "AAAA" + "GATCGA" + "CCCC" + "TGCATA").upper()
+    row = {
+        "id": "row1",
+        "sequence": sequence,
+        "densegen__used_tfbs_detail": [
+            {
+                "regulator": "very_long_transcription_factor_alpha_beta_gamma",
+                "orientation": "fwd",
+                "sequence": "AACCGG",
+                "offset": 0,
+            },
+            {
+                "regulator": "very_long_transcription_factor_delta_epsilon_zeta",
+                "orientation": "fwd",
+                "sequence": "CCGTTA",
+                "offset": 10,
+            },
+            {
+                "regulator": "very_long_transcription_factor_eta_theta_iota",
+                "orientation": "fwd",
+                "sequence": "GATCGA",
+                "offset": 20,
+            },
+            {
+                "regulator": "very_long_transcription_factor_kappa_lambda_mu",
+                "orientation": "fwd",
+                "sequence": "TGCATA",
+                "offset": 30,
+            },
+        ],
+    }
+    adapter = DensegenTfbsAdapter(
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+        },
+        policies={},
+        alphabet="DNA",
+    )
+    record = adapter.apply(row, row_index=0)
+    style = resolve_style(
+        preset="presentation_default",
+        overrides={
+            "show_reverse_complement": True,
+            "legend": True,
+            "legend_mode": "bottom",
+            "legend_font_size": 14,
+            "legend_gap_x": 44.0,
+            "legend_patch_w": 28.0,
+            "legend_gap_patch_text": 11.0,
+            "legend_height_px": 60.0,
+        },
+    )
+    palette = Palette(style.palette)
+    initialize_runtime()
+    fig = render_record(record, renderer_name="sequence_rows", style=style, palette=palette)
+    try:
+        axis = fig.axes[0]
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        legend_texts = [text for text in axis.texts if float(text.get_zorder()) == 10.0]
+        assert legend_texts, "Expected bottom-legend labels."
+
+        max_text_x = max(
+            float(axis.transData.inverted().transform((text.get_window_extent(renderer=renderer).x1, 0.0))[0])
+            for text in legend_texts
+        )
+        x_max = float(axis.get_xlim()[1])
+        assert max_text_x <= (x_max + 1e-6)
+
+        unique_text_rows = {round(float(text.get_position()[1]), 3) for text in legend_texts}
+        assert len(unique_text_rows) >= 2
     finally:
         plt.close(fig)
 

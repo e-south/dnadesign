@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-19
+**Last verified:** 2026-03-02
 
 ## At a glance
 This document records security expectations for code, data, secrets, and dependency handling in `dnadesign`.
@@ -18,8 +18,9 @@ It is a policy map with links to operator runbooks and implementation details.
 
 ## Secrets and credentials
 - Never commit credentials or webhook URLs to git-tracked files.
-- Prefer environment variables and secret backends for runtime secrets.
+- Prefer secret backends and file-backed secret references for runtime secrets.
 - Notify webhook and profile operations must keep secret material out of logs/history where possible.
+- For batch notify workflows, require file-backed webhook references (`*_FILE` / `file://`) so secret values are not embedded in scheduler submit metadata.
 
 ## Dependency and supply-chain controls
 - Python dependencies are pinned via `uv.lock` and installed with `uv sync --locked`.

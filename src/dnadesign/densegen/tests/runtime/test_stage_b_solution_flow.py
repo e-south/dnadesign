@@ -782,3 +782,63 @@ def test_record_accepted_solution_progress_flushes_sinks_before_checkpoint_state
     )
 
     assert call_order == ["sinks", "attempts", "solutions", "state"]
+
+
+def test_record_accepted_solution_progress_checkpoints_composition_rows(tmp_path: Path) -> None:
+    progress_reporter = MagicMock()
+    diagnostics = MagicMock()
+    diagnostics.map_tf_usage.return_value = {}
+    diagnostics.map_tfbs_usage.return_value = {}
+    context = SimpleNamespace(
+        source_label="demo",
+        plan_name="baseline",
+        checkpoint_every=1,
+        tables_root=tmp_path,
+        attempts_buffer=[],
+        solution_rows=None,
+        composition_rows=[
+            {
+                "solution_id": "sol-1",
+                "input_name": "demo",
+                "plan_name": "baseline",
+                "placement_index": 0,
+                "regulator": "TF_A",
+                "sequence": "AAAA",
+            }
+        ],
+        state_counts=None,
+        write_state=None,
+        flush_sinks=None,
+        total_quota=None,
+        progress_reporter=progress_reporter,
+        counters=SimpleNamespace(),
+        failure_counts={},
+        leaderboard_every=0,
+        show_solutions=False,
+        usage_counts={},
+        tf_usage_counts={},
+        diagnostics=diagnostics,
+        logger=MagicMock(),
+    )
+
+    record_accepted_solution_progress(
+        context=context,
+        global_generated=0,
+        local_generated=0,
+        produced_this_library=0,
+        sol=object(),
+        final_seq="ACGT",
+        used_tfbs_detail=[],
+        used_tf_list=[],
+        sampling_library_index=1,
+        library_tfs=["lexA"],
+        library_tfbs=["site-1"],
+        duplicate_records=0,
+        duplicate_solutions=0,
+        failed_solutions=0,
+        stall_events=0,
+    )
+
+    assert context.composition_rows == []
+    composition_parts = sorted(tmp_path.glob("composition_part-*.parquet"))
+    assert len(composition_parts) == 1

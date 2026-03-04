@@ -82,6 +82,11 @@ does not (or IDs differ), DenseGen fails fast.
 
 Keys are namespaced as `densegen__<key>`.
 
+Overlay-first USR note:
+- Base `records.parquet` may contain only USR core columns (`id`, `bio_type`, `sequence`, `alphabet`, `length`, `source`, `created_at`).
+- DenseGen-derived columns are attached under `_derived/densegen/part-*.parquet` and are merged by default in USR reads (`usr head`, `usr schema`, `usr info`).
+- Use `usr materialize` when you need those merged columns physically written into base `records.parquet`.
+
 Retention labels in the table:
 - `record_keep`: keep at record level for downstream analysis/provenance.
 - `record_conditional`: keep at record level when applicable.

@@ -33,6 +33,7 @@ from dnadesign.densegen.src.viz.plot_run import (
     _build_run_health_detail_figure,
     _build_run_health_figure,
     _build_run_health_outcomes_figure,
+    _outcomes_attempts_per_row_for_workload,
     _build_run_health_tfbs_length_by_regulator_figure,
     _build_tfbs_usage_breakdown_figure,
     _extract_plan_quotas,
@@ -51,6 +52,7 @@ from dnadesign.densegen.src.viz.plot_stage_b_placement import (
     _build_occupancy,
     _build_tfbs_count_records,
     _category_display_label,
+    _normalize_tf_label,
     _placement_bounds,
     _promoter_constraints,
     _render_occupancy,
@@ -775,11 +777,34 @@ def test_run_health_tfbs_length_by_regulator_groups_lengths() -> None:
         assert not any("fixed:" in label for label in labels)
         legend = ax.get_legend()
         assert legend is not None
+        assert getattr(legend, "_loc", None) == 6
+        legend_bbox = legend.get_bbox_to_anchor()._bbox
+        assert legend_bbox.x0 >= 1.0
+        assert legend_bbox.y0 == pytest.approx(0.5)
         legend_labels = [text.get_text() for text in legend.get_texts()]
         assert "4 bp" in legend_labels
         assert "5 bp" in legend_labels
         assert not ax.spines["top"].get_visible()
         assert not ax.spines["right"].get_visible()
+    finally:
+        fig.clf()
+
+
+def test_run_health_tfbs_length_by_regulator_drops_nan_regulator_labels() -> None:
+    composition = pd.DataFrame(
+        [
+            {"tf": "TF_A", "tfbs": "AAAA", "length": 4},
+            {"tf": "TF_B", "tfbs": "TTTTT", "length": 5},
+            {"tf": np.nan, "tfbs": "TTGACA", "length": 6},
+            {"tf": "fixed:sigma70:-35", "tfbs": "TTGACA", "length": 6},
+        ]
+    )
+    fig, axes = _build_run_health_tfbs_length_by_regulator_figure(composition, style={})
+    try:
+        labels = [tick.get_text().lower() for tick in axes["length"].get_xticklabels()]
+        assert any("tf_a" in label for label in labels)
+        assert any("tf_b" in label for label in labels)
+        assert not any("nan" in label for label in labels)
     finally:
         fig.clf()
 
@@ -824,6 +849,13 @@ def test_run_health_tfbs_length_single_regulator_uses_length_axis() -> None:
         assert float(face_color[2]) > 0.3
     finally:
         fig.clf()
+
+
+def test_run_health_outcomes_attempts_per_row_scales_by_workload() -> None:
+    assert _outcomes_attempts_per_row_for_workload(9999) == 10
+    assert _outcomes_attempts_per_row_for_workload(10_000) == 100
+    assert _outcomes_attempts_per_row_for_workload(999_999) == 100
+    assert _outcomes_attempts_per_row_for_workload(1_000_000) == 1000
 
 
 def test_run_health_outcomes_legend_and_waste_subtitle() -> None:
@@ -890,14 +922,11 @@ def test_run_health_outcomes_plot_is_single_panel_event_map() -> None:
         assert float(y_lim[0]) > float(y_lim[1])
         assert len(ax.get_lines()) == 0
         assert ax.get_aspect() == pytest.approx(1.0)
-        assert ax.patches
-        assert len(ax.patches) == 2
-        widths = [float(patch.get_width()) for patch in ax.patches]
-        heights = [float(patch.get_height()) for patch in ax.patches]
-        assert widths
-        assert all(width == pytest.approx(height, rel=1e-6) for width, height in zip(widths, heights))
-        assert all(0.8 <= width <= 1.0 for width in widths)
-        assert all(float(p.get_linewidth()) == pytest.approx(0.0) for p in ax.patches)
+        assert not ax.patches
+        assert len(ax.images) == 1
+        image_data = np.asarray(ax.images[0].get_array(), dtype=int)
+        assert int(np.count_nonzero(image_data == 1)) >= 1
+        assert int(np.count_nonzero(image_data == 2)) >= 1
         assert ax.collections
         marker_offsets = [coll.get_offsets() for coll in ax.collections if len(coll.get_offsets()) > 0]
         assert marker_offsets
@@ -989,12 +1018,13 @@ def test_run_health_outcomes_points_follow_actual_run_order() -> None:
         plan_quotas={"plan_a": 12, "plan_b": 12},
     )
     try:
-        patches = axes["outcome"].patches
-        assert len(patches) == 4
+        image_data = np.asarray(axes["outcome"].images[0].get_array(), dtype=int)
+        row_positions, col_positions = np.where(image_data == 1)
         centers = [
-            (float(patch.get_x() + patch.get_width() / 2.0), float(patch.get_y() + patch.get_height() / 2.0))
-            for patch in patches
+            (float(col_pos) + 0.5, float(row_pos) + 0.5)
+            for row_pos, col_pos in zip(row_positions, col_positions)
         ]
+        assert len(centers) == 4
         y_values = {round(y, 3) for _, y in centers}
         assert y_values == {0.5}
         x_values = sorted(round(x, 3) for x, _ in centers)
@@ -1025,12 +1055,13 @@ def test_run_health_outcomes_tiles_attempts_by_plan_row() -> None:
         plan_quotas={"plan_a": 12},
     )
     try:
-        patches = axes["outcome"].patches
-        assert len(patches) == 12
+        image_data = np.asarray(axes["outcome"].images[0].get_array(), dtype=int)
+        row_positions, col_positions = np.where(image_data == 1)
         centers = [
-            (float(patch.get_x() + patch.get_width() / 2.0), float(patch.get_y() + patch.get_height() / 2.0))
-            for patch in patches
+            (float(col_pos) + 0.5, float(row_pos) + 0.5)
+            for row_pos, col_pos in zip(row_positions, col_positions)
         ]
+        assert len(centers) == 12
         row_one = sorted(x for x, y in centers if y == pytest.approx(0.5))
         row_two = sorted(x for x, y in centers if y == pytest.approx(1.5))
         assert len(row_one) == 10
@@ -1072,6 +1103,35 @@ def test_run_health_outcomes_xticks_use_regular_spacing() -> None:
         labels = [tick.get_text() for tick in axes["outcome"].get_xticklabels()]
         assert labels
         assert "Plan_a" in labels[0]
+    finally:
+        fig.clf()
+
+
+def test_run_health_outcomes_xtick_labels_are_angled_for_readability() -> None:
+    matplotlib.use("Agg", force=True)
+    attempts = pd.DataFrame(
+        [
+            {
+                "attempt_index": idx + 1,
+                "created_at": f"2026-01-26T00:00:{idx:02d}+00:00",
+                "status": "ok",
+                "reason": "ok",
+                "plan_name": "plan_alpha" if idx % 2 == 0 else "plan_beta",
+                "sampling_library_index": idx + 1,
+            }
+            for idx in range(20)
+        ]
+    )
+    fig, axes = _build_run_health_outcomes_figure(
+        attempts,
+        events_df=None,
+        style={},
+        plan_quotas={"plan_alpha": 10, "plan_beta": 10},
+    )
+    try:
+        rotations = [float(tick.get_rotation()) for tick in axes["outcome"].get_xticklabels()]
+        assert rotations
+        assert all(rotation == pytest.approx(45.0) for rotation in rotations)
     finally:
         fig.clf()
 
@@ -1901,6 +1961,47 @@ def test_placement_map_label_sanitizer() -> None:
     assert _sanitize_fixed_label("fixed:sigma70_consensus:-10") == "σ70 downstream site (-10)"
 
 
+def test_placement_map_normalize_tf_label_drops_nan_values() -> None:
+    fixed_set: set[str] = set()
+    assert _normalize_tf_label(np.nan, fixed_set) == ""
+    assert _normalize_tf_label("nan", fixed_set) == ""
+    assert _normalize_tf_label("None", fixed_set) == ""
+
+
+def test_tfbs_count_records_exclude_nan_regulator_labels() -> None:
+    composition = _composition_df().copy()
+    composition = pd.concat(
+        [
+            composition,
+            pd.DataFrame(
+                [
+                    {
+                        "solution_id": "s1",
+                        "input_name": PLAN_POOL_LABEL,
+                        "plan_name": "demo_plan",
+                        "library_index": 1,
+                        "library_hash": "hash1",
+                        "tf": np.nan,
+                        "tfbs": "TATAAT",
+                        "offset": 10,
+                        "length": 6,
+                        "end": 16,
+                    }
+                ]
+            ),
+        ],
+        ignore_index=True,
+    )
+    constraints, aggregate_fixed_components = _promoter_constraints(_cfg(), "demo_plan")
+    counts = _build_tfbs_count_records(
+        composition,
+        solutions=_dense_arrays_df(),
+        constraints=constraints,
+        aggregate_fixed_components=aggregate_fixed_components,
+    )
+    assert not any(str(label).strip().lower() == "nan" for label in counts["category_label"].tolist())
+
+
 def test_placement_bounds_uses_final_offset_when_present() -> None:
     row = pd.Series({"offset": 6, "offset_raw": 0, "pad_left": 6, "length": 4})
     assert _placement_bounds(row, seq_len=60) == (6, 10)
@@ -1957,6 +2058,64 @@ def test_tfbs_usage_title_is_human_readable_and_legend_has_no_frame() -> None:
         assert summary_font_size <= 11.6
         for text in axes["usage"].texts:
             assert text.get_bbox_patch() is None
+    finally:
+        fig.clf()
+
+
+def test_tfbs_usage_drops_nan_categories_from_heatmap_and_legend() -> None:
+    matplotlib.use("Agg", force=True)
+    composition = _composition_df().copy()
+    composition = pd.concat(
+        [
+            composition,
+            pd.DataFrame(
+                [
+                    {
+                        "solution_id": "s_nan",
+                        "input_name": PLAN_POOL_LABEL,
+                        "plan_name": "demo_plan",
+                        "library_index": 99,
+                        "library_hash": "hash_nan",
+                        "tf": np.nan,
+                        "tfbs": "TATAAT",
+                        "offset": 10,
+                        "length": 6,
+                        "end": 16,
+                    },
+                    {
+                        "solution_id": "s_none",
+                        "input_name": PLAN_POOL_LABEL,
+                        "plan_name": "demo_plan",
+                        "library_index": 100,
+                        "library_hash": "hash_none",
+                        "tf": "None",
+                        "tfbs": "TTGACA",
+                        "offset": 2,
+                        "length": 6,
+                        "end": 8,
+                    },
+                ]
+            ),
+        ],
+        ignore_index=True,
+    )
+    fig, axes = _build_tfbs_usage_breakdown_figure(
+        composition,
+        input_name=PLAN_POOL_LABEL,
+        plan_name="demo_plan",
+        style={},
+        pools=None,
+        library_members_df=_library_members_df(),
+    )
+    try:
+        y_labels = [tick.get_text().strip().lower() for tick in axes["cum"].get_yticklabels() if tick.get_text().strip()]
+        assert y_labels
+        assert not any(label in {"nan", "none"} for label in y_labels)
+        legend_text = ""
+        if fig.legends:
+            legend_text = "\n".join(text.get_text().strip().lower() for text in fig.legends[0].get_texts())
+        assert "nan:" not in legend_text
+        assert "none:" not in legend_text
     finally:
         fig.clf()
 

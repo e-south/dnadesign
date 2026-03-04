@@ -15,6 +15,8 @@ import csv
 import json
 from pathlib import Path
 
+import yaml
+
 from dnadesign.densegen.src.adapters.sources.base import resolve_path
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.config.base import LATEST_SCHEMA_VERSION
@@ -264,6 +266,70 @@ def test_packaged_workspace_configs_track_latest_schema_version() -> None:
         assert cfg.root.densegen.schema_version == LATEST_SCHEMA_VERSION
 
 
+def test_packaged_workspace_plan_constraints_surface_min_total_sites_key() -> None:
+    for workspace_id in PACKAGED_WORKSPACE_IDS:
+        cfg_path = _demo_config_path(workspace_id)
+        payload = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        plans = payload["densegen"]["generation"]["plan"]
+        assert plans, f"{workspace_id}: expected at least one generation plan"
+        for plan in plans:
+            regulator_constraints = plan.get("regulator_constraints", {})
+            assert "min_total_sites" in regulator_constraints, (
+                f"{workspace_id}/{plan.get('name', '<unnamed>')}: "
+                "regulator_constraints.min_total_sites key must be present in config.yaml"
+            )
+
+
+def test_stress_workspace_sets_min_total_sites_to_three_for_all_plans() -> None:
+    cfg_path = _demo_config_path("study_stress_ethanol_cipro")
+    payload = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    plans = payload["densegen"]["generation"]["plan"]
+    values = [int(plan["regulator_constraints"]["min_total_sites"]) for plan in plans]
+    assert values == [3, 3, 3, 3]
+
+
+def test_stress_workspace_uses_four_equal_base_plan_quotas() -> None:
+    cfg_path = _demo_config_path("study_stress_ethanol_cipro")
+    payload = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    plans = payload["densegen"]["generation"]["plan"]
+    assert [plan["name"] for plan in plans] == [
+        "background_only",
+        "ethanol",
+        "ciprofloxacin",
+        "ethanol_ciprofloxacin",
+    ]
+    assert [int(plan["sequences"]) for plan in plans] == [250000, 250000, 250000, 250000]
+
+    by_name = {str(plan["name"]): plan for plan in plans}
+    assert by_name["background_only"]["regulator_constraints"]["groups"] == []
+    assert by_name["ethanol"]["regulator_constraints"]["groups"] == [
+        {
+            "name": "ethanol_response",
+            "members": ["cpxR_MANWWHTTTAM", "baeR_TTTCTSCVHNA"],
+            "min_required": 1,
+        }
+    ]
+    assert by_name["ciprofloxacin"]["regulator_constraints"]["groups"] == [
+        {
+            "name": "ciprofloxacin_response",
+            "members": ["lexA_CTGTATAWAWWHACA"],
+            "min_required": 1,
+        }
+    ]
+    assert by_name["ethanol_ciprofloxacin"]["regulator_constraints"]["groups"] == [
+        {
+            "name": "ethanol_response",
+            "members": ["cpxR_MANWWHTTTAM", "baeR_TTTCTSCVHNA"],
+            "min_required": 1,
+        },
+        {
+            "name": "ciprofloxacin_response",
+            "members": ["lexA_CTGTATAWAWWHACA"],
+            "min_required": 1,
+        },
+    ]
+
+
 def test_packaged_workspace_semantic_ids_align_to_workspace_name() -> None:
     for workspace_id in (
         "demo_tfbs_baseline",
@@ -488,7 +554,8 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     assert input_types.count("pwm_artifact") == 3
     assert input_types.count("background_pool") == 1
     plan_names = [item.name for item in cfg.root.densegen.generation.plan]
-    assert len(plan_names) == 15
+    assert len(plan_names) == 20
+    assert len([name for name in plan_names if name.startswith("background_only__sig35=")]) == 5
     assert len([name for name in plan_names if name.startswith("ethanol__sig35=")]) == 5
     assert len([name for name in plan_names if name.startswith("ciprofloxacin__sig35=")]) == 5
     assert len([name for name in plan_names if name.startswith("ethanol_ciprofloxacin__sig35=")]) == 5
@@ -497,20 +564,25 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     pwm_inputs = [inp for inp in cfg.root.densegen.inputs if inp.type == "pwm_artifact"]
     assert len(pwm_inputs) == 3
     for inp in pwm_inputs:
-        assert inp.sampling.n_sites == 500
+        assert inp.sampling.n_sites == 1000
         assert inp.sampling.mining.batch_size == 5000
         assert inp.sampling.mining.budget.mode == "fixed_candidates"
-        assert inp.sampling.mining.budget.candidates == 10_000_000
+        assert inp.sampling.mining.budget.candidates == 1_000_000
 
     background = next(inp for inp in cfg.root.densegen.inputs if inp.type == "background_pool")
-    assert background.sampling.n_sites == 500
+    assert background.sampling.n_sites == 1000
     assert background.sampling.mining.batch_size == 20000
     assert background.sampling.mining.budget.mode == "fixed_candidates"
-    assert background.sampling.mining.budget.candidates == 10_000_000
+    assert background.sampling.mining.budget.candidates == 1_000_000
     sampling = cfg.root.densegen.generation.sampling
     assert sampling.library_size == 10
     assert cfg.root.densegen.generation.expansion.max_plans == 64
     quotas_by_base = {
+        "background_only": [
+            item.sequences
+            for item in cfg.root.densegen.generation.plan
+            if item.name.startswith("background_only__sig35=")
+        ],
         "ethanol": [
             item.sequences for item in cfg.root.densegen.generation.plan if item.name.startswith("ethanol__sig35=")
         ],
@@ -525,12 +597,18 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
             if item.name.startswith("ethanol_ciprofloxacin__sig35=")
         ],
     }
-    assert set(quotas_by_base["ethanol"]) == {60_000}
-    assert set(quotas_by_base["ciprofloxacin"]) == {60_000}
-    assert set(quotas_by_base["ethanol_ciprofloxacin"]) == {80_000}
+    assert set(quotas_by_base["background_only"]) == {50_000}
+    assert set(quotas_by_base["ethanol"]) == {50_000}
+    assert set(quotas_by_base["ciprofloxacin"]) == {50_000}
+    assert set(quotas_by_base["ethanol_ciprofloxacin"]) == {50_000}
     assert cfg.root.densegen.generation.total_quota() == 1_000_000
     assert cfg.root.densegen.generation.sequence_constraints is not None
     assert "validate_final_sequence" not in cfg.root.densegen.postprocess.model_dump(exclude_none=False)
+
+
+def test_study_stress_ethanol_cipro_uses_campaign_checkpoint_cadence() -> None:
+    cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
+    assert cfg.root.densegen.runtime.checkpoint_every == 2000
 
 
 def test_packaged_workspace_stage_a_length_policy_is_range_16_20() -> None:

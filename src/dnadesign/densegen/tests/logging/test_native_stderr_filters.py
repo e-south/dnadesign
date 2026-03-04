@@ -57,3 +57,9 @@ def test_install_native_stderr_filters_strict_raises_on_install_failure(
     monkeypatch.setattr(logging_utils.os, "dup", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("no-fd")))
     with pytest.raises(RuntimeError, match="Native stderr deduper installation failed"):
         logging_utils.install_native_stderr_filters(suppress_solver_messages=False, strict=True)
+
+
+def test_solver_stderr_pattern_set_covers_repeated_gurobi_parameter_banners() -> None:
+    patterns = [pattern for pattern, _message in logging_utils._SOLVER_STDERR_PATTERNS]
+    assert any("Set parameter" in pattern for pattern in patterns)
+    assert any("TokenServer" in pattern for pattern in patterns)

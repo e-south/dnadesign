@@ -103,6 +103,22 @@ def _flush_solutions(tables_root: Path, buffer: list[dict]) -> None:
     buffer.clear()
 
 
+def _flush_composition(tables_root: Path, buffer: list[dict]) -> None:
+    if not buffer:
+        return
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except Exception as exc:
+        raise RuntimeError("pyarrow is required to write composition logs.") from exc
+
+    table = pa.Table.from_pylist(buffer)
+    tables_root.mkdir(parents=True, exist_ok=True)
+    filename = f"composition_part-{uuid.uuid4().hex}.parquet"
+    pq.write_table(table, tables_root / filename)
+    buffer.clear()
+
+
 def _coerce_attempt_list(value: object, *, field: str, input_name: str, plan_name: str) -> list:
     if value is None:
         return []

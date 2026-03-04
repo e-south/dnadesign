@@ -76,4 +76,4 @@ def test_cli_overlay_compact(tmp_path: Path) -> None:
 
     assert overlay_path(ds.dir, "audit").exists()
     archived = ds.dir / "_derived" / "_archived" / "audit"
-    assert archived.exists()
+    assert not archived.exists()

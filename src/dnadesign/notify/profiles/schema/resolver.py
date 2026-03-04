@@ -14,6 +14,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from dnadesign._contracts.notify_webhook_profile import parse_notify_profile_webhook
+
 from ...errors import NotifyConfigError
 from ...events.source import normalize_tool_name
 from .contract import PROFILE_VERSION, WEBHOOK_SOURCES
@@ -22,19 +24,14 @@ from .contract import PROFILE_VERSION, WEBHOOK_SOURCES
 def resolve_profile_webhook_source(profile_data: dict[str, Any]) -> tuple[str | None, str | None]:
     if not profile_data:
         return None, None
-    version = profile_data.get("profile_version")
-    if version != PROFILE_VERSION:
-        raise NotifyConfigError(f"profile_version must be {PROFILE_VERSION}; found {version!r}")
-    webhook = profile_data.get("webhook")
-    if not isinstance(webhook, dict):
-        raise NotifyConfigError("profile field 'webhook' must be an object")
-    source = str(webhook.get("source") or "").strip().lower()
-    ref = str(webhook.get("ref") or "").strip()
-    if source not in WEBHOOK_SOURCES:
-        allowed = ", ".join(sorted(WEBHOOK_SOURCES))
-        raise NotifyConfigError(f"profile field 'webhook.source' must be one of: {allowed}")
-    if not ref:
-        raise NotifyConfigError("profile field 'webhook.ref' must be a non-empty string")
+    try:
+        source, ref = parse_notify_profile_webhook(
+            profile_data,
+            required_profile_version=PROFILE_VERSION,
+            allowed_sources=WEBHOOK_SOURCES,
+        )
+    except ValueError as exc:
+        raise NotifyConfigError(str(exc)) from exc
     if source == "env":
         return ref, None
     return None, ref

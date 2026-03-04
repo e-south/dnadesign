@@ -118,3 +118,29 @@ def test_parse_used_tfbs_detail_rejects_non_collection_values() -> None:
 def test_parse_used_tfbs_detail_rejects_non_dict_items() -> None:
     with pytest.raises(ValueError, match="must contain dict entries"):
         _parse_used_tfbs_detail(["not-a-dict"])
+
+
+def test_compute_used_tf_info_excludes_fixed_promoter_hexamers_from_counts() -> None:
+    sol = _DummySol(sequence="AAAA", library=["TTGACA", "CCCC"], indices=[0, 1])
+    used_tfbs, used_detail, used_counts, used_list = _compute_used_tf_info(
+        sol,
+        ["TTGACA", "CCCC"],
+        ["fixed_like", "background"],
+        {
+            "promoter_constraints": [
+                {
+                    "upstream": "TTGACA",
+                    "downstream": "TATAAT",
+                }
+            ]
+        },
+        None,
+        None,
+        None,
+        None,
+    )
+
+    assert used_tfbs == ["background:CCCC"]
+    assert len(used_detail) == 1
+    assert used_counts == {"background": 1}
+    assert used_list == ["background"]

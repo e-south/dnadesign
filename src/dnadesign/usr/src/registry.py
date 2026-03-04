@@ -23,6 +23,8 @@ from .errors import SchemaError
 
 REGISTRY_FILENAME = "registry.yaml"
 USR_STATE_NAMESPACE = "usr_state"
+_REGISTRY_CACHE: dict[str, tuple[int, int, Dict[str, "RegistryEntry"]]] = {}
+_REGISTRY_CACHE_MAX = 4_096
 
 
 @dataclass(frozen=True)
@@ -66,7 +68,20 @@ def load_registry_file(path: Path) -> Dict[str, RegistryEntry]:
 
 
 def _load_registry_file(path: Path) -> Dict[str, RegistryEntry]:
-    with Path(path).open("r", encoding="utf-8") as f:
+    resolved_path = Path(path).resolve()
+    cache_key = str(resolved_path)
+    try:
+        stat = resolved_path.stat()
+    except FileNotFoundError as exc:
+        raise SchemaError(f"Registry required but not found: {resolved_path}.") from exc
+    cached = _REGISTRY_CACHE.get(cache_key)
+    stat_key = (int(stat.st_mtime_ns), int(stat.st_size))
+    if cached is not None:
+        cached_mtime_ns, cached_size, cached_entries = cached
+        if (cached_mtime_ns, cached_size) == stat_key:
+            return _clone_registry_entries(cached_entries)
+
+    with resolved_path.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     namespaces = data.get("namespaces") or {}
     if not isinstance(namespaces, dict):
@@ -75,7 +90,22 @@ def _load_registry_file(path: Path) -> Dict[str, RegistryEntry]:
     for ns, entry in namespaces.items():
         out[str(ns)] = _parse_entry(str(ns), entry)
     _ensure_usr_state_entry(out)
-    return out
+    _REGISTRY_CACHE[cache_key] = (stat_key[0], stat_key[1], _clone_registry_entries(out))
+    if len(_REGISTRY_CACHE) > _REGISTRY_CACHE_MAX:
+        _REGISTRY_CACHE.clear()
+    return _clone_registry_entries(out)
+
+
+def _clone_registry_entries(entries: Dict[str, RegistryEntry]) -> Dict[str, RegistryEntry]:
+    return {
+        name: RegistryEntry(
+            namespace=entry.namespace,
+            owner=entry.owner,
+            description=entry.description,
+            columns=list(entry.columns),
+        )
+        for name, entry in entries.items()
+    }
 
 
 def usr_state_entry() -> RegistryEntry:
@@ -117,6 +147,7 @@ def save_registry(root: Path, entries: Dict[str, RegistryEntry]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         yaml.safe_dump(payload, f, sort_keys=True)
+    _REGISTRY_CACHE.pop(str(path.resolve()), None)
     return path
 
 

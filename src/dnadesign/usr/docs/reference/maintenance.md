@@ -16,6 +16,12 @@ uv run usr maintenance registry-freeze densegen/demo
 uv run usr maintenance overlay-compact densegen/demo --namespace densegen
 ```
 
+Compaction retention contract:
+
+- Compaction rewrites active parts into one compact overlay file.
+- Previous part snapshots are dropped by default (no lingering compact archives).
+- Explicit `remove_overlay(..., mode=\"archive\")` keeps only the latest archived snapshot.
+
 ## De-duplication
 
 ```bash

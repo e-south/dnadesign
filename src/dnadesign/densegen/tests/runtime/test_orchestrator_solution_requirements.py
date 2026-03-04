@@ -17,13 +17,21 @@ from dnadesign.densegen.src.core.pipeline.stage_b_runtime_checks import _evaluat
 
 
 @pytest.mark.parametrize(
-    ("used_tf_counts", "min_count_per_tf", "required_regulators", "min_count_by_regulator", "expected"),
+    (
+        "used_tf_counts",
+        "min_count_per_tf",
+        "required_regulators",
+        "min_count_by_regulator",
+        "min_total_sites",
+        "expected",
+    ),
     [
         (
             {"TF1": 1},
             1,
             [],
             {},
+            0,
             (
                 False,
                 True,
@@ -36,6 +44,7 @@ from dnadesign.densegen.src.core.pipeline.stage_b_runtime_checks import _evaluat
             0,
             ["TF1", "TF2"],
             {},
+            0,
             (
                 True,
                 False,
@@ -48,6 +57,7 @@ from dnadesign.densegen.src.core.pipeline.stage_b_runtime_checks import _evaluat
             0,
             [],
             {"TF1": 2},
+            0,
             (
                 True,
                 True,
@@ -56,10 +66,32 @@ from dnadesign.densegen.src.core.pipeline.stage_b_runtime_checks import _evaluat
             ),
         ),
         (
+            {"TF1": 1, "background": 1},
+            0,
+            [],
+            {},
+            3,
+            (
+                True,
+                True,
+                "min_total_sites",
+                {"min_total_sites": 3, "found": 2},
+            ),
+        ),
+        (
+            {"TF1": 1, "background": 2},
+            0,
+            [],
+            {},
+            3,
+            (True, True, None, {}),
+        ),
+        (
             {"TF1": 1, "TF2": 1},
             1,
             ["TF1", "TF2"],
             {"TF1": 1},
+            2,
             (True, True, None, {}),
         ),
     ],
@@ -69,6 +101,7 @@ def test_evaluate_solution_requirements(
     min_count_per_tf: int,
     required_regulators: list[str],
     min_count_by_regulator: dict[str, int],
+    min_total_sites: int,
     expected: tuple[bool, bool, str | None, dict],
 ) -> None:
     result = _evaluate_solution_requirements(
@@ -76,6 +109,7 @@ def test_evaluate_solution_requirements(
         tf_list_from_library=["TF1", "TF2"],
         required_regulators=required_regulators,
         plan_min_count_by_regulator=min_count_by_regulator,
+        plan_min_total_sites=min_total_sites,
         used_tf_counts=used_tf_counts,
     )
     assert result == expected

@@ -177,6 +177,7 @@ def _run_stage_b_sampling(
     fixed_elements = plan_item.fixed_elements
     constraints = plan_item.regulator_constraints
     plan_min_count_by_regulator = dict(constraints.min_count_by_regulator or {})
+    plan_min_total_sites = int(getattr(constraints, "min_total_sites", 0) or 0)
     fixed_elements_dump = _fixed_elements_dump(fixed_elements)
     compiled_sequence_constraints = None
     sequence_constraint_patterns: list[str] = []
@@ -321,6 +322,7 @@ def _run_stage_b_sampling(
         tables_root=tables_root,
         attempts_buffer=attempts_buffer,
         solution_rows=solution_rows,
+        composition_rows=composition_rows,
         state_counts=state_counts,
         write_state=write_state,
         total_quota=total_quota,
@@ -365,6 +367,7 @@ def _run_stage_b_sampling(
         fixed_elements=fixed_elements,
         fixed_elements_dump=fixed_elements_dump,
         plan_min_count_by_regulator=plan_min_count_by_regulator,
+        plan_min_total_sites=plan_min_total_sites,
         input_meta=input_meta,
         input_tfbs_count=input_tfbs_count,
         input_tf_tfbs_pair_count=input_tf_tfbs_pair_count,

@@ -141,12 +141,15 @@ def test_profile_wizard_persists_progress_tunables(tmp_path: Path, monkeypatch) 
             "12",
             "--progress-min-seconds",
             "75",
+            "--progress-heartbeat-seconds",
+            "480",
         ],
     )
     assert result.exit_code == 0
     data = json.loads(profile.read_text(encoding="utf-8"))
     assert data["progress_step_pct"] == 12
     assert data["progress_min_seconds"] == 75.0
+    assert data["progress_heartbeat_seconds"] == 480.0
 
 
 def test_profile_wizard_env_uses_default_webhook_env_when_not_set(tmp_path: Path, monkeypatch) -> None:

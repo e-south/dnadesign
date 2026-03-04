@@ -97,6 +97,8 @@ def test_profile_init_persists_progress_tunables(tmp_path: Path) -> None:
             "20",
             "--progress-min-seconds",
             "90",
+            "--progress-heartbeat-seconds",
+            "420",
         ],
     )
 
@@ -104,6 +106,7 @@ def test_profile_init_persists_progress_tunables(tmp_path: Path) -> None:
     data = json.loads(profile.read_text(encoding="utf-8"))
     assert data["progress_step_pct"] == 20
     assert data["progress_min_seconds"] == 90.0
+    assert data["progress_heartbeat_seconds"] == 420.0
 
 
 def test_profile_init_writes_infer_evo2_policy_defaults(tmp_path: Path) -> None:

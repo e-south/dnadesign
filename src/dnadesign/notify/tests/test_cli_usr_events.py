@@ -742,6 +742,7 @@ def test_usr_events_watch_formats_densegen_health_message(tmp_path: Path) -> Non
             "rows_written_session": 12,
             "run_quota": 120,
             "quota_progress_pct": 10.0,
+            "run_elapsed_seconds": 60.0,
         },
     }
     _write_events(events, [event])
@@ -761,8 +762,12 @@ def test_usr_events_watch_formats_densegen_health_message(tmp_path: Path) -> Non
     )
     assert result.exit_code == 0
     assert "DenseGen progress | run=run-1 | dataset=demo" in result.stdout
-    assert "- Quota: 10.0% (12/120 rows)" in result.stdout
-    assert "- Plan success: 8/10 (80.0%)" in result.stdout
+    assert "- Quota (run session): 10.0% (12/120 rows)" in result.stdout
+    assert "- Remaining to quota: 108 rows" in result.stdout
+    assert "- Workspace rows: 1" in result.stdout
+    assert "- Plan yield: 8/10 (80.0%)" in result.stdout
+    assert "- Session throughput: 720.0 rows/hour" in result.stdout
+    assert "- ETA to quota: 00:09:00" in result.stdout
     assert "- TFBS coverage: 25.0% (20/80)" in result.stdout
 
 
@@ -909,6 +914,60 @@ def test_usr_events_watch_suppresses_densegen_running_health_without_progress_st
     assert result.exit_code == 0
     payload_lines = [line for line in result.stdout.splitlines() if line.strip().startswith("{")]
     assert len(payload_lines) == 1
+
+
+def test_usr_events_watch_respects_custom_progress_heartbeat_seconds(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    first = _event(action="densegen_health")
+    first["args"] = {"status": "running"}
+    first["timestamp_utc"] = "2026-02-06T00:00:00+00:00"
+    first["metrics"] = {
+        "densegen": {
+            "run_quota": 100,
+            "rows_written_session": 1,
+            "quota_progress_pct": 1.0,
+            "tfbs_total_library": 40,
+            "tfbs_unique_used": 10,
+            "tfbs_coverage_pct": 25.0,
+            "plans_attempted": 1,
+            "plans_solved": 1,
+        }
+    }
+    second = _event(action="densegen_health")
+    second["args"] = {"status": "running"}
+    second["timestamp_utc"] = "2026-02-06T00:03:00+00:00"
+    second["metrics"] = {
+        "densegen": {
+            "run_quota": 100,
+            "rows_written_session": 3,
+            "quota_progress_pct": 3.0,
+            "tfbs_total_library": 40,
+            "tfbs_unique_used": 10,
+            "tfbs_coverage_pct": 25.0,
+            "plans_attempted": 1,
+            "plans_solved": 1,
+        }
+    }
+    _write_events(events, [first, second])
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--events",
+            str(events),
+            "--progress-heartbeat-seconds",
+            "120",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    payload_lines = [line for line in result.stdout.splitlines() if line.strip().startswith("{")]
+    assert len(payload_lines) == 2
 
 
 def test_usr_events_watch_emits_densegen_running_health_on_quota_step_boundary(tmp_path: Path) -> None:

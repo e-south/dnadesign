@@ -18,7 +18,11 @@ from typing import Any
 from ..delivery.secrets import is_secret_backend_available, resolve_secret_ref, store_secret_ref
 from ..errors import NotifyConfigError
 from ..runtime.spool import ensure_private_directory
-from .flow_types import _validate_progress_min_seconds, _validate_progress_step_pct
+from .flow_types import (
+    _validate_progress_heartbeat_seconds,
+    _validate_progress_min_seconds,
+    _validate_progress_step_pct,
+)
 from .flow_webhook import resolve_webhook_config
 from .ops import sanitize_profile_name, wizard_next_steps
 from .policy import DEFAULT_PROFILE_PATH, default_profile_path_for_tool, policy_defaults, resolve_workflow_policy
@@ -75,6 +79,7 @@ def create_wizard_profile(
     include_raw_event: bool,
     progress_step_pct: int | None,
     progress_min_seconds: float | None,
+    progress_heartbeat_seconds: float | None,
     tls_ca_bundle: Path | None,
     policy: str | None,
     secret_source: str,
@@ -104,6 +109,7 @@ def create_wizard_profile(
     policy_name = resolve_workflow_policy(policy=policy)
     progress_step_pct_value = _validate_progress_step_pct(progress_step_pct)
     progress_min_seconds_value = _validate_progress_min_seconds(progress_min_seconds)
+    progress_heartbeat_seconds_value = _validate_progress_heartbeat_seconds(progress_heartbeat_seconds)
 
     webhook_config = resolve_webhook_config(
         secret_source=secret_source,
@@ -157,6 +163,8 @@ def create_wizard_profile(
         payload["progress_step_pct"] = int(progress_step_pct_value)
     if progress_min_seconds_value is not None:
         payload["progress_min_seconds"] = float(progress_min_seconds_value)
+    if progress_heartbeat_seconds_value is not None:
+        payload["progress_heartbeat_seconds"] = float(progress_heartbeat_seconds_value)
 
     write_profile_file_fn(profile_path, payload, force)
     next_steps = wizard_next_steps(

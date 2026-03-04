@@ -56,6 +56,9 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
     assert "start an infer_evo2 workspace watcher and send to slack" in text
     assert "i already have a profile, just validate wiring" in text
     assert "resume failed deliveries from spool" in text
+    assert "--secret-source file" in text
+    assert "--secret-ref file://" in text
+    assert "--secret-source auto" not in text
     assert "`notify setup slack` mode contract" in text
     assert "`notify usr-events watch` mode contract" in text
 
@@ -74,6 +77,9 @@ def test_notify_usr_events_manual_keeps_setup_run_recover_flow() -> None:
         ],
         label="docs/notify/usr-events.md",
     )
+    assert "--secret-source file" in text
+    assert "--secret-ref file://" in text
+    assert "--secret-source auto" not in text
 
 
 def test_notify_module_readme_is_lightweight_router_and_links_top_level_runbook() -> None:

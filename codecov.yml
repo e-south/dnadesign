@@ -42,6 +42,10 @@ component_management:
       name: usr
       paths:
         - src/dnadesign/usr/**
+    - component_id: ops
+      name: ops
+      paths:
+        - src/dnadesign/ops/**
     - component_id: notify
       name: notify
       paths:

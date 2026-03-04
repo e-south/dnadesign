@@ -51,6 +51,7 @@ This page is the tool-local source for Notify command invocation contracts and f
 - `--config/--workspace` cannot be combined with `--profile` or `--events`.
 - Resolver mode fails when the expected auto-profile file is missing and prints setup guidance.
 - If profile `events_source` disagrees with current resolver inputs, watch fails fast with mismatch details.
+- DenseGen running cadence can be tuned with `--progress-heartbeat-seconds` (or profile `progress_heartbeat_seconds`).
 - Live delivery source contract without profile webhook values: exactly one of `--url`, `--url-env`, or `--secret-ref`.
 - `--dry-run` bypasses webhook posting and can run without webhook URL resolution.
 
@@ -71,6 +72,7 @@ This page is the tool-local source for Notify command invocation contracts and f
 - Profile files must not store plaintext `url` fields.
 - Required string fields and webhook/event source structures are validated at load.
 - Non-generic policies require explicit `only_actions` and `only_tools` in profile payload.
+- Progress tuning fields (`progress_step_pct`, `progress_min_seconds`, `progress_heartbeat_seconds`) must be positive numbers in range constraints.
 
 ### observer boundary
 

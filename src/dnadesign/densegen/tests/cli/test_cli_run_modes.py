@@ -386,7 +386,7 @@ def test_run_next_steps_use_plot_discovery_and_generic_plot_command(tmp_path: Pa
     normalized = result.output.replace("\n", " ")
     assert "dense ls-plots" in normalized
     assert "dense plot --only stage_a_summary" not in normalized
-    assert "render configured plot set" in normalized
+    assert "dense plot -c" in normalized
 
 
 def test_help_lists_campaign_reset_command() -> None:
@@ -864,6 +864,33 @@ def test_run_fresh_preserves_notify_profile_and_cursor(tmp_path: Path, monkeypat
     assert profile_path.read_text() == '{"provider":"slack"}\n'
     assert cursor_path.exists()
     assert cursor_path.read_text() == "12345\n"
+    assert not stale_marker.exists()
+
+
+def test_run_fresh_preserves_ops_logs_directory(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+    logs_dir = run_root / "outputs" / "logs" / "ops" / "sge" / "demo"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    stdout_log = logs_dir / "dnadesign_densegen_cpu.9999.out"
+    stdout_log.write_text("seed-log\n")
+    stale_tables = run_root / "outputs" / "tables"
+    stale_tables.mkdir(parents=True, exist_ok=True)
+    stale_marker = stale_tables / "records.parquet"
+    stale_marker.write_text("stale\n")
+
+    def _fake_run_pipeline(_loaded, *, resume, build_stage_a, **_kwargs):
+        return None
+
+    runner = CliRunner()
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    result = runner.invoke(app, ["run", "--fresh", "-c", str(cfg_path), "--no-plot"])
+
+    assert result.exit_code == 0, result.output
+    assert stdout_log.exists()
+    assert stdout_log.read_text() == "seed-log\n"
     assert not stale_marker.exists()
 
 

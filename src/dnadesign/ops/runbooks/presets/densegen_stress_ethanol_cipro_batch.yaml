@@ -1,0 +1,33 @@
+runbook:
+  schema_version: 1
+  id: study_stress_ethanol_cipro_batch
+  workflow_id: densegen_batch_submit
+  project: dunlop
+  workspace_root: ../../../densegen/workspaces/study_stress_ethanol_cipro
+  logging:
+    stdout_dir: ../../../densegen/workspaces/study_stress_ethanol_cipro/outputs/logs/ops/sge/study_stress_ethanol_cipro_batch
+  densegen:
+    config: ../../../densegen/workspaces/study_stress_ethanol_cipro/config.yaml
+    qsub_template: ../../../../../docs/bu-scc/jobs/densegen-cpu.qsub
+    post_run:
+      qsub_template: ../../../../../docs/bu-scc/jobs/densegen-analysis.qsub
+    run_args:
+      fresh: --fresh --no-plot
+      resume: --resume --no-plot
+    overlay_guard:
+      max_projected_overlay_parts: 3000
+      max_existing_overlay_parts: 1000
+      auto_compact_existing_overlay_parts: true
+      overlay_namespace: densegen
+    records_part_guard:
+      max_projected_records_parts: 3000
+      max_existing_records_parts: 1000
+      max_existing_records_part_age_days: 14
+      auto_compact_existing_records_parts: true
+  resources:
+    pe_omp: 16
+    h_rt: 08:00:00
+    mem_per_core: 8G
+  mode_policy:
+    default: auto
+    on_active_job: hold_jid
