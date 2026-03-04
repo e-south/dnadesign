@@ -117,13 +117,13 @@ def test_resolve_profile_webhook_source_secret_ref_returns_secret_ref() -> None:
         "profile_version": 2,
         "provider": "slack",
         "events": "/tmp/usr/.events.log",
-        "webhook": {"source": "secret_ref", "ref": "file:///tmp/notify.secret"},
+        "webhook": {"source": "secret_ref", "ref": "file:///tmp/notify.webhook"},
     }
 
     url_env, secret_ref = resolve_profile_webhook_source(profile_data)
 
     assert url_env is None
-    assert secret_ref == "file:///tmp/notify.secret"
+    assert secret_ref == "file:///tmp/notify.webhook"  # pragma: allowlist secret
 
 
 def test_resolve_profile_events_source_resolves_relative_config_path(tmp_path: Path) -> None:
