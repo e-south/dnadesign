@@ -642,6 +642,31 @@ def test_iter_file_lines_follow_reports_stale_handle_when_path_disappears(tmp_pa
         next(rows)
 
 
+def test_iter_file_lines_follow_reports_missing_events_file_in_error_mode(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    original = json.dumps(_event(action="write_overlay_part")) + "\n"
+    events.write_text(original, encoding="utf-8")
+    sleep_calls = {"n": 0}
+
+    def _fake_sleep(_seconds: float) -> None:
+        sleep_calls["n"] += 1
+        if sleep_calls["n"] == 1:
+            events.unlink()
+            return
+        raise RuntimeError("follow loop did not report missing events file")
+
+    monkeypatch.setattr("dnadesign.notify.runtime.cursor.iteration.time.sleep", _fake_sleep)
+
+    rows = _iter_file_lines(
+        events,
+        start_offset=len(original),
+        on_truncate="error",
+        follow=True,
+    )
+    with pytest.raises(NotifyConfigError, match="events file disappeared while following"):
+        next(rows)
+
+
 def test_usr_events_watch_spools_after_delivery_failures(tmp_path: Path, monkeypatch) -> None:
     events = tmp_path / "events.log"
     spool_dir = tmp_path / "spool"

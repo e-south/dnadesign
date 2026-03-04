@@ -92,12 +92,20 @@ def iter_file_lines(
                 return
             time.sleep(poll_interval)
             if not events_path.exists():
+                if mode == "error":
+                    raise NotifyConfigError(
+                        "events file disappeared while following. Pass --on-truncate restart to resume from start."
+                    )
                 if timeout_value is not None and (time.monotonic() - last_activity) >= timeout_value:
                     return
                 continue
             try:
                 path_stat = events_path.stat()
             except FileNotFoundError:
+                if mode == "error":
+                    raise NotifyConfigError(
+                        "events file disappeared while following. Pass --on-truncate restart to resume from start."
+                    )
                 if timeout_value is not None and (time.monotonic() - last_activity) >= timeout_value:
                     return
                 continue
