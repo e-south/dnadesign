@@ -88,6 +88,16 @@ def test_status_first_queue_fair_guidance_present_in_bu_scc_docs_bundle() -> Non
     assert "respect the queue and do not skip the line" in docs_bundle
 
 
+def test_bu_scc_notify_webhook_examples_require_owner_only_secret_file_permissions() -> None:
+    quickstart = _read(BU_SCC_DOCS / "quickstart.md")
+    batch_notify = _read(BU_SCC_DOCS / "batch-notify.md")
+    jobs_readme = _read(BU_SCC_DOCS / "jobs" / "README.md")
+    docs_bundle = "\n".join((quickstart, batch_notify, jobs_readme))
+
+    assert 'touch "$WEBHOOK_FILE"' in docs_bundle
+    assert 'chmod 600 "$WEBHOOK_FILE"' in docs_bundle
+
+
 def test_top_level_docs_do_not_reference_removed_repo_local_sge_skill_path() -> None:
     removed_repo_local_path = "docs/bu-scc/sge-hpc-ops/SKILL.md"
     for path in TOP_LEVEL_SYSTEM_DOCS:

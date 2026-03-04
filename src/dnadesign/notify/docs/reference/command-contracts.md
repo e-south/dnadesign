@@ -49,6 +49,9 @@ This page is the tool-local source for Notify command invocation contracts and f
   - `--events <path>`
   - resolver mode: `--tool` with exactly one of `--config` or `--workspace`
 - `--config/--workspace` cannot be combined with `--profile` or `--events`.
+- `--on-truncate` contract is explicit:
+  - `error` (default) fails fast on truncation/replacement/disappearance while following.
+  - `restart` reopens from start and resumes follow loop.
 - Resolver mode fails when the expected auto-profile file is missing and prints setup guidance.
 - If profile `events_source` disagrees with current resolver inputs, watch fails fast with mismatch details.
 - DenseGen running cadence can be tuned with `--progress-heartbeat-seconds` (or profile `progress_heartbeat_seconds`).

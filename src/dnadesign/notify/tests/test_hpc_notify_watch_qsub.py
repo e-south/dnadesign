@@ -636,3 +636,42 @@ def test_qsub_script_terminal_enforcement_allows_terminal_probe_success(tmp_path
     calls = capture_path.read_text(encoding="utf-8")
     assert "run notify usr-events watch --events" in calls
     assert "run notify send --status failure" not in calls
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
+def test_qsub_script_propagates_on_truncate_override_to_watch_and_probe(tmp_path: Path) -> None:
+    repo_root = _repo_root()
+    script_path = repo_root / "docs/bu-scc/jobs/notify-watch.qsub"
+
+    events_path = tmp_path / "dataset" / ".events.log"
+    events_path.parent.mkdir(parents=True, exist_ok=True)
+    events_path.write_text('{"event":"running"}\n', encoding="utf-8")
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    capture_path = _write_fake_uv(bin_dir)
+    webhook_file = _write_webhook_secret(tmp_path)
+
+    env = dict(os.environ)
+    env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+    env["UV_CAPTURE"] = str(capture_path)
+    env["EVENTS_PATH"] = str(events_path)
+    env["WEBHOOK_ENV"] = "DENSEGEN_WEBHOOK"
+    env["WEBHOOK_FILE"] = str(webhook_file)
+    env["NOTIFY_POLICY"] = "generic"
+    env["NOTIFY_NAMESPACE"] = "densegen"
+    env["NOTIFY_ENFORCE_TERMINAL_ON_IDLE"] = "1"
+    env["NOTIFY_ON_TRUNCATE"] = "error"
+    env.pop("DENSEGEN_WEBHOOK", None)
+
+    result = subprocess.run(
+        ["bash", str(script_path)],
+        cwd=str(tmp_path),
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 3
+    calls = capture_path.read_text(encoding="utf-8")
+    assert calls.count("--on-truncate error") >= 2

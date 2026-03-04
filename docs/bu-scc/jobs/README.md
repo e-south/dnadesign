@@ -113,6 +113,8 @@ NOTIFY_DIR="<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/outpu
 WEBHOOK_FILE="$HOME/.config/dnadesign/notify_webhook.secret"
 
 mkdir -p "$(dirname "$WEBHOOK_FILE")"
+touch "$WEBHOOK_FILE"
+chmod 600 "$WEBHOOK_FILE"
 uv run notify setup webhook \
   --secret-source file \
   --secret-ref "file://$WEBHOOK_FILE"

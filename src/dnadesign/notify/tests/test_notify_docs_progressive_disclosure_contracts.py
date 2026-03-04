@@ -80,6 +80,7 @@ def test_notify_usr_events_manual_keeps_setup_run_recover_flow() -> None:
     )
     assert "--secret-source file" in text
     assert "--secret-ref file://" in text
+    assert "chmod 600" in text
     assert "--secret-source auto" not in text
 
 
