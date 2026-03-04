@@ -594,7 +594,7 @@ def test_qsub_script_can_enforce_terminal_status_on_idle_timeout(tmp_path: Path)
     assert result.returncode == 3
     calls = capture_path.read_text(encoding="utf-8")
     assert "run notify usr-events watch --events" in calls
-    assert "--dry-run --no-advance-cursor-on-dry-run --stop-on-terminal-status" in calls
+    assert "--dry-run --no-advance-cursor-on-dry-run --on-truncate restart --stop-on-terminal-status" in calls
     assert "run notify send --status failure" in calls
 
 

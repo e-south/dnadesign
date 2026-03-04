@@ -109,6 +109,7 @@ probe_terminal_status_since_offset() {
       --only-tools densegen \
       --dry-run \
       --no-advance-cursor-on-dry-run \
+      --on-truncate "$NOTIFY_ON_TRUNCATE" \
       --stop-on-terminal-status 2>/dev/null || true
   )"
   rm -f "$probe_cursor"
