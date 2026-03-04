@@ -1584,28 +1584,73 @@ def test_cli_execute_help_includes_command_timeout_option() -> None:
     assert "execute phases." in result.output
 
 
-def test_cli_plan_help_includes_repo_root_option() -> None:
+def test_cli_plan_accepts_repo_root_option(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["runbook", "plan", "--help"])
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "plan",
+            "--runbook",
+            str(runbook_path),
+            "--repo-root",
+            str(Path.cwd()),
+            "--max-discovery-jobs",
+            "0",
+        ],
+    )
 
-    assert result.exit_code == 0
-    assert "--repo-root" in result.output
+    assert result.exit_code == 2
+    assert "--max-discovery-jobs must be > 0" in result.output
+    assert "No such option: --repo-root" not in result.output
 
 
-def test_cli_active_jobs_help_includes_repo_root_option() -> None:
+def test_cli_active_jobs_accepts_repo_root_option(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["runbook", "active-jobs", "--help"])
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "active-jobs",
+            "--runbook",
+            str(runbook_path),
+            "--repo-root",
+            str(Path.cwd()),
+            "--max-discovery-jobs",
+            "0",
+        ],
+    )
 
-    assert result.exit_code == 0
-    assert "--repo-root" in result.output
+    assert result.exit_code == 2
+    assert "--max-discovery-jobs must be > 0" in result.output
+    assert "No such option: --repo-root" not in result.output
 
 
-def test_cli_execute_help_includes_repo_root_option() -> None:
+def test_cli_execute_accepts_repo_root_option(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    audit_path = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "audit" / "result.json"
     runner = CliRunner()
-    result = runner.invoke(app, ["runbook", "execute", "--help"])
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "execute",
+            "--runbook",
+            str(runbook_path),
+            "--audit-json",
+            str(audit_path),
+            "--repo-root",
+            str(Path.cwd()),
+            "--max-discovery-jobs",
+            "0",
+        ],
+    )
 
-    assert result.exit_code == 0
-    assert "--repo-root" in result.output
+    assert result.exit_code == 2
+    assert "--max-discovery-jobs must be > 0" in result.output
+    assert "No such option: --repo-root" not in result.output
 
 
 def test_cli_execute_defaults_timeout_to_300_seconds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1645,6 +1690,7 @@ def test_cli_execute_defaults_timeout_to_300_seconds(tmp_path: Path, monkeypatch
             "--audit-json",
             str(audit_path),
             "--no-submit",
+            "--no-discover-active-jobs",
         ],
     )
 
