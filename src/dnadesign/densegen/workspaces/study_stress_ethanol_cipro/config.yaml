@@ -40,7 +40,7 @@ densegen:
           rank_by: score_norm
           alpha: 0.35
           pool:
-            min_score_norm: 0.75
+            min_score_norm: null
             max_candidates: null
             relevance_norm: minmax_raw_score
         tier_fractions: [0.001, 0.01, 0.09]
@@ -68,7 +68,7 @@ densegen:
           rank_by: score_norm
           alpha: 0.35
           pool:
-            min_score_norm: 0.75
+            min_score_norm: null
             max_candidates: null
             relevance_norm: minmax_raw_score
         tier_fractions: [0.001, 0.01, 0.09]
@@ -96,7 +96,7 @@ densegen:
           rank_by: score_norm
           alpha: 0.35
           pool:
-            min_score_norm: 0.75
+            min_score_norm: null
             max_candidates: null
             relevance_norm: minmax_raw_score
         tier_fractions: [0.001, 0.01, 0.09]

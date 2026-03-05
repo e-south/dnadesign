@@ -568,6 +568,9 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
         assert inp.sampling.mining.batch_size == 5000
         assert inp.sampling.mining.budget.mode == "fixed_candidates"
         assert inp.sampling.mining.budget.candidates == 1_000_000
+        assert inp.sampling.selection.policy == "mmr"
+        assert inp.sampling.selection.pool is not None
+        assert inp.sampling.selection.pool.min_score_norm is None
 
     background = next(inp for inp in cfg.root.densegen.inputs if inp.type == "background_pool")
     assert background.sampling.n_sites == 1000
