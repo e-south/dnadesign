@@ -105,11 +105,11 @@ Curated record fields:
 | `densegen__input_pwm_ids` | record_conditional | Stage-A PWM motif IDs used for sampling (`pwm_*` inputs). |
 | `densegen__used_tfbs` | record_keep | `TF:TFBS` strings used in the final sequence. |
 | `densegen__used_tfbs_detail` | record_keep | Consolidated per-placement detail for all sequence parts. TFBS entries use explicit keys (`part_index`, `regulator`, `sequence`, `core_sequence`, `orientation`, `offset_raw`, `pad_left`, `offset`, `length`, `end`, `source`, `motif_id`, `tfbs_id`). PWM-sampled runs additionally include lineage fields (`score_best_hit_raw`, `score_theoretical_max`, `score_relative_to_theoretical_max`, `rank_among_mined_positive`, `rank_among_selected`, `selection_policy`, `nearest_selected_*`, `matched_start`, `matched_stop`, `matched_strand`). Fixed-element entries keep `role`, `sequence`, normalized geometry, and optional variant/spacer metadata. |
-| `densegen__used_tf_counts` | record_keep | Per-TF placement counts (`{tf, count}`). |
+| `densegen__used_tf_counts` | record_keep | Per-TF placement counts (`{tf, count}`) computed from `densegen__used_tfbs_detail` TFBS entries. |
 | `densegen__library_unique_tf_count` | record_keep | Unique TF count in sampled library. |
 | `densegen__library_unique_tfbs_count` | record_keep | Unique TFBS count in sampled library. |
 | `densegen__covers_all_tfs_in_solution` | record_keep | Whether min-count TF coverage was satisfied. |
-| `densegen__required_regulators` | record_keep | Regulators required for this library. |
+| `densegen__required_regulators` | record_keep | Selected required regulators for this sampled library (one/minimum picks from `regulator_constraints.groups`). This is a constraint set, not the full set of regulators used in the accepted sequence. |
 | `densegen__min_count_by_regulator` | record_keep | Per-regulator minimum counts (`{tf, min_count}`). |
 | `densegen__compression_ratio` | record_keep | Solution compression ratio. |
 | `densegen__sampling_library_hash` | record_keep | Stage-B stable sampled-library hash. |

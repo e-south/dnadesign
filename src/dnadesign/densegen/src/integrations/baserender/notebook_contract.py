@@ -19,6 +19,15 @@ from dnadesign.baserender import DENSEGEN_TFBS_REQUIRED_KEYS, cruncher_showcase_
 REQUIRED_ADAPTER_COLUMN_KEYS = ("id", "sequence", "annotations")
 REQUIRED_TFBS_ENTRY_KEYS = DENSEGEN_TFBS_REQUIRED_KEYS
 
+_NOTEBOOK_COLORBLIND_PASTEL_PALETTE: Mapping[str, str] = {
+    "tf:background": "#C3CAD3",
+    "tf:lexA": "#5DADE2",
+    "tf:cpxR": "#2D9B66",
+    "tf:baeR": "#E58A2B",
+    "promoter:sigma70_core:upstream": "#7D86D1",
+    "promoter:sigma70_core:downstream": "#C886D1",
+}
+
 
 @dataclass(frozen=True)
 class DenseGenNotebookRenderContract:
@@ -51,6 +60,7 @@ def _validate_notebook_render_contract(contract: DenseGenNotebookRenderContract)
 def densegen_notebook_render_contract() -> DenseGenNotebookRenderContract:
     showcase_style = dict(cruncher_showcase_style_overrides())
     showcase_palette = dict(showcase_style.get("palette") or {})
+    showcase_palette.update(_NOTEBOOK_COLORBLIND_PASTEL_PALETTE)
     contract = DenseGenNotebookRenderContract(
         adapter_kind="densegen_tfbs",
         adapter_columns={

@@ -1361,6 +1361,39 @@ def test_run_health_detail_reason_labels_start_capitalized() -> None:
         fig.clf()
 
 
+def test_run_health_detail_reason_labels_keep_full_text_without_truncation() -> None:
+    attempts_rows: list[dict[str, object]] = []
+    for idx in range(24):
+        attempts_rows.append(
+            {
+                "attempt_index": idx + 1,
+                "created_at": f"2026-01-26T00:00:{idx:02d}+00:00",
+                "status": "failed",
+                "reason": f"custom_reason_label_with_many_words_{idx:02d}_segment",
+                "plan_name": "demo_plan",
+                "sampling_library_index": 1,
+            }
+        )
+
+    attempts = pd.DataFrame(attempts_rows)
+    fig, axes = _build_run_health_detail_figure(
+        attempts,
+        events_df=None,
+        style={},
+        plan_quotas={"demo_plan": 24},
+    )
+    try:
+        labels = [tick.get_text() for tick in axes["fail"].get_yticklabels() if tick.get_text()]
+        assert labels
+        assert all("..." not in label for label in labels)
+        assert any("Custom reason label with many words 00 segment" == label for label in labels)
+        font_sizes = [float(tick.get_fontsize()) for tick in axes["fail"].get_yticklabels() if tick.get_text()]
+        assert font_sizes
+        assert max(font_sizes) <= 10.0
+    finally:
+        fig.clf()
+
+
 def test_run_health_summary_table_uses_tighter_vertical_save_padding(monkeypatch, tmp_path: Path) -> None:
     import dnadesign.densegen.src.viz.plot_run as plot_run_module
 

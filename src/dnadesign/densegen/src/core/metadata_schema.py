@@ -97,6 +97,7 @@ def validate_metadata(meta: Mapping[str, Any]) -> None:
 
 
 def _validate_list_fields(meta: Mapping[str, Any]) -> None:
+    detail_tf_counts: dict[str, int] | None = None
     list_of_str = {
         "used_tfbs",
         "input_pwm_ids",
@@ -116,6 +117,7 @@ def _validate_list_fields(meta: Mapping[str, Any]) -> None:
         vals = meta["used_tfbs_detail"]
         if isinstance(vals, (str, bytes)) or not isinstance(vals, Sequence):
             raise TypeError("Metadata field 'used_tfbs_detail' must be a list of dicts")
+        detail_tf_counts = {}
         input_mode = str(meta.get("input_mode") or "").strip().lower()
         for item in vals:
             if not isinstance(item, dict):
@@ -142,9 +144,11 @@ def _validate_list_fields(meta: Mapping[str, Any]) -> None:
                 for key in ("regulator", "sequence", "core_sequence", "source", "motif_id", "tfbs_id"):
                     if not str(item.get(key) or "").strip():
                         raise ValueError(f"used_tfbs_detail tfbs entries must use non-empty '{key}'")
+                regulator = str(item.get("regulator") or "").strip()
                 orientation = str(item.get("orientation") or "").strip().lower()
                 if orientation not in {"fwd", "rev"}:
                     raise ValueError("used_tfbs_detail tfbs entries must use orientation 'fwd' or 'rev'")
+                detail_tf_counts[regulator] = int(detail_tf_counts.get(regulator, 0)) + 1
                 if input_mode == "pwm_sampled":
                     for key in (
                         "score_best_hit_raw",
@@ -175,11 +179,35 @@ def _validate_list_fields(meta: Mapping[str, Any]) -> None:
         vals = meta["used_tf_counts"]
         if isinstance(vals, (str, bytes)) or not isinstance(vals, Sequence):
             raise TypeError("Metadata field 'used_tf_counts' must be a list of dicts")
+        counts_by_tf: dict[str, int] = {}
         for item in vals:
             if not isinstance(item, dict):
                 raise TypeError("Metadata field 'used_tf_counts' must contain dict entries")
             if "tf" not in item or "count" not in item:
                 raise ValueError("used_tf_counts entries must include 'tf' and 'count'")
+            tf = str(item["tf"]).strip()
+            if not tf:
+                raise ValueError("used_tf_counts.tf must be non-empty")
+            count = item["count"]
+            if not isinstance(count, numbers.Integral):
+                raise TypeError("used_tf_counts.count must be an int")
+            count_int = int(count)
+            if count_int < 0:
+                raise ValueError("used_tf_counts.count must be >= 0")
+            if tf in counts_by_tf:
+                raise ValueError(f"used_tf_counts entries must not repeat tf '{tf}'")
+            counts_by_tf[tf] = count_int
+        if detail_tf_counts is not None and counts_by_tf != detail_tf_counts:
+            raise ValueError("used_tf_counts must match tfbs entries in used_tfbs_detail")
+        required = [
+            str(tf).strip()
+            for tf in meta.get("required_regulators", [])
+            if isinstance(tf, str) and str(tf).strip()
+        ]
+        missing_required = [tf for tf in required if counts_by_tf.get(tf, 0) < 1]
+        if missing_required:
+            missing_text = ", ".join(missing_required)
+            raise ValueError(f"required_regulators must appear in used_tf_counts (missing: {missing_text})")
 
     if "min_count_by_regulator" in meta:
         vals = meta["min_count_by_regulator"]

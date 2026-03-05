@@ -44,8 +44,8 @@ uv run dense workspace where --format json
 ### Resume and fresh behavior
 
 - `dense run` resumes by default when prior run state is present.
-- `dense run --fresh` clears outputs before running.
-- `dense campaign-reset` clears outputs while preserving `config.yaml` and `inputs/`.
+- `dense run --fresh` clears run artifacts under `outputs/` before running while preserving `outputs/notify` and `outputs/logs` scaffolding.
+- `dense campaign-reset` applies the same reset contract and preserves `config.yaml` and `inputs/`; it preserves USR registry by default.
 
 ### Related documents
 

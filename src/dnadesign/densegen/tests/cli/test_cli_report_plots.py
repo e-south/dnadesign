@@ -101,7 +101,9 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         "if len(_record_display_id) > 16:",
         '_record_display_id = f"{_record_display_id[:8]}...{_record_display_id[-4:]}"',
         '_workspace_title = str(workspace_heading or "").strip()',
-        '_header_text = f"{_workspace_title} | Sequence {_record_display_id}"',
+        "_raw_plan_text = str(plan_summary or \"\").strip()",
+        '_header_text = f"{_workspace_title} | Sequence {_record_display_id} | Plan {_plan_label}"',
+        "_header_wrapped = textwrap.fill(",
         "_legend_pad_px = 24.0",
         '"padding_y": 12.0,',
         "_figure.text(",
@@ -480,7 +482,9 @@ def test_notebook_generate_baserender_preview_adds_title_and_legend_clearance(tm
     assert "_figure.text(" in content
     assert '_record_id = str(getattr(record, "id", "") or "unknown")' in content
     assert '_workspace_title = str(workspace_heading or "").strip()' in content
-    assert '_header_text = f"{_workspace_title} | Sequence {_record_display_id}"' in content
+    assert ' | Plan {_plan_label}"' in content
+    assert "_header_wrapped = textwrap.fill(" in content
+    assert "_title_font_size = max(" in content
     assert '_header_text = f"{workspace_name} | sequence {_record_display_id}"' not in content
 
 

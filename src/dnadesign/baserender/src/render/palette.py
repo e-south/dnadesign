@@ -69,9 +69,35 @@ def _promoter_component_color(name: str, component: str) -> tuple[float, float, 
 class Palette:
     def __init__(self, overrides: Mapping[str, str] | None = None):
         self.overrides = dict(overrides or {})
+        self._overrides_lower = {str(key).strip().lower(): value for key, value in self.overrides.items()}
+
+    def _resolve_override(self, tag: str) -> str | None:
+        tag_norm = str(tag).strip()
+        if not tag_norm:
+            return None
+
+        direct = self.overrides.get(tag_norm)
+        if direct:
+            return direct
+
+        lower = self._overrides_lower.get(tag_norm.lower())
+        if lower:
+            return lower
+
+        if tag_norm.startswith("tf:"):
+            tf_name = tag_norm[3:]
+            if "_" in tf_name:
+                base_tf = tf_name.split("_", 1)[0]
+                base_tag = f"tf:{base_tf}"
+                base_direct = self.overrides.get(base_tag)
+                if base_direct:
+                    return base_direct
+                return self._overrides_lower.get(base_tag.lower())
+
+        return None
 
     def color_for(self, tag: str) -> tuple[float, float, float]:
-        hex_color = self.overrides.get(tag)
+        hex_color = self._resolve_override(tag)
         if hex_color:
             return _hex_to_rgb(hex_color)
 

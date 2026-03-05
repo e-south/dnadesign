@@ -21,7 +21,7 @@ densegen:
       path: inputs/motif_artifacts/lexA__demo_merged_meme_oops_multitf__lexA_CTGTATAWAWWHACA.json
       sampling:
         strategy: stochastic
-        n_sites: 1000
+        n_sites: 500
         mining:
           batch_size: 5000
           budget:
@@ -41,7 +41,7 @@ densegen:
           alpha: 0.35
           pool:
             min_score_norm: null
-            max_candidates: null
+            max_candidates: 10000
             relevance_norm: minmax_raw_score
         tier_fractions: [0.001, 0.01, 0.09]
     - name: cpxR_pwm
@@ -49,7 +49,7 @@ densegen:
       path: inputs/motif_artifacts/cpxR__demo_merged_meme_oops_multitf__cpxR_MANWWHTTTAM.json
       sampling:
         strategy: stochastic
-        n_sites: 1000
+        n_sites: 500
         mining:
           batch_size: 5000
           budget:
@@ -69,7 +69,7 @@ densegen:
           alpha: 0.35
           pool:
             min_score_norm: null
-            max_candidates: null
+            max_candidates: 10000
             relevance_norm: minmax_raw_score
         tier_fractions: [0.001, 0.01, 0.09]
     - name: baeR_pwm
@@ -77,7 +77,7 @@ densegen:
       path: inputs/motif_artifacts/baeR__demo_merged_meme_oops_multitf__baeR_TTTCTSCVHNA.json
       sampling:
         strategy: stochastic
-        n_sites: 1000
+        n_sites: 500
         mining:
           batch_size: 5000
           budget:
@@ -97,13 +97,13 @@ densegen:
           alpha: 0.35
           pool:
             min_score_norm: null
-            max_candidates: null
+            max_candidates: 10000
             relevance_norm: minmax_raw_score
         tier_fractions: [0.001, 0.01, 0.09]
     - name: background
       type: background_pool
       sampling:
-        n_sites: 1000
+        n_sites: 500
         mining:
           batch_size: 20000
           budget:
@@ -149,7 +149,7 @@ densegen:
       max_plans: 64
     sampling:
       pool_strategy: subsample
-      library_size: 10
+      library_size: 25
       library_sampling_strategy: coverage_weighted
       coverage_boost_alpha: 0.25
       unique_binding_sites: true
@@ -274,7 +274,7 @@ densegen:
 
   runtime:
     round_robin: true
-    max_accepted_per_library: 512
+    max_accepted_per_library: 100
     min_count_per_tf: 0
     max_duplicate_solutions: 3
     no_progress_seconds_before_resample: 10

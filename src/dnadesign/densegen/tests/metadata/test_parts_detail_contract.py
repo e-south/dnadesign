@@ -65,3 +65,46 @@ def test_validate_metadata_rejects_pwm_tfbs_missing_lineage_fields() -> None:
     ]
     with pytest.raises(ValueError, match="score_theoretical_max"):
         validate_metadata(meta)
+
+
+def test_validate_metadata_rejects_used_tf_counts_mismatch_with_parts_detail() -> None:
+    meta = output_meta(library_hash="demo_hash", library_index=1)
+    meta["used_tf_counts"] = [{"tf": "lexA", "count": 2}, {"tf": "cpxR", "count": 1}]
+    with pytest.raises(ValueError, match="used_tf_counts.*used_tfbs_detail"):
+        validate_metadata(meta)
+
+
+def test_validate_metadata_rejects_required_regulators_missing_from_used_tf_counts() -> None:
+    meta = output_meta(library_hash="demo_hash", library_index=1)
+    meta["required_regulators"] = ["lexA", "baeR"]
+    with pytest.raises(ValueError, match="required_regulators"):
+        validate_metadata(meta)
+
+
+def test_validate_metadata_accepts_required_regulators_as_subset_of_used_tf_counts() -> None:
+    meta = output_meta(library_hash="demo_hash", library_index=1)
+    meta["required_regulators"] = ["lexA"]
+    meta["used_tfbs_detail"].append(
+        {
+            "part_kind": "tfbs",
+            "part_index": 2,
+            "regulator": "background",
+            "sequence": "GGG",
+            "core_sequence": "GGG",
+            "orientation": "fwd",
+            "offset": 7,
+            "offset_raw": 7,
+            "pad_left": 0,
+            "length": 3,
+            "end": 10,
+            "source": "demo",
+            "motif_id": "motif_background",
+            "tfbs_id": "tfbs_background_GGG",
+        }
+    )
+    meta["used_tf_counts"] = [
+        {"tf": "background", "count": 1},
+        {"tf": "cpxR", "count": 1},
+        {"tf": "lexA", "count": 1},
+    ]
+    validate_metadata(meta)

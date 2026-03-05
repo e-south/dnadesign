@@ -306,8 +306,10 @@ def test_build_workspace_intro_reports_missing_manifest_with_source_tagged_summa
     assert "## Run details" in intro
     bullets = _summary_bullets(intro)
     assert len(bullets) == 0
-    assert "Outcome: manifest not found. [manifest]" in intro
-    assert "Pressure: manifest not found. [manifest]" in intro
+    assert "Outcome: run outcomes are not available yet;" in intro
+    assert "outputs/meta/run_manifest.json" in intro
+    assert "Pressure: run outcomes are not available yet;" in intro
+    assert "manifest not found" not in intro
     expected = [
         "### Definitions",
         "### Scope and quotas (2 plans)",

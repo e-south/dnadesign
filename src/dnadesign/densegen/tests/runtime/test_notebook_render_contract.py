@@ -18,6 +18,7 @@ import pandas as pd
 import pytest
 
 from dnadesign.baserender import DENSEGEN_TFBS_REQUIRED_KEYS, SchemaError, render_parquet_record_figure
+from dnadesign.baserender.src.render.palette import Palette
 from dnadesign.densegen.src.integrations.baserender.notebook_contract import (
     REQUIRED_TFBS_ENTRY_KEYS,
     densegen_notebook_render_contract,
@@ -65,11 +66,38 @@ def test_notebook_render_contract_is_explicit_and_complete() -> None:
     assert isinstance(contract.style_overrides, dict)
     palette = contract.style_overrides.get("palette")
     assert isinstance(palette, dict)
-    assert palette.get("tf:lexA")
-    assert palette.get("tf:cpxR")
-    assert palette.get("tf:baeR")
+    assert palette.get("tf:lexA") == "#5DADE2"
+    assert palette.get("tf:cpxR") == "#2D9B66"
+    assert palette.get("tf:baeR") == "#E58A2B"
+    assert palette.get("tf:background") == "#C3CAD3"
+    assert palette.get("promoter:sigma70_core:upstream") == "#7D86D1"
+    assert palette.get("promoter:sigma70_core:downstream") == "#C886D1"
     assert contract.record_window_limit == 500
     assert REQUIRED_TFBS_ENTRY_KEYS == DENSEGEN_TFBS_REQUIRED_KEYS
+
+
+def test_notebook_render_contract_maps_extended_densegen_tf_tags_to_base_palette() -> None:
+    contract = densegen_notebook_render_contract()
+    palette = Palette(contract.style_overrides.get("palette"))
+    assert palette.color_for("tf:lexA_CTGTATAWAWWHACA") == palette.color_for("tf:lexA")
+    assert palette.color_for("tf:cpxR_MANWWHTTTAM") == palette.color_for("tf:cpxR")
+    assert palette.color_for("tf:baeR_TTTCTSCVHNA") == palette.color_for("tf:baeR")
+
+
+def test_notebook_render_contract_keeps_background_cpxr_baer_visually_separated() -> None:
+    contract = densegen_notebook_render_contract()
+    palette = Palette(contract.style_overrides.get("palette"))
+
+    def _distance(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
+        return sum((x - y) ** 2 for x, y in zip(a, b)) ** 0.5
+
+    background = palette.color_for("tf:background")
+    cpxr = palette.color_for("tf:cpxR")
+    baer = palette.color_for("tf:baeR")
+
+    assert _distance(background, cpxr) >= 0.20
+    assert _distance(background, baer) >= 0.20
+    assert _distance(cpxr, baer) >= 0.20
 
 
 def test_notebook_render_contract_rejects_legacy_tf_tfbs_keys(tmp_path: Path) -> None:

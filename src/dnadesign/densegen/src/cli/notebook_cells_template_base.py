@@ -20,6 +20,7 @@ def _():
     from pathlib import Path
     import shutil
     import subprocess
+    import textwrap
 
     import marimo as mo
     import pandas as pd
@@ -59,6 +60,7 @@ def _():
         render_record_figure,
         shutil,
         subprocess,
+        textwrap,
         yaml,
     )
 
@@ -472,16 +474,45 @@ def _(json):
 
 
 @app.cell
-def _(contract, render_record_figure, workspace_heading, workspace_name):
+def _(contract, render_record_figure, textwrap, workspace_heading, workspace_name):
     _workspace_title = str(workspace_heading or "").strip()
     if not _workspace_title:
         _workspace_title = str(workspace_name or "").strip().replace("_", " ").replace("-", " ")
         _workspace_title = " ".join(_workspace_title.split()).title()
 
-    def build_baserender_figure(record, *, core_summary: str):
+    def build_baserender_figure(record, *, core_summary: str, plan_summary: str):
         _legend_pad_px = 24.0
         _legend_patch_h = 13.0
-        _title_font_size = 14
+        _title_font_size = 14.0
+        _raw_plan_text = str(plan_summary or "").strip()
+        if not _raw_plan_text:
+            _raw_plan_text = "unscoped"
+        _plan_base = _raw_plan_text.split("__", 1)[0] if "__" in _raw_plan_text else _raw_plan_text
+        _plan_label = " ".join(str(_plan_base).replace("_", " ").split())
+        if not _plan_label:
+            _plan_label = "unscoped"
+        _record_id = str(getattr(record, "id", "") or "unknown")
+        _record_display_id = _record_id
+        if len(_record_display_id) > 16:
+            _record_display_id = f"{_record_display_id[:8]}...{_record_display_id[-4:]}"
+        _header_text = f"{_workspace_title} | Sequence {_record_display_id} | Plan {_plan_label}"
+        _header_wrapped = textwrap.fill(
+            _header_text,
+            width=76,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        _line_count = max(1, len(_header_wrapped.splitlines()))
+        _longest_line = max((len(line) for line in _header_wrapped.splitlines()), default=len(_header_text))
+        if _longest_line > 70:
+            _title_font_size = 10.0
+        elif _longest_line > 56:
+            _title_font_size = 11.0
+        elif _longest_line > 44:
+            _title_font_size = 12.0
+        else:
+            _title_font_size = 13.0
+        _title_font_size = max(10.0, min(14.0, _title_font_size))
         _contract_style_overrides = dict(getattr(contract, "style_overrides", {}) or {})
         _style_overrides = dict(_contract_style_overrides)
         _style_overrides.update(
@@ -498,6 +529,7 @@ def _(contract, render_record_figure, workspace_heading, workspace_name):
                 "legend_gap_x": 44.0,
             }
         )
+        _style_overrides["padding_y"] = max(float(_style_overrides.get("padding_y", 12.0)), 8.0 + 4.0 * _line_count)
         _figure = render_record_figure(
             record,
             style_preset=contract.style_preset,
@@ -507,12 +539,6 @@ def _(contract, render_record_figure, workspace_heading, workspace_name):
         for _axis in _figure.axes:
             _axis.set_facecolor("white")
 
-        _record_id = str(getattr(record, "id", "") or "unknown")
-        _record_display_id = _record_id
-        if len(_record_display_id) > 16:
-            _record_display_id = f"{_record_display_id[:8]}...{_record_display_id[-4:]}"
-        _header_text = f"{_workspace_title} | Sequence {_record_display_id}"
-
         _axis = _figure.axes[0] if _figure.axes else None
         if _axis is None:
             raise RuntimeError("BaseRender preview figure expected one axes for title placement.")
@@ -520,7 +546,7 @@ def _(contract, render_record_figure, workspace_heading, workspace_name):
         _figure.text(
             0.5,
             0.985,
-            _header_text,
+            _header_wrapped,
             transform=_figure.transFigure,
             ha="center",
             va="top",
@@ -685,6 +711,7 @@ def _(
         _record_id = str(_row[record_id_column])
         preview_meta_by_id[_record_id] = {
             "core_summary": summarize_promoter_sites(_row.get("densegen__parts_detail")),
+            "plan_summary": str(_row.get("densegen__plan") or "").strip(),
         }
 
     preview_cache_dir = run_root / "outputs" / "notebooks" / ".baserender_preview_cache"
@@ -707,6 +734,7 @@ def _(
         _figure = build_baserender_figure(
             _record,
             core_summary=str(_meta.get("core_summary") or ""),
+            plan_summary=str(_meta.get("plan_summary") or ""),
         )
         _figure.savefig(
             _destination,
