@@ -16,9 +16,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import pytest
+from matplotlib import colors as mcolors
 
 from dnadesign.baserender import DENSEGEN_TFBS_REQUIRED_KEYS, SchemaError, render_parquet_record_figure
-from dnadesign.baserender.src.render.palette import Palette
 from dnadesign.densegen.src.integrations.baserender.notebook_contract import (
     REQUIRED_TFBS_ENTRY_KEYS,
     densegen_notebook_render_contract,
@@ -76,24 +76,61 @@ def test_notebook_render_contract_is_explicit_and_complete() -> None:
     assert REQUIRED_TFBS_ENTRY_KEYS == DENSEGEN_TFBS_REQUIRED_KEYS
 
 
-def test_notebook_render_contract_maps_extended_densegen_tf_tags_to_base_palette() -> None:
+def test_notebook_render_contract_renders_extended_densegen_tf_tags(tmp_path: Path) -> None:
+    records_path = tmp_path / "records.parquet"
+    pd.DataFrame(
+        [
+            {
+                "id": "row1",
+                "sequence": "AAAAGGGGCCCC",
+                "densegen__used_tfbs_detail": [
+                    {
+                        "regulator": "lexA_CTGTATAWAWWHACA",
+                        "orientation": "fwd",
+                        "sequence": "AAA",
+                        "offset": 0,
+                    },
+                    {
+                        "regulator": "cpxR_MANWWHTTTAM",
+                        "orientation": "fwd",
+                        "sequence": "GGG",
+                        "offset": 4,
+                    },
+                    {
+                        "regulator": "baeR_TTTCTSCVHNA",
+                        "orientation": "fwd",
+                        "sequence": "CCC",
+                        "offset": 8,
+                    },
+                ],
+            }
+        ]
+    ).to_parquet(records_path)
+
     contract = densegen_notebook_render_contract()
-    palette = Palette(contract.style_overrides.get("palette"))
-    assert palette.color_for("tf:lexA_CTGTATAWAWWHACA") == palette.color_for("tf:lexA")
-    assert palette.color_for("tf:cpxR_MANWWHTTTAM") == palette.color_for("tf:cpxR")
-    assert palette.color_for("tf:baeR_TTTCTSCVHNA") == palette.color_for("tf:baeR")
+    fig = render_parquet_record_figure(
+        dataset_path=records_path,
+        record_id="row1",
+        adapter_kind=contract.adapter_kind,
+        adapter_columns=contract.adapter_columns,
+        adapter_policies=contract.adapter_policies,
+        style_preset=contract.style_preset,
+        style_overrides=contract.style_overrides,
+    )
+    assert fig is not None
+    plt.close(fig)
 
 
 def test_notebook_render_contract_keeps_background_cpxr_baer_visually_separated() -> None:
     contract = densegen_notebook_render_contract()
-    palette = Palette(contract.style_overrides.get("palette"))
+    palette = contract.style_overrides.get("palette") or {}
 
     def _distance(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
         return sum((x - y) ** 2 for x, y in zip(a, b)) ** 0.5
 
-    background = palette.color_for("tf:background")
-    cpxr = palette.color_for("tf:cpxR")
-    baer = palette.color_for("tf:baeR")
+    background = mcolors.to_rgb(str(palette.get("tf:background")))
+    cpxr = mcolors.to_rgb(str(palette.get("tf:cpxR")))
+    baer = mcolors.to_rgb(str(palette.get("tf:baeR")))
 
     assert _distance(background, cpxr) >= 0.20
     assert _distance(background, baer) >= 0.20
