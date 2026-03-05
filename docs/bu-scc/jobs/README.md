@@ -55,8 +55,8 @@ Override command args at submit time when needed:
 - analysis chain: `uv run dense plot -c "$DENSEGEN_CONFIG"`
 - preflight gate: requires attempts/composition artifacts to exist as
   finalized parquet or part files
-- sure-up behavior: when part files exist, `dense plot` consolidates them
-  into finalized tables before analysis
+- read behavior: when part files exist, `dense plot` reads finalized tables
+  and part files directly without mutating on-disk artifacts
 
 Resume + quota extension submission:
 

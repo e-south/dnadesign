@@ -26,7 +26,6 @@ from typing_extensions import Literal
 from ..adapters.outputs import load_records_from_config
 from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
 from ..core.artifacts.pool import POOL_MODE_TFBS, TFBSPoolArtifact, load_pool_artifact
-from ..core.parquet_parts import consolidate_parquet_parts
 from ..utils.rich_style import make_panel, make_table
 from .dense_array_video import plot_dense_array_video_showcase
 from .plot_common import (  # noqa: F401
@@ -132,31 +131,35 @@ def _read_composition_parquet(path: Path, *, columns: Iterable[str] | None = Non
     return frame
 
 
-def _prepare_analysis_table(
+def _resolve_analysis_table_paths(
     tables_root: Path,
     *,
     final_name: str,
     part_glob: str,
-) -> Path:
+) -> list[Path]:
     final_path = tables_root / final_name
     part_paths = sorted(tables_root.glob(part_glob))
-    if part_paths:
-        consolidate_parquet_parts(tables_root, part_glob=part_glob, final_name=final_name)
-    if not final_path.exists():
+    paths: list[Path] = []
+    if final_path.exists():
+        paths.append(final_path)
+    paths.extend(part_paths)
+    if not paths:
         raise ValueError(
             f"{final_name} not found: {final_path}. Expected finalized table or pending `{part_glob}` files."
         )
-    return final_path
+    return paths
 
 
 def _load_attempts(run_root: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame:
     tables_root = run_root / "outputs" / "tables"
-    attempts_path = _prepare_analysis_table(
+    attempts_paths = _resolve_analysis_table_paths(
         tables_root,
         final_name="attempts.parquet",
         part_glob="attempts_part-*.parquet",
     )
-    return pd.read_parquet(attempts_path, columns=_read_columns(columns))
+    projected_columns = _read_columns(columns)
+    frames = [pd.read_parquet(path, columns=projected_columns) for path in attempts_paths]
+    return pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
 
 
 def _load_events(run_root: Path) -> pd.DataFrame:
@@ -270,12 +273,13 @@ def _maybe_load_stage_a_pools(
 
 def _load_composition(run_root: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame:
     tables_root = run_root / "outputs" / "tables"
-    final_path = _prepare_analysis_table(
+    composition_paths = _resolve_analysis_table_paths(
         tables_root,
         final_name="composition.parquet",
         part_glob="composition_part-*.parquet",
     )
-    frame = _read_composition_parquet(final_path, columns=columns)
+    frames = [_read_composition_parquet(path, columns=columns) for path in composition_paths]
+    frame = pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
     if {"solution_id", "placement_index"}.issubset(set(frame.columns)):
         frame = frame.drop_duplicates(subset=["solution_id", "placement_index"], keep="last", ignore_index=True)
     return frame
