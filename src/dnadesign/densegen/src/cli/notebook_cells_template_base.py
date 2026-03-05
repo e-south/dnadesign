@@ -482,10 +482,10 @@ def _(contract, render_record_figure, workspace_heading, workspace_name):
         _legend_pad_px = 24.0
         _legend_patch_h = 13.0
         _title_font_size = 14
-        _figure = render_record_figure(
-            record,
-            style_preset=contract.style_preset,
-            style_overrides={
+        _contract_style_overrides = dict(getattr(contract, "style_overrides", {}) or {})
+        _style_overrides = dict(_contract_style_overrides)
+        _style_overrides.update(
+            {
                 "dpi": 320,
                 "padding_y": 12.0,
                 "layout": {"outer_pad_cells": 0.62},
@@ -496,7 +496,12 @@ def _(contract, render_record_figure, workspace_heading, workspace_name):
                 "legend_font_size": 14,
                 "legend_gap_patch_text": 11.0,
                 "legend_gap_x": 44.0,
-            },
+            }
+        )
+        _figure = render_record_figure(
+            record,
+            style_preset=contract.style_preset,
+            style_overrides=_style_overrides,
         )
         _figure.patch.set_facecolor("white")
         for _axis in _figure.axes:

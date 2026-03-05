@@ -46,6 +46,7 @@ def test_notebook_render_contract_renders_without_optional_details_column(tmp_pa
         adapter_columns=contract.adapter_columns,
         adapter_policies=contract.adapter_policies,
         style_preset=contract.style_preset,
+        style_overrides=contract.style_overrides,
     )
     assert fig is not None
     plt.close(fig)
@@ -61,6 +62,12 @@ def test_notebook_render_contract_is_explicit_and_complete() -> None:
     }
     assert contract.adapter_policies == {"on_invalid_row": "error"}
     assert contract.style_preset == "presentation_default"
+    assert isinstance(contract.style_overrides, dict)
+    palette = contract.style_overrides.get("palette")
+    assert isinstance(palette, dict)
+    assert palette.get("tf:lexA")
+    assert palette.get("tf:cpxR")
+    assert palette.get("tf:baeR")
     assert contract.record_window_limit == 500
     assert REQUIRED_TFBS_ENTRY_KEYS == DENSEGEN_TFBS_REQUIRED_KEYS
 
@@ -88,4 +95,5 @@ def test_notebook_render_contract_rejects_legacy_tf_tfbs_keys(tmp_path: Path) ->
             adapter_columns=contract.adapter_columns,
             adapter_policies=contract.adapter_policies,
             style_preset=contract.style_preset,
+            style_overrides=contract.style_overrides,
         )
