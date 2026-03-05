@@ -46,6 +46,10 @@ def _is_solver_no_solution_value_error(exc: ValueError) -> bool:
     return "no feasible solution" in message or "infeasible" in message
 
 
+class _MinTotalSitesShortfallError(ValueError):
+    pass
+
+
 def _apply_solver_min_total_sites_constraint(
     *,
     optimizer: Any,
@@ -67,14 +71,14 @@ def _apply_solver_min_total_sites_constraint(
     if nb_motifs <= 0 or nb_nodes <= 0:
         raise RuntimeError(f"[{source_label}/{plan_name}] optimizer metadata missing for min_total_sites enforcement.")
     valid_indices = [int(idx) for idx in list(countable_indices) if 0 <= int(idx) < nb_motifs]
+    if not valid_indices:
+        raise _MinTotalSitesShortfallError(
+            f"[{source_label}/{plan_name}] min_total_sites requires at least one variable motif candidate."
+        )
     if min_sites > len(valid_indices):
-        raise RuntimeError(
+        raise _MinTotalSitesShortfallError(
             f"[{source_label}/{plan_name}] min_total_sites={min_sites} exceeds available variable motifs "
             f"({len(valid_indices)})."
-        )
-    if not valid_indices:
-        raise RuntimeError(
-            f"[{source_label}/{plan_name}] min_total_sites requires at least one variable motif candidate."
         )
     original_build_model = optimizer.build_model
 
@@ -358,20 +362,6 @@ class StageBLibraryRuntimeCallbacks:
             required_regulators_local=required_regulators,
             min_required_regulators_local=min_required_regulators,
         )
-        opt = run.optimizer
-        _apply_solver_min_total_sites_constraint(
-            optimizer=opt,
-            min_total_sites=int(self._context.plan_min_total_sites),
-            countable_indices=_countable_variable_motif_indices(
-                library_for_opt=library_for_opt,
-                fixed_elements=self._context.fixed_elements,
-            ),
-            source_label=self._context.source_label,
-            plan_name=self._context.plan_name,
-        )
-        generator = run.generator
-        forbid_each = run.forbid_each
-
         local_generated = 0
         produced_this_library = 0
         stall_triggered = False
@@ -382,6 +372,50 @@ class StageBLibraryRuntimeCallbacks:
         self._state.last_no_solution_solver_solve_time_s = None
         self._state.last_no_solution_detail = None
         subsample_started = time.monotonic()
+        opt = run.optimizer
+        try:
+            _apply_solver_min_total_sites_constraint(
+                optimizer=opt,
+                min_total_sites=int(self._context.plan_min_total_sites),
+                countable_indices=_countable_variable_motif_indices(
+                    library_for_opt=library_for_opt,
+                    fixed_elements=self._context.fixed_elements,
+                ),
+                source_label=self._context.source_label,
+                plan_name=self._context.plan_name,
+            )
+        except _MinTotalSitesShortfallError as exc:
+            library_elapsed = max(0.0, float(time.monotonic() - subsample_started))
+            self._state.last_no_solution_reason = "no_solution"
+            self._state.last_no_solution_solver_status = "min_total_sites_shortfall"
+            self._state.last_no_solution_solver_objective = None
+            self._state.last_no_solution_solver_solve_time_s = library_elapsed
+            self._state.last_no_solution_detail = {
+                "solver_status": "min_total_sites_shortfall",
+                "solver_solve_time_s": library_elapsed,
+                "constraint": "min_total_sites",
+                "constraint_error": str(exc),
+                "library_index": int(sampling_library_index),
+                "library_hash": str(sampling_library_hash),
+                "library_infeasible": bool(library_context.infeasible),
+                "library_slack_bp": int(library_context.slack_bp),
+                "library_min_required_len": int(library_context.min_required_len),
+            }
+            self._context.logger.info(
+                "[%s/%s] %s",
+                self._context.source_label,
+                self._context.plan_name,
+                str(exc),
+            )
+            return LibraryRunResult(
+                produced=0,
+                stall_triggered=False,
+                global_generated=int(global_generated),
+                no_solution_reason="no_solution",
+                active_runtime_seconds=library_elapsed,
+            )
+        generator = run.generator
+        forbid_each = run.forbid_each
 
         if local_generated < max_per_subsample and global_generated < quota:
             fingerprints = set()
