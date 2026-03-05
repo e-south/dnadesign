@@ -74,6 +74,21 @@ def discover_active_job_ids_for_runbook(
     return tuple(active_job_ids)
 
 
+def _normalize_hold_jid(active_job_ids: Sequence[str]) -> str | None:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for job_id in active_job_ids:
+        for value in str(job_id).split(","):
+            token = value.strip()
+            if not token or token in seen:
+                continue
+            seen.add(token)
+            normalized.append(token)
+    if not normalized:
+        return None
+    return ",".join(sorted(normalized))
+
+
 @dataclass(frozen=True)
 class ModeDecision:
     requested_mode: RunMode
@@ -316,11 +331,11 @@ def resolve_mode_decision(
         if selected_mode == "fresh":
             reason = f"{reason}; fresh_reset_ack={str(allow_fresh_reset).lower()}"
 
-    if active_job_ids:
-        first_active_job = str(active_job_ids[0]).strip()
+    hold_jid_candidates = _normalize_hold_jid(active_job_ids)
+    if hold_jid_candidates is not None:
         if runbook.mode_policy.on_active_job == "hold_jid":
             submit_behavior = "hold_jid"
-            hold_jid = first_active_job
+            hold_jid = hold_jid_candidates
             reason = f"{reason}; active_jobs_detected; submission_chained_with_hold_jid={hold_jid}"
         else:
             submit_behavior = "blocked"

@@ -485,7 +485,33 @@ def test_mode_auto_with_active_jobs_returns_hold_jid(tmp_path: Path) -> None:
 
     decision = resolve_mode_decision(runbook=runbook, requested_mode=None, active_job_ids=("81001", "81002"))
     assert decision.submit_behavior == "hold_jid"
-    assert decision.hold_jid == "81001"
+    assert decision.hold_jid == "81001,81002"
+
+
+def test_mode_auto_with_active_jobs_normalizes_hold_jid_list(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    decision = resolve_mode_decision(
+        runbook=runbook,
+        requested_mode=None,
+        active_job_ids=("81002", "81001", "81002", "  ", ""),
+    )
+    assert decision.submit_behavior == "hold_jid"
+    assert decision.hold_jid == "81001,81002"
+
+
+def test_mode_auto_with_active_jobs_normalizes_comma_delimited_ids(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    decision = resolve_mode_decision(
+        runbook=runbook,
+        requested_mode=None,
+        active_job_ids=("81002,81001", "81002"),
+    )
+    assert decision.submit_behavior == "hold_jid"
+    assert decision.hold_jid == "81001,81002"
 
 
 def test_build_batch_plan_forwards_allow_fresh_reset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -2212,6 +2238,47 @@ def test_cli_plan_uses_discovered_active_job_ids(tmp_path: Path, monkeypatch: py
     assert payload["hold_jid"] == "93331"
 
 
+def test_cli_plan_chains_all_discovered_active_job_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    monkeypatch.setattr(
+        "dnadesign.ops.cli.discover_active_job_ids_for_runbook",
+        lambda runbook, max_jobs: ("93332", "93331", "93332"),
+    )
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["runbook", "plan", "--runbook", str(runbook_path), "--discover-active-jobs"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["submit_behavior"] == "hold_jid"
+    assert payload["hold_jid"] == "93331,93332"
+
+
+def test_cli_plan_accepts_comma_delimited_active_job_ids(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "plan",
+            "--runbook",
+            str(runbook_path),
+            "--no-discover-active-jobs",
+            "--active-job-id",
+            "93332,93331",
+            "--active-job-id",
+            "93332",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["submit_behavior"] == "hold_jid"
+    assert payload["hold_jid"] == "93331,93332"
+
+
 def test_cli_active_jobs_emits_discovered_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     runbook_path = _write_runbook(tmp_path)
     monkeypatch.setattr(
@@ -2225,6 +2292,10 @@ def test_cli_active_jobs_emits_discovered_ids(tmp_path: Path, monkeypatch: pytes
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["active_job_ids"] == ["95001", "95002"]
+    assert payload["active_job_count"] == 2
+    assert payload["active_job_ids_csv"] == "95001,95002"
+    assert payload["active_job_id_args"] == "--active-job-id 95001 --active-job-id 95002"
+    assert "--no-discover-active-jobs --active-job-id 95001 --active-job-id 95002" in payload["plan_command_hint"]
 
 
 def test_packaged_runbook_precedents_exist_and_load() -> None:
