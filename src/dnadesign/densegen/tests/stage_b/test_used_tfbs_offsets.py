@@ -4,8 +4,8 @@ import pytest
 
 from dnadesign.densegen.src.core.pipeline.sequence_validation import _apply_pad_offsets
 from dnadesign.densegen.src.core.pipeline.usage_tracking import (
-    _countable_variable_motif_indices,
     _compute_used_tf_info,
+    _countable_variable_motif_indices,
     _parse_used_tfbs_detail,
     _update_usage_summary,
 )
