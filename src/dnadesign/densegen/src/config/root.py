@@ -136,6 +136,23 @@ class DenseGenConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def _solver_strategy_plan_constraints(self):
+        if self.solver.strategy != "approximate":
+            return self
+        plans_with_min_total_sites: list[str] = []
+        for plan in self.generation.plan or []:
+            min_total_sites = int(getattr(plan.regulator_constraints, "min_total_sites", 0) or 0)
+            if min_total_sites > 0:
+                plans_with_min_total_sites.append(str(plan.name))
+        if plans_with_min_total_sites:
+            names = ", ".join(plans_with_min_total_sites)
+            raise ValueError(
+                "regulator_constraints.min_total_sites requires a non-approximate solver strategy. "
+                f"Plans: {names}"
+            )
+        return self
+
+    @model_validator(mode="after")
     def _background_pool_inputs(self):
         input_by_name = {i.name: i for i in self.inputs}
         pwm_inputs = {

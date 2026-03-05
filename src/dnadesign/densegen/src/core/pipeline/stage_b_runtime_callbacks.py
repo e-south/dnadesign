@@ -38,7 +38,66 @@ from .stage_b_solution_rejections import (
     reject_sequence_validation_failure,
     reject_solution_requirement_failure,
 )
-from .usage_tracking import _compute_used_tf_info
+from .usage_tracking import _compute_used_tf_info, _countable_variable_motif_indices
+
+
+def _apply_solver_min_total_sites_constraint(
+    *,
+    optimizer: Any,
+    min_total_sites: int,
+    countable_indices: list[int],
+    source_label: str,
+    plan_name: str,
+) -> None:
+    min_sites = int(min_total_sites)
+    if min_sites <= 0:
+        return
+    if not hasattr(optimizer, "build_model"):
+        raise RuntimeError(
+            f"[{source_label}/{plan_name}] optimizer does not support model-level min_total_sites enforcement."
+        )
+    nb_motifs = int(getattr(optimizer, "nb_motifs", 0))
+    nb_nodes = int(getattr(optimizer, "nb_nodes", 0))
+    strands = str(getattr(optimizer, "strands", "single")).lower()
+    if nb_motifs <= 0 or nb_nodes <= 0:
+        raise RuntimeError(f"[{source_label}/{plan_name}] optimizer metadata missing for min_total_sites enforcement.")
+    valid_indices = [int(idx) for idx in list(countable_indices) if 0 <= int(idx) < nb_motifs]
+    if min_sites > len(valid_indices):
+        raise RuntimeError(
+            f"[{source_label}/{plan_name}] min_total_sites={min_sites} exceeds available variable motifs "
+            f"({len(valid_indices)})."
+        )
+    if not valid_indices:
+        raise RuntimeError(
+            f"[{source_label}/{plan_name}] min_total_sites requires at least one variable motif candidate."
+        )
+    original_build_model = optimizer.build_model
+
+    def _build_model_with_min_total_sites(*args, **kwargs):
+        original_build_model(*args, **kwargs)
+        model = getattr(optimizer, "model", None)
+        if model is None or not hasattr(model, "X"):
+            raise RuntimeError(
+                f"[{source_label}/{plan_name}] optimizer model unavailable for min_total_sites enforcement."
+            )
+
+        def _incoming(node: int):
+            return sum(model.X[i, node] for i in range(-1, nb_nodes) if i != node)
+
+        selected_vars = []
+        for idx in valid_indices:
+            selected = model.BoolVar(f"densegen_min_total_selected[{idx}]")
+            used_fwd = _incoming(idx)
+            if strands == "double":
+                used_total = used_fwd + _incoming(idx + nb_motifs)
+            else:
+                used_total = used_fwd
+            model.Add(used_total <= selected)
+            model.Add(selected <= used_total)
+            selected_vars.append(selected)
+        model.Add(sum(selected_vars) >= min_sites)
+
+    optimizer.build_model = _build_model_with_min_total_sites
 
 
 @dataclass
@@ -211,6 +270,11 @@ class StageBLibraryRuntimeCallbacks:
         library_sources = list(library_context.library_sources)
         required_regulators = list(library_context.required_regulators)
         min_required_regulators = None
+        if int(self._context.plan_min_total_sites) > 0 and str(self._context.solver_strategy) == "approximate":
+            raise RuntimeError(
+                f"[{self._context.source_label}/{self._context.plan_name}] "
+                "regulator_constraints.min_total_sites requires a non-approximate solver strategy."
+            )
         tf_list_from_library = sorted(set(regulator_labels)) if regulator_labels else []
         site_id_by_index = sampling_info.get("site_id_by_index")
         source_by_index = sampling_info.get("source_by_index")
@@ -290,6 +354,16 @@ class StageBLibraryRuntimeCallbacks:
             min_required_regulators_local=min_required_regulators,
         )
         opt = run.optimizer
+        _apply_solver_min_total_sites_constraint(
+            optimizer=opt,
+            min_total_sites=int(self._context.plan_min_total_sites),
+            countable_indices=_countable_variable_motif_indices(
+                library_for_opt=library_for_opt,
+                fixed_elements=self._context.fixed_elements,
+            ),
+            source_label=self._context.source_label,
+            plan_name=self._context.plan_name,
+        )
         generator = run.generator
         forbid_each = run.forbid_each
 
