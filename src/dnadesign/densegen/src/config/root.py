@@ -147,8 +147,7 @@ class DenseGenConfig(BaseModel):
         if plans_with_min_total_sites:
             names = ", ".join(plans_with_min_total_sites)
             raise ValueError(
-                "regulator_constraints.min_total_sites requires a non-approximate solver strategy. "
-                f"Plans: {names}"
+                f"regulator_constraints.min_total_sites requires a non-approximate solver strategy. Plans: {names}"
             )
         return self
 

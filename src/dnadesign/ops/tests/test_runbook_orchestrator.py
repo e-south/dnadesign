@@ -690,13 +690,15 @@ def test_densegen_post_run_can_use_dedicated_resources(tmp_path: Path) -> None:
     post_run_verify = next(
         command
         for command in plan.preflight_commands
-        if command.argv is not None and command.argv[:2] == ("qsub", "-verify")
+        if command.argv is not None
+        and command.argv[:2] == ("qsub", "-verify")
         and command.argv[-1].endswith("densegen-analysis.qsub")
     )
     post_run_submit = next(
         command
         for command in plan.submit_commands
-        if command.argv is not None and command.argv[0] == "qsub"
+        if command.argv is not None
+        and command.argv[0] == "qsub"
         and command.argv[-1].endswith("densegen-analysis.qsub")
     )
 
@@ -719,7 +721,8 @@ def test_densegen_post_run_defaults_to_small_analysis_resources(tmp_path: Path) 
     post_run_submit = next(
         command
         for command in plan.submit_commands
-        if command.argv is not None and command.argv[0] == "qsub"
+        if command.argv is not None
+        and command.argv[0] == "qsub"
         and command.argv[-1].endswith("densegen-analysis.qsub")
     )
 
