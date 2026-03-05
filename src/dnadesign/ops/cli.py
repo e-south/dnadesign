@@ -411,8 +411,7 @@ def runbook_plan(
         typer.Option(
             "--active-job-id",
             help=(
-                "Existing active job id(s) for hold_jid policy decisions; "
-                "repeat option or pass a comma-delimited list."
+                "Existing active job id(s) for hold_jid policy decisions; repeat option or pass a comma-delimited list."
             ),
         ),
     ] = [],
@@ -529,8 +528,7 @@ def runbook_execute(
         typer.Option(
             "--active-job-id",
             help=(
-                "Existing active job id(s) for hold_jid policy decisions; "
-                "repeat option or pass a comma-delimited list."
+                "Existing active job id(s) for hold_jid policy decisions; repeat option or pass a comma-delimited list."
             ),
         ),
     ] = [],

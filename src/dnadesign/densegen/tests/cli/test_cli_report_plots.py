@@ -101,7 +101,7 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         "if len(_record_display_id) > 16:",
         '_record_display_id = f"{_record_display_id[:8]}...{_record_display_id[-4:]}"',
         '_workspace_title = str(workspace_heading or "").strip()',
-        "_raw_plan_text = str(plan_summary or \"\").strip()",
+        '_raw_plan_text = str(plan_summary or "").strip()',
         '_header_text = f"{_workspace_title} | Sequence {_record_display_id} | Plan {_plan_label}"',
         "_header_wrapped = textwrap.fill(",
         "_legend_pad_px = 24.0",

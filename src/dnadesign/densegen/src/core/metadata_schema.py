@@ -200,9 +200,7 @@ def _validate_list_fields(meta: Mapping[str, Any]) -> None:
         if detail_tf_counts is not None and counts_by_tf != detail_tf_counts:
             raise ValueError("used_tf_counts must match tfbs entries in used_tfbs_detail")
         required = [
-            str(tf).strip()
-            for tf in meta.get("required_regulators", [])
-            if isinstance(tf, str) and str(tf).strip()
+            str(tf).strip() for tf in meta.get("required_regulators", []) if isinstance(tf, str) and str(tf).strip()
         ]
         missing_required = [tf for tf in required if counts_by_tf.get(tf, 0) < 1]
         if missing_required:
