@@ -84,8 +84,10 @@ def _outcomes_attempts_per_row_for_workload(max_plan_attempts: int) -> int:
     attempts = max(1, int(max_plan_attempts))
     if attempts < 10_000:
         return 10
-    if attempts < 1_000_000:
+    if attempts < 100_000:
         return 100
+    if attempts < 1_000_000:
+        return 500
     return 1000
 
 
@@ -222,10 +224,12 @@ def _build_run_health_outcomes_figure(
     )
     plan_counts = attempts_df["plan_name"].astype(str).value_counts()
     max_plan_attempts = int(plan_counts.max()) if not plan_counts.empty else int(len(attempts_df))
+    total_attempts = int(len(attempts_df))
+    workload_attempts = max(max_plan_attempts, total_attempts)
     try:
         attempts_per_row_raw = _style_cfg.get("run_health_outcomes_attempts_per_row")
         if attempts_per_row_raw is None:
-            attempts_per_row = _outcomes_attempts_per_row_for_workload(max_plan_attempts)
+            attempts_per_row = _outcomes_attempts_per_row_for_workload(workload_attempts)
         else:
             attempts_per_row = max(1, int(attempts_per_row_raw))
     except Exception as exc:

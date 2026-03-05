@@ -854,8 +854,39 @@ def test_run_health_tfbs_length_single_regulator_uses_length_axis() -> None:
 def test_run_health_outcomes_attempts_per_row_scales_by_workload() -> None:
     assert _outcomes_attempts_per_row_for_workload(9999) == 10
     assert _outcomes_attempts_per_row_for_workload(10_000) == 100
-    assert _outcomes_attempts_per_row_for_workload(999_999) == 100
+    assert _outcomes_attempts_per_row_for_workload(999_999) == 500
     assert _outcomes_attempts_per_row_for_workload(1_000_000) == 1000
+
+
+def test_run_health_outcomes_auto_scales_by_total_workload_across_plans() -> None:
+    matplotlib.use("Agg", force=True)
+    rows = []
+    attempt_index = 1
+    for plan_name in ("plan_a", "plan_b", "plan_c", "plan_d"):
+        for _ in range(3000):
+            rows.append(
+                {
+                    "attempt_index": attempt_index,
+                    "created_at": f"2026-01-26T00:00:{attempt_index % 60:02d}+00:00",
+                    "status": "ok",
+                    "reason": "ok",
+                    "plan_name": plan_name,
+                    "sampling_library_index": attempt_index,
+                }
+            )
+            attempt_index += 1
+    attempts = pd.DataFrame(rows)
+    fig, axes = _build_run_health_outcomes_figure(
+        attempts,
+        events_df=None,
+        style={},
+        plan_quotas={plan: 3000 for plan in ("plan_a", "plan_b", "plan_c", "plan_d")},
+    )
+    try:
+        x_lim = axes["outcome"].get_xlim()
+        assert x_lim[1] == pytest.approx(400.0)
+    finally:
+        fig.clf()
 
 
 def test_run_health_outcomes_legend_and_waste_subtitle() -> None:
@@ -1899,6 +1930,26 @@ def test_run_health_reason_breaks_out_forbidden_kmer_from_detail_json() -> None:
     attempts.loc[1, "status"] = "rejected"
     attempts.loc[1, "reason"] = "postprocess_forbidden_kmer"
     attempts.loc[1, "detail_json"] = '{"kmer":"ATGC","position":9}'
+    fig, axes = _build_run_health_figure(
+        attempts,
+        events_df=None,
+        style={},
+        plan_quotas={"demo_plan": 12},
+    )
+    try:
+        labels = [tick.get_text() for tick in axes["fail"].get_yticklabels()]
+        assert any("forbidden kmer" in label.lower() and "ATGC" in label for label in labels)
+    finally:
+        fig.clf()
+
+
+def test_run_health_reason_breaks_out_sequence_validation_forbidden_kmer_from_detail_json() -> None:
+    attempts = _attempts_df().copy()
+    attempts.loc[1, "status"] = "rejected"
+    attempts.loc[1, "reason"] = "sequence_validation_failed"
+    attempts.loc[1, "detail_json"] = (
+        '{"violations":[{"constraint":"forbid_sigma70_hexamers","pattern":"ATGC","position":9}]}'
+    )
     fig, axes = _build_run_health_figure(
         attempts,
         events_df=None,
