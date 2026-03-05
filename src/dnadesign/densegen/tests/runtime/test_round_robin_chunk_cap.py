@@ -863,6 +863,170 @@ def test_no_solution_attempt_records_solver_diagnostics(tmp_path: Path) -> None:
     assert float(detail.get("solver_solve_time_s", 0.0)) >= 0.01
 
 
+def test_solver_exception_records_failed_attempt_without_crashing(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "outputs" / "parquet").mkdir(parents=True)
+    (run_dir / "logs").mkdir()
+
+    csv_path = run_dir / "sites.csv"
+    csv_path.write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
+
+    cfg = {
+        "densegen": {
+            "schema_version": "2.9",
+            "run": {"id": "demo", "root": "."},
+            "inputs": [
+                {
+                    "name": "demo",
+                    "type": "binding_sites",
+                    "path": str(csv_path),
+                    "format": "csv",
+                }
+            ],
+            "output": {
+                "targets": ["parquet"],
+                "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+                "parquet": {"path": "outputs/tables/records.parquet"},
+            },
+            "generation": {
+                "sequence_length": 8,
+                "sampling": {
+                    "pool_strategy": "subsample",
+                    "library_size": 2,
+                    "library_sampling_strategy": "tf_balanced",
+                    "cover_all_regulators": True,
+                    "unique_binding_sites": True,
+                    "max_sites_per_regulator": None,
+                    "relax_on_exhaustion": False,
+                },
+                "plan": [
+                    {
+                        "name": "default",
+                        "sequences": 1,
+                        "sampling": {"include_inputs": ["demo"]},
+                        "regulator_constraints": {"groups": []},
+                    }
+                ],
+            },
+            "solver": {"backend": "CBC", "strategy": "iterate"},
+            "runtime": {
+                "round_robin": False,
+                "max_accepted_per_library": 1,
+                "min_count_per_tf": 0,
+                "max_duplicate_solutions": 5,
+                "no_progress_seconds_before_resample": 10,
+                "max_consecutive_no_progress_resamples": 0,
+                "max_failed_solutions": 0,
+                "random_seed": 1,
+            },
+            "postprocess": {"pad": {"mode": "off"}},
+            "logging": {"log_dir": "outputs/logs", "level": "INFO"},
+        }
+    }
+
+    cfg_path = run_dir / "config.yaml"
+    cfg_path.write_text(yaml.safe_dump(cfg))
+    loaded = load_config(cfg_path)
+
+    class _SolverErrorAdapter:
+        def probe_solver(self, backend: str, *, test_length: int = 10) -> None:
+            return None
+
+        def build(
+            self,
+            *,
+            library,
+            sequence_length,
+            solver,
+            strategy,
+            fixed_elements,
+            strands="double",
+            regulator_by_index=None,
+            required_regulators=None,
+            min_count_by_regulator=None,
+            min_required_regulators=None,
+            solver_attempt_timeout_seconds=None,
+            solver_threads=None,
+            extra_label=None,
+        ):
+            _ = (
+                library,
+                sequence_length,
+                solver,
+                strategy,
+                fixed_elements,
+                strands,
+                regulator_by_index,
+                required_regulators,
+                min_count_by_regulator,
+                min_required_regulators,
+                solver_attempt_timeout_seconds,
+                solver_threads,
+                extra_label,
+            )
+            opt = _DummyOpt()
+
+            def _gen():
+                raise ValueError("No feasible solution was found")
+                if False:
+                    yield _DummySol(sequence="AAA", library=["AAA", "CCC"])
+
+            return OptimizerRun(optimizer=opt, generator=_gen())
+
+    sink = _DummySink()
+    deps = PipelineDeps(
+        source_factory=data_source_factory,
+        sink_factory=lambda _cfg, _path: [sink],
+        optimizer=_SolverErrorAdapter(),
+        pad=lambda *args, **kwargs: "",
+    )
+    plan_context = PlanRunContext(
+        global_cfg=loaded.root.densegen,
+        sinks=[sink],
+        chosen_solver="CBC",
+        deps=deps,
+        rng=random.Random(1),
+        np_rng=np.random.default_rng(1),
+        cfg_path=loaded.path,
+        run_id=str(loaded.root.densegen.run.id),
+        run_root=str(run_dir),
+        run_config_path="config.yaml",
+        run_config_sha256="sha",
+        random_seed=1,
+        dense_arrays_version=None,
+        dense_arrays_version_source="test",
+        show_tfbs=False,
+        show_solutions=False,
+        output_bio_type="dna",
+        output_alphabet="dna_4",
+    )
+    execution_state = PlanExecutionState(inputs_manifest={})
+
+    plan_item = loaded.root.densegen.generation.resolve_plan()[0]
+    produced, _stats = _process_plan_for_source(
+        loaded.root.densegen.inputs[0],
+        plan_item,
+        plan_context,
+        one_subsample_only=True,
+        already_generated=0,
+        execution_state=execution_state,
+    )
+    assert produced == 0
+
+    attempts_parts = sorted((run_dir / "outputs" / "tables").glob("attempts_part-*.parquet"))
+    assert attempts_parts
+    attempts = pd.concat([pd.read_parquet(path) for path in attempts_parts], ignore_index=True)
+    assert len(attempts) == 1
+    row = attempts.iloc[0]
+    assert str(row["status"]) == "failed"
+    assert str(row["reason"]) == "no_solution"
+    assert str(row["solver_status"]) == "solver_error"
+    detail = json.loads(str(row["detail_json"]))
+    assert detail.get("solver_error_type") == "ValueError"
+    assert "No feasible solution was found" in str(detail.get("solver_error"))
+
+
 def test_one_subsample_flushes_all_sinks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()

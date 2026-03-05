@@ -413,225 +413,263 @@ class StageBLibraryRuntimeCallbacks:
                 )
                 return True
 
-            for sol in generator:
-                now = time.monotonic()
-                if self._context.policy.should_warn_stall(
-                    now=now,
-                    last_warn=last_log_warn,
-                    last_progress=float(last_accepted_progress),
-                ):
-                    self._context.logger.info(
-                        "[%s/%s] Still working... %.1fs on current library.",
-                        self._context.source_label,
-                        self._context.plan_name,
-                        now - subsample_started,
-                    )
-                    last_log_warn = now
+            try:
+                for sol in generator:
+                    now = time.monotonic()
+                    if self._context.policy.should_warn_stall(
+                        now=now,
+                        last_warn=last_log_warn,
+                        last_progress=float(last_accepted_progress),
+                    ):
+                        self._context.logger.info(
+                            "[%s/%s] Still working... %.1fs on current library.",
+                            self._context.source_label,
+                            self._context.plan_name,
+                            now - subsample_started,
+                        )
+                        last_log_warn = now
 
-                if forbid_each:
-                    opt.forbid(sol)
-                seq = sol.sequence
-                should_continue, should_break, self._state.duplicate_solutions, consecutive_dup = (
-                    handle_duplicate_sequence(
-                        sequence=seq,
-                        fingerprints=fingerprints,
-                        duplicate_solutions=self._state.duplicate_solutions,
-                        consecutive_dup=consecutive_dup,
-                        max_dupes=self._context.max_dupes,
-                        source_label=self._context.source_label,
-                        plan_name=self._context.plan_name,
-                        logger=self._context.logger,
+                    if forbid_each:
+                        opt.forbid(sol)
+                    seq = sol.sequence
+                    should_continue, should_break, self._state.duplicate_solutions, consecutive_dup = (
+                        handle_duplicate_sequence(
+                            sequence=seq,
+                            fingerprints=fingerprints,
+                            duplicate_solutions=self._state.duplicate_solutions,
+                            consecutive_dup=consecutive_dup,
+                            max_dupes=self._context.max_dupes,
+                            source_label=self._context.source_label,
+                            plan_name=self._context.plan_name,
+                            logger=self._context.logger,
+                        )
                     )
-                )
-                if should_break:
-                    break
-                if should_continue:
-                    if _check_stall_after_candidate(now):
+                    if should_break:
                         break
-                    continue
+                    if should_continue:
+                        if _check_stall_after_candidate(now):
+                            break
+                        continue
 
-                used_tfbs, used_tfbs_detail, used_tf_counts, used_tf_list = _compute_used_tf_info(
-                    sol,
-                    library_for_opt,
-                    regulator_labels,
-                    self._context.fixed_elements,
-                    site_id_by_index,
-                    source_by_index,
-                    tfbs_id_by_index,
-                    motif_id_by_index,
-                    stage_a_best_hit_score_by_index,
-                    stage_a_rank_within_regulator_by_index,
-                    stage_a_tier_by_index,
-                    stage_a_fimo_start_by_index,
-                    stage_a_fimo_stop_by_index,
-                    stage_a_fimo_strand_by_index,
-                    stage_a_selection_rank_by_index,
-                    stage_a_selection_score_norm_by_index,
-                    stage_a_tfbs_core_by_index,
-                    stage_a_score_theoretical_max_by_index,
-                    stage_a_selection_policy_by_index,
-                    stage_a_nearest_selected_similarity_by_index,
-                    stage_a_nearest_selected_distance_by_index,
-                    stage_a_nearest_selected_distance_norm_by_index,
-                )
-                solver_status, solver_objective, solver_solve_time_s = _extract_solver_metrics(sol)
-
-                covers_all, covers_required, rejection_reason, rejection_detail = _evaluate_solution_requirements(
-                    min_count_per_tf=self._context.min_count_per_tf,
-                    tf_list_from_library=tf_list_from_library,
-                    required_regulators=required_regulators,
-                    plan_min_count_by_regulator=self._context.plan_min_count_by_regulator,
-                    plan_min_total_sites=self._context.plan_min_total_sites,
-                    used_tf_counts=used_tf_counts,
-                )
-                if rejection_reason is not None:
-                    (
-                        self._state.failed_solutions,
-                        self._state.failed_min_count_per_tf,
-                        self._state.failed_required_regulators,
-                        self._state.failed_min_count_by_regulator,
-                    ) = reject_solution_requirement_failure(
-                        rejection_context=self._context.rejection_context,
-                        rejection_reason=rejection_reason,
-                        rejection_detail=rejection_detail,
-                        sequence=seq,
-                        used_tf_counts=used_tf_counts,
-                        used_tf_list=used_tf_list,
-                        sampling_library_index=int(sampling_library_index),
-                        sampling_library_hash=str(sampling_library_hash),
-                        solver_status=solver_status,
-                        solver_objective=solver_objective,
-                        solver_solve_time_s=solver_solve_time_s,
-                        library_tfbs=library_tfbs,
-                        library_tfs=library_tfs,
-                        library_site_ids=library_site_ids,
-                        library_sources=library_sources,
-                        failed_solutions=self._state.failed_solutions,
-                        max_failed_solutions=self._context.max_failed_solutions,
-                        source_label=self._context.source_label,
-                        plan_name=self._context.plan_name,
-                        failed_min_count_per_tf=self._state.failed_min_count_per_tf,
-                        failed_required_regulators=self._state.failed_required_regulators,
-                        failed_min_count_by_regulator=self._state.failed_min_count_by_regulator,
-                        diagnostics=self._context.diagnostics,
+                    used_tfbs, used_tfbs_detail, used_tf_counts, used_tf_list = _compute_used_tf_info(
+                        sol,
+                        library_for_opt,
+                        regulator_labels,
+                        self._context.fixed_elements,
+                        site_id_by_index,
+                        source_by_index,
+                        tfbs_id_by_index,
+                        motif_id_by_index,
+                        stage_a_best_hit_score_by_index,
+                        stage_a_rank_within_regulator_by_index,
+                        stage_a_tier_by_index,
+                        stage_a_fimo_start_by_index,
+                        stage_a_fimo_stop_by_index,
+                        stage_a_fimo_strand_by_index,
+                        stage_a_selection_rank_by_index,
+                        stage_a_selection_score_norm_by_index,
+                        stage_a_tfbs_core_by_index,
+                        stage_a_score_theoretical_max_by_index,
+                        stage_a_selection_policy_by_index,
+                        stage_a_nearest_selected_similarity_by_index,
+                        stage_a_nearest_selected_distance_by_index,
+                        stage_a_nearest_selected_distance_norm_by_index,
                     )
-                    if _check_stall_after_candidate(now):
-                        break
-                    continue
+                    solver_status, solver_objective, solver_solve_time_s = _extract_solver_metrics(sol)
 
-                final_seq, pad_meta = _maybe_pad_sequence(
-                    sequence=seq,
-                    seq_len=self._context.seq_len,
-                    source_label=self._context.source_label,
-                    plan_name=self._context.plan_name,
-                    pad_enabled=self._context.pad_enabled,
-                    pad_end=self._context.pad_end,
-                    pad_mode=self._context.pad_mode,
-                    pad_gc_mode=self._context.pad_gc_mode,
-                    pad_gc_min=self._context.pad_gc_min,
-                    pad_gc_max=self._context.pad_gc_max,
-                    pad_gc_target=self._context.pad_gc_target,
-                    pad_gc_tolerance=self._context.pad_gc_tolerance,
-                    pad_gc_min_length=self._context.pad_gc_min_length,
-                    pad_max_tries=self._context.pad_max_tries,
-                    sequence_constraint_patterns=self._context.sequence_constraint_patterns,
-                    pad_builder=self._context.deps.pad,
-                    rng=self._context.rng,
-                )
-
-                sequence_constraints_eval = _evaluate_sequence_constraints(
-                    final_seq=final_seq,
-                    compiled_sequence_constraints=self._context.compiled_sequence_constraints,
-                    fixed_elements_dump=self._context.fixed_elements_dump,
-                    source_label=self._context.source_label,
-                    plan_name=self._context.plan_name,
-                    sampling_library_index=int(sampling_library_index),
-                    sampling_library_hash=str(sampling_library_hash),
-                )
-                promoter_detail = dict(sequence_constraints_eval.promoter_detail)
-                sequence_validation = dict(sequence_constraints_eval.sequence_validation)
-                if sequence_constraints_eval.rejection_detail is not None:
-                    self._state.failed_solutions = reject_sequence_validation_failure(
-                        rejection_context=self._context.rejection_context,
-                        rejection_detail=dict(sequence_constraints_eval.rejection_detail),
-                        rejection_event_payload=sequence_constraints_eval.rejection_event_payload,
-                        validation_error=sequence_constraints_eval.error,
-                        final_seq=final_seq,
-                        used_tf_counts=used_tf_counts,
-                        used_tf_list=used_tf_list,
-                        sampling_library_index=int(sampling_library_index),
-                        sampling_library_hash=str(sampling_library_hash),
-                        solver_status=solver_status,
-                        solver_objective=solver_objective,
-                        solver_solve_time_s=solver_solve_time_s,
-                        library_tfbs=library_tfbs,
-                        library_tfs=library_tfs,
-                        library_site_ids=library_site_ids,
-                        library_sources=library_sources,
-                        failed_solutions=self._state.failed_solutions,
-                        max_failed_solutions=self._context.max_failed_solutions,
-                        source_label=self._context.source_label,
-                        plan_name=self._context.plan_name,
-                        events_path=self._context.events_path,
-                        emit_event=self._context.emit_event,
-                        logger=self._context.logger,
-                    )
-                    if _check_stall_after_candidate(now):
-                        break
-                    continue
-
-                global_generated, local_generated, produced_this_library, self._state.duplicate_records, accepted = (
-                    persist_candidate_solution(
-                        solution_output_context=self._context.solution_output_context,
-                        progress_context=self._context.progress_context,
-                        sol=sol,
-                        seq=seq,
-                        final_seq=final_seq,
-                        used_tfbs=used_tfbs,
-                        used_tfbs_detail=used_tfbs_detail,
-                        used_tf_counts=used_tf_counts,
-                        used_tf_list=used_tf_list,
-                        pad_meta=pad_meta,
-                        covers_all=covers_all,
-                        covers_required=covers_required,
-                        tfbs_parts=tfbs_parts,
-                        regulator_labels=regulator_labels,
-                        library_for_opt=library_for_opt,
-                        sampling_info=sampling_info,
+                    covers_all, covers_required, rejection_reason, rejection_detail = _evaluate_solution_requirements(
+                        min_count_per_tf=self._context.min_count_per_tf,
+                        tf_list_from_library=tf_list_from_library,
                         required_regulators=required_regulators,
-                        min_required_regulators=min_required_regulators,
-                        sampling_fraction=sampling_fraction,
-                        sampling_fraction_pairs=sampling_fraction_pairs,
+                        plan_min_count_by_regulator=self._context.plan_min_count_by_regulator,
+                        plan_min_total_sites=self._context.plan_min_total_sites,
+                        used_tf_counts=used_tf_counts,
+                    )
+                    if rejection_reason is not None:
+                        (
+                            self._state.failed_solutions,
+                            self._state.failed_min_count_per_tf,
+                            self._state.failed_required_regulators,
+                            self._state.failed_min_count_by_regulator,
+                        ) = reject_solution_requirement_failure(
+                            rejection_context=self._context.rejection_context,
+                            rejection_reason=rejection_reason,
+                            rejection_detail=rejection_detail,
+                            sequence=seq,
+                            used_tf_counts=used_tf_counts,
+                            used_tf_list=used_tf_list,
+                            sampling_library_index=int(sampling_library_index),
+                            sampling_library_hash=str(sampling_library_hash),
+                            solver_status=solver_status,
+                            solver_objective=solver_objective,
+                            solver_solve_time_s=solver_solve_time_s,
+                            library_tfbs=library_tfbs,
+                            library_tfs=library_tfs,
+                            library_site_ids=library_site_ids,
+                            library_sources=library_sources,
+                            failed_solutions=self._state.failed_solutions,
+                            max_failed_solutions=self._context.max_failed_solutions,
+                            source_label=self._context.source_label,
+                            plan_name=self._context.plan_name,
+                            failed_min_count_per_tf=self._state.failed_min_count_per_tf,
+                            failed_required_regulators=self._state.failed_required_regulators,
+                            failed_min_count_by_regulator=self._state.failed_min_count_by_regulator,
+                            diagnostics=self._context.diagnostics,
+                        )
+                        if _check_stall_after_candidate(now):
+                            break
+                        continue
+
+                    final_seq, pad_meta = _maybe_pad_sequence(
+                        sequence=seq,
+                        seq_len=self._context.seq_len,
+                        source_label=self._context.source_label,
+                        plan_name=self._context.plan_name,
+                        pad_enabled=self._context.pad_enabled,
+                        pad_end=self._context.pad_end,
+                        pad_mode=self._context.pad_mode,
+                        pad_gc_mode=self._context.pad_gc_mode,
+                        pad_gc_min=self._context.pad_gc_min,
+                        pad_gc_max=self._context.pad_gc_max,
+                        pad_gc_target=self._context.pad_gc_target,
+                        pad_gc_tolerance=self._context.pad_gc_tolerance,
+                        pad_gc_min_length=self._context.pad_gc_min_length,
+                        pad_max_tries=self._context.pad_max_tries,
+                        sequence_constraint_patterns=self._context.sequence_constraint_patterns,
+                        pad_builder=self._context.deps.pad,
+                        rng=self._context.rng,
+                    )
+
+                    sequence_constraints_eval = _evaluate_sequence_constraints(
+                        final_seq=final_seq,
+                        compiled_sequence_constraints=self._context.compiled_sequence_constraints,
+                        fixed_elements_dump=self._context.fixed_elements_dump,
+                        source_label=self._context.source_label,
+                        plan_name=self._context.plan_name,
                         sampling_library_index=int(sampling_library_index),
                         sampling_library_hash=str(sampling_library_hash),
-                        library_tfbs=library_tfbs,
-                        library_tfs=library_tfs,
-                        library_site_ids=library_site_ids,
-                        library_sources=library_sources,
-                        promoter_detail=promoter_detail,
-                        sequence_validation=sequence_validation,
-                        solver_status=solver_status,
-                        solver_objective=solver_objective,
-                        solver_solve_time_s=solver_solve_time_s,
-                        apply_pad_offsets=self._context.apply_pad_offsets,
-                        global_generated=global_generated,
-                        local_generated=local_generated,
-                        produced_this_library=produced_this_library,
-                        duplicate_records=self._state.duplicate_records,
-                        duplicate_solutions=self._state.duplicate_solutions,
-                        failed_solutions=self._state.failed_solutions,
-                        stall_events=self._state.stall_events,
                     )
-                )
-                if not accepted:
-                    if _check_stall_after_candidate(now):
-                        break
-                    continue
-                last_accepted_progress = now
-                self._state.last_accepted_progress = last_accepted_progress
+                    promoter_detail = dict(sequence_constraints_eval.promoter_detail)
+                    sequence_validation = dict(sequence_constraints_eval.sequence_validation)
+                    if sequence_constraints_eval.rejection_detail is not None:
+                        self._state.failed_solutions = reject_sequence_validation_failure(
+                            rejection_context=self._context.rejection_context,
+                            rejection_detail=dict(sequence_constraints_eval.rejection_detail),
+                            rejection_event_payload=sequence_constraints_eval.rejection_event_payload,
+                            validation_error=sequence_constraints_eval.error,
+                            final_seq=final_seq,
+                            used_tf_counts=used_tf_counts,
+                            used_tf_list=used_tf_list,
+                            sampling_library_index=int(sampling_library_index),
+                            sampling_library_hash=str(sampling_library_hash),
+                            solver_status=solver_status,
+                            solver_objective=solver_objective,
+                            solver_solve_time_s=solver_solve_time_s,
+                            library_tfbs=library_tfbs,
+                            library_tfs=library_tfs,
+                            library_site_ids=library_site_ids,
+                            library_sources=library_sources,
+                            failed_solutions=self._state.failed_solutions,
+                            max_failed_solutions=self._context.max_failed_solutions,
+                            source_label=self._context.source_label,
+                            plan_name=self._context.plan_name,
+                            events_path=self._context.events_path,
+                            emit_event=self._context.emit_event,
+                            logger=self._context.logger,
+                        )
+                        if _check_stall_after_candidate(now):
+                            break
+                        continue
 
-                if local_generated >= max_per_subsample or global_generated >= quota:
-                    break
+                    (
+                        global_generated,
+                        local_generated,
+                        produced_this_library,
+                        self._state.duplicate_records,
+                        accepted,
+                    ) = persist_candidate_solution(
+                            solution_output_context=self._context.solution_output_context,
+                            progress_context=self._context.progress_context,
+                            sol=sol,
+                            seq=seq,
+                            final_seq=final_seq,
+                            used_tfbs=used_tfbs,
+                            used_tfbs_detail=used_tfbs_detail,
+                            used_tf_counts=used_tf_counts,
+                            used_tf_list=used_tf_list,
+                            pad_meta=pad_meta,
+                            covers_all=covers_all,
+                            covers_required=covers_required,
+                            tfbs_parts=tfbs_parts,
+                            regulator_labels=regulator_labels,
+                            library_for_opt=library_for_opt,
+                            sampling_info=sampling_info,
+                            required_regulators=required_regulators,
+                            min_required_regulators=min_required_regulators,
+                            sampling_fraction=sampling_fraction,
+                            sampling_fraction_pairs=sampling_fraction_pairs,
+                            sampling_library_index=int(sampling_library_index),
+                            sampling_library_hash=str(sampling_library_hash),
+                            library_tfbs=library_tfbs,
+                            library_tfs=library_tfs,
+                            library_site_ids=library_site_ids,
+                            library_sources=library_sources,
+                            promoter_detail=promoter_detail,
+                            sequence_validation=sequence_validation,
+                            solver_status=solver_status,
+                            solver_objective=solver_objective,
+                            solver_solve_time_s=solver_solve_time_s,
+                            apply_pad_offsets=self._context.apply_pad_offsets,
+                            global_generated=global_generated,
+                            local_generated=local_generated,
+                            produced_this_library=produced_this_library,
+                            duplicate_records=self._state.duplicate_records,
+                            duplicate_solutions=self._state.duplicate_solutions,
+                            failed_solutions=self._state.failed_solutions,
+                            stall_events=self._state.stall_events,
+                        )
+                    if not accepted:
+                        if _check_stall_after_candidate(now):
+                            break
+                        continue
+                    last_accepted_progress = now
+                    self._state.last_accepted_progress = last_accepted_progress
+
+                    if local_generated >= max_per_subsample or global_generated >= quota:
+                        break
+            except ValueError as exc:
+                message = str(exc).lower()
+                if "no feasible solution" not in message and "infeasible" not in message:
+                    raise
+                library_elapsed = max(0.0, float(time.monotonic() - subsample_started))
+                self._state.last_no_solution_reason = "no_solution"
+                self._state.last_no_solution_solver_status = "solver_error"
+                self._state.last_no_solution_solver_objective = None
+                self._state.last_no_solution_solver_solve_time_s = library_elapsed
+                self._state.last_no_solution_detail = {
+                    "solver_status": "solver_error",
+                    "solver_solve_time_s": library_elapsed,
+                    "solver_error_type": type(exc).__name__,
+                    "solver_error": str(exc),
+                    "library_index": int(sampling_library_index),
+                    "library_hash": str(sampling_library_hash),
+                    "library_infeasible": bool(library_context.infeasible),
+                    "library_slack_bp": int(library_context.slack_bp),
+                    "library_min_required_len": int(library_context.min_required_len),
+                }
+                self._context.logger.info(
+                    "[%s/%s] Solver returned no feasible solution for library_index=%s.",
+                    self._context.source_label,
+                    self._context.plan_name,
+                    int(sampling_library_index),
+                )
+                return LibraryRunResult(
+                    produced=0,
+                    stall_triggered=False,
+                    global_generated=int(global_generated),
+                    no_solution_reason="no_solution",
+                    active_runtime_seconds=library_elapsed,
+                )
 
         if (
             produced_this_library == 0
