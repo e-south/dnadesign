@@ -15,4 +15,29 @@ if [[ ! -f "$DENSEGEN_CONFIG" ]]; then
   exit 2
 fi
 
+RUN_ROOT="$(cd "$(dirname "$DENSEGEN_CONFIG")" && pwd)"
+TABLES_DIR="$RUN_ROOT/outputs/tables"
+ATTEMPTS_PARQUET="$TABLES_DIR/attempts.parquet"
+COMPOSITION_PARQUET="$TABLES_DIR/composition.parquet"
+
+has_attempts_artifact=0
+if [[ -f "$ATTEMPTS_PARQUET" ]] || compgen -G "$TABLES_DIR/attempts_part-*.parquet" > /dev/null; then
+  has_attempts_artifact=1
+fi
+if [[ "$has_attempts_artifact" -ne 1 ]]; then
+  echo "DenseGen post-run analysis requires attempts artifacts." >&2
+  echo "Missing attempts.parquet and attempts_part-*.parquet under: $TABLES_DIR" >&2
+  exit 2
+fi
+
+has_composition_artifact=0
+if [[ -f "$COMPOSITION_PARQUET" ]] || compgen -G "$TABLES_DIR/composition_part-*.parquet" > /dev/null; then
+  has_composition_artifact=1
+fi
+if [[ "$has_composition_artifact" -ne 1 ]]; then
+  echo "DenseGen post-run analysis requires composition artifacts." >&2
+  echo "Missing composition.parquet and composition_part-*.parquet under: $TABLES_DIR" >&2
+  exit 2
+fi
+
 uv run dense plot -c "$DENSEGEN_CONFIG"

@@ -53,6 +53,10 @@ Override command args at submit time when needed:
 
 `densegen-analysis.qsub` command defaults:
 - analysis chain: `uv run dense plot -c "$DENSEGEN_CONFIG"`
+- preflight gate: requires attempts/composition artifacts to exist as
+  finalized parquet or part files
+- sure-up behavior: when part files exist, `dense plot` consolidates them
+  into finalized tables before analysis
 
 Resume + quota extension submission:
 

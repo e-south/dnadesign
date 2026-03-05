@@ -72,6 +72,10 @@ def test_bu_scc_docs_use_current_densegen_runtime_field_names() -> None:
 def test_densegen_analysis_qsub_is_plot_only_without_notebook_generation() -> None:
     qsub_script = _read(BU_SCC_DOCS / "jobs" / "densegen-analysis.qsub")
     assert 'uv run dense plot -c "$DENSEGEN_CONFIG"' in qsub_script
+    assert 'ATTEMPTS_PARQUET="$TABLES_DIR/attempts.parquet"' in qsub_script
+    assert 'COMPOSITION_PARQUET="$TABLES_DIR/composition.parquet"' in qsub_script
+    assert "requires attempts artifacts" in qsub_script
+    assert "requires composition artifacts" in qsub_script
     assert "dense notebook generate" not in qsub_script
     assert "DENSEGEN_NOTEBOOK_FORCE" not in qsub_script
 
