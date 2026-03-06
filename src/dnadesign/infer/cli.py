@@ -19,7 +19,6 @@ import typer
 import yaml
 
 from ._console import (
-    RichProgressManager,
     console,
     render_adapters_table,
     render_config_summary,
@@ -32,7 +31,8 @@ from ._console import (
     setup_console_logging,
 )
 from .api import run_job
-from .config import IngestConfig, JobConfig, ModelConfig, OutputSpec, RootConfig
+from .cli_builders import build_model_config, run_with_progress
+from .config import IngestConfig, JobConfig, OutputSpec, RootConfig
 from .engine import clear_adapter_cache
 from .errors import (
     CapabilityError,
@@ -142,15 +142,14 @@ def run(
         if preset:
             # Build a single job from a preset (extract or generate)
             p = load_preset(preset)
-            # model defaults (CLI overrides last)
-            model_d = {
-                "id": p.get("model", {}).get("id") or "evo2_7b",
-                "device": device or "cpu",
-                "precision": precision or p.get("model", {}).get("precision", "fp32"),
-                "alphabet": p.get("model", {}).get("alphabet", "dna"),
-                "batch_size": batch_size,
-            }
-            model = ModelConfig(**model_d)
+            model = build_model_config(
+                model_id=p.get("model", {}).get("id"),
+                device=device,
+                precision=precision,
+                alphabet=None,
+                batch_size=batch_size,
+                preset_model=p.get("model", {}),
+            )
 
             if p["kind"] == "extract":
                 outputs = [OutputSpec(**o) for o in p.get("outputs", [])]
@@ -189,16 +188,15 @@ def run(
                 console.print("[green]✔ Preset validated (dry run).[/green]")
                 raise typer.Exit(code=0)
 
-            if not progress:
-                os.environ["DNADESIGN_PROGRESS"] = "0"
-            pm = RichProgressManager(enabled=progress)
-            with pm:
-                res = run_job(
+            res = run_with_progress(
+                progress=progress,
+                runner=lambda progress_factory: run_job(
                     inputs=None,
                     model=model,
                     job=job_cfg,
-                    progress_factory=pm.factory if progress else None,
-                )
+                    progress_factory=progress_factory,
+                ),
+            )
             if p["kind"] == "extract":
                 render_outputs_summary(job_cfg, res)
             else:
@@ -227,11 +225,7 @@ def run(
             console.print("[green]✔ Config validated (dry run).[/green]")
             raise typer.Exit(code=0)
 
-        if not progress:
-            os.environ["DNADESIGN_PROGRESS"] = "0"
-        pm = RichProgressManager(enabled=progress)
-
-        with pm:
+        def _run_selected_jobs(progress_factory):
             for j in jobs:
                 inputs = None
                 if j.ingest.source == "pt_file":
@@ -241,12 +235,14 @@ def run(
                     inputs=inputs,
                     model=model,
                     job=j,
-                    progress_factory=pm.factory if progress else None,
+                    progress_factory=progress_factory,
                 )
                 if j.operation == "extract":
                     render_outputs_summary(j, res)
                 else:
                     console.print(f"[green]Generated {len(res.get('gen_seqs', []))} sequence(s).[/green]")
+
+        run_with_progress(progress=progress, runner=_run_selected_jobs)
 
     except typer.Exit:
         raise
@@ -299,15 +295,15 @@ def extract(
             p = load_preset(preset)
             if p["kind"] != "extract":
                 raise ConfigError(f"Preset '{preset}' is not an extract preset.")
-            # model defaults come from preset if not specified
-            model_d = {
-                "id": model_id or p.get("model", {}).get("id") or "evo2_7b",
-                "device": device or "cpu",
-                "precision": precision or p.get("model", {}).get("precision", "fp32"),
-                "alphabet": alphabet or p.get("model", {}).get("alphabet", "dna"),
-                "batch_size": batch_size,
-            }
             outputs = [OutputSpec(**o) for o in p.get("outputs", [])]
+            model = build_model_config(
+                model_id=model_id,
+                device=device,
+                precision=precision,
+                alphabet=alphabet,
+                batch_size=batch_size,
+                preset_model=p.get("model", {}),
+            )
         else:
             # single-output path must have fn+format
             if not (fn and format):
@@ -326,15 +322,13 @@ def extract(
                 params.setdefault("method", "native")
                 params.setdefault("reduction", "sum")
             outputs = [OutputSpec(id=out_id, fn=fn, params=params, format=format)]
-            model_d = {
-                "id": model_id or "evo2_7b",
-                "device": device or "cpu",
-                "precision": precision or "fp32",
-                "alphabet": alphabet or "dna",
-                "batch_size": batch_size,
-            }
-
-        model = ModelConfig(**model_d)
+            model = build_model_config(
+                model_id=model_id,
+                device=device,
+                precision=precision,
+                alphabet=alphabet,
+                batch_size=batch_size,
+            )
 
         # Ingest
         job = JobConfig(
@@ -378,16 +372,15 @@ def extract(
             console.print("[green]✔ Extract validated (dry run).[/green]")
             raise typer.Exit(code=0)
 
-        if not progress:
-            os.environ["DNADESIGN_PROGRESS"] = "0"
-        pm = RichProgressManager(enabled=progress)
-        with pm:
-            res = run_job(
+        res = run_with_progress(
+            progress=progress,
+            runner=lambda progress_factory: run_job(
                 inputs=inputs,
                 model=model,
                 job=job,
-                progress_factory=pm.factory if progress else None,
-            )
+                progress_factory=progress_factory,
+            ),
+        )
         render_outputs_summary(job, res)
 
     except typer.Exit:
@@ -436,13 +429,14 @@ def generate(
             if p["kind"] != "generate":
                 raise ConfigError(f"Preset '{preset}' is not a generate preset.")
             params.update(p.get("params") or {})
-            model_d = {
-                "id": model_id or p.get("model", {}).get("id") or "evo2_7b",
-                "device": device or "cpu",
-                "precision": precision or p.get("model", {}).get("precision", "fp32"),
-                "alphabet": alphabet or p.get("model", {}).get("alphabet", "dna"),
-                "batch_size": batch_size,
-            }
+            model = build_model_config(
+                model_id=model_id,
+                device=device,
+                precision=precision,
+                alphabet=alphabet,
+                batch_size=batch_size,
+                preset_model=p.get("model", {}),
+            )
         else:
             if max_new_tokens is None:
                 max_new_tokens = 64
@@ -460,15 +454,13 @@ def generate(
                 params["top_p"] = top_p
             if seed is not None:
                 params["seed"] = seed
-            model_d = {
-                "id": model_id or "evo2_7b",
-                "device": device or "cpu",
-                "precision": precision or "fp32",
-                "alphabet": alphabet or "dna",
-                "batch_size": batch_size,
-            }
-
-        model = ModelConfig(**model_d)
+            model = build_model_config(
+                model_id=model_id,
+                device=device,
+                precision=precision,
+                alphabet=alphabet,
+                batch_size=batch_size,
+            )
 
         job = JobConfig(
             id="adhoc_generate",
@@ -503,16 +495,15 @@ def generate(
             console.print("[green]✔ Generate validated (dry run).[/green]")
             raise typer.Exit(code=0)
 
-        if not progress:
-            os.environ["DNADESIGN_PROGRESS"] = "0"
-        pm = RichProgressManager(enabled=progress)
-        with pm:
-            res = run_job(
+        res = run_with_progress(
+            progress=progress,
+            runner=lambda progress_factory: run_job(
                 inputs=inputs,
                 model=model,
                 job=job,
-                progress_factory=pm.factory if progress else None,
-            )
+                progress_factory=progress_factory,
+            ),
+        )
 
         seqs = res.get("gen_seqs", [])
         console.print(f"[green]Generated {len(seqs)} sequence(s).[/green]")

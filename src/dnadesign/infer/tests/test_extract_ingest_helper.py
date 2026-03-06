@@ -20,17 +20,30 @@ from dnadesign.infer.engine import _load_extract_ingest
 from dnadesign.infer.errors import ConfigError, ValidationError
 
 
+def test_load_extract_ingest_returns_payload_object(monkeypatch) -> None:
+    ingest = IngestConfig(source="sequences", field="sequence")
+    monkeypatch.setattr("dnadesign.infer.engine.load_sequences_input", lambda _inputs: ["ACGT", "TGCA"])
+
+    payload = _load_extract_ingest(["ACGT", "TGCA"], ingest=ingest)
+
+    assert payload.seqs == ["ACGT", "TGCA"]
+    assert payload.ids is None
+    assert payload.records is None
+    assert payload.pt_path is None
+    assert payload.dataset is None
+
+
 def test_load_extract_ingest_sequences_path(monkeypatch) -> None:
     ingest = IngestConfig(source="sequences", field="sequence")
     monkeypatch.setattr("dnadesign.infer.engine.load_sequences_input", lambda _inputs: ["ACGT", "TGCA"])
 
-    seqs, ids, records, pt_path, ds = _load_extract_ingest(["ACGT", "TGCA"], ingest=ingest)
+    payload = _load_extract_ingest(["ACGT", "TGCA"], ingest=ingest)
 
-    assert seqs == ["ACGT", "TGCA"]
-    assert ids is None
-    assert records is None
-    assert pt_path is None
-    assert ds is None
+    assert payload.seqs == ["ACGT", "TGCA"]
+    assert payload.ids is None
+    assert payload.records is None
+    assert payload.pt_path is None
+    assert payload.dataset is None
 
 
 def test_load_extract_ingest_records_uses_field_fallback(monkeypatch) -> None:
@@ -42,13 +55,13 @@ def test_load_extract_ingest_records_uses_field_fallback(monkeypatch) -> None:
 
     monkeypatch.setattr("dnadesign.infer.engine.load_records_input", _load_records)
 
-    seqs, ids, records, pt_path, ds = _load_extract_ingest([{"sequence": "ACGT"}], ingest=ingest)
+    payload = _load_extract_ingest([{"sequence": "ACGT"}], ingest=ingest)
 
-    assert seqs == ["ACGT"]
-    assert records == [{"sequence": "ACGT"}]
-    assert ids is None
-    assert pt_path is None
-    assert ds is None
+    assert payload.seqs == ["ACGT"]
+    assert payload.records == [{"sequence": "ACGT"}]
+    assert payload.ids is None
+    assert payload.pt_path is None
+    assert payload.dataset is None
 
 
 def test_load_extract_ingest_pt_file_requires_string_path() -> None:
@@ -76,13 +89,13 @@ def test_load_extract_ingest_usr_forwards_contract_fields(monkeypatch) -> None:
 
     monkeypatch.setattr("dnadesign.infer.engine.load_usr_input", _load_usr)
 
-    seqs, ids, records, pt_path, ds = _load_extract_ingest(inputs=None, ingest=ingest)
+    payload = _load_extract_ingest(inputs=None, ingest=ingest)
 
-    assert seqs == ["ACGT"]
-    assert ids == ["id-1"]
-    assert records is None
-    assert pt_path is None
-    assert getattr(ds, "name") == "demo"
+    assert payload.seqs == ["ACGT"]
+    assert payload.ids == ["id-1"]
+    assert payload.records is None
+    assert payload.pt_path is None
+    assert getattr(payload.dataset, "name") == "demo"
 
 
 def test_load_extract_ingest_unknown_source_fails_fast() -> None:

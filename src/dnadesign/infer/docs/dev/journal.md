@@ -1149,3 +1149,47 @@ Deterministic path for each slice:
 - [x] Split extract/generate batch-policy parsing into `batch_policy.py`.
 - [x] Run measurement-first extract-loop optimization cycle and revert non-improving variants.
 - [ ] Next slice candidate: isolate progress-manager construction and per-job execution envelope from CLI command handlers into a dedicated runtime helper to reduce CLI monolith size.
+
+## 2026-03-06 - Phase 1 Slice O (Typed Ingest Payload + CLI Helper Boundary)
+
+### Scope
+
+- Objective: reduce change fragility in `engine.py` by replacing the untyped ingest 5-tuple with a typed payload contract.
+- Objective: reduce CLI monolith duplication by extracting shared model/progress assembly into a dedicated helper module.
+
+### Boundary and Contract Decisions
+
+- Added `ExtractIngestPayload` dataclass in `src/dnadesign/infer/engine.py` and updated engine call sites to consume named fields (`seqs`, `ids`, `records`, `pt_path`, `dataset`).
+- Preserved ingest source behavior and fail-fast semantics for unknown sources and invalid pt-file inputs.
+- Added `src/dnadesign/infer/cli_builders.py` with:
+  - `build_model_config(...)`
+  - `run_with_progress(...)`
+- Rewired `run`, `extract`, and `generate` command handlers in `src/dnadesign/infer/cli.py` to use the shared helper boundary while preserving command surface and output semantics.
+
+### TDD Evidence
+
+- Red:
+  - Added `test_load_extract_ingest_returns_payload_object` and confirmed failure against tuple contract:
+    - `AttributeError: 'tuple' object has no attribute 'seqs'`
+  - Added `src/dnadesign/infer/tests/test_cli_builders.py` and confirmed initial failure:
+    - `ModuleNotFoundError: No module named 'dnadesign.infer.cli_builders'`
+- Green:
+  - Implemented payload dataclass + CLI helper module and rewired call sites.
+  - All targeted and full infer tests passed.
+
+### Verification Commands (Executed)
+
+- `uv run pytest -q src/dnadesign/infer/tests/test_extract_ingest_helper.py -k returns_payload_object`
+- `uv run pytest -q src/dnadesign/infer/tests/test_extract_ingest_helper.py src/dnadesign/infer/tests/test_generate_ingest_helper.py src/dnadesign/infer/tests/test_namespace_contracts.py src/dnadesign/infer/tests/test_usr_writeback_contract.py`
+- `uv run pytest -q src/dnadesign/infer/tests/test_cli_builders.py`
+- `uv run pytest -q src/dnadesign/infer/tests/test_cli_builders.py src/dnadesign/infer/tests/test_presets.py src/dnadesign/infer/tests/test_extract_ingest_helper.py src/dnadesign/infer/tests/test_generate_ingest_helper.py src/dnadesign/infer/tests/test_namespace_contracts.py src/dnadesign/infer/tests/test_wrapper_contracts.py`
+- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer"`
+- `uv run pytest -q src/dnadesign/infer/tests`
+
+### Task Board
+
+- [x] Replace untyped ingest tuple in `engine.py` with typed payload contract.
+- [x] Extract shared CLI model/progress assembly into dedicated helper module.
+- [x] Rewire `run`/`extract`/`generate` handlers to use shared helper boundary.
+- [x] Verify no regressions in infer tests and infer-linked notify/usr contracts.
+- [ ] Next slice candidate: split command-specific request assembly from Typer entrypoints into `cli_commands/` modules to further reduce `cli.py` size without changing CLI behavior.

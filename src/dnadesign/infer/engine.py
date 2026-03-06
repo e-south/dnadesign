@@ -3,6 +3,8 @@
 <dnadesign project>
 dnadesign/infer/engine.py
 
+Inference execution orchestration for extract and generate jobs.
+
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
@@ -10,7 +12,8 @@ Dunlop Lab
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 from ._logging import get_logger
 from .adapter_runtime import (
@@ -45,6 +48,15 @@ from .writers.usr import write_back_usr
 _LOG = get_logger(__name__)
 
 
+@dataclass(frozen=True)
+class ExtractIngestPayload:
+    seqs: List[str]
+    ids: Optional[List[str]]
+    records: Optional[List[Dict[str, Any]]]
+    pt_path: Optional[str]
+    dataset: object
+
+
 def _validate_alphabet(alphabet: str, seqs: List[str]) -> None:
     if alphabet == "dna":
         validate_dna(seqs, allow_iupac=False)
@@ -54,19 +66,19 @@ def _validate_alphabet(alphabet: str, seqs: List[str]) -> None:
         raise ValidationError(f"Unknown alphabet: {alphabet}")
 
 
-def _load_extract_ingest(inputs, *, ingest) -> Tuple[List[str], Optional[List[str]], Optional[List[Dict[str, Any]]], Optional[str], object]:
+def _load_extract_ingest(inputs, *, ingest) -> ExtractIngestPayload:
     source = ingest.source
     if source == "sequences":
         seqs = load_sequences_input(inputs)
-        return seqs, None, None, None, None
+        return ExtractIngestPayload(seqs=seqs, ids=None, records=None, pt_path=None, dataset=None)
     if source == "records":
         seqs, records = load_records_input(inputs, ingest.field or "sequence")
-        return seqs, None, records, None, None
+        return ExtractIngestPayload(seqs=seqs, ids=None, records=records, pt_path=None, dataset=None)
     if source == "pt_file":
         if not isinstance(inputs, str):
             raise ValidationError("inputs must be a path string for pt_file ingest")
         seqs, records = load_pt_file_input(inputs, ingest.field or "sequence")
-        return seqs, None, records, inputs, None
+        return ExtractIngestPayload(seqs=seqs, ids=None, records=records, pt_path=inputs, dataset=None)
     if source == "usr":
         seqs, ids, ds = load_usr_input(
             dataset_name=ingest.dataset,  # type: ignore[arg-type]
@@ -74,13 +86,13 @@ def _load_extract_ingest(inputs, *, ingest) -> Tuple[List[str], Optional[List[st
             root=ingest.root,
             ids=ingest.ids,
         )
-        return seqs, ids, None, None, ds
+        return ExtractIngestPayload(seqs=seqs, ids=ids, records=None, pt_path=None, dataset=ds)
     raise ConfigError(f"Unknown ingest source: {source}")
 
 
 def _load_generate_ingest(inputs, *, ingest) -> List[str]:
-    prompts, _ids, _records, _pt_path, _ds = _load_extract_ingest(inputs, ingest=ingest)
-    return prompts
+    payload = _load_extract_ingest(inputs, ingest=ingest)
+    return payload.seqs
 
 
 def run_extract_job(
@@ -92,7 +104,12 @@ def run_extract_job(
 ) -> Dict[str, List[object]]:
     # ingest
     source = job.ingest.source
-    seqs, ids, records, pt_path, ds = _load_extract_ingest(inputs, ingest=job.ingest)
+    payload = _load_extract_ingest(inputs, ingest=job.ingest)
+    seqs = payload.seqs
+    ids = payload.ids
+    records = payload.records
+    pt_path = payload.pt_path
+    ds = payload.dataset
 
     validate_extract_output_namespace(model_id=model.id, outputs=job.outputs or [])
     _validate_alphabet(model.alphabet, seqs)

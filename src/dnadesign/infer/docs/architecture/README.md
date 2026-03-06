@@ -2,7 +2,7 @@
 
 ### Package Layers
 
-- Interface layer: `cli.py`, `_console.py`, `__main__.py`
+- Interface layer: `cli.py`, `cli_builders.py`, `_console.py`, `__main__.py`
 - Application layer: `api.py`
 - Core runtime:
   - orchestration: `engine.py`
