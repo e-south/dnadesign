@@ -36,8 +36,7 @@ from .ingest.sources import (
 from .ingest.validators import validate_dna, validate_protein
 from .progress import ProgressFactory, create_progress_handle
 from .registry import get_adapter_cls
-from .writers.pt_file import write_back_pt_file
-from .writers.records import write_back_records
+from .writeback_dispatch import run_extract_write_back
 from .writers.usr import write_back_usr
 
 _LOG = get_logger(__name__)
@@ -279,24 +278,18 @@ def run_extract_job(
             raise RuntimeError("Adapter returned wrong number of outputs")
         columnar[out.id] = all_vals
 
-    # final write-back
-    if job.io.write_back:
-        if source == "records":
-            write_back_records(records, model_id=model.id, job_id=job.id, columnar=columnar, overwrite=job.io.overwrite)  # type: ignore[arg-type]
-        elif source == "pt_file":
-            write_back_pt_file(
-                pt_path,
-                records,
-                model_id=model.id,
-                job_id=job.id,
-                columnar=columnar,
-                overwrite=job.io.overwrite,
-            )  # noqa
-        elif source == "usr":
-            if ids is None or ds is None:
-                raise WriteBackError("USR write-back requires ids and dataset handle")
-        else:
-            raise WriteBackError("write_back not supported for this ingest source")
+    run_extract_write_back(
+        write_back=bool(job.io.write_back),
+        source=source,
+        records=records,
+        pt_path=pt_path,
+        ds=ds,
+        ids=ids,
+        model_id=model.id,
+        job_id=job.id,
+        columnar=columnar,
+        overwrite=bool(job.io.overwrite),
+    )
 
     return columnar
 

@@ -731,3 +731,63 @@ Deterministic path for each slice:
 - [x] Isolate generate micro-batch execution loop behind a helper with generation-output contract tests.
 - [x] Isolate progress-handle creation and lifecycle into a shared helper.
 - [ ] Next slice candidate: split final write-back dispatch in extract path into a dedicated helper with contract tests.
+
+## 2026-03-06 - Phase 1 Slice I (Extract Final Write-Back Dispatch Module)
+
+### Scope
+
+- Objective: isolate extract final write-back dispatch from `engine.py` into a dedicated boundary module.
+- Constraint: preserve chunk-level USR write-back behavior and keep existing source contracts unchanged.
+
+### Prioritized Finding
+
+1. Low-Medium: final write-back source dispatch remained embedded in `run_extract_job`.
+   - risk: unnecessary orchestration coupling and slower iteration for source-specific write-back hardening.
+
+### Boundary and Contract Decisions
+
+- Added `src/dnadesign/infer/writeback_dispatch.py` with:
+  - `run_extract_write_back(...)`
+- Explicit source-contract behavior:
+  - `records` -> `write_back_records(...)`
+  - `pt_file` -> `write_back_pt_file(...)`
+  - `usr` -> fail-fast if `ids` or dataset handle missing; otherwise no final-op (chunk writes remain authoritative)
+  - any other source -> `WriteBackError` fail-fast.
+- `engine.py` now delegates final write-back dispatch to `run_extract_write_back(...)`.
+
+### TDD Evidence
+
+- Red:
+  - added `src/dnadesign/infer/tests/test_writeback_dispatch.py`
+  - initial run failed with:
+    - `ModuleNotFoundError: No module named 'dnadesign.infer.writeback_dispatch'`
+- Green:
+  - implemented `writeback_dispatch.py`
+  - rewired `run_extract_job` to use `run_extract_write_back(...)`
+  - verification passed for targeted contracts and existing USR/namespace regressions.
+
+### Verification Commands (Executed)
+
+- `uv run pytest -q src/dnadesign/infer/tests/test_writeback_dispatch.py src/dnadesign/infer/tests/test_usr_writeback_contract.py src/dnadesign/infer/tests/test_namespace_contracts.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
+- `uv run infer generate --model-id evo2_7b --device cpu --precision bf16 --alphabet dna --prompt ACGT --max-new-tokens 4 --dry-run`
+
+### Information Architecture Update
+
+- Runtime map updated in `src/dnadesign/infer/docs/architecture/README.md` with:
+  - `writeback_dispatch.py` as final extract write-back dispatch boundary.
+
+### Task Board
+
+- [x] Add fail-fast namespace contract hardening for extract/generate runtime dispatch.
+- [x] Add adversarial namespace pressure tests.
+- [x] Add infer pressure-test operations runbook docs and config example.
+- [x] Extract adapter-dispatch block from `engine.py` into dedicated module with invariant tests.
+- [x] Split ingest loading branch from `run_extract_job` into a focused helper with parity tests.
+- [x] Split generate ingest loading branch from `run_generate_job` into a focused helper with parity tests.
+- [x] Isolate extract micro-batch/derating execution loop behind a helper with chunk-contract tests.
+- [x] Isolate generate micro-batch execution loop behind a helper with generation-output contract tests.
+- [x] Isolate progress-handle creation and lifecycle into a shared helper.
+- [x] Split final write-back dispatch in extract path into a dedicated helper with contract tests.
+- [ ] Next slice candidate: isolate `_plan_resume_for_usr(...)` from `engine.py` behind a dedicated resume planner module with overlay/records parity tests.
