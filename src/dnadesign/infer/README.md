@@ -3,6 +3,7 @@
 **infer** runs biological sequence models and writes results back to datasets.
 
 See the [repository docs index](../../../docs/README.md) for workflow routes and operational references.
+See the [infer docs index](docs/README.md) for package-local architecture, reference, and development notes.
 
 - **Adapters:** `evo2` (implemented), `esm2` (stub)
 - **Ops (evo2):** `evo2.logits`, `evo2.embedding`, `evo2.log_likelihood`, `evo2.generate`

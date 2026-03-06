@@ -44,6 +44,7 @@ from .errors import (
     ValidationError,
     WriteBackError,
 )
+from .input_parsing import load_nonempty_lines, read_ids_arg
 from .presets import list_presets, load_preset
 from .registry import list_fns, list_models
 
@@ -81,18 +82,6 @@ def _discovery_config(provided: Optional[Path]) -> Path:
     if module_cfg.exists():
         return module_cfg.resolve()
     raise ConfigError("No config found. Pass --config or place config.yaml in the current directory.")
-
-
-def _read_ids_arg(ids: Optional[str]) -> Optional[List[str]]:
-    if not ids:
-        return None
-    p = Path(ids)
-    if p.exists():
-        text = p.read_text().strip()
-        if "\n" in text:
-            return [ln.strip() for ln in text.splitlines() if ln.strip()]
-        return [x.strip() for x in text.split(",") if x.strip()]
-    return [x.strip() for x in ids.split(",") if x.strip()]
 
 
 def _guard_pickle(i_know: bool) -> None:
@@ -173,7 +162,7 @@ def run(
                         "dataset": usr,
                         "root": usr_root.as_posix() if usr_root else None,
                         "field": field,
-                        "ids": _read_ids_arg(ids),
+                        "ids": read_ids_arg(ids),
                     },
                     outputs=outputs,
                     io={"write_back": write_back, "overwrite": bool(overwrite)},
@@ -187,7 +176,7 @@ def run(
                         "dataset": usr,
                         "root": usr_root.as_posix() if usr_root else None,
                         "field": field,
-                        "ids": _read_ids_arg(ids),
+                        "ids": read_ids_arg(ids),
                     },
                     params=p.get("params") or {},
                     io={"write_back": False, "overwrite": False},
@@ -358,16 +347,13 @@ def extract(
 
         inputs = None
 
-        def _load_lines(path: Path) -> List[str]:
-            return [ln.strip() for ln in path.read_text().splitlines() if ln.strip()]
-
         if usr:
             job.ingest = IngestConfig(
                 source="usr",
                 dataset=usr,
                 field=field,
                 root=(usr_root.as_posix() if usr_root else None),
-                ids=_read_ids_arg(ids),
+                ids=read_ids_arg(ids),
             )
         elif pt:
             _guard_pickle(i_know_this_is_pickle)
@@ -375,11 +361,11 @@ def extract(
             inputs = pt.as_posix()
         elif records_jsonl:
             job.ingest = IngestConfig(source="records", field=field)
-            records = [json.loads(ln) for ln in _load_lines(records_jsonl)]
+            records = [json.loads(ln) for ln in load_nonempty_lines(records_jsonl)]
             inputs = records  # type: ignore[assignment]
         elif seq_file:
             job.ingest = IngestConfig(source="sequences")
-            inputs = _load_lines(seq_file)
+            inputs = load_nonempty_lines(seq_file)
         elif seq:
             job.ingest = IngestConfig(source="sequences")
             inputs = seq
@@ -493,20 +479,17 @@ def generate(
 
         inputs = None
 
-        def _load_lines(path: Path) -> List[str]:
-            return [ln.strip() for ln in path.read_text().splitlines() if ln.strip()]
-
         if usr:
             job.ingest = IngestConfig(
                 source="usr",
                 dataset=usr,
                 field=field,
                 root=(usr_root.as_posix() if usr_root else None),
-                ids=_read_ids_arg(ids),
+                ids=read_ids_arg(ids),
             )
         elif prompt_file:
             job.ingest = IngestConfig(source="sequences")
-            inputs = _load_lines(prompt_file)
+            inputs = load_nonempty_lines(prompt_file)
         elif prompt:
             job.ingest = IngestConfig(source="sequences")
             inputs = prompt
@@ -622,7 +605,7 @@ def validate_usr(
             dataset_name=dataset,
             field=field,
             root=(usr_root.as_posix() if usr_root else None),
-            ids=_read_ids_arg(ids),
+            ids=read_ids_arg(ids),
         )
         console.print(f"[green]✔ USR OK[/green]  dataset={dataset}  rows={len(seqs)}  field={field}")
         console.print(f"[accent]records:[/accent] {ds.records_path}")
