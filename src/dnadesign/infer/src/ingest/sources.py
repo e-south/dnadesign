@@ -1,12 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/ingest/sources.py
 
-Public API:
-  - run_extract
-  - run_generate
-  - run_job (YAML-driven)
+Input-source loaders for infer runtime ingest paths.
 
 Module Author(s): Eric J. South
 Dunlop Lab

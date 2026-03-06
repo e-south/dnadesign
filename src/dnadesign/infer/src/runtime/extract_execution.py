@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/runtime/extract_execution.py
 
 Executes chunked extract calls with explicit fail-fast output contracts and OOM derating.

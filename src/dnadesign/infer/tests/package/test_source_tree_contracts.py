@@ -104,3 +104,13 @@ def test_infer_tests_are_grouped_by_area() -> None:
     assert (tests_root / "contracts").is_dir()
     assert (tests_root / "docs").is_dir()
     assert (tests_root / "package").is_dir()
+
+
+def test_infer_src_headers_do_not_use_template_project_placeholder() -> None:
+    infer_src_root = _infer_root() / "src"
+    offenders: list[str] = []
+    for path in sorted(infer_src_root.rglob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        if "<dnadesign project>" in text:
+            offenders.append(str(path.relative_to(_infer_root())))
+    assert offenders == []

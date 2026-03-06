@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/runtime/writeback_dispatch.py
 
 Dispatches final extract write-back by ingest source with explicit contracts.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/runtime/adapter_dispatch.py
 
 Resolves and invokes infer adapter callables for extract and generate operations.

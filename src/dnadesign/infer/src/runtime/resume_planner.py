@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/runtime/resume_planner.py
 
 Plans resumable USR extract work by reading records and infer overlays.

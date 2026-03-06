@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/runtime/adapter_runtime.py
 
 Provides adapter cache/loading and runtime policy helpers for infer execution.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/input_parsing.py
 
 Shared parsing helpers for infer CLI text and id inputs.

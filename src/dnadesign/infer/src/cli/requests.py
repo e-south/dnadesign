@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/cli/requests.py
 
 CLI request assembly helpers for infer extract and generate commands.

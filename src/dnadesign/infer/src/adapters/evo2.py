@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/adapters/evo2.py
 
 This module adapts the Arc Institute "Evo 2" DNA language model to the

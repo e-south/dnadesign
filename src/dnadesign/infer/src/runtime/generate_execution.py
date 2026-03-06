@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/runtime/generate_execution.py
 
 Executes chunked generation calls with explicit payload contracts and OOM derating.

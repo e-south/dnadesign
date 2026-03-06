@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/cli/builders.py
 
 Shared builders for infer CLI model configuration and progress-managed execution.

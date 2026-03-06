@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/runtime/progress.py
 
 Creates progress handles for infer runtime jobs with optional environment-based suppression.

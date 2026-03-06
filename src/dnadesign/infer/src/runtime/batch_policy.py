@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/runtime/batch_policy.py
 
 Resolves runtime micro-batch policy from model config and environment contracts.

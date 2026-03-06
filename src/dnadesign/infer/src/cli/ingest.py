@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/cli/ingest.py
 
 CLI ingest request builders for extract and generate command inputs.

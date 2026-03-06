@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/src/runtime/extract_chunk_writeback.py
 
 Builds extract chunk write-back callbacks with explicit USR contract checks.
