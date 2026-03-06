@@ -3,6 +3,8 @@
 dnadesign
 src/dnadesign/infer/__main__.py
 
+Python module entrypoint that executes the infer CLI.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

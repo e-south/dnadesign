@@ -1812,3 +1812,62 @@ Clarify infer UX for workspace-local datasets (not only USR) and harden config-d
 ### Notes / next opportunities
 
 - Next hardening step: add `infer validate workspace --config <path>` to combine config, local ingest.path readability, and USR dataset preflight into one deterministic command.
+
+## 2026-03-06 - Phase 2 Slice L (PR Critique Closure + Run-Mode UX + Root IA Tightening)
+
+### Goal
+
+Address open infer Codex PR critique(s), harden `infer run` mode ergonomics with explicit fail-fast contracts, and remove top-level package cruft that increased IA sprawl.
+
+### Codex critique addressed
+
+- PR thread item: `src/dnadesign/infer/src/writers/usr.py`
+  - `_guard_usr_overwrite` failed when an existing infer overlay did not yet contain newly requested output columns.
+  - Root cause: Parquet read requested all target columns unconditionally, causing `ArrowInvalid` before column-presence checks.
+
+### TDD record
+
+1. Added failing regression test:
+   - `src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py::test_write_back_usr_overwrite_guard_allows_new_columns_missing_from_existing_overlay`
+2. Confirmed red state:
+   - `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py -k missing_from_existing_overlay`
+3. Implemented schema-aware overwrite guard.
+4. Added failing `run` mode-contract tests:
+   - mixed `--config` and `--preset`
+   - preset-only flags used in config mode
+5. Confirmed red state:
+   - `uv run pytest -q src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py`
+6. Implemented explicit run-mode contract validator and re-verified green.
+7. Added failing IA contract for minimal infer root surface and removed stale `infer/config.yaml`.
+
+### Changes applied
+
+- Write-back guard hardening:
+  - `src/dnadesign/infer/src/writers/usr.py`
+  - infer overlay schema is inspected first; overwrite guard reads only columns present in schema.
+  - fail-fast if overlay schema is unreadable or missing `id`.
+- Run command UX hardening:
+  - `src/dnadesign/infer/src/cli/commands/run.py`
+  - added explicit mode-contract checks:
+    - reject `--config` + `--preset` together.
+    - reject preset-only flags in config mode (`--usr`, `--field` when non-default, `--ids`, `--usr-root`, `--write-back`).
+    - reject `--job` in preset mode.
+- IA/cruft tightening:
+  - removed stale root file: `src/dnadesign/infer/config.yaml`
+  - added minimal top-level surface contract:
+    - `src/dnadesign/infer/tests/package/test_source_tree_contracts.py::test_infer_root_keeps_minimal_top_level_surface`
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py -k missing_from_existing_overlay`
+- `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py`
+- `uv run pytest -q src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py`
+- `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py -k minimal_top_level_surface`
+- `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py src/dnadesign/infer/tests/cli/test_workspace_command.py src/dnadesign/infer/tests/package/test_source_tree_contracts.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k infer`
+
+### Notes / next opportunities
+
+- Remaining UX hardening candidate: add CLI characterization tests for broader `run` error-envelope mapping (exit code + message stability per mode).
+- Remaining IA candidate: consolidate any future package examples under `docs/operations/examples/` or `workspaces/` only (avoid adding root-level samples).

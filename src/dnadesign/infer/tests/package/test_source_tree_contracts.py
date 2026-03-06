@@ -39,6 +39,26 @@ def test_infer_root_keeps_progressive_disclosure_directories() -> None:
     assert (infer_root / "workspaces").is_dir()
 
 
+def test_infer_root_keeps_minimal_top_level_surface() -> None:
+    infer_root = _infer_root()
+    observed = {
+        path.name
+        for path in infer_root.iterdir()
+        if path.name != "__pycache__" and not path.name.startswith(".")
+    }
+    assert observed == {
+        "README.md",
+        "__init__.py",
+        "__main__.py",
+        "assets",
+        "cli.py",
+        "docs",
+        "src",
+        "tests",
+        "workspaces",
+    }
+
+
 def test_infer_workspaces_scaffold_exists() -> None:
     infer_root = _infer_root()
     workspaces_root = infer_root / "workspaces"
