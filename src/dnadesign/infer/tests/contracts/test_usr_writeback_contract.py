@@ -138,6 +138,48 @@ def test_write_back_usr_fails_fast_on_existing_values_when_overwrite_false(tmp_p
         )
 
 
+def test_write_back_usr_overwrite_guard_allows_new_columns_missing_from_existing_overlay(tmp_path: Path) -> None:
+    root = tmp_path / "usr_root"
+    register_test_namespace(
+        root,
+        namespace="infer",
+        columns_spec="infer__evo2_7b__job_a__ll_mean:float64,infer__evo2_7b__job_a__logits_mean:float64",
+        overwrite=True,
+    )
+    ds = Dataset(root, "demo")
+    ds.init(source="unit-test")
+    ds.import_rows(
+        [
+            {"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"},
+        ],
+        source="unit",
+    )
+    one_id = ds.head(1, columns=["id"])["id"].tolist()
+
+    write_back_usr(
+        ds,
+        ids=one_id,
+        model_id="evo2_7b",
+        job_id="job_a",
+        columnar={"ll_mean": [1.0]},
+        overwrite=False,
+    )
+    write_back_usr(
+        ds,
+        ids=one_id,
+        model_id="evo2_7b",
+        job_id="job_a",
+        columnar={"logits_mean": [2.0]},
+        overwrite=False,
+    )
+
+    infer_overlay = next(overlay for overlay in ds.list_overlays() if overlay.namespace == "infer")
+    overlay_table = pq.read_table(infer_overlay.path)
+    frame = overlay_table.to_pandas()
+    assert frame["infer__evo2_7b__job_a__ll_mean"].tolist() == [1.0]
+    assert frame["infer__evo2_7b__job_a__logits_mean"].tolist() == [2.0]
+
+
 def test_plan_resume_for_usr_fails_fast_on_unreadable_records(tmp_path: Path) -> None:
     broken = tmp_path / "records.parquet"
     broken.write_text("not a parquet file", encoding="utf-8")

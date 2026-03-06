@@ -16,6 +16,7 @@ from typing import Dict, List
 
 import pandas as pd
 import pyarrow as pa
+import pyarrow.dataset as pa_dataset
 import pyarrow.parquet as pq
 
 from .._logging import get_logger
@@ -47,7 +48,16 @@ def _guard_usr_overwrite(ds, *, ids: List[str], out_cols: List[str], overwrite: 
     if overlay_path is None or not overlay_path.exists():
         return
 
-    read_cols = ["id", *[col for col in out_cols if col != "id"]]
+    try:
+        schema_names = set(pa_dataset.dataset(overlay_path, format="parquet").schema.names)
+    except Exception as error:
+        raise WriteBackError(f"Unable to inspect existing infer overlay schema: {error}") from error
+    if "id" not in schema_names:
+        raise WriteBackError("Existing infer overlay is missing required 'id' column.")
+
+    read_cols = ["id", *[col for col in out_cols if col != "id" and col in schema_names]]
+    if len(read_cols) == 1:
+        return
     try:
         existing = pq.read_table(overlay_path, columns=read_cols).to_pandas()
     except Exception as error:
