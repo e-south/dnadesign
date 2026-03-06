@@ -1632,3 +1632,183 @@ Reduce implicit coupling in adapter registration and remove hidden config fallba
 
 - `src/dnadesign/infer/src/engine.py` remains the highest coupling point and next candidate for further orchestration decomposition.
 - A dedicated `infer validate runtime` preflight command could expose a deterministic operator check bundle for scheduler workflows.
+
+## 2026-03-06 - Phase 2 Slice I (Workspace Harness + Scaffold Contracts)
+
+### Goal
+
+Add an explicit infer workspace harness path so pressure-test runs are easier to start, fail-fast, and consistent with sibling package IA patterns.
+
+### TDD record
+
+1. Added failing tests:
+   - `src/dnadesign/infer/tests/cli/test_workspace_command.py`
+   - `src/dnadesign/infer/tests/package/test_source_tree_contracts.py` (workspace scaffold assertions)
+2. Confirmed red state:
+   - `uv run pytest -q src/dnadesign/infer/tests/cli/test_workspace_command.py src/dnadesign/infer/tests/package/test_source_tree_contracts.py`
+3. Implemented workspace resolution/scaffold module + CLI command group + docs/workspaces scaffold.
+4. Re-ran targeted and full suites to green.
+
+### Implemented changes
+
+- Added workspace contract module:
+  - `src/dnadesign/infer/src/workspace.py`
+  - explicit contracts:
+    - `--root` override, then `INFER_WORKSPACE_ROOT`, then repo-default root.
+    - fail-fast workspace id validation (no path-like ids).
+    - fail-fast template existence checks.
+- Added CLI command group:
+  - `src/dnadesign/infer/src/cli/commands/workspace.py`
+  - `infer workspace where`
+  - `infer workspace init --id <name> [--root] [--template]`
+- Registered command group:
+  - `src/dnadesign/infer/src/cli/commands/__init__.py`
+- Added infer workspace scaffold directory:
+  - `src/dnadesign/infer/workspaces/README.md`
+- Updated IA/docs references:
+  - `src/dnadesign/infer/README.md`
+  - `src/dnadesign/infer/docs/README.md`
+  - `src/dnadesign/infer/docs/index.md`
+  - `src/dnadesign/infer/docs/architecture/README.md`
+  - `src/dnadesign/infer/src/README.md`
+  - `src/dnadesign/infer/docs/reference/command-contracts.md`
+  - `src/dnadesign/infer/docs/operations/pressure-test-agnostic-models.md`
+  - `src/dnadesign/infer/docs/tutorials/demo_pressure_test_usr_ops_notify.md`
+- Added/updated tests:
+  - `src/dnadesign/infer/tests/cli/test_workspace_command.py`
+  - `src/dnadesign/infer/tests/package/test_source_tree_contracts.py`
+  - `src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py`
+  - `src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py`
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/infer/tests/cli/test_workspace_command.py src/dnadesign/infer/tests/package/test_source_tree_contracts.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run infer workspace where`
+- `uv run infer workspace init --id demo_tmp --root <tmp>`
+- `uv run infer validate config --config src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml`
+
+### Notes / next opportunities
+
+- Infer now has a first-class `workspaces/` root and deterministic init path, matching sibling package structure more closely.
+- Next incremental hardening candidate: add `infer validate workspace` to check workspace config + USR accessibility in one deterministic preflight command for scheduler workflows.
+
+## 2026-03-06 - Phase 2 Slice J (Maintainer Audit: Demo Workspace Intent + Legacy Cruft Hardening)
+
+### Goal
+
+Confirm workspace intent for end-to-end pressure-test demos and remove high-signal legacy cruft from active infer source/docs surfaces.
+
+### Audit scope and baseline
+
+- Scope: `src/dnadesign/infer` (`src/`, `docs/`, `tests/`, CLI user path).
+- Baseline verification before fixes:
+  - `uv run pytest -q src/dnadesign/infer/tests`
+  - `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- Baseline cruft scan:
+  - 35 infer `src/*.py` headers still contained `<dnadesign project>` template token.
+  - docs outside `docs/dev/journal.md` were already mostly aligned with new module layout.
+
+### Prioritized findings
+
+1. Medium: source-header template token remained across infer runtime modules.
+   - Impact: avoidable maintainability/documentation noise and inconsistent file identity metadata.
+2. Medium: no machine-checkable contract prevented legacy flat-module references from reappearing in active docs.
+   - Impact: drift risk in operator-facing docs over future increments.
+3. Low: workspace intent ambiguity for demo pressure tests needed explicit CLI/docs confirmation.
+   - Impact: small UX ambiguity during onboarding.
+
+### TDD record
+
+1. Added failing test:
+   - `src/dnadesign/infer/tests/package/test_source_tree_contracts.py::test_infer_src_headers_do_not_use_template_project_placeholder`
+2. Added docs guard test:
+   - `src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py::test_infer_docs_excluding_journal_avoid_legacy_flat_module_paths`
+3. Confirmed red state for header-placeholder contract.
+4. Replaced placeholder token in infer `src/*.py` headers and re-verified.
+
+### Changes applied
+
+- Added source-tree hardening contract:
+  - no `<dnadesign project>` placeholder token allowed under infer `src/` python files.
+- Added docs hardening contract:
+  - docs excluding `docs/dev/journal.md` must not reference legacy flat-module/test paths.
+- Cleaned infer `src/*.py` header template token to `dnadesign`.
+- Confirmed workspace demo intent with real user flow:
+  - `infer workspace init --id test_stress_ethanol --root <tmp>`
+  - `infer validate config --config <tmp>/test_stress_ethanol/config.yaml`
+
+### Adversarial / pressure evidence
+
+- Workspace id/path abuse checks (existing contracts) remain enforced:
+  - path-like workspace ids fail fast.
+  - existing workspace directory fails fast.
+- Demo workspace scaffold pressure path succeeded and produced valid config + expected folder structure.
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py::test_infer_src_headers_do_not_use_template_project_placeholder src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py::test_infer_docs_excluding_journal_avoid_legacy_flat_module_paths`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run infer workspace init --id test_stress_ethanol --root <tmp>`
+- `uv run infer validate config --config <tmp>/test_stress_ethanol/config.yaml`
+
+### Notes / next opportunities
+
+- Historical journal entries intentionally retain prior file paths as time-stamped evidence; active docs now carry no legacy flat-path references under current contracts.
+- Next increment: add `infer validate workspace` for a single command that checks workspace config + USR accessibility + dry-run readiness.
+
+## 2026-03-06 - Phase 2 Slice K (UX Audit: Local Workspace IO + Cruft Pass)
+
+### Goal
+
+Clarify infer UX for workspace-local datasets (not only USR) and harden config-driven IO behavior for `infer run`.
+
+### Audit findings
+
+1. High UX gap: `infer extract`/`infer generate` already supported local workspace files, but `infer run --config` was effectively USR-centric unless inputs were injected programmatically.
+2. Medium cruft: `src/ingest/sources.py` module header still carried stale copied description text.
+3. Medium cruft-control gap: no automated contract for config-driven local ingest path behavior in `run` command.
+
+### Changes applied
+
+- Added config-driven local ingest resolution module:
+  - `src/dnadesign/infer/src/cli/config_inputs.py`
+  - supports `ingest.path` for `sequences`, `records`, and `pt_file` in config workflows.
+  - relative `ingest.path` values resolve against config directory.
+- Updated config schema:
+  - `src/dnadesign/infer/src/config.py`
+  - added `ingest.path` field.
+  - fail-fast guard: `ingest.path` is invalid for `source='usr'`.
+- Wired `infer run` to config-driven input resolver:
+  - `src/dnadesign/infer/src/cli/commands/run.py`
+- Added tests:
+  - `src/dnadesign/infer/tests/cli/test_config_inputs.py`
+  - `src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py`
+  - `src/dnadesign/infer/tests/cli/test_validate_command.py` (USR path rejection contract)
+- Docs updates:
+  - `src/dnadesign/infer/docs/reference/command-contracts.md`
+  - `src/dnadesign/infer/workspaces/README.md`
+- Cruft cleanup:
+  - `src/dnadesign/infer/src/ingest/sources.py` header description corrected.
+
+### UX contract (current)
+
+- Ad-hoc commands:
+  - `extract`: `--seq-file`, `--records-jsonl`, `--pt`, or `--usr`.
+  - `generate`: `--prompt-file` or `--usr`.
+- Config workflows (`infer run --config`):
+  - `ingest.source: usr` via dataset/root fields.
+  - `ingest.source: sequences|records|pt_file` via `ingest.path` (workspace-local path supported).
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/infer/tests/cli/test_config_inputs.py src/dnadesign/infer/tests/cli/test_validate_command.py`
+- `uv run pytest -q src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+
+### Notes / next opportunities
+
+- Next hardening step: add `infer validate workspace --config <path>` to combine config, local ingest.path readability, and USR dataset preflight into one deterministic command.
