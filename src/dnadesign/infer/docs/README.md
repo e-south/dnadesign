@@ -1,15 +1,42 @@
-## Infer Docs Index
+## infer docs
 
-This index is the package-local entrypoint for `dnadesign.infer` documentation.
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-03-06
 
-### Reader Routes
+### Read order
 
-- Need command usage and examples: go to [reference](reference/README.md).
-- Need architecture and module boundaries: go to [architecture](architecture/README.md).
-- Need operational workflow context with sibling tools: go to [operations](operations/README.md).
-- Need refactor history and active work log: go to [dev](dev/README.md).
+1. [Top README](../README.md): package boundary and fast route map.
+2. [Getting started index](getting-started/README.md): first local command flow.
+3. [Operations index](operations/README.md): pressure-test paths for local and scheduler workflows.
+4. [Reference index](reference/README.md): stable command and runtime contracts.
+5. [Architecture map](architecture/README.md): package boundary map and extension seams.
+6. [Dev index](dev/README.md): maintainer process and journal.
 
-### Scope
+### Documentation by workflow
 
-- In scope: infer package behavior, contracts, and local operating patterns.
-- Out of scope: global repo policy docs (use `docs/README.md` at repo root for cross-tool policies).
+#### Validate local command path
+- [CLI quickstart](getting-started/cli-quickstart.md): run `validate`, ad-hoc `extract`, and ad-hoc `generate`.
+- [Reference index](reference/README.md): command and contract lookups before automation.
+
+#### Pressure-test agnostic model writes into USR
+- [Agnostic-model pressure-test runbook](operations/pressure-test-agnostic-models.md): standalone CLI and ops-runbook paths.
+- [End-to-end pressure-test demo](tutorials/demo_pressure_test_usr_ops_notify.md): reproducible infer -> usr -> ops -> notify walkthrough.
+
+#### Run scheduler-oriented infer flows
+- [Operations index](operations/README.md): choose no-submit and submit route.
+- [Agnostic-model pressure-test runbook](operations/pressure-test-agnostic-models.md): contract-first ops workflow.
+
+#### Extend and maintain infer internals
+- [Architecture map](architecture/README.md): runtime module boundaries.
+- [Dev index](dev/README.md): maintainer loop and evidence logging.
+- [Development journal](dev/journal.md): refactor slices and validation record.
+
+### Documentation by type
+
+- [docs index by type](index.md)
+- [getting-started/](getting-started/): first-run commands and prerequisites.
+- [tutorials/](tutorials/): full end-to-end walkthroughs.
+- [operations/](operations/): operational runbooks and pressure-test routes.
+- [reference/](reference/): command and contract documentation.
+- [architecture/](architecture/): package boundary map.
+- [dev/](dev/): maintainer process and journal.

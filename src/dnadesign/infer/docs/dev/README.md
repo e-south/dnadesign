@@ -1,5 +1,6 @@
 ## Infer Dev Docs
 
+- Architecture map: [../architecture/README.md](../architecture/README.md)
 - Active development journal: [journal.md](journal.md)
 - Current refactor stream: information architecture reorganization with progressive disclosure.
 

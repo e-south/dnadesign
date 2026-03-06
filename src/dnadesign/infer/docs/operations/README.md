@@ -1,23 +1,27 @@
-## Infer Operations
+## infer operations
 
-### Local Runtime Checks
+### Start path
 
-- Validate config contract: `uv run infer validate config --config <path>`
-- Validate USR dataset path/field: `uv run infer validate usr --dataset <id> --field sequence`
-- Run dry-run extract for fast contract checks: `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
+1. Validate command contracts locally:
+   - `uv run infer validate config --config <path>`
+   - `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
+2. Run pressure-test path from this index.
+3. Verify dataset state with `uv run usr ...` before enabling scheduler submit.
 
-### HPC and Orchestration Context
+### Runbooks
 
-- Infer workflow contracts in ops:
+- [Agnostic model + USR pressure test](pressure-test-agnostic-models.md): standalone and ops-runbook paths.
+- [End-to-end pressure-test demo](../tutorials/demo_pressure_test_usr_ops_notify.md): infer + usr + ops + notify full walkthrough.
+
+### Integration boundary
+
+- Ops workflow contracts consumed by infer:
   - `infer_batch_submit`
   - `infer_batch_with_notify_slack`
-- Notify/ops integration depends on shared infer USR producer contract parsing in `src/dnadesign/_contracts/usr_producer.py`.
+- Shared producer contract path:
+  - `src/dnadesign/_contracts/usr_producer.py`
 
-Use this package-local page with repo-wide operations docs:
+### Related docs
 
-- `docs/operations/README.md`
-- `docs/bu-scc/README.md`
-
-### Pressure Test Runbook
-
-- [Agnostic model + USR pressure test](pressure-test-agnostic-models.md)
+- [infer docs index](../README.md)
+- [repository operations index](../../../../../docs/operations/README.md)

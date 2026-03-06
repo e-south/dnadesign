@@ -2,6 +2,8 @@
 
 This guide pressure-tests infer as a model-agnostic extraction engine with explicit namespace contracts and USR write-back.
 
+For a step-by-step walkthrough route, use the [end-to-end demo tutorial](../tutorials/demo_pressure_test_usr_ops_notify.md).
+
 ### Objective
 
 - run extract jobs that produce multiple outputs (for example logits + log-likelihood ratio variants),

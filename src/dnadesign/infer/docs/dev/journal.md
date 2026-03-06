@@ -980,3 +980,90 @@ Deterministic path for each slice:
 - [x] Separate extract chunk write-back callback construction into `extract_chunk_writeback.py`.
 - [x] Isolate adapter runtime/cache policy into `adapter_runtime.py`.
 - [ ] Next slice candidate: align infer docs information architecture with sibling package pattern (light top README + workflow/docs index + explicit pressure-test demo route) and add docs/wrapper contract tests.
+
+## 2026-03-06 - Phase 1 Slice M (Docs IA Parity + Wrapper Contract Hardening)
+
+### Scope
+
+- Objective: align infer docs layout with sibling package pattern:
+  - lightweight top README,
+  - workflow-first docs entry,
+  - by-type docs index,
+  - explicit end-to-end pressure-test demo route.
+- Objective: add wrapper correctness checks for module entrypoint and public API exports.
+
+### Prioritized Findings
+
+1. Medium: infer top README remained monolithic compared with sibling package router pattern.
+2. Medium: infer docs lacked an explicit `docs/index.md` by-type index and dedicated tutorial route for end-to-end pressure testing.
+3. Low-Medium: wrapper correctness (`python -m dnadesign.infer`, public API exports) lacked explicit contract tests.
+
+### Boundary and Contract Decisions
+
+- Replaced `src/dnadesign/infer/README.md` with a lightweight router containing:
+  - documentation map,
+  - entrypoint contract,
+  - boundary reminder with USR namespaced write-back contract.
+- Reworked docs IA to progressive disclosure:
+  - `src/dnadesign/infer/docs/README.md` as workflow-first map,
+  - new `src/dnadesign/infer/docs/index.md` as by-type index,
+  - new getting-started section (`docs/getting-started/README.md`, `cli-quickstart.md`),
+  - new tutorial route (`docs/tutorials/demo_pressure_test_usr_ops_notify.md`),
+  - updated operations index to link both runbook and tutorial.
+- Added wrapper correctness tests:
+  - module entrypoint existence,
+  - public API callable export contracts,
+  - `python -m dnadesign.infer --help` execution contract.
+
+### TDD Evidence
+
+- Red:
+  - added `src/dnadesign/infer/tests/test_docs_information_architecture_contracts.py`
+  - added `src/dnadesign/infer/tests/test_wrapper_contracts.py`
+  - initial run failed on missing docs IA files/sections and missing tutorial routes.
+- Green:
+  - implemented docs IA files/links and README reduction
+  - added tutorial and getting-started surfaces
+  - verification passed for new docs/wrapper contracts and existing infer suites.
+
+### Verification Commands (Executed)
+
+- `uv run pytest -q src/dnadesign/infer/tests/test_docs_information_architecture_contracts.py src/dnadesign/infer/tests/test_wrapper_contracts.py`
+- `uv run pytest -q src/dnadesign/infer/tests/test_infer_usr_docs_contract.py src/dnadesign/infer/tests/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/test_adapter_runtime.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
+- `uv run infer generate --model-id evo2_7b --device cpu --precision bf16 --alphabet dna --prompt ACGT --max-new-tokens 4 --dry-run`
+- `uv run python -m dnadesign.infer --help`
+
+### Information Architecture Update
+
+- Added/updated docs surfaces:
+  - `src/dnadesign/infer/README.md`
+  - `src/dnadesign/infer/docs/README.md`
+  - `src/dnadesign/infer/docs/index.md`
+  - `src/dnadesign/infer/docs/getting-started/README.md`
+  - `src/dnadesign/infer/docs/getting-started/cli-quickstart.md`
+  - `src/dnadesign/infer/docs/tutorials/README.md`
+  - `src/dnadesign/infer/docs/tutorials/demo_pressure_test_usr_ops_notify.md`
+  - `src/dnadesign/infer/docs/operations/README.md`
+  - `src/dnadesign/infer/docs/reference/README.md`
+  - `src/dnadesign/infer/docs/reference/command-contracts.md`
+
+### Task Board
+
+- [x] Add fail-fast namespace contract hardening for extract/generate runtime dispatch.
+- [x] Add adversarial namespace pressure tests.
+- [x] Add infer pressure-test operations runbook docs and config example.
+- [x] Extract adapter-dispatch block from `engine.py` into dedicated module with invariant tests.
+- [x] Split ingest loading branch from `run_extract_job` into a focused helper with parity tests.
+- [x] Split generate ingest loading branch from `run_generate_job` into a focused helper with parity tests.
+- [x] Isolate extract micro-batch/derating execution loop behind a helper with chunk-contract tests.
+- [x] Isolate generate micro-batch execution loop behind a helper with generation-output contract tests.
+- [x] Isolate progress-handle creation and lifecycle into a shared helper.
+- [x] Split final write-back dispatch in extract path into a dedicated helper with contract tests.
+- [x] Isolate `_plan_resume_for_usr(...)` behind `resume_planner.py` with parity coverage.
+- [x] Separate extract chunk write-back callback construction into `extract_chunk_writeback.py`.
+- [x] Isolate adapter runtime/cache policy into `adapter_runtime.py`.
+- [x] Align infer docs IA to sibling pattern with lightweight README + workflow/type indexes + explicit pressure-test demo route.
+- [x] Add infer wrapper correctness contracts for module entrypoint and public API exports.
+- [ ] Next slice candidate: split extract/generate batch-policy parsing (`DNADESIGN_INFER_BATCH`, `DNADESIGN_INFER_DEFAULT_BS`) into a dedicated runtime policy module with invariant tests.
