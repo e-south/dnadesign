@@ -1193,3 +1193,47 @@ Deterministic path for each slice:
 - [x] Rewire `run`/`extract`/`generate` handlers to use shared helper boundary.
 - [x] Verify no regressions in infer tests and infer-linked notify/usr contracts.
 - [ ] Next slice candidate: split command-specific request assembly from Typer entrypoints into `cli_commands/` modules to further reduce `cli.py` size without changing CLI behavior.
+
+## 2026-03-06 - Phase 1 Slice P (CLI Ingest Builder Boundary)
+
+### Scope
+
+- Objective: reduce `cli.py` command-body branching by extracting ingest source selection and input materialization into a focused module.
+
+### Boundary and Contract Decisions
+
+- Added `src/dnadesign/infer/cli_ingest.py` with explicit request builders:
+  - `build_extract_ingest(...)`
+  - `build_generate_ingest(...)`
+  - `CliIngestRequest` dataclass (`ingest`, `inputs`)
+- Rewired `extract` and `generate` command handlers in `src/dnadesign/infer/cli.py` to delegate ingest-source assembly to `cli_ingest.py`.
+- Preserved source precedence and fail-fast contracts:
+  - extract precedence: `usr` > `pt` > `records_jsonl` > `seq_file` > `seq`
+  - generate precedence: `usr` > `prompt_file` > `prompt`
+  - unchanged explicit errors when no valid source is provided.
+
+### TDD Evidence
+
+- Red:
+  - Added `src/dnadesign/infer/tests/test_cli_ingest.py` and confirmed initial failure:
+    - `ModuleNotFoundError: No module named 'dnadesign.infer.cli_ingest'`
+- Green:
+  - Implemented `cli_ingest.py` and rewired `cli.py` call sites.
+  - New ingest tests and full infer suite passed.
+
+### Verification Commands (Executed)
+
+- `uv run pytest -q src/dnadesign/infer/tests/test_cli_ingest.py`
+- `uv run pytest -q src/dnadesign/infer/tests/test_cli_ingest.py src/dnadesign/infer/tests/test_cli_builders.py src/dnadesign/infer/tests/test_presets.py src/dnadesign/infer/tests/test_wrapper_contracts.py`
+- `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer"`
+
+### Information Architecture Update
+
+- Updated `src/dnadesign/infer/docs/architecture/README.md` interface-layer map to include `cli_ingest.py`.
+
+### Task Board
+
+- [x] Extract CLI ingest source branching into dedicated module.
+- [x] Keep command behavior stable with characterization tests.
+- [x] Verify infer + infer-linked notify/usr tests remain green.
+- [ ] Next slice candidate: move command-specific request assembly (`run` preset job, extract output spec params, generate params) into `cli_commands/` modules and keep Typer entrypoints declarative.

@@ -32,6 +32,7 @@ from ._console import (
 )
 from .api import run_job
 from .cli_builders import build_model_config, run_with_progress
+from .cli_ingest import build_extract_ingest, build_generate_ingest
 from .config import IngestConfig, JobConfig, OutputSpec, RootConfig
 from .engine import clear_adapter_cache
 from .errors import (
@@ -44,7 +45,7 @@ from .errors import (
     ValidationError,
     WriteBackError,
 )
-from .input_parsing import load_nonempty_lines, read_ids_arg
+from .input_parsing import read_ids_arg
 from .presets import list_presets, load_preset
 from .registry import list_fns, list_models
 
@@ -339,32 +340,20 @@ def extract(
             io={"write_back": write_back, "overwrite": overwrite},
         )
 
-        inputs = None
-
-        if usr:
-            job.ingest = IngestConfig(
-                source="usr",
-                dataset=usr,
-                field=field,
-                root=(usr_root.as_posix() if usr_root else None),
-                ids=read_ids_arg(ids),
-            )
-        elif pt:
-            _guard_pickle(i_know_this_is_pickle)
-            job.ingest = IngestConfig(source="pt_file", field=field)
-            inputs = pt.as_posix()
-        elif records_jsonl:
-            job.ingest = IngestConfig(source="records", field=field)
-            records = [json.loads(ln) for ln in load_nonempty_lines(records_jsonl)]
-            inputs = records  # type: ignore[assignment]
-        elif seq_file:
-            job.ingest = IngestConfig(source="sequences")
-            inputs = load_nonempty_lines(seq_file)
-        elif seq:
-            job.ingest = IngestConfig(source="sequences")
-            inputs = seq
-        else:
-            raise ConfigError("Provide one of --seq/--seq-file/--usr/--pt/--records-jsonl")
+        ingest_request = build_extract_ingest(
+            seq=seq,
+            seq_file=seq_file,
+            usr=usr,
+            field=field,
+            ids=ids,
+            usr_root=usr_root,
+            pt=pt,
+            records_jsonl=records_jsonl,
+            i_know_this_is_pickle=i_know_this_is_pickle,
+            guard_pickle=_guard_pickle,
+        )
+        job.ingest = ingest_request.ingest
+        inputs = ingest_request.inputs
 
         if dry_run:
             render_config_summary(model, [job])
@@ -469,24 +458,16 @@ def generate(
             params=params,
         )
 
-        inputs = None
-
-        if usr:
-            job.ingest = IngestConfig(
-                source="usr",
-                dataset=usr,
-                field=field,
-                root=(usr_root.as_posix() if usr_root else None),
-                ids=read_ids_arg(ids),
-            )
-        elif prompt_file:
-            job.ingest = IngestConfig(source="sequences")
-            inputs = load_nonempty_lines(prompt_file)
-        elif prompt:
-            job.ingest = IngestConfig(source="sequences")
-            inputs = prompt
-        else:
-            raise ConfigError("Provide prompts via --prompt/--prompt-file or use --usr.")
+        ingest_request = build_generate_ingest(
+            prompt=prompt,
+            prompt_file=prompt_file,
+            usr=usr,
+            field=field,
+            ids=ids,
+            usr_root=usr_root,
+        )
+        job.ingest = ingest_request.ingest
+        inputs = ingest_request.inputs
 
         if dry_run:
             render_config_summary(model, [job])
