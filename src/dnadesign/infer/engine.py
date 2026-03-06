@@ -34,6 +34,7 @@ from .ingest.sources import (
     load_usr_input,
 )
 from .ingest.validators import validate_dna, validate_protein
+from .progress import ProgressFactory, create_progress_handle
 from .registry import get_adapter_cls
 from .writers.pt_file import write_back_pt_file
 from .writers.records import write_back_records
@@ -47,50 +48,6 @@ _ADAPTER_CACHE: Dict[Tuple[str, str, str], object] = {}
 
 def clear_adapter_cache() -> None:
     _ADAPTER_CACHE.clear()
-
-
-# --------------------------------------------------------------------- Progress
-def _get_tqdm():
-    show = os.environ.get("DNADESIGN_PROGRESS", "1").lower() not in {
-        "0",
-        "false",
-        "off",
-        "no",
-    }
-    if not show:
-
-        class _NoTQDM:
-            def __init__(self, total=None, **kwargs):
-                self.total = total
-
-            def update(self, n):
-                pass
-
-            def close(self):
-                pass
-
-        return _NoTQDM, False
-    try:
-        from tqdm.auto import tqdm  # type: ignore
-
-        return tqdm, True
-    except Exception:
-        _LOG.info("tqdm not available; continuing without a progress bar.")
-
-        class _NoTQDM:
-            def __init__(self, total=None, **kwargs):
-                self.total = total
-
-            def update(self, n):
-                pass
-
-            def close(self):
-                pass
-
-        return _NoTQDM, False
-
-
-ProgressFactory = Optional[Callable[[str, int], Any]]  # returns handle with update(n), close()
 
 
 def _validate_alphabet(alphabet: str, seqs: List[str]) -> None:
@@ -279,11 +236,12 @@ def run_extract_job(
             continue
 
         # progress handle
-        if progress_factory:
-            pbar = progress_factory(f"{job.id}/{out.id}", len(need_idx))
-        else:
-            tqdm, _ = _get_tqdm()
-            pbar = tqdm(total=len(need_idx), unit="seq", desc=f"{job.id}/{out.id}")
+        pbar = create_progress_handle(
+            progress_factory=progress_factory,
+            label=f"{job.id}/{out.id}",
+            total=len(need_idx),
+            unit="seq",
+        )
 
         def _write_back_chunk(idx_chunk: List[int], vals: List[object]) -> None:
             if source != "usr" or ids is None or not job.io.write_back:
@@ -365,11 +323,12 @@ def run_generate_job(
     if not micro_bs or micro_bs <= 0:
         return validate_generate_payload(fn(prompts, **params))
 
-    if progress_factory:
-        pbar = progress_factory(f"{job.id}/generate", len(prompts))
-    else:
-        tqdm, _ = _get_tqdm()
-        pbar = tqdm(total=len(prompts), unit="prompt", desc=f"{job.id}/generate")
+    pbar = create_progress_handle(
+        progress_factory=progress_factory,
+        label=f"{job.id}/generate",
+        total=len(prompts),
+        unit="prompt",
+    )
 
     try:
         return execute_generate_batches(

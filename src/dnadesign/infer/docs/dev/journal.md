@@ -672,3 +672,62 @@ Deterministic path for each slice:
 - [x] Isolate extract micro-batch/derating execution loop behind a helper with chunk-contract tests.
 - [x] Isolate generate micro-batch execution loop behind a helper with generation-output contract tests.
 - [ ] Next slice candidate: isolate progress-handle creation and lifecycle into a shared helper to remove repeated pbar setup/close logic.
+
+## 2026-03-06 - Phase 1 Slice H (Progress Lifecycle Module Extraction)
+
+### Scope
+
+- Objective: remove repeated progress-handle setup logic from `engine.py` by introducing a dedicated module.
+- Constraint: preserve existing CLI/runtime behavior for progress enabled/disabled modes.
+
+### Prioritized Finding
+
+1. Low-Medium: duplicated progress setup and tqdm fallback logic in extract and generate paths.
+   - risk: divergence between code paths and larger `engine.py` maintenance surface.
+
+### Boundary and Contract Decisions
+
+- Added `src/dnadesign/infer/progress.py` with explicit progress contracts:
+  - `resolve_tqdm_factory()`
+  - `create_progress_handle(...)`
+  - `_NoTQDM` no-op handle.
+- `engine.py` now imports `ProgressFactory` and `create_progress_handle` and no longer owns progress fallback implementation.
+- No silent fallback behavior added; missing tqdm remains operator-visible via existing logger info.
+
+### TDD Evidence
+
+- Red:
+  - added `src/dnadesign/infer/tests/test_progress_handles.py`
+  - initial run failed with:
+    - `ModuleNotFoundError: No module named 'dnadesign.infer.progress'`
+- Green:
+  - implemented `progress.py`
+  - rewired engine progress-handle call sites
+  - verification passed:
+    - `uv run pytest -q src/dnadesign/infer/tests/test_progress_handles.py`
+    - `uv run pytest -q src/dnadesign/infer/tests`
+
+### Verification Commands (Executed)
+
+- `uv run pytest -q src/dnadesign/infer/tests/test_progress_handles.py`
+- `uv run pytest -q src/dnadesign/infer/tests/test_extract_execution.py src/dnadesign/infer/tests/test_generate_execution.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
+- `uv run infer generate --model-id evo2_7b --device cpu --precision bf16 --alphabet dna --prompt ACGT --max-new-tokens 4 --dry-run`
+
+### Information Architecture Update
+
+- Runtime map updated in `src/dnadesign/infer/docs/architecture/README.md` with `progress.py`.
+
+### Task Board
+
+- [x] Add fail-fast namespace contract hardening for extract/generate runtime dispatch.
+- [x] Add adversarial namespace pressure tests.
+- [x] Add infer pressure-test operations runbook docs and config example.
+- [x] Extract adapter-dispatch block from `engine.py` into dedicated module with invariant tests.
+- [x] Split ingest loading branch from `run_extract_job` into a focused helper with parity tests.
+- [x] Split generate ingest loading branch from `run_generate_job` into a focused helper with parity tests.
+- [x] Isolate extract micro-batch/derating execution loop behind a helper with chunk-contract tests.
+- [x] Isolate generate micro-batch execution loop behind a helper with generation-output contract tests.
+- [x] Isolate progress-handle creation and lifecycle into a shared helper.
+- [ ] Next slice candidate: split final write-back dispatch in extract path into a dedicated helper with contract tests.
