@@ -387,3 +387,52 @@ Deterministic path for each slice:
 - [x] Add adversarial namespace pressure tests.
 - [x] Add infer pressure-test operations runbook docs and config example.
 - [ ] Next slice candidate: extract adapter-dispatch block from `engine.py` into a dedicated module with invariant tests.
+
+## 2026-03-06 - Phase 1 Slice C (Adapter Dispatch Module Extraction)
+
+### Scope
+
+- Objective: extract adapter function dispatch from `engine.py` into a dedicated module with invariant tests.
+- Constraint: behavior must remain unchanged for existing extract/generate flows.
+
+### Changes Applied
+
+- Added dedicated adapter dispatch module:
+  - `src/dnadesign/infer/adapter_dispatch.py`
+  - responsibilities:
+    - resolve extract callable from namespaced function,
+    - invoke extract callable with v1 method contract (`log_likelihood`, `logits`, `embedding`),
+    - resolve generate callable from namespaced function.
+- Refactored runtime to use dispatch module:
+  - `src/dnadesign/infer/engine.py`
+  - removed inline adapter capability/dispatch logic from job loops and delegated to module helpers.
+- Added invariant tests:
+  - `src/dnadesign/infer/tests/test_adapter_dispatch.py`
+  - covers callable resolution, missing method failures, format forwarding for logits, and unsupported method rejection.
+
+### TDD Evidence
+
+- Red:
+  - added `src/dnadesign/infer/tests/test_adapter_dispatch.py` importing new module.
+  - initial run failed with:
+    - `ModuleNotFoundError: No module named 'dnadesign.infer.adapter_dispatch'`
+- Green:
+  - implemented `adapter_dispatch.py`
+  - rewired `engine.py` call sites
+  - verification passed:
+    - `uv run pytest -q src/dnadesign/infer/tests/test_adapter_dispatch.py`
+    - `uv run pytest -q src/dnadesign/infer/tests/test_namespace_contracts.py`
+    - `uv run pytest -q src/dnadesign/infer/tests`
+
+### Notes
+
+- This slice narrows `engine.py` responsibilities without changing public CLI/API behavior.
+- Dispatch invariants are now unit-testable independently of ingest/write-back paths.
+
+### Task Board
+
+- [x] Add fail-fast namespace contract hardening for extract/generate runtime dispatch.
+- [x] Add adversarial namespace pressure tests.
+- [x] Add infer pressure-test operations runbook docs and config example.
+- [x] Extract adapter-dispatch block from `engine.py` into dedicated module with invariant tests.
+- [ ] Next slice candidate: split ingest loading branch from `run_extract_job` into a focused helper with parity tests.

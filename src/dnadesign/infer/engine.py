@@ -15,10 +15,10 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ._logging import get_logger
+from .adapter_dispatch import invoke_extract_callable, resolve_extract_callable, resolve_generate_callable
 from .config import JobConfig, ModelConfig
 from .contracts import infer_usr_column_name, resolve_generate_namespaced_fn, validate_extract_output_namespace
 from .errors import (
-    CapabilityError,
     ConfigError,
     InferError,
     ModelLoadError,
@@ -33,7 +33,7 @@ from .ingest.sources import (
     load_usr_input,
 )
 from .ingest.validators import validate_dna, validate_protein
-from .registry import get_adapter_cls, resolve_fn
+from .registry import get_adapter_cls
 from .writers.pt_file import write_back_pt_file
 from .writers.records import write_back_records
 from .writers.usr import write_back_usr
@@ -265,10 +265,7 @@ def run_extract_job(
     columnar: Dict[str, List[object]] = {}
 
     for out in job.outputs or []:
-        method_name = resolve_fn(out.fn)
-        fn = getattr(adapter, method_name, None)
-        if fn is None:
-            raise CapabilityError(f"Adapter does not implement '{out.fn}'")
+        method_name, fn = resolve_extract_callable(adapter=adapter, namespaced_fn=out.fn)
 
         all_vals: List[object] = list(existing[out.id])
         need_idx = [j for j in todo_idx if all_vals[j] is None]
@@ -298,12 +295,13 @@ def run_extract_job(
             chunk = [seqs[i] for i in idx_chunk]
 
             try:
-                if method_name == "log_likelihood":
-                    vals = fn(chunk, **out.params)
-                elif method_name in {"logits", "embedding"}:
-                    vals = fn(chunk, **out.params, fmt=out.format)
-                else:
-                    raise CapabilityError(f"Unsupported extract function '{out.fn}' in v1")
+                vals = invoke_extract_callable(
+                    fn=fn,
+                    method_name=method_name,
+                    chunk=chunk,
+                    params=out.params,
+                    output_format=out.format,
+                )
 
             except RuntimeError as e:
                 if _is_oom(e) and _auto_derate_enabled() and bs > 1:
@@ -392,10 +390,7 @@ def run_generate_job(
     adapter = _get_adapter(model)
 
     # Choose generate fn from explicit contract-validated namespaced function.
-    gen_fn_name = resolve_fn(gen_name)
-    fn = getattr(adapter, gen_fn_name, None)
-    if not fn:
-        raise CapabilityError(f"Adapter does not support generation '{gen_name}'")
+    fn = resolve_generate_callable(adapter=adapter, namespaced_fn=gen_name)
 
     micro_bs = model.batch_size or int(os.environ.get("DNADESIGN_INFER_BATCH", "0"))
     micro_bs = int(micro_bs) if micro_bs else 0
