@@ -20,9 +20,7 @@ from dnadesign.infer.cli import app
 _RUNNER = CliRunner()
 
 
-def test_run_config_sequences_ingest_path_resolves_relative_to_config(monkeypatch, tmp_path: Path) -> None:
-    (tmp_path / "inputs").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "inputs" / "seqs.txt").write_text("ACGT\nTGCA\n", encoding="utf-8")
+def _write_minimal_config(tmp_path: Path) -> Path:
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         """
@@ -45,6 +43,13 @@ jobs:
         + "\n",
         encoding="utf-8",
     )
+    return config_path
+
+
+def test_run_config_sequences_ingest_path_resolves_relative_to_config(monkeypatch, tmp_path: Path) -> None:
+    (tmp_path / "inputs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "inputs" / "seqs.txt").write_text("ACGT\nTGCA\n", encoding="utf-8")
+    config_path = _write_minimal_config(tmp_path)
 
     captured: dict[str, object] = {}
 
@@ -65,3 +70,32 @@ jobs:
     assert result.exit_code == 0, result.stdout
     assert captured["job_id"] == "j1"
     assert captured["inputs"] == ["ACGT", "TGCA"]
+
+
+def test_run_rejects_mixed_config_and_preset_modes(tmp_path: Path) -> None:
+    (tmp_path / "inputs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "inputs" / "seqs.txt").write_text("ACGT\n", encoding="utf-8")
+    config_path = _write_minimal_config(tmp_path)
+
+    result = _RUNNER.invoke(
+        app,
+        ["run", "--config", config_path.as_posix(), "--preset", "evo2/extract_logits_ll", "--dry-run"],
+    )
+
+    assert result.exit_code == 2
+    assert "accepts exactly one mode" in (result.stdout or "")
+
+
+def test_run_rejects_preset_only_flags_when_config_mode_is_selected(tmp_path: Path) -> None:
+    (tmp_path / "inputs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "inputs" / "seqs.txt").write_text("ACGT\n", encoding="utf-8")
+    config_path = _write_minimal_config(tmp_path)
+
+    result = _RUNNER.invoke(
+        app,
+        ["run", "--config", config_path.as_posix(), "--usr", "demo"],
+    )
+
+    assert result.exit_code == 2
+    assert "Preset-mode options are not allowed with --config" in (result.stdout or "")
+    assert "--usr" in (result.stdout or "")

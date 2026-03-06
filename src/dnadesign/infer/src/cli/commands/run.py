@@ -33,6 +33,40 @@ from ..console import (
 )
 
 
+def _validate_run_mode_contract(
+    *,
+    config: Optional[Path],
+    preset: Optional[str],
+    job: List[str],
+    usr: Optional[str],
+    field: str,
+    ids: Optional[str],
+    usr_root: Optional[Path],
+    write_back: bool,
+) -> None:
+    if preset:
+        if config is not None:
+            raise ConfigError("infer run accepts exactly one mode: use --config or --preset, not both.")
+        if job:
+            raise ConfigError("--job is only valid with --config.")
+        return
+
+    invalid_flags: list[str] = []
+    if usr is not None:
+        invalid_flags.append("--usr")
+    if field != "sequence":
+        invalid_flags.append("--field")
+    if ids is not None:
+        invalid_flags.append("--ids")
+    if usr_root is not None:
+        invalid_flags.append("--usr-root")
+    if write_back:
+        invalid_flags.append("--write-back")
+    if invalid_flags:
+        joined = ", ".join(invalid_flags)
+        raise ConfigError(f"Preset-mode options are not allowed with --config: {joined}")
+
+
 def register(app: typer.Typer) -> None:
     @app.command(help="Run jobs from a config OR a single job from a preset.")
     def run(
@@ -57,6 +91,16 @@ def register(app: typer.Typer) -> None:
         i_know_this_is_pickle: bool = typer.Option(False, "--i-know-this-is-pickle", help="Needed only for pt_file."),
     ):
         try:
+            _validate_run_mode_contract(
+                config=config,
+                preset=preset,
+                job=job,
+                usr=usr,
+                field=field,
+                ids=ids,
+                usr_root=usr_root,
+                write_back=write_back,
+            )
             if preset:
                 p = load_preset(preset)
                 model = build_model_config(
