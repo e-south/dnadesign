@@ -11,16 +11,20 @@ Dunlop Lab
 from __future__ import annotations
 
 import os
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from ._logging import get_logger
+from .adapter_runtime import (
+    auto_derate_enabled as _auto_derate_enabled,
+    clear_adapter_cache,
+    get_adapter as _get_adapter,
+    is_oom as _is_oom,
+)
 from .adapter_dispatch import resolve_extract_callable, resolve_generate_callable
 from .config import JobConfig, ModelConfig
 from .contracts import resolve_generate_namespaced_fn, validate_extract_output_namespace
 from .errors import (
     ConfigError,
-    InferError,
-    ModelLoadError,
     ValidationError,
 )
 from .extract_chunk_writeback import build_extract_chunk_write_back
@@ -34,19 +38,11 @@ from .ingest.sources import (
 )
 from .ingest.validators import validate_dna, validate_protein
 from .progress import ProgressFactory, create_progress_handle
-from .registry import get_adapter_cls
 from .resume_planner import plan_resume_for_usr as _plan_resume_for_usr
 from .writeback_dispatch import run_extract_write_back
 from .writers.usr import write_back_usr
 
 _LOG = get_logger(__name__)
-
-# Cache adapter instances per (model_id, device, precision)
-_ADAPTER_CACHE: Dict[Tuple[str, str, str], object] = {}
-
-
-def clear_adapter_cache() -> None:
-    _ADAPTER_CACHE.clear()
 
 
 def _validate_alphabet(alphabet: str, seqs: List[str]) -> None:
@@ -56,34 +52,6 @@ def _validate_alphabet(alphabet: str, seqs: List[str]) -> None:
         validate_protein(seqs, allow_extended_aas=False)
     else:
         raise ValidationError(f"Unknown alphabet: {alphabet}")
-
-
-def _get_adapter(model: ModelConfig):
-    key = (model.id, model.device, model.precision)
-    if key in _ADAPTER_CACHE:
-        return _ADAPTER_CACHE[key]
-    adapter_cls = get_adapter_cls(model.id)
-    try:
-        adapter = adapter_cls(model.id, model.device, model.precision)
-    except InferError:
-        raise
-    except Exception as e:
-        raise ModelLoadError(str(e))
-    _ADAPTER_CACHE[key] = adapter
-    return adapter
-
-
-def _is_oom(e: BaseException) -> bool:
-    return "out of memory" in str(e).lower()
-
-
-def _auto_derate_enabled() -> bool:
-    return os.environ.get("INFER_AUTO_DERATE_OOM", "1").lower() not in {
-        "0",
-        "false",
-        "off",
-        "no",
-    }
 
 
 def _load_extract_ingest(inputs, *, ingest) -> Tuple[List[str], Optional[List[str]], Optional[List[Dict[str, Any]]], Optional[str], object]:

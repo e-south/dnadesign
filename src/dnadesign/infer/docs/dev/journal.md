@@ -913,3 +913,70 @@ Deterministic path for each slice:
 - [x] Isolate `_plan_resume_for_usr(...)` behind `resume_planner.py` with parity coverage.
 - [x] Separate extract chunk write-back callback construction into `extract_chunk_writeback.py`.
 - [ ] Next slice candidate: isolate adapter cache and loader concerns from `engine.py` into a dedicated adapter runtime module with cache-contract tests.
+
+## 2026-03-06 - Phase 1 Slice L (Adapter Runtime/Cache Module Extraction)
+
+### Scope
+
+- Objective: extract adapter cache/loading and runtime policy helpers from `engine.py` into a dedicated runtime module.
+- Constraint: preserve existing `engine` monkeypatch seam names used by tests (`_get_adapter`, `_is_oom`, `_auto_derate_enabled`).
+
+### Prioritized Finding
+
+1. Medium: adapter cache and load policy were embedded in orchestration module.
+   - risk: broader regression surface for adapter policy changes and reduced test isolation for load/cache contracts.
+
+### Boundary and Contract Decisions
+
+- Added `src/dnadesign/infer/adapter_runtime.py` with explicit helper contracts:
+  - `clear_adapter_cache()`
+  - `get_adapter(...)`
+  - `is_oom(...)`
+  - `auto_derate_enabled()`
+- `engine.py` now imports alias bindings:
+  - `get_adapter as _get_adapter`
+  - `is_oom as _is_oom`
+  - `auto_derate_enabled as _auto_derate_enabled`
+- Error contract preserved:
+  - `InferError` subclasses are re-raised,
+  - non-infer exceptions are wrapped as `ModelLoadError`.
+
+### TDD Evidence
+
+- Red:
+  - added `src/dnadesign/infer/tests/test_adapter_runtime.py`
+  - initial run failed with:
+    - `ModuleNotFoundError: No module named 'dnadesign.infer.adapter_runtime'`
+- Green:
+  - implemented `adapter_runtime.py`
+  - rewired `engine.py` to import alias helpers
+  - verification passed for new runtime tests and existing regressions.
+
+### Verification Commands (Executed)
+
+- `uv run pytest -q src/dnadesign/infer/tests/test_adapter_runtime.py src/dnadesign/infer/tests/test_namespace_contracts.py src/dnadesign/infer/tests/test_usr_writeback_contract.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
+- `uv run infer generate --model-id evo2_7b --device cpu --precision bf16 --alphabet dna --prompt ACGT --max-new-tokens 4 --dry-run`
+
+### Information Architecture Update
+
+- Runtime map updated in `src/dnadesign/infer/docs/architecture/README.md` with:
+  - `adapter_runtime.py` as adapter cache/runtime policy boundary.
+
+### Task Board
+
+- [x] Add fail-fast namespace contract hardening for extract/generate runtime dispatch.
+- [x] Add adversarial namespace pressure tests.
+- [x] Add infer pressure-test operations runbook docs and config example.
+- [x] Extract adapter-dispatch block from `engine.py` into dedicated module with invariant tests.
+- [x] Split ingest loading branch from `run_extract_job` into a focused helper with parity tests.
+- [x] Split generate ingest loading branch from `run_generate_job` into a focused helper with parity tests.
+- [x] Isolate extract micro-batch/derating execution loop behind a helper with chunk-contract tests.
+- [x] Isolate generate micro-batch execution loop behind a helper with generation-output contract tests.
+- [x] Isolate progress-handle creation and lifecycle into a shared helper.
+- [x] Split final write-back dispatch in extract path into a dedicated helper with contract tests.
+- [x] Isolate `_plan_resume_for_usr(...)` behind `resume_planner.py` with parity coverage.
+- [x] Separate extract chunk write-back callback construction into `extract_chunk_writeback.py`.
+- [x] Isolate adapter runtime/cache policy into `adapter_runtime.py`.
+- [ ] Next slice candidate: align infer docs information architecture with sibling package pattern (light top README + workflow/docs index + explicit pressure-test demo route) and add docs/wrapper contract tests.

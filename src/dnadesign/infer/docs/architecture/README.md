@@ -6,6 +6,7 @@
 - Application layer: `api.py`
 - Core runtime:
   - orchestration: `engine.py`
+  - adapter runtime/cache policy: `adapter_runtime.py`
   - dispatch contracts: `adapter_dispatch.py`
   - extract execution loop: `extract_execution.py`
   - extract chunk write-back callback: `extract_chunk_writeback.py`
