@@ -52,11 +52,15 @@ Override command args at submit time when needed:
 - `DENSEGEN_RUN_ARGS` (example: `--resume --extend-quota 8 --no-plot`)
 
 `densegen-analysis.qsub` command defaults:
-- analysis chain: `uv run dense plot -c "$DENSEGEN_CONFIG"`
+- analysis chain: `uv run dense plot -c "$DENSEGEN_CONFIG" --only "$DENSEGEN_ANALYSIS_PLOTS"`
+- default `DENSEGEN_ANALYSIS_PLOTS`: `stage_a_summary,placement_map,run_health,tfbs_usage` (static plots only)
+- fail-fast gate: `DENSEGEN_ANALYSIS_PLOTS` must be non-empty
 - preflight gate: requires attempts/composition artifacts to exist as
   finalized parquet or part files
 - read behavior: when part files exist, `dense plot` reads finalized tables
   and part files directly without mutating on-disk artifacts
+- optional video plot: include `dense_array_video_showcase` only when FFmpeg is available in the queue environment
+- fail-fast gate: if `DENSEGEN_ANALYSIS_PLOTS` includes `dense_array_video_showcase` and `ffmpeg` is unavailable, the job exits with an explicit error
 
 Resume + quota extension submission:
 
