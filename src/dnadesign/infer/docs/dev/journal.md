@@ -537,3 +537,75 @@ Deterministic path for each slice:
 - [x] Split ingest loading branch from `run_extract_job` into a focused helper with parity tests.
 - [x] Split generate ingest loading branch from `run_generate_job` into a focused helper with parity tests.
 - [ ] Next slice candidate: isolate micro-batch/derating execution loop in extract path behind a helper with chunk-contract tests.
+
+## 2026-03-06 - Phase 1 Slice F (Extract Execution Module, Maintainer Hardening)
+
+### Skill Composition Decision
+
+- Coordinator: `maintainer-audit-hardening`.
+- Applied principles: `pragmatic-programming-principles` (DRY knowledge, orthogonal boundaries, explicit contracts, no silent fallback).
+- `file-organizer` note: source-repo refactoring is out-of-scope for that skill; only inventory/IA guidance pattern was applied (no destructive file moves, no broad directory reshuffle).
+
+### Baseline Audit Evidence (Pre-change)
+
+- Branch state clean and ahead:
+  - `git status --short --branch`
+- Tests baseline:
+  - `uv run pytest -q src/dnadesign/infer/tests`
+- Primary CLI user paths:
+  - `uv run infer --help`
+  - `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
+
+### Prioritized Finding
+
+1. Medium: extract runtime execution loop remained monolithic in `engine.py`.
+   - the chunk loop mixed batching policy, OOM derating, adapter invocation, per-chunk persistence, and progress updates in one block.
+   - risk: change surface too wide for future edits and pressure-hardening; higher regression likelihood.
+
+### Boundary and Contract Decisions
+
+- Added `src/dnadesign/infer/extract_execution.py` with `execute_extract_output(...)` as a dedicated chunk execution boundary.
+- Contract preserved and made explicit in one place:
+  - fail-fast `RuntimeOOMError` on non-derated or exhausted OOM cases,
+  - fail-fast chunk output cardinality check,
+  - explicit callback contracts for progress and per-chunk write-back.
+- `engine.py` now orchestrates and delegates execution details, reducing monolithic sprawl.
+
+### TDD and Adversarial Evidence
+
+- Red:
+  - added `src/dnadesign/infer/tests/test_extract_execution.py`
+  - initial run failed with:
+    - `ModuleNotFoundError: No module named 'dnadesign.infer.extract_execution'`
+- Green:
+  - implemented `extract_execution.py`
+  - rewired `run_extract_job` to call `execute_extract_output`
+- Adversarial tests now cover:
+  - OOM derating retry path,
+  - non-derated OOM fail-fast path,
+  - wrong chunk output length fail-fast path,
+  - hook and value propagation contracts.
+
+### Verification Commands (Executed)
+
+- `uv run pytest -q src/dnadesign/infer/tests/test_extract_execution.py`
+- `uv run pytest -q src/dnadesign/infer/tests/test_namespace_contracts.py src/dnadesign/infer/tests/test_usr_writeback_contract.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
+
+### Information Architecture Update
+
+- Updated `src/dnadesign/infer/docs/architecture/README.md` runtime map to include:
+  - `adapter_dispatch.py` (dispatch contracts)
+  - `extract_execution.py` (chunk execution loop)
+
+### Task Board
+
+- [x] Add fail-fast namespace contract hardening for extract/generate runtime dispatch.
+- [x] Add adversarial namespace pressure tests.
+- [x] Add infer pressure-test operations runbook docs and config example.
+- [x] Extract adapter-dispatch block from `engine.py` into dedicated module with invariant tests.
+- [x] Split ingest loading branch from `run_extract_job` into a focused helper with parity tests.
+- [x] Split generate ingest loading branch from `run_generate_job` into a focused helper with parity tests.
+- [x] Isolate extract micro-batch/derating execution loop behind a helper with chunk-contract tests.
+- [ ] Next slice candidate: isolate generate micro-batch execution loop behind a helper with generation-output contract tests.

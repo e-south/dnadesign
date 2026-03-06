@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ._logging import get_logger
-from .adapter_dispatch import invoke_extract_callable, resolve_extract_callable, resolve_generate_callable
+from .adapter_dispatch import resolve_extract_callable, resolve_generate_callable
 from .config import JobConfig, ModelConfig
 from .contracts import infer_usr_column_name, resolve_generate_namespaced_fn, validate_extract_output_namespace
 from .errors import (
@@ -26,6 +26,7 @@ from .errors import (
     ValidationError,
     WriteBackError,
 )
+from .extract_execution import execute_extract_output
 from .ingest.sources import (
     load_pt_file_input,
     load_records_input,
@@ -247,6 +248,8 @@ def run_extract_job(
     # micro-batch
     micro_bs = model.batch_size or int(os.environ.get("DNADESIGN_INFER_BATCH", "0"))
     micro_bs = int(micro_bs) if micro_bs else 0
+    default_bs = int(os.environ.get("DNADESIGN_INFER_DEFAULT_BS", "64"))
+    auto_derate = _auto_derate_enabled()
 
     # resume plan
     if source == "usr" and ids is not None:
@@ -275,10 +278,6 @@ def run_extract_job(
             columnar[out.id] = all_vals
             continue
 
-        # Choose a starting batch size: explicit > env > safe default.
-        default_bs = int(os.environ.get("DNADESIGN_INFER_DEFAULT_BS", "64"))
-        start_bs = micro_bs if micro_bs > 0 else min(len(need_idx), default_bs)
-
         # progress handle
         if progress_factory:
             pbar = progress_factory(f"{job.id}/{out.id}", len(need_idx))
@@ -286,53 +285,37 @@ def run_extract_job(
             tqdm, _ = _get_tqdm()
             pbar = tqdm(total=len(need_idx), unit="seq", desc=f"{job.id}/{out.id}")
 
-        # dynamic derating (still available, but we start from a safe size).
-        start = 0
-        bs = start_bs
+        def _write_back_chunk(idx_chunk: List[int], vals: List[object]) -> None:
+            if source != "usr" or ids is None or not job.io.write_back:
+                return
+            chunk_ids = [ids[j] for j in idx_chunk]
+            write_back_usr(
+                ds,
+                ids=chunk_ids,
+                model_id=model.id,
+                job_id=job.id,
+                columnar={out.id: vals},
+                overwrite=bool(job.io.overwrite),
+            )
 
-        while start < len(need_idx):
-            take = min(bs, len(need_idx) - start)
-            idx_chunk = need_idx[start : start + take]
-            chunk = [seqs[i] for i in idx_chunk]
-
-            try:
-                vals = invoke_extract_callable(
-                    fn=fn,
-                    method_name=method_name,
-                    chunk=chunk,
-                    params=out.params,
-                    output_format=out.format,
-                )
-
-            except RuntimeError as e:
-                if _is_oom(e) and _auto_derate_enabled() and bs > 1:
-                    new_bs = max(1, bs // 2)
-                    _LOG.warning("OOM at batch=%d → retry at batch=%d", bs, new_bs)
-                    bs = new_bs
-                    continue
-                raise RuntimeOOMError(str(e))
-
-            if len(vals) != len(idx_chunk):
-                raise RuntimeError("Adapter returned wrong number of outputs for chunk")
-
-            for k, j in enumerate(idx_chunk):
-                all_vals[j] = vals[k]
-
-            if source == "usr" and ids is not None and job.io.write_back:
-                chunk_ids = [ids[j] for j in idx_chunk]
-                write_back_usr(
-                    ds,
-                    ids=chunk_ids,
-                    model_id=model.id,
-                    job_id=job.id,
-                    columnar={out.id: vals},
-                    overwrite=bool(job.io.overwrite),
-                )
-
-            pbar.update(len(idx_chunk))
-            start += take
-
-        pbar.close()
+        try:
+            all_vals = execute_extract_output(
+                seqs=seqs,
+                need_idx=need_idx,
+                existing=all_vals,
+                method_name=method_name,
+                fn=fn,
+                params=out.params,
+                output_format=out.format,
+                micro_batch_size=micro_bs,
+                default_batch_size=default_bs,
+                auto_derate=auto_derate,
+                is_oom=_is_oom,
+                on_progress=pbar.update,
+                on_chunk=_write_back_chunk,
+            )
+        finally:
+            pbar.close()
 
         if len(all_vals) != len(seqs):
             raise RuntimeError("Adapter returned wrong number of outputs")
