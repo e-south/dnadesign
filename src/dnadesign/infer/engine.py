@@ -11,19 +11,17 @@ Dunlop Lab
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ._logging import get_logger
 from .adapter_dispatch import resolve_extract_callable, resolve_generate_callable
 from .config import JobConfig, ModelConfig
-from .contracts import infer_usr_column_name, resolve_generate_namespaced_fn, validate_extract_output_namespace
+from .contracts import resolve_generate_namespaced_fn, validate_extract_output_namespace
 from .errors import (
     ConfigError,
     InferError,
     ModelLoadError,
     ValidationError,
-    WriteBackError,
 )
 from .extract_execution import execute_extract_output
 from .generate_execution import execute_generate_batches, validate_generate_payload
@@ -36,6 +34,7 @@ from .ingest.sources import (
 from .ingest.validators import validate_dna, validate_protein
 from .progress import ProgressFactory, create_progress_handle
 from .registry import get_adapter_cls
+from .resume_planner import plan_resume_for_usr as _plan_resume_for_usr
 from .writeback_dispatch import run_extract_write_back
 from .writers.usr import write_back_usr
 
@@ -84,77 +83,6 @@ def _auto_derate_enabled() -> bool:
         "off",
         "no",
     }
-
-
-def _plan_resume_for_usr(
-    *,
-    ds,  # dnadesign.usr.Dataset
-    ids: List[str],
-    model_id: str,
-    job_id: str,
-    outputs: List,  # list[OutputSpec]
-    overwrite: bool,
-) -> Tuple[List[int], Dict[str, List[object]]]:
-    N = len(ids)
-    existing: Dict[str, List[object]] = {o.id: [None] * N for o in outputs}
-    if overwrite or ds is None or N == 0:
-        return list(range(N)), existing
-
-    infer_cols = {
-        o.id: infer_usr_column_name(model_id=model_id, job_id=job_id, out_id=o.id)
-        for o in outputs
-    }
-
-    try:
-        import pyarrow.parquet as pq
-
-        rec_path = ds.records_path  # type: ignore[attr-defined]
-        pf = pq.ParquetFile(rec_path)
-        present = set(pf.schema_arrow.names)  # type: ignore[attr-defined]
-        want_cols = ["id"] + [c for c in infer_cols.values() if c in present]
-        if len(want_cols) > 1:
-            tbl = pq.read_table(rec_path, columns=want_cols)
-            t_ids = tbl.column("id").to_pylist()
-            pos = {rid: i for i, rid in enumerate(t_ids)}
-
-            for out in outputs:
-                colname = infer_cols[out.id]
-                if colname in present:
-                    vals = tbl.column(colname).to_pylist()
-                    for j, rid in enumerate(ids):
-                        i_tbl = pos.get(rid)
-                        if i_tbl is not None:
-                            existing[out.id][j] = vals[i_tbl]
-
-        if hasattr(ds, "list_overlays"):
-            overlays = ds.list_overlays()  # type: ignore[attr-defined]
-            infer_overlay = next((ov for ov in overlays if getattr(ov, "namespace", None) == "infer"), None)
-            if infer_overlay is not None:
-                overlay_path = Path(str(infer_overlay.path))
-                overlay_pf = pq.ParquetFile(str(overlay_path))
-                overlay_present = set(overlay_pf.schema_arrow.names)
-                overlay_cols = ["id"] + [c for c in infer_cols.values() if c in overlay_present]
-                if len(overlay_cols) > 1:
-                    overlay_tbl = pq.read_table(str(overlay_path), columns=overlay_cols)
-                    overlay_ids = overlay_tbl.column("id").to_pylist()
-                    overlay_pos = {rid: i for i, rid in enumerate(overlay_ids)}
-                    for out in outputs:
-                        colname = infer_cols[out.id]
-                        if colname not in overlay_present:
-                            continue
-                        vals = overlay_tbl.column(colname).to_pylist()
-                        for j, rid in enumerate(ids):
-                            i_tbl = overlay_pos.get(rid)
-                            if i_tbl is not None and vals[i_tbl] is not None:
-                                existing[out.id][j] = vals[i_tbl]
-    except Exception as e:
-        raise WriteBackError(f"USR resume scan failed for records table {ds.records_path}: {e}") from e
-
-    todo_idx: List[int] = []
-    for j in range(N):
-        if any(existing[o.id][j] is None for o in outputs):
-            todo_idx.append(j)
-    return todo_idx, existing
 
 
 def _load_extract_ingest(inputs, *, ingest) -> Tuple[List[str], Optional[List[str]], Optional[List[Dict[str, Any]]], Optional[str], object]:

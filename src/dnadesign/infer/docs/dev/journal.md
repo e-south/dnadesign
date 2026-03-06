@@ -791,3 +791,64 @@ Deterministic path for each slice:
 - [x] Isolate progress-handle creation and lifecycle into a shared helper.
 - [x] Split final write-back dispatch in extract path into a dedicated helper with contract tests.
 - [ ] Next slice candidate: isolate `_plan_resume_for_usr(...)` from `engine.py` behind a dedicated resume planner module with overlay/records parity tests.
+
+## 2026-03-06 - Phase 1 Slice J (USR Resume Planner Module Extraction)
+
+### Scope
+
+- Objective: extract `_plan_resume_for_usr(...)` from `engine.py` to an explicit module boundary.
+- Constraint: preserve existing overlay-aware resume behavior and engine compatibility hooks used by tests.
+
+### Prioritized Finding
+
+1. Medium: USR resume planning remained a large in-engine block mixing parquet scans, overlay merge, and todo index derivation.
+   - risk: orchestration drift in `engine.py` and broader blast radius for future resume hardening.
+
+### Boundary and Contract Decisions
+
+- Added `src/dnadesign/infer/resume_planner.py` with:
+  - `plan_resume_for_usr(...)`
+- Kept engine compatibility contract by importing alias:
+  - `from .resume_planner import plan_resume_for_usr as _plan_resume_for_usr`
+- Explicit fail-fast contract preserved:
+  - unreadable records table -> `WriteBackError`,
+  - overlay values override records values only when non-null,
+  - overwrite/empty dataset bypasses scans and returns full todo index.
+
+### TDD Evidence
+
+- Red:
+  - added `src/dnadesign/infer/tests/test_resume_planner.py`
+  - initial run failed with:
+    - `ModuleNotFoundError: No module named 'dnadesign.infer.resume_planner'`
+- Green:
+  - implemented `resume_planner.py`
+  - removed in-engine implementation and wired alias import
+  - verification passed for new module tests and existing USR/namespace regressions.
+
+### Verification Commands (Executed)
+
+- `uv run pytest -q src/dnadesign/infer/tests/test_resume_planner.py src/dnadesign/infer/tests/test_usr_writeback_contract.py src/dnadesign/infer/tests/test_namespace_contracts.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
+- `uv run infer generate --model-id evo2_7b --device cpu --precision bf16 --alphabet dna --prompt ACGT --max-new-tokens 4 --dry-run`
+
+### Information Architecture Update
+
+- Runtime map updated in `src/dnadesign/infer/docs/architecture/README.md` with:
+  - `resume_planner.py` as USR resume planning boundary.
+
+### Task Board
+
+- [x] Add fail-fast namespace contract hardening for extract/generate runtime dispatch.
+- [x] Add adversarial namespace pressure tests.
+- [x] Add infer pressure-test operations runbook docs and config example.
+- [x] Extract adapter-dispatch block from `engine.py` into dedicated module with invariant tests.
+- [x] Split ingest loading branch from `run_extract_job` into a focused helper with parity tests.
+- [x] Split generate ingest loading branch from `run_generate_job` into a focused helper with parity tests.
+- [x] Isolate extract micro-batch/derating execution loop behind a helper with chunk-contract tests.
+- [x] Isolate generate micro-batch execution loop behind a helper with generation-output contract tests.
+- [x] Isolate progress-handle creation and lifecycle into a shared helper.
+- [x] Split final write-back dispatch in extract path into a dedicated helper with contract tests.
+- [x] Isolate `_plan_resume_for_usr(...)` behind `resume_planner.py` with parity coverage.
+- [ ] Next slice candidate: separate extract chunk write-back callback construction from `run_extract_job` to reduce closure coupling and allow direct callback-contract tests.
