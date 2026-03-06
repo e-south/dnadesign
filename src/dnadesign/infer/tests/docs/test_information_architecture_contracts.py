@@ -50,6 +50,7 @@ def test_infer_top_readme_is_lightweight_router() -> None:
     assert "docs/README.md" in readme
     assert "docs/index.md" in readme
     assert "docs/getting-started/cli-quickstart.md" in readme
+    assert "workspaces/README.md" in readme
     assert "docs/operations/pressure-test-agnostic-models.md" in readme
     assert "docs/tutorials/demo_pressure_test_usr_ops_notify.md" in readme
     assert "docs/reference/README.md" in readme
@@ -74,6 +75,7 @@ def test_infer_docs_readme_keeps_workflow_then_type_progressive_disclosure() -> 
     assert "getting-started/README.md" in docs_readme
     assert "getting-started/cli-quickstart.md" in docs_readme
     assert "operations/README.md" in docs_readme
+    assert "../workspaces/README.md" in docs_readme
     assert "operations/pressure-test-agnostic-models.md" in docs_readme
     assert "tutorials/demo_pressure_test_usr_ops_notify.md" in docs_readme
     assert "reference/README.md" in docs_readme
@@ -102,9 +104,30 @@ def test_infer_operations_index_links_pressure_test_demo_and_runbook() -> None:
 def test_infer_pressure_test_tutorial_covers_local_and_ops_paths() -> None:
     tutorial = _read("src/dnadesign/infer/docs/tutorials/demo_pressure_test_usr_ops_notify.md")
     assert "uv run infer validate config --config" in tutorial
+    assert "uv run infer workspace init --id test_stress_ethanol" in tutorial
     assert "uv run infer run --config" in tutorial
     assert "uv run ops runbook init" in tutorial
     assert "uv run ops runbook execute" in tutorial
     assert "--no-submit" in tutorial
     assert "--submit" in tutorial
     assert "uv run usr --root" in tutorial
+
+
+def test_infer_docs_excluding_journal_avoid_legacy_flat_module_paths() -> None:
+    docs_root = _repo_root() / "src" / "dnadesign" / "infer" / "docs"
+    legacy_tokens = [
+        "src/dnadesign/infer/adapter_dispatch.py",
+        "src/dnadesign/infer/adapter_runtime.py",
+        "src/dnadesign/infer/cli_builders.py",
+        "src/dnadesign/infer/cli_ingest.py",
+        "src/dnadesign/infer/cli_requests.py",
+        "src/dnadesign/infer/tests/test_",
+    ]
+    offenders: list[str] = []
+    for path in sorted(docs_root.rglob("*.md")):
+        if path.resolve() == (docs_root / "dev" / "journal.md").resolve():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if any(token in text for token in legacy_tokens):
+            offenders.append(str(path.relative_to(_repo_root())))
+    assert offenders == []

@@ -18,6 +18,7 @@ Use [docs/README.md](README.md) as the workflow-first entrypoint. This page is a
 
 - [Operations index](operations/README.md)
 - [Agnostic-model pressure-test runbook](operations/pressure-test-agnostic-models.md)
+- [Workspaces guide](../workspaces/README.md)
 
 ### Reference
 

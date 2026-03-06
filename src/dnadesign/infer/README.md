@@ -10,13 +10,14 @@ Read in this order:
 2. [infer docs index by type](docs/index.md)
 3. [getting-started guide](docs/getting-started/README.md)
 4. [CLI quickstart](docs/getting-started/cli-quickstart.md)
-5. [operations index](docs/operations/README.md)
-6. [agnostic-model pressure-test runbook](docs/operations/pressure-test-agnostic-models.md)
-7. [end-to-end pressure-test demo (infer + usr + ops + notify)](docs/tutorials/demo_pressure_test_usr_ops_notify.md)
-8. [reference index](docs/reference/README.md)
-9. [source-tree map](src/README.md)
-10. [developer docs](docs/dev/README.md)
-11. [repository docs index](../../../docs/README.md)
+5. [workspaces guide](workspaces/README.md)
+6. [operations index](docs/operations/README.md)
+7. [agnostic-model pressure-test runbook](docs/operations/pressure-test-agnostic-models.md)
+8. [end-to-end pressure-test demo (infer + usr + ops + notify)](docs/tutorials/demo_pressure_test_usr_ops_notify.md)
+9. [reference index](docs/reference/README.md)
+10. [source-tree map](src/README.md)
+11. [developer docs](docs/dev/README.md)
+12. [repository docs index](../../../docs/README.md)
 
 ## Entrypoint contract
 

@@ -7,11 +7,12 @@
 
 1. [Top README](../README.md): package boundary and fast route map.
 2. [Getting started index](getting-started/README.md): first local command flow.
-3. [Operations index](operations/README.md): pressure-test paths for local and scheduler workflows.
-4. [Reference index](reference/README.md): stable command and runtime contracts.
-5. [Source-tree map](../src/README.md): internal implementation layout under `infer/src/`.
-6. [Architecture map](architecture/README.md): package boundary map and extension seams.
-7. [Dev index](dev/README.md): maintainer process and journal.
+3. [Workspaces guide](../workspaces/README.md): deterministic workspace scaffold and template contract.
+4. [Operations index](operations/README.md): pressure-test paths for local and scheduler workflows.
+5. [Reference index](reference/README.md): stable command and runtime contracts.
+6. [Source-tree map](../src/README.md): internal implementation layout under `infer/src/`.
+7. [Architecture map](architecture/README.md): package boundary map and extension seams.
+8. [Dev index](dev/README.md): maintainer process and journal.
 
 ### Documentation by workflow
 
@@ -22,6 +23,7 @@
 #### Pressure-test agnostic model writes into USR
 - [Agnostic-model pressure-test runbook](operations/pressure-test-agnostic-models.md): standalone CLI and ops-runbook paths.
 - [End-to-end pressure-test demo](tutorials/demo_pressure_test_usr_ops_notify.md): reproducible infer -> usr -> ops -> notify walkthrough.
+- [Workspaces guide](../workspaces/README.md): initialize workspace roots with `infer workspace init`.
 
 #### Run scheduler-oriented infer flows
 - [Operations index](operations/README.md): choose no-submit and submit route.

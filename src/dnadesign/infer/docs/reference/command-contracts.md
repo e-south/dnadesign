@@ -3,6 +3,10 @@
 ### infer run
 
 - Accepts `--config` for YAML-driven runs or `--preset` for single preset-driven runs.
+- Config workflows support `ingest.source` values `usr`, `sequences`, `records`, and `pt_file`.
+- For `sequences` and `records`, set `ingest.path` in the job config (path is resolved relative to config directory when not absolute).
+- For `pt_file`, `ingest.path` is optional; when omitted, infer uses `<config-dir>/<job_id>.pt`.
+- For `usr`, `ingest.path` is invalid and fails validation.
 - `--dry-run` validates and prints summary without model execution.
 - Unknown or missing selected jobs fail fast with non-zero exit.
 
@@ -29,6 +33,12 @@
 - `validate config` requires either `--config` or a `config.yaml` in the current working directory.
 - `validate config` rejects unknown schema keys and type mismatches with config exit code (`2`).
 - `validate usr` checks dataset/field accessibility for write-back/resume paths.
+
+### infer workspace
+
+- `workspace where` resolves effective workspace root from `--root`, `INFER_WORKSPACE_ROOT`, or repo default.
+- `workspace init` creates `config.yaml`, `inputs/`, and `outputs/logs/ops/audit/` for a workspace id.
+- `workspace init` rejects path-like ids and existing workspace directories.
 
 ### no-silent-fallback contract
 

@@ -38,6 +38,7 @@ class ModelConfig(StrictConfigModel):
 
 class IngestConfig(StrictConfigModel):
     source: Literal["sequences", "records", "pt_file", "usr"]
+    path: Optional[str] = None
     field: Optional[str] = "sequence"
     dataset: Optional[str] = None
     root: Optional[str] = None
@@ -50,6 +51,8 @@ class IngestConfig(StrictConfigModel):
         if self.source == "usr":
             if not self.dataset:
                 raise ConfigError("ingest.dataset is required for source='usr'")
+            if self.path:
+                raise ConfigError("ingest.path is not allowed for source='usr'")
             if not self.field:
                 self.field = "sequence"
         return self

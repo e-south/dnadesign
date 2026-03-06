@@ -22,33 +22,27 @@ For a step-by-step walkthrough route, use the [end-to-end demo tutorial](../tuto
 ### 1) Prepare variables
 
 ```bash
+uv run infer workspace init --id test_stress_ethanol
 export WORKSPACE_ROOT="$PWD/src/dnadesign/infer/workspaces/test_stress_ethanol"
 export INFER_CONFIG="$WORKSPACE_ROOT/config.yaml"
 export USR_ROOT="/projectnb/dunlop/esouth/outputs/usr_datasets"
 export DATASET_ID="test_stress_ethanol"
-mkdir -p "$WORKSPACE_ROOT/outputs/logs/ops/audit"
 ```
 
-### 2) Seed config from example
-
-```bash
-cp src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml "$INFER_CONFIG"
-```
-
-### 3) Contract preflight
+### 2) Contract preflight
 
 ```bash
 uv run infer validate config --config "$INFER_CONFIG"
 uv run infer run --config "$INFER_CONFIG" --dry-run
 ```
 
-### 4) Execute pressure test (local CLI)
+### 3) Execute pressure test (local CLI)
 
 ```bash
 uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr
 ```
 
-### 5) Verify USR state and events
+### 4) Verify USR state and events
 
 ```bash
 uv run usr --root "$USR_ROOT" head "$DATASET_ID" -n 5

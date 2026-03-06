@@ -36,6 +36,13 @@ def test_infer_root_keeps_progressive_disclosure_directories() -> None:
     assert (infer_root / "docs").is_dir()
     assert (infer_root / "src").is_dir()
     assert (infer_root / "tests").is_dir()
+    assert (infer_root / "workspaces").is_dir()
+
+
+def test_infer_workspaces_scaffold_exists() -> None:
+    infer_root = _infer_root()
+    workspaces_root = infer_root / "workspaces"
+    assert (workspaces_root / "README.md").is_file()
 
 
 def test_infer_internal_cli_is_packaged_and_not_flat() -> None:
@@ -65,6 +72,7 @@ def test_infer_cli_commands_are_split_by_group() -> None:
     assert (commands_dir / "presets.py").is_file()
     assert (commands_dir / "adapters.py").is_file()
     assert (commands_dir / "validate.py").is_file()
+    assert (commands_dir / "workspace.py").is_file()
 
 
 def test_infer_runtime_modules_are_grouped_under_runtime_package() -> None:

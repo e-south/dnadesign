@@ -3,6 +3,7 @@
 ### Start path
 
 1. Validate command contracts locally:
+   - `uv run infer workspace init --id <workspace_id>`
    - `uv run infer validate config --config <path>`
    - `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
 2. Run pressure-test path from this index.

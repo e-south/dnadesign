@@ -24,6 +24,7 @@ from ...input_parsing import read_ids_arg
 from ...presets import load_preset
 from ..builders import build_model_config, run_with_progress
 from ..common import discovery_config, guard_pickle, raise_cli_error
+from ..config_inputs import resolve_config_job_inputs
 from ..console import (
     console,
     render_config_summary,
@@ -143,10 +144,12 @@ def register(app: typer.Typer) -> None:
 
             def _run_selected_jobs(progress_factory):
                 for selected_job in jobs:
-                    inputs = None
-                    if selected_job.ingest.source == "pt_file":
-                        guard_pickle(i_know_this_is_pickle)
-                        inputs = (cfg_path.parent / f"{selected_job.id}.pt").as_posix()
+                    inputs = resolve_config_job_inputs(
+                        job=selected_job,
+                        config_dir=cfg_path.parent,
+                        i_know_this_is_pickle=i_know_this_is_pickle,
+                        guard_pickle=guard_pickle,
+                    )
                     result = run_job(
                         inputs=inputs,
                         model=model,
