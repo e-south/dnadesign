@@ -436,3 +436,53 @@ Deterministic path for each slice:
 - [x] Add infer pressure-test operations runbook docs and config example.
 - [x] Extract adapter-dispatch block from `engine.py` into dedicated module with invariant tests.
 - [ ] Next slice candidate: split ingest loading branch from `run_extract_job` into a focused helper with parity tests.
+
+## 2026-03-06 - Phase 1 Slice D (Extract Ingest Helper Split)
+
+### Scope
+
+- Objective: split ingest-source branch loading from `run_extract_job` into a focused helper with parity tests.
+- Constraint: preserve existing ingest behavior and error messages.
+
+### Changes Applied
+
+- Added ingest helper in runtime module:
+  - `src/dnadesign/infer/engine.py`
+  - new helper: `_load_extract_ingest(inputs, ingest=...)`
+  - handles `sequences`, `records`, `pt_file`, and `usr` source contracts and returns normalized ingest state tuple.
+- Refactored `run_extract_job` to delegate ingest state construction to helper.
+- Added parity tests:
+  - `src/dnadesign/infer/tests/test_extract_ingest_helper.py`
+  - coverage:
+    - sequences path
+    - records path (field fallback)
+    - pt-file path validation error
+    - usr argument forwarding
+    - unknown source fail-fast
+
+### TDD Evidence
+
+- Red:
+  - added `src/dnadesign/infer/tests/test_extract_ingest_helper.py`
+  - initial run failed with:
+    - `ImportError: cannot import name '_load_extract_ingest' from 'dnadesign.infer.engine'`
+- Green:
+  - implemented `_load_extract_ingest` and rewired `run_extract_job`
+  - resolved one test fixture issue by using a lightweight ingest stub for records field-fallback parity
+  - verification passed:
+    - `uv run pytest -q src/dnadesign/infer/tests/test_extract_ingest_helper.py`
+    - `uv run pytest -q src/dnadesign/infer/tests`
+
+### Notes
+
+- Ingest source branching is now isolated to one helper, reducing `run_extract_job` surface area.
+- Existing engine monkeypatch seams used by other tests remained stable.
+
+### Task Board
+
+- [x] Add fail-fast namespace contract hardening for extract/generate runtime dispatch.
+- [x] Add adversarial namespace pressure tests.
+- [x] Add infer pressure-test operations runbook docs and config example.
+- [x] Extract adapter-dispatch block from `engine.py` into dedicated module with invariant tests.
+- [x] Split ingest loading branch from `run_extract_job` into a focused helper with parity tests.
+- [ ] Next slice candidate: split generate ingest loading branch from `run_generate_job` into a focused helper with parity tests.

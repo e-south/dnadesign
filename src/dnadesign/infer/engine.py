@@ -200,6 +200,30 @@ def _plan_resume_for_usr(
     return todo_idx, existing
 
 
+def _load_extract_ingest(inputs, *, ingest) -> Tuple[List[str], Optional[List[str]], Optional[List[Dict[str, Any]]], Optional[str], object]:
+    source = ingest.source
+    if source == "sequences":
+        seqs = load_sequences_input(inputs)
+        return seqs, None, None, None, None
+    if source == "records":
+        seqs, records = load_records_input(inputs, ingest.field or "sequence")
+        return seqs, None, records, None, None
+    if source == "pt_file":
+        if not isinstance(inputs, str):
+            raise ValidationError("inputs must be a path string for pt_file ingest")
+        seqs, records = load_pt_file_input(inputs, ingest.field or "sequence")
+        return seqs, None, records, inputs, None
+    if source == "usr":
+        seqs, ids, ds = load_usr_input(
+            dataset_name=ingest.dataset,  # type: ignore[arg-type]
+            field=ingest.field or "sequence",
+            root=ingest.root,
+            ids=ingest.ids,
+        )
+        return seqs, ids, None, None, ds
+    raise ConfigError(f"Unknown ingest source: {source}")
+
+
 def run_extract_job(
     inputs,
     *,
@@ -209,35 +233,7 @@ def run_extract_job(
 ) -> Dict[str, List[object]]:
     # ingest
     source = job.ingest.source
-    if source == "sequences":
-        seqs = load_sequences_input(inputs)
-        ids = None
-        records = None
-        pt_path = None
-        ds = None
-    elif source == "records":
-        seqs, records = load_records_input(inputs, job.ingest.field or "sequence")
-        ids = None
-        pt_path = None
-        ds = None
-    elif source == "pt_file":
-        if not isinstance(inputs, str):
-            raise ValidationError("inputs must be a path string for pt_file ingest")
-        seqs, records = load_pt_file_input(inputs, job.ingest.field or "sequence")
-        ids = None
-        pt_path = inputs
-        ds = None
-    elif source == "usr":
-        seqs, ids, ds = load_usr_input(
-            dataset_name=job.ingest.dataset,  # type: ignore[arg-type]
-            field=job.ingest.field or "sequence",
-            root=job.ingest.root,
-            ids=job.ingest.ids,
-        )
-        records = None
-        pt_path = None
-    else:
-        raise ConfigError(f"Unknown ingest source: {source}")
+    seqs, ids, records, pt_path, ds = _load_extract_ingest(inputs, ingest=job.ingest)
 
     validate_extract_output_namespace(model_id=model.id, outputs=job.outputs or [])
     _validate_alphabet(model.alphabet, seqs)
