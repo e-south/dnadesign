@@ -19,6 +19,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .._logging import get_logger
+from ..contracts import infer_usr_column_name
 from ..errors import WriteBackError
 
 _LOG = get_logger(__name__)
@@ -44,7 +45,7 @@ def write_back_usr(
 
     out_cols = {}
     for out_id, col in columnar.items():
-        col_name = f"infer__{model_id}__{job_id}__{out_id}"
+        col_name = infer_usr_column_name(model_id=model_id, job_id=job_id, out_id=out_id)
         out_cols[col_name] = col
 
     df = pd.DataFrame({"id": ids, **out_cols})

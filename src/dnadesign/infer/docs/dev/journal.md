@@ -289,3 +289,101 @@ Deterministic path for each slice:
 
 - Refactor remains behavior-preserving for existing CLI contracts.
 - No scheduler mutation commands were run during this slice.
+
+## 2026-03-06 - Phase 1 Slice B (Maintainer Audit + Contract Hardening)
+
+### Audit Scope
+
+- Package: `src/dnadesign/infer`
+- Primary user surfaces:
+  - CLI: `infer run`, `infer extract`, `infer presets`, `infer validate`
+  - API/runtime: `run_extract_job`, `run_generate_job`
+- Pressure objective:
+  - keep infer model-agnostic by explicit namespace contract,
+  - verify USR namespaced write-back columns remain deterministic,
+  - provide standalone and ops-runbook pressure-test commands.
+
+### Baseline Evidence
+
+- Scheduler (read-only):
+  - `qstat -u esouth` showed 2 running + 1 held job (`hqw`), no Eqw.
+  - `sge-session-status.sh --warn-over-running 3` reported threshold not exceeded.
+- Tests:
+  - baseline infer suite green before hardening pass.
+- CLI:
+  - `uv run infer --help`
+  - `uv run infer presets list`
+  - `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
+
+### Prioritized Findings
+
+1. High: missing fail-fast namespace contract in runtime dispatch
+   - extract path accepted output namespaces that did not match model namespace.
+   - generate path accepted explicit `job.fn` namespaces that did not match model namespace.
+   - risk: accidental cross-namespace dispatch and ambiguous adapter behavior under extension.
+2. Medium: infer USR output naming logic duplicated in multiple modules
+   - writer and resume planner constructed infer column names independently.
+   - risk: drift in namespaced contract over time.
+3. Medium: ops pressure-test docs path had contract gaps
+   - notify-enabled scaffold requires webhook secret wiring.
+   - audit json path must be under `outputs/logs/ops/audit/`.
+   - risk: operator friction and false-start runbook execution.
+
+### Changes Applied
+
+- Added explicit infer contracts module:
+  - `src/dnadesign/infer/contracts.py`
+  - fail-fast namespace validation for extract/generate dispatch.
+  - centralized infer USR column-name builder.
+- Hardened runtime:
+  - `src/dnadesign/infer/engine.py`
+    - extract now validates output namespace against model namespace before adapter load.
+    - generate now validates explicit fn namespace against model namespace before adapter load.
+    - resume planner now uses centralized infer USR column-name builder.
+  - `src/dnadesign/infer/writers/usr.py`
+    - uses shared infer USR column-name builder.
+- Added adversarial and pressure tests:
+  - `src/dnadesign/infer/tests/test_namespace_contracts.py`
+    - mismatch extract namespace fails fast.
+    - mismatch generate namespace fails fast.
+    - agnostic model + USR pressure path verifies infer-prefixed namespaced column attach.
+- Added pressure-test operations docs:
+  - `src/dnadesign/infer/docs/operations/pressure-test-agnostic-models.md`
+  - `src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml`
+  - updated `src/dnadesign/infer/docs/operations/README.md`
+- Added docs contract test:
+  - `src/dnadesign/infer/tests/test_pressure_runbook_docs_contract.py`
+
+### Adversarial Hardening Evidence
+
+- Red-to-green TDD evidence for namespace mismatch:
+  - initial failures: mismatch namespace tests did not raise `ConfigError`.
+  - after hardening: mismatch tests pass with fail-fast errors.
+- Agnostic-model pressure path:
+  - test adapter namespace path writes expected infer-prefixed USR columns:
+    - `infer__<model_id>__<job_id>__logits`
+    - `infer__<model_id>__<job_id>__llr`
+
+### Runbook Path Verification Notes
+
+- `ops runbook` no-submit path was executed successfully with:
+  - workspace config at `<workspace-root>/config.yaml`
+  - audit json path under `<workspace-root>/outputs/logs/ops/audit/*.json`
+  - `--no-notify` baseline
+- notify-enabled path remains optional and requires explicit webhook secret wiring.
+
+### Verification Commands (Executed)
+
+- `uv run pytest -q src/dnadesign/infer/tests/test_namespace_contracts.py`
+- `uv run pytest -q src/dnadesign/infer/tests/test_pressure_runbook_docs_contract.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run ops runbook init --runbook <tmp>/infer-pressure.runbook.yaml --workflow infer --workspace-root <tmp>/workspace --id infer_pressure_test --no-notify`
+- `uv run ops runbook plan --runbook <tmp>/infer-pressure.runbook.yaml`
+- `uv run ops runbook execute --runbook <tmp>/infer-pressure.runbook.yaml --audit-json <tmp>/workspace/outputs/logs/ops/audit/infer-pressure.audit.json --no-submit`
+
+### Task Board
+
+- [x] Add fail-fast namespace contract hardening for extract/generate runtime dispatch.
+- [x] Add adversarial namespace pressure tests.
+- [x] Add infer pressure-test operations runbook docs and config example.
+- [ ] Next slice candidate: extract adapter-dispatch block from `engine.py` into a dedicated module with invariant tests.

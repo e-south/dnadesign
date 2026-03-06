@@ -17,3 +17,7 @@ Use this package-local page with repo-wide operations docs:
 
 - `docs/operations/README.md`
 - `docs/bu-scc/README.md`
+
+### Pressure Test Runbook
+
+- [Agnostic model + USR pressure test](pressure-test-agnostic-models.md)

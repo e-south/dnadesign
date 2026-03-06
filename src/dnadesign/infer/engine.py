@@ -16,6 +16,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ._logging import get_logger
 from .config import JobConfig, ModelConfig
+from .contracts import infer_usr_column_name, resolve_generate_namespaced_fn, validate_extract_output_namespace
 from .errors import (
     CapabilityError,
     ConfigError,
@@ -32,7 +33,7 @@ from .ingest.sources import (
     load_usr_input,
 )
 from .ingest.validators import validate_dna, validate_protein
-from .registry import get_adapter_cls, get_namespace_for_model, resolve_fn
+from .registry import get_adapter_cls, resolve_fn
 from .writers.pt_file import write_back_pt_file
 from .writers.records import write_back_records
 from .writers.usr import write_back_usr
@@ -142,7 +143,10 @@ def _plan_resume_for_usr(
     if overwrite or ds is None or N == 0:
         return list(range(N)), existing
 
-    infer_cols = {o.id: f"infer__{model_id}__{job_id}__{o.id}" for o in outputs}
+    infer_cols = {
+        o.id: infer_usr_column_name(model_id=model_id, job_id=job_id, out_id=o.id)
+        for o in outputs
+    }
 
     try:
         import pyarrow.parquet as pq
@@ -235,15 +239,9 @@ def run_extract_job(
     else:
         raise ConfigError(f"Unknown ingest source: {source}")
 
+    validate_extract_output_namespace(model_id=model.id, outputs=job.outputs or [])
     _validate_alphabet(model.alphabet, seqs)
     adapter = _get_adapter(model)
-
-    # ensure one namespace
-    namespace = job.outputs[0].fn.split(".")[0] if job.outputs else None
-    for out in job.outputs or []:
-        ns = out.fn.split(".")[0]
-        if ns != namespace:
-            raise ConfigError("All outputs in a job must share the same adapter namespace")
 
     # micro-batch
     micro_bs = model.batch_size or int(os.environ.get("DNADESIGN_INFER_BATCH", "0"))
@@ -389,12 +387,11 @@ def run_generate_job(
     else:
         raise ConfigError(f"Unknown ingest source: {source}")
 
+    gen_name = resolve_generate_namespaced_fn(model_id=model.id, fn=getattr(job, "fn", None))
     _validate_alphabet(model.alphabet, prompts)
     adapter = _get_adapter(model)
 
-    # Choose generate fn: explicit job.fn or default to <ns>.generate
-    ns_model = get_namespace_for_model(model.id)
-    gen_name = job.fn if getattr(job, "fn", None) else f"{ns_model}.generate"
+    # Choose generate fn from explicit contract-validated namespaced function.
     gen_fn_name = resolve_fn(gen_name)
     fn = getattr(adapter, gen_fn_name, None)
     if not fn:
