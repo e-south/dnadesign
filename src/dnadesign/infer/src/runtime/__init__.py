@@ -1,13 +1,10 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/infer/__main__.py
+src/dnadesign/infer/src/runtime/__init__.py
+
+Infer runtime execution modules and policies.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
-
-from .cli import app
-
-if __name__ == "__main__":
-    app()

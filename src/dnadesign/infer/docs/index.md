@@ -26,5 +26,6 @@ Use [docs/README.md](README.md) as the workflow-first entrypoint. This page is a
 ### Developer notes
 
 - [Architecture map](architecture/README.md)
+- [Source-tree map](../src/README.md)
 - [Dev index](dev/README.md)
 - [Development journal](dev/journal.md)

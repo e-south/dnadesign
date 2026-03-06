@@ -1,13 +1,9 @@
 """
 --------------------------------------------------------------------------------
-dnadesign
-src/dnadesign/infer/__main__.py
+<dnadesign project>
+src/dnadesign/infer/src/writers/__init__.py
 
 Module Author(s): Eric J. South
+Dunlop Lab
 --------------------------------------------------------------------------------
 """
-
-from .cli import app
-
-if __name__ == "__main__":
-    app()

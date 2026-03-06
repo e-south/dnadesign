@@ -1,13 +1,10 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/infer/__main__.py
+src/dnadesign/infer/src/__init__.py
+
+Internal infer implementation modules grouped under a single source subtree.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
-
-from .cli import app
-
-if __name__ == "__main__":
-    app()

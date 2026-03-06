@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/infer/__init__.py
+dnadesign
+src/dnadesign/infer/__init__.py
 
 Public API:
   - run_extract
@@ -13,8 +13,6 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-# Side-effect import: registers models & functions (evo2.*, etc.)
-from . import adapters  # noqa: F401
-from .api import run_extract, run_generate, run_job
+from .src.api import run_extract, run_generate, run_job
 
 __all__ = ["run_extract", "run_generate", "run_job"]

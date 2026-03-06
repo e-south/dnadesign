@@ -26,10 +26,13 @@
 ### infer validate
 
 - `validate config` checks root model/job schema and command contract readiness.
+- `validate config` requires either `--config` or a `config.yaml` in the current working directory.
+- `validate config` rejects unknown schema keys and type mismatches with config exit code (`2`).
 - `validate usr` checks dataset/field accessibility for write-back/resume paths.
 
 ### no-silent-fallback contract
 
 - Output cardinality mismatches fail immediately.
 - Resume-scan parquet read errors fail immediately.
+- `overwrite=false` rejects writes that would replace existing infer overlay values for the same ids/columns.
 - Unsupported write-back source contracts fail immediately.

@@ -9,8 +9,9 @@
 2. [Getting started index](getting-started/README.md): first local command flow.
 3. [Operations index](operations/README.md): pressure-test paths for local and scheduler workflows.
 4. [Reference index](reference/README.md): stable command and runtime contracts.
-5. [Architecture map](architecture/README.md): package boundary map and extension seams.
-6. [Dev index](dev/README.md): maintainer process and journal.
+5. [Source-tree map](../src/README.md): internal implementation layout under `infer/src/`.
+6. [Architecture map](architecture/README.md): package boundary map and extension seams.
+7. [Dev index](dev/README.md): maintainer process and journal.
 
 ### Documentation by workflow
 
@@ -28,6 +29,7 @@
 
 #### Extend and maintain infer internals
 - [Architecture map](architecture/README.md): runtime module boundaries.
+- [Source-tree map](../src/README.md): internal module locations.
 - [Dev index](dev/README.md): maintainer loop and evidence logging.
 - [Development journal](dev/journal.md): refactor slices and validation record.
 
