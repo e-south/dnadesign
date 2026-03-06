@@ -1281,3 +1281,354 @@ Deterministic path for each slice:
 - [x] Keep dry-run output rendering contracts stable through request return shape.
 - [x] Verify infer + infer-linked notify/usr tests remain green.
 - [ ] Next slice candidate: split Typer command entrypoints into `cli_commands/` package (`run.py`, `extract.py`, `generate.py`) with one function per command and shared exception envelope.
+
+## 2026-03-06 - Phase 2 Slice B (Top-Level Sprawl Consolidation)
+
+### Goal
+
+Reduce `infer` top-level module sprawl and align package shape with sibling progressive-disclosure layout: `README.md`, `docs/`, `src/`, `tests/`.
+
+### TDD record
+
+1. Added failing IA contract test: `src/dnadesign/infer/tests/test_source_tree_contracts.py`.
+2. Confirmed red state:
+   - `uv run pytest -q src/dnadesign/infer/tests/test_source_tree_contracts.py`
+3. Implemented structural consolidation.
+4. Re-ran tests to green.
+
+### Implemented changes
+
+- Moved internal implementation modules under `src/dnadesign/infer/src/`:
+  - interface/runtime modules (`cli.py`, `engine.py`, `config.py`, etc.)
+  - boundaries/extensions subpackages (`adapters/`, `ingest/`, `presets/`, `writers/`)
+- Kept only thin package entrypoints at top level:
+  - `__init__.py`, `__main__.py`, `cli.py`
+- Updated package exports and side-effect registration wiring:
+  - `dnadesign.infer.__init__` now imports from `dnadesign.infer.src.*`
+- Updated tests and monkeypatch targets to `dnadesign.infer.src.*` for internal modules.
+- Updated preset package resource path to `dnadesign.infer.src.presets`.
+- Added internal source-tree guide:
+  - `src/dnadesign/infer/src/README.md`
+- Updated docs architecture and index routes to reflect `infer/src/` layout.
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/infer/tests/test_source_tree_contracts.py src/dnadesign/infer/tests/test_wrapper_contracts.py src/dnadesign/infer/tests/test_docs_information_architecture_contracts.py`
+- `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer"`
+- `uv run infer --help`
+
+### Notes / remaining opportunities
+
+- `activations_debug.log` still exists at infer root and should be moved to workspace-local logs or removed by explicit hygiene policy.
+- Next decoupling slice should split `src/cli.py` command handlers into `src/cli_commands/` to reduce command-path coupling while preserving CLI contracts.
+- Additional verification rerun (unfiltered infer suite):
+  - `uv run pytest -q src/dnadesign/infer/tests`
+  - `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+
+## 2026-03-06 - Phase 2 Slice C (CLI Package + Test Area Modularization)
+
+### Goal
+
+Reduce internal `infer/src` flatness by introducing a dedicated `src/cli/` package and align infer test layout with sibling package patterns (area-based folders).
+
+### TDD record
+
+1. Extended IA contract test with two new assertions:
+   - `src/cli/` package must exist with `app.py`, `console.py`, `builders.py`, `ingest.py`, `requests.py`.
+   - `tests/` must be grouped by area (`cli`, `runtime`, `contracts`, `docs`, `package`).
+2. Confirmed red state:
+   - `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py`
+3. Implemented structural moves and import rewiring.
+4. Re-ran targeted and full suites to green.
+
+### Implemented changes
+
+- Internal CLI modularization:
+  - moved `src/cli.py` -> `src/cli/app.py`
+  - moved `src/_console.py` -> `src/cli/console.py`
+  - moved `src/cli_builders.py` -> `src/cli/builders.py`
+  - moved `src/cli_ingest.py` -> `src/cli/ingest.py`
+  - moved `src/cli_requests.py` -> `src/cli/requests.py`
+  - added `src/cli/__init__.py` as CLI package surface
+- Fixed config discovery to continue honoring package-local fallback config at `infer/config.yaml` after CLI package move.
+- Test modularization:
+  - moved infer tests under area folders: `tests/cli`, `tests/runtime`, `tests/contracts`, `tests/docs`, `tests/package`.
+- Documentation updates:
+  - updated architecture map to represent `src/cli/*` package shape.
+  - updated `src/README.md` internal source map for CLI package boundary.
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py src/dnadesign/infer/tests/cli/test_builders.py src/dnadesign/infer/tests/cli/test_ingest.py src/dnadesign/infer/tests/cli/test_requests.py src/dnadesign/infer/tests/package/test_wrapper_contracts.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run infer --help`
+- `uv run python -m dnadesign.infer --help`
+
+### Notes / next opportunities
+
+- `src/cli/app.py` remains a large command file; next slice should split command handlers by command group into `src/cli/commands/` while preserving current CLI signatures and exit-code behavior.
+- `activations_debug.log` remains at infer package root and should be moved under workspace-local logs by explicit policy.
+- Added infer CLI wrapper `main()` in `src/dnadesign/infer/cli.py` and added package wrapper contract test to keep a callable entrypoint alias available alongside `app`.
+
+## 2026-03-06 - Phase 2 Slice D (CLI Command Group Split)
+
+### Goal
+
+Further reduce CLI monolith coupling by splitting `src/cli/app.py` command bodies into command-group modules under `src/cli/commands/` while preserving command signatures and exit semantics.
+
+### TDD record
+
+1. Added failing IA contract for command-group split:
+   - `test_infer_cli_commands_are_split_by_group`
+2. Confirmed red state:
+   - `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py::test_infer_cli_commands_are_split_by_group`
+3. Implemented command-group extraction and app wiring reduction.
+4. Re-ran targeted and full suites to green.
+
+### Implemented changes
+
+- Added shared CLI helper module:
+  - `src/dnadesign/infer/src/cli/common.py` (`exit_for`, `raise_cli_error`, `discovery_config`, `guard_pickle`).
+- Added command-group modules:
+  - `src/dnadesign/infer/src/cli/commands/run.py`
+  - `src/dnadesign/infer/src/cli/commands/extract.py`
+  - `src/dnadesign/infer/src/cli/commands/generate.py`
+  - `src/dnadesign/infer/src/cli/commands/presets.py`
+  - `src/dnadesign/infer/src/cli/commands/adapters.py`
+  - `src/dnadesign/infer/src/cli/commands/validate.py`
+  - `src/dnadesign/infer/src/cli/commands/__init__.py` (`register_all`).
+- Reduced `src/dnadesign/infer/src/cli/app.py` to:
+  - Typer app creation
+  - root callback (logging/trace flags)
+  - command-group registration call.
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py src/dnadesign/infer/tests/cli src/dnadesign/infer/tests/package/test_wrapper_contracts.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run infer --help`
+- `uv run python -m dnadesign.infer --help`
+
+### Notes / next opportunities
+
+- Runtime core is still relatively flat (`adapter_*`, `*execution`, `writeback_*` at one level); next IA slice should evaluate introducing `src/runtime/` subpackages without changing behavior.
+- `activations_debug.log` remains at package root and should be addressed by explicit hygiene policy.
+
+## 2026-03-06 - Phase 2 Slice E (Runtime Package + Log Hygiene)
+
+### Goal
+
+Apply next two IA quality increments:
+1. group runtime modules under `src/runtime/`
+2. enforce root log-artifact hygiene (`no tracked *.log` at infer package root).
+
+### TDD record
+
+1. Added failing IA contracts:
+   - `test_infer_runtime_modules_are_grouped_under_runtime_package`
+   - `test_infer_root_does_not_track_runtime_log_artifacts`
+2. Confirmed red state:
+   - `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py::test_infer_runtime_modules_are_grouped_under_runtime_package src/dnadesign/infer/tests/package/test_source_tree_contracts.py::test_infer_root_does_not_track_runtime_log_artifacts`
+3. Implemented runtime package move + import rewiring + log artifact removal.
+4. Re-ran targeted and full suites to green.
+
+### Implemented changes
+
+- Runtime package created:
+  - `src/dnadesign/infer/src/runtime/__init__.py`
+- Moved runtime modules into `src/runtime/`:
+  - `adapter_dispatch.py`, `adapter_runtime.py`, `batch_policy.py`, `extract_chunk_writeback.py`, `extract_execution.py`, `generate_execution.py`, `progress.py`, `resume_planner.py`, `writeback_dispatch.py`
+- Updated import graph:
+  - `engine.py` now imports runtime modules from `src.runtime.*`
+  - CLI builders now import `ProgressFactory` from `src.runtime.progress`
+  - runtime tests now import and monkeypatch `dnadesign.infer.src.runtime.*`
+- Removed tracked root log artifact:
+  - deleted `src/dnadesign/infer/activations_debug.log`
+- Updated architecture/docs maps for runtime package shape.
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py src/dnadesign/infer/tests/runtime src/dnadesign/infer/tests/contracts src/dnadesign/infer/tests/cli src/dnadesign/infer/tests/package/test_wrapper_contracts.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run infer --help`
+- `uv run python -m dnadesign.infer --help`
+
+### Notes / next opportunities
+
+- `engine.py` still centralizes orchestration + ingest/load concerns and is the next decoupling hotspot.
+- Logging setup remains duplicated between `src/_logging.py` and `src/cli/console.py`; a single policy owner module would reduce drift risk.
+
+## 2026-03-06 - Phase 2 Slice F (Engine Ingest Boundary + Shared Logging Policy)
+
+### Goal
+
+Apply the next two decoupling increments:
+1. move ingest loading contracts out of `engine.py` into a dedicated runtime module.
+2. establish one logging policy owner used by CLI and runtime paths.
+
+### TDD record
+
+1. Added failing tests:
+   - source-tree contract update requiring `src/runtime/ingest_loading.py`.
+   - ingest-helper tests switched to `dnadesign.infer.src.runtime.ingest_loading`.
+   - new CLI test `test_console_setup_logging_uses_shared_policy_owner`.
+2. Confirmed red state:
+   - `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py src/dnadesign/infer/tests/runtime/test_extract_ingest_helper.py src/dnadesign/infer/tests/runtime/test_generate_ingest_helper.py src/dnadesign/infer/tests/cli/test_console.py`
+   - initial failure: `ModuleNotFoundError` for `dnadesign.infer.src.runtime.ingest_loading`.
+3. Implemented runtime ingest module extraction + shared logging delegation.
+4. Re-ran targeted and full suites to green.
+
+### Implemented changes
+
+- Added runtime ingest boundary:
+  - `src/dnadesign/infer/src/runtime/ingest_loading.py`
+  - `ExtractIngestPayload`, `load_extract_ingest(...)`, `load_generate_ingest(...)`
+- Rewired engine orchestration:
+  - `src/dnadesign/infer/src/engine.py` now imports ingest-loading helpers from `src/runtime/ingest_loading.py`.
+  - removed ingest-source loader branching from `engine.py`.
+- Consolidated logging setup ownership:
+  - `src/dnadesign/infer/src/_logging.py` now accepts optional `rich_console` and owns root logging setup policy.
+  - `src/dnadesign/infer/src/cli/console.py` now delegates `setup_console_logging(...)` to shared logging policy.
+- Updated docs maps:
+  - `src/dnadesign/infer/docs/architecture/README.md`
+  - `src/dnadesign/infer/src/README.md`
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/infer/tests/package/test_source_tree_contracts.py src/dnadesign/infer/tests/runtime/test_extract_ingest_helper.py src/dnadesign/infer/tests/runtime/test_generate_ingest_helper.py src/dnadesign/infer/tests/cli/test_console.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run infer --help`
+- `uv run python -m dnadesign.infer --help`
+
+### Notes / next opportunities
+
+- `engine.py` remains the main orchestration surface; further decomposition should preserve explicit contracts and keep API signatures stable.
+- Runtime module grouping can continue if additional hotspots emerge, but current module seams are now explicit for ingest and logging policy ownership.
+
+## 2026-03-06 - Phase 2 Slice G (Maintainer Audit Hardening)
+
+### Goal
+
+Run an end-to-end maintainer audit for infer shipping readiness, then harden highest-impact correctness and UX footguns with adversarial coverage.
+
+### Baseline evidence
+
+- Baseline suites:
+  - `uv run pytest -q src/dnadesign/infer/tests`
+  - `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- Primary CLI usage-path checks:
+  - `uv run infer validate config --config src/dnadesign/infer/config.yaml`
+  - `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
+- Baseline adversarial probe before hardening:
+  - unknown model key accepted by `validate config` (`/tmp/infer_bad_extra.yaml`) with exit code `0` (unexpected permissive behavior).
+
+### Prioritized findings
+
+1. High: config schema accepted unknown keys (silent drift risk).
+   - Evidence: `validate config` accepted `model.typo_field` with exit code `0`.
+   - Impact: typoed or stale fields silently ignored, producing hidden misconfiguration.
+2. High: USR write-back overwrite contract was ambiguous.
+   - Evidence: `writers/usr.py` accepted `overwrite` parameter but attach semantics required `allow_overwrite=True` for chunk append safety.
+   - Impact: direct write-back flows could accidentally replace existing values without explicit guard behavior.
+3. Medium: CLI exit-code ergonomics for schema validation.
+   - Evidence: Pydantic schema failures were not mapped to config exit code by contract.
+   - Impact: operators saw generic non-specific failure code for config validation errors.
+
+### TDD and implementation
+
+1. Added failing tests:
+   - `src/dnadesign/infer/tests/cli/test_validate_command.py`
+     - unknown fields must fail with exit `2`
+     - wrong type must fail with exit `2`
+   - `src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py`
+     - `overwrite=false` must fail fast when attempting to replace existing infer values.
+2. Implemented fixes:
+   - strict config parsing:
+     - `src/dnadesign/infer/src/config.py`
+     - introduced `StrictConfigModel` (`extra="forbid"`) for root and nested schema models.
+   - CLI config error mapping:
+     - `src/dnadesign/infer/src/cli/common.py`
+     - map `pydantic.ValidationError` to config exit code (`2`).
+   - write-back overwrite guard with append-safe chunk semantics:
+     - `src/dnadesign/infer/src/writers/usr.py`
+     - keep `allow_overwrite=True` for chunk append behavior, but reject value replacement when `overwrite=false` by scanning existing infer overlay ids/columns.
+3. Updated docs:
+   - `src/dnadesign/infer/docs/reference/command-contracts.md`
+   - documented strict validate-config behavior and overwrite=false replacement guard.
+
+### Adversarial pressure-test outcomes
+
+- Schema mutation:
+  - unknown model key (`model.typo_field`) now fails with explicit schema error and exit code `2`.
+  - wrong type (`model.batch_size: not_an_int`) now fails with explicit schema error and exit code `2`.
+- State/flow abuse:
+  - repeated write-back on same id/column with `overwrite=false` now fails fast with `WriteBackError`.
+  - chunked append on non-overlapping ids remains functional and resume-safe.
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/infer/tests/cli/test_validate_command.py src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run infer validate config --config src/dnadesign/infer/config.yaml`
+- `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
+- `uv run infer validate config --config /tmp/infer_bad_extra.yaml` (now explicit failure, exit `2`)
+
+### Notes / next opportunities
+
+- Full positive-path runtime extraction/generation still depends on model/runtime availability; current hardening covered schema/CLI contracts, overlay safety, and dry-run/runtime-invariant surfaces.
+
+## 2026-03-06 - Phase 2 Slice H (Explicit Registry Bootstrap + Config Discovery Hardening)
+
+### Goal
+
+Reduce implicit coupling in adapter registration and remove hidden config fallback behavior to keep infer fail-fast and easier to reason about.
+
+### TDD record
+
+1. Added failing tests:
+   - `src/dnadesign/infer/tests/package/test_registry_bootstrap_contracts.py`
+   - `src/dnadesign/infer/tests/cli/test_adapters_commands.py`
+   - `src/dnadesign/infer/tests/cli/test_validate_command.py::test_validate_config_requires_explicit_path_or_cwd_config`
+2. Confirmed red state:
+   - `uv run pytest -q src/dnadesign/infer/tests/package/test_registry_bootstrap_contracts.py src/dnadesign/infer/tests/cli/test_validate_command.py src/dnadesign/infer/tests/cli/test_adapters_commands.py`
+3. Implemented explicit bootstrap boundary and config discovery hardening.
+4. Re-ran targeted and full suites to green.
+
+### Implemented changes
+
+- Added explicit registry bootstrap module:
+  - `src/dnadesign/infer/src/bootstrap.py` (`initialize_registry()` idempotent contract).
+- Refactored adapter registration to explicit function:
+  - `src/dnadesign/infer/src/adapters/__init__.py` now exposes `register_defaults()` instead of import-time registration.
+- Removed package import side-effect registration:
+  - `src/dnadesign/infer/__init__.py` no longer imports adapters for registration side effects.
+- Wired explicit bootstrap at runtime boundaries:
+  - CLI root callback (`src/dnadesign/infer/src/cli/app.py`)
+  - API entrypoints (`src/dnadesign/infer/src/api.py`)
+  - Output function validation (`src/dnadesign/infer/src/config.py`)
+- Hardened config discovery:
+  - `src/dnadesign/infer/src/cli/common.py` now allows only `--config` or cwd `config.yaml` (no module-local fallback path).
+- Added IA contract guard:
+  - `src/dnadesign/infer/tests/package/test_source_tree_contracts.py` now requires `src/bootstrap.py`.
+- Updated docs:
+  - `src/dnadesign/infer/docs/architecture/README.md`
+  - `src/dnadesign/infer/src/README.md`
+  - `src/dnadesign/infer/docs/reference/command-contracts.md`
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/infer/tests/package/test_registry_bootstrap_contracts.py src/dnadesign/infer/tests/cli/test_validate_command.py src/dnadesign/infer/tests/cli/test_adapters_commands.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
+- `uv run infer validate config --config src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml`
+- `uv run infer adapters list`
+
+### Notes / next opportunities
+
+- `src/dnadesign/infer/src/engine.py` remains the highest coupling point and next candidate for further orchestration decomposition.
+- A dedicated `infer validate runtime` preflight command could expose a deterministic operator check bundle for scheduler workflows.
