@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import typer
 import yaml
@@ -33,7 +33,8 @@ from ._console import (
 from .api import run_job
 from .cli_builders import build_model_config, run_with_progress
 from .cli_ingest import build_extract_ingest, build_generate_ingest
-from .config import IngestConfig, JobConfig, OutputSpec, RootConfig
+from .cli_requests import build_extract_request, build_generate_request
+from .config import JobConfig, OutputSpec, RootConfig
 from .engine import clear_adapter_cache
 from .errors import (
     CapabilityError,
@@ -291,54 +292,24 @@ def extract(
     i_know_this_is_pickle: bool = typer.Option(False, "--i-know-this-is-pickle"),
 ):
     try:
-        outputs: List[OutputSpec] = []
-        if preset:
-            p = load_preset(preset)
-            if p["kind"] != "extract":
-                raise ConfigError(f"Preset '{preset}' is not an extract preset.")
-            outputs = [OutputSpec(**o) for o in p.get("outputs", [])]
-            model = build_model_config(
-                model_id=model_id,
-                device=device,
-                precision=precision,
-                alphabet=alphabet,
-                batch_size=batch_size,
-                preset_model=p.get("model", {}),
-            )
-        else:
-            # single-output path must have fn+format
-            if not (fn and format):
-                raise ConfigError("Provide --fn and --format, or use --preset.")
-            params: Dict[str, Any] = {}
-            if fn.split(".")[-1] in {"logits", "embedding"}:
-                if pool_method or pool_dim is not None:
-                    params["pool"] = {}
-                    if pool_method:
-                        params["pool"]["method"] = pool_method
-                    if pool_dim is not None:
-                        params["pool"]["dim"] = pool_dim
-                if layer:
-                    params["layer"] = layer
-            elif fn.split(".")[-1] == "log_likelihood":
-                params.setdefault("method", "native")
-                params.setdefault("reduction", "sum")
-            outputs = [OutputSpec(id=out_id, fn=fn, params=params, format=format)]
-            model = build_model_config(
-                model_id=model_id,
-                device=device,
-                precision=precision,
-                alphabet=alphabet,
-                batch_size=batch_size,
-            )
-
-        # Ingest
-        job = JobConfig(
-            id="adhoc_extract",
-            operation="extract",
-            ingest={"source": "sequences"},
-            outputs=outputs,
-            io={"write_back": write_back, "overwrite": overwrite},
+        request = build_extract_request(
+            model_id=model_id,
+            device=device,
+            precision=precision,
+            alphabet=alphabet,
+            batch_size=batch_size,
+            preset=preset,
+            fn=fn,
+            format=format,
+            out_id=out_id,
+            pool_method=pool_method,
+            pool_dim=pool_dim,
+            layer=layer,
+            write_back=write_back,
+            overwrite=overwrite,
         )
+        model = request.model
+        job = request.job
 
         ingest_request = build_extract_ingest(
             seq=seq,
@@ -357,7 +328,7 @@ def extract(
 
         if dry_run:
             render_config_summary(model, [job])
-            render_outputs_spec_table([o.model_dump() for o in outputs])
+            render_outputs_spec_table(request.output_rows)
             console.print("[green]✔ Extract validated (dry run).[/green]")
             raise typer.Exit(code=0)
 
@@ -411,52 +382,21 @@ def generate(
     dry_run: bool = typer.Option(False, "--dry-run", help="Print summary and exit."),
 ):
     try:
-        params: Dict[str, Any] = {}
-
-        if preset:
-            p = load_preset(preset)
-            if p["kind"] != "generate":
-                raise ConfigError(f"Preset '{preset}' is not a generate preset.")
-            params.update(p.get("params") or {})
-            model = build_model_config(
-                model_id=model_id,
-                device=device,
-                precision=precision,
-                alphabet=alphabet,
-                batch_size=batch_size,
-                preset_model=p.get("model", {}),
-            )
-        else:
-            if max_new_tokens is None:
-                max_new_tokens = 64
-            if temperature is None:
-                temperature = 1.0
-            params.update(
-                {
-                    "max_new_tokens": max_new_tokens,
-                    "temperature": temperature,
-                }
-            )
-            if top_k is not None:
-                params["top_k"] = top_k
-            if top_p is not None:
-                params["top_p"] = top_p
-            if seed is not None:
-                params["seed"] = seed
-            model = build_model_config(
-                model_id=model_id,
-                device=device,
-                precision=precision,
-                alphabet=alphabet,
-                batch_size=batch_size,
-            )
-
-        job = JobConfig(
-            id="adhoc_generate",
-            operation="generate",
-            ingest={"source": "sequences"},
-            params=params,
+        request = build_generate_request(
+            model_id=model_id,
+            device=device,
+            precision=precision,
+            alphabet=alphabet,
+            batch_size=batch_size,
+            preset=preset,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+            seed=seed,
         )
+        model = request.model
+        job = request.job
 
         ingest_request = build_generate_ingest(
             prompt=prompt,
@@ -471,8 +411,7 @@ def generate(
 
         if dry_run:
             render_config_summary(model, [job])
-            t = {"id": "gen", "fn": "generate", "format": "—", "params": params}
-            render_outputs_spec_table([t])  # simple visualization
+            render_outputs_spec_table([request.output_row])  # simple visualization
             console.print("[green]✔ Generate validated (dry run).[/green]")
             raise typer.Exit(code=0)
 

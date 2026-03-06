@@ -1237,3 +1237,47 @@ Deterministic path for each slice:
 - [x] Keep command behavior stable with characterization tests.
 - [x] Verify infer + infer-linked notify/usr tests remain green.
 - [ ] Next slice candidate: move command-specific request assembly (`run` preset job, extract output spec params, generate params) into `cli_commands/` modules and keep Typer entrypoints declarative.
+
+## 2026-03-06 - Phase 1 Slice Q (CLI Request Assembly Boundary)
+
+### Scope
+
+- Objective: reduce extract/generate command complexity in `cli.py` by moving request assembly logic (model + job + params/outputs) into a dedicated module.
+
+### Boundary and Contract Decisions
+
+- Added `src/dnadesign/infer/cli_requests.py` with:
+  - `build_extract_request(...)`
+  - `build_generate_request(...)`
+  - dataclasses `ExtractRequest` and `GenerateRequest`
+- Rewired `extract` and `generate` command handlers in `src/dnadesign/infer/cli.py` to consume the request builders.
+- Preserved existing fail-fast validation contracts:
+  - extract still requires `--fn` + `--format` when `--preset` absent
+  - generate preset-kind mismatch still fails with `ConfigError`
+  - default generate params remain `max_new_tokens=64`, `temperature=1.0`.
+
+### TDD Evidence
+
+- Red:
+  - Added `src/dnadesign/infer/tests/test_cli_requests.py` and confirmed initial failure:
+    - `ModuleNotFoundError: No module named 'dnadesign.infer.cli_requests'`
+- Green:
+  - Implemented `cli_requests.py` and rewired `cli.py` call sites.
+  - New request tests and full infer suite passed.
+
+### Verification Commands (Executed)
+
+- `uv run pytest -q src/dnadesign/infer/tests/test_cli_requests.py`
+- `uv run pytest -q src/dnadesign/infer/tests/test_cli_requests.py src/dnadesign/infer/tests/test_cli_ingest.py src/dnadesign/infer/tests/test_cli_builders.py src/dnadesign/infer/tests/test_presets.py src/dnadesign/infer/tests/test_wrapper_contracts.py`
+- `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer"`
+
+### Information Architecture Update
+
+- Updated `src/dnadesign/infer/docs/architecture/README.md` interface-layer map to include `cli_requests.py`.
+
+### Task Board
+
+- [x] Extract request assembly for extract/generate into dedicated module.
+- [x] Keep dry-run output rendering contracts stable through request return shape.
+- [x] Verify infer + infer-linked notify/usr tests remain green.
+- [ ] Next slice candidate: split Typer command entrypoints into `cli_commands/` package (`run.py`, `extract.py`, `generate.py`) with one function per command and shared exception envelope.
