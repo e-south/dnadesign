@@ -71,7 +71,12 @@ def test_bu_scc_docs_use_current_densegen_runtime_field_names() -> None:
 
 def test_densegen_analysis_qsub_is_plot_only_without_notebook_generation() -> None:
     qsub_script = _read(BU_SCC_DOCS / "jobs" / "densegen-analysis.qsub")
-    assert 'uv run dense plot -c "$DENSEGEN_CONFIG"' in qsub_script
+    assert (
+        'DENSEGEN_ANALYSIS_PLOTS="${DENSEGEN_ANALYSIS_PLOTS:-stage_a_summary,placement_map,run_health,tfbs_usage}"'
+        in qsub_script
+    )
+    assert 'uv run dense plot -c "$DENSEGEN_CONFIG" --only "$DENSEGEN_ANALYSIS_PLOTS"' in qsub_script
+    assert "dense_array_video_showcase requires ffmpeg executable in PATH." in qsub_script
     assert 'ATTEMPTS_PARQUET="$TABLES_DIR/attempts.parquet"' in qsub_script
     assert 'COMPOSITION_PARQUET="$TABLES_DIR/composition.parquet"' in qsub_script
     assert "requires attempts artifacts" in qsub_script

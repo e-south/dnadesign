@@ -9,9 +9,18 @@
 set -euo pipefail
 
 DENSEGEN_CONFIG="${DENSEGEN_CONFIG:-$PWD/config.yaml}"
+DENSEGEN_ANALYSIS_PLOTS="${DENSEGEN_ANALYSIS_PLOTS:-stage_a_summary,placement_map,run_health,tfbs_usage}"
 
 if [[ ! -f "$DENSEGEN_CONFIG" ]]; then
   echo "Missing DenseGen config: $DENSEGEN_CONFIG" >&2
+  exit 2
+fi
+if [[ -z "${DENSEGEN_ANALYSIS_PLOTS//[[:space:]]/}" ]]; then
+  echo "DENSEGEN_ANALYSIS_PLOTS must be a non-empty comma-separated list." >&2
+  exit 2
+fi
+if [[ "$DENSEGEN_ANALYSIS_PLOTS" == *"dense_array_video_showcase"* ]] && ! command -v ffmpeg >/dev/null 2>&1; then
+  echo "dense_array_video_showcase requires ffmpeg executable in PATH." >&2
   exit 2
 fi
 
@@ -42,4 +51,4 @@ if [[ "$has_composition_artifact" -ne 1 ]]; then
   exit 2
 fi
 
-uv run dense plot -c "$DENSEGEN_CONFIG"
+uv run dense plot -c "$DENSEGEN_CONFIG" --only "$DENSEGEN_ANALYSIS_PLOTS"
