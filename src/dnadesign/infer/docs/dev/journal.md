@@ -852,3 +852,64 @@ Deterministic path for each slice:
 - [x] Split final write-back dispatch in extract path into a dedicated helper with contract tests.
 - [x] Isolate `_plan_resume_for_usr(...)` behind `resume_planner.py` with parity coverage.
 - [ ] Next slice candidate: separate extract chunk write-back callback construction from `run_extract_job` to reduce closure coupling and allow direct callback-contract tests.
+
+## 2026-03-06 - Phase 1 Slice K (Extract Chunk Write-Back Callback Module)
+
+### Scope
+
+- Objective: remove inline USR chunk write-back closure from `run_extract_job` into a dedicated callback-construction module.
+- Constraint: preserve chunk write-back chunking semantics and existing monkeypatch-based tests.
+
+### Prioritized Finding
+
+1. Medium: extract chunk write-back callback was an inline closure in orchestration code.
+   - risk: tighter coupling between runtime execution loop and sink-specific write-back behavior, with weaker unit-level contract visibility.
+
+### Boundary and Contract Decisions
+
+- Added `src/dnadesign/infer/extract_chunk_writeback.py` with:
+  - `build_extract_chunk_write_back(...)`
+- Explicit callback contract:
+  - non-`usr` source or disabled write-back -> return `None` callback,
+  - `usr` + write-back requires both `ids` and dataset handle, else fail-fast `WriteBackError`,
+  - callback writes only chunk ids and chunk values for the active output id.
+- Preserved testability boundary by injecting `writer` callable; engine passes `write_back_usr`.
+
+### TDD Evidence
+
+- Red:
+  - added `src/dnadesign/infer/tests/test_extract_chunk_writeback.py`
+  - initial run failed with:
+    - `ModuleNotFoundError: No module named 'dnadesign.infer.extract_chunk_writeback'`
+- Green:
+  - implemented `extract_chunk_writeback.py`
+  - rewired `run_extract_job` to call `build_extract_chunk_write_back(...)`
+  - verification passed for new callback tests and existing USR/namespace regressions.
+
+### Verification Commands (Executed)
+
+- `uv run pytest -q src/dnadesign/infer/tests/test_extract_chunk_writeback.py src/dnadesign/infer/tests/test_usr_writeback_contract.py src/dnadesign/infer/tests/test_namespace_contracts.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
+- `uv run infer generate --model-id evo2_7b --device cpu --precision bf16 --alphabet dna --prompt ACGT --max-new-tokens 4 --dry-run`
+
+### Information Architecture Update
+
+- Runtime map updated in `src/dnadesign/infer/docs/architecture/README.md` with:
+  - `extract_chunk_writeback.py` as extract chunk write-back callback boundary.
+
+### Task Board
+
+- [x] Add fail-fast namespace contract hardening for extract/generate runtime dispatch.
+- [x] Add adversarial namespace pressure tests.
+- [x] Add infer pressure-test operations runbook docs and config example.
+- [x] Extract adapter-dispatch block from `engine.py` into dedicated module with invariant tests.
+- [x] Split ingest loading branch from `run_extract_job` into a focused helper with parity tests.
+- [x] Split generate ingest loading branch from `run_generate_job` into a focused helper with parity tests.
+- [x] Isolate extract micro-batch/derating execution loop behind a helper with chunk-contract tests.
+- [x] Isolate generate micro-batch execution loop behind a helper with generation-output contract tests.
+- [x] Isolate progress-handle creation and lifecycle into a shared helper.
+- [x] Split final write-back dispatch in extract path into a dedicated helper with contract tests.
+- [x] Isolate `_plan_resume_for_usr(...)` behind `resume_planner.py` with parity coverage.
+- [x] Separate extract chunk write-back callback construction into `extract_chunk_writeback.py`.
+- [ ] Next slice candidate: isolate adapter cache and loader concerns from `engine.py` into a dedicated adapter runtime module with cache-contract tests.

@@ -23,6 +23,7 @@ from .errors import (
     ModelLoadError,
     ValidationError,
 )
+from .extract_chunk_writeback import build_extract_chunk_write_back
 from .extract_execution import execute_extract_output
 from .generate_execution import execute_generate_batches, validate_generate_payload
 from .ingest.sources import (
@@ -170,18 +171,17 @@ def run_extract_job(
             unit="seq",
         )
 
-        def _write_back_chunk(idx_chunk: List[int], vals: List[object]) -> None:
-            if source != "usr" or ids is None or not job.io.write_back:
-                return
-            chunk_ids = [ids[j] for j in idx_chunk]
-            write_back_usr(
-                ds,
-                ids=chunk_ids,
-                model_id=model.id,
-                job_id=job.id,
-                columnar={out.id: vals},
-                overwrite=bool(job.io.overwrite),
-            )
+        on_chunk = build_extract_chunk_write_back(
+            source=source,
+            write_back=bool(job.io.write_back),
+            ds=ds,
+            ids=ids,
+            model_id=model.id,
+            job_id=job.id,
+            out_id=out.id,
+            overwrite=bool(job.io.overwrite),
+            writer=write_back_usr,
+        )
 
         try:
             all_vals = execute_extract_output(
@@ -197,7 +197,7 @@ def run_extract_job(
                 auto_derate=auto_derate,
                 is_oom=_is_oom,
                 on_progress=pbar.update,
-                on_chunk=_write_back_chunk,
+                on_chunk=on_chunk,
             )
         finally:
             pbar.close()

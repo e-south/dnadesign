@@ -8,6 +8,7 @@
   - orchestration: `engine.py`
   - dispatch contracts: `adapter_dispatch.py`
   - extract execution loop: `extract_execution.py`
+  - extract chunk write-back callback: `extract_chunk_writeback.py`
   - generate execution loop: `generate_execution.py`
   - progress lifecycle: `progress.py`
   - usr resume planning: `resume_planner.py`
