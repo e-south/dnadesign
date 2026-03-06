@@ -47,7 +47,7 @@ def execute_extract_output(
     while start < len(need_idx):
         take = min(bs, len(need_idx) - start)
         idx_chunk = need_idx[start : start + take]
-        chunk = [seqs[i] for i in idx_chunk]
+        chunk = [seqs[row_index] for row_index in idx_chunk]
 
         try:
             vals = invoke_extract_callable(

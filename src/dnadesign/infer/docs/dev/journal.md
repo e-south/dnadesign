@@ -1067,3 +1067,85 @@ Deterministic path for each slice:
 - [x] Align infer docs IA to sibling pattern with lightweight README + workflow/type indexes + explicit pressure-test demo route.
 - [x] Add infer wrapper correctness contracts for module entrypoint and public API exports.
 - [ ] Next slice candidate: split extract/generate batch-policy parsing (`DNADESIGN_INFER_BATCH`, `DNADESIGN_INFER_DEFAULT_BS`) into a dedicated runtime policy module with invariant tests.
+
+## 2026-03-06 - Phase 1 Slice N (Batch Policy Runtime Module + Profiling Cycle)
+
+### Scope
+
+- Objective: extract batch policy parsing from `engine.py` into a dedicated runtime-policy module.
+- Objective: run a measurement-first optimization cycle on extract execution loop and keep only measured wins.
+
+### Prioritized Findings
+
+1. Low-Medium: extract/generate duplicated environment parsing for batch policy in `engine.py`.
+2. Medium (performance): extract execution loop dominated cumulative runtime in synthetic profiling baseline.
+
+### Boundary and Contract Decisions
+
+- Added `src/dnadesign/infer/batch_policy.py` with:
+  - `resolve_micro_batch_size(...)`
+  - `resolve_default_extract_batch_size()`
+  - `resolve_extract_batch_policy(...)`
+- Rewired `engine.py` extract/generate paths to consume batch policy helpers.
+- Preserved fail-fast behavior on invalid integer environment values (ValueError propagation).
+
+### TDD Evidence
+
+- Red:
+  - added `src/dnadesign/infer/tests/test_batch_policy.py`
+  - initial run failed with:
+    - `ModuleNotFoundError: No module named 'dnadesign.infer.batch_policy'`
+- Green:
+  - implemented `batch_policy.py`
+  - rewired `engine.py` batch policy resolution
+  - all targeted and full infer tests passed.
+
+### Performance Optimization Cycle (Measurement-first)
+
+- Baseline workload:
+  - `execute_extract_output` synthetic run (`N=120000`, `micro_bs=64`, five runs).
+  - baseline mean: `0.008402s` (stdev `0.001635s`).
+  - cProfile hotspot: `extract_execution.execute_extract_output` dominated cumulative time.
+- Hypothesis tested:
+  - replace per-batch indexed sequence gather with contiguous fast path / precompute variants.
+- Outcome:
+  - post-change means worsened (`0.009236s` and `0.011089s` in successive attempts).
+  - decision: **revert optimization changes** and keep original execution logic.
+- Recommendation:
+  - continue investigation with larger realistic adapter-bound workloads; current micro-optimization did not produce validated gain.
+
+### Verification Commands (Executed)
+
+- `uv run pytest -q src/dnadesign/infer/tests/test_batch_policy.py`
+- `uv run pytest -q src/dnadesign/infer/tests/test_batch_policy.py src/dnadesign/infer/tests/test_extract_execution.py src/dnadesign/infer/tests/test_namespace_contracts.py src/dnadesign/infer/tests/test_usr_writeback_contract.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
+- `uv run infer generate --model-id evo2_7b --device cpu --precision bf16 --alphabet dna --prompt ACGT --max-new-tokens 4 --dry-run`
+- profiling harness (baseline and after-change):
+  - `uv run python - <<'PY' ... execute_extract_output benchmark + cProfile ... PY`
+
+### Information Architecture Update
+
+- Runtime map updated in `src/dnadesign/infer/docs/architecture/README.md` with:
+  - `batch_policy.py` as runtime policy boundary.
+
+### Task Board
+
+- [x] Add fail-fast namespace contract hardening for extract/generate runtime dispatch.
+- [x] Add adversarial namespace pressure tests.
+- [x] Add infer pressure-test operations runbook docs and config example.
+- [x] Extract adapter-dispatch block from `engine.py` into dedicated module with invariant tests.
+- [x] Split ingest loading branch from `run_extract_job` into a focused helper with parity tests.
+- [x] Split generate ingest loading branch from `run_generate_job` into a focused helper with parity tests.
+- [x] Isolate extract micro-batch/derating execution loop behind a helper with chunk-contract tests.
+- [x] Isolate generate micro-batch execution loop behind a helper with generation-output contract tests.
+- [x] Isolate progress-handle creation and lifecycle into a shared helper.
+- [x] Split final write-back dispatch in extract path into a dedicated helper with contract tests.
+- [x] Isolate `_plan_resume_for_usr(...)` behind `resume_planner.py` with parity coverage.
+- [x] Separate extract chunk write-back callback construction into `extract_chunk_writeback.py`.
+- [x] Isolate adapter runtime/cache policy into `adapter_runtime.py`.
+- [x] Align infer docs IA to sibling pattern with lightweight README + workflow/type indexes + explicit pressure-test demo route.
+- [x] Add infer wrapper correctness contracts for module entrypoint and public API exports.
+- [x] Split extract/generate batch-policy parsing into `batch_policy.py`.
+- [x] Run measurement-first extract-loop optimization cycle and revert non-improving variants.
+- [ ] Next slice candidate: isolate progress-manager construction and per-job execution envelope from CLI command handlers into a dedicated runtime helper to reduce CLI monolith size.

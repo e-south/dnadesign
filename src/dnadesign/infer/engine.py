@@ -10,7 +10,6 @@ Dunlop Lab
 
 from __future__ import annotations
 
-import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from ._logging import get_logger
@@ -21,6 +20,7 @@ from .adapter_runtime import (
     is_oom as _is_oom,
 )
 from .adapter_dispatch import resolve_extract_callable, resolve_generate_callable
+from .batch_policy import resolve_extract_batch_policy, resolve_micro_batch_size
 from .config import JobConfig, ModelConfig
 from .contracts import resolve_generate_namespaced_fn, validate_extract_output_namespace
 from .errors import (
@@ -99,9 +99,7 @@ def run_extract_job(
     adapter = _get_adapter(model)
 
     # micro-batch
-    micro_bs = model.batch_size or int(os.environ.get("DNADESIGN_INFER_BATCH", "0"))
-    micro_bs = int(micro_bs) if micro_bs else 0
-    default_bs = int(os.environ.get("DNADESIGN_INFER_DEFAULT_BS", "64"))
+    micro_bs, default_bs = resolve_extract_batch_policy(model_batch_size=model.batch_size)
     auto_derate = _auto_derate_enabled()
 
     # resume plan
@@ -206,8 +204,7 @@ def run_generate_job(
     # Choose generate fn from explicit contract-validated namespaced function.
     fn = resolve_generate_callable(adapter=adapter, namespaced_fn=gen_name)
 
-    micro_bs = model.batch_size or int(os.environ.get("DNADESIGN_INFER_BATCH", "0"))
-    micro_bs = int(micro_bs) if micro_bs else 0
+    micro_bs = resolve_micro_batch_size(model_batch_size=model.batch_size)
     params = job.params or {}
     if not micro_bs or micro_bs <= 0:
         return validate_generate_payload(fn(prompts, **params))
