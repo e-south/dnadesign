@@ -8,6 +8,7 @@
   - orchestration: `engine.py`
   - dispatch contracts: `adapter_dispatch.py`
   - extract execution loop: `extract_execution.py`
+  - generate execution loop: `generate_execution.py`
   - config and errors: `config.py`, `errors.py`
   - registry and utils: `registry.py`, `utils.py`
 - Boundary adapters: `ingest/*`, `writers/*`

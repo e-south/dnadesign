@@ -609,3 +609,66 @@ Deterministic path for each slice:
 - [x] Split generate ingest loading branch from `run_generate_job` into a focused helper with parity tests.
 - [x] Isolate extract micro-batch/derating execution loop behind a helper with chunk-contract tests.
 - [ ] Next slice candidate: isolate generate micro-batch execution loop behind a helper with generation-output contract tests.
+
+## 2026-03-06 - Phase 1 Slice G (Generate Execution Module, No-Silent-Fallback Contract)
+
+### Scope
+
+- Objective: isolate generate micro-batch execution from `engine.py` into a focused helper module.
+- Hardening objective: remove silent fallback behavior in chunked generation output handling.
+
+### Prioritized Finding
+
+1. Medium: generate chunk path used permissive output extraction (`out.get('gen_seqs', [])`).
+   - risk: malformed adapter output could silently produce partial/empty results and hide defects.
+
+### Boundary and Contract Decisions
+
+- Added `src/dnadesign/infer/generate_execution.py` with:
+  - `validate_generate_payload(payload)`
+  - `execute_generate_batches(...)`
+- `run_generate_job` now delegates chunked execution to `execute_generate_batches`.
+- Explicit contract enforced in both chunked and non-chunked paths:
+  - payload must be a mapping,
+  - payload must include `gen_seqs`,
+  - `gen_seqs` must be a list,
+  - per-chunk generated sequence count must equal prompt chunk size.
+
+### TDD and Adversarial Evidence
+
+- Red:
+  - added `src/dnadesign/infer/tests/test_generate_execution.py`
+  - initial run failed with:
+    - `ModuleNotFoundError: No module named 'dnadesign.infer.generate_execution'`
+- Green:
+  - implemented `generate_execution.py`
+  - rewired `engine.py` generate path
+- Adversarial tests cover:
+  - OOM derating retry,
+  - non-derated OOM fail-fast,
+  - missing `gen_seqs` fail-fast,
+  - prompt/output cardinality mismatch fail-fast.
+
+### Verification Commands (Executed)
+
+- `uv run pytest -q src/dnadesign/infer/tests/test_generate_execution.py`
+- `uv run pytest -q src/dnadesign/infer/tests/test_namespace_contracts.py`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run infer generate --model-id evo2_7b --device cpu --precision bf16 --alphabet dna --prompt ACGT --max-new-tokens 4 --dry-run`
+
+### Information Architecture Update
+
+- Runtime map updated in `src/dnadesign/infer/docs/architecture/README.md`:
+  - added `generate_execution.py` as dedicated generation execution boundary.
+
+### Task Board
+
+- [x] Add fail-fast namespace contract hardening for extract/generate runtime dispatch.
+- [x] Add adversarial namespace pressure tests.
+- [x] Add infer pressure-test operations runbook docs and config example.
+- [x] Extract adapter-dispatch block from `engine.py` into dedicated module with invariant tests.
+- [x] Split ingest loading branch from `run_extract_job` into a focused helper with parity tests.
+- [x] Split generate ingest loading branch from `run_generate_job` into a focused helper with parity tests.
+- [x] Isolate extract micro-batch/derating execution loop behind a helper with chunk-contract tests.
+- [x] Isolate generate micro-batch execution loop behind a helper with generation-output contract tests.
+- [ ] Next slice candidate: isolate progress-handle creation and lifecycle into a shared helper to remove repeated pbar setup/close logic.

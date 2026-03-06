@@ -22,11 +22,11 @@ from .errors import (
     ConfigError,
     InferError,
     ModelLoadError,
-    RuntimeOOMError,
     ValidationError,
     WriteBackError,
 )
 from .extract_execution import execute_extract_output
+from .generate_execution import execute_generate_batches, validate_generate_payload
 from .ingest.sources import (
     load_pt_file_input,
     load_records_input,
@@ -361,8 +361,9 @@ def run_generate_job(
 
     micro_bs = model.batch_size or int(os.environ.get("DNADESIGN_INFER_BATCH", "0"))
     micro_bs = int(micro_bs) if micro_bs else 0
+    params = job.params or {}
     if not micro_bs or micro_bs <= 0:
-        return fn(prompts, **(job.params or {}))
+        return validate_generate_payload(fn(prompts, **params))
 
     if progress_factory:
         pbar = progress_factory(f"{job.id}/generate", len(prompts))
@@ -370,24 +371,15 @@ def run_generate_job(
         tqdm, _ = _get_tqdm()
         pbar = tqdm(total=len(prompts), unit="prompt", desc=f"{job.id}/generate")
 
-    gen_all: Dict[str, List[object]] = {"gen_seqs": []}
-    start = 0
-    bs = micro_bs
-    while start < len(prompts):
-        take = min(bs, len(prompts) - start)
-        chunk = prompts[start : start + take]
-        try:
-            out = fn(chunk, **(job.params or {}))
-        except RuntimeError as e:
-            if _is_oom(e) and _auto_derate_enabled() and bs > 1:
-                new_bs = max(1, bs // 2)
-                _LOG.warning("OOM at batch=%d → retry at batch=%d", bs, new_bs)
-                bs = new_bs
-                continue
-            raise RuntimeOOMError(str(e))
-        gen_all["gen_seqs"].extend(out.get("gen_seqs", []))
-        pbar.update(len(chunk))
-        start += take
-
-    pbar.close()
-    return gen_all
+    try:
+        return execute_generate_batches(
+            prompts=prompts,
+            fn=fn,
+            params=params,
+            micro_batch_size=micro_bs,
+            auto_derate=_auto_derate_enabled(),
+            is_oom=_is_oom,
+            on_progress=pbar.update,
+        )
+    finally:
+        pbar.close()
