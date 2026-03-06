@@ -486,3 +486,54 @@ Deterministic path for each slice:
 - [x] Extract adapter-dispatch block from `engine.py` into dedicated module with invariant tests.
 - [x] Split ingest loading branch from `run_extract_job` into a focused helper with parity tests.
 - [ ] Next slice candidate: split generate ingest loading branch from `run_generate_job` into a focused helper with parity tests.
+
+## 2026-03-06 - Phase 1 Slice E (Generate Ingest Helper Split, DRY Contract)
+
+### Scope
+
+- Objective: split generate ingest loading from `run_generate_job` into a focused helper.
+- Pragmatic constraint: keep ingest-source knowledge DRY by using one fail-fast ingest contract path.
+
+### Boundary and Contract Decision
+
+- Added `_load_generate_ingest(inputs, ingest=...)` in `engine.py`.
+- `_load_generate_ingest` delegates to `_load_extract_ingest` and returns only prompts.
+- Result: one source of truth for ingest source handling (`sequences`, `records`, `pt_file`, `usr`) and one fail-fast error surface for unknown sources/invalid pt-file input types.
+
+### Changes Applied
+
+- Runtime:
+  - `src/dnadesign/infer/engine.py`
+  - `run_generate_job` now calls `_load_generate_ingest` instead of maintaining an inline ingest branch.
+- Tests:
+  - added `src/dnadesign/infer/tests/test_generate_ingest_helper.py`
+  - parity coverage for all source paths and fail-fast behavior.
+
+### TDD Evidence
+
+- Red:
+  - added `src/dnadesign/infer/tests/test_generate_ingest_helper.py`
+  - initial run failed with:
+    - `ImportError: cannot import name '_load_generate_ingest' from 'dnadesign.infer.engine'`
+- Green:
+  - implemented `_load_generate_ingest` as delegation to `_load_extract_ingest`
+  - rewired `run_generate_job`
+  - verification passed:
+    - `uv run pytest -q src/dnadesign/infer/tests/test_generate_ingest_helper.py`
+    - `uv run pytest -q src/dnadesign/infer/tests/test_extract_ingest_helper.py`
+    - `uv run pytest -q src/dnadesign/infer/tests`
+
+### Notes
+
+- This is a reversible refactor: if needed, helper delegation can be changed without public API changes.
+- No silent fallback paths were introduced.
+
+### Task Board
+
+- [x] Add fail-fast namespace contract hardening for extract/generate runtime dispatch.
+- [x] Add adversarial namespace pressure tests.
+- [x] Add infer pressure-test operations runbook docs and config example.
+- [x] Extract adapter-dispatch block from `engine.py` into dedicated module with invariant tests.
+- [x] Split ingest loading branch from `run_extract_job` into a focused helper with parity tests.
+- [x] Split generate ingest loading branch from `run_generate_job` into a focused helper with parity tests.
+- [ ] Next slice candidate: isolate micro-batch/derating execution loop in extract path behind a helper with chunk-contract tests.

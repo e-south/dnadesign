@@ -224,6 +224,11 @@ def _load_extract_ingest(inputs, *, ingest) -> Tuple[List[str], Optional[List[st
     raise ConfigError(f"Unknown ingest source: {source}")
 
 
+def _load_generate_ingest(inputs, *, ingest) -> List[str]:
+    prompts, _ids, _records, _pt_path, _ds = _load_extract_ingest(inputs, ingest=ingest)
+    return prompts
+
+
 def run_extract_job(
     inputs,
     *,
@@ -362,24 +367,7 @@ def run_generate_job(
     job: JobConfig,
     progress_factory: ProgressFactory = None,
 ) -> Dict[str, List[object]]:
-    source = job.ingest.source
-    if source == "sequences":
-        prompts = load_sequences_input(inputs)
-    elif source == "records":
-        prompts, _ = load_records_input(inputs, job.ingest.field or "sequence")
-    elif source == "pt_file":
-        if not isinstance(inputs, str):
-            raise ValidationError("inputs must be a path string for pt_file ingest")
-        prompts, _ = load_pt_file_input(inputs, job.ingest.field or "sequence")
-    elif source == "usr":
-        prompts, _, _ = load_usr_input(
-            dataset_name=job.ingest.dataset,  # type: ignore[arg-type]
-            field=job.ingest.field or "sequence",
-            root=job.ingest.root,
-            ids=job.ingest.ids,
-        )
-    else:
-        raise ConfigError(f"Unknown ingest source: {source}")
+    prompts = _load_generate_ingest(inputs, ingest=job.ingest)
 
     gen_name = resolve_generate_namespaced_fn(model_id=model.id, fn=getattr(job, "fn", None))
     _validate_alphabet(model.alphabet, prompts)
