@@ -3584,3 +3584,58 @@ Observed effect: subset resume scans are materially faster because reads are fil
 1. Resume planning behavior remains unchanged for valid inputs.
 2. Requested-ID duplicate ordering is explicit and preserved.
 3. Resume table scans are now subset-based and easier to reason about and extend.
+
+## 2026-03-07 - Phase 2 Slice AN (Resume Planner Large-Filter Chunking Contract)
+
+### Goal
+
+Harden resume planning for large ID subsets by introducing an explicit chunked parquet-filter contract while preserving existing resume semantics.
+
+### Audit findings
+
+1. Resume subset filtering previously used a single `id in [...]` predicate, which can become brittle at large ID counts.
+2. Chunking behavior was not explicit/tested, making this path harder to reason about under scale.
+
+### TDD sequence
+
+1. Red:
+   - `test_plan_resume_for_usr_chunks_large_id_filters`
+2. Green:
+   - added `_RESUME_FILTER_CHUNK_SIZE` constant.
+   - `_read_subset_table(...)` now returns chunked table tuple when deduped requested IDs exceed chunk size.
+   - records/overlay merge loops now consume table tuples from `_read_subset_table(...)`.
+3. Verify:
+   - targeted resume planner tests pass.
+   - resume/writeback contract tests pass.
+   - full infer suite and docs contract suites pass.
+
+### Performance evidence (measurement-first)
+
+1. Small subset (`5` ids over `200k` records):
+   - post-change mean: `10.238ms` (same order of magnitude as previous optimized subset path)
+2. Large subset (`50k` ids over `200k` records), chunked with size `10k`:
+   - mean: `128.466ms`
+
+Interpretation: chunked-filter path remains performant while removing single giant-filter dependence.
+
+### Changes applied
+
+1. `src/dnadesign/infer/src/runtime/resume_planner.py`
+   - added `_RESUME_FILTER_CHUNK_SIZE = 10_000` contract constant.
+   - changed `_read_subset_table(...)` to return one or more chunk-filtered tables.
+   - updated records + overlay callers to merge per-table chunks.
+2. `src/dnadesign/infer/tests/runtime/test_resume_planner.py`
+   - added chunked-filter contract test with explicit filter-call assertions.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_resume_planner.py::test_plan_resume_for_usr_chunks_large_id_filters src/dnadesign/infer/tests/runtime/test_resume_planner.py::test_plan_resume_for_usr_reads_only_requested_ids_and_preserves_duplicate_order src/dnadesign/infer/tests/runtime/test_resume_planner.py::test_plan_resume_for_usr_overwrite_short_circuits_scan`
+2. `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py -k "plan_resume_for_usr_uses_infer_prefixed_columns or usr_chunk_write_back_is_append_safe_and_resume_reads_overlay or run_extract_job_usr_resume_skips_completed_rows_from_overlay"`
+3. `uv run pytest -q src/dnadesign/infer/tests`
+4. `uv run pytest -q src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+
+### Contract impact
+
+1. Resume behavior is unchanged for callers.
+2. Large ID subsets now use explicit chunked filter reads.
+3. Chunk size is centrally defined and easy to tune in follow-up slices.
