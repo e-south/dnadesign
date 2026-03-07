@@ -92,7 +92,10 @@ def test_validate_config_requires_explicit_path_or_cwd_config(monkeypatch, tmp_p
     result = _RUNNER.invoke(app, ["validate", "config"])
 
     assert result.exit_code == 2
-    assert "No config found. Pass --config or place config.yaml in the current directory." in (result.stdout or "")
+    output = result.stdout or ""
+    assert "ConfigError:" in output
+    assert "No config found." in output
+    assert "Pass --config or place config.yaml in the current" in output
 
 
 def test_validate_config_rejects_usr_ingest_path_field(tmp_path: Path) -> None:

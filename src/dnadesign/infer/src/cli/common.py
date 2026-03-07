@@ -50,7 +50,8 @@ def exit_for(error: Exception) -> int:
 
 
 def raise_cli_error(error: Exception) -> None:
-    console.print(f"[red]{error}[/red]")
+    error_label = type(error).__name__
+    console.print(f"[red]{error_label}: {error}[/red]")
     raise typer.Exit(code=exit_for(error))
 
 

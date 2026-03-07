@@ -102,17 +102,24 @@ def load_usr_input(
 
     import pyarrow.parquet as pq
 
-    tbl = pq.read_table(rec_path, columns=["id", field])
+    read_filters = None
+    if ids:
+        scoped_ids = [str(value) for value in ids if str(value).strip()]
+        if scoped_ids:
+            read_filters = [("id", "in", list(dict.fromkeys(scoped_ids)))]
+
+    tbl = pq.read_table(rec_path, columns=["id", field], filters=read_filters)
     all_ids = tbl.column("id").to_pylist()
     all_seqs = tbl.column(field).to_pylist()
 
     if ids:
-        pos = {rid: i for i, rid in enumerate(all_ids)}
+        pos = {str(rid): i for i, rid in enumerate(all_ids)}
         sub_ids, sub_seqs = [], []
         for rid in ids:
-            idx = pos.get(rid)
+            rid_key = str(rid)
+            idx = pos.get(rid_key)
             if idx is not None:
-                sub_ids.append(rid)
+                sub_ids.append(rid_key)
                 sub_seqs.append(all_seqs[idx])
         ids, seqs = sub_ids, sub_seqs
     else:
