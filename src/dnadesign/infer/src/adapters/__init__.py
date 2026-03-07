@@ -25,6 +25,8 @@ def register_defaults() -> None:
 
     # Register models
     register_model("evo2_7b", Evo2Adapter)
+    register_model("evo2_20b", Evo2Adapter)
+    register_model("evo2_40b", Evo2Adapter)
     register_model("evo2_1b_base", Evo2Adapter)  # convenience
     # ESM2 is stubbed but keep an example for future
     # register_model("esm2_t33_650M_UR50D", ESM2Adapter)

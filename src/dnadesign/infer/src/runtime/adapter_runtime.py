@@ -25,7 +25,7 @@ def clear_adapter_cache() -> None:
     _ADAPTER_CACHE.clear()
 
 
-def get_adapter(*, model: ModelConfig, resolver: Callable[[str], object] = get_adapter_cls):
+def get_adapter(model: ModelConfig, resolver: Callable[[str], object] = get_adapter_cls):
     key = (model.id, model.device, model.precision)
     if key in _ADAPTER_CACHE:
         return _ADAPTER_CACHE[key]

@@ -22,10 +22,48 @@ Precision = Literal["fp32", "fp16", "bf16"]
 Alphabet = Literal["dna", "protein"]
 Format = Literal["float", "list", "numpy", "tensor"]
 Operation = Literal["extract", "generate"]
+ParallelismStrategy = Literal["single_device", "multi_gpu_vortex"]
 
 
 class StrictConfigModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class ModelParallelismConfig(StrictConfigModel):
+    strategy: ParallelismStrategy = "single_device"
+    min_gpus: int = Field(default=1, ge=1)
+    gpu_ids: Optional[List[int]] = None
+
+    @field_validator("gpu_ids")
+    @classmethod
+    def _validate_gpu_ids(cls, value: Optional[List[int]]) -> Optional[List[int]]:
+        if value is None:
+            return value
+        if len(value) == 0:
+            raise ConfigError("model.parallelism.gpu_ids must be non-empty when provided")
+        if any(idx < 0 for idx in value):
+            raise ConfigError("model.parallelism.gpu_ids must contain non-negative integers")
+        if len(set(value)) != len(value):
+            raise ConfigError("model.parallelism.gpu_ids must not contain duplicates")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_parallelism_contract(self) -> "ModelParallelismConfig":
+        if self.strategy == "single_device":
+            if self.min_gpus != 1:
+                raise ConfigError("model.parallelism.min_gpus must be 1 when strategy='single_device'")
+            if self.gpu_ids is not None and len(self.gpu_ids) != 1:
+                raise ConfigError("model.parallelism.gpu_ids must have exactly one id for strategy='single_device'")
+            return self
+
+        if self.min_gpus < 2:
+            raise ConfigError("model.parallelism.min_gpus must be >= 2 when strategy='multi_gpu_vortex'")
+        if self.gpu_ids is not None:
+            if len(self.gpu_ids) < 2:
+                raise ConfigError("model.parallelism.gpu_ids must include at least two ids for multi_gpu_vortex")
+            if len(self.gpu_ids) < self.min_gpus:
+                raise ConfigError("model.parallelism.gpu_ids must include at least min_gpus ids")
+        return self
 
 
 class ModelConfig(StrictConfigModel):
@@ -34,6 +72,7 @@ class ModelConfig(StrictConfigModel):
     precision: Precision = Field(...)
     alphabet: Alphabet
     batch_size: Optional[int] = None
+    parallelism: ModelParallelismConfig = Field(default_factory=ModelParallelismConfig)
 
 
 class IngestConfig(StrictConfigModel):

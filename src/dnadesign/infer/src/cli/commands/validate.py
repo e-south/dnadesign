@@ -20,6 +20,7 @@ import yaml
 from ...config import RootConfig
 from ...input_parsing import read_ids_arg
 from ...ingest.sources import load_usr_input
+from ...runtime.capacity_planner import probe_gpu_inventory, validate_model_hardware_contract
 from ..common import discovery_config, raise_cli_error
 from ..console import console, render_config_summary
 
@@ -33,6 +34,14 @@ def register(app: typer.Typer) -> None:
         try:
             cfg_path = discovery_config(config)
             root = RootConfig(**yaml.safe_load(cfg_path.read_text()))
+            inventory = probe_gpu_inventory()
+            if root.model.device.startswith("cuda") and inventory.count == 0:
+                console.print(
+                    "[yellow]Capacity check skipped: no local GPU inventory detected. "
+                    "Run this check on a GPU node or use ops runbook planning for declared scheduler resources.[/yellow]"
+                )
+            else:
+                validate_model_hardware_contract(model=root.model, inventory=inventory)
             render_config_summary(root.model, root.jobs)
             console.print("[green]✔ Config validated.[/green]")
         except Exception as error:

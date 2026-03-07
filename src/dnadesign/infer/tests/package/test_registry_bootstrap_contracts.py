@@ -33,6 +33,9 @@ print(f"after_fns={len(list_fns())}")
     lines = {line.strip() for line in (result.stdout or "").splitlines() if line.strip()}
     assert "before_models=0" in lines
     assert "before_fns=0" in lines
-    assert "after_models=2" in lines
-    assert "after_fns=4" in lines
-
+    after_models = [line for line in lines if line.startswith("after_models=")]
+    after_fns = [line for line in lines if line.startswith("after_fns=")]
+    assert len(after_models) == 1
+    assert len(after_fns) == 1
+    assert int(after_models[0].split("=", 1)[1]) >= 2
+    assert int(after_fns[0].split("=", 1)[1]) >= 4

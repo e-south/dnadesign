@@ -16,6 +16,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from dnadesign.infer.cli import app
+from dnadesign.infer.src.runtime.capacity_planner import GpuDeviceInfo, GpuInventory
 
 _RUNNER = CliRunner()
 
@@ -122,3 +123,45 @@ jobs:
 
     assert result.exit_code == 2
     assert "ingest.path is not allowed for source='usr'" in (result.stdout or "")
+
+
+def test_validate_config_fails_capacity_for_40b_on_single_gpu(monkeypatch, tmp_path: Path) -> None:
+    cfg = _write(
+        tmp_path / "capacity_fail_40b.yaml",
+        """
+model:
+  id: evo2_40b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs:
+  - id: j1
+    operation: extract
+    ingest:
+      source: sequences
+    outputs:
+      - id: ll
+        fn: evo2.log_likelihood
+        format: float
+""".strip()
+        + "\n",
+    )
+
+    monkeypatch.setattr(
+        "dnadesign.infer.src.cli.commands.validate.probe_gpu_inventory",
+        lambda: GpuInventory(
+            devices=(
+                GpuDeviceInfo(
+                    index=0,
+                    name="L40S",
+                    total_memory_gib=45.0,
+                    compute_capability="8.9",
+                ),
+            )
+        ),
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "config", "--config", cfg.as_posix()])
+
+    assert result.exit_code == 3
+    assert "CAPACITY_FAIL" in (result.stdout or "")

@@ -16,6 +16,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from dnadesign.infer.cli import app
+from dnadesign.infer.src.runtime.capacity_planner import GpuDeviceInfo, GpuInventory
 
 _RUNNER = CliRunner()
 
@@ -99,3 +100,46 @@ def test_run_rejects_preset_only_flags_when_config_mode_is_selected(tmp_path: Pa
     assert result.exit_code == 2
     assert "Preset-mode options are not allowed with --config" in (result.stdout or "")
     assert "--usr" in (result.stdout or "")
+
+
+def test_run_dry_run_fails_capacity_for_40b_on_single_gpu(monkeypatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        """
+model:
+  id: evo2_40b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs:
+  - id: j1
+    operation: extract
+    ingest:
+      source: sequences
+    outputs:
+      - id: ll
+        fn: evo2.log_likelihood
+        format: float
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "dnadesign.infer.src.cli.commands.run.probe_gpu_inventory",
+        lambda: GpuInventory(
+            devices=(
+                GpuDeviceInfo(
+                    index=0,
+                    name="L40S",
+                    total_memory_gib=45.0,
+                    compute_capability="8.9",
+                ),
+            )
+        ),
+    )
+
+    result = _RUNNER.invoke(app, ["run", "--config", config_path.as_posix(), "--dry-run"])
+
+    assert result.exit_code == 3
+    assert "CAPACITY_FAIL" in (result.stdout or "")

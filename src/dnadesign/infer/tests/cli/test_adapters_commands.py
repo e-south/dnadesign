@@ -24,6 +24,8 @@ def test_adapters_list_reports_registered_default_model_ids() -> None:
     assert result.exit_code == 0, result.stdout
     output = result.stdout or ""
     assert "evo2_7b" in output
+    assert "evo2_20b" in output
+    assert "evo2_40b" in output
     assert "evo2_1b_base" in output
 
 
@@ -36,4 +38,3 @@ def test_adapters_fns_reports_registered_default_namespaced_functions() -> None:
     assert "evo2.embedding" in output
     assert "evo2.log_likelihood" in output
     assert "evo2.generate" in output
-

@@ -22,6 +22,7 @@ from ...config import JobConfig, OutputSpec, RootConfig
 from ...errors import ConfigError
 from ...input_parsing import read_ids_arg
 from ...presets import load_preset
+from ...runtime.capacity_planner import probe_gpu_inventory, validate_model_hardware_contract
 from ..builders import build_model_config, run_with_progress
 from ..common import discovery_config, guard_pickle, raise_cli_error
 from ..config_inputs import resolve_config_job_inputs
@@ -142,6 +143,10 @@ def register(app: typer.Typer) -> None:
                         io={"write_back": False, "overwrite": False},
                     )
 
+                preset_inventory = probe_gpu_inventory()
+                if not (dry_run and model.device.startswith("cuda") and preset_inventory.count == 0):
+                    validate_model_hardware_contract(model=model, inventory=preset_inventory)
+
                 if dry_run:
                     render_config_summary(model, [job_cfg])
                     if p["kind"] == "extract":
@@ -180,6 +185,10 @@ def register(app: typer.Typer) -> None:
             if overwrite is not None:
                 for selected_job in jobs:
                     selected_job.io.overwrite = overwrite
+
+            config_inventory = probe_gpu_inventory()
+            if not (dry_run and model.device.startswith("cuda") and config_inventory.count == 0):
+                validate_model_hardware_contract(model=model, inventory=config_inventory)
 
             if dry_run:
                 render_config_summary(model, jobs)

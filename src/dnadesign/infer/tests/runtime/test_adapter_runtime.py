@@ -44,6 +44,20 @@ def test_get_adapter_caches_by_model_device_precision() -> None:
     assert first.key == ("evo2_7b", "cpu", "fp32")
 
 
+def test_get_adapter_accepts_positional_model_argument() -> None:
+    clear_adapter_cache()
+
+    class _Adapter:
+        def __init__(self, model_id: str, device: str, precision: str) -> None:
+            self.key = (model_id, device, precision)
+
+    def _resolver(_model_id: str):
+        return _Adapter
+
+    adapter = get_adapter(_model(), resolver=_resolver)
+    assert adapter.key == ("evo2_7b", "cpu", "fp32")
+
+
 def test_get_adapter_re_raises_infer_error() -> None:
     clear_adapter_cache()
 
