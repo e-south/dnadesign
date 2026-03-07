@@ -12,8 +12,12 @@ from __future__ import annotations
 
 from ..registry import register_default_embedding_layer, register_fn, register_model
 
-# from .esm2 import ESM2Adapter
-from .evo2 import Evo2Adapter
+
+class Evo2Adapter:
+    def __new__(cls, model_id: str, device: str, precision: str):
+        from .evo2 import Evo2Adapter as _Evo2Adapter
+
+        return _Evo2Adapter(model_id, device, precision)
 
 _REGISTERED = False
 

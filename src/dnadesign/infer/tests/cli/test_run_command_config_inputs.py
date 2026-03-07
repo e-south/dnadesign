@@ -87,6 +87,16 @@ def test_run_rejects_mixed_config_and_preset_modes(tmp_path: Path) -> None:
     assert "accepts exactly one mode" in (result.stdout or "")
 
 
+def test_run_preset_requires_usr_dataset_flag() -> None:
+    result = _RUNNER.invoke(
+        app,
+        ["run", "--preset", "evo2/extract_logits_ll", "--dry-run"],
+    )
+
+    assert result.exit_code == 2
+    assert "--usr is required when using --preset" in (result.stdout or "")
+
+
 def test_run_rejects_preset_only_flags_when_config_mode_is_selected(tmp_path: Path) -> None:
     (tmp_path / "inputs").mkdir(parents=True, exist_ok=True)
     (tmp_path / "inputs" / "seqs.txt").write_text("ACGT\n", encoding="utf-8")

@@ -46,6 +46,25 @@ def test_python_module_wrapper_invokes_cli_help() -> None:
     assert "Model-agnostic sequence inference CLI" in result.stdout
 
 
+def test_infer_import_does_not_eagerly_load_gpu_runtime_modules() -> None:
+    script = """
+import sys
+import dnadesign.infer
+print(f"torch_loaded={'torch' in sys.modules}")
+print(f"evo2_loaded={'evo2' in sys.modules}")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+    lines = {line.strip() for line in (result.stdout or "").splitlines() if line.strip()}
+    assert "torch_loaded=False" in lines
+    assert "evo2_loaded=False" in lines
+
+
 def test_infer_public_contract_exposes_runbook_gpu_validation(tmp_path: Path) -> None:
     from dnadesign.infer import validate_runbook_gpu_resources
 

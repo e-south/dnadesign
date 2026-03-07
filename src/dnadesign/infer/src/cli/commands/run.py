@@ -50,6 +50,8 @@ def _validate_run_mode_contract(
             raise ConfigError("infer run accepts exactly one mode: use --config or --preset, not both.")
         if job:
             raise ConfigError("--job is only valid with --config.")
+        if usr is None or not str(usr).strip():
+            raise ConfigError("--usr is required when using --preset.")
         return
 
     invalid_flags: list[str] = []

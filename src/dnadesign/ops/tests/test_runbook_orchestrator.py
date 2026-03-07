@@ -52,6 +52,28 @@ def test_ops_plan_avoids_infer_internal_module_imports() -> None:
     assert "dnadesign.infer.src." not in plan_source
 
 
+def test_ops_plan_import_does_not_eagerly_load_gpu_runtime_modules() -> None:
+    import subprocess
+    import sys
+
+    script = """
+import sys
+import dnadesign.ops.orchestrator.plan
+print(f"torch_loaded={'torch' in sys.modules}")
+print(f"evo2_loaded={'evo2' in sys.modules}")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+    lines = {line.strip() for line in (result.stdout or "").splitlines() if line.strip()}
+    assert "torch_loaded=False" in lines
+    assert "evo2_loaded=False" in lines
+
+
 def _render_block(commands: list[CommandSpec]) -> str:
     return "\n".join(command.render_shell() for command in commands)
 
