@@ -39,12 +39,64 @@ def test_workspace_init_creates_default_layout_and_config(tmp_path: Path) -> Non
 
     workspace_dir = root / "demo_pressure"
     assert result.exit_code == 0, result.stdout
-    assert (workspace_dir / "config.yaml").is_file()
+    config_path = workspace_dir / "config.yaml"
+    assert config_path.is_file()
     assert (workspace_dir / "inputs").is_dir()
     assert (workspace_dir / "outputs" / "logs" / "ops" / "audit").is_dir()
+    config = config_path.read_text(encoding="utf-8")
+    assert "source: records" in config
+    assert "path: inputs/records.jsonl" in config
     output = result.stdout or ""
     assert "infer validate config --config" in output
     assert "infer run --config" in output
+
+
+def test_workspace_init_usr_pressure_profile_uses_usr_template(tmp_path: Path) -> None:
+    root = tmp_path / "ws_root"
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_pressure_usr",
+            "--root",
+            root.as_posix(),
+            "--profile",
+            "usr-pressure",
+        ],
+    )
+
+    workspace_dir = root / "demo_pressure_usr"
+    assert result.exit_code == 0, result.stdout
+    config = (workspace_dir / "config.yaml").read_text(encoding="utf-8")
+    assert "source: usr" in config
+    assert "dataset: test_stress_ethanol" in config
+    output = result.stdout or ""
+    assert "profile: usr-pressure" in output
+    assert "Review ingest.dataset and ingest.root in config.yaml before running." in output
+
+
+def test_workspace_init_rejects_unknown_profile(tmp_path: Path) -> None:
+    root = tmp_path / "ws_root"
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_pressure_usr",
+            "--root",
+            root.as_posix(),
+            "--profile",
+            "unknown",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "workspace profile must be one of" in (result.stdout or "")
 
 
 def test_workspace_init_rejects_path_like_workspace_id(tmp_path: Path) -> None:

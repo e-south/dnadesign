@@ -28,7 +28,7 @@ def test_pressure_runbook_docs_include_standalone_and_ops_paths() -> None:
         / "src/dnadesign/infer/docs/operations/pressure-test-agnostic-models.md"
     ).read_text(encoding="utf-8")
 
-    assert "uv run infer workspace init --id test_stress_ethanol" in doc
+    assert "uv run infer workspace init --id test_stress_ethanol --profile usr-pressure" in doc
     assert "uv run infer validate config --config" in doc
     assert "uv run infer run --config" in doc
     assert "uv run ops runbook init" in doc

@@ -18,6 +18,11 @@ from typing import Optional
 
 from .errors import ConfigError
 
+_WORKSPACE_TEMPLATE_BY_PROFILE = {
+    "local": "workspace_local_records_config.yaml",
+    "usr-pressure": "pressure_test_infer_config.yaml",
+}
+
 
 def _repo_root_from(start: Path) -> Path | None:
     try:
@@ -69,14 +74,20 @@ def resolve_workspace_root(root: Optional[Path]) -> tuple[Path, str]:
     )
 
 
-def resolve_workspace_template(template: Optional[Path]) -> Path:
+def resolve_workspace_template(template: Optional[Path], *, profile: str = "local") -> Path:
     if template is not None:
         resolved = template.expanduser().resolve()
         if not resolved.exists() or not resolved.is_file():
             raise ConfigError(f"template config file not found: {resolved}")
         return resolved
 
-    resolved = (_infer_root() / "docs" / "operations" / "examples" / "pressure_test_infer_config.yaml").resolve()
+    profile_key = str(profile or "").strip()
+    template_name = _WORKSPACE_TEMPLATE_BY_PROFILE.get(profile_key)
+    if template_name is None:
+        choices = ", ".join(sorted(_WORKSPACE_TEMPLATE_BY_PROFILE))
+        raise ConfigError(f"workspace profile must be one of: {choices}")
+
+    resolved = (_infer_root() / "docs" / "operations" / "examples" / template_name).resolve()
     if not resolved.exists() or not resolved.is_file():
         raise ConfigError(
             "default workspace template not found: "
@@ -85,10 +96,10 @@ def resolve_workspace_template(template: Optional[Path]) -> Path:
     return resolved
 
 
-def init_workspace(*, workspace_id: str, root: Optional[Path], template: Optional[Path]) -> Path:
+def init_workspace(*, workspace_id: str, root: Optional[Path], template: Optional[Path], profile: str = "local") -> Path:
     workspace_name = normalize_workspace_id(workspace_id)
     root_path, _source = resolve_workspace_root(root)
-    template_path = resolve_workspace_template(template)
+    template_path = resolve_workspace_template(template, profile=profile)
 
     root_path.mkdir(parents=True, exist_ok=True)
     workspace_dir = (root_path / workspace_name).resolve()

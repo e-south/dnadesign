@@ -37,7 +37,10 @@
 ### infer workspace
 
 - `workspace where` resolves effective workspace root from `--root`, `INFER_WORKSPACE_ROOT`, or repo default.
+- `workspace where` resolves the template from `--profile` (`local` or `usr-pressure`) unless `--template` is provided.
 - `workspace init` creates `config.yaml`, `inputs/`, and `outputs/logs/ops/audit/` for a workspace id.
+- `workspace init` defaults to `--profile local` so the scaffold can run with workspace-local files.
+- `workspace init --profile usr-pressure` selects the USR pressure-test template.
 - `workspace init` rejects path-like ids and existing workspace directories.
 
 ### no-silent-fallback contract

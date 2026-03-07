@@ -1871,3 +1871,63 @@ Address open infer Codex PR critique(s), harden `infer run` mode ergonomics with
 
 - Remaining UX hardening candidate: add CLI characterization tests for broader `run` error-envelope mapping (exit code + message stability per mode).
 - Remaining IA candidate: consolidate any future package examples under `docs/operations/examples/` or `workspaces/` only (avoid adding root-level samples).
+
+## 2026-03-06 - Phase 2 Slice M (Workspace Profile Contract + Portable Local Scaffold)
+
+### Goal
+
+Remove workspace-init portability footguns by making local-file scaffolds the default while keeping explicit pressure-test template routing for USR workflows.
+
+### Audit findings
+
+1. High UX footgun: `infer workspace init` defaulted to a USR pressure template with environment-specific root and dataset assumptions.
+2. Medium docs drift: pressure-test docs implied default workspace init was always correct for USR route without stating template profile contract.
+3. Medium contract gap: no CLI test enforced profile-based template selection behavior.
+
+### TDD record
+
+1. Added failing workspace command tests for:
+   - default scaffold content (`source: records`, `path: inputs/records.jsonl`)
+   - explicit `--profile usr-pressure`
+   - invalid profile rejection contract.
+2. Added failing docs contract checks requiring pressure-test walkthroughs to call `workspace init` with `--profile usr-pressure`.
+3. Confirmed red state on targeted suite.
+4. Implemented profile-based template resolution and command wiring.
+5. Re-ran targeted suite and confirmed green.
+
+### Changes applied
+
+- Workspace profile contract:
+  - `src/dnadesign/infer/src/workspace.py`
+  - `resolve_workspace_template(..., profile=...)` supports:
+    - `local` -> `workspace_local_records_config.yaml`
+    - `usr-pressure` -> `pressure_test_infer_config.yaml`
+  - invalid profile fails fast with explicit choices.
+  - `init_workspace(..., profile=...)` now uses profile resolver.
+- CLI workspace ergonomics:
+  - `src/dnadesign/infer/src/cli/commands/workspace.py`
+  - added `--profile` to `workspace where` and `workspace init`.
+  - `workspace where` now prints `workspace_profile`.
+  - `workspace init` now prints selected profile and warns in `usr-pressure` mode to review `ingest.dataset` and `ingest.root`.
+- New portable template:
+  - `src/dnadesign/infer/docs/operations/examples/workspace_local_records_config.yaml`
+  - default scaffold uses local JSONL records in `inputs/records.jsonl`.
+- Docs alignment:
+  - `src/dnadesign/infer/workspaces/README.md`
+  - `src/dnadesign/infer/docs/operations/README.md`
+  - `src/dnadesign/infer/docs/reference/command-contracts.md`
+  - `src/dnadesign/infer/docs/operations/pressure-test-agnostic-models.md`
+  - `src/dnadesign/infer/docs/tutorials/demo_pressure_test_usr_ops_notify.md`
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/infer/tests/cli/test_workspace_command.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py -k "workspace_init or pressure_runbook_docs_include_standalone_and_ops_paths or infer_pressure_test_tutorial_covers_local_and_ops_paths"`
+- `uv run infer workspace where`
+- `uv run infer workspace where --profile usr-pressure`
+- `uv run pytest -q src/dnadesign/infer/tests`
+- `uv run pytest -q src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k infer`
+
+### Notes / next opportunities
+
+- Add `infer workspace doctor --config <path>` to validate scaffold files exist (`inputs/records.jsonl` etc.) before runtime.
+- Add docs snippet with minimal JSONL example under `docs/getting-started/`.

@@ -22,7 +22,7 @@ For a step-by-step walkthrough route, use the [end-to-end demo tutorial](../tuto
 ### 1) Prepare variables
 
 ```bash
-uv run infer workspace init --id test_stress_ethanol
+uv run infer workspace init --id test_stress_ethanol --profile usr-pressure
 export WORKSPACE_ROOT="$PWD/src/dnadesign/infer/workspaces/test_stress_ethanol"
 export INFER_CONFIG="$WORKSPACE_ROOT/config.yaml"
 export USR_ROOT="/projectnb/dunlop/esouth/outputs/usr_datasets"

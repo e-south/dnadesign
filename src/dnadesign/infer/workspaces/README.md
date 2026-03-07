@@ -19,6 +19,9 @@ This creates:
 - Workspace names must be directory names, not paths.
 - Existing workspace directories are never overwritten.
 - Config template defaults to:
+  - `src/dnadesign/infer/docs/operations/examples/workspace_local_records_config.yaml` (`--profile local`)
+- Pressure-test USR template profile:
+  - `uv run infer workspace init --id test_stress_ethanol --profile usr-pressure`
   - `src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml`
 
 ### Local data path option (non-USR)

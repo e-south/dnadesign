@@ -104,7 +104,7 @@ def test_infer_operations_index_links_pressure_test_demo_and_runbook() -> None:
 def test_infer_pressure_test_tutorial_covers_local_and_ops_paths() -> None:
     tutorial = _read("src/dnadesign/infer/docs/tutorials/demo_pressure_test_usr_ops_notify.md")
     assert "uv run infer validate config --config" in tutorial
-    assert "uv run infer workspace init --id test_stress_ethanol" in tutorial
+    assert "uv run infer workspace init --id test_stress_ethanol --profile usr-pressure" in tutorial
     assert "uv run infer run --config" in tutorial
     assert "uv run ops runbook init" in tutorial
     assert "uv run ops runbook execute" in tutorial
