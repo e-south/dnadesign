@@ -111,10 +111,7 @@ def test_plan_resume_for_usr_chunks_large_id_filters(
     ds = SimpleNamespace(records_path=path, list_overlays=lambda: [])
     out = SimpleNamespace(id="ll_mean")
 
-    monkeypatch.setattr(
-        "dnadesign.infer.src.runtime.resume_planner._RESUME_FILTER_CHUNK_SIZE",
-        2,
-    )
+    monkeypatch.setenv("DNADESIGN_INFER_RESUME_FILTER_CHUNK", "2")
 
     captured_filters: list[object] = []
     read_table_original = pq.read_table
@@ -140,3 +137,33 @@ def test_plan_resume_for_usr_chunks_large_id_filters(
         [("id", "in", ["id-1", "id-2"])],
         [("id", "in", ["id-3", "id-4"])],
     ]
+
+
+def test_plan_resume_for_usr_fails_fast_on_invalid_resume_filter_chunk_env(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "records.parquet"
+    pq.write_table(
+        pa.table(
+            {
+                "id": ["id-1"],
+                "infer__evo2_7b__job_a__ll_mean": [1.0],
+            }
+        ),
+        path,
+    )
+    ds = SimpleNamespace(records_path=path, list_overlays=lambda: [])
+    out = SimpleNamespace(id="ll_mean")
+
+    monkeypatch.setenv("DNADESIGN_INFER_RESUME_FILTER_CHUNK", "0")
+
+    with pytest.raises(WriteBackError, match="DNADESIGN_INFER_RESUME_FILTER_CHUNK"):
+        plan_resume_for_usr(
+            ds=ds,
+            ids=["id-1"],
+            model_id="evo2_7b",
+            job_id="job_a",
+            outputs=[out],
+            overwrite=False,
+        )

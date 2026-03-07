@@ -16,8 +16,7 @@ from typing import Dict, List, Tuple
 
 from ..contracts import infer_usr_column_name
 from ..errors import WriteBackError
-
-_RESUME_FILTER_CHUNK_SIZE = 10_000
+from .resume_policy import resolve_resume_filter_chunk_size
 
 
 def _dedupe_ids(ids: List[str]) -> List[str]:
@@ -39,14 +38,21 @@ def _positions_by_id(ids: List[str]) -> Dict[str, List[int]]:
     return positions
 
 
-def _read_subset_table(*, pq, path: Path, columns: List[str], ids: List[str]):
+def _read_subset_table(
+    *,
+    pq,
+    path: Path,
+    columns: List[str],
+    ids: List[str],
+    filter_chunk_size: int,
+):
     unique_ids = _dedupe_ids(ids)
-    if len(unique_ids) <= _RESUME_FILTER_CHUNK_SIZE:
+    if len(unique_ids) <= filter_chunk_size:
         return (pq.read_table(path, columns=columns, filters=[("id", "in", unique_ids)]),)
 
     tables = []
-    for start in range(0, len(unique_ids), _RESUME_FILTER_CHUNK_SIZE):
-        id_chunk = unique_ids[start : start + _RESUME_FILTER_CHUNK_SIZE]
+    for start in range(0, len(unique_ids), filter_chunk_size):
+        id_chunk = unique_ids[start : start + filter_chunk_size]
         tables.append(pq.read_table(path, columns=columns, filters=[("id", "in", id_chunk)]))
     return tuple(tables)
 
@@ -102,6 +108,8 @@ def plan_resume_for_usr(
     try:
         import pyarrow.parquet as pq
 
+        filter_chunk_size = resolve_resume_filter_chunk_size()
+
         records_path = ds.records_path  # type: ignore[attr-defined]
         records_parquet = pq.ParquetFile(records_path)
         records_columns = set(records_parquet.schema_arrow.names)  # type: ignore[attr-defined]
@@ -112,6 +120,7 @@ def plan_resume_for_usr(
                 path=Path(records_path),
                 columns=selected_columns,
                 ids=ids,
+                filter_chunk_size=filter_chunk_size,
             ):
                 _merge_table_values(
                     existing=existing,
@@ -136,6 +145,7 @@ def plan_resume_for_usr(
                         path=overlay_path,
                         columns=selected_overlay_columns,
                         ids=ids,
+                        filter_chunk_size=filter_chunk_size,
                     ):
                         _merge_table_values(
                             existing=existing,
