@@ -1129,7 +1129,18 @@ def test_infer_runbook_uses_gpu_submit_template_and_filters(tmp_path: Path) -> N
     workspace_root = tmp_path / "infer_workspace"
     workspace_root.mkdir(parents=True, exist_ok=True)
     config_path = workspace_root / "config.yaml"
-    config_path.write_text("jobs: []\n", encoding="utf-8")
+    config_path.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
 
     payload = {
         "runbook": {
@@ -1226,19 +1237,35 @@ def test_infer_workflow_rejects_notify_tool_mismatch() -> None:
         load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
 
 
-def test_infer_batch_submit_without_notify_skips_notify_phase() -> None:
+def test_infer_batch_submit_without_notify_skips_notify_phase(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_batch_workspace"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    config_path = workspace_root / "config.yaml"
+    config_path.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
     payload = {
         "runbook": {
             "schema_version": 1,
             "id": "infer_evo2_batch",
             "workflow_id": "infer_batch_submit",
             "project": "dunlop",
-            "workspace_root": "/tmp/workspace",
+            "workspace_root": str(workspace_root),
             "logging": {
-                "stdout_dir": "/tmp/workspace/outputs/logs/ops/sge/infer_evo2_batch",
+                "stdout_dir": str(workspace_root / "outputs" / "logs" / "ops" / "sge" / "infer_evo2_batch"),
             },
             "infer": {
-                "config": "/tmp/workspace/config.yaml",
+                "config": str(config_path),
                 "qsub_template": "docs/bu-scc/jobs/evo2-gpu-infer.qsub",
                 "cuda_module": "cuda/12.4",
                 "gcc_module": "gcc/13.2.0",
@@ -1280,7 +1307,18 @@ def test_mode_auto_blocks_for_infer_when_resume_policy_marks_workspace_partial(
     pyarrow_parquet.write_table(pyarrow.table({"id": ["r1"], "sequence": ["ATGC"]}), records_path)
 
     config_path = workspace_root / "config.yaml"
-    config_path.write_text("jobs: []\n", encoding="utf-8")
+    config_path.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
     payload = {
         "runbook": {
             "schema_version": 1,
@@ -1329,6 +1367,52 @@ def test_mode_auto_blocks_for_infer_when_resume_policy_marks_workspace_partial(
         resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
 
 
+def test_infer_runbook_resource_contract_fails_for_40b_single_gpu(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_resource_guard"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    config_path = workspace_root / "config.yaml"
+    config_path.write_text(
+        """
+model:
+  id: evo2_40b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    payload = {
+        "runbook": {
+            "schema_version": 1,
+            "id": "infer_resource_guard",
+            "workflow_id": "infer_batch_submit",
+            "project": "dunlop",
+            "workspace_root": str(workspace_root),
+            "logging": {
+                "stdout_dir": str(workspace_root / "outputs" / "logs" / "ops" / "sge" / "infer_resource_guard"),
+            },
+            "infer": {
+                "config": str(config_path),
+                "qsub_template": "docs/bu-scc/jobs/evo2-gpu-infer.qsub",
+                "cuda_module": "cuda/12.4",
+                "gcc_module": "gcc/13.2.0",
+            },
+            "resources": {
+                "pe_omp": 4,
+                "h_rt": "04:00:00",
+                "mem_per_core": "8G",
+                "gpus": 1,
+                "gpu_capability": "8.9",
+            },
+        }
+    }
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    with pytest.raises(ValueError, match="infer runbook resources are incompatible with infer model contract"):
+        build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
+
+
 def test_densegen_workflow_rejects_gpu_fields() -> None:
     payload = {
         "runbook": {
@@ -1368,7 +1452,7 @@ def test_densegen_workflow_rejects_gpu_fields() -> None:
     }
     with pytest.raises(
         ValueError,
-        match="densegen workflow does not accept resources.gpus or resources.gpu_capability",
+        match="densegen workflow does not accept resources.gpus, resources.gpu_capability, or resources.gpu_memory_gib",
     ):
         load_orchestration_runbook(Path("densegen-runbook.yaml"), raw=payload)
 

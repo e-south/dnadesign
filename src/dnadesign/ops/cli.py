@@ -222,6 +222,7 @@ def _build_init_payload(
             "mem_per_core": mem_per_core or "8G",
             "gpus": 1,
             "gpu_capability": "8.9",
+            "gpu_memory_gib": 45.0,
         }
     return payload
 

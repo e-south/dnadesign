@@ -226,6 +226,7 @@ class NotifyContract(StrictBaseModel):
 class ResourceContract(CpuResourceContract):
     gpus: int | None = Field(default=None, ge=1)
     gpu_capability: str | None = None
+    gpu_memory_gib: float | None = Field(default=None, gt=0)
 
     @field_validator("gpu_capability")
     @classmethod
@@ -236,6 +237,12 @@ class ResourceContract(CpuResourceContract):
         if not text:
             raise ValueError("resources.gpu_capability must be non-empty when provided")
         return text
+
+    @model_validator(mode="after")
+    def _validate_gpu_memory_contract(self) -> "ResourceContract":
+        if self.gpu_memory_gib is not None and self.gpus is None:
+            raise ValueError("resources.gpu_memory_gib requires resources.gpus")
+        return self
 
 
 class ModePolicy(StrictBaseModel):
@@ -308,8 +315,15 @@ class OrchestrationRunbookV1(StrictBaseModel):
                 raise ValueError("densegen workflow requires runbook.densegen block")
             if self.infer is not None:
                 raise ValueError("densegen workflow does not accept runbook.infer block")
-            if self.resources.gpus is not None or self.resources.gpu_capability is not None:
-                raise ValueError("densegen workflow does not accept resources.gpus or resources.gpu_capability")
+            if (
+                self.resources.gpus is not None
+                or self.resources.gpu_capability is not None
+                or self.resources.gpu_memory_gib is not None
+            ):
+                raise ValueError(
+                    "densegen workflow does not accept resources.gpus, "
+                    "resources.gpu_capability, or resources.gpu_memory_gib"
+                )
             if expects_notify:
                 if self.notify is None:
                     raise ValueError("densegen notify workflow requires runbook.notify block")
