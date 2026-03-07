@@ -17,6 +17,15 @@
   - boundary subpackages: `src/ingest/*`, `src/writers/*`
   - extensions: `src/adapters/*`, `src/presets/*`
 
+### Runtime execution contracts
+
+- Adapter extract execution is padding-free and deterministic by token-length buckets:
+  - inputs are grouped by token length before Evo2 forward calls for logits and embedding extraction.
+  - batch assembly preserves input ordering in emitted outputs.
+- Pooling contracts remain explicit and fail fast:
+  - `pool.dim >= 1` is required for logits/embedding extract outputs.
+  - pooling over the batch axis is rejected.
+
 ### Cross-Tool Boundaries
 
 - `usr`: dataset ingest + write-back columns/overlay interactions.

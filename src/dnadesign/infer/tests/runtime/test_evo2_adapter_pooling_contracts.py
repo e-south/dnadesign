@@ -29,6 +29,7 @@ class _Model:
     def __init__(self) -> None:
         self.tokenizer = _Tokenizer()
         self.reduce_calls: list[str] = []
+        self.forward_calls = 0
 
     def __call__(
         self,
@@ -37,6 +38,7 @@ class _Model:
         return_embeddings: bool = False,
         layer_names: list[str] | None = None,
     ) -> tuple[Any, Any]:
+        self.forward_calls += 1
         batch, length = x.shape
         logits = (
             torch.arange(batch * length * 4, dtype=torch.float32)
@@ -101,6 +103,31 @@ def test_embedding_pooling_sequence_dimension_is_consistent_for_variable_lengths
     assert out[1].shape == torch.Size([3])
     assert torch.allclose(out[0], torch.tensor([4.5, 5.5, 6.5]))
     assert torch.allclose(out[1], torch.tensor([1.5, 2.5, 3.5]))
+
+
+def test_logits_groups_variable_lengths_to_reduce_forward_calls() -> None:
+    adapter = _adapter()
+    out = adapter.logits(
+        ["ACGT", "AC", "TGCA"],
+        pool={"method": "mean", "dim": 1},
+        fmt="tensor",
+    )
+
+    assert len(out) == 3
+    assert adapter.model.forward_calls == 2
+
+
+def test_embedding_groups_variable_lengths_to_reduce_forward_calls() -> None:
+    adapter = _adapter()
+    out = adapter.embedding(
+        ["ACGT", "AC", "TGCA"],
+        layer="blocks.1.mlp.l3",
+        pool={"method": "mean", "dim": 1},
+        fmt="tensor",
+    )
+
+    assert len(out) == 3
+    assert adapter.model.forward_calls == 2
 
 
 def test_logits_rejects_pool_dim_zero_that_consumes_batch_axis() -> None:

@@ -20,7 +20,7 @@ Dunlop Lab
 from __future__ import annotations
 
 import contextlib
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import torch
 
@@ -45,6 +45,14 @@ def _all_equal_lengths(items: Sequence[Sequence[int]]) -> bool:
     except StopIteration:
         return True
     return all(len(s) == first_len for s in it)
+
+
+def _bucket_indices_by_token_length(tokens: Sequence[Sequence[int]]) -> List[List[int]]:
+    """Group sequence indices by token length for padding-free batched forwards."""
+    buckets: Dict[int, List[int]] = {}
+    for index, row in enumerate(tokens):
+        buckets.setdefault(len(row), []).append(index)
+    return [buckets[length] for length in sorted(buckets)]
 
 
 def _normalize_pool_config(pool: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -86,19 +94,6 @@ def _pool_batched_tensor(
             "Use pool.dim >= 1 and avoid pooling over batch dimension."
         )
     return pooled
-
-
-def _single_item_tensor_from_batch(
-    t: torch.Tensor,
-    *,
-    pool: Optional[Dict[str, Any]],
-) -> torch.Tensor:
-    if t.size(0) != 1:
-        raise CapabilityError(
-            f"Expected single-item Evo2 batch in fallback path, got batch={t.size(0)}."
-        )
-    pooled = _pool_batched_tensor(t, pool=pool, expected_batch_size=1)
-    return pooled.squeeze(0)
 
 
 class Evo2Adapter:
@@ -208,6 +203,34 @@ class Evo2Adapter:
         x = torch.tensor(toks, dtype=torch.int64, device=self.device)
         return x
 
+    def _run_extract_batches_by_length(
+        self,
+        *,
+        tokens: List[List[int]],
+        pool: Optional[Dict[str, Any]],
+        batch_forward: Callable[[torch.Tensor], torch.Tensor],
+    ) -> List[torch.Tensor]:
+        if not tokens:
+            return []
+
+        per_index: List[Optional[torch.Tensor]] = [None] * len(tokens)
+        with torch.inference_mode(), self._autocast_ctx():
+            for group in _bucket_indices_by_token_length(tokens):
+                batch_tokens = [tokens[idx] for idx in group]
+                x = self._stack_equal_len(batch_tokens)
+                batch_tensor = batch_forward(x)
+                batch_tensor = _pool_batched_tensor(
+                    batch_tensor,
+                    pool=pool,
+                    expected_batch_size=len(group),
+                )
+                for row_index, sample_index in enumerate(group):
+                    per_index[sample_index] = batch_tensor[row_index]
+
+        if any(value is None for value in per_index):
+            raise CapabilityError("Evo2 extract output assembly failed: missing batch outputs.")
+        return [value for value in per_index if value is not None]
+
     # -------------------------------------------------------------------------
     # Ops
     # -------------------------------------------------------------------------
@@ -229,50 +252,23 @@ class Evo2Adapter:
           - With pooling over dim=1 (sequence dim): shape per element is [V] (or as resulting tensor).
 
         Implementation details:
-          - If all inputs are the same length, we issue a single batched forward.
-          - Otherwise, we loop per sequence.
+          - Inputs are grouped by token length and executed as padding-free batches.
         """
         tokens = self._tokenize_many(seqs)
-        results: List[Any] = []
 
-        # Batched path (all same length, no padding required)
-        if tokens and _all_equal_lengths(tokens):
-            x = self._stack_equal_len(tokens)
-            with torch.inference_mode(), self._autocast_ctx():
-                # Upstream forward: outputs, _ = model(x) ; outputs[0] are logits
-                outputs, _ = self.model(x)
-                try:
-                    logits = outputs[0]  # [B, L, V]
-                except Exception as e:
-                    raise CapabilityError(f"Evo2 forward returned unexpected structure: {e}")
+        def _forward_logits(x: torch.Tensor) -> torch.Tensor:
+            outputs, _ = self.model(x)
+            try:
+                return outputs[0]  # [B, L, V]
+            except Exception as e:
+                raise CapabilityError(f"Evo2 forward returned unexpected structure: {e}")
 
-                logits = _pool_batched_tensor(
-                    logits,
-                    pool=pool,
-                    expected_batch_size=len(seqs),
-                )
-
-            # Split per input, cast
-            for i in range(logits.size(0)):
-                results.append(to_format(logits[i], fmt))
-            return results
-
-        # Fallback path (variable lengths): one-by-one forward
-        for s in seqs:
-            ids = self._tokenize(s)
-            x = torch.tensor(ids, dtype=torch.int64, device=self.device).unsqueeze(0)
-            with torch.inference_mode(), self._autocast_ctx():
-                outputs, _ = self.model(x)
-                try:
-                    logits_batch = outputs[0]  # [1, L, V]
-                except Exception as e:
-                    raise CapabilityError(f"Evo2 forward returned unexpected structure: {e}")
-                lgt = _single_item_tensor_from_batch(
-                    logits_batch,
-                    pool=pool,
-                )
-            results.append(to_format(lgt, fmt))
-        return results
+        logits_by_input = self._run_extract_batches_by_length(
+            tokens=tokens,
+            pool=pool,
+            batch_forward=_forward_logits,
+        )
+        return [to_format(item, fmt) for item in logits_by_input]
 
     def embedding(
         self,
@@ -310,39 +306,19 @@ class Evo2Adapter:
             )
 
         tokens = self._tokenize_many(seqs)
-        results: List[Any] = []
 
-        # Batched if equal lengths (no padding)
-        if tokens and _all_equal_lengths(tokens):
-            x = self._stack_equal_len(tokens)
-            with torch.inference_mode(), self._autocast_ctx():
-                outputs, embeddings = self.model(x, return_embeddings=True, layer_names=[layer])
-                if layer not in embeddings:
-                    raise CapabilityError(f"Embedding layer '{layer}' not found in Evo2 response.")
-                emb = embeddings[layer]  # [B, L, D]
-                emb = _pool_batched_tensor(
-                    emb,
-                    pool=pool,
-                    expected_batch_size=len(seqs),
-                )
-            for i in range(emb.size(0)):
-                results.append(to_format(emb[i], fmt))
-            return results
+        def _forward_embedding(x: torch.Tensor) -> torch.Tensor:
+            _, embeddings = self.model(x, return_embeddings=True, layer_names=[layer])
+            if layer not in embeddings:
+                raise CapabilityError(f"Embedding layer '{layer}' not found in Evo2 response.")
+            return embeddings[layer]  # [B, L, D]
 
-        # Fallback: per sequence
-        for s in seqs:
-            ids = self._tokenize(s)
-            x = torch.tensor(ids, dtype=torch.int64, device=self.device).unsqueeze(0)
-            with torch.inference_mode(), self._autocast_ctx():
-                outputs, embeddings = self.model(x, return_embeddings=True, layer_names=[layer])
-                if layer not in embeddings:
-                    raise CapabilityError(f"Embedding layer '{layer}' not found in Evo2 response.")
-                e = _single_item_tensor_from_batch(
-                    embeddings[layer],  # [1, L, D]
-                    pool=pool,
-                )
-            results.append(to_format(e, fmt))
-        return results
+        embeddings_by_input = self._run_extract_batches_by_length(
+            tokens=tokens,
+            pool=pool,
+            batch_forward=_forward_embedding,
+        )
+        return [to_format(item, fmt) for item in embeddings_by_input]
 
     def log_likelihood(self, seqs: List[str], *, method: str = "native", reduction: str = "sum") -> List[float]:
         """
