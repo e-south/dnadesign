@@ -3853,3 +3853,49 @@ Close the infer mode-selection gap where ops only probed workspace-local USR ove
 1. Ops infer `auto`/`resume` decisions now correctly detect infer artifacts in external USR roots declared in infer config.
 2. Ambiguous infer USR destination configs fail fast during mode probing, preventing silent misclassification.
 3. Cross-tool contract alignment is tighter because ops infer mode probing now shares the same destination resolver seam as notify and overlay guard paths.
+
+## 2026-03-07 - Phase 2 Slice AR (Ops Mode Adapter Registry + Explicit Workload Invariant)
+
+### Goal
+
+Address remaining mode-resolution coupling by replacing densegen/infer conditional branching with an explicit mode-tool adapter registry, and fail fast on invalid runbook workload shape.
+
+### Prioritized findings
+
+1. Medium: `resolve_mode_decision(...)` still selected tool via inline `densegen`/`infer` branching, making extension to additional sibling tools more invasive.
+2. Medium: mode resolution implicitly tolerated invalid runbook objects with zero or multiple workload blocks when called directly, instead of enforcing an explicit precondition.
+
+### TDD sequence
+
+1. Red:
+   - `test_mode_decision_raises_when_runbook_has_no_workload_blocks`
+   - `test_mode_decision_raises_when_runbook_has_multiple_workload_blocks`
+2. Green:
+   - introduced `ModeToolAdapter` and `_MODE_TOOL_ADAPTERS` registry.
+   - added `_resolve_mode_tool_adapter(...)` with strict invariant: exactly one workload block.
+   - rewired mode-resolution artifact probing and run-args resolution through adapter functions.
+3. Verify:
+   - targeted invariant tests pass.
+   - ops runbook orchestration test suite passes.
+   - notify events-source/tool-event suites pass.
+
+### Changes applied
+
+1. `src/dnadesign/ops/orchestrator/state.py`
+   - added `ModeToolAdapter` contract.
+   - added adapter implementations for densegen and infer (`has_resume_artifacts`, `run_args_for_mode`).
+   - replaced direct tool branching with `_resolve_mode_tool_adapter(...)`.
+   - enforced fail-fast invariant for invalid workload shape.
+2. `src/dnadesign/ops/tests/test_runbook_orchestrator.py`
+   - added explicit invariant tests for zero/multiple workload blocks.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "mode_decision_raises_when_runbook_has_no_workload_blocks or mode_decision_raises_when_runbook_has_multiple_workload_blocks or infer_mode_auto_selects_resume_when_external_usr_overlay_exists or infer_mode_auto_raises_when_infer_usr_destination_is_ambiguous or mode_auto_selects_fresh_without_artifacts"`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+
+### Contract impact
+
+1. Ops mode resolution now depends on an explicit adapter map instead of inline tool conditionals.
+2. Invalid runbook workload shapes fail fast with clear invariant errors.
+3. Cross-tool extension path is now smaller: add adapter entry rather than edit core mode decision flow.

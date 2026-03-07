@@ -15,7 +15,7 @@ import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Sequence
+from typing import Callable, Literal, Sequence
 
 from dnadesign._contracts import (
     ResumeReadinessPolicy,
@@ -28,6 +28,7 @@ from ..runbooks.schema import OrchestrationRunbookV1
 RunMode = Literal["auto", "fresh", "resume"]
 SubmitBehavior = Literal["submit", "hold_jid", "blocked"]
 ResumeState = Literal["none", "resume_ready", "partial"]
+ResolvedMode = Literal["fresh", "resume"]
 
 
 def _run_probe(argv: Sequence[str]) -> tuple[int, str, str]:
@@ -96,12 +97,19 @@ def _normalize_hold_jid(active_job_ids: Sequence[str]) -> str | None:
 @dataclass(frozen=True)
 class ModeDecision:
     requested_mode: RunMode
-    selected_mode: Literal["fresh", "resume"]
+    selected_mode: ResolvedMode
     run_args: str
     resume_artifacts_found: bool
     submit_behavior: SubmitBehavior
     hold_jid: str | None
     reason: str
+
+
+@dataclass(frozen=True)
+class ModeToolAdapter:
+    tool: str
+    has_resume_artifacts: Callable[[OrchestrationRunbookV1], bool]
+    run_args_for_mode: Callable[[OrchestrationRunbookV1, ResolvedMode], str]
 
 
 def _infer_overlay_artifacts(workspace_root: Path, *, infer_config: Path | None) -> tuple[Path, ...]:
@@ -146,16 +154,8 @@ def _resolve_infer_usr_output_for_mode_probe(infer_config: Path):
         ) from exc
 
 
-def _has_resume_artifacts(runbook: OrchestrationRunbookV1, *, workflow_tool: str) -> bool:
+def _has_densegen_resume_artifacts(runbook: OrchestrationRunbookV1) -> bool:
     workspace_root = runbook.workspace_root
-    tool = str(workflow_tool or "").strip().lower()
-    if tool == "infer":
-        manifest_path = workspace_root / "outputs" / "meta" / "run_manifest.json"
-        if manifest_path.exists():
-            return True
-        infer_config = runbook.infer.config if runbook.infer is not None else None
-        return bool(_infer_overlay_artifacts(workspace_root, infer_config=infer_config))
-
     markers = (
         workspace_root / "outputs" / "meta" / "run_manifest.json",
         workspace_root / "outputs" / "tables" / "records.parquet",
@@ -174,6 +174,57 @@ def _has_resume_artifacts(runbook: OrchestrationRunbookV1, *, workflow_tool: str
         if any(directory.glob("attempts_part-*.parquet")):
             return True
     return False
+
+
+def _has_infer_resume_artifacts(runbook: OrchestrationRunbookV1) -> bool:
+    workspace_root = runbook.workspace_root
+    manifest_path = workspace_root / "outputs" / "meta" / "run_manifest.json"
+    if manifest_path.exists():
+        return True
+    infer_config = runbook.infer.config if runbook.infer is not None else None
+    return bool(_infer_overlay_artifacts(workspace_root, infer_config=infer_config))
+
+
+def _run_args_for_densegen(runbook: OrchestrationRunbookV1, mode: ResolvedMode) -> str:
+    if runbook.densegen is None:
+        raise ValueError("densegen mode adapter requires runbook.densegen")
+    if mode == "fresh":
+        return runbook.densegen.run_args.fresh
+    return runbook.densegen.run_args.resume
+
+
+def _run_args_for_infer(_runbook: OrchestrationRunbookV1, _mode: ResolvedMode) -> str:
+    return ""
+
+
+_MODE_TOOL_ADAPTERS: dict[str, ModeToolAdapter] = {
+    "densegen": ModeToolAdapter(
+        tool="densegen",
+        has_resume_artifacts=_has_densegen_resume_artifacts,
+        run_args_for_mode=_run_args_for_densegen,
+    ),
+    "infer": ModeToolAdapter(
+        tool="infer",
+        has_resume_artifacts=_has_infer_resume_artifacts,
+        run_args_for_mode=_run_args_for_infer,
+    ),
+}
+
+
+def _resolve_mode_tool_adapter(runbook: OrchestrationRunbookV1) -> ModeToolAdapter:
+    active_tools: list[str] = []
+    if runbook.densegen is not None:
+        active_tools.append("densegen")
+    if runbook.infer is not None:
+        active_tools.append("infer")
+    if len(active_tools) != 1:
+        raise ValueError("runbook workload contract must define exactly one tool block")
+    selected_tool = active_tools[0]
+    adapter = _MODE_TOOL_ADAPTERS.get(selected_tool)
+    if adapter is None:
+        supported = ", ".join(sorted(_MODE_TOOL_ADAPTERS))
+        raise ValueError(f"unsupported workflow tool adapter: {selected_tool} (supported: {supported})")
+    return adapter
 
 
 def _candidate_record_paths_for_resume(workspace_root: Path) -> tuple[Path, ...]:
@@ -326,10 +377,11 @@ def resolve_mode_decision(
     allow_fresh_reset: bool = False,
 ) -> ModeDecision:
     selected_requested_mode = requested_mode or runbook.mode_policy.default
-    workflow_tool = "densegen" if runbook.densegen is not None else "infer"
+    tool_adapter = _resolve_mode_tool_adapter(runbook)
+    workflow_tool = tool_adapter.tool
     resume_policy = resolve_resume_readiness_policy(workflow_tool)
     has_explicit_resume_policy = resume_policy is not None
-    artifacts_found = _has_resume_artifacts(runbook, workflow_tool=workflow_tool)
+    artifacts_found = tool_adapter.has_resume_artifacts(runbook)
     resume_state: ResumeState = "none"
     resume_readiness_reason = "not-evaluated"
     if has_explicit_resume_policy:
@@ -376,14 +428,7 @@ def resolve_mode_decision(
             "Re-run with --allow-fresh-reset only after confirming outputs should be cleared."
         )
 
-    if runbook.densegen is not None:
-        assert runbook.densegen is not None
-        if selected_mode == "fresh":
-            run_args = runbook.densegen.run_args.fresh
-        else:
-            run_args = runbook.densegen.run_args.resume
-    else:
-        run_args = ""
+    run_args = tool_adapter.run_args_for_mode(runbook, selected_mode)
 
     hold_jid: str | None = None
     submit_behavior: SubmitBehavior = "submit"

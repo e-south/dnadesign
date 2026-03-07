@@ -382,6 +382,43 @@ def test_mode_auto_selects_fresh_without_artifacts(tmp_path: Path) -> None:
     assert decision.run_args == "--fresh --no-plot"
 
 
+def test_mode_decision_raises_when_runbook_has_no_workload_blocks(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    invalid_runbook = runbook.model_copy(update={"densegen": None, "infer": None})
+
+    with pytest.raises(ValueError, match="runbook workload contract must define exactly one tool block"):
+        resolve_mode_decision(runbook=invalid_runbook, requested_mode=None, active_job_ids=())
+
+
+def test_mode_decision_raises_when_runbook_has_multiple_workload_blocks(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    infer_config = tmp_path / "infer_config.yaml"
+    infer_config.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    infer_workload = runbook_schema.InferWorkloadContract(
+        config=infer_config,
+        qsub_template=Path("docs/bu-scc/jobs/evo2-gpu-infer.qsub"),
+        cuda_module="cuda/12.4",
+        gcc_module="gcc/13.2.0",
+    )
+    invalid_runbook = runbook.model_copy(update={"infer": infer_workload})
+
+    with pytest.raises(ValueError, match="runbook workload contract must define exactly one tool block"):
+        resolve_mode_decision(runbook=invalid_runbook, requested_mode=None, active_job_ids=())
+
+
 def test_mode_auto_selects_resume_with_artifacts(tmp_path: Path) -> None:
     runbook_path = _write_runbook(tmp_path)
     runbook = load_orchestration_runbook(runbook_path)
