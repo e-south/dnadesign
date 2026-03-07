@@ -46,6 +46,12 @@ def test_workflow_helpers_classify_all_schema_workflow_ids() -> None:
         assert is_densegen != is_infer
 
 
+def test_list_workflow_tools_matches_schema_workflow_ids() -> None:
+    workflow_ids = get_args(runbook_schema.OrchestrationRunbookV1.model_fields["workflow_id"].annotation)
+    resolved_tools = tuple(sorted({runbook_schema.resolve_workflow_tool(workflow_id) for workflow_id in workflow_ids}))
+    assert runbook_schema.list_workflow_tools() == resolved_tools
+
+
 def test_mode_tool_adapters_cover_all_schema_workflow_ids() -> None:
     workflow_ids = get_args(runbook_schema.OrchestrationRunbookV1.model_fields["workflow_id"].annotation)
     assert workflow_ids

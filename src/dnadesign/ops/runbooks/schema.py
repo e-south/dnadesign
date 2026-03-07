@@ -35,14 +35,31 @@ _INFER_WORKFLOW_IDS = frozenset(
         "infer_batch_with_notify_slack",
     }
 )
+_WORKFLOW_IDS_BY_TOOL = {
+    "densegen": _DENSEGEN_WORKFLOW_IDS,
+    "infer": _INFER_WORKFLOW_IDS,
+}
+
+
+def list_workflow_tools() -> tuple[str, ...]:
+    return tuple(sorted(_WORKFLOW_IDS_BY_TOOL))
+
+
+def resolve_workflow_tool(workflow_id: str) -> str:
+    workflow = str(workflow_id or "").strip()
+    for tool, workflow_ids in _WORKFLOW_IDS_BY_TOOL.items():
+        if workflow in workflow_ids:
+            return tool
+    supported = ", ".join(sorted(set().union(*_WORKFLOW_IDS_BY_TOOL.values())))
+    raise ValueError(f"unsupported orchestration workflow id: {workflow} (supported: {supported})")
 
 
 def is_densegen_workflow_id(workflow_id: str) -> bool:
-    return str(workflow_id or "").strip() in _DENSEGEN_WORKFLOW_IDS
+    return str(workflow_id or "").strip() in _WORKFLOW_IDS_BY_TOOL["densegen"]
 
 
 def is_infer_workflow_id(workflow_id: str) -> bool:
-    return str(workflow_id or "").strip() in _INFER_WORKFLOW_IDS
+    return str(workflow_id or "").strip() in _WORKFLOW_IDS_BY_TOOL["infer"]
 
 
 class StrictBaseModel(BaseModel):

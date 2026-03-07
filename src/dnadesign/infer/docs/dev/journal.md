@@ -4009,3 +4009,55 @@ Observed reduction: ~`30x` mean latency improvement on this workload shape.
 1. Mode-tool registration has explicit fail-fast contracts (no duplicate or mismatched tool registration).
 2. Infer mode artifact probing is now explicit and lower-cost for resolvable destinations.
 3. Workspace recursive fallback remains available only when infer destination is not resolvable from config.
+
+## 2026-03-07 - Phase 2 Slice AU (Schema-Canonical Workflow Tool Introspection)
+
+### Goal
+
+Finish the next ops decoupling increment by making runbook schema the canonical source of workflow-tool membership and exposing a read-only mode-tool registry introspection API.
+
+### Prioritized findings
+
+1. Medium: workflow-tool knowledge was still duplicated between runbook schema and `mode_tools.py`.
+2. Medium: there was no explicit read-only API for inspecting registered mode tools.
+3. Medium: registry/schema drift could be caught by tests, but not by a direct runtime contract.
+
+### TDD sequence
+
+1. Red:
+   - `test_list_registered_mode_tools_returns_sorted_read_only_tuple`
+   - `test_registered_mode_tools_exactly_match_schema_workflow_tools`
+2. Green:
+   - added `runbooks.schema.list_workflow_tools()` and `runbooks.schema.resolve_workflow_tool(...)`.
+   - added `mode_tools.list_registered_mode_tools()` as a read-only tuple API.
+   - rewired `mode_tools.resolve_mode_tool_adapter_for_workflow_id(...)` to use schema canonical resolver.
+   - added `_validate_mode_tool_registry()` import-time guard to fail fast if registered tools drift from schema workflow tools.
+3. Verify:
+   - new introspection tests pass.
+   - ops orchestration + notify suites pass.
+
+### Changes applied
+
+1. `src/dnadesign/ops/runbooks/schema.py`
+   - added canonical workflow-tool listing and workflow-id resolver.
+   - updated helper membership checks to read from canonical tool mapping.
+2. `src/dnadesign/ops/orchestrator/mode_tools.py`
+   - added read-only `list_registered_mode_tools()` API.
+   - added registry/schema drift validation.
+   - removed local workflow-id classification logic in favor of schema resolver.
+3. `src/dnadesign/ops/tests/test_mode_tools.py`
+   - added registry introspection and exact schema-match tests.
+4. `src/dnadesign/ops/tests/test_runbook_orchestrator.py`
+   - added `test_list_workflow_tools_matches_schema_workflow_ids`.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/ops/tests/test_mode_tools.py -k "list_registered_mode_tools or registered_mode_tools_exactly_match_schema_workflow_tools"`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "list_registered_mode_tools or registered_mode_tools_exactly_match_schema_workflow_tools or list_workflow_tools_matches_schema_workflow_ids or mode_tool_adapters_cover_all_schema_workflow_ids"`
+3. `uv run pytest -q src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+
+### Contract impact
+
+1. Workflow-tool membership now has one canonical source in schema.
+2. Registered mode-tool adapters are inspectable through a read-only API.
+3. Registry/schema drift now fails fast during import and is also enforced by tests.

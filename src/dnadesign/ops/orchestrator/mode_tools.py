@@ -17,7 +17,11 @@ from typing import Callable, Literal
 
 from dnadesign._contracts import resolve_usr_producer_contract
 
-from ..runbooks.schema import OrchestrationRunbookV1, is_densegen_workflow_id, is_infer_workflow_id
+from ..runbooks.schema import (
+    OrchestrationRunbookV1,
+    list_workflow_tools,
+    resolve_workflow_tool,
+)
 
 ResolvedMode = Literal["fresh", "resume"]
 
@@ -142,6 +146,20 @@ def register_mode_tool_adapter(tool: str, adapter: ModeToolAdapter) -> None:
     _MODE_TOOL_ADAPTERS[tool_name] = adapter
 
 
+def list_registered_mode_tools() -> tuple[str, ...]:
+    return tuple(sorted(_MODE_TOOL_ADAPTERS))
+
+
+def _validate_mode_tool_registry() -> None:
+    registered_tools = list_registered_mode_tools()
+    expected_tools = list_workflow_tools()
+    if registered_tools != expected_tools:
+        raise RuntimeError(
+            "mode tool registry does not match workflow tool set "
+            f"(registered={registered_tools}, expected={expected_tools})"
+        )
+
+
 register_mode_tool_adapter(
     "densegen",
     ModeToolAdapter(
@@ -158,16 +176,11 @@ register_mode_tool_adapter(
         run_args_for_mode=_run_args_for_infer,
     ),
 )
+_validate_mode_tool_registry()
 
 
 def resolve_mode_tool_adapter_for_workflow_id(workflow_id: str) -> ModeToolAdapter:
-    workflow = str(workflow_id or "").strip()
-    if is_densegen_workflow_id(workflow):
-        tool = "densegen"
-    elif is_infer_workflow_id(workflow):
-        tool = "infer"
-    else:
-        raise ValueError(f"unsupported workflow id for mode tool adapter: {workflow}")
+    tool = resolve_workflow_tool(workflow_id)
     adapter = _MODE_TOOL_ADAPTERS.get(tool)
     if adapter is None:
         raise ValueError(f"missing mode tool adapter for workflow tool: {tool}")

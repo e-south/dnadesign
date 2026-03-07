@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+import dnadesign.ops.runbooks.schema as runbook_schema
 from dnadesign.ops.orchestrator import mode_tools
 
 
@@ -117,3 +118,13 @@ def test_register_mode_tool_adapter_requires_tool_name_match() -> None:
     adapter = mode_tools.resolve_mode_tool_adapter_for_workflow_id("infer_batch_submit")
     with pytest.raises(ValueError, match="mode tool adapter tool mismatch"):
         mode_tools.register_mode_tool_adapter("densegen", adapter)
+
+
+def test_list_registered_mode_tools_returns_sorted_read_only_tuple() -> None:
+    registered_tools = mode_tools.list_registered_mode_tools()
+    assert registered_tools == ("densegen", "infer")
+    assert isinstance(registered_tools, tuple)
+
+
+def test_registered_mode_tools_exactly_match_schema_workflow_tools() -> None:
+    assert mode_tools.list_registered_mode_tools() == runbook_schema.list_workflow_tools()
