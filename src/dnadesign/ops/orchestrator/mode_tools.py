@@ -29,22 +29,7 @@ class ModeToolAdapter:
     run_args_for_mode: Callable[[OrchestrationRunbookV1, ResolvedMode], str]
 
 
-def _infer_overlay_artifacts(workspace_root: Path, *, infer_config: Path | None) -> tuple[Path, ...]:
-    candidates: list[Path] = []
-    usr_root = workspace_root / "outputs" / "usr_datasets"
-    if usr_root.exists():
-        candidates.extend(sorted(usr_root.glob("**/_derived/infer.parquet")))
-        candidates.extend(sorted(usr_root.glob("**/_derived/infer/*.parquet")))
-
-    if infer_config is not None:
-        contract = _resolve_infer_usr_output_for_mode_probe(infer_config)
-        if contract is not None:
-            dataset_root = contract.usr_root / contract.usr_dataset
-            candidates.append(dataset_root / "_derived" / "infer.parquet")
-            infer_parts_root = dataset_root / "_derived" / "infer"
-            if infer_parts_root.exists():
-                candidates.extend(sorted(infer_parts_root.glob("*.parquet")))
-
+def _dedupe_existing_paths(candidates: tuple[Path, ...]) -> tuple[Path, ...]:
     deduped: list[Path] = []
     seen: set[Path] = set()
     for path in candidates:
@@ -56,6 +41,35 @@ def _infer_overlay_artifacts(workspace_root: Path, *, infer_config: Path | None)
         seen.add(resolved)
         deduped.append(path)
     return tuple(deduped)
+
+
+def _infer_workspace_overlay_candidates(workspace_root: Path) -> tuple[Path, ...]:
+    workspace_usr_root = workspace_root / "outputs" / "usr_datasets"
+    if not workspace_usr_root.exists():
+        return ()
+    candidates: list[Path] = []
+    candidates.extend(sorted(workspace_usr_root.glob("**/_derived/infer.parquet")))
+    candidates.extend(sorted(workspace_usr_root.glob("**/_derived/infer/*.parquet")))
+    return tuple(candidates)
+
+
+def _infer_dataset_overlay_candidates(dataset_root: Path) -> tuple[Path, ...]:
+    candidates: list[Path] = []
+    candidates.append(dataset_root / "_derived" / "infer.parquet")
+    infer_parts_root = dataset_root / "_derived" / "infer"
+    if infer_parts_root.exists():
+        candidates.extend(sorted(infer_parts_root.glob("*.parquet")))
+    return tuple(candidates)
+
+
+def _infer_overlay_artifacts(workspace_root: Path, *, infer_config: Path | None) -> tuple[Path, ...]:
+    if infer_config is not None:
+        contract = _resolve_infer_usr_output_for_mode_probe(infer_config)
+        if contract is not None:
+            dataset_root = contract.usr_root / contract.usr_dataset
+            return _dedupe_existing_paths(_infer_dataset_overlay_candidates(dataset_root))
+
+    return _dedupe_existing_paths(_infer_workspace_overlay_candidates(workspace_root))
 
 
 def _resolve_infer_usr_output_for_mode_probe(infer_config: Path):
@@ -114,18 +128,36 @@ def _run_args_for_infer(_runbook: OrchestrationRunbookV1, _mode: ResolvedMode) -
     return ""
 
 
-_MODE_TOOL_ADAPTERS: dict[str, ModeToolAdapter] = {
-    "densegen": ModeToolAdapter(
+_MODE_TOOL_ADAPTERS: dict[str, ModeToolAdapter] = {}
+
+
+def register_mode_tool_adapter(tool: str, adapter: ModeToolAdapter) -> None:
+    tool_name = str(tool or "").strip().lower()
+    if not tool_name:
+        raise ValueError("mode tool adapter tool must be non-empty")
+    if adapter.tool != tool_name:
+        raise ValueError(f"mode tool adapter tool mismatch: expected {tool_name}, got {adapter.tool}")
+    if tool_name in _MODE_TOOL_ADAPTERS:
+        raise ValueError(f"mode tool adapter already registered for tool: {tool_name}")
+    _MODE_TOOL_ADAPTERS[tool_name] = adapter
+
+
+register_mode_tool_adapter(
+    "densegen",
+    ModeToolAdapter(
         tool="densegen",
         has_resume_artifacts=_has_densegen_resume_artifacts,
         run_args_for_mode=_run_args_for_densegen,
     ),
-    "infer": ModeToolAdapter(
+)
+register_mode_tool_adapter(
+    "infer",
+    ModeToolAdapter(
         tool="infer",
         has_resume_artifacts=_has_infer_resume_artifacts,
         run_args_for_mode=_run_args_for_infer,
     ),
-}
+)
 
 
 def resolve_mode_tool_adapter_for_workflow_id(workflow_id: str) -> ModeToolAdapter:

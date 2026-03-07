@@ -3946,3 +3946,66 @@ Complete the next ops decoupling increment by moving mode-tool adapter policy ou
 1. Ops mode orchestration is more orthogonal: `state.py` coordinates decisions while `mode_tools.py` owns tool-specific policy.
 2. Schema workflow IDs now have explicit adapter coverage assertions in tests.
 3. Cross-tool extension path is narrower: adding a new workflow/tool now requires adapter registration and coverage tests.
+
+## 2026-03-07 - Phase 2 Slice AT (Ops Mode-Tool Registry Contract + Infer Probe I/O Reduction)
+
+### Goal
+
+Continue ops pragmatism and performance hardening by adding explicit mode-tool adapter registration contracts and reducing infer artifact probe filesystem traversal overhead.
+
+### Prioritized findings
+
+1. Medium: mode-tool adapter map was mutable only by direct module edits; no explicit registration contract existed.
+2. Medium: infer artifact probing always traversed workspace USR overlays recursively even when infer config resolved an exact external USR destination.
+3. Performance: recursive workspace probe added avoidable I/O latency for large workspace trees.
+
+### TDD sequence
+
+1. Red:
+   - `test_register_mode_tool_adapter_rejects_duplicate_tool`
+   - `test_register_mode_tool_adapter_requires_tool_name_match`
+   - `test_infer_overlay_probe_avoids_workspace_fallback_when_usr_destination_resolves`
+   - `test_infer_overlay_probe_uses_workspace_fallback_when_no_usr_destination`
+2. Green:
+   - added `register_mode_tool_adapter(...)` with fail-fast duplicate/mismatch guards.
+   - split infer overlay probing into explicit candidate helpers:
+     - `_infer_dataset_overlay_candidates(...)`
+     - `_infer_workspace_overlay_candidates(...)`
+     - `_dedupe_existing_paths(...)`
+   - changed `_infer_overlay_artifacts(...)` to use exact dataset probing when infer config resolves destination, and only use workspace recursive fallback when no infer USR destination can be resolved.
+3. Verify:
+   - new mode-tools contract suite passes.
+   - ops runbook orchestration + notify cross-tool suites pass.
+
+### Performance evidence (measurement-first)
+
+Workload: `350` workspace datasets with non-infer derived files, infer config resolving external USR destination, 25 runs.
+
+1. Before (workspace recursive probe always executed):
+   - mean: `23.324ms`
+   - median: `23.126ms`
+2. After (exact destination probe first, no workspace recursion when resolvable):
+   - mean: `0.776ms`
+   - median: `0.766ms`
+
+Observed reduction: ~`30x` mean latency improvement on this workload shape.
+
+### Changes applied
+
+1. `src/dnadesign/ops/orchestrator/mode_tools.py`
+   - added explicit registration API and guardrails.
+   - refactored infer overlay candidate collection for exact destination-first probing.
+2. `src/dnadesign/ops/tests/test_mode_tools.py`
+   - new focused contract tests for registration and probe path selection.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/ops/tests/test_mode_tools.py`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "mode_tool or infer_mode_auto_selects_resume_when_external_usr_overlay_exists or infer_mode_auto_raises_when_infer_usr_destination_is_ambiguous or mode_decision_raises_when_runbook_has_no_workload_blocks or mode_decision_raises_when_runbook_has_multiple_workload_blocks"`
+3. `uv run pytest -q src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+
+### Contract impact
+
+1. Mode-tool registration has explicit fail-fast contracts (no duplicate or mismatched tool registration).
+2. Infer mode artifact probing is now explicit and lower-cost for resolvable destinations.
+3. Workspace recursive fallback remains available only when infer destination is not resolvable from config.
