@@ -18,6 +18,57 @@ from ..contracts import infer_usr_column_name
 from ..errors import WriteBackError
 
 
+def _dedupe_ids(ids: List[str]) -> List[str]:
+    seen: set[str] = set()
+    unique_ids: List[str] = []
+    for row_id in ids:
+        normalized = str(row_id)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        unique_ids.append(normalized)
+    return unique_ids
+
+
+def _positions_by_id(ids: List[str]) -> Dict[str, List[int]]:
+    positions: Dict[str, List[int]] = {}
+    for index, row_id in enumerate(ids):
+        positions.setdefault(str(row_id), []).append(index)
+    return positions
+
+
+def _read_subset_table(*, pq, path: Path, columns: List[str], ids: List[str]):
+    return pq.read_table(path, columns=columns, filters=[("id", "in", _dedupe_ids(ids))])
+
+
+def _merge_table_values(
+    *,
+    existing: Dict[str, List[object]],
+    outputs: List,
+    infer_cols: Dict[str, str],
+    table,
+    positions: Dict[str, List[int]],
+    only_non_null: bool,
+) -> None:
+    table_columns = set(table.schema.names)
+    table_ids = table.column("id").to_pylist()
+    for output in outputs:
+        column_name = infer_cols[output.id]
+        if column_name not in table_columns:
+            continue
+        values = table.column(column_name).to_pylist()
+        target = existing[output.id]
+        for table_index, table_id in enumerate(table_ids):
+            target_positions = positions.get(str(table_id))
+            if not target_positions:
+                continue
+            value = values[table_index]
+            if only_non_null and value is None:
+                continue
+            for row_index in target_positions:
+                target[row_index] = value
+
+
 def plan_resume_for_usr(
     *,
     ds,  # dnadesign.usr.Dataset
@@ -36,6 +87,7 @@ def plan_resume_for_usr(
         o.id: infer_usr_column_name(model_id=model_id, job_id=job_id, out_id=o.id)
         for o in outputs
     }
+    id_positions = _positions_by_id(ids)
 
     try:
         import pyarrow.parquet as pq
@@ -45,18 +97,20 @@ def plan_resume_for_usr(
         records_columns = set(records_parquet.schema_arrow.names)  # type: ignore[attr-defined]
         selected_columns = ["id"] + [name for name in infer_cols.values() if name in records_columns]
         if len(selected_columns) > 1:
-            records_table = pq.read_table(records_path, columns=selected_columns)
-            record_ids = records_table.column("id").to_pylist()
-            record_index = {record_id: index for index, record_id in enumerate(record_ids)}
-
-            for output in outputs:
-                column_name = infer_cols[output.id]
-                if column_name in records_columns:
-                    values = records_table.column(column_name).to_pylist()
-                    for row_index, row_id in enumerate(ids):
-                        table_index = record_index.get(row_id)
-                        if table_index is not None:
-                            existing[output.id][row_index] = values[table_index]
+            records_table = _read_subset_table(
+                pq=pq,
+                path=Path(records_path),
+                columns=selected_columns,
+                ids=ids,
+            )
+            _merge_table_values(
+                existing=existing,
+                outputs=outputs,
+                infer_cols=infer_cols,
+                table=records_table,
+                positions=id_positions,
+                only_non_null=False,
+            )
 
         if hasattr(ds, "list_overlays"):
             overlays = ds.list_overlays()  # type: ignore[attr-defined]
@@ -67,18 +121,20 @@ def plan_resume_for_usr(
                 overlay_columns = set(overlay_parquet.schema_arrow.names)
                 selected_overlay_columns = ["id"] + [name for name in infer_cols.values() if name in overlay_columns]
                 if len(selected_overlay_columns) > 1:
-                    overlay_table = pq.read_table(str(overlay_path), columns=selected_overlay_columns)
-                    overlay_ids = overlay_table.column("id").to_pylist()
-                    overlay_index = {record_id: index for index, record_id in enumerate(overlay_ids)}
-                    for output in outputs:
-                        column_name = infer_cols[output.id]
-                        if column_name not in overlay_columns:
-                            continue
-                        values = overlay_table.column(column_name).to_pylist()
-                        for row_index, row_id in enumerate(ids):
-                            table_index = overlay_index.get(row_id)
-                            if table_index is not None and values[table_index] is not None:
-                                existing[output.id][row_index] = values[table_index]
+                    overlay_table = _read_subset_table(
+                        pq=pq,
+                        path=overlay_path,
+                        columns=selected_overlay_columns,
+                        ids=ids,
+                    )
+                    _merge_table_values(
+                        existing=existing,
+                        outputs=outputs,
+                        infer_cols=infer_cols,
+                        table=overlay_table,
+                        positions=id_positions,
+                        only_non_null=True,
+                    )
     except Exception as exc:
         raise WriteBackError(f"USR resume scan failed for records table {ds.records_path}: {exc}") from exc
 
