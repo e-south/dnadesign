@@ -30,6 +30,6 @@
 
 - `usr`: dataset ingest + write-back columns/overlay interactions.
 - `notify`: infer events source resolution via shared `_contracts`.
-- `ops`: infer runbook workflow contracts and scheduler planning/validation hooks.
+- `ops`: infer runbook workflow contracts and scheduler planning/validation hooks through public infer API (`dnadesign.infer.validate_runbook_gpu_resources`), not `dnadesign.infer.src.*` internals.
 
 For architecture evolution and evidence-backed notes, see the [dev journal](../dev/journal.md).

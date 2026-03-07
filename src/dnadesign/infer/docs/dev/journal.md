@@ -3169,3 +3169,60 @@ After refactor, same benchmark and workload:
 1. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_evo2_adapter_pooling_contracts.py`
 2. `uv run pytest -q src/dnadesign/infer/tests`
 3. `uv run pytest -q src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer or workspace"`
+
+## 2026-03-07 - Phase 2 Slice AG (Ops/Infer Boundary Decoupling + Generic Infer Overlay Guard Routing)
+
+### Goal
+
+Bring `ops` orchestration into explicit top-level boundary compliance by removing `dnadesign.infer.src.*` imports from cross-tool code, while preserving runbook behavior and keeping infer preflight tool routing model-agnostic.
+
+### Audit finding
+
+1. `src/dnadesign/ops/orchestrator/plan.py` imported infer internals (`dnadesign.infer.src.config`, `dnadesign.infer.src.errors`, `dnadesign.infer.src.runtime.capacity_planner`), which violates top-level boundary rules.
+2. Infer overlay preflight guard routing was hardcoded to `--tool infer_evo2`; this over-couples ops planning to an adapter-specific label.
+
+### Refactor boundary (behavior-preserving)
+
+1. Runbook schema, CLI flags, and submit command contracts remain unchanged.
+2. Notify policy semantics remain unchanged (`infer_evo2|generic` for infer workflows).
+3. Infer resource guard still fails fast on capacity/model-parallelism contract violations.
+4. Only boundary and IA wiring changed:
+   - ops now consumes infer resource validation through public `dnadesign.infer` API.
+   - infer preflight overlay guard now routes through generic `--tool infer` adapter key.
+
+### TDD sequence
+
+1. Red:
+   - added `test_ops_plan_avoids_infer_internal_module_imports` in `src/dnadesign/ops/tests/test_runbook_orchestrator.py`.
+   - tightened infer preflight expectation to require `--tool infer` and reject `--tool infer_evo2` in the preflight block.
+   - added `test_infer_public_contract_exposes_runbook_gpu_validation` in `src/dnadesign/infer/tests/package/test_wrapper_contracts.py`.
+2. Green:
+   - moved runbook GPU resource validation contract to public infer API:
+     - `dnadesign.infer.validate_runbook_gpu_resources(...)`.
+   - rewired ops planner to call the public infer API only.
+   - updated infer overlay preflight route to `--tool infer`.
+   - updated architecture/runbook docs accordingly.
+3. Verify:
+   - targeted and full infer+ops suites pass.
+
+### Performance evidence (measurement-first)
+
+Import-time micro-benchmark for `dnadesign.ops.orchestrator.plan` (7 subprocess runs):
+
+1. Baseline (before decoupling):
+   - runs: `6.519151,3.135660,3.129427,3.162139,3.055969,2.976449,3.019569`
+   - mean: `3.571195s`
+   - median: `3.129427s`
+2. After decoupling:
+   - runs: `3.386329,3.060911,3.023662,2.992303,3.142908,4.113937,3.039048`
+   - mean: `3.251300s`
+   - median: `3.060911s`
+
+Observed effect: lower mean and median module import cost with reduced cross-tool import surface; variance remains expected due process/filesystem jitter.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "ops_plan_avoids_infer_internal_module_imports or infer_runbook_uses_gpu_submit_template_and_filters"`
+2. `uv run pytest -q src/dnadesign/infer/tests/package/test_wrapper_contracts.py -k "infer_public_contract_exposes_runbook_gpu_validation"`
+3. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/ops/tests/test_densegen_usr_contract_sharing.py src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py src/dnadesign/infer/tests/package/test_wrapper_contracts.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py`
+4. `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/ops/tests`
