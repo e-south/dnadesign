@@ -99,6 +99,28 @@ def test_workspace_init_rejects_unknown_profile(tmp_path: Path) -> None:
     assert "workspace profile must be one of" in (result.stdout or "")
 
 
+def test_workspace_local_profile_supports_validate_and_dry_run(tmp_path: Path) -> None:
+    root = tmp_path / "ws_root"
+    workspace_id = "demo_local_flow"
+
+    init_result = _RUNNER.invoke(
+        app,
+        ["workspace", "init", "--id", workspace_id, "--root", root.as_posix(), "--profile", "local"],
+    )
+    assert init_result.exit_code == 0, init_result.stdout
+
+    workspace_dir = root / workspace_id
+    config_path = workspace_dir / "config.yaml"
+    (workspace_dir / "inputs" / "records.jsonl").write_text('{"id":"r1","sequence":"ACGT"}\n', encoding="utf-8")
+
+    validate_result = _RUNNER.invoke(app, ["validate", "config", "--config", config_path.as_posix()])
+    assert validate_result.exit_code == 0, validate_result.stdout
+
+    dry_run_result = _RUNNER.invoke(app, ["run", "--config", config_path.as_posix(), "--dry-run"])
+    assert dry_run_result.exit_code == 0, dry_run_result.stdout
+    assert "Config validated (dry run)" in (dry_run_result.stdout or "")
+
+
 def test_workspace_init_rejects_path_like_workspace_id(tmp_path: Path) -> None:
     root = tmp_path / "ws_root"
 

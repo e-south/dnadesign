@@ -1912,6 +1912,9 @@ Remove workspace-init portability footguns by making local-file scaffolds the de
 - New portable template:
   - `src/dnadesign/infer/docs/operations/examples/workspace_local_records_config.yaml`
   - default scaffold uses local JSONL records in `inputs/records.jsonl`.
+- Added CLI characterization coverage:
+  - `src/dnadesign/infer/tests/cli/test_workspace_command.py::test_workspace_local_profile_supports_validate_and_dry_run`
+  - verifies `workspace init` -> `validate config` -> `run --dry-run` local profile flow.
 - Docs alignment:
   - `src/dnadesign/infer/workspaces/README.md`
   - `src/dnadesign/infer/docs/operations/README.md`
