@@ -10,6 +10,13 @@ For BU SCC platform details and scheduler policy, see [BU SCC install bootstrap]
 - You are on an SCC interactive GPU node or equivalent GPU-capable shell.
 - You want infer Evo2 support (`infer-evo2` extra) and deterministic build behavior.
 
+### Path policy
+
+- Keep one canonical uv environment at `<dnadesign_repo>/.venv`.
+- Keep infer model cache for routine runs (`HF_HOME`) on `/project`.
+- Keep large external Evo2 artifacts (for example 400B assets) on `/projectnb`.
+- Keep runtime transients inside infer workspace `outputs/runtime/...`.
+
 ### Lockfile preflight
 
 flash-attn is sdist-only in `uv.lock`, so this environment currently compiles flash-attn from source during `uv sync --locked --extra infer-evo2`.
@@ -125,16 +132,21 @@ module purge
 module load cuda/12.8
 module load gcc/13.2.0
 
-export UV_PROJECT_ENVIRONMENT=/project/dunlop/esouth/dnadesign/.venv
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
 export INFER_WORKSPACE_ROOT=/project/dunlop/esouth/dnadesign/src/dnadesign/infer/workspaces/test_stress_ethanol
 export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}"
-export HF_HOME="${HF_HOME:-/project/dunlop/esouth/cache/huggingface}"
+export HF_HOME_7B="${HF_HOME_7B:-/project/dunlop/esouth/cache/huggingface/evo2_7b}"
+export HF_HOME_LARGE="${HF_HOME_LARGE:-/projectnb/dunlop/esouth/cache/huggingface/evo2_large}"
+export HF_HOME="${HF_HOME:-$HF_HOME_7B}"
+export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
+export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HUB_CACHE}"
+export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
 export UV_CACHE_DIR="$INFER_RUNTIME_ROOT/uv-cache"
 export TMPDIR="$INFER_RUNTIME_ROOT/tmp"
 export TORCH_EXTENSIONS_DIR="$INFER_RUNTIME_ROOT/torch-extensions"
 export TRITON_CACHE_DIR="$INFER_RUNTIME_ROOT/triton-cache"
 export PYTHONPYCACHEPREFIX="$INFER_RUNTIME_ROOT/pycache"
-mkdir -p "$UV_CACHE_DIR" "$TMPDIR" "$TORCH_EXTENSIONS_DIR" "$TRITON_CACHE_DIR" "$PYTHONPYCACHEPREFIX" "$HF_HOME"
+mkdir -p "$UV_CACHE_DIR" "$TMPDIR" "$TORCH_EXTENSIONS_DIR" "$TRITON_CACHE_DIR" "$PYTHONPYCACHEPREFIX" "$HF_HOME" "$HF_HUB_CACHE" "$HUGGINGFACE_HUB_CACHE" "$TRANSFORMERS_CACHE"
 
 uv python install 3.12
 uv sync --locked

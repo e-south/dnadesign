@@ -70,6 +70,8 @@ Details: [BU SCC Install bootstrap: Install uv](install.md#1-install-uv-once)
 ### 2) Clone repo
 
 ```bash
+mkdir -p /project/<project>/$USER
+cd /project/<project>/$USER
 git clone https://github.com/e-south/dnadesign.git
 cd dnadesign
 ```
@@ -79,16 +81,21 @@ Details: [BU SCC Install bootstrap: Clone the repository](install.md#2-clone-the
 ### 3) Set environment and caches
 
 ```bash
-export UV_PROJECT_ENVIRONMENT="/projectnb/<project>/$USER/dnadesign/.venv"
-export SCC_SCRATCH="${TMPDIR:-/scratch/$USER}"
-export UV_CACHE_DIR="${UV_CACHE_DIR:-$SCC_SCRATCH/uv-cache}"
-export HF_HOME="${HF_HOME:-/project/<project>/$USER/huggingface}"
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/project/<project>/$USER/cache/uv}"
+export HF_HOME_7B="${HF_HOME_7B:-/project/<project>/$USER/cache/huggingface/evo2_7b}"
+export HF_HOME_LARGE="${HF_HOME_LARGE:-/projectnb/<project>/$USER/cache/huggingface/evo2_large}"
+export HF_HOME="${HF_HOME:-$HF_HOME_7B}"
+export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
+export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HUB_CACHE}"
+export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
 export INFER_WORKSPACE_ROOT="${INFER_WORKSPACE_ROOT:-/project/<project>/$USER/dnadesign/src/dnadesign/infer/workspaces/test_stress_ethanol}"
 export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}"
 export TMPDIR="${TMPDIR:-$INFER_RUNTIME_ROOT/tmp}"
 export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-$INFER_RUNTIME_ROOT/torch-extensions}"
 export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-$INFER_RUNTIME_ROOT/triton-cache}"
 export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-$INFER_RUNTIME_ROOT/pycache}"
+mkdir -p "$UV_CACHE_DIR" "$HF_HOME" "$HF_HUB_CACHE" "$HUGGINGFACE_HUB_CACHE" "$TRANSFORMERS_CACHE" "$TMPDIR" "$TORCH_EXTENSIONS_DIR" "$TRITON_CACHE_DIR" "$PYTHONPYCACHEPREFIX"
 ```
 
 Details: [BU SCC Install bootstrap: Configure environment location and caches](install.md#3-configure-environment-location-and-caches)

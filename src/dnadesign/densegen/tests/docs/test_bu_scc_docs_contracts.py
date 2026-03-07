@@ -113,6 +113,21 @@ def test_bu_scc_install_doc_includes_infer_transient_path_policy_and_model_suppo
     assert "TARGET_MODEL_ID" in install_doc
 
 
+def test_bu_scc_docs_define_canonical_repo_venv_and_model_cache_split_policy() -> None:
+    install_doc = _read(BU_SCC_DOCS / "install.md")
+    quickstart_doc = _read(BU_SCC_DOCS / "quickstart.md")
+    bundle = "\n".join((install_doc, quickstart_doc))
+
+    assert 'export UV_PROJECT_ENVIRONMENT="$PWD/.venv"' in bundle
+    assert "HF_HOME_7B" in bundle
+    assert "HF_HOME_LARGE" in bundle
+    assert "HF_HUB_CACHE" in bundle
+    assert "HUGGINGFACE_HUB_CACHE" in bundle
+    assert "TRANSFORMERS_CACHE" in bundle
+    assert "/project/<your_project>/$USER/cache/huggingface/evo2_7b" in install_doc
+    assert "/projectnb/<your_project>/$USER/cache/huggingface/evo2_large" in install_doc
+
+
 def test_bu_scc_install_doc_includes_deterministic_flash_attn_source_build_controls() -> None:
     install_doc = _read(BU_SCC_DOCS / "install.md")
     assert "### GPU setup and verification runbook" in install_doc

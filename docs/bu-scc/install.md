@@ -57,6 +57,8 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ### 2) Clone the repository
 
 ```bash
+mkdir -p /project/<your_project>/$USER
+cd /project/<your_project>/$USER
 git clone https://github.com/e-south/dnadesign.git
 cd dnadesign
 ```
@@ -72,27 +74,38 @@ uv cache clean
 
 ### 3) Configure environment location and caches
 
-Use a persistent project location for the environment so expensive GPU builds are reusable.
+Use one canonical environment location in the repository root and explicit cache roots.
 
 ```bash
-# Choose a persistent location for the project environment (recommended)
-export UV_PROJECT_ENVIRONMENT="/projectnb/<your_project>/$USER/dnadesign/.venv"
+# Keep one canonical environment in the repo root.
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
 
-# Use job-local scratch for caches/temp when available; fall back to /scratch
-export SCC_SCRATCH="${TMPDIR:-/scratch/$USER}"
-export UV_CACHE_DIR="${UV_CACHE_DIR:-$SCC_SCRATCH/uv-cache}"
+# Keep uv cache outside the repo.
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/project/<your_project>/$USER/cache/uv}"
 
 # Network timeout and retry settings for outbound package fetches
 export UV_HTTP_TIMEOUT="${UV_HTTP_TIMEOUT:-600}"
 export UV_HTTP_RETRIES="${UV_HTTP_RETRIES:-10}"
 
-# Model cache root (set explicitly to control where checkpoints land)
-export HF_HOME="${HF_HOME:-/project/<your_project>/$USER/huggingface}"
-mkdir -p "$HF_HOME"
+# Infer model-cache policy:
+# - 7B infer smoke and routine infer runs use /project.
+# - large-model artifacts stay in /projectnb.
+export HF_HOME_7B="${HF_HOME_7B:-/project/<your_project>/$USER/cache/huggingface/evo2_7b}"
+export HF_HOME_LARGE="${HF_HOME_LARGE:-/projectnb/<your_project>/$USER/cache/huggingface/evo2_large}"
+export HF_HOME="${HF_HOME:-$HF_HOME_7B}"
+export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
+export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HUB_CACHE}"
+export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
+mkdir -p "$UV_CACHE_DIR" "$HF_HOME" "$HF_HUB_CACHE" "$HUGGINGFACE_HUB_CACHE" "$TRANSFORMERS_CACHE"
 
 printf 'UV_PROJECT_ENVIRONMENT=%s\n' "$UV_PROJECT_ENVIRONMENT"
 printf 'UV_CACHE_DIR=%s\n' "$UV_CACHE_DIR"
-printf 'SCC_SCRATCH=%s\n' "$SCC_SCRATCH"
+printf 'HF_HOME=%s\n' "$HF_HOME"
+printf 'HF_HOME_7B=%s\n' "$HF_HOME_7B"
+printf 'HF_HOME_LARGE=%s\n' "$HF_HOME_LARGE"
+printf 'HF_HUB_CACHE=%s\n' "$HF_HUB_CACHE"
+printf 'HUGGINGFACE_HUB_CACHE=%s\n' "$HUGGINGFACE_HUB_CACHE"
+printf 'TRANSFORMERS_CACHE=%s\n' "$TRANSFORMERS_CACHE"
 ```
 
 ---
@@ -121,6 +134,17 @@ printf 'TRITON_CACHE_DIR=%s\n' "$TRITON_CACHE_DIR"
 printf 'PYTHONPYCACHEPREFIX=%s\n' "$PYTHONPYCACHEPREFIX"
 printf 'HF_HOME=%s\n' "$HF_HOME"
 ```
+
+---
+
+### 3b) Evo2 checkpoint placement policy
+
+Use this policy in runbooks and sessions:
+
+- Keep infer checkpoint downloads (`evo2_7b`, `evo2_20b`, `evo2_40b`) under `HF_HOME_7B` on `/project`.
+- Keep large-model artifacts (for example 400B external assets) under `HF_HOME_LARGE` on `/projectnb`.
+- Keep `HF_HOME` pointed to `HF_HOME_7B` for infer smoke and infer runs.
+- Export `HF_HUB_CACHE`, `HUGGINGFACE_HUB_CACHE`, and `TRANSFORMERS_CACHE` to `HF_HOME` subpaths to override inherited SCC cache defaults.
 
 ---
 
@@ -168,10 +192,15 @@ export CUDAHOSTCXX="$(which g++)"
 export CUDA_HOME="$(dirname "$(dirname "$(which nvcc)")")"
 
 # Runtime/cache roots.
-export UV_PROJECT_ENVIRONMENT="/projectnb/<your_project>/$USER/dnadesign/.venv"
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
 export INFER_WORKSPACE_ROOT="${INFER_WORKSPACE_ROOT:-/project/<your_project>/$USER/dnadesign/src/dnadesign/infer/workspaces/test_stress_ethanol}"
 export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}"
-export HF_HOME="${HF_HOME:-/project/<your_project>/$USER/huggingface}"
+export HF_HOME_7B="${HF_HOME_7B:-/project/<your_project>/$USER/cache/huggingface/evo2_7b}"
+export HF_HOME_LARGE="${HF_HOME_LARGE:-/projectnb/<your_project>/$USER/cache/huggingface/evo2_large}"
+export HF_HOME="${HF_HOME:-$HF_HOME_7B}"
+export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
+export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HUB_CACHE}"
+export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
 export UV_CACHE_DIR="${UV_CACHE_DIR:-$INFER_RUNTIME_ROOT/uv-cache}"
 export TMPDIR="${TMPDIR:-$INFER_RUNTIME_ROOT/tmp}"
 export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-$INFER_RUNTIME_ROOT/torch-extensions}"
@@ -183,7 +212,10 @@ mkdir -p \
   "$TORCH_EXTENSIONS_DIR" \
   "$TRITON_CACHE_DIR" \
   "$PYTHONPYCACHEPREFIX" \
-  "$HF_HOME"
+  "$HF_HOME" \
+  "$HF_HUB_CACHE" \
+  "$HUGGINGFACE_HUB_CACHE" \
+  "$TRANSFORMERS_CACHE"
 
 # Prepare Python and base runtime before computing wheel include paths.
 uv python install 3.12

@@ -2917,3 +2917,46 @@ Enforce repo information architecture by removing top-level transient sprawl and
 
 1. Repo-root layout now has no `runtime/` directory.
 2. Documentation exports for infer GPU setup now route transients to workspace-scoped paths.
+
+## 2026-03-07 - Phase 2 Slice AB (Canonical Cache Placement Hardening + Real 7B Smoke)
+
+### Goal
+
+Harden SCC docs and operator sequence so infer uses one canonical repo `.venv`, writes runtime transients under infer workspace outputs, and places 7B cache on `/project` deterministically.
+
+### Root cause found during live smoke
+
+1. Setting `HF_HOME` alone was not sufficient in this SCC session.
+2. Inherited environment had `HF_HUB_CACHE` preset to `/projectnb/.../huggingface/hub`.
+3. `huggingface_hub.constants.HF_HUB_CACHE` followed that inherited path, so Evo2 loaded from `/projectnb` even when `HF_HOME` was set to `/project`.
+
+### Hardening change
+
+1. Documentation now exports all cache controls together:
+   - `HF_HOME`
+   - `HF_HUB_CACHE`
+   - `HUGGINGFACE_HUB_CACHE`
+   - `TRANSFORMERS_CACHE`
+2. Policy remains:
+   - canonical uv env: `UV_PROJECT_ENVIRONMENT="$PWD/.venv"`
+   - infer 7B cache on `/project` (`HF_HOME_7B`)
+   - large external Evo2 artifacts on `/projectnb` (`HF_HOME_LARGE`)
+   - runtime transients in infer workspace `outputs/runtime/...`
+
+### Live verification (real run)
+
+1. Command class:
+   - `uv run infer extract --model-id evo2_7b --device cuda:0 --precision bf16 --alphabet dna --batch-size 1 --fn evo2.log_likelihood --format float --seq ACGTACGTACGT --no-progress`
+2. Result:
+   - execution succeeded and returned one float output.
+3. Deterministic placement evidence:
+   - model load path during run:
+     - `/project/dunlop/esouth/cache/huggingface/evo2_7b/hub/models--arcinstitute--evo2_7b/.../evo2_7b.pt`
+   - cache size after run:
+     - `13G /project/dunlop/esouth/cache/huggingface/evo2_7b`
+
+### Cleanup status
+
+1. Removed leftover moved runtime trash directory:
+   - `/project/dunlop/esouth/.trash/dnadesign-runtime-20260307-123847`
+2. Repo root remains clean of top-level `runtime/` directory.

@@ -110,6 +110,12 @@ For SCC GPU setup, including environment exports and build controls, use:
 - [BU SCC install bootstrap: capacity gate and resource profile](bu-scc/install.md#64-capacity-gate-and-resource-profile)
 - [infer SCC Evo2 GPU environment runbook](../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
 
+SCC infer path policy:
+- keep one environment at `<dnadesign_repo>/.venv` (`UV_PROJECT_ENVIRONMENT="$PWD/.venv"`).
+- keep infer model cache for routine runs on `/project` (`HF_HOME_7B`) and set `HUGGINGFACE_HUB_CACHE` plus `TRANSFORMERS_CACHE` under `HF_HOME`.
+- keep large external Evo2 artifacts on `/projectnb` (`HF_HOME_LARGE`).
+- keep transient build/runtime outputs in infer workspace `outputs/runtime/...`.
+
 Current lock behavior note:
 - flash-attn is currently sdist-only in `uv.lock`, so SCC `infer-evo2` setup compiles flash-attn from source.
 - infer currently supports `evo2_7b`, `evo2_20b`, and `evo2_40b`; 400B is not a supported `model.id`.
