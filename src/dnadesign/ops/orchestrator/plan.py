@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -24,14 +23,13 @@ from dnadesign._contracts.tls_ca_bundle import (
     DEFAULT_SYSTEM_TLS_CA_BUNDLE_CANDIDATES,
     resolve_tls_ca_bundle_path,
 )
-from dnadesign.infer import validate_runbook_gpu_resources
 
 from ..runbooks.path_policy import WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR
-from ..runbooks.schema import OrchestrationRunbookV1, is_densegen_workflow_id
+from ..runbooks.schema import OrchestrationRunbookV1
+from .plan_tools import ToolCommandSpec, resolve_plan_tool_adapter
 from .state import ModeDecision, resolve_mode_decision
 
 SmokeMode = Literal["dry", "live"]
-_JOB_NAME_SAFE_PATTERN = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
 @dataclass(frozen=True)
@@ -74,6 +72,12 @@ def _shell_command(command_text: str, *, env: dict[str, str] | None = None) -> C
 
 def _ops_gate_command(*parts: object) -> CommandSpec:
     return _argv_command("uv", "run", "python", "-m", "dnadesign.ops.orchestrator.gates", *parts)
+
+
+def _render_tool_command(command: ToolCommandSpec) -> CommandSpec:
+    if command.kind == "ops_gate":
+        return _ops_gate_command(*command.parts)
+    return _argv_command(*command.parts, env=command.env)
 
 
 def _notify_webhook_file_path_from_profile(profile_path: Path) -> str | None:
@@ -235,44 +239,6 @@ def _runtime_to_seconds(h_rt: str) -> int:
     return (int(hours_str) * 3600) + (int(minutes_str) * 60) + int(seconds_str)
 
 
-def _validate_infer_resource_contract(runbook: OrchestrationRunbookV1) -> None:
-    assert runbook.infer is not None
-    if runbook.resources.gpus is None:
-        raise ValueError("infer workflow requires resources.gpus")
-    try:
-        validate_runbook_gpu_resources(
-            config_path=Path(runbook.infer.config),
-            declared_gpus=int(runbook.resources.gpus),
-            gpu_capability=runbook.resources.gpu_capability,
-            gpu_memory_gib=runbook.resources.gpu_memory_gib,
-        )
-    except ValueError as exc:
-        raise ValueError(
-            "infer runbook resources are incompatible with infer model contract: "
-            f"{exc}"
-        ) from exc
-
-
-def _sge_job_name(*, runbook_id: str, suffix: str) -> str:
-    runbook_token = _JOB_NAME_SAFE_PATTERN.sub("_", str(runbook_id or "").strip()).strip("_.-")
-    suffix_token = _JOB_NAME_SAFE_PATTERN.sub("_", str(suffix or "").strip()).strip("_.-")
-    if not runbook_token:
-        runbook_token = "runbook"
-    if not suffix_token:
-        suffix_token = "job"
-    return f"{runbook_token}_{suffix_token}"[:128]
-
-
-def _densegen_post_run_resource_values(runbook: OrchestrationRunbookV1) -> tuple[str, str, str]:
-    assert runbook.densegen is not None
-    post_run_resources = runbook.densegen.post_run.resources
-    return (
-        str(post_run_resources.pe_omp),
-        post_run_resources.h_rt,
-        post_run_resources.mem_per_core,
-    )
-
-
 def _preflight_commands(
     runbook: OrchestrationRunbookV1,
     *,
@@ -361,214 +327,14 @@ def _preflight_commands(
             ]
         )
 
-    if is_densegen_workflow_id(runbook.workflow_id):
-        assert runbook.densegen is not None
-        config = str(runbook.densegen.config)
-        densegen_template = str(runbook.densegen.qsub_template)
-        densegen_post_run_template = str(runbook.densegen.post_run.qsub_template)
-        post_run_pe_omp, post_run_h_rt, post_run_mem_per_core = _densegen_post_run_resource_values(runbook)
-        densegen_usr_contract_checks: list[CommandSpec] = []
-        overlay_guard = runbook.densegen.overlay_guard
-        overlay_guard_parts: list[str] = [
-            "usr-overlay-guard",
-            "--tool",
-            "densegen",
-            "--config",
-            config,
-            "--workspace-root",
-            str(runbook.workspace_root),
-            "--mode",
-            mode_decision.selected_mode,
-            "--run-args",
-            mode_decision.run_args,
-            "--max-projected-overlay-parts",
-            str(overlay_guard.max_projected_overlay_parts),
-            "--max-existing-overlay-parts",
-            str(overlay_guard.max_existing_overlay_parts),
-            "--overlay-namespace",
-            overlay_guard.overlay_namespace,
-            "--json",
-        ]
-        if overlay_guard.auto_compact_existing_overlay_parts:
-            overlay_guard_parts.append("--auto-compact-existing-overlay-parts")
-        densegen_usr_contract_checks.append(_ops_gate_command(*overlay_guard_parts))
-        records_part_guard = runbook.densegen.records_part_guard
-        records_part_guard_parts: list[str] = [
-            "usr-records-part-guard",
-            "--tool",
-            "densegen",
-            "--config",
-            config,
-            "--workspace-root",
-            str(runbook.workspace_root),
-            "--mode",
-            mode_decision.selected_mode,
-            "--run-args",
-            mode_decision.run_args,
-            "--max-projected-records-parts",
-            str(records_part_guard.max_projected_records_parts),
-            "--max-existing-records-parts",
-            str(records_part_guard.max_existing_records_parts),
-            "--max-existing-records-part-age-days",
-            str(records_part_guard.max_existing_records_part_age_days),
-            "--json",
-        ]
-        if records_part_guard.auto_compact_existing_records_parts:
-            records_part_guard_parts.append("--auto-compact-existing-records-parts")
-        densegen_usr_contract_checks.append(_ops_gate_command(*records_part_guard_parts))
-        archived_overlay_guard = runbook.densegen.archived_overlay_guard
-        archived_overlay_guard_parts: list[str] = [
-            "usr-archived-overlay-guard",
-            "--tool",
-            "densegen",
-            "--config",
-            config,
-            "--workspace-root",
-            str(runbook.workspace_root),
-            "--max-archived-entries",
-            str(archived_overlay_guard.max_archived_entries),
-            "--max-archived-bytes",
-            str(archived_overlay_guard.max_archived_bytes),
-            "--json",
-        ]
-        densegen_usr_contract_checks.append(_ops_gate_command(*archived_overlay_guard_parts))
-        if runbook.notify is not None:
-            densegen_usr_contract_checks.append(
-                _argv_command(
-                    "uv",
-                    "run",
-                    "dense",
-                    "inspect",
-                    "run",
-                    "--usr-events-path",
-                    "-c",
-                    config,
-                )
-            )
-        gurobi_home = os.environ.get("GUROBI_HOME", "/share/pkg.7/gurobi/10.0.1/install")
-        ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
-        gurobi_ld_library_path = f"{gurobi_home}/lib"
-        if ld_library_path:
-            gurobi_ld_library_path = f"{gurobi_ld_library_path}:{ld_library_path}"
-        solver_probe_env = {
-            "GUROBI_HOME": gurobi_home,
-            "GRB_LICENSE_FILE": os.environ.get("GRB_LICENSE_FILE", "/usr/local/gurobi/gurobi.lic"),
-            "TOKENSERVER": os.environ.get("TOKENSERVER", "sccsvc.bu.edu"),
-            "LD_LIBRARY_PATH": gurobi_ld_library_path,
-        }
-        return [
-            *shared,
-            *densegen_usr_contract_checks,
-            _argv_command(
-                "uv",
-                "run",
-                "dense",
-                "validate-config",
-                "--probe-solver",
-                "-c",
-                config,
-                env=solver_probe_env,
-            ),
-            _argv_command(
-                "qsub",
-                "-verify",
-                "-P",
-                runbook.project,
-                "-o",
-                stdout_file,
-                "-pe",
-                "omp",
-                str(runbook.resources.pe_omp),
-                "-l",
-                f"h_rt={runbook.resources.h_rt}",
-                "-l",
-                f"mem_per_core={runbook.resources.mem_per_core}",
-                "-v",
-                f"DENSEGEN_CONFIG={config}",
-                densegen_template,
-            ),
-            _ops_gate_command("qa-submit-preflight", "--template", densegen_template),
-            _argv_command(
-                "qsub",
-                "-verify",
-                "-P",
-                runbook.project,
-                "-o",
-                stdout_file,
-                "-pe",
-                "omp",
-                post_run_pe_omp,
-                "-l",
-                f"h_rt={post_run_h_rt}",
-                "-l",
-                f"mem_per_core={post_run_mem_per_core}",
-                "-v",
-                f"DENSEGEN_CONFIG={config}",
-                densegen_post_run_template,
-            ),
-            _ops_gate_command("qa-submit-preflight", "--template", densegen_post_run_template),
-            _ops_gate_command(*shape_command_parts),
-            _ops_gate_command(
-                "operator-brief",
-                "--planned-submits",
-                str(planned_submits),
-                "--warn-over-running",
-                "3",
-            ),
-        ]
-    assert runbook.infer is not None
-    config = str(runbook.infer.config)
-    infer_template = str(runbook.infer.qsub_template)
-    infer_overlay_guard = runbook.infer.overlay_guard
-    infer_overlay_guard_parts: list[str] = [
-        "usr-overlay-guard",
-        "--tool",
-        "infer",
-        "--config",
-        config,
-        "--workspace-root",
-        str(runbook.workspace_root),
-        "--mode",
-        mode_decision.selected_mode,
-        "--run-args",
-        mode_decision.run_args,
-        "--max-projected-overlay-parts",
-        str(infer_overlay_guard.max_projected_overlay_parts),
-        "--max-existing-overlay-parts",
-        str(infer_overlay_guard.max_existing_overlay_parts),
-        "--overlay-namespace",
-        infer_overlay_guard.overlay_namespace,
-        "--json",
+    tool_adapter = resolve_plan_tool_adapter(runbook)
+    tool_commands = [
+        _render_tool_command(command)
+        for command in tool_adapter.build_preflight_commands(runbook, mode_decision, stdout_file)
     ]
-    if infer_overlay_guard.auto_compact_existing_overlay_parts:
-        infer_overlay_guard_parts.append("--auto-compact-existing-overlay-parts")
     return [
         *shared,
-        _ops_gate_command(*infer_overlay_guard_parts),
-        _argv_command("uv", "run", "infer", "validate", "config", "--config", config),
-        _argv_command(
-            "qsub",
-            "-verify",
-            "-P",
-            runbook.project,
-            "-o",
-            stdout_file,
-            "-pe",
-            "omp",
-            str(runbook.resources.pe_omp),
-            "-l",
-            f"h_rt={runbook.resources.h_rt}",
-            "-l",
-            f"mem_per_core={runbook.resources.mem_per_core}",
-            "-l",
-            f"gpus={runbook.resources.gpus}",
-            "-l",
-            f"gpu_c={runbook.resources.gpu_capability}",
-            "-v",
-            f"CUDA_MODULE={runbook.infer.cuda_module},GCC_MODULE={runbook.infer.gcc_module}",
-            infer_template,
-        ),
-        _ops_gate_command("qa-submit-preflight", "--template", infer_template),
+        *tool_commands,
         _ops_gate_command(*shape_command_parts),
         _ops_gate_command(
             "operator-brief",
@@ -588,15 +354,9 @@ def _notify_smoke_commands(
     if runbook.notify is None:
         return []
 
-    if is_densegen_workflow_id(runbook.workflow_id):
-        assert runbook.densegen is not None
-        config = str(runbook.densegen.config)
-        setup_tool = runbook.notify.tool
-    else:
-        assert runbook.infer is not None
-        config = str(runbook.infer.config)
-        setup_tool = runbook.notify.tool
-    resolve_tool = setup_tool
+    tool_adapter = resolve_plan_tool_adapter(runbook)
+    config = str(tool_adapter.notify_config_path(runbook))
+    resolve_tool = tool_adapter.tool
     notify_runtime = _resolve_notify_runtime_contract(
         runbook.notify.webhook_env,
         profile_path=runbook.notify.profile,
@@ -696,86 +456,16 @@ def _submit_commands(runbook: OrchestrationRunbookV1, *, mode_decision: ModeDeci
     if mode_decision.submit_behavior == "hold_jid" and mode_decision.hold_jid:
         hold_fragment = ["-hold_jid", mode_decision.hold_jid]
 
-    if is_densegen_workflow_id(runbook.workflow_id):
-        assert runbook.densegen is not None
-        post_run_pe_omp, post_run_h_rt, post_run_mem_per_core = _densegen_post_run_resource_values(runbook)
-        runtime_trace_dir = (runbook.workspace_root / WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR).resolve()
-        densegen_job_name = _sge_job_name(runbook_id=runbook.id, suffix="densegen_cpu")
-        densegen_post_run_job_name = _sge_job_name(runbook_id=runbook.id, suffix="densegen_postrun")
-        densegen_submit = _argv_command(
-            "qsub",
-            "-terse",
-            "-P",
-            runbook.project,
-            *hold_fragment,
-            "-N",
-            densegen_job_name,
-            "-o",
+    tool_adapter = resolve_plan_tool_adapter(runbook)
+    submit_commands.extend(
+        _render_tool_command(command)
+        for command in tool_adapter.build_submit_commands(
+            runbook,
+            mode_decision,
             stdout_file,
-            "-pe",
-            "omp",
-            str(runbook.resources.pe_omp),
-            "-l",
-            f"h_rt={runbook.resources.h_rt}",
-            "-l",
-            f"mem_per_core={runbook.resources.mem_per_core}",
-            "-v",
-            "DENSEGEN_CONFIG="
-            f"{runbook.densegen.config},DENSEGEN_RUN_ARGS={mode_decision.run_args},DENSEGEN_TRACE_DIR={runtime_trace_dir}",
-            str(runbook.densegen.qsub_template),
+            tuple(hold_fragment),
         )
-        densegen_post_run_submit = _argv_command(
-            "qsub",
-            "-terse",
-            "-P",
-            runbook.project,
-            "-hold_jid",
-            densegen_job_name,
-            "-N",
-            densegen_post_run_job_name,
-            "-o",
-            stdout_file,
-            "-pe",
-            "omp",
-            post_run_pe_omp,
-            "-l",
-            f"h_rt={post_run_h_rt}",
-            "-l",
-            f"mem_per_core={post_run_mem_per_core}",
-            "-v",
-            f"DENSEGEN_CONFIG={runbook.densegen.config}",
-            str(runbook.densegen.post_run.qsub_template),
-        )
-        submit_commands.append(densegen_submit)
-        submit_commands.append(densegen_post_run_submit)
-        return submit_commands
-
-    assert runbook.infer is not None
-    infer_submit = _argv_command(
-        "qsub",
-        "-terse",
-        "-P",
-        runbook.project,
-        *hold_fragment,
-        "-o",
-        stdout_file,
-        "-pe",
-        "omp",
-        str(runbook.resources.pe_omp),
-        "-l",
-        f"h_rt={runbook.resources.h_rt}",
-        "-l",
-        f"mem_per_core={runbook.resources.mem_per_core}",
-        "-l",
-        f"gpus={runbook.resources.gpus}",
-        "-l",
-        f"gpu_c={runbook.resources.gpu_capability}",
-        "-v",
-        "INFER_CONFIG="
-        f"{runbook.infer.config},CUDA_MODULE={runbook.infer.cuda_module},GCC_MODULE={runbook.infer.gcc_module}",
-        str(runbook.infer.qsub_template),
     )
-    submit_commands.append(infer_submit)
     return submit_commands
 
 
@@ -789,8 +479,7 @@ def build_batch_plan(
 ) -> BatchPlan:
     if runbook.notify is None and requested_smoke is not None:
         raise ValueError("notify smoke override is not valid when runbook.notify is absent")
-    if not is_densegen_workflow_id(runbook.workflow_id):
-        _validate_infer_resource_contract(runbook)
+    resolve_plan_tool_adapter(runbook).validate_resources(runbook)
     selected_smoke: SmokeMode | None = requested_smoke or (runbook.notify.smoke if runbook.notify is not None else None)
     mode_decision = resolve_mode_decision(
         runbook=runbook,

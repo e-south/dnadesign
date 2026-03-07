@@ -4061,3 +4061,54 @@ Finish the next ops decoupling increment by making runbook schema the canonical 
 1. Workflow-tool membership now has one canonical source in schema.
 2. Registered mode-tool adapters are inspectable through a read-only API.
 3. Registry/schema drift now fails fast during import and is also enforced by tests.
+
+## 2026-03-07 - Phase 2 Slice AV (Plan-Tool Adapter Seam For Ops Rendering)
+
+### Goal
+
+Reduce remaining tool branching in ops plan rendering by extracting workflow-specific preflight, notify-config, resource-validation, and submit behavior into a dedicated `plan_tools.py` adapter module.
+
+### Prioritized findings
+
+1. High: `plan.py` still branched directly on densegen vs infer across preflight, notify smoke, submit, and resource validation.
+2. Medium: mode resolution had already been decoupled, but command-plan rendering still concentrated tool-specific knowledge in one file.
+3. Medium: there was no explicit plan-tool registry or workflow-coverage contract comparable to `mode_tools.py`.
+
+### TDD sequence
+
+1. Red:
+   - `test_list_registered_plan_tools_returns_sorted_read_only_tuple`
+   - `test_registered_plan_tools_exactly_match_schema_workflow_tools`
+   - `test_plan_tool_adapters_cover_all_schema_workflow_ids`
+2. Green:
+   - added `ops/orchestrator/plan_tools.py` with schema-backed plan-tool adapter registry.
+   - moved tool-specific resource validation, notify-config resolution, preflight command generation, and submit command generation into adapters.
+   - rewired `plan.py` to render tool command specs via `resolve_plan_tool_adapter(...)` rather than direct workflow branching.
+   - added import-time registry/schema drift validation for plan-tool adapters.
+3. Verify:
+   - focused plan-tool and runbook plan tests pass.
+   - full ops orchestration + notify suites pass.
+
+### Changes applied
+
+1. `src/dnadesign/ops/orchestrator/plan_tools.py`
+   - new plan-tool adapter module.
+   - explicit adapter registration and read-only introspection.
+   - densegen/infer tool-specific preflight + submit contract builders.
+2. `src/dnadesign/ops/orchestrator/plan.py`
+   - removed direct densegen/infer branching from preflight, notify-smoke config selection, submit, and resource validation.
+   - now converts `ToolCommandSpec` values from `plan_tools.py` into `CommandSpec`.
+3. `src/dnadesign/ops/tests/test_plan_tools.py`
+   - new registry and workflow-coverage tests.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/ops/tests/test_plan_tools.py`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_plan_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "plan_tool or mode_tool or infer_runbook_uses_gpu_submit_template_and_filters or infer_batch_submit_without_notify_skips_notify_phase or build_batch_plan"`
+3. `uv run pytest -q src/dnadesign/ops/tests/test_plan_tools.py src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+
+### Contract impact
+
+1. Ops plan rendering now has an explicit adapter seam parallel to mode resolution.
+2. Tool onboarding path is narrower: add schema workflow-tool mapping plus plan/mode adapter registrations instead of editing `plan.py` branching sites.
+3. `plan.py` now owns common orchestration rendering while `plan_tools.py` owns workflow-specific command planning.
