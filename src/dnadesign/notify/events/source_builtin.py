@@ -16,7 +16,7 @@ from pathlib import Path
 
 from dnadesign._contracts import (
     resolve_densegen_usr_output_contract,
-    resolve_infer_evo2_usr_output_contract,
+    resolve_infer_usr_output_contract,
 )
 
 from ..errors import NotifyConfigError
@@ -32,9 +32,9 @@ def _resolve_densegen_events_from_config(config_path: Path) -> Path:
     return (contract.usr_root / contract.usr_dataset / ".events.log").resolve()
 
 
-def _resolve_infer_evo2_events_from_config(config_path: Path) -> Path:
+def _resolve_infer_events_from_config(config_path: Path) -> Path:
     try:
-        contract = resolve_infer_evo2_usr_output_contract(config_path)
+        contract = resolve_infer_usr_output_contract(config_path)
     except ValueError as exc:
         raise NotifyConfigError(str(exc)) from exc
     return (contract.usr_root / contract.usr_dataset / ".events.log").resolve()
@@ -49,8 +49,7 @@ def register_builtin_tool_events_sources(register: ToolEventsSourceRegister) -> 
         default_policy="densegen",
     )
     register(
-        tool="infer_evo2",
-        resolver=_resolve_infer_evo2_events_from_config,
-        default_policy="infer_evo2",
-        aliases=("infer-evo2",),
+        tool="infer",
+        resolver=_resolve_infer_events_from_config,
+        default_policy="infer",
     )

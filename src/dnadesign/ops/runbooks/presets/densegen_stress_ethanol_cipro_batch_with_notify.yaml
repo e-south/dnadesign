@@ -34,7 +34,7 @@ runbook:
     qsub_template: ../../../../../docs/bu-scc/jobs/notify-watch.qsub
     smoke: dry
   resources:
-    pe_omp: 16
+    pe_omp: 12
     h_rt: 08:00:00
     mem_per_core: 8G
   mode_policy:

@@ -584,7 +584,7 @@ def test_main_usr_overlay_guard_infer_tool_is_explicitly_skipped(tmp_path: Path,
         [
             "usr-overlay-guard",
             "--tool",
-            "infer_evo2",
+            "infer",
             "--config",
             str(config_path),
             "--workspace-root",
@@ -605,7 +605,7 @@ def test_main_usr_overlay_guard_infer_tool_is_explicitly_skipped(tmp_path: Path,
     assert exit_code == 0
     payload = json.loads(captured.out)
     assert payload["guard_status"] == "skipped"
-    assert payload["tool"] == "infer_evo2"
+    assert payload["tool"] == "infer"
     assert "does not emit overlay parts" in payload["reason"]
 
 
@@ -619,7 +619,7 @@ def test_main_usr_records_part_guard_infer_tool_is_explicitly_skipped(tmp_path: 
         [
             "usr-records-part-guard",
             "--tool",
-            "infer_evo2",
+            "infer",
             "--config",
             str(config_path),
             "--workspace-root",
@@ -642,7 +642,7 @@ def test_main_usr_records_part_guard_infer_tool_is_explicitly_skipped(tmp_path: 
     assert exit_code == 0
     payload = json.loads(captured.out)
     assert payload["guard_status"] == "skipped"
-    assert payload["tool"] == "infer_evo2"
+    assert payload["tool"] == "infer"
     assert "does not emit records part files" in payload["reason"]
 
 

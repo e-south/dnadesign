@@ -328,8 +328,8 @@ def test_qsub_script_applies_infer_policy_filters(tmp_path: Path) -> None:
     env["EVENTS_PATH"] = str(events_path)
     env["WEBHOOK_FILE"] = str(webhook_file)
     env["WEBHOOK_ENV"] = "DENSEGEN_WEBHOOK"
-    env["NOTIFY_POLICY"] = "infer_evo2"
-    env["NOTIFY_NAMESPACE"] = "infer_evo2"
+    env["NOTIFY_POLICY"] = "infer"
+    env["NOTIFY_NAMESPACE"] = "infer"
     env.pop("DENSEGEN_WEBHOOK", None)
 
     result = subprocess.run(

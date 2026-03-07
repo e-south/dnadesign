@@ -286,6 +286,57 @@ def _clear_outputs_preserving_notify(*, outputs_root: Path) -> None:
             child.unlink()
 
 
+def _render_os_error(exc: OSError) -> str:
+    detail = exc.strerror or str(exc)
+    filename = getattr(exc, "filename", None)
+    if filename:
+        return f"{detail} ({filename})"
+    return detail
+
+
+def _reset_outputs(
+    *,
+    cfg,
+    cfg_path: Path,
+    run_root: Path,
+    outputs_root: Path,
+    context: CliContext,
+    preserve_usr_registry: bool,
+    remove_empty_root: bool,
+) -> list[Path]:
+    registry_snapshots: dict[Path, str] = {}
+    if preserve_usr_registry:
+        registry_snapshots = _capture_usr_registry_snapshots(
+            cfg=cfg,
+            cfg_path=cfg_path,
+            run_root=run_root,
+            context=context,
+        )
+    try:
+        _clear_outputs_preserving_notify(outputs_root=outputs_root)
+    except OSError as exc:
+        raise RuntimeError(f"Failed to clear outputs: {_render_os_error(exc)}") from exc
+    except Exception as exc:
+        raise RuntimeError(f"Failed to clear outputs: {exc}") from exc
+
+    if registry_snapshots:
+        try:
+            _restore_usr_registry_snapshots(snapshots=registry_snapshots)
+        except OSError as exc:
+            raise RuntimeError(f"Failed to restore preserved USR registry: {_render_os_error(exc)}") from exc
+        except Exception as exc:
+            raise RuntimeError(f"Failed to restore preserved USR registry: {exc}") from exc
+
+    if remove_empty_root:
+        try:
+            if outputs_root.exists() and not any(outputs_root.iterdir()):
+                outputs_root.rmdir()
+        except OSError as exc:
+            raise RuntimeError(f"Failed to finalize outputs cleanup: {_render_os_error(exc)}") from exc
+
+    return sorted(registry_snapshots)
+
+
 def _print_usr_registry_next_steps(*, console) -> None:
     console.print("[bold]Next steps[/]:")
     console.print("  - stage your run via `dense workspace init --output-mode usr|both` to seed registry.yaml")
@@ -352,20 +403,20 @@ def _resolve_resume_mode(
         raise typer.Exit(code=1)
 
     if fresh:
-        registry_snapshots = _capture_usr_registry_snapshots(
-            cfg=cfg,
-            cfg_path=cfg_path,
-            run_root=run_root,
-            context=context,
-        )
         if outputs_root.exists():
             try:
-                _clear_outputs_preserving_notify(outputs_root=outputs_root)
-            except Exception as exc:
-                console.print(f"[bold red]Failed to clear outputs:[/] {exc}")
+                _reset_outputs(
+                    cfg=cfg,
+                    cfg_path=cfg_path,
+                    run_root=run_root,
+                    outputs_root=outputs_root,
+                    context=context,
+                    preserve_usr_registry=True,
+                    remove_empty_root=False,
+                )
+            except RuntimeError as exc:
+                console.print(f"[bold red]{exc}[/]")
                 raise typer.Exit(code=1) from exc
-            if registry_snapshots:
-                _restore_usr_registry_snapshots(snapshots=registry_snapshots)
             console.print(
                 ":broom: [bold yellow]Cleared outputs[/]: "
                 f"{context.display_path(outputs_root, run_root, absolute=False)}"
@@ -892,24 +943,26 @@ def register_run_commands(
                 console.print("[yellow]Reset aborted.[/]")
                 raise typer.Exit(code=1)
 
-        registry_snapshots: dict[Path, str] = {}
-        if not purge_usr_registry:
-            registry_snapshots = _capture_usr_registry_snapshots(
+        try:
+            preserved_registry_paths = _reset_outputs(
                 cfg=loaded.root.densegen,
                 cfg_path=cfg_path,
                 run_root=run_root,
+                outputs_root=outputs_root,
                 context=context,
+                preserve_usr_registry=not purge_usr_registry,
+                remove_empty_root=True,
             )
+        except RuntimeError as exc:
+            console.print(f"[bold red]{exc}[/]")
+            raise typer.Exit(code=1) from exc
 
-        shutil.rmtree(outputs_root)
-        if registry_snapshots:
-            _restore_usr_registry_snapshots(snapshots=registry_snapshots)
         console.print(
             ":broom: [bold green]Removed outputs under[/] "
             f"{context.display_path(outputs_root, run_root, absolute=False)}"
         )
-        if registry_snapshots:
+        if preserved_registry_paths:
             preserved = ", ".join(
-                context.display_path(path, run_root, absolute=False) for path in sorted(registry_snapshots)
+                context.display_path(path, run_root, absolute=False) for path in preserved_registry_paths
             )
             console.print(f":bookmark_tabs: [bold green]Preserved USR registry[/]: {preserved}")

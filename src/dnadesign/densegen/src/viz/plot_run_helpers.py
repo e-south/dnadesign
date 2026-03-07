@@ -145,30 +145,54 @@ def _ellipsize(label: object, max_len: int = 18) -> str:
 
 def _forbidden_kmer_tokens(value: object) -> list[str]:
     tokens: set[str] = set()
+
+    def _collect_from_payload(payload: object) -> None:
+        if not isinstance(payload, dict):
+            return
+        single = payload.get("forbidden_kmer")
+        if isinstance(single, str) and single.strip():
+            tokens.add(single.strip().upper())
+        multi = payload.get("forbidden_kmers")
+        if isinstance(multi, list):
+            for item in multi:
+                if isinstance(item, str) and item.strip():
+                    tokens.add(item.strip().upper())
+        kmer = payload.get("kmer")
+        if isinstance(kmer, str) and kmer.strip():
+            tokens.add(kmer.strip().upper())
+        kmers = payload.get("kmers")
+        if isinstance(kmers, list):
+            for item in kmers:
+                if isinstance(item, str) and item.strip():
+                    tokens.add(item.strip().upper())
+        violations = payload.get("violations")
+        if isinstance(violations, list):
+            for item in violations:
+                if not isinstance(item, dict):
+                    continue
+                constraint = str(item.get("constraint") or "").strip().lower()
+                if "forbid" not in constraint:
+                    continue
+                pattern = item.get("pattern")
+                if isinstance(pattern, str) and pattern.strip():
+                    tokens.add(pattern.strip().upper())
+                matched_seq = item.get("matched_seq")
+                if isinstance(matched_seq, str) and matched_seq.strip():
+                    tokens.add(matched_seq.strip().upper())
+
     text = str(value or "").strip()
     if not text:
         return []
+    if isinstance(value, dict):
+        _collect_from_payload(value)
+    elif isinstance(value, list):
+        for item in value:
+            _collect_from_payload(item)
     json_match = re.search(r"\{.*\}", text)
     if json_match:
         try:
             payload = json.loads(json_match.group(0))
-            if isinstance(payload, dict):
-                single = payload.get("forbidden_kmer")
-                if isinstance(single, str) and single.strip():
-                    tokens.add(single.strip().upper())
-                multi = payload.get("forbidden_kmers")
-                if isinstance(multi, list):
-                    for item in multi:
-                        if isinstance(item, str) and item.strip():
-                            tokens.add(item.strip().upper())
-                kmer = payload.get("kmer")
-                if isinstance(kmer, str) and kmer.strip():
-                    tokens.add(kmer.strip().upper())
-                kmers = payload.get("kmers")
-                if isinstance(kmers, list):
-                    for item in kmers:
-                        if isinstance(item, str) and item.strip():
-                            tokens.add(item.strip().upper())
+            _collect_from_payload(payload)
         except Exception:
             pass
     for match in re.findall(r'"forbidden_kmer"\s*:\s*"([acgtun]+)"', text):
@@ -198,6 +222,13 @@ def _reason_family_label(status: str, reason: object, detail_json: object | None
         if len(tokens) > 1:
             return f"forbidden kmers: {', '.join(tokens)}"
         return "forbidden kmer"
+    if value == "sequence_validation_failed":
+        tokens = sorted(set(_forbidden_kmer_tokens(reason_text)) | set(_forbidden_kmer_tokens(detail_json)))
+        if len(tokens) == 1:
+            return f"forbidden kmer: {tokens[0]}"
+        if len(tokens) > 1:
+            return f"forbidden kmers: {', '.join(tokens)}"
+        return "sequence validation"
     replacements = {
         "postprocess_forbidden_kmer": "forbidden kmer",
         "stall_no_solution": "no solution",

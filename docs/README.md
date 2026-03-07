@@ -1,14 +1,14 @@
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-01
+**Last verified:** 2026-03-07
 
 This is the central documentation map for workflows, tool references, and repository policy.
 
 ### Use this index
 
 1. If this is a new machine, start with [Installation](installation.md) first.
-2. Continue to [Workflow routes](#workflow-routes) to choose a preflight -> run -> verify path by outcome.
+2. Continue to [Workflow routes](#workflow-routes) and follow the preflight -> run -> verify sequence for the relevant outcome.
 3. Follow the route's "Verify next" target before moving to downstream tools.
 4. Use [Tool docs](#tool-docs) when you need package-level commands and data contracts.
 5. Use [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for policy, operations, and governance detail.
@@ -19,12 +19,13 @@ This is the central documentation map for workflows, tool references, and reposi
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
 | Design a sequence library in a workspace | [DenseGen docs overview](../src/dnadesign/densegen/docs/README.md) | Verify generated artifacts and metadata with [DenseGen outputs reference](../src/dnadesign/densegen/docs/reference/outputs.md). |
-| Run model inference and write outputs back to datasets | [Infer README](../src/dnadesign/infer/README.md) | Verify write-back columns and types with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
+| Run model inference and write outputs back to datasets | [Infer docs index](../src/dnadesign/infer/docs/README.md) | Verify write-back columns and types with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
+| Build SCC Evo2 infer GPU environment deterministically | [BU SCC install bootstrap](bu-scc/install.md#gpu-setup-and-verification-runbook) | Verify infer model capabilities with [infer SCC Evo2 GPU runbook](../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md). |
 | Operate Notify for local event watching and webhook setup | [Notify docs index](notify/README.md) | Verify mode and delivery contracts in [Notify command contracts](../src/dnadesign/notify/docs/reference/command-contracts.md). |
 | Inspect Notify package internals or extension seams | [Notify package docs index](../src/dnadesign/notify/docs/README.md) | Verify module boundaries in [Notify maintainer architecture map](../src/dnadesign/notify/docs/dev/architecture.md). |
 | Sync iterative HPC outputs to local analysis safely | [USR workflow map](../src/dnadesign/usr/docs/operations/workflow-map.md) -> [USR HPC sync flow](../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md) | Verify transfer parity with [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync-audit-loop.md). |
 | Run cross-machine sync with stricter failure checks | [USR sync command contract](../src/dnadesign/usr/docs/operations/sync.md) | Verify sidecar and overlay fidelity with [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync-fidelity-drills.md). |
-| Chain DenseGen -> USR -> Infer -> USR updates | [Chained workflow demo](../src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md) | Verify downstream dataset state with [Infer docs](../src/dnadesign/infer/README.md). |
+| Chain DenseGen -> USR -> Infer -> USR updates | [Chained workflow demo](../src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md) | Verify downstream dataset state with [Infer docs](../src/dnadesign/infer/docs/README.md). |
 | Run BU SCC batch jobs with notifications | [BU SCC batch + notify runbook](bu-scc/batch-notify.md) | Verify event delivery contract in [Notify USR events contract](notify/usr-events.md). |
 | Plan and execute deterministic HPC runbooks | [Ops operations index](operations/README.md) | Verify command ordering and outcomes in [orchestration audit contract](operations/orchestration-runbooks.md#contract-rules). |
 

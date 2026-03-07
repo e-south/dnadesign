@@ -38,7 +38,7 @@ def test_resolve_tool_workspace_config_path_densegen_from_repo_root(tmp_path: Pa
     assert resolved == config_path.resolve()
 
 
-def test_resolve_tool_workspace_config_path_supports_infer_alias(tmp_path: Path) -> None:
+def test_resolve_tool_workspace_config_path_supports_infer_tool(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     config_path = repo_root / "src" / "dnadesign" / "infer" / "workspaces" / "demo_i" / "config.yaml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -46,12 +46,25 @@ def test_resolve_tool_workspace_config_path_supports_infer_alias(tmp_path: Path)
     (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\n", encoding="utf-8")
 
     resolved = resolve_tool_workspace_config_path(
-        tool="infer-evo2",
+        tool="infer",
         workspace="demo_i",
         search_start=repo_root,
     )
 
     assert resolved == config_path.resolve()
+
+
+def test_resolve_tool_workspace_config_path_rejects_legacy_infer_alias(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir(parents=True, exist_ok=True)
+    (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\n", encoding="utf-8")
+
+    with pytest.raises(NotifyConfigError, match="unsupported tool"):
+        resolve_tool_workspace_config_path(
+            tool="infer-evo2",
+            workspace="demo_i",
+            search_start=repo_root,
+        )
 
 
 def test_list_tool_workspaces_reports_available_workspace_names(tmp_path: Path) -> None:

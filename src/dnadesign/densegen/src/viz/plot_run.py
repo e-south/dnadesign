@@ -84,8 +84,10 @@ def _outcomes_attempts_per_row_for_workload(max_plan_attempts: int) -> int:
     attempts = max(1, int(max_plan_attempts))
     if attempts < 10_000:
         return 10
-    if attempts < 1_000_000:
+    if attempts < 100_000:
         return 100
+    if attempts < 1_000_000:
+        return 500
     return 1000
 
 
@@ -222,10 +224,12 @@ def _build_run_health_outcomes_figure(
     )
     plan_counts = attempts_df["plan_name"].astype(str).value_counts()
     max_plan_attempts = int(plan_counts.max()) if not plan_counts.empty else int(len(attempts_df))
+    total_attempts = int(len(attempts_df))
+    workload_attempts = max(max_plan_attempts, total_attempts)
     try:
         attempts_per_row_raw = _style_cfg.get("run_health_outcomes_attempts_per_row")
         if attempts_per_row_raw is None:
-            attempts_per_row = _outcomes_attempts_per_row_for_workload(max_plan_attempts)
+            attempts_per_row = _outcomes_attempts_per_row_for_workload(workload_attempts)
         else:
             attempts_per_row = max(1, int(attempts_per_row_raw))
     except Exception as exc:
@@ -418,6 +422,7 @@ def _build_run_health_detail_figure(
     plan_colors = {plan: plan_palette[idx] for idx, plan in enumerate(plan_names)}
     plan_markers = _plan_markers(plan_names)
     problem = attempts_df[attempts_df["status"].astype(str).isin(["rejected", "failed"])].copy()
+    reason_label_size: float | None = None
     if problem.empty:
         ax_fail.text(
             0.5,
@@ -467,9 +472,18 @@ def _build_run_health_detail_figure(
             zorder=3,
         )
         ax_fail.set_yticks(positions)
-        ax_fail.set_yticklabels(
-            [_capitalize_first(_ellipsize(item, max_len=30)) for item in reason_counts.index.tolist()]
-        )
+        reason_labels = [_capitalize_first(str(item)) for item in reason_counts.index.tolist()]
+        ax_fail.set_yticklabels(reason_labels)
+        try:
+            reason_label_size_raw = _style_cfg.get("run_health_reason_label_size")
+            if reason_label_size_raw is None:
+                reason_label_size = max(7.0, 11.0 - 0.20 * max(0, len(reason_labels) - 8))
+            else:
+                reason_label_size = float(reason_label_size_raw)
+            if reason_label_size <= 0:
+                raise ValueError
+        except Exception as exc:
+            raise ValueError("run_health_reason_label_size must be a number > 0") from exc
         ax_fail.invert_yaxis()
         x_pad = 5.0
         y_pad = 0.2
@@ -561,6 +575,9 @@ def _build_run_health_detail_figure(
     ax_plan.set_box_aspect(1.0)
 
     _apply_style(ax_fail, _style_cfg)
+    if reason_label_size is not None:
+        for tick in ax_fail.get_yticklabels():
+            tick.set_fontsize(float(reason_label_size))
     _apply_style(ax_plan, _style_cfg)
     handles = []
     for plan in plan_names:

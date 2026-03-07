@@ -21,7 +21,7 @@ from dnadesign.notify.errors import NotifyConfigError
 from dnadesign.notify.events.source import register_tool_events_source, resolve_tool_events_path
 
 
-def test_resolve_tool_events_path_infer_evo2_from_single_usr_writeback_job(tmp_path: Path) -> None:
+def test_resolve_tool_events_path_infer_from_single_usr_writeback_job(tmp_path: Path) -> None:
     config = tmp_path / "infer.yaml"
     usr_root = tmp_path / "usr_root"
     config.write_text(
@@ -49,13 +49,13 @@ def test_resolve_tool_events_path_infer_evo2_from_single_usr_writeback_job(tmp_p
         encoding="utf-8",
     )
 
-    events_path, policy = resolve_tool_events_path(tool="infer_evo2", config=config)
+    events_path, policy = resolve_tool_events_path(tool="infer", config=config)
 
     assert events_path == (usr_root / "infer_demo" / ".events.log").resolve()
-    assert policy == "infer_evo2"
+    assert policy == "infer"
 
 
-def test_resolve_tool_events_path_infer_evo2_uses_env_usr_root_when_ingest_root_absent(
+def test_resolve_tool_events_path_infer_uses_env_usr_root_when_ingest_root_absent(
     tmp_path: Path, monkeypatch
 ) -> None:
     config = tmp_path / "infer.yaml"
@@ -85,13 +85,13 @@ def test_resolve_tool_events_path_infer_evo2_uses_env_usr_root_when_ingest_root_
     )
     monkeypatch.setenv("DNADESIGN_USR_ROOT", str(usr_root))
 
-    events_path, policy = resolve_tool_events_path(tool="infer_evo2", config=config)
+    events_path, policy = resolve_tool_events_path(tool="infer", config=config)
 
     assert events_path == (usr_root / "infer_demo" / ".events.log").resolve()
-    assert policy == "infer_evo2"
+    assert policy == "infer"
 
 
-def test_resolve_tool_events_path_infer_evo2_requires_explicit_root_without_env(tmp_path: Path, monkeypatch) -> None:
+def test_resolve_tool_events_path_infer_requires_explicit_root_without_env(tmp_path: Path, monkeypatch) -> None:
     config = tmp_path / "infer.yaml"
     config.write_text(
         "\n".join(
@@ -119,10 +119,10 @@ def test_resolve_tool_events_path_infer_evo2_requires_explicit_root_without_env(
     monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
 
     with pytest.raises(NotifyConfigError, match="requires ingest.root or DNADESIGN_USR_ROOT"):
-        resolve_tool_events_path(tool="infer_evo2", config=config)
+        resolve_tool_events_path(tool="infer", config=config)
 
 
-def test_resolve_tool_events_path_infer_evo2_rejects_ambiguous_destinations(tmp_path: Path) -> None:
+def test_resolve_tool_events_path_infer_rejects_ambiguous_destinations(tmp_path: Path) -> None:
     config = tmp_path / "infer.yaml"
     config.write_text(
         "\n".join(
@@ -160,10 +160,10 @@ def test_resolve_tool_events_path_infer_evo2_rejects_ambiguous_destinations(tmp_
     )
 
     with pytest.raises(NotifyConfigError, match="multiple USR destinations"):
-        resolve_tool_events_path(tool="infer_evo2", config=config)
+        resolve_tool_events_path(tool="infer", config=config)
 
 
-def test_resolve_tool_events_path_infer_evo2_requires_usr_writeback_job(tmp_path: Path) -> None:
+def test_resolve_tool_events_path_infer_requires_usr_writeback_job(tmp_path: Path) -> None:
     config = tmp_path / "infer.yaml"
     config.write_text(
         "\n".join(
@@ -187,6 +187,14 @@ def test_resolve_tool_events_path_infer_evo2_requires_usr_writeback_job(tmp_path
     )
 
     with pytest.raises(NotifyConfigError, match="ingest.source='usr'"):
+        resolve_tool_events_path(tool="infer", config=config)
+
+
+def test_resolve_tool_events_path_rejects_legacy_infer_alias(tmp_path: Path) -> None:
+    config = tmp_path / "infer.yaml"
+    config.write_text("jobs: []\n", encoding="utf-8")
+
+    with pytest.raises(NotifyConfigError, match="unsupported tool"):
         resolve_tool_events_path(tool="infer_evo2", config=config)
 
 

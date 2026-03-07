@@ -17,7 +17,7 @@ This page maps package boundaries for maintainers extending command registration
 ### Event-source and profile boundaries
 
 - `src/dnadesign/notify/events/source.py`: tool resolver registry.
-- `src/dnadesign/notify/events/source_builtin.py`: built-in tool resolvers (`densegen`, `infer_evo2`).
+- `src/dnadesign/notify/events/source_builtin.py`: built-in tool resolvers (`densegen`, `infer`).
 - `src/dnadesign/notify/profiles/flow_events.py`: setup event-source mode resolution.
 - `src/dnadesign/notify/profiles/flow_webhook.py`: webhook source selection and secure ref storage.
 - `src/dnadesign/notify/profiles/flow_profile.py`: profile materialization and default path resolution.

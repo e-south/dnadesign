@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -766,6 +767,57 @@ def test_campaign_reset_preserves_usr_registry_by_default(tmp_path: Path) -> Non
     assert not stale_table.exists()
 
 
+def test_campaign_reset_preserves_notify_profile_scaffold(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+    outputs_dir = run_root / "outputs"
+    notify_dir = outputs_dir / "notify" / "densegen"
+    notify_dir.mkdir(parents=True, exist_ok=True)
+    profile_path = notify_dir / "profile.json"
+    cursor_path = notify_dir / "cursor"
+    profile_path.write_text('{"provider":"slack"}\n')
+    cursor_path.write_text("12345\n")
+    stale_table = outputs_dir / "tables" / "records.parquet"
+    stale_table.parent.mkdir(parents=True, exist_ok=True)
+    stale_table.write_text("seed")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["campaign-reset", "--yes", "-c", str(cfg_path)])
+
+    assert result.exit_code == 0, result.output
+    assert profile_path.exists()
+    assert profile_path.read_text() == '{"provider":"slack"}\n'
+    assert cursor_path.exists()
+    assert cursor_path.read_text() == "12345\n"
+    assert not stale_table.exists()
+
+
+def test_campaign_reset_reports_clear_outputs_errors(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+    outputs_dir = run_root / "outputs"
+    stale_table = outputs_dir / "tables" / "records.parquet"
+    stale_table.parent.mkdir(parents=True, exist_ok=True)
+    stale_table.write_text("seed")
+
+    def _raise_stale_file_handle(*, outputs_root: Path) -> None:
+        raise OSError(errno.ESTALE, "Stale file handle", str(outputs_root))
+
+    runner = CliRunner()
+    monkeypatch.setattr(run_command, "_clear_outputs_preserving_notify", _raise_stale_file_handle)
+    result = runner.invoke(app, ["campaign-reset", "--yes", "-c", str(cfg_path)])
+
+    assert result.exit_code == 1
+    assert "Failed to clear outputs" in result.output
+    assert "Stale file handle" in result.output
+    assert "Traceback" not in result.output
+    assert outputs_dir.exists()
+
+
 def test_campaign_reset_purge_usr_registry_removes_registry(tmp_path: Path) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
@@ -865,6 +917,35 @@ def test_run_fresh_preserves_notify_profile_and_cursor(tmp_path: Path, monkeypat
     assert cursor_path.exists()
     assert cursor_path.read_text() == "12345\n"
     assert not stale_marker.exists()
+
+
+def test_run_fresh_reports_clear_outputs_errors(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+    outputs_dir = run_root / "outputs"
+    stale_table = outputs_dir / "tables" / "records.parquet"
+    stale_table.parent.mkdir(parents=True, exist_ok=True)
+    stale_table.write_text("seed")
+
+    called = {"run_pipeline": False}
+
+    def _fake_run_pipeline(*_args, **_kwargs):
+        called["run_pipeline"] = True
+
+    def _raise_stale_file_handle(*, outputs_root: Path) -> None:
+        raise OSError(errno.ESTALE, "Stale file handle", str(outputs_root))
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    monkeypatch.setattr(run_command, "_clear_outputs_preserving_notify", _raise_stale_file_handle)
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "--fresh", "--no-plot", "-c", str(cfg_path)])
+
+    assert result.exit_code == 1
+    assert "Failed to clear outputs: Stale file handle" in result.output
+    assert "Traceback" not in result.output
+    assert called["run_pipeline"] is False
 
 
 def test_run_fresh_preserves_ops_logs_directory(tmp_path: Path, monkeypatch) -> None:

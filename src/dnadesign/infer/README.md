@@ -1,188 +1,36 @@
 ![infer banner](assets/infer-banner.svg)
 
-**infer** runs biological sequence models and writes results back to datasets.
+infer runs model-agnostic sequence inference and writes namespaced outputs back to datasets with explicit fail-fast contracts.
 
-See the [repository docs index](../../../docs/README.md) for workflow routes and operational references.
+## Documentation map
 
-- **Adapters:** `evo2` (implemented), `esm2` (stub)
-- **Ops (evo2):** `evo2.logits`, `evo2.embedding`, `evo2.log_likelihood`, `evo2.generate`
-- **Ingest sources:** sequences | records | pt_file | usr
-- **Outputs:** columnar dict; with USR attach, columns are:
+Read in this order:
 
-```bash
-infer__<model_id>__<job_id>__<out_id>
-```
+1. [infer docs index by workflow](docs/README.md)
+2. [infer docs index by type](docs/index.md)
+3. [getting-started guide](docs/getting-started/README.md)
+4. [CLI quickstart](docs/getting-started/cli-quickstart.md)
+5. [workspaces guide](workspaces/README.md)
+6. [operations index](docs/operations/README.md)
+7. [SCC Evo2 GPU environment runbook](docs/operations/scc-evo2-gpu-uv-runbook.md)
+8. [agnostic-model pressure-test runbook](docs/operations/pressure-test-agnostic-models.md)
+9. [end-to-end pressure-test demo (infer + usr + ops + notify)](docs/tutorials/demo_pressure_test_usr_ops_notify.md)
+10. [reference index](docs/reference/README.md)
+11. [source-tree map](src/README.md)
+12. [developer docs](docs/dev/README.md)
+13. [repository docs index](../../../docs/README.md)
 
-USR write-back contract:
+## Entrypoint contract
+
+1. Audience: infer operators and maintainers.
+2. Primary entrypoints: `uv run infer ...` and `python -m dnadesign.infer ...`.
+3. Prerequisites: installed adapter dependencies (for example `evo2`), valid input alphabet, and writable target when using `--write-back`.
+4. Verify next: [pressure-test runbook](docs/operations/pressure-test-agnostic-models.md).
+
+## Boundary reminder
+
+- USR write-back columns use this namespaced contract:
+  - `infer__<model_id>__<job_id>__<out_id>`
 - Infer writes USR outputs in chunk-sized attaches for resumable long runs.
-- Resume scan requires a readable USR `records.parquet`; unreadable tables fail fast.
-
-> Evo2 is from the Arc Institute: install [`evo2`](https://github.com/ArcInstitute/evo2) before use.
-
----
-
-### Install
-
-Add to `pyproject.toml` (already present in this repo):
-
-```toml
-[project.scripts]
-infer = "dnadesign.infer.cli:app"
-````
-
-You can still run as a module:
-
-```bash
-python -m dnadesign.infer  # dispatches to the Typer app
-```
-
----
-
-### Command line presets
-
-Presets are small YAML files shipped in `dnadesign.infer.presets`. They capture common jobs so you don’t have to remember flags.
-
-List & inspect:
-
-```bash
-infer presets list
-infer presets show evo2/extract_logits_ll
-````
-
-Run from a preset (extracting multiple outputs):
-
-```bash
-# From a USR dataset
-infer run --preset evo2/extract_logits_ll --usr my_dataset --field sequence --device cuda:0 --precision bf16 --write-back
-
-# Or ad-hoc (no YAML config), reading sequences from a file:
-infer extract --preset evo2/extract_logits_ll --seq-file ./seqs.txt --device cpu --dry-run
-```
-
-> The `evo2/extract_logits_ll` preset collects:
->
-> * `logits_mean` (mean‑pooled over dim=1)
-> * `ll_mean` (reduction=mean)
-> * `ll_sum` (reduction=sum)
-
-### Python API
-
-Run an in‑memory batch:
-
-```python
-from dnadesign.infer import run_extract
-
-out = run_extract(
-  ["ACGTACGT", "GTAC"],
-  model_id="evo2_7b",
-  outputs=[
-    {"id": "logits_mean", "fn": "evo2.logits",
-     "params": {"pool": {"method": "mean", "dim": 1}}, "format": "numpy"},
-    {"id": "ll_mean", "fn": "evo2.log_likelihood",
-     "params": {"method": "native", "reduction": "mean"}, "format": "float"},
-  ],
-  device="cuda:0", precision="bf16", alphabet="dna",
-)
-```
-
----
-
-### CLI Quick Reference
-
-#### `infer run` — run jobs from YAML
-
-```bash
-infer run --config ./config.yaml --job myjob
-infer run --dry-run
-infer run --device cuda:0 --precision bf16 --batch-size 128 --overwrite
-```
-
-#### `infer extract` — one output ad‑hoc (no YAML)
-
-```bash
-# From USR (attaches results if --write-back)
-infer extract --model-id evo2_7b --device cuda:0 --precision bf16 \
-  --fn evo2.log_likelihood --format float \
-  --usr my_dataset --field sequence --write-back
-
-# From sequences on stdin (file)
-infer extract --model-id evo2_7b --fn evo2.logits --format list \
-  --seq-file ./seqs.txt --pool-method mean --pool-dim 1
-```
-
-#### `infer generate` — prompt continuation
-
-```bash
-infer generate --model-id evo2_7b --device cuda:0 --precision bf16 \
-  --prompt ACGTACGT --max-new-tokens 64 --temperature 0.8 --out gen.txt
-```
-
-#### `infer adapters` — introspection & cache
-
-```bash
-infer adapters list
-infer adapters fns
-infer adapters cache-clear
-```
-
-#### `infer validate` — config & USR checks
-
-```bash
-infer validate config --config ./config.yaml
-infer validate usr --dataset my_dataset --field sequence
-```
-
----
-
-### Environment variables
-
-* `DNADESIGN_INFER_BATCH` — fallback micro‑batch size
-* `DNADESIGN_PROGRESS` — disable/enable progress (`0`/`1`)
-* `DNADESIGN_USR_ROOT` — default USR datasets root
-* `INFER_LOG_LEVEL` — default CLI log level
-* `INFER_ALLOW_PICKLE` — allow `.pt` ingestion without `--i-know-this-is-pickle`
-* `INFER_AUTO_DERATE_OOM` — `1` (default) to auto‑reduce batch on OOM
-
----
-
-### Extending Presets
-
-Add YAMLs under `dnadesign/infer/presets/your_ns/your_preset.yaml`:
-
-```yaml
-id: yourns/extract_example
-kind: extract
-model: { id: evo2_7b, precision: bf16, alphabet: dna }
-outputs: [ ... ]
-```
-
-They will automatically show up in `infer presets list`.
-
----
-
-## 🧱 Minimal structural tidy‑up
-
-- **Presentation/UI** (console helpers) now clearly separated in `_console.py`.
-- **Presets** live in `presets/` with a small **registry**; this is where we’ll grow preset coverage.
-- The **core** (engine/config/adapters/ingest/writers) is left in place to avoid invasive churn, but the new structure makes it easy to split into `core/` and `ui/` in a future minor release without breaking imports. The CLI and Python API retain the same public signatures.
-
----
-
-### Extending to new models
-
-Add an adapter `dnadesign/infer/adapters/your_model.py` and register:
-
-```python
-from dnadesign.infer.registry import register_model, register_fn
-from .your_model import YourAdapter
-
-register_model("yourns_foo", YourAdapter)
-register_fn("yourns.logits", "logits")
-register_fn("yourns.embedding", "embedding")
-register_fn("yourns.log_likelihood", "log_likelihood")
-register_fn("yourns.generate", "generate")
-```
-
-Use `model.id="yourns_foo"` and `fn: yourns.*` in YAML/CLI.
-
----
+- Resume scanning requires a readable USR `records.parquet`; unreadable tables fail fast.
+- Cross-tool workflow routes are maintained in [repository docs index](../../../docs/README.md).

@@ -225,8 +225,9 @@ def _build_summary_lines(contract: RunContractSummary, outcome: RunOutcomeSummar
     execution_line = _summary_with_source(execution_value, "config")
 
     if not outcome.available:
-        outcome_line = _summary_with_source("Outcome: manifest not found (no outcome summary available).", "manifest")
-        pressure_line = _summary_with_source("Pressure: manifest not found.", "manifest")
+        _unavailable_message = str(outcome.message or "").strip().rstrip(".") or "manifest not found"
+        outcome_line = _summary_with_source(f"Outcome: {_unavailable_message}.", "manifest")
+        pressure_line = _summary_with_source(f"Pressure: {_unavailable_message}.", "manifest")
     else:
         quota_total = int(outcome.quota_total or 0)
         generated_total = int(outcome.generated_total or 0)
@@ -447,8 +448,9 @@ def _render_outcome_section(contract: RunContractSummary, outcome: RunOutcomeSum
     rows = _build_plan_rows(contract, outcome)
 
     if not outcome.available:
-        lines.append("Outcome: manifest not found. [manifest]")
-        lines.append("Pressure: manifest not found. [manifest]")
+        _unavailable_message = str(outcome.message or "").strip().rstrip(".") or "manifest not found"
+        lines.append(f"Outcome: {_unavailable_message}. [manifest]")
+        lines.append(f"Pressure: {_unavailable_message}. [manifest]")
         lines.append("Plan-local pressure is not recorded in this manifest.")
         return "\n".join(lines)
 

@@ -45,8 +45,8 @@ When both sinks are enabled, plots and notebooks resolve records from `plots.sou
 
 - `dense run --resume` continues from existing run state.
 - `dense run --resume --extend-quota <n>` grows quotas without editing config.
-- `dense run --fresh` clears outputs and restarts from clean state.
-- `dense campaign-reset` clears outputs while preserving config and inputs.
+- `dense run --fresh` clears run artifacts under `outputs/` and restarts from clean state while preserving `outputs/notify` and `outputs/logs` scaffolding.
+- `dense campaign-reset` applies the same reset contract as `dense run --fresh`; by default it also preserves `output.usr.root/registry.yaml` unless `--purge-usr-registry` is set.
 
 ### Strand handling by stage
 

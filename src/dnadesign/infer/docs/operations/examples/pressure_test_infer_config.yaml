@@ -1,0 +1,27 @@
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+  batch_size: 16
+
+jobs:
+  - id: pressure_evo2_logits_llr
+    operation: extract
+    ingest:
+      source: usr
+      dataset: test_stress_ethanol
+      root: /projectnb/dunlop/esouth/outputs/usr_datasets
+      field: sequence
+    outputs:
+      - id: logits_mean
+        fn: evo2.logits
+        params: { pool: { method: mean, dim: 1 } }
+        format: list
+      - id: llr_mean
+        fn: evo2.log_likelihood
+        params: { method: native, reduction: mean }
+        format: float
+    io:
+      write_back: true
+      overwrite: false

@@ -102,7 +102,7 @@ register_workflow_policy(
     defaults=dict(_DENSEGEN_PROFILE_PRESET),
 )
 register_workflow_policy(
-    policy="infer_evo2",
+    policy="infer",
     defaults={
         "only_actions": "attach,materialize",
         "only_tools": "infer",
@@ -110,7 +110,6 @@ register_workflow_policy(
         "include_context": False,
         "include_raw_event": False,
     },
-    aliases=("infer-evo2",),
 )
 register_workflow_policy(
     policy="generic",

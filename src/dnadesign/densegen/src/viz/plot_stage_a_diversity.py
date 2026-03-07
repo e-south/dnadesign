@@ -202,6 +202,7 @@ def _build_stage_a_diversity_figure(
                 )
             selection_policy = str(row.get("selection_policy") or "").lower()
             pool_size_final = row.get("selection_pool_size_final")
+            pool_target_size = row.get("selection_pool_target_size")
             retained_count = row.get("retained")
             is_degenerate = (
                 selection_policy == "mmr"
@@ -296,10 +297,22 @@ def _build_stage_a_diversity_figure(
                         fontsize=text_sizes["annotation"] * 1.05,
                     )
             if is_degenerate:
+                try:
+                    pool_size_label = str(int(pool_size_final))
+                except Exception:
+                    pool_size_label = "?"
+                try:
+                    target_pool_label = str(int(pool_target_size)) if pool_target_size is not None else "?"
+                except Exception:
+                    target_pool_label = "?"
+                try:
+                    retained_label = str(int(retained_count))
+                except Exception:
+                    retained_label = "?"
                 ax_right.text(
                     0.02,
                     0.94,
-                    "MMR degenerate:\npool ≤ n_sites\n(diversified = top-score)",
+                    f"MMR pool shortfall:\n{pool_size_label}/{target_pool_label} candidates\nretained={retained_label}",
                     ha="left",
                     va="top",
                     transform=ax_right.transAxes,

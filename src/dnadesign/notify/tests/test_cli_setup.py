@@ -664,19 +664,19 @@ def test_setup_slack_events_mode_defaults_profile_to_policy_namespace(tmp_path: 
             "--events",
             str(events),
             "--policy",
-            "infer_evo2",
+            "infer",
             "--secret-source",
             "env",
         ],
     )
     assert result.exit_code == 0
-    profile = tmp_path / "outputs" / "notify" / "infer_evo2" / "profile.json"
+    profile = tmp_path / "outputs" / "notify" / "infer" / "profile.json"
     assert profile.exists()
     data = json.loads(profile.read_text(encoding="utf-8"))
     assert data["events"] == str(events.resolve())
-    assert data["policy"] == "infer_evo2"
-    assert data["cursor"] == str((tmp_path / "outputs" / "notify" / "infer_evo2" / "cursor").resolve())
-    assert data["spool_dir"] == str((tmp_path / "outputs" / "notify" / "infer_evo2" / "spool").resolve())
+    assert data["policy"] == "infer"
+    assert data["cursor"] == str((tmp_path / "outputs" / "notify" / "infer" / "cursor").resolve())
+    assert data["spool_dir"] == str((tmp_path / "outputs" / "notify" / "infer" / "spool").resolve())
 
 
 def test_setup_slack_env_uses_default_webhook_env_when_not_set(tmp_path: Path, monkeypatch) -> None:
@@ -839,7 +839,7 @@ def test_setup_slack_rejects_unsupported_tool(tmp_path: Path, monkeypatch) -> No
     assert "unsupported tool" in result.stdout.lower()
 
 
-def test_setup_slack_can_resolve_infer_evo2_events_from_config(tmp_path: Path, monkeypatch) -> None:
+def test_setup_slack_can_resolve_infer_events_from_config(tmp_path: Path, monkeypatch) -> None:
     config_path = tmp_path / "infer.yaml"
     profile = tmp_path / "notify.profile.json"
     usr_root = tmp_path / "usr_root"
@@ -878,7 +878,7 @@ def test_setup_slack_can_resolve_infer_evo2_events_from_config(tmp_path: Path, m
             "--profile",
             str(profile),
             "--tool",
-            "infer_evo2",
+            "infer",
             "--config",
             str(config_path),
             "--secret-source",
@@ -890,5 +890,5 @@ def test_setup_slack_can_resolve_infer_evo2_events_from_config(tmp_path: Path, m
     assert result.exit_code == 0
     data = json.loads(profile.read_text(encoding="utf-8"))
     assert data["events"] == str((usr_root / "infer_demo" / ".events.log").resolve())
-    assert data["policy"] == "infer_evo2"
-    assert data["events_source"] == {"tool": "infer_evo2", "config": str(config_path.resolve())}
+    assert data["policy"] == "infer"
+    assert data["events_source"] == {"tool": "infer", "config": str(config_path.resolve())}

@@ -69,8 +69,35 @@ class DensegenRunArgs(StrictBaseModel):
         return text
 
 
+class CpuResourceContract(StrictBaseModel):
+    pe_omp: int = Field(ge=1)
+    h_rt: str
+    mem_per_core: str
+
+    @field_validator("h_rt")
+    @classmethod
+    def _validate_h_rt(cls, value: str) -> str:
+        text = str(value).strip()
+        if not _HRT_PATTERN.match(text):
+            raise ValueError("resources.h_rt must match HH:MM:SS")
+        return text
+
+    @field_validator("mem_per_core")
+    @classmethod
+    def _validate_mem_per_core(cls, value: str) -> str:
+        text = str(value).strip()
+        if not text:
+            raise ValueError("resources.mem_per_core must be non-empty")
+        return text
+
+
+def _default_densegen_post_run_resources() -> CpuResourceContract:
+    return CpuResourceContract(pe_omp=4, h_rt="01:00:00", mem_per_core="4G")
+
+
 class DensegenPostRunContract(StrictBaseModel):
     qsub_template: Path = _DENSEGEN_POST_RUN_TEMPLATE_DEFAULT
+    resources: CpuResourceContract = Field(default_factory=_default_densegen_post_run_resources)
 
     @field_validator("qsub_template")
     @classmethod
@@ -170,7 +197,7 @@ class InferWorkloadContract(StrictBaseModel):
 
 class NotifyContract(StrictBaseModel):
     tool: Literal["densegen", "infer"]
-    policy: Literal["densegen", "infer_evo2", "generic"] = "densegen"
+    policy: Literal["densegen", "infer", "generic"] = "densegen"
     profile: Path
     cursor: Path
     spool_dir: Path
@@ -196,28 +223,10 @@ class NotifyContract(StrictBaseModel):
         return text
 
 
-class ResourceContract(StrictBaseModel):
-    pe_omp: int = Field(ge=1)
-    h_rt: str
-    mem_per_core: str
+class ResourceContract(CpuResourceContract):
     gpus: int | None = Field(default=None, ge=1)
     gpu_capability: str | None = None
-
-    @field_validator("h_rt")
-    @classmethod
-    def _validate_h_rt(cls, value: str) -> str:
-        text = str(value).strip()
-        if not _HRT_PATTERN.match(text):
-            raise ValueError("resources.h_rt must match HH:MM:SS")
-        return text
-
-    @field_validator("mem_per_core")
-    @classmethod
-    def _validate_mem_per_core(cls, value: str) -> str:
-        text = str(value).strip()
-        if not text:
-            raise ValueError("resources.mem_per_core must be non-empty")
-        return text
+    gpu_memory_gib: float | None = Field(default=None, gt=0)
 
     @field_validator("gpu_capability")
     @classmethod
@@ -228,6 +237,12 @@ class ResourceContract(StrictBaseModel):
         if not text:
             raise ValueError("resources.gpu_capability must be non-empty when provided")
         return text
+
+    @model_validator(mode="after")
+    def _validate_gpu_memory_contract(self) -> "ResourceContract":
+        if self.gpu_memory_gib is not None and self.gpus is None:
+            raise ValueError("resources.gpu_memory_gib requires resources.gpus")
+        return self
 
 
 class ModePolicy(StrictBaseModel):
@@ -300,15 +315,22 @@ class OrchestrationRunbookV1(StrictBaseModel):
                 raise ValueError("densegen workflow requires runbook.densegen block")
             if self.infer is not None:
                 raise ValueError("densegen workflow does not accept runbook.infer block")
-            if self.resources.gpus is not None or self.resources.gpu_capability is not None:
-                raise ValueError("densegen workflow does not accept resources.gpus or resources.gpu_capability")
+            if (
+                self.resources.gpus is not None
+                or self.resources.gpu_capability is not None
+                or self.resources.gpu_memory_gib is not None
+            ):
+                raise ValueError(
+                    "densegen workflow does not accept resources.gpus, "
+                    "resources.gpu_capability, or resources.gpu_memory_gib"
+                )
             if expects_notify:
                 if self.notify is None:
                     raise ValueError("densegen notify workflow requires runbook.notify block")
                 if self.notify.tool != "densegen":
                     raise ValueError("densegen workflow requires notify.tool=densegen")
-                if self.notify.policy == "infer_evo2":
-                    raise ValueError("densegen workflow does not accept notify.policy=infer_evo2")
+                if self.notify.policy == "infer":
+                    raise ValueError("densegen workflow does not accept notify.policy=infer")
             elif self.notify is not None:
                 raise ValueError("densegen_batch_submit does not accept runbook.notify block")
 

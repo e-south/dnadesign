@@ -24,6 +24,7 @@ from dnadesign._contracts.tls_ca_bundle import (
     DEFAULT_SYSTEM_TLS_CA_BUNDLE_CANDIDATES,
     resolve_tls_ca_bundle_path,
 )
+from dnadesign.infer import validate_runbook_gpu_resources
 
 from ..runbooks.path_policy import WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR
 from ..runbooks.schema import OrchestrationRunbookV1, is_densegen_workflow_id
@@ -234,6 +235,24 @@ def _runtime_to_seconds(h_rt: str) -> int:
     return (int(hours_str) * 3600) + (int(minutes_str) * 60) + int(seconds_str)
 
 
+def _validate_infer_resource_contract(runbook: OrchestrationRunbookV1) -> None:
+    assert runbook.infer is not None
+    if runbook.resources.gpus is None:
+        raise ValueError("infer workflow requires resources.gpus")
+    try:
+        validate_runbook_gpu_resources(
+            config_path=Path(runbook.infer.config),
+            declared_gpus=int(runbook.resources.gpus),
+            gpu_capability=runbook.resources.gpu_capability,
+            gpu_memory_gib=runbook.resources.gpu_memory_gib,
+        )
+    except ValueError as exc:
+        raise ValueError(
+            "infer runbook resources are incompatible with infer model contract: "
+            f"{exc}"
+        ) from exc
+
+
 def _sge_job_name(*, runbook_id: str, suffix: str) -> str:
     runbook_token = _JOB_NAME_SAFE_PATTERN.sub("_", str(runbook_id or "").strip()).strip("_.-")
     suffix_token = _JOB_NAME_SAFE_PATTERN.sub("_", str(suffix or "").strip()).strip("_.-")
@@ -242,6 +261,16 @@ def _sge_job_name(*, runbook_id: str, suffix: str) -> str:
     if not suffix_token:
         suffix_token = "job"
     return f"{runbook_token}_{suffix_token}"[:128]
+
+
+def _densegen_post_run_resource_values(runbook: OrchestrationRunbookV1) -> tuple[str, str, str]:
+    assert runbook.densegen is not None
+    post_run_resources = runbook.densegen.post_run.resources
+    return (
+        str(post_run_resources.pe_omp),
+        post_run_resources.h_rt,
+        post_run_resources.mem_per_core,
+    )
 
 
 def _preflight_commands(
@@ -337,6 +366,7 @@ def _preflight_commands(
         config = str(runbook.densegen.config)
         densegen_template = str(runbook.densegen.qsub_template)
         densegen_post_run_template = str(runbook.densegen.post_run.qsub_template)
+        post_run_pe_omp, post_run_h_rt, post_run_mem_per_core = _densegen_post_run_resource_values(runbook)
         densegen_usr_contract_checks: list[CommandSpec] = []
         overlay_guard = runbook.densegen.overlay_guard
         overlay_guard_parts: list[str] = [
@@ -467,11 +497,11 @@ def _preflight_commands(
                 stdout_file,
                 "-pe",
                 "omp",
-                str(runbook.resources.pe_omp),
+                post_run_pe_omp,
                 "-l",
-                f"h_rt={runbook.resources.h_rt}",
+                f"h_rt={post_run_h_rt}",
                 "-l",
-                f"mem_per_core={runbook.resources.mem_per_core}",
+                f"mem_per_core={post_run_mem_per_core}",
                 "-v",
                 f"DENSEGEN_CONFIG={config}",
                 densegen_post_run_template,
@@ -493,7 +523,7 @@ def _preflight_commands(
     infer_overlay_guard_parts: list[str] = [
         "usr-overlay-guard",
         "--tool",
-        "infer_evo2",
+        "infer",
         "--config",
         config,
         "--workspace-root",
@@ -565,7 +595,7 @@ def _notify_smoke_commands(
     else:
         assert runbook.infer is not None
         config = str(runbook.infer.config)
-        setup_tool = "infer_evo2"
+        setup_tool = runbook.notify.tool
     resolve_tool = setup_tool
     notify_runtime = _resolve_notify_runtime_contract(
         runbook.notify.webhook_env,
@@ -668,6 +698,7 @@ def _submit_commands(runbook: OrchestrationRunbookV1, *, mode_decision: ModeDeci
 
     if is_densegen_workflow_id(runbook.workflow_id):
         assert runbook.densegen is not None
+        post_run_pe_omp, post_run_h_rt, post_run_mem_per_core = _densegen_post_run_resource_values(runbook)
         runtime_trace_dir = (runbook.workspace_root / WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR).resolve()
         densegen_job_name = _sge_job_name(runbook_id=runbook.id, suffix="densegen_cpu")
         densegen_post_run_job_name = _sge_job_name(runbook_id=runbook.id, suffix="densegen_postrun")
@@ -706,11 +737,11 @@ def _submit_commands(runbook: OrchestrationRunbookV1, *, mode_decision: ModeDeci
             stdout_file,
             "-pe",
             "omp",
-            str(runbook.resources.pe_omp),
+            post_run_pe_omp,
             "-l",
-            f"h_rt={runbook.resources.h_rt}",
+            f"h_rt={post_run_h_rt}",
             "-l",
-            f"mem_per_core={runbook.resources.mem_per_core}",
+            f"mem_per_core={post_run_mem_per_core}",
             "-v",
             f"DENSEGEN_CONFIG={runbook.densegen.config}",
             str(runbook.densegen.post_run.qsub_template),
@@ -758,6 +789,8 @@ def build_batch_plan(
 ) -> BatchPlan:
     if runbook.notify is None and requested_smoke is not None:
         raise ValueError("notify smoke override is not valid when runbook.notify is absent")
+    if not is_densegen_workflow_id(runbook.workflow_id):
+        _validate_infer_resource_contract(runbook)
     selected_smoke: SmokeMode | None = requested_smoke or (runbook.notify.smoke if runbook.notify is not None else None)
     mode_decision = resolve_mode_decision(
         runbook=runbook,

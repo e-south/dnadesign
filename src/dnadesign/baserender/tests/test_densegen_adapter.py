@@ -538,6 +538,15 @@ def test_densegen_palette_keeps_promoter_components_visually_related() -> None:
     assert _distance(upstream, downstream) < _distance(upstream, tf)
 
 
+def test_densegen_palette_reuses_base_tf_override_for_extended_regulator_ids() -> None:
+    palette = Palette({"tf:lexA": "#8EC9E6"})
+
+    base = palette.color_for("tf:lexA")
+    extended = palette.color_for("tf:lexA_CTGTATAWAWWHACA")
+
+    assert extended == base
+
+
 def test_densegen_spacer_annotation_is_centered_on_promoter_feature_track() -> None:
     row = {
         "id": "row1",

@@ -32,5 +32,5 @@ def test_notify_and_ops_reference_shared_infer_usr_output_contract_parser() -> N
     notify_source_text = inspect.getsource(notify_source_module)
     ops_inputs_text = inspect.getsource(ops_inputs_module)
 
-    assert "resolve_infer_evo2_usr_output_contract" in notify_source_text
-    assert "resolve_infer_evo2_usr_output_contract" in ops_inputs_text
+    assert "resolve_infer_usr_output_contract" in notify_source_text
+    assert "resolve_infer_usr_output_contract" in ops_inputs_text

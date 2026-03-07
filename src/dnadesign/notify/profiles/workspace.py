@@ -182,10 +182,9 @@ register_tool_workspace_resolver(
     list_workspaces=lambda repo_root: _list_workspace_names(repo_root, Path("src/dnadesign/densegen/workspaces")),
 )
 register_tool_workspace_resolver(
-    tool="infer_evo2",
+    tool="infer",
     resolve_config=lambda workspace_name, repo_root: _resolve_config_from_workspace_root(
         workspace_name, repo_root, Path("src/dnadesign/infer/workspaces")
     ),
     list_workspaces=lambda repo_root: _list_workspace_names(repo_root, Path("src/dnadesign/infer/workspaces")),
-    aliases=("infer-evo2",),
 )

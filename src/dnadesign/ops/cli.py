@@ -12,8 +12,9 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import shlex
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Sequence
 
 import typer
 import yaml
@@ -163,7 +164,7 @@ def _build_init_payload(
     }
     if with_notify:
         notify_tool = "densegen" if workflow == "densegen" else "infer"
-        notify_policy = "densegen" if workflow == "densegen" else "infer_evo2"
+        notify_policy = "densegen" if workflow == "densegen" else "infer"
         payload["runbook"]["notify"] = {
             "tool": notify_tool,
             "policy": notify_policy,
@@ -204,7 +205,7 @@ def _build_init_payload(
             },
         }
         payload["runbook"]["resources"] = {
-            "pe_omp": pe_omp if pe_omp is not None else 16,
+            "pe_omp": pe_omp if pe_omp is not None else 12,
             "h_rt": h_rt or "08:00:00",
             "mem_per_core": mem_per_core or "8G",
         }
@@ -221,6 +222,7 @@ def _build_init_payload(
             "mem_per_core": mem_per_core or "8G",
             "gpus": 1,
             "gpu_capability": "8.9",
+            "gpu_memory_gib": 45.0,
         }
     return payload
 
@@ -232,7 +234,7 @@ def _resolve_active_job_ids(
     discover_active_jobs: bool,
     max_discovery_jobs: int,
 ) -> tuple[str, ...]:
-    resolved_job_ids = [str(job_id).strip() for job_id in active_job_ids if str(job_id).strip()]
+    resolved_job_ids = _split_active_job_id_tokens(active_job_ids)
     if not discover_active_jobs:
         return tuple(dict.fromkeys(resolved_job_ids))
 
@@ -246,6 +248,33 @@ def _resolve_active_job_ids(
         if discovered not in resolved_job_ids:
             resolved_job_ids.append(discovered)
     return tuple(resolved_job_ids)
+
+
+def _split_active_job_id_tokens(values: Sequence[str]) -> list[str]:
+    tokens: list[str] = []
+    for value in values:
+        for item in str(value).split(","):
+            token = item.strip()
+            if token:
+                tokens.append(token)
+    return tokens
+
+
+def _render_active_job_hints(*, runbook_path: Path, active_job_ids: Sequence[str]) -> dict[str, object]:
+    deduped_job_ids = tuple(dict.fromkeys(_split_active_job_id_tokens(active_job_ids)))
+    csv_value = ",".join(deduped_job_ids)
+    repeat_args = " ".join(f"--active-job-id {shlex.quote(job_id)}" for job_id in deduped_job_ids)
+    runbook_arg = shlex.quote(str(runbook_path.expanduser()))
+    if repeat_args:
+        plan_hint = f"uv run ops runbook plan --runbook {runbook_arg} --no-discover-active-jobs {repeat_args}"
+    else:
+        plan_hint = f"uv run ops runbook plan --runbook {runbook_arg}"
+    return {
+        "active_job_count": len(deduped_job_ids),
+        "active_job_ids_csv": csv_value,
+        "active_job_id_args": repeat_args,
+        "plan_command_hint": plan_hint,
+    }
 
 
 def _packaged_precedent_paths() -> list[Path]:
@@ -380,7 +409,12 @@ def runbook_plan(
     ] = None,
     active_job_id: Annotated[
         list[str],
-        typer.Option("--active-job-id", help="Existing active job id for hold_jid policy decisions."),
+        typer.Option(
+            "--active-job-id",
+            help=(
+                "Existing active job id(s) for hold_jid policy decisions; repeat option or pass a comma-delimited list."
+            ),
+        ),
     ] = [],
     discover_active_jobs: Annotated[
         bool,
@@ -461,10 +495,12 @@ def runbook_active_jobs(
     except RuntimeError as exc:
         typer.echo(f"Runbook contract error: active-job discovery failed: {exc}", err=True)
         raise typer.Exit(code=2) from exc
+    hints = _render_active_job_hints(runbook_path=runbook, active_job_ids=active_job_ids)
     payload = {
         "runbook_id": loaded.id,
         "workflow_id": loaded.workflow_id,
         "active_job_ids": list(active_job_ids),
+        **hints,
     }
     typer.echo(json.dumps(payload, indent=2, sort_keys=True))
 
@@ -490,7 +526,12 @@ def runbook_execute(
     ] = None,
     active_job_id: Annotated[
         list[str],
-        typer.Option("--active-job-id", help="Existing active job id for hold_jid policy decisions."),
+        typer.Option(
+            "--active-job-id",
+            help=(
+                "Existing active job id(s) for hold_jid policy decisions; repeat option or pass a comma-delimited list."
+            ),
+        ),
     ] = [],
     discover_active_jobs: Annotated[
         bool,

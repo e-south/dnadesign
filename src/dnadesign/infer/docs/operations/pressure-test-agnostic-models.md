@@ -1,0 +1,111 @@
+## Infer Pressure Test: Agnostic Model Namespaces + USR Write-Back
+
+This guide pressure-tests infer as a model-agnostic extraction engine with explicit namespace contracts and USR write-back.
+
+For a full walkthrough, use the [end-to-end demo tutorial](../tutorials/demo_pressure_test_usr_ops_notify.md).
+
+For deterministic SCC GPU environment setup before pressure runs, use the [SCC Evo2 GPU environment runbook](scc-evo2-gpu-uv-runbook.md).
+
+### Objective
+
+- run extract jobs that produce multiple outputs (for example logits + log-likelihood ratio variants),
+- ensure outputs attach to USR with infer-prefixed namespaced columns:
+  - `infer__<model_id>__<job_id>__<out_id>`
+- support local CLI execution and ops runbook orchestration.
+
+### Safety Posture
+
+- Use `--dry-run` and `--no-submit` first.
+- Use read-only scheduler checks before submit (`qstat -u "$USER"`).
+- Keep `ingest.root` explicit for workspace and cluster runs.
+
+## Ordered procedure
+
+### 1) Prepare workspace and variables
+
+```bash
+uv run infer workspace init --id test_stress_ethanol --profile usr-pressure
+export WORKSPACE_ROOT="$PWD/src/dnadesign/infer/workspaces/test_stress_ethanol"
+export INFER_CONFIG="$WORKSPACE_ROOT/config.yaml"
+export USR_ROOT="/projectnb/dunlop/esouth/outputs/usr_datasets"
+export DATASET_ID="test_stress_ethanol"
+```
+
+### 2) Contract preflight
+
+```bash
+uv run infer validate config --config "$INFER_CONFIG"
+uv run infer run --config "$INFER_CONFIG" --dry-run
+```
+
+### 3) Execute local pressure test
+
+```bash
+uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr
+```
+
+### 4) Verify USR state and events
+
+```bash
+uv run usr --root "$USR_ROOT" head "$DATASET_ID" -n 5
+uv run usr --root "$USR_ROOT" events tail "$DATASET_ID" -n 20
+```
+
+### 5) Initialize infer ops runbook
+
+```bash
+uv run ops runbook init \
+  --runbook "$WORKSPACE_ROOT/infer-pressure.runbook.yaml" \
+  --workflow infer \
+  --workspace-root "$WORKSPACE_ROOT" \
+  --id infer_pressure_test \
+  --no-notify
+```
+
+### 6) Plan and execute no-submit preflight
+
+```bash
+uv run ops runbook precedents
+uv run ops runbook plan --runbook "$WORKSPACE_ROOT/infer-pressure.runbook.yaml"
+uv run ops runbook execute \
+  --runbook "$WORKSPACE_ROOT/infer-pressure.runbook.yaml" \
+  --audit-json "$WORKSPACE_ROOT/outputs/logs/ops/audit/infer-pressure.audit.json" \
+  --no-submit
+```
+
+### 7) Submit after preflight passes
+
+```bash
+qstat -u "$USER"
+uv run ops runbook execute \
+  --runbook "$WORKSPACE_ROOT/infer-pressure.runbook.yaml" \
+  --audit-json "$WORKSPACE_ROOT/outputs/logs/ops/audit/infer-pressure-submit.audit.json" \
+  --submit
+```
+
+### 8) Enable notify in the same runbook when needed
+
+First configure webhook secret wiring (for example by setting a readable `NOTIFY_WEBHOOK_FILE` path), then re-initialize the same runbook:
+
+```bash
+uv run ops runbook init \
+  --runbook "$WORKSPACE_ROOT/infer-pressure.runbook.yaml" \
+  --workflow infer \
+  --workspace-root "$WORKSPACE_ROOT" \
+  --id infer_pressure_test \
+  --with-notify \
+  --force
+```
+
+### 9) Run focused ad-hoc extract checks when isolating issues
+
+```bash
+uv run infer extract \
+  --model-id evo2_7b \
+  --fn evo2.log_likelihood \
+  --format float \
+  --usr "$DATASET_ID" \
+  --usr-root "$USR_ROOT" \
+  --field sequence \
+  --write-back
+```
