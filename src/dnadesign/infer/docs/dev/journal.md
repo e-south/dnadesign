@@ -3712,3 +3712,90 @@ Interpretation: larger chunk sizes reduce query count and can improve throughput
 1. Resume semantics are preserved for callers.
 2. Large-scale tuning is now explicit and externalized via env contract.
 3. Invalid chunk-size overrides fail fast with operator-visible errors.
+
+## 2026-03-07 - Phase 2 Slice AP (Cross-Tool Hardening: Infer↔USR↔Notify + Ops Mode Safety)
+
+### Goal
+
+Pressure-test infer lifecycle behavior across fresh, resume, interrupted, and reset-ack paths, then harden high-friction contracts for large-scale runs.
+
+### Prioritized findings
+
+1. High: infer write-back overwrite guard scanned the full infer overlay on each chunk write-back, creating avoidable O(total_overlay_rows) pressure in large runs.
+2. High: ops infer mode detection treated `outputs/usr_datasets/registry.yaml` as a generic resume marker, which could auto-select resume even when no infer artifacts existed.
+3. Medium: ops infer mode allowed explicit `--mode resume` even when no infer resume artifacts existed.
+4. Medium: ops infer mode allowed explicit `--mode fresh` on infer artifacts without reset acknowledgement.
+5. Medium: interrupted infer runs had resume behavior coverage for fully-complete overlays, but not for partial chunk-persisted interruptions.
+
+### TDD sequence
+
+1. Red:
+   - `test_write_back_usr_overwrite_guard_reads_only_requested_ids`
+   - `test_run_extract_job_usr_resume_recovers_after_interrupted_partial_write`
+   - `test_infer_mode_auto_selects_fresh_when_only_usr_registry_exists`
+   - `test_infer_mode_auto_selects_resume_when_infer_overlay_exists`
+   - `test_infer_mode_resume_raises_without_resume_artifacts`
+   - `test_infer_mode_fresh_requires_reset_ack_when_resume_artifacts_exist`
+2. Green:
+   - infer writer guard now reads only requested IDs via filtered parquet reads and chunked ID predicates.
+   - ops mode state now uses infer-specific resume artifact detection (infer overlay artifacts), not generic USR registry marker.
+   - ops mode now fails fast for infer `resume` with no artifacts.
+   - ops mode now requires `--allow-fresh-reset` for infer `fresh` when infer artifacts exist.
+   - resumed execution after partial interrupted chunk write is covered by an integration-style contract test.
+3. Verify:
+   - infer contracts/tests pass.
+   - ops infer mode tests pass.
+   - notify infer-related event/source tests pass.
+
+### Changes applied
+
+1. `src/dnadesign/infer/src/writers/usr.py`
+   - added `_read_overlay_subset(...)` with chunked ID-filter reads for overwrite guard.
+   - guard now scans only requested IDs instead of full overlay tables.
+2. `src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py`
+   - added filtered-read assertion test for overwrite guard.
+   - added interrupted-partial-write resume recovery test.
+3. `src/dnadesign/ops/orchestrator/state.py`
+   - added infer-specific artifact discovery (`outputs/usr_datasets/**/_derived/infer*.parquet`).
+   - made generic mode guards explicit:
+     - `resume` requires artifacts.
+     - `fresh` with artifacts requires reset acknowledgement.
+4. `src/dnadesign/ops/tests/test_runbook_orchestrator.py`
+   - added infer mode tests for registry-only, overlay-present, missing-resume-artifacts, and fresh-reset-ack contracts.
+
+### Performance evidence (measurement-first)
+
+Benchmark target: overwrite guard scan path over infer overlay parquet (`500k` rows, row-grouped), `20` requested IDs, `5` runs.
+
+1. previous full-table scan emulation:
+   - runs: `32.070, 27.018, 27.484, 25.280, 25.394`
+   - mean: `27.449ms`
+2. new filtered subset scan:
+   - runs: `3.386, 3.080, 2.998, 2.895, 2.718`
+   - mean: `3.015ms`
+
+Observed effect: filtered guard reads remove repeated whole-overlay scans and materially improve chunk write-back guard latency for row-grouped overlays.
+
+### Adversarial hardening evidence
+
+1. Interrupted run simulation with chunk write-back persisted and second-chunk failure:
+   - rerun resumes only missing IDs.
+   - no duplicate overwrite collisions.
+2. Infer mode-policy adversarial checks:
+   - registry-only state no longer forces `auto -> resume`.
+   - infer overlay artifacts enforce reset acknowledgement for `fresh`.
+   - `resume` without infer artifacts fails fast.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py -k "overwrite_guard_reads_only_requested_ids or interrupted_partial_write"`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "infer_mode_auto_selects_fresh_when_only_usr_registry_exists or infer_mode_auto_selects_resume_when_infer_overlay_exists or infer_mode_resume_raises_without_resume_artifacts or infer_mode_fresh_requires_reset_ack_when_resume_artifacts_exist"`
+3. `uv run pytest -q src/dnadesign/infer/tests`
+4. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+
+### Contract impact
+
+1. Infer runtime remains behavior-compatible for successful writes.
+2. Large-scale overwrite guard path is now subset-based and chunked.
+3. Ops infer mode selection is stricter and safer for fresh/resume/reset flows.
+4. Interrupted infer runs now have explicit resume-recovery coverage.
