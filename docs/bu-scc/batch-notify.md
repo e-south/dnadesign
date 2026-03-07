@@ -239,7 +239,7 @@ qsub -P <project> \
 
 Use this when you intentionally do not want a profile file.
 If `EVENTS_PATH` is omitted, the script resolves it from `NOTIFY_TOOL` and `NOTIFY_CONFIG`.
-If `EVENTS_PATH` is explicit, set `NOTIFY_POLICY` (`densegen`, `infer_evo2`, or `generic`)
+If `EVENTS_PATH` is explicit, set `NOTIFY_POLICY` (`densegen`, `infer`, or `generic`)
 and `NOTIFY_NAMESPACE` (for example, `densegen`).
 
 ```bash

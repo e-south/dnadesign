@@ -3226,3 +3226,113 @@ Observed effect: lower mean and median module import cost with reduced cross-too
 2. `uv run pytest -q src/dnadesign/infer/tests/package/test_wrapper_contracts.py -k "infer_public_contract_exposes_runbook_gpu_validation"`
 3. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/ops/tests/test_densegen_usr_contract_sharing.py src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py src/dnadesign/infer/tests/package/test_wrapper_contracts.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py`
 4. `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/ops/tests`
+
+## 2026-03-07 - Phase 2 Slice AH (Infer/Notify/USR Semantic Decoupling + USR Ingest Performance + CLI UX)
+
+### Goal
+
+Align cross-tool infer contracts to model-agnostic naming (`infer`), reduce infer<->notify and infer<->usr semantic coupling, improve infer CLI stderr ergonomics, and optimize USR subset ingest performance without changing infer job behavior.
+
+### Audit findings
+
+1. Shared contract and notify source resolver names still encoded adapter-specific labeling (`infer_evo2`) at cross-tool seams.
+2. Ops infer notify smoke path still hardcoded `--tool infer_evo2` instead of using runbook tool contract.
+3. Notify policy/workspace defaults still wrote infer profiles under `outputs/notify/infer_evo2/...`.
+4. `load_usr_input(...)` read full USR records parquet even when `ids` subset was provided, then filtered in Python.
+5. CLI error printing omitted exception class context, reducing triage clarity in stdio output.
+
+### Changes applied
+
+1. Shared infer USR contract surface was renamed to model-agnostic identifiers:
+   - `InferUSROutputContract`
+   - `resolve_infer_usr_output_contract(...)`
+2. Ops and notify now consume the shared infer contract through the generic function name:
+   - `ops/orchestrator/usr_overlay_inputs.py`
+   - `notify/events/source_builtin.py`
+3. Notify built-in events resolver now registers canonical tool `infer` with aliases `infer_evo2` and `infer-evo2`.
+4. Notify workflow policy defaults now register canonical policy `infer` with aliases `infer_evo2` and `infer-evo2`.
+5. Notify workspace resolver now registers canonical tool `infer` with infer-evo2 aliases.
+6. Ops notify smoke setup now uses `runbook.notify.tool` for infer workflows rather than hardcoded `infer_evo2`.
+7. Ops runbook schema now accepts canonical infer policy and normalizes legacy `infer_evo2` to `infer`.
+8. Ops runbook init now emits infer notify policy as `infer` for infer workflows.
+9. Infer USR ingest optimization:
+   - `load_usr_input(...)` now passes parquet `filters=[("id", "in", ...)]` when `ids` are supplied.
+   - preserves requested id ordering and duplicate ids in returned outputs.
+10. Infer CLI error formatting:
+   - now prints `"<ErrorType>: <message>"` in stderr/stdout console contract while retaining existing exit-code mapping.
+11. Docs updated for canonical infer policy/tool naming in operator-facing notify/ops runbooks.
+
+### Refactor boundary (behavior-preserving)
+
+1. Infer model execution, output schemas, and write-back contracts remain unchanged.
+2. Existing infer-evo2 tool/policy tokens are still accepted as explicit aliases where relevant.
+3. No silent fallback was added; invalid contracts still fail fast with explicit errors.
+
+### Performance evidence (measurement-first)
+
+Benchmark: `load_usr_input(dataset=demo, ids=500)` on synthetic USR records parquet with `200,000` rows.
+
+1. Before optimization:
+   - runs: `0.192747, 0.191704, 0.182606, 0.182817, 0.186049`
+   - mean: `0.187185s`
+2. After optimization:
+   - runs: `0.013423, 0.011254, 0.011016, 0.012248, 0.010990`
+   - mean: `0.011786s`
+
+Observed effect: approximately `15.9x` lower mean runtime for subset-id ingest path due to filtered parquet reads.
+
+### TDD evidence
+
+1. Red tests added first for:
+   - shared infer contract naming across notify+ops
+   - canonical infer tool/policy events-source routing
+   - infer runbook notify smoke tool routing
+   - USR ingest filtered parquet reads for id subsets
+   - infer CLI error-type rendering
+2. Green implementation completed with all added characterization tests passing.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/ops/tests/test_densegen_usr_contract_sharing.py src/dnadesign/notify/tests/test_workflow_policy_module.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k 'infer' src/dnadesign/infer/tests/runtime/test_ingest_sources_usr.py src/dnadesign/infer/tests/cli/test_common.py`
+2. `uv run pytest -q src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/notify/tests/test_cli_profile_init.py src/dnadesign/notify/tests/test_cli_setup.py src/dnadesign/notify/tests/test_cli_usr_events.py src/dnadesign/ops/tests/test_sge_gates.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/infer/tests/runtime/test_extract_ingest_helper.py src/dnadesign/infer/tests/runtime/test_generate_ingest_helper.py src/dnadesign/infer/tests/runtime/test_ingest_sources_usr.py src/dnadesign/infer/tests/cli/test_common.py`
+3. `uv run pytest -q src/dnadesign/notify/tests/test_notify_docs_progressive_disclosure_contracts.py src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py`
+4. `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/ops/tests src/dnadesign/notify/tests`
+
+## 2026-03-07 - Phase 2 Slice AI (Risk Closure: Canonical Infer Naming + Alias Removal)
+
+### Goal
+
+Close outstanding coupling risks by removing legacy `infer_evo2` naming from notify tool-event internals and by removing `infer_evo2` alias acceptance from active cross-tool contracts.
+
+### Changes applied
+
+1. Notify tool-event pack/module canonicalization:
+   - renamed `notify/tool_events/infer_evo2.py` -> `notify/tool_events/infer.py`
+   - renamed handler export `register_infer_evo2_handlers(...)` -> `register_infer_handlers(...)`
+   - built-in pack name now `infer` (not `infer_evo2`)
+   - default activation now calls `activate_tool_event_pack("infer")`
+   - infer actor contract is strict: `_is_infer_actor(...)` now matches only `actor.tool == "infer"`
+2. Alias removal (breaking by design):
+   - removed `infer_evo2` / `infer-evo2` aliases from:
+     - notify event-source resolver registration
+     - notify workflow policy registration
+     - notify workspace resolver registration
+     - shared USR producer contract adapter map
+     - ops overlay-input infer tool gate
+     - resume-readiness tool whitelist
+3. Ops runbook policy contract is strict infer naming:
+   - `notify.policy` literals now `densegen|infer|generic`
+   - removed infer_evo2 normalization path
+4. BU SCC notify watch qsub policy contract updated:
+   - `NOTIFY_POLICY` supports `densegen|infer|generic` only
+
+### Contract impact
+
+1. Legacy `infer_evo2` tool/policy tokens are now rejected at active interfaces.
+2. Canonical token for infer flows is `infer`.
+3. This is an intentional strictness increase to prevent semantic drift.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/notify/tests/test_tool_events_registry.py src/dnadesign/notify/tests/test_tool_events.py src/dnadesign/notify/tests/test_package_layout.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/notify/tests/test_workflow_policy_module.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_cli_profile_init.py src/dnadesign/notify/tests/test_cli_setup.py src/dnadesign/notify/tests/test_hpc_notify_watch_qsub.py src/dnadesign/ops/tests/test_sge_gates.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "infer or tool_events or workspace"`
+2. `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/ops/tests src/dnadesign/notify/tests`

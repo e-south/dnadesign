@@ -54,7 +54,7 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
         label="docs/notify/README.md",
     )
     assert "start a densegen workspace watcher and send to slack" in text
-    assert "start an infer_evo2 workspace watcher and send to slack" in text
+    assert "start an infer workspace watcher and send to slack" in text
     assert "i already have a profile, just validate wiring" in text
     assert "resume failed deliveries from spool" in text
     assert "--secret-source file" in text

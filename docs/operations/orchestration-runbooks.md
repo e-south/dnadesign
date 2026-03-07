@@ -282,7 +282,7 @@ uv run ops runbook execute \
 12. Infer planning validates runbook GPU resources against infer `model.parallelism` and capacity contracts before preflight command rendering.
 13. Infer capacity preflight uses `resources.gpu_memory_gib` when provided; otherwise it uses capability hints for known classes (`gpu_capability=8.9 -> 45.0 GiB`).
 14. Infer `validate config` on non-GPU hosts validates schema/contracts and reports capacity-check skip; runbook planning remains the deterministic place for declared scheduler-resource capacity checks.
-15. Notify workflows require `runbook.notify`, with policy matching workflow family (`densegen|generic` for DenseGen, `infer_evo2|generic` for Infer).
+15. Notify workflows require `runbook.notify`, with policy matching workflow family (`densegen|generic` for DenseGen, `infer|generic` for Infer).
 16. Notify setup is non-interactive and file-only by contract: planner resolves webhook file with explicit precedence (`<notify.webhook_env>_FILE` first, otherwise `notify.profile` webhook `secret_ref` when it is a `file://` path) and uses `--secret-source file --secret-ref file://<resolved-path> --no-store-webhook`; missing/unreadable webhook file fails fast before submit.
 17. Notify setup writes an explicit TLS CA bundle in profile wiring (`--tls-ca-bundle`, defaulting to `SSL_CERT_FILE` or `/etc/pki/tls/certs/ca-bundle.crt`).
 18. Notify smoke bootstraps the resolved USR events file path before dry-watch so fresh workspaces do not fail on missing `.events.log`.
