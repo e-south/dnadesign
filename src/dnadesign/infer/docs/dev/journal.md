@@ -3457,3 +3457,65 @@ Observed effect: import-time coupling to GPU runtime stack was removed from infe
 1. Infer and ops import paths are now lightweight and do not require GPU runtime dependencies at module import time.
 2. Infer preset mode surfaces direct, flag-level contract guidance (`--usr`) instead of deferred ingest-schema errors.
 3. Runtime behavior for extract/generate execution and resource validation remains unchanged.
+
+## 2026-03-07 - Phase 2 Slice AL (Preset Registry Decoupling + Cache + Fail-Fast Ambiguity Contract)
+
+### Goal
+
+Refactor infer preset resolution to be easier to change and faster under repeated CLI/API calls by separating scan/parse concerns from lookup concerns, and by making ambiguous fallback behavior explicit.
+
+### Audit findings
+
+1. `presets/registry.py` rescanned package files and reparsed YAML on every `list_presets()` and `load_preset()` call.
+2. `load_preset()` duplicated parse logic across two loops and silently chose the first match for stem collisions.
+3. No explicit cache reset seam existed for tests/diagnostics.
+
+### TDD sequence
+
+1. Red:
+   - `test_preset_registry_reuses_cached_scan`
+   - `test_load_preset_fails_fast_on_ambiguous_stem`
+2. Green:
+   - introduced cached normalized preset-record table (`_preset_records()` with `lru_cache`).
+   - unified parse/normalize path in `_normalize_preset_record(...)`.
+   - added explicit `clear_preset_cache()` seam.
+   - changed stem fallback to fail fast on ambiguity with explicit match list.
+3. Verify:
+   - targeted tests pass.
+   - full infer suite + docs contract suites pass.
+
+### Performance evidence (measurement-first)
+
+Benchmark workload: 200 repeated calls in same process.
+
+1. Before:
+   - `list_presets()` mean: `1.293ms`
+   - `load_preset('evo2/extract_logits_ll')` mean: `1.353ms`
+2. After:
+   - `list_presets()` mean: `0.031ms`
+   - `load_preset('evo2/extract_logits_ll')` mean: `0.008ms`
+
+Observed effect: preset resolution path now avoids repeated package scan/YAML parse overhead for steady-state calls.
+
+### Changes applied
+
+1. `src/dnadesign/infer/src/presets/registry.py`
+   - added `_PresetRecord` internal data model.
+   - added `_normalize_preset_record(...)` with explicit contract checks.
+   - added cached `_preset_records()` index and `clear_preset_cache()`.
+   - refactored `list_presets()` and `load_preset()` to use normalized records.
+   - fail-fast ambiguous stem lookup contract (`KeyError` with concrete matches).
+2. `src/dnadesign/infer/tests/cli/test_presets.py`
+   - added cache-reuse and ambiguous-stem contract tests.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/cli/test_presets.py::test_preset_registry_reuses_cached_scan src/dnadesign/infer/tests/cli/test_presets.py::test_load_preset_fails_fast_on_ambiguous_stem`
+2. `uv run pytest -q src/dnadesign/infer/tests/cli/test_presets.py src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py src/dnadesign/infer/tests/package/test_source_tree_contracts.py src/dnadesign/infer/tests`
+3. `uv run pytest -q src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+
+### Contract impact
+
+1. Behavior preserved for explicit preset id/path-id lookup.
+2. Stem fallback is now deterministic and explicit: ambiguous stems fail fast instead of silently choosing one file.
+3. Cache seam is explicit for test and debug workflows.
