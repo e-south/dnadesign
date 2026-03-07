@@ -164,7 +164,7 @@ def _build_init_payload(
     }
     if with_notify:
         notify_tool = "densegen" if workflow == "densegen" else "infer"
-        notify_policy = "densegen" if workflow == "densegen" else "infer_evo2"
+        notify_policy = "densegen" if workflow == "densegen" else "infer"
         payload["runbook"]["notify"] = {
             "tool": notify_tool,
             "policy": notify_policy,

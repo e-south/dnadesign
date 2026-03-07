@@ -109,7 +109,7 @@ def test_profile_init_persists_progress_tunables(tmp_path: Path) -> None:
     assert data["progress_heartbeat_seconds"] == 420.0
 
 
-def test_profile_init_writes_infer_evo2_policy_defaults(tmp_path: Path) -> None:
+def test_profile_init_writes_infer_policy_defaults(tmp_path: Path) -> None:
     events = tmp_path / "events.log"
     profile = tmp_path / "notify.profile.json"
     _write_events(events, [_event(action="attach")])
@@ -129,7 +129,7 @@ def test_profile_init_writes_infer_evo2_policy_defaults(tmp_path: Path) -> None:
             "--events",
             str(events),
             "--policy",
-            "infer_evo2",
+            "infer",
         ],
     )
 
@@ -137,7 +137,7 @@ def test_profile_init_writes_infer_evo2_policy_defaults(tmp_path: Path) -> None:
     data = json.loads(profile.read_text(encoding="utf-8"))
     assert data["profile_version"] == 2
     assert data["webhook"] == {"source": "env", "ref": "DENSEGEN_WEBHOOK"}
-    assert data["policy"] == "infer_evo2"
+    assert data["policy"] == "infer"
     assert data["only_tools"] == "infer"
     assert data["only_actions"] == "attach,materialize"
 

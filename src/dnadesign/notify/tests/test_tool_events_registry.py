@@ -82,10 +82,10 @@ def test_activate_tool_event_pack_supports_custom_pack() -> None:
     assert tool_event_status_override(action, {"action": action}) == "running"
 
 
-def test_supported_tool_event_packs_include_infer_evo2_builtin_pack() -> None:
+def test_supported_tool_event_packs_include_infer_builtin_pack() -> None:
     packs = set(supported_tool_event_packs())
     assert "densegen" in packs
-    assert "infer_evo2" in packs
+    assert "infer" in packs
 
 
 def test_register_tool_event_pack_rejects_duplicate_name() -> None:

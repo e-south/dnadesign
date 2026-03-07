@@ -84,7 +84,7 @@ def test_tool_event_status_override_is_none_for_unhandled_actions() -> None:
 
 def test_tool_event_status_override_handles_infer_attach_events() -> None:
     event = _event("attach")
-    event["actor"] = {"tool": "infer_evo2", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
     event["args"] = {"rows_incoming": 10, "rows_matched": 10, "rows_missing": 0}
 
     assert tool_event_status_override("attach", event) == "running"
@@ -92,7 +92,7 @@ def test_tool_event_status_override_handles_infer_attach_events() -> None:
 
 def test_tool_event_message_override_formats_infer_attach_message() -> None:
     event = _event("attach")
-    event["actor"] = {"tool": "infer_evo2", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
     event["args"] = {"rows_incoming": 12, "rows_matched": 11, "rows_missing": 1}
 
     msg = tool_event_message_override("attach", event, run_id="infer-run-1", duration_seconds=None)
@@ -106,13 +106,13 @@ def test_tool_event_message_override_formats_infer_attach_message() -> None:
 def test_evaluate_tool_event_infer_attach_is_throttled_by_min_seconds() -> None:
     state = ToolEventState()
     first = _event("attach", timestamp="2026-02-06T00:00:00+00:00")
-    first["actor"] = {"tool": "infer_evo2", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    first["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
     first["args"] = {"rows_incoming": 20, "rows_matched": 20, "rows_missing": 0}
     second = _event("attach", timestamp="2026-02-06T00:00:10+00:00")
-    second["actor"] = {"tool": "infer_evo2", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    second["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
     second["args"] = {"rows_incoming": 20, "rows_matched": 20, "rows_missing": 0}
     third = _event("attach", timestamp="2026-02-06T00:01:10+00:00")
-    third["actor"] = {"tool": "infer_evo2", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    third["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
     third["args"] = {"rows_incoming": 20, "rows_matched": 20, "rows_missing": 0}
 
     first_decision = evaluate_tool_event("attach", first, run_id="infer-run-1", state=state)

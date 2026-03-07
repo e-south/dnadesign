@@ -1431,7 +1431,7 @@ def test_usr_events_watch_can_autoload_profile_from_infer_tool_config(tmp_path: 
     events = tmp_path / "usr" / "infer_demo" / ".events.log"
     events.parent.mkdir(parents=True, exist_ok=True)
     infer_event = _event(action="materialize")
-    infer_event["actor"] = {"tool": "infer_evo2", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    infer_event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
     _write_events(events, [infer_event])
     config_path = tmp_path / "workspaces" / "infer_demo" / "infer.yaml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1459,7 +1459,7 @@ def test_usr_events_watch_can_autoload_profile_from_infer_tool_config(tmp_path: 
         + "\n",
         encoding="utf-8",
     )
-    profile = config_path.parent / "outputs" / "notify" / "infer_evo2" / "profile.json"
+    profile = config_path.parent / "outputs" / "notify" / "infer" / "profile.json"
     profile.parent.mkdir(parents=True, exist_ok=True)
     profile.write_text(
         json.dumps(
@@ -1468,7 +1468,7 @@ def test_usr_events_watch_can_autoload_profile_from_infer_tool_config(tmp_path: 
                 "provider": "generic",
                 "events": str(events.resolve()),
                 "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
-                "events_source": {"tool": "infer_evo2", "config": str(config_path.resolve())},
+                "events_source": {"tool": "infer", "config": str(config_path.resolve())},
             }
         ),
         encoding="utf-8",
@@ -1482,7 +1482,7 @@ def test_usr_events_watch_can_autoload_profile_from_infer_tool_config(tmp_path: 
             "usr-events",
             "watch",
             "--tool",
-            "infer_evo2",
+            "infer",
             "--config",
             str(config_path),
             "--dry-run",
@@ -1490,7 +1490,7 @@ def test_usr_events_watch_can_autoload_profile_from_infer_tool_config(tmp_path: 
     )
     assert result.exit_code == 0
     assert '"usr_action": "materialize"' in result.stdout
-    assert "infer_evo2" in result.stdout
+    assert "infer" in result.stdout
 
 
 def test_usr_events_watch_autoload_rejects_profile_events_source_mismatch(tmp_path: Path, monkeypatch) -> None:

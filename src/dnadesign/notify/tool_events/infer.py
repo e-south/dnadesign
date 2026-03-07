@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/notify/tool_events/infer_evo2.py
+src/dnadesign/notify/tool_events/infer.py
 
-Infer Evo2 tool-event status/message/evaluation handlers for notify.
+Infer tool-event status/message/evaluation handlers for notify.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -29,7 +29,7 @@ def _infer_actor_tool(event: dict[str, Any]) -> str:
 
 
 def _is_infer_actor(event: dict[str, Any]) -> bool:
-    return _infer_actor_tool(event) in {"infer", "infer_evo2", "infer-evo2"}
+    return _infer_actor_tool(event) == "infer"
 
 
 def _event_timestamp_seconds(event: dict[str, Any]) -> float | None:
@@ -146,7 +146,7 @@ def _evaluate_infer_attach_event(event: dict[str, Any], run_id: str, state: Tool
     return ToolEventDecision(emit=True, duration_seconds=None)
 
 
-def register_infer_evo2_handlers(
+def register_infer_handlers(
     *,
     register_status_override: Callable[[str, Callable[[dict[str, Any]], str | None]], None],
     register_message_override: Callable[

@@ -595,7 +595,7 @@ def _notify_smoke_commands(
     else:
         assert runbook.infer is not None
         config = str(runbook.infer.config)
-        setup_tool = "infer_evo2"
+        setup_tool = runbook.notify.tool
     resolve_tool = setup_tool
     notify_runtime = _resolve_notify_runtime_contract(
         runbook.notify.webhook_env,

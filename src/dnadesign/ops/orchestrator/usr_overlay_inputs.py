@@ -16,7 +16,7 @@ from pathlib import Path
 
 from dnadesign._contracts import (
     resolve_densegen_usr_output_contract,
-    resolve_infer_evo2_usr_output_contract,
+    resolve_infer_usr_output_contract,
     resolve_usr_producer_contract,
 )
 
@@ -41,9 +41,9 @@ def parse_usr_overlay_guard_inputs(*, tool: str, config_path: Path) -> UsrOverla
     if tool_name == "densegen":
         # Keep densegen events-source contract explicit and shared with notify.
         resolve_densegen_usr_output_contract(config_path)
-    if tool_name in {"infer", "infer-evo2", "infer_evo2"}:
+    if tool_name == "infer":
         # Keep infer events-source contract explicit and shared with notify.
-        resolve_infer_evo2_usr_output_contract(config_path)
+        resolve_infer_usr_output_contract(config_path)
     try:
         contract = resolve_usr_producer_contract(tool=tool_name, config_path=config_path)
     except ValueError as exc:

@@ -197,7 +197,7 @@ class InferWorkloadContract(StrictBaseModel):
 
 class NotifyContract(StrictBaseModel):
     tool: Literal["densegen", "infer"]
-    policy: Literal["densegen", "infer_evo2", "generic"] = "densegen"
+    policy: Literal["densegen", "infer", "generic"] = "densegen"
     profile: Path
     cursor: Path
     spool_dir: Path
@@ -329,8 +329,8 @@ class OrchestrationRunbookV1(StrictBaseModel):
                     raise ValueError("densegen notify workflow requires runbook.notify block")
                 if self.notify.tool != "densegen":
                     raise ValueError("densegen workflow requires notify.tool=densegen")
-                if self.notify.policy == "infer_evo2":
-                    raise ValueError("densegen workflow does not accept notify.policy=infer_evo2")
+                if self.notify.policy == "infer":
+                    raise ValueError("densegen workflow does not accept notify.policy=infer")
             elif self.notify is not None:
                 raise ValueError("densegen_batch_submit does not accept runbook.notify block")
 

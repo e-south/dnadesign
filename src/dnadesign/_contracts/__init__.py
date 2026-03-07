@@ -28,9 +28,9 @@ from .tls_ca_bundle import (
     resolve_tls_ca_bundle_path,
 )
 from .usr_producer import (
-    InferEvo2USROutputContract,
+    InferUSROutputContract,
     USRProducerContract,
-    resolve_infer_evo2_usr_output_contract,
+    resolve_infer_usr_output_contract,
     resolve_usr_producer_contract,
 )
 
@@ -38,14 +38,14 @@ __all__ = [
     "DensegenUSROutputContract",
     "DEFAULT_SYSTEM_TLS_CA_BUNDLE_CANDIDATES",
     "DEFAULT_NOTIFY_WEBHOOK_SOURCES",
-    "InferEvo2USROutputContract",
+    "InferUSROutputContract",
     "ResumeReadinessPolicy",
     "TLSCABundleResolutionError",
     "USRProducerContract",
     "load_densegen_config_mapping",
     "parse_notify_profile_webhook",
     "resolve_resume_readiness_policy",
-    "resolve_infer_evo2_usr_output_contract",
+    "resolve_infer_usr_output_contract",
     "resolve_densegen_usr_output_contract",
     "resolve_file_secret_ref_path",
     "resolve_usr_producer_contract",

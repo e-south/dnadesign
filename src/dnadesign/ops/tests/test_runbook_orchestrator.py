@@ -1168,7 +1168,7 @@ jobs: []
             },
             "notify": {
                 "tool": "infer",
-                "policy": "infer_evo2",
+                "policy": "infer",
                 "profile": str(workspace_root / "outputs/notify/infer/profile.json"),
                 "cursor": str(workspace_root / "outputs/notify/infer/cursor"),
                 "spool_dir": str(workspace_root / "outputs/notify/infer/spool"),
@@ -1202,7 +1202,7 @@ jobs: []
     assert "gpu_c=8.9" in submit_block
     assert "NOTIFY_PROFILE" in submit_block
     assert "notify profile smoke --profile" in smoke_block
-    assert "--tool infer_evo2" in smoke_block
+    assert "--tool infer " in smoke_block
     assert "setup resolve-events --tool infer --config" not in smoke_block
     assert "--only-tools infer" in smoke_block
 
@@ -1226,7 +1226,7 @@ def test_infer_workflow_rejects_notify_tool_mismatch() -> None:
             },
             "notify": {
                 "tool": "densegen",
-                "policy": "infer_evo2",
+                "policy": "infer",
                 "profile": "/tmp/workspace/outputs/notify/infer/profile.json",
                 "cursor": "/tmp/workspace/outputs/notify/infer/cursor",
                 "spool_dir": "/tmp/workspace/outputs/notify/infer/spool",
@@ -1664,7 +1664,7 @@ def test_cli_plan_invalid_runbook_shows_contract_error_without_traceback(tmp_pat
             },
             "notify": {
                 "tool": "densegen",
-                "policy": "infer_evo2",
+                "policy": "infer",
                 "profile": "/tmp/workspace/outputs/notify/infer/profile.json",
                 "cursor": "/tmp/workspace/outputs/notify/infer/cursor",
                 "spool_dir": "/tmp/workspace/outputs/notify/infer/spool",

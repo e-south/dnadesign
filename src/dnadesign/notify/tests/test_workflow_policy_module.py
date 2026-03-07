@@ -22,14 +22,19 @@ from dnadesign.notify.profiles.policy import (
 )
 
 
-def test_resolve_workflow_policy_accepts_alias_and_known_policy() -> None:
-    assert resolve_workflow_policy(policy="infer-evo2") == "infer_evo2"
+def test_resolve_workflow_policy_accepts_known_policy() -> None:
+    assert resolve_workflow_policy(policy="infer") == "infer"
     assert resolve_workflow_policy(policy="densegen") == "densegen"
 
 
 def test_resolve_workflow_policy_rejects_unknown_policy() -> None:
     with pytest.raises(NotifyConfigError, match="unsupported policy"):
         resolve_workflow_policy(policy="mystery")
+
+
+def test_resolve_workflow_policy_rejects_legacy_infer_alias() -> None:
+    with pytest.raises(NotifyConfigError, match="unsupported policy"):
+        resolve_workflow_policy(policy="infer_evo2")
 
 
 def test_default_profile_path_for_tool_namespaces_by_tool() -> None:
