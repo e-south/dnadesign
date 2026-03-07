@@ -50,6 +50,11 @@ def test_infer_scc_gpu_env_runbook_exists_and_covers_uv_stack_contract() -> None
     assert "RUN_CAPACITY_FAIL" in doc
     assert "RESOURCE_GATE_OK" in doc
     assert "FLASH_ATTN_CUDA_ARCHS" in doc
+    assert "API pressure checks (forward, embeddings, generation)" in doc
+    assert "pool.dim=1" in doc
+    assert "pool.dim=0" in doc
+    assert "evo2.embedding" in doc
+    assert "layer" in doc
     assert 'export UV_PROJECT_ENVIRONMENT="$PWD/.venv"' in doc
     assert "HF_HOME_7B" in doc
     assert "HF_HOME_LARGE" in doc

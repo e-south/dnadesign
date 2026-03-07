@@ -2960,3 +2960,63 @@ Harden SCC docs and operator sequence so infer uses one canonical repo `.venv`, 
 1. Removed leftover moved runtime trash directory:
    - `/project/dunlop/esouth/.trash/dnadesign-runtime-20260307-123847`
 2. Repo root remains clean of top-level `runtime/` directory.
+
+## 2026-03-07 - Phase 2 Slice AC (Evo2 API Pressure Pass + Pooling/Embedding Contracts)
+
+### Goal
+
+Pressure-test infer Evo2 usage for forward/logits, embeddings, and generation; harden contracts so behavior is explicit and easier to extend.
+
+### Audit finding (root cause)
+
+1. Pooling semantics drifted between batched and variable-length fallback paths in `Evo2Adapter`:
+   - batched path pooled with `pool.dim` default `1` on `[B,L,V]` / `[B,L,D]`.
+   - variable-length fallback pooled after `squeeze(0)` with default dim `0` on `[L,V]` / `[L,D]`.
+2. Practical effect:
+   - with explicit `pool.dim=1` (documented sequence-dimension pooling), fallback path pooled the feature axis instead of sequence axis.
+3. Additional UX footguns:
+   - `evo2.embedding` without `layer` could pass request assembly and fail later at adapter invocation.
+   - `pool.dim=0` could consume batch axis and violate one-output-per-input contract.
+
+### Changes applied
+
+1. Refactored Evo2 pooling path to one contract:
+   - added pool normalization + batch-preserving pooling helpers in `src/dnadesign/infer/src/adapters/evo2.py`.
+   - both batched and fallback paths now interpret `pool.dim` against batched tensors.
+   - fallback path pools before dropping batch axis, removing semantic drift.
+2. Added explicit fail-fast pooling contract:
+   - reject `pool.dim < 1` with clear `CapabilityError`.
+3. Hardened embedding extraction contract:
+   - CLI request assembly now fails fast when `fn=evo2.embedding` and `layer` is missing.
+   - runtime adapter dispatch now enforces non-empty `params.layer` for `embedding`.
+4. Added pressure-check runbook section:
+   - `src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md` now includes forward/logits, embeddings (layered), and generation checks.
+
+### TDD evidence
+
+1. Added failing tests first:
+   - `src/dnadesign/infer/tests/runtime/test_evo2_adapter_pooling_contracts.py`
+   - `src/dnadesign/infer/tests/runtime/test_adapter_dispatch.py` (embedding layer missing)
+   - `src/dnadesign/infer/tests/cli/test_requests.py` (embedding layer requirement)
+2. Implemented minimal fixes.
+3. Re-ran targeted tests and full infer tests: pass.
+
+### Live pressure checks (GPU)
+
+1. Executed real 7B API checks on `cuda:0` in canonical `.venv`:
+   - logits mean pooling (`evo2.logits`, `pool.dim=1`) for mixed-length inputs
+   - embedding extraction (`evo2.embedding`, `layer=blocks.28.mlp.l3`, `pool.dim=1`)
+   - generation (`max_new_tokens=4`)
+2. Observed outputs:
+   - `logits_widths [512, 512]`
+   - `embedding_widths [4096, 4096]`
+   - generation produced one continuation sequence.
+3. Fail-fast adversarial checks:
+   - `pool.dim=0` now raises explicit `CapabilityError`.
+   - embedding request without `layer` now fails fast in CLI request validation.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_evo2_adapter_pooling_contracts.py src/dnadesign/infer/tests/runtime/test_adapter_dispatch.py src/dnadesign/infer/tests/cli/test_requests.py`
+2. `uv run pytest -q src/dnadesign/infer/tests`
+3. `uv run pytest -q src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py`

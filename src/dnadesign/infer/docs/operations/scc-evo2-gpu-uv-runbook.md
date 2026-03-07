@@ -231,6 +231,66 @@ uv run infer extract \
   --no-progress
 ```
 
+### API pressure checks (forward, embeddings, generation)
+
+Use these checks to verify Evo2 usage contracts in infer:
+
+- logits/embedding pooling uses sequence dimension with `pool.dim=1`.
+- `pool.dim=0` is rejected to avoid consuming batch axis.
+- `evo2.embedding` requires `layer`.
+
+```bash
+uv run python - <<'PY'
+from dnadesign.infer import run_extract, run_generate
+
+seqs = ["ACGTACGT", "ACGT"]
+
+logits = run_extract(
+    seqs,
+    model_id="evo2_7b",
+    device="cuda:0",
+    precision="bf16",
+    alphabet="dna",
+    batch_size=2,
+    outputs=[{
+        "id": "logits_mean",
+        "fn": "evo2.logits",
+        "params": {"pool": {"method": "mean", "dim": 1}},
+        "format": "list",
+    }],
+)
+
+emb = run_extract(
+    seqs,
+    model_id="evo2_7b",
+    device="cuda:0",
+    precision="bf16",
+    alphabet="dna",
+    batch_size=2,
+    outputs=[{
+        "id": "emb_mean",
+        "fn": "evo2.embedding",
+        "params": {"layer": "blocks.28.mlp.l3", "pool": {"method": "mean", "dim": 1}},
+        "format": "list",
+    }],
+)
+
+gen = run_generate(
+    ["ACGTACGT"],
+    model_id="evo2_7b",
+    device="cuda:0",
+    precision="bf16",
+    alphabet="dna",
+    batch_size=1,
+    params={"max_new_tokens": 4, "temperature": 1.0, "top_k": 4, "seed": 7},
+)
+
+print("logits_widths", [len(row) for row in logits["logits_mean"]])
+print("embedding_widths", [len(row) for row in emb["emb_mean"]])
+print("generated", gen["gen_seqs"][0])
+PY
+```
+
 `infer validate config` checks capacity when local GPUs are visible. On GPU-less hosts it validates schema/contracts and reports that capacity checks were skipped; use `ops runbook plan` with declared GPU resources for deterministic scheduler-side preflight.
 
 ### Recovery after interrupted or partial installs
