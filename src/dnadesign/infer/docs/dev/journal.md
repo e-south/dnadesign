@@ -3096,3 +3096,76 @@ Match Evo2 embedding semantics with a sensible default intermediate block while 
 ### Verification commands
 
 1. `uv run pytest -q src/dnadesign/infer/tests/cli/test_requests.py src/dnadesign/infer/tests/runtime/test_extract_params.py src/dnadesign/infer/tests/contracts/test_namespace_contracts.py -k "embedding or extract_params"`
+
+## 2026-03-07 - Phase 2 Slice AF (Evo2 Length-Bucket Execution Refactor + Performance Contract)
+
+### Goal
+
+Reduce adapter execution overhead for variable-length batches while preserving infer extract behavior and output ordering.
+
+### Audit finding
+
+1. In `adapters/evo2.py`, variable-length logits/embedding extraction executed one model forward per sequence.
+2. This created avoidable Python overhead and duplicated control-flow across logits and embedding paths.
+3. Top-level design and quality contracts require explicit, test-backed boundaries and no hidden behavior drift.
+
+### Refactor boundary (behavior-preserving)
+
+1. Public infer API/CLI contracts unchanged.
+2. Output ordering and pooling semantics unchanged.
+3. Error contracts remain fail-fast (`CapabilityError`) for invalid pooling/layer invariants.
+4. Only internal execution strategy changed: variable-length batches now run as padding-free token-length groups.
+
+### TDD sequence
+
+1. Red:
+   - added failing tests in `src/dnadesign/infer/tests/runtime/test_evo2_adapter_pooling_contracts.py`:
+     - `test_logits_groups_variable_lengths_to_reduce_forward_calls`
+     - `test_embedding_groups_variable_lengths_to_reduce_forward_calls`
+   - failure showed `forward_calls == 3` for three inputs with two token lengths.
+2. Green:
+   - extracted shared helper in Evo2 adapter:
+     - `_bucket_indices_by_token_length(...)`
+     - `Evo2Adapter._run_extract_batches_by_length(...)`
+   - unified logits/embedding execution through the shared batch-by-length path.
+   - removed obsolete single-item fallback helper.
+3. Verify:
+   - targeted runtime tests and full infer test suite passed.
+
+### Performance evidence (measurement-first)
+
+Baseline benchmark (before refactor), 5 runs on synthetic mixed-length workload (`240` sequences, token lengths `{80,100,120}`):
+
+1. `logits`:
+   - forward calls per run: `[240, 240, 240, 240, 240]`
+   - mean wall time: `0.004405s`
+   - min wall time: `0.004204s`
+2. `embedding`:
+   - forward calls per run: `[240, 240, 240, 240, 240]`
+   - mean wall time: `0.005031s`
+   - min wall time: `0.005005s`
+
+After refactor, same benchmark and workload:
+
+1. `logits`:
+   - forward calls per run: `[3, 3, 3, 3, 3]`
+   - mean wall time: `0.001180s`
+   - min wall time: `0.001021s`
+2. `embedding`:
+   - forward calls per run: `[3, 3, 3, 3, 3]`
+   - mean wall time: `0.001158s`
+   - min wall time: `0.001107s`
+
+### IA and harness hardening updates
+
+1. Updated `src/dnadesign/infer/docs/architecture/README.md` runtime contract section to document:
+   - token-length bucketing
+   - deterministic output-order preservation
+   - fail-fast pooling invariants
+2. New runtime tests now act as regression harness against reintroduction of per-sequence variable-length forwards.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_evo2_adapter_pooling_contracts.py`
+2. `uv run pytest -q src/dnadesign/infer/tests`
+3. `uv run pytest -q src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py -k "infer or workspace"`
