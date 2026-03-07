@@ -3044,3 +3044,55 @@ Validate mean pooling against explicit `1/n` averaging math and ensure Evo2 like
 2. `uv run pytest -q src/dnadesign/infer/tests`
 
 Passed.
+
+## 2026-03-07 - Phase 2 Slice AE (Default Embedding Layer Policy + Decoupled Runtime Resolution)
+
+### Goal
+
+Match Evo2 embedding semantics with a sensible default intermediate block while keeping infer decoupled from adapter specifics and extensible to future models.
+
+### Findings
+
+1. Embedding calls previously required explicit `params.layer` at CLI request assembly and runtime dispatch.
+2. This made the common Evo2 path more rigid than needed and forced model-specific knowledge into command invocation.
+3. We need one default block for practical use (no sweep) and explicit override support.
+
+### Changes applied
+
+1. Added registry-backed embedding default policy:
+   - `register_default_embedding_layer(namespace, layer)`
+   - `get_default_embedding_layer(model_id)`
+2. Registered Evo2 default embedding layer at adapter bootstrap:
+   - namespace `evo2` -> `blocks.20.mlp.l3`
+3. Added runtime extract-parameter resolver:
+   - `runtime.extract_params.resolve_extract_params(...)`
+   - embedding resolution order:
+     - explicit `params.layer` (validated non-empty)
+     - registered namespace default
+     - fail fast when neither exists
+4. Wired runtime resolver into `engine.run_extract_job` before adapter invocation.
+5. Relaxed CLI request assembly:
+   - `evo2.embedding` no longer requires `--layer` in request builder.
+6. Updated SCC Evo2 runbook wording/examples:
+   - default embedding layer behavior documented.
+   - explicit layer override documented.
+
+### Decoupling posture
+
+1. Engine/runtime no longer hardcodes Evo2 layer literals.
+2. Model-specific defaults are declared at adapter registration time.
+3. Future model namespaces can add their own embedding default without changing engine flow.
+
+### TDD evidence
+
+1. Red phase:
+   - added failing tests for:
+     - embedding request without explicit layer
+     - runtime embedding param resolution defaults
+     - end-to-end extract path uses default embedding layer
+2. Green phase:
+   - implemented the minimal registry + resolver + engine wiring to satisfy tests.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/cli/test_requests.py src/dnadesign/infer/tests/runtime/test_extract_params.py src/dnadesign/infer/tests/contracts/test_namespace_contracts.py -k "embedding or extract_params"`
