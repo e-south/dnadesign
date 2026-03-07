@@ -38,7 +38,15 @@ def invoke_extract_callable(
 ) -> List[object]:
     if method_name == "log_likelihood":
         return fn(chunk, **params)
-    if method_name in {"logits", "embedding"}:
+    if method_name == "logits":
+        return fn(chunk, **params, fmt=output_format)
+    if method_name == "embedding":
+        layer = params.get("layer")
+        if not isinstance(layer, str) or not layer.strip():
+            raise CapabilityError(
+                "embedding output requires params.layer with a non-empty Evo2 layer name "
+                "(for example 'blocks.28.mlp.l3')"
+            )
         return fn(chunk, **params, fmt=output_format)
     raise CapabilityError(f"Unsupported extract function '{method_name}' in v1")
 

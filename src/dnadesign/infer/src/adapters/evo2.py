@@ -47,6 +47,60 @@ def _all_equal_lengths(items: Sequence[Sequence[int]]) -> bool:
     return all(len(s) == first_len for s in it)
 
 
+def _normalize_pool_config(pool: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if pool is None:
+        return None
+
+    method = pool.get("method", "mean")
+    try:
+        dim = int(pool.get("dim", 1))
+    except (TypeError, ValueError) as e:
+        raise CapabilityError(f"pool.dim must be an integer for Evo2 extract outputs: {e}")
+
+    if dim < 1:
+        raise CapabilityError("pool.dim must be >= 1 for Evo2 extract outputs; dim=1 pools sequence positions.")
+
+    return {"method": method, "dim": dim}
+
+
+def _pool_batched_tensor(
+    t: torch.Tensor,
+    *,
+    pool: Optional[Dict[str, Any]],
+    expected_batch_size: int,
+) -> torch.Tensor:
+    spec = _normalize_pool_config(pool)
+    if spec is None:
+        return t
+
+    try:
+        pooled = pool_tensor(t, method=spec["method"], dim=spec["dim"])
+    except Exception as e:
+        raise CapabilityError(
+            f"Invalid pooling config for Evo2 outputs: method='{spec['method']}', dim={spec['dim']}: {e}"
+        )
+
+    if pooled.size(0) != expected_batch_size:
+        raise CapabilityError(
+            "Pooling must preserve batch axis for Evo2 extract outputs. "
+            "Use pool.dim >= 1 and avoid pooling over batch dimension."
+        )
+    return pooled
+
+
+def _single_item_tensor_from_batch(
+    t: torch.Tensor,
+    *,
+    pool: Optional[Dict[str, Any]],
+) -> torch.Tensor:
+    if t.size(0) != 1:
+        raise CapabilityError(
+            f"Expected single-item Evo2 batch in fallback path, got batch={t.size(0)}."
+        )
+    pooled = _pool_batched_tensor(t, pool=pool, expected_batch_size=1)
+    return pooled.squeeze(0)
+
+
 class Evo2Adapter:
     """
     Thin adapter around Evo 2 models.
@@ -192,12 +246,11 @@ class Evo2Adapter:
                 except Exception as e:
                     raise CapabilityError(f"Evo2 forward returned unexpected structure: {e}")
 
-                if pool:
-                    logits = pool_tensor(
-                        logits,
-                        method=pool.get("method", "mean"),
-                        dim=int(pool.get("dim", 1)),
-                    )  # typically [B, V] if dim=1
+                logits = _pool_batched_tensor(
+                    logits,
+                    pool=pool,
+                    expected_batch_size=len(seqs),
+                )
 
             # Split per input, cast
             for i in range(logits.size(0)):
@@ -211,15 +264,13 @@ class Evo2Adapter:
             with torch.inference_mode(), self._autocast_ctx():
                 outputs, _ = self.model(x)
                 try:
-                    lgt = outputs[0].squeeze(0)  # [L, V]
+                    logits_batch = outputs[0]  # [1, L, V]
                 except Exception as e:
                     raise CapabilityError(f"Evo2 forward returned unexpected structure: {e}")
-                if pool:
-                    lgt = pool_tensor(
-                        lgt,
-                        method=pool.get("method", "mean"),
-                        dim=int(pool.get("dim", 0)),
-                    )  # if pooling single item, sequence dim is 0
+                lgt = _single_item_tensor_from_batch(
+                    logits_batch,
+                    pool=pool,
+                )
             results.append(to_format(lgt, fmt))
         return results
 
@@ -269,12 +320,11 @@ class Evo2Adapter:
                 if layer not in embeddings:
                     raise CapabilityError(f"Embedding layer '{layer}' not found in Evo2 response.")
                 emb = embeddings[layer]  # [B, L, D]
-                if pool:
-                    emb = pool_tensor(
-                        emb,
-                        method=pool.get("method", "mean"),
-                        dim=int(pool.get("dim", 1)),
-                    )  # [B, D] if dim=1
+                emb = _pool_batched_tensor(
+                    emb,
+                    pool=pool,
+                    expected_batch_size=len(seqs),
+                )
             for i in range(emb.size(0)):
                 results.append(to_format(emb[i], fmt))
             return results
@@ -287,13 +337,10 @@ class Evo2Adapter:
                 outputs, embeddings = self.model(x, return_embeddings=True, layer_names=[layer])
                 if layer not in embeddings:
                     raise CapabilityError(f"Embedding layer '{layer}' not found in Evo2 response.")
-                e = embeddings[layer].squeeze(0)  # [L, D]
-                if pool:
-                    e = pool_tensor(
-                        e,
-                        method=pool.get("method", "mean"),
-                        dim=int(pool.get("dim", 0)),
-                    )
+                e = _single_item_tensor_from_batch(
+                    embeddings[layer],  # [1, L, D]
+                    pool=pool,
+                )
             results.append(to_format(e, fmt))
         return results
 

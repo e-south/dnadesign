@@ -74,6 +74,17 @@ def test_invoke_extract_callable_rejects_unsupported_method() -> None:
         )
 
 
+def test_invoke_extract_callable_fails_fast_when_embedding_layer_is_missing() -> None:
+    with pytest.raises(CapabilityError, match="embedding output requires params.layer"):
+        invoke_extract_callable(
+            fn=lambda _chunk, **_kwargs: [],
+            method_name="embedding",
+            chunk=["ACGT"],
+            params={},
+            output_format="list",
+        )
+
+
 def test_resolve_generate_callable_fails_when_method_missing() -> None:
     register_fn("audit_dispatch_generate.generate", "generate")
     adapter = SimpleNamespace()
