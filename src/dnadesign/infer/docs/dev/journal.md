@@ -3394,3 +3394,66 @@ Close still-valid Codex review findings for infer/ops contracts while keeping be
 1. Infer/ops preflight now rejects invalid `cuda:<idx>` targets before runtime adapter initialization.
 2. Runbook planning and infer public resource validation now surface invalid infer model contracts through consistent `ValueError` boundaries.
 3. Infer default USR ingest root now aligns with actual package layout and shared tool expectations.
+
+## 2026-03-07 - Phase 2 Slice AK (Infer Import Decoupling + Ops Boundary Hardening + Run UX Contract)
+
+### Goal
+
+Reduce import-time coupling between infer and ops, keep cross-tool boundaries explicit, and tighten one high-frequency CLI contract for clearer operator UX.
+
+### Audit findings
+
+1. Importing `dnadesign.infer` eagerly loaded GPU runtime modules (`torch`, `evo2`) via top-level API imports and adapter registration chain.
+2. Importing `dnadesign.ops.orchestrator.plan` inherited the same eager runtime load through `from dnadesign.infer import validate_runbook_gpu_resources`.
+3. `infer run --preset ...` without `--usr` failed late with generic ingest-model validation text instead of a direct CLI flag contract message.
+
+### TDD sequence
+
+1. Red:
+   - `test_infer_import_does_not_eagerly_load_gpu_runtime_modules`
+   - `test_ops_plan_import_does_not_eagerly_load_gpu_runtime_modules`
+   - `test_run_preset_requires_usr_dataset_flag`
+2. Green:
+   - infer public API is now lazy-imported at call time (`run_extract`, `run_generate`, `run_job`, `validate_runbook_gpu_resources`).
+   - infer adapter registration now uses a lazy `Evo2Adapter` constructor proxy, deferring `evo2`/`torch` import until adapter instantiation.
+   - run command contract now fails fast with `--usr is required when using --preset.`
+3. Verify:
+   - targeted red/green tests plus broader infer/ops/notify and docs suites pass.
+
+### Performance evidence (measurement-first)
+
+Cold import benchmark (3 subprocess runs each):
+
+1. Before:
+   - `dnadesign.infer` mean: `3759.0ms`
+   - `dnadesign.ops.orchestrator.plan` mean: `3992.2ms`
+2. After:
+   - `dnadesign.infer` mean: `25.8ms`
+   - `dnadesign.ops.orchestrator.plan` mean: `155.7ms`
+
+Observed effect: import-time coupling to GPU runtime stack was removed from infer and ops module import paths.
+
+### Changes applied
+
+1. `src/dnadesign/infer/__init__.py`
+   - replaced eager imports with lazy call-through wrappers for public API functions.
+2. `src/dnadesign/infer/src/adapters/__init__.py`
+   - replaced eager `from .evo2 import Evo2Adapter` import with lazy constructor proxy.
+3. `src/dnadesign/infer/src/cli/commands/run.py`
+   - added explicit preset-mode flag contract: `--usr` required with `--preset`.
+4. Tests:
+   - `src/dnadesign/infer/tests/package/test_wrapper_contracts.py`
+   - `src/dnadesign/ops/tests/test_runbook_orchestrator.py`
+   - `src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py`
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/package/test_wrapper_contracts.py::test_infer_import_does_not_eagerly_load_gpu_runtime_modules src/dnadesign/ops/tests/test_runbook_orchestrator.py::test_ops_plan_import_does_not_eagerly_load_gpu_runtime_modules src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py::test_run_preset_requires_usr_dataset_flag`
+2. `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/ops/tests/test_densegen_usr_contract_sharing.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/notify/tests/test_workflow_policy_module.py`
+3. `uv run pytest -q src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py src/dnadesign/notify/tests/test_notify_docs_progressive_disclosure_contracts.py`
+
+### Contract impact
+
+1. Infer and ops import paths are now lightweight and do not require GPU runtime dependencies at module import time.
+2. Infer preset mode surfaces direct, flag-level contract guidance (`--usr`) instead of deferred ingest-schema errors.
+3. Runtime behavior for extract/generate execution and resource validation remains unchanged.
