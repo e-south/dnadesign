@@ -3519,3 +3519,68 @@ Observed effect: preset resolution path now avoids repeated package scan/YAML pa
 1. Behavior preserved for explicit preset id/path-id lookup.
 2. Stem fallback is now deterministic and explicit: ambiguous stems fail fast instead of silently choosing one file.
 3. Cache seam is explicit for test and debug workflows.
+
+## 2026-03-07 - Phase 2 Slice AM (Resume Planner Decoupling + Filtered Parquet Reads)
+
+### Goal
+
+Make infer resume planning easier to change and faster for partial-resume workloads by separating table merge responsibilities and applying explicit ID filters at parquet read boundaries.
+
+### Audit findings
+
+1. `plan_resume_for_usr(...)` contained duplicated table-merge logic for records and overlay paths.
+2. Resume scans read full parquet tables even when only a small set of IDs was requested.
+3. Mapping logic was row-loop heavy and harder to reason about for duplicate requested IDs.
+
+### TDD sequence
+
+1. Red:
+   - `test_plan_resume_for_usr_reads_only_requested_ids_and_preserves_duplicate_order`
+2. Green:
+   - added reusable helpers:
+     - `_dedupe_ids(...)`
+     - `_positions_by_id(...)`
+     - `_read_subset_table(...)`
+     - `_merge_table_values(...)`
+   - records and overlay paths now share one merge implementation.
+   - parquet reads now use explicit `filters=[("id", "in", ...)]` contract.
+   - duplicate requested IDs preserve output ordering.
+3. Verify:
+   - targeted resume-planner tests pass.
+   - resume/write-back infer contract tests pass.
+   - full infer suite and docs contract suites pass.
+
+### Performance evidence (measurement-first)
+
+Benchmark: `plan_resume_for_usr(...)` against `200,000`-row records table with `5` requested IDs.
+
+1. Before:
+   - runs: `177.276, 141.453, 148.040, 136.974, 143.659`
+   - mean: `149.480ms`
+2. After:
+   - runs: `15.365, 8.985, 8.502, 8.084, 7.969`
+   - mean: `9.781ms`
+
+Observed effect: subset resume scans are materially faster because reads are filtered by requested IDs instead of scanning entire parquet tables.
+
+### Changes applied
+
+1. `src/dnadesign/infer/src/runtime/resume_planner.py`
+   - extracted ID normalization, positions map, subset read, and table merge helpers.
+   - replaced duplicated records/overlay loops with shared helper path.
+   - added parquet filter contract on ID subsets.
+2. `src/dnadesign/infer/tests/runtime/test_resume_planner.py`
+   - added filtered-read + duplicate-order contract coverage.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_resume_planner.py::test_plan_resume_for_usr_reads_only_requested_ids_and_preserves_duplicate_order src/dnadesign/infer/tests/runtime/test_resume_planner.py::test_plan_resume_for_usr_overwrite_short_circuits_scan src/dnadesign/infer/tests/runtime/test_resume_planner.py::test_plan_resume_for_usr_fails_fast_on_unreadable_records`
+2. `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py -k "plan_resume_for_usr_uses_infer_prefixed_columns or usr_chunk_write_back_is_append_safe_and_resume_reads_overlay or run_extract_job_usr_resume_skips_completed_rows_from_overlay"`
+3. `uv run pytest -q src/dnadesign/infer/tests`
+4. `uv run pytest -q src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+
+### Contract impact
+
+1. Resume planning behavior remains unchanged for valid inputs.
+2. Requested-ID duplicate ordering is explicit and preserved.
+3. Resume table scans are now subset-based and easier to reason about and extend.
