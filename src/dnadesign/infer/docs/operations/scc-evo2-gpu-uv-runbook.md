@@ -238,6 +238,7 @@ Use these checks to verify Evo2 usage contracts in infer:
 - logits/embedding pooling uses sequence dimension with `pool.dim=1`.
 - `pool.dim=0` is rejected to avoid consuming batch axis.
 - `evo2.embedding` requires `layer`.
+- mean pooling follows `e = (1/n) * Σ_j E_j` over token positions.
 
 ```bash
 uv run python - <<'PY'

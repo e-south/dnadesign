@@ -53,6 +53,7 @@ def test_infer_scc_gpu_env_runbook_exists_and_covers_uv_stack_contract() -> None
     assert "API pressure checks (forward, embeddings, generation)" in doc
     assert "pool.dim=1" in doc
     assert "pool.dim=0" in doc
+    assert "e = (1/n) * Σ_j E_j" in doc
     assert "evo2.embedding" in doc
     assert "layer" in doc
     assert 'export UV_PROJECT_ENVIRONMENT="$PWD/.venv"' in doc

@@ -350,7 +350,9 @@ class Evo2Adapter:
         """
         if method != "native":
             raise CapabilityError("Evo2 supports only method='native' in v1.")
-        red = "mean" if reduction == "mean" else "sum"
+        if reduction not in {"sum", "mean"}:
+            raise CapabilityError("Evo2 log_likelihood supports reduction='sum' or 'mean' only.")
+        red = reduction
         with torch.inference_mode():
             values = self.model.score_sequences(seqs, reduce_method=red)
         return [float(v) for v in values]

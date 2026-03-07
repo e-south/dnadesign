@@ -3020,3 +3020,27 @@ Pressure-test infer Evo2 usage for forward/logits, embeddings, and generation; h
 1. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_evo2_adapter_pooling_contracts.py src/dnadesign/infer/tests/runtime/test_adapter_dispatch.py src/dnadesign/infer/tests/cli/test_requests.py`
 2. `uv run pytest -q src/dnadesign/infer/tests`
 3. `uv run pytest -q src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py`
+
+## 2026-03-07 - Phase 2 Slice AD (Mean-Pooling Math Contract + Likelihood Reduction Fail-Fast)
+
+### Goal
+
+Validate mean pooling against explicit `1/n` averaging math and ensure Evo2 likelihood API usage has no silent reduction fallback.
+
+### Findings and hardening
+
+1. Mean pooling contract now has value-level tests (not shape-only) for logits and embeddings:
+   - verifies pooled vectors equal explicit arithmetic mean over token positions.
+2. Likelihood contract tightened:
+   - previous behavior mapped unknown reductions to `sum` silently.
+   - now invalid reductions fail fast with `CapabilityError`.
+3. Evo2 API usage verified against runtime signature introspection:
+   - `Evo2.__call__(..., return_embeddings=False, layer_names=None)`
+   - `Evo2.score_sequences(..., reduce_method='mean', ...)`
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_evo2_adapter_pooling_contracts.py src/dnadesign/infer/tests/runtime/test_adapter_dispatch.py src/dnadesign/infer/tests/cli/test_requests.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+2. `uv run pytest -q src/dnadesign/infer/tests`
+
+Passed.

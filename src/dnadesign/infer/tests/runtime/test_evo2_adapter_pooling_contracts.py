@@ -28,6 +28,7 @@ class _Tokenizer:
 class _Model:
     def __init__(self) -> None:
         self.tokenizer = _Tokenizer()
+        self.reduce_calls: list[str] = []
 
     def __call__(
         self,
@@ -54,7 +55,9 @@ class _Model:
 
     def score_sequences(self, seqs: list[str], *, reduce_method: str) -> list[float]:
         assert reduce_method in {"sum", "mean"}
-        return [float(len(s)) for s in seqs]
+        self.reduce_calls.append(reduce_method)
+        mult = 10.0 if reduce_method == "sum" else 1.0
+        return [float(len(s)) * mult for s in seqs]
 
 
 def _adapter() -> Evo2Adapter:
@@ -79,6 +82,8 @@ def test_logits_pooling_sequence_dimension_is_consistent_for_variable_lengths() 
     assert all(torch.is_tensor(item) for item in out)
     assert out[0].shape == torch.Size([4])
     assert out[1].shape == torch.Size([4])
+    assert torch.allclose(out[0], torch.tensor([6.0, 7.0, 8.0, 9.0]))
+    assert torch.allclose(out[1], torch.tensor([2.0, 3.0, 4.0, 5.0]))
 
 
 def test_embedding_pooling_sequence_dimension_is_consistent_for_variable_lengths() -> None:
@@ -94,6 +99,8 @@ def test_embedding_pooling_sequence_dimension_is_consistent_for_variable_lengths
     assert all(torch.is_tensor(item) for item in out)
     assert out[0].shape == torch.Size([3])
     assert out[1].shape == torch.Size([3])
+    assert torch.allclose(out[0], torch.tensor([4.5, 5.5, 6.5]))
+    assert torch.allclose(out[1], torch.tensor([1.5, 2.5, 3.5]))
 
 
 def test_logits_rejects_pool_dim_zero_that_consumes_batch_axis() -> None:
@@ -105,3 +112,20 @@ def test_logits_rejects_pool_dim_zero_that_consumes_batch_axis() -> None:
             pool={"method": "mean", "dim": 0},
             fmt="tensor",
         )
+
+
+def test_log_likelihood_reduction_sum_and_mean_map_directly_to_evo2_api() -> None:
+    adapter = _adapter()
+
+    out_sum = adapter.log_likelihood(["AC", "ACGT"], method="native", reduction="sum")
+    out_mean = adapter.log_likelihood(["AC", "ACGT"], method="native", reduction="mean")
+
+    assert out_sum == [20.0, 40.0]
+    assert out_mean == [2.0, 4.0]
+    assert adapter.model.reduce_calls == ["sum", "mean"]
+
+
+def test_log_likelihood_rejects_unknown_reduction() -> None:
+    adapter = _adapter()
+    with pytest.raises(CapabilityError, match="reduction='sum' or 'mean'"):
+        adapter.log_likelihood(["ACGT"], method="native", reduction="median")
