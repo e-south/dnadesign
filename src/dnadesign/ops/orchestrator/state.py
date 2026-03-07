@@ -100,7 +100,32 @@ class ModeDecision:
     reason: str
 
 
-def _has_resume_artifacts(workspace_root: Path) -> bool:
+def _infer_overlay_artifacts(workspace_root: Path) -> tuple[Path, ...]:
+    usr_root = workspace_root / "outputs" / "usr_datasets"
+    if not usr_root.exists():
+        return ()
+    candidates: list[Path] = []
+    candidates.extend(sorted(usr_root.glob("**/_derived/infer.parquet")))
+    candidates.extend(sorted(usr_root.glob("**/_derived/infer/*.parquet")))
+    deduped: list[Path] = []
+    seen: set[Path] = set()
+    for path in candidates:
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        deduped.append(path)
+    return tuple(deduped)
+
+
+def _has_resume_artifacts(workspace_root: Path, *, workflow_tool: str) -> bool:
+    tool = str(workflow_tool or "").strip().lower()
+    if tool == "infer":
+        manifest_path = workspace_root / "outputs" / "meta" / "run_manifest.json"
+        if manifest_path.exists():
+            return True
+        return bool(_infer_overlay_artifacts(workspace_root))
+
     markers = (
         workspace_root / "outputs" / "meta" / "run_manifest.json",
         workspace_root / "outputs" / "tables" / "records.parquet",
@@ -274,7 +299,7 @@ def resolve_mode_decision(
     workflow_tool = "densegen" if runbook.densegen is not None else "infer"
     resume_policy = resolve_resume_readiness_policy(workflow_tool)
     has_explicit_resume_policy = resume_policy is not None
-    artifacts_found = _has_resume_artifacts(runbook.workspace_root)
+    artifacts_found = _has_resume_artifacts(runbook.workspace_root, workflow_tool=workflow_tool)
     resume_state: ResumeState = "none"
     resume_readiness_reason = "not-evaluated"
     if has_explicit_resume_policy:
@@ -311,6 +336,13 @@ def resolve_mode_decision(
         raise ValueError(
             "fresh mode blocked: workspace already has resume artifacts "
             f"({resume_readiness_reason}). "
+            "Re-run with --allow-fresh-reset only after confirming outputs should be cleared."
+        )
+    if selected_mode == "resume" and not artifacts_found:
+        raise ValueError("resume mode blocked: workspace has no resume artifacts.")
+    if selected_mode == "fresh" and artifacts_found and not allow_fresh_reset:
+        raise ValueError(
+            "fresh mode blocked: workspace already has resume artifacts. "
             "Re-run with --allow-fresh-reset only after confirming outputs should be cleared."
         )
 

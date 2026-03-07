@@ -24,6 +24,7 @@ from ..contracts import infer_usr_column_name
 from ..errors import WriteBackError
 
 _LOG = get_logger(__name__)
+_OVERLAY_GUARD_FILTER_CHUNK_SIZE = 10_000
 
 
 def _existing_infer_overlay_path(ds) -> Path | None:
@@ -39,6 +40,39 @@ def _existing_infer_overlay_path(ds) -> Path | None:
             if path is not None:
                 return Path(path)
     return None
+
+
+def _dedupe_ids(ids: List[str]) -> List[str]:
+    unique_ids: List[str] = []
+    seen: set[str] = set()
+    for row_id in ids:
+        value = str(row_id).strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        unique_ids.append(value)
+    return unique_ids
+
+
+def _read_overlay_subset(*, overlay_path: Path, read_cols: List[str], ids: List[str]) -> pd.DataFrame:
+    unique_ids = _dedupe_ids(ids)
+    if not unique_ids:
+        return pd.DataFrame(columns=read_cols)
+
+    frames: List[pd.DataFrame] = []
+    for start in range(0, len(unique_ids), _OVERLAY_GUARD_FILTER_CHUNK_SIZE):
+        id_chunk = unique_ids[start : start + _OVERLAY_GUARD_FILTER_CHUNK_SIZE]
+        try:
+            table = pq.read_table(overlay_path, columns=read_cols, filters=[("id", "in", id_chunk)])
+        except Exception as error:
+            raise WriteBackError(f"Unable to scan existing infer overlay: {error}") from error
+        if table.num_rows == 0:
+            continue
+        frames.append(table.to_pandas())
+
+    if not frames:
+        return pd.DataFrame(columns=read_cols)
+    return pd.concat(frames, ignore_index=True)
 
 
 def _guard_usr_overwrite(ds, *, ids: List[str], out_cols: List[str], overwrite: bool) -> None:
@@ -58,24 +92,16 @@ def _guard_usr_overwrite(ds, *, ids: List[str], out_cols: List[str], overwrite: 
     read_cols = ["id", *[col for col in out_cols if col != "id" and col in schema_names]]
     if len(read_cols) == 1:
         return
-    try:
-        existing = pq.read_table(overlay_path, columns=read_cols).to_pandas()
-    except Exception as error:
-        raise WriteBackError(f"Unable to scan existing infer overlay: {error}") from error
+    existing = _read_overlay_subset(overlay_path=overlay_path, read_cols=read_cols, ids=ids)
     if existing.empty:
         return
 
-    id_filter = {str(id_value) for id_value in ids}
-    scoped = existing[existing["id"].astype(str).isin(id_filter)]
-    if scoped.empty:
-        return
-
     for col_name in out_cols:
-        if col_name not in scoped.columns:
+        if col_name not in existing.columns:
             continue
-        occupied = scoped[col_name].notna()
+        occupied = existing[col_name].notna()
         if occupied.any():
-            collision_ids = scoped.loc[occupied, "id"].astype(str).tolist()
+            collision_ids = existing.loc[occupied, "id"].astype(str).tolist()
             sample = ", ".join(collision_ids[:5])
             raise WriteBackError(
                 f"Refusing overwrite for existing infer values in column '{col_name}' (sample ids: {sample}). "

@@ -142,6 +142,59 @@ def _write_runbook(
     return runbook_path
 
 
+def _infer_runbook_payload(
+    workspace_root: Path,
+    *,
+    runbook_id: str = "infer_evo2_batch",
+    mode_default: str = "auto",
+) -> dict[str, object]:
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    config_path = workspace_root / "config.yaml"
+    if not config_path.exists():
+        config_path.write_text(
+            """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs: []
+""".strip()
+            + "\n",
+            encoding="utf-8",
+        )
+
+    return {
+        "runbook": {
+            "schema_version": 1,
+            "id": runbook_id,
+            "workflow_id": "infer_batch_submit",
+            "project": "dunlop",
+            "workspace_root": str(workspace_root),
+            "logging": {
+                "stdout_dir": str(workspace_root / "outputs" / "logs" / "ops" / "sge" / runbook_id),
+            },
+            "infer": {
+                "config": str(config_path),
+                "qsub_template": "docs/bu-scc/jobs/evo2-gpu-infer.qsub",
+                "cuda_module": "cuda/12.4",
+                "gcc_module": "gcc/13.2.0",
+            },
+            "resources": {
+                "pe_omp": 4,
+                "h_rt": "04:00:00",
+                "mem_per_core": "8G",
+                "gpus": 1,
+                "gpu_capability": "8.9",
+            },
+            "mode_policy": {
+                "default": mode_default,
+                "on_active_job": "hold_jid",
+            },
+        }
+    }
+
+
 @pytest.fixture(autouse=True)
 def _set_notify_webhook_file_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     webhook_file = tmp_path / "notify_webhook.secret"
@@ -1322,6 +1375,99 @@ jobs: []
     assert plan.notify_smoke_commands == []
     assert "NOTIFY_PROFILE" not in submit_block
     assert "INFER_CONFIG=" in submit_block
+
+
+def test_infer_mode_auto_selects_fresh_when_only_usr_registry_exists(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_mode_registry_only"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_registry_only",
+        mode_default="auto",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    marker = runbook.workspace_root / "outputs" / "usr_datasets" / "registry.yaml"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("version: 1\n", encoding="utf-8")
+
+    decision = resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
+    assert decision.selected_mode == "fresh"
+    assert decision.run_args == ""
+
+
+def test_infer_mode_auto_selects_resume_when_infer_overlay_exists(tmp_path: Path) -> None:
+    pyarrow = pytest.importorskip("pyarrow")
+    pyarrow_parquet = pytest.importorskip("pyarrow.parquet")
+
+    workspace_root = tmp_path / "infer_mode_overlay_exists"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_overlay_exists",
+        mode_default="auto",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    overlay_path = runbook.workspace_root / "outputs" / "usr_datasets" / "demo" / "_derived" / "infer.parquet"
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    pyarrow_parquet.write_table(
+        pyarrow.table(
+            {
+                "id": ["id-1"],
+                "infer__evo2_7b__job_a__ll_mean": [1.0],
+            }
+        ),
+        overlay_path,
+    )
+
+    decision = resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
+    assert decision.selected_mode == "resume"
+    assert decision.run_args == ""
+
+
+def test_infer_mode_resume_raises_without_resume_artifacts(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_mode_resume_missing_artifacts"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_resume_missing_artifacts",
+        mode_default="auto",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+
+    with pytest.raises(ValueError, match="resume mode blocked: workspace has no resume artifacts"):
+        resolve_mode_decision(runbook=runbook, requested_mode="resume", active_job_ids=())
+
+
+def test_infer_mode_fresh_requires_reset_ack_when_resume_artifacts_exist(tmp_path: Path) -> None:
+    pyarrow = pytest.importorskip("pyarrow")
+    pyarrow_parquet = pytest.importorskip("pyarrow.parquet")
+
+    workspace_root = tmp_path / "infer_mode_fresh_reset_ack"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_fresh_reset_ack",
+        mode_default="auto",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    overlay_path = runbook.workspace_root / "outputs" / "usr_datasets" / "demo" / "_derived" / "infer.parquet"
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    pyarrow_parquet.write_table(
+        pyarrow.table(
+            {
+                "id": ["id-1"],
+                "infer__evo2_7b__job_a__ll_mean": [1.0],
+            }
+        ),
+        overlay_path,
+    )
+
+    with pytest.raises(ValueError, match="fresh mode blocked"):
+        resolve_mode_decision(runbook=runbook, requested_mode="fresh", active_job_ids=())
+
+    decision = resolve_mode_decision(
+        runbook=runbook,
+        requested_mode="fresh",
+        active_job_ids=(),
+        allow_fresh_reset=True,
+    )
+    assert decision.selected_mode == "fresh"
 
 
 def test_mode_auto_blocks_for_infer_when_resume_policy_marks_workspace_partial(

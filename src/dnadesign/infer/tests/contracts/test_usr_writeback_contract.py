@@ -20,7 +20,7 @@ import pytest
 
 from dnadesign.infer.src.config import JobConfig, ModelConfig
 from dnadesign.infer.src.engine import _plan_resume_for_usr, run_extract_job
-from dnadesign.infer.src.errors import WriteBackError
+from dnadesign.infer.src.errors import RuntimeOOMError, WriteBackError
 from dnadesign.infer.src.writers.usr import write_back_usr
 from dnadesign.usr import Dataset
 from dnadesign.usr.tests.registry_helpers import register_test_namespace
@@ -178,6 +178,47 @@ def test_write_back_usr_overwrite_guard_allows_new_columns_missing_from_existing
     frame = overlay_table.to_pandas()
     assert frame["infer__evo2_7b__job_a__ll_mean"].tolist() == [1.0]
     assert frame["infer__evo2_7b__job_a__logits_mean"].tolist() == [2.0]
+
+
+def test_write_back_usr_overwrite_guard_reads_only_requested_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    overlay_path = tmp_path / "infer.parquet"
+    table = pa.table(
+        {
+            "id": ["id-1", "id-2", "id-3"],
+            "infer__evo2_7b__job_a__ll_mean": [1.0, None, 3.0],
+        }
+    )
+    pq.write_table(table, overlay_path)
+
+    class _OverlayAttachDataset(_AttachCaptureDataset):
+        def list_overlays(self):
+            return [SimpleNamespace(namespace="infer", path=overlay_path)]
+
+    ds = _OverlayAttachDataset()
+
+    captured_filters: list[object] = []
+    read_table_original = pq.read_table
+
+    def _capture_read_table(*args, **kwargs):
+        path_arg = kwargs.get("where") if "where" in kwargs else args[0]
+        if Path(path_arg) == overlay_path:
+            captured_filters.append(kwargs.get("filters"))
+        return read_table_original(*args, **kwargs)
+
+    monkeypatch.setattr("pyarrow.parquet.read_table", _capture_read_table)
+
+    write_back_usr(
+        ds,
+        ids=["id-2"],
+        model_id="evo2_7b",
+        job_id="job_a",
+        columnar={"ll_mean": [2.0]},
+        overwrite=False,
+    )
+
+    assert captured_filters
+    assert captured_filters[0] == [("id", "in", ["id-2"])]
+    assert len(ds.calls) == 1
 
 
 def test_plan_resume_for_usr_fails_fast_on_unreadable_records(tmp_path: Path) -> None:
@@ -381,3 +422,74 @@ def test_run_extract_job_usr_resume_skips_completed_rows_from_overlay(tmp_path: 
     monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: _FailAdapter())
     second = run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
     assert list(second["ll_mean"]) == [1.0, 2.0, 1.0]
+
+
+def test_run_extract_job_usr_resume_recovers_after_interrupted_partial_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "usr_root"
+    register_test_namespace(
+        root,
+        namespace="infer",
+        columns_spec="infer__evo2_7b__job_a__ll_mean:float64",
+        overwrite=True,
+    )
+    ds = Dataset(root, "demo")
+    ds.init(source="unit-test")
+    ds.import_rows(
+        [
+            {"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"},
+            {"sequence": "TGCA", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"},
+            {"sequence": "GGGG", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"},
+        ],
+        source="unit",
+    )
+    ids = ds.head(3, columns=["id"])["id"].tolist()
+    seqs = ds.head(3, columns=["sequence"])["sequence"].tolist()
+
+    monkeypatch.setattr(
+        "dnadesign.infer.src.runtime.ingest_loading.load_usr_input",
+        lambda **_kwargs: (seqs, ids, ds),
+    )
+    monkeypatch.setattr("dnadesign.infer.src.engine._validate_alphabet", lambda *_args, **_kwargs: None)
+
+    interrupted_calls = {"count": 0}
+
+    class _InterruptingAdapter:
+        @staticmethod
+        def log_likelihood(chunk, **_kwargs):
+            interrupted_calls["count"] += 1
+            if interrupted_calls["count"] == 1:
+                return [10.0, 11.0]
+            raise RuntimeError("simulated interruption")
+
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: _InterruptingAdapter())
+
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna", batch_size=2)
+    job = JobConfig(
+        id="job_a",
+        operation="extract",
+        ingest={"source": "usr", "dataset": "demo", "root": str(root)},
+        outputs=[{"id": "ll_mean", "fn": "evo2.log_likelihood", "format": "float", "params": {}}],
+        io={"write_back": True, "overwrite": False},
+    )
+
+    with pytest.raises(RuntimeOOMError, match="simulated interruption"):
+        run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+    assert interrupted_calls["count"] == 2
+
+    resumed_calls = {"count": 0}
+
+    class _ResumeAdapter:
+        @staticmethod
+        def log_likelihood(chunk, **_kwargs):
+            resumed_calls["count"] += 1
+            assert len(chunk) == 1
+            return [99.0]
+
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: _ResumeAdapter())
+    resumed = run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+
+    assert resumed_calls["count"] == 1
+    assert list(resumed["ll_mean"]) == [10.0, 11.0, 99.0]
