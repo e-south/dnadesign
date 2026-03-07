@@ -11,21 +11,19 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
-import os
 import shlex
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Literal, Sequence
-
-from dnadesign._contracts.notify_webhook_profile import parse_notify_profile_webhook, resolve_file_secret_ref_path
-from dnadesign._contracts.tls_ca_bundle import (
-    DEFAULT_SYSTEM_TLS_CA_BUNDLE_CANDIDATES,
-    resolve_tls_ca_bundle_path,
-)
 
 from ..runbooks.path_policy import WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR
 from ..runbooks.schema import OrchestrationRunbookV1
+from .orchestration_notify import (
+    OrchestrationNotifySpec,
+    build_notify_setup_secret_contract,
+    build_orchestration_notify_argv,
+    build_orchestration_notify_spec,
+    resolve_notify_runtime_contract,
+)
 from .plan_tools import ToolCommandSpec, resolve_plan_tool_adapter
 from .state import ModeDecision, resolve_mode_decision
 
@@ -78,124 +76,6 @@ def _render_tool_command(command: ToolCommandSpec) -> CommandSpec:
     if command.kind == "ops_gate":
         return _ops_gate_command(*command.parts)
     return _argv_command(*command.parts, env=command.env)
-
-
-def _notify_webhook_file_path_from_profile(profile_path: Path) -> str | None:
-    if not profile_path.is_file():
-        return None
-    try:
-        payload = json.loads(profile_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"notify profile is not valid JSON: {profile_path}") from exc
-    except OSError as exc:
-        raise ValueError(f"notify profile is not readable: {profile_path}") from exc
-    if not isinstance(payload, dict):
-        raise ValueError(f"notify profile root must be an object: {profile_path}")
-    source, ref = parse_notify_profile_webhook(payload)
-    if source != "secret_ref":
-        return None
-    path = resolve_file_secret_ref_path(
-        ref,
-        source_label=f"notify profile webhook secret_ref (profile={profile_path})",
-    )
-    return str(path)
-
-
-def _notify_webhook_file_path(webhook_env_name: str, *, profile_path: Path | None = None) -> str | None:
-    webhook_file_env_name = f"{webhook_env_name}_FILE"
-    webhook_file = os.environ.get(webhook_file_env_name, "").strip()
-    if not webhook_file:
-        if profile_path is None:
-            return None
-        return _notify_webhook_file_path_from_profile(profile_path)
-    return str(Path(webhook_file).expanduser().resolve())
-
-
-def _require_notify_webhook_file_path(webhook_env_name: str, *, profile_path: Path | None = None) -> str:
-    webhook_file_env_name = f"{webhook_env_name}_FILE"
-    webhook_file = _notify_webhook_file_path(webhook_env_name, profile_path=profile_path)
-    if webhook_file is None:
-        profile_hint = ""
-        if profile_path is not None:
-            profile_hint = (
-                f", or configure {profile_path} with webhook.source=secret_ref and a file:// secret reference"
-            )
-        raise ValueError(
-            "notify webhook secret file is required for batch notify workflows. "
-            f"Set {webhook_file_env_name} to a readable file path{profile_hint}."
-        )
-    if not os.path.isfile(webhook_file):
-        raise ValueError(
-            f"notify webhook secret file does not exist or is not a file: {webhook_file} (from {webhook_file_env_name})"
-        )
-    if not os.access(webhook_file, os.R_OK):
-        raise ValueError(f"notify webhook secret file is not readable: {webhook_file} (from {webhook_file_env_name})")
-    return webhook_file
-
-
-def _notify_setup_secret_contract(secret_ref: str) -> tuple[str, ...]:
-    return (
-        "--secret-source",
-        "file",
-        "--secret-ref",
-        secret_ref,
-        "--no-store-webhook",
-    )
-
-
-@dataclass(frozen=True)
-class NotifyRuntimeContract:
-    webhook_file: str
-    secret_ref: str
-    tls_ca_bundle: str
-
-
-def _resolve_notify_runtime_contract(
-    webhook_env_name: str, *, profile_path: Path | None = None
-) -> NotifyRuntimeContract:
-    webhook_file = _require_notify_webhook_file_path(webhook_env_name, profile_path=profile_path)
-    tls_ca_bundle = _resolve_tls_ca_bundle()
-    return NotifyRuntimeContract(
-        webhook_file=webhook_file,
-        secret_ref=Path(webhook_file).as_uri(),
-        tls_ca_bundle=tls_ca_bundle,
-    )
-
-
-@dataclass(frozen=True)
-class OrchestrationNotifySpec:
-    tool: str
-    provider: str
-    webhook_env: str
-    secret_ref: str
-    run_id: str
-    tls_ca_bundle: str
-
-    def as_dict(self) -> dict[str, str]:
-        return {
-            "tool": self.tool,
-            "provider": self.provider,
-            "webhook_env": self.webhook_env,
-            "secret_ref": self.secret_ref,
-            "run_id": self.run_id,
-            "tls_ca_bundle": self.tls_ca_bundle,
-        }
-
-
-def _resolve_tls_ca_bundle() -> str:
-    return str(
-        resolve_tls_ca_bundle_path(
-            explicit_path=None,
-            env_var_name="SSL_CERT_FILE",
-            allow_system_candidates=True,
-            system_candidates=DEFAULT_SYSTEM_TLS_CA_BUNDLE_CANDIDATES,
-            not_configured_error=(
-                "notify TLS CA bundle is not configured. "
-                "Set SSL_CERT_FILE to a readable CA bundle path before running notify workflows."
-            ),
-            source_label="notify TLS CA bundle path",
-        )
-    )
 
 
 @dataclass(frozen=True)
@@ -357,11 +237,11 @@ def _notify_smoke_commands(
     tool_adapter = resolve_plan_tool_adapter(runbook)
     config = str(tool_adapter.notify_config_path(runbook))
     resolve_tool = tool_adapter.tool
-    notify_runtime = _resolve_notify_runtime_contract(
+    notify_runtime = resolve_notify_runtime_contract(
         runbook.notify.webhook_env,
         profile_path=runbook.notify.profile,
     )
-    secret_contract = _notify_setup_secret_contract(notify_runtime.secret_ref)
+    secret_contract = build_notify_setup_secret_contract(notify_runtime.secret_ref)
     commands = [
         _argv_command(
             "uv",
@@ -393,22 +273,18 @@ def _notify_smoke_commands(
     if smoke_mode == "live":
         commands.append(
             _argv_command(
-                "uv",
-                "run",
-                "notify",
-                "send",
-                "--status",
-                "started",
-                "--tool",
-                runbook.notify.tool,
-                "--run-id",
-                "notify-smoke-live",
-                "--provider",
-                "slack",
-                "--secret-ref",
-                notify_runtime.secret_ref,
-                "--message",
-                "notify live smoke canary",
+                *build_orchestration_notify_argv(
+                    notify=OrchestrationNotifySpec(
+                        tool=runbook.notify.tool,
+                        provider="slack",
+                        webhook_env=runbook.notify.webhook_env,
+                        secret_ref=notify_runtime.secret_ref,
+                        run_id="notify-smoke-live",
+                        tls_ca_bundle=notify_runtime.tls_ca_bundle,
+                    ),
+                    status="started",
+                    message="notify live smoke canary",
+                )
             )
         )
     return commands
@@ -422,7 +298,7 @@ def _submit_commands(runbook: OrchestrationRunbookV1, *, mode_decision: ModeDeci
     submit_commands: list[CommandSpec] = []
     if runbook.notify is not None:
         webhook_env_name = runbook.notify.webhook_env
-        notify_runtime = _resolve_notify_runtime_contract(
+        notify_runtime = resolve_notify_runtime_contract(
             webhook_env_name,
             profile_path=runbook.notify.profile,
         )
@@ -493,17 +369,12 @@ def build_batch_plan(
     requires_order = mode_decision.submit_behavior == "hold_jid"
     orchestration_notify: OrchestrationNotifySpec | None = None
     if runbook.notify is not None and runbook.notify.orchestration_events:
-        notify_runtime = _resolve_notify_runtime_contract(
-            runbook.notify.webhook_env,
-            profile_path=runbook.notify.profile,
-        )
-        orchestration_notify = OrchestrationNotifySpec(
+        orchestration_notify = build_orchestration_notify_spec(
             tool=runbook.notify.tool,
             provider="slack",
             webhook_env=runbook.notify.webhook_env,
-            secret_ref=notify_runtime.secret_ref,
             run_id=runbook.id,
-            tls_ca_bundle=notify_runtime.tls_ca_bundle,
+            profile_path=runbook.notify.profile,
         )
     return BatchPlan(
         workflow_id=runbook.workflow_id,

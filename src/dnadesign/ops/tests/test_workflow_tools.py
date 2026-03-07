@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import dnadesign.ops.runbooks.schema as runbook_schema
 from dnadesign.ops.orchestrator import workflow_tools
 
 
@@ -39,6 +40,20 @@ def test_list_registered_workflow_tools_returns_sorted_read_only_tuple() -> None
         adapter=DummyAdapter(tool="densegen"),
     )
     assert workflow_tools.list_registered_workflow_tools(registry) == ("densegen", "infer")
+
+
+def test_build_workflow_tool_registry_returns_read_only_mapping() -> None:
+    registry = workflow_tools.build_workflow_tool_registry(
+        contract_name="dummy tool adapter",
+        adapters=(
+            DummyAdapter(tool="infer"),
+            DummyAdapter(tool="densegen"),
+        ),
+    )
+
+    assert workflow_tools.list_registered_workflow_tools(registry) == runbook_schema.list_workflow_tools()
+    with pytest.raises(TypeError):
+        registry["infer"] = DummyAdapter(tool="infer")
 
 
 def test_validate_workflow_tool_registry_rejects_schema_drift() -> None:

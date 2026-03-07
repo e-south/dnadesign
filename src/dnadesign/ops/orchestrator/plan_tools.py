@@ -23,11 +23,12 @@ from ..runbooks.path_policy import WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR
 from ..runbooks.schema import OrchestrationRunbookV1
 from .state import ModeDecision
 from .workflow_tools import (
+    build_workflow_tool_registry,
+    freeze_workflow_tool_registry,
     list_registered_workflow_tools,
     register_workflow_tool_adapter,
     resolve_workflow_tool_adapter_for_runbook,
     resolve_workflow_tool_adapter_for_workflow_id,
-    validate_workflow_tool_registry,
 )
 
 ToolCommandKind = Literal["argv", "ops_gate"]
@@ -434,47 +435,41 @@ def _sge_job_name(*, runbook_id: str, suffix: str) -> str:
     return f"{token}_{suffix_token}"[:128]
 
 
-_PLAN_TOOL_ADAPTERS: dict[str, PlanToolAdapter] = {}
+_PLAN_TOOL_ADAPTERS = build_workflow_tool_registry(
+    contract_name="plan tool adapter",
+    adapters=(
+        PlanToolAdapter(
+            tool="densegen",
+            validate_resources=_validate_densegen_resources,
+            notify_config_path=_densegen_notify_config_path,
+            build_preflight_commands=_densegen_preflight_commands,
+            build_submit_commands=_densegen_submit_commands,
+        ),
+        PlanToolAdapter(
+            tool="infer",
+            validate_resources=_validate_infer_resources,
+            notify_config_path=_infer_notify_config_path,
+            build_preflight_commands=_infer_preflight_commands,
+            build_submit_commands=_infer_submit_commands,
+        ),
+    ),
+)
 
 
 def register_plan_tool_adapter(tool: str, adapter: PlanToolAdapter) -> None:
+    global _PLAN_TOOL_ADAPTERS
+    updated = dict(_PLAN_TOOL_ADAPTERS)
     register_workflow_tool_adapter(
-        _PLAN_TOOL_ADAPTERS,
+        updated,
         contract_name="plan tool adapter",
         tool=tool,
         adapter=adapter,
     )
+    _PLAN_TOOL_ADAPTERS = freeze_workflow_tool_registry(updated, contract_name="plan tool adapter")
 
 
 def list_registered_plan_tools() -> tuple[str, ...]:
     return list_registered_workflow_tools(_PLAN_TOOL_ADAPTERS)
-
-
-def _validate_plan_tool_registry() -> None:
-    validate_workflow_tool_registry(_PLAN_TOOL_ADAPTERS, contract_name="plan tool adapter")
-
-
-register_plan_tool_adapter(
-    "densegen",
-    PlanToolAdapter(
-        tool="densegen",
-        validate_resources=_validate_densegen_resources,
-        notify_config_path=_densegen_notify_config_path,
-        build_preflight_commands=_densegen_preflight_commands,
-        build_submit_commands=_densegen_submit_commands,
-    ),
-)
-register_plan_tool_adapter(
-    "infer",
-    PlanToolAdapter(
-        tool="infer",
-        validate_resources=_validate_infer_resources,
-        notify_config_path=_infer_notify_config_path,
-        build_preflight_commands=_infer_preflight_commands,
-        build_submit_commands=_infer_submit_commands,
-    ),
-)
-_validate_plan_tool_registry()
 
 
 def resolve_plan_tool_adapter_for_workflow_id(workflow_id: str) -> PlanToolAdapter:

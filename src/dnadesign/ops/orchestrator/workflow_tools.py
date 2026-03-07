@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from types import MappingProxyType
 from typing import Mapping, MutableMapping, Protocol, TypeVar
 
 from ..runbooks.schema import OrchestrationRunbookV1, list_workflow_tools, resolve_workflow_tool
@@ -43,6 +44,31 @@ def register_workflow_tool_adapter(
 
 def list_registered_workflow_tools(registry: Mapping[str, AdapterT]) -> tuple[str, ...]:
     return tuple(sorted(registry))
+
+
+def freeze_workflow_tool_registry(
+    registry: Mapping[str, AdapterT],
+    *,
+    contract_name: str,
+) -> Mapping[str, AdapterT]:
+    validate_workflow_tool_registry(registry, contract_name=contract_name)
+    return MappingProxyType(dict(registry))
+
+
+def build_workflow_tool_registry(
+    *,
+    contract_name: str,
+    adapters: tuple[AdapterT, ...],
+) -> Mapping[str, AdapterT]:
+    registry: dict[str, AdapterT] = {}
+    for adapter in adapters:
+        register_workflow_tool_adapter(
+            registry,
+            contract_name=contract_name,
+            tool=adapter.tool,
+            adapter=adapter,
+        )
+    return freeze_workflow_tool_registry(registry, contract_name=contract_name)
 
 
 def validate_workflow_tool_registry(

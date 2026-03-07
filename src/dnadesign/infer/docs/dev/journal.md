@@ -4165,3 +4165,62 @@ Remove the remaining duplicated workflow-tool registry and runbook-tool resoluti
 1. Ops now has one source of truth for workflow-tool adapter registration semantics.
 2. Both mode resolution and plan rendering share the same fail-fast workload-block validation path.
 3. Future tool onboarding now requires fewer edit sites and has one explicit place to enforce schema-to-adapter coverage.
+
+## 2026-03-07 - Phase 2 Slice AX (Read-Only Tool Registries And Shared Notify Contracts)
+
+### Goal
+
+Make ops more explicit and future-proof by replacing mutable import-built adapter registries with declarative read-only registries, and by moving notify runtime / secret / TLS / send-command policy into one shared orchestration module.
+
+### Prioritized findings
+
+1. High: plan rendering and execution still split notify policy across two modules, which created drift risk; live notify smoke omitted `--tls-ca-bundle` while orchestration notify included it.
+2. Medium: mode-tool and plan-tool registries were using mutable module globals built incrementally through registration side effects.
+3. Medium: tests covered notify behavior end to end, but there was no direct contract test for the shared notify runtime and send-command logic.
+
+### TDD sequence
+
+1. Red:
+   - added `src/dnadesign/ops/tests/test_orchestration_notify.py`.
+   - added read-only registry builder test in `src/dnadesign/ops/tests/test_workflow_tools.py`.
+   - tightened `test_batch_plan_includes_live_canary_when_overridden` to require `--tls-ca-bundle`.
+   - confirmed failure because `orchestration_notify` module and registry builder did not exist.
+2. Green:
+   - added `src/dnadesign/ops/orchestrator/orchestration_notify.py`.
+   - moved notify runtime resolution, profile secret-ref loading, TLS bundle resolution, orchestration notify spec creation, and notify send argv construction into that module.
+   - rewired `plan.py` and `execute.py` to use the shared notify contract functions.
+   - added `build_workflow_tool_registry(...)` and `freeze_workflow_tool_registry(...)` in `workflow_tools.py`.
+   - rewired `mode_tools.py` and `plan_tools.py` to define declarative read-only registries and rebuild them explicitly on test-time registration.
+3. Verify:
+   - focused new tests pass.
+   - broader ops and notify suites remain green.
+
+### Changes applied
+
+1. `src/dnadesign/ops/orchestrator/orchestration_notify.py`
+   - new shared notify contract module for runtime, secret, TLS, and send-command behavior.
+2. `src/dnadesign/ops/orchestrator/plan.py`
+   - removed local notify runtime and secret helper duplication.
+   - live notify smoke now uses the same send-command builder as orchestration notifications.
+3. `src/dnadesign/ops/orchestrator/execute.py`
+   - now delegates orchestration notify command construction to the shared notify module.
+4. `src/dnadesign/ops/orchestrator/workflow_tools.py`
+   - added declarative read-only registry builder and freeze helpers.
+5. `src/dnadesign/ops/orchestrator/mode_tools.py`
+   - now defines mode-tool adapters through one read-only registry build.
+6. `src/dnadesign/ops/orchestrator/plan_tools.py`
+   - now defines plan-tool adapters through one read-only registry build.
+7. `src/dnadesign/ops/tests/test_orchestration_notify.py`
+   - new direct notify contract tests.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_tools.py src/dnadesign/ops/tests/test_orchestration_notify.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "build_workflow_tool_registry_returns_read_only_mapping or build_orchestration_notify_argv_requires_secret_ref or resolve_notify_runtime_contract_prefers_profile_secret_ref_when_env_missing or batch_plan_includes_live_canary_when_overridden"`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_tools.py src/dnadesign/ops/tests/test_orchestration_notify.py src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_plan_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+3. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+
+### Contract impact
+
+1. Notify runtime policy now has one module and one command builder.
+2. Live smoke and orchestration notify now share the same TLS and secret-ref contract.
+3. Tool registries are now declarative and read-only by default, which removes mutation from normal import flow while preserving explicit fail-fast registration semantics in tests.

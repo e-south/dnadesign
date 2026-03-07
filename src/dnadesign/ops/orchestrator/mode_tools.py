@@ -19,11 +19,12 @@ from dnadesign._contracts import resolve_usr_producer_contract
 
 from ..runbooks.schema import OrchestrationRunbookV1
 from .workflow_tools import (
+    build_workflow_tool_registry,
+    freeze_workflow_tool_registry,
     list_registered_workflow_tools,
     register_workflow_tool_adapter,
     resolve_workflow_tool_adapter_for_runbook,
     resolve_workflow_tool_adapter_for_workflow_id,
-    validate_workflow_tool_registry,
 )
 
 ResolvedMode = Literal["fresh", "resume"]
@@ -135,43 +136,37 @@ def _run_args_for_infer(_runbook: OrchestrationRunbookV1, _mode: ResolvedMode) -
     return ""
 
 
-_MODE_TOOL_ADAPTERS: dict[str, ModeToolAdapter] = {}
+_MODE_TOOL_ADAPTERS = build_workflow_tool_registry(
+    contract_name="mode tool adapter",
+    adapters=(
+        ModeToolAdapter(
+            tool="densegen",
+            has_resume_artifacts=_has_densegen_resume_artifacts,
+            run_args_for_mode=_run_args_for_densegen,
+        ),
+        ModeToolAdapter(
+            tool="infer",
+            has_resume_artifacts=_has_infer_resume_artifacts,
+            run_args_for_mode=_run_args_for_infer,
+        ),
+    ),
+)
 
 
 def register_mode_tool_adapter(tool: str, adapter: ModeToolAdapter) -> None:
+    global _MODE_TOOL_ADAPTERS
+    updated = dict(_MODE_TOOL_ADAPTERS)
     register_workflow_tool_adapter(
-        _MODE_TOOL_ADAPTERS,
+        updated,
         contract_name="mode tool adapter",
         tool=tool,
         adapter=adapter,
     )
+    _MODE_TOOL_ADAPTERS = freeze_workflow_tool_registry(updated, contract_name="mode tool adapter")
 
 
 def list_registered_mode_tools() -> tuple[str, ...]:
     return list_registered_workflow_tools(_MODE_TOOL_ADAPTERS)
-
-
-def _validate_mode_tool_registry() -> None:
-    validate_workflow_tool_registry(_MODE_TOOL_ADAPTERS, contract_name="mode tool adapter")
-
-
-register_mode_tool_adapter(
-    "densegen",
-    ModeToolAdapter(
-        tool="densegen",
-        has_resume_artifacts=_has_densegen_resume_artifacts,
-        run_args_for_mode=_run_args_for_densegen,
-    ),
-)
-register_mode_tool_adapter(
-    "infer",
-    ModeToolAdapter(
-        tool="infer",
-        has_resume_artifacts=_has_infer_resume_artifacts,
-        run_args_for_mode=_run_args_for_infer,
-    ),
-)
-_validate_mode_tool_registry()
 
 
 def resolve_mode_tool_adapter_for_workflow_id(workflow_id: str) -> ModeToolAdapter:

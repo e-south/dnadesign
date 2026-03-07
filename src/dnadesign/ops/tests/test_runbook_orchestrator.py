@@ -807,7 +807,7 @@ def test_batch_plan_requires_tls_ca_bundle_for_notify_workflows(
     runbook_path = _write_runbook(tmp_path)
     runbook = load_orchestration_runbook(runbook_path)
     monkeypatch.delenv("SSL_CERT_FILE", raising=False)
-    monkeypatch.setattr("dnadesign.ops.orchestrator.plan.DEFAULT_SYSTEM_TLS_CA_BUNDLE_CANDIDATES", ())
+    monkeypatch.setattr("dnadesign.ops.orchestrator.orchestration_notify.DEFAULT_SYSTEM_TLS_CA_BUNDLE_CANDIDATES", ())
 
     with pytest.raises(ValueError, match="notify TLS CA bundle is not configured"):
         build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
@@ -1228,6 +1228,7 @@ def test_batch_plan_includes_live_canary_when_overridden(tmp_path: Path) -> None
     smoke_block = _render_block(plan.notify_smoke_commands)
     assert "--dry-run" in smoke_block
     assert "notify send" in smoke_block
+    assert "--tls-ca-bundle" in smoke_block
 
 
 def test_batch_plan_uses_structured_specs_and_safe_shell_rendering(tmp_path: Path) -> None:
