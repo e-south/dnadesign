@@ -19,21 +19,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Sequence
 
-import yaml
-from pydantic import ValidationError as PydanticValidationError
-
 from dnadesign._contracts.notify_webhook_profile import parse_notify_profile_webhook, resolve_file_secret_ref_path
 from dnadesign._contracts.tls_ca_bundle import (
     DEFAULT_SYSTEM_TLS_CA_BUNDLE_CANDIDATES,
     resolve_tls_ca_bundle_path,
 )
-from dnadesign.infer.src.config import ModelConfig
-from dnadesign.infer.src.errors import ValidationError as InferValidationError
-from dnadesign.infer.src.runtime.capacity_planner import (
-    GpuDeviceInfo,
-    GpuInventory,
-    validate_model_hardware_contract,
-)
+from dnadesign.infer import validate_runbook_gpu_resources
 
 from ..runbooks.path_policy import WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR
 from ..runbooks.schema import OrchestrationRunbookV1, is_densegen_workflow_id
@@ -41,9 +32,6 @@ from .state import ModeDecision, resolve_mode_decision
 
 SmokeMode = Literal["dry", "live"]
 _JOB_NAME_SAFE_PATTERN = re.compile(r"[^A-Za-z0-9_.-]+")
-_GPU_CAPABILITY_MEMORY_HINT_GIB: dict[str, float] = {
-    "8.9": 45.0,
-}
 
 
 @dataclass(frozen=True)
@@ -247,74 +235,18 @@ def _runtime_to_seconds(h_rt: str) -> int:
     return (int(hours_str) * 3600) + (int(minutes_str) * 60) + int(seconds_str)
 
 
-def _infer_config_model(config_path: Path) -> ModelConfig:
-    try:
-        payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise ValueError(f"infer config is not readable: {config_path}") from exc
-    except yaml.YAMLError as exc:
-        raise ValueError(f"infer config is not valid yaml: {config_path}") from exc
-
-    if not isinstance(payload, dict):
-        raise ValueError(f"infer config root must be a mapping: {config_path}")
-    model_payload = payload.get("model")
-    if not isinstance(model_payload, dict):
-        raise ValueError(f"infer config must include a model block: {config_path}")
-    try:
-        return ModelConfig(**model_payload)
-    except (PydanticValidationError, ValueError) as exc:
-        raise ValueError(f"infer model contract invalid in config {config_path}: {exc}") from exc
-
-
-def _infer_gpu_memory_hint(*, gpu_capability: str | None, gpu_memory_gib: float | None) -> float | None:
-    if gpu_memory_gib is not None:
-        return float(gpu_memory_gib)
-    if gpu_capability is None:
-        return None
-    return _GPU_CAPABILITY_MEMORY_HINT_GIB.get(str(gpu_capability).strip())
-
-
 def _validate_infer_resource_contract(runbook: OrchestrationRunbookV1) -> None:
     assert runbook.infer is not None
     if runbook.resources.gpus is None:
         raise ValueError("infer workflow requires resources.gpus")
-    model = _infer_config_model(Path(runbook.infer.config))
-    declared_gpus = int(runbook.resources.gpus)
-    memory_hint = _infer_gpu_memory_hint(
-        gpu_capability=runbook.resources.gpu_capability,
-        gpu_memory_gib=runbook.resources.gpu_memory_gib,
-    )
-
-    if memory_hint is None:
-        required_gpus = model.parallelism.min_gpus if model.parallelism.strategy == "multi_gpu_vortex" else 1
-        if declared_gpus < int(required_gpus):
-            raise ValueError(
-                "infer runbook resources do not satisfy model.parallelism contract: "
-                f"required_gpus={required_gpus} resources.gpus={declared_gpus}"
-            )
-        if model.parallelism.gpu_ids is not None:
-            invalid = [idx for idx in model.parallelism.gpu_ids if idx >= declared_gpus]
-            if invalid:
-                raise ValueError(
-                    "infer runbook resources do not satisfy model.parallelism.gpu_ids contract: "
-                    f"invalid_gpu_ids={invalid} resources.gpus={declared_gpus}"
-                )
-        return
-
-    inventory = GpuInventory(
-        devices=tuple(
-            GpuDeviceInfo(
-                index=index,
-                name=f"declared_gpu_{index}",
-                total_memory_gib=float(memory_hint),
-                compute_capability=str(runbook.resources.gpu_capability or ""),
-            )
-            for index in range(declared_gpus)
-        )
-    )
     try:
-        validate_model_hardware_contract(model=model, inventory=inventory)
-    except InferValidationError as exc:
+        validate_runbook_gpu_resources(
+            config_path=Path(runbook.infer.config),
+            declared_gpus=int(runbook.resources.gpus),
+            gpu_capability=runbook.resources.gpu_capability,
+            gpu_memory_gib=runbook.resources.gpu_memory_gib,
+        )
+    except ValueError as exc:
         raise ValueError(
             "infer runbook resources are incompatible with infer model contract: "
             f"{exc}"
@@ -591,7 +523,7 @@ def _preflight_commands(
     infer_overlay_guard_parts: list[str] = [
         "usr-overlay-guard",
         "--tool",
-        "infer_evo2",
+        "infer",
         "--config",
         config,
         "--workspace-root",

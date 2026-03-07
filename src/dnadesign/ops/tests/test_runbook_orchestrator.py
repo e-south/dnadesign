@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import inspect
 import os
 import shlex
 from pathlib import Path
@@ -42,6 +43,13 @@ def test_workflow_helpers_classify_all_schema_workflow_ids() -> None:
         is_densegen = runbook_schema.is_densegen_workflow_id(workflow_id)
         is_infer = runbook_schema.is_infer_workflow_id(workflow_id)
         assert is_densegen != is_infer
+
+
+def test_ops_plan_avoids_infer_internal_module_imports() -> None:
+    import dnadesign.ops.orchestrator.plan as plan_module
+
+    plan_source = inspect.getsource(plan_module)
+    assert "dnadesign.infer.src." not in plan_source
 
 
 def _render_block(commands: list[CommandSpec]) -> str:
@@ -1187,7 +1195,8 @@ jobs: []
     smoke_block = _render_block(plan.notify_smoke_commands)
 
     assert "dnadesign.ops.orchestrator.gates usr-overlay-guard" in preflight_block
-    assert "--tool infer_evo2" in preflight_block
+    assert "--tool infer " in preflight_block
+    assert "--tool infer_evo2" not in preflight_block
     assert "evo2-gpu-infer.qsub" in submit_block
     assert "gpus=1" in submit_block
     assert "gpu_c=8.9" in submit_block
