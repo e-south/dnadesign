@@ -46,7 +46,7 @@ def register(app: typer.Typer) -> None:
         records_jsonl: Optional[Path] = typer.Option(None, "--records-jsonl", help="JSONL records path."),
         pool_method: Optional[str] = typer.Option(None, "--pool-method", help="mean|sum|max (for logits/embedding)"),
         pool_dim: Optional[int] = typer.Option(None, "--pool-dim"),
-        layer: Optional[str] = typer.Option(None, "--layer", help="Layer (embedding)"),
+        layer: Optional[str] = typer.Option(None, "--layer", help="Layer override (embedding)."),
         write_back: bool = typer.Option(False, "--write-back/--no-write-back"),
         overwrite: bool = typer.Option(False, "--overwrite/--no-overwrite"),
         progress: bool = typer.Option(True, "--progress/--no-progress"),

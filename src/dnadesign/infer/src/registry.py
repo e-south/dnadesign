@@ -19,6 +19,7 @@ _LOG = get_logger(__name__)
 
 _MODEL_REGISTRY: Dict[str, Type] = {}
 _FN_REGISTRY: Dict[str, str] = {}
+_DEFAULT_EMBEDDING_LAYER_BY_NAMESPACE: Dict[str, str] = {}
 
 
 def register_model(model_id: str, adapter_cls: Type) -> None:
@@ -41,6 +42,21 @@ def list_models() -> Dict[str, Type]:
 def get_namespace_for_model(model_id: str) -> str:
     """Infer adapter namespace from model_id. 'evo2_7b' -> 'evo2'."""
     return model_id.split("_", 1)[0] if "_" in model_id else model_id
+
+
+def register_default_embedding_layer(namespace: str, layer: str) -> None:
+    ns = namespace.strip()
+    layer_name = layer.strip()
+    if not ns:
+        raise ConfigError("embedding layer namespace must be non-empty")
+    if not layer_name:
+        raise ConfigError("default embedding layer name must be non-empty")
+    _DEFAULT_EMBEDDING_LAYER_BY_NAMESPACE[ns] = layer_name
+
+
+def get_default_embedding_layer(model_id: str) -> str | None:
+    namespace = get_namespace_for_model(model_id)
+    return _DEFAULT_EMBEDDING_LAYER_BY_NAMESPACE.get(namespace)
 
 
 def register_fn(namespaced: str, method_name: str) -> None:

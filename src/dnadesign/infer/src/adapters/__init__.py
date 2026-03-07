@@ -10,7 +10,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
-from ..registry import register_fn, register_model
+from ..registry import register_default_embedding_layer, register_fn, register_model
 
 # from .esm2 import ESM2Adapter
 from .evo2 import Evo2Adapter
@@ -36,6 +36,7 @@ def register_defaults() -> None:
     register_fn("evo2.embedding", "embedding")
     register_fn("evo2.log_likelihood", "log_likelihood")
     register_fn("evo2.generate", "generate")
+    register_default_embedding_layer("evo2", "blocks.20.mlp.l3")
 
     # ESM2 (to be implemented later)
     # register_fn("esm2.embedding", "embedding")

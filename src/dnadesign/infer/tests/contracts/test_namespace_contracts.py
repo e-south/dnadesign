@@ -148,3 +148,30 @@ def test_agnostic_model_usr_pressure_path_writes_namespaced_columns(monkeypatch)
     attached_columns = {col for call in ds.calls for col in call["columns"]}  # type: ignore[index]
     assert f"infer__{model_id}__pressure_job__logits" in attached_columns
     assert f"infer__{model_id}__pressure_job__llr" in attached_columns
+
+
+def test_extract_embedding_uses_registered_default_layer_when_missing(monkeypatch) -> None:
+    observed: dict[str, object] = {}
+
+    def _embedding(chunk, **kwargs):
+        observed["layer"] = kwargs.get("layer")
+        return [[0.0] for _ in chunk]
+
+    register_fn("evo2.embedding", "embedding")
+    monkeypatch.setattr(
+        "dnadesign.infer.src.engine._get_adapter",
+        lambda _model: SimpleNamespace(embedding=_embedding),
+    )
+
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna")
+    job = JobConfig(
+        id="embedding_default_layer",
+        operation="extract",
+        ingest={"source": "sequences"},
+        outputs=[{"id": "emb", "fn": "evo2.embedding", "format": "list", "params": {}}],
+    )
+
+    out = run_extract_job(inputs=["ACGT"], model=model, job=job, progress_factory=None)
+
+    assert out == {"emb": [[0.0]]}
+    assert observed["layer"] == "blocks.20.mlp.l3"

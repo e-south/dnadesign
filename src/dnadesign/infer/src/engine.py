@@ -30,6 +30,7 @@ from .errors import (
 )
 from .runtime.extract_chunk_writeback import build_extract_chunk_write_back
 from .runtime.extract_execution import execute_extract_output
+from .runtime.extract_params import resolve_extract_params
 from .runtime.generate_execution import execute_generate_batches, validate_generate_payload
 from .runtime.ingest_loading import load_extract_ingest, load_generate_ingest
 from .ingest.validators import validate_dna, validate_protein
@@ -93,6 +94,11 @@ def run_extract_job(
 
     for out in job.outputs or []:
         method_name, fn = resolve_extract_callable(adapter=adapter, namespaced_fn=out.fn)
+        resolved_params = resolve_extract_params(
+            model_id=model.id,
+            method_name=method_name,
+            params=out.params,
+        )
 
         all_vals: List[object] = list(existing[out.id])
         need_idx = [j for j in todo_idx if all_vals[j] is None]
@@ -128,7 +134,7 @@ def run_extract_job(
                 existing=all_vals,
                 method_name=method_name,
                 fn=fn,
-                params=out.params,
+                params=resolved_params,
                 output_format=out.format,
                 micro_batch_size=micro_bs,
                 default_batch_size=default_bs,

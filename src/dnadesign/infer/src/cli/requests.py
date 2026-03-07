@@ -78,8 +78,6 @@ def build_extract_request(
                     params["pool"]["method"] = pool_method
                 if pool_dim is not None:
                     params["pool"]["dim"] = pool_dim
-            if fn.split(".")[-1] == "embedding" and not layer:
-                raise ConfigError("embedding extract requires --layer with a valid Evo2 layer name")
             if layer:
                 params["layer"] = layer
         elif fn.split(".")[-1] == "log_likelihood":

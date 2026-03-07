@@ -237,7 +237,8 @@ Use these checks to verify Evo2 usage contracts in infer:
 
 - logits/embedding pooling uses sequence dimension with `pool.dim=1`.
 - `pool.dim=0` is rejected to avoid consuming batch axis.
-- `evo2.embedding` requires `layer`.
+- `evo2.embedding` defaults to `blocks.20.mlp.l3` when `params.layer` is omitted.
+- set `params.layer` to override the default layer.
 - mean pooling follows `e = (1/n) * Σ_j E_j` over token positions.
 
 ```bash
@@ -271,7 +272,7 @@ emb = run_extract(
     outputs=[{
         "id": "emb_mean",
         "fn": "evo2.embedding",
-        "params": {"layer": "blocks.28.mlp.l3", "pool": {"method": "mean", "dim": 1}},
+        "params": {"pool": {"method": "mean", "dim": 1}},
         "format": "list",
     }],
 )
