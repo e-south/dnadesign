@@ -17,7 +17,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Sequence
 
-from dnadesign._contracts import ResumeReadinessPolicy, resolve_resume_readiness_policy
+from dnadesign._contracts import (
+    ResumeReadinessPolicy,
+    resolve_resume_readiness_policy,
+    resolve_usr_producer_contract,
+)
 
 from ..runbooks.schema import OrchestrationRunbookV1
 
@@ -100,16 +104,27 @@ class ModeDecision:
     reason: str
 
 
-def _infer_overlay_artifacts(workspace_root: Path) -> tuple[Path, ...]:
-    usr_root = workspace_root / "outputs" / "usr_datasets"
-    if not usr_root.exists():
-        return ()
+def _infer_overlay_artifacts(workspace_root: Path, *, infer_config: Path | None) -> tuple[Path, ...]:
     candidates: list[Path] = []
-    candidates.extend(sorted(usr_root.glob("**/_derived/infer.parquet")))
-    candidates.extend(sorted(usr_root.glob("**/_derived/infer/*.parquet")))
+    usr_root = workspace_root / "outputs" / "usr_datasets"
+    if usr_root.exists():
+        candidates.extend(sorted(usr_root.glob("**/_derived/infer.parquet")))
+        candidates.extend(sorted(usr_root.glob("**/_derived/infer/*.parquet")))
+
+    if infer_config is not None:
+        contract = _resolve_infer_usr_output_for_mode_probe(infer_config)
+        if contract is not None:
+            dataset_root = contract.usr_root / contract.usr_dataset
+            candidates.append(dataset_root / "_derived" / "infer.parquet")
+            infer_parts_root = dataset_root / "_derived" / "infer"
+            if infer_parts_root.exists():
+                candidates.extend(sorted(infer_parts_root.glob("*.parquet")))
+
     deduped: list[Path] = []
     seen: set[Path] = set()
     for path in candidates:
+        if not path.exists():
+            continue
         resolved = path.resolve()
         if resolved in seen:
             continue
@@ -118,13 +133,28 @@ def _infer_overlay_artifacts(workspace_root: Path) -> tuple[Path, ...]:
     return tuple(deduped)
 
 
-def _has_resume_artifacts(workspace_root: Path, *, workflow_tool: str) -> bool:
+def _resolve_infer_usr_output_for_mode_probe(infer_config: Path):
+    try:
+        return resolve_usr_producer_contract(tool="infer", config_path=infer_config)
+    except ValueError as exc:
+        message = str(exc)
+        if "at least one job with ingest.source='usr' and io.write_back=true" in message:
+            return None
+        raise ValueError(
+            "infer mode probe requires a single resolvable USR destination in infer config "
+            f"{infer_config}: {message}"
+        ) from exc
+
+
+def _has_resume_artifacts(runbook: OrchestrationRunbookV1, *, workflow_tool: str) -> bool:
+    workspace_root = runbook.workspace_root
     tool = str(workflow_tool or "").strip().lower()
     if tool == "infer":
         manifest_path = workspace_root / "outputs" / "meta" / "run_manifest.json"
         if manifest_path.exists():
             return True
-        return bool(_infer_overlay_artifacts(workspace_root))
+        infer_config = runbook.infer.config if runbook.infer is not None else None
+        return bool(_infer_overlay_artifacts(workspace_root, infer_config=infer_config))
 
     markers = (
         workspace_root / "outputs" / "meta" / "run_manifest.json",
@@ -299,7 +329,7 @@ def resolve_mode_decision(
     workflow_tool = "densegen" if runbook.densegen is not None else "infer"
     resume_policy = resolve_resume_readiness_policy(workflow_tool)
     has_explicit_resume_policy = resume_policy is not None
-    artifacts_found = _has_resume_artifacts(runbook.workspace_root, workflow_tool=workflow_tool)
+    artifacts_found = _has_resume_artifacts(runbook, workflow_tool=workflow_tool)
     resume_state: ResumeState = "none"
     resume_readiness_reason = "not-evaluated"
     if has_explicit_resume_policy:

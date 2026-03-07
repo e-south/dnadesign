@@ -147,8 +147,11 @@ def _infer_runbook_payload(
     *,
     runbook_id: str = "infer_evo2_batch",
     mode_default: str = "auto",
+    usr_root: Path | None = None,
+    usr_dataset: str = "demo",
 ) -> dict[str, object]:
     workspace_root.mkdir(parents=True, exist_ok=True)
+    selected_usr_root = usr_root or (workspace_root / "outputs" / "usr_datasets")
     config_path = workspace_root / "config.yaml"
     if not config_path.exists():
         config_path.write_text(
@@ -158,8 +161,25 @@ model:
   device: cuda:0
   precision: bf16
   alphabet: dna
-jobs: []
+jobs:
+  - id: job_a
+    operation: extract
+    ingest:
+      source: usr
+      root: "__USR_ROOT__"
+      dataset: "__USR_DATASET__"
+      field: sequence
+    outputs:
+      - id: ll_mean
+        fn: log_likelihood
+        format: float
+        params:
+          reduction: mean
+    io:
+      write_back: true
 """.strip()
+            .replace("__USR_ROOT__", str(selected_usr_root))
+            .replace("__USR_DATASET__", usr_dataset)
             + "\n",
             encoding="utf-8",
         )
@@ -1422,6 +1442,37 @@ def test_infer_mode_auto_selects_resume_when_infer_overlay_exists(tmp_path: Path
     assert decision.run_args == ""
 
 
+def test_infer_mode_auto_selects_resume_when_external_usr_overlay_exists(tmp_path: Path) -> None:
+    pyarrow = pytest.importorskip("pyarrow")
+    pyarrow_parquet = pytest.importorskip("pyarrow.parquet")
+
+    workspace_root = tmp_path / "infer_mode_external_overlay"
+    external_usr_root = tmp_path / "external_usr_root"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_external_overlay",
+        mode_default="auto",
+        usr_root=external_usr_root,
+        usr_dataset="external_demo",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    overlay_path = external_usr_root / "external_demo" / "_derived" / "infer.parquet"
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    pyarrow_parquet.write_table(
+        pyarrow.table(
+            {
+                "id": ["id-1"],
+                "infer__evo2_7b__job_a__ll_mean": [1.0],
+            }
+        ),
+        overlay_path,
+    )
+
+    decision = resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
+    assert decision.selected_mode == "resume"
+    assert decision.run_args == ""
+
+
 def test_infer_mode_resume_raises_without_resume_artifacts(tmp_path: Path) -> None:
     workspace_root = tmp_path / "infer_mode_resume_missing_artifacts"
     payload = _infer_runbook_payload(
@@ -1433,6 +1484,63 @@ def test_infer_mode_resume_raises_without_resume_artifacts(tmp_path: Path) -> No
 
     with pytest.raises(ValueError, match="resume mode blocked: workspace has no resume artifacts"):
         resolve_mode_decision(runbook=runbook, requested_mode="resume", active_job_ids=())
+
+
+def test_infer_mode_auto_raises_when_infer_usr_destination_is_ambiguous(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_mode_ambiguous_destination"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_ambiguous_destination",
+        mode_default="auto",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    runbook.infer.config.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs:
+  - id: job_a
+    operation: extract
+    ingest:
+      source: usr
+      root: "__USR_ROOT_A__"
+      dataset: "dataset_a"
+      field: sequence
+    outputs:
+      - id: ll_mean
+        fn: log_likelihood
+        format: float
+        params:
+          reduction: mean
+    io:
+      write_back: true
+  - id: job_b
+    operation: extract
+    ingest:
+      source: usr
+      root: "__USR_ROOT_B__"
+      dataset: "dataset_b"
+      field: sequence
+    outputs:
+      - id: ll_mean
+        fn: log_likelihood
+        format: float
+        params:
+          reduction: mean
+    io:
+      write_back: true
+""".strip()
+        .replace("__USR_ROOT_A__", str(tmp_path / "external_usr_a"))
+        .replace("__USR_ROOT_B__", str(tmp_path / "external_usr_b"))
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="infer mode probe requires a single resolvable USR destination"):
+        resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
 
 
 def test_infer_mode_fresh_requires_reset_ack_when_resume_artifacts_exist(tmp_path: Path) -> None:

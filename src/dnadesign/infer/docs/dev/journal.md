@@ -3799,3 +3799,57 @@ Observed effect: filtered guard reads remove repeated whole-overlay scans and ma
 2. Large-scale overwrite guard path is now subset-based and chunked.
 3. Ops infer mode selection is stricter and safer for fresh/resume/reset flows.
 4. Interrupted infer runs now have explicit resume-recovery coverage.
+
+## 2026-03-07 - Phase 2 Slice AQ (Ops Infer Artifact Probe from Config USR Root)
+
+### Goal
+
+Close the infer mode-selection gap where ops only probed workspace-local USR overlays and missed infer artifacts when infer writes to an external USR root/dataset.
+
+### Prioritized findings
+
+1. High: infer mode auto-detection in ops could select `fresh` even when infer overlays existed in external USR roots declared in infer config.
+2. Medium: infer mode probing silently ignored ambiguous infer USR destinations (multiple write-back targets), which hid configuration contract errors.
+3. Medium: cross-tool integration is strongest where ops/notify/infer use shared `_contracts` resolvers; deviations from this seam increase drift risk.
+
+### TDD sequence
+
+1. Red:
+   - `test_infer_mode_auto_selects_resume_when_external_usr_overlay_exists`
+   - `test_infer_mode_auto_raises_when_infer_usr_destination_is_ambiguous`
+2. Green:
+   - wired infer artifact probe to shared producer contract (`resolve_usr_producer_contract(tool="infer", config_path=...)`) for exact `usr_root/usr_dataset` probing.
+   - retained workspace run-manifest + workspace overlay checks.
+   - added explicit fail-fast contract for ambiguous/invalid infer USR destination resolution in mode probe.
+3. Verify:
+   - infer-mode targeted tests pass.
+   - full ops runbook orchestration tests pass.
+   - notify event-source/tool-event tests pass (cross-tool contract stability).
+
+### Changes applied
+
+1. `src/dnadesign/ops/orchestrator/state.py`
+   - infer overlay probe now includes config-resolved USR destination paths.
+   - added `_resolve_infer_usr_output_for_mode_probe(...)` fail-fast contract for ambiguous/invalid infer destinations.
+   - mode artifact detection now receives runbook context instead of workspace-only context.
+2. `src/dnadesign/ops/tests/test_runbook_orchestrator.py`
+   - helper now writes infer config with a concrete USR write-back job contract.
+   - added external-root overlay resume detection test.
+   - added ambiguous infer destination fail-fast test.
+
+### Cross-tool audit notes (ops <-> densegen/infer/notify)
+
+1. Positive: ops and notify both depend on `_contracts/usr_producer.py` for tool-output destination resolution; this is the correct extensibility seam.
+2. Positive: infer mode-selection now uses the same producer contract seam used by overlay guards and notify event-source plumbing.
+3. Remaining coupling to track: `resolve_mode_decision(...)` still branches on densegen vs infer directly; if additional workflow tools are added, this should move to an explicit mode-policy adapter map keyed by workflow tool.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "infer_mode_auto_selects_resume_when_external_usr_overlay_exists or infer_mode_auto_raises_when_infer_usr_destination_is_ambiguous or infer_mode_auto_selects_resume_when_infer_overlay_exists or infer_mode_auto_selects_fresh_when_only_usr_registry_exists or infer_mode_resume_raises_without_resume_artifacts or infer_mode_fresh_requires_reset_ack_when_resume_artifacts_exist"`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+
+### Contract impact
+
+1. Ops infer `auto`/`resume` decisions now correctly detect infer artifacts in external USR roots declared in infer config.
+2. Ambiguous infer USR destination configs fail fast during mode probing, preventing silent misclassification.
+3. Cross-tool contract alignment is tighter because ops infer mode probing now shares the same destination resolver seam as notify and overlay guard paths.
