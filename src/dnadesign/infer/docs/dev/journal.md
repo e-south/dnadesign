@@ -4224,3 +4224,51 @@ Make ops more explicit and future-proof by replacing mutable import-built adapte
 1. Notify runtime policy now has one module and one command builder.
 2. Live smoke and orchestration notify now share the same TLS and secret-ref contract.
 3. Tool registries are now declarative and read-only by default, which removes mutation from normal import flow while preserving explicit fail-fast registration semantics in tests.
+
+## 2026-03-07 - Phase 2 Slice AY (Explicit Workflow Metadata For Ops Runbooks)
+
+### Goal
+
+Reduce schema monolith size and make workflow-tool / notify-policy semantics more declarative by extracting orchestration workflow metadata into a dedicated runbooks module.
+
+### Prioritized findings
+
+1. High: `src/dnadesign/ops/runbooks/schema.py` still encoded workflow IDs, tool ownership, notify requirements, GPU requirements, and notify-policy rules inline.
+2. Medium: onboarding a future sibling tool would still require editing workflow semantics inside the runbook schema module rather than a dedicated workflow-definition surface.
+3. Medium: notify-policy validation had no direct metadata-level contract test; behavior was only implied through broader runbook validation paths.
+
+### TDD sequence
+
+1. Red:
+   - added `src/dnadesign/ops/tests/test_workflow_metadata.py`.
+   - confirmed failure because `dnadesign.ops.runbooks.workflow_metadata` did not yet exist.
+2. Green:
+   - added `src/dnadesign/ops/runbooks/workflow_metadata.py`.
+   - moved workflow IDs, workflow-tool mapping, workflow metadata definitions, and workflow contract validation into that module.
+   - rewired `schema.py` to import workflow ID / tool / notify-policy types and delegate workflow validation to `validate_workflow_contract(...)`.
+3. Verify:
+   - focused workflow metadata and orchestration tests pass.
+   - full ops and notify suites remain green.
+
+### Changes applied
+
+1. `src/dnadesign/ops/runbooks/workflow_metadata.py`
+   - new explicit workflow metadata module.
+   - owns workflow IDs, workflow-tool resolution, and notify-policy contract rules.
+   - exposes a single validation function for workflow-specific runbook semantics.
+2. `src/dnadesign/ops/runbooks/schema.py`
+   - removed inline workflow-ID sets and workflow-specific validation branching.
+   - now imports workflow metadata types and delegates workflow contract validation.
+3. `src/dnadesign/ops/tests/test_workflow_metadata.py`
+   - new direct metadata coverage and policy-validation tests.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_metadata.py src/dnadesign/ops/tests/test_workflow_tools.py src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_plan_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "workflow_metadata or workflow_helpers_classify_all_schema_workflow_ids or list_workflow_tools_matches_schema_workflow_ids or mode_tool_adapters_cover_all_schema_workflow_ids or plan_tool_adapters_cover_all_schema_workflow_ids or cli_plan_invalid_runbook_shows_contract_error_without_traceback"`
+2. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+
+### Contract impact
+
+1. Workflow semantics now have a dedicated module instead of living inside the schema monolith.
+2. Workflow tool ownership, notify requirement, GPU requirement, and allowed notify policies are now explicit data.
+3. Future sibling-tool onboarding now has a clearer first edit site in runbooks workflow metadata before touching schema structure.

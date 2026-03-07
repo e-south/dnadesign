@@ -19,47 +19,21 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
+from .workflow_metadata import (
+    NotifyPolicy,
+    OrchestrationWorkflowId,
+    WorkflowTool,
+    is_densegen_workflow_id,
+    is_infer_workflow_id,
+    list_workflow_tools,
+    resolve_workflow_tool,
+    validate_workflow_contract,
+)
+
 _HRT_PATTERN = re.compile(r"^[0-9]{2}:[0-9]{2}:[0-9]{2}$")
 _SLUG_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _USR_OVERLAY_NAMESPACE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 _DENSEGEN_POST_RUN_TEMPLATE_DEFAULT = Path("docs/bu-scc/jobs/densegen-analysis.qsub")
-_DENSEGEN_WORKFLOW_IDS = frozenset(
-    {
-        "densegen_batch_submit",
-        "densegen_batch_with_notify_slack",
-    }
-)
-_INFER_WORKFLOW_IDS = frozenset(
-    {
-        "infer_batch_submit",
-        "infer_batch_with_notify_slack",
-    }
-)
-_WORKFLOW_IDS_BY_TOOL = {
-    "densegen": _DENSEGEN_WORKFLOW_IDS,
-    "infer": _INFER_WORKFLOW_IDS,
-}
-
-
-def list_workflow_tools() -> tuple[str, ...]:
-    return tuple(sorted(_WORKFLOW_IDS_BY_TOOL))
-
-
-def resolve_workflow_tool(workflow_id: str) -> str:
-    workflow = str(workflow_id or "").strip()
-    for tool, workflow_ids in _WORKFLOW_IDS_BY_TOOL.items():
-        if workflow in workflow_ids:
-            return tool
-    supported = ", ".join(sorted(set().union(*_WORKFLOW_IDS_BY_TOOL.values())))
-    raise ValueError(f"unsupported orchestration workflow id: {workflow} (supported: {supported})")
-
-
-def is_densegen_workflow_id(workflow_id: str) -> bool:
-    return str(workflow_id or "").strip() in _WORKFLOW_IDS_BY_TOOL["densegen"]
-
-
-def is_infer_workflow_id(workflow_id: str) -> bool:
-    return str(workflow_id or "").strip() in _WORKFLOW_IDS_BY_TOOL["infer"]
 
 
 class StrictBaseModel(BaseModel):
@@ -213,8 +187,8 @@ class InferWorkloadContract(StrictBaseModel):
 
 
 class NotifyContract(StrictBaseModel):
-    tool: Literal["densegen", "infer"]
-    policy: Literal["densegen", "infer", "generic"] = "densegen"
+    tool: WorkflowTool
+    policy: NotifyPolicy = "densegen"
     profile: Path
     cursor: Path
     spool_dir: Path
@@ -288,12 +262,7 @@ class LoggingContract(StrictBaseModel):
 class OrchestrationRunbookV1(StrictBaseModel):
     schema_version: Literal[1] = 1
     id: str
-    workflow_id: Literal[
-        "densegen_batch_submit",
-        "densegen_batch_with_notify_slack",
-        "infer_batch_submit",
-        "infer_batch_with_notify_slack",
-    ]
+    workflow_id: OrchestrationWorkflowId
     project: str
     workspace_root: Path
     densegen: DensegenWorkloadContract | None = None
@@ -323,52 +292,17 @@ class OrchestrationRunbookV1(StrictBaseModel):
 
     @model_validator(mode="after")
     def _validate_workflow_contracts(self) -> "OrchestrationRunbookV1":
-        is_densegen_workflow = is_densegen_workflow_id(self.workflow_id)
-        is_infer_workflow = is_infer_workflow_id(self.workflow_id)
-        expects_notify = self.workflow_id.endswith("_with_notify_slack")
-
-        if is_densegen_workflow:
-            if self.densegen is None:
-                raise ValueError("densegen workflow requires runbook.densegen block")
-            if self.infer is not None:
-                raise ValueError("densegen workflow does not accept runbook.infer block")
-            if (
-                self.resources.gpus is not None
-                or self.resources.gpu_capability is not None
-                or self.resources.gpu_memory_gib is not None
-            ):
-                raise ValueError(
-                    "densegen workflow does not accept resources.gpus, "
-                    "resources.gpu_capability, or resources.gpu_memory_gib"
-                )
-            if expects_notify:
-                if self.notify is None:
-                    raise ValueError("densegen notify workflow requires runbook.notify block")
-                if self.notify.tool != "densegen":
-                    raise ValueError("densegen workflow requires notify.tool=densegen")
-                if self.notify.policy == "infer":
-                    raise ValueError("densegen workflow does not accept notify.policy=infer")
-            elif self.notify is not None:
-                raise ValueError("densegen_batch_submit does not accept runbook.notify block")
-
-        if is_infer_workflow:
-            if self.infer is None:
-                raise ValueError("infer workflow requires runbook.infer block")
-            if self.densegen is not None:
-                raise ValueError("infer workflow does not accept runbook.densegen block")
-            if self.resources.gpus is None:
-                raise ValueError("infer workflow requires resources.gpus")
-            if self.resources.gpu_capability is None:
-                raise ValueError("infer workflow requires resources.gpu_capability")
-            if expects_notify:
-                if self.notify is None:
-                    raise ValueError("infer notify workflow requires runbook.notify block")
-                if self.notify.tool != "infer":
-                    raise ValueError("infer workflow requires notify.tool=infer")
-                if self.notify.policy == "densegen":
-                    raise ValueError("infer workflow does not accept notify.policy=densegen")
-            elif self.notify is not None:
-                raise ValueError("infer_batch_submit does not accept runbook.notify block")
+        validate_workflow_contract(
+            workflow_id=self.workflow_id,
+            densegen_present=self.densegen is not None,
+            infer_present=self.infer is not None,
+            notify_present=self.notify is not None,
+            notify_tool=(self.notify.tool if self.notify is not None else None),
+            notify_policy=(self.notify.policy if self.notify is not None else None),
+            has_gpus=self.resources.gpus is not None,
+            has_gpu_capability=self.resources.gpu_capability is not None,
+            has_gpu_memory=self.resources.gpu_memory_gib is not None,
+        )
         return self
 
 
