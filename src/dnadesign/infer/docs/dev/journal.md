@@ -3899,3 +3899,50 @@ Address remaining mode-resolution coupling by replacing densegen/infer condition
 1. Ops mode resolution now depends on an explicit adapter map instead of inline tool conditionals.
 2. Invalid runbook workload shapes fail fast with clear invariant errors.
 3. Cross-tool extension path is now smaller: add adapter entry rather than edit core mode decision flow.
+
+## 2026-03-07 - Phase 2 Slice AS (Ops Mode-Tool Policy Module + Workflow Coverage Contracts)
+
+### Goal
+
+Complete the next ops decoupling increment by moving mode-tool adapter policy out of `state.py` into a dedicated module and enforcing workflow-schema coverage via explicit adapter tests.
+
+### Prioritized findings
+
+1. Medium: even after adapter introduction, policy implementation still lived in `state.py`, keeping mode orchestration and tool policy tightly coupled.
+2. Medium: there was no direct contract test ensuring all runbook workflow IDs are resolvable to a mode-tool adapter.
+
+### TDD sequence
+
+1. Red:
+   - `test_mode_tool_adapters_cover_all_schema_workflow_ids` (module missing)
+2. Green:
+   - added `ops/orchestrator/mode_tools.py` with mode-tool adapter contracts and resolver entrypoints.
+   - moved infer/densegen artifact probing + run-args selectors into policy module.
+   - rewired `resolve_mode_decision(...)` to consume `resolve_mode_tool_adapter(...)` from policy module.
+   - added explicit workflow-id-to-adapter resolver: `resolve_mode_tool_adapter_for_workflow_id(...)`.
+3. Verify:
+   - targeted adapter/workflow tests pass.
+   - full ops runbook orchestration suite passes.
+   - notify event-source/tool-event suites pass.
+
+### Changes applied
+
+1. `src/dnadesign/ops/orchestrator/mode_tools.py`
+   - new dedicated tool-policy module for mode resolution contracts.
+   - centralized adapter registry and workflow-id adapter resolution.
+2. `src/dnadesign/ops/orchestrator/state.py`
+   - removed tool-policy implementation details.
+   - now delegates tool-policy selection to `mode_tools.resolve_mode_tool_adapter(...)`.
+3. `src/dnadesign/ops/tests/test_runbook_orchestrator.py`
+   - added workflow-id coverage test for mode-tool adapters.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "mode_tool_adapters_cover_all_schema_workflow_ids or mode_decision_raises_when_runbook_has_no_workload_blocks or mode_decision_raises_when_runbook_has_multiple_workload_blocks or infer_mode_auto_selects_resume_when_external_usr_overlay_exists or infer_mode_auto_raises_when_infer_usr_destination_is_ambiguous"`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+
+### Contract impact
+
+1. Ops mode orchestration is more orthogonal: `state.py` coordinates decisions while `mode_tools.py` owns tool-specific policy.
+2. Schema workflow IDs now have explicit adapter coverage assertions in tests.
+3. Cross-tool extension path is narrower: adding a new workflow/tool now requires adapter registration and coverage tests.

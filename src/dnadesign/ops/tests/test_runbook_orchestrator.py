@@ -26,6 +26,7 @@ import dnadesign.ops.orchestrator.state as orchestrator_state
 import dnadesign.ops.runbooks.schema as runbook_schema
 from dnadesign.ops.cli import app
 from dnadesign.ops.orchestrator.execute import execute_batch_plan
+from dnadesign.ops.orchestrator.mode_tools import resolve_mode_tool_adapter_for_workflow_id
 from dnadesign.ops.orchestrator.plan import (
     BatchPlan,
     CommandSpec,
@@ -43,6 +44,14 @@ def test_workflow_helpers_classify_all_schema_workflow_ids() -> None:
         is_densegen = runbook_schema.is_densegen_workflow_id(workflow_id)
         is_infer = runbook_schema.is_infer_workflow_id(workflow_id)
         assert is_densegen != is_infer
+
+
+def test_mode_tool_adapters_cover_all_schema_workflow_ids() -> None:
+    workflow_ids = get_args(runbook_schema.OrchestrationRunbookV1.model_fields["workflow_id"].annotation)
+    assert workflow_ids
+    for workflow_id in workflow_ids:
+        adapter = resolve_mode_tool_adapter_for_workflow_id(workflow_id)
+        assert adapter.tool in {"densegen", "infer"}
 
 
 def test_ops_plan_avoids_infer_internal_module_imports() -> None:
