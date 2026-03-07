@@ -69,3 +69,31 @@ jobs: []
             gpu_capability="8.9",
             gpu_memory_gib=None,
         )
+
+
+def test_runbook_gpu_validation_normalizes_config_contract_errors(tmp_path: Path) -> None:
+    from dnadesign.infer import validate_runbook_gpu_resources
+
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+  parallelism:
+    strategy: single_device
+    gpu_ids: []
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="infer model contract invalid"):
+        validate_runbook_gpu_resources(
+            config_path=config,
+            declared_gpus=1,
+            gpu_capability=None,
+            gpu_memory_gib=None,
+        )

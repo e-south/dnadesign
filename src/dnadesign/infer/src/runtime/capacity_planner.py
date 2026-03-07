@@ -47,6 +47,25 @@ def _required_gpu_count(model: ModelConfig) -> int:
     return max(2, int(model.parallelism.min_gpus))
 
 
+def _cuda_device_index(device: str) -> int:
+    if device == "cuda":
+        return 0
+    _, _, suffix = device.partition(":")
+    if not suffix:
+        raise ValidationError(
+            "CAPACITY_FAIL model.device must be 'cuda' or 'cuda:<index>' when using CUDA."
+        )
+    try:
+        index = int(suffix)
+    except ValueError as exc:
+        raise ValidationError(
+            "CAPACITY_FAIL model.device must be 'cuda' or 'cuda:<index>' when using CUDA."
+        ) from exc
+    if index < 0:
+        raise ValidationError("CAPACITY_FAIL model.device cuda index must be >= 0")
+    return index
+
+
 def _selected_devices(model: ModelConfig, inventory: GpuInventory) -> tuple[GpuDeviceInfo, ...]:
     if model.parallelism.gpu_ids is None:
         return inventory.devices
@@ -77,7 +96,16 @@ def validate_model_hardware_contract(
     if not device.startswith("cuda"):
         return
 
+    device_index = _cuda_device_index(device)
     active_inventory = inventory or probe_gpu_inventory()
+    if device_index >= active_inventory.count:
+        raise ValidationError(
+            "CAPACITY_FAIL "
+            f"device={device} "
+            f"device_index={device_index} "
+            f"gpus_available={active_inventory.count}"
+        )
+
     required_gpus = _required_gpu_count(model)
     if active_inventory.count < required_gpus:
         raise ValidationError(

@@ -101,3 +101,16 @@ def test_multi_gpu_vortex_fails_when_gpu_ids_do_not_cover_required_gpus() -> Non
 
     with pytest.raises(ValidationError, match="invalid_gpu_ids"):
         validate_model_hardware_contract(model=model, inventory=_inventory(count=4))
+
+
+def test_single_device_fails_when_device_index_is_out_of_range() -> None:
+    model = ModelConfig(
+        id="evo2_7b",
+        device="cuda:3",
+        precision="bf16",
+        alphabet="dna",
+        parallelism=ModelParallelismConfig(strategy="single_device"),
+    )
+
+    with pytest.raises(ValidationError, match="device_index=3"):
+        validate_model_hardware_contract(model=model, inventory=_inventory(count=2))

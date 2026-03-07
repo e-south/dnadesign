@@ -77,8 +77,9 @@ def _default_usr_root() -> Path:
     env = os.environ.get("DNADESIGN_USR_ROOT")
     if env:
         return Path(env).expanduser().resolve()
-    here = Path(__file__).resolve()
-    return here.parents[2] / "usr" / "datasets"
+    import dnadesign.usr as usr_pkg
+
+    return (Path(usr_pkg.__file__).resolve().parent / "datasets").resolve()
 
 
 def load_usr_input(

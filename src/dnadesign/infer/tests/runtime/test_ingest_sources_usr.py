@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pyarrow as pa
 
-from dnadesign.infer.src.ingest.sources import load_usr_input
+from dnadesign.infer.src.ingest.sources import _default_usr_root, load_usr_input
 
 
 def _install_fake_usr_dataset(monkeypatch, records_path: Path) -> None:
@@ -28,6 +28,15 @@ def _install_fake_usr_dataset(monkeypatch, records_path: Path) -> None:
     monkeypatch.setattr(usr_mod, "Dataset", _FakeDataset)
     records_path.parent.mkdir(parents=True, exist_ok=True)
     records_path.write_bytes(b"PAR1")
+
+
+def test_default_usr_root_matches_usr_package_datasets_dir(monkeypatch) -> None:
+    import dnadesign.usr as usr_pkg
+
+    monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
+
+    expected = (Path(usr_pkg.__file__).resolve().parent / "datasets").resolve()
+    assert _default_usr_root() == expected
 
 
 def test_load_usr_input_filters_read_table_when_ids_are_provided(monkeypatch, tmp_path: Path) -> None:

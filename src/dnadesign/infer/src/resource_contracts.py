@@ -24,6 +24,7 @@ def _load_model_config(config_path: Path):
     from pydantic import ValidationError as PydanticValidationError
 
     from .config import ModelConfig
+    from .errors import ConfigError
 
     try:
         payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
@@ -39,7 +40,7 @@ def _load_model_config(config_path: Path):
         raise ValueError(f"infer config must include a model block: {config_path}")
     try:
         return ModelConfig(**model_payload)
-    except (PydanticValidationError, ValueError) as exc:
+    except (PydanticValidationError, ValueError, ConfigError) as exc:
         raise ValueError(f"infer model contract invalid in config {config_path}: {exc}") from exc
 
 
@@ -102,4 +103,3 @@ def validate_runbook_gpu_resources(
 
 
 __all__ = ["validate_runbook_gpu_resources"]
-
