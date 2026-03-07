@@ -3336,3 +3336,61 @@ Close outstanding coupling risks by removing legacy `infer_evo2` naming from not
 
 1. `uv run pytest -q src/dnadesign/notify/tests/test_tool_events_registry.py src/dnadesign/notify/tests/test_tool_events.py src/dnadesign/notify/tests/test_package_layout.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/notify/tests/test_workflow_policy_module.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_cli_profile_init.py src/dnadesign/notify/tests/test_cli_setup.py src/dnadesign/notify/tests/test_hpc_notify_watch_qsub.py src/dnadesign/ops/tests/test_sge_gates.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "infer or tool_events or workspace"`
 2. `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/ops/tests src/dnadesign/notify/tests`
+
+## 2026-03-07 - Phase 2 Slice AJ (Infer/Ops Contract Hardening + Codex Comment Closure)
+
+### Goal
+
+Close still-valid Codex review findings for infer/ops contracts while keeping behavior fail-fast and cross-tool boundaries explicit.
+
+### Audit findings (still valid)
+
+1. `infer` default USR root regression:
+   - `_default_usr_root()` resolved to `src/dnadesign/infer/usr/datasets` after infer module IA moves.
+   - correct package root is `src/dnadesign/usr/datasets`.
+2. GPU capacity contract gap:
+   - `validate_model_hardware_contract(...)` did not validate `model.device` CUDA index against available inventory.
+   - `cuda:<idx>` with out-of-range index could pass preflight and fail later at runtime.
+3. Ops-facing config normalization gap:
+   - infer resource contract loader normalized `pydantic.ValidationError` and `ValueError`, but not infer `ConfigError`.
+   - invalid `model.parallelism` contracts could escape as uncaught infer exceptions instead of runbook-facing `ValueError`.
+
+### TDD sequence
+
+1. Red:
+   - `test_default_usr_root_matches_usr_package_datasets_dir`
+   - `test_single_device_fails_when_device_index_is_out_of_range`
+   - `test_runbook_gpu_validation_normalizes_config_contract_errors`
+2. Green:
+   - infer ingest default root now resolves from installed `dnadesign.usr` package path.
+   - capacity planner now parses and validates CUDA device index with explicit `CAPACITY_FAIL` error.
+   - resource-contract loader now normalizes infer `ConfigError` into `ValueError` contract surface.
+3. Verify:
+   - targeted tests plus full infer and infer-linked ops/notify suites passed.
+
+### Changes applied
+
+1. `src/dnadesign/infer/src/ingest/sources.py`
+   - `_default_usr_root()` now resolves `<dnadesign.usr package>/datasets`.
+2. `src/dnadesign/infer/src/runtime/capacity_planner.py`
+   - added `_cuda_device_index(...)` parser/validator.
+   - `validate_model_hardware_contract(...)` now fails fast when `model.device` index is out of range.
+3. `src/dnadesign/infer/src/resource_contracts.py`
+   - `_load_model_config(...)` now catches infer `ConfigError` and raises normalized `ValueError`.
+4. Tests:
+   - `src/dnadesign/infer/tests/runtime/test_ingest_sources_usr.py`
+   - `src/dnadesign/infer/tests/runtime/test_capacity_planner.py`
+   - `src/dnadesign/infer/tests/package/test_wrapper_contracts.py`
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_ingest_sources_usr.py src/dnadesign/infer/tests/runtime/test_capacity_planner.py src/dnadesign/infer/tests/package/test_wrapper_contracts.py`
+2. `uv run pytest -q src/dnadesign/infer/tests`
+3. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/ops/tests/test_densegen_usr_contract_sharing.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/notify/tests/test_workflow_policy_module.py -k "infer or workspace or policy"`
+4. `uv run pytest -q src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py src/dnadesign/notify/tests/test_notify_docs_progressive_disclosure_contracts.py`
+
+### Contract impact
+
+1. Infer/ops preflight now rejects invalid `cuda:<idx>` targets before runtime adapter initialization.
+2. Runbook planning and infer public resource validation now surface invalid infer model contracts through consistent `ValueError` boundaries.
+3. Infer default USR ingest root now aligns with actual package layout and shared tool expectations.
