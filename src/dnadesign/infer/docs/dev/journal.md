@@ -3639,3 +3639,76 @@ Interpretation: chunked-filter path remains performant while removing single gia
 1. Resume behavior is unchanged for callers.
 2. Large ID subsets now use explicit chunked filter reads.
 3. Chunk size is centrally defined and easy to tune in follow-up slices.
+
+## 2026-03-07 - Phase 2 Slice AO (Resume Chunk Policy Contract + Large-Scale Hardening)
+
+### Goal
+
+Make resume-filter chunking configurable under an explicit fail-fast runtime contract so large-scale resume scans can be tuned without code edits.
+
+### Audit findings
+
+1. Resume filter chunk size was hardcoded in `resume_planner.py`, which forced source edits for scale tuning.
+2. There was no bounded runtime contract for chunk-size overrides.
+3. Planner behavior on invalid chunk overrides was not covered.
+
+### TDD sequence
+
+1. Red:
+   - `test_resume_filter_chunk_size_defaults_to_10000`
+   - `test_resume_filter_chunk_size_reads_env_value`
+   - `test_resume_filter_chunk_size_fails_fast_on_non_integer_env`
+   - `test_resume_filter_chunk_size_fails_fast_on_non_positive_env`
+   - `test_resume_filter_chunk_size_fails_fast_on_oversized_env`
+   - `test_plan_resume_for_usr_fails_fast_on_invalid_resume_filter_chunk_env`
+2. Green:
+   - added `src/runtime/resume_policy.py` with explicit env contract:
+     - env: `DNADESIGN_INFER_RESUME_FILTER_CHUNK`
+     - default: `10000`
+     - bounds: `1..100000`
+     - invalid values raise `ValueError` (no silent fallback).
+   - rewired `resume_planner.py` to resolve chunk size through runtime policy and pass it to `_read_subset_table(...)`.
+   - updated chunking planner test to use env contract instead of monkeypatching module constants.
+3. Verify:
+   - targeted runtime policy + planner tests pass.
+   - resume/write-back contract tests pass.
+   - full infer suite and infer docs contract suites pass.
+
+### Performance evidence (measurement-first)
+
+Benchmark: `200,000` records, `50,000` requested IDs, `5` runs per chunk size.
+
+1. chunk `2000`: mean `328.481ms`
+2. chunk `5000`: mean `166.256ms`
+3. chunk `10000` (default): mean `124.781ms`
+4. chunk `20000`: mean `113.102ms`
+
+Interpretation: larger chunk sizes reduce query count and can improve throughput; default `10000` remains a practical middle ground while operators now have an explicit tuning control.
+
+### Changes applied
+
+1. `src/dnadesign/infer/src/runtime/resume_policy.py`
+   - new bounded env-policy resolver for resume filter chunk size.
+2. `src/dnadesign/infer/src/runtime/resume_planner.py`
+   - removed hardcoded chunk-size constant.
+   - uses `resolve_resume_filter_chunk_size()` and explicit `filter_chunk_size` parameter at subset-read seam.
+3. `src/dnadesign/infer/tests/runtime/test_resume_policy.py`
+   - new contract tests for default/valid/invalid env behavior.
+4. `src/dnadesign/infer/tests/runtime/test_resume_planner.py`
+   - updated chunking test to env-path.
+   - added invalid env fail-fast planner contract test.
+5. `src/dnadesign/infer/docs/architecture/README.md`
+   - added `src/runtime/resume_policy.py` to runtime package map.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_resume_policy.py src/dnadesign/infer/tests/runtime/test_resume_planner.py -k "resume_filter_chunk or chunks_large_id_filters"`
+2. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_resume_planner.py src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py -k "resume or write_back"`
+3. `uv run pytest -q src/dnadesign/infer/tests`
+4. `uv run pytest -q src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+
+### Contract impact
+
+1. Resume semantics are preserved for callers.
+2. Large-scale tuning is now explicit and externalized via env contract.
+3. Invalid chunk-size overrides fail fast with operator-visible errors.
