@@ -1934,3 +1934,986 @@ Remove workspace-init portability footguns by making local-file scaffolds the de
 
 - Add `infer workspace doctor --config <path>` to validate scaffold files exist (`inputs/records.jsonl` etc.) before runtime.
 - Add docs snippet with minimal JSONL example under `docs/getting-started/`.
+
+## 2026-03-06 - Phase 2 Slice N (40B Pressure-Test Readiness + 3-Hour Infer Batch Plan)
+
+### Goal
+
+Record concrete SCC findings for current infer behavior (7B baseline and desired 40B pressure path), then define an execution-ready plan for promptable 3-hour infer jobs with explicit fresh/reset/resume semantics.
+
+### Read-only scheduler and storage snapshot
+
+- Scheduler snapshot (`qstat -u "$USER"` and `uv run python -m dnadesign.ops.orchestrator.gates session-counts`):
+  - running jobs: `2`
+  - queued jobs: `1`
+  - Eqw jobs: `0`
+- Storage snapshot (`df -h /projectnb/dunlop/esouth /project/dunlop/esouth /scratch/$USER`):
+  - `/projectnb`: `91%` used (`799G/880G`)
+  - `/project`: `44%` used (`96G/220G`)
+  - `/scratch`: `14%` used (`112G/876G`)
+
+### Findings (current-state audit)
+
+1. High: infer model registry is still 7B-centric.
+   - Registered model ids are `evo2_7b` and `evo2_1b_base`; `evo2_40b` is not registered.
+   - Practical effect: `model.id: evo2_40b` currently fails fast at registry resolution before adapter instantiation.
+2. High: ops infer submit path does not execute infer runtime.
+   - Runbook submit injects `INFER_CONFIG=...` into `qsub -v`, but `docs/bu-scc/jobs/evo2-gpu-infer.qsub` is still a GPU smoke shell and does not call `uv run infer run --config "$INFER_CONFIG"`.
+   - Practical effect: a successful submit today can complete without writing infer columns.
+3. High: existing 40B model cache is large and concentrated on `/projectnb`.
+   - `models--arcinstitute--evo2_40b` exists under `/projectnb/dunlop/esouth/cache/huggingface/hub/` at ~`77G`.
+   - Snapshot contains `evo2_40b.pt.part0` and `evo2_40b.pt.part1` symlinked to two ~`39G` blobs.
+4. Medium: infer mode semantics in ops are not yet hard-gated like densegen.
+   - infer has no explicit resume-readiness policy in `_contracts.resume_readiness`.
+   - `--mode auto` can choose `resume` from generic artifact markers, but `--mode fresh` is still accepted even when artifacts exist (no `--allow-fresh-reset` enforcement for infer).
+5. Medium: infer overlay-part preflight guard is explicit skip.
+   - `usr-overlay-guard --tool infer_evo2` returns `guard_status=skipped` because infer_evo2 contract reports no overlay-part emission.
+6. Medium: reset/prune ergonomics are missing for infer-only columns.
+   - There is no infer CLI command to prune only infer namespaced columns for a dataset/workspace.
+   - Current behavior is limited to write-back `overwrite` semantics plus resume-by-missing-column logic.
+
+### Real-run behavior (if executed today)
+
+1. Ops path (`uv run ops runbook execute --workflow infer ... --submit`):
+   - preflight passes (dir checks, config validate, qsub verify, shape advisor/operator brief).
+   - submit command launches `evo2-gpu-infer.qsub`.
+   - job script does module loads + CUDA smoke print, then exits.
+   - infer outputs (`infer__...`) are not produced because infer runtime is not invoked.
+2. Direct infer path with current pressure template (`model.id: evo2_7b`):
+   - `uv run infer run --config ... --job pressure_evo2_logits_llr` can write `logits_mean` and `llr_mean` columns for USR datasets when run on a GPU-capable node.
+3. Direct infer path with `model.id: evo2_40b` right now:
+   - fails fast with unknown model id contract unless infer registry is extended for `evo2_40b`.
+
+### Proposed transient layout for 40B pressure runs
+
+- Keep heavy model shards read-only in existing `/projectnb` Hugging Face hub cache.
+- Route runtime transients to `/project` (or job-local scratch) to avoid additional `/projectnb` sprawl:
+  - `TMPDIR=<workspace>/outputs/runtime/tmp/$JOB_ID`
+  - `UV_CACHE_DIR=<workspace>/outputs/runtime/uv-cache`
+  - `TORCH_EXTENSIONS_DIR=<workspace>/outputs/runtime/torch-extensions`
+  - `TRITON_CACHE_DIR=<workspace>/outputs/runtime/triton-cache`
+  - `PYTHONPYCACHEPREFIX=<workspace>/outputs/runtime/pycache`
+- Keep runbook/audit/stdout artifacts under workspace:
+  - `<workspace>/outputs/logs/ops/runbooks/`
+  - `<workspace>/outputs/logs/ops/audit/`
+  - `<workspace>/outputs/logs/ops/sge/<runbook-id>/`
+
+### Create-Plan Artifact: 3-Hour Infer Promptable Batch Flow
+
+#### Plan intent summary
+
+Enable a user prompt like: "run a 3 hour batch job for infer on workspace X" with deterministic behavior for:
+
+- fresh infer-column addition,
+- infer-column-only reset/prune,
+- resume after interruption,
+
+while preserving 7B support and allowing 40B pressure tests.
+
+#### Explicit scope
+
+- In scope:
+  - infer 40B model-id readiness in infer registry/contracts.
+  - infer GPU qsub template execution correctness (`INFER_CONFIG` must be consumed).
+  - explicit mode contract (`fresh`, `reset-prune`, `resume`) for infer ops route.
+  - transient path policy to keep runtime artifacts off near-full `/projectnb`.
+  - docs/runbook updates for low-friction `uv` environment/bootstrap.
+- Out of scope:
+  - workspace deletion flows from infer.
+  - silent fallback behaviors.
+  - changing densegen/usr/notify core runtime behavior beyond infer-facing contract additions.
+
+#### Ordered action checklist
+
+1. Add infer 40B registry contract under TDD:
+   - failing tests for `adapters list` + config validation with `model.id=evo2_40b`.
+   - register `evo2_40b` while keeping existing 7B/1B ids unchanged.
+2. Replace infer GPU qsub smoke body with real infer execution contract:
+   - require non-empty `INFER_CONFIG`.
+   - run `uv run infer validate config --config "$INFER_CONFIG"` then `uv run infer run --config "$INFER_CONFIG"`.
+   - keep CUDA/GCC module loading and fail-fast shell options.
+3. Add infer mode contract in ops plan/execute:
+   - `fresh`: append missing infer outputs only.
+   - `resume`: continue from partial infer outputs.
+   - `reset-prune`: explicit infer-column prune step, then fresh run.
+4. Implement infer-column-only prune command (no workspace deletion):
+   - dataset + job/model/output scoped.
+   - removes only `infer__<model>__<job>__<out>` targets.
+   - guarded by explicit confirmation flag.
+5. Add runbook fields for infer mode wiring:
+   - infer reset/prune enablement and target scope.
+   - explicit transient path block for qsub environment exports.
+6. Add no-submit integration tests for prompt-like 3-hour flow:
+   - runbook init (`h_rt=03:00:00`) -> plan -> execute `--no-submit`.
+   - assert infer submit command consumes `INFER_CONFIG` and mode wiring.
+7. Add docs updates:
+   - infer pressure-test guide (7B + 40B options),
+   - SCC install/quickstart env recommendations for transient isolation,
+   - ops runbook docs for infer fresh/reset/resume behavior.
+8. Validate on GPU batch session (not login node):
+   - run one bounded infer job against `test_stress_ethanol`.
+   - verify infer namespaced columns for `logits` + `llr`, plus resume/reset-prune behavior.
+
+#### Validation and risk handling
+
+- Validation gates per increment:
+  - `uv run pytest -q src/dnadesign/infer/tests`
+  - `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/ops/tests/test_sge_gates.py -k infer`
+  - `uv run pytest -q src/dnadesign/notify/tests/test_workspace_source.py src/dnadesign/notify/tests/test_events_source.py -k infer`
+- Risk controls:
+  - keep infer reset strictly column-scoped and opt-in.
+  - no implicit mode fallback.
+  - no scheduler mutation during planning (`--no-submit` first).
+
+#### Open blockers (true blockers only)
+
+1. Confirm canonical persistent location for 40B shard cache (keep in `/projectnb` vs relocate).
+2. Confirm whether infer reset-prune should live under `infer` CLI, `usr` CLI, or both with one canonical implementation.
+3. Confirm required notify orchestration events for infer reset-prune runs (if any).
+
+### Evidence commands executed
+
+- `qstat -u "$USER"`
+- `uv run python -m dnadesign.ops.orchestrator.gates session-counts`
+- `df -h /projectnb/dunlop/esouth /project/dunlop/esouth /scratch/$USER`
+- `du -sh /projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b`
+- `ls -lah /projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b/snapshots/*`
+- `uv run ops runbook init --workflow infer --h-rt 03:00:00 ... --no-notify`
+- `uv run ops runbook plan --runbook ... --mode auto|fresh|resume`
+- `uv run ops runbook execute --runbook ... --audit-json ... --no-submit`
+
+## 2026-03-06 - Phase 2 Slice O (GPU Env Build Execution Plan + Evo2 Upstream Delta)
+
+### Goal
+
+Create an execution-ready, low-fanout plan to build and validate the SCC GPU infer environment, grounded in current repo contracts and current Evo2 upstream state.
+
+### Route + risk posture (SGE ops)
+
+- workflow_id: `infer_batch_submit`
+- execution_locus: `scc_login_shell` (`hostname=scc1`)
+- queue posture snapshot:
+  - running jobs: `2`
+  - queued jobs: `1`
+  - Eqw jobs: `0`
+- advisor output:
+  - `advisor=single`
+  - `recommended_action=submit_single`
+  - `submit_gate=ready`
+- risk posture: low fanout (single submit path only), no arrays, enforce `--no-submit` preflight before any real submit.
+
+### Current evidence snapshot
+
+1. Local dev env currently does not have Evo2 extras installed:
+   - `evo2`, `transformer-engine`, `flash-attn`, `vtx` were reported as not installed.
+   - `torch` is present at `2.8.0+cu128`.
+2. Storage pressure remains asymmetric:
+   - `/projectnb/dunlop/esouth` is at `91%`.
+   - `/project/dunlop/esouth` is at `44%`.
+3. 40B shard cache exists and is large under `/projectnb`:
+   - model cache directory size ~`77G`
+   - two shard blobs (`part0`, `part1`) are ~`39G` each.
+
+### Docs and packaging audit findings
+
+1. `pyproject.toml` uses `infer-evo2` extra with:
+   - `torch>=2.8,<2.9` (Linux x86_64 via PyTorch cu128 index),
+   - `flash-attn>=2.8.0.post2,<3`,
+   - `transformer-engine[pytorch]>=2.0,<3`,
+   - `evo2`.
+2. High-level install docs are coherent but need one explicit hardening addition:
+   - they describe `UV_PROJECT_ENVIRONMENT`, `UV_CACHE_DIR`, and `HF_HOME`,
+   - they do not yet prescribe a full transient-path bundle for infer batch jobs (`TMPDIR`, `TORCH_EXTENSIONS_DIR`, `TRITON_CACHE_DIR`, `PYTHONPYCACHEPREFIX`) to keep build/runtime churn off near-full `/projectnb`.
+3. Contract mismatch remains in infer GPU submit template:
+   - `ops` injects `INFER_CONFIG=...` into infer submit commands,
+   - `docs/bu-scc/jobs/evo2-gpu-infer.qsub` still executes CUDA smoke only and does not run `infer validate config` + `infer run --config`.
+
+### Evo2 upstream delta (as of 2026-03-06)
+
+Upstream probes against `https://github.com/ArcInstitute/evo2` show:
+
+1. Default branch head: `bc7e7bf...`.
+2. Released tag observed: `v0.5.0`.
+3. Current package metadata on `main` reports `version = "0.5.3"` and includes dependency `vtx>=0.0.8`.
+4. README now explicitly calls out `evo2_20b` release and model set:
+   - `evo2_7b`, `evo2_20b`, `evo2_40b`, base variants.
+5. README states FP8/Transformer Engine requirement for `40B`, `20B`, and `1B`; 7B can run without TE on supported GPUs.
+
+### Update needs inferred from upstream delta
+
+1. Infer adapter/model registry should be updated from current 7B/1B-only registration to include at least `evo2_40b` and likely `evo2_20b` (under TDD) so runbook/model contracts align with available upstream checkpoints.
+2. SCC install docs should explicitly separate:
+   - 7B lane (lighter, non-TE-capable fallback where valid),
+   - FP8 lane (20B/40B/1B with Hopper + TE constraints).
+3. Dependency/compatibility note should be tightened in docs:
+   - dnadesign currently pins Torch 2.8 for infer extra, while upstream README recommends Torch 2.6/2.7.
+   - this should be captured as an explicit compatibility test gate rather than implicit assumption.
+
+### Create-Plan artifact (execution plan)
+
+#### Plan intent summary
+
+Build the infer GPU environment deterministically, then run one bounded pressure-test path that is scheduler-safe and validates infer write-back behavior before scaling out.
+
+#### Explicit scope
+
+- In scope:
+  - environment bootstrap + verification for Evo2 infer on SCC,
+  - infer submit-template correctness (`INFER_CONFIG` consumption),
+  - infer model-id readiness for large-model pressure tests,
+  - docs hardening for repeatable SCC GPU setup and transient-path policy.
+- Out of scope:
+  - multi-submit fanout or arrays in this phase,
+  - workspace deletion semantics,
+  - silent fallback behavior.
+
+#### Ordered action checklist
+
+1. Lock transience policy in docs/runbook contract:
+   - keep model shards where they are,
+   - route runtime/build caches to `/project` (or job scratch) with explicit env exports.
+2. TDD: harden infer qsub template contract:
+   - failing tests for infer submit command expectation and template semantics,
+   - enforce required `INFER_CONFIG`,
+   - run `uv run infer validate config --config "$INFER_CONFIG"` then `uv run infer run --config "$INFER_CONFIG"`.
+3. TDD: extend infer model registration:
+   - add failing tests for adapter list/config acceptance of new model ids,
+   - register `evo2_40b`, evaluate `evo2_20b` inclusion in same slice if tests remain tight.
+4. TDD: add infer mode hardening in ops:
+   - codify fresh/resume/reset-prune behavior for infer columns only.
+5. Add infer column-prune command contract (no workspace delete path):
+   - explicit scope + explicit confirmation flag,
+   - no fallback behavior.
+6. Harden install docs:
+   - add GPU lane matrix (7B vs FP8 models),
+   - add deterministic env exports for transients/caches,
+   - add compatibility test section tied to current pinned torch + evo2 stack.
+7. Execute no-submit workflow only:
+   - `ops runbook init --workflow infer --h-rt 03:00:00 --no-notify`,
+   - `ops runbook plan`,
+   - `ops runbook execute --no-submit`.
+8. Submit exactly one job after green gates:
+   - `ops runbook execute --submit`,
+   - verify `infer__...` namespaced columns (llr/logits) on target dataset.
+
+#### Validation and risk handling
+
+- Required checks before submit:
+  1. `qstat -u "$USER"`
+  2. `uv run ops runbook plan --runbook <path>`
+  3. `uv run ops runbook execute --runbook <path> --audit-json <path> --no-submit`
+  4. template verify gate (`qsub -verify`) through ops preflight
+- Hard-stop conditions:
+  1. any preflight non-zero,
+  2. any `Eqw` job appears,
+  3. running jobs exceed `3` and new submissions are requested.
+
+#### Open blockers (max 3)
+
+1. Confirm canonical long-term location for 40B model cache (`/projectnb` retained vs migration plan).
+2. Confirm whether infer reset-prune command should be owned by infer CLI, usr CLI, or both delegating to one implementation.
+3. Confirm first pressure-test sequence: 7B smoke-first vs direct 40B path.
+
+### Commands executed for this slice
+
+- `skills-preflight --json --strict --ensure-fresh --require-hooks`
+- `hostname`
+- `qstat -u "$USER"`
+- `uv run python -m dnadesign.ops.orchestrator.gates session-counts`
+- `uv run python -m dnadesign.ops.orchestrator.gates submit-shape-advisor --planned-submits 1 --warn-over-running 3`
+- `uv run python -m dnadesign.ops.orchestrator.gates operator-brief --planned-submits 1 --warn-over-running 3`
+- `sed -n '1,260p' pyproject.toml`
+- `sed -n '1,260p' docs/installation.md`
+- `sed -n '1,340p' docs/bu-scc/install.md`
+- `sed -n '1,320p' docs/bu-scc/quickstart.md`
+- `sed -n '1,260p' docs/bu-scc/jobs/evo2-gpu-infer.qsub`
+- `sed -n '1,340p' docs/operations/orchestration-runbooks.md`
+- `git ls-remote --heads --tags https://github.com/ArcInstitute/evo2.git`
+- `curl -L https://raw.githubusercontent.com/ArcInstitute/evo2/main/README.md`
+- `curl -L https://raw.githubusercontent.com/ArcInstitute/evo2/main/pyproject.toml`
+- `uv run python - <<'PY' ... importlib.metadata ... PY`
+- `df -h /projectnb/dunlop/esouth /project/dunlop/esouth /scratch/$USER`
+- `du -sh /projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b`
+
+## 2026-03-06 - Phase 2 Slice P (Infer-Evo2 Local Env Build Attempt + Interactive Session Gate)
+
+### Goal
+
+Attempt a real `uv sync --locked --extra infer-evo2` with transient/caches routed to `/project`, then record concrete blockers and the required interactive-session bootstrap contract.
+
+### Build attempt executed
+
+1. Created a dedicated env and runtime cache roots under `/project/dunlop/esouth/dnadesign/`:
+   - `.venv-infer-evo2-attempt`
+   - `runtime/infer-evo2-attempt/{tmp,uv-cache,torch-extensions,triton-cache,pycache}`
+2. Ran:
+   - `uv sync --locked --extra infer-evo2`
+3. Result:
+   - dependency resolution + large wheel downloads completed,
+   - build failed at `transformer-engine-torch==2.11.0`.
+
+### Root cause evidence
+
+1. Missing CUDA toolchain headers on login host path:
+   - repeated compile error: `fatal error: crt/host_defines.h: No such file or directory`
+2. Host compiler too old for torch extension build:
+   - error: `We need GCC 9 or later.`
+3. Host checks during failure window:
+   - `gcc (GCC) 8.5.0 ...`
+   - `nvcc=missing`
+
+### Operational conclusion
+
+Yes, a proper SCC toolchain context is required for reliable infer-evo2 build completion. A GPU allocation is not required for dependency resolution itself, but practical TE/flash-attn build + runtime validation should be performed in an interactive or batch environment with the correct CUDA/GCC modules loaded.
+
+### Interactive-session bootstrap checklist (next attempt)
+
+1. Start a bounded interactive session with GPU resources.
+2. Load explicit modules before `uv sync`:
+   - `module purge`
+   - `module load cuda/<version>`
+   - `module load gcc/<version>`
+3. Export compiler/CUDA pointers:
+   - `CC`, `CXX`, `CUDAHOSTCXX`, `CUDA_HOME`
+4. Keep transient/caches under `/project` or job scratch:
+   - `TMPDIR`, `UV_CACHE_DIR`, `TORCH_EXTENSIONS_DIR`, `TRITON_CACHE_DIR`, `PYTHONPYCACHEPREFIX`
+5. Re-run:
+   - `uv sync --locked --extra infer-evo2`
+6. Validate after sync:
+   - torch CUDA visibility,
+   - `transformer_engine`, `flash_attn`, `evo2`, `vtx` imports,
+   - infer adapter listing and infer config validation commands.
+
+### Commands executed for this slice
+
+- `uv sync --locked --extra infer-evo2` (with transient/cache exports to `/project`)
+- `gcc --version`
+- `command -v nvcc`
+
+### Implementation changes landed in this slice
+
+1. Infer model-id readiness:
+   - registered `evo2_20b` and `evo2_40b` in infer adapter defaults.
+2. Infer GPU qsub contract:
+   - `docs/bu-scc/jobs/evo2-gpu-infer.qsub` now requires `INFER_CONFIG`, runs infer config validation, then runs infer config execution.
+3. SCC docs hardening:
+   - added transient-path guidance and model-lane guidance to `docs/bu-scc/install.md`,
+   - updated infer submit examples in `docs/bu-scc/quickstart.md`, `docs/bu-scc/jobs/README.md`, and `docs/bu-scc/batch-notify.md`.
+
+### Verification evidence for landed changes
+
+- `uv run pytest -q src/dnadesign/infer/tests/cli/test_adapters_commands.py src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py -k "adapters_list_reports_registered_default_model_ids or evo2_qsub_template_requires_infer_config_and_runs_infer_cli or bu_scc_install_doc_includes_infer_transient_path_policy_and_model_lanes"`
+- `uv run pytest -q src/dnadesign/infer/tests/cli/test_adapters_commands.py src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py`
+- `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "infer_runbook_uses_gpu_submit_template_and_filters or infer_batch_submit_without_notify_skips_notify_phase"`
+
+## 2026-03-07 - Phase 2 Slice Q (Top-Level Docs + pyproject Sequence Audit During Interactive GPU Build)
+
+### Goal
+
+Align real SCC GPU build behavior with documented install flow and `pyproject.toml` packaging contracts, then capture an execution sequence that avoids known build/runtime failure modes.
+
+### Top-level sequence audit (docs + pyproject)
+
+1. Top-level route map is coherent:
+   - `README.md` -> `docs/README.md` -> `docs/installation.md` -> `docs/bu-scc/{quickstart,install}.md`.
+2. Packaging contract in `pyproject.toml` matches intent:
+   - `infer-evo2` extra includes `torch` + `flash-attn` + `transformer-engine[pytorch]` + `evo2`.
+   - uv is configured with `no-build-isolation-package = ["flash-attn", "transformer-engine-torch"]`.
+3. SCC docs cover module/toolchain loading and transient-path routing, but interactive build findings exposed additional critical knobs needed for deterministic success on this host.
+
+### Interactive build findings (real host evidence)
+
+1. Host C library is `glibc 2.28` (`ldd --version`), while installed `flash_attn_2_cuda*.so` required `GLIBC_2.32`.
+   - implication: prebuilt `flash-attn` binaries can be incompatible on this SCC host; source build is required.
+2. Correct flash-attn force-build env var is:
+   - `FLASH_ATTENTION_FORCE_BUILD=TRUE`
+   - not `FLASH_ATTN_FORCE_BUILD`.
+3. `flash-attn` arch fanout is controlled by:
+   - `FLASH_ATTN_CUDA_ARCHS` (defaults to `80;90;100;120` in upstream setup.py),
+   - not `TORCH_CUDA_ARCH_LIST` for this package/version.
+4. Transformer Engine include discovery can fail on `nccl.h` when include paths are narrowed.
+   - using only `NVTE_CUDA_INCLUDE_PATH=$CUDA_HOME/include` can hide NCCL headers from nvidia wheel includes.
+   - stable fix: compose `CPATH`/`CPLUS_INCLUDE_PATH` with both `$CUDA_HOME/include` and venv `site-packages/nvidia/*/include`.
+
+### Recommended sequence of events (SCC interactive build lane)
+
+1. Load toolchain first (`module purge`, `module load cuda/...`, `module load gcc/...`), export `CC/CXX/CUDAHOSTCXX/CUDA_HOME`.
+2. Pin env + transients to project paths (`UV_PROJECT_ENVIRONMENT`, `UV_CACHE_DIR`, `TMPDIR`, `TORCH_EXTENSIONS_DIR`, `TRITON_CACHE_DIR`, `PYTHONPYCACHEPREFIX`).
+3. Build include path from:
+   - `$CUDA_HOME/include`
+   - venv `site-packages/nvidia/*/include`
+4. Force source build for flash-attn:
+   - `FLASH_ATTENTION_FORCE_BUILD=TRUE`
+   - `FLASH_ATTN_CUDA_ARCHS=80` (single-arch compile path for this host/toolchain)
+5. Install/repair:
+   - `uv sync --locked --extra infer-evo2` (or targeted `uv sync --reinstall-package flash-attn ...` for remediation).
+6. Verify binary compatibility and runtime imports:
+   - inspect `flash_attn_2_cuda*.so` GLIBC symbols,
+   - run `uv run python` imports for `torch`, `transformer_engine`, `flash_attn`, `evo2`, `vtx`,
+   - run `uv run infer adapters list`.
+
+### Current status (slice checkpoint)
+
+1. Interactive rebuild rerun is active with:
+   - `FLASH_ATTENTION_FORCE_BUILD=TRUE`
+   - `FLASH_ATTN_CUDA_ARCHS=80`
+2. Compile invocation confirms single-arch `-gencode arch=compute_80,code=sm_80` path.
+3. Final import/GLIBC verification remains pending on completion of this build step.
+
+### Commands executed for this slice
+
+- `sed -n ... README.md docs/README.md docs/installation.md docs/bu-scc/install.md docs/bu-scc/quickstart.md docs/bu-scc/jobs/README.md`
+- `sed -n ... pyproject.toml`
+- `nl -ba ... pyproject.toml docs/installation.md docs/bu-scc/install.md docs/bu-scc/quickstart.md`
+- `ldd --version`
+- `getconf GNU_LIBC_VERSION`
+- `strings .venv-infer-evo2-gpu/lib/python3.12/site-packages/flash_attn_2_cuda*.so | rg GLIBC_`
+- `rg -n 'FLASH_ATTENTION_FORCE_BUILD|FLASH_ATTN_CUDA_ARCHS|gencode' <flash-attn setup.py in uv sdist temp>`
+- `uv pip install --python .venv-infer-evo2-gpu/bin/python --reinstall-package flash-attn --no-binary flash-attn --no-build-isolation --refresh-package flash-attn --refresh --no-cache flash-attn==2.8.3`
+
+## 2026-03-07 - Phase 2 Slice R (Deterministic GPU Docs Hardening: Runbook + Didactic Lane)
+
+### Goal
+
+Harden documentation so a human or machine can deterministically bootstrap Evo2 GPU infer on SCC with clear UV lane semantics, explicit export ordering, and infer capability verification.
+
+### Audit summary
+
+1. Top-level docs already route correctly (`README` -> `docs/README` -> `docs/installation` -> `docs/bu-scc/*`) but lacked one explicit deterministic GPU lane with the discovered flash-attn/TE controls.
+2. Infer docs had pressure-test and demo runbooks but lacked a dedicated SCC GPU environment runbook tied to infer capability checks.
+3. Existing docs tests covered SCC install transient/model-lane sections but did not enforce deterministic flash-attn source-build controls or infer runbook discoverability for this lane.
+
+### Changes applied
+
+1. Added infer deterministic runbook:
+   - `src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md`
+   - includes:
+     - machine lane (copy/paste deterministic command sequence),
+     - didactic lane (UV lanes, extras/groups, exports rationale),
+     - infer capability checks (`infer adapters list`, `infer validate config`).
+2. Updated infer docs IA routing:
+   - `src/dnadesign/infer/docs/operations/README.md`
+   - `src/dnadesign/infer/docs/README.md`
+   - `src/dnadesign/infer/docs/index.md`
+   - `src/dnadesign/infer/docs/getting-started/README.md`
+   - `src/dnadesign/infer/README.md`
+   - `src/dnadesign/infer/docs/operations/pressure-test-agnostic-models.md`
+3. Hardened BU SCC + top-level docs:
+   - `docs/bu-scc/install.md`
+     - added `### Deterministic GPU build runbook (copy/paste lane)`
+     - added didactic rationale section
+     - documented `FLASH_ATTENTION_FORCE_BUILD`, `FLASH_ATTN_CUDA_ARCHS`, `CPATH`, `CPLUS_INCLUDE_PATH`
+   - `docs/installation.md`
+     - added explicit UV lane model (`default-groups`, `--group dev`, `--extra infer-evo2`)
+     - linked deterministic SCC GPU lane + infer runbook
+   - cross-link updates:
+     - `docs/README.md`
+     - `docs/bu-scc/README.md`
+     - `docs/bu-scc/quickstart.md`
+     - `docs/bu-scc/jobs/README.md`
+     - `docs/bu-scc/batch-notify.md`
+4. Added/updated doc contract tests (TDD):
+   - `src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py`
+     - new deterministic flash-attn control assertions
+   - `src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py`
+     - operations index must link SCC GPU runbook
+   - `src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+     - new infer SCC GPU runbook content contract
+
+### Verification evidence
+
+- Failing test gate (before docs changes):
+  - deterministic SCC install section missing,
+  - infer operations index missing new runbook link,
+  - runbook file missing.
+- Green test gate (after docs changes):
+  - `uv run pytest -q src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+  - result: pass (`21` tests).
+
+### Runtime build status snapshot
+
+1. Active flash-attn source build remains in progress in `.venv-infer-evo2-gpu`.
+2. Current compile path confirms bounded arch control (`-gencode arch=compute_80,code=sm_80`).
+3. Final runtime import verification is still pending completion of that build command.
+
+## 2026-03-07 - Phase 2 Slice S (UV Workflow Policy Correction: No uv pip in Canonical Path)
+
+### Goal
+
+Correct the environment-repair workflow to stay on canonical UV project commands and encode the policy in docs/contracts.
+
+### Critical evaluation
+
+1. `uv add` / `uv remove` are the correct commands for dependency declaration changes because they update `pyproject.toml` and `uv.lock`.
+2. `uv sync` is the correct command for environment realization and rebuilds when dependency declarations are unchanged.
+3. `uv pip` is not the preferred path for this repo's canonical runbooks and was removed from active guidance.
+
+### Corrective actions applied
+
+1. Stopped the in-flight `uv pip` flash-attn remediation process and orphaned compile workers.
+2. Replaced active rebuild path with lock-driven sync:
+   - `uv sync --locked --extra infer-evo2 --reinstall-package flash-attn --refresh --refresh-package flash-attn --no-binary-package flash-attn --no-cache`
+3. Updated docs to encode UV policy explicitly:
+   - `docs/installation.md`
+   - `docs/bu-scc/install.md`
+   - `src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md`
+4. Updated docs contract tests to enforce UV policy wording:
+   - `src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py`
+   - `src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+- result: pass (`21` tests).
+
+### Runtime status
+
+1. Canonical `uv sync` source-build path is active for flash-attn rebuild.
+2. Import-level compatibility verification remains pending completion.
+
+## 2026-03-07 - Phase 2 Slice T (Docs Language Hardening: Direct, Plain, Single-Path Guidance)
+
+### Goal
+
+Rewrite installation and infer SCC documentation to use plain, direct language with clear sequential instructions, no human/agent phrasing, and no divergent path framing.
+
+### Changes applied
+
+1. Updated top-level installation guidance:
+   - `docs/installation.md`
+   - renamed lane/branch framing to direct section titles (`Platform support`, `UV dependency model`, `Development tools (when needed)`).
+   - preserved UV policy clarity (`uv add/remove` for declaration changes, `uv sync` for realization/rebuilds).
+2. Updated BU SCC install/runbook wording:
+   - `docs/bu-scc/install.md`
+   - replaced `At a glance`/`Choose your path` with direct scope language.
+   - renamed runbook sections to:
+     - `GPU setup and verification runbook`
+     - `Why these settings are required`
+   - replaced model-lane wording with model-support wording.
+3. Updated infer SCC runbook wording:
+   - `src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md`
+   - replaced `machine lane`/`human lane` headings with:
+     - `Setup and verification steps`
+     - `Why this setup works`
+4. Updated cross-links to new BU SCC install anchor:
+   - `docs/README.md`
+   - `docs/bu-scc/README.md`
+   - `docs/bu-scc/quickstart.md`
+   - `docs/bu-scc/batch-notify.md`
+   - `docs/bu-scc/jobs/README.md`
+5. Added/updated docs contracts to enforce style and structure:
+   - `src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py`
+   - `src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+   - updated expectations for new section names and removed phrasing.
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+- result: pass (`22` tests).
+
+### Runtime note
+
+1. Stopped the in-progress `uv sync --reinstall-package flash-attn` build process after docs pass completion to avoid leaving background compile load running.
+
+## 2026-03-07 - Phase 2 Slice U (Documentation Tone + Single-Sequence Runbook Pass)
+
+### Goal
+
+Run a strict language pass on installation + BU SCC + infer pressure-test docs so the instructions stay plain, direct, and sequential without branch-labeled runbook paths.
+
+### Changes applied
+
+1. Tightened docs style contract tests first (red -> green):
+   - `src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py`
+   - `src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py`
+   - Added forbidden phrasing gates for lane/agent labels and branch-labeled `Path A/B/C` sections.
+2. Rewrote wording in installation and BU SCC index/bootstrap docs:
+   - `docs/installation.md`
+   - `docs/bu-scc/README.md`
+   - `docs/bu-scc/install.md`
+   - `docs/bu-scc/batch-notify.md`
+   - `docs/README.md`
+   - renamed `docs/bu-scc/agent-cheatsheet.md` -> `docs/bu-scc/submission-reference.md` and updated links.
+3. Rewrote infer docs wording and pressure runbook structure:
+   - `src/dnadesign/infer/docs/README.md`
+   - `src/dnadesign/infer/docs/operations/pressure-test-agnostic-models.md`
+   - Converted branch labels into one ordered procedure (`1..9`) while preserving all required commands.
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+- result: pass (`22` tests).
+
+## 2026-03-07 - Phase 2 Slice V (GPU Env Pressure Test Audit: Real Build Evidence + Runbook Hardening)
+
+### Goal
+
+Pressure-test the installation and infer BU SCC GPU docs as a first-time operator workflow and verify whether the deterministic runbook builds a usable Evo2 infer environment end-to-end.
+
+### Environment evidence
+
+1. Host: `scc-505` (interactive GPU session).
+2. GPUs: `NVIDIA L40S` (multiple devices visible via `nvidia-smi -L`).
+3. Modules used: `cuda/12.8`, `gcc/13.2.0`.
+4. UV contract: `uv 0.9.18`, project requires Python `3.12`.
+
+### Pressure-test execution summary
+
+1. Base lock sync completed successfully in fresh env root:
+   - `uv sync --locked` completed and installed torch CUDA stack (`torch 2.8.0+cu128`) and base dependencies.
+2. Evo2 extra sync entered source build path for flash-attn:
+   - `uv sync --locked --extra infer-evo2` triggered `flash-attn` CUDA compilation.
+   - Build inventory showed `72` CUDA translation units in flash-attn source tree.
+   - Runtime observation: with constrained build controls (`MAX_JOBS=1`, `CMAKE_BUILD_PARALLEL_LEVEL=1`), compile wall-clock extended beyond 30 minutes and was still in-progress.
+3. Partial-state footgun observed after interrupted compile:
+   - Dist metadata contained `transformer-engine` but missing runtime torch extension (`transformer_engine.pytorch` import failed).
+   - `flash-attn` package remained missing.
+   - `infer validate config --config ...` still passed, which can mask unusable runtime extension state.
+
+### Root-cause findings
+
+1. Lockfile expectation mismatch in docs:
+   - `flash-attn` entry in `uv.lock` is sdist-only (no wheel entries), so source compilation is expected in current lock state.
+2. Runbook verification was not fail-fast enough:
+   - previous verification printed versions but did not fail when required runtime imports were absent.
+3. Efficiency posture was too conservative by default:
+   - hard-coded single-thread build caps maximize determinism but can make first build impractically long on available GPU nodes.
+
+### Hardening changes applied
+
+1. Added explicit lockfile expectation to runbooks:
+   - `flash-attn is sdist-only in uv.lock` now called out in infer SCC runbook and BU SCC install runbook.
+2. Added fail-fast runtime verification gate:
+   - runbook now emits `MISSING_REQUIRED` and exits non-zero (`raise SystemExit(1)`) when required dist/module imports fail.
+3. Added deterministic recovery command for partial installs:
+   - `uv sync --locked --extra infer-evo2 --reinstall-package flash-attn --reinstall-package transformer-engine-torch`.
+4. Updated build-control guidance:
+   - parallel defaults for normal runs, single-thread caps reserved for memory-constrained fallback.
+
+### Verification evidence
+
+- Docs contract tests after hardening:
+  - `uv run pytest -q src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+  - result: pass.
+
+## 2026-03-07 - Phase 2 Slice W (Resource Budget Gate: 4 cores + 1x L40S)
+
+### Goal
+
+Add a deterministic, budget-aware preflight so build and run decisions are mechanical for constrained SCC sessions and do not rely on ad-hoc tuning.
+
+### Session evidence
+
+1. GPU query:
+   - `nvidia-smi --query-gpu=name,memory.total,compute_cap --format=csv,noheader`
+   - observed: `NVIDIA L40S, 46068 MiB, 8.9`
+2. Scheduler/session variables:
+   - `NSLOTS=4`
+   - `OMP_NUM_THREADS=1` (default shell state can underutilize allocated cores unless explicitly set)
+   - `TMPDIR=/scratch/<jobid>.1.l40s`
+3. Python/runtime precision contract in infer:
+   - only `fp32`, `fp16`, `bf16` are accepted (`src/dnadesign/infer/src/config.py`).
+   - no quantized/offloaded inference path is exposed in infer CLI/config.
+
+### Capacity calculation used for preflight
+
+- weight memory estimate: `params * bytes_per_param`
+- guard band: `required_gib = weight_gib * 1.25`
+- GPU usable headroom: `gpu_total_gib * 0.90`
+- fail condition: `required_gib > gpu_usable_gib`
+
+Approximate bf16/fp16 values:
+
+1. `evo2_7b`: weights `13.0 GiB`, guarded `16.3 GiB`
+2. `evo2_20b`: weights `37.3 GiB`, guarded `46.6 GiB`
+3. `evo2_40b`: weights `74.5 GiB`, guarded `93.1 GiB`
+4. `400B` class: weights `745.1 GiB`, guarded `931.3 GiB`
+
+Implication on one L40S (`~45.0 GiB` total):
+
+1. `evo2_7b`: expected fit.
+2. `evo2_20b`: borderline-to-fail under guard-band policy.
+3. `evo2_40b`: fail.
+4. `400B`: out of scope by both model-id support and capacity.
+
+### Hardening changes applied
+
+1. Added `Capacity and build profile gate` to:
+   - `src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md`
+2. Added mirrored `6.4 Capacity gate and resource profile` to:
+   - `docs/bu-scc/install.md`
+3. Gate behavior:
+   - derives `FLASH_ATTN_CUDA_ARCHS` from detected compute capability (`8.9 -> 89`),
+   - derives build jobs from `NSLOTS` (`1/2/4` cap),
+   - exports deterministic build knobs,
+   - emits `RESOURCE_GATE_OK` on pass,
+   - emits `RUN_CAPACITY_FAIL` and exits non-zero on fail.
+4. Added explicit model-id scope note:
+   - infer supports `evo2_7b`, `evo2_20b`, `evo2_40b`;
+   - 400B is not a supported infer `model.id`.
+
+### Test hardening updates
+
+1. Updated infer docs contract:
+   - `src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+   - now asserts presence of gate tokens (`TARGET_MODEL_ID`, `RUN_CAPACITY_FAIL`, `RESOURCE_GATE_OK`).
+2. Updated BU SCC docs contract:
+   - `src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py`
+   - now asserts install doc includes capacity gate section + 400B scope note.
+
+### Verification evidence
+
+- `uv run pytest -q src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py`
+
+## 2026-03-07 - Phase 2 Slice X (Infer Multi-GPU Contract Hardening: Topology + Capacity Preflight)
+
+### Goal
+
+Land the first implementation increment for flexible multi-GPU infer behavior with strict fail-fast contract checks, while preserving current single-GPU 7B behavior.
+
+### Scope of implementation
+
+1. Add explicit model topology contract to infer config.
+2. Add runtime GPU inventory probe and capacity validator.
+3. Wire fail-fast capacity checks into:
+   - `infer validate config`
+   - `infer run --dry-run` (and `infer run` preflight path)
+4. Keep current CLI surfaces unchanged.
+
+### Changes applied
+
+1. Config contract update:
+   - `src/dnadesign/infer/src/config.py`
+   - added `ModelParallelismConfig` with:
+     - `strategy`: `single_device | multi_gpu_vortex`
+     - `min_gpus`
+     - `gpu_ids`
+   - added `model.parallelism` to `ModelConfig` with strict validation.
+2. Runtime probe module:
+   - `src/dnadesign/infer/src/runtime/hardware_probe.py`
+   - provides `GpuDeviceInfo`, `GpuInventory`, `probe_gpu_inventory()`.
+3. Runtime capacity planner:
+   - `src/dnadesign/infer/src/runtime/capacity_planner.py`
+   - computes guarded model memory requirement (`weights * 1.25`) for Evo2 ids and validates against usable GPU memory (`sum(vram * 0.90)` across required devices).
+   - enforces topology contract (`required_gpus`, valid `gpu_ids`, no multi-gpu strategy on non-cuda device).
+   - emits explicit `ValidationError` messages prefixed with `CAPACITY_FAIL`.
+4. CLI fail-fast wiring:
+   - `src/dnadesign/infer/src/cli/commands/validate.py`
+   - `src/dnadesign/infer/src/cli/commands/run.py`
+   - both now call `validate_model_hardware_contract(..., inventory=probe_gpu_inventory())` before success summary or execution.
+5. Test hardening:
+   - new: `src/dnadesign/infer/tests/runtime/test_capacity_planner.py`
+   - updated:
+     - `src/dnadesign/infer/tests/cli/test_validate_command.py`
+     - `src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py`
+   - fixed stale registry expectation to avoid false failures as model registrations expanded:
+     - `src/dnadesign/infer/tests/package/test_registry_bootstrap_contracts.py`
+
+### Behavior outcomes
+
+1. `evo2_40b` + one ~45 GiB GPU now fails during validate/dry-run with explicit `CAPACITY_FAIL`.
+2. `evo2_7b` + one ~45 GiB GPU passes capacity checks.
+3. Multi-GPU strategy requires explicit minimum GPU count and valid GPU id mapping; no silent fallback to single device.
+
+### Verification evidence
+
+1. Targeted TDD slice:
+   - `uv run pytest -q src/dnadesign/infer/tests/runtime/test_capacity_planner.py src/dnadesign/infer/tests/cli/test_validate_command.py src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py`
+2. Full infer package tests:
+   - `uv run pytest -q src/dnadesign/infer/tests`
+3. Previously hardened docs contract tests remain green:
+   - `uv run pytest -q src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+
+## 2026-03-07 - Phase 2 Slice Y (Ops Harness Hardening + Docs/Runbook Audit)
+
+### Goal
+
+1. Enforce infer topology/capacity contract compatibility in ops runbook planning before submit command rendering.
+2. Audit and harden docs/runbooks so naive operators can build and preflight environments with canonical UV `sync --group/--extra` flows and explicit resource semantics.
+
+### Harness lane and endpoints used
+
+1. Primary lane: `autonomy-hardening`
+2. Secondary lane: `knowledge-refresh`
+3. Endpoints in scope:
+   - `autonomy-capability`
+   - `architecture-invariants`
+   - `knowledge-integrity`
+
+### Ops contract hardening applied
+
+1. Added infer runbook resource contract checks in ops planner:
+   - `src/dnadesign/ops/orchestrator/plan.py`
+   - loads infer `model` contract from runbook config and validates it against runbook GPU resources before preflight command generation.
+2. Added runbook resource field:
+   - `resources.gpu_memory_gib` (optional, positive float)
+   - schema: `src/dnadesign/ops/runbooks/schema.py`
+   - densegen workflows now reject `resources.gpu_memory_gib` alongside other GPU-only keys.
+3. Added infer runbook scaffold default:
+   - `gpu_memory_gib: 45.0` for default infer scaffold
+   - `src/dnadesign/ops/cli.py`
+4. Infer planner capacity behavior:
+   - uses `resources.gpu_memory_gib` when provided;
+   - falls back to capability hints for known class (`gpu_capability=8.9 -> 45.0 GiB`);
+   - fails fast when runbook resources are incompatible with infer model contract (`CAPACITY_FAIL` surface via runbook contract error).
+
+### Infer CLI capacity-check context hardening
+
+1. `infer validate config` now skips hardware-capacity enforcement when no local GPUs are visible and the model targets CUDA; it still validates schema/contracts and prints explicit guidance to use runbook planning for declared resources.
+2. `infer run --dry-run` now skips hardware-capacity enforcement only when no local GPUs are visible; on GPU nodes it still enforces full capacity checks.
+
+### Docs/runbook audit findings and fixes
+
+1. Gap found:
+   - Ops runbook docs did not describe `resources.gpu_memory_gib` or infer model.parallelism/resource preflight interaction.
+2. Fixes:
+   - `docs/operations/orchestration-runbooks.md`
+     - added infer route support for `resources.gpu_memory_gib`;
+     - added explicit infer planner contract rules for model.parallelism/resource validation and capability fallback.
+   - `docs/bu-scc/quickstart.md`
+     - added runbook guidance to set `resources.gpus`, `resources.gpu_capability`, and optional `resources.gpu_memory_gib` for deterministic infer preflight.
+   - `src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md`
+     - clarified that `infer validate config` on GPU-less hosts reports capacity-check skip and points to `ops runbook plan` for declared scheduler-resource preflight.
+3. UV canonical-flow audit:
+   - current docs consistently use `uv sync --locked`, `uv sync --locked --group dev`, and `uv sync --locked --extra infer-evo2` for canonical environment realization;
+   - no active install/runbook paths use `uv pip`.
+
+### Test and evidence updates
+
+1. Added runtime/CLI contract tests:
+   - `src/dnadesign/infer/tests/runtime/test_capacity_planner.py`
+   - `src/dnadesign/infer/tests/cli/test_validate_command.py`
+   - `src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py`
+2. Added ops runbook planner coverage:
+   - `src/dnadesign/ops/tests/test_runbook_orchestrator.py`
+   - includes explicit failure test for `evo2_40b` with single-GPU runbook resources.
+3. Updated docs contract checks:
+   - `src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py`
+   - `src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+4. Verification commands:
+   - `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/ops/tests/test_sge_gates.py src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+   - skill-harness audit: `/usr4/dl523/esouth/.agents/skills/harness-engineering/scripts/audit_skill_contracts.sh`
+
+## 2026-03-07 - Phase 2 Slice Z (Canonical `.venv` GPU Build + Real Evo Smoke + Runtime Bug Fix)
+
+### Goal
+
+Pressure-test the documented SCC GPU build path in the canonical repo UV environment (`/project/dunlop/esouth/dnadesign/.venv`), run a real Evo infer smoke execution, and record operator-facing hardening updates.
+
+### Session and resource evidence
+
+1. Host: `scc-510` interactive session.
+2. Scheduler/session vars: `NSLOTS=4`, `JOB_ID=3655013`, `CUDA_VISIBLE_DEVICES=0`.
+3. GPU class: `NVIDIA L40S` (`46068 MiB`, compute capability `8.9`).
+4. Storage posture:
+   - `/projectnb/dunlop` at `91%` utilization.
+   - `HF_HOME=/projectnb/dunlop/esouth/cache/huggingface`.
+   - Runtime transients routed to `/project/dunlop/esouth/dnadesign/runtime/...`.
+
+### Canonical build execution (actual run)
+
+1. Environment target:
+   - `UV_PROJECT_ENVIRONMENT=/project/dunlop/esouth/dnadesign/.venv`
+2. Toolchain:
+   - `module purge`
+   - `module load cuda/12.8`
+   - `module load gcc/13.2.0`
+3. Build sequence:
+   - `uv sync --locked`
+   - `uv sync --locked --extra infer-evo2 --reinstall-package flash-attn --reinstall-package transformer-engine-torch`
+4. Build evidence:
+   - `flash-attn` built from source (sdist path in lock).
+   - compile phase finished with: `Prepared 2 packages without build isolation in 69m 30s`.
+   - runtime import gate passed:
+     - `torch 2.8.0+cu128`
+     - `transformer-engine 2.11.0`
+     - `flash-attn 2.8.3`
+     - `evo2 0.4.0`
+     - `vtx 1.0.7`
+     - `transformer_engine.pytorch import_ok`
+     - `flash_attn import_ok`
+     - `evo2 import_ok`
+5. Build log path:
+   - `/project/dunlop/esouth/dnadesign/runtime/infer-evo2-canonical-20260307-110609/build.log`
+
+### Real infer smoke execution (model call)
+
+1. Command:
+   - `uv run infer extract --model-id evo2_7b --device cuda:0 --precision bf16 --alphabet dna --batch-size 1 --fn evo2.log_likelihood --format float --seq ACGTACGTACGT --no-progress`
+2. Result:
+   - succeeded (`Outputs for job 'adhoc_extract'`, `out` count `1`, type `float`).
+3. Model cache outcome:
+   - `evo2_7b` downloaded and cached:
+     - `/projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_7b` -> `13G`
+   - existing `evo2_40b` cache retained:
+     - `/projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b` -> `77G`
+
+### 40B capacity behavior in this current allocation
+
+1. Validation check on `evo2_40b` with `cuda:0` in this session fails fast:
+   - `CAPACITY_FAIL model_id=evo2_40b precision=bf16 required_gib=93.1 usable_gib=40.0`
+   - `required_gpus=1 gpus_available=1`
+2. Interpretation:
+   - with current single visible L40S (`CUDA_VISIBLE_DEVICES=0`) this contract is intentionally blocked.
+   - larger/multi-GPU topology must be requested and declared for 40B runtime.
+
+### Runtime bug found during smoke and fixed (TDD)
+
+1. Observed failure on first smoke attempt:
+   - `get_adapter() takes 0 positional arguments but 1 was given`
+2. Root cause:
+   - `runtime.adapter_runtime.get_adapter` had keyword-only `model` while engine/existing call sites pass positional model.
+3. TDD slice:
+   - added failing regression test:
+     - `src/dnadesign/infer/tests/runtime/test_adapter_runtime.py::test_get_adapter_accepts_positional_model_argument`
+   - fixed signature:
+     - `src/dnadesign/infer/src/runtime/adapter_runtime.py`
+     - from `def get_adapter(*, model: ...)` to `def get_adapter(model: ...)`
+   - reran targeted tests: pass.
+
+### UV operator hardening finding
+
+1. `uv sync --locked --group dev` without `--extra infer-evo2` removes GPU infer packages from the same environment realization.
+2. Hardened guidance now requires combined command when both are needed:
+   - `uv sync --locked --group dev --extra infer-evo2`
+
+### Verification commands run
+
+1. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_adapter_runtime.py -k positional`
+2. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_adapter_runtime.py src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py src/dnadesign/infer/tests/cli/test_validate_command.py`
+3. real smoke command listed above (`infer extract` with `evo2_7b`).
+
+## 2026-03-07 - Phase 2 Slice AA (Transient Path Policy Cleanup + Cache Placement Clarification)
+
+### Goal
+
+Enforce repo information architecture by removing top-level transient sprawl and hardening where infer GPU build/runtime artifacts are written.
+
+### Findings
+
+1. Top-level `runtime/` contained UV/flash-attn/triton transient artifacts from environment build and smoke runs.
+2. Current model caches observed in this environment:
+   - `evo2_7b` under current `HF_HOME` (~13G)
+   - `evo2_40b` under current `HF_HOME` (~77G)
+3. With near-full `/projectnb` posture, checkpoint location must be explicit before smoke/pressure runs.
+
+### Decisions and changes
+
+1. Top-level runtime sprawl guard:
+   - added `/.gitignore` rule for `/runtime/`.
+2. SCC install and infer runbook transient routing now uses workspace-scoped runtime paths:
+   - `INFER_WORKSPACE_ROOT=.../src/dnadesign/infer/workspaces/test_stress_ethanol`
+   - `INFER_RUNTIME_ROOT=$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu`
+3. Model cache root is explicitly exported in docs (`HF_HOME`) so checkpoint placement is deterministic and auditable.
+4. Removed repo-root `runtime/` directory from `dnadesign` working tree.
+
+### Operator guidance for next smoke/pressure run
+
+1. Set `HF_HOME` intentionally before run (`/project` vs `/projectnb`) and verify free space.
+2. Keep build/runtime transients under workspace `outputs/runtime/...`.
+3. Run 7B smoke first in the selected cache location before pressure tests.
+
+### Verification notes
+
+1. Repo-root layout now has no `runtime/` directory.
+2. Documentation exports for infer GPU setup now route transients to workspace-scoped paths.

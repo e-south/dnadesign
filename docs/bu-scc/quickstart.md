@@ -1,9 +1,9 @@
 ## BU SCC Quickstart: dnadesign (Interactive -> Batch -> Notify)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-03-07
 
-### At a glance
+### Purpose
 
 **Intent:** Provide one copy/paste path from SCC login through first batch submissions and Notify setup.
 
@@ -82,7 +82,13 @@ Details: [BU SCC Install bootstrap: Clone the repository](install.md#2-clone-the
 export UV_PROJECT_ENVIRONMENT="/projectnb/<project>/$USER/dnadesign/.venv"
 export SCC_SCRATCH="${TMPDIR:-/scratch/$USER}"
 export UV_CACHE_DIR="${UV_CACHE_DIR:-$SCC_SCRATCH/uv-cache}"
-export HF_HOME="${HF_HOME:-/projectnb/<project>/$USER/huggingface}"
+export HF_HOME="${HF_HOME:-/project/<project>/$USER/huggingface}"
+export INFER_WORKSPACE_ROOT="${INFER_WORKSPACE_ROOT:-/project/<project>/$USER/dnadesign/src/dnadesign/infer/workspaces/test_stress_ethanol}"
+export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}"
+export TMPDIR="${TMPDIR:-$INFER_RUNTIME_ROOT/tmp}"
+export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-$INFER_RUNTIME_ROOT/torch-extensions}"
+export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-$INFER_RUNTIME_ROOT/triton-cache}"
+export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-$INFER_RUNTIME_ROOT/pycache}"
 ```
 
 Details: [BU SCC Install bootstrap: Configure environment location and caches](install.md#3-configure-environment-location-and-caches)
@@ -107,7 +113,17 @@ uv sync --locked
 uv sync --locked --extra infer-evo2
 ```
 
+If this same environment also needs test/lint tools:
+
+```bash
+uv sync --locked --group dev --extra infer-evo2
+```
+
 Details: [BU SCC Install bootstrap: Sync dependencies](install.md#5-sync-dependencies)
+
+For Evo2 build controls (`FLASH_ATTENTION_FORCE_BUILD`, `FLASH_ATTN_CUDA_ARCHS`, include-path composition), use:
+- [BU SCC install bootstrap: GPU setup and verification runbook](install.md#gpu-setup-and-verification-runbook)
+- [infer SCC Evo2 GPU environment runbook](../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
 
 ### 6) Smoke tests
 
@@ -121,6 +137,9 @@ PY
 
 For extended TE/FlashAttention/Evo2 checks:
 [BU SCC Install bootstrap: Smoke tests](install.md#6-smoke-tests)
+
+For one-sequence infer execution smoke (`evo2_7b`) and 40B capacity preflight:
+[BU SCC Install bootstrap: Model support](install.md#63-model-support-7b-and-fp8-checkpoints)
 
 ### 6.5) Submission pressure gate (status-first)
 
@@ -193,10 +212,14 @@ qsub -P <project> \
 #### 7.3 Evo2 GPU inference
 
 ```bash
+INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml
 qsub -P <project> \
-  -v CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
+  -v INFER_CONFIG="$INFER_CONFIG",CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
 ```
+
+For runbook-based infer submits, set `runbook.resources.gpus`, `runbook.resources.gpu_capability`, and optionally
+`runbook.resources.gpu_memory_gib` so `ops runbook plan` can fail fast on infeasible multi-GPU model requests before submit.
 
 Template details and overrides:
 [BU SCC job templates](jobs/README.md)

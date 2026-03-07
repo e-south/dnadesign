@@ -99,6 +99,7 @@ def test_infer_operations_index_links_pressure_test_demo_and_runbook() -> None:
     ops_index = _read("src/dnadesign/infer/docs/operations/README.md")
     assert "pressure-test-agnostic-models.md" in ops_index
     assert "../tutorials/demo_pressure_test_usr_ops_notify.md" in ops_index
+    assert "scc-evo2-gpu-uv-runbook.md" in ops_index
 
 
 def test_infer_pressure_test_tutorial_covers_local_and_ops_paths() -> None:

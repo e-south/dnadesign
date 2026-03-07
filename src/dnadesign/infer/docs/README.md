@@ -1,7 +1,7 @@
 ## infer docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-06
+**Last verified:** 2026-03-07
 
 ### Read order
 
@@ -26,7 +26,8 @@
 - [Workspaces guide](../workspaces/README.md): initialize workspace roots with `infer workspace init`.
 
 #### Run scheduler-oriented infer flows
-- [Operations index](operations/README.md): choose no-submit and submit route.
+- [Operations index](operations/README.md): run no-submit preflight, then submit.
+- [SCC Evo2 GPU environment runbook (UV + infer)](operations/scc-evo2-gpu-uv-runbook.md): deterministic GPU environment bootstrap and infer capability verification.
 - [Agnostic-model pressure-test runbook](operations/pressure-test-agnostic-models.md): contract-first ops workflow.
 
 #### Extend and maintain infer internals

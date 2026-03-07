@@ -1,9 +1,9 @@
 ## BU SCC Install: `dnadesign` Interactive Bootstrap (CPU + Evo2 GPU)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-03-07
 
-### At a glance
+### Purpose
 
 **Intent:** One-time environment bootstrap for running `dnadesign` on BU SCC for CPU workflows (for example DenseGen with CBC/Gurobi) and Linux GPU workflows (Evo2 inference stack).
 
@@ -17,10 +17,10 @@
 - Operational monitoring setup (use [BU SCC Batch + Notify runbook](batch-notify.md) and [Notify USR events operator manual](../notify/usr-events.md)).
 - Large model or dataset transfers on compute nodes (use BU data transfer node workflows).
 
-### Choose your path
+### Scope
 
-- Interactive install + smoke tests (this doc).
-- Batch usage + Notify setup ([BU SCC Batch + Notify runbook](batch-notify.md)).
+- This doc covers environment setup and validation for CPU and Evo2 GPU workflows.
+- For batch submission and Notify operations, use [BU SCC Batch + Notify runbook](batch-notify.md).
 
 Run this from an SCC login shell:
 - `ssh <BU_USERNAME>@scc1.bu.edu`
@@ -61,7 +61,7 @@ git clone https://github.com/e-south/dnadesign.git
 cd dnadesign
 ```
 
-Optional reset:
+Reset the local environment only when needed:
 
 ```bash
 rm -rf .venv
@@ -82,16 +82,44 @@ export UV_PROJECT_ENVIRONMENT="/projectnb/<your_project>/$USER/dnadesign/.venv"
 export SCC_SCRATCH="${TMPDIR:-/scratch/$USER}"
 export UV_CACHE_DIR="${UV_CACHE_DIR:-$SCC_SCRATCH/uv-cache}"
 
-# Network robustness for cluster outbound calls
+# Network timeout and retry settings for outbound package fetches
 export UV_HTTP_TIMEOUT="${UV_HTTP_TIMEOUT:-600}"
 export UV_HTTP_RETRIES="${UV_HTTP_RETRIES:-10}"
 
-# Optional: model cache on project storage
-export HF_HOME="${HF_HOME:-/projectnb/<your_project>/$USER/huggingface}"
+# Model cache root (set explicitly to control where checkpoints land)
+export HF_HOME="${HF_HOME:-/project/<your_project>/$USER/huggingface}"
+mkdir -p "$HF_HOME"
 
 printf 'UV_PROJECT_ENVIRONMENT=%s\n' "$UV_PROJECT_ENVIRONMENT"
 printf 'UV_CACHE_DIR=%s\n' "$UV_CACHE_DIR"
 printf 'SCC_SCRATCH=%s\n' "$SCC_SCRATCH"
+```
+
+---
+
+### 3a) Infer runtime transient paths
+
+Keep long-lived model shards in `HF_HOME`, and route infer runtime transients inside the infer workspace so transient outputs stay colocated with the run context.
+
+```bash
+export INFER_WORKSPACE_ROOT="${INFER_WORKSPACE_ROOT:-/project/<your_project>/$USER/dnadesign/src/dnadesign/infer/workspaces/test_stress_ethanol}"
+export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}"
+export TMPDIR="${TMPDIR:-$INFER_RUNTIME_ROOT/tmp}"
+export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-$INFER_RUNTIME_ROOT/torch-extensions}"
+export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-$INFER_RUNTIME_ROOT/triton-cache}"
+export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-$INFER_RUNTIME_ROOT/pycache}"
+
+mkdir -p \
+  "$TMPDIR" \
+  "$TORCH_EXTENSIONS_DIR" \
+  "$TRITON_CACHE_DIR" \
+  "$PYTHONPYCACHEPREFIX"
+
+printf 'TMPDIR=%s\n' "$TMPDIR"
+printf 'TORCH_EXTENSIONS_DIR=%s\n' "$TORCH_EXTENSIONS_DIR"
+printf 'TRITON_CACHE_DIR=%s\n' "$TRITON_CACHE_DIR"
+printf 'PYTHONPYCACHEPREFIX=%s\n' "$PYTHONPYCACHEPREFIX"
+printf 'HF_HOME=%s\n' "$HF_HOME"
 ```
 
 ---
@@ -123,6 +151,140 @@ Use `#!/bin/bash -l` in batch scripts when relying on `module` commands:
 
 ---
 
+### GPU setup and verification runbook
+
+Use this sequence as the default SCC Evo2 infer setup path.
+
+```bash
+cd dnadesign
+
+# Toolchain and compiler roots.
+module purge
+module load cuda/<version>
+module load gcc/<version>
+export CC="$(which gcc)"
+export CXX="$(which g++)"
+export CUDAHOSTCXX="$(which g++)"
+export CUDA_HOME="$(dirname "$(dirname "$(which nvcc)")")"
+
+# Runtime/cache roots.
+export UV_PROJECT_ENVIRONMENT="/projectnb/<your_project>/$USER/dnadesign/.venv"
+export INFER_WORKSPACE_ROOT="${INFER_WORKSPACE_ROOT:-/project/<your_project>/$USER/dnadesign/src/dnadesign/infer/workspaces/test_stress_ethanol}"
+export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}"
+export HF_HOME="${HF_HOME:-/project/<your_project>/$USER/huggingface}"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-$INFER_RUNTIME_ROOT/uv-cache}"
+export TMPDIR="${TMPDIR:-$INFER_RUNTIME_ROOT/tmp}"
+export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-$INFER_RUNTIME_ROOT/torch-extensions}"
+export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-$INFER_RUNTIME_ROOT/triton-cache}"
+export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-$INFER_RUNTIME_ROOT/pycache}"
+mkdir -p \
+  "$UV_CACHE_DIR" \
+  "$TMPDIR" \
+  "$TORCH_EXTENSIONS_DIR" \
+  "$TRITON_CACHE_DIR" \
+  "$PYTHONPYCACHEPREFIX" \
+  "$HF_HOME"
+
+# Prepare Python and base runtime before computing wheel include paths.
+uv python install 3.12
+uv sync --locked
+
+# Include headers from CUDA and NVIDIA wheel packages for TE/flash-attn builds.
+NVIDIA_INCLUDE_DIRS="$("$UV_PROJECT_ENVIRONMENT"/bin/python - <<'PY'
+import site
+from pathlib import Path
+parts = []
+for sp in site.getsitepackages():
+    nvidia = Path(sp) / "nvidia"
+    if nvidia.exists():
+        for include_dir in sorted(nvidia.glob("*/include")):
+            parts.append(str(include_dir))
+print(":".join(parts))
+PY
+)"
+export CPATH="$CUDA_HOME/include${NVIDIA_INCLUDE_DIRS:+:$NVIDIA_INCLUDE_DIRS}${CPATH:+:$CPATH}"
+export CPLUS_INCLUDE_PATH="$CPATH"
+
+# Build controls.
+# Apply the capacity/profile gate in section 6.4 first.
+# These defaults are fallback values.
+export UV_CONCURRENT_BUILDS="${UV_CONCURRENT_BUILDS:-1}"
+export UV_CONCURRENT_INSTALLS="${UV_CONCURRENT_INSTALLS:-1}"
+export MAX_JOBS="${MAX_JOBS:-2}"
+export CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-2}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-2}"
+
+# Keep explicit flags for reproducibility and constrained fallback runs.
+export FLASH_ATTENTION_FORCE_BUILD="${FLASH_ATTENTION_FORCE_BUILD:-TRUE}"
+export FLASH_ATTN_CUDA_ARCHS="${FLASH_ATTN_CUDA_ARCHS:-89}"
+
+# Sync Evo2 GPU stack.
+uv sync --locked --extra infer-evo2
+
+# Verify package + infer wiring with fail-fast imports.
+uv run python - <<'PY'
+import importlib
+import importlib.metadata as im
+import torch
+
+required_dist = ("torch", "transformer-engine", "flash-attn", "evo2", "vtx")
+missing = []
+
+print("cuda_available", torch.cuda.is_available())
+for name in required_dist:
+    try:
+        print(name, im.version(name))
+    except Exception:
+        missing.append(f"missing_dist:{name}")
+
+for module_name in ("transformer_engine.pytorch", "flash_attn", "evo2"):
+    try:
+        importlib.import_module(module_name)
+        print(module_name, "import_ok")
+    except Exception as exc:
+        missing.append(f"import_failed:{module_name}:{type(exc).__name__}:{exc}")
+
+if missing:
+    print("MISSING_REQUIRED")
+    for item in missing:
+        print(item)
+    raise SystemExit(1)
+PY
+uv run infer adapters list
+```
+
+If the verification block prints `MISSING_REQUIRED`, rebuild the two compiled extensions explicitly:
+
+```bash
+uv sync --locked --extra infer-evo2 \
+  --reinstall-package flash-attn \
+  --reinstall-package transformer-engine-torch
+```
+
+### Why these settings are required
+
+- UV dependency model:
+  - `uv sync --locked` installs base runtime only.
+  - `uv sync --locked --extra infer-evo2` adds Evo2 GPU dependencies.
+  - `uv sync --locked --group dev --extra infer-evo2` installs dev tooling and Evo2 GPU dependencies together.
+  - `pyproject.toml` sets `[tool.uv] default-groups = []`, so dev/test groups are opt-in.
+  - use `uv add` / `uv remove` only for dependency declaration changes (`pyproject.toml` + `uv.lock` updates).
+  - use `uv sync --reinstall-package <pkg>` for environment rebuilds without dependency graph changes.
+  - each `uv sync` realizes exactly the requested groups/extras; if `--extra infer-evo2` is omitted later, GPU packages are removed from the environment.
+- explicit compiler/module setup:
+  - Python GPU extension builds require the active `gcc` and `nvcc` toolchain to match headers/libraries on host.
+- explicit transient routing:
+  - infer runtime churn (tmp, torch extensions, triton cache, bytecode) stays out of near-full model storage paths.
+- explicit flash-attn source build controls:
+  - flash-attn is sdist-only in `uv.lock`, so source compilation is expected in the current lock state.
+  - `FLASH_ATTENTION_FORCE_BUILD` and `FLASH_ATTN_CUDA_ARCHS` keep build behavior explicit.
+- explicit include-path composition:
+  - `CPATH` and `CPLUS_INCLUDE_PATH` include CUDA and wheel-provided `nvidia/*/include` headers to avoid missing `nccl.h` and related build failures.
+- fail-fast runtime verification:
+  - `MISSING_REQUIRED` + `raise SystemExit(1)` prevents partial extension installs from being treated as success.
+
+---
+
 ### 5) Sync dependencies
 
 ```bash
@@ -132,6 +294,12 @@ uv sync --locked --extra infer-evo2
 ```
 
 `infer-evo2` is Linux-only and intended for SCC GPU nodes.
+
+If this same environment also needs test/lint tools:
+
+```bash
+uv sync --locked --group dev --extra infer-evo2
+```
 
 ---
 
@@ -182,6 +350,124 @@ PY
 
 ---
 
+#### 6.3 Model support: 7B and FP8 checkpoints
+
+- 7B checkpoints (`evo2_7b`, `evo2_7b_base`, `evo2_7b_262k`) can run without Transformer Engine.
+- FP8 checkpoints (`evo2_20b`, `evo2_40b`, `evo2_40b_base`, `evo2_1b_base`) require Transformer Engine and Hopper-class GPUs.
+- `dnadesign` currently pins torch in the infer extra to `2.8.x`; Evo2 upstream docs recommend `2.6.x` or `2.7.x`. Always run smoke tests after sync on the target host.
+- `infer` currently supports `evo2_7b`, `evo2_20b`, and `evo2_40b`; 400B is not a supported `model.id` in this stack.
+
+```bash
+uv run infer adapters list
+uv run python - <<'PY'
+import importlib.metadata as im
+for name in ("torch", "transformer-engine", "flash-attn", "evo2", "vtx"):
+    try:
+        print(name, im.version(name))
+    except Exception:
+        print(name, "(not installed)")
+PY
+```
+
+Minimal infer execution smoke (`evo2_7b`, one sequence):
+
+```bash
+uv run infer extract \
+  --model-id evo2_7b \
+  --device cuda:0 \
+  --precision bf16 \
+  --alphabet dna \
+  --batch-size 1 \
+  --fn evo2.log_likelihood \
+  --format float \
+  --seq ACGTACGTACGT \
+  --no-progress
+```
+
+40B preflight on one L40S-class GPU should fail fast:
+
+```bash
+uv run infer validate config --config <path_to_evo2_40b_config.yaml>
+# expected shape:
+# CAPACITY_FAIL model_id=evo2_40b precision=bf16 required_gib=... usable_gib=...
+```
+
+---
+
+#### 6.4 Capacity gate and resource profile
+
+Run this once before build or submit. It selects build parallelism from `NSLOTS`, sets `FLASH_ATTN_CUDA_ARCHS` from detected GPU capability, and fails when the requested model/precision is not a safe fit.
+
+```bash
+export TARGET_MODEL_ID="${TARGET_MODEL_ID:-evo2_7b}"
+export TARGET_PRECISION="${TARGET_PRECISION:-bf16}"
+
+eval "$(
+uv run python - <<'PY'
+import os
+import subprocess
+import sys
+
+model_id = os.environ.get("TARGET_MODEL_ID", "evo2_7b")
+precision = os.environ.get("TARGET_PRECISION", "bf16")
+params_b = {"evo2_7b": 7.0, "evo2_20b": 20.0, "evo2_40b": 40.0}
+bytes_per = {"fp32": 4.0, "fp16": 2.0, "bf16": 2.0}
+
+if model_id not in params_b:
+    raise SystemExit(f"Unsupported TARGET_MODEL_ID={model_id}")
+if precision not in bytes_per:
+    raise SystemExit(f"Unsupported TARGET_PRECISION={precision}")
+
+line = subprocess.check_output(
+    ["nvidia-smi", "--query-gpu=memory.total,compute_cap", "--format=csv,noheader,nounits"],
+    text=True,
+).splitlines()[0]
+gpu_total_mib, gpu_cc = [part.strip() for part in line.split(",")]
+gpu_total_gib = int(gpu_total_mib) / 1024.0
+gpu_usable_gib = gpu_total_gib * 0.90
+flash_arch = gpu_cc.replace(".", "")
+
+weight_gib = params_b[model_id] * 1e9 * bytes_per[precision] / (1024.0 ** 3)
+required_gib = weight_gib * 1.25
+if required_gib > gpu_usable_gib:
+    print(
+        "RUN_CAPACITY_FAIL "
+        f"model={model_id} precision={precision} "
+        f"gpu_total_gib={gpu_total_gib:.1f} required_gib={required_gib:.1f}",
+        file=sys.stderr,
+    )
+    print(
+        "single L40S-class 45-48 GiB GPUs are a safe fit for evo2_7b in this infer stack; "
+        "evo2_20b/evo2_40b require additional GPU memory headroom.",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
+
+slots = max(1, int(os.environ.get("NSLOTS", "1")))
+build_jobs = 1 if slots <= 2 else 2 if slots <= 4 else 4
+
+print("export UV_CONCURRENT_BUILDS=1")
+print("export UV_CONCURRENT_INSTALLS=1")
+print(f"export MAX_JOBS={build_jobs}")
+print(f"export CMAKE_BUILD_PARALLEL_LEVEL={build_jobs}")
+print(f"export OMP_NUM_THREADS={build_jobs}")
+print("export FLASH_ATTENTION_FORCE_BUILD=TRUE")
+print(f"export FLASH_ATTN_CUDA_ARCHS={flash_arch}")
+print(
+    "echo RESOURCE_GATE_OK "
+    f"model={model_id} precision={precision} "
+    f"gpu_total_gib={gpu_total_gib:.1f} required_gib={required_gib:.1f} "
+    f"nslots={slots} build_jobs={build_jobs} flash_arch={flash_arch}"
+)
+PY
+)"
+```
+
+Expected result for `TARGET_MODEL_ID=evo2_7b` on one L40S: `RESOURCE_GATE_OK`.
+Expected result for `TARGET_MODEL_ID=evo2_40b` on one L40S: `RUN_CAPACITY_FAIL`.
+
+---
+
 ### 7) Next step
 
 For long jobs, arrays, Notify watchers, and transfer-node workflows, use:
@@ -194,18 +480,39 @@ For long jobs, arrays, Notify watchers, and transfer-node workflows, use:
 Use conservative build caps when TE/flash-attn builds fail due to memory pressure:
 
 ```bash
-export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-8.9}"
+export FLASH_ATTN_CUDA_ARCHS="${FLASH_ATTN_CUDA_ARCHS:-80}"
 export UV_CONCURRENT_BUILDS="${UV_CONCURRENT_BUILDS:-1}"
 export UV_CONCURRENT_INSTALLS="${UV_CONCURRENT_INSTALLS:-1}"
 export MAX_JOBS="${MAX_JOBS:-1}"
 export CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-1}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
 export NVTE_BUILD_THREADS_PER_JOB="${NVTE_BUILD_THREADS_PER_JOB:-1}"
+export FLASH_ATTENTION_FORCE_BUILD="${FLASH_ATTENTION_FORCE_BUILD:-TRUE}"
 ```
 
 If CUDA headers are not discovered during Transformer Engine builds:
 
 ```bash
 export NVTE_CUDA_INCLUDE_PATH="${NVTE_CUDA_INCLUDE_PATH:-$CUDA_HOME/include}"
+```
+
+If Transformer Engine fails on `nccl.h`:
+
+```bash
+NVIDIA_INCLUDE_DIRS="$("$UV_PROJECT_ENVIRONMENT"/bin/python - <<'PY'
+import site
+from pathlib import Path
+parts = []
+for sp in site.getsitepackages():
+    nvidia = Path(sp) / "nvidia"
+    if nvidia.exists():
+        for include_dir in sorted(nvidia.glob("*/include")):
+            parts.append(str(include_dir))
+print(":".join(parts))
+PY
+)"
+export CPATH="$CUDA_HOME/include${NVIDIA_INCLUDE_DIRS:+:$NVIDIA_INCLUDE_DIRS}${CPATH:+:$CPATH}"
+export CPLUS_INCLUDE_PATH="$CPATH"
 ```
 
 #### Optional deep diagnostics (full import + extension checks)

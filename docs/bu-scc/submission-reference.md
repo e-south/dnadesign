@@ -1,6 +1,6 @@
-## BU SCC Agent Cheat Sheet (`dnadesign`)
+## BU SCC Submission Reference (`dnadesign`)
 
-Pragmatic command + resource defaults for BU SCC runs.
+Command and resource defaults for BU SCC runs.
 
 Use this with:
 - `docs/bu-scc/quickstart.md`

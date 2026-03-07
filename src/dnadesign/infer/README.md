@@ -12,12 +12,13 @@ Read in this order:
 4. [CLI quickstart](docs/getting-started/cli-quickstart.md)
 5. [workspaces guide](workspaces/README.md)
 6. [operations index](docs/operations/README.md)
-7. [agnostic-model pressure-test runbook](docs/operations/pressure-test-agnostic-models.md)
-8. [end-to-end pressure-test demo (infer + usr + ops + notify)](docs/tutorials/demo_pressure_test_usr_ops_notify.md)
-9. [reference index](docs/reference/README.md)
-10. [source-tree map](src/README.md)
-11. [developer docs](docs/dev/README.md)
-12. [repository docs index](../../../docs/README.md)
+7. [SCC Evo2 GPU environment runbook](docs/operations/scc-evo2-gpu-uv-runbook.md)
+8. [agnostic-model pressure-test runbook](docs/operations/pressure-test-agnostic-models.md)
+9. [end-to-end pressure-test demo (infer + usr + ops + notify)](docs/tutorials/demo_pressure_test_usr_ops_notify.md)
+10. [reference index](docs/reference/README.md)
+11. [source-tree map](src/README.md)
+12. [developer docs](docs/dev/README.md)
+13. [repository docs index](../../../docs/README.md)
 
 ## Entrypoint contract
 

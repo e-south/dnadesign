@@ -4,7 +4,7 @@ These scripts are submit-ready templates for BU SCC SGE jobs:
 
 - `densegen-cpu.qsub`: DenseGen CPU batch run
 - `densegen-analysis.qsub`: post-run DenseGen analysis (plots)
-- `evo2-gpu-infer.qsub`: Evo2 GPU smoke/inference job shell
+- `evo2-gpu-infer.qsub`: Evo2 GPU infer batch run
 - `notify-watch.qsub`: Notify watcher for USR `.events.log`
 
 ### Quick start
@@ -20,7 +20,9 @@ qsub -P <project> \
   -hold_jid <densegen_cpu_job_name_or_id> \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/densegen-analysis.qsub
-qsub -P <project> docs/bu-scc/jobs/evo2-gpu-infer.qsub
+qsub -P <project> \
+  -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml \
+  docs/bu-scc/jobs/evo2-gpu-infer.qsub
 qsub -P <project> docs/bu-scc/jobs/notify-watch.qsub
 ```
 
@@ -107,9 +109,18 @@ For large campaigns with `runtime.round_robin: true`, avoid tiny turn caps:
 
 ```bash
 qsub -P <project> \
-  -v CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
+  -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml,CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
 ```
+
+`evo2-gpu-infer.qsub` command defaults:
+- fail-fast gate: `INFER_CONFIG` is required
+- preflight: `uv run infer validate config --config "$INFER_CONFIG"`
+- run: `uv run infer run --config "$INFER_CONFIG"`
+
+Before first submit on a host, run deterministic environment bootstrap:
+- [BU SCC install GPU setup and verification runbook](../install.md#gpu-setup-and-verification-runbook)
+- [infer SCC Evo2 GPU environment runbook](../../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
 
 ### Notify watcher submissions
 

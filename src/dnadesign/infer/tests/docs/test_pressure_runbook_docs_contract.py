@@ -39,3 +39,7 @@ def test_pressure_runbook_docs_include_standalone_and_ops_paths() -> None:
     assert "--with-notify" in doc
     assert "outputs/logs/ops/audit/" in doc
     assert "infer__<model_id>__<job_id>__<out_id>" in doc
+    lowered = doc.lower()
+    assert "path a:" not in lowered
+    assert "path b:" not in lowered
+    assert "path c:" not in lowered

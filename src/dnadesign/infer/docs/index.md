@@ -1,7 +1,7 @@
 ## infer docs index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-06
+**Last verified:** 2026-03-07
 
 Use [docs/README.md](README.md) as the workflow-first entrypoint. This page is a compact by-type index.
 
@@ -17,6 +17,7 @@ Use [docs/README.md](README.md) as the workflow-first entrypoint. This page is a
 ### Operations
 
 - [Operations index](operations/README.md)
+- [SCC Evo2 GPU environment runbook (UV + infer)](operations/scc-evo2-gpu-uv-runbook.md)
 - [Agnostic-model pressure-test runbook](operations/pressure-test-agnostic-models.md)
 - [Workspaces guide](../workspaces/README.md)
 

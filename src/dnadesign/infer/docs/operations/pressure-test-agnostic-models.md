@@ -2,14 +2,16 @@
 
 This guide pressure-tests infer as a model-agnostic extraction engine with explicit namespace contracts and USR write-back.
 
-For a step-by-step walkthrough route, use the [end-to-end demo tutorial](../tutorials/demo_pressure_test_usr_ops_notify.md).
+For a full walkthrough, use the [end-to-end demo tutorial](../tutorials/demo_pressure_test_usr_ops_notify.md).
+
+For deterministic SCC GPU environment setup before pressure runs, use the [SCC Evo2 GPU environment runbook](scc-evo2-gpu-uv-runbook.md).
 
 ### Objective
 
 - run extract jobs that produce multiple outputs (for example logits + log-likelihood ratio variants),
 - ensure outputs attach to USR with infer-prefixed namespaced columns:
   - `infer__<model_id>__<job_id>__<out_id>`
-- support both standalone CLI usage and ops runbook orchestration paths.
+- support local CLI execution and ops runbook orchestration.
 
 ### Safety Posture
 
@@ -17,9 +19,9 @@ For a step-by-step walkthrough route, use the [end-to-end demo tutorial](../tuto
 - Use read-only scheduler checks before submit (`qstat -u "$USER"`).
 - Keep `ingest.root` explicit for workspace and cluster runs.
 
-## Path A: Standalone CLI Pressure Test
+## Ordered procedure
 
-### 1) Prepare variables
+### 1) Prepare workspace and variables
 
 ```bash
 uv run infer workspace init --id test_stress_ethanol --profile usr-pressure
@@ -36,7 +38,7 @@ uv run infer validate config --config "$INFER_CONFIG"
 uv run infer run --config "$INFER_CONFIG" --dry-run
 ```
 
-### 3) Execute pressure test (local CLI)
+### 3) Execute local pressure test
 
 ```bash
 uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr
@@ -49,9 +51,7 @@ uv run usr --root "$USR_ROOT" head "$DATASET_ID" -n 5
 uv run usr --root "$USR_ROOT" events tail "$DATASET_ID" -n 20
 ```
 
-## Path B: Ops Runbook Pressure Test (Cluster-Friendly)
-
-### 1) Scaffold infer runbook
+### 5) Initialize infer ops runbook
 
 ```bash
 uv run ops runbook init \
@@ -62,23 +62,18 @@ uv run ops runbook init \
   --no-notify
 ```
 
-### 2) Plan and inspect command graph
+### 6) Plan and execute no-submit preflight
 
 ```bash
 uv run ops runbook precedents
 uv run ops runbook plan --runbook "$WORKSPACE_ROOT/infer-pressure.runbook.yaml"
-```
-
-### 3) Execute no-submit pressure pass
-
-```bash
 uv run ops runbook execute \
   --runbook "$WORKSPACE_ROOT/infer-pressure.runbook.yaml" \
   --audit-json "$WORKSPACE_ROOT/outputs/logs/ops/audit/infer-pressure.audit.json" \
   --no-submit
 ```
 
-### 4) Submit only after preflight passes
+### 7) Submit after preflight passes
 
 ```bash
 qstat -u "$USER"
@@ -88,9 +83,9 @@ uv run ops runbook execute \
   --submit
 ```
 
-### 5) Optional notify-enabled variant
+### 8) Enable notify in the same runbook when needed
 
-If you need notify smoke/watcher phases, first configure webhook secret wiring (for example by setting a readable `NOTIFY_WEBHOOK_FILE` path), then re-init with notify enabled:
+First configure webhook secret wiring (for example by setting a readable `NOTIFY_WEBHOOK_FILE` path), then re-initialize the same runbook:
 
 ```bash
 uv run ops runbook init \
@@ -102,7 +97,7 @@ uv run ops runbook init \
   --force
 ```
 
-## Path C: Independent Ad-Hoc CLI Extract
+### 9) Run focused ad-hoc extract checks when isolating issues
 
 ```bash
 uv run infer extract \
@@ -114,5 +109,3 @@ uv run infer extract \
   --field sequence \
   --write-back
 ```
-
-Use this path for focused troubleshooting when runbook orchestration is unnecessary.
