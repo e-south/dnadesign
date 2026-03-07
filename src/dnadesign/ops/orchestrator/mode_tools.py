@@ -17,10 +17,13 @@ from typing import Callable, Literal
 
 from dnadesign._contracts import resolve_usr_producer_contract
 
-from ..runbooks.schema import (
-    OrchestrationRunbookV1,
-    list_workflow_tools,
-    resolve_workflow_tool,
+from ..runbooks.schema import OrchestrationRunbookV1
+from .workflow_tools import (
+    list_registered_workflow_tools,
+    register_workflow_tool_adapter,
+    resolve_workflow_tool_adapter_for_runbook,
+    resolve_workflow_tool_adapter_for_workflow_id,
+    validate_workflow_tool_registry,
 )
 
 ResolvedMode = Literal["fresh", "resume"]
@@ -136,28 +139,20 @@ _MODE_TOOL_ADAPTERS: dict[str, ModeToolAdapter] = {}
 
 
 def register_mode_tool_adapter(tool: str, adapter: ModeToolAdapter) -> None:
-    tool_name = str(tool or "").strip().lower()
-    if not tool_name:
-        raise ValueError("mode tool adapter tool must be non-empty")
-    if adapter.tool != tool_name:
-        raise ValueError(f"mode tool adapter tool mismatch: expected {tool_name}, got {adapter.tool}")
-    if tool_name in _MODE_TOOL_ADAPTERS:
-        raise ValueError(f"mode tool adapter already registered for tool: {tool_name}")
-    _MODE_TOOL_ADAPTERS[tool_name] = adapter
+    register_workflow_tool_adapter(
+        _MODE_TOOL_ADAPTERS,
+        contract_name="mode tool adapter",
+        tool=tool,
+        adapter=adapter,
+    )
 
 
 def list_registered_mode_tools() -> tuple[str, ...]:
-    return tuple(sorted(_MODE_TOOL_ADAPTERS))
+    return list_registered_workflow_tools(_MODE_TOOL_ADAPTERS)
 
 
 def _validate_mode_tool_registry() -> None:
-    registered_tools = list_registered_mode_tools()
-    expected_tools = list_workflow_tools()
-    if registered_tools != expected_tools:
-        raise RuntimeError(
-            "mode tool registry does not match workflow tool set "
-            f"(registered={registered_tools}, expected={expected_tools})"
-        )
+    validate_workflow_tool_registry(_MODE_TOOL_ADAPTERS, contract_name="mode tool adapter")
 
 
 register_mode_tool_adapter(
@@ -180,27 +175,16 @@ _validate_mode_tool_registry()
 
 
 def resolve_mode_tool_adapter_for_workflow_id(workflow_id: str) -> ModeToolAdapter:
-    tool = resolve_workflow_tool(workflow_id)
-    adapter = _MODE_TOOL_ADAPTERS.get(tool)
-    if adapter is None:
-        raise ValueError(f"missing mode tool adapter for workflow tool: {tool}")
-    return adapter
+    return resolve_workflow_tool_adapter_for_workflow_id(
+        _MODE_TOOL_ADAPTERS,
+        contract_name="mode tool adapter",
+        workflow_id=workflow_id,
+    )
 
 
 def resolve_mode_tool_adapter(runbook: OrchestrationRunbookV1) -> ModeToolAdapter:
-    adapter = resolve_mode_tool_adapter_for_workflow_id(runbook.workflow_id)
-
-    active_tools: list[str] = []
-    if runbook.densegen is not None:
-        active_tools.append("densegen")
-    if runbook.infer is not None:
-        active_tools.append("infer")
-    if len(active_tools) != 1:
-        raise ValueError("runbook workload contract must define exactly one tool block")
-    selected_tool = active_tools[0]
-    if selected_tool != adapter.tool:
-        raise ValueError(
-            "runbook workload contract does not match workflow tool "
-            f"(workflow_id={runbook.workflow_id}, workflow_tool={adapter.tool}, workload_block={selected_tool})"
-        )
-    return adapter
+    return resolve_workflow_tool_adapter_for_runbook(
+        _MODE_TOOL_ADAPTERS,
+        contract_name="mode tool adapter",
+        runbook=runbook,
+    )

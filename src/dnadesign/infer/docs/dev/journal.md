@@ -4112,3 +4112,56 @@ Reduce remaining tool branching in ops plan rendering by extracting workflow-spe
 1. Ops plan rendering now has an explicit adapter seam parallel to mode resolution.
 2. Tool onboarding path is narrower: add schema workflow-tool mapping plus plan/mode adapter registrations instead of editing `plan.py` branching sites.
 3. `plan.py` now owns common orchestration rendering while `plan_tools.py` owns workflow-specific command planning.
+
+## 2026-03-07 - Phase 2 Slice AW (Shared Workflow-Tool Contracts For Ops)
+
+### Goal
+
+Remove the remaining duplicated workflow-tool registry and runbook-tool resolution logic from `mode_tools.py` and `plan_tools.py` so ops has one fail-fast contract seam for workflow-tool registration, coverage, and workload-block validation.
+
+### Prioritized findings
+
+1. High: `mode_tools.py` and `plan_tools.py` duplicated tool-name normalization, duplicate-registration guards, schema coverage validation, workflow-id resolution, and runbook workload-block checks.
+2. Medium: the duplicated workload-block logic still hard-coded `densegen` and `infer` in two modules, which would drift again on future tool onboarding.
+3. Medium: there was no direct unit test for the shared workflow-tool contract itself; only module-specific tests existed.
+
+### TDD sequence
+
+1. Red:
+   - added `src/dnadesign/ops/tests/test_workflow_tools.py`.
+   - confirmed failure during collection because `dnadesign.ops.orchestrator.workflow_tools` did not yet exist.
+2. Green:
+   - added `src/dnadesign/ops/orchestrator/workflow_tools.py`.
+   - moved shared registration, listing, schema coverage validation, workflow-id resolution, and runbook workload-tool resolution into that module.
+   - rewired `mode_tools.py` and `plan_tools.py` to delegate to the shared workflow-tool contract functions.
+   - made workload-tool detection iterate the canonical schema workflow-tool set instead of re-spelling tool names locally.
+3. Verify:
+   - focused shared-contract tests pass.
+   - existing mode-tool, plan-tool, runbook orchestration, and notify suites remain green.
+
+### Changes applied
+
+1. `src/dnadesign/ops/orchestrator/workflow_tools.py`
+   - new shared workflow-tool contract module.
+   - generic fail-fast registration and registry/schema validation helpers.
+   - canonical runbook workload-tool resolution and adapter lookup helpers.
+2. `src/dnadesign/ops/orchestrator/mode_tools.py`
+   - removed duplicated registry and runbook workload-block logic.
+   - now delegates public mode-tool API behavior to `workflow_tools.py`.
+3. `src/dnadesign/ops/orchestrator/plan_tools.py`
+   - removed duplicated registry and runbook workload-block logic.
+   - now delegates public plan-tool API behavior to `workflow_tools.py`.
+4. `src/dnadesign/ops/tests/test_workflow_tools.py`
+   - new direct contract tests for the shared workflow-tool seam.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_tools.py`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_tools.py src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_plan_tools.py`
+3. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_tools.py src/dnadesign/ops/tests/test_mode_tools.py src/dnadesign/ops/tests/test_plan_tools.py src/dnadesign/ops/tests/test_runbook_orchestrator.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+
+### Contract impact
+
+1. Ops now has one source of truth for workflow-tool adapter registration semantics.
+2. Both mode resolution and plan rendering share the same fail-fast workload-block validation path.
+3. Future tool onboarding now requires fewer edit sites and has one explicit place to enforce schema-to-adapter coverage.
