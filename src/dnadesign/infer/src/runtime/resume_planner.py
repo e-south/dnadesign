@@ -17,6 +17,8 @@ from typing import Dict, List, Tuple
 from ..contracts import infer_usr_column_name
 from ..errors import WriteBackError
 
+_RESUME_FILTER_CHUNK_SIZE = 10_000
+
 
 def _dedupe_ids(ids: List[str]) -> List[str]:
     seen: set[str] = set()
@@ -38,7 +40,15 @@ def _positions_by_id(ids: List[str]) -> Dict[str, List[int]]:
 
 
 def _read_subset_table(*, pq, path: Path, columns: List[str], ids: List[str]):
-    return pq.read_table(path, columns=columns, filters=[("id", "in", _dedupe_ids(ids))])
+    unique_ids = _dedupe_ids(ids)
+    if len(unique_ids) <= _RESUME_FILTER_CHUNK_SIZE:
+        return (pq.read_table(path, columns=columns, filters=[("id", "in", unique_ids)]),)
+
+    tables = []
+    for start in range(0, len(unique_ids), _RESUME_FILTER_CHUNK_SIZE):
+        id_chunk = unique_ids[start : start + _RESUME_FILTER_CHUNK_SIZE]
+        tables.append(pq.read_table(path, columns=columns, filters=[("id", "in", id_chunk)]))
+    return tuple(tables)
 
 
 def _merge_table_values(
@@ -97,20 +107,20 @@ def plan_resume_for_usr(
         records_columns = set(records_parquet.schema_arrow.names)  # type: ignore[attr-defined]
         selected_columns = ["id"] + [name for name in infer_cols.values() if name in records_columns]
         if len(selected_columns) > 1:
-            records_table = _read_subset_table(
+            for records_table in _read_subset_table(
                 pq=pq,
                 path=Path(records_path),
                 columns=selected_columns,
                 ids=ids,
-            )
-            _merge_table_values(
-                existing=existing,
-                outputs=outputs,
-                infer_cols=infer_cols,
-                table=records_table,
-                positions=id_positions,
-                only_non_null=False,
-            )
+            ):
+                _merge_table_values(
+                    existing=existing,
+                    outputs=outputs,
+                    infer_cols=infer_cols,
+                    table=records_table,
+                    positions=id_positions,
+                    only_non_null=False,
+                )
 
         if hasattr(ds, "list_overlays"):
             overlays = ds.list_overlays()  # type: ignore[attr-defined]
@@ -121,20 +131,20 @@ def plan_resume_for_usr(
                 overlay_columns = set(overlay_parquet.schema_arrow.names)
                 selected_overlay_columns = ["id"] + [name for name in infer_cols.values() if name in overlay_columns]
                 if len(selected_overlay_columns) > 1:
-                    overlay_table = _read_subset_table(
+                    for overlay_table in _read_subset_table(
                         pq=pq,
                         path=overlay_path,
                         columns=selected_overlay_columns,
                         ids=ids,
-                    )
-                    _merge_table_values(
-                        existing=existing,
-                        outputs=outputs,
-                        infer_cols=infer_cols,
-                        table=overlay_table,
-                        positions=id_positions,
-                        only_non_null=True,
-                    )
+                    ):
+                        _merge_table_values(
+                            existing=existing,
+                            outputs=outputs,
+                            infer_cols=infer_cols,
+                            table=overlay_table,
+                            positions=id_positions,
+                            only_non_null=True,
+                        )
     except Exception as exc:
         raise WriteBackError(f"USR resume scan failed for records table {ds.records_path}: {exc}") from exc
 
