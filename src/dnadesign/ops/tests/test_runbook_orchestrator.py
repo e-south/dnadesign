@@ -2298,6 +2298,9 @@ def test_cli_runbook_init_creates_valid_densegen_contract(tmp_path: Path) -> Non
     assert raw_payload["runbook"]["densegen"]["archived_overlay_guard"]["max_archived_entries"] == 1000
     assert raw_payload["runbook"]["densegen"]["archived_overlay_guard"]["max_archived_bytes"] == 2147483648
     assert raw_payload["runbook"]["notify"]["policy"] == "generic"
+    assert "Notify contract required before planning" in result.stderr
+    assert "NOTIFY_WEBHOOK_FILE" in result.stderr
+    assert str(workspace_root / "outputs" / "notify" / "densegen" / "profile.json") in result.stderr
 
 
 def test_cli_runbook_init_supports_densegen_without_notify(tmp_path: Path) -> None:
@@ -2353,6 +2356,37 @@ def test_cli_runbook_init_generates_infer_notify_scaffold_with_generic_policy(tm
     raw_payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
     assert raw_payload["runbook"]["notify"]["tool"] == "infer"
     assert raw_payload["runbook"]["notify"]["policy"] == "generic"
+    assert "Notify contract required before planning" in result.stderr
+    assert "NOTIFY_WEBHOOK_FILE" in result.stderr
+    assert str(workspace_root / "outputs" / "notify" / "infer" / "profile.json") in result.stderr
+
+
+def test_cli_runbook_init_without_notify_emits_no_notify_contract_warning(tmp_path: Path) -> None:
+    runbook_path = tmp_path / "contracts" / "infer-runbook.yaml"
+    workspace_root = tmp_path / "workspace_infer"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "init",
+            "--workflow",
+            "infer",
+            "--runbook",
+            str(runbook_path),
+            "--workspace-root",
+            str(workspace_root),
+            "--project",
+            "dunlop",
+            "--id",
+            "infer_demo",
+            "--no-notify",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Notify contract required before planning" not in result.stderr
 
 
 def test_cli_runbook_init_applies_resource_overrides(tmp_path: Path) -> None:

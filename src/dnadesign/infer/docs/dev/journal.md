@@ -4386,3 +4386,49 @@ Continue shrinking ops runbook coupling by extracting resolved-path rewriting ou
 1. Resolved-path rewriting is now a distinct loader concern instead of living inside the schema module.
 2. Workflow metadata is now the only non-test runtime site that spells concrete orchestration workflow IDs.
 3. Notify-enabled runbook planning remains fail-fast when the notify secret contract is missing; there is still no hidden fallback.
+
+## 2026-03-07 - Phase 2 Slice BB (Notify Scaffold Contract Warning At Init Time)
+
+### Goal
+
+Keep notify enabled by default for ops runbook scaffolding while making the notify prerequisite explicit at `runbook init` time instead of letting a naive operator discover it only when `runbook plan` fails.
+
+### Prioritized findings
+
+1. High: default notify-enabled runbook scaffolds were valid YAML, but the first real `ops runbook plan` would fail if no notify secret contract was configured.
+2. Medium: `runbook init` only printed the path to the generated file, which preserved scriptability but gave no operator guidance about the next required notify setup step.
+3. Medium: disabling notify by default would reduce the footgun, but it would move the default away from the common intended workflow.
+
+### TDD sequence
+
+1. Red:
+   - updated densegen and infer `runbook init` tests to require a notify contract warning on `stderr`.
+   - added a negative test ensuring `--no-notify` emits no warning.
+   - confirmed the notify-enabled tests failed because no warning existed.
+2. Green:
+   - added `_render_notify_contract_warning(...)` to `src/dnadesign/ops/cli.py`.
+   - `runbook init` now prints the generated runbook path on `stdout` and the notify prerequisite on `stderr` when notify scaffolding is included.
+3. Verify:
+   - targeted CLI tests pass.
+   - full ops and notify suites remain green.
+   - real CLI invocation shows the path on `stdout` and the notify prerequisite on `stderr`.
+
+### Changes applied
+
+1. `src/dnadesign/ops/cli.py`
+   - added an explicit notify setup warning for notify-enabled scaffolds.
+2. `src/dnadesign/ops/tests/test_runbook_orchestrator.py`
+   - added CLI coverage for notify warning presence and absence.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "cli_runbook_init_creates_valid_densegen_contract or cli_runbook_init_generates_infer_notify_scaffold_with_generic_policy or cli_runbook_init_without_notify_emits_no_notify_contract_warning"`
+2. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+3. Real CLI path:
+   - `uv run ops runbook init --workflow infer --runbook <tmp>/contracts/infer-runbook.yaml --workspace-root <tmp>/workspace --project dunlop --id infer_demo`
+
+### Contract impact
+
+1. Notify remains the default scaffold path.
+2. The notify prerequisite is now explicit at init time rather than only surfacing later during planning.
+3. `stdout` remains machine-friendly because the generated runbook path is unchanged there; the warning is emitted on `stderr`.

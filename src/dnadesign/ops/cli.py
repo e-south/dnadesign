@@ -78,6 +78,15 @@ def _resolve_repo_base(repo_root: Path | None) -> Path:
     return repo_root.expanduser().resolve()
 
 
+def _render_notify_contract_warning(*, workspace_root: Path, notify_tool: str) -> str:
+    profile_path = (workspace_root / "outputs" / "notify" / notify_tool / "profile.json").resolve()
+    return (
+        "Notify contract required before planning.\n"
+        "Set NOTIFY_WEBHOOK_FILE to a readable file path, or configure "
+        f"{profile_path} with webhook.source=secret_ref and a file:// secret reference."
+    )
+
+
 def _validate_runbook_output_path_for_init(*, runbook_path: Path, repo_base: Path) -> None:
     resolved_repo_base = repo_base.resolve()
     resolved_runbook = runbook_path.resolve()
@@ -378,6 +387,14 @@ def runbook_init(
     runbook_path.parent.mkdir(parents=True, exist_ok=True)
     runbook_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     typer.echo(str(runbook_path.resolve()))
+    if with_notify:
+        typer.echo(
+            _render_notify_contract_warning(
+                workspace_root=resolved_workspace_root,
+                notify_tool=resolve_workflow_tool(workflow_id=payload["runbook"]["workflow_id"]),
+            ),
+            err=True,
+        )
 
 
 @runbook_app.command("precedents")
