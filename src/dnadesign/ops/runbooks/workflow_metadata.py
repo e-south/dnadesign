@@ -87,6 +87,19 @@ def resolve_workflow_tool(workflow_id: str) -> WorkflowTool:
     return resolve_workflow_metadata(workflow_id).tool
 
 
+def resolve_workflow_id(*, tool: WorkflowTool, with_notify: bool) -> OrchestrationWorkflowId:
+    matches = [
+        metadata.workflow_id
+        for metadata in _WORKFLOW_METADATA_BY_ID.values()
+        if metadata.tool == tool and metadata.requires_notify is with_notify
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"workflow metadata must define exactly one workflow for tool={tool} with_notify={with_notify}"
+        )
+    return matches[0]
+
+
 def is_densegen_workflow_id(workflow_id: str) -> bool:
     metadata = _WORKFLOW_METADATA_BY_ID.get(str(workflow_id or "").strip())
     return metadata is not None and metadata.tool == "densegen"

@@ -30,6 +30,7 @@ from .runbooks.path_policy import (
     WORKSPACE_SGE_STDOUT_RELATIVE_DIR,
 )
 from .runbooks.schema import load_orchestration_runbook
+from .runbooks.workflow_metadata import resolve_workflow_id, resolve_workflow_tool
 
 app = typer.Typer(
     add_completion=True,
@@ -138,10 +139,7 @@ def _build_init_payload(
     infer_qsub_template: str,
 ) -> dict[str, object]:
     workspace_contract = Path(_contract_path(workspace_root, runbook_parent=runbook_parent))
-    if workflow == "densegen":
-        workflow_id = "densegen_batch_with_notify_slack" if with_notify else "densegen_batch_submit"
-    else:
-        workflow_id = "infer_batch_with_notify_slack" if with_notify else "infer_batch_submit"
+    workflow_id = resolve_workflow_id(tool=workflow, with_notify=with_notify)
     payload: dict[str, object] = {
         "runbook": {
             "schema_version": 1,
@@ -163,7 +161,7 @@ def _build_init_payload(
         }
     }
     if with_notify:
-        notify_tool = "densegen" if workflow == "densegen" else "infer"
+        notify_tool = resolve_workflow_tool(workflow_id)
         payload["runbook"]["notify"] = {
             "tool": notify_tool,
             "policy": "generic",

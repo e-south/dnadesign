@@ -4326,3 +4326,63 @@ Remove the remaining single-tool bias from ops runbook defaults and continue shr
 1. Notify policy is now tool-neutral by default.
 2. Both densegen and infer scaffolded runbooks use the same neutral notify policy baseline.
 3. Schema loading and workspace layout enforcement now have separate modules and separate responsibilities.
+
+## 2026-03-07 - Phase 2 Slice BA (Extracted Runbook Path Resolution And Metadata-Driven Workflow IDs)
+
+### Goal
+
+Continue shrinking ops runbook coupling by extracting resolved-path rewriting out of `schema.py` and making workflow metadata the canonical source for workflow ID selection during CLI scaffolding.
+
+### Prioritized findings
+
+1. High: `src/dnadesign/ops/runbooks/schema.py` still owned relative-path rewriting and repo-template resolution in addition to schema loading and validation.
+2. Medium: `src/dnadesign/ops/cli.py` still hardcoded workflow IDs for densegen and infer scaffolding even after workflow metadata had become the canonical runbook semantics surface.
+3. Medium: a real `ops runbook init` -> `ops runbook plan` path for notify-enabled infer scaffolds fails fast without a notify secret contract. This is explicit and correct, but it remains a UX prerequisite that the docs and operators must account for.
+
+### TDD sequence
+
+1. Red:
+   - added a direct workflow metadata test for `resolve_workflow_id(tool=..., with_notify=...)`.
+   - added a direct orchestrator test requiring a dedicated `runbook_paths` module.
+   - confirmed both failed because neither seam existed.
+2. Green:
+   - added `src/dnadesign/ops/runbooks/runbook_paths.py`.
+   - moved resolved-path rewriting and default densegen post-run template resolution there.
+   - added `resolve_workflow_id(...)` to `src/dnadesign/ops/runbooks/workflow_metadata.py`.
+   - rewired `src/dnadesign/ops/runbooks/schema.py` to call `resolve_runbook_paths(...)`.
+   - rewired `src/dnadesign/ops/cli.py` to derive `workflow_id` and `notify.tool` from workflow metadata rather than local string branching.
+3. Verify:
+   - targeted tests for the two new seams pass.
+   - broader ops and notify suites remain green.
+   - runtime grep shows workflow ID literals now live only in `workflow_metadata.py` outside tests.
+
+### Changes applied
+
+1. `src/dnadesign/ops/runbooks/runbook_paths.py`
+   - new resolved-path rewriting module for runbook loading.
+2. `src/dnadesign/ops/runbooks/workflow_metadata.py`
+   - added metadata-backed `resolve_workflow_id(...)`.
+3. `src/dnadesign/ops/runbooks/schema.py`
+   - removed inline path resolution helpers and delegated to `runbook_paths`.
+4. `src/dnadesign/ops/cli.py`
+   - runbook scaffolding now derives workflow ID and notify tool from metadata.
+5. `src/dnadesign/ops/tests/test_workflow_metadata.py`
+   - added direct workflow ID resolution contract coverage.
+6. `src/dnadesign/ops/tests/test_runbook_orchestrator.py`
+   - added direct coverage that the extracted runbook path module exists as a loader seam.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_metadata.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "resolve_workflow_id_for_tool_and_notify_contract or runbook_path_resolution_module_is_available"`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_workflow_metadata.py src/dnadesign/ops/tests/test_runbook_layout.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "workflow_metadata or runbook_path_resolution_module_is_available or runbook_relative_paths_resolve_against_runbook_parent or runbook_default_post_run_template_resolves_to_repo_jobs_template or cli_runbook_init_creates_valid_densegen_contract or cli_runbook_init_generates_infer_notify_scaffold_with_generic_policy or notify_policy_defaults_to_generic_when_omitted"`
+3. `rg -n 'densegen_batch_submit|densegen_batch_with_notify_slack|infer_batch_submit|infer_batch_with_notify_slack' src/dnadesign/ops -g'*.py' -g'!**/tests/**'`
+4. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+5. Real CLI path:
+   - `uv run ops runbook init --workflow infer --runbook <tmp>/contracts/infer-runbook.yaml --workspace-root <tmp>/workspace --project dunlop --id infer_demo --no-notify`
+   - `uv run ops runbook plan --runbook <tmp>/contracts/infer-runbook.yaml --no-discover-active-jobs`
+
+### Contract impact
+
+1. Resolved-path rewriting is now a distinct loader concern instead of living inside the schema module.
+2. Workflow metadata is now the only non-test runtime site that spells concrete orchestration workflow IDs.
+3. Notify-enabled runbook planning remains fail-fast when the notify secret contract is missing; there is still no hidden fallback.

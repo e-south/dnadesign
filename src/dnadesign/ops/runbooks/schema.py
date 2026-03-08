@@ -20,6 +20,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from .runbook_layout import enforce_workspace_layout
+from .runbook_paths import DENSEGEN_POST_RUN_TEMPLATE_DEFAULT, resolve_runbook_paths
 from .workflow_metadata import (
     NotifyPolicy,
     OrchestrationWorkflowId,
@@ -34,7 +35,6 @@ from .workflow_metadata import (
 _HRT_PATTERN = re.compile(r"^[0-9]{2}:[0-9]{2}:[0-9]{2}$")
 _SLUG_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _USR_OVERLAY_NAMESPACE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
-_DENSEGEN_POST_RUN_TEMPLATE_DEFAULT = Path("docs/bu-scc/jobs/densegen-analysis.qsub")
 
 
 class StrictBaseModel(BaseModel):
@@ -88,7 +88,7 @@ def _default_densegen_post_run_resources() -> CpuResourceContract:
 
 
 class DensegenPostRunContract(StrictBaseModel):
-    qsub_template: Path = _DENSEGEN_POST_RUN_TEMPLATE_DEFAULT
+    qsub_template: Path = DENSEGEN_POST_RUN_TEMPLATE_DEFAULT
     resources: CpuResourceContract = Field(default_factory=_default_densegen_post_run_resources)
 
     @field_validator("qsub_template")
@@ -310,96 +310,6 @@ class OrchestrationRunbookV1(StrictBaseModel):
 class OrchestrationRunbookRoot(StrictBaseModel):
     runbook: OrchestrationRunbookV1
 
-
-def _resolve_path_from_runbook_base(path_value: Path, *, runbook_base_dir: Path) -> Path:
-    expanded = path_value.expanduser()
-    if expanded.is_absolute():
-        return expanded
-    return (runbook_base_dir / expanded).resolve()
-
-
-def _resolve_repo_root_from_module() -> Path | None:
-    current = Path(__file__).resolve()
-    for parent in current.parents:
-        if (parent / "pyproject.toml").exists():
-            return parent
-    return None
-
-
-def _resolve_densegen_post_run_template(path_value: Path, *, runbook_base_dir: Path) -> Path:
-    expanded = path_value.expanduser()
-    if expanded.is_absolute():
-        return expanded
-    if expanded == _DENSEGEN_POST_RUN_TEMPLATE_DEFAULT:
-        repo_root = _resolve_repo_root_from_module()
-        if repo_root is not None:
-            return (repo_root / expanded).resolve()
-    return (runbook_base_dir / expanded).resolve()
-
-
-def _resolve_runbook_paths(runbook: OrchestrationRunbookV1, *, runbook_base_dir: Path) -> OrchestrationRunbookV1:
-    densegen = runbook.densegen
-    if densegen is not None:
-        post_run = densegen.post_run.model_copy(
-            update={
-                "qsub_template": _resolve_densegen_post_run_template(
-                    densegen.post_run.qsub_template,
-                    runbook_base_dir=runbook_base_dir,
-                )
-            }
-        )
-        densegen = densegen.model_copy(
-            update={
-                "config": _resolve_path_from_runbook_base(densegen.config, runbook_base_dir=runbook_base_dir),
-                "qsub_template": _resolve_path_from_runbook_base(
-                    densegen.qsub_template, runbook_base_dir=runbook_base_dir
-                ),
-                "post_run": post_run,
-            }
-        )
-
-    infer = runbook.infer
-    if infer is not None:
-        infer = infer.model_copy(
-            update={
-                "config": _resolve_path_from_runbook_base(infer.config, runbook_base_dir=runbook_base_dir),
-                "qsub_template": _resolve_path_from_runbook_base(
-                    infer.qsub_template, runbook_base_dir=runbook_base_dir
-                ),
-            }
-        )
-
-    notify = runbook.notify
-    if notify is not None:
-        notify = notify.model_copy(
-            update={
-                "profile": _resolve_path_from_runbook_base(notify.profile, runbook_base_dir=runbook_base_dir),
-                "cursor": _resolve_path_from_runbook_base(notify.cursor, runbook_base_dir=runbook_base_dir),
-                "spool_dir": _resolve_path_from_runbook_base(notify.spool_dir, runbook_base_dir=runbook_base_dir),
-                "qsub_template": _resolve_path_from_runbook_base(
-                    notify.qsub_template, runbook_base_dir=runbook_base_dir
-                ),
-            }
-        )
-
-    logging = runbook.logging.model_copy(
-        update={
-            "stdout_dir": _resolve_path_from_runbook_base(runbook.logging.stdout_dir, runbook_base_dir=runbook_base_dir)
-        }
-    )
-
-    return runbook.model_copy(
-        update={
-            "workspace_root": _resolve_path_from_runbook_base(
-                runbook.workspace_root, runbook_base_dir=runbook_base_dir
-            ),
-            "densegen": densegen,
-            "infer": infer,
-            "notify": notify,
-            "logging": logging,
-        }
-    )
-
 def load_orchestration_runbook(path: Path, *, raw: dict | None = None) -> OrchestrationRunbookV1:
     runbook_path = path.expanduser().resolve()
     if raw is None:
@@ -409,5 +319,5 @@ def load_orchestration_runbook(path: Path, *, raw: dict | None = None) -> Orches
     if not isinstance(raw, dict) or "runbook" not in raw:
         raise ValueError("orchestration runbook schema v1 requires root key: runbook")
     runbook = OrchestrationRunbookRoot.model_validate(raw).runbook
-    resolved_runbook = _resolve_runbook_paths(runbook, runbook_base_dir=runbook_path.parent)
+    resolved_runbook = resolve_runbook_paths(runbook, runbook_base_dir=runbook_path.parent)
     return enforce_workspace_layout(resolved_runbook)

@@ -244,6 +244,12 @@ def test_runbook_notify_smoke_defaults_to_dry(tmp_path: Path) -> None:
     assert runbook.notify.smoke == "dry"
 
 
+def test_runbook_path_resolution_module_is_available() -> None:
+    from dnadesign.ops.runbooks import runbook_paths
+
+    assert callable(runbook_paths.resolve_runbook_paths)
+
+
 def test_runbook_relative_paths_resolve_against_runbook_parent(tmp_path: Path) -> None:
     runbook_dir = tmp_path / "contracts"
     workspace_dir = runbook_dir / "workspace"

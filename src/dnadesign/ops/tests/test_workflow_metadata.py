@@ -42,6 +42,13 @@ def test_densegen_submit_workflow_metadata_is_explicit() -> None:
     assert definition.allowed_notify_policies == ()
 
 
+def test_resolve_workflow_id_for_tool_and_notify_contract() -> None:
+    assert workflow_metadata.resolve_workflow_id(tool="densegen", with_notify=False) == "densegen_batch_submit"
+    assert workflow_metadata.resolve_workflow_id(tool="densegen", with_notify=True) == "densegen_batch_with_notify_slack"
+    assert workflow_metadata.resolve_workflow_id(tool="infer", with_notify=False) == "infer_batch_submit"
+    assert workflow_metadata.resolve_workflow_id(tool="infer", with_notify=True) == "infer_batch_with_notify_slack"
+
+
 def test_validate_workflow_contract_rejects_infer_notify_policy_densegen() -> None:
     try:
         workflow_metadata.validate_workflow_contract(
