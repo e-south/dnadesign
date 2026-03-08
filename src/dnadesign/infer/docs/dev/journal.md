@@ -4901,3 +4901,46 @@ Remove the hardcoded personal USR root from infer pressure-test workspaces and m
 1. Infer pressure-test workspaces no longer depend on a personal `/projectnb/.../outputs` path to express their default USR root.
 2. Config-driven infer now treats `ingest.root` the same way it already treated `ingest.path`: relative to `config.yaml`.
 3. Workspace-scoped curated infer examples are aligned with repo IA, while general USR sync docs can still describe broader non-git dataset roots as a separate workflow.
+
+## 2026-03-07 - Phase 2 Slice BK (USR Root Policy Clarification)
+
+### Goal
+
+Make the repo-wide storage policy explicit after the infer pressure-workspace leak was removed, so curated dnadesign workflows and generic USR sync workflows no longer imply conflicting root expectations.
+
+### Decision
+
+1. External USR roots remain allowed for explicit sync and mirror workflows.
+2. Curated dnadesign workspaces and runbooks default USR dataset roots to `<workspace-root>/outputs/usr_datasets`.
+3. Curated examples must not hardcode personal absolute USR roots.
+
+### Why
+
+1. The infer leak was real, but the stronger conclusion "USR roots must always stay inside the repo" would have broken legitimate USR sync and mirror use cases.
+2. The actual invariant is narrower and more useful:
+   - curated workspace/runbook defaults stay workspace-scoped and self-contained,
+   - explicit external storage remains available when the workflow chooses it deliberately.
+
+### Changes applied
+
+1. `ARCHITECTURE.md`
+   - added the explicit default-vs-external USR root policy to the cross-tool IA section.
+2. `DESIGN.md`
+   - added the same rule to information-architecture invariants.
+3. `src/dnadesign/usr/docs/operations/sync-setup.md`
+   - clarified workspace-scoped defaults versus explicit external roots.
+4. `src/dnadesign/usr/docs/operations/sync-quickstart.md`
+   - clarified that workspace `outputs/usr_datasets` is the curated default.
+5. `src/dnadesign/usr/tests/test_usr_docs_contract.py`
+   - added docs contract coverage for the policy wording.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/usr/tests/test_usr_docs_contract.py -k storage_policy_docs`
+2. `uv run pytest -q src/dnadesign/usr/tests/test_usr_docs_contract.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py`
+
+### Contract impact
+
+1. Infer and DenseGen style workspaces keep their default USR roots inside the workspace tree.
+2. USR sync remains flexible enough for local mirrors and explicit external storage roots.
+3. The boundary is now written down in the SOR docs instead of being inferred from examples.

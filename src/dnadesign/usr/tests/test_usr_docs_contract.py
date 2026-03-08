@@ -406,6 +406,21 @@ def test_usr_sync_docs_include_auxiliary_file_audit_contract() -> None:
     assert "--audit-json-out" in sync_quickstart
 
 
+def test_usr_storage_policy_docs_distinguish_workspace_defaults_and_explicit_external_roots() -> None:
+    architecture = _read("ARCHITECTURE.md")
+    design = _read("DESIGN.md")
+    setup = _read("src/dnadesign/usr/docs/operations/sync-setup.md")
+    quickstart = _read("src/dnadesign/usr/docs/operations/sync-quickstart.md")
+
+    assert "Curated dnadesign workspaces default USR dataset roots to `<workspace-root>/outputs/usr_datasets`." in architecture
+    assert "Explicit external USR roots remain allowed for sync and mirror workflows when the operator chooses them deliberately." in architecture
+    assert "Curated workspace and runbook examples must default USR dataset roots to `<workspace-root>/outputs/usr_datasets`." in design
+    assert "External USR roots remain allowed only when the workflow makes that storage boundary explicit." in design
+    assert "Curated dnadesign workflows should prefer workspace-scoped dataset roots" in setup
+    assert "External dataset roots are still allowed for ad-hoc sync or mirror workflows" in setup
+    assert "workspace `outputs/usr_datasets` is the default for curated dnadesign workflows" in quickstart
+
+
 def test_hpc_sync_runbook_covers_bootstrap_from_either_side() -> None:
     runbook = _read("src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md")
 

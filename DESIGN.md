@@ -43,6 +43,8 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
   - `notify`: profile/cursor/spool and webhook delivery
   - `usr`: dataset records and `.events.log`
   - `densegen` and `infer`: workload-domain artifacts and dataset updates
+- Curated workspace and runbook examples must default USR dataset roots to `<workspace-root>/outputs/usr_datasets`.
+- External USR roots remain allowed only when the workflow makes that storage boundary explicit.
 - Shared data-plane behaviors such as overlay compaction and part-management are expressed with USR semantics (`usr-overlay-*`) instead of tool-specific command names.
 - No hidden path fallback is allowed for orchestration accumulation; when required paths are missing or invalid, commands fail with actionable errors.
 - Transient operational working directories are never root-level repo paths; disposable working state uses `/scratch`, while durable orchestration state remains workspace-scoped.

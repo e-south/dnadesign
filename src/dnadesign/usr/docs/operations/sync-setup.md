@@ -10,12 +10,14 @@ Use this page for one-time setup and periodic key hygiene.
 
 Recommended storage layout:
 
-- Local datasets root outside repo, for example `~/data/usr_datasets/`
-- SCC datasets root in project/scratch storage, for example `/project/$USER/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets`
+- Curated dnadesign workflows should prefer workspace-scoped dataset roots, for example `<workspace-root>/outputs/usr_datasets`.
+- External dataset roots are still allowed for ad-hoc sync or mirror workflows, for example `~/data/usr_datasets/` or another explicit operator-owned location.
+- SCC dataset roots should stay in project storage for long-lived runs, for example `/project/$USER/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets`.
 
 Notes:
 
 - Scratch may have retention/purge policies; use project storage for long-lived datasets.
+- Keep curated tool workspaces self-contained when possible: config, logs, notify state, and default USR roots should accumulate under the same workspace tree.
 - Keep code in git, keep datasets in USR roots, and sync with `uv run usr diff/pull/push`.
 
 ## Prepare SSH keys (one-time)

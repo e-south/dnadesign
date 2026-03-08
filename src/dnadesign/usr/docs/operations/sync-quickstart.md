@@ -10,7 +10,7 @@ Use this page for the minimum reliable loop: preflight diff, transfer, verify.
 
 1. One-time setup: [sync-setup.md](sync-setup.md).
 2. Every run: `diff` -> `pull`/`push`.
-3. For DenseGen runs, sync datasets under workspace `outputs/usr_datasets`.
+3. The workspace `outputs/usr_datasets` is the default for curated dnadesign workflows.
 
 ## Minimum command loop
 
