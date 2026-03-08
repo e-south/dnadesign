@@ -4272,3 +4272,57 @@ Reduce schema monolith size and make workflow-tool / notify-policy semantics mor
 1. Workflow semantics now have a dedicated module instead of living inside the schema monolith.
 2. Workflow tool ownership, notify requirement, GPU requirement, and allowed notify policies are now explicit data.
 3. Future sibling-tool onboarding now has a clearer first edit site in runbooks workflow metadata before touching schema structure.
+
+## 2026-03-07 - Phase 2 Slice AZ (Generic Notify Policy And Extracted Layout Contracts)
+
+### Goal
+
+Remove the remaining single-tool bias from ops runbook defaults and continue shrinking schema responsibilities by extracting workspace layout enforcement into its own runbooks module.
+
+### Prioritized findings
+
+1. High: `NotifyContract.policy` still defaulted to `densegen`, which made one tool the implicit baseline for notify behavior.
+2. Medium: `runbook init` scaffolding still emitted tool-specific notify policies instead of a neutral contract.
+3. Medium: `schema.py` still owned workspace layout enforcement, keeping workflow schema and resolved-path layout policy coupled in one file.
+
+### TDD sequence
+
+1. Red:
+   - added `src/dnadesign/ops/tests/test_runbook_layout.py`.
+   - updated scaffold test to require `notify.policy == "generic"`.
+   - added coverage for omitted `notify.policy` defaulting to `generic`.
+   - added infer scaffold coverage to ensure the generic default is not densegen-only.
+2. Green:
+   - added `src/dnadesign/ops/runbooks/runbook_layout.py`.
+   - moved workspace layout enforcement there and rewired `schema.py` to call `enforce_workspace_layout(...)`.
+   - changed `NotifyContract.policy` default to `generic`.
+   - changed `runbook init` scaffolding to emit `notify.policy: generic` for both densegen and infer workflows.
+3. Verify:
+   - focused layout/default-policy tests pass.
+   - full ops and notify suites remain green.
+
+### Changes applied
+
+1. `src/dnadesign/ops/runbooks/runbook_layout.py`
+   - new workspace layout contract module.
+2. `src/dnadesign/ops/runbooks/schema.py`
+   - removed inline workspace layout enforcement.
+   - changed notify policy default to `generic`.
+3. `src/dnadesign/ops/cli.py`
+   - runbook scaffolding now emits `notify.policy: generic`.
+4. `src/dnadesign/ops/tests/test_runbook_layout.py`
+   - new direct layout contract test.
+5. `src/dnadesign/ops/tests/test_runbook_orchestrator.py`
+   - scaffold and default-policy coverage updated for generic notify policy.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_layout.py src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "runbook_layout or notify_policy_defaults_to_generic_when_omitted or cli_runbook_init_generates_densegen_notify_scaffold or runbook_rejects_stdout_dir_outside_workspace_ops_logs or runbook_rejects_notify_profile_outside_workspace_notify_namespace"`
+2. `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "infer_notify_scaffold_with_generic_policy or cli_runbook_init_generates_densegen_notify_scaffold or notify_policy_defaults_to_generic_when_omitted"`
+3. `uv run pytest -q src/dnadesign/ops/tests src/dnadesign/notify/tests/test_events_source.py src/dnadesign/notify/tests/test_tool_events.py`
+
+### Contract impact
+
+1. Notify policy is now tool-neutral by default.
+2. Both densegen and infer scaffolded runbooks use the same neutral notify policy baseline.
+3. Schema loading and workspace layout enforcement now have separate modules and separate responsibilities.

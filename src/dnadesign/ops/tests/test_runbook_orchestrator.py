@@ -313,6 +313,17 @@ def test_runbook_default_post_run_template_resolves_to_repo_jobs_template(tmp_pa
     assert runbook.densegen.post_run.qsub_template == expected_template
 
 
+def test_runbook_notify_policy_defaults_to_generic_when_omitted(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
+    del payload["runbook"]["notify"]["policy"]
+
+    runbook = load_orchestration_runbook(runbook_path, raw=payload)
+
+    assert runbook.notify is not None
+    assert runbook.notify.policy == "generic"
+
+
 def test_runbook_rejects_stdout_dir_outside_workspace_ops_logs(tmp_path: Path) -> None:
     runbook_path = _write_runbook(tmp_path)
     payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
@@ -2280,6 +2291,7 @@ def test_cli_runbook_init_creates_valid_densegen_contract(tmp_path: Path) -> Non
     assert raw_payload["runbook"]["densegen"]["records_part_guard"]["auto_compact_existing_records_parts"] is True
     assert raw_payload["runbook"]["densegen"]["archived_overlay_guard"]["max_archived_entries"] == 1000
     assert raw_payload["runbook"]["densegen"]["archived_overlay_guard"]["max_archived_bytes"] == 2147483648
+    assert raw_payload["runbook"]["notify"]["policy"] == "generic"
 
 
 def test_cli_runbook_init_supports_densegen_without_notify(tmp_path: Path) -> None:
@@ -2306,6 +2318,35 @@ def test_cli_runbook_init_supports_densegen_without_notify(tmp_path: Path) -> No
     loaded = load_orchestration_runbook(runbook_path)
     assert loaded.workflow_id == "densegen_batch_submit"
     assert loaded.notify is None
+
+
+def test_cli_runbook_init_generates_infer_notify_scaffold_with_generic_policy(tmp_path: Path) -> None:
+    runbook_path = tmp_path / "contracts" / "infer-runbook.yaml"
+    workspace_root = tmp_path / "workspace_infer"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "init",
+            "--workflow",
+            "infer",
+            "--runbook",
+            str(runbook_path),
+            "--workspace-root",
+            str(workspace_root),
+            "--project",
+            "dunlop",
+            "--id",
+            "infer_demo",
+        ],
+    )
+
+    assert result.exit_code == 0
+    raw_payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
+    assert raw_payload["runbook"]["notify"]["tool"] == "infer"
+    assert raw_payload["runbook"]["notify"]["policy"] == "generic"
 
 
 def test_cli_runbook_init_applies_resource_overrides(tmp_path: Path) -> None:

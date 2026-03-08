@@ -164,10 +164,9 @@ def _build_init_payload(
     }
     if with_notify:
         notify_tool = "densegen" if workflow == "densegen" else "infer"
-        notify_policy = "densegen" if workflow == "densegen" else "infer"
         payload["runbook"]["notify"] = {
             "tool": notify_tool,
-            "policy": notify_policy,
+            "policy": "generic",
             "profile": str(workspace_contract / "outputs" / "notify" / notify_tool / "profile.json"),
             "cursor": str(workspace_contract / "outputs" / "notify" / notify_tool / "cursor"),
             "spool_dir": str(workspace_contract / "outputs" / "notify" / notify_tool / "spool"),
