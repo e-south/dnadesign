@@ -37,6 +37,10 @@ def test_pressure_runbook_docs_include_standalone_and_ops_paths() -> None:
     assert "--submit" in doc
     assert "--no-notify" in doc
     assert "--with-notify" in doc
+    assert 'uv run infer prune --usr "$DATASET_ID" --usr-root "$USR_ROOT"' in doc
+    assert "layer: mid" in doc
+    assert "layer: final" in doc
+    assert "list<float64>" in doc
     assert "outputs/logs/ops/audit/" in doc
     assert "infer__<model_id>__<job_id>__<out_id>" in doc
     lowered = doc.lower()

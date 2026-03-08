@@ -107,6 +107,8 @@ def test_infer_pressure_test_tutorial_covers_local_and_ops_paths() -> None:
     assert "uv run infer validate config --config" in tutorial
     assert "uv run infer workspace init --id test_stress_ethanol --profile usr-pressure" in tutorial
     assert "uv run infer run --config" in tutorial
+    assert 'uv run infer prune --usr "$DATASET_ID" --usr-root "$USR_ROOT"' in tutorial
+    assert "layer` values `mid` and `final`" in tutorial
     assert "uv run ops runbook init" in tutorial
     assert "uv run ops runbook execute" in tutorial
     assert "--no-submit" in tutorial

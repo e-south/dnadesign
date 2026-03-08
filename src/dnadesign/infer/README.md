@@ -32,5 +32,6 @@ Read in this order:
 - USR write-back columns use this namespaced contract:
   - `infer__<model_id>__<job_id>__<out_id>`
 - Infer writes USR outputs in chunk-sized attaches for resumable long runs.
+- Infer reset is namespaced and dataset-scoped: `uv run infer prune --usr <dataset-id> --usr-root <usr-root>`.
 - Resume scanning requires a readable USR `records.parquet`; unreadable tables fail fast.
 - Cross-tool workflow routes are maintained in [repository docs index](../../../docs/README.md).

@@ -40,7 +40,15 @@ uv run usr --root "$USR_ROOT" head "$DATASET_ID" -n 5
 uv run usr --root "$USR_ROOT" events tail "$DATASET_ID" -n 20
 ```
 
-### 5) Build ops runbook and inspect plan
+### 5) Resume and prune infer output state
+
+```bash
+uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr
+uv run infer prune --usr "$DATASET_ID" --usr-root "$USR_ROOT"
+uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr
+```
+
+### 6) Build ops runbook and inspect plan
 
 ```bash
 uv run ops runbook init \
@@ -54,7 +62,7 @@ uv run ops runbook precedents
 uv run ops runbook plan --runbook "$WORKSPACE_ROOT/infer-pressure.runbook.yaml"
 ```
 
-### 6) Execute no-submit and submit paths
+### 7) Execute no-submit and submit paths
 
 ```bash
 uv run ops runbook execute \
@@ -70,7 +78,7 @@ uv run ops runbook execute \
   --submit
 ```
 
-### 7) Optional notify-enabled runbook variant
+### 8) Optional notify-enabled runbook variant
 
 ```bash
 uv run ops runbook init \
@@ -82,7 +90,9 @@ uv run ops runbook init \
   --force
 ```
 
-### 8) Contract reminder
+### 9) Contract reminder
 
 - USR write-back column pattern is `infer__<model_id>__<job_id>__<out_id>`.
 - Invalid or unreadable USR `records.parquet` fails fast during resume scan.
+- Fresh USR test datasets must register exact infer output types before write-back.
+- `evo2.embedding` accepts semantic `layer` values `mid` and `final` for the common pooled embedding checks.

@@ -4432,3 +4432,95 @@ Keep notify enabled by default for ops runbook scaffolding while making the noti
 1. Notify remains the default scaffold path.
 2. The notify prerequisite is now explicit at init time rather than only surfacing later during planning.
 3. `stdout` remains machine-friendly because the generated runbook path is unchanged there; the warning is emitted on `stderr`.
+
+## 2026-03-07 - Phase 2 Slice BC (Infer Resume/Prune/Embedding Hardening)
+
+### Goal
+
+Pressure-test infer on real GPU-backed tracer bullets, then harden the package around the concrete gaps that still affected changeability, UX, and large-run ergonomics: semantic embedding selection, no-op resume efficiency, infer-only reset scope, and CLI logging behavior.
+
+### Prioritized findings
+
+1. High: Evo2 embedding use still pushed raw adapter-specific layer names into infer ergonomics for common mid/final checks.
+2. High: completed USR resume runs still instantiated the adapter before resume planning had proven that no work remained, which wastes model-load time on large reruns.
+3. Medium: infer had no first-class infer-only prune command even though USR overlays already supported namespace-scoped removal.
+4. Medium: third-party INFO logs were noisy during CLI runs, and infer logger ownership was brittle enough to duplicate infer log lines after root logging setup.
+5. Medium: fresh USR test-dataset onboarding requires exact registry types for infer outputs; real tracer bullets showed pooled Evo2 logits write back as `list<float64>`.
+6. Low: upstream Evo2/StripedHyena still emits `Extra keys in state_dict` directly to stdio during model load; this remains outside infer logger policy.
+
+### TDD sequence
+
+1. Red:
+   - added Evo2 adapter tests for `layer="mid"` and `layer="final"`.
+   - added logging policy tests for third-party INFO suppression and CLI re-homing of infer library loggers.
+   - added a resume contract test proving completed USR reruns must not call `_get_adapter(...)`.
+   - added CLI prune tests for infer overlay archive and missing-overlay failure.
+2. Green:
+   - added semantic Evo2 embedding layer alias resolution (`mid`, `default`, `final`, `endpoint`).
+   - moved the Evo2 default embedding layer to an adapter-package constant so runtime semantics no longer depend on registry bootstrap side effects.
+   - moved adapter construction behind resume planning in `run_extract_job(...)` so no-op reruns skip model load entirely.
+   - added `infer prune --usr ... --usr-root ...` as a dataset-scoped infer overlay reset path using USR namespace removal.
+   - tightened logging setup so infer library loggers rehome to root handlers after CLI setup and third-party INFO noise is suppressed outside `DEBUG`.
+3. Verify:
+   - targeted unit and contract tests passed.
+   - full infer suite passed.
+   - real local-workspace GPU tracer bullet passed for likelihoods, pooled logits, `mid` embeddings, and `final` embeddings.
+   - real USR tracer bullet passed for first write-back, no-op resume, infer-only prune, and rerun after prune.
+
+### Changes applied
+
+1. `src/dnadesign/infer/src/adapters/evo2.py`
+   - added semantic embedding layer aliases and final-layer resolution from the loaded torch module.
+2. `src/dnadesign/infer/src/adapters/__init__.py`
+   - defined the Evo2 default embedding layer once at the adapter package boundary.
+3. `src/dnadesign/infer/src/engine.py`
+   - delayed adapter construction until an output actually has remaining work.
+4. `src/dnadesign/infer/src/prune.py`
+   - added infer-only USR overlay prune operations.
+5. `src/dnadesign/infer/src/cli/commands/prune.py`
+   - added `infer prune` CLI surface.
+6. `src/dnadesign/infer/src/_logging.py`
+   - suppressed third-party INFO noise by default and re-homed infer loggers to root handlers after CLI logging setup.
+7. `src/dnadesign/infer/tests/runtime/test_evo2_adapter_pooling_contracts.py`
+   - added semantic embedding alias coverage.
+8. `src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py`
+   - added no-adapter-load resume coverage.
+9. `src/dnadesign/infer/tests/cli/test_prune_command.py`
+   - added prune CLI coverage.
+10. `src/dnadesign/infer/tests/package/test_logging_policy.py`
+    - added logging ownership and noise-suppression coverage.
+11. `src/dnadesign/infer/docs/operations/pressure-test-agnostic-models.md`
+    - documented infer-only prune, resume expectations, semantic embedding layers, and exact USR registry types for fresh test datasets.
+12. `src/dnadesign/infer/docs/tutorials/demo_pressure_test_usr_ops_notify.md`
+    - added resume/prune flow and semantic embedding note.
+13. `src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md`
+    - documented `params.layer: mid` and `params.layer: final` semantics.
+14. `src/dnadesign/infer/workspaces/README.md`
+    - documented infer-only reset scope for USR-backed workspaces.
+15. `src/dnadesign/infer/README.md`
+    - added the infer-only prune contract to the package boundary reminder.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/runtime/test_evo2_adapter_pooling_contracts.py src/dnadesign/infer/tests/package/test_logging_policy.py -k "embedding_alias or suppresses_third_party_info_noise"`
+2. `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py -k "does_not_load_adapter_when_all_rows_are_complete or skips_completed_rows_from_overlay or recovers_after_interrupted_partial_write"`
+3. `uv run pytest -q src/dnadesign/infer/tests/cli/test_prune_command.py`
+4. `uv run pytest -q src/dnadesign/infer/tests/package/test_logging_policy.py src/dnadesign/infer/tests/cli/test_console.py`
+5. `uv run pytest -q src/dnadesign/infer/tests`
+6. Real local workspace tracer bullet:
+   - validated and ran a workspace-local config on `cuda:0` with outputs `ll_mean`, `logits_mean`, `emb_mid`, and `emb_final`.
+7. Real USR tracer bullet:
+   - created a scratch USR dataset,
+   - registered infer output types,
+   - ran infer write-back,
+   - reran to confirm no-op resume,
+   - ran `uv run infer prune --usr audit_resume --usr-root <scratch-root>`,
+   - reran to confirm recomputation after prune.
+
+### Contract impact
+
+1. Infer now exposes semantic pooled embedding selection for the common Evo2 mid/final checks without forcing raw layer strings into routine configs.
+2. Completed USR resume runs no longer load the model adapter when every requested output is already complete.
+3. Infer reset scope is now explicit and dataset-scoped: prune only removes the `infer` overlay namespace.
+4. Infer CLI logging is quieter and less error-prone, but upstream Evo2 model-load stdout noise still remains outside infer logger ownership.
+5. Fresh USR dataset onboarding still requires exact registry type declarations for infer outputs; the docs now state the observed pooled Evo2 types used in validation runs.

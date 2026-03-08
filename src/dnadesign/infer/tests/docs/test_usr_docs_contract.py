@@ -25,4 +25,5 @@ def _repo_root() -> Path:
 def test_infer_readme_documents_usr_column_name_contract() -> None:
     readme = (_repo_root() / "src/dnadesign/infer/README.md").read_text(encoding="utf-8")
     assert "infer__<model_id>__<job_id>__<out_id>" in readme
+    assert "uv run infer prune --usr <dataset-id> --usr-root <usr-root>" in readme
     assert "infer__<model_id>**<job_id>**<out_id>" not in readme

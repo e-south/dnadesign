@@ -33,3 +33,13 @@ For config-driven local files, set `ingest.source` and `ingest.path` in `config.
 - `ingest.source: pt_file` with optional `ingest.path: inputs/batch.pt`
 
 Relative `ingest.path` values are resolved from the directory that contains `config.yaml`.
+
+### USR reset scope
+
+For USR-backed workspaces, reset only infer outputs with:
+
+```bash
+uv run infer prune --usr <dataset-id> --usr-root <usr-root>
+```
+
+This archives the `infer` overlay namespace only. It does not delete the workspace or the base USR records table.

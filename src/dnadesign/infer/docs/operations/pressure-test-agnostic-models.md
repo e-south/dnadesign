@@ -18,6 +18,9 @@ For deterministic SCC GPU environment setup before pressure runs, use the [SCC E
 - Use `--dry-run` and `--no-submit` first.
 - Use read-only scheduler checks before submit (`qstat -u "$USER"`).
 - Keep `ingest.root` explicit for workspace and cluster runs.
+- For fresh USR test datasets, register exact infer output types before write-back:
+  - pooled Evo2 likelihoods are `float64`
+  - pooled Evo2 logits are `list<float64>`
 
 ## Ordered procedure
 
@@ -51,7 +54,22 @@ uv run usr --root "$USR_ROOT" head "$DATASET_ID" -n 5
 uv run usr --root "$USR_ROOT" events tail "$DATASET_ID" -n 20
 ```
 
-### 5) Initialize infer ops runbook
+### 5) Resume and prune the infer namespace when needed
+
+Second runs on the same dataset should resume and skip completed infer rows:
+
+```bash
+uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr
+```
+
+To reset only infer outputs for the dataset, archive the infer overlay and rerun:
+
+```bash
+uv run infer prune --usr "$DATASET_ID" --usr-root "$USR_ROOT"
+uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr
+```
+
+### 6) Initialize infer ops runbook
 
 ```bash
 uv run ops runbook init \
@@ -62,7 +80,7 @@ uv run ops runbook init \
   --no-notify
 ```
 
-### 6) Plan and execute no-submit preflight
+### 7) Plan and execute no-submit preflight
 
 ```bash
 uv run ops runbook precedents
@@ -73,7 +91,7 @@ uv run ops runbook execute \
   --no-submit
 ```
 
-### 7) Submit after preflight passes
+### 8) Submit after preflight passes
 
 ```bash
 qstat -u "$USER"
@@ -83,7 +101,7 @@ uv run ops runbook execute \
   --submit
 ```
 
-### 8) Enable notify in the same runbook when needed
+### 9) Enable notify in the same runbook when needed
 
 First configure webhook secret wiring (for example by setting a readable `NOTIFY_WEBHOOK_FILE` path), then re-initialize the same runbook:
 
@@ -97,7 +115,7 @@ uv run ops runbook init \
   --force
 ```
 
-### 9) Run focused ad-hoc extract checks when isolating issues
+### 10) Run focused ad-hoc extract checks when isolating issues
 
 ```bash
 uv run infer extract \
@@ -108,4 +126,22 @@ uv run infer extract \
   --usr-root "$USR_ROOT" \
   --field sequence \
   --write-back
+```
+
+For embedding pressure checks in config-driven runs, use semantic layer names instead of raw Evo2 block names when possible:
+
+```yaml
+outputs:
+  - id: emb_mid
+    fn: evo2.embedding
+    params:
+      layer: mid
+      pool: { method: mean, dim: 1 }
+    format: list
+  - id: emb_final
+    fn: evo2.embedding
+    params:
+      layer: final
+      pool: { method: mean, dim: 1 }
+    format: list
 ```
