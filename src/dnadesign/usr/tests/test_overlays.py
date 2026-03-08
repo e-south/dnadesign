@@ -724,18 +724,19 @@ def test_overlay_schema_validation_is_reused_across_repeated_dataset_reads(tmp_p
     target_id = ds.head(1)["id"].iloc[0]
     ds.write_overlay_part("mock", pa.table({"id": [target_id], "mock__score": [1.0]}), key="id")
 
+    from dnadesign.usr.src import dataset_overlay_catalog as overlay_catalog_module
     from dnadesign.usr.src import dataset_views as dataset_views_module
 
     calls = {"count": 0}
-    real_validate = dataset_module.validate_overlay_schema
+    real_validate = overlay_catalog_module.validate_overlay_schema
 
     def _counted_validate(*args, **kwargs):
         calls["count"] += 1
         return real_validate(*args, **kwargs)
 
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(dataset_module, "validate_overlay_schema", _counted_validate)
-        dataset_module._LOAD_OVERLAYS_CACHE.clear()
+        mp.setattr(overlay_catalog_module, "validate_overlay_schema", _counted_validate)
+        overlay_catalog_module._LOAD_OVERLAYS_CACHE.clear()
         dataset_views_module._HEAD_CACHE.clear()
         ds.head(5, include_derived=True)
         dataset_views_module._HEAD_CACHE.clear()

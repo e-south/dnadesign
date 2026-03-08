@@ -33,6 +33,7 @@ from .dataset_ingest import (
     prepare_import_rows_dataset,
     write_import_df_dataset,
 )
+from .dataset_overlay_catalog import build_dataset_info, load_overlay_catalog, merge_dataset_schema
 from .dataset_materialize import materialize_dataset
 from .dataset_overlay_maintenance import (
     compact_overlay_namespace,
@@ -60,7 +61,6 @@ from .dataset_state_facade import (
 from .dataset_validate import validate_dataset
 from .dataset_views import export_dataset, get_dataset, grep_dataset, head_dataset, scan_dataset
 from .errors import (
-    NamespaceError,
     SchemaError,
     SequencesError,
 )
@@ -68,9 +68,7 @@ from .maintenance import maintenance as maintenance_context
 from .maintenance import require_maintenance
 from .overlays import (
     list_overlays,
-    overlay_metadata,
     overlay_path,
-    overlay_schema,
 )
 from .registry import (
     USR_STATE_NAMESPACE,
@@ -111,13 +109,6 @@ USR_STATE_SCHEMA_TYPES = {
 }
 USR_STATE_QC_STATUS_ALLOWED = {"pass", "fail", "warn", "unknown"}
 USR_STATE_SPLIT_ALLOWED = {"train", "val", "test", "holdout"}
-_LOAD_OVERLAYS_CACHE: dict[
-    tuple[str, bool, tuple[str, ...] | None],
-    tuple[tuple[tuple[str, int, int], ...], tuple[int, int] | None, tuple[dict, ...]],
-] = {}
-_LOAD_OVERLAYS_CACHE_MAX = 4_096
-
-
 @dataclass(frozen=True)
 class DedupeStats:
     rows_total: int
@@ -371,29 +362,10 @@ class Dataset:
 
     def info(self) -> DatasetInfo:
         """Basic dataset metadata plus discovered namespaces."""
-        self._require_exists()
-        pf = pq.ParquetFile(str(self.records_path))
-        cols = list(pf.schema_arrow.names)
-        derived_cols = []
-        try:
-            overlay_data = self._load_overlays()
-            for ov in overlay_data:
-                derived_cols.extend(ov["cols"])
-        except FileNotFoundError:
-            overlay_data = []
-        all_cols = list(cols)
-        for col in derived_cols:
-            if col not in all_cols:
-                all_cols.append(col)
-        namespaces = sorted(
-            {c.split("__", 1)[0] for c in all_cols if c not in {k for k, _ in REQUIRED_COLUMNS} and "__" in c}
-        )
-        return DatasetInfo(
-            name=self.name,
-            path=str(self.records_path),
-            rows=int(pf.metadata.num_rows),
-            columns=all_cols,
-            namespaces=namespaces,
+        return build_dataset_info(
+            self,
+            required_columns=REQUIRED_COLUMNS,
+            reserved_namespaces=RESERVED_NAMESPACES,
         )
 
     def info_dict(self) -> dict:
@@ -401,23 +373,7 @@ class Dataset:
 
     def schema(self):
         """Return the Arrow schema of the current table (base + overlays)."""
-        self._require_exists()
-        base_schema = pq.ParquetFile(str(self.records_path)).schema_arrow
-        for ov in self._load_overlays():
-            for field in ov["schema"]:
-                if field.name == ov["key"]:
-                    continue
-                existing_idx = base_schema.get_field_index(field.name)
-                if existing_idx >= 0:
-                    existing_field = base_schema.field(existing_idx)
-                    if existing_field.type != field.type:
-                        raise NamespaceError(
-                            f"Derived column type mismatch in schema: {field.name} "
-                            f"(base={existing_field.type}, overlay={field.type})"
-                        )
-                    continue
-                base_schema = base_schema.append(field)
-        return base_schema
+        return merge_dataset_schema(self, reserved_namespaces=RESERVED_NAMESPACES)
 
     def scan(
         self,
@@ -486,68 +442,12 @@ class Dataset:
         include_tombstone: bool = True,
         namespaces: Optional[Sequence[str]] = None,
     ):
-        overlays = []
-        paths = list_overlays(self.dir)
-        path_entries = []
-        path_sig_rows: list[tuple[str, int, int]] = []
-        for path in paths:
-            path_stat = path.stat()
-            meta = overlay_metadata(path)
-            namespace = meta.get("namespace") or path.stem
-            path_entries.append((path, meta, namespace))
-            path_sig_rows.append((str(path), int(path_stat.st_mtime_ns), int(path_stat.st_size)))
-        namespace_filter = set(namespaces) if namespaces else None
-        require_registry = any(namespace not in RESERVED_NAMESPACES for _, _, namespace in path_entries)
-        namespace_key = tuple(sorted(namespace_filter)) if namespace_filter else None
-        cache_key = (str(self.dir), bool(include_tombstone), namespace_key)
-        path_sig = tuple(path_sig_rows)
-        registry_sig: tuple[int, int] | None = None
-        if require_registry:
-            reg_path = self.dir / "_registry" / "registry.yaml"
-            if reg_path.exists():
-                reg_stat = reg_path.stat()
-                registry_sig = (int(reg_stat.st_mtime_ns), int(reg_stat.st_size))
-        cached = _LOAD_OVERLAYS_CACHE.get(cache_key)
-        if cached is not None and cached[0] == path_sig and cached[1] == registry_sig:
-            return [dict(overlay) for overlay in cached[2]]
-
-        registry = self._registry(required=require_registry) if require_registry else {}
-        seen: Dict[str, Path] = {}
-        for path, meta, ns in path_entries:
-            key = meta.get("key")
-            if not key:
-                raise SchemaError(f"Overlay missing required metadata key: {path}")
-            if ns in seen:
-                raise SchemaError(
-                    f"Overlay namespace '{ns}' has multiple sources: {seen[ns]} and {path}. "
-                    "Resolve by compacting or removing one source."
-                )
-            seen[ns] = path
-            if not include_tombstone and ns in RESERVED_NAMESPACES:
-                continue
-            if namespace_filter and ns not in namespace_filter:
-                continue
-            schema = overlay_schema(path)
-            if ns not in RESERVED_NAMESPACES:
-                validate_overlay_schema(ns, schema, registry=registry, key=key)
-            if key not in schema.names:
-                raise SchemaError(f"Overlay missing key column '{key}': {path}")
-            overlay_cols = [c for c in schema.names if c != key]
-            read_path = str(path / "part-*.parquet") if path.is_dir() else str(path)
-            overlays.append(
-                {
-                    "namespace": ns,
-                    "key": key,
-                    "cols": overlay_cols,
-                    "schema": schema,
-                    "path": path,
-                    "read_path": read_path,
-                }
-            )
-        _LOAD_OVERLAYS_CACHE[cache_key] = (path_sig, registry_sig, tuple(dict(overlay) for overlay in overlays))
-        if len(_LOAD_OVERLAYS_CACHE) > _LOAD_OVERLAYS_CACHE_MAX:
-            _LOAD_OVERLAYS_CACHE.clear()
-        return overlays
+        return load_overlay_catalog(
+            self,
+            include_tombstone=include_tombstone,
+            namespaces=namespaces,
+            reserved_namespaces=RESERVED_NAMESPACES,
+        )
 
     @staticmethod
     def _sql_ident(name: str) -> str:

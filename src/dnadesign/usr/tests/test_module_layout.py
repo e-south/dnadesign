@@ -116,6 +116,13 @@ def test_dataset_overlay_query_module_exports_expected_symbols() -> None:
     assert hasattr(module, "build_overlay_query")
 
 
+def test_dataset_overlay_catalog_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.dataset_overlay_catalog")
+    assert hasattr(module, "load_overlay_catalog")
+    assert hasattr(module, "build_dataset_info")
+    assert hasattr(module, "merge_dataset_schema")
+
+
 def test_dataset_state_facade_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.dataset_state_facade")
     assert hasattr(module, "ensure_dataset_ids_exist")

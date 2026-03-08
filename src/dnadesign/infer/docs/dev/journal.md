@@ -4728,3 +4728,58 @@ Remove a mixed-suite skip from the USR lazy-import test so import-hygiene verifi
 
 1. The lazy-import contract remains the same: importing `dnadesign.usr.src.convert_legacy` must not import `torch`.
 2. The test harness is now deterministic under mixed-package collection.
+
+## 2026-03-07 - Phase 2 Slice BH (USR Overlay Catalog Extraction)
+
+### Goal
+
+Shrink `usr/src/dataset.py` by extracting overlay catalog loading and overlay-aware read metadata assembly into an explicit module, while preserving `infer` and `densegen` behavior against USR datasets.
+
+### Findings
+
+1. `dataset.py` still owned overlay inventory/cache loading, overlay-aware `info()` assembly, and overlay-aware `schema()` assembly in one file.
+2. Those responsibilities are read-path concerns and do not belong in the same file as lifecycle, ingest, mutation, and state operations.
+3. The sibling-tool risk surface is USR overlay reads, so the refactor must be verified against `infer` write-back/resume flows and `densegen` USR source/output flows, not only USR-local tests.
+
+### TDD sequence
+
+1. Red:
+   - added layout tests requiring `usr.src.dataset_overlay_catalog`.
+   - required `Dataset._load_overlays`, `Dataset.info`, and `Dataset.schema` to delegate through the new seam.
+2. Green:
+   - added `usr/src/dataset_overlay_catalog.py`.
+   - moved overlay catalog caching/loading and overlay-aware schema/info assembly into that module.
+   - rewired `dataset.py` to delegate those responsibilities.
+   - updated the overlay cache reuse test to assert against the extracted module seam instead of `dataset.py` internals.
+3. Verify:
+   - targeted overlay-catalog tests passed.
+   - full `usr` suite passed.
+   - `infer` USR write-back/prune tests passed.
+   - `densegen` USR source/output tests passed.
+   - full `infer` suite passed.
+
+### Changes applied
+
+1. `src/dnadesign/usr/src/dataset_overlay_catalog.py`
+   - added overlay catalog loading/cache helpers.
+   - added overlay-aware dataset info/schema helpers.
+2. `src/dnadesign/usr/src/dataset.py`
+   - delegated `_load_overlays`, `info`, and `schema`.
+3. `src/dnadesign/usr/tests/test_dataset_overlay_catalog_module.py`
+   - added layout contract coverage.
+4. `src/dnadesign/usr/tests/test_module_layout.py`
+   - added module export coverage.
+5. `src/dnadesign/usr/tests/test_overlays.py`
+   - aligned cache-reuse assertion to the extracted seam.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/usr/tests`
+2. `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/infer/tests/cli/test_prune_command.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/densegen/tests/runtime/test_usr_sequences_source.py src/dnadesign/densegen/tests/runtime/test_output_sink_parity.py`
+3. `uv run pytest -q src/dnadesign/infer/tests`
+
+### Contract impact
+
+1. `infer` and `densegen` continue to interact with USR through the same overlay read/write contracts.
+2. Overlay catalog caching is now owned by the overlay-catalog seam rather than `dataset.py`.
+3. `dataset.py` is smaller and more orthogonal, with read metadata responsibilities extracted from the monolith.
