@@ -63,6 +63,9 @@ class _Model:
         mult = 10.0 if reduce_method == "sum" else 1.0
         return [float(len(s)) * mult for s in seqs]
 
+    def generate(self, **_kwargs):
+        return (["ACGTAA"], [0.5])
+
 
 class _TorchModule:
     def named_modules(self):
@@ -192,3 +195,11 @@ def test_log_likelihood_rejects_unknown_reduction() -> None:
     adapter = _adapter()
     with pytest.raises(CapabilityError, match="reduction='sum' or 'mean'"):
         adapter.log_likelihood(["ACGT"], method="native", reduction="median")
+
+
+def test_generate_accepts_tuple_sequences_from_evo2_api() -> None:
+    adapter = _adapter()
+
+    out = adapter.generate(["ACGT"], max_new_tokens=2)
+
+    assert out == {"gen_seqs": ["ACGTAA"]}

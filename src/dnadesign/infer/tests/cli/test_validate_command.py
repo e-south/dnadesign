@@ -170,6 +170,48 @@ jobs:
     assert "CAPACITY_FAIL" in (result.stdout or "")
 
 
+def test_validate_config_rejects_20b_on_non_hopper_gpu(monkeypatch, tmp_path: Path) -> None:
+    cfg = _write(
+        tmp_path / "capacity_fail_20b_non_hopper.yaml",
+        """
+model:
+  id: evo2_20b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs:
+  - id: j1
+    operation: extract
+    ingest:
+      source: sequences
+    outputs:
+      - id: ll
+        fn: evo2.log_likelihood
+        format: float
+""".strip()
+        + "\n",
+    )
+
+    monkeypatch.setattr(
+        "dnadesign.infer.src.cli.commands.validate.probe_gpu_inventory",
+        lambda: GpuInventory(
+            devices=(
+                GpuDeviceInfo(
+                    index=0,
+                    name="L40S",
+                    total_memory_gib=80.0,
+                    compute_capability="8.9",
+                ),
+            )
+        ),
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "config", "--config", cfg.as_posix()])
+
+    assert result.exit_code == 3
+    assert "requires Hopper" in (result.stdout or "")
+
+
 def test_validate_usr_registry_renders_exact_namespace_register_command(tmp_path: Path) -> None:
     cfg = _write(
         tmp_path / "usr_registry.yaml",

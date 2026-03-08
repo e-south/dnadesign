@@ -424,14 +424,23 @@ class Evo2Adapter:
             except Exception as e:
                 raise CapabilityError(f"Evo2.generate failed: {e}")
 
-        # Upstream returns an object with attribute `.sequences` (README).
+        # Upstream generate returns either an object with `.sequences` or a tuple
+        # whose first element is the generated sequence list.
         seqs = getattr(out, "sequences", None)
         if seqs is None:
-            # Fallback: accept list[str] return if implementation changes.
-            if isinstance(out, list) and all(isinstance(x, str) for x in out):
+            if (
+                isinstance(out, tuple)
+                and out
+                and isinstance(out[0], list)
+                and all(isinstance(x, str) for x in out[0])
+            ):
+                seqs = out[0]
+            elif isinstance(out, list) and all(isinstance(x, str) for x in out):
                 seqs = out
             else:
-                raise CapabilityError("Unexpected return type from Evo2.generate: missing '.sequences' attribute.")
+                raise CapabilityError(
+                    "Unexpected return type from Evo2.generate: expected '.sequences' or tuple/list[str]."
+                )
 
         # Defensive: normalize to plain Python list[str].
         return {"gen_seqs": [str(s) for s in list(seqs)]}

@@ -4944,3 +4944,43 @@ Make the repo-wide storage policy explicit after the infer pressure-workspace le
 1. Infer and DenseGen style workspaces keep their default USR roots inside the workspace tree.
 2. USR sync remains flexible enough for local mirrors and explicit external storage roots.
 3. The boundary is now written down in the SOR docs instead of being inferred from examples.
+
+## 2026-03-07 - Phase 2 Slice BL (Canonical Evo2 GPU Env Rebuild)
+
+### Goal
+
+Rebuild the canonical dnadesign GPU environment in `/project/dunlop/esouth/dnadesign/.venv` with the locked dev and `infer-evo2` dependency set, then verify that infer runs against the current Evo2 package surface that includes `evo2_20b`.
+
+### Findings
+
+1. The correct environment-realization command after the dependency declaration change is `uv sync --locked --group dev --extra infer-evo2`, not `uv add`. The declaration was already canonical in `pyproject.toml` and `uv.lock`.
+2. A cold `flash-attn` rebuild on the current SCC GPU node took `61m 28s` with `UV_CONCURRENT_BUILDS=1`, `UV_CONCURRENT_INSTALLS=1`, `MAX_JOBS=2`, `CMAKE_BUILD_PARALLEL_LEVEL=2`, `OMP_NUM_THREADS=2`, and `FLASH_ATTN_CUDA_ARCHS=89`.
+3. The canonical environment stayed at `/project/dunlop/esouth/dnadesign/.venv`. Build transients and caches stayed under `/project/dunlop/esouth/cache/...` (`uv`, `tmp`, `torch-extensions`, `triton-cache`, `pycache`, HuggingFace cache).
+4. Final verified package surface:
+   - `evo2==0.5.3`
+   - `flash-attn==2.8.3`
+   - `transformer-engine==2.11.0`
+   - `transformer-engine-torch==2.11.0`
+   - `torch==2.8.0+cu128`
+5. `evo2.utils.MODEL_NAMES` now includes `evo2_20b` in the canonical environment.
+6. The first post-build failure was not resolver drift. `uv run infer adapters list` failed because `typer` was corrupted in-place: `.venv/lib/python3.12/site-packages` contained `typer-0.21.1.dist-info` but no importable `typer/` module directory.
+7. The likely root cause of the `typer` corruption was an interrupted earlier install. A targeted repair with `uv sync --locked --group dev --extra infer-evo2 --reinstall-package typer` fixed the issue.
+8. Real infer runtime smoke passed after the repair:
+   - `uv run infer extract --model-id evo2_7b --device cuda:0 --precision bf16 --alphabet dna --batch-size 1 --fn evo2.log_likelihood --format float --seq ACGTACGTACGT --no-progress`
+9. Evo2 runtime still prints `Extra keys in state_dict` during model load. This is upstream runtime noise rather than a dnadesign logging regression.
+
+### Verification commands
+
+1. `uv lock --check`
+2. `uv sync --locked --group dev --extra infer-evo2 --reinstall-package flash-attn --reinstall-package transformer-engine-torch --reinstall-package evo2`
+3. `UV_PROJECT_ENVIRONMENT="$PWD/.venv" uv run python - <<'PY' ... from evo2.utils import MODEL_NAMES ... import transformer_engine.pytorch, flash_attn, evo2 ... PY`
+4. `UV_PROJECT_ENVIRONMENT="$PWD/.venv" uv run infer adapters list`
+5. `UV_PROJECT_ENVIRONMENT="$PWD/.venv" uv run pytest -q src/dnadesign/infer/tests/runtime/test_capacity_planner.py src/dnadesign/infer/tests/runtime/test_evo2_adapter_pooling_contracts.py src/dnadesign/infer/tests/cli/test_validate_command.py src/dnadesign/infer/tests/package/test_wrapper_contracts.py -k "20b or hopper or tuple_sequences or runbook_gpu_validation_rejects_20b_on_non_hopper_declared_gpu or rejects_20b_on_non_hopper_gpu"`
+6. `UV_PROJECT_ENVIRONMENT="$PWD/.venv" uv sync --locked --group dev --extra infer-evo2 --reinstall-package typer`
+7. `UV_PROJECT_ENVIRONMENT="$PWD/.venv" uv run infer extract --model-id evo2_7b --device cuda:0 --precision bf16 --alphabet dna --batch-size 1 --fn evo2.log_likelihood --format float --seq ACGTACGTACGT --no-progress`
+
+### Contract impact
+
+1. The canonical SCC GPU build path for infer is now validated end-to-end with the latest locked Evo2 package surface that exposes `evo2_20b`.
+2. Environment repair should use targeted `uv sync --reinstall-package ...` for corrupted installs, not ad hoc secondary environments.
+3. Infer can now be pressure-tested from the canonical `.venv` with real Evo2 runtime execution on `evo2_7b`, while `evo2_20b` is present and validated at the package/registry/contract layer.

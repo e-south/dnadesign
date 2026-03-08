@@ -90,6 +90,31 @@ jobs: []
         )
 
 
+def test_runbook_gpu_validation_rejects_20b_on_non_hopper_declared_gpu(tmp_path: Path) -> None:
+    from dnadesign.infer import validate_runbook_gpu_resources
+
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        """
+model:
+  id: evo2_20b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="requires Hopper"):
+        validate_runbook_gpu_resources(
+            config_path=config,
+            declared_gpus=1,
+            gpu_capability="8.9",
+            gpu_memory_gib=80.0,
+        )
+
+
 def test_runbook_gpu_validation_normalizes_config_contract_errors(tmp_path: Path) -> None:
     from dnadesign.infer import validate_runbook_gpu_resources
 

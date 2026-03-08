@@ -22,6 +22,12 @@ _MODEL_PARAM_BILLIONS = {
     "evo2_40b": 40.0,
 }
 
+_HOPPER_REQUIRED_MODELS = {
+    "evo2_1b_base",
+    "evo2_20b",
+    "evo2_40b",
+}
+
 _PRECISION_BYTES = {
     "fp32": 4.0,
     "fp16": 2.0,
@@ -30,6 +36,47 @@ _PRECISION_BYTES = {
 
 _USABLE_MEMORY_FACTOR = 0.90
 _MODEL_HEADROOM_FACTOR = 1.25
+
+
+def _parse_compute_capability(value: str) -> tuple[int, int] | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    major_text, dot, minor_text = text.partition(".")
+    if dot != ".":
+        return None
+    try:
+        return int(major_text), int(minor_text)
+    except ValueError:
+        return None
+
+
+def _is_hopper_class_device(device_info: GpuDeviceInfo) -> bool:
+    name = str(device_info.name or "").lower()
+    if any(token in name for token in ("h100", "h200", "gh200", "hopper")):
+        return True
+    capability = _parse_compute_capability(device_info.compute_capability)
+    if capability is None:
+        return False
+    return capability >= (9, 0)
+
+
+def _validate_evo2_gpu_arch_contract(*, model: ModelConfig, devices: tuple[GpuDeviceInfo, ...]) -> None:
+    if model.id not in _HOPPER_REQUIRED_MODELS:
+        return
+    non_hopper = [
+        f"{device.name or f'gpu{device.index}'}(cc={device.compute_capability})"
+        for device in devices
+        if not _is_hopper_class_device(device)
+    ]
+    if not non_hopper:
+        return
+    raise ValidationError(
+        "CAPACITY_FAIL "
+        f"model_id={model.id} "
+        "requires Hopper-class GPUs for the current Evo2 upstream contract "
+        f"selected_devices={non_hopper}"
+    )
 
 
 def estimate_required_gib(*, model_id: str, precision: str) -> float | None:
@@ -123,6 +170,7 @@ def validate_model_hardware_contract(
             f"selected_gpus={len(selected)}"
         )
     selected = selected[:required_gpus]
+    _validate_evo2_gpu_arch_contract(model=model, devices=selected)
 
     required_gib = estimate_required_gib(model_id=model.id, precision=model.precision)
     if required_gib is None:

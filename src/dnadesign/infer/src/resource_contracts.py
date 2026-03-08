@@ -17,6 +17,7 @@ import yaml
 
 _GPU_CAPABILITY_MEMORY_HINT_GIB: dict[str, float] = {
     "8.9": 45.0,
+    "9.0": 80.0,
 }
 
 
