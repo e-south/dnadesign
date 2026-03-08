@@ -94,6 +94,11 @@ def test_dataset_identity_module_exports_expected_symbols() -> None:
     assert hasattr(module, "open_dataset")
 
 
+def test_dataset_read_keys_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.dataset_read_keys")
+    assert hasattr(module, "key_list_from_batch")
+
+
 def test_dataset_overlay_maintenance_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.dataset_overlay_maintenance")
     assert hasattr(module, "list_overlay_infos")

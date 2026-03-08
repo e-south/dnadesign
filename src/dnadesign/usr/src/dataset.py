@@ -47,6 +47,7 @@ from .dataset_overlay_ops import (
     write_overlay_part_dataset,
 )
 from .dataset_overlay_query import build_overlay_query
+from .dataset_read_keys import key_list_from_batch
 from .dataset_query import create_overlay_view, sql_ident, sql_str
 from .dataset_reporting import describe_dataset, manifest_dataset, manifest_dict_dataset
 from .dataset_reserved_overlay import write_reserved_overlay
@@ -408,33 +409,7 @@ class Dataset:
         )
 
     def _key_list_from_batch(self, batch: pa.RecordBatch, key: str) -> List[str]:
-        def _col(name: str) -> pa.Array:
-            idx = batch.schema.get_field_index(name)
-            if idx < 0:
-                raise SchemaError(f"Missing required column '{name}' for key '{key}'.")
-            return batch.column(idx)
-
-        if key == "id":
-            vals = _col("id").to_pylist()
-            if any(v is None or str(v).strip() == "" for v in vals):
-                raise SchemaError("Missing id values while computing dedupe key.")
-            return [str(v) for v in vals]
-        if key in {"sequence", "sequence_norm"}:
-            vals = _col("sequence").to_pylist()
-            if any(v is None or str(v).strip() == "" for v in vals):
-                raise SchemaError("Missing sequence values while computing dedupe key.")
-            return [str(v).strip() for v in vals]
-        if key == "sequence_ci":
-            alph = _col("alphabet").to_pylist()
-            if any(v is None or str(v).strip() == "" for v in alph):
-                raise SchemaError("Missing alphabet values while computing dedupe key.")
-            if any(str(v) != "dna_4" for v in alph):
-                raise SchemaError("sequence_ci is only valid for dna_4 datasets.")
-            seqs = _col("sequence").to_pylist()
-            if any(v is None or str(v).strip() == "" for v in seqs):
-                raise SchemaError("Missing sequence values while computing dedupe key.")
-            return [str(v).strip().upper() for v in seqs]
-        raise SchemaError(f"Unsupported join key '{key}'.")
+        return key_list_from_batch(batch, key)
 
     def _load_overlays(
         self,

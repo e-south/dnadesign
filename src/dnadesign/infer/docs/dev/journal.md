@@ -4783,3 +4783,58 @@ Shrink `usr/src/dataset.py` by extracting overlay catalog loading and overlay-aw
 1. `infer` and `densegen` continue to interact with USR through the same overlay read/write contracts.
 2. Overlay catalog caching is now owned by the overlay-catalog seam rather than `dataset.py`.
 3. `dataset.py` is smaller and more orthogonal, with read metadata responsibilities extracted from the monolith.
+
+## 2026-03-07 - Phase 2 Slice BI (USR Read-Key Extraction)
+
+### Goal
+
+Continue shrinking `usr/src/dataset.py` by extracting record-batch key derivation into an explicit read-key helper module, while preserving dedupe behavior and sibling-tool compatibility with USR.
+
+### Findings
+
+1. `Dataset._key_list_from_batch(...)` remained embedded in `dataset.py` even though it is a standalone read/dedupe helper.
+2. The behavior is contract-sensitive because it drives dedupe key semantics (`id`, `sequence`, `sequence_norm`, `sequence_ci`) and associated fail-fast error messages.
+3. The sibling-tool compatibility risk is indirect: `infer` and `densegen` rely on USR read/write stability, so the same broad compatibility set should be rerun after even a small `dataset.py` extraction.
+
+### TDD sequence
+
+1. Red:
+   - added `usr/tests/test_dataset_read_keys_module.py`.
+   - added module export coverage to `usr/tests/test_module_layout.py`.
+   - required `Dataset._key_list_from_batch(...)` to delegate to the new helper module.
+2. Green:
+   - added `usr/src/dataset_read_keys.py`.
+   - moved record-batch key extraction logic into `key_list_from_batch(...)`.
+   - rewired `Dataset._key_list_from_batch(...)` to delegate.
+3. Verify:
+   - targeted read-key tests passed.
+   - dedupe/read-path tests passed.
+   - full `usr` suite passed.
+   - `infer` USR write-back/prune tests passed.
+   - `densegen` USR source/output tests passed.
+   - full `infer` suite passed.
+
+### Changes applied
+
+1. `src/dnadesign/usr/src/dataset_read_keys.py`
+   - added record-batch key extraction helper.
+2. `src/dnadesign/usr/src/dataset.py`
+   - delegated `_key_list_from_batch(...)`.
+3. `src/dnadesign/usr/tests/test_dataset_read_keys_module.py`
+   - added layout and behavior coverage.
+4. `src/dnadesign/usr/tests/test_module_layout.py`
+   - added module export coverage.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/usr/tests/test_dataset_read_keys_module.py src/dnadesign/usr/tests/test_module_layout.py -k "read_keys"`
+2. `uv run pytest -q src/dnadesign/usr/tests/test_dedupe.py src/dnadesign/usr/tests/test_dataset_read_ops.py`
+3. `uv run pytest -q src/dnadesign/usr/tests`
+4. `uv run pytest -q src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/infer/tests/cli/test_prune_command.py src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py src/dnadesign/notify/tests/test_events_source.py src/dnadesign/densegen/tests/runtime/test_usr_sequences_source.py src/dnadesign/densegen/tests/runtime/test_output_sink_parity.py`
+5. `uv run pytest -q src/dnadesign/infer/tests`
+
+### Contract impact
+
+1. Dedupe/read key semantics remain unchanged.
+2. `dataset.py` is smaller and more orthogonal, with the read-key helper extracted from the monolith.
+3. `infer` and `densegen` continue to work with USR on the same compatibility paths.
