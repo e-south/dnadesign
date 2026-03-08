@@ -113,6 +113,8 @@ qsub -P <project> \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
 ```
 
+Use that direct submit as the default `evo2_7b` lane. For `evo2_20b`, keep the same template but submit through an ops runbook or pass explicit Hopper resources (`-l gpus=1 -l gpu_c=9.0`) so the scheduler request matches the model contract.
+
 `evo2-gpu-infer.qsub` command defaults:
 - fail-fast gate: `INFER_CONFIG` is required
 - preflight: `uv run infer validate config --config "$INFER_CONFIG"`

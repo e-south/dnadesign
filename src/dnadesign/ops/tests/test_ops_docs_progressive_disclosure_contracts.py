@@ -121,6 +121,7 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     assert "resources.gpu_memory_gib" in text
     assert "model.parallelism" in text
     assert "gpu_capability=8.9 -> 45.0 GiB" in text
+    assert "gpu_capability=9.0 -> 80.0 GiB" in text
 
 
 def test_repo_docs_index_exposes_ops_tool_and_operations_route() -> None:

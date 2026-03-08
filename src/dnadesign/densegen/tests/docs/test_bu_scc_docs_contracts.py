@@ -120,12 +120,14 @@ def test_bu_scc_docs_define_canonical_repo_venv_and_model_cache_split_policy() -
 
     assert 'export UV_PROJECT_ENVIRONMENT="$PWD/.venv"' in bundle
     assert "HF_HOME_7B" in bundle
-    assert "HF_HOME_LARGE" in bundle
+    assert "HF_HOME_20B" in bundle
     assert "HF_HUB_CACHE" in bundle
     assert "HUGGINGFACE_HUB_CACHE" in bundle
     assert "TRANSFORMERS_CACHE" in bundle
     assert "/project/<your_project>/$USER/cache/huggingface/evo2_7b" in install_doc
-    assert "/projectnb/<your_project>/$USER/cache/huggingface/evo2_large" in install_doc
+    assert "/project/<your_project>/$USER/cache/huggingface/evo2_20b" in install_doc
+    assert "gpu_c=9.0" in bundle
+    assert "H200" in bundle
 
 
 def test_bu_scc_install_doc_includes_deterministic_flash_attn_source_build_controls() -> None:

@@ -16,7 +16,8 @@ Use this with:
 - On shared nodes, start DenseGen at `-pe omp 12` and tune based on measured throughput.
 - DenseGen runs are CPU jobs (no GPU request).
 - DenseGen submit commands must pass `DENSEGEN_RUN_ARGS` with exactly one of `--fresh` or `--resume`.
-- Evo2 runs require GPU resources (`-l gpus=1 -l gpu_c=8.9`).
+- Evo2 `evo2_7b` runs require GPU resources (`-l gpus=1 -l gpu_c=8.9`).
+- Evo2 `evo2_20b` runs require Hopper-class GPU resources (`-l gpus=1 -l gpu_c=9.0`).
 - Notify watches USR `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
 - Prefer `WEBHOOK_FILE` for watcher submits so webhook values are not exposed in `qstat -j` env metadata.
 - Notify/USR contract requires structured events with `event_version`; legacy logs are rejected.
@@ -30,7 +31,8 @@ Use this with:
 | DenseGen interactive smoke/debug | interactive (`qrsh`) CPU | `-l h_rt=01:00:00 -pe omp 8 -l mem_per_core=8G` | Use for short validation and debugging only. |
 | DenseGen batch (CBC/GUROBI) | batch CPU | `-l h_rt=08:00:00 -pe omp 12 -l mem_per_core=8G` | Scale slots with plan complexity; keep solver threads aligned. |
 | Notify watcher | batch CPU | `-l h_rt=24:00:00 -pe omp 1 -l mem_per_core=2G` | Low-footprint long-running watcher. |
-| Evo2 inference/smoke | batch GPU | `-l h_rt=04:00:00 -pe omp 4 -l mem_per_core=8G -l gpus=1 -l gpu_c=8.9` | Load matching CUDA/GCC modules in job script. |
+| Evo2 7B inference/smoke | batch GPU | `-l h_rt=04:00:00 -pe omp 4 -l mem_per_core=8G -l gpus=1 -l gpu_c=8.9` | Default SCC lane for `evo2_7b`. |
+| Evo2 20B inference | batch GPU | `-l h_rt=04:00:00 -pe omp 4 -l mem_per_core=8G -l gpus=1 -l gpu_c=9.0` | Hopper/H200 lane for `evo2_20b`. |
 | Large downloads / model prefetch / dataset transfer | transfer-node | `-l download -l h_rt=24:00:00 -pe omp 1` | Do not run compute-heavy tasks here. |
 
 ### Copy/paste commands
@@ -66,6 +68,8 @@ qsub -P <project> \
   -v CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
 ```
+
+For `evo2_20b`, prefer the ops runbook path so the resource declaration stays attached to the run config. If you submit directly, add `-l gpus=1 -l gpu_c=9.0`.
 
 #### 5) Notify profile setup + watcher submit
 

@@ -83,9 +83,17 @@ Details: [BU SCC Install bootstrap: Clone the repository](install.md#2-clone-the
 ```bash
 export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
 export UV_CACHE_DIR="${UV_CACHE_DIR:-/project/<project>/$USER/cache/uv}"
+export TARGET_MODEL_ID="${TARGET_MODEL_ID:-evo2_7b}"
 export HF_HOME_7B="${HF_HOME_7B:-/project/<project>/$USER/cache/huggingface/evo2_7b}"
-export HF_HOME_LARGE="${HF_HOME_LARGE:-/projectnb/<project>/$USER/cache/huggingface/evo2_large}"
-export HF_HOME="${HF_HOME:-$HF_HOME_7B}"
+export HF_HOME_20B="${HF_HOME_20B:-/project/<project>/$USER/cache/huggingface/evo2_20b}"
+case "$TARGET_MODEL_ID" in
+  evo2_7b) export HF_HOME="${HF_HOME:-$HF_HOME_7B}" ;;
+  evo2_20b) export HF_HOME="${HF_HOME:-$HF_HOME_20B}" ;;
+  *)
+    printf 'Unsupported TARGET_MODEL_ID=%s\n' "$TARGET_MODEL_ID" >&2
+    return 2 2>/dev/null || exit 2
+    ;;
+esac
 export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
 export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HUB_CACHE}"
 export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
@@ -145,7 +153,7 @@ PY
 For extended TE/FlashAttention/Evo2 checks:
 [BU SCC Install bootstrap: Smoke tests](install.md#6-smoke-tests)
 
-For one-sequence infer execution smoke (`evo2_7b`) and 40B capacity preflight:
+For one-sequence infer execution smoke (`evo2_7b`), Hopper `evo2_20b` validation, and 40B capacity preflight:
 [BU SCC Install bootstrap: Model support](install.md#63-model-support-7b-and-fp8-checkpoints)
 
 ### 6.5) Submission pressure gate (status-first)
@@ -227,6 +235,10 @@ qsub -P <project> \
 
 For runbook-based infer submits, set `runbook.resources.gpus`, `runbook.resources.gpu_capability`, and optionally
 `runbook.resources.gpu_memory_gib` so `ops runbook plan` can fail fast on infeasible multi-GPU model requests before submit.
+
+Use:
+- `gpu_capability: 8.9` and `gpu_memory_gib: 45.0` for `evo2_7b`
+- `gpu_capability: 9.0` and `gpu_memory_gib: 80.0` for `evo2_20b` on Hopper/H200
 
 Template details and overrides:
 [BU SCC job templates](jobs/README.md)

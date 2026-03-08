@@ -30,12 +30,13 @@ Run this from an SCC login shell:
 
 ### 0) Node and GPU requirements
 
-Evo2 requirements are Linux + CUDA 12.1+, cuDNN 9.3+, Python 3.12, and GPU Compute Capability 8.9+ for FP8 workflows:
+Evo2 requirements are Linux + CUDA 12.1+, cuDNN 9.3+, Python 3.12, and Hopper-class GPUs for FP8 workflows:
 - Evo2 repo: <https://github.com/ArcInstitute/evo2>
 
 BU SCC GPU requests support explicit GPU count and capability constraints. Use:
 - `-l gpus=1`
-- `-l gpu_c=8.9`
+- `-l gpu_c=8.9` for `evo2_7b`
+- `-l gpu_c=9.0` for `evo2_20b`
 
 Useful SCC commands:
 - `qgpus` to inspect available GPU classes
@@ -89,10 +90,19 @@ export UV_HTTP_RETRIES="${UV_HTTP_RETRIES:-10}"
 
 # Infer model-cache policy:
 # - 7B infer smoke and routine infer runs use /project.
-# - large-model artifacts stay in /projectnb.
+# - 20B Hopper runs also use /project, but with a separate cache root.
+# - 40B is optional and not part of the default SCC path.
 export HF_HOME_7B="${HF_HOME_7B:-/project/<your_project>/$USER/cache/huggingface/evo2_7b}"
-export HF_HOME_LARGE="${HF_HOME_LARGE:-/projectnb/<your_project>/$USER/cache/huggingface/evo2_large}"
-export HF_HOME="${HF_HOME:-$HF_HOME_7B}"
+export HF_HOME_20B="${HF_HOME_20B:-/project/<your_project>/$USER/cache/huggingface/evo2_20b}"
+export TARGET_MODEL_ID="${TARGET_MODEL_ID:-evo2_7b}"
+case "$TARGET_MODEL_ID" in
+  evo2_7b) export HF_HOME="${HF_HOME:-$HF_HOME_7B}" ;;
+  evo2_20b) export HF_HOME="${HF_HOME:-$HF_HOME_20B}" ;;
+  *)
+    printf 'Unsupported TARGET_MODEL_ID=%s\n' "$TARGET_MODEL_ID" >&2
+    return 2 2>/dev/null || exit 2
+    ;;
+esac
 export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
 export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HUB_CACHE}"
 export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
@@ -100,9 +110,10 @@ mkdir -p "$UV_CACHE_DIR" "$HF_HOME" "$HF_HUB_CACHE" "$HUGGINGFACE_HUB_CACHE" "$T
 
 printf 'UV_PROJECT_ENVIRONMENT=%s\n' "$UV_PROJECT_ENVIRONMENT"
 printf 'UV_CACHE_DIR=%s\n' "$UV_CACHE_DIR"
+printf 'TARGET_MODEL_ID=%s\n' "$TARGET_MODEL_ID"
 printf 'HF_HOME=%s\n' "$HF_HOME"
 printf 'HF_HOME_7B=%s\n' "$HF_HOME_7B"
-printf 'HF_HOME_LARGE=%s\n' "$HF_HOME_LARGE"
+printf 'HF_HOME_20B=%s\n' "$HF_HOME_20B"
 printf 'HF_HUB_CACHE=%s\n' "$HF_HUB_CACHE"
 printf 'HUGGINGFACE_HUB_CACHE=%s\n' "$HUGGINGFACE_HUB_CACHE"
 printf 'TRANSFORMERS_CACHE=%s\n' "$TRANSFORMERS_CACHE"
@@ -141,9 +152,10 @@ printf 'HF_HOME=%s\n' "$HF_HOME"
 
 Use this policy in runbooks and sessions:
 
-- Keep infer checkpoint downloads (`evo2_7b`, `evo2_20b`, `evo2_40b`) under `HF_HOME_7B` on `/project`.
-- Keep large-model artifacts (for example 400B external assets) under `HF_HOME_LARGE` on `/projectnb`.
-- Keep `HF_HOME` pointed to `HF_HOME_7B` for infer smoke and infer runs.
+- Keep `evo2_7b` under `HF_HOME_7B` on `/project`.
+- Keep `evo2_20b` under `HF_HOME_20B` on `/project`.
+- Keep `HF_HOME` pointed to the model-specific root selected by `TARGET_MODEL_ID`.
+- Treat `evo2_40b` as optional and non-default on SCC until a dedicated multi-Hopper lane is validated.
 - Export `HF_HUB_CACHE`, `HUGGINGFACE_HUB_CACHE`, and `TRANSFORMERS_CACHE` to `HF_HOME` subpaths to override inherited SCC cache defaults.
 
 ---
@@ -195,9 +207,17 @@ export CUDA_HOME="$(dirname "$(dirname "$(which nvcc)")")"
 export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
 export INFER_WORKSPACE_ROOT="${INFER_WORKSPACE_ROOT:-/project/<your_project>/$USER/dnadesign/src/dnadesign/infer/workspaces/test_stress_ethanol}"
 export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}"
+export TARGET_MODEL_ID="${TARGET_MODEL_ID:-evo2_7b}"
 export HF_HOME_7B="${HF_HOME_7B:-/project/<your_project>/$USER/cache/huggingface/evo2_7b}"
-export HF_HOME_LARGE="${HF_HOME_LARGE:-/projectnb/<your_project>/$USER/cache/huggingface/evo2_large}"
-export HF_HOME="${HF_HOME:-$HF_HOME_7B}"
+export HF_HOME_20B="${HF_HOME_20B:-/project/<your_project>/$USER/cache/huggingface/evo2_20b}"
+case "$TARGET_MODEL_ID" in
+  evo2_7b) export HF_HOME="${HF_HOME:-$HF_HOME_7B}" ;;
+  evo2_20b) export HF_HOME="${HF_HOME:-$HF_HOME_20B}" ;;
+  *)
+    printf 'Unsupported TARGET_MODEL_ID=%s\n' "$TARGET_MODEL_ID" >&2
+    return 2 2>/dev/null || exit 2
+    ;;
+esac
 export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
 export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HUB_CACHE}"
 export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
@@ -384,8 +404,9 @@ PY
 
 #### 6.3 Model support: 7B and FP8 checkpoints
 
-- 7B checkpoints (`evo2_7b`, `evo2_7b_base`, `evo2_7b_262k`) can run without Transformer Engine.
+- 7B checkpoints (`evo2_7b`, `evo2_7b_base`, `evo2_7b_262k`) can run without Transformer Engine and fit the default L40S-style lane (`gpu_c=8.9`).
 - FP8 checkpoints (`evo2_20b`, `evo2_40b`, `evo2_40b_base`, `evo2_1b_base`) require Transformer Engine and Hopper-class GPUs.
+- On BU SCC, use `qgpus` and request `gpu_c=9.0` for `evo2_20b`; H200 is the relevant currently visible Hopper lane.
 - `dnadesign` currently pins torch in the infer extra to `2.8.x`; Evo2 upstream docs recommend `2.6.x` or `2.7.x`. Always run smoke tests after sync on the target host.
 - `infer` currently supports `evo2_7b`, `evo2_20b`, and `evo2_40b`; 400B is not a supported `model.id` in this stack.
 
@@ -414,6 +435,28 @@ uv run infer extract \
   --format float \
   --seq ACGTACGTACGT \
   --no-progress
+```
+
+Model prefetch without runtime:
+
+```bash
+TARGET_MODEL_ID=evo2_7b HF_HOME="$HF_HOME_7B" uv run python - <<'PY'
+from huggingface_hub import snapshot_download
+print(snapshot_download("arcinstitute/evo2_7b"))
+PY
+
+TARGET_MODEL_ID=evo2_20b HF_HOME="$HF_HOME_20B" uv run python - <<'PY'
+from huggingface_hub import snapshot_download
+print(snapshot_download("arcinstitute/evo2_20b"))
+PY
+```
+
+20B preflight on a non-Hopper GPU should fail fast:
+
+```bash
+TARGET_MODEL_ID=evo2_20b uv run infer validate config --config <path_to_evo2_20b_config.yaml>
+# expected shape:
+# CAPACITY_FAIL model_id=evo2_20b ... requires Hopper-class GPUs ...
 ```
 
 40B preflight on one L40S-class GPU should fail fast:
@@ -458,6 +501,20 @@ gpu_total_mib, gpu_cc = [part.strip() for part in line.split(",")]
 gpu_total_gib = int(gpu_total_mib) / 1024.0
 gpu_usable_gib = gpu_total_gib * 0.90
 flash_arch = gpu_cc.replace(".", "")
+gpu_cc_tuple = tuple(int(part) for part in gpu_cc.split("."))
+
+if model_id in {"evo2_20b", "evo2_40b"} and gpu_cc_tuple < (9, 0):
+    print(
+        "RUN_CAPACITY_FAIL "
+        f"model={model_id} precision={precision} gpu_cc={gpu_cc} "
+        "requires Hopper-class GPUs for the current Evo2 upstream contract",
+        file=sys.stderr,
+    )
+    print(
+        "Use gpu_c=9.0 on SCC and schedule onto a Hopper lane such as H200 for evo2_20b.",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
 
 weight_gib = params_b[model_id] * 1e9 * bytes_per[precision] / (1024.0 ** 3)
 required_gib = weight_gib * 1.25
@@ -470,7 +527,7 @@ if required_gib > gpu_usable_gib:
     )
     print(
         "single L40S-class 45-48 GiB GPUs are a safe fit for evo2_7b in this infer stack; "
-        "evo2_20b/evo2_40b require additional GPU memory headroom.",
+        "evo2_20b/evo2_40b require Hopper-class GPUs and additional memory headroom.",
         file=sys.stderr,
     )
     raise SystemExit(2)
@@ -496,6 +553,7 @@ PY
 ```
 
 Expected result for `TARGET_MODEL_ID=evo2_7b` on one L40S: `RESOURCE_GATE_OK`.
+Expected result for `TARGET_MODEL_ID=evo2_20b` on one H200 (`gpu_c=9.0`, `gpu_memory_gib=80.0`): `RESOURCE_GATE_OK`.
 Expected result for `TARGET_MODEL_ID=evo2_40b` on one L40S: `RUN_CAPACITY_FAIL`.
 
 ---

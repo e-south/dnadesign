@@ -112,8 +112,8 @@ For SCC GPU setup, including environment exports and build controls, use:
 
 SCC infer path policy:
 - keep one environment at `<dnadesign_repo>/.venv` (`UV_PROJECT_ENVIRONMENT="$PWD/.venv"`).
-- keep infer model cache for routine runs on `/project` (`HF_HOME_7B`) and set `HUGGINGFACE_HUB_CACHE` plus `TRANSFORMERS_CACHE` under `HF_HOME`.
-- keep large external Evo2 artifacts on `/projectnb` (`HF_HOME_LARGE`).
+- keep infer model caches for routine runs on `/project` (`HF_HOME_7B`, `HF_HOME_20B`) and set `HUGGINGFACE_HUB_CACHE` plus `TRANSFORMERS_CACHE` under `HF_HOME`.
+- keep `TARGET_MODEL_ID` aligned with the selected cache root so `HF_HOME` points to the active model cache.
 - keep transient build/runtime outputs in infer workspace `outputs/runtime/...`.
 
 Current lock behavior note:

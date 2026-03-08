@@ -60,11 +60,13 @@ def test_infer_scc_gpu_env_runbook_exists_and_covers_uv_stack_contract() -> None
     assert "params.layer: final" in doc
     assert 'export UV_PROJECT_ENVIRONMENT="$PWD/.venv"' in doc
     assert "HF_HOME_7B" in doc
-    assert "HF_HOME_LARGE" in doc
+    assert "HF_HOME_20B" in doc
     assert "HF_HUB_CACHE" in doc
     assert "HUGGINGFACE_HUB_CACHE" in doc
     assert "TRANSFORMERS_CACHE" in doc
-    assert "/projectnb/dunlop/esouth/cache/huggingface/evo2_large" in doc
+    assert "/project/dunlop/esouth/cache/huggingface/evo2_20b" in doc
     assert "evo2_40b" in doc
     assert "400B model is out of scope" in doc
     assert "Quantized/offloaded 40B execution is not currently wired." in doc
+    assert "gpu_c=9.0" in doc
+    assert "H200" in doc

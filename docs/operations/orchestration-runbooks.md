@@ -280,7 +280,7 @@ uv run ops runbook execute \
 10. DenseGen routes reject `runbook.infer` and reject GPU resource fields.
 11. Infer routes reject `runbook.densegen` and require GPU resource fields.
 12. Infer planning validates runbook GPU resources against infer `model.parallelism` and capacity contracts before preflight command rendering.
-13. Infer capacity preflight uses `resources.gpu_memory_gib` when provided; otherwise it uses capability hints for known classes (`gpu_capability=8.9 -> 45.0 GiB`).
+13. Infer capacity preflight uses `resources.gpu_memory_gib` when provided; otherwise it uses capability hints for known classes (`gpu_capability=8.9 -> 45.0 GiB`, `gpu_capability=9.0 -> 80.0 GiB`).
 14. Infer `validate config` on non-GPU hosts validates schema/contracts and reports capacity-check skip; runbook planning remains the deterministic place for declared scheduler-resource capacity checks.
 15. Notify workflows require `runbook.notify`, with policy matching workflow family (`densegen|generic` for DenseGen, `infer|generic` for Infer).
 16. Notify setup is non-interactive and file-only by contract: planner resolves webhook file with explicit precedence (`<notify.webhook_env>_FILE` first, otherwise `notify.profile` webhook `secret_ref` when it is a `file://` path) and uses `--secret-source file --secret-ref file://<resolved-path> --no-store-webhook`; missing/unreadable webhook file fails fast before submit.

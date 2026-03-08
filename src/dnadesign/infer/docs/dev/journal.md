@@ -4984,3 +4984,80 @@ Rebuild the canonical dnadesign GPU environment in `/project/dunlop/esouth/dnade
 1. The canonical SCC GPU build path for infer is now validated end-to-end with the latest locked Evo2 package surface that exposes `evo2_20b`.
 2. Environment repair should use targeted `uv sync --reinstall-package ...` for corrupted installs, not ad hoc secondary environments.
 3. Infer can now be pressure-tested from the canonical `.venv` with real Evo2 runtime execution on `evo2_7b`, while `evo2_20b` is present and validated at the package/registry/contract layer.
+
+## 2026-03-07 - Phase 2 Slice BM (SCC 7B/20B Path Policy + Cache Transition)
+
+### Goal
+
+Align the SCC docs, runbooks, and actual model cache state to the intended default lane set: `evo2_7b` and `evo2_20b`, with `20b` documented as a Hopper/H200 lane and `40b` moved out of the default SCC path.
+
+### Findings
+
+1. The docs still encoded a stale split policy (`HF_HOME_7B` on `/project`, `HF_HOME_LARGE` on `/projectnb`) even though the practical infer path now needs model-specific caches and the canonical repo `.venv`.
+2. The checked-in SCC docs and infer GPU runbook did not make the `evo2_20b` scheduler contract explicit enough:
+   - `evo2_20b` needs Hopper-class GPUs.
+   - On SCC, the relevant visible Hopper lane is `H200`.
+   - The correct scheduler capability request is `gpu_c=9.0`.
+3. Direct deletion of `/projectnb/.../models--arcinstitute--evo2_40b` removed the 40B cache correctly, but `df` on `/projectnb` did not change because `df` is filesystem-wide on shared storage. `du` on the user cache tree is the correct verification method for this cleanup.
+4. `evo2_20b` was not yet cached under the canonical `/project` infer cache root. A direct `huggingface_hub.model_info("arcinstitute/evo2_20b")` check succeeded, so prefetch was viable from the current session.
+
+### TDD sequence
+
+1. Red:
+   - updated infer SCC docs contract test to require `HF_HOME_20B`, `/project/.../evo2_20b`, `gpu_c=9.0`, and `H200`.
+   - updated BU SCC docs contract test bundle to require `HF_HOME_20B`, `/project/.../evo2_20b`, `gpu_c=9.0`, and `H200`.
+   - ran the targeted docs tests and confirmed failure on the old `HF_HOME_LARGE` / `/projectnb` contract.
+2. Green:
+   - rewrote SCC docs to use `HF_HOME_7B` + `HF_HOME_20B` under `/project`, with explicit `TARGET_MODEL_ID` selection of `HF_HOME`.
+   - documented `evo2_7b` as the default SCC lane and `evo2_20b` as the Hopper/H200 lane with `gpu_c=9.0`.
+   - updated capacity-gate examples to match the current infer Hopper contract.
+   - added explicit model-prefetch commands for `evo2_7b` and `evo2_20b`.
+3. Real state transition:
+   - prefetched `arcinstitute/evo2_20b` into `/project/dunlop/esouth/cache/huggingface/evo2_20b`.
+   - removed `/projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b` and its lock entry.
+   - verified remaining `/projectnb` infer cache footprint with `du`, not `df`.
+
+### Changes applied
+
+1. `docs/bu-scc/install.md`
+   - replaced `HF_HOME_LARGE` with `HF_HOME_20B`.
+   - documented `TARGET_MODEL_ID` selection of `HF_HOME`.
+   - documented `gpu_c=9.0` / Hopper / H200 for `evo2_20b`.
+   - added `snapshot_download(...)` prefetch commands for `evo2_7b` and `evo2_20b`.
+2. `docs/bu-scc/quickstart.md`
+   - aligned the cache/export sequence with `HF_HOME_7B` + `HF_HOME_20B`.
+   - documented runbook resource values for `7b` vs `20b`.
+3. `docs/installation.md`
+   - aligned the top-level SCC path policy summary with model-specific `/project` caches.
+4. `docs/bu-scc/jobs/README.md`
+   - documented direct template usage as the default `7b` lane and `gpu_c=9.0` override / runbook path for `20b`.
+5. `docs/bu-scc/submission-reference.md`
+   - split `evo2_7b` and `evo2_20b` into separate scheduler resource rows.
+6. `docs/operations/orchestration-runbooks.md`
+   - added `gpu_capability=9.0 -> 80.0 GiB` to the infer capacity preflight contract docs.
+7. `src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md`
+   - aligned path policy, capacity gate, and setup steps to `7b` / `20b`.
+   - added explicit Hopper/H200 guidance and model-prefetch commands.
+8. `src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py`
+   - updated SCC infer docs contract assertions.
+9. `src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py`
+   - updated shared BU SCC docs contract assertions.
+10. `src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py`
+   - updated ops docs contract assertions for the `9.0 -> 80.0 GiB` hint.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py -k "scc_gpu_env_runbook_exists_and_covers_uv_stack_contract or model_cache_split_policy or infer_gpu_resource_contracts_are_documented_in_ops_runbook"`
+2. `UV_PROJECT_ENVIRONMENT="$PWD/.venv" uv run python - <<'PY' from huggingface_hub import model_info; info = model_info("arcinstitute/evo2_20b"); print(info.id); print(info.sha) PY`
+3. `UV_PROJECT_ENVIRONMENT="$PWD/.venv" uv run python - <<'PY' from huggingface_hub import snapshot_download; print(snapshot_download("arcinstitute/evo2_20b")) PY`
+4. `du -sh /project/dunlop/esouth/cache/huggingface/evo2_7b /project/dunlop/esouth/cache/huggingface/evo2_20b`
+5. `rm -rf /projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b /projectnb/dunlop/esouth/cache/huggingface/hub/.locks/models--arcinstitute--evo2_40b`
+6. `du -sh /projectnb/dunlop/esouth/cache/huggingface/hub`
+7. `find /projectnb/dunlop/esouth/cache/huggingface/hub -maxdepth 2 -type d -name 'models--arcinstitute--evo2*' -print | sort`
+
+### Contract impact
+
+1. The default SCC infer story is now `evo2_7b` plus optional `evo2_20b`, both cached under `/project`.
+2. `evo2_20b` docs and runbooks now match the current infer Hopper contract and SCC scheduler resource request (`gpu_c=9.0`).
+3. `evo2_40b` remains supported in infer code, but it is no longer part of the default SCC path or cache policy.
+4. The stale `40b` user cache under `/projectnb` has been removed; the remaining `projectnb` infer cache footprint is the old `evo2_7b` cache only.
