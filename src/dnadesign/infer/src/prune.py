@@ -13,7 +13,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.usr import Dataset
+from dnadesign.usr.src.errors import SequencesError
+from dnadesign.usr.src.overlay_maintenance import remove_dataset_overlay
 
 from .errors import ConfigError
 
@@ -24,17 +25,10 @@ def prune_usr_overlay(*, dataset: str, usr_root: Path, mode: str = "archive") ->
         raise ConfigError("prune mode must be one of: archive, delete")
 
     resolved_root = usr_root.expanduser().resolve()
-    if not resolved_root.exists() or not resolved_root.is_dir():
-        raise ConfigError(f"USR root not found: {resolved_root}")
-
-    ds = Dataset(resolved_root, dataset)
-    if not any(overlay.namespace == "infer" for overlay in ds.list_overlays()):
+    try:
+        result = remove_dataset_overlay(resolved_root, dataset, "infer", mode=selected_mode)
+    except SequencesError as error:
+        raise ConfigError(str(error)) from error
+    if not bool(result.get("removed")):
         raise ConfigError("Overlay 'infer' not found.")
-    result = ds.remove_overlay("infer", mode=selected_mode)
-    return {
-        "dataset": ds.name,
-        "root": str(resolved_root),
-        "namespace": "infer",
-        "mode": selected_mode,
-        **result,
-    }
+    return result

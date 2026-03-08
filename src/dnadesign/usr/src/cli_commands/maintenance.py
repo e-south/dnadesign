@@ -17,6 +17,7 @@ from typing import Callable
 
 from ..dataset import Dataset
 from ..errors import SequencesError
+from ..overlay_maintenance import remove_dataset_overlay
 
 
 @dataclass(frozen=True)
@@ -56,9 +57,7 @@ def cmd_overlay_remove(args, *, deps: MaintenanceDeps) -> None:
     if not namespace:
         raise SequencesError("overlay-remove requires a namespace argument.")
     mode = str(getattr(args, "mode", "error") or "error")
-    dataset = Dataset(args.root, ds_name)
-    with dataset.maintenance(reason="overlay_remove"):
-        result = dataset.remove_overlay(str(namespace), mode=mode)
+    result = remove_dataset_overlay(args.root, ds_name, str(namespace), mode=mode)
     if result.get("removed"):
         archived_path = result.get("archived_path")
         if archived_path:

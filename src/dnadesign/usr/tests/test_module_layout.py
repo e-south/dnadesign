@@ -44,6 +44,12 @@ def test_cli_paths_module_exports_expected_symbols() -> None:
     assert hasattr(module, "resolve_path_anywhere")
 
 
+def test_cli_bindings_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_bindings")
+    assert hasattr(module, "CliBindings")
+    assert hasattr(module, "build_cli_bindings")
+
+
 def test_dataset_query_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.dataset_query")
     assert hasattr(module, "sql_ident")
@@ -82,11 +88,22 @@ def test_dataset_validate_module_exports_expected_symbols() -> None:
     assert hasattr(module, "validate_dataset")
 
 
+def test_dataset_identity_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.dataset_identity")
+    assert hasattr(module, "normalize_dataset_id")
+    assert hasattr(module, "open_dataset")
+
+
 def test_dataset_overlay_maintenance_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.dataset_overlay_maintenance")
     assert hasattr(module, "list_overlay_infos")
     assert hasattr(module, "remove_overlay_namespace")
     assert hasattr(module, "compact_overlay_namespace")
+
+
+def test_overlay_maintenance_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.overlay_maintenance")
+    assert hasattr(module, "remove_dataset_overlay")
 
 
 def test_dataset_reserved_overlay_module_exports_expected_symbols() -> None:
@@ -225,6 +242,7 @@ def test_cli_maintenance_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.cli_commands.maintenance")
     assert hasattr(module, "cmd_registry_freeze")
     assert hasattr(module, "cmd_overlay_compact")
+    assert hasattr(module, "cmd_overlay_remove")
     assert hasattr(module, "cmd_snapshot")
     assert hasattr(module, "cmd_dedupe_sequences")
 

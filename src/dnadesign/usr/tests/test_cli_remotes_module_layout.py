@@ -15,6 +15,7 @@ import importlib
 import inspect
 
 import dnadesign.usr.src.cli as usr_cli
+import dnadesign.usr.src.cli_bindings as cli_bindings
 
 
 def test_usr_cli_remotes_module_importable() -> None:
@@ -27,7 +28,7 @@ def test_usr_cli_remotes_module_importable() -> None:
 
 
 def test_usr_cli_remotes_commands_delegate_to_remotes_module() -> None:
-    source = inspect.getsource(usr_cli)
+    source = inspect.getsource(cli_bindings)
     assert "remotes_commands.cmd_remotes_list(" in source
     assert "remotes_commands.cmd_remotes_show(" in source
     assert "remotes_commands.cmd_remotes_add(" in source

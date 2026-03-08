@@ -23,6 +23,8 @@ import pyarrow.parquet as pq
 from .dataset_activity import append_meta_note as append_dataset_meta_note
 from .dataset_activity import record_dataset_activity_event
 from .dataset_dedupe import dedupe_dataset
+from .dataset_identity import normalize_dataset_id as normalize_dataset_id_impl
+from .dataset_identity import open_dataset
 from .dataset_ingest import (
     add_sequences_dataset,
     import_csv_dataset,
@@ -126,20 +128,7 @@ class DedupeStats:
 
 
 def normalize_dataset_id(name: str) -> str:
-    ds = str(name or "").strip()
-    if not ds:
-        raise SequencesError("Dataset name cannot be empty.")
-    p = Path(ds)
-    if p.is_absolute():
-        raise SequencesError("Dataset name must be a relative path.")
-    if any(part in {".", ".."} for part in p.parts):
-        raise SequencesError("Dataset name must not contain '.' or '..'.")
-    if p.parts and p.parts[0] == LEGACY_DATASET_PREFIX:
-        raise SequencesError(
-            "legacy dataset paths under 'archived/' are not supported. "
-            "Use canonical datasets or datasets/_archive/<namespace>/<dataset>."
-        )
-    return Path(*p.parts).as_posix()
+    return normalize_dataset_id_impl(name, legacy_dataset_prefix=LEGACY_DATASET_PREFIX)
 
 
 @dataclass
@@ -154,21 +143,13 @@ class Dataset:
 
     @classmethod
     def open(cls, root: Path, name_or_path: str) -> "Dataset":
-        root_path = Path(root).resolve()
-        target = Path(str(name_or_path)).expanduser()
-        if target.exists():
-            if target.is_file() and target.name == RECORDS:
-                dataset_dir = target.parent
-            elif target.is_dir() and (target / RECORDS).exists():
-                dataset_dir = target
-            else:
-                raise SequencesError(f"Path does not point to a dataset: {target}")
-            try:
-                rel = dataset_dir.resolve().relative_to(root_path)
-            except ValueError as e:
-                raise SequencesError(f"Dataset path must live under root: {root_path}") from e
-            return cls(root_path, rel.as_posix())
-        return cls(root_path, normalize_dataset_id(str(name_or_path)))
+        return open_dataset(
+            root,
+            name_or_path,
+            dataset_factory=cls,
+            records_name=RECORDS,
+            legacy_dataset_prefix=LEGACY_DATASET_PREFIX,
+        )
 
     @property
     def dir(self) -> Path:
