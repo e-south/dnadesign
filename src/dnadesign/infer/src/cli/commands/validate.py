@@ -21,6 +21,7 @@ from ...config import RootConfig
 from ...input_parsing import read_ids_arg
 from ...ingest.sources import load_usr_input
 from ...runtime.capacity_planner import probe_gpu_inventory, validate_model_hardware_contract
+from ...usr_registry import derive_usr_registry_spec
 from ..common import discovery_config, raise_cli_error
 from ..console import console, render_config_summary
 
@@ -63,5 +64,21 @@ def register(app: typer.Typer) -> None:
             )
             console.print(f"[green]✔ USR OK[/green]  dataset={dataset}  rows={len(seqs)}  field={field}")
             console.print(f"[accent]records:[/accent] {ds.records_path}")
+        except Exception as error:
+            raise_cli_error(error)
+
+    @validate_app.command("usr-registry", help="Render the required USR namespace registration spec for infer write-back jobs.")
+    def validate_usr_registry(
+        config: Optional[Path] = typer.Option(None, "--config"),
+        job: Optional[str] = typer.Option(None, "--job", help="Restrict to one job id."),
+    ) -> None:
+        try:
+            cfg_path = discovery_config(config)
+            root = RootConfig(**yaml.safe_load(cfg_path.read_text()))
+            spec = derive_usr_registry_spec(root=root, job_id=job)
+            typer.echo(f"namespace: {spec.namespace}")
+            typer.echo(f"root: {spec.root}")
+            typer.echo(f"columns: {spec.columns_spec}")
+            typer.echo(f"register: {spec.register_command}")
         except Exception as error:
             raise_cli_error(error)

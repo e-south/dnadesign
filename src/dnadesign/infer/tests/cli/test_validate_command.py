@@ -168,3 +168,173 @@ jobs:
 
     assert result.exit_code == 3
     assert "CAPACITY_FAIL" in (result.stdout or "")
+
+
+def test_validate_usr_registry_renders_exact_namespace_register_command(tmp_path: Path) -> None:
+    cfg = _write(
+        tmp_path / "usr_registry.yaml",
+        """
+model:
+  id: evo2_7b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: j1
+    operation: extract
+    ingest:
+      source: usr
+      dataset: demo
+      root: /tmp/usr-root
+    outputs:
+      - id: ll_mean
+        fn: evo2.log_likelihood
+        format: float
+      - id: logits_mean
+        fn: evo2.logits
+        format: list
+    io:
+      write_back: true
+""".strip()
+        + "\n",
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "usr-registry", "--config", cfg.as_posix()])
+
+    assert result.exit_code == 0, result.stdout
+    output = result.stdout or ""
+    assert "namespace: infer" in output
+    assert "root: /tmp/usr-root" in output
+    assert (
+        "columns: infer__evo2_7b__j1__ll_mean:float64,"
+        "infer__evo2_7b__j1__logits_mean:list<float64>"
+    ) in output
+    assert (
+        "uv run usr --root /tmp/usr-root namespace register infer --columns "
+        "'infer__evo2_7b__j1__ll_mean:float64,"
+        "infer__evo2_7b__j1__logits_mean:list<float64>'"
+    ) in output
+
+
+def test_validate_usr_registry_filters_to_selected_job(tmp_path: Path) -> None:
+    cfg = _write(
+        tmp_path / "usr_registry_filter.yaml",
+        """
+model:
+  id: evo2_7b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: j1
+    operation: extract
+    ingest:
+      source: usr
+      dataset: demo
+      root: /tmp/usr-root
+    outputs:
+      - id: ll_mean
+        fn: evo2.log_likelihood
+        format: float
+    io:
+      write_back: true
+  - id: j2
+    operation: extract
+    ingest:
+      source: usr
+      dataset: demo
+      root: /tmp/usr-root
+    outputs:
+      - id: logits_mean
+        fn: evo2.logits
+        format: list
+    io:
+      write_back: true
+""".strip()
+        + "\n",
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "usr-registry", "--config", cfg.as_posix(), "--job", "j2"])
+
+    assert result.exit_code == 0, result.stdout
+    output = result.stdout or ""
+    assert "infer__evo2_7b__j2__logits_mean:list<float64>" in output
+    assert "infer__evo2_7b__j1__ll_mean" not in output
+
+
+def test_validate_usr_registry_fails_fast_on_mixed_usr_roots(tmp_path: Path) -> None:
+    cfg = _write(
+        tmp_path / "usr_registry_mixed_roots.yaml",
+        """
+model:
+  id: evo2_7b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: j1
+    operation: extract
+    ingest:
+      source: usr
+      dataset: demo
+      root: /tmp/usr-root-a
+    outputs:
+      - id: ll_mean
+        fn: evo2.log_likelihood
+        format: float
+    io:
+      write_back: true
+  - id: j2
+    operation: extract
+    ingest:
+      source: usr
+      dataset: demo
+      root: /tmp/usr-root-b
+    outputs:
+      - id: logits_mean
+        fn: evo2.logits
+        format: list
+    io:
+      write_back: true
+""".strip()
+        + "\n",
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "usr-registry", "--config", cfg.as_posix()])
+
+    assert result.exit_code == 2
+    assert "All selected USR write-back jobs must use the same ingest.root." in (result.stdout or "")
+
+
+def test_validate_usr_registry_fails_fast_on_unsupported_output_format(tmp_path: Path) -> None:
+    cfg = _write(
+        tmp_path / "usr_registry_tensor.yaml",
+        """
+model:
+  id: evo2_7b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: j1
+    operation: extract
+    ingest:
+      source: usr
+      dataset: demo
+      root: /tmp/usr-root
+    outputs:
+      - id: emb
+        fn: evo2.embedding
+        format: tensor
+        params:
+          layer: mid
+    io:
+      write_back: true
+""".strip()
+        + "\n",
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "usr-registry", "--config", cfg.as_posix()])
+
+    assert result.exit_code == 2
+    assert "USR registry spec only supports infer output formats: float, list" in (result.stdout or "")

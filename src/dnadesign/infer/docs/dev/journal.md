@@ -4524,3 +4524,52 @@ Pressure-test infer on real GPU-backed tracer bullets, then harden the package a
 3. Infer reset scope is now explicit and dataset-scoped: prune only removes the `infer` overlay namespace.
 4. Infer CLI logging is quieter and less error-prone, but upstream Evo2 model-load stdout noise still remains outside infer logger ownership.
 5. Fresh USR dataset onboarding still requires exact registry type declarations for infer outputs; the docs now state the observed pooled Evo2 types used in validation runs.
+
+## 2026-03-07 - Phase 2 Slice BD (Infer USR Registry Spec Command)
+
+### Goal
+
+Remove the fresh USR dataset onboarding footgun by deriving the exact `usr namespace register infer --columns ...` contract from an infer config before the first write-back run.
+
+### Findings
+
+1. Infer knew how to name write-back columns but exposed no public command to derive the exact USR registry spec from a config.
+2. Real tracer bullets showed pooled Evo2 logits write back as `list<float64>`, so hand-authored registry specs are easy to get wrong.
+3. The helper must stay explicit and fail fast; hidden auto-registration would blur the dataset mutation boundary.
+
+### TDD sequence
+
+1. Red:
+   - added CLI tests for `infer validate usr-registry` success, job filtering, mixed-root failure, and unsupported-format failure.
+2. Green:
+   - added `src/dnadesign/infer/src/usr_registry.py` to derive a deterministic infer namespace spec from config.
+   - added `infer validate usr-registry --config ... [--job ...]`.
+   - restricted the helper to deterministic current write-back formats: `float -> float64`, `list -> list<float64>`.
+   - required a single explicit `ingest.root` across selected USR write-back jobs.
+3. Verify:
+   - targeted validate-command tests passed.
+   - pressure-test runbook docs now point operators to the command before first write-back.
+
+### Changes applied
+
+1. `src/dnadesign/infer/src/usr_registry.py`
+   - added config-to-USR-registry derivation helper.
+2. `src/dnadesign/infer/src/cli/commands/validate.py`
+   - added `usr-registry` command.
+3. `src/dnadesign/infer/tests/cli/test_validate_command.py`
+   - added command contract coverage.
+4. `src/dnadesign/infer/docs/operations/pressure-test-agnostic-models.md`
+   - added the new preflight step.
+5. `src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py`
+   - added docs contract coverage.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/cli/test_validate_command.py -k "usr_registry"`
+2. `uv run pytest -q src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py`
+
+### Contract impact
+
+1. Fresh USR dataset registration remains explicit and operator-visible.
+2. Mixed or missing USR roots now fail fast at helper time.
+3. Unsupported write-back formats are rejected by the helper instead of being guessed.

@@ -30,6 +30,7 @@ def test_pressure_runbook_docs_include_standalone_and_ops_paths() -> None:
 
     assert "uv run infer workspace init --id test_stress_ethanol --profile usr-pressure" in doc
     assert "uv run infer validate config --config" in doc
+    assert "uv run infer validate usr-registry --config" in doc
     assert "uv run infer run --config" in doc
     assert "uv run ops runbook init" in doc
     assert "uv run ops runbook execute" in doc

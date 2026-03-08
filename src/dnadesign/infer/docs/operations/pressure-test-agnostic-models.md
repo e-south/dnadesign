@@ -21,6 +21,7 @@ For deterministic SCC GPU environment setup before pressure runs, use the [SCC E
 - For fresh USR test datasets, register exact infer output types before write-back:
   - pooled Evo2 likelihoods are `float64`
   - pooled Evo2 logits are `list<float64>`
+- Use `infer validate usr-registry --config ...` to derive the exact namespace registration command from the active infer config.
 
 ## Ordered procedure
 
@@ -38,6 +39,7 @@ export DATASET_ID="test_stress_ethanol"
 
 ```bash
 uv run infer validate config --config "$INFER_CONFIG"
+uv run infer validate usr-registry --config "$INFER_CONFIG"
 uv run infer run --config "$INFER_CONFIG" --dry-run
 ```
 
