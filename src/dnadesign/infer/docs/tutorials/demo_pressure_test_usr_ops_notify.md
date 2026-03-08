@@ -16,7 +16,7 @@ This demo executes infer in an end-to-end pressure-test loop that can run standa
 uv run infer workspace init --id test_stress_ethanol --profile usr-pressure
 export WORKSPACE_ROOT="$PWD/src/dnadesign/infer/workspaces/test_stress_ethanol"
 export INFER_CONFIG="$WORKSPACE_ROOT/config.yaml"
-export USR_ROOT="/projectnb/dunlop/esouth/outputs/usr_datasets"
+export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets"
 export DATASET_ID="test_stress_ethanol"
 ```
 

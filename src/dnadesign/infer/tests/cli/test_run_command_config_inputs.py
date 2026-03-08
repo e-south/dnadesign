@@ -73,6 +73,55 @@ def test_run_config_sequences_ingest_path_resolves_relative_to_config(monkeypatc
     assert captured["inputs"] == ["ACGT", "TGCA"]
 
 
+def test_run_config_usr_ingest_root_resolves_relative_to_config(monkeypatch, tmp_path: Path) -> None:
+    usr_root = tmp_path / "outputs" / "usr_datasets"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: j1
+    operation: extract
+    ingest:
+      source: usr
+      dataset: demo
+      root: outputs/usr_datasets
+      field: sequence
+    outputs:
+      - id: ll
+        fn: evo2.log_likelihood
+        format: float
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    captured: dict[str, object] = {}
+
+    def _fake_run_job(*, inputs, model, job, progress_factory=None):
+        captured["inputs"] = inputs
+        captured["job_root"] = job.ingest.root
+        return {"ll": [0.1]}
+
+    monkeypatch.setattr("dnadesign.infer.src.cli.commands.run.run_job", _fake_run_job)
+    monkeypatch.setattr(
+        "dnadesign.infer.src.cli.commands.run.run_with_progress",
+        lambda *, progress, runner: runner(None),
+    )
+    monkeypatch.setattr("dnadesign.infer.src.cli.commands.run.render_outputs_summary", lambda *_a, **_k: None)
+
+    result = _RUNNER.invoke(app, ["run", "--config", config_path.as_posix()])
+
+    assert result.exit_code == 0, result.stdout
+    assert captured["inputs"] is None
+    assert captured["job_root"] == usr_root.resolve().as_posix()
+
+
 def test_run_rejects_mixed_config_and_preset_modes(tmp_path: Path) -> None:
     (tmp_path / "inputs").mkdir(parents=True, exist_ok=True)
     (tmp_path / "inputs" / "seqs.txt").write_text("ACGT\n", encoding="utf-8")

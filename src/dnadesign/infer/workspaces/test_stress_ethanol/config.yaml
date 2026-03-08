@@ -11,7 +11,7 @@ jobs:
     ingest:
       source: usr
       dataset: test_stress_ethanol
-      root: /projectnb/dunlop/esouth/outputs/usr_datasets
+      root: outputs/usr_datasets
       field: sequence
     outputs:
       - id: logits_mean

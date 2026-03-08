@@ -73,6 +73,8 @@ def test_workspace_init_usr_pressure_profile_uses_usr_template(tmp_path: Path) -
     config = (workspace_dir / "config.yaml").read_text(encoding="utf-8")
     assert "source: usr" in config
     assert "dataset: test_stress_ethanol" in config
+    assert "root: outputs/usr_datasets" in config
+    assert (workspace_dir / "outputs" / "usr_datasets").is_dir()
     output = result.stdout or ""
     assert "profile: usr-pressure" in output
     assert "Review ingest.dataset and ingest.root in config.yaml before running." in output

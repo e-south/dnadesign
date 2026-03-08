@@ -13,6 +13,7 @@ This creates:
 - `workspaces/<id>/config.yaml`
 - `workspaces/<id>/inputs/`
 - `workspaces/<id>/outputs/logs/ops/audit/`
+- `workspaces/<id>/outputs/usr_datasets/` when `--profile usr-pressure` is used
 
 ### Contract
 
@@ -23,6 +24,7 @@ This creates:
 - Pressure-test USR template profile:
   - `uv run infer workspace init --id test_stress_ethanol --profile usr-pressure`
   - `src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml`
+  - `ingest.root: outputs/usr_datasets` resolves relative to the workspace `config.yaml`
 
 ### Local data path option (non-USR)
 

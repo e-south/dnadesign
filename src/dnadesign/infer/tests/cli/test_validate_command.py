@@ -216,6 +216,38 @@ jobs:
     ) in output
 
 
+def test_validate_usr_registry_resolves_relative_ingest_root_from_config(tmp_path: Path) -> None:
+    cfg = _write(
+        tmp_path / "usr_registry_relative_root.yaml",
+        """
+model:
+  id: evo2_7b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: j1
+    operation: extract
+    ingest:
+      source: usr
+      dataset: demo
+      root: outputs/usr_datasets
+    outputs:
+      - id: ll_mean
+        fn: evo2.log_likelihood
+        format: float
+    io:
+      write_back: true
+""".strip()
+        + "\n",
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "usr-registry", "--config", cfg.as_posix()])
+
+    assert result.exit_code == 0, result.stdout
+    assert f"root: {(tmp_path / 'outputs' / 'usr_datasets').resolve()}" in (result.stdout or "")
+
+
 def test_validate_usr_registry_filters_to_selected_job(tmp_path: Path) -> None:
     cfg = _write(
         tmp_path / "usr_registry_filter.yaml",

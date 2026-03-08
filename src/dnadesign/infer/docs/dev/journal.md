@@ -4838,3 +4838,66 @@ Continue shrinking `usr/src/dataset.py` by extracting record-batch key derivatio
 1. Dedupe/read key semantics remain unchanged.
 2. `dataset.py` is smaller and more orthogonal, with the read-key helper extracted from the monolith.
 3. `infer` and `densegen` continue to work with USR on the same compatibility paths.
+
+## 2026-03-07 - Phase 2 Slice BJ (Infer Workspace-Local USR Root Contract)
+
+### Goal
+
+Remove the hardcoded personal USR root from infer pressure-test workspaces and make config-driven USR roots resolve relative to `config.yaml`, so curated infer workspaces stay self-contained and aligned with repo IA.
+
+### Findings
+
+1. The checked-in infer pressure-test workspace, the pressure-test example config, and the runbook/tutorial docs all hardcoded `/projectnb/dunlop/esouth/outputs/usr_datasets`.
+2. That path shape drifted from infer workspace IA: curated infer workspaces already own `config.yaml` and `outputs/logs/ops/...`, but the USR root was leaking into a personal external `outputs/` tree.
+3. The underlying contract gap was in config-mode infer itself: `ingest.path` already resolved relative to `config.yaml`, but `ingest.root` for `source: usr` did not, which pushed examples toward absolute paths.
+
+### TDD sequence
+
+1. Red:
+   - added workspace CLI test requiring `usr-pressure` scaffolds to use `root: outputs/usr_datasets` and create that directory.
+   - added run-config test requiring relative `ingest.root` to resolve against the config directory.
+   - added `validate usr-registry` test requiring relative `ingest.root` to render as an absolute workspace-local path.
+   - added docs regression guard banning `/projectnb/dunlop/esouth/outputs/usr_datasets` from infer docs/examples/workspaces.
+2. Green:
+   - added `resolve_config_usr_root(...)` in `infer/src/cli/config_inputs.py`.
+   - resolved config-mode USR roots relative to `config.yaml` in `infer run` and `infer validate usr-registry`.
+   - changed the `usr-pressure` template and checked-in workspace config to `root: outputs/usr_datasets`.
+   - changed `infer workspace init --profile usr-pressure` to scaffold `outputs/usr_datasets/`.
+   - updated tutorial/runbook/workspace docs to use workspace-local `USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets"`.
+3. Verify:
+   - targeted red-to-green infer CLI/docs tests passed.
+   - broader infer + USR + Notify compatibility set passed.
+   - real CLI tracer bullet passed:
+     - `infer workspace init --profile usr-pressure` created a workspace-local USR root.
+     - `infer validate usr-registry --config ...` rendered the absolute workspace-local root and the expected register command.
+
+### Changes applied
+
+1. `src/dnadesign/infer/src/cli/config_inputs.py`
+   - added config-relative USR root resolution for config-mode runs.
+2. `src/dnadesign/infer/src/cli/commands/validate.py`
+   - normalized config-driven USR roots before deriving registry specs.
+3. `src/dnadesign/infer/src/workspace.py`
+   - `usr-pressure` scaffolds now create `outputs/usr_datasets/`.
+4. `src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml`
+   - changed `ingest.root` to `outputs/usr_datasets`.
+5. `src/dnadesign/infer/workspaces/test_stress_ethanol/config.yaml`
+   - changed `ingest.root` to `outputs/usr_datasets`.
+6. `src/dnadesign/infer/docs/operations/pressure-test-agnostic-models.md`
+   - changed `USR_ROOT` example to workspace-local `outputs/usr_datasets`.
+7. `src/dnadesign/infer/docs/tutorials/demo_pressure_test_usr_ops_notify.md`
+   - changed `USR_ROOT` example to workspace-local `outputs/usr_datasets`.
+8. `src/dnadesign/infer/workspaces/README.md`
+   - documented the workspace-local USR root scaffold for `usr-pressure`.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/infer/tests/cli/test_workspace_command.py src/dnadesign/infer/tests/cli/test_run_command_config_inputs.py src/dnadesign/infer/tests/cli/test_validate_command.py src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py -k "usr_pressure_profile or usr_ingest_root_resolves_relative_to_config or usr_registry_resolves_relative_ingest_root_from_config or hardcoded_personal_usr_roots or USR_ROOT"`
+2. `uv run pytest -q src/dnadesign/infer/tests src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py src/dnadesign/notify/tests/test_events_source.py -k "workspace or usr_registry or prune or pressure or infer"`
+3. `tmp_root=$(mktemp -d /scratch/infer-workspace-XXXXXX) && uv run infer workspace init --id demo_usr_pressure --root "$tmp_root" --profile usr-pressure && uv run infer validate usr-registry --config "$tmp_root/demo_usr_pressure/config.yaml"`
+
+### Contract impact
+
+1. Infer pressure-test workspaces no longer depend on a personal `/projectnb/.../outputs` path to express their default USR root.
+2. Config-driven infer now treats `ingest.root` the same way it already treated `ingest.path`: relative to `config.yaml`.
+3. Workspace-scoped curated infer examples are aligned with repo IA, while general USR sync docs can still describe broader non-git dataset roots as a separate workflow.

@@ -23,6 +23,7 @@ from ...ingest.sources import load_usr_input
 from ...runtime.capacity_planner import probe_gpu_inventory, validate_model_hardware_contract
 from ...usr_registry import derive_usr_registry_spec
 from ..common import discovery_config, raise_cli_error
+from ..config_inputs import resolve_config_usr_root
 from ..console import console, render_config_summary
 
 
@@ -75,6 +76,13 @@ def register(app: typer.Typer) -> None:
         try:
             cfg_path = discovery_config(config)
             root = RootConfig(**yaml.safe_load(cfg_path.read_text()))
+            for selected_job in root.jobs:
+                if selected_job.ingest.source != "usr":
+                    continue
+                selected_job.ingest.root = resolve_config_usr_root(
+                    usr_root=selected_job.ingest.root,
+                    config_dir=cfg_path.parent,
+                )
             spec = derive_usr_registry_spec(root=root, job_id=job)
             typer.echo(f"namespace: {spec.namespace}")
             typer.echo(f"root: {spec.root}")

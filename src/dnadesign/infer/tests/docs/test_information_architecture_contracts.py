@@ -106,6 +106,7 @@ def test_infer_pressure_test_tutorial_covers_local_and_ops_paths() -> None:
     tutorial = _read("src/dnadesign/infer/docs/tutorials/demo_pressure_test_usr_ops_notify.md")
     assert "uv run infer validate config --config" in tutorial
     assert "uv run infer workspace init --id test_stress_ethanol --profile usr-pressure" in tutorial
+    assert 'export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets"' in tutorial
     assert "uv run infer run --config" in tutorial
     assert 'uv run infer prune --usr "$DATASET_ID" --usr-root "$USR_ROOT"' in tutorial
     assert "layer` values `mid` and `final`" in tutorial
@@ -133,4 +134,25 @@ def test_infer_docs_excluding_journal_avoid_legacy_flat_module_paths() -> None:
         text = path.read_text(encoding="utf-8")
         if any(token in text for token in legacy_tokens):
             offenders.append(str(path.relative_to(_repo_root())))
+    assert offenders == []
+
+
+def test_infer_docs_examples_and_workspaces_avoid_hardcoded_personal_usr_roots() -> None:
+    repo_root = _repo_root()
+    targets = [
+        repo_root / "src/dnadesign/infer/docs",
+        repo_root / "src/dnadesign/infer/workspaces",
+    ]
+    offenders: list[str] = []
+    for target in targets:
+        for path in sorted(target.rglob("*")):
+            if not path.is_file():
+                continue
+            if path.resolve() == (repo_root / "src/dnadesign/infer/docs/dev/journal.md").resolve():
+                continue
+            if path.suffix not in {".md", ".yaml"}:
+                continue
+            text = path.read_text(encoding="utf-8")
+            if "/projectnb/dunlop/esouth/outputs/usr_datasets" in text:
+                offenders.append(str(path.relative_to(repo_root)))
     assert offenders == []

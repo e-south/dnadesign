@@ -30,6 +30,19 @@ def _resolve_ingest_path(*, ingest_path: str, config_dir: Path) -> Path:
     return resolved
 
 
+def resolve_config_usr_root(*, usr_root: str | None, config_dir: Path) -> str | None:
+    value = str(usr_root or "").strip()
+    if not value:
+        return None
+    candidate = Path(value).expanduser()
+    if not candidate.is_absolute():
+        candidate = config_dir / candidate
+    resolved = candidate.resolve()
+    if resolved.exists() and not resolved.is_dir():
+        raise ConfigError(f"ingest.root is not a directory: {resolved}")
+    return resolved.as_posix()
+
+
 def resolve_config_job_inputs(
     *,
     job: JobConfig,
@@ -41,6 +54,7 @@ def resolve_config_job_inputs(
     ingest_path = str(job.ingest.path or "").strip()
 
     if source == "usr":
+        job.ingest.root = resolve_config_usr_root(usr_root=job.ingest.root, config_dir=config_dir)
         return None
 
     if source == "sequences":

@@ -109,5 +109,7 @@ def init_workspace(*, workspace_id: str, root: Optional[Path], template: Optiona
     workspace_dir.mkdir(parents=False, exist_ok=False)
     (workspace_dir / "inputs").mkdir(parents=True, exist_ok=True)
     (workspace_dir / "outputs" / "logs" / "ops" / "audit").mkdir(parents=True, exist_ok=True)
+    if profile == "usr-pressure":
+        (workspace_dir / "outputs" / "usr_datasets").mkdir(parents=True, exist_ok=True)
     shutil.copy2(template_path, workspace_dir / "config.yaml")
     return workspace_dir
