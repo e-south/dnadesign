@@ -30,6 +30,7 @@ class _Model:
         self.tokenizer = _Tokenizer()
         self.reduce_calls: list[str] = []
         self.forward_calls = 0
+        self.embedding_layers: list[str] = []
 
     def __call__(
         self,
@@ -48,6 +49,7 @@ class _Model:
         if not return_embeddings:
             return (logits,), None
         assert layer_names is not None and len(layer_names) == 1
+        self.embedding_layers.append(layer_names[0])
         embeddings = (
             torch.arange(batch * length * 3, dtype=torch.float32)
             .reshape(batch, length, 3)
@@ -62,13 +64,21 @@ class _Model:
         return [float(len(s)) * mult for s in seqs]
 
 
+class _TorchModule:
+    def named_modules(self):
+        yield ("", object())
+        yield ("blocks.0.mlp.l3", object())
+        yield ("blocks.20.mlp.l3", object())
+        yield ("blocks.31.mlp.l3", object())
+
+
 def _adapter() -> Evo2Adapter:
     adapter = Evo2Adapter.__new__(Evo2Adapter)
     adapter.model_id = "evo2_7b"
     adapter.device = "cpu"
     adapter.precision = "fp32"
     adapter.model = _Model()
-    adapter._torch_module = None
+    adapter._torch_module = _TorchModule()
     return adapter
 
 
@@ -128,6 +138,32 @@ def test_embedding_groups_variable_lengths_to_reduce_forward_calls() -> None:
 
     assert len(out) == 3
     assert adapter.model.forward_calls == 2
+
+
+def test_embedding_alias_mid_uses_registered_default_layer() -> None:
+    adapter = _adapter()
+    out = adapter.embedding(
+        ["ACGT"],
+        layer="mid",
+        pool={"method": "mean", "dim": 1},
+        fmt="tensor",
+    )
+
+    assert len(out) == 1
+    assert adapter.model.embedding_layers == ["blocks.20.mlp.l3"]
+
+
+def test_embedding_alias_final_resolves_to_last_block() -> None:
+    adapter = _adapter()
+    out = adapter.embedding(
+        ["ACGT"],
+        layer="final",
+        pool={"method": "mean", "dim": 1},
+        fmt="tensor",
+    )
+
+    assert len(out) == 1
+    assert adapter.model.embedding_layers == ["blocks.31.mlp.l3"]
 
 
 def test_logits_rejects_pool_dim_zero_that_consumes_batch_axis() -> None:

@@ -19,6 +19,37 @@ except Exception:
     RichHandler = None  # type: ignore
 
 _DEF_FMT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+_NOISY_THIRD_PARTY_LOGGERS = (
+    "httpx",
+    "httpcore",
+    "huggingface_hub",
+    "StripedHyena",
+    "vortex",
+    "vortex.model.utils",
+)
+
+
+def _rehome_infer_loggers_to_root() -> None:
+    logger_map = getattr(logging.root.manager, "loggerDict", {})
+    for name, value in logger_map.items():
+        if not str(name).startswith("dnadesign.infer"):
+            continue
+        if not isinstance(value, logging.Logger):
+            continue
+        for handler in list(value.handlers):
+            value.removeHandler(handler)
+        value.setLevel(logging.NOTSET)
+        value.propagate = True
+
+
+def _apply_third_party_logging_policy(level: str) -> None:
+    requested = logging.getLevelName(str(level).upper())
+    if not isinstance(requested, int):
+        requested = logging.INFO
+
+    target_level = logging.NOTSET if requested <= logging.DEBUG else logging.WARNING
+    for logger_name in _NOISY_THIRD_PARTY_LOGGERS:
+        logging.getLogger(logger_name).setLevel(target_level)
 
 
 def setup_console_logging(level: str = "INFO", json_logs: bool = False, *, rich_console=None) -> None:
@@ -46,6 +77,8 @@ def setup_console_logging(level: str = "INFO", json_logs: bool = False, *, rich_
         sh.setLevel(level.upper())
         sh.setFormatter(JsonFormatter())
         root.addHandler(sh)
+        _rehome_infer_loggers_to_root()
+        _apply_third_party_logging_policy(level)
         return
 
     if RichHandler is not None:
@@ -65,15 +98,22 @@ def setup_console_logging(level: str = "INFO", json_logs: bool = False, *, rich_
         sh.setLevel(level.upper())
         sh.setFormatter(logging.Formatter(_DEF_FMT))
         root.addHandler(sh)
+    _rehome_infer_loggers_to_root()
+    _apply_third_party_logging_policy(level)
 
 
 def get_logger(name: str = "dnadesign.infer", level: str = "INFO") -> logging.Logger:
     """Library-friendly logger (idempotent handler attach)."""
     logger = logging.getLogger(name)
+    if logging.getLogger().handlers:
+        logger.setLevel(logging.NOTSET)
+        logger.propagate = True
+        return logger
     if not logger.handlers:
         logger.setLevel(level.upper())
         ch = logging.StreamHandler(sys.stdout)
         ch.setLevel(level.upper())
         ch.setFormatter(logging.Formatter(_DEF_FMT))
         logger.addHandler(ch)
+    logger.propagate = False
     return logger

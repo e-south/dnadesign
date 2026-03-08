@@ -89,6 +89,7 @@ def test_infer_cli_commands_are_split_by_group() -> None:
     assert (commands_dir / "run.py").is_file()
     assert (commands_dir / "extract.py").is_file()
     assert (commands_dir / "generate.py").is_file()
+    assert (commands_dir / "prune.py").is_file()
     assert (commands_dir / "presets.py").is_file()
     assert (commands_dir / "adapters.py").is_file()
     assert (commands_dir / "validate.py").is_file()

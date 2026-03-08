@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from ..registry import register_default_embedding_layer, register_fn, register_model
 
+EVO2_DEFAULT_EMBEDDING_LAYER = "blocks.20.mlp.l3"
+
 
 class Evo2Adapter:
     def __new__(cls, model_id: str, device: str, precision: str):
@@ -40,7 +42,7 @@ def register_defaults() -> None:
     register_fn("evo2.embedding", "embedding")
     register_fn("evo2.log_likelihood", "log_likelihood")
     register_fn("evo2.generate", "generate")
-    register_default_embedding_layer("evo2", "blocks.20.mlp.l3")
+    register_default_embedding_layer("evo2", EVO2_DEFAULT_EMBEDDING_LAYER)
 
     # ESM2 (to be implemented later)
     # register_fn("esm2.embedding", "embedding")

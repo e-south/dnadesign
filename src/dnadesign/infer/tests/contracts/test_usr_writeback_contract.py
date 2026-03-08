@@ -424,6 +424,62 @@ def test_run_extract_job_usr_resume_skips_completed_rows_from_overlay(tmp_path: 
     assert list(second["ll_mean"]) == [1.0, 2.0, 1.0]
 
 
+def test_run_extract_job_usr_resume_does_not_load_adapter_when_all_rows_are_complete(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "usr_root"
+    register_test_namespace(
+        root,
+        namespace="infer",
+        columns_spec="infer__evo2_7b__job_a__ll_mean:float64",
+        overwrite=True,
+    )
+    ds = Dataset(root, "demo")
+    ds.init(source="unit-test")
+    ds.import_rows(
+        [
+            {"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"},
+            {"sequence": "TGCA", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"},
+        ],
+        source="unit",
+    )
+    ids = ds.head(2, columns=["id"])["id"].tolist()
+    seqs = ds.head(2, columns=["sequence"])["sequence"].tolist()
+
+    monkeypatch.setattr(
+        "dnadesign.infer.src.runtime.ingest_loading.load_usr_input",
+        lambda **_kwargs: (seqs, ids, ds),
+    )
+    monkeypatch.setattr("dnadesign.infer.src.engine._validate_alphabet", lambda *_args, **_kwargs: None)
+
+    class _Adapter:
+        @staticmethod
+        def log_likelihood(chunk, **_kwargs):
+            return [float(i + 1) for i, _ in enumerate(chunk)]
+
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: _Adapter())
+
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna", batch_size=2)
+    job = JobConfig(
+        id="job_a",
+        operation="extract",
+        ingest={"source": "usr", "dataset": "demo", "root": str(root)},
+        outputs=[{"id": "ll_mean", "fn": "evo2.log_likelihood", "format": "float", "params": {}}],
+        io={"write_back": True, "overwrite": False},
+    )
+
+    first = run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+    assert list(first["ll_mean"]) == [1.0, 2.0]
+
+    def _raise_if_called(_model):
+        raise AssertionError("resume should not load adapter when all rows are complete")
+
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", _raise_if_called)
+    second = run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+    assert list(second["ll_mean"]) == [1.0, 2.0]
+
+
 def test_run_extract_job_usr_resume_recovers_after_interrupted_partial_write(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

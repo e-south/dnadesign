@@ -20,15 +20,18 @@ Dunlop Lab
 from __future__ import annotations
 
 import contextlib
+import re
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import torch
 
 from .._logging import get_logger
 from ..errors import CapabilityError, ModelLoadError
+from . import EVO2_DEFAULT_EMBEDDING_LAYER
 from ..utils import pool_tensor, to_format
 
 _LOG = get_logger(__name__)
+_BLOCK_MLP_LAYER_PATTERN = re.compile(r"^blocks\.(\d+)\.mlp\.l3$")
 
 try:
     # Per upstream README, the public class is exposed as `from evo2 import Evo2`.
@@ -231,6 +234,37 @@ class Evo2Adapter:
             raise CapabilityError("Evo2 extract output assembly failed: missing batch outputs.")
         return [value for value in per_index if value is not None]
 
+    def _resolve_embedding_layer_alias(self, layer: str) -> str:
+        value = str(layer).strip()
+        if not value:
+            raise CapabilityError("Evo2 embedding expects a non-empty layer name.")
+
+        alias = value.lower()
+        if alias in {"mid", "default"}:
+            return EVO2_DEFAULT_EMBEDDING_LAYER
+
+        if alias not in {"final", "endpoint"}:
+            return value
+
+        if self._torch_module is None or not hasattr(self._torch_module, "named_modules"):
+            raise CapabilityError(
+                "Evo2 endpoint embedding layer could not be resolved automatically. "
+                "Pass an explicit layer string."
+            )
+
+        candidates: list[tuple[int, str]] = []
+        for name, _module in self._torch_module.named_modules():
+            match = _BLOCK_MLP_LAYER_PATTERN.fullmatch(str(name))
+            if match is None:
+                continue
+            candidates.append((int(match.group(1)), str(name)))
+        if not candidates:
+            raise CapabilityError(
+                "Evo2 endpoint embedding layer could not be resolved automatically. "
+                "Pass an explicit layer string."
+            )
+        return max(candidates, key=lambda item: item[0])[1]
+
     # -------------------------------------------------------------------------
     # Ops
     # -------------------------------------------------------------------------
@@ -304,14 +338,15 @@ class Evo2Adapter:
                 "Evo2 embedding expects a string layer name like 'blocks.28.mlp.l3'. "
                 "Pass adapter-specific names explicitly to avoid ambiguity."
             )
+        resolved_layer = self._resolve_embedding_layer_alias(layer)
 
         tokens = self._tokenize_many(seqs)
 
         def _forward_embedding(x: torch.Tensor) -> torch.Tensor:
-            _, embeddings = self.model(x, return_embeddings=True, layer_names=[layer])
-            if layer not in embeddings:
-                raise CapabilityError(f"Embedding layer '{layer}' not found in Evo2 response.")
-            return embeddings[layer]  # [B, L, D]
+            _, embeddings = self.model(x, return_embeddings=True, layer_names=[resolved_layer])
+            if resolved_layer not in embeddings:
+                raise CapabilityError(f"Embedding layer '{resolved_layer}' not found in Evo2 response.")
+            return embeddings[resolved_layer]  # [B, L, D]
 
         embeddings_by_input = self._run_extract_batches_by_length(
             tokens=tokens,

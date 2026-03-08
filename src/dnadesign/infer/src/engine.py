@@ -69,7 +69,6 @@ def run_extract_job(
 
     validate_extract_output_namespace(model_id=model.id, outputs=job.outputs or [])
     _validate_alphabet(model.alphabet, seqs)
-    adapter = _get_adapter(model)
 
     # micro-batch
     micro_bs, default_bs = resolve_extract_batch_policy(model_batch_size=model.batch_size)
@@ -91,21 +90,23 @@ def run_extract_job(
 
     # execute
     columnar: Dict[str, List[object]] = {}
+    adapter = None
 
     for out in job.outputs or []:
-        method_name, fn = resolve_extract_callable(adapter=adapter, namespaced_fn=out.fn)
-        resolved_params = resolve_extract_params(
-            model_id=model.id,
-            method_name=method_name,
-            params=out.params,
-        )
-
         all_vals: List[object] = list(existing[out.id])
         need_idx = [j for j in todo_idx if all_vals[j] is None]
         if len(need_idx) == 0:
             _LOG.info(f"{job.id}/{out.id}: nothing to do (already complete).")
             columnar[out.id] = all_vals
             continue
+        if adapter is None:
+            adapter = _get_adapter(model)
+        method_name, fn = resolve_extract_callable(adapter=adapter, namespaced_fn=out.fn)
+        resolved_params = resolve_extract_params(
+            model_id=model.id,
+            method_name=method_name,
+            params=out.params,
+        )
 
         # progress handle
         pbar = create_progress_handle(
