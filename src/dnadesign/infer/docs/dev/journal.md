@@ -4632,3 +4632,99 @@ Make USR the explicit, tool-neutral boundary for derived-namespace pruning so si
 1. Sibling tools now have one generic dataset-prune command in USR instead of package-specific reset implementations for ordinary namespace removal.
 2. `usr_state` remains queryable and registry-governed, but generic overlay mutation/removal paths now fail fast.
 3. Infer-style prune flows can delegate to USR semantics without gaining broader workspace-deletion capability.
+
+## 2026-03-07 - Phase 2 Slice BF (USR Delegated Prune + USR IA Seams)
+
+### Goal
+
+Replace Infer's bespoke dataset-prune path with the generic USR overlay-maintenance contract, and shrink the highest-friction USR entry seams without changing CLI or dataset behavior.
+
+### Findings
+
+1. Infer prune still duplicated dataset-root checks and overlay-removal assembly even after USR gained a generic `overlay-remove` contract.
+2. `usr/src/cli.py` still carried a large layer of thin command-forwarding boilerplate, which made monkeypatch-sensitive CLI tests and future command moves harder to reason about.
+3. `Dataset.open(...)` and dataset-id normalization were buried inside `dataset.py`, which kept path/identity concerns coupled to broader dataset behavior.
+
+### TDD sequence
+
+1. Red:
+   - added layout tests requiring `usr.src.overlay_maintenance`, `usr.src.dataset_identity`, and `usr.src.cli_bindings`.
+   - added an infer package-layout test requiring prune delegation through the shared USR maintenance seam.
+2. Green:
+   - added `usr/src/overlay_maintenance.py` with dataset-targeted overlay removal for CLI and sibling tools.
+   - changed `infer/src/prune.py` to delegate to `remove_dataset_overlay(...)` while preserving Infer's stricter fail-fast contract when the `infer` overlay is absent.
+   - extracted dataset identity helpers into `usr/src/dataset_identity.py` and delegated `Dataset.open(...)` / normalization through that module.
+   - extracted CLI command binding boilerplate into `usr/src/cli_bindings.py` and rewired `usr/src/cli.py` to consume the bindings.
+3. Verify:
+   - targeted layout and contract tests passed.
+   - full `usr` suite passed.
+   - full `infer` suite passed.
+
+### Changes applied
+
+1. `src/dnadesign/usr/src/overlay_maintenance.py`
+   - added the shared dataset-overlay removal seam.
+2. `src/dnadesign/infer/src/prune.py`
+   - delegated infer prune to USR overlay maintenance and preserved fail-fast missing-overlay behavior.
+3. `src/dnadesign/usr/src/dataset_identity.py`
+   - extracted dataset-id normalization and path-based open logic.
+4. `src/dnadesign/usr/src/dataset.py`
+   - delegated identity/open responsibilities to the extracted module.
+5. `src/dnadesign/usr/src/cli_bindings.py`
+   - extracted CLI command forwarding/binding assembly.
+6. `src/dnadesign/usr/src/cli.py`
+   - replaced a large set of thin forwarding functions with a single binding assembly call.
+7. `src/dnadesign/usr/src/cli_commands/maintenance.py`
+   - delegated overlay removal to the shared maintenance seam.
+8. `src/dnadesign/usr/tests/*module_layout*.py`
+   - aligned IA contract tests to the new seams.
+9. `src/dnadesign/infer/tests/package/test_prune_module_layout.py`
+   - added the infer prune delegation contract.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/usr/tests src/dnadesign/infer/tests/cli/test_prune_command.py src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/notify/tests/test_events_source.py`
+2. `uv run pytest -q src/dnadesign/infer/tests`
+
+### Contract impact
+
+1. Infer prune now uses the same USR overlay-maintenance boundary available to sibling tools instead of carrying bespoke dataset-removal logic.
+2. USR CLI and dataset identity concerns are more orthogonal, with smaller explicit seams for command binding and dataset opening.
+3. Infer still does not gain any broader workspace-deletion ability; it only delegates namespace-scoped overlay removal.
+
+## 2026-03-07 - Phase 2 Slice BG (Deterministic Lazy-Import Harness)
+
+### Goal
+
+Remove a mixed-suite skip from the USR lazy-import test so import-hygiene verification stays deterministic when Infer tests are collected in the same pytest run.
+
+### Findings
+
+1. `usr/tests/test_convert_legacy_imports.py` asserted lazy import in-process and skipped if `torch` was already present in `sys.modules`.
+2. The skip was not a product bug. It was a harness artifact caused by Infer runtime tests importing `torch` at module scope during mixed-suite collection.
+3. Other USR import-hygiene tests already used subprocess isolation, so the lazy-import test should use the same contract style.
+
+### TDD sequence
+
+1. Red:
+   - reproduced the skip with `uv run pytest -q src/dnadesign/usr/tests/test_convert_legacy_imports.py src/dnadesign/infer/tests/runtime/test_evo2_adapter_pooling_contracts.py`.
+2. Green:
+   - rewrote the lazy-import test to assert the contract in a subprocess instead of relying on ambient parent-process import state.
+3. Verify:
+   - the mixed run no longer skips.
+   - the broader `usr` + `infer` + `notify` verification run completed with no skips in this path.
+
+### Changes applied
+
+1. `src/dnadesign/usr/tests/test_convert_legacy_imports.py`
+   - changed the lazy-import assertion to use subprocess isolation.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/usr/tests/test_convert_legacy_imports.py src/dnadesign/infer/tests/runtime/test_evo2_adapter_pooling_contracts.py`
+2. `uv run pytest -q src/dnadesign/usr/tests src/dnadesign/infer/tests/cli/test_prune_command.py src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py src/dnadesign/notify/tests/test_events_source.py`
+
+### Contract impact
+
+1. The lazy-import contract remains the same: importing `dnadesign.usr.src.convert_legacy` must not import `torch`.
+2. The test harness is now deterministic under mixed-package collection.

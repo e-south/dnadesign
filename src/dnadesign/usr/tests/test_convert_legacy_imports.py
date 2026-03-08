@@ -9,15 +9,19 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-import importlib
-import sys
+from __future__ import annotations
 
-import pytest
+import subprocess
+import sys
 
 
 def test_convert_legacy_import_is_lazy() -> None:
-    if "torch" in sys.modules:
-        pytest.skip("torch already imported; cannot assert lazy import")
-    sys.modules.pop("dnadesign.usr.src.convert_legacy", None)
-    importlib.import_module("dnadesign.usr.src.convert_legacy")
-    assert "torch" not in sys.modules
+    code = "import sys\nimport dnadesign.usr.src.convert_legacy\nprint('torch' in sys.modules)\n"
+    proc = subprocess.run(
+        [sys.executable, "-c", code],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert proc.stdout.strip() == "False"
