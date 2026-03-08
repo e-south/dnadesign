@@ -5061,3 +5061,85 @@ Align the SCC docs, runbooks, and actual model cache state to the intended defau
 2. `evo2_20b` docs and runbooks now match the current infer Hopper contract and SCC scheduler resource request (`gpu_c=9.0`).
 3. `evo2_40b` remains supported in infer code, but it is no longer part of the default SCC path or cache policy.
 4. The stale `40b` user cache under `/projectnb` has been removed; the remaining `projectnb` infer cache footprint is the old `evo2_7b` cache only.
+
+## 2026-03-07 - Phase 2 Slice BN (Cache Cleanup + Real 7B Pressure Test)
+
+### Goal
+
+Keep the canonical repo `.venv` intact, remove stale Evo2 Hugging Face cache cruft, then run a real workspace-local `evo2_7b` pressure test that exercises fresh, resume, prune, and recompute behavior on USR artifacts.
+
+### Findings
+
+1. The canonical `.venv` did not need any mutation for this slice and remained untouched.
+2. `/projectnb/dunlop/esouth/cache/huggingface` still contained only stale Evo2 material after the earlier 40B cleanup:
+   - old top-level `models--arcinstitute--evo2_40b`
+   - old duplicate hub cache for `evo2_7b`
+   - stale lock/xet log directories
+3. `lsof +D /projectnb/dunlop/esouth/cache/huggingface` returned no open files, so cache cleanup was safe from the current session.
+4. The checked-in infer workspace `test_stress_ethanol` was only a scaffold. It had `config.yaml` but no populated workspace-local USR dataset under `outputs/usr_datasets/test_stress_ethanol`.
+5. Because the intended dataset was not present anywhere live under `/project` or `/projectnb`, the honest pressure-test route was to materialize a bounded workspace-local USR dataset under the same dataset id rather than pretending the dataset already existed.
+
+### Real pressure-test setup
+
+1. Registered the infer namespace at the workspace-local USR root:
+   - `infer__evo2_7b__pressure_evo2_logits_llr__logits_mean:list<float64>`
+   - `infer__evo2_7b__pressure_evo2_logits_llr__llr_mean:float64`
+2. Initialized dataset `test_stress_ethanol` under:
+   - `src/dnadesign/infer/workspaces/test_stress_ethanol/outputs/usr_datasets/test_stress_ethanol`
+3. Imported 8 DNA sequences from a bounded CSV subset derived from `src/dnadesign/usr/demo_material/demo_sequences.csv`.
+
+### Runtime verification
+
+1. Fresh run:
+   - `uv run infer run --config src/dnadesign/infer/workspaces/test_stress_ethanol/config.yaml --no-progress`
+   - used canonical cache `/project/dunlop/esouth/cache/huggingface/evo2_7b`
+   - wrote both `logits_mean` and `llr_mean` for all 8 rows
+2. Resume/no-op run:
+   - same command, same config
+   - output was explicit:
+     - `pressure_evo2_logits_llr/logits_mean: nothing to do (already complete).`
+     - `pressure_evo2_logits_llr/llr_mean: nothing to do (already complete).`
+   - no Evo2 model-load noise was emitted on this path
+   - walltime was ~`2.3s`
+3. Prune:
+   - `uv run infer prune --usr test_stress_ethanol --usr-root <workspace-root>/outputs/usr_datasets`
+   - result:
+     - `mode: archive`
+     - overlay archived under `_derived/_archived/infer-<timestamp>.parquet`
+   - `usr info` after prune showed base columns only and `namespaces: []`
+4. Recompute after prune:
+   - same infer config run again
+   - recomputed and reattached both infer outputs for all 8 rows
+   - walltime was ~`8.9s`
+
+### Cache cleanup applied
+
+1. Removed stale duplicate Evo2 Hugging Face cache tree:
+   - `rm -rf /projectnb/dunlop/esouth/cache/huggingface`
+2. Canonical remaining Evo2 caches:
+   - `/project/dunlop/esouth/cache/huggingface/evo2_7b` -> `13G`
+   - `/project/dunlop/esouth/cache/huggingface/evo2_20b` -> `45G`
+3. After cleanup, `/projectnb/dunlop/esouth/cache` no longer contains a Hugging Face cache tree for Evo2.
+
+### Verification commands
+
+1. `find /project/dunlop/esouth/cache/huggingface /projectnb/dunlop/esouth/cache/huggingface -maxdepth 4 -type d -name 'models--arcinstitute--evo2*'`
+2. `lsof +D /projectnb/dunlop/esouth/cache/huggingface`
+3. `uv run infer validate usr-registry --config src/dnadesign/infer/workspaces/test_stress_ethanol/config.yaml`
+4. `uv run usr --root <workspace-root>/outputs/usr_datasets namespace register infer --columns 'infer__evo2_7b__pressure_evo2_logits_llr__logits_mean:list<float64>,infer__evo2_7b__pressure_evo2_logits_llr__llr_mean:float64'`
+5. `uv run usr --root <workspace-root>/outputs/usr_datasets init test_stress_ethanol --source 'infer pressure test'`
+6. `uv run usr --root <workspace-root>/outputs/usr_datasets import test_stress_ethanol --from csv --path <bounded-sequences.csv> --bio-type dna --alphabet dna_4`
+7. `uv run infer run --config src/dnadesign/infer/workspaces/test_stress_ethanol/config.yaml --no-progress`
+8. `time uv run infer run --config src/dnadesign/infer/workspaces/test_stress_ethanol/config.yaml --no-progress`
+9. `uv run infer prune --usr test_stress_ethanol --usr-root <workspace-root>/outputs/usr_datasets`
+10. `uv run usr --root <workspace-root>/outputs/usr_datasets info test_stress_ethanol`
+11. `du -sh /project/dunlop/esouth/cache/huggingface /projectnb/dunlop/esouth/cache`
+
+### Contract impact
+
+1. The canonical infer runtime path now has no stale Evo2 Hugging Face duplicate cache under `/projectnb`.
+2. The workspace-local infer pressure-test flow is verified on real USR artifacts, not just docs or dry-run scaffolds.
+3. Resume and prune semantics are explicit and scoped:
+   - resume does no work when outputs are already complete
+   - prune archives only the infer namespace overlay
+   - recompute after prune restores only infer outputs
