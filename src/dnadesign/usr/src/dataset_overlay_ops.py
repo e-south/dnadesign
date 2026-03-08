@@ -634,9 +634,12 @@ def write_overlay_part_dataset(
     key_col: Optional[str] = None,
     allow_missing: bool = False,
     actor: Optional[dict] = None,
+    reserved_namespaces: set[str],
 ) -> int:
     """Append an overlay part file under _derived/<namespace>/part-*.parquet."""
     dataset._require_exists()
+    if namespace in reserved_namespaces:
+        raise NamespaceError(f"Namespace '{namespace}' is reserved.")
     key = str(key or "").strip()
     if key not in {"id", "sequence", "sequence_norm", "sequence_ci"}:
         raise SchemaError(f"Unsupported overlay key '{key}'.")

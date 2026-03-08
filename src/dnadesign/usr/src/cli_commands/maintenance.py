@@ -48,6 +48,30 @@ def cmd_overlay_compact(args, *, deps: MaintenanceDeps) -> None:
     print(f"[overlay-compact] wrote {out_path}")
 
 
+def cmd_overlay_remove(args, *, deps: MaintenanceDeps) -> None:
+    ds_name = deps.resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
+    if not ds_name:
+        return
+    namespace = getattr(args, "namespace", None)
+    if not namespace:
+        raise SequencesError("overlay-remove requires a namespace argument.")
+    mode = str(getattr(args, "mode", "error") or "error")
+    dataset = Dataset(args.root, ds_name)
+    with dataset.maintenance(reason="overlay_remove"):
+        result = dataset.remove_overlay(str(namespace), mode=mode)
+    if result.get("removed"):
+        archived_path = result.get("archived_path")
+        if archived_path:
+            print(
+                f"[overlay-remove] removed namespace={result['namespace']} "
+                f"mode={mode} archived_path={archived_path}"
+            )
+            return
+        print(f"[overlay-remove] removed namespace={result['namespace']} mode={mode}")
+        return
+    print(f"[overlay-remove] no-op namespace={result['namespace']} mode={mode}")
+
+
 def cmd_snapshot(args, *, deps: MaintenanceDeps) -> None:
     ds_name = deps.resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
     if not ds_name:

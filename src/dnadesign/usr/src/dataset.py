@@ -97,6 +97,7 @@ _NS_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 TOMBSTONE_NAMESPACE = "usr"
 TOMBSTONE_COLUMNS = ("usr__deleted", "usr__deleted_at", "usr__deleted_reason")
 RESERVED_NAMESPACES = {TOMBSTONE_NAMESPACE}
+MUTATION_RESERVED_NAMESPACES = {TOMBSTONE_NAMESPACE, USR_STATE_NAMESPACE}
 LEGACY_DATASET_PREFIX = "archived"
 USR_STATE_SCHEMA_TYPES = {
     "id": pa.string(),
@@ -781,7 +782,7 @@ class Dataset:
             backend=backend,
             note=note,
             namespace_pattern=_NS_RE,
-            reserved_namespaces=RESERVED_NAMESPACES,
+            reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
         )
 
     # Friendly alias for didactic API name in README/examples
@@ -812,7 +813,7 @@ class Dataset:
             backend=backend,
             note=note,
             namespace_pattern=_NS_RE,
-            reserved_namespaces=RESERVED_NAMESPACES,
+            reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
         )
 
     def write_overlay(
@@ -832,7 +833,7 @@ class Dataset:
             overwrite=overwrite,
             allow_missing=allow_missing,
             namespace_pattern=_NS_RE,
-            reserved_namespaces=RESERVED_NAMESPACES,
+            reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
         )
 
     def write_overlay_part(
@@ -853,13 +854,19 @@ class Dataset:
             key_col=key_col,
             allow_missing=allow_missing,
             actor=actor,
+            reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
         )
 
     def list_overlays(self) -> List[OverlayInfo]:
         return list_overlay_infos(self)
 
     def remove_overlay(self, namespace: str, *, mode: str = "error") -> dict:
-        return remove_overlay_namespace(self, namespace, mode=mode)
+        return remove_overlay_namespace(
+            self,
+            namespace,
+            mode=mode,
+            reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
+        )
 
     def compact_overlay(self, namespace: str) -> Path:
         return compact_overlay_namespace(self, namespace, reserved_namespaces=RESERVED_NAMESPACES)

@@ -331,6 +331,10 @@ def cmd_overlay_compact(args) -> None:
     maintenance_commands.cmd_overlay_compact(args, deps=_maintenance_deps())
 
 
+def cmd_overlay_remove(args) -> None:
+    maintenance_commands.cmd_overlay_remove(args, deps=_maintenance_deps())
+
+
 def _emit_event_line(line: str, fmt: str) -> None:
     runtime_commands._emit_event_line(line, fmt)
 
@@ -530,6 +534,7 @@ register_ops_commands(
     cmd_dedupe_sequences=cmd_dedupe_sequences,
     cmd_registry_freeze=cmd_registry_freeze,
     cmd_overlay_compact=cmd_overlay_compact,
+    cmd_overlay_remove=cmd_overlay_remove,
     cmd_repair_densegen=cmd_repair_densegen,
     cmd_make_mock=cmd_make_mock,
     cmd_add_demo=cmd_add_demo,

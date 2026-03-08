@@ -4573,3 +4573,62 @@ Remove the fresh USR dataset onboarding footgun by deriving the exact `usr names
 1. Fresh USR dataset registration remains explicit and operator-visible.
 2. Mixed or missing USR roots now fail fast at helper time.
 3. Unsupported write-back formats are rejected by the helper instead of being guessed.
+
+## 2026-03-07 - Phase 2 Slice BE (USR Generic Overlay Prune Contract)
+
+### Goal
+
+Make USR the explicit, tool-neutral boundary for derived-namespace pruning so sibling tools such as Infer and DenseGen do not need bespoke dataset-reset logic for ordinary overlay maintenance.
+
+### Findings
+
+1. USR already exposed generic overlay removal in the dataset API, but the CLI only exposed compaction, so tool-facing runbooks had to invent package-specific prune flows.
+2. The registry and docs treated `usr_state` as reserved, but generic mutation/removal paths still allowed it through ordinary overlay APIs.
+3. The correct fix is to harden the generic mutation boundary without changing the dedicated `usr state` surface.
+
+### TDD sequence
+
+1. Red:
+   - added CLI tests for `usr maintenance overlay-remove`.
+   - added API tests proving generic remove/write calls must reject reserved `usr_state`.
+2. Green:
+   - added `usr maintenance overlay-remove <dataset> --namespace <ns> --mode error|delete|archive`.
+   - hardened generic overlay mutation/removal paths to treat `usr_state` as reserved alongside tombstones.
+   - kept the dedicated `usr state` APIs as the only supported mutation surface for `usr_state`.
+3. Verify:
+   - targeted overlay maintenance tests passed.
+   - full USR suite remained green.
+
+### Changes applied
+
+1. `src/dnadesign/usr/src/cli_commands/maintenance.py`
+   - added the generic overlay-remove command handler.
+2. `src/dnadesign/usr/src/cli_commands/ops_cli.py`
+   - added the `maintenance overlay-remove` CLI surface.
+3. `src/dnadesign/usr/src/cli.py`
+   - wired the maintenance command through the existing CLI dependency boundary.
+4. `src/dnadesign/usr/src/dataset.py`
+   - defined the generic mutation-reserved namespace set and applied it to attach/write/remove paths.
+5. `src/dnadesign/usr/src/dataset_overlay_ops.py`
+   - hardened generic overlay-part writes against reserved namespaces.
+6. `src/dnadesign/usr/src/dataset_overlay_maintenance.py`
+   - hardened generic overlay removal against reserved namespaces.
+7. `src/dnadesign/usr/tests/test_cli_maintenance_registry.py`
+   - added CLI coverage for archive removal and reserved-namespace rejection.
+8. `src/dnadesign/usr/tests/test_overlays.py`
+   - added reserved-namespace rejection coverage for generic overlay writes/removal.
+9. `src/dnadesign/usr/docs/reference/maintenance.md`
+   - documented the tool-neutral overlay-remove command.
+10. `src/dnadesign/usr/docs/reference/overlay-and-registry.md`
+    - aligned the registry contract with the dedicated `usr state` mutation surface.
+
+### Verification commands
+
+1. `uv run pytest -q src/dnadesign/usr/tests/test_cli_maintenance_registry.py src/dnadesign/usr/tests/test_overlays.py -k "overlay_remove or usr_state_namespace"`
+2. `uv run pytest -q src/dnadesign/usr/tests`
+
+### Contract impact
+
+1. Sibling tools now have one generic dataset-prune command in USR instead of package-specific reset implementations for ordinary namespace removal.
+2. `usr_state` remains queryable and registry-governed, but generic overlay mutation/removal paths now fail fast.
+3. Infer-style prune flows can delegate to USR semantics without gaining broader workspace-deletion capability.
