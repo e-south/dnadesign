@@ -19,6 +19,7 @@ This is the central documentation map for workflows, tool references, and reposi
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
 | Design a sequence library in a workspace | [DenseGen docs overview](../src/dnadesign/densegen/docs/README.md) | Verify generated artifacts and metadata with [DenseGen outputs reference](../src/dnadesign/densegen/docs/reference/outputs.md). |
+| Realize contextualized or multi-part DNA constructs into derived datasets | [construct docs overview](../src/dnadesign/construct/docs/README.md) | Verify resulting lineage and sequence identity in [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
 | Run model inference and write outputs back to datasets | [Infer docs index](../src/dnadesign/infer/docs/README.md) | Verify write-back columns and types with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
 | Build SCC Evo2 infer GPU environment deterministically | [BU SCC install bootstrap](bu-scc/install.md#gpu-setup-and-verification-runbook) | Verify infer model capabilities with [infer SCC Evo2 GPU runbook](../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md). |
 | Operate Notify for local event watching and webhook setup | [Notify docs index](notify/README.md) | Verify mode and delivery contracts in [Notify command contracts](../src/dnadesign/notify/docs/reference/command-contracts.md). |
@@ -39,6 +40,7 @@ This is the central documentation map for workflows, tool references, and reposi
 | `cluster` | `uv run cluster --help` | [cluster README](../src/dnadesign/cluster/README.md) |
 | `cruncher` | `uv run cruncher --help` | [cruncher README](../src/dnadesign/cruncher/README.md) |
 | `densegen` | `uv run dense --help` | [densegen README](../src/dnadesign/densegen/README.md) |
+| `construct` | `uv run construct --help` | [construct README](../src/dnadesign/construct/README.md) |
 | `infer` | `uv run infer --help` | [infer README](../src/dnadesign/infer/README.md) |
 | `latdna` | n/a | [latdna README](../src/dnadesign/latdna/README.md) |
 | `libshuffle` | n/a | [libshuffle README](../src/dnadesign/libshuffle/README.md) |
