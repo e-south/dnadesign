@@ -11,6 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 from pathlib import Path
 
 DENSEGEN_ROOT = Path(__file__).resolve().parents[2]
@@ -18,6 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parents[5]
 DENSEGEN_TUTORIALS = DENSEGEN_ROOT / "docs" / "tutorials"
 BU_SCC_DOCS = REPO_ROOT / "docs" / "bu-scc"
 NOTIFY_DOCS = REPO_ROOT / "docs" / "notify"
+SGE_SKILL_ROOT = REPO_ROOT / ".agents" / "skills" / "sge-hpc-ops"
 TOP_LEVEL_SYSTEM_DOCS = (
     REPO_ROOT / "README.md",
     REPO_ROOT / "ARCHITECTURE.md",
@@ -57,6 +60,29 @@ def test_bu_scc_readme_avoids_external_skill_link_dependency() -> None:
 def test_notify_docs_avoid_external_skill_link_dependency() -> None:
     text = _read(NOTIFY_DOCS / "README.md")
     assert "https://github.com/e-south/agent-skills/tree/main/sge-hpc-ops" not in text
+
+
+def test_repo_local_sge_skill_overlay_exists() -> None:
+    assert (SGE_SKILL_ROOT / "SKILL.md").exists()
+    assert (SGE_SKILL_ROOT / "references" / "README.md").exists()
+    assert (SGE_SKILL_ROOT / "scripts" / "audit-sge-hpc-ops-skill.sh").exists()
+
+
+def test_repo_local_sge_skill_audit_passes() -> None:
+    result = subprocess.run(
+        [shutil.which("bash") or "bash", str(SGE_SKILL_ROOT / "scripts" / "audit-sge-hpc-ops-skill.sh")],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_bu_scc_readme_routes_to_optional_repo_local_skill_overlay() -> None:
+    text = _read(BU_SCC_DOCS / "README.md")
+    assert "../../.agents/skills/sge-hpc-ops/SKILL.md" in text
+    assert "optional overlay" in text
 
 
 def test_bu_scc_docs_use_current_densegen_runtime_field_names() -> None:
@@ -192,7 +218,9 @@ def test_installation_docs_use_direct_wording_without_lane_or_agent_labels() -> 
     infer_pressure_doc = _read(
         REPO_ROOT / "src" / "dnadesign" / "infer" / "docs" / "operations" / "pressure-test-agnostic-models.md"
     )
-    infer_scc_doc = _read(REPO_ROOT / "src" / "dnadesign" / "infer" / "docs" / "operations" / "scc-evo2-gpu-uv-runbook.md")
+    infer_scc_doc = _read(
+        REPO_ROOT / "src" / "dnadesign" / "infer" / "docs" / "operations" / "scc-evo2-gpu-uv-runbook.md"
+    )
     bundle = "\n".join(
         (
             install_doc,
