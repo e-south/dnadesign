@@ -1,26 +1,28 @@
-construct creates derived DNA constructs from anchor sequences, template context, and explicit placement specs, then writes the realized sequences into USR datasets with fail-fast lineage metadata.
+![construct banner](docs/assets/construct-banner.svg)
+
+construct takes an input dataset, a template, and explicit placement rules, then writes realized sequences back to USR with `construct__*` lineage.
 
 ## Documentation map
 
-Read in this order:
+1. [Getting started](docs/getting-started.md): shortest path to a validated demo run or blank custom workspace.
+2. [Docs overview](docs/README.md): choose the next document by task.
+3. [Docs index](docs/index.md): choose the next document by type.
+4. [Workspaces guide](workspaces/README.md): scaffold a workspace or copy the packaged demo.
+5. [Developer notes](docs/dev/README.md): maintainer notes, internal architecture, and journal entries.
 
-1. [construct docs overview](docs/README.md)
-2. [construct docs index](docs/index.md)
-3. [workspaces guide](workspaces/README.md)
-4. [developer notes](docs/dev/README.md)
-5. [development journal](docs/dev/journal.md)
-6. [repository docs index](../../../docs/README.md)
+## Primary entrypoints
 
-## Entrypoint contract
+- `uv run construct --help`
+- `uv run construct validate config --config <path> --runtime`
+- `uv run construct run --config <path>`
+- `uv run construct seed import-manifest --manifest <path>`
+- `uv run construct workspace init --id <workspace-id>`
+- `uv run construct workspace doctor --workspace <workspace-dir>`
 
-1. Audience: construct operators and maintainers.
-2. Primary entrypoints: `uv run construct ...` and `python -m dnadesign.construct ...`.
-3. Prerequisites: valid config YAML, readable template input, and readable/writable USR roots.
-4. Verify next: `uv run construct validate config --config <path> --runtime`.
+## Package boundary
 
-## Boundary reminder
-
-- USR owns the resulting sequence records and construct lineage overlays.
-- construct owns realization logic: template loading, part placement, focal-window extraction, and output dataset writes.
-- Placement semantics are explicit: `kind=insert` or `kind=replace`, with optional incumbent-sequence checks for replacements.
-- infer consumes construct outputs as ordinary USR sequences; it does not own construct assembly semantics.
+- `construct` owns sequence realization, placement semantics, and `construct__*` lineage.
+- USR owns dataset persistence, dataset ids, and downstream reuse.
+- One construct job uses one template plus one or more placed parts.
+- Larger studies stay explicit as multiple workspace projects, not one oversized config.
+- Packaged workspaces default to workspace-local `outputs/usr_datasets`; shared USR roots are always explicit.
