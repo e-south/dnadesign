@@ -22,7 +22,7 @@ from .densegen_usr_output import load_densegen_config_mapping, resolve_densegen_
 
 
 @dataclass(frozen=True)
-class InferEvo2USROutputContract:
+class InferUSROutputContract:
     config_path: Path
     usr_root: Path
     usr_dataset: str
@@ -169,7 +169,7 @@ def _infer_usr_root_from_env() -> Path | None:
     return Path(env).expanduser().resolve()
 
 
-def resolve_infer_evo2_usr_output_contract(config_path: Path) -> InferEvo2USROutputContract:
+def resolve_infer_usr_output_contract(config_path: Path) -> InferUSROutputContract:
     resolved_config_path, root = _load_infer_config_mapping(config_path)
     jobs = root.get("jobs")
     if not isinstance(jobs, list):
@@ -191,17 +191,17 @@ def resolve_infer_evo2_usr_output_contract(config_path: Path) -> InferEvo2USROut
             continue
         dataset = _normalize_relative_dataset_path(
             ingest.get("dataset"),
-            label="infer_evo2 resolver requires ingest.dataset for source='usr' jobs",
+            label="infer resolver requires ingest.dataset for source='usr' jobs",
         )
         root_value = ingest.get("root")
         if root_value is None:
             usr_root = _infer_usr_root_from_env()
             if usr_root is None:
-                raise ValueError("infer_evo2 resolver requires ingest.root or DNADESIGN_USR_ROOT for source='usr' jobs")
+                raise ValueError("infer resolver requires ingest.root or DNADESIGN_USR_ROOT for source='usr' jobs")
         else:
             root_text = str(root_value).strip()
             if not root_text:
-                raise ValueError("infer_evo2 resolver received empty ingest.root")
+                raise ValueError("infer resolver received empty ingest.root")
             candidate = Path(root_text).expanduser()
             if candidate.is_absolute():
                 usr_root = candidate.resolve()
@@ -211,26 +211,26 @@ def resolve_infer_evo2_usr_output_contract(config_path: Path) -> InferEvo2USROut
 
     if not destinations:
         raise ValueError(
-            "infer_evo2 resolver requires at least one job with ingest.source='usr' and io.write_back=true"
+            "infer resolver requires at least one job with ingest.source='usr' and io.write_back=true"
         )
     if len(destinations) > 1:
         rendered = ", ".join(sorted(f"{root_path}/{dataset}" for root_path, dataset in destinations))
         raise ValueError(
-            f"infer_evo2 resolver found multiple USR destinations in config: {rendered}. "
+            f"infer resolver found multiple USR destinations in config: {rendered}. "
             "Pass --events explicitly to select one stream."
         )
     usr_root, dataset = next(iter(destinations))
-    return InferEvo2USROutputContract(
+    return InferUSROutputContract(
         config_path=resolved_config_path,
         usr_root=usr_root,
         usr_dataset=dataset,
     )
 
 
-def _resolve_infer_evo2_usr_producer_contract(config_path: Path) -> USRProducerContract:
-    destination = resolve_infer_evo2_usr_output_contract(config_path)
+def _resolve_infer_usr_producer_contract(config_path: Path) -> USRProducerContract:
+    destination = resolve_infer_usr_output_contract(config_path)
     return USRProducerContract(
-        tool="infer_evo2",
+        tool="infer",
         config_path=destination.config_path,
         run_root=None,
         usr_root=destination.usr_root,
@@ -248,9 +248,7 @@ def _resolve_infer_evo2_usr_producer_contract(config_path: Path) -> USRProducerC
 
 _USR_PRODUCER_ADAPTERS: dict[str, Callable[[Path], USRProducerContract]] = {
     "densegen": _resolve_densegen_usr_producer_contract,
-    "infer": _resolve_infer_evo2_usr_producer_contract,
-    "infer-evo2": _resolve_infer_evo2_usr_producer_contract,
-    "infer_evo2": _resolve_infer_evo2_usr_producer_contract,
+    "infer": _resolve_infer_usr_producer_contract,
 }
 
 

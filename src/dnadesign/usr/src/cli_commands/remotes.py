@@ -44,7 +44,8 @@ def cmd_remotes_list(args) -> None:
         print("(no remotes configured)")
         return
     for name, cfg in remotes.items():
-        print(f"{name:20s} ssh {cfg.user}@{cfg.host}  base_dir={cfg.base_dir}")
+        mode = "batch" if cfg.batch_mode else "interactive-auth"
+        print(f"{name:20s} ssh {cfg.user}@{cfg.host}  base_dir={cfg.base_dir}  auth={mode}")
 
 
 def cmd_remotes_show(args) -> None:
@@ -53,6 +54,7 @@ def cmd_remotes_show(args) -> None:
     print("type     : ssh")
     print(f"ssh      : {cfg.user}@{cfg.host}")
     print(f"base_dir : {cfg.base_dir}")
+    print(f"batch    : {'yes' if cfg.batch_mode else 'no'}")
     print(f"ssh_key  : {cfg.ssh_key_env or '(ssh-agent or default key)'}")
 
 
@@ -64,6 +66,7 @@ def cmd_remotes_add(args) -> None:
         host=args.host,
         user=args.user,
         base_dir=args.base_dir,
+        batch_mode=bool(getattr(args, "batch_mode", True)),
         ssh_key_env=args.ssh_key_env,
     )
     path = save_remote(cfg)
@@ -84,6 +87,7 @@ def cmd_remotes_wizard(args) -> None:
         host=host,
         user=args.user,
         base_dir=args.base_dir,
+        batch_mode=bool(getattr(args, "batch_mode", True)),
         ssh_key_env=args.ssh_key_env,
     )
     path = save_remote(cfg)

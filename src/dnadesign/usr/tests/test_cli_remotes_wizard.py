@@ -56,6 +56,34 @@ def test_remotes_wizard_bu_scc_writes_remote_and_prints_ssh_snippet(tmp_path: Pa
     assert payload["remotes"]["bu-scc"]["host"] == "scc1.bu.edu"
     assert payload["remotes"]["bu-scc"]["user"] == "alice"
     assert payload["remotes"]["bu-scc"]["base_dir"] == "/project/alice/usr_datasets"
+    assert payload["remotes"]["bu-scc"]["batch_mode"] is True
+
+
+def test_remotes_add_can_disable_batch_mode(tmp_path: Path, monkeypatch) -> None:
+    remotes_path = tmp_path / "config" / "usr-remotes.yaml"
+    _write_remotes(remotes_path)
+    monkeypatch.setenv("USR_REMOTES_PATH", str(remotes_path))
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli_module.app,
+        [
+            "remotes",
+            "add",
+            "bu-scc",
+            "--host",
+            "scc1.bu.edu",
+            "--user",
+            "alice",
+            "--base-dir",
+            "/project/alice/usr_datasets",
+            "--no-batch-mode",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = yaml.safe_load(remotes_path.read_text(encoding="utf-8"))
+    assert payload["remotes"]["bu-scc"]["batch_mode"] is False
 
 
 def test_remotes_doctor_reports_success(tmp_path: Path, monkeypatch) -> None:
@@ -69,6 +97,7 @@ def test_remotes_doctor_reports_success(tmp_path: Path, monkeypatch) -> None:
             "    host: scc1.bu.edu\n"
             "    user: alice\n"
             "    base_dir: /project/alice/usr_datasets\n"
+            "    batch_mode: false\n"
         ),
     )
     monkeypatch.setenv("USR_REMOTES_PATH", str(remotes_path))

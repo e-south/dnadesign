@@ -35,8 +35,8 @@ def test_usr_sync_docs_use_positional_remote_for_sync_commands() -> None:
 
     stale = re.compile(r"usr\s+(?:pull|push|diff|status)\s+[^\n]*--remote\b")
     assert stale.search(combined) is None
-    assert "uv run usr diff densegen/my_dataset bu-scc" in sync_ops
-    assert "uv run usr pull densegen/my_dataset bu-scc -y" in sync_ops
+    assert "uv run usr diff my_dataset bu-scc" in sync_ops
+    assert "uv run usr pull my_dataset bu-scc -y" in sync_ops
 
 
 def test_bu_scc_runbook_uses_positional_usr_pull_example() -> None:
@@ -72,9 +72,9 @@ def test_usr_sync_docs_cover_iterative_hpc_clone_safety_loop() -> None:
     quickstart = _read("src/dnadesign/usr/docs/operations/sync-quickstart.md")
 
     assert "Iterative batch loop (HPC clone -> local clone)" in quickstart
-    assert "uv run usr diff densegen/my_dataset bu-scc" in quickstart
-    assert "uv run usr pull densegen/my_dataset bu-scc -y" in quickstart
-    assert "uv run usr push densegen/my_dataset bu-scc -y" in quickstart
+    assert "uv run usr diff my_dataset bu-scc" in quickstart
+    assert "uv run usr pull my_dataset bu-scc -y" in quickstart
+    assert "uv run usr push my_dataset bu-scc -y" in quickstart
     assert "fails fast when remote `records.parquet` is missing" in quickstart
     assert "fails fast when local `records.parquet` is missing" in quickstart
     assert "skip transfer when no changes are detected" in quickstart
@@ -404,6 +404,30 @@ def test_usr_sync_docs_include_auxiliary_file_audit_contract() -> None:
     assert "strict sidecar and `_derived`/`_auxiliary` content-hash fidelity checks" in chained
     assert "strict sidecar and `_derived`/`_auxiliary` content-hash fidelity checks" in hpc
     assert "--audit-json-out" in sync_quickstart
+
+
+def test_usr_storage_policy_docs_distinguish_workspace_defaults_and_explicit_external_roots() -> None:
+    architecture = _read("ARCHITECTURE.md")
+    design = _read("DESIGN.md")
+    setup = _read("src/dnadesign/usr/docs/operations/sync-setup.md")
+    quickstart = _read("src/dnadesign/usr/docs/operations/sync-quickstart.md")
+
+    assert (
+        "Curated dnadesign workspaces default USR dataset roots to `<workspace-root>/outputs/usr_datasets`."
+        in architecture
+    )
+    assert (
+        "Explicit external USR roots remain allowed for sync and mirror workflows "
+        "when the operator chooses them deliberately." in architecture
+    )
+    assert (
+        "Curated workspace and runbook examples must default USR dataset roots to "
+        "`<workspace-root>/outputs/usr_datasets`." in design
+    )
+    assert "External USR roots remain allowed only when the workflow makes that storage boundary explicit." in design
+    assert "Canonical repo-local datasets should live under `src/dnadesign/usr/datasets`." in setup
+    assert "External dataset roots are still allowed for ad-hoc sync or mirror workflows" in setup
+    assert "The canonical repo-local datasets root is `src/dnadesign/usr/datasets`" in quickstart
 
 
 def test_hpc_sync_runbook_covers_bootstrap_from_either_side() -> None:

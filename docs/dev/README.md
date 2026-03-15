@@ -20,6 +20,8 @@ Use this index to find maintainer workflows, CI parity commands, and planning re
 `uv run python -m dnadesign.devtools.docs_checks --repo-root .`
 5. Run boundary checks when changing cross-tool imports:
 `uv run python -m dnadesign.devtools.architecture_boundaries --repo-root .`
+6. Run the repo-local BU SCC skill audit when changing `.agents/skills/sge-hpc-ops/`:
+`bash .agents/skills/sge-hpc-ops/scripts/audit-sge-hpc-ops-skill.sh`
 
 ### CI and quality checks
 

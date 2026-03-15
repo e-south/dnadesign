@@ -35,6 +35,7 @@ from .overlays import (
     overlay_path,
     with_overlay_metadata,
 )
+from .registry import registry_entry
 from .schema import REQUIRED_COLUMNS
 from .storage.locking import dataset_write_lock
 from .storage.parquet import PARQUET_COMPRESSION, now_utc, read_parquet, write_parquet_atomic_batches
@@ -269,7 +270,12 @@ def attach_dataset(
             combined[key] = combined.index
             overlay_df = combined.reset_index(drop=True)
 
-        tbl = pa.Table.from_pandas(overlay_df, preserve_index=False)
+        if namespace in reserved_namespaces:
+            tbl = pa.Table.from_pandas(overlay_df, preserve_index=False)
+        else:
+            registry = dataset._registry(required=True)
+            entry = registry_entry(registry, namespace)
+            tbl = _overlay_table_from_registry(overlay_df, entry=entry, key=key)
         dataset._validate_registry_schema(namespace=namespace, schema=tbl.schema, key=key)
         reg_hash = dataset._registry_hash(required=True)
         tbl = with_overlay_metadata(
@@ -302,6 +308,111 @@ def attach_dataset(
 
     with dataset_write_lock(dataset.dir):
         return _write_overlay()
+
+
+def _overlay_table_from_registry(overlay_df: pd.DataFrame, *, entry: Any, key: str) -> pa.Table:
+    fields = [pa.field(key, pa.string())]
+    allowed = {column.name: column.type for column in entry.columns}
+    for name in overlay_df.columns:
+        if name == key:
+            continue
+        if name not in allowed:
+            raise SchemaError(f"Overlay column '{name}' not registered under namespace '{entry.namespace}'.")
+        fields.append(pa.field(name, _registry_type_to_arrow(allowed[name])))
+    schema = pa.schema(fields)
+    try:
+        return pa.table(
+            {
+                field.name: pa.array(
+                    [_normalize_arrow_value(value) for value in overlay_df[field.name].tolist()],
+                    type=field.type,
+                )
+                for field in schema
+            },
+            schema=schema,
+        )
+    except (pa.ArrowInvalid, pa.ArrowTypeError) as error:
+        raise SchemaError(f"Overlay type mismatch under namespace '{entry.namespace}': {error}") from error
+
+
+def _normalize_arrow_value(value: object) -> object:
+    if value is None or value is pd.NA:
+        return None
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    if hasattr(value, "tolist") and not isinstance(value, (str, bytes)):
+        converted = value.tolist()
+        if isinstance(converted, list):
+            return converted
+        value = converted
+    try:
+        if pd.isna(value):
+            return None
+    except TypeError:
+        pass
+    return value
+
+
+def _registry_type_to_arrow(type_str: str) -> pa.DataType:
+    primitive = {
+        "string": pa.string(),
+        "int8": pa.int8(),
+        "int16": pa.int16(),
+        "int32": pa.int32(),
+        "int64": pa.int64(),
+        "uint8": pa.uint8(),
+        "uint16": pa.uint16(),
+        "uint32": pa.uint32(),
+        "uint64": pa.uint64(),
+        "float16": pa.float16(),
+        "float32": pa.float32(),
+        "float64": pa.float64(),
+        "bool": pa.bool_(),
+    }
+    if type_str in primitive:
+        return primitive[type_str]
+    if type_str.startswith("list<") and type_str.endswith(">"):
+        inner = type_str[len("list<") : -1].strip()
+        return pa.list_(_registry_type_to_arrow(inner))
+    if type_str.startswith("fixed_size_list<") and type_str.endswith("]"):
+        inner_and_size = type_str[len("fixed_size_list<") :]
+        inner, size_text = inner_and_size.split(">[", 1)
+        return pa.list_(_registry_type_to_arrow(inner.strip()), int(size_text[:-1]))
+    if type_str.startswith("timestamp[") and type_str.endswith("]"):
+        inner = type_str[len("timestamp[") : -1]
+        parts = [part.strip() for part in inner.split(",")]
+        if len(parts) == 1:
+            return pa.timestamp(parts[0])
+        if len(parts) == 2:
+            return pa.timestamp(parts[0], tz=parts[1])
+    if type_str.startswith("struct<") and type_str.endswith(">"):
+        fields = []
+        for item in _split_top_level_registry_fields(type_str[len("struct<") : -1]):
+            name, inner = item.split(":", 1)
+            fields.append(pa.field(name.strip(), _registry_type_to_arrow(inner.strip())))
+        return pa.struct(fields)
+    raise SchemaError(f"Unsupported registry type '{type_str}'.")
+
+
+def _split_top_level_registry_fields(text: str) -> list[str]:
+    depth = 0
+    current: list[str] = []
+    parts: list[str] = []
+    for char in text:
+        if char in "<[":
+            depth += 1
+        elif char in ">]":
+            depth -= 1
+        if char == "," and depth == 0:
+            parts.append("".join(current).strip())
+            current = []
+            continue
+        current.append(char)
+    if current:
+        parts.append("".join(current).strip())
+    return [part for part in parts if part]
 
 
 def attach_duckdb_dataset(
@@ -634,9 +745,12 @@ def write_overlay_part_dataset(
     key_col: Optional[str] = None,
     allow_missing: bool = False,
     actor: Optional[dict] = None,
+    reserved_namespaces: set[str],
 ) -> int:
     """Append an overlay part file under _derived/<namespace>/part-*.parquet."""
     dataset._require_exists()
+    if namespace in reserved_namespaces:
+        raise NamespaceError(f"Namespace '{namespace}' is reserved.")
     key = str(key or "").strip()
     if key not in {"id", "sequence", "sequence_norm", "sequence_ci"}:
         raise SchemaError(f"Unsupported overlay key '{key}'.")

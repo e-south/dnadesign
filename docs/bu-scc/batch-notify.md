@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-02-28
 
-### At a glance
+### Purpose
 
 **Intent:** Run `dnadesign` workflows as SGE batch jobs on BU SCC with restart-safe logs and optional Notify webhooks.
 
@@ -35,7 +35,7 @@ Operational rules to keep in mind:
 BU references:
 - Submitting jobs: <https://www.bu.edu/tech/support/research/system-usage/running-jobs/submitting-jobs/>
 - Interactive jobs: <https://www.bu.edu/tech/support/research/system-usage/running-jobs/interactive-jobs/>
-- Advanced batch: <https://www.bu.edu/tech/support/research/system-usage/running-jobs/advanced-batch/>
+- Batch reference: <https://www.bu.edu/tech/support/research/system-usage/running-jobs/advanced-batch/>
 
 ### 1.1) Queue-fair pressure gate before new submits
 
@@ -85,13 +85,19 @@ Use versioned templates from [BU SCC jobs README](jobs/README.md):
 - [Evo2 GPU template](jobs/evo2-gpu-infer.qsub)
 - [Notify watcher template](jobs/notify-watch.qsub)
 
+Before first Evo2 submit on a host, run:
+- [BU SCC install GPU setup and verification runbook](install.md#gpu-setup-and-verification-runbook)
+- [infer SCC Evo2 GPU environment runbook](../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
+
 Submit examples:
 
 ```bash
 qsub -P <project> \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
   docs/bu-scc/jobs/densegen-cpu.qsub
-qsub -P <project> docs/bu-scc/jobs/evo2-gpu-infer.qsub
+qsub -P <project> \
+  -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml \
+  docs/bu-scc/jobs/evo2-gpu-infer.qsub
 qsub -P <project> docs/bu-scc/jobs/notify-watch.qsub
 ```
 
@@ -121,7 +127,7 @@ densegen:
   solver:
     backend: GUROBI
     strategy: iterate
-    threads: 16
+    threads: 12
     solver_attempt_timeout_seconds: 60
   runtime:
     checkpoint_every: 50
@@ -131,7 +137,7 @@ Example submit command:
 
 ```bash
 qsub -P <project> \
-  -pe omp 16 \
+  -pe omp 12 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
@@ -142,7 +148,7 @@ Iterative contribution submit (resume + quota growth):
 
 ```bash
 qsub -P <project> \
-  -pe omp 16 \
+  -pe omp 12 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--resume --extend-quota 8 --no-plot' \
@@ -233,7 +239,7 @@ qsub -P <project> \
 
 Use this when you intentionally do not want a profile file.
 If `EVENTS_PATH` is omitted, the script resolves it from `NOTIFY_TOOL` and `NOTIFY_CONFIG`.
-If `EVENTS_PATH` is explicit, set `NOTIFY_POLICY` (`densegen`, `infer_evo2`, or `generic`)
+If `EVENTS_PATH` is explicit, set `NOTIFY_POLICY` (`densegen`, `infer`, or `generic`)
 and `NOTIFY_NAMESPACE` (for example, `densegen`).
 
 ```bash

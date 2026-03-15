@@ -17,8 +17,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Sequence
 
-from dnadesign._contracts import ResumeReadinessPolicy, resolve_resume_readiness_policy
+from dnadesign._contracts import (
+    ResumeReadinessPolicy,
+    resolve_resume_readiness_policy,
+)
 
+from .mode_tools import resolve_mode_tool_adapter
 from ..runbooks.schema import OrchestrationRunbookV1
 
 RunMode = Literal["auto", "fresh", "resume"]
@@ -74,6 +78,21 @@ def discover_active_job_ids_for_runbook(
     return tuple(active_job_ids)
 
 
+def _normalize_hold_jid(active_job_ids: Sequence[str]) -> str | None:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for job_id in active_job_ids:
+        for value in str(job_id).split(","):
+            token = value.strip()
+            if not token or token in seen:
+                continue
+            seen.add(token)
+            normalized.append(token)
+    if not normalized:
+        return None
+    return ",".join(sorted(normalized))
+
+
 @dataclass(frozen=True)
 class ModeDecision:
     requested_mode: RunMode
@@ -83,27 +102,6 @@ class ModeDecision:
     submit_behavior: SubmitBehavior
     hold_jid: str | None
     reason: str
-
-
-def _has_resume_artifacts(workspace_root: Path) -> bool:
-    markers = (
-        workspace_root / "outputs" / "meta" / "run_manifest.json",
-        workspace_root / "outputs" / "tables" / "records.parquet",
-        workspace_root / "outputs" / "usr_datasets" / "registry.yaml",
-    )
-    if any(path.exists() for path in markers):
-        return True
-    tables_root = workspace_root / "outputs" / "tables"
-    candidate_dirs = [tables_root]
-    nested_tables_root = tables_root / "tables"
-    if nested_tables_root.exists():
-        candidate_dirs.append(nested_tables_root)
-    for directory in candidate_dirs:
-        if any(directory.glob("records__part-*.parquet")):
-            return True
-        if any(directory.glob("attempts_part-*.parquet")):
-            return True
-    return False
 
 
 def _candidate_record_paths_for_resume(workspace_root: Path) -> tuple[Path, ...]:
@@ -256,10 +254,11 @@ def resolve_mode_decision(
     allow_fresh_reset: bool = False,
 ) -> ModeDecision:
     selected_requested_mode = requested_mode or runbook.mode_policy.default
-    workflow_tool = "densegen" if runbook.densegen is not None else "infer"
+    tool_adapter = resolve_mode_tool_adapter(runbook)
+    workflow_tool = tool_adapter.tool
     resume_policy = resolve_resume_readiness_policy(workflow_tool)
     has_explicit_resume_policy = resume_policy is not None
-    artifacts_found = _has_resume_artifacts(runbook.workspace_root)
+    artifacts_found = tool_adapter.has_resume_artifacts(runbook)
     resume_state: ResumeState = "none"
     resume_readiness_reason = "not-evaluated"
     if has_explicit_resume_policy:
@@ -298,15 +297,15 @@ def resolve_mode_decision(
             f"({resume_readiness_reason}). "
             "Re-run with --allow-fresh-reset only after confirming outputs should be cleared."
         )
+    if selected_mode == "resume" and not artifacts_found:
+        raise ValueError("resume mode blocked: workspace has no resume artifacts.")
+    if selected_mode == "fresh" and artifacts_found and not allow_fresh_reset:
+        raise ValueError(
+            "fresh mode blocked: workspace already has resume artifacts. "
+            "Re-run with --allow-fresh-reset only after confirming outputs should be cleared."
+        )
 
-    if runbook.densegen is not None:
-        assert runbook.densegen is not None
-        if selected_mode == "fresh":
-            run_args = runbook.densegen.run_args.fresh
-        else:
-            run_args = runbook.densegen.run_args.resume
-    else:
-        run_args = ""
+    run_args = tool_adapter.run_args_for_mode(runbook, selected_mode)
 
     hold_jid: str | None = None
     submit_behavior: SubmitBehavior = "submit"
@@ -316,11 +315,11 @@ def resolve_mode_decision(
         if selected_mode == "fresh":
             reason = f"{reason}; fresh_reset_ack={str(allow_fresh_reset).lower()}"
 
-    if active_job_ids:
-        first_active_job = str(active_job_ids[0]).strip()
+    hold_jid_candidates = _normalize_hold_jid(active_job_ids)
+    if hold_jid_candidates is not None:
         if runbook.mode_policy.on_active_job == "hold_jid":
             submit_behavior = "hold_jid"
-            hold_jid = first_active_job
+            hold_jid = hold_jid_candidates
             reason = f"{reason}; active_jobs_detected; submission_chained_with_hold_jid={hold_jid}"
         else:
             submit_behavior = "blocked"

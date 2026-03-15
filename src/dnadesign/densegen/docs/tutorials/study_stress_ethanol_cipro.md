@@ -47,7 +47,7 @@ densegen:                                    # DenseGen runtime settings root.
     expansion:                               # Plan-expansion controls for fixed-element matrices.
       max_plans: 64                          # Max expanded plans; protects against combinatorial growth.
     sampling:                                # Stage-B sampling controls.
-      library_size: 10                       # Candidate library size sampled per plan.
+      library_size: 25                       # Candidate library size sampled per plan.
     plan:                                    # List of base plans before expansion.
       - name: ethanol                        # Plan name shown in outputs and summaries.
         sequences: 300000                    # Base-plan target count before expansion.
@@ -58,8 +58,9 @@ densegen:                                    # DenseGen runtime settings root.
   solver:                                    # Dense-array solver settings.
     backend: GUROBI                          # Solver backend; common backends include GUROBI and CBC.
     strategy: iterate                        # Solver strategy; iterate performs repeated bounded passes.
-    threads: 16                              # Keep aligned with BU SCC `-pe omp` slots.
+    threads: 12                              # Keep aligned with BU SCC `-pe omp` slots.
   runtime:                                   # Runtime stop and retry settings.
+    max_accepted_per_library: 100            # Accepted-sequence cap per Stage-B sampled library.
     max_failed_solutions_per_target: 2.0     # Failed-solve budget scaled by target count.
 ```
 
@@ -68,15 +69,18 @@ densegen:                                    # DenseGen runtime settings root.
 inputs:                                      # Input definitions used by Stage-A and filters.
   - name: lexA_pwm                           # Input name referenced by plans and filters.
     sampling:                                # Sampling controls for this input.
-      n_sites: 1000                          # Number of retained Stage-A sites for this input.
+      n_sites: 500                           # Number of retained Stage-A sites for this input.
       mining:                                # Candidate-mining controls before retention.
         batch_size: 5000                     # Candidates evaluated per mining batch.
         budget:                              # Budget policy for Stage-A mining.
           mode: fixed_candidates             # Budget mode; fixed_candidates uses a hard candidate cap.
           candidates: 1000000                # Total candidate budget for this input.
+      selection:                             # Candidate selection controls after mining.
+        pool:                                # MMR candidate-pool limits.
+          max_candidates: 10000              # Cap MMR pool width before final retained-site selection.
   - name: background                         # Input name referenced by plans and filters.
     sampling:                                # Sampling controls for this input.
-      n_sites: 1000                          # Number of retained Stage-A sites for this input.
+      n_sites: 500                           # Number of retained Stage-A sites for this input.
       mining:                                # Candidate-mining controls before retention.
         batch_size: 20000                    # Candidates evaluated per mining batch.
         budget:                              # Budget policy for Stage-A mining.
@@ -125,9 +129,9 @@ qstat -u "$USER"
 # Summarize running, queued, and Eqw jobs for submit gating.
 qstat -u "$USER" | awk '$1 ~ /^[0-9]+$/ { running += ($5 ~ /r/); queued += ($5 ~ /q/); eqw += ($5 ~ /Eqw/) } END { printf "running_jobs=%d queued_jobs=%d eqw_jobs=%d\n", running, queued, eqw }'
 # Submit generation-only DenseGen batch against this workspace config.
-qsub -P <project> -pe omp 16 -l h_rt=08:00:00 -l mem_per_core=8G -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --no-plot' docs/bu-scc/jobs/densegen-cpu.qsub
+qsub -P <project> -pe omp 12 -l h_rt=08:00:00 -l mem_per_core=8G -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --no-plot' docs/bu-scc/jobs/densegen-cpu.qsub
 # Submit a quota-extension pass when additional rows are required.
-qsub -P <project> -pe omp 16 -l h_rt=08:00:00 -l mem_per_core=8G -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --extend-quota 50000 --no-plot' docs/bu-scc/jobs/densegen-cpu.qsub
+qsub -P <project> -pe omp 12 -l h_rt=08:00:00 -l mem_per_core=8G -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --extend-quota 50000 --no-plot' docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
 Queue-fair policy for SCC: if `running_jobs > 3`, avoid burst submits, prefer arrays or `-hold_jid` chains, and do not skip the line.
@@ -137,7 +141,7 @@ Million-scale execution model:
 - For one workspace/run root, keep a single active writer; DenseGen enforces `outputs/meta/run.lock` and concurrent submits on the same workspace exit with a lock-held error.
 - For repeated contributions against the same workspace, prefer `-hold_jid` chains over blind parallel submits.
 - If you need Stage-A mining/diversity edits, branch to a new workspace (or run root) and separate USR dataset, then merge approved datasets with `uv run usr maintenance merge`.
-- Avoid `--fresh` when preserving accumulated rows; `--fresh` clears `outputs/` (except `outputs/notify`).
+- Avoid `--fresh` when preserving accumulated rows; `--fresh` clears run artifacts under `outputs/` (while preserving `outputs/notify` and `outputs/logs` scaffolding).
 
 #### Mode 3: Post-run analysis only
 

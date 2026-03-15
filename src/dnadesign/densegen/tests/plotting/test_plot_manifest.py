@@ -13,6 +13,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import os
 import textwrap
 from pathlib import Path
 
@@ -734,6 +735,8 @@ def test_load_composition_reads_part_files_when_final_file_missing(tmp_path: Pat
     assert set(composition_df["solution_id"].astype(str)) == {"sol-1", "sol-2"}
     assert set(composition_df["tf"].astype(str)) == {"TF_A", "TF_B"}
     assert set(composition_df["tfbs"].astype(str)) == {"AAAA", "CCCC"}
+    assert not (tables_dir / "composition.parquet").exists()
+    assert len(list(tables_dir.glob("composition_part-*.parquet"))) == 2
 
 
 def test_load_attempts_reads_part_files_when_final_file_missing(tmp_path: Path) -> None:
@@ -763,6 +766,78 @@ def test_load_attempts_reads_part_files_when_final_file_missing(tmp_path: Path) 
         run_root, columns=["status", "reason", "plan_name", "created_at", "detail_json"]
     )
     assert sorted(attempts_df["status"].astype(str).tolist()) == ["ok", "rejected"]
+    assert not (tables_dir / "attempts.parquet").exists()
+    assert len(list(tables_dir.glob("attempts_part-*.parquet"))) == 2
+
+
+def test_load_attempts_reads_part_files_without_mutating_read_only_tables_dir(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    tables_dir = run_root / "outputs" / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    part_a = tables_dir / "attempts_part-a.parquet"
+    part_b = tables_dir / "attempts_part-b.parquet"
+    pd.DataFrame(
+        {
+            "status": ["ok"],
+            "reason": [None],
+            "plan_name": ["demo_plan"],
+            "created_at": ["2026-03-01T00:00:00+00:00"],
+            "detail_json": [None],
+        }
+    ).to_parquet(part_a, index=False)
+    pd.DataFrame(
+        {
+            "status": ["rejected"],
+            "reason": ["duplicate"],
+            "plan_name": ["demo_plan"],
+            "created_at": ["2026-03-01T00:01:00+00:00"],
+            "detail_json": [None],
+        }
+    ).to_parquet(part_b, index=False)
+    os.chmod(tables_dir, 0o555)
+    try:
+        attempts_df = plotting_module._load_attempts(
+            run_root, columns=["status", "reason", "plan_name", "created_at", "detail_json"]
+        )
+    finally:
+        os.chmod(tables_dir, 0o755)
+
+    assert sorted(attempts_df["status"].astype(str).tolist()) == ["ok", "rejected"]
+    assert not (tables_dir / "attempts.parquet").exists()
+    assert part_a.exists()
+    assert part_b.exists()
+
+
+def test_load_composition_reads_pending_part_files_with_final_file(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    tables_dir = run_root / "outputs" / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "solution_id": ["sol-0"],
+            "input_name": ["demo_input"],
+            "plan_name": ["demo_plan"],
+            "placement_index": [0],
+            "regulator": ["TF_A"],
+            "sequence": ["AAAA"],
+        }
+    ).to_parquet(tables_dir / "composition.parquet", index=False)
+    pd.DataFrame(
+        {
+            "solution_id": ["sol-1"],
+            "input_name": ["demo_input"],
+            "plan_name": ["demo_plan"],
+            "placement_index": [0],
+            "regulator": ["TF_B"],
+            "sequence": ["CCCC"],
+        }
+    ).to_parquet(tables_dir / "composition_part-a.parquet", index=False)
+
+    composition_df = plotting_module._load_composition(run_root, columns=["solution_id", "tf", "tfbs"])
+    assert set(composition_df["solution_id"].astype(str)) == {"sol-0", "sol-1"}
+    assert set(composition_df["tf"].astype(str)) == {"TF_A", "TF_B"}
+    assert (tables_dir / "composition.parquet").exists()
+    assert len(list(tables_dir.glob("composition_part-*.parquet"))) == 1
 
 
 def test_stage_a_summary_reads_projected_pool_columns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

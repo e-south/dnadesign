@@ -16,7 +16,7 @@
   - Maintain a canonical sequence store that supports iterative updates without losing reproducibility.
   - Preserve strict mutation/event boundaries for sibling tools and operators.
 - Primary use cases:
-  - Initialize/import canonical records for namespace-qualified datasets.
+  - Initialize/import canonical records for flat or namespace-qualified datasets.
   - Attach tool-derived overlays incrementally and materialize deterministically.
   - Run iterative pull/push cycles between local and HPC roots with strict verification.
   - Emit `.events.log` as operator integration boundary.
@@ -88,7 +88,7 @@ Runtime interaction scenario:
 | `--verify` (`hash|auto|size|parquet`) | Sync CLI + diff resolver | Chooses primary verification method for diff/pull/push. |
 | `--verify-sidecars` / `--no-verify-sidecars` | Sync policy | Enables/disables strict sidecar parity checks for dataset mode. |
 | `--verify-derived-hashes` | Sync policy + sidecar verifier | Enables high-assurance content-hash verification for `_derived` and `_auxiliary`. |
-| `USR_SYNC_STRICT_BOOTSTRAP_ID=1` | Sync CLI policy | Requires namespace-qualified dataset id on bootstrap pulls. |
+| `USR_SYNC_STRICT_BOOTSTRAP_ID=1` | Sync CLI policy | Requires an explicit canonical dataset id on bootstrap pulls and disables local name guessing. |
 | `USR_SHOW_DEV_COMMANDS=1` | CLI app registration | Enables hidden dev subcommands in CLI surface. |
 | `USR_REMOTES_PATH` | Remote config loading | Selects remotes registry path for SSH sync profiles. |
 

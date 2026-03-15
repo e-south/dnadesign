@@ -14,7 +14,7 @@ from __future__ import annotations
 import importlib
 import inspect
 
-import dnadesign.usr.src.cli as usr_cli
+import dnadesign.usr.src.cli_bindings as cli_bindings
 
 
 def test_usr_cli_maintenance_module_importable() -> None:
@@ -22,13 +22,15 @@ def test_usr_cli_maintenance_module_importable() -> None:
     assert hasattr(module, "MaintenanceDeps")
     assert hasattr(module, "cmd_registry_freeze")
     assert hasattr(module, "cmd_overlay_compact")
+    assert hasattr(module, "cmd_overlay_remove")
     assert hasattr(module, "cmd_snapshot")
     assert hasattr(module, "cmd_dedupe_sequences")
 
 
 def test_usr_cli_maintenance_commands_delegate_to_maintenance_module() -> None:
-    source = inspect.getsource(usr_cli)
+    source = inspect.getsource(cli_bindings)
     assert "maintenance_commands.cmd_registry_freeze(" in source
     assert "maintenance_commands.cmd_overlay_compact(" in source
+    assert "maintenance_commands.cmd_overlay_remove(" in source
     assert "maintenance_commands.cmd_snapshot(" in source
     assert "maintenance_commands.cmd_dedupe_sequences(" in source

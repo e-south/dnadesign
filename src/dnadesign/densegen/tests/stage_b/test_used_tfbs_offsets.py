@@ -5,6 +5,7 @@ import pytest
 from dnadesign.densegen.src.core.pipeline.sequence_validation import _apply_pad_offsets
 from dnadesign.densegen.src.core.pipeline.usage_tracking import (
     _compute_used_tf_info,
+    _countable_variable_motif_indices,
     _parse_used_tfbs_detail,
     _update_usage_summary,
 )
@@ -144,3 +145,18 @@ def test_compute_used_tf_info_excludes_fixed_promoter_hexamers_from_counts() -> 
     assert len(used_detail) == 1
     assert used_counts == {"background": 1}
     assert used_list == ["background"]
+
+
+def test_countable_variable_motif_indices_excludes_promoter_motifs() -> None:
+    indices = _countable_variable_motif_indices(
+        library_for_opt=["TTGACA", "cccc", "TATAAT", "GGGG"],
+        fixed_elements={
+            "promoter_constraints": [
+                {
+                    "upstream": "ttgaca",
+                    "downstream": "tataat",
+                }
+            ]
+        },
+    )
+    assert indices == [1, 3]

@@ -1,0 +1,32 @@
+job:
+  id: promoter_swap_slot_b_full
+  input:
+    source: usr
+    dataset: mg1655_promoters
+    root: outputs/usr_datasets
+    field: sequence
+  template:
+    id: pDual-10
+    kind: usr
+    dataset: plasmids
+    root: outputs/usr_datasets
+    record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+    field: sequence
+    circular: true
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        start: 3621
+        end: 3656
+        orientation: forward
+        expected_template_sequence: tttacggctagctcagtcctaggtactatgctagc
+  realize:
+    mode: full_construct
+  output:
+    dataset: pdual10_slot_b_full_demo
+    root: outputs/usr_datasets

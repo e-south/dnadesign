@@ -1,7 +1,7 @@
 # USR sync target modes
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-03-14
 
 
 Use this page when dataset-id sync is not enough and you need explicit path mapping.
@@ -12,13 +12,13 @@ Use this when you have an explicit dataset directory path outside `--root`.
 
 ```bash
 # Diff dataset directory path outside --root.
-uv run usr diff /path/to/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets/densegen/demo_hpc bu-scc
+uv run usr diff /path/to/dnadesign/src/dnadesign/usr/datasets/densegen/demo_hpc bu-scc
 
 # Pull dataset directory by explicit path.
-uv run usr pull /path/to/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
+uv run usr pull /path/to/dnadesign/src/dnadesign/usr/datasets/densegen/demo_hpc bu-scc -y
 
 # Push dataset directory by explicit path.
-uv run usr push /path/to/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
+uv run usr push /path/to/dnadesign/src/dnadesign/usr/datasets/densegen/demo_hpc bu-scc -y
 ```
 
 ## File mode
@@ -33,10 +33,12 @@ remotes:
     type: ssh                                                                                          # Sets `type` for this example configuration.
     host: scc1.bu.edu                                                                                  # Sets `host` for this example configuration.
     user: <user>                                                                                       # Sets `user` for this example configuration.
-    base_dir: /project/<user>/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets  # Sets `base_dir` for this example configuration.
+    base_dir: /project/<user>/dnadesign/src/dnadesign/usr/datasets                                     # Sets `base_dir` for this example configuration.
     repo_root: /path/to/remote/dnadesign                                                               # Sets `repo_root` for this example configuration.
     local_repo_root: /path/to/local/dnadesign                                                          # Sets `local_repo_root` for this example configuration.
 ```
+
+Dataset-id mode against the canonical USR root remains the preferred path. Explicit path mode is for exceptional cases where dataset-id resolution is not enough.
 
 Examples:
 

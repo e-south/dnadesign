@@ -66,7 +66,7 @@ def register_profile_init_command(
         policy: str | None = typer.Option(
             None,
             "--policy",
-            help="Workflow policy defaults: densegen|infer_evo2|generic.",
+            help="Workflow policy defaults: densegen|infer|generic.",
         ),
         force: bool = typer.Option(False, "--force", help="Overwrite an existing profile file."),
     ) -> None:

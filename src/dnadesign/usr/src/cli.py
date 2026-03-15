@@ -19,6 +19,7 @@ from types import SimpleNamespace as NS
 
 import typer
 
+from .cli_bindings import build_cli_bindings
 from .cli_commands import datasets as dataset_commands
 from .cli_commands import deps as deps_commands
 from .cli_commands import error_output as error_output_commands
@@ -26,13 +27,10 @@ from .cli_commands import maintenance as maintenance_commands
 from .cli_commands import materialize as materialize_commands
 from .cli_commands import merge as merge_commands
 from .cli_commands import namespace_handlers as namespace_handlers_commands
-from .cli_commands import read as read_commands
 from .cli_commands import read_views as read_views_commands
 from .cli_commands import remotes as remotes_commands
 from .cli_commands import runtime as runtime_commands
-from .cli_commands import sync as sync_commands
 from .cli_commands import tooling as tooling_commands
-from .cli_commands import write as write_commands
 from .cli_commands.lifecycle_cli import register_lifecycle_commands
 from .cli_commands.namespace_cli import register_namespace_commands
 from .cli_commands.ops_cli import register_ops_commands
@@ -67,6 +65,8 @@ from .merge_datasets import (
 )
 from .mock import add_demo_columns, create_mock_dataset
 from .registry import load_registry, parse_columns_spec, register_namespace
+from .roots import default_usr_root as _default_usr_root_impl
+from .roots import normalize_usr_root as _normalize_usr_root_impl
 
 # Compatibility exports kept for existing monkeypatch-based tests.
 shutil = remotes_commands.shutil
@@ -93,10 +93,6 @@ def _print_json(payload) -> None:
 
 def _is_interactive() -> bool:
     return sys.stdin.isatty() and sys.stdout.isatty()
-
-
-def cmd_repair_densegen(args):
-    tooling_commands.cmd_repair_densegen(args, deps=_tooling_deps())
 
 
 # --------- dataset guessing (path-first) ----------
@@ -228,6 +224,14 @@ def _assert_supported_root(root: Path) -> None:
     _assert_supported_root_impl(root, pkg_root=_pkg_usr_root())
 
 
+def _default_usr_root() -> Path:
+    return _default_usr_root_impl(pkg_root=_pkg_usr_root())
+
+
+def _normalize_usr_root(root: Path) -> Path:
+    return _normalize_usr_root_impl(root, pkg_root=_pkg_usr_root())
+
+
 def _resolve_path_anywhere(p: Path) -> Path:
     """
     Make file arguments robust:
@@ -245,231 +249,69 @@ def list_datasets(root: Path):
     return dataset_commands.list_datasets(root)
 
 
-def cmd_ls(args):
-    read_commands.cmd_ls(
-        args,
-        resolve_output_format=_resolve_output_format,
-        print_json=_print_json,
-        output_version=USR_OUTPUT_VERSION,
-    )
-
-
-def cmd_init(args):
-    write_commands.cmd_init(args)
-
-
-def cmd_import(args):
-    write_commands.cmd_import(
-        args,
-        resolve_path_anywhere=_resolve_path_anywhere,
-    )
-
-
-def cmd_attach(args):
-    write_commands.cmd_attach(
-        args,
-        resolve_path_anywhere=_resolve_path_anywhere,
-    )
-
-
 def _print_user_error(e: SequencesError) -> None:
     error_output_commands.print_user_error(e)
 
 
-def cmd_info(args):
-    read_commands.cmd_info(
-        args,
-        resolve_output_format=_resolve_output_format,
-        print_json=_print_json,
-        output_version=USR_OUTPUT_VERSION,
-        resolve_dataset_for_read=_resolve_dataset_for_read,
-    )
-
-
-def cmd_schema(args):
-    read_commands.cmd_schema(
-        args,
-        resolve_output_format=_resolve_output_format,
-        print_json=_print_json,
-        output_version=USR_OUTPUT_VERSION,
-    )
-
-
-def _resolve_parquet_from_dir(dir_path: Path, glob: str | None = None) -> Path:
-    return read_views_commands._resolve_parquet_from_dir(dir_path, glob=glob)
-
-
-def _resolve_parquet_target(path_like: Path, glob: str | None = None) -> Path:
-    return read_views_commands._resolve_parquet_target(path_like, glob=glob)
-
-
-def cmd_head(args):
-    read_views_commands.cmd_head(args, deps=_read_view_deps())
-
-
-def cmd_cols(args):
-    read_views_commands.cmd_cols(args, deps=_read_view_deps())
-
-
-def cmd_describe(args):
-    read_views_commands.cmd_describe(args, deps=_read_view_deps())
-
-
-def cmd_cell(args):
-    read_views_commands.cmd_cell(args, deps=_read_view_deps())
-
-
-def cmd_validate(args):
-    runtime_commands.cmd_validate(args, deps=_runtime_deps())
-
-
-def cmd_registry_freeze(args) -> None:
-    maintenance_commands.cmd_registry_freeze(args, deps=_maintenance_deps())
-
-
-def cmd_overlay_compact(args) -> None:
-    maintenance_commands.cmd_overlay_compact(args, deps=_maintenance_deps())
-
-
-def _emit_event_line(line: str, fmt: str) -> None:
-    runtime_commands._emit_event_line(line, fmt)
-
-
-def cmd_events_tail(args) -> None:
-    runtime_commands.cmd_events_tail(args, deps=_runtime_deps())
-
-
-def cmd_get(args):
-    runtime_commands.cmd_get(args, deps=_runtime_deps())
-
-
-def cmd_grep(args):
-    runtime_commands.cmd_grep(args, deps=_runtime_deps())
-
-
-def _default_export_filename(dataset_name: str, fmt: str) -> str:
-    return runtime_commands._default_export_filename(dataset_name, fmt)
-
-
-def _resolve_export_target(out_path: Path, *, dataset_name: str, fmt: str) -> Path:
-    return runtime_commands._resolve_export_target(out_path, dataset_name=dataset_name, fmt=fmt)
-
-
-def cmd_export(args):
-    runtime_commands.cmd_export(args, deps=_runtime_deps())
-
-
-def _collect_ids(ids: list[str] | None, id_file: Path | None) -> list[str]:
-    return runtime_commands._collect_ids(ids, id_file)
-
-
-def _collect_list(vals: list[str] | None) -> list[str]:
-    return runtime_commands._collect_list(vals)
-
-
-def cmd_delete(args):
-    runtime_commands.cmd_delete(args, deps=_runtime_deps())
-
-
-def cmd_restore(args):
-    runtime_commands.cmd_restore(args, deps=_runtime_deps())
-
-
-def cmd_state_set(args):
-    runtime_commands.cmd_state_set(args, deps=_runtime_deps())
-
-
-def cmd_state_clear(args):
-    runtime_commands.cmd_state_clear(args, deps=_runtime_deps())
-
-
-def cmd_state_get(args):
-    runtime_commands.cmd_state_get(args, deps=_runtime_deps())
-
-
-def cmd_materialize(args):
-    materialize_commands.cmd_materialize(args, deps=_materialize_deps())
-
-
-def cmd_snapshot(args):
-    maintenance_commands.cmd_snapshot(args, deps=_maintenance_deps())
-
-
-def cmd_convert_legacy(args):
-    tooling_commands.cmd_convert_legacy(args, deps=_tooling_deps())
-
-
-# ---------- make-mock ----------
-def cmd_make_mock(args):
-    tooling_commands.cmd_make_mock(args, deps=_tooling_deps())
-
-
-# ---------- add-demo-cols ----------
-def cmd_add_demo(args):
-    tooling_commands.cmd_add_demo(args, deps=_tooling_deps())
-
-
-# ---------- MERGE DATASETS ----------
-def cmd_merge_datasets(args):
-    merge_commands.cmd_merge_datasets(args, deps=_merge_deps())
-
-
-# ---------- remotes commands ----------
-def cmd_remotes_list(args):
-    remotes_commands.cmd_remotes_list(args)
-
-
-def cmd_remotes_show(args):
-    remotes_commands.cmd_remotes_show(args)
-
-
-def cmd_remotes_add(args):
-    remotes_commands.cmd_remotes_add(args)
-
-
-def cmd_remotes_wizard(args):
-    remotes_commands.cmd_remotes_wizard(args)
-
-
-def cmd_remotes_doctor(args):
-    remotes_commands.shutil = shutil
-    remotes_commands.SSHRemote = SSHRemote
-    remotes_commands.cmd_remotes_doctor(args)
-
-
-# ---------- namespace registry ----------
-def cmd_namespace_list(args):
-    namespace_handlers_commands.cmd_namespace_list(args, deps=_namespace_deps())
-
-
-def cmd_namespace_show(args):
-    namespace_handlers_commands.cmd_namespace_show(args, deps=_namespace_deps())
-
-
-def cmd_namespace_register(args):
-    namespace_handlers_commands.cmd_namespace_register(args, deps=_namespace_deps())
-
-
-# ---------- diff/pull/push ----------
-def cmd_diff(args):
-    sync_commands.cmd_diff(
-        args,
-        resolve_output_format=_resolve_output_format,
-        print_json=_print_json,
-        output_version=USR_OUTPUT_VERSION,
-    )
-
-
-def cmd_pull(args):
-    sync_commands.cmd_pull(args)
-
-
-def cmd_push(args):
-    sync_commands.cmd_push(args)
-
-
-def cmd_dedupe_sequences(args):
-    maintenance_commands.cmd_dedupe_sequences(args, deps=_maintenance_deps())
+_bindings = build_cli_bindings(
+    resolve_path_anywhere=_resolve_path_anywhere,
+    resolve_output_format=_resolve_output_format,
+    print_json=_print_json,
+    output_version=USR_OUTPUT_VERSION,
+    resolve_dataset_for_read=_resolve_dataset_for_read,
+    read_view_deps=_read_view_deps,
+    runtime_deps=_runtime_deps,
+    materialize_deps=_materialize_deps,
+    maintenance_deps=_maintenance_deps,
+    merge_deps=_merge_deps,
+    namespace_deps=_namespace_deps,
+    tooling_deps=_tooling_deps,
+    get_shutil_module=lambda: shutil,
+    get_ssh_remote_class=lambda: SSHRemote,
+)
+
+cmd_repair_densegen = _bindings.cmd_repair_densegen
+cmd_ls = _bindings.cmd_ls
+cmd_init = _bindings.cmd_init
+cmd_import = _bindings.cmd_import
+cmd_attach = _bindings.cmd_attach
+cmd_info = _bindings.cmd_info
+cmd_schema = _bindings.cmd_schema
+cmd_head = _bindings.cmd_head
+cmd_cols = _bindings.cmd_cols
+cmd_describe = _bindings.cmd_describe
+cmd_cell = _bindings.cmd_cell
+cmd_validate = _bindings.cmd_validate
+cmd_registry_freeze = _bindings.cmd_registry_freeze
+cmd_overlay_compact = _bindings.cmd_overlay_compact
+cmd_overlay_remove = _bindings.cmd_overlay_remove
+cmd_events_tail = _bindings.cmd_events_tail
+cmd_get = _bindings.cmd_get
+cmd_grep = _bindings.cmd_grep
+cmd_export = _bindings.cmd_export
+cmd_delete = _bindings.cmd_delete
+cmd_restore = _bindings.cmd_restore
+cmd_state_set = _bindings.cmd_state_set
+cmd_state_clear = _bindings.cmd_state_clear
+cmd_state_get = _bindings.cmd_state_get
+cmd_materialize = _bindings.cmd_materialize
+cmd_snapshot = _bindings.cmd_snapshot
+cmd_convert_legacy = _bindings.cmd_convert_legacy
+cmd_make_mock = _bindings.cmd_make_mock
+cmd_add_demo = _bindings.cmd_add_demo
+cmd_merge_datasets = _bindings.cmd_merge_datasets
+cmd_remotes_list = _bindings.cmd_remotes_list
+cmd_remotes_show = _bindings.cmd_remotes_show
+cmd_remotes_add = _bindings.cmd_remotes_add
+cmd_remotes_wizard = _bindings.cmd_remotes_wizard
+cmd_remotes_doctor = _bindings.cmd_remotes_doctor
+cmd_namespace_list = _bindings.cmd_namespace_list
+cmd_namespace_show = _bindings.cmd_namespace_show
+cmd_namespace_register = _bindings.cmd_namespace_register
+cmd_diff = _bindings.cmd_diff
+cmd_pull = _bindings.cmd_pull
+cmd_push = _bindings.cmd_push
+cmd_dedupe_sequences = _bindings.cmd_dedupe_sequences
 
 
 # ---------- Typer CLI (library-first adapter) ----------
@@ -495,7 +337,7 @@ def _ctx_args(ctx: typer.Context, **kwargs) -> NS:
 def _root(
     ctx: typer.Context,
     root: Path = typer.Option(
-        (_pkg_usr_root() / "datasets").resolve(),
+        _default_usr_root(),
         "--root",
         help="Datasets root folder",
         readable=True,
@@ -507,6 +349,7 @@ def _root(
     rich: bool = typer.Option(True, "--rich/--no-rich", help="Use Rich formatting for supported commands"),
 ) -> None:
     try:
+        root = _normalize_usr_root(root)
         _assert_supported_root(root)
     except SequencesError as exc:
         raise typer.BadParameter(str(exc), param_hint="--root") from exc
@@ -530,6 +373,7 @@ register_ops_commands(
     cmd_dedupe_sequences=cmd_dedupe_sequences,
     cmd_registry_freeze=cmd_registry_freeze,
     cmd_overlay_compact=cmd_overlay_compact,
+    cmd_overlay_remove=cmd_overlay_remove,
     cmd_repair_densegen=cmd_repair_densegen,
     cmd_make_mock=cmd_make_mock,
     cmd_add_demo=cmd_add_demo,

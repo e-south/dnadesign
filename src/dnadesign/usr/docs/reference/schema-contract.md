@@ -1,7 +1,7 @@
 # USR schema contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-03-14
 
 
 ## Core schema
@@ -37,6 +37,19 @@
 - Namespace regex: `^[a-z][a-z0-9_]*$`
 - Reserved namespaces: `usr`
 - Collision policy: hard error unless `--allow-overwrite` is explicit.
+
+Conventional cross-tool label namespace:
+
+- Use `usr_label__primary` for the preferred human-readable record name.
+- Use `usr_label__aliases` for stable alternate names or legacy labels.
+- Use tool-specific namespaces for tool provenance, not for the canonical human label itself.
+
+Dataset id naming convention:
+
+- Prefer the least-coupled semantic id that still makes the dataset obvious to operators.
+- Flat ids are first-class: examples include `mg1655_promoters`, `plasmids`, and `pdual10_slot_a_window_1kb_demo`.
+- Namespace-qualified ids remain valid when they genuinely improve disambiguation.
+- Avoid encoding the producing tool name in the dataset id when the dataset is intended to be consumed across sibling packages.
 
 ## Base table metadata
 

@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import inspect
 import os
 import shlex
 from pathlib import Path
@@ -25,6 +26,7 @@ import dnadesign.ops.orchestrator.state as orchestrator_state
 import dnadesign.ops.runbooks.schema as runbook_schema
 from dnadesign.ops.cli import app
 from dnadesign.ops.orchestrator.execute import execute_batch_plan
+from dnadesign.ops.orchestrator.mode_tools import resolve_mode_tool_adapter_for_workflow_id
 from dnadesign.ops.orchestrator.plan import (
     BatchPlan,
     CommandSpec,
@@ -42,6 +44,49 @@ def test_workflow_helpers_classify_all_schema_workflow_ids() -> None:
         is_densegen = runbook_schema.is_densegen_workflow_id(workflow_id)
         is_infer = runbook_schema.is_infer_workflow_id(workflow_id)
         assert is_densegen != is_infer
+
+
+def test_list_workflow_tools_matches_schema_workflow_ids() -> None:
+    workflow_ids = get_args(runbook_schema.OrchestrationRunbookV1.model_fields["workflow_id"].annotation)
+    resolved_tools = tuple(sorted({runbook_schema.resolve_workflow_tool(workflow_id) for workflow_id in workflow_ids}))
+    assert runbook_schema.list_workflow_tools() == resolved_tools
+
+
+def test_mode_tool_adapters_cover_all_schema_workflow_ids() -> None:
+    workflow_ids = get_args(runbook_schema.OrchestrationRunbookV1.model_fields["workflow_id"].annotation)
+    assert workflow_ids
+    for workflow_id in workflow_ids:
+        adapter = resolve_mode_tool_adapter_for_workflow_id(workflow_id)
+        assert adapter.tool in {"densegen", "infer"}
+
+
+def test_ops_plan_avoids_infer_internal_module_imports() -> None:
+    import dnadesign.ops.orchestrator.plan as plan_module
+
+    plan_source = inspect.getsource(plan_module)
+    assert "dnadesign.infer.src." not in plan_source
+
+
+def test_ops_plan_import_does_not_eagerly_load_gpu_runtime_modules() -> None:
+    import subprocess
+    import sys
+
+    script = """
+import sys
+import dnadesign.ops.orchestrator.plan
+print(f"torch_loaded={'torch' in sys.modules}")
+print(f"evo2_loaded={'evo2' in sys.modules}")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+    lines = {line.strip() for line in (result.stdout or "").splitlines() if line.strip()}
+    assert "torch_loaded=False" in lines
+    assert "evo2_loaded=False" in lines
 
 
 def _render_block(commands: list[CommandSpec]) -> str:
@@ -112,6 +157,79 @@ def _write_runbook(
     return runbook_path
 
 
+def _infer_runbook_payload(
+    workspace_root: Path,
+    *,
+    runbook_id: str = "infer_evo2_batch",
+    mode_default: str = "auto",
+    usr_root: Path | None = None,
+    usr_dataset: str = "demo",
+) -> dict[str, object]:
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    selected_usr_root = usr_root or (workspace_root / "outputs" / "usr_datasets")
+    config_path = workspace_root / "config.yaml"
+    if not config_path.exists():
+        config_path.write_text(
+            """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs:
+  - id: job_a
+    operation: extract
+    ingest:
+      source: usr
+      root: "__USR_ROOT__"
+      dataset: "__USR_DATASET__"
+      field: sequence
+    outputs:
+      - id: ll_mean
+        fn: log_likelihood
+        format: float
+        params:
+          reduction: mean
+    io:
+      write_back: true
+""".strip()
+            .replace("__USR_ROOT__", str(selected_usr_root))
+            .replace("__USR_DATASET__", usr_dataset)
+            + "\n",
+            encoding="utf-8",
+        )
+
+    return {
+        "runbook": {
+            "schema_version": 1,
+            "id": runbook_id,
+            "workflow_id": "infer_batch_submit",
+            "project": "dunlop",
+            "workspace_root": str(workspace_root),
+            "logging": {
+                "stdout_dir": str(workspace_root / "outputs" / "logs" / "ops" / "sge" / runbook_id),
+            },
+            "infer": {
+                "config": str(config_path),
+                "qsub_template": "docs/bu-scc/jobs/evo2-gpu-infer.qsub",
+                "cuda_module": "cuda/12.4",
+                "gcc_module": "gcc/13.2.0",
+            },
+            "resources": {
+                "pe_omp": 4,
+                "h_rt": "04:00:00",
+                "mem_per_core": "8G",
+                "gpus": 1,
+                "gpu_capability": "8.9",
+            },
+            "mode_policy": {
+                "default": mode_default,
+                "on_active_job": "hold_jid",
+            },
+        }
+    }
+
+
 @pytest.fixture(autouse=True)
 def _set_notify_webhook_file_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     webhook_file = tmp_path / "notify_webhook.secret"
@@ -124,6 +242,12 @@ def test_runbook_notify_smoke_defaults_to_dry(tmp_path: Path) -> None:
     runbook_path = _write_runbook(tmp_path, include_smoke=False)
     runbook = load_orchestration_runbook(runbook_path)
     assert runbook.notify.smoke == "dry"
+
+
+def test_runbook_path_resolution_module_is_available() -> None:
+    from dnadesign.ops.runbooks import runbook_paths
+
+    assert callable(runbook_paths.resolve_runbook_paths)
 
 
 def test_runbook_relative_paths_resolve_against_runbook_parent(tmp_path: Path) -> None:
@@ -193,6 +317,17 @@ def test_runbook_default_post_run_template_resolves_to_repo_jobs_template(tmp_pa
             break
     expected_template = (repo_root / "docs" / "bu-scc" / "jobs" / "densegen-analysis.qsub").resolve()
     assert runbook.densegen.post_run.qsub_template == expected_template
+
+
+def test_runbook_notify_policy_defaults_to_generic_when_omitted(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
+    del payload["runbook"]["notify"]["policy"]
+
+    runbook = load_orchestration_runbook(runbook_path, raw=payload)
+
+    assert runbook.notify is not None
+    assert runbook.notify.policy == "generic"
 
 
 def test_runbook_rejects_stdout_dir_outside_workspace_ops_logs(tmp_path: Path) -> None:
@@ -277,6 +412,43 @@ def test_mode_auto_selects_fresh_without_artifacts(tmp_path: Path) -> None:
     decision = resolve_mode_decision(runbook=runbook, requested_mode=None, active_job_ids=())
     assert decision.selected_mode == "fresh"
     assert decision.run_args == "--fresh --no-plot"
+
+
+def test_mode_decision_raises_when_runbook_has_no_workload_blocks(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    invalid_runbook = runbook.model_copy(update={"densegen": None, "infer": None})
+
+    with pytest.raises(ValueError, match="runbook workload contract must define exactly one tool block"):
+        resolve_mode_decision(runbook=invalid_runbook, requested_mode=None, active_job_ids=())
+
+
+def test_mode_decision_raises_when_runbook_has_multiple_workload_blocks(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    infer_config = tmp_path / "infer_config.yaml"
+    infer_config.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    infer_workload = runbook_schema.InferWorkloadContract(
+        config=infer_config,
+        qsub_template=Path("docs/bu-scc/jobs/evo2-gpu-infer.qsub"),
+        cuda_module="cuda/12.4",
+        gcc_module="gcc/13.2.0",
+    )
+    invalid_runbook = runbook.model_copy(update={"infer": infer_workload})
+
+    with pytest.raises(ValueError, match="runbook workload contract must define exactly one tool block"):
+        resolve_mode_decision(runbook=invalid_runbook, requested_mode=None, active_job_ids=())
 
 
 def test_mode_auto_selects_resume_with_artifacts(tmp_path: Path) -> None:
@@ -485,7 +657,33 @@ def test_mode_auto_with_active_jobs_returns_hold_jid(tmp_path: Path) -> None:
 
     decision = resolve_mode_decision(runbook=runbook, requested_mode=None, active_job_ids=("81001", "81002"))
     assert decision.submit_behavior == "hold_jid"
-    assert decision.hold_jid == "81001"
+    assert decision.hold_jid == "81001,81002"
+
+
+def test_mode_auto_with_active_jobs_normalizes_hold_jid_list(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    decision = resolve_mode_decision(
+        runbook=runbook,
+        requested_mode=None,
+        active_job_ids=("81002", "81001", "81002", "  ", ""),
+    )
+    assert decision.submit_behavior == "hold_jid"
+    assert decision.hold_jid == "81001,81002"
+
+
+def test_mode_auto_with_active_jobs_normalizes_comma_delimited_ids(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    decision = resolve_mode_decision(
+        runbook=runbook,
+        requested_mode=None,
+        active_job_ids=("81002,81001", "81002"),
+    )
+    assert decision.submit_behavior == "hold_jid"
+    assert decision.hold_jid == "81001,81002"
 
 
 def test_build_batch_plan_forwards_allow_fresh_reset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -626,7 +824,7 @@ def test_batch_plan_requires_tls_ca_bundle_for_notify_workflows(
     runbook_path = _write_runbook(tmp_path)
     runbook = load_orchestration_runbook(runbook_path)
     monkeypatch.delenv("SSL_CERT_FILE", raising=False)
-    monkeypatch.setattr("dnadesign.ops.orchestrator.plan.DEFAULT_SYSTEM_TLS_CA_BUNDLE_CANDIDATES", ())
+    monkeypatch.setattr("dnadesign.ops.orchestrator.orchestration_notify.DEFAULT_SYSTEM_TLS_CA_BUNDLE_CANDIDATES", ())
 
     with pytest.raises(ValueError, match="notify TLS CA bundle is not configured"):
         build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
@@ -671,6 +869,66 @@ def test_densegen_preflight_verifies_post_run_analysis_template(tmp_path: Path) 
     assert "docs/bu-scc/jobs/densegen-analysis.qsub" in preflight_block
     assert "qa-submit-preflight --template" in preflight_block
     assert "densegen-analysis.qsub" in preflight_block
+
+
+def test_densegen_post_run_can_use_dedicated_resources(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
+    payload["runbook"]["densegen"]["post_run"] = {
+        "qsub_template": "docs/bu-scc/jobs/densegen-analysis.qsub",
+        "resources": {
+            "pe_omp": 1,
+            "h_rt": "00:20:00",
+            "mem_per_core": "2G",
+        },
+    }
+    runbook = load_orchestration_runbook(runbook_path, raw=payload)
+
+    plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
+    post_run_verify = next(
+        command
+        for command in plan.preflight_commands
+        if command.argv is not None
+        and command.argv[:2] == ("qsub", "-verify")
+        and command.argv[-1].endswith("densegen-analysis.qsub")
+    )
+    post_run_submit = next(
+        command
+        for command in plan.submit_commands
+        if command.argv is not None
+        and command.argv[0] == "qsub"
+        and command.argv[-1].endswith("densegen-analysis.qsub")
+    )
+
+    post_run_verify_shell = post_run_verify.render_shell()
+    post_run_submit_shell = post_run_submit.render_shell()
+    assert "-pe omp 1" in post_run_verify_shell
+    assert "-l h_rt=00:20:00" in post_run_verify_shell
+    assert "-l mem_per_core=2G" in post_run_verify_shell
+    assert "-pe omp 1" in post_run_submit_shell
+    assert "-l h_rt=00:20:00" in post_run_submit_shell
+    assert "-l mem_per_core=2G" in post_run_submit_shell
+    assert "-hold_jid study_stress_ethanol_cipro_densegen_cpu" in post_run_submit_shell
+
+
+def test_densegen_post_run_defaults_to_small_analysis_resources(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
+    post_run_submit = next(
+        command
+        for command in plan.submit_commands
+        if command.argv is not None
+        and command.argv[0] == "qsub"
+        and command.argv[-1].endswith("densegen-analysis.qsub")
+    )
+
+    post_run_submit_shell = post_run_submit.render_shell()
+    assert "-pe omp 4" in post_run_submit_shell
+    assert "-l h_rt=01:00:00" in post_run_submit_shell
+    assert "-l mem_per_core=4G" in post_run_submit_shell
+    assert "-hold_jid study_stress_ethanol_cipro_densegen_cpu" in post_run_submit_shell
 
 
 def test_notify_submit_uses_webhook_file_without_embedding_secret(
@@ -987,6 +1245,7 @@ def test_batch_plan_includes_live_canary_when_overridden(tmp_path: Path) -> None
     smoke_block = _render_block(plan.notify_smoke_commands)
     assert "--dry-run" in smoke_block
     assert "notify send" in smoke_block
+    assert "--tls-ca-bundle" in smoke_block
 
 
 def test_batch_plan_uses_structured_specs_and_safe_shell_rendering(tmp_path: Path) -> None:
@@ -1043,7 +1302,18 @@ def test_infer_runbook_uses_gpu_submit_template_and_filters(tmp_path: Path) -> N
     workspace_root = tmp_path / "infer_workspace"
     workspace_root.mkdir(parents=True, exist_ok=True)
     config_path = workspace_root / "config.yaml"
-    config_path.write_text("jobs: []\n", encoding="utf-8")
+    config_path.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
 
     payload = {
         "runbook": {
@@ -1063,7 +1333,7 @@ def test_infer_runbook_uses_gpu_submit_template_and_filters(tmp_path: Path) -> N
             },
             "notify": {
                 "tool": "infer",
-                "policy": "infer_evo2",
+                "policy": "infer",
                 "profile": str(workspace_root / "outputs/notify/infer/profile.json"),
                 "cursor": str(workspace_root / "outputs/notify/infer/cursor"),
                 "spool_dir": str(workspace_root / "outputs/notify/infer/spool"),
@@ -1090,13 +1360,14 @@ def test_infer_runbook_uses_gpu_submit_template_and_filters(tmp_path: Path) -> N
     smoke_block = _render_block(plan.notify_smoke_commands)
 
     assert "dnadesign.ops.orchestrator.gates usr-overlay-guard" in preflight_block
-    assert "--tool infer_evo2" in preflight_block
+    assert "--tool infer " in preflight_block
+    assert "--tool infer_evo2" not in preflight_block
     assert "evo2-gpu-infer.qsub" in submit_block
     assert "gpus=1" in submit_block
     assert "gpu_c=8.9" in submit_block
     assert "NOTIFY_PROFILE" in submit_block
     assert "notify profile smoke --profile" in smoke_block
-    assert "--tool infer_evo2" in smoke_block
+    assert "--tool infer " in smoke_block
     assert "setup resolve-events --tool infer --config" not in smoke_block
     assert "--only-tools infer" in smoke_block
 
@@ -1120,7 +1391,7 @@ def test_infer_workflow_rejects_notify_tool_mismatch() -> None:
             },
             "notify": {
                 "tool": "densegen",
-                "policy": "infer_evo2",
+                "policy": "infer",
                 "profile": "/tmp/workspace/outputs/notify/infer/profile.json",
                 "cursor": "/tmp/workspace/outputs/notify/infer/cursor",
                 "spool_dir": "/tmp/workspace/outputs/notify/infer/spool",
@@ -1140,19 +1411,35 @@ def test_infer_workflow_rejects_notify_tool_mismatch() -> None:
         load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
 
 
-def test_infer_batch_submit_without_notify_skips_notify_phase() -> None:
+def test_infer_batch_submit_without_notify_skips_notify_phase(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_batch_workspace"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    config_path = workspace_root / "config.yaml"
+    config_path.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
     payload = {
         "runbook": {
             "schema_version": 1,
             "id": "infer_evo2_batch",
             "workflow_id": "infer_batch_submit",
             "project": "dunlop",
-            "workspace_root": "/tmp/workspace",
+            "workspace_root": str(workspace_root),
             "logging": {
-                "stdout_dir": "/tmp/workspace/outputs/logs/ops/sge/infer_evo2_batch",
+                "stdout_dir": str(workspace_root / "outputs" / "logs" / "ops" / "sge" / "infer_evo2_batch"),
             },
             "infer": {
-                "config": "/tmp/workspace/config.yaml",
+                "config": str(config_path),
                 "qsub_template": "docs/bu-scc/jobs/evo2-gpu-infer.qsub",
                 "cuda_module": "cuda/12.4",
                 "gcc_module": "gcc/13.2.0",
@@ -1180,6 +1467,187 @@ def test_infer_batch_submit_without_notify_skips_notify_phase() -> None:
     assert "INFER_CONFIG=" in submit_block
 
 
+def test_infer_mode_auto_selects_fresh_when_only_usr_registry_exists(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_mode_registry_only"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_registry_only",
+        mode_default="auto",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    marker = runbook.workspace_root / "outputs" / "usr_datasets" / "registry.yaml"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("version: 1\n", encoding="utf-8")
+
+    decision = resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
+    assert decision.selected_mode == "fresh"
+    assert decision.run_args == ""
+
+
+def test_infer_mode_auto_selects_resume_when_infer_overlay_exists(tmp_path: Path) -> None:
+    pyarrow = pytest.importorskip("pyarrow")
+    pyarrow_parquet = pytest.importorskip("pyarrow.parquet")
+
+    workspace_root = tmp_path / "infer_mode_overlay_exists"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_overlay_exists",
+        mode_default="auto",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    overlay_path = runbook.workspace_root / "outputs" / "usr_datasets" / "demo" / "_derived" / "infer.parquet"
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    pyarrow_parquet.write_table(
+        pyarrow.table(
+            {
+                "id": ["id-1"],
+                "infer__evo2_7b__job_a__ll_mean": [1.0],
+            }
+        ),
+        overlay_path,
+    )
+
+    decision = resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
+    assert decision.selected_mode == "resume"
+    assert decision.run_args == ""
+
+
+def test_infer_mode_auto_selects_resume_when_external_usr_overlay_exists(tmp_path: Path) -> None:
+    pyarrow = pytest.importorskip("pyarrow")
+    pyarrow_parquet = pytest.importorskip("pyarrow.parquet")
+
+    workspace_root = tmp_path / "infer_mode_external_overlay"
+    external_usr_root = tmp_path / "external_usr_root"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_external_overlay",
+        mode_default="auto",
+        usr_root=external_usr_root,
+        usr_dataset="external_demo",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    overlay_path = external_usr_root / "external_demo" / "_derived" / "infer.parquet"
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    pyarrow_parquet.write_table(
+        pyarrow.table(
+            {
+                "id": ["id-1"],
+                "infer__evo2_7b__job_a__ll_mean": [1.0],
+            }
+        ),
+        overlay_path,
+    )
+
+    decision = resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
+    assert decision.selected_mode == "resume"
+    assert decision.run_args == ""
+
+
+def test_infer_mode_resume_raises_without_resume_artifacts(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_mode_resume_missing_artifacts"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_resume_missing_artifacts",
+        mode_default="auto",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+
+    with pytest.raises(ValueError, match="resume mode blocked: workspace has no resume artifacts"):
+        resolve_mode_decision(runbook=runbook, requested_mode="resume", active_job_ids=())
+
+
+def test_infer_mode_auto_raises_when_infer_usr_destination_is_ambiguous(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_mode_ambiguous_destination"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_ambiguous_destination",
+        mode_default="auto",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    runbook.infer.config.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs:
+  - id: job_a
+    operation: extract
+    ingest:
+      source: usr
+      root: "__USR_ROOT_A__"
+      dataset: "dataset_a"
+      field: sequence
+    outputs:
+      - id: ll_mean
+        fn: log_likelihood
+        format: float
+        params:
+          reduction: mean
+    io:
+      write_back: true
+  - id: job_b
+    operation: extract
+    ingest:
+      source: usr
+      root: "__USR_ROOT_B__"
+      dataset: "dataset_b"
+      field: sequence
+    outputs:
+      - id: ll_mean
+        fn: log_likelihood
+        format: float
+        params:
+          reduction: mean
+    io:
+      write_back: true
+""".strip()
+        .replace("__USR_ROOT_A__", str(tmp_path / "external_usr_a"))
+        .replace("__USR_ROOT_B__", str(tmp_path / "external_usr_b"))
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="infer mode probe requires a single resolvable USR destination"):
+        resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
+
+
+def test_infer_mode_fresh_requires_reset_ack_when_resume_artifacts_exist(tmp_path: Path) -> None:
+    pyarrow = pytest.importorskip("pyarrow")
+    pyarrow_parquet = pytest.importorskip("pyarrow.parquet")
+
+    workspace_root = tmp_path / "infer_mode_fresh_reset_ack"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_fresh_reset_ack",
+        mode_default="auto",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    overlay_path = runbook.workspace_root / "outputs" / "usr_datasets" / "demo" / "_derived" / "infer.parquet"
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    pyarrow_parquet.write_table(
+        pyarrow.table(
+            {
+                "id": ["id-1"],
+                "infer__evo2_7b__job_a__ll_mean": [1.0],
+            }
+        ),
+        overlay_path,
+    )
+
+    with pytest.raises(ValueError, match="fresh mode blocked"):
+        resolve_mode_decision(runbook=runbook, requested_mode="fresh", active_job_ids=())
+
+    decision = resolve_mode_decision(
+        runbook=runbook,
+        requested_mode="fresh",
+        active_job_ids=(),
+        allow_fresh_reset=True,
+    )
+    assert decision.selected_mode == "fresh"
+
+
 def test_mode_auto_blocks_for_infer_when_resume_policy_marks_workspace_partial(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1194,7 +1662,18 @@ def test_mode_auto_blocks_for_infer_when_resume_policy_marks_workspace_partial(
     pyarrow_parquet.write_table(pyarrow.table({"id": ["r1"], "sequence": ["ATGC"]}), records_path)
 
     config_path = workspace_root / "config.yaml"
-    config_path.write_text("jobs: []\n", encoding="utf-8")
+    config_path.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
     payload = {
         "runbook": {
             "schema_version": 1,
@@ -1243,6 +1722,52 @@ def test_mode_auto_blocks_for_infer_when_resume_policy_marks_workspace_partial(
         resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
 
 
+def test_infer_runbook_resource_contract_fails_for_40b_single_gpu(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_resource_guard"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    config_path = workspace_root / "config.yaml"
+    config_path.write_text(
+        """
+model:
+  id: evo2_40b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    payload = {
+        "runbook": {
+            "schema_version": 1,
+            "id": "infer_resource_guard",
+            "workflow_id": "infer_batch_submit",
+            "project": "dunlop",
+            "workspace_root": str(workspace_root),
+            "logging": {
+                "stdout_dir": str(workspace_root / "outputs" / "logs" / "ops" / "sge" / "infer_resource_guard"),
+            },
+            "infer": {
+                "config": str(config_path),
+                "qsub_template": "docs/bu-scc/jobs/evo2-gpu-infer.qsub",
+                "cuda_module": "cuda/12.4",
+                "gcc_module": "gcc/13.2.0",
+            },
+            "resources": {
+                "pe_omp": 4,
+                "h_rt": "04:00:00",
+                "mem_per_core": "8G",
+                "gpus": 1,
+                "gpu_capability": "8.9",
+            },
+        }
+    }
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    with pytest.raises(ValueError, match="infer runbook resources are incompatible with infer model contract"):
+        build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
+
+
 def test_densegen_workflow_rejects_gpu_fields() -> None:
     payload = {
         "runbook": {
@@ -1282,7 +1807,7 @@ def test_densegen_workflow_rejects_gpu_fields() -> None:
     }
     with pytest.raises(
         ValueError,
-        match="densegen workflow does not accept resources.gpus or resources.gpu_capability",
+        match="densegen workflow does not accept resources.gpus, resources.gpu_capability, or resources.gpu_memory_gib",
     ):
         load_orchestration_runbook(Path("densegen-runbook.yaml"), raw=payload)
 
@@ -1485,7 +2010,7 @@ def test_cli_plan_invalid_runbook_shows_contract_error_without_traceback(tmp_pat
             },
             "notify": {
                 "tool": "densegen",
-                "policy": "infer_evo2",
+                "policy": "infer",
                 "profile": "/tmp/workspace/outputs/notify/infer/profile.json",
                 "cursor": "/tmp/workspace/outputs/notify/infer/cursor",
                 "spool_dir": "/tmp/workspace/outputs/notify/infer/spool",
@@ -1754,6 +2279,7 @@ def test_cli_runbook_init_creates_valid_densegen_contract(tmp_path: Path) -> Non
     assert loaded.id == "densegen_demo"
     assert loaded.notify.smoke == "dry"
     assert loaded.densegen is not None
+    assert loaded.resources.pe_omp == 12
     assert loaded.densegen.config == (workspace_root / "config.yaml").resolve()
     assert (
         loaded.logging.stdout_dir == (workspace_root / "outputs" / "logs" / "ops" / "sge" / "densegen_demo").resolve()
@@ -1771,6 +2297,10 @@ def test_cli_runbook_init_creates_valid_densegen_contract(tmp_path: Path) -> Non
     assert raw_payload["runbook"]["densegen"]["records_part_guard"]["auto_compact_existing_records_parts"] is True
     assert raw_payload["runbook"]["densegen"]["archived_overlay_guard"]["max_archived_entries"] == 1000
     assert raw_payload["runbook"]["densegen"]["archived_overlay_guard"]["max_archived_bytes"] == 2147483648
+    assert raw_payload["runbook"]["notify"]["policy"] == "generic"
+    assert "Notify contract required before planning" in result.stderr
+    assert "NOTIFY_WEBHOOK_FILE" in result.stderr
+    assert str(workspace_root / "outputs" / "notify" / "densegen" / "profile.json") in result.stderr
 
 
 def test_cli_runbook_init_supports_densegen_without_notify(tmp_path: Path) -> None:
@@ -1797,6 +2327,66 @@ def test_cli_runbook_init_supports_densegen_without_notify(tmp_path: Path) -> No
     loaded = load_orchestration_runbook(runbook_path)
     assert loaded.workflow_id == "densegen_batch_submit"
     assert loaded.notify is None
+
+
+def test_cli_runbook_init_generates_infer_notify_scaffold_with_generic_policy(tmp_path: Path) -> None:
+    runbook_path = tmp_path / "contracts" / "infer-runbook.yaml"
+    workspace_root = tmp_path / "workspace_infer"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "init",
+            "--workflow",
+            "infer",
+            "--runbook",
+            str(runbook_path),
+            "--workspace-root",
+            str(workspace_root),
+            "--project",
+            "dunlop",
+            "--id",
+            "infer_demo",
+        ],
+    )
+
+    assert result.exit_code == 0
+    raw_payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
+    assert raw_payload["runbook"]["notify"]["tool"] == "infer"
+    assert raw_payload["runbook"]["notify"]["policy"] == "generic"
+    assert "Notify contract required before planning" in result.stderr
+    assert "NOTIFY_WEBHOOK_FILE" in result.stderr
+    assert str(workspace_root / "outputs" / "notify" / "infer" / "profile.json") in result.stderr
+
+
+def test_cli_runbook_init_without_notify_emits_no_notify_contract_warning(tmp_path: Path) -> None:
+    runbook_path = tmp_path / "contracts" / "infer-runbook.yaml"
+    workspace_root = tmp_path / "workspace_infer"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "init",
+            "--workflow",
+            "infer",
+            "--runbook",
+            str(runbook_path),
+            "--workspace-root",
+            str(workspace_root),
+            "--project",
+            "dunlop",
+            "--id",
+            "infer_demo",
+            "--no-notify",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Notify contract required before planning" not in result.stderr
 
 
 def test_cli_runbook_init_applies_resource_overrides(tmp_path: Path) -> None:
@@ -2151,6 +2741,47 @@ def test_cli_plan_uses_discovered_active_job_ids(tmp_path: Path, monkeypatch: py
     assert payload["hold_jid"] == "93331"
 
 
+def test_cli_plan_chains_all_discovered_active_job_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    monkeypatch.setattr(
+        "dnadesign.ops.cli.discover_active_job_ids_for_runbook",
+        lambda runbook, max_jobs: ("93332", "93331", "93332"),
+    )
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["runbook", "plan", "--runbook", str(runbook_path), "--discover-active-jobs"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["submit_behavior"] == "hold_jid"
+    assert payload["hold_jid"] == "93331,93332"
+
+
+def test_cli_plan_accepts_comma_delimited_active_job_ids(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "plan",
+            "--runbook",
+            str(runbook_path),
+            "--no-discover-active-jobs",
+            "--active-job-id",
+            "93332,93331",
+            "--active-job-id",
+            "93332",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["submit_behavior"] == "hold_jid"
+    assert payload["hold_jid"] == "93331,93332"
+
+
 def test_cli_active_jobs_emits_discovered_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     runbook_path = _write_runbook(tmp_path)
     monkeypatch.setattr(
@@ -2164,6 +2795,10 @@ def test_cli_active_jobs_emits_discovered_ids(tmp_path: Path, monkeypatch: pytes
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["active_job_ids"] == ["95001", "95002"]
+    assert payload["active_job_count"] == 2
+    assert payload["active_job_ids_csv"] == "95001,95002"
+    assert payload["active_job_id_args"] == "--active-job-id 95001 --active-job-id 95002"
+    assert "--no-discover-active-jobs --active-job-id 95001 --active-job-id 95002" in payload["plan_command_hint"]
 
 
 def test_packaged_runbook_precedents_exist_and_load() -> None:

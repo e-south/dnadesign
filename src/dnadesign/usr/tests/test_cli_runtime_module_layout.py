@@ -14,7 +14,7 @@ from __future__ import annotations
 import importlib
 import inspect
 
-import dnadesign.usr.src.cli as usr_cli
+import dnadesign.usr.src.cli_bindings as cli_bindings
 
 
 def test_usr_cli_runtime_module_importable() -> None:
@@ -33,7 +33,7 @@ def test_usr_cli_runtime_module_importable() -> None:
 
 
 def test_usr_cli_runtime_commands_delegate_to_runtime_module() -> None:
-    source = inspect.getsource(usr_cli)
+    source = inspect.getsource(cli_bindings)
     assert "runtime_commands.cmd_validate(" in source
     assert "runtime_commands.cmd_events_tail(" in source
     assert "runtime_commands.cmd_get(" in source

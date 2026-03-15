@@ -6,19 +6,22 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
 - Code (CLI + library): `src/dnadesign/usr/src/`
 - Datasets root: `src/dnadesign/usr/datasets/`
   - Dataset layout (recommended):
-    - `datasets/<namespace>/<name>/records.parquet` (canonical base table)
-    - `datasets/<namespace>/<name>/_derived/` (derived overlays)
-    - `datasets/<namespace>/<name>/meta.md` (hand-edited notes/snippets)
-    - `datasets/<namespace>/<name>/.events.log` (append-only; generated)
-    - `datasets/<namespace>/<name>/_snapshots/` (generated)
-    - `datasets/_archive/<namespace>/<name>/...` (canonical archive location)
+    - `datasets/<dataset_id>/records.parquet` (canonical base table)
+    - `datasets/<dataset_id>/_derived/` (derived overlays)
+    - `datasets/<dataset_id>/meta.md` (hand-edited notes/snippets)
+    - `datasets/<dataset_id>/.events.log` (append-only; generated)
+    - `datasets/<dataset_id>/_snapshots/` (generated)
+    - `datasets/_archive/<dataset_id-or-qualified-path>/...` (canonical archive location)
   - Legacy archive roots are not operational:
     - `datasets/archived/**` and `usr/archived/**` should be treated as historical only.
 - Notebooks: `src/dnadesign/usr/notebooks/`
 - Remote sync config: set `USR_REMOTES_PATH` to your remotes YAML
 - Namespace registry: `registry.yaml` under the datasets root
 - Sync details: `src/dnadesign/usr/docs/operations/sync.md`
+- Repo-local BU SCC sync skill: `src/dnadesign/usr/skills/bu-scc-usr-sync/SKILL.md`
 - Historical artifacts: `src/dnadesign/usr/archived/` (treat as generated)
+- Dataset naming ontology: prefer the least-coupled semantic dataset ids, usually flat ids such as `mg1655_promoters`, `plasmids`, or `pdual10_slot_a_window_1kb_demo`; use namespace-qualified ids only when they genuinely improve disambiguation. Keep tool provenance in overlay namespaces, not dataset ids.
+- Human-readable record names belong in `usr_label__primary` / `usr_label__aliases`.
 
 ### Generated vs hand-edited
 - Hand-edited: `datasets/**/meta.md`, `remotes.yaml`, `docs/operations/sync.md`

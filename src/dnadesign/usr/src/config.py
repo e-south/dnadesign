@@ -27,6 +27,7 @@ class SSHRemoteConfig:
     host: str
     user: str
     base_dir: str
+    batch_mode: bool = True
     ssh_key_env: Optional[str] = None
     repo_root: Optional[str] = None
     local_repo_root: Optional[str] = None
@@ -92,6 +93,7 @@ def load_all(custom: Optional[Path] = None) -> Dict[str, SSHRemoteConfig]:
                 host=rec["host"],
                 user=rec["user"],
                 base_dir=rec["base_dir"],
+                batch_mode=bool(rec.get("batch_mode", True)),
                 ssh_key_env=rec.get("ssh_key_env"),
                 repo_root=rec.get("repo_root"),
                 local_repo_root=rec.get("local_repo_root"),
@@ -110,6 +112,7 @@ def save_remote(cfg: SSHRemoteConfig, custom: Optional[Path] = None) -> Path:
         "host": cfg.host,
         "user": cfg.user,
         "base_dir": cfg.base_dir,
+        "batch_mode": bool(cfg.batch_mode),
         "ssh_key_env": cfg.ssh_key_env,
         "repo_root": cfg.repo_root,
         "local_repo_root": cfg.local_repo_root,

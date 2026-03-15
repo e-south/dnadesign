@@ -4,7 +4,7 @@ These scripts are submit-ready templates for BU SCC SGE jobs:
 
 - `densegen-cpu.qsub`: DenseGen CPU batch run
 - `densegen-analysis.qsub`: post-run DenseGen analysis (plots)
-- `evo2-gpu-infer.qsub`: Evo2 GPU smoke/inference job shell
+- `evo2-gpu-infer.qsub`: Evo2 GPU infer batch run
 - `notify-watch.qsub`: Notify watcher for USR `.events.log`
 
 ### Quick start
@@ -20,7 +20,9 @@ qsub -P <project> \
   -hold_jid <densegen_cpu_job_name_or_id> \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/densegen-analysis.qsub
-qsub -P <project> docs/bu-scc/jobs/evo2-gpu-infer.qsub
+qsub -P <project> \
+  -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml \
+  docs/bu-scc/jobs/evo2-gpu-infer.qsub
 qsub -P <project> docs/bu-scc/jobs/notify-watch.qsub
 ```
 
@@ -52,7 +54,15 @@ Override command args at submit time when needed:
 - `DENSEGEN_RUN_ARGS` (example: `--resume --extend-quota 8 --no-plot`)
 
 `densegen-analysis.qsub` command defaults:
-- analysis chain: `uv run dense plot -c "$DENSEGEN_CONFIG"`
+- analysis chain: `uv run dense plot -c "$DENSEGEN_CONFIG" --only "$DENSEGEN_ANALYSIS_PLOTS"`
+- default `DENSEGEN_ANALYSIS_PLOTS`: `stage_a_summary,placement_map,run_health,tfbs_usage` (static plots only)
+- fail-fast gate: `DENSEGEN_ANALYSIS_PLOTS` must be non-empty
+- preflight gate: requires attempts/composition artifacts to exist as
+  finalized parquet or part files
+- read behavior: when part files exist, `dense plot` reads finalized tables
+  and part files directly without mutating on-disk artifacts
+- optional video plot: include `dense_array_video_showcase` only when FFmpeg is available in the queue environment
+- fail-fast gate: if `DENSEGEN_ANALYSIS_PLOTS` includes `dense_array_video_showcase` and `ffmpeg` is unavailable, the job exits with an explicit error
 
 Resume + quota extension submission:
 
@@ -62,11 +72,11 @@ qsub -P <project> \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
-DenseGen + GUROBI with explicit 16-slot cap:
+DenseGen + GUROBI with explicit 12-slot cap:
 
 ```bash
 qsub -P <project> \
-  -pe omp 16 \
+  -pe omp 12 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
@@ -77,7 +87,7 @@ Override bootstrap values when needed:
 
 ```bash
 qsub -P <project> \
-  -pe omp 16 \
+  -pe omp 12 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot',GUROBI_MODULE=gurobi/10.0.1,GUROBI_HOME=/share/pkg.7/gurobi/10.0.1/install,GRB_LICENSE_FILE=/usr/local/gurobi/gurobi.lic,TOKENSERVER=sccsvc.bu.edu \
@@ -99,9 +109,20 @@ For large campaigns with `runtime.round_robin: true`, avoid tiny turn caps:
 
 ```bash
 qsub -P <project> \
-  -v CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
+  -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml,CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
 ```
+
+Use that direct submit as the default `evo2_7b` lane. For `evo2_20b`, keep the same template but submit through an ops runbook or pass explicit Hopper resources (`-l gpus=1 -l gpu_c=9.0`) so the scheduler request matches the model contract.
+
+`evo2-gpu-infer.qsub` command defaults:
+- fail-fast gate: `INFER_CONFIG` is required
+- preflight: `uv run infer validate config --config "$INFER_CONFIG"`
+- run: `uv run infer run --config "$INFER_CONFIG"`
+
+Before first submit on a host, run deterministic environment bootstrap:
+- [BU SCC install GPU setup and verification runbook](../install.md#gpu-setup-and-verification-runbook)
+- [infer SCC Evo2 GPU environment runbook](../../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
 
 ### Notify watcher submissions
 

@@ -58,7 +58,9 @@ class SSHRemote:
     # ---- subprocess helpers ----
 
     def _ssh_cmd(self) -> List[str]:
-        cmd = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
+        cmd = ["ssh", "-o", "ConnectTimeout=10"]
+        if self.cfg.batch_mode:
+            cmd += ["-o", "BatchMode=yes"]
         if self.cfg.ssh_key_env:
             key_env = self.cfg.ssh_key_env
             key_path = os.environ.get(key_env)
@@ -70,20 +72,29 @@ class SSHRemote:
     def _rsync_cmd(self) -> List[str]:
         cmd = [
             "rsync",
-            "-az",
+            # Preserve dataset contents and symlink topology, but avoid replaying
+            # host-specific ownership/permission metadata onto the destination.
+            "-rltz",
             "--partial",
             "--protect-args",
             "--info=progress2",
             "--delete-delay",
             "--delay-updates",
+            "--no-perms",
+            "--no-owner",
+            "--no-group",
+            "--omit-dir-times",
         ]
-        ssh_opts = "ssh -o BatchMode=yes -o ConnectTimeout=10"
+        ssh_parts = ["ssh", "-o", "ConnectTimeout=10"]
+        if self.cfg.batch_mode:
+            ssh_parts += ["-o", "BatchMode=yes"]
         if self.cfg.ssh_key_env:
             key_env = self.cfg.ssh_key_env
             key_path = os.environ.get(key_env)
             if not key_path:
                 raise RemoteUnavailableError(f"Environment variable '{key_env}' not set (SSH key path).")
-            ssh_opts = f"ssh -i {shlex.quote(key_path)} -o BatchMode=yes -o ConnectTimeout=10"
+            ssh_parts[1:1] = ["-i", str(Path(key_path))]
+        ssh_opts = " ".join(shlex.quote(part) for part in ssh_parts)
         cmd += ["-e", ssh_opts]
         return cmd
 
@@ -118,8 +129,17 @@ class SSHRemote:
             text=True,
         )
         marker = ""
+        noise_lines: list[str] = []
         if proc.stdout is not None:
-            marker = proc.stdout.readline().strip()
+            while True:
+                line = proc.stdout.readline()
+                if line == "":
+                    break
+                marker = line.strip()
+                if marker in {"USR_REMOTE_LOCK_ACQUIRED", "USR_REMOTE_LOCK_TIMEOUT"}:
+                    break
+                if marker:
+                    noise_lines.append(marker)
         if marker != "USR_REMOTE_LOCK_ACQUIRED":
             stderr_text = ""
             if proc.stderr is not None:
@@ -133,6 +153,8 @@ class SSHRemote:
                     f"after {max(1, int(timeout_seconds))} seconds."
                 )
             detail = stderr_text or marker or "missing lock handshake marker"
+            if noise_lines:
+                detail = f"{detail}; stdout_before_marker={noise_lines[-1]}"
             raise TransferError(
                 f"Failed to acquire remote dataset lock for '{dataset}' on {self.cfg.ssh_target}: {detail}"
             )

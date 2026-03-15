@@ -14,7 +14,7 @@ from __future__ import annotations
 import importlib
 import inspect
 
-import dnadesign.usr.src.cli as usr_cli
+import dnadesign.usr.src.cli_bindings as cli_bindings
 
 
 def test_usr_cli_read_views_module_importable() -> None:
@@ -26,7 +26,7 @@ def test_usr_cli_read_views_module_importable() -> None:
 
 
 def test_usr_cli_read_view_commands_delegate_to_read_views_module() -> None:
-    source = inspect.getsource(usr_cli)
+    source = inspect.getsource(cli_bindings)
     assert "read_views_commands.cmd_head(" in source
     assert "read_views_commands.cmd_cols(" in source
     assert "read_views_commands.cmd_describe(" in source

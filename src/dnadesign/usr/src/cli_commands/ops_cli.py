@@ -27,6 +27,7 @@ def register_ops_commands(
     cmd_dedupe_sequences: Callable[[object], None],
     cmd_registry_freeze: Callable[[object], None],
     cmd_overlay_compact: Callable[[object], None],
+    cmd_overlay_remove: Callable[[object], None],
     cmd_repair_densegen: Callable[[object], None],
     cmd_make_mock: Callable[[object], None],
     cmd_add_demo: Callable[[object], None],
@@ -69,6 +70,15 @@ def register_ops_commands(
         namespace: str = typer.Option(..., "--namespace"),
     ) -> None:
         cmd_overlay_compact(ctx_args_builder(ctx, dataset=dataset, namespace=namespace))
+
+    @maintenance_app.command("overlay-remove")
+    def cli_overlay_remove(
+        ctx: typer.Context,
+        dataset: str = typer.Argument(...),
+        namespace: str = typer.Option(..., "--namespace"),
+        mode: str = typer.Option("error", "--mode", help="Removal mode: error|delete|archive"),
+    ) -> None:
+        cmd_overlay_remove(ctx_args_builder(ctx, dataset=dataset, namespace=namespace, mode=mode))
 
     @densegen_app.command("repair")
     def cli_repair_densegen(

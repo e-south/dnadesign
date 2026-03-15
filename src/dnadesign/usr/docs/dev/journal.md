@@ -13,7 +13,7 @@
   - PyArrow sysctl warnings appear in non-TTY environments unless `USR_SUPPRESS_PYARROW_SYSCTL=1` is set.
 - Next: propose minimal UX improvements and doc alignment; consider optional streaming writer or id index for large datasets.
 
-- Decision: dataset layout should be namespaced (no active/archive buckets). CLI resolution will accept unqualified names only when unambiguous; otherwise require `namespace/dataset` for clarity.
+- Decision: dataset layout supports both flat and namespace-qualified ids. Prefer the least-coupled semantic id; use namespace nesting only when it materially improves disambiguation.
 - Decision: remotes config should be decoupled and explicit. Add `USR_REMOTES_PATH` override and fail fast if multiple config files are found.
 - Update: added column projection support for `head`/`export` and optimized `get` to scan via pyarrow.dataset. Added tests for read ops.
 - Update: grep now supports batch_size for large datasets (streamed scan with early cutoff).

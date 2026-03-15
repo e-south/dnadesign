@@ -56,6 +56,7 @@ opal       = "dnadesign.opal.cli:main"
 dense      = "dnadesign.densegen:app"
 notify     = "dnadesign.notify.cli:app"
 infer      = "dnadesign.infer.cli:app"
+construct  = "dnadesign.construct.cli:main"
 cluster    = "dnadesign.cluster.cli:main"
 permuter   = "dnadesign.permuter.cli:main"
 baserender = "dnadesign.baserender.cli:app"
@@ -69,7 +70,6 @@ infer-evo2 = [
   "torch>=2.8,<2.9; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "torchvision>=0.23,<0.24; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "torchaudio>=2.8,<2.9; sys_platform == 'linux' and platform_machine == 'x86_64'",
-
   # --- build helpers (required because we disable build isolation for flash-attn + TE-torch)
   "pip; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "setuptools; sys_platform == 'linux' and platform_machine == 'x86_64'",
@@ -77,17 +77,13 @@ infer-evo2 = [
   "packaging; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "ninja; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "cmake>=3.18; sys_platform == 'linux' and platform_machine == 'x86_64'",
-
   # --- kernels
   # flash-attn commonly requires building against the torch in the env; install it w/o build isolation.
   "flash-attn>=2.8.0.post2,<3; sys_platform == 'linux' and platform_machine == 'x86_64'",
-
   # Transformer Engine: let it float within major=2.
   # (TE is a prereq for Evo2; Evo2 requires TE>=2.0.0)
   "transformer-engine[pytorch]>=2.0,<3; sys_platform == 'linux' and platform_machine == 'x86_64'",
-
-  # --- evo2
-  "evo2; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "evo2>=0.5.3",
 ]
 
 [dependency-groups]
@@ -99,6 +95,13 @@ dev  = [{ include-group = "test" }, { include-group = "lint" }]
 where = ["src"]
 
 [tool.setuptools.package-data]
+"dnadesign.construct" = [
+  "src/seeds/*.yaml",
+  "workspaces/demo_promoter_swap_pdual10/*.md",
+  "workspaces/demo_promoter_swap_pdual10/*.sh",
+  "workspaces/demo_promoter_swap_pdual10/*.yaml",
+  "workspaces/demo_promoter_swap_pdual10/inputs/*.md",
+]
 "dnadesign.cruncher.ingest.certs" = ["*.pem"]
 "dnadesign.densegen" = [
   "workspaces/demo_meme_three_tfs/config.yaml",

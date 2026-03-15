@@ -205,7 +205,7 @@ Notes:
 
 ### `dense campaign-reset`
 
-Deletes run outputs while preserving config and inputs.
+Clears run artifacts under `outputs/` while preserving workspace config and inputs.
 
 Key options:
 - `--yes` (skip confirmation prompt)
@@ -215,6 +215,7 @@ Key options:
 Notes:
 - Runs in danger-zone mode by default and prompts before deleting outputs.
 - Preserves workspace-local USR registry by default so post-reset `dense run` remains ergonomic.
+- Preserves `outputs/notify` and `outputs/logs` scaffolding so watcher/profile wiring and ops log roots remain stable across fresh resets.
 
 ### `dense plot`
 

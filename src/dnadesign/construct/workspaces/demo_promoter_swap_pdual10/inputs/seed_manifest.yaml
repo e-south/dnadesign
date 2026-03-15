@@ -1,0 +1,45 @@
+demo_id: promoter_swap_pdual10
+datasets:
+  anchors: mg1655_promoters
+  templates: plasmids
+anchors:
+  spyP_MG1655:
+    record_id: d869c72063ebcd4931a6efc296febbfd33d5b171
+    length_bp: 220
+    sha256: bc389d5261009cbaf82074757d0696771720c12c65b37b8df48afec601797a7d # pragma: allowlist secret
+  sulAp:
+    record_id: 0680773303aae947343a073b717bf8f578d04ba0
+    length_bp: 165
+    sha256: a85bdc1dcc17c8fcc775c49f6a5783c274108709e1eb558d4a9add4c76173349 # pragma: allowlist secret
+  soxS:
+    record_id: ccf7eda978a4579bb38f1279ee89c7eb23f34123
+    length_bp: 200
+    sha256: 1c007e2979dedd35b90477dfa04289b6d94febd04d3bf5f30f842fa0a7421250 # pragma: allowlist secret
+  J23105:
+    record_id: 90dec98c1dd4d3676a76f6e45881bc6b57e2a2d4
+    length_bp: 35
+    sha256: ba0fbd9e0b7d9991625772fbdf8f1ab7e8d058b85121809f0ea7cd4faf459b26 # pragma: allowlist secret
+templates:
+  pDual-10:
+    record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+    length_bp: 5726
+    topology: circular
+    sha256: b42000b97931c77e6418ef4018b3c08364fda4beaaaf90dafe53500a47c22803 # pragma: allowlist secret
+slots:
+  slot_a:
+    template_label: pDual-10
+    incumbent_label: J23105
+    start: 2300
+    end: 2335
+    expected_template_sequence: tttacggctagctcagtcctaggtactatgctagc
+  slot_b:
+    template_label: pDual-10
+    incumbent_label: J23105
+    start: 3621
+    end: 3656
+    expected_template_sequence: tttacggctagctcagtcctaggtactatgctagc
+notes:
+- The full pDual-10 record contains two exact J23105 matches; choose slot_a or slot_b
+  explicitly.
+- The earlier scaffold-only interval [405, 440) does not apply to the full pDual-10
+  record.

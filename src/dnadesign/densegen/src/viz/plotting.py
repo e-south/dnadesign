@@ -131,17 +131,35 @@ def _read_composition_parquet(path: Path, *, columns: Iterable[str] | None = Non
     return frame
 
 
+def _resolve_analysis_table_paths(
+    tables_root: Path,
+    *,
+    final_name: str,
+    part_glob: str,
+) -> list[Path]:
+    final_path = tables_root / final_name
+    part_paths = sorted(tables_root.glob(part_glob))
+    paths: list[Path] = []
+    if final_path.exists():
+        paths.append(final_path)
+    paths.extend(part_paths)
+    if not paths:
+        raise ValueError(
+            f"{final_name} not found: {final_path}. Expected finalized table or pending `{part_glob}` files."
+        )
+    return paths
+
+
 def _load_attempts(run_root: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame:
     tables_root = run_root / "outputs" / "tables"
-    attempts_path = tables_root / "attempts.parquet"
-    part_paths = sorted(tables_root.glob("attempts_part-*.parquet"))
-    if not attempts_path.exists() and not part_paths:
-        raise ValueError(f"attempts.parquet not found: {attempts_path}")
-    paths = ([attempts_path] if attempts_path.exists() else []) + part_paths
-    frames = [pd.read_parquet(path, columns=_read_columns(columns)) for path in paths]
-    if len(frames) == 1:
-        return frames[0]
-    return pd.concat(frames, ignore_index=True)
+    attempts_paths = _resolve_analysis_table_paths(
+        tables_root,
+        final_name="attempts.parquet",
+        part_glob="attempts_part-*.parquet",
+    )
+    projected_columns = _read_columns(columns)
+    frames = [pd.read_parquet(path, columns=projected_columns) for path in attempts_paths]
+    return pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
 
 
 def _load_events(run_root: Path) -> pd.DataFrame:
@@ -255,21 +273,16 @@ def _maybe_load_stage_a_pools(
 
 def _load_composition(run_root: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame:
     tables_root = run_root / "outputs" / "tables"
-    final_path = tables_root / "composition.parquet"
-    part_paths = sorted(tables_root.glob("composition_part-*.parquet"))
-    if not final_path.exists() and not part_paths:
-        raise ValueError(f"composition.parquet not found: {final_path}")
-
-    paths = ([final_path] if final_path.exists() else []) + part_paths
-    frames = [_read_composition_parquet(path, columns=columns) for path in paths]
-    if not frames:
-        return pd.DataFrame()
-    if len(frames) == 1:
-        return frames[0]
-    merged = pd.concat(frames, ignore_index=True)
-    if {"solution_id", "placement_index"}.issubset(set(merged.columns)):
-        merged = merged.drop_duplicates(subset=["solution_id", "placement_index"], keep="last", ignore_index=True)
-    return merged
+    composition_paths = _resolve_analysis_table_paths(
+        tables_root,
+        final_name="composition.parquet",
+        part_glob="composition_part-*.parquet",
+    )
+    frames = [_read_composition_parquet(path, columns=columns) for path in composition_paths]
+    frame = pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
+    if {"solution_id", "placement_index"}.issubset(set(frame.columns)):
+        frame = frame.drop_duplicates(subset=["solution_id", "placement_index"], keep="last", ignore_index=True)
+    return frame
 
 
 def _maybe_load_composition(run_root: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame | None:

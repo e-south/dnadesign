@@ -23,6 +23,7 @@ from .errors import (
 )
 from .event_schema import USR_EVENT_VERSION
 from .normalize import compute_id, normalize_sequence, validate_alphabet, validate_bio_type
+from .roots import default_usr_root, normalize_usr_root
 from .schema import ARROW_SCHEMA, ID_HASH_SPEC, REQUIRED_COLUMNS, SCHEMA_VERSION
 from .types import AddSequencesResult, DatasetInfo, Fingerprint, Manifest, OverlayInfo
 from .version import __version__
@@ -38,7 +39,9 @@ __all__ = [
     "SequencesError",
     "ValidationError",
     "compute_id",
+    "default_usr_root",
     "normalize_sequence",
+    "normalize_usr_root",
     "validate_bio_type",
     "validate_alphabet",
     "ARROW_SCHEMA",

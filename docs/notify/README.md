@@ -34,7 +34,7 @@ This page is a route map only. Operator steps live in [Notify USR events operato
 | If the user asks... | Run this first | Then verify with |
 | --- | --- | --- |
 | "start a densegen workspace watcher and send to slack" | `notify setup slack --tool densegen --workspace <workspace> --secret-source file --secret-ref file://<abs-path-to-webhook-secret> --policy densegen` | `notify profile doctor --profile <config-dir>/outputs/notify/densegen/profile.json` |
-| "start an infer_evo2 workspace watcher and send to slack" | `notify setup slack --tool infer_evo2 --workspace <workspace> --secret-source file --secret-ref file://<abs-path-to-webhook-secret> --policy infer_evo2` | `notify profile doctor --profile <config-dir>/outputs/notify/infer_evo2/profile.json` |
+| "start an infer workspace watcher and send to slack" | `notify setup slack --tool infer --workspace <workspace> --secret-source file --secret-ref file://<abs-path-to-webhook-secret> --policy infer` | `notify profile doctor --profile <config-dir>/outputs/notify/infer/profile.json` |
 | "i already have a profile, just validate wiring" | `notify profile doctor --profile <profile.json>` | `notify usr-events watch --profile <profile.json> --dry-run` |
 | "resume failed deliveries from spool" | `notify spool drain --profile <profile.json>` | `notify spool drain --profile <profile.json> --fail-fast` |
 | "watch this workspace without passing profile path" | `notify usr-events watch --tool <tool> --workspace <workspace> --follow` | `notify setup resolve-events --tool <tool> --workspace <workspace>` |

@@ -12,7 +12,7 @@ When HPC already has dataset contents and local does not.
 
 ```bash
 # Set the dataset id used across sync calls.
-DATASET_ID="densegen/my_dataset"
+DATASET_ID="my_dataset"
 # Preview divergence before transfer.
 uv run usr diff "$DATASET_ID" bu-scc
 # Pull remote dataset into local root.
@@ -29,7 +29,7 @@ When local already has dataset contents and HPC does not.
 
 ```bash
 # Set the dataset id used across sync calls.
-DATASET_ID="densegen/my_dataset"
+DATASET_ID="my_dataset"
 # Preview divergence before transfer.
 uv run usr diff "$DATASET_ID" bu-scc
 # Push local dataset into remote root.
@@ -46,7 +46,7 @@ Use this for repeated remote writes and local analysis refresh.
 
 ```bash
 # Set the dataset id used across sync calls.
-DATASET_ID="densegen/my_dataset"
+DATASET_ID="my_dataset"
 # Preview divergence before transfer.
 uv run usr diff "$DATASET_ID" bu-scc
 # Pull remote updates into local root.
@@ -64,7 +64,7 @@ Use this when DenseGen runs on HPC and Infer annotations are produced locally or
 
 ```bash
 # Set the dataset id used across sync calls.
-DATASET_ID="densegen/my_dataset"
+DATASET_ID="my_dataset"
 # Pull the latest dataset state from HPC.
 uv run usr pull "$DATASET_ID" bu-scc -y
 # Run infer against the USR dataset and write derived outputs.
@@ -81,7 +81,7 @@ Use this when command chains are orchestrated by scripts, notebooks, or higher-l
 
 ```bash
 # Set the dataset id used across sync calls.
-DATASET_ID="densegen/my_dataset"
+DATASET_ID="my_dataset"
 # Emit machine-readable sync decision artifact.
 uv run usr diff "$DATASET_ID" bu-scc --audit-json-out /tmp/usr-sync-audit.json
 # Read the diff decision payload for orchestration logic.

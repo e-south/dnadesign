@@ -1,13 +1,14 @@
 # USR HPC Sync Flow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-03-14
 
 
 Use this runbook when a dataset is produced incrementally on BU SCC (or similar HPC) and local analysis must stay in sync without moving data through git.
 
 Default sync contract:
 - Dataset sync defaults to `--verify hash` plus strict sidecar and `_derived`/`_auxiliary` content-hash fidelity checks.
+- Dataset sync preserves contents and sidecars, not cross-host owner/group/permission bits.
 - Use `--no-verify-derived-hashes` only when an operator intentionally trades content-hash fidelity for speed.
 
 ## Scope
@@ -28,18 +29,23 @@ uv run usr remotes doctor --remote bu-scc
 2. Confirm dataset roots are correct on both hosts.
 
 ```bash
-# Local root example
+# Local root example (canonical repo-local datasets root)
+LOCAL_USR_ROOT="src/dnadesign/usr/datasets"
 echo "$LOCAL_USR_ROOT"
 # Remote base_dir is shown by:
 # Print the configured remote profile and dataset base path.
 uv run usr remotes show bu-scc
 ```
 
-3. Confirm the dataset id is namespace-qualified.
+`usr --root src/dnadesign/usr ...` is also accepted and normalized automatically, but this runbook uses the canonical datasets root to keep path ownership explicit.
+
+If BU SCC auth works in your shell only when SSH BatchMode is disabled, set `batch_mode: false` in the configured remote profile before running `diff` / `pull` / `push`.
+
+3. Confirm the dataset id you intend to sync is explicit and canonical.
 
 ```bash
-# Set the namespace-qualified dataset id used for sync calls.
-DATASET_ID="densegen/my_dataset"
+# Set the canonical dataset id used for sync calls.
+DATASET_ID="my_dataset"
 ```
 
 4. Preview drift before transfer.
@@ -139,8 +145,10 @@ Then verify on HPC by pulling or diffing from that side.
 
 - If transfer fails mid-run: rerun the same `pull`/`push` command. Pull stages and verifies before promotion.
 - If lock acquisition fails: resolve remote lock holder contention, then retry.
+- If the remote shell emits benign startup noise before the lock marker, USR now ignores that noise and continues waiting for the real lock marker.
 - If strict sidecar verification fails: inspect `meta.md`, `.events.log`, and `_snapshots` drift before retrying.
 - If doctor reports missing `flock`: install `flock` (util-linux) on remote host.
+- If a local filesystem rejects remote permission metadata, use the standard `usr pull` / `usr push` path; rsync metadata replay is already disabled in that path.
 
 ## Checklist
 

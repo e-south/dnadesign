@@ -18,7 +18,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from dnadesign.usr import Dataset, SchemaError
+from dnadesign.usr import Dataset, NamespaceError, SchemaError
 from dnadesign.usr.src import dataset as dataset_module
 from dnadesign.usr.src.dataset_query import create_overlay_view
 from dnadesign.usr.src.duckdb_runtime import connect_duckdb_utc
@@ -256,6 +256,27 @@ def test_remove_overlay_rejects_conflicting_file_and_parts_sources(tmp_path: Pat
 
     with pytest.raises(SchemaError, match="both file and directory sources"):
         ds.remove_overlay("mock", mode="delete")
+
+
+def test_remove_overlay_rejects_reserved_usr_state_namespace(tmp_path: Path) -> None:
+    ds = _make_dataset(tmp_path)
+    ids = ds.head(1)["id"].tolist()
+    ds.set_state(ids, masked=True)
+
+    with pytest.raises(NamespaceError, match="reserved"):
+        ds.remove_overlay("usr_state", mode="archive")
+
+
+def test_write_overlay_part_rejects_reserved_usr_state_namespace(tmp_path: Path) -> None:
+    ds = _make_dataset(tmp_path)
+    target_id = ds.head(1)["id"].iloc[0]
+
+    with pytest.raises(NamespaceError, match="reserved"):
+        ds.write_overlay_part(
+            "usr_state",
+            pa.table({"id": [target_id], "usr_state__masked": [True]}),
+            key="id",
+        )
 
 
 def test_overlay_parts_last_writer_wins_on_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -703,18 +724,19 @@ def test_overlay_schema_validation_is_reused_across_repeated_dataset_reads(tmp_p
     target_id = ds.head(1)["id"].iloc[0]
     ds.write_overlay_part("mock", pa.table({"id": [target_id], "mock__score": [1.0]}), key="id")
 
+    from dnadesign.usr.src import dataset_overlay_catalog as overlay_catalog_module
     from dnadesign.usr.src import dataset_views as dataset_views_module
 
     calls = {"count": 0}
-    real_validate = dataset_module.validate_overlay_schema
+    real_validate = overlay_catalog_module.validate_overlay_schema
 
     def _counted_validate(*args, **kwargs):
         calls["count"] += 1
         return real_validate(*args, **kwargs)
 
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(dataset_module, "validate_overlay_schema", _counted_validate)
-        dataset_module._LOAD_OVERLAYS_CACHE.clear()
+        mp.setattr(overlay_catalog_module, "validate_overlay_schema", _counted_validate)
+        overlay_catalog_module._LOAD_OVERLAYS_CACHE.clear()
         dataset_views_module._HEAD_CACHE.clear()
         ds.head(5, include_derived=True)
         dataset_views_module._HEAD_CACHE.clear()

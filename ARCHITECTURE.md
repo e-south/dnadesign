@@ -46,6 +46,8 @@ This file is the architecture map: it names system boundaries, major flows, and 
   - runtime traces: `<workspace-root>/outputs/logs/ops/runtime/`
 - `densegen` and `infer` own workload execution using `<workspace-root>/config.yaml` and write domain outputs under workspace outputs/tables and dataset materialization paths.
 - `usr` owns dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
+- Curated dnadesign workspaces default USR dataset roots to `<workspace-root>/outputs/usr_datasets`.
+- Explicit external USR roots remain allowed for sync and mirror workflows when the operator chooses them deliberately.
 - `notify` owns delivery wiring under `<workspace-root>/outputs/notify/<tool>/` and consumes USR events without mutating DenseGen/Infer domain artifacts.
 - Cross-tool coupling is file/event contract based; packages must not depend on internal `src.*` modules across tool boundaries.
 - Utility modules must stay tool-local (`src/dnadesign/<tool>/...`); top-level shared `src/dnadesign/utils` is not an allowed boundary.

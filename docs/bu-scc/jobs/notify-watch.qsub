@@ -221,7 +221,7 @@ resolve_webhook_env
 
 if [[ -z "$NOTIFY_POLICY" ]]; then
   echo "Missing NOTIFY_POLICY." >&2
-  echo "Set NOTIFY_POLICY=densegen|infer_evo2|generic, or provide NOTIFY_TOOL with NOTIFY_CONFIG so policy can be resolved." >&2
+  echo "Set NOTIFY_POLICY=densegen|infer|generic, or provide NOTIFY_TOOL with NOTIFY_CONFIG so policy can be resolved." >&2
   exit 2
 fi
 
@@ -246,7 +246,7 @@ case "$NOTIFY_POLICY" in
     POLICY_ACTIONS="densegen_health,densegen_flush_failed,materialize"
     POLICY_TOOLS="densegen"
     ;;
-  infer_evo2)
+  infer)
     POLICY_ACTIONS="attach,materialize"
     POLICY_TOOLS="infer"
     ;;
@@ -256,7 +256,7 @@ case "$NOTIFY_POLICY" in
     ;;
   *)
     echo "Unsupported NOTIFY_POLICY: $NOTIFY_POLICY" >&2
-    echo "Supported policies: densegen | infer_evo2 | generic" >&2
+    echo "Supported policies: densegen | infer | generic" >&2
     exit 2
     ;;
 esac

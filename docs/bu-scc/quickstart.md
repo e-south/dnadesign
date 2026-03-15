@@ -1,9 +1,9 @@
 ## BU SCC Quickstart: dnadesign (Interactive -> Batch -> Notify)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-03-07
 
-### At a glance
+### Purpose
 
 **Intent:** Provide one copy/paste path from SCC login through first batch submissions and Notify setup.
 
@@ -70,6 +70,8 @@ Details: [BU SCC Install bootstrap: Install uv](install.md#1-install-uv-once)
 ### 2) Clone repo
 
 ```bash
+mkdir -p /project/<project>/$USER
+cd /project/<project>/$USER
 git clone https://github.com/e-south/dnadesign.git
 cd dnadesign
 ```
@@ -79,10 +81,29 @@ Details: [BU SCC Install bootstrap: Clone the repository](install.md#2-clone-the
 ### 3) Set environment and caches
 
 ```bash
-export UV_PROJECT_ENVIRONMENT="/projectnb/<project>/$USER/dnadesign/.venv"
-export SCC_SCRATCH="${TMPDIR:-/scratch/$USER}"
-export UV_CACHE_DIR="${UV_CACHE_DIR:-$SCC_SCRATCH/uv-cache}"
-export HF_HOME="${HF_HOME:-/projectnb/<project>/$USER/huggingface}"
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/project/<project>/$USER/cache/uv}"
+export TARGET_MODEL_ID="${TARGET_MODEL_ID:-evo2_7b}"
+export HF_HOME_7B="${HF_HOME_7B:-/project/<project>/$USER/cache/huggingface/evo2_7b}"
+export HF_HOME_20B="${HF_HOME_20B:-/project/<project>/$USER/cache/huggingface/evo2_20b}"
+case "$TARGET_MODEL_ID" in
+  evo2_7b) export HF_HOME="${HF_HOME:-$HF_HOME_7B}" ;;
+  evo2_20b) export HF_HOME="${HF_HOME:-$HF_HOME_20B}" ;;
+  *)
+    printf 'Unsupported TARGET_MODEL_ID=%s\n' "$TARGET_MODEL_ID" >&2
+    return 2 2>/dev/null || exit 2
+    ;;
+esac
+export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
+export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HUB_CACHE}"
+export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
+export INFER_WORKSPACE_ROOT="${INFER_WORKSPACE_ROOT:-/project/<project>/$USER/dnadesign/src/dnadesign/infer/workspaces/test_stress_ethanol}"
+export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}"
+export TMPDIR="${TMPDIR:-$INFER_RUNTIME_ROOT/tmp}"
+export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-$INFER_RUNTIME_ROOT/torch-extensions}"
+export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-$INFER_RUNTIME_ROOT/triton-cache}"
+export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-$INFER_RUNTIME_ROOT/pycache}"
+mkdir -p "$UV_CACHE_DIR" "$HF_HOME" "$HF_HUB_CACHE" "$HUGGINGFACE_HUB_CACHE" "$TRANSFORMERS_CACHE" "$TMPDIR" "$TORCH_EXTENSIONS_DIR" "$TRITON_CACHE_DIR" "$PYTHONPYCACHEPREFIX"
 ```
 
 Details: [BU SCC Install bootstrap: Configure environment location and caches](install.md#3-configure-environment-location-and-caches)
@@ -107,7 +128,17 @@ uv sync --locked
 uv sync --locked --extra infer-evo2
 ```
 
+If this same environment also needs test/lint tools:
+
+```bash
+uv sync --locked --group dev --extra infer-evo2
+```
+
 Details: [BU SCC Install bootstrap: Sync dependencies](install.md#5-sync-dependencies)
+
+For Evo2 build controls (`FLASH_ATTENTION_FORCE_BUILD`, `FLASH_ATTN_CUDA_ARCHS`, include-path composition), use:
+- [BU SCC install bootstrap: GPU setup and verification runbook](install.md#gpu-setup-and-verification-runbook)
+- [infer SCC Evo2 GPU environment runbook](../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
 
 ### 6) Smoke tests
 
@@ -121,6 +152,9 @@ PY
 
 For extended TE/FlashAttention/Evo2 checks:
 [BU SCC Install bootstrap: Smoke tests](install.md#6-smoke-tests)
+
+For one-sequence infer execution smoke (`evo2_7b`), Hopper `evo2_20b` validation, and 40B capacity preflight:
+[BU SCC Install bootstrap: Model support](install.md#63-model-support-7b-and-fp8-checkpoints)
 
 ### 6.5) Submission pressure gate (status-first)
 
@@ -162,20 +196,20 @@ qsub -P <project> \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
-#### 7.2 DenseGen + GUROBI (16-slot example)
+#### 7.2 DenseGen + GUROBI (12-slot baseline)
 
 Use this when your config sets `densegen.solver.backend: GUROBI`.
 
 ```bash
 qsub -P <project> \
-  -pe omp 16 \
+  -pe omp 12 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
-In config, keep `densegen.solver.threads <= 16`.
+In config, keep `densegen.solver.threads <= 12`.
 `densegen-cpu.qsub` bootstraps GUROBI runtime defaults for BU SCC and accepts overrides via
 `GUROBI_MODULE`, `GUROBI_HOME`, `GRB_LICENSE_FILE`, and `TOKENSERVER`.
 `DENSEGEN_RUN_ARGS` is required and must include exactly one of `--fresh` or `--resume`.
@@ -193,10 +227,18 @@ qsub -P <project> \
 #### 7.3 Evo2 GPU inference
 
 ```bash
+INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml
 qsub -P <project> \
-  -v CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
+  -v INFER_CONFIG="$INFER_CONFIG",CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
 ```
+
+For runbook-based infer submits, set `runbook.resources.gpus`, `runbook.resources.gpu_capability`, and optionally
+`runbook.resources.gpu_memory_gib` so `ops runbook plan` can fail fast on infeasible multi-GPU model requests before submit.
+
+Use:
+- `gpu_capability: 8.9` and `gpu_memory_gib: 45.0` for `evo2_7b`
+- `gpu_capability: 9.0` and `gpu_memory_gib: 80.0` for `evo2_20b` on Hopper/H200
 
 Template details and overrides:
 [BU SCC job templates](jobs/README.md)

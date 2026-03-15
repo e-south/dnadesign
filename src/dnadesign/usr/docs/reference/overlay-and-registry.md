@@ -20,14 +20,14 @@ Operational implications:
 - Compact parts periodically with `uv run usr maintenance overlay-compact ...` to reduce read overhead.
 - After compaction, future overlay-part appends are allowed; USR promotes the compact file into part form before appending.
 - Compact overlay snapshots are not retained by default.
-- Explicit `remove_overlay(..., mode=\"archive\")` retention is bounded: only the latest archived snapshot is kept.
+- Explicit overlay pruning is exposed through `uv run usr maintenance overlay-remove ...`; archive retention is bounded to the latest archived snapshot.
 
 ## Namespace registry (required)
 
 All dataset mutations require a registry at the datasets root (`registry.yaml`).
 
 - Register every namespace before attach/materialize.
-- Reserved `usr_state` namespace must exist and remain unmodified.
+- Reserved `usr_state` namespace must exist and is only mutated through the dedicated `uv run usr state ...` surface.
 - First successful registration creates `registry.yaml` and includes `usr_state`.
 
 Register namespace:

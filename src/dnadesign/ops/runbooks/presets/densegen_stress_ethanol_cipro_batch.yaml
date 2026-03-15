@@ -25,7 +25,7 @@ runbook:
       max_existing_records_part_age_days: 14
       auto_compact_existing_records_parts: true
   resources:
-    pe_omp: 16
+    pe_omp: 12
     h_rt: 08:00:00
     mem_per_core: 8G
   mode_policy:

@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from .densegen import register_densegen_handlers
-from .infer_evo2 import register_infer_evo2_handlers
+from .infer import register_infer_handlers
 
 ToolEventRegister = Callable[..., None]
 ToolEventPackRegister = Callable[..., None]
@@ -28,8 +28,8 @@ def _install_densegen_pack(register: ToolEventRegister) -> None:
     )
 
 
-def _install_infer_evo2_pack(register: ToolEventRegister) -> None:
-    register_infer_evo2_handlers(
+def _install_infer_pack(register: ToolEventRegister) -> None:
+    register_infer_handlers(
         register_status_override=lambda action, override: register(action=action, status_override=override),
         register_message_override=lambda action, renderer: register(action=action, message_override=renderer),
         register_evaluator=lambda action, evaluator: register(action=action, evaluator=evaluator),
@@ -40,4 +40,4 @@ def register_builtin_tool_event_packs(register_pack: ToolEventPackRegister) -> N
     if not callable(register_pack):
         raise TypeError("register_pack must be callable")
     register_pack(pack="densegen", installer=_install_densegen_pack)
-    register_pack(pack="infer_evo2", installer=_install_infer_evo2_pack)
+    register_pack(pack="infer", installer=_install_infer_pack)

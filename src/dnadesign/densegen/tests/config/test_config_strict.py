@@ -921,6 +921,15 @@ def test_solver_backend_optional_for_approximate(tmp_path: Path) -> None:
     load_config(cfg_path)
 
 
+def test_min_total_sites_rejected_for_approximate_at_config_validation(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["solver"] = {"strategy": "approximate"}
+    cfg["densegen"]["generation"]["plan"][0]["regulator_constraints"]["min_total_sites"] = 1
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="min_total_sites.*non-approximate"):
+        load_config(cfg_path)
+
+
 def test_side_biases_invalid_motif_rejected(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["generation"]["plan"] = [

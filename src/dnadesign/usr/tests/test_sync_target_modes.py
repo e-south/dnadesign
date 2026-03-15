@@ -828,9 +828,96 @@ def test_cmd_pull_file_mode_rejects_no_verify_derived_hashes(tmp_path: Path) -> 
     raise AssertionError("expected no-verify-derived-hashes in FILE mode to fail fast")
 
 
-def test_cmd_pull_strict_bootstrap_requires_namespaced_dataset_id(tmp_path: Path) -> None:
+def test_cmd_pull_strict_bootstrap_allows_explicit_flat_dataset_id(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "usr_root"
+    root.mkdir(parents=True)
+
+    summary = SimpleNamespace(has_change=False, verify_notes=[])
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(sync_commands, "plan_diff", lambda *_args, **_kwargs: summary)
+    monkeypatch.setattr(sync_commands, "_print_verify_notes", lambda _summary: None)
+    monkeypatch.setattr(sync_commands, "_print_diff", lambda _summary, *, use_rich=None: None)
+    monkeypatch.setattr(sync_commands, "_confirm_or_abort", lambda _summary, *, assume_yes: None)
+
+    def _fake_execute_pull(resolved_root: Path, dataset: str, remote_name: str, opts):
+        captured["root"] = resolved_root
+        captured["dataset"] = dataset
+        captured["remote"] = remote_name
+        captured["opts"] = opts
+        return summary
+
+    monkeypatch.setattr(sync_commands, "execute_pull", _fake_execute_pull)
+
     args = SimpleNamespace(
         dataset="demo_remote_only",
+        remote="bu-scc",
+        verify="auto",
+        root=root,
+        rich=False,
+        repo_root=None,
+        remote_path=None,
+        primary_only=False,
+        skip_snapshots=False,
+        dry_run=False,
+        yes=True,
+        strict_bootstrap_id=True,
+    )
+
+    sync_commands.cmd_pull(args)
+
+    assert captured["root"] == root
+    assert captured["dataset"] == "demo_remote_only"
+    assert captured["remote"] == "bu-scc"
+
+
+def test_cmd_pull_strict_bootstrap_env_allows_explicit_flat_dataset_id(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("USR_SYNC_STRICT_BOOTSTRAP_ID", "1")
+    root = tmp_path / "usr_root"
+    root.mkdir(parents=True)
+
+    summary = SimpleNamespace(has_change=False, verify_notes=[])
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(sync_commands, "plan_diff", lambda *_args, **_kwargs: summary)
+    monkeypatch.setattr(sync_commands, "_print_verify_notes", lambda _summary: None)
+    monkeypatch.setattr(sync_commands, "_print_diff", lambda _summary, *, use_rich=None: None)
+    monkeypatch.setattr(sync_commands, "_confirm_or_abort", lambda _summary, *, assume_yes: None)
+
+    def _fake_execute_pull(resolved_root: Path, dataset: str, remote_name: str, opts):
+        captured["root"] = resolved_root
+        captured["dataset"] = dataset
+        captured["remote"] = remote_name
+        captured["opts"] = opts
+        return summary
+
+    monkeypatch.setattr(sync_commands, "execute_pull", _fake_execute_pull)
+
+    args = SimpleNamespace(
+        dataset="demo_remote_only",
+        remote="bu-scc",
+        verify="auto",
+        root=root,
+        rich=False,
+        repo_root=None,
+        remote_path=None,
+        primary_only=False,
+        skip_snapshots=False,
+        dry_run=False,
+        yes=True,
+        strict_bootstrap_id=False,
+    )
+
+    sync_commands.cmd_pull(args)
+
+    assert captured["root"] == root
+    assert captured["dataset"] == "demo_remote_only"
+    assert captured["remote"] == "bu-scc"
+
+
+def test_cmd_pull_strict_bootstrap_rejects_path_like_dataset_id(tmp_path: Path) -> None:
+    args = SimpleNamespace(
+        dataset="../demo_remote_only",
         remote="bu-scc",
         verify="auto",
         root=tmp_path / "usr_root",
@@ -847,34 +934,9 @@ def test_cmd_pull_strict_bootstrap_requires_namespaced_dataset_id(tmp_path: Path
     try:
         sync_commands.cmd_pull(args)
     except SystemExit as exc:
-        assert "namespace-qualified dataset id" in str(exc)
+        assert "explicit canonical dataset id" in str(exc)
         return
-    raise AssertionError("expected strict bootstrap pull to require namespace-qualified id")
-
-
-def test_cmd_pull_strict_bootstrap_env_requires_namespaced_dataset_id(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setenv("USR_SYNC_STRICT_BOOTSTRAP_ID", "1")
-    args = SimpleNamespace(
-        dataset="demo_remote_only",
-        remote="bu-scc",
-        verify="auto",
-        root=tmp_path / "usr_root",
-        rich=False,
-        repo_root=None,
-        remote_path=None,
-        primary_only=False,
-        skip_snapshots=False,
-        dry_run=False,
-        yes=True,
-        strict_bootstrap_id=False,
-    )
-
-    try:
-        sync_commands.cmd_pull(args)
-    except SystemExit as exc:
-        assert "namespace-qualified dataset id" in str(exc)
-        return
-    raise AssertionError("expected env strict bootstrap pull to require namespace-qualified id")
+    raise AssertionError("expected strict bootstrap mode to reject path-like dataset ids")
 
 
 def test_cmd_pull_strict_bootstrap_allows_unqualified_existing_local_dataset(tmp_path: Path, monkeypatch) -> None:

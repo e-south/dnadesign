@@ -42,6 +42,11 @@ def register_remotes_commands(
         host: str = typer.Option(..., "--host"),
         user: str = typer.Option(..., "--user"),
         base_dir: str = typer.Option(..., "--base-dir"),
+        batch_mode: bool = typer.Option(
+            True,
+            "--batch-mode/--no-batch-mode",
+            help="Use SSH BatchMode=yes for strict non-interactive auth.",
+        ),
         ssh_key_env: str | None = typer.Option(None, "--ssh-key-env"),
     ) -> None:
         cmd_remotes_add(
@@ -52,6 +57,7 @@ def register_remotes_commands(
                 host=host,
                 user=user,
                 base_dir=base_dir,
+                batch_mode=batch_mode,
                 ssh_key_env=ssh_key_env,
             )
         )
@@ -73,6 +79,11 @@ def register_remotes_commands(
             "--transfer-node",
             help="Use BU SCC transfer host default (scc-globus.bu.edu).",
         ),
+        batch_mode: bool = typer.Option(
+            True,
+            "--batch-mode/--no-batch-mode",
+            help="Use SSH BatchMode=yes for strict non-interactive auth.",
+        ),
         ssh_key_env: str | None = typer.Option(None, "--ssh-key-env"),
     ) -> None:
         cmd_remotes_wizard(
@@ -84,6 +95,7 @@ def register_remotes_commands(
                 base_dir=base_dir,
                 host=host,
                 transfer_node=transfer_node,
+                batch_mode=batch_mode,
                 ssh_key_env=ssh_key_env,
             )
         )
