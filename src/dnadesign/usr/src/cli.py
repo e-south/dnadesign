@@ -19,6 +19,7 @@ from types import SimpleNamespace as NS
 
 import typer
 
+from .cli_bindings import build_cli_bindings
 from .cli_commands import datasets as dataset_commands
 from .cli_commands import deps as deps_commands
 from .cli_commands import error_output as error_output_commands
@@ -37,7 +38,6 @@ from .cli_commands.query_cli import register_query_commands
 from .cli_commands.remotes_cli import register_remotes_commands
 from .cli_commands.sync_cli import register_sync_commands
 from .cli_merge_policy import resolve_merge_policy
-from .cli_bindings import build_cli_bindings
 from .cli_paths import (
     LEGACY_DATASET_PATH_ERROR as _LEGACY_DATASET_PATH_ERROR,
 )
@@ -65,6 +65,8 @@ from .merge_datasets import (
 )
 from .mock import add_demo_columns, create_mock_dataset
 from .registry import load_registry, parse_columns_spec, register_namespace
+from .roots import default_usr_root as _default_usr_root_impl
+from .roots import normalize_usr_root as _normalize_usr_root_impl
 
 # Compatibility exports kept for existing monkeypatch-based tests.
 shutil = remotes_commands.shutil
@@ -222,6 +224,14 @@ def _assert_supported_root(root: Path) -> None:
     _assert_supported_root_impl(root, pkg_root=_pkg_usr_root())
 
 
+def _default_usr_root() -> Path:
+    return _default_usr_root_impl(pkg_root=_pkg_usr_root())
+
+
+def _normalize_usr_root(root: Path) -> Path:
+    return _normalize_usr_root_impl(root, pkg_root=_pkg_usr_root())
+
+
 def _resolve_path_anywhere(p: Path) -> Path:
     """
     Make file arguments robust:
@@ -238,8 +248,11 @@ def _resolve_path_anywhere(p: Path) -> Path:
 def list_datasets(root: Path):
     return dataset_commands.list_datasets(root)
 
+
 def _print_user_error(e: SequencesError) -> None:
     error_output_commands.print_user_error(e)
+
+
 _bindings = build_cli_bindings(
     resolve_path_anywhere=_resolve_path_anywhere,
     resolve_output_format=_resolve_output_format,
@@ -324,7 +337,7 @@ def _ctx_args(ctx: typer.Context, **kwargs) -> NS:
 def _root(
     ctx: typer.Context,
     root: Path = typer.Option(
-        (_pkg_usr_root() / "datasets").resolve(),
+        _default_usr_root(),
         "--root",
         help="Datasets root folder",
         readable=True,
@@ -336,6 +349,7 @@ def _root(
     rich: bool = typer.Option(True, "--rich/--no-rich", help="Use Rich formatting for supported commands"),
 ) -> None:
     try:
+        root = _normalize_usr_root(root)
         _assert_supported_root(root)
     except SequencesError as exc:
         raise typer.BadParameter(str(exc), param_hint="--root") from exc

@@ -5,20 +5,88 @@ namespaces:
       type: list<float64>
     description: Audit overlay for demo dataset examples.
     owner: usr
-  usr_state:
+  construct:
     columns:
-    - name: usr_state__masked
+    - name: construct__job
+      type: string
+    - name: construct__spec_id
+      type: string
+    - name: construct__template_id
+      type: string
+    - name: construct__template_kind
+      type: string
+    - name: construct__template_source
+      type: string
+    - name: construct__template_dataset
+      type: string
+    - name: construct__template_field
+      type: string
+    - name: construct__template_record_id
+      type: string
+    - name: construct__template_sha256
+      type: string
+    - name: construct__template_length
+      type: int64
+    - name: construct__template_circular
       type: bool
-    - name: usr_state__qc_status
+    - name: construct__input_dataset
       type: string
-    - name: usr_state__split
+    - name: construct__input_field
       type: string
-    - name: usr_state__supersedes
-      type: string
-    - name: usr_state__lineage
+    - name: construct__input_fields
       type: list<string>
-    description: Reserved record-state overlay (masked/qc/split/lineage).
-    owner: usr
+    - name: construct__anchor_id
+      type: string
+    - name: construct__anchor_length
+      type: int64
+    - name: construct__mode
+      type: string
+    - name: construct__focal_part
+      type: string
+    - name: construct__window_bp
+      type: int64
+    - name: construct__window_start
+      type: int64
+    - name: construct__window_end
+      type: int64
+    - name: construct__full_construct_length
+      type: int64
+    - name: construct__part_count
+      type: int64
+    - name: construct__part_names
+      type: list<string>
+    - name: construct__part_roles
+      type: list<string>
+    - name: construct__part_kinds
+      type: list<string>
+    - name: construct__part_starts
+      type: list<int64>
+    - name: construct__part_ends
+      type: list<int64>
+    - name: construct__part_orientations
+      type: list<string>
+    - name: construct__part_template_starts
+      type: list<int64>
+    - name: construct__part_template_ends
+      type: list<int64>
+    description: Construct lineage overlays for realized DNA sequences.
+    owner: construct
+  construct_seed:
+    columns:
+    - name: construct_seed__label
+      type: string
+    - name: construct_seed__manifest_id
+      type: string
+    - name: construct_seed__role
+      type: string
+    - name: construct_seed__source_ref
+      type: string
+    - name: construct_seed__topology
+      type: string
+    - name: construct_seed__sha256
+      type: string
+    description: Construct bootstrap/import metadata for seeded input datasets.
+    owner: construct
   densegen:
     columns:
     - name: densegen__schema_version
@@ -83,64 +151,6 @@ namespaces:
       type: list<string>
     description: DenseGen derived outputs.
     owner: densegen
-  construct:
-    columns:
-    - name: construct__job
-      type: string
-    - name: construct__spec_id
-      type: string
-    - name: construct__template_id
-      type: string
-    - name: construct__template_source
-      type: string
-    - name: construct__template_sha256
-      type: string
-    - name: construct__template_length
-      type: int64
-    - name: construct__template_circular
-      type: bool
-    - name: construct__input_dataset
-      type: string
-    - name: construct__input_field
-      type: string
-    - name: construct__input_fields
-      type: list<string>
-    - name: construct__anchor_id
-      type: string
-    - name: construct__anchor_length
-      type: int64
-    - name: construct__mode
-      type: string
-    - name: construct__focal_part
-      type: string
-    - name: construct__window_bp
-      type: int64
-    - name: construct__window_start
-      type: int64
-    - name: construct__window_end
-      type: int64
-    - name: construct__full_construct_length
-      type: int64
-    - name: construct__part_count
-      type: int64
-    - name: construct__part_names
-      type: list<string>
-    - name: construct__part_roles
-      type: list<string>
-    - name: construct__part_kinds
-      type: list<string>
-    - name: construct__part_starts
-      type: list<int64>
-    - name: construct__part_ends
-      type: list<int64>
-    - name: construct__part_orientations
-      type: list<string>
-    - name: construct__part_template_starts
-      type: list<int64>
-    - name: construct__part_template_ends
-      type: list<int64>
-    description: Construct lineage overlays for realized DNA sequences.
-    owner: construct
   mock:
     columns:
     - name: mock__X_value
@@ -150,4 +160,26 @@ namespaces:
     - name: mock__y_label
       type: list<float64>
     description: Mock attachment columns used in README examples.
+    owner: usr
+  usr_label:
+    columns:
+    - name: usr_label__primary
+      type: string
+    - name: usr_label__aliases
+      type: list<string>
+    description: Human-readable labels and aliases for canonical sequence records.
+    owner: usr
+  usr_state:
+    columns:
+    - name: usr_state__masked
+      type: bool
+    - name: usr_state__qc_status
+      type: string
+    - name: usr_state__split
+      type: string
+    - name: usr_state__supersedes
+      type: string
+    - name: usr_state__lineage
+      type: list<string>
+    description: Reserved record-state overlay (masked/qc/split/lineage).
     owner: usr

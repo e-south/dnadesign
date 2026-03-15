@@ -18,7 +18,11 @@ from dnadesign.usr.tests.registry_helpers import register_test_namespace
 
 def _make_dataset(tmp_path: Path) -> Dataset:
     root = tmp_path / "datasets"
-    register_test_namespace(root, namespace="mock", columns_spec="mock__score:float64,mock__vec:string")
+    register_test_namespace(
+        root,
+        namespace="mock",
+        columns_spec="mock__score:float64,mock__vec:string,mock__rank:int64",
+    )
     ds = Dataset(root, "demo")
     ds.init(source="test")
     ds.import_rows(
@@ -108,3 +112,30 @@ def test_attach_allow_overwrite_appends_new_ids_for_existing_column(tmp_path: Pa
     by_id = {row["id"]: row["mock__score"] for _, row in out.iterrows()}
     assert by_id[ids[0]] == 1.0
     assert by_id[ids[1]] == 2.0
+
+
+def test_attach_allow_overwrite_preserves_registered_int_schema(tmp_path: Path) -> None:
+    ds = _make_dataset(tmp_path)
+    ids = ds.head(2, columns=["id"])["id"].tolist()
+
+    first = pd.DataFrame({"id": [ids[0]], "rank": [1]})
+    first_path = tmp_path / "attach_rank_first.csv"
+    first.to_csv(first_path, index=False)
+    ds.attach(first_path, namespace="mock", key="id", key_col="id", columns=["rank"])
+
+    second = pd.DataFrame({"id": [ids[1]], "rank": [2]})
+    second_path = tmp_path / "attach_rank_second.csv"
+    second.to_csv(second_path, index=False)
+    ds.attach(
+        second_path,
+        namespace="mock",
+        key="id",
+        key_col="id",
+        columns=["rank"],
+        allow_overwrite=True,
+    )
+
+    out = ds.head(2, columns=["id", "mock__rank"])
+    by_id = {row["id"]: row["mock__rank"] for _, row in out.iterrows()}
+    assert by_id[ids[0]] == 1
+    assert by_id[ids[1]] == 2

@@ -36,8 +36,8 @@ uv run usr --root "$LOCAL_USR_ROOT" push "$DATASET_ID" bu-scc -y
 uv run usr remotes doctor --remote bu-scc
 # Show remote base_dir and profile wiring used by sync calls.
 uv run usr remotes show bu-scc
-# Set the namespace-qualified dataset id used by both hosts.
-DATASET_ID="densegen/my_dataset"
+# Set the canonical dataset id used by both hosts.
+DATASET_ID="my_dataset"
 ```
 
 ### 2) HPC side DenseGen batch increment

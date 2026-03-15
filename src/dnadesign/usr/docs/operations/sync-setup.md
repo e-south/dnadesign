@@ -1,7 +1,7 @@
 # USR sync setup
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-03-14
 
 
 Use this page for one-time setup and periodic key hygiene.
@@ -10,14 +10,14 @@ Use this page for one-time setup and periodic key hygiene.
 
 Recommended storage layout:
 
-- Curated dnadesign workflows should prefer workspace-scoped dataset roots, for example `<workspace-root>/outputs/usr_datasets`.
+- Canonical repo-local datasets should live under `src/dnadesign/usr/datasets`.
 - External dataset roots are still allowed for ad-hoc sync or mirror workflows, for example `~/data/usr_datasets/` or another explicit operator-owned location.
-- SCC dataset roots should stay in project storage for long-lived runs, for example `/project/$USER/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets`.
+- SCC dataset roots should stay in project storage for long-lived runs, for example `/project/$USER/dnadesign/src/dnadesign/usr/datasets`.
 
 Notes:
 
 - Scratch may have retention/purge policies; use project storage for long-lived datasets.
-- Keep curated tool workspaces self-contained when possible: config, logs, notify state, and default USR roots should accumulate under the same workspace tree.
+- Keep curated tool configs and logs in their tool workspaces, but keep canonical USR datasets under the package USR root.
 - Keep code in git, keep datasets in USR roots, and sync with `uv run usr diff/pull/push`.
 
 ## Prepare SSH keys (one-time)
@@ -78,7 +78,7 @@ uv run usr remotes wizard \
   --name bu-scc \
   --user <user> \
   --host scc1.bu.edu \
-  --base-dir /project/<user>/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets
+  --base-dir /project/<user>/dnadesign/src/dnadesign/usr/datasets
 
 # Validate remote profile wiring.
 uv run usr remotes doctor --remote bu-scc
@@ -103,10 +103,15 @@ remotes:
     type: ssh                                                                                          # Sets `type` for this example configuration.
     host: scc1.bu.edu                                                                                  # Sets `host` for this example configuration.
     user: <user>                                                                                       # Sets `user` for this example configuration.
-    base_dir: /project/<user>/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets  # Sets `base_dir` for this example configuration.
+    base_dir: /project/<user>/dnadesign/src/dnadesign/usr/datasets                                     # Sets `base_dir` for this example configuration.
+    batch_mode: true                                                                                   # Set false when SCC auth works only without BatchMode=yes.
     # Optional explicit key via environment variable:
     # ssh_key_env: USR_SSH_KEY
 ```
+
+If BU SCC auth fails with `Permission denied (keyboard-interactive,hostbased)` under strict batch mode, re-save the remote with `--no-batch-mode` or set `batch_mode: false` in `USR_REMOTES_PATH`.
+
+USR sync preserves dataset contents and sidecars across hosts, but it intentionally does not preserve remote owner/group/permission metadata on the destination.
 
 If using `ssh_key_env`:
 

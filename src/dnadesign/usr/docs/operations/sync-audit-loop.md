@@ -22,7 +22,7 @@ Use this runbook when you need machine-readable transfer decisions during iterat
 
 ```bash
 # Set dataset id used by pull/push calls.
-DATASET_ID="densegen/my_dataset"
+DATASET_ID="my_dataset"
 # Set configured remote profile name.
 REMOTE="bu-scc"
 # Set local directory for audit JSON artifacts.

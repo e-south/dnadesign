@@ -16,16 +16,12 @@ from typing import Callable
 
 from .dataset import LEGACY_DATASET_PREFIX, RECORDS, Dataset
 from .errors import SequencesError
+from .roots import normalize_usr_root, pkg_usr_root
 
 LEGACY_DATASET_PATH_ERROR = (
     "Legacy dataset paths under 'archived/' are not supported. "
     "Use canonical datasets or datasets/_archive/<namespace>/<dataset>."
 )
-
-
-def pkg_usr_root() -> Path:
-    """Return the installed dnadesign/usr package directory."""
-    return Path(__file__).resolve().parents[1]
 
 
 def assert_not_legacy_dataset_path(
@@ -52,7 +48,7 @@ def assert_not_legacy_dataset_path(
 
 
 def assert_supported_root(root: Path, *, pkg_root: Path | None = None) -> None:
-    root_resolved = Path(root).resolve()
+    root_resolved = normalize_usr_root(root, pkg_root=pkg_root)
     pkg_root = Path(pkg_root).resolve() if pkg_root is not None else pkg_usr_root().resolve()
     legacy_roots = {
         (pkg_root / "archived").resolve(),

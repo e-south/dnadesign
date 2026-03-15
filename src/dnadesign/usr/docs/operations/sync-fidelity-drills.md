@@ -21,8 +21,8 @@ Use this runbook to pressure test strict sync fidelity for iterative batch workf
 ```bash
 # Remote profile health must be clean before drills.
 uv run usr remotes doctor --remote bu-scc
-# Use a namespaced dataset id.
-DATASET_ID="densegen/my_dataset"
+# Use the canonical dataset id.
+DATASET_ID="my_dataset"
 ```
 
 ## Drill 1: Pull must fail when `_derived` payload is missing

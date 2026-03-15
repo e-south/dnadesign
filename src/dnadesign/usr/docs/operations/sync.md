@@ -24,11 +24,11 @@ Use the split runbooks below to follow progressive disclosure by task.
 
 ```bash
 # Preview local-vs-remote diff.
-uv run usr diff densegen/my_dataset bu-scc
+uv run usr diff my_dataset bu-scc
 # Pull remote state into local dataset path.
-uv run usr pull densegen/my_dataset bu-scc -y
+uv run usr pull my_dataset bu-scc -y
 # Push local state back to remote when needed.
-uv run usr push densegen/my_dataset bu-scc -y
+uv run usr push my_dataset bu-scc -y
 ```
 
 ### Related runbooks

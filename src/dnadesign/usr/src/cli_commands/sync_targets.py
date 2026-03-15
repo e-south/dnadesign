@@ -119,4 +119,16 @@ def resolve_dataset_id_for_diff_or_pull(
             return normalize_dataset_id(target)
         except sequences_error_type as exc:
             raise SystemExit(str(exc)) from None
-    return resolve_dataset_name_interactive(root, target, use_rich)
+    try:
+        return resolve_dataset_name_interactive(root, target, use_rich)
+    except SystemExit as exc:
+        # Explicit pull/diff targets are allowed to bootstrap into an empty local
+        # root when strict bootstrap mode is off. Keep local resolution for
+        # existing/ambiguous datasets, but accept a normalized raw id when the
+        # only failure is "not found locally yet".
+        if str(exc).startswith("Dataset not found:"):
+            try:
+                return normalize_dataset_id(target)
+            except sequences_error_type as norm_exc:
+                raise SystemExit(str(norm_exc)) from None
+        raise
