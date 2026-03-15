@@ -17,6 +17,7 @@ import typer
 
 from ...api import run_from_config
 from ...errors import ConstructError
+from ._render import echo_run_result
 
 
 def run(
@@ -33,12 +34,4 @@ def run(
         typer.echo(f"Error: {exc}")
         raise typer.Exit(1) from exc
 
-    if result.dry_run:
-        typer.echo(f"Config validated (dry run): job={result.job_id} rows={result.records_total}")
-        typer.echo(f"output_root: {result.output_root}")
-        typer.echo(f"output_dataset: {result.output_dataset}")
-        return
-
-    typer.echo(f"Construct run complete: job={result.job_id} rows={result.records_total}")
-    typer.echo(f"output_root: {result.output_root}")
-    typer.echo(f"output_dataset: {result.output_dataset}")
+    echo_run_result(result)

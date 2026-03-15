@@ -14,16 +14,16 @@ from __future__ import annotations
 import hashlib
 import json
 import tempfile
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List
 
-import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
-from dnadesign.usr import Dataset, compute_id, normalize_sequence
+from dnadesign.usr import Dataset, compute_id, default_usr_root, normalize_sequence, normalize_usr_root
 
 from .config import JobConfig, PartConfig, load_job_config
 from .errors import ValidationError
@@ -42,7 +42,11 @@ _CONSTRUCT_COLUMNS = [
     {"name": "construct__job", "type": "string"},
     {"name": "construct__spec_id", "type": "string"},
     {"name": "construct__template_id", "type": "string"},
+    {"name": "construct__template_kind", "type": "string"},
     {"name": "construct__template_source", "type": "string"},
+    {"name": "construct__template_dataset", "type": "string"},
+    {"name": "construct__template_field", "type": "string"},
+    {"name": "construct__template_record_id", "type": "string"},
     {"name": "construct__template_sha256", "type": "string"},
     {"name": "construct__template_length", "type": "int64"},
     {"name": "construct__template_circular", "type": "bool"},
@@ -68,6 +72,20 @@ _CONSTRUCT_COLUMNS = [
     {"name": "construct__part_template_ends", "type": "list<int64>"},
 ]
 
+_CONSTRUCT_SEED_COLUMNS = [
+    {"name": "construct_seed__label", "type": "string"},
+    {"name": "construct_seed__manifest_id", "type": "string"},
+    {"name": "construct_seed__role", "type": "string"},
+    {"name": "construct_seed__source_ref", "type": "string"},
+    {"name": "construct_seed__topology", "type": "string"},
+    {"name": "construct_seed__sha256", "type": "string"},
+]
+
+_USR_LABEL_COLUMNS = [
+    {"name": "usr_label__primary", "type": "string"},
+    {"name": "usr_label__aliases", "type": "list<string>"},
+]
+
 
 @dataclass(frozen=True)
 class RunResult:
@@ -76,6 +94,9 @@ class RunResult:
     output_dataset: str
     output_root: Path
     records_total: int
+    records_written: int
+    records_skipped_existing: int
+    spec_id: str
     dry_run: bool
 
 
@@ -89,6 +110,19 @@ class PlannedRow:
 
 
 @dataclass(frozen=True)
+class PlannedPlacement:
+    part_name: str
+    part_role: str
+    sequence_source: str
+    sequence_field: str | None
+    placement_kind: str
+    template_start: int
+    template_end: int
+    orientation: str
+    expected_template_sequence: str | None
+
+
+@dataclass(frozen=True)
 class PreflightResult:
     job_id: str
     input_dataset: str
@@ -96,12 +130,24 @@ class PreflightResult:
     input_root: Path
     output_root: Path
     template_id: str
+    template_kind: str
     template_source: str
+    template_dataset: str | None
+    template_field: str | None
+    template_record_id: str | None
     template_sha256: str
     template_length: int
     template_circular: bool
+    realize_mode: str
+    focal_part: str | None
+    focal_point: str
+    anchor_offset_bp: int
+    window_bp: int | None
     spec_id: str
     records_total: int
+    existing_output_collisions: int
+    output_on_conflict: str
+    placements: List[PlannedPlacement]
     planned_rows: List[PlannedRow]
 
 
@@ -126,10 +172,20 @@ class _BuiltRecord:
     metadata: Dict[str, object]
 
 
-def _default_usr_root() -> Path:
-    import dnadesign.usr as usr_pkg
+@dataclass(frozen=True)
+class _ResolvedTemplate:
+    id: str
+    kind: str
+    sequence: str
+    source: str
+    dataset: str | None
+    field: str | None
+    record_id: str | None
+    circular: bool
 
-    return (Path(usr_pkg.__file__).resolve().parent / "datasets").resolve()
+
+def _default_usr_root() -> Path:
+    return default_usr_root()
 
 
 def _resolve_optional_path(base_dir: Path, value: str | None) -> Path | None:
@@ -142,8 +198,7 @@ def _resolve_optional_path(base_dir: Path, value: str | None) -> Path | None:
 
 
 def _resolve_usr_root(base_dir: Path, value: str | None) -> Path:
-    path = _resolve_optional_path(base_dir, value)
-    return path if path is not None else _default_usr_root()
+    return normalize_usr_root(_resolve_optional_path(base_dir, value))
 
 
 def _ensure_dna_text(text: str, *, label: str) -> str:
@@ -176,27 +231,86 @@ def _expected_template_sequence(part: PartConfig) -> str | None:
     )
 
 
-def _load_template_sequence(base_dir: Path, cfg: JobConfig) -> tuple[str, str]:
+def _load_template_sequence(base_dir: Path, cfg: JobConfig) -> _ResolvedTemplate:
     template = cfg.job.template
-    if template.sequence is not None:
+    if template.kind == "literal":
+        if template.sequence is None:
+            raise ValidationError("template.sequence is required when template.kind='literal'.")
         seq = _ensure_dna_text(template.sequence, label="template.sequence")
-        return seq, template.source or "template.sequence"
+        return _ResolvedTemplate(
+            id=template.id,
+            kind="literal",
+            sequence=seq,
+            source=template.source or "template.sequence",
+            dataset=None,
+            field=None,
+            record_id=None,
+            circular=bool(template.circular),
+        )
 
-    path = _resolve_optional_path(base_dir, template.path)
-    if path is None or not path.exists():
-        raise ValidationError(f"Template path not found: {template.path}")
-    raw = path.read_text(encoding="utf-8")
-    lines = [line.strip() for line in raw.splitlines() if line.strip()]
-    if not lines:
-        raise ValidationError(f"Template file is empty: {path}")
-    if lines[0].startswith(">"):
-        seq_lines = [line for line in lines if not line.startswith(">")]
-        if not seq_lines:
-            raise ValidationError(f"Template FASTA does not contain sequence lines: {path}")
-        seq = "".join(seq_lines)
-    else:
-        seq = "".join(lines)
-    return _ensure_dna_text(seq, label=f"template.path ({path})"), template.source or str(path)
+    if template.kind == "path":
+        path = _resolve_optional_path(base_dir, template.path)
+        if path is None or not path.exists():
+            raise ValidationError(f"Template path not found: {template.path}")
+        if not path.is_file():
+            raise ValidationError(f"Template path must resolve to a readable file: {path}")
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ValidationError(f"Template path could not be read: {path}") from exc
+        lines = [line.strip() for line in raw.splitlines() if line.strip()]
+        if not lines:
+            raise ValidationError(f"Template file is empty: {path}")
+        if lines[0].startswith(">"):
+            header_count = sum(1 for line in lines if line.startswith(">"))
+            if header_count != 1:
+                raise ValidationError(f"Template FASTA must contain exactly one record. Found {header_count}: {path}")
+            seq_lines = [line for line in lines if not line.startswith(">")]
+            if not seq_lines:
+                raise ValidationError(f"Template FASTA does not contain sequence lines: {path}")
+            seq = "".join(seq_lines)
+        else:
+            seq = "".join(lines)
+        return _ResolvedTemplate(
+            id=template.id,
+            kind="path",
+            sequence=_ensure_dna_text(seq, label=f"template.path ({path})"),
+            source=template.source or str(path),
+            dataset=None,
+            field=None,
+            record_id=None,
+            circular=bool(template.circular),
+        )
+
+    if template.kind != "usr":
+        raise ValidationError(f"Unsupported template.kind '{template.kind}'.")
+
+    template_root = _resolve_usr_root(base_dir, template.root or cfg.job.input.root)
+    template_ds = Dataset(template_root, str(template.dataset))
+    if not template_ds.records_path.exists():
+        raise ValidationError(f"Template dataset not initialized: {template_ds.records_path}")
+    rows = _scan_usr_rows(
+        template_ds,
+        columns=["id", str(template.field)],
+        ids=[str(template.record_id)],
+    )
+    if len(rows) != 1:
+        raise ValidationError(f"Template selection must resolve exactly one row in dataset '{template.dataset}'.")
+    row = rows[0]
+    raw = row.get(str(template.field))
+    if raw is None:
+        raise ValidationError(f"Template record '{template.record_id}' is missing field '{template.field}'.")
+    seq = _ensure_dna_text(str(raw), label=f"template field '{template.field}' in dataset '{template.dataset}'")
+    return _ResolvedTemplate(
+        id=template.id,
+        kind="usr",
+        sequence=seq,
+        source=template.source or f"usr:{template.dataset}:{template.record_id}",
+        dataset=str(template.dataset),
+        field=str(template.field),
+        record_id=str(template.record_id),
+        circular=bool(template.circular),
+    )
 
 
 def _scan_usr_rows(ds: Dataset, *, columns: List[str], ids: List[str] | None) -> List[dict[str, object]]:
@@ -235,6 +349,23 @@ def _input_fields(cfg: JobConfig) -> List[str]:
     return sorted(fields)
 
 
+def _planned_placements(parts: Iterable[PartConfig]) -> List[PlannedPlacement]:
+    return [
+        PlannedPlacement(
+            part_name=part.name,
+            part_role=part.role,
+            sequence_source=part.sequence.source,
+            sequence_field=str(part.sequence.field) if part.sequence.field is not None else None,
+            placement_kind=part.placement.kind,
+            template_start=part.placement.start,
+            template_end=part.placement.end,
+            orientation=part.placement.orientation,
+            expected_template_sequence=_expected_template_sequence(part),
+        )
+        for part in parts
+    ]
+
+
 def _part_sequence(part: PartConfig, row: dict[str, object]) -> str:
     if part.sequence.source == "literal":
         seq = _ensure_dna_text(str(part.sequence.literal), label=f"literal for part '{part.name}'")
@@ -251,15 +382,28 @@ def _part_sequence(part: PartConfig, row: dict[str, object]) -> str:
 
 
 def _validate_placements(template_len: int, parts: Iterable[PartConfig]) -> List[PartConfig]:
-    ordered = sorted(parts, key=lambda part: (part.placement.start, part.placement.end, part.name))
+    indexed_parts = list(enumerate(parts))
+    ordered = [
+        part
+        for _, part in sorted(
+            indexed_parts,
+            key=lambda item: (item[1].placement.start, item[0]),
+        )
+    ]
     prior_end = -1
     prior_name = None
+    prior_start = None
+    prior_template_end = None
     for part in ordered:
         start = part.placement.start
         end = part.placement.end
         if end > template_len:
+            raise ValidationError(f"Part '{part.name}' placement end {end} exceeds template length {template_len}.")
+        if prior_start is not None and start == prior_start and end != prior_template_end:
             raise ValidationError(
-                f"Part '{part.name}' placement end {end} exceeds template length {template_len}."
+                f"Part '{part.name}' shares template start {start} with part '{prior_name}' but uses a different "
+                "template end. Same-start placements with different intervals are ambiguous; use distinct start "
+                "coordinates or split them into separate construct jobs."
             )
         if start < prior_end:
             raise ValidationError(
@@ -267,6 +411,8 @@ def _validate_placements(template_len: int, parts: Iterable[PartConfig]) -> List
             )
         prior_end = end
         prior_name = part.name
+        prior_start = start
+        prior_template_end = end
     return ordered
 
 
@@ -274,12 +420,13 @@ def _assemble_full_construct(
     template_seq: str,
     parts: List[PartConfig],
     row: dict[str, object],
-) -> tuple[str, Dict[str, _ResolvedPart]]:
+) -> tuple[str, List[_ResolvedPart], Dict[str, _ResolvedPart]]:
     ordered = _validate_placements(len(template_seq), parts)
     cursor = 0
     out: list[str] = []
     out_len = 0
     realized: Dict[str, _ResolvedPart] = {}
+    realized_ordered: list[_ResolvedPart] = []
 
     for part in ordered:
         expected_template = _expected_template_sequence(part)
@@ -299,7 +446,7 @@ def _assemble_full_construct(
         out_len += len(seq)
         realized_end = out_len
 
-        realized[part.name] = _ResolvedPart(
+        resolved_part = _ResolvedPart(
             name=part.name,
             role=part.role,
             kind=part.placement.kind,
@@ -310,10 +457,12 @@ def _assemble_full_construct(
             realized_start=realized_start,
             realized_end=realized_end,
         )
+        realized[part.name] = resolved_part
+        realized_ordered.append(resolved_part)
         cursor = part.placement.end
 
     out.append(template_seq[cursor:])
-    return "".join(out), realized
+    return "".join(out), realized_ordered, realized
 
 
 def _focal_index(part: _ResolvedPart, *, focal_point: str) -> int:
@@ -344,7 +493,9 @@ def _extract_output_sequence(
     end_raw = start_raw + window_bp
     if cfg.job.template.circular:
         seq = "".join(full_construct[(start_raw + idx) % len(full_construct)] for idx in range(window_bp))
-        return seq, start_raw, end_raw
+        start = start_raw % len(full_construct)
+        end = (start + window_bp) % len(full_construct)
+        return seq, start, end
     if start_raw < 0 or end_raw > len(full_construct):
         raise ValidationError(
             "Requested window extends beyond the linear construct boundaries. "
@@ -353,17 +504,30 @@ def _extract_output_sequence(
     return full_construct[start_raw:end_raw], start_raw, end_raw
 
 
-def _spec_id(cfg: JobConfig, *, template_sha256: str) -> str:
+def _spec_id(
+    cfg: JobConfig,
+    *,
+    template: _ResolvedTemplate,
+    template_sha256: str,
+    input_root: Path,
+    output_root: Path,
+) -> str:
     payload = {
         "job_id": cfg.job.id,
         "input": {
             "dataset": cfg.job.input.dataset,
             "field": cfg.job.input.field,
+            "ids": list(cfg.job.input.ids or []),
+            "root": str(input_root),
         },
         "template": {
             "id": cfg.job.template.id,
-            "circular": cfg.job.template.circular,
-            "source": cfg.job.template.source,
+            "kind": template.kind,
+            "circular": template.circular,
+            "source": template.source,
+            "dataset": template.dataset,
+            "field": template.field,
+            "record_id": template.record_id,
             "sha256": template_sha256,
         },
         "parts": [
@@ -392,6 +556,13 @@ def _spec_id(cfg: JobConfig, *, template_sha256: str) -> str:
             "anchor_offset_bp": cfg.job.realize.anchor_offset_bp,
             "window_bp": cfg.job.realize.window_bp,
         },
+        "output": {
+            "dataset": cfg.job.output.dataset,
+            "root": str(output_root),
+            "source": cfg.job.output.source,
+            "on_conflict": cfg.job.output.on_conflict,
+            "allow_same_as_input": cfg.job.output.allow_same_as_input,
+        },
     }
     text = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -405,45 +576,107 @@ def _load_registry_payload(root: Path) -> dict:
     path = _registry_path(root)
     if not path.exists():
         return {"namespaces": {}}
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except OSError as exc:
+        raise ValidationError(f"USR registry could not be read: {path}") from exc
     namespaces = data.get("namespaces") or {}
     if not isinstance(namespaces, dict):
         raise ValidationError(f"USR registry at {path} must contain a 'namespaces' mapping.")
     return {"namespaces": namespaces}
 
 
+def _validated_registry_columns(namespace_name: str, payload: dict) -> dict[str, str]:
+    columns = payload.get("columns")
+    if columns is None:
+        payload["columns"] = []
+        return {}
+    if not isinstance(columns, list):
+        raise ValidationError(f"USR registry namespace '{namespace_name}' must define columns as a list.")
+    observed: dict[str, str] = {}
+    for index, item in enumerate(columns):
+        if not isinstance(item, dict):
+            raise ValidationError(f"USR registry namespace '{namespace_name}' column #{index + 1} must be a mapping.")
+        name = str(item.get("name") or "").strip()
+        type_name = str(item.get("type") or "").strip()
+        if not name or not type_name:
+            raise ValidationError(
+                f"USR registry namespace '{namespace_name}' column #{index + 1} must define name and type."
+            )
+        if name in observed:
+            raise ValidationError(f"USR registry namespace '{namespace_name}' duplicates column '{name}'.")
+        observed[name] = type_name
+    return observed
+
+
+def _ensure_registry_namespace(
+    *,
+    namespace_name: str,
+    namespaces: dict,
+    owner: str,
+    description: str,
+    expected_columns: list[dict[str, str]],
+) -> None:
+    payload = namespaces.setdefault(
+        namespace_name,
+        {
+            "owner": owner,
+            "description": description,
+            "columns": [],
+        },
+    )
+    if not isinstance(payload, dict):
+        raise ValidationError(f"USR registry namespace '{namespace_name}' must be a mapping.")
+    payload.setdefault("owner", owner)
+    payload.setdefault("description", description)
+    observed = _validated_registry_columns(namespace_name, payload)
+    missing = []
+    for column in expected_columns:
+        observed_type = observed.get(column["name"])
+        if observed_type is None:
+            missing.append(column)
+            continue
+        if observed_type != column["type"]:
+            raise ValidationError(
+                f"USR registry namespace '{namespace_name}' column '{column['name']}' has type "
+                f"'{observed_type}', expected '{column['type']}'."
+            )
+    if missing:
+        payload["columns"] = list(payload.get("columns", [])) + missing
+
+
 def _ensure_construct_registry(root: Path) -> None:
     root.mkdir(parents=True, exist_ok=True)
     payload = _load_registry_payload(root)
     namespaces = payload["namespaces"]
-    usr_state = namespaces.setdefault(
-        "usr_state",
-        {
-            "owner": "usr",
-            "description": "Reserved record-state overlay (masked/qc/split/lineage).",
-            "columns": [],
-        },
+    _ensure_registry_namespace(
+        namespace_name="usr_state",
+        namespaces=namespaces,
+        owner="usr",
+        description="Reserved record-state overlay (masked/qc/split/lineage).",
+        expected_columns=_USR_STATE_COLUMNS,
     )
-    construct = namespaces.setdefault(
-        "construct",
-        {
-            "owner": "construct",
-            "description": "Construct lineage overlays for realized DNA sequences.",
-            "columns": [],
-        },
+    _ensure_registry_namespace(
+        namespace_name="construct",
+        namespaces=namespaces,
+        owner="construct",
+        description="Construct lineage overlays for realized DNA sequences.",
+        expected_columns=_CONSTRUCT_COLUMNS,
     )
-    usr_state.setdefault("owner", "usr")
-    usr_state.setdefault("description", "Reserved record-state overlay (masked/qc/split/lineage).")
-    construct.setdefault("owner", "construct")
-    construct.setdefault("description", "Construct lineage overlays for realized DNA sequences.")
-    existing_usr_state = {col["name"] for col in usr_state.get("columns", [])}
-    existing_construct = {col["name"] for col in construct.get("columns", [])}
-    usr_state["columns"] = list(usr_state.get("columns", [])) + [
-        col for col in _USR_STATE_COLUMNS if col["name"] not in existing_usr_state
-    ]
-    construct["columns"] = list(construct.get("columns", [])) + [
-        col for col in _CONSTRUCT_COLUMNS if col["name"] not in existing_construct
-    ]
+    _ensure_registry_namespace(
+        namespace_name="construct_seed",
+        namespaces=namespaces,
+        owner="construct",
+        description="Construct bootstrap/import metadata for seeded input datasets.",
+        expected_columns=_CONSTRUCT_SEED_COLUMNS,
+    )
+    _ensure_registry_namespace(
+        namespace_name="usr_label",
+        namespaces=namespaces,
+        owner="usr",
+        description="Human-readable labels and aliases for canonical sequence records.",
+        expected_columns=_USR_LABEL_COLUMNS,
+    )
     path = _registry_path(root)
     path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
 
@@ -452,12 +685,16 @@ def _build_record(
     *,
     row: dict[str, object],
     cfg: JobConfig,
-    template_seq: str,
-    template_source: str,
+    template: _ResolvedTemplate,
     template_sha256: str,
     spec_id: str,
+    ordered_parts: List[PartConfig],
 ) -> _BuiltRecord:
-    full_construct, realized_parts = _assemble_full_construct(template_seq, cfg.job.parts, row)
+    full_construct, ordered_realized_parts, realized_parts = _assemble_full_construct(
+        template.sequence,
+        ordered_parts,
+        row,
+    )
     output_sequence, window_start, window_end = _extract_output_sequence(
         full_construct=full_construct,
         realized_parts=realized_parts,
@@ -467,41 +704,40 @@ def _build_record(
     sequence_norm = normalize_sequence(output_sequence, "dna", alphabet)
     output_id = compute_id("dna", sequence_norm)
 
-    input_fields = [
-        str(part.sequence.field)
-        for part in cfg.job.parts
-        if part.sequence.source == "input_field"
-    ]
-    ordered_parts = [realized_parts[part.name] for part in cfg.job.parts]
+    input_fields = [str(part.sequence.field) for part in cfg.job.parts if part.sequence.source == "input_field"]
     metadata = {
         "id": output_id,
         "construct__job": cfg.job.id,
         "construct__spec_id": spec_id,
-        "construct__template_id": cfg.job.template.id,
-        "construct__template_source": template_source,
+        "construct__template_id": template.id,
+        "construct__template_kind": template.kind,
+        "construct__template_source": template.source,
+        "construct__template_dataset": template.dataset or "",
+        "construct__template_field": template.field or "",
+        "construct__template_record_id": template.record_id or "",
         "construct__template_sha256": template_sha256,
-        "construct__template_length": len(template_seq),
-        "construct__template_circular": bool(cfg.job.template.circular),
+        "construct__template_length": len(template.sequence),
+        "construct__template_circular": bool(template.circular),
         "construct__input_dataset": cfg.job.input.dataset,
         "construct__input_field": cfg.job.input.field,
         "construct__input_fields": input_fields,
         "construct__anchor_id": str(row["id"]),
         "construct__anchor_length": len(str(row[cfg.job.input.field]).strip()),
         "construct__mode": cfg.job.realize.mode,
-        "construct__focal_part": cfg.job.realize.focal_part,
-        "construct__window_bp": cfg.job.realize.window_bp,
+        "construct__focal_part": cfg.job.realize.focal_part or "",
+        "construct__window_bp": int(cfg.job.realize.window_bp) if cfg.job.realize.window_bp is not None else -1,
         "construct__window_start": window_start,
         "construct__window_end": window_end,
         "construct__full_construct_length": len(full_construct),
-        "construct__part_count": len(ordered_parts),
-        "construct__part_names": [part.name for part in ordered_parts],
-        "construct__part_roles": [part.role for part in ordered_parts],
-        "construct__part_kinds": [part.kind for part in ordered_parts],
-        "construct__part_starts": [part.realized_start for part in ordered_parts],
-        "construct__part_ends": [part.realized_end for part in ordered_parts],
-        "construct__part_orientations": [part.orientation for part in ordered_parts],
-        "construct__part_template_starts": [part.start for part in ordered_parts],
-        "construct__part_template_ends": [part.end for part in ordered_parts],
+        "construct__part_count": len(ordered_realized_parts),
+        "construct__part_names": [part.name for part in ordered_realized_parts],
+        "construct__part_roles": [part.role for part in ordered_realized_parts],
+        "construct__part_kinds": [part.kind for part in ordered_realized_parts],
+        "construct__part_starts": [part.realized_start for part in ordered_realized_parts],
+        "construct__part_ends": [part.realized_end for part in ordered_realized_parts],
+        "construct__part_orientations": [part.orientation for part in ordered_realized_parts],
+        "construct__part_template_starts": [part.start for part in ordered_realized_parts],
+        "construct__part_template_ends": [part.end for part in ordered_realized_parts],
     }
     return _BuiltRecord(output_id=output_id, sequence=output_sequence, alphabet=alphabet, metadata=metadata)
 
@@ -509,20 +745,52 @@ def _build_record(
 def _attach_construct_metadata(ds: Dataset, metadata_rows: List[dict[str, object]]) -> None:
     if not metadata_rows:
         return
-    frame = pd.DataFrame(metadata_rows)
     with tempfile.TemporaryDirectory() as tmp_dir:
         path = Path(tmp_dir) / "construct_attach.parquet"
-        table = pa.Table.from_pandas(frame, preserve_index=False)
+        schema = pa.schema(
+            [pa.field("id", pa.string())]
+            + [pa.field(col["name"], _registry_arrow_type(col["type"])) for col in _CONSTRUCT_COLUMNS]
+        )
+        table = pa.table(
+            {
+                field.name: pa.array(
+                    [row.get(field.name) for row in metadata_rows],
+                    type=field.type,
+                )
+                for field in schema
+            },
+            schema=schema,
+        )
         pq.write_table(table, path)
         ds.attach(
             path,
             namespace="construct",
             key="id",
             key_col="id",
-            columns=[col for col in frame.columns if col != "id"],
-            allow_overwrite=False,
+            columns=[field.name for field in schema if field.name != "id"],
+            allow_overwrite=True,
             note="dnadesign.construct lineage attach",
         )
+
+
+def _existing_output_ids(root: Path, dataset_name: str) -> set[str]:
+    ds = Dataset(root, dataset_name)
+    if not ds.records_path.exists():
+        return set()
+    return {str(row["id"]) for row in _scan_usr_rows(ds, columns=["id"], ids=None)}
+
+
+def _registry_arrow_type(type_name: str) -> pa.DataType:
+    mapping: dict[str, pa.DataType] = {
+        "bool": pa.bool_(),
+        "string": pa.string(),
+        "int64": pa.int64(),
+        "list<string>": pa.list_(pa.string()),
+        "list<int64>": pa.list_(pa.int64()),
+    }
+    if type_name not in mapping:
+        raise ValidationError(f"Unsupported registry column type '{type_name}' for construct overlay attach.")
+    return mapping[type_name]
 
 
 def _plan_from_config(path: str | Path) -> tuple[PreflightResult, List[_BuiltRecord]]:
@@ -534,10 +802,26 @@ def _plan_from_config(path: str | Path) -> tuple[PreflightResult, List[_BuiltRec
     input_ds = Dataset(input_root, cfg.job.input.dataset)
     if not input_ds.records_path.exists():
         raise ValidationError(f"Input dataset not initialized: {input_ds.records_path}")
+    if (
+        input_root == output_root
+        and cfg.job.input.dataset == cfg.job.output.dataset
+        and not cfg.job.output.allow_same_as_input
+    ):
+        raise ValidationError(
+            "Output dataset resolves to the same root/dataset as input. "
+            "Set output.allow_same_as_input=true only when recursive accumulation is intentional."
+        )
 
-    template_seq, template_source = _load_template_sequence(base_dir, cfg)
-    template_sha256 = hashlib.sha256(template_seq.encode("utf-8")).hexdigest()
-    spec_id = _spec_id(cfg, template_sha256=template_sha256)
+    template = _load_template_sequence(base_dir, cfg)
+    ordered_parts = _validate_placements(len(template.sequence), cfg.job.parts)
+    template_sha256 = hashlib.sha256(template.sequence.encode("utf-8")).hexdigest()
+    spec_id = _spec_id(
+        cfg,
+        template=template,
+        template_sha256=template_sha256,
+        input_root=input_root,
+        output_root=output_root,
+    )
 
     rows = _scan_usr_rows(input_ds, columns=_input_fields(cfg), ids=cfg.job.input.ids)
     if not rows:
@@ -547,13 +831,29 @@ def _plan_from_config(path: str | Path) -> tuple[PreflightResult, List[_BuiltRec
         _build_record(
             row=row,
             cfg=cfg,
-            template_seq=template_seq,
-            template_source=template_source,
+            template=template,
             template_sha256=template_sha256,
             spec_id=spec_id,
+            ordered_parts=ordered_parts,
         )
         for row in rows
     ]
+    duplicate_output_ids = sorted(
+        output_id for output_id, count in Counter(record.output_id for record in built).items() if count > 1
+    )
+    if duplicate_output_ids:
+        preview = ", ".join(duplicate_output_ids[:5])
+        raise ValidationError(
+            f"{len(duplicate_output_ids)} duplicate planned output id(s) were generated within this construct run. "
+            f"Sample: {preview}. Deduplicate input.ids or route the colliding outputs into separate construct jobs."
+        )
+    existing_ids = _existing_output_ids(output_root, cfg.job.output.dataset)
+    collision_count = sum(1 for record in built if record.output_id in existing_ids)
+    if collision_count and cfg.job.output.on_conflict == "error":
+        raise ValidationError(
+            f"{collision_count} planned output id(s) already exist in dataset '{cfg.job.output.dataset}'. "
+            "Choose a different output dataset, change the construct spec, or set output.on_conflict='ignore'."
+        )
     planned_rows = [
         PlannedRow(
             input_id=str(row["id"]),
@@ -570,13 +870,25 @@ def _plan_from_config(path: str | Path) -> tuple[PreflightResult, List[_BuiltRec
         output_dataset=cfg.job.output.dataset,
         input_root=input_root,
         output_root=output_root,
-        template_id=cfg.job.template.id,
-        template_source=template_source,
+        template_id=template.id,
+        template_kind=template.kind,
+        template_source=template.source,
+        template_dataset=template.dataset,
+        template_field=template.field,
+        template_record_id=template.record_id,
         template_sha256=template_sha256,
-        template_length=len(template_seq),
-        template_circular=bool(cfg.job.template.circular),
+        template_length=len(template.sequence),
+        template_circular=bool(template.circular),
+        realize_mode=cfg.job.realize.mode,
+        focal_part=cfg.job.realize.focal_part,
+        focal_point=cfg.job.realize.focal_point,
+        anchor_offset_bp=cfg.job.realize.anchor_offset_bp,
+        window_bp=cfg.job.realize.window_bp,
         spec_id=spec_id,
         records_total=len(built),
+        existing_output_collisions=collision_count,
+        output_on_conflict=cfg.job.output.on_conflict,
+        placements=_planned_placements(ordered_parts),
         planned_rows=planned_rows,
     )
     return preflight, built
@@ -598,6 +910,9 @@ def run_from_config(path: str | Path, *, dry_run: bool = False) -> RunResult:
             output_dataset=cfg.job.output.dataset,
             output_root=preflight.output_root,
             records_total=preflight.records_total,
+            records_written=0,
+            records_skipped_existing=preflight.existing_output_collisions,
+            spec_id=preflight.spec_id,
             dry_run=True,
         )
 
@@ -606,6 +921,11 @@ def run_from_config(path: str | Path, *, dry_run: bool = False) -> RunResult:
     if not output_ds.records_path.exists():
         output_ds.init(source="construct", notes=f"Initialized by construct job {cfg.job.id}.")
 
+    existing_ids = _existing_output_ids(preflight.output_root, cfg.job.output.dataset)
+    built_to_write = [
+        record for record in built if cfg.job.output.on_conflict != "ignore" or record.output_id not in existing_ids
+    ]
+
     base_rows = [
         {
             "sequence": record.sequence,
@@ -613,14 +933,15 @@ def run_from_config(path: str | Path, *, dry_run: bool = False) -> RunResult:
             "alphabet": record.alphabet,
             "source": cfg.job.output.source or f"construct run {cfg.job.id}",
         }
-        for record in built
+        for record in built_to_write
     ]
-    output_ds.import_rows(
-        base_rows,
-        default_bio_type="dna",
-        source=cfg.job.output.source or f"construct run {cfg.job.id}",
-    )
-    _attach_construct_metadata(output_ds, [record.metadata for record in built])
+    if base_rows:
+        output_ds.import_rows(
+            base_rows,
+            default_bio_type="dna",
+            source=cfg.job.output.source or f"construct run {cfg.job.id}",
+        )
+        _attach_construct_metadata(output_ds, [record.metadata for record in built_to_write])
 
     return RunResult(
         job_id=cfg.job.id,
@@ -628,5 +949,8 @@ def run_from_config(path: str | Path, *, dry_run: bool = False) -> RunResult:
         output_dataset=cfg.job.output.dataset,
         output_root=preflight.output_root,
         records_total=preflight.records_total,
+        records_written=len(built_to_write),
+        records_skipped_existing=preflight.records_total - len(built_to_write),
+        spec_id=preflight.spec_id,
         dry_run=False,
     )

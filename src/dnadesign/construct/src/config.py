@@ -43,15 +43,63 @@ class InputConfig(StrictConfigModel):
 
 class TemplateConfig(StrictConfigModel):
     id: str
+    kind: Optional[Literal["literal", "path", "usr"]] = None
     sequence: Optional[str] = None
     path: Optional[str] = None
+    dataset: Optional[str] = None
+    root: Optional[str] = None
+    record_id: Optional[str] = None
+    field: str = "sequence"
     circular: bool = False
     source: Optional[str] = None
 
+    @field_validator("id", "field")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("template.id and template.field cannot be empty.")
+        return text
+
     @model_validator(mode="after")
     def _validate_source(self) -> "TemplateConfig":
-        if bool(self.sequence) == bool(self.path):
-            raise ValueError("template must define exactly one of template.sequence or template.path.")
+        has_sequence = self.sequence is not None
+        has_path = self.path is not None
+        has_usr = bool(str(self.dataset or "").strip()) or bool(str(self.record_id or "").strip())
+
+        if self.kind is None:
+            selected = [has_sequence, has_path, has_usr]
+            if sum(1 for item in selected if item) != 1:
+                raise ValueError(
+                    "template must define exactly one source: template.sequence, template.path, "
+                    "or template.dataset + template.record_id."
+                )
+            if has_sequence:
+                self.kind = "literal"
+            elif has_path:
+                self.kind = "path"
+            else:
+                self.kind = "usr"
+
+        if self.kind == "literal":
+            if not has_sequence or has_path or has_usr:
+                raise ValueError(
+                    "template.kind='literal' requires template.sequence and disallows template.path/template.dataset."
+                )
+        elif self.kind == "path":
+            if not has_path or has_sequence or has_usr:
+                raise ValueError(
+                    "template.kind='path' requires template.path and disallows template.sequence/template.dataset."
+                )
+        elif self.kind == "usr":
+            if has_sequence or has_path:
+                raise ValueError("template.kind='usr' disallows template.sequence and template.path.")
+            if not str(self.dataset or "").strip():
+                raise ValueError("template.dataset is required when template.kind='usr'.")
+            if not str(self.record_id or "").strip():
+                raise ValueError("template.record_id is required when template.kind='usr'.")
+        else:
+            raise ValueError("template.kind must be one of: literal, path, usr.")
         return self
 
 
@@ -134,6 +182,16 @@ class OutputConfig(StrictConfigModel):
     dataset: str
     root: Optional[str] = None
     source: Optional[str] = None
+    on_conflict: Literal["error", "ignore"] = "error"
+    allow_same_as_input: bool = False
+
+    @field_validator("dataset")
+    @classmethod
+    def _dataset_not_blank(cls, value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("output.dataset cannot be empty.")
+        return text
 
 
 class InnerJobConfig(StrictConfigModel):

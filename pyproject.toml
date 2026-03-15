@@ -95,6 +95,13 @@ dev  = [{ include-group = "test" }, { include-group = "lint" }]
 where = ["src"]
 
 [tool.setuptools.package-data]
+"dnadesign.construct" = [
+  "src/seeds/*.yaml",
+  "workspaces/demo_promoter_swap_pdual10/*.md",
+  "workspaces/demo_promoter_swap_pdual10/*.sh",
+  "workspaces/demo_promoter_swap_pdual10/*.yaml",
+  "workspaces/demo_promoter_swap_pdual10/inputs/*.md",
+]
 "dnadesign.cruncher.ingest.certs" = ["*.pem"]
 "dnadesign.densegen" = [
   "workspaces/demo_meme_three_tfs/config.yaml",

@@ -17,6 +17,7 @@ import typer
 
 from ...api import load_job_config, preflight_from_config
 from ...errors import ConstructError
+from ._render import echo_validate_result
 
 validate_app = typer.Typer(no_args_is_help=True, help="Validation commands for construct.")
 
@@ -42,21 +43,4 @@ def validate_config(
         except ConstructError as exc:
             typer.echo(f"Error: {exc}")
             raise typer.Exit(1) from exc
-    typer.echo(f"Config OK: {config_path}")
-    typer.echo(f"job_id: {loaded.job.id}")
-    typer.echo(f"input_dataset: {loaded.job.input.dataset}")
-    typer.echo(f"output_dataset: {loaded.job.output.dataset}")
-    if preflight is None:
-        return
-    typer.echo(f"template_id: {preflight.template_id}")
-    typer.echo(f"template_length: {preflight.template_length}")
-    typer.echo(f"template_circular: {str(preflight.template_circular).lower()}")
-    typer.echo(f"rows_total: {preflight.records_total}")
-    for row in preflight.planned_rows:
-        typer.echo(
-            "row: "
-            f"input_id={row.input_id} "
-            f"anchor_length={row.anchor_length} "
-            f"full_construct_length={row.full_construct_length} "
-            f"output_length={row.output_length}"
-        )
+    echo_validate_result(config_path=config_path, loaded=loaded, preflight=preflight)

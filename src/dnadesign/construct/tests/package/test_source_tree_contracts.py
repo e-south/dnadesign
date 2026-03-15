@@ -26,6 +26,7 @@ def test_construct_root_keeps_progressive_disclosure_directories() -> None:
     construct_root = _construct_root()
     assert (construct_root / "README.md").is_file()
     assert (construct_root / "docs").is_dir()
+    assert (construct_root / "docs" / "reference").is_dir()
     assert (construct_root / "src").is_dir()
     assert (construct_root / "tests").is_dir()
     assert (construct_root / "workspaces").is_dir()
@@ -34,9 +35,7 @@ def test_construct_root_keeps_progressive_disclosure_directories() -> None:
 def test_construct_root_keeps_minimal_top_level_surface() -> None:
     construct_root = _construct_root()
     observed = {
-        path.name
-        for path in construct_root.iterdir()
-        if path.name != "__pycache__" and not path.name.startswith(".")
+        path.name for path in construct_root.iterdir() if path.name != "__pycache__" and not path.name.startswith(".")
     }
     assert observed == {
         "README.md",
