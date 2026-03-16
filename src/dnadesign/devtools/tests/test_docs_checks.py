@@ -22,6 +22,7 @@ from dnadesign.devtools.docs_checks import (
     _find_docs_root_heading_style_issues,
     _find_entrypoint_local_path_literal_issues,
     _find_operational_runbook_path_issues,
+    _find_ops_deprecated_semantics_issues,
     _find_packaged_runbook_variant_issues,
     _find_root_docs_entrypoint_issues,
     _find_runbook_demo_snippet_issues,
@@ -1750,3 +1751,24 @@ def test_cross_tool_doc_metadata_check_accepts_expected_contract_values(tmp_path
     issues = _find_cross_tool_doc_metadata_issues(tmp_path)
 
     assert issues == []
+
+
+def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
+        "\n".join(
+            [
+                "## Ops runbook",
+                "",
+                "Use `densegen_batch_with_notify_slack`.",
+                "",
+                "The precedents surface remains available.",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_ops_deprecated_semantics_issues(tmp_path)
+
+    assert any("with_notify_slack" in issue for issue in issues)
+    assert any("precedents" in issue for issue in issues)

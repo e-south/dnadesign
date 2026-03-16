@@ -24,7 +24,7 @@ OrchestrationWorkflowId = Literal[
     "infer_batch_with_notify",
 ]
 
-_LEGACY_WORKFLOW_ID_ALIASES: dict[str, OrchestrationWorkflowId] = {
+_RETIRED_WORKFLOW_ID_REPLACEMENTS: dict[str, OrchestrationWorkflowId] = {
     "densegen_batch_with_notify_slack": "densegen_batch_with_notify",
     "infer_batch_with_notify_slack": "infer_batch_with_notify",
 }
@@ -75,9 +75,9 @@ def list_workflow_ids() -> tuple[OrchestrationWorkflowId, ...]:
     return tuple(sorted(_WORKFLOW_METADATA_BY_ID))
 
 
-def normalize_workflow_id(workflow_id: str) -> str:
+def retired_workflow_id_replacement(workflow_id: str) -> OrchestrationWorkflowId | None:
     workflow = str(workflow_id or "").strip()
-    return _LEGACY_WORKFLOW_ID_ALIASES.get(workflow, workflow)
+    return _RETIRED_WORKFLOW_ID_REPLACEMENTS.get(workflow)
 
 
 def list_workflow_tools() -> tuple[WorkflowTool, ...]:
@@ -85,10 +85,16 @@ def list_workflow_tools() -> tuple[WorkflowTool, ...]:
 
 
 def resolve_workflow_metadata(workflow_id: str) -> WorkflowMetadata:
-    workflow = normalize_workflow_id(workflow_id)
+    workflow = str(workflow_id or "").strip()
     metadata = _WORKFLOW_METADATA_BY_ID.get(workflow)
     if metadata is None:
+        replacement = retired_workflow_id_replacement(workflow)
         supported = ", ".join(list_workflow_ids())
+        if replacement is not None:
+            raise ValueError(
+                f"unsupported orchestration workflow id: {workflow} "
+                f"(retired; use {replacement}; supported: {supported})"
+            )
         raise ValueError(f"unsupported orchestration workflow id: {workflow} (supported: {supported})")
     return metadata
 
@@ -111,12 +117,12 @@ def resolve_workflow_id(*, tool: WorkflowTool, with_notify: bool) -> Orchestrati
 
 
 def is_densegen_workflow_id(workflow_id: str) -> bool:
-    metadata = _WORKFLOW_METADATA_BY_ID.get(normalize_workflow_id(workflow_id))
+    metadata = _WORKFLOW_METADATA_BY_ID.get(str(workflow_id or "").strip())
     return metadata is not None and metadata.tool == "densegen"
 
 
 def is_infer_workflow_id(workflow_id: str) -> bool:
-    metadata = _WORKFLOW_METADATA_BY_ID.get(normalize_workflow_id(workflow_id))
+    metadata = _WORKFLOW_METADATA_BY_ID.get(str(workflow_id or "").strip())
     return metadata is not None and metadata.tool == "infer"
 
 

@@ -366,6 +366,23 @@ def test_runbook_rejects_invalid_log_retention_values(tmp_path: Path) -> None:
         load_orchestration_runbook(runbook_path, raw=payload)
 
 
+def test_runbook_rejects_retired_workflow_id_with_replacement_hint(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
+    payload["runbook"]["workflow_id"] = "densegen_batch_with_notify_slack"
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "unsupported orchestration workflow id: densegen_batch_with_notify_slack "
+            r"\(retired; use densegen_batch_with_notify; supported: "
+            r"densegen_batch_submit, densegen_batch_with_notify, infer_batch_submit, "
+            r"infer_batch_with_notify\)"
+        ),
+    ):
+        load_orchestration_runbook(runbook_path, raw=payload)
+
+
 def test_runbook_rejects_notify_profile_outside_workspace_notify_namespace(tmp_path: Path) -> None:
     runbook_path = _write_runbook(tmp_path)
     payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
@@ -2913,5 +2930,12 @@ def test_cli_presets_lists_packaged_runbooks() -> None:
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["presets"]
-    assert payload["precedents"] == payload["presets"]
     assert all(entry["path"].endswith(".yaml") for entry in payload["presets"])
+
+
+def test_cli_precedents_command_is_not_supported() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["runbook", "precedents"])
+
+    assert result.exit_code != 0

@@ -201,9 +201,19 @@ OVERLAY_GUARD_DOC_PATHS = (
     "docs/bu-scc/jobs/README.md",
     "src/dnadesign/ops/README.md",
 )
+OPS_DEPRECATED_SEMANTICS_DOC_PATHS = (
+    "docs/operations/README.md",
+    "docs/operations/orchestration-runbooks.md",
+    "src/dnadesign/ops/README.md",
+)
 STALE_OVERLAY_GUARD_TERMS = (
     "densegen-overlay-guard",
     "densegen.overlay_guard.namespace",
+)
+OPS_DEPRECATED_SEMANTICS_TERMS = (
+    "precedent",
+    "precedents",
+    "with_notify_slack",
 )
 PACKAGED_RUNBOOK_DURATION_SUFFIX_PATTERN = re.compile(r"_(?:\d+)(?:h|hr|hrs|hour|hours)$", re.IGNORECASE)
 OPERATIONAL_RUNBOOK_SCAN_PRUNE_DIRS = {
@@ -1377,6 +1387,23 @@ def _find_stale_overlay_guard_term_issues(repo_root: Path) -> list[str]:
     return issues
 
 
+def _find_ops_deprecated_semantics_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    target_files = _collect_markdown_files_from_relative_paths(
+        repo_root,
+        relative_paths=OPS_DEPRECATED_SEMANTICS_DOC_PATHS,
+    )
+    for path in target_files:
+        content = path.read_text(encoding="utf-8")
+        for term in OPS_DEPRECATED_SEMANTICS_TERMS:
+            if term in content:
+                issues.append(
+                    f"{path}: deprecated ops semantics term '{term}' is not allowed; "
+                    "use transport-neutral workflow ids and the presets surface only."
+                )
+    return issues
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check docs markdown naming and local links.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
@@ -1494,6 +1521,13 @@ def main(argv: list[str] | None = None) -> int:
     if stale_overlay_guard_term_issues:
         print("Overlay guard terminology check failed:")
         for issue in stale_overlay_guard_term_issues:
+            print(f" - {issue}")
+        return 1
+
+    ops_deprecated_semantics_issues = _find_ops_deprecated_semantics_issues(repo_root)
+    if ops_deprecated_semantics_issues:
+        print("Ops terminology drift check failed:")
+        for issue in ops_deprecated_semantics_issues:
             print(f" - {issue}")
         return 1
 

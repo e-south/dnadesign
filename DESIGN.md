@@ -68,6 +68,9 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
   - `workflow`: downstream tool-owned branch or state-machine procedure when the tool intentionally uses a `workflows/` subtree
   - `tutorial`: pedagogical walkthrough, not the authority contract
   - `demo`: packaged sample assets or tracer-bullet profiles, not the authority contract
+- Terminology and workflow ids are strict contracts, not compatibility layers:
+  - do not keep deprecated aliases alive in authoritative surfaces
+  - when an identifier is retired, reject it explicitly and point to the supported replacement
 - Cross-tool route/runbook/workflow docs must declare:
   - `Type`
   - `Plane`

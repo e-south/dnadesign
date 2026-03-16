@@ -62,6 +62,9 @@ This file is the architecture map: it names system boundaries, major flows, and 
   - `workflow`: downstream tool-owned branch or state-machine procedure when a tool intentionally uses a `workflows/` subtree
   - `tutorial`: pedagogical walkthrough, not the authority surface
   - `demo`: packaged sample assets or tracer-bullet workspace/profile, not the authority surface
+- Authoritative runbook and workflow semantics must not rely on back-compat shims:
+  - deprecated ids, commands, and document-type labels are removed from the supported surface
+  - if a rename is necessary, fail fast with an actionable error instead of silently normalizing
 - Cross-tool deep procedures must declare:
   - `Type`
   - `Plane`

@@ -27,9 +27,10 @@ from .workflow_metadata import (
     WorkflowTool,
     is_densegen_workflow_id,
     is_infer_workflow_id,
+    list_workflow_ids,
     list_workflow_tools,
-    normalize_workflow_id,
     resolve_workflow_tool,
+    retired_workflow_id_replacement,
     validate_workflow_contract,
 )
 
@@ -342,7 +343,13 @@ def load_orchestration_runbook(path: Path, *, raw: dict | None = None) -> Orches
     if isinstance(runbook_payload, dict):
         workflow_id = runbook_payload.get("workflow_id")
         if isinstance(workflow_id, str):
-            runbook_payload["workflow_id"] = normalize_workflow_id(workflow_id)
+            replacement = retired_workflow_id_replacement(workflow_id)
+            if replacement is not None:
+                supported = ", ".join(list_workflow_ids())
+                raise ValueError(
+                    f"unsupported orchestration workflow id: {workflow_id} "
+                    f"(retired; use {replacement}; supported: {supported})"
+                )
     runbook = OrchestrationRunbookRoot.model_validate(raw).runbook
     resolved_runbook = resolve_runbook_paths(runbook, runbook_base_dir=runbook_path.parent)
     return enforce_workspace_layout(resolved_runbook)

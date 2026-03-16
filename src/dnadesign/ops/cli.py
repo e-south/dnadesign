@@ -399,16 +399,11 @@ def runbook_init(
 
 def _emit_packaged_runbook_presets() -> None:
     presets = [{"name": path.stem, "path": str(path)} for path in _packaged_preset_paths()]
-    typer.echo(json.dumps({"precedents": presets, "presets": presets}, indent=2, sort_keys=True))
+    typer.echo(json.dumps({"presets": presets}, indent=2, sort_keys=True))
 
 
 @runbook_app.command("presets")
 def runbook_presets() -> None:
-    _emit_packaged_runbook_presets()
-
-
-@runbook_app.command("precedents", hidden=True)
-def runbook_precedents_alias() -> None:
     _emit_packaged_runbook_presets()
 
 

@@ -10,6 +10,7 @@
 **Last verified:** 2026-03-16
 
 This contract defines machine-readable runbooks for cross-tool BU SCC control-plane orchestration.
+It does not own durable USR-backed data-plane workflows; return to the root docs router or USR operations docs when the next authoritative procedure is about source-of-truth datasets rather than scheduler sequencing.
 
 ### Why this exists
 
@@ -116,7 +117,7 @@ Result expectations:
 8. DenseGen preflight runs a records-part guard that projects `records__part-*.parquet` growth and applies age/count maintenance before submit.
 9. DenseGen preflight runs an archived-overlay retention guard that enforces `_derived/_archived` count/size thresholds before submit.
 
-### Workflow routes
+### Orchestration workflow ids
 
 Workflow ids are transport-neutral. Notify transport and delivery wiring live in `runbook.notify`, not in `workflow_id`.
 
@@ -181,7 +182,7 @@ Path behavior:
 1. Relative paths are resolved from the runbook file parent directory.
 2. Absolute paths remain unchanged.
 3. `runbook.notify` is required only for `*_with_notify` workflows.
-4. Legacy `*_with_notify_slack` workflow ids are accepted only as explicit migration aliases and normalize to `*_with_notify`.
+4. `workflow_id` must be one of the transport-neutral ids listed above; deprecated transport-specific ids are rejected.
 5. `runbook.logging.stdout_dir` is required and is used for all scheduler stdout (`qsub -o`) in verify and submit phases.
 6. Notify-enabled runbooks accept `notify.orchestration_events` (default `true`) to control direct orchestration lifecycle notifications.
 7. DenseGen runbooks accept `densegen.post_run.qsub_template` for the dependent analysis submit that runs plots after CPU generation completes.

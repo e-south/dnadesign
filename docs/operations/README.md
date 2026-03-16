@@ -21,19 +21,19 @@ Ops is the repository-level control-plane orchestration surface for deterministi
 ### Start here
 
 1. Start with [Ops package README](../../src/dnadesign/ops/README.md) for scope and boundaries.
-2. Choose a route in [Workflow routes](#workflow-routes) based on batch intent.
+2. Choose a route in [Orchestration routes](#orchestration-routes) based on batch intent.
 3. Confirm contract details in [Contracts](#contracts).
 4. Run the [Verification loop](#verification-loop) before any submit.
 5. Return to the [repository docs index](../README.md) for cross-tool routing across control-plane and data-plane surfaces.
 
-### Workflow routes
+### Orchestration routes
 
 | Need | Start here | Verify next |
 | --- | --- | --- |
 | Bootstrap a runbook from scratch | [runbook bootstrap path](orchestration-runbooks.md#runbook-bootstrap-path) | [runbook schema (v1)](orchestration-runbooks.md#runbook-schema-v1) |
 | Validate command order without side effects | [2-minute dry-run path](orchestration-runbooks.md#2-minute-dry-run-path) | [contract rules](orchestration-runbooks.md#contract-rules) |
-| Run batch-only orchestration | [workflow routes](orchestration-runbooks.md#workflow-routes) | [planner and executor commands](orchestration-runbooks.md#planner-and-executor-commands) |
-| Run batch plus notify orchestration | [workflow routes](orchestration-runbooks.md#workflow-routes) | [notify command contracts](../../src/dnadesign/notify/docs/reference/command-contracts.md) |
+| Run batch-only orchestration | [orchestration workflow ids](orchestration-runbooks.md#orchestration-workflow-ids) | [planner and executor commands](orchestration-runbooks.md#planner-and-executor-commands) |
+| Run batch plus notify orchestration | [orchestration workflow ids](orchestration-runbooks.md#orchestration-workflow-ids) | [notify command contracts](../../src/dnadesign/notify/docs/reference/command-contracts.md) |
 | Run generation now and refresh plots in the same submit chain | [runbook schema (v1)](orchestration-runbooks.md#runbook-schema-v1) | [contract rules](orchestration-runbooks.md#contract-rules) |
 
 ### Adjacent routes outside Ops

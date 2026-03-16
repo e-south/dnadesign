@@ -64,7 +64,7 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
         [
             "### What Ops is for",
             "### Start here",
-            "### Workflow routes",
+            "### Orchestration routes",
             "### Contracts",
             "### Verification loop",
             "### Operator quickstart",
@@ -93,7 +93,7 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
             "### Why this exists",
             "### Runbook bootstrap path",
             "### 2-minute dry-run path",
-            "### Workflow routes",
+            "### Orchestration workflow ids",
             "### Runbook schema (v1)",
             "### Planner and executor commands",
             "### Contract rules",
@@ -107,6 +107,7 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     assert "**Type:** runbook" in text
     assert "**Plane:** control-plane" in text
     assert "**Owner-boundary:** ops" in text
+    assert "It does not own durable USR-backed data-plane workflows" in text
     assert "default is `300`" in text
     assert "operator and agent review" not in text
     assert "--command-timeout-seconds" in text
@@ -140,8 +141,8 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     assert "infer.overlay_guard.overlay_namespace` is fixed to `infer`" in text
     assert "densegen_batch_with_notify" in text
     assert "infer_batch_with_notify" in text
-    assert text.count("with_notify_slack") == 1
-    assert "Legacy `*_with_notify_slack` workflow ids are accepted only as explicit migration aliases" in text
+    assert "with_notify_slack" not in text
+    assert "precedents" not in text
 
 
 def test_repo_docs_index_exposes_ops_tool_and_operations_route() -> None:
@@ -219,3 +220,15 @@ def test_core_docs_avoid_contrived_doc_language() -> None:
         text = _read(repo_root / rel).lower()
         for token in banned_tokens:
             assert token not in text, f"{rel}: contains banned token {token!r}"
+
+
+def test_ops_docs_remove_legacy_presets_and_workflow_alias_terms() -> None:
+    docs_targets = [
+        _repo_root() / "docs" / "operations" / "README.md",
+        _repo_root() / "docs" / "operations" / "orchestration-runbooks.md",
+        _repo_root() / "src" / "dnadesign" / "ops" / "README.md",
+    ]
+    for path in docs_targets:
+        text = _read(path)
+        assert "precedents" not in text
+        assert "with_notify_slack" not in text
