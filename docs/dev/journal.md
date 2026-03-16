@@ -502,3 +502,28 @@ This section lists dated entries so you can jump to a specific investigation win
     - root + `ops` + `usr` ownership and routing
     - tool-local entry surfaces for `densegen`, `infer`, `construct`, and `notify`
     - downstream consumer surfaces for `opal` and `cluster`
+- 2026-03-16 17:02 EDT: cluster-first-class-surface follow-up
+  - Intent:
+    - run one more bounded docs pressure-test pass with a specific focus on whether `cluster` now reads like a first-class downstream tool rather than a long appendix
+    - keep the same ownership contract intact:
+      - root `docs/README.md` stays the only top-level router
+      - `docs/operations/` stays control-plane only
+      - `src/dnadesign/usr/docs/operations/` stays the durable USR-backed data-plane handoff surface
+      - downstream tool-owned workflows stay with the downstream tool after handoff
+    - fix remaining naive-user footguns surfaced by the swarm without introducing duplicate authority or silent compatibility layers
+  - Swarm findings:
+    - `cluster` routing and downstream ownership were already coherent, but the tool still lagged as a monolithic README with no `docs/` tree, making it the weakest first-pass didactic surface
+    - `notify` still made operators hop between repo-level and package-level docs before they could run the first three commands
+    - `ops` still had one contradictory `--audit-json` example and a hard-coded project slug in docs examples
+    - `usr` workflow-map still used `/tmp` for machine-readable artifacts and lacked one explicit context preamble for summary fragments
+  - Implementation targets for this slice:
+    - refactor `cluster` into a small docs tree:
+      - workflow router
+      - by-type index
+      - exploratory workflow
+      - CLI/reference contract page
+      - ownership-boundary concept page
+    - keep `cluster/README.md` as the concise package entry surface and retarget downstream handoff links to the new workflow doc
+    - add a `Start here in 3 commands` block to Notify package docs without creating a second authoritative runbook
+    - align Ops docs examples with the workspace-scoped audit-path contract and replace `dunlop` placeholders with `<project>`
+    - replace `/tmp` examples in the USR workflow map with a workspace-rooted artifact convention and add a shared context preamble

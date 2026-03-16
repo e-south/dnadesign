@@ -12,6 +12,35 @@
 
 Use this page to pick a command chain quickly, then open the linked runbook for full detail. The command blocks below are summary fragments, not fully self-contained procedures.
 
+## Context preamble
+
+Set shared roots once before you copy any branch-specific summary fragment.
+Only keep the variables that the chosen branch actually uses, then open the linked runbook for exact value derivation and verification detail.
+
+```bash
+# Choose one operator workspace or scratch root for machine-readable artifacts.
+# Set the operator workspace root that will own audit artifacts for this run.
+WORKFLOW_ROOT="${WORKFLOW_ROOT:-$PWD}"
+# Set the workspace-scoped artifact directory used by the summary fragments below.
+ARTIFACT_ROOT="${ARTIFACT_ROOT:-$WORKFLOW_ROOT/outputs/logs/usr-workflow-map}"
+# Create the artifact directory before any machine-readable reports are emitted.
+mkdir -p "$ARTIFACT_ROOT"
+
+# Shared branch inputs. Keep only the ones needed by the branch you are running.
+# Set the dataset id used by the sync-oriented branches.
+DATASET_ID="my_dataset"
+# Set the local USR root used by infer or notify dry-run branches.
+LOCAL_USR_ROOT="<local-usr-root>"
+# Set the USR root used by construct-backed branches.
+USR_ROOT="$LOCAL_USR_ROOT"
+# Set the construct or infer workspace root used by workspace-backed branches.
+WORKSPACE_ROOT="<workspace-root>"
+# Set the first infer config used by the feature-matrix branch.
+INFER_CONFIG_7B="<path-to-infer-config.yaml>"
+# Set the OPAL campaign workdir used by the active-learning branch.
+OPAL_WORKDIR="<path-to-opal-campaign-dir>"
+```
+
 ## Bootstrap from remote -> local clone
 
 When HPC already has dataset contents and local does not.
@@ -160,11 +189,11 @@ Use this when command chains are orchestrated by scripts, notebooks, or higher-l
 # Set the dataset id used across sync calls.
 DATASET_ID="my_dataset"
 # Emit machine-readable sync decision artifact.
-uv run usr diff "$DATASET_ID" bu-scc --audit-json-out /tmp/usr-sync-audit.json
+uv run usr diff "$DATASET_ID" bu-scc --audit-json-out "$ARTIFACT_ROOT/usr-sync-audit.json"
 # Read the diff decision payload for orchestration logic.
-jq -r '.changes' /tmp/usr-sync-audit.json
+jq -r '.changes' "$ARTIFACT_ROOT/usr-sync-audit.json"
 # Read exact sidecar file deltas for transfer decisions.
-jq -r '.data | {derived_local_only: ._derived.local_only, derived_remote_only: ._derived.remote_only, aux_local_only: ._auxiliary.local_only, aux_remote_only: ._auxiliary.remote_only}' /tmp/usr-sync-audit.json
+jq -r '.data | {derived_local_only: ._derived.local_only, derived_remote_only: ._derived.remote_only, aux_local_only: ._auxiliary.local_only, aux_remote_only: ._auxiliary.remote_only}' "$ARTIFACT_ROOT/usr-sync-audit.json"
 ```
 
 Details: [sync-audit-loop.md](sync-audit-loop.md)
@@ -181,8 +210,8 @@ Use this before or after sync/overlay refactors to validate iterative transfer b
 ```bash
 # Run deterministic harness cycle with optional sync-audit drill enabled.
 USR_HARNESS_RUN_SYNC_AUDIT_DRILL=1 \
-USR_HARNESS_REPORT_PATH=/tmp/usr-harness-report.json \
-USR_HARNESS_SYNC_AUDIT_REPORT_PATH=/tmp/usr-sync-audit-drill-report.json \
+USR_HARNESS_REPORT_PATH="$ARTIFACT_ROOT/usr-harness-report.json" \
+USR_HARNESS_SYNC_AUDIT_REPORT_PATH="$ARTIFACT_ROOT/usr-sync-audit-drill-report.json" \
   bash src/dnadesign/usr/scripts/run_usr_harness_cycle.sh
 
 # Re-run targeted adversarial suites directly when iterating quickly.
@@ -202,11 +231,11 @@ Use this when you want one reproducible preflight -> run -> verify pass before o
 # Run the deterministic USR harness cycle from repo root.
 bash src/dnadesign/usr/scripts/run_usr_harness_cycle.sh
 # Optional: emit machine-readable harness evidence.
-USR_HARNESS_REPORT_PATH=/tmp/usr-harness-report.json \
+USR_HARNESS_REPORT_PATH="$ARTIFACT_ROOT/usr-harness-report.json" \
   bash src/dnadesign/usr/scripts/run_usr_harness_cycle.sh
 # Optional: include the local sync audit drill in the harness cycle.
 USR_HARNESS_RUN_SYNC_AUDIT_DRILL=1 \
-USR_HARNESS_SYNC_AUDIT_REPORT_PATH=/tmp/usr-sync-audit-drill-report.json \
+USR_HARNESS_SYNC_AUDIT_REPORT_PATH="$ARTIFACT_ROOT/usr-sync-audit-drill-report.json" \
   bash src/dnadesign/usr/scripts/run_usr_harness_cycle.sh
 ```
 
@@ -217,9 +246,9 @@ Use this when you want an end-to-end `diff/pull/push` drill with machine-readabl
 ```bash
 # Run the local sync audit drill with an explicit report path.
 uv run python src/dnadesign/usr/scripts/run_usr_sync_audit_drill.py \
-  --report-json /tmp/usr-sync-audit-drill-report.json
+  --report-json "$ARTIFACT_ROOT/usr-sync-audit-drill-report.json"
 # Optional: keep local and remote drill roots for manual inspection.
 uv run python src/dnadesign/usr/scripts/run_usr_sync_audit_drill.py \
-  --work-dir /tmp/usr-sync-audit-drill \
-  --report-json /tmp/usr-sync-audit-drill-report.json
+  --work-dir "$ARTIFACT_ROOT/usr-sync-audit-drill" \
+  --report-json "$ARTIFACT_ROOT/usr-sync-audit-drill-report.json"
 ```

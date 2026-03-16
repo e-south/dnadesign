@@ -362,6 +362,9 @@ def test_usr_workflow_map_runbook_is_indexed_with_command_chains() -> None:
     assert "Construct -> USR -> Infer source-of-truth loop" in workflow_map
     assert "Promoter feature matrix -> Cluster or OPAL" in workflow_map
     assert "summary fragments, not fully self-contained procedures" in workflow_map
+    assert "## Context preamble" in workflow_map
+    assert 'WORKFLOW_ROOT="${WORKFLOW_ROOT:-$PWD}"' in workflow_map
+    assert 'ARTIFACT_ROOT="${ARTIFACT_ROOT:-$WORKFLOW_ROOT/outputs/logs/usr-workflow-map}"' in workflow_map
     assert "Pressure-test loop (mock batch + adversarial schemas)" in workflow_map
     assert 'uv run usr diff "$DATASET_ID" bu-scc' in workflow_map
     assert 'uv run usr pull "$DATASET_ID" bu-scc -y' in workflow_map
@@ -386,6 +389,11 @@ def test_usr_workflow_map_runbook_is_indexed_with_command_chains() -> None:
     assert "run_usr_harness_cycle.sh" in workflow_map
     assert "test_sync_schema_adversarial.py" in workflow_map
     assert "--audit-json-out" in workflow_map
+    assert "/tmp/usr-sync-audit.json" not in workflow_map
+    assert '"$ARTIFACT_ROOT/usr-sync-audit.json"' in workflow_map
+    assert '"$ARTIFACT_ROOT/usr-harness-report.json"' in workflow_map
+    assert '"$ARTIFACT_ROOT/usr-sync-audit-drill-report.json"' in workflow_map
+    assert '"$ARTIFACT_ROOT/usr-sync-audit-drill"' in workflow_map
 
 
 def test_multi_source_source_of_truth_runbook_routes_to_shared_downstream_handoff() -> None:
@@ -467,7 +475,7 @@ def test_promoter_feature_matrix_runbook_routes_to_cluster_and_opal() -> None:
     assert 'uv run infer run --config "$INFER_CONFIG_7B"' in runbook
     assert "uv run cluster fit \\" in runbook
     assert 'uv run opal validate -c "$OPAL_WORKDIR/configs/campaign.yaml"' in runbook
-    assert "../../../cluster/README.md" in runbook
+    assert "../../../cluster/docs/workflows/exploratory-clustering.md" in runbook
     assert "../../../opal/docs/workflows/usr-infer-x-active-learning.md" in runbook
 
 

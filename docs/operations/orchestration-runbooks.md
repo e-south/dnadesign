@@ -30,12 +30,13 @@ uv run ops runbook init \
   --runbook <path-to-runbook.yaml> \
   --workspace-root <workspace-root> \
   --repo-root <repo-root> \
-  --project dunlop \
+  --project <project> \
   --id <runbook-id>
 ```
 
 DenseGen scaffolds include notify by default; add `--no-notify` only when you explicitly want batch-only submit.
 Use a workspace-scoped runbook path to avoid root-level clutter and repeated ad-hoc YAML fan-out; recommended pattern: `<workspace-root>/outputs/logs/ops/runbooks/<runbook-id>.yaml`.
+`<project>` must be the scheduler account or project id used by that workspace or study.
 
 Optional resource overrides for prompt-driven runs:
 
@@ -58,7 +59,7 @@ uv run ops runbook init \
   --runbook <path-to-runbook.yaml> \
   --workspace-root <workspace-root> \
   --repo-root <repo-root> \
-  --project dunlop \
+  --project <project> \
   --id <runbook-id>
 ```
 
@@ -75,7 +76,7 @@ uv run ops runbook init \
   --runbook <path-to-runbook.yaml> \
   --workspace-root <workspace-root> \
   --repo-root <repo-root> \
-  --project dunlop \
+  --project <project> \
   --id <runbook-id> \
   --no-notify
 ```
@@ -102,8 +103,11 @@ Run only gate checks, no qsub submit phase:
 ```bash
 uv run ops runbook execute \
   --runbook <path-to-runbook.yaml> \
-  --audit-json <path-to-audit.json>
+  --repo-root <repo-root> \
+  --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json
 ```
+
+Only workspace-scoped audit paths are accepted; `--audit-json` must stay under `<workspace-root>/outputs/logs/ops/audit/`.
 
 Result expectations:
 
@@ -136,7 +140,7 @@ runbook:
   schema_version: 1
   id: study_stress_ethanol_cipro
   workflow_id: densegen_batch_submit
-  project: dunlop
+  project: <project>
   workspace_root: src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro
   logging:
     stdout_dir: src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/outputs/logs/ops/sge/study_stress_ethanol_cipro

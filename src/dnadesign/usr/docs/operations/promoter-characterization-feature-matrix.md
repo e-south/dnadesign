@@ -242,7 +242,7 @@ uv run cluster umap \
   --allow-overwrite
 ```
 
-Continue with [cluster README](../../../cluster/README.md) for preset, hue, and OPAL-join details.
+Continue with [cluster exploratory clustering workflow](../../../cluster/docs/workflows/exploratory-clustering.md) for preset, hue, and OPAL-join details.
 
 #### OPAL branch
 
@@ -275,5 +275,5 @@ Continue with the OPAL-owned workflow for the full label-ingest and round-loop p
 - Multi-source upstream assembly: [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md)
 - Construct-backed source-of-truth handoff: [construct-infer-source-of-truth-demo.md](construct-infer-source-of-truth-demo.md)
 - Infer docs router: [../../../infer/docs/README.md](../../../infer/docs/README.md)
-- Cluster exploratory workflow surface: [../../../cluster/README.md](../../../cluster/README.md)
+- Cluster exploratory workflow surface: [../../../cluster/docs/workflows/exploratory-clustering.md](../../../cluster/docs/workflows/exploratory-clustering.md)
 - OPAL downstream workflow: [../../../opal/docs/workflows/usr-infer-x-active-learning.md](../../../opal/docs/workflows/usr-infer-x-active-learning.md)

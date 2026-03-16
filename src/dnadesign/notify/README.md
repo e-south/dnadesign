@@ -6,6 +6,16 @@ For day-to-day operator workflows, start with the [Notify USR events runbook](..
 
 For cross-tool routing, start at the [repository docs index](../../../docs/README.md).
 
+## Start here in 3 commands
+
+```bash
+uv run notify setup list-workspaces --tool <tool>
+uv run notify setup slack --tool <tool> --workspace <workspace-name> --secret-source file --secret-ref file://<path-to-webhook-file>
+uv run notify usr-events watch --tool <tool> --workspace <workspace-name> --follow
+```
+
+Use [Notify USR events runbook](../../../docs/notify/usr-events.md) for explicit `--events` mode, recovery, and secret-source alternatives.
+
 ## Documentation map
 
 Read in this order:

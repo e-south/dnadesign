@@ -24,6 +24,16 @@ Operators who just need to set up, run, or recover a watcher should start with [
 - Prerequisites: workspace config, USR `.events.log`, and one webhook source (`--url`, `--url-env`, or `--secret-ref`).
 - Verify next: [watch command contract](reference/command-contracts.md#notify-usr-events-watch).
 
+### Operator quick path (3 commands)
+
+```bash
+uv run notify setup list-workspaces --tool <tool>
+uv run notify setup slack --tool <tool> --workspace <workspace-name> --secret-source file --secret-ref file://<path-to-webhook-file>
+uv run notify usr-events watch --tool <tool> --workspace <workspace-name> --follow
+```
+
+Use [Notify USR events runbook](../../../../docs/notify/usr-events.md) for explicit `--events` mode, recovery, and secret-source alternatives.
+
 ### Documentation by workflow
 
 #### Start or refresh a workspace watcher

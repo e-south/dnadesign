@@ -78,6 +78,8 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
     assert "**Plane:** control-plane" in text
     assert "**Owner-boundary:** ops" in text
     assert "ops runbook init --workflow" in text
+    assert "--project <project>" in text
+    assert "project dunlop" not in text
     assert "orchestration-runbooks.md" in text
     assert "multi-source-source-of-truth-assembly.md" in text
     assert "../README.md" in text
@@ -101,6 +103,7 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
         label="docs/operations/orchestration-runbooks.md",
     )
     assert "uv run ops runbook init" in text
+    assert "--project <project>" in text
     assert "uv run ops runbook presets" in text
     assert "uv run ops runbook active-jobs" in text
     assert "Infer scaffolds also include notify by default" in text
@@ -116,6 +119,8 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     assert "resume_ready -> resume" in text
     assert "partial -> contract error" in text
     assert "<workspace-root>/outputs/logs/ops/audit/<file>.json" in text
+    assert "<path-to-audit.json>" not in text
+    assert "Only workspace-scoped audit paths are accepted" in text
     assert "prune-ops-logs" in text
     assert "logging.retention.keep_last" in text
     assert "logging.retention.max_age_days" in text
@@ -141,6 +146,8 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     assert "infer.overlay_guard.overlay_namespace` is fixed to `infer`" in text
     assert "densegen_batch_with_notify" in text
     assert "infer_batch_with_notify" in text
+    assert "project: <project>" in text
+    assert "project: dunlop" not in text
     assert "with_notify_slack" not in text
     assert "precedents" not in text
 

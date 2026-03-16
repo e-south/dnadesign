@@ -1,7 +1,7 @@
 ## USR Sync over SSH
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-03-16
 
 
 This page is the sync router for USR dataset and file transfers over SSH.
