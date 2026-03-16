@@ -11,18 +11,19 @@ from __future__ import annotations
 
 from typing import Any, Dict, Literal
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class Preset(BaseModel):
     name: str
-    kind: Literal["fit", "umap", "plot", "analysis"]
+    kind: Literal["method", "umap", "plot", "analysis"]
     params: Dict[str, Any] = Field(default_factory=dict)
     plot: Dict[str, Any] = Field(default_factory=dict)
     hue: Dict[str, Any] = Field(default_factory=dict)
 
-    @validator("name")
-    def nonempty(cls, v):
+    @field_validator("name")
+    @classmethod
+    def nonempty(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("name cannot be empty")
         return v

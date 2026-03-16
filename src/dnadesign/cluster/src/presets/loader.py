@@ -14,6 +14,7 @@ from pathlib import Path
 
 import yaml
 
+from ..layout import builtin_cluster_dir, is_builtin_cluster_path
 from .schema import Preset
 
 
@@ -30,16 +31,12 @@ def _load_dir(d: Path) -> dict[str, Preset]:
     return out
 
 
-def _find_project_preset_dirs() -> list[Path]:
-    """Search for project-level presets deterministically, independent of CWD.
+def _find_workspace_preset_dirs() -> list[Path]:
+    """Search for workspace-level presets deterministically, independent of CWD.
     Returns a list of candidate directories in ascending precedence (earlier = lower).
     """
     dirs: list[Path] = []
-    # 1) The package's cluster/presets (works when installed or in editable mode)
-    pkg_cluster = Path(__file__).resolve().parents[2] / "presets"  # .../cluster/presets
-    if pkg_cluster.exists():
-        dirs.append(pkg_cluster)
-    # 2) Walk upward from CWD; prefer the *nearest* cluster/presets last
+    # Walk upward from CWD; prefer the *nearest* workspace cluster/presets last.
     bases = list(reversed(list(Path.cwd().parents))) + [Path.cwd()]
     seen: set[str] = set()
     for base in bases:
@@ -50,7 +47,7 @@ def _find_project_preset_dirs() -> list[Path]:
         for c in candidates:
             if c.exists():
                 key = str(c.resolve())
-                if key not in seen:
+                if key not in seen and not is_builtin_cluster_path(c):
                     dirs.append(c)
                     seen.add(key)
     return dirs
@@ -58,17 +55,19 @@ def _find_project_preset_dirs() -> list[Path]:
 
 def load_all() -> dict[str, Preset]:
     """Load presets with clear precedence (later wins):
-    built-in defaults → built-in siblings → user dir → package presets → nearest project presets.
+    built-in defaults → built-in siblings → user dir → package presets → nearest workspace presets.
     """
     presets_dir = Path(__file__).resolve().parent
     built_in_defaults = presets_dir / "defaults"
     built_in_siblings = presets_dir
     user = Path(os.path.expanduser("~/.dnADESIGN/cluster/presets".lower().replace("dnadesign", "dnadesign")))
+    package_presets = builtin_cluster_dir() / "presets"
     # Assemble precedence
     out: dict[str, Preset] = {}
     out.update(_load_dir(built_in_defaults))
     out.update(_load_dir(built_in_siblings))
     out.update(_load_dir(user))
-    for d in _find_project_preset_dirs():
+    out.update(_load_dir(package_presets))
+    for d in _find_workspace_preset_dirs():
         out.update(_load_dir(d))
     return out

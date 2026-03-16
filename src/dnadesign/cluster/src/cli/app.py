@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 from typing import Callable, List, Optional
 
+import click
 import numpy as np
 import pandas as pd
 import typer
@@ -22,32 +23,36 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TimeElapsedColumn
 from rich.table import Table
 from rich.traceback import install as rich_traceback
 
-from ..algo.leiden import run as leiden_run
+from ..analysis.contracts import AnalysisRequest
 from ..io.detect import detect_context
 from ..io.read import extract_X, load_table, peek_columns
 from ..io.write import attach_usr, drop_usr_columns, write_generic
 from ..jobs.loader import load_job_file
+from ..layout import ClusterLayoutError
+from ..methods import parse_method_param_assignments
+from ..methods.registry import get_method
 from ..presets.loader import load_all as load_presets
-from ..runs.index import add_or_update_index, list_runs
+from ..runs.contracts import ClusterRun, EmbeddingRun, RunCounts, utc_now_iso
+from ..runs.index import list_runs
+from ..runs.recorder import (
+    CommandRecord,
+    append_command_record_entry,
+    record_analysis_run,
+    record_fit_run,
+    record_umap_run,
+)
 from ..runs.reuse import find_equivalent_fit
 from ..runs.signatures import (
-    AlgoSignature,
     InputSignature,
+    MethodSignature,
     UmapSignature,
     file_fingerprint,
     ids_hash,
 )
 from ..runs.store import (
-    append_records_md,
-    create_run_dir,
     runs_root,
-    umap_dir,
-    write_labels,
-    write_run_meta,
-    write_summary,
-    write_umap_coords,
-    write_umap_meta,
 )
+from ..runtime_contracts import FeatureSpec, FitRequest, InputSource, MethodConfig
 from ..util.checks import (
     ClusterError,
     assert_id_sequence_bijection,
@@ -60,7 +65,7 @@ from ..util.warnings import configure as configure_warnings
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="Cluster CLI — fit, UMAP, analyses, jobs, presets. Results live under ./results/",
+    help="Cluster CLI — fit, UMAP, analyses, jobs, and presets. Results live under a project or working-directory results root.",  # noqa: E501
 )
 console = Console()
 
@@ -94,16 +99,6 @@ def _context_and_df(
 
 def _rows_ids(df: pd.DataFrame, key_col: str) -> list[str]:
     return list(map(str, df[key_col].tolist()))
-
-
-def _source_clause(ctx: dict) -> dict:
-    if ctx["kind"] == "usr":
-        return {"kind": "usr", "dataset": ctx["dataset"]}
-    if ctx["kind"] == "parquet":
-        return {"kind": "parquet", "file": str(ctx["file"])}
-    if ctx["kind"] == "csv":
-        return {"kind": "csv", "file": str(ctx["file"])}
-    return {"kind": ctx["kind"]}
 
 
 def _collect_existing_meta_sig(df: pd.DataFrame, name: str) -> Optional[str]:
@@ -277,20 +272,58 @@ def _apply_job_params(job_path: Optional[str], expected_command: str) -> dict:
     return params
 
 
-def _assert_no_algo_overlap_with_preset(kind: str, job_params: dict, preset_name: Optional[str]) -> None:
+LEGACY_FIT_METHOD_KEYS = {"neighbors", "resolution", "scale", "metric", "random_state", "backend"}
+
+
+def _assert_no_method_overlap_with_preset(kind: str, job_params: dict, preset_name: Optional[str]) -> None:
     if not preset_name:
         return
-    # Disallow common algo keys per kind when a preset is provided.
-    fit_keys = {"neighbors", "resolution", "scale", "metric", "random_state", "algo"}
+    # Disallow common method keys per kind when a preset is provided.
     umap_keys = {"neighbors", "min_dist", "metric", "random_state"}
-    banned = fit_keys if kind == "fit" else (umap_keys if kind == "umap" else set())
+    banned = umap_keys if kind == "umap" else set()
     overlap = sorted(k for k in job_params.keys() if k in banned)
     if overlap:
         import typer
 
         raise typer.BadParameter(
             f"Job provides {overlap} but also references a preset. "
-            f"Move algorithm knobs into the preset or pass via CLI flags."
+            "Move method-specific knobs into the preset or pass them via CLI flags."
+        )
+
+
+def _job_method_params(job_params: dict) -> dict:
+    legacy = sorted(k for k in job_params.keys() if k in LEGACY_FIT_METHOD_KEYS)
+    if legacy:
+        raise typer.BadParameter(
+            "Legacy fit method keys are no longer accepted at the top level of job params: "
+            + ", ".join(legacy)
+            + ". Move them under job.params.method_params or into the selected preset."
+        )
+    raw = job_params.get("method_params", {}) or {}
+    if not isinstance(raw, dict):
+        raise typer.BadParameter("Job 'method_params' must be a mapping.")
+    return dict(raw)
+
+
+def _resolve_method_params(job_params: dict, cli_assignments: list[str]) -> dict:
+    params = _job_method_params(job_params)
+    try:
+        params.update(parse_method_param_assignments(cli_assignments))
+    except ValueError as e:
+        raise typer.BadParameter(str(e)) from e
+    return params
+
+
+def _assert_no_fit_method_param_overlap_with_preset(method_params: dict, preset_name: Optional[str]) -> None:
+    if not preset_name or not method_params:
+        return
+    preset_params = _apply_preset("method", preset_name)
+    overlap = sorted(set(method_params).intersection(preset_params))
+    if overlap:
+        raise typer.BadParameter(
+            "Method params overlap with the selected preset: "
+            + ", ".join(overlap)
+            + ". Keep reusable method knobs in the preset or override them exclusively via --method-param."
         )
 
 
@@ -310,6 +343,14 @@ def _apply_job_plot(job_path: Optional[str], expected_command: str) -> dict:
     return plot
 
 
+def _runs_root_or_exit() -> Path:
+    try:
+        return runs_root()
+    except ClusterLayoutError as e:
+        console.print(f"[red]Layout error:[/red] {e}")
+        raise typer.Exit(code=2) from e
+
+
 def _resolve_color_by(cli_val, jp_params, jp_plot_cfg, preset_plot_cfg):
     """
     Resolve final color_by with precedence:
@@ -325,6 +366,19 @@ def _resolve_color_by(cli_val, jp_params, jp_plot_cfg, preset_plot_cfg):
     if isinstance(preset_plot_cfg.get("color_by"), (list, tuple)):
         return list(preset_plot_cfg["color_by"])
     return ["cluster"]
+
+
+def _resolve_cli_or_job_value(
+    *,
+    parameter_source: click.core.ParameterSource | None,
+    cli_value,
+    job_value,
+):
+    if job_value is None:
+        return cli_value
+    if parameter_source in (None, click.core.ParameterSource.DEFAULT):
+        return job_value
+    return cli_value
 
 
 def _load_highlight_ids_from_file(
@@ -372,7 +426,7 @@ def _load_highlight_ids_from_file(
 # ----------------------------- Commands -----------------------------
 @app.command(
     "fit",
-    help="Run Leiden clustering on X, attach minimal columns, and catalog a fit run.",
+    help="Run one clustering method on X, attach minimal columns, and catalog a fit run.",
 )
 def cmd_fit(
     ctx: typer.Context,
@@ -384,16 +438,13 @@ def cmd_fit(
     key_col: str = typer.Option("id", help="Key column"),
     x_col: Optional[str] = typer.Option(None, help="Vector column (list<float> or JSON array string)"),
     x_cols: Optional[str] = typer.Option(None, help="Comma-separated list of numeric columns"),
-    # allow presets to fill defaults; explicit flags still win because they’re non-None
-    algo: str = typer.Option("leiden", help="Clustering algorithm", show_default=True),
-    neighbors: Optional[int] = typer.Option(None, help="kNN neighbors (Leiden); falls back to preset or 15"),
-    resolution: Optional[float] = typer.Option(None, help="Leiden resolution; falls back to preset or 0.30"),
-    scale: Optional[bool] = typer.Option(None, help="Scale X before neighbors (Leiden); falls back to preset or False"),
-    metric: Optional[str] = typer.Option(
-        None, help='Distance metric (Leiden/UMAP); falls back to preset or "euclidean"'
+    method: str = typer.Option("leiden", help="Clustering method id", show_default=True),
+    preset: Optional[str] = typer.Option(None, help="Preset name (kind: 'method') to pre-fill parameters"),
+    method_param: List[str] = typer.Option(
+        [],
+        "--method-param",
+        help="Method-specific parameter override as key=value. Repeatable.",
     ),
-    random_state: Optional[int] = typer.Option(None, help="Random seed; falls back to preset or 42"),
-    preset: Optional[str] = typer.Option(None, help="Preset name (kind: 'fit') to pre-fill parameters"),
     silhouette: bool = typer.Option(False, help="Attach per-row silhouette quality as cluster__<NAME>__quality"),
     full_silhouette: bool = typer.Option(False, help="Compute silhouette on all rows (default samples to ≤20k)"),
     dedupe_policy: str = typer.Option(
@@ -417,32 +468,112 @@ def cmd_fit(
 ):
     # Apply job params first (flags still override)
     jp = _apply_job_params(job, expected_command="fit")
-    dataset = dataset or jp.get("dataset")
-    file = file or jp.get("file")
-    usr_root = usr_root or jp.get("usr_root")
-    name = name or jp.get("name")
-    key_col = key_col or jp.get("key_col", "id")
-    x_col = x_col or jp.get("x_col")
+    dataset = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("dataset"),
+        cli_value=dataset,
+        job_value=jp.get("dataset"),
+    )
+    file = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("file"),
+        cli_value=file,
+        job_value=jp.get("file"),
+    )
+    usr_root = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("usr_root"),
+        cli_value=usr_root,
+        job_value=jp.get("usr_root"),
+    )
+    name = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("name"),
+        cli_value=name,
+        job_value=jp.get("name"),
+    )
+    key_col = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("key_col"),
+        cli_value=key_col,
+        job_value=jp.get("key_col"),
+    )
+    x_col = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("x_col"),
+        cli_value=x_col,
+        job_value=jp.get("x_col"),
+    )
     if x_col:
         x_col = str(x_col).strip()
-    x_cols = x_cols or jp.get("x_cols")
-    algo = algo or jp.get("algo", "leiden")
-    neighbors = neighbors if neighbors is not None else jp.get("neighbors")
-    resolution = resolution if resolution is not None else jp.get("resolution")
-    scale = scale if scale is not None else jp.get("scale")
-    metric = metric or jp.get("metric")
-    random_state = random_state if random_state is not None else jp.get("random_state")
-    preset = preset or jp.get("preset")
-    _assert_no_algo_overlap_with_preset("fit", jp, preset)
-    silhouette = bool(silhouette or jp.get("silhouette", False))
-    full_silhouette = bool(full_silhouette or jp.get("full_silhouette", False))
-    dedupe_policy = jp.get("dedupe_policy", dedupe_policy)
-    reuse = jp.get("reuse", reuse)
-    force = bool(force or jp.get("force", False))
-    write = bool(write or jp.get("write", False))
-    yes = bool(yes or jp.get("allow_overwrite", False))
-    inplace = bool(inplace or jp.get("inplace", False))
-    out = out or jp.get("out")
+    x_cols = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("x_cols"),
+        cli_value=x_cols,
+        job_value=jp.get("x_cols"),
+    )
+    method = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("method"),
+        cli_value=method,
+        job_value=jp.get("method"),
+    )
+    preset = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("preset"),
+        cli_value=preset,
+        job_value=jp.get("preset"),
+    )
+    raw_method_params = _resolve_method_params(jp, method_param)
+    _assert_no_fit_method_param_overlap_with_preset(raw_method_params, preset)
+    silhouette = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("silhouette"),
+            cli_value=silhouette,
+            job_value=jp.get("silhouette"),
+        )
+    )
+    full_silhouette = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("full_silhouette"),
+            cli_value=full_silhouette,
+            job_value=jp.get("full_silhouette"),
+        )
+    )
+    dedupe_policy = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("dedupe_policy"),
+        cli_value=dedupe_policy,
+        job_value=jp.get("dedupe_policy"),
+    )
+    reuse = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("reuse"),
+        cli_value=reuse,
+        job_value=jp.get("reuse"),
+    )
+    force = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("force"),
+            cli_value=force,
+            job_value=jp.get("force"),
+        )
+    )
+    write = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("write"),
+            cli_value=write,
+            job_value=jp.get("write"),
+        )
+    )
+    yes = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("yes"),
+            cli_value=yes,
+            job_value=jp.get("allow_overwrite"),
+        )
+    )
+    inplace = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("inplace"),
+            cli_value=inplace,
+            job_value=jp.get("inplace"),
+        )
+    )
+    out = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("out"),
+        cli_value=out,
+        job_value=jp.get("out"),
+    )
     if name:
         name = slugify(name)
     ictx, df_full = _context_and_df(dataset, file, usr_root)
@@ -456,11 +587,9 @@ def cmd_fit(
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=2)
     # Build X
+    feature_spec = FeatureSpec.from_inputs(x_col=x_col, x_cols=x_cols)
     cols_needed = [key_col]
-    if x_col:
-        cols_needed.append(x_col)
-    if x_cols:
-        cols_needed.extend([c.strip() for c in x_cols.split(",")])
+    cols_needed.extend(feature_spec.columns)
     # Reload with projection to speed up
     ictx, df = _context_and_df(
         dataset,
@@ -479,53 +608,39 @@ def cmd_fit(
         t_build = prog.add_task("Preparing X...", total=None)
         X = extract_X(
             df,
-            x_col=x_col,
-            x_cols=[c.strip() for c in x_cols.split(",")] if x_cols else None,
+            x_col=feature_spec.columns[0] if feature_spec.mode == "single_col" else None,
+            x_cols=list(feature_spec.columns) if feature_spec.mode == "multi_col" else None,
         )
         ids = _rows_ids(df, key_col)
         prog.update(t_build, completed=1)
 
-    # Resolve params with preset -> defaults cascade
-    p = _apply_preset("fit", preset)
-    neighbors = neighbors if neighbors is not None else int(p.get("neighbors", 15))
-    resolution = resolution if resolution is not None else float(p.get("resolution", 0.30))
-    scale = bool(scale) if scale is not None else bool(p.get("scale", False))
-    metric = metric if metric is not None else str(p.get("metric", "euclidean"))
-    random_state = random_state if random_state is not None else int(p.get("random_state", 42))
+    method_spec = get_method(method)
+    preset_params = _apply_preset("method", preset)
+    method_params = method_spec.resolve_fit_params(preset=preset_params, raw_params=raw_method_params)
+    source = InputSource.from_context(ictx)
+    method_config = MethodConfig(method_id=method_spec.method_id, params=method_params)
+    fit_request = FitRequest(source=source, key_col=key_col, feature=feature_spec, method=method_config)
 
     # Signatures
-    source_ref = ictx["dataset"] if ictx["kind"] == "usr" else str(ictx["file"])
-    inp = {
-        "source_kind": ictx["kind"],
-        "source_ref": source_ref,
-        "key_col": key_col,
-        "row_ids_hash": ids_hash(ids),
-        "x_spec": {
-            "mode": "single_col" if x_col else "multi_col",
-            "cols": [x_col] if x_col else [c.strip() for c in x_cols.split(",")],
-            "x_dim": int(X.shape[1]),
-        },
-        "fingerprint": file_fingerprint(ictx["file"]),
-    }
+    inp = fit_request.input_signature_payload(
+        row_ids_hash=ids_hash(ids),
+        x_dim=int(X.shape[1]),
+        fingerprint=file_fingerprint(source.file),
+    )
     input_sig = InputSignature(**inp)
     input_hash = input_sig.hash()
-    algo_sig = AlgoSignature(
-        algo="leiden",
-        params={
-            "neighbors": neighbors,
-            "resolution": resolution,
-            "scale": scale,
-            "metric": metric,
-            "random_state": random_state,
-        },
+    method_signature = MethodSignature(
+        method_id=method_spec.method_id,
+        params=method_params,
         libs={},
-    ).hash()
+    )
+    method_sig = method_signature.hash()
     # Reuse logic
     if not force and reuse in ("auto", "require", "reattach"):
-        hit = find_equivalent_fit(input_hash, algo_sig, root=None)
+        hit = find_equivalent_fit(input_hash, method_sig, root=None)
         if hit is not None:
             existing_sig = _collect_existing_meta_sig(df, name or hit.get("alias") or hit.get("run_slug"))
-            if reuse in ("auto", "require") and existing_sig == algo_sig:
+            if reuse in ("auto", "require") and existing_sig == method_sig:
                 console.print("[green]Reuse[/green]: matching fit already attached; nothing to do.")
                 raise typer.Exit(code=0)
             if reuse in ("auto", "reattach") and write:
@@ -541,18 +656,12 @@ def cmd_fit(
                     attach_cols = attach_cols.rename(columns={"cluster_label": f"cluster__{name or hit['alias']}"})
                     attach_cols[f"cluster__{name or hit['alias']}__meta"] = compact_meta(
                         "2.0.0",
-                        "leiden",
-                        x_col or "<multi>",
+                        method_spec.method_id,
+                        feature_spec.primary_label,
                         len(df),
-                        {
-                            "neighbors": neighbors,
-                            "resolution": resolution,
-                            "scale": scale,
-                            "metric": metric,
-                            "random_state": random_state,
-                        },
-                        _source_clause(ictx),
-                        sig_hash=algo_sig,
+                        method_params,
+                        source.source_clause(),
+                        sig_hash=method_sig,
                     )
                     if ictx["kind"] == "usr":
                         attach_usr(
@@ -581,8 +690,6 @@ def cmd_fit(
                         raise typer.Exit(code=2)
 
     # Compute
-    if algo != "leiden":
-        raise typer.BadParameter("Only 'leiden' is supported in v2.0.")
     with Progress(
         SpinnerColumn(),
         "[progress.description]{task.description}",
@@ -590,14 +697,10 @@ def cmd_fit(
         TimeElapsedColumn(),
         transient=True,
     ) as prog:
-        t_fit = prog.add_task("Clustering (Leiden)...", total=None)
-        labels = leiden_run(
+        t_fit = prog.add_task(f"Clustering ({method_spec.display_name})...", total=None)
+        labels = method_spec.fit(
             X,
-            neighbors=neighbors,
-            resolution=resolution,
-            scale=scale,
-            metric=metric,
-            seed=random_state,
+            **method_params,
         )
         prog.update(t_fit, completed=1)
 
@@ -618,31 +721,31 @@ def cmd_fit(
             ) as prog:
                 t_sil = prog.add_task("Computing silhouette...", total=None)
                 n = len(df)
+                sil_metric = str(method_params.get("metric", "euclidean"))
+                sil_seed = int(method_params.get("random_state", 42))
                 if n > 20000 and not full_silhouette:
-                    rng = np.random.default_rng(random_state)
+                    rng = np.random.default_rng(sil_seed)
                     keep = rng.choice(np.arange(n), size=20000, replace=False)
                     svals = np.full(n, np.nan, dtype="float32")
-                    svals[keep] = silhouette_samples(X[keep], labels[keep], metric=metric).astype("float32")
+                    svals[keep] = silhouette_samples(X[keep], labels[keep], metric=sil_metric).astype("float32")
                     quality = svals
                 else:
-                    quality = silhouette_samples(X, labels, metric=metric).astype("float32")
+                    quality = silhouette_samples(X, labels, metric=sil_metric).astype("float32")
                 prog.update(t_sil, completed=1)
     # Build attachments
-    run_alias = name or auto_run_name("ldn", {"n": neighbors, "r": resolution})
+    run_alias = name or auto_run_name(
+        method_spec.default_run_prefix,
+        method_spec.slug_params(method_params),
+    )
+    attached_columns = [f"cluster__{run_alias}", f"cluster__{run_alias}__meta"]
     meta_json = compact_meta(
         "2.0.0",
-        "leiden",
-        x_col or "<multi>",
+        method_spec.method_id,
+        feature_spec.primary_label,
         len(df),
-        {
-            "neighbors": neighbors,
-            "resolution": resolution,
-            "scale": scale,
-            "metric": metric,
-            "random_state": random_state,
-        },
-        _source_clause(ictx),
-        sig_hash=algo_sig,
+        method_params,
+        source.source_clause(),
+        sig_hash=method_sig,
     )
     attach_cols = pd.DataFrame(
         {
@@ -653,69 +756,31 @@ def cmd_fit(
     )
     if quality is not None:
         attach_cols[f"cluster__{run_alias}__quality"] = quality
+        attached_columns.append(f"cluster__{run_alias}__quality")
 
     # Run store bookkeeping
-    root = runs_root()
-    slug = run_alias
-    run_dir = create_run_dir(root, slug)
-    write_run_meta(
-        run_dir,
-        {
-            "alias": run_alias,
-            "slug": slug,
-            "created_utc": pd.Timestamp.utcnow().isoformat(),
-            "input_signature": inp,
-            "algo_signature": {
-                "algo": "leiden",
-                "params": {
-                    "neighbors": neighbors,
-                    "resolution": resolution,
-                    "scale": scale,
-                    "metric": metric,
-                    "random_state": random_state,
-                },
-                "libs": {},
-            },
-            "io": _source_clause(ictx),
-            "x": {"col": x_col or "<multi>", "dim": int(X.shape[1])},
-            "counts": {
-                "n_rows": int(len(df)),
-                "n_clusters": int(len(np.unique(labels))),
-            },
-            "attach": {"wrote_usr_columns": bool(ictx["kind"] == "usr")},
-            "columns": [f"cluster__{run_alias}", f"cluster__{run_alias}__meta"],
-        },
+    root = _runs_root_or_exit()
+    n_clusters = int(len(np.unique(labels)))
+    cluster_run = ClusterRun(
+        alias=run_alias,
+        slug=run_alias,
+        created_utc=utc_now_iso(),
+        input_signature=input_sig,
+        method_signature=method_signature,
+        source=source,
+        feature=feature_spec,
+        x_dim=int(X.shape[1]),
+        counts=RunCounts(n_rows=int(len(df)), n_clusters=n_clusters),
+        wrote_usr_columns=bool(ictx["kind"] == "usr"),
+        attached_columns=tuple(attached_columns),
     )
-    labels_path = write_labels(run_dir, pd.DataFrame({"id": df[key_col].astype(str), "cluster_label": labels}))
     size_counts = pd.Series(labels).value_counts().to_dict()
-    write_summary(run_dir, {"cluster_sizes": size_counts})
-    add_or_update_index(
-        {
-            "kind": "fit",
-            "run_slug": slug,
-            "alias": run_alias,
-            "created_utc": pd.Timestamp.utcnow().isoformat(),
-            "source_kind": ictx["kind"],
-            "source_ref": source_ref,
-            "x_col": x_col or "<multi>",
-            "n_rows": int(len(df)),
-            "n_clusters": int(len(np.unique(labels))),
-            "algo": "leiden",
-            "algo_params": {
-                "neighbors": neighbors,
-                "resolution": resolution,
-                "scale": scale,
-                "metric": metric,
-                "random_state": random_state,
-            },
-            "input_sig_hash": input_hash,
-            "labels_path": str(labels_path),
-            "status": "complete",
-            "umap_slug": None,
-            "umap_params": None,
-            "coords_path": None,
-            "plot_paths": None,
-        }
+    run_dir = record_fit_run(
+        root=root,
+        run=cluster_run,
+        labels_df=pd.DataFrame({"id": df[key_col].astype(str), "cluster_label": labels}),
+        summary={"cluster_sizes": size_counts},
+        input_sig_hash=input_hash,
     )
 
     # Attach/write
@@ -748,22 +813,20 @@ def cmd_fit(
     _print_fit_summary(labels, run_alias, size_counts)
     # ---- Records sink (Markdown) ----
     try:
-        effective = {
-            "command": "fit",
-            "job": job or None,
-            "preset": preset or None,
-            "resolved": {
-                "name": run_alias,
-                "algo": "leiden",
-                "neighbors": neighbors,
-                "resolution": resolution,
-                "scale": bool(scale),
-                "metric": metric,
-                "random_state": random_state,
-            },
-        }
-        md = f"## cluster fit — {run_alias}\n\n```json\n{json.dumps(effective, indent=2, sort_keys=True)}\n```"
-        append_records_md(run_dir, md)
+        append_command_record_entry(
+            run_dir,
+            CommandRecord(
+                command="fit",
+                subject=run_alias,
+                job=job or None,
+                preset=preset or None,
+                resolved={
+                    "name": run_alias,
+                    "method": method_spec.method_id,
+                    **method_params,
+                },
+            ),
+        )
     except Exception:
         pass
 
@@ -912,7 +975,7 @@ def cmd_delete_columns(
     help="Compute UMAP, save coords & plots under the fit run; optionally attach coords.",
 )
 def cmd_umap(
-    _ctx: typer.Context,
+    ctx: typer.Context,
     job: Optional[str] = typer.Option(None, help="Path to a job YAML for 'umap'."),
     dataset: Optional[str] = typer.Option(None),
     file: Optional[str] = typer.Option(None),
@@ -989,50 +1052,186 @@ def cmd_umap(
     # Job params (flags win)
     jp = _apply_job_params(job, expected_command="umap")
     jp_plot = _apply_job_plot(job, expected_command="umap")
-    dataset = dataset or jp.get("dataset")
-    file = file or jp.get("file")
-    usr_root = usr_root or jp.get("usr_root")
-    name = name or jp.get("name")
+    dataset = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("dataset"),
+        cli_value=dataset,
+        job_value=jp.get("dataset"),
+    )
+    file = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("file"),
+        cli_value=file,
+        job_value=jp.get("file"),
+    )
+    usr_root = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("usr_root"),
+        cli_value=usr_root,
+        job_value=jp.get("usr_root"),
+    )
+    name = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("name"),
+        cli_value=name,
+        job_value=jp.get("name"),
+    )
     if not name:
         raise typer.BadParameter("UMAP requires a fit alias. Provide --name or set params.name in the job YAML.")
-    key_col = key_col or jp.get("key_col", "id")
-    x_col = x_col or jp.get("x_col")
+    key_col = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("key_col"),
+        cli_value=key_col,
+        job_value=jp.get("key_col"),
+    )
+    x_col = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("x_col"),
+        cli_value=x_col,
+        job_value=jp.get("x_col"),
+    )
     if x_col:
         x_col = str(x_col).strip()
-    x_cols = x_cols or jp.get("x_cols")
-    neighbors = neighbors if neighbors is not None else jp.get("neighbors")
-    min_dist = min_dist if min_dist is not None else jp.get("min_dist")
-    metric = metric or jp.get("metric")
-    random_state = random_state if random_state is not None else jp.get("random_state")
-    preset = preset or jp.get("preset")
-    _assert_no_algo_overlap_with_preset("umap", jp, preset)
+    x_cols = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("x_cols"),
+        cli_value=x_cols,
+        job_value=jp.get("x_cols"),
+    )
+    neighbors = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("neighbors"),
+        cli_value=neighbors,
+        job_value=jp.get("neighbors"),
+    )
+    min_dist = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("min_dist"),
+        cli_value=min_dist,
+        job_value=jp.get("min_dist"),
+    )
+    metric = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("metric"),
+        cli_value=metric,
+        job_value=jp.get("metric"),
+    )
+    random_state = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("random_state"),
+        cli_value=random_state,
+        job_value=jp.get("random_state"),
+    )
+    preset = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("preset"),
+        cli_value=preset,
+        job_value=jp.get("preset"),
+    )
+    _assert_no_method_overlap_with_preset("umap", jp, preset)
     if color_by == ["cluster"] and isinstance(jp.get("color_by"), (list, tuple)):
         color_by = list(jp["color_by"])
-    highlight = highlight or jp.get("highlight")
-    highlight_hue_col = highlight_hue_col or jp.get("highlight_hue_col")
-    # BUGFIX: read highlight_topn knobs from job params
-    highlight_topn = highlight_topn if highlight_topn is not None else jp.get("highlight_topn")
-    highlight_topn_col = highlight_topn_col or jp.get("highlight_topn_col")
-    highlight_topn_asc = bool(highlight_topn_asc or jp.get("highlight_topn_asc", False))
-    alpha = alpha if alpha is not None else jp.get("alpha")
-    size = size if size is not None else jp.get("size")
-    dims = dims if dims is not None else jp.get("dims")
-    font_scale = font_scale if font_scale is not None else jp.get("font_scale")
-    opal_campaign = opal_campaign or jp.get("opal_campaign")
-    opal_run = opal_run or jp.get("opal_run")
-    opal_as_of_round = opal_as_of_round or jp.get("opal_as_of_round")
-    opal_fields = opal_fields or (
-        ",".join(jp["opal_fields"]) if isinstance(jp.get("opal_fields"), (list, tuple)) else jp.get("opal_fields")
+    highlight = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("highlight"),
+        cli_value=highlight,
+        job_value=jp.get("highlight"),
     )
-    attach_coords = bool(attach_coords or jp.get("attach_coords", False))
-    out_plot = out_plot or jp.get("out_plot")
-    write = bool(write or jp.get("write", False))
-    yes = bool(yes or jp.get("allow_overwrite", False))
-    inplace = bool(inplace or jp.get("inplace", False))
-    out = out or jp.get("out")
+    highlight_hue_col = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("highlight_hue_col"),
+        cli_value=highlight_hue_col,
+        job_value=jp.get("highlight_hue_col"),
+    )
+    # BUGFIX: read highlight_topn knobs from job params
+    highlight_topn = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("highlight_topn"),
+        cli_value=highlight_topn,
+        job_value=jp.get("highlight_topn"),
+    )
+    highlight_topn_col = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("highlight_topn_col"),
+        cli_value=highlight_topn_col,
+        job_value=jp.get("highlight_topn_col"),
+    )
+    highlight_topn_asc = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("highlight_topn_asc"),
+            cli_value=highlight_topn_asc,
+            job_value=jp.get("highlight_topn_asc"),
+        )
+    )
+    alpha = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("alpha"),
+        cli_value=alpha,
+        job_value=jp.get("alpha"),
+    )
+    size = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("size"),
+        cli_value=size,
+        job_value=jp.get("size"),
+    )
+    dims = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("dims"),
+        cli_value=dims,
+        job_value=jp.get("dims"),
+    )
+    font_scale = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("font_scale"),
+        cli_value=font_scale,
+        job_value=jp.get("font_scale"),
+    )
+    opal_campaign = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("opal_campaign"),
+        cli_value=opal_campaign,
+        job_value=jp.get("opal_campaign"),
+    )
+    opal_run = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("opal_run"),
+        cli_value=opal_run,
+        job_value=jp.get("opal_run"),
+    )
+    opal_as_of_round = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("opal_as_of_round"),
+        cli_value=opal_as_of_round,
+        job_value=jp.get("opal_as_of_round"),
+    )
+    opal_fields = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("opal_fields"),
+        cli_value=opal_fields,
+        job_value=(
+            ",".join(jp["opal_fields"]) if isinstance(jp.get("opal_fields"), (list, tuple)) else jp.get("opal_fields")
+        ),
+    )
+    attach_coords = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("attach_coords"),
+            cli_value=attach_coords,
+            job_value=jp.get("attach_coords"),
+        )
+    )
+    out_plot = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("out_plot"),
+        cli_value=out_plot,
+        job_value=jp.get("out_plot"),
+    )
+    write = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("write"),
+            cli_value=write,
+            job_value=jp.get("write"),
+        )
+    )
+    yes = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("yes"),
+            cli_value=yes,
+            job_value=jp.get("allow_overwrite"),
+        )
+    )
+    inplace = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("inplace"),
+            cli_value=inplace,
+            job_value=jp.get("inplace"),
+        )
+    )
+    out = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("out"),
+        cli_value=out,
+        job_value=jp.get("out"),
+    )
     ictx, df = _context_and_df(dataset, file, usr_root)
     console.rule("[bold]cluster umap[/]")
     df = assert_no_duplicate_ids(df, key_col=key_col, policy="error")
+    source = InputSource.from_context(ictx)
+    feature_spec = FeatureSpec.from_inputs(x_col=x_col, x_cols=x_cols)
     # Always index by id so plotting & coords/attach are consistent
     if df.index.name != key_col:
         df = df.set_index(key_col, drop=False)
@@ -1261,8 +1460,8 @@ def cmd_umap(
         t_build = prog.add_task("Preparing X...", total=None)
         X = extract_X(
             df,
-            x_col=x_col,
-            x_cols=[c.strip() for c in x_cols.split(",")] if x_cols else None,
+            x_col=feature_spec.columns[0] if feature_spec.mode == "single_col" else None,
+            x_cols=list(feature_spec.columns) if feature_spec.mode == "multi_col" else None,
         )
         prog.update(t_build, completed=1)
         t_umap = prog.add_task("Computing UMAP...", total=None)
@@ -1313,19 +1512,19 @@ def cmd_umap(
     if "highlight" in jp_plot and "palette" in (jp_plot["highlight"] or {}):
         highlight_style["palette"] = jp_plot["highlight"]["palette"]
     # Decide output location (default: run store)
-    root = runs_root()
+    root = _runs_root_or_exit()
     run_dir = root / (name or "unnamed")
     run_dir.mkdir(parents=True, exist_ok=True)
-    umap_sig = UmapSignature(
-        params={
-            "neighbors": neighbors,
-            "min_dist": min_dist,
-            "metric": metric,
-            "random_state": random_state,
-        },
-        libs={},
-    ).hash()
-    udir = umap_dir(run_dir, "<flat>")
+    umap_params = {
+        "neighbors": neighbors,
+        "min_dist": min_dist,
+        "metric": metric,
+        "random_state": random_state,
+    }
+    umap_signature = UmapSignature(params=umap_params, libs={})
+    run_dir = root / (name or "unnamed")
+    udir = run_dir / "umap"
+    udir.mkdir(parents=True, exist_ok=True)
     out_path = Path(out_plot) if out_plot else (udir / f"{name}.png")  # base; .<label>.png appended
     umap_scatter(
         coords,
@@ -1351,46 +1550,20 @@ def cmd_umap(
             "umap_y": coords[:, 1],
         }
     )
-    write_umap_coords(udir, coords_df)
-    write_umap_meta(
-        udir,
-        {
-            "alias": name,
-            "params": {
-                "neighbors": neighbors,
-                "min_dist": min_dist,
-                "metric": metric,
-                "random_state": random_state,
-            },
-            "sig": umap_sig,
-        },
+    embedding_run = EmbeddingRun(
+        alias=name,
+        created_utc=utc_now_iso(),
+        source=source,
+        feature=feature_spec,
+        counts=RunCounts(n_rows=int(len(df))),
+        params=umap_params,
+        signature=umap_signature,
     )
-    add_or_update_index(
-        {
-            "kind": "umap",
-            "run_slug": name,
-            "alias": name,
-            "created_utc": pd.Timestamp.utcnow().isoformat(),
-            "source_kind": ictx["kind"],
-            "source_ref": ictx.get("dataset") or str(ictx.get("file")),
-            "x_col": x_col or "<multi>",
-            "n_rows": int(len(df)),
-            "n_clusters": None,
-            "algo": None,
-            "algo_params": None,
-            "input_sig_hash": None,
-            "labels_path": None,
-            "status": "complete",
-            "umap_slug": "flat",
-            "umap_params": {
-                "neighbors": neighbors,
-                "min_dist": min_dist,
-                "metric": metric,
-                "random_state": random_state,
-            },
-            "coords_path": str(udir / "coords.parquet"),
-            "plot_paths": str(udir),
-        }
+    run_dir, udir = record_umap_run(
+        root=root,
+        run_alias=name,
+        run=embedding_run,
+        coords_df=coords_df,
     )
     # Persist artifacts (coords and/or derived columns) if requested
     to_attach = {"id": df[key_col].astype(str)}
@@ -1447,37 +1620,38 @@ def cmd_umap(
 
     # ---- Records sink (Markdown) ----
     try:
-        run_dir = runs_root() / (name or "unnamed")
-        payload = {
-            "command": "umap",
-            "job": job or None,
-            "preset": preset or None,
-            "resolved": {
-                "name": name,
-                "neighbors": neighbors,
-                "min_dist": min_dist,
-                "metric": metric,
-                "random_state": random_state,
-                "plot": {
-                    "alpha": alpha,
-                    "size": size,
-                    "dims": [W, H],
-                    "font_scale": font_scale,
-                    "legend": legend,
-                    "color_by": color_by,
-                    "highlight": highlight_style,
+        append_command_record_entry(
+            run_dir,
+            CommandRecord(
+                command="umap",
+                subject=name,
+                job=job or None,
+                preset=preset or None,
+                resolved={
+                    "name": name,
+                    "neighbors": neighbors,
+                    "min_dist": min_dist,
+                    "metric": metric,
+                    "random_state": random_state,
+                    "plot": {
+                        "alpha": alpha,
+                        "size": size,
+                        "dims": [W, H],
+                        "font_scale": font_scale,
+                        "legend": legend,
+                        "color_by": color_by,
+                        "highlight": highlight_style,
+                    },
                 },
-            },
-        }
-        md = f"## cluster umap — {name}\n\n```json\n{json.dumps(payload, indent=2, sort_keys=True)}\n```"
-        append_records_md(run_dir, md)
+            ),
+        )
     except Exception:
         pass
 
 
 @app.command(
     "sweep",
-    help="Leiden resolution sweep with replicates; saves Parquet+PNG and suggested resolution.",
+    help="Run a method-scoped resolution sweep for methods that expose a resolution parameter.",
 )
 def cmd_sweep(
     dataset: Optional[str] = typer.Option(None),
@@ -1486,7 +1660,13 @@ def cmd_sweep(
     key_col: str = typer.Option("id"),
     x_col: Optional[str] = typer.Option(None),
     x_cols: Optional[str] = typer.Option(None),
-    neighbors: int = typer.Option(15),
+    method: str = typer.Option(..., help="Clustering method id for the sweep"),
+    preset: Optional[str] = typer.Option(None, help="Preset name (kind: 'method') to pre-fill parameters"),
+    method_param: List[str] = typer.Option(
+        [],
+        "--method-param",
+        help="Method-specific parameter override as key=value. Repeatable.",
+    ),
     res_min: float = typer.Option(0.05),
     res_max: float = typer.Option(1.0),
     step: float = typer.Option(0.05),
@@ -1494,15 +1674,21 @@ def cmd_sweep(
     seeds: str = typer.Option("1,2,3,4,5"),
     out_dir: str = typer.Option(...),
 ):
-    from ..algo.sweep import leiden_sweep
-
-    _, df = _context_and_df(dataset, file, usr_root)
+    ictx, df = _context_and_df(dataset, file, usr_root)
     df = assert_no_duplicate_ids(df, key_col=key_col, policy="error")
+    feature_spec = FeatureSpec.from_inputs(x_col=x_col, x_cols=x_cols)
     X = extract_X(
         df,
-        x_col=x_col,
-        x_cols=[c.strip() for c in x_cols.split(",")] if x_cols else None,
+        x_col=feature_spec.columns[0] if feature_spec.mode == "single_col" else None,
+        x_cols=list(feature_spec.columns) if feature_spec.mode == "multi_col" else None,
     )
+    method_spec = get_method(method)
+    if method_spec.resolution_sweep is None:
+        raise typer.BadParameter(f"Method '{method}' does not expose a resolution sweep contract.")
+    raw_method_params = _resolve_method_params({"method_params": {}}, method_param)
+    _assert_no_fit_method_param_overlap_with_preset(raw_method_params, preset)
+    preset_params = _apply_preset("method", preset)
+    method_params = method_spec.resolve_fit_params(preset=preset_params, raw_params=raw_method_params)
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
     # If --seeds isn't provided (empty string), derive seeds from --replicates
@@ -1510,9 +1696,9 @@ def cmd_sweep(
         s = [int(x.strip()) for x in seeds.split(",")]
     else:
         s = list(range(1, int(replicates) + 1))
-    leiden_sweep(
+    method_spec.resolution_sweep(
         X,
-        neighbors=neighbors,
+        method_params=method_params,
         res_min=res_min,
         res_max=res_max,
         step=step,
@@ -1527,6 +1713,7 @@ def cmd_sweep(
     help="Run composition/diversity/differential analyses on an existing cluster__<NAME>.",
 )
 def cmd_analyze(
+    ctx: typer.Context,
     dataset: Optional[str] = typer.Option(None),
     file: Optional[str] = typer.Option(None),
     usr_root: Optional[str] = typer.Option(None),
@@ -1534,9 +1721,7 @@ def cmd_analyze(
     cluster_col: Optional[str] = typer.Option(None, help="e.g., cluster__perm_v1"),
     group_by: str = typer.Option("source"),
     preset: Optional[str] = typer.Option(None, help="Preset name (kind: 'analysis') to pre-fill parameters"),
-    out_dir: Optional[str] = typer.Option(
-        None, help="If omitted, defaults to batch_results/<FIT>/analysis/<group_by>/"
-    ),
+    out_dir: Optional[str] = typer.Option(None, help="If omitted, defaults to <results-root>/<FIT>/analysis/"),
     composition: bool = typer.Option(False),
     diversity: bool = typer.Option(False),
     difffeat: bool = typer.Option(False),
@@ -1551,46 +1736,113 @@ def cmd_analyze(
     opal_as_of_round: Optional[int] = typer.Option(None, help="Optional: round filter for OPAL join"),
     opal_fields: Optional[str] = typer.Option(None, help="If set, join these OPAL fields before analysis"),
 ):
-    from ..analysis.composition import composition as comp_fn
-    from ..analysis.differential import differential as diff_fn
-    from ..analysis.diversity import diversity as div_fn
-    from ..analysis.numeric_per_cluster import summarize_numeric_by_cluster
-
     # Job params
     jp = _apply_job_params(job, expected_command="analyze")
     jp_plot = _apply_job_plot(job, expected_command="analyze")
-    dataset = dataset or jp.get("dataset")
-    file = file or jp.get("file")
-    usr_root = usr_root or jp.get("usr_root")
-    cluster_col = cluster_col or jp.get("cluster_col")
+    dataset = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("dataset"),
+        cli_value=dataset,
+        job_value=jp.get("dataset"),
+    )
+    file = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("file"),
+        cli_value=file,
+        job_value=jp.get("file"),
+    )
+    usr_root = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("usr_root"),
+        cli_value=usr_root,
+        job_value=jp.get("usr_root"),
+    )
+    cluster_col = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("cluster_col"),
+        cli_value=cluster_col,
+        job_value=jp.get("cluster_col"),
+    )
     if not cluster_col:
         raise typer.BadParameter(
             "Missing --cluster-col and job.params.cluster_col.\n"
             "Provide --cluster-col cluster__<NAME> or set it in the job YAML."
         )
-    group_by = group_by or jp.get("group_by", "source")
-    preset = preset or jp.get("preset")
-    out_dir = out_dir or jp.get("out_dir")
-    composition = bool(composition or jp.get("composition", False))
-    diversity = bool(diversity or jp.get("diversity", False))
-    difffeat = bool(difffeat or jp.get("difffeat", False))
-    plots = bool(plots or jp.get("plots", False))
-    if not numeric and jp.get("numeric"):
-        numeric = ",".join(jp["numeric"]) if isinstance(jp["numeric"], (list, tuple)) else str(jp["numeric"])
-    numeric_plots = bool(jp.get("numeric_plots", numeric_plots))
+    group_by = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("group_by"),
+        cli_value=group_by,
+        job_value=jp.get("group_by"),
+    )
+    preset = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("preset"),
+        cli_value=preset,
+        job_value=jp.get("preset"),
+    )
+    out_dir = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("out_dir"),
+        cli_value=out_dir,
+        job_value=jp.get("out_dir"),
+    )
+    composition = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("composition"),
+            cli_value=composition,
+            job_value=jp.get("composition"),
+        )
+    )
+    diversity = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("diversity"),
+            cli_value=diversity,
+            job_value=jp.get("diversity"),
+        )
+    )
+    difffeat = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("difffeat"),
+            cli_value=difffeat,
+            job_value=jp.get("difffeat"),
+        )
+    )
+    plots = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("plots"),
+            cli_value=plots,
+            job_value=jp.get("plots"),
+        )
+    )
+    numeric = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("numeric"),
+        cli_value=numeric,
+        job_value=",".join(jp["numeric"]) if isinstance(jp.get("numeric"), (list, tuple)) else jp.get("numeric"),
+    )
+    numeric_plots = bool(
+        _resolve_cli_or_job_value(
+            parameter_source=ctx.get_parameter_source("numeric_plots"),
+            cli_value=numeric_plots,
+            job_value=jp.get("numeric_plots"),
+        )
+    )
     font_scale = (
         float(jp.get("font_scale", font_scale))
         if font_scale is not None
         else (float(jp_plot.get("font_scale")) if jp_plot.get("font_scale") is not None else None)
     )
-    opal_campaign = opal_campaign or jp.get("opal_campaign")
-    opal_as_of_round = opal_as_of_round or jp.get("opal_as_of_round")
-    if not opal_fields and jp.get("opal_fields"):
-        opal_fields = (
-            ",".join(jp["opal_fields"]) if isinstance(jp["opal_fields"], (list, tuple)) else str(jp["opal_fields"])
-        )
+    opal_campaign = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("opal_campaign"),
+        cli_value=opal_campaign,
+        job_value=jp.get("opal_campaign"),
+    )
+    opal_as_of_round = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("opal_as_of_round"),
+        cli_value=opal_as_of_round,
+        job_value=jp.get("opal_as_of_round"),
+    )
+    opal_fields = _resolve_cli_or_job_value(
+        parameter_source=ctx.get_parameter_source("opal_fields"),
+        cli_value=opal_fields,
+        job_value=(
+            ",".join(jp["opal_fields"]) if isinstance(jp.get("opal_fields"), (list, tuple)) else jp.get("opal_fields")
+        ),
+    )
 
-    _, df = _context_and_df(dataset, file, usr_root)
+    ictx, df = _context_and_df(dataset, file, usr_root)
     console.rule("[bold]cluster analyze[/]")
 
     # ---------- Apply preset (if any) ----------
@@ -1602,7 +1854,7 @@ def cmd_analyze(
             # allow either string or list in YAML
             group_bys = [group_by_from_preset] if isinstance(group_by_from_preset, str) else list(group_by_from_preset)
         else:
-            group_bys = [group_by]
+            group_bys = [group_by] if group_by else ["source"]
         composition = composition or bool(p.get("composition", False))
         diversity = diversity or bool(p.get("diversity", False))
         difffeat = difffeat or bool(p.get("difffeat", False))
@@ -1627,33 +1879,49 @@ def cmd_analyze(
                 ",".join(p["opal_fields"]) if isinstance(p["opal_fields"], (list, tuple)) else str(p["opal_fields"])
             )
     else:
-        group_bys = [group_by]
         numeric_missing_policy = "error"
 
     if font_scale is None:
         font_scale = 1.2
 
+    request_kwargs = {
+        "source": InputSource.from_context(ictx),
+        "df_columns": list(df.columns),
+        "cluster_col": cluster_col,
+        "group_by": group_bys if p else group_by,
+        "out_dir": out_dir,
+        "composition": composition,
+        "diversity": diversity,
+        "difffeat": difffeat,
+        "plots": plots,
+        "numeric": numeric,
+        "numeric_missing_policy": numeric_missing_policy,
+        "numeric_plots": numeric_plots,
+        "font_scale": float(font_scale),
+        "opal_campaign": opal_campaign,
+        "opal_as_of_round": opal_as_of_round,
+        "opal_fields": opal_fields,
+    }
+    try:
+        request = AnalysisRequest.from_runtime(results_root=None, **request_kwargs)
+    except ValueError as e:
+        if out_dir is None and "explicit results root" in str(e):
+            try:
+                request = AnalysisRequest.from_runtime(results_root=_runs_root_or_exit(), **request_kwargs)
+            except ValueError as inner:
+                raise typer.BadParameter(str(inner)) from inner
+        else:
+            raise typer.BadParameter(str(e)) from e
+
     # Decide *root* output directory (flattened layout; no per-group_by subdirs)
-    if out_dir is None and cluster_col.startswith("cluster__"):
-        fit_name = cluster_col.split("__", 1)[1]
-        out_root = runs_root() / fit_name / "analysis"
-    else:
-        out_root = Path(out_dir or "./analysis")
+    out_root = request.out_dir
+    fit_alias = request.fit_alias
     out_root.mkdir(parents=True, exist_ok=True)
 
     # ---------- Optional OPAL join, driven by numeric metrics and/or explicit fields ----------
-    # If numeric metrics include obj__/pred__/sel__ columns and they are not present,
-    # auto-join them (mirrors UMAP behavior).
-    needed_from_numeric: set[str] = set()
-    if numeric:
-        for c in [x.strip() for x in numeric.split(",") if x.strip()]:
-            if c.startswith(("obj__", "pred__", "sel__")) and c not in df.columns:
-                needed_from_numeric.add(c)
-    explicit_fields = {f.strip() for f in opal_fields.split(",")} if opal_fields else set()
-    required_fields = needed_from_numeric | explicit_fields
-
+    required_fields = set(request.required_opal_fields)
     if required_fields:
-        if not opal_campaign:
+        if not request.opal_campaign:
             raise typer.BadParameter(
                 "Analysis requires OPAL metrics "
                 f"({', '.join(sorted(required_fields))}) but --opal-campaign is not set. "
@@ -1663,7 +1931,7 @@ def cmd_analyze(
         from ..opal.join import resolve_campaign_dir as _resolve_campaign_dir
 
         try:
-            camp = _resolve_campaign_dir(opal_campaign)
+            camp = _resolve_campaign_dir(request.opal_campaign)
         except FileNotFoundError as e:
             raise typer.BadParameter(str(e))
         df = _opal_join(
@@ -1671,7 +1939,7 @@ def cmd_analyze(
             campaign_dir=camp,
             run_selector="latest",
             fields=sorted(required_fields),
-            as_of_round=opal_as_of_round,
+            as_of_round=request.opal_as_of_round,
             log_fn=lambda m: console.log(m),
         )
         # Assert coverage + warn if any nulls remain
@@ -1685,14 +1953,11 @@ def cmd_analyze(
         if required_fields:
             console.log("Joined OPAL fields: " + ", ".join(sorted(required_fields)))
 
-    # Run numeric once (not per group_by) to avoid duplication
-    if numeric:
-        cols = [c.strip() for c in numeric.split(",") if c.strip()]
-    else:
-        cols = []
-    # If the mut-count column exists, include it (coerced to numeric) for the violins
-    if "permuter__mut_count" in df.columns and "permuter__mut_count" not in cols:
-        cols.append("permuter__mut_count")
+    # Run numeric once (not per group_by) to avoid duplication.
+    cols = list(request.numeric_cols)
+    if cols:
+        from ..analysis.numeric_per_cluster import summarize_numeric_by_cluster
+
         summarize_numeric_by_cluster(
             df,
             cluster_col=cluster_col,
@@ -1706,34 +1971,37 @@ def cmd_analyze(
         console.log("Numeric summaries/plots written.")
 
     # Run group_by‑dependent analyses; write into the *same* root with filenames namespaced by __by_<group>
-    for gb in group_bys:
-        if composition:
-            comp_fn(df, cluster_col=cluster_col, group_by=gb, out_dir=out_root, plots=plots)
-        if diversity:
-            div_fn(df, cluster_col=cluster_col, group_by=gb, out_dir=out_root, plots=plots)
-        if difffeat:
-            diff_fn(df, cluster_col=cluster_col, group_by=gb, out_dir=out_root)
+    for gb in request.group_by:
+        if request.composition:
+            from ..analysis.composition import composition as comp_fn
+
+            comp_fn(df, cluster_col=request.cluster_col, group_by=gb, out_dir=out_root, plots=request.plots)
+        if request.diversity:
+            from ..analysis.diversity import diversity as div_fn
+
+            div_fn(df, cluster_col=request.cluster_col, group_by=gb, out_dir=out_root, plots=request.plots)
+        if request.difffeat:
+            from ..analysis.differential import differential as diff_fn
+
+            diff_fn(df, cluster_col=request.cluster_col, group_by=gb, out_dir=out_root)
         console.log(f"Completed group_by='{gb}'.")
     console.print(f"[green]Analyses complete[/green]. Outputs at {out_root}")
+    record_analysis_run(out_dir=out_root, run=request.to_run(created_utc=utc_now_iso()))
     # ---- Records sink (Markdown) ----
-    try:
-        fit_name = cluster_col.split("__", 1)[1] if cluster_col.startswith("cluster__") else "analysis"
-        run_dir = runs_root() / fit_name
-        payload = {
-            "command": "analyze",
-            "job": job or None,
-            "preset": preset or None,
-            "resolved": {
-                "cluster_col": cluster_col,
-                "group_by": group_bys,
-                "plots": bool(plots),
-                "font_scale": float(font_scale),
-            },
-        }
-        md = f"## cluster analyze — {fit_name}\n\n```json\n{json.dumps(payload, indent=2, sort_keys=True)}\n```"
-        append_records_md(run_dir, md)
-    except Exception:
-        pass
+    if fit_alias is not None:
+        try:
+            append_command_record_entry(
+                _runs_root_or_exit() / fit_alias,
+                CommandRecord(
+                    command="analyze",
+                    subject=fit_alias,
+                    job=job or None,
+                    preset=preset or None,
+                    resolved=request.command_payload(),
+                ),
+            )
+        except Exception:
+            pass
 
 
 @app.command("intra-sim")
@@ -1824,7 +2092,7 @@ def runs_list():
         "x_col",
         "n_rows",
         "n_clusters",
-        "algo",
+        "method_id",
         "umap_slug",
     ]
     for k in keep:

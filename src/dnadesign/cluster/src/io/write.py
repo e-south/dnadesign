@@ -33,7 +33,7 @@ def attach_usr(usr_root: Path, dataset: str, cols_df: pd.DataFrame, allow_overwr
         ) from e
     ds = Dataset(usr_root, dataset)
     # We assume 'cols_df' contains 'id' plus one or more *namespaced* columns
-    # (e.g., 'cluster__ldn_v1', 'cluster__ldn_v1__meta', ...).
+    # (e.g., 'cluster__promoter_clusters_v1', 'cluster__promoter_clusters_v1__meta', ...).
     # USR requires an explicit namespace; infer it and *fail fast* if ambiguous.
     non_id = [c for c in cols_df.columns if c != "id"]
     if not non_id:
@@ -85,8 +85,8 @@ def drop_usr_columns(usr_root: Path, dataset: str, columns: list[str]) -> None:
     """
     if not columns:
         return
-    # Normalize dotted leaf paths (e.g., 'cluster__ldn_v1__meta.algo') to their
-    # top‑level column ('cluster__ldn_v1__meta') and de‑duplicate.
+    # Normalize dotted leaf paths (e.g., 'cluster__foo__meta.method_id') to their
+    # top‑level column ('cluster__foo__meta') and de‑duplicate.
     columns = list(dict.fromkeys(c.split(".", 1)[0] for c in columns))
     non_cluster = [c for c in columns if not c.startswith("cluster__")]
     if non_cluster:

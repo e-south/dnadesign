@@ -2,7 +2,7 @@
 command: "fit"
 params:
   # Point directly at the permuter records.parquet
-  file: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/permuter/results/rt_combine_from_dms/records.parquet"
+  file: "../../../permuter/results/rt_combine_from_dms/records.parquet"
 
   name: "perm_v1"
 
@@ -10,7 +10,7 @@ params:
   x-col: "permuter__observed__logits_mean"
 
   # Good general-purpose Leiden settings
-  preset: "fit.leiden.fine"
+  preset: "method.leiden.fine"
 
   # Attach cluster labels into that parquet (creates a .bak backup)
   write: true

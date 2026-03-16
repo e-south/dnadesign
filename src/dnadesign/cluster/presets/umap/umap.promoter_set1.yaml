@@ -2,7 +2,7 @@
 name: "umap.promoter_set1"
 kind: "umap"
 
-# UMAP knobs (algo)
+# UMAP knobs
 params:
   neighbors: 15
   min_dist: 0.10

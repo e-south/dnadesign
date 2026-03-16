@@ -12,9 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sns
 
 
 def composition(df: pd.DataFrame, cluster_col: str, group_by: str, out_dir: Path, plots: bool) -> dict:
@@ -30,6 +28,9 @@ def composition(df: pd.DataFrame, cluster_col: str, group_by: str, out_dir: Path
     props_name = f"composition_proportions__{cluster_col}__by_{group_by}.csv"
     props.to_csv(out_dir / props_name)
     if plots:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
         sns.set_theme(style="ticks", palette="colorblind")
         fig, ax = plt.subplots(figsize=(12, 8), constrained_layout=False)
         props.plot(kind="bar", stacked=True, width=0.9, ax=ax)

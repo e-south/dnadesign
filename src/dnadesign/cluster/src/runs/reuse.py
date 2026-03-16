@@ -11,20 +11,28 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .contracts import FIT_REUSE_REQUIRED_COLUMNS
 from .index import list_runs
 
 
-def find_equivalent_fit(input_sig_hash: str, algo_sig_hash: str, root: Path | None = None) -> dict | None:
+def find_equivalent_fit(input_sig_hash: str, method_sig_hash: str, root: Path | None = None) -> dict | None:
     df = list_runs(root=root)
     if df.empty:
         return None
+    required = FIT_REUSE_REQUIRED_COLUMNS
+    missing = required.difference(df.columns)
+    if missing:
+        raise RuntimeError(
+            "Cluster run index uses a retired schema and cannot be reused. "
+            f"Missing columns: {sorted(missing)}. Clear the old results index and rerun."
+        )
     m = (
         (df["kind"] == "fit")
         & (df["input_sig_hash"] == input_sig_hash)
-        & (df["algo_params"].apply(lambda p: isinstance(p, dict)))
-        & (df["algo"] == "leiden")
+        & (df["method_id"].astype(str).str.len() > 0)
+        & (df["method_params"].apply(lambda p: isinstance(p, dict)))
     )
-    # Further filter on algo_sig hash if stored; otherwise approximate by same params
+    # Further filter on method signature if stored; otherwise approximate by same params.
     cand = df[m]
     if cand.empty:
         return None

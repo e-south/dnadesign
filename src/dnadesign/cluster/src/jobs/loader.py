@@ -9,30 +9,12 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import yaml
 
-
-def _package_cluster_dir() -> Path:
-    """Return the installed package's cluster directory (…/dnadesign/cluster)."""
-    return Path(__file__).resolve().parents[2]
-
-
-def _nearest_cluster_dir() -> Path | None:
-    """
-    Walk upward from CWD and return the nearest directory that looks like a
-    project-level 'cluster/' folder. Returns None if not found.
-    """
-    cwd = Path.cwd()
-    for base in [cwd, *cwd.parents]:
-        if (base / "cluster").exists():
-            return base / "cluster"
-        if base.name == "cluster":
-            return base
-    return None
+from ..layout import builtin_cluster_dir, configured_workspace_cluster_dir, nearest_workspace_cluster_dir
 
 
 def _search_job_candidates(spec: str | Path) -> List[Path]:
@@ -41,9 +23,9 @@ def _search_job_candidates(spec: str | Path) -> List[Path]:
     The search is explicit and deterministic — we try:
       1) The path exactly as provided (absolute or relative to CWD)
       2) <cluster_root>/<tail> and <cluster_root>/jobs/<tail> for:
-         a) $DNADESIGN_CLUSTER_ROOT, if set
-         b) nearest project 'cluster/' found by walking up from CWD
-         c) the package's own cluster directory (…/src/dnadesign/cluster)
+         a) the configured workspace root from $DNADESIGN_CLUSTER_ROOT
+        b) the nearest workspace 'cluster/' found by walking up from CWD
+        c) built-in package assets under …/src/dnadesign/cluster
 
     Where <tail> is the provided spec with a leading 'cluster/' prefix removed
     (so specs like 'cluster/jobs/foo.yaml' work regardless of CWD).
@@ -56,15 +38,15 @@ def _search_job_candidates(spec: str | Path) -> List[Path]:
     tail = pspec
     if len(pspec.parts) >= 1 and pspec.parts[0] == "cluster":
         tail = Path(*pspec.parts[1:])
-    # Resolve cluster roots (explicit env first, then project, then package)
+    # Resolve workspace roots first, then fall back to built-in package assets.
     roots: List[Path] = []
-    env = os.environ.get("DNADESIGN_CLUSTER_ROOT")
-    if env:
-        roots.append(Path(env).expanduser())
-    proj = _nearest_cluster_dir()
+    configured = configured_workspace_cluster_dir()
+    if configured:
+        roots.append(configured)
+    proj = nearest_workspace_cluster_dir()
     if proj:
         roots.append(proj)
-    roots.append(_package_cluster_dir())
+    roots.append(builtin_cluster_dir())
     # For each root, try <root>/<tail> and <root>/jobs/<tail> unless tail already starts with 'jobs'
     for root in roots:
         if tail.parts and tail.parts[0] == "jobs":
@@ -109,19 +91,12 @@ def _normalize_dict_keys(d: Dict[str, Any], *, path: Tuple[str, ...] = ()) -> Di
     return out
 
 
-def load_job_file(path: str | Path) -> Dict[str, Any]:
+def resolve_job_file(path: str | Path) -> Path:
     tried: List[str] = []
     for cand in _search_job_candidates(path):
         tried.append(str(cand))
         if cand.exists():
-            obj = yaml.safe_load(cand.read_text())
-            if not isinstance(obj, dict):
-                raise ValueError("Job YAML must be a mapping with keys: command, params.")
-            # Normalize keys (kebab-case → snake_case) throughout the job mapping
-            obj = _normalize_dict_keys(obj)
-            if "params" in obj and not isinstance(obj["params"], dict):
-                raise ValueError("Job 'params' must be a mapping.")
-            return obj
+            return cand
     lines = [
         f"Job file not found for spec: {path}",
         "Paths tried:",
@@ -130,8 +105,41 @@ def load_job_file(path: str | Path) -> Dict[str, Any]:
     if len(tried) > 20:
         lines.append("  - …")
     lines.append(
-        "Hint: pass an absolute path, or a path relative to your project's 'cluster/' "
-        "directory (e.g., 'cluster/jobs/<fit_alias>/umap.yaml'). "
-        "You can also set DNADESIGN_CLUSTER_ROOT to point at that 'cluster/' directory."
+        "Hint: pass an absolute path, a path relative to your workspace 'cluster/' "
+        "directory (e.g., 'cluster/jobs/<fit_alias>/umap.yaml'), or a built-in package job path. "
+        "DNADESIGN_CLUSTER_ROOT must point at a writable workspace 'cluster/' directory."
     )
     raise FileNotFoundError("\n".join(lines))
+
+
+def _resolve_relative_param_paths(obj: Dict[str, Any], *, origin: Path) -> Dict[str, Any]:
+    params = obj.get("params")
+    if not isinstance(params, dict):
+        return obj
+    resolved = dict(params)
+    for key in ("file", "usr_root", "highlight", "out", "out_dir"):
+        value = resolved.get(key)
+        if not isinstance(value, str) or not value.strip():
+            continue
+        candidate = Path(value).expanduser()
+        if candidate.is_absolute():
+            resolved[key] = str(candidate)
+            continue
+        if value.startswith(("round:", "run_id:", "latest")):
+            continue
+        resolved[key] = str((origin.parent / candidate).resolve())
+    out = dict(obj)
+    out["params"] = resolved
+    return out
+
+
+def load_job_file(path: str | Path) -> Dict[str, Any]:
+    resolved = resolve_job_file(path)
+    obj = yaml.safe_load(resolved.read_text())
+    if not isinstance(obj, dict):
+        raise ValueError("Job YAML must be a mapping with keys: command, params.")
+    obj = _normalize_dict_keys(obj)
+    obj = _resolve_relative_param_paths(obj, origin=resolved)
+    if "params" in obj and not isinstance(obj["params"], dict):
+        raise ValueError("Job 'params' must be a mapping.")
+    return obj

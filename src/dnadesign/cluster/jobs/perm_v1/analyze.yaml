@@ -1,6 +1,6 @@
 command: "analyze"
 params:
-  file: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/permuter/results/rt_combine_from_dms/records.parquet"
+  file: "../../../permuter/results/rt_combine_from_dms/records.parquet"
   cluster_col: "cluster__perm_v1"
 
   # Summarize these numerics per cluster; violin plots enabled

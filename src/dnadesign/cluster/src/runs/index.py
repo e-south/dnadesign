@@ -10,9 +10,11 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
+from .contracts import RunIndexEntry
 from .store import runs_root
 
 
@@ -21,16 +23,17 @@ def _index_path(root: Path | None) -> Path:
     return runs_root(root) / "index.parquet"
 
 
-def add_or_update_index(row: dict, root: Path | None = None) -> None:
+def add_or_update_index(row: RunIndexEntry | dict[str, Any], root: Path | None = None) -> None:
     """
     Append a single run row into results/index.parquet, evolving schema as needed.
     """
     idx_path = _index_path(root)
     df = pd.read_parquet(idx_path) if idx_path.exists() else pd.DataFrame()
+    payload = row.payload() if isinstance(row, RunIndexEntry) else dict(row)
 
     # Column superset = existing ∪ new row’s keys
-    cols = sorted(set(df.columns).union(row.keys()))
-    new_row_df = pd.DataFrame([{c: row.get(c, pd.NA) for c in cols}], columns=cols)
+    cols = sorted(set(df.columns).union(payload.keys()))
+    new_row_df = pd.DataFrame([{c: payload.get(c, pd.NA) for c in cols}], columns=cols)
 
     if df.empty:
         # First write: avoid appending into an empty frame (triggers pandas’ concat deprecation)

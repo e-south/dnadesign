@@ -15,13 +15,15 @@ from pathlib import Path
 
 
 def _runtime_root() -> Path:
-    return Path(__file__).resolve().parents[1] / "src"
+    return Path(__file__).resolve().parents[1]
 
 
 def test_cluster_runtime_does_not_import_usr_internal_paths() -> None:
     disallowed = "dnadesign.usr.src."
     violations: list[str] = []
     for path in sorted(_runtime_root().rglob("*.py")):
+        if "tests" in path.parts:
+            continue
         text = path.read_text(encoding="utf-8")
         if disallowed in text:
             violations.append(str(path))

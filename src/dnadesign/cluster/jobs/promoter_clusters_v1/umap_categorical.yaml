@@ -1,15 +1,15 @@
-# cluster/jobs/ldn_v1/umap_categorical.yaml
+# cluster/jobs/promoter_clusters_v1/umap_categorical.yaml
 command: "umap"
 params:
   dataset: "60bp_dual_promoter_cpxR_LexA"
-  usr_root: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr"
+  usr_root: "../../../usr"
 
-  name: "ldn_v1"
+  name: "promoter_clusters_v1"
   x-col: "infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean"
   preset: "umap.promoter_set1"
 
   # Categorical highlight: ids file must include a column we can color by
-  highlight: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/opal/campaigns/prom60-etoh-cipro-andgate/outputs/ledger.labels/part-1e5a6a5834f14a22b7d5e2794b1a7b25.parquet"
+  highlight: "../../../opal/campaigns/prom60-etoh-cipro-andgate/outputs/ledger.labels/part-1e5a6a5834f14a22b7d5e2794b1a7b25.parquet"
   highlight_hue_col: "observed_round"
 
   # Optional OPAL joins (if your hues reference obj__/pred__/sel__ columns)

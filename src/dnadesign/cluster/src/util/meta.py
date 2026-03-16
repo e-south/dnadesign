@@ -15,7 +15,7 @@ import json
 
 def compact_meta(
     ver: str,
-    algo: str,
+    method_id: str,
     x_col: str | None,
     n: int,
     params: dict,
@@ -27,7 +27,7 @@ def compact_meta(
     obj = {
         "ver": ver,
         "utc": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "algo": algo,
+        "method_id": method_id,
         "x_col": x_col,
         "n": n,
         "p": params or {},

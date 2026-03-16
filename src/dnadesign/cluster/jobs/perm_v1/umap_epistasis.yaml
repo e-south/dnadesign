@@ -1,6 +1,6 @@
 command: "umap"
 params:
-  file: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/permuter/results/rt_combine_from_dms/records.parquet"
+  file: "../../../permuter/results/rt_combine_from_dms/records.parquet"
   name: "perm_v1"
   x-col: "permuter__observed__logits_mean"
   preset: "umap.permuter"
