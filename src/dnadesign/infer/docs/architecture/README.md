@@ -1,5 +1,8 @@
 ## Infer Architecture
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-03-15
+
 ### Package shape
 
 - Top-level package surface:

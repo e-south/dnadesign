@@ -99,10 +99,7 @@ def plan_resume_for_usr(
     if overwrite or ds is None or total_rows == 0:
         return list(range(total_rows)), existing
 
-    infer_cols = {
-        o.id: infer_usr_column_name(model_id=model_id, job_id=job_id, out_id=o.id)
-        for o in outputs
-    }
+    infer_cols = {o.id: infer_usr_column_name(model_id=model_id, job_id=job_id, out_id=o.id) for o in outputs}
     id_positions = _positions_by_id(ids)
 
     try:
@@ -133,7 +130,10 @@ def plan_resume_for_usr(
 
         if hasattr(ds, "list_overlays"):
             overlays = ds.list_overlays()  # type: ignore[attr-defined]
-            infer_overlay = next((overlay for overlay in overlays if getattr(overlay, "namespace", None) == "infer"), None)
+            infer_overlay = next(
+                (overlay for overlay in overlays if getattr(overlay, "namespace", None) == "infer"),
+                None,
+            )
             if infer_overlay is not None:
                 overlay_path = Path(str(infer_overlay.path))
                 overlay_parquet = pq.ParquetFile(str(overlay_path))

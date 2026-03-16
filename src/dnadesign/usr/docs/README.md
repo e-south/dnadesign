@@ -1,13 +1,13 @@
 ## USR docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-03-15
 
 ### Read order
 
 1. [Top README](../README.md): package intent, hard boundaries, and where to branch next.
 2. [Getting started index](getting-started/README.md): first local run paths for CLI and notebook setup.
-3. [Operations index](operations/README.md): task-first sync runbooks for iterative remote and HPC updates.
+3. [Operations index](operations/README.md): task-first sync and cross-tool source-of-truth runbooks for iterative remote and HPC updates.
 4. [Reference index](reference/README.md): authoritative contracts for schema, overlays, events, and API usage.
 5. [Architecture introspection](architecture-introspection.md): deep lifecycle and module interaction map for integration work.
 
@@ -28,6 +28,9 @@
 - [Sync audit loop](operations/sync-audit-loop.md): machine-readable transfer decisions for chained command execution.
 - [HPC sync flow](operations/hpc-agent-sync-flow.md): preflight/run/verify loop for batch-driven workspace updates.
 - [Chained DenseGen and Infer sync demo](operations/chained-densegen-infer-sync-demo.md): end-to-end cross-tool update loop with bidirectional sync.
+- [Multi-source source-of-truth assembly](operations/multi-source-source-of-truth-assembly.md): merge multiple USR-backed producer datasets before construct and infer share one downstream dataset.
+- [Construct -> USR -> Infer source-of-truth demo](operations/construct-infer-source-of-truth-demo.md): construct-led consolidation path for one USR-backed dataset plus infer handoff.
+- [Promoter characterization feature matrix](operations/promoter-characterization-feature-matrix.md): combine DenseGen/manual sources, optional construct expansion, and infer feature-matrix write-back before downstream cluster or OPAL use.
 - [Sync fidelity drills](operations/sync-fidelity-drills.md): adversarial checks for sidecar, overlay, and hash parity.
 
 ### Reference

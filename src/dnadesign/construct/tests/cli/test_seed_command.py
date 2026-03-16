@@ -105,6 +105,42 @@ def test_seed_promoter_swap_demo_warns_about_legacy_dataset_names(tmp_path: Path
     assert "canonical curated inputs are mg1655_promoters and plasmids" in (result.stdout or "")
 
 
+def test_seed_promoter_swap_demo_is_idempotent(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+
+    first = _RUNNER.invoke(
+        app,
+        [
+            "seed",
+            "promoter-swap-demo",
+            "--root",
+            usr_root.as_posix(),
+        ],
+    )
+    second = _RUNNER.invoke(
+        app,
+        [
+            "seed",
+            "promoter-swap-demo",
+            "--root",
+            usr_root.as_posix(),
+        ],
+    )
+
+    assert first.exit_code == 0, first.stdout
+    assert second.exit_code == 0, second.stdout
+
+    anchors = Dataset(usr_root, "mg1655_promoters")
+    templates = Dataset(usr_root, "plasmids")
+    anchors_frame = anchors.head(n=10)
+    templates_frame = templates.head(n=10)
+
+    assert len(anchors_frame) == 4
+    assert len(templates_frame) == 1
+    assert set(anchors_frame["construct_seed__label"]) == {"spyP_MG1655", "sulAp", "soxS", "J23105"}
+    assert list(templates_frame["construct_seed__label"]) == ["pDual-10"]
+
+
 def test_seed_import_manifest_creates_generic_usr_datasets(tmp_path: Path) -> None:
     usr_root = tmp_path / "usr_root"
     manifest_path = tmp_path / "import_manifest.yaml"
@@ -116,7 +152,6 @@ datasets:
     notes: Example anchors.
     records:
       - label: sulAp
-        role: anchor
         topology: linear
         aliases: [sulA]
         source_ref: canonical local note
@@ -126,7 +161,7 @@ datasets:
     notes: Example templates.
     records:
       - label: pDual-10
-        role: template
+        intended_role: template
         topology: circular
         aliases: [pDual10]
         source_ref: canonical plasmid
@@ -155,6 +190,8 @@ datasets:
     assert list(anchors_frame["usr_label__primary"]) == ["sulAp"]
     assert list(templates_frame["usr_label__primary"]) == ["pDual-10"]
     assert list(anchors_frame["construct_seed__manifest_id"]) == ["custom_construct_inputs"]
+    assert list(anchors_frame["construct_seed__role"]) == [""]
+    assert list(templates_frame["construct_seed__role"]) == ["template"]
     assert list(anchors_frame["construct_seed__source_ref"]) == ["canonical local note"]
     output = result.stdout or ""
     assert "manifest_id: custom_construct_inputs" in output
@@ -223,3 +260,69 @@ def test_seed_promoter_swap_demo_rejects_non_integer_slot_bounds(tmp_path: Path,
 
     assert result.exit_code == 1
     assert "start/end must be integers" in (result.stdout or "")
+
+
+def test_seed_promoter_swap_demo_rejects_reversed_slot_bounds(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "dnadesign.construct.src.seed._seed_asset_payload",
+        lambda: {
+            "demo_id": "bad_demo",
+            "datasets": {"anchors": "bad_anchors", "templates": "bad_templates"},
+            "anchors": [
+                {"label": "anchor", "role": "anchor", "topology": "linear", "sequence": "ACGT"},
+            ],
+            "templates": [
+                {"label": "template", "role": "template", "topology": "circular", "sequence": "AAAATTTT"},
+            ],
+            "slots": [
+                {
+                    "slot": "slot_a",
+                    "template_label": "template",
+                    "incumbent_label": "anchor",
+                    "start": 5,
+                    "end": 5,
+                    "expected_template_sequence": "ACGT",
+                }
+            ],
+        },
+    )
+
+    result = _RUNNER.invoke(app, ["seed", "promoter-swap-demo", "--root", (tmp_path / "usr_root").as_posix()])
+
+    assert result.exit_code == 1
+    assert "end must be greater than start" in (result.stdout or "")
+
+
+def test_seed_import_manifest_rejects_non_string_alias_values(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    manifest_path = tmp_path / "bad_alias_manifest.yaml"
+    manifest_path.write_text(
+        """
+manifest_id: custom_construct_inputs
+datasets:
+  - id: custom_promoters
+    notes: Example anchors.
+    records:
+      - label: sulAp
+        topology: linear
+        aliases: [ok_alias, 42]
+        source_ref: canonical local note
+        sequence: ACGT
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "seed",
+            "import-manifest",
+            "--manifest",
+            manifest_path.as_posix(),
+            "--root",
+            usr_root.as_posix(),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "aliases must contain only strings" in (result.stdout or "")

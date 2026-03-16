@@ -15,13 +15,13 @@ from types import SimpleNamespace
 
 import pytest
 
+from dnadesign.infer.src.errors import CapabilityError
+from dnadesign.infer.src.registry import register_fn
 from dnadesign.infer.src.runtime.adapter_dispatch import (
     invoke_extract_callable,
     resolve_extract_callable,
     resolve_generate_callable,
 )
-from dnadesign.infer.src.errors import CapabilityError
-from dnadesign.infer.src.registry import register_fn
 
 
 def test_resolve_extract_callable_returns_method_and_callable() -> None:

@@ -1,7 +1,7 @@
 ## Notify maintainer architecture map
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-01
+**Last verified:** 2026-03-15
 
 This page maps package boundaries for maintainers extending command registration, event resolution, and delivery/runtime flows.
 
@@ -17,11 +17,11 @@ This page maps package boundaries for maintainers extending command registration
 ### Event-source and profile boundaries
 
 - `src/dnadesign/notify/events/source.py`: tool resolver registry.
-- `src/dnadesign/notify/events/source_builtin.py`: built-in tool resolvers (`densegen`, `infer`).
+- `src/dnadesign/notify/events/source_builtin.py`: built-in tool resolvers (`construct`, `densegen`, `infer`).
 - `src/dnadesign/notify/profiles/flow_events.py`: setup event-source mode resolution.
 - `src/dnadesign/notify/profiles/flow_webhook.py`: webhook source selection and secure ref storage.
 - `src/dnadesign/notify/profiles/flow_profile.py`: profile materialization and default path resolution.
-- `src/dnadesign/notify/profiles/workspace.py`: workspace-name to config-path resolver.
+- `src/dnadesign/notify/profiles/workspace.py`: workspace-name to config-path resolver, including `construct` workspace selectors (`workspace[:project]`).
 - `src/dnadesign/notify/profiles/schema/`: profile schema contract and loader validation.
 
 ### Tool-event transforms and policy logic

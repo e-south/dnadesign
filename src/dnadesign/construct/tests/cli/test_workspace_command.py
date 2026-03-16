@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 
 import yaml
@@ -19,6 +20,7 @@ from typer.testing import CliRunner
 from dnadesign.construct.cli import app
 from dnadesign.construct.src.seed import bootstrap_promoter_swap_demo
 from dnadesign.construct.src.workspace import project_root
+from dnadesign.usr import Dataset
 
 _RUNNER = CliRunner()
 
@@ -38,7 +40,7 @@ def test_workspace_where_uses_env_root_when_set(monkeypatch, tmp_path: Path) -> 
 
 def test_workspace_init_creates_default_layout_and_config(tmp_path: Path) -> None:
     root = tmp_path / "ws_root"
-    command_prefix = f"uv run --project {project_root()} construct"
+    command_prefix = f"uv run --project {shlex.quote(project_root().as_posix())} construct"
 
     result = _RUNNER.invoke(app, ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix()])
 
@@ -49,7 +51,7 @@ def test_workspace_init_creates_default_layout_and_config(tmp_path: Path) -> Non
     assert (workspace_dir / "inputs" / "README.md").is_file()
     assert (workspace_dir / "inputs" / "import_manifest.template.yaml").is_file()
     assert (workspace_dir / "outputs" / "logs" / "ops" / "audit").is_dir()
-    assert "# root: outputs/usr_datasets" in (workspace_dir / "config.yaml").read_text(encoding="utf-8")
+    assert "root: outputs/usr_datasets" in (workspace_dir / "config.yaml").read_text(encoding="utf-8")
     inputs_readme = (workspace_dir / "inputs" / "README.md").read_text(encoding="utf-8")
     assert "workspace's `outputs/usr_datasets/` root" in inputs_readme
     assert "src/dnadesign/usr/datasets/" in inputs_readme
@@ -59,14 +61,16 @@ def test_workspace_init_creates_default_layout_and_config(tmp_path: Path) -> Non
     assert f"{command_prefix} workspace show --workspace" in output
     assert f"{command_prefix} validate config --config" in output
     assert "import_manifest.template.yaml" in output
-    assert f"Optional demo bootstrap: {command_prefix} seed promoter-swap-demo" in output
+    assert f"Then: {command_prefix} seed import-manifest" in output
     assert "outputs/usr_datasets" in output
+    assert "seed_manifest.yaml" not in output
+    assert "--profile promoter-swap-demo" in output
     assert "./runbook.sh" not in output
 
 
 def test_workspace_init_copies_packaged_promoter_swap_demo_profile(tmp_path: Path) -> None:
     root = tmp_path / "ws_root"
-    command_prefix = f"uv run --project {project_root()} construct"
+    command_prefix = f"uv run --project {shlex.quote(project_root().as_posix())} construct"
 
     result = _RUNNER.invoke(
         app,
@@ -97,6 +101,54 @@ def test_workspace_init_copies_packaged_promoter_swap_demo_profile(tmp_path: Pat
     assert "./runbook.sh --mode dry-run --config <chosen-config>" in output
 
 
+def test_workspace_init_copies_packaged_source_of_truth_demo_profile(tmp_path: Path) -> None:
+    root = tmp_path / "ws_root"
+    command_prefix = f"uv run --project {shlex.quote(project_root().as_posix())} construct"
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_construct",
+            "--root",
+            root.as_posix(),
+            "--profile",
+            "promoter-swap-source-of-truth-demo",
+        ],
+    )
+
+    workspace_dir = root / "demo_construct"
+    assert result.exit_code == 0, result.stdout
+    assert (workspace_dir / "README.md").is_file()
+    assert (workspace_dir / "construct.workspace.yaml").is_file()
+    assert (workspace_dir / "runbook.md").is_file()
+    assert (workspace_dir / "runbook.sh").is_file()
+    assert (workspace_dir / "config.slot_a.window.yaml").is_file()
+    assert (workspace_dir / "config.slot_b.window.yaml").is_file()
+    assert not (workspace_dir / "config.slot_a.full.yaml").exists()
+    assert not (workspace_dir / "config.slot_b.full.yaml").exists()
+    output = result.stdout or ""
+    assert "profile: promoter-swap-source-of-truth-demo" in output
+    assert "workspace_registry:" in output
+    assert f"{command_prefix} workspace show --workspace" in output
+    assert "outputs/usr_datasets" in output
+    assert "./runbook.sh --mode dry-run-all" in output
+
+
+def test_workspace_init_quotes_project_root_in_external_workspace_commands(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "ws_root"
+    fake_repo_root = tmp_path / "repo with spaces"
+    expected_prefix = f"uv run --project {shlex.quote(fake_repo_root.as_posix())} construct"
+    monkeypatch.setattr("dnadesign.construct.src.cli.commands.workspace.project_root", lambda: fake_repo_root)
+
+    result = _RUNNER.invoke(app, ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix()])
+
+    assert result.exit_code == 0, result.stdout
+    assert expected_prefix in (result.stdout or "")
+
+
 def test_workspace_init_rejects_path_like_workspace_id(tmp_path: Path) -> None:
     root = tmp_path / "ws_root"
 
@@ -115,6 +167,32 @@ def test_workspace_init_fails_if_workspace_already_exists(tmp_path: Path) -> Non
 
     assert result.exit_code == 2
     assert "workspace already exists" in (result.stdout or "")
+
+
+def test_workspace_init_rejects_file_root(tmp_path: Path) -> None:
+    root_file = tmp_path / "workspace_root.txt"
+    root_file.write_text("not a directory\n", encoding="utf-8")
+
+    result = _RUNNER.invoke(app, ["workspace", "init", "--id", "demo_construct", "--root", root_file.as_posix()])
+
+    assert result.exit_code == 2
+    assert "workspace root must be a directory" in (result.stdout or "")
+
+
+def test_workspace_init_cleans_up_partial_workspace_on_copy_failure(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "ws_root"
+
+    def _boom(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise OSError("simulated scaffold failure")
+
+    monkeypatch.setattr("dnadesign.construct.src.workspace._copy_blank_workspace", _boom)
+
+    result = _RUNNER.invoke(app, ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix()])
+
+    workspace_dir = root / "demo_construct"
+    assert result.exit_code == 2
+    assert "construct workspace could not be created" in (result.stdout or "")
+    assert not workspace_dir.exists()
 
 
 def test_workspace_show_reports_registry_summary(tmp_path: Path) -> None:
@@ -262,3 +340,62 @@ def test_workspace_run_project_dry_run_resolves_registry_project(tmp_path: Path)
     output = result.stdout or ""
     assert "Config validated (dry run): job=promoter_swap_slot_a_window_1kb" in output
     assert "output_dataset: pdual10_slot_a_window_1kb_demo" in output
+
+
+def test_workspace_shared_source_of_truth_profile_accumulates_distinct_projects(tmp_path: Path) -> None:
+    root = tmp_path / "ws_root"
+    init_result = _RUNNER.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_construct",
+            "--root",
+            root.as_posix(),
+            "--profile",
+            "promoter-swap-source-of-truth-demo",
+        ],
+    )
+    assert init_result.exit_code == 0, init_result.stdout
+
+    workspace_dir = root / "demo_construct"
+    bootstrap_promoter_swap_demo(
+        root=workspace_dir / "outputs" / "usr_datasets",
+        manifest=workspace_dir / "inputs" / "seed_manifest.yaml",
+    )
+
+    for project in ("slot_a_window", "slot_b_window"):
+        validate_result = _RUNNER.invoke(
+            app,
+            [
+                "workspace",
+                "validate-project",
+                "--workspace",
+                workspace_dir.as_posix(),
+                "--project",
+                project,
+                "--runtime",
+            ],
+        )
+        assert validate_result.exit_code == 0, validate_result.stdout
+
+        run_result = _RUNNER.invoke(
+            app,
+            [
+                "workspace",
+                "run-project",
+                "--workspace",
+                workspace_dir.as_posix(),
+                "--project",
+                project,
+            ],
+        )
+        assert run_result.exit_code == 0, run_result.stdout
+
+    output_ds = Dataset(workspace_dir / "outputs" / "usr_datasets", "pdual10_source_of_truth_demo")
+    output_ds.validate(strict=True)
+    frame = output_ds.head(n=20)
+    assert len(frame) == 8
+    assert set(frame["construct__job"]) == {"promoter_swap_slot_a_window_1kb", "promoter_swap_slot_b_window_1kb"}
+    assert "usr_label__primary" in frame.columns

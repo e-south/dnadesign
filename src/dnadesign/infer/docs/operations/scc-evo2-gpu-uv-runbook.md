@@ -1,5 +1,8 @@
 ## SCC Evo2 GPU Environment Runbook (UV + infer)
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-03-15
+
 Use this page when you need a deterministic SCC GPU environment build for infer.
 
 For BU SCC platform details and scheduler policy, see [BU SCC install bootstrap](../../../../../docs/bu-scc/install.md).
@@ -23,8 +26,8 @@ For BU SCC platform details and scheduler policy, see [BU SCC install bootstrap]
 flash-attn is sdist-only in `uv.lock`, so this environment currently compiles flash-attn from source during `uv sync --locked --extra infer-evo2`.
 
 ```bash
-cd /project/dunlop/esouth/dnadesign
-sed -n '632,650p' uv.lock
+cd /project/dunlop/esouth/dnadesign # Move to repo root on SCC storage.
+sed -n '632,650p' uv.lock # Inspect locked flash-attn package entries.
 ```
 
 ### Capacity and build profile gate
@@ -32,11 +35,12 @@ sed -n '632,650p' uv.lock
 Run this once per interactive session. It sets build knobs from `NSLOTS`, sets `FLASH_ATTN_CUDA_ARCHS` from detected GPU capability, and fails fast when the requested model/precision is not a safe fit for the detected GPU memory.
 
 ```bash
-export TARGET_MODEL_ID="${TARGET_MODEL_ID:-evo2_7b}"
-export TARGET_PRECISION="${TARGET_PRECISION:-bf16}"
+export TARGET_MODEL_ID="${TARGET_MODEL_ID:-evo2_7b}" # Select model lane for capacity gating.
+export TARGET_PRECISION="${TARGET_PRECISION:-bf16}" # Select precision for memory-fit checks.
 
+# Compute build/runtime gate exports from current GPU and slot state.
 eval "$(
-uv run python - <<'PY'
+uv run python - <<'PY' # Emit export statements and fail fast on unsafe capacity.
 import os
 import subprocess
 import sys
@@ -133,6 +137,7 @@ print(
     f"nslots={slots} build_jobs={build_jobs} flash_arch={flash_arch}"
 )
 PY
+# Close the eval command substitution after emitting exports.
 )"
 ```
 
@@ -143,45 +148,45 @@ Use `evo2_7b` as the default SCC smoke and pressure-test lane. Use `evo2_20b` on
 ### Setup and verification steps
 
 ```bash
-cd /project/dunlop/esouth/dnadesign
+cd /project/dunlop/esouth/dnadesign # Enter repo root used for SCC setup.
 
-module purge
-module load cuda/12.8
-module load gcc/13.2.0
+module purge # Clear inherited module state before deterministic loads.
+module load cuda/12.8 # Load CUDA toolchain for torch/flash-attn builds.
+module load gcc/13.2.0 # Load compiler toolchain compatible with CUDA build flow.
 
-export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
-export INFER_WORKSPACE_ROOT=/project/dunlop/esouth/dnadesign/src/dnadesign/infer/workspaces/test_stress_ethanol
-export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}"
-export TARGET_MODEL_ID="${TARGET_MODEL_ID:-evo2_7b}"
-export HF_HOME_7B="${HF_HOME_7B:-/project/dunlop/esouth/cache/huggingface/evo2_7b}"
-export HF_HOME_20B="${HF_HOME_20B:-/project/dunlop/esouth/cache/huggingface/evo2_20b}"
-case "$TARGET_MODEL_ID" in
-  evo2_7b) export HF_HOME="${HF_HOME:-$HF_HOME_7B}" ;;
-  evo2_20b) export HF_HOME="${HF_HOME:-$HF_HOME_20B}" ;;
-  *)
-    printf 'Unsupported TARGET_MODEL_ID=%s\n' "$TARGET_MODEL_ID" >&2
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv" # Use a single canonical uv environment path.
+export INFER_WORKSPACE_ROOT=/project/dunlop/esouth/dnadesign/src/dnadesign/infer/workspaces/test_stress_ethanol # Pin infer workspace root.
+export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}" # Keep runtime artifacts workspace-scoped.
+export TARGET_MODEL_ID="${TARGET_MODEL_ID:-evo2_7b}" # Default to the 7B SCC lane.
+export HF_HOME_7B="${HF_HOME_7B:-/project/dunlop/esouth/cache/huggingface/evo2_7b}" # Define cache root for evo2_7b.
+export HF_HOME_20B="${HF_HOME_20B:-/project/dunlop/esouth/cache/huggingface/evo2_20b}" # Define cache root for evo2_20b.
+case "$TARGET_MODEL_ID" in # Select active HF cache by model lane.
+  evo2_7b) export HF_HOME="${HF_HOME:-$HF_HOME_7B}" ;; # Resolve HF cache for evo2_7b.
+  evo2_20b) export HF_HOME="${HF_HOME:-$HF_HOME_20B}" ;; # Resolve HF cache for evo2_20b.
+  *) # Reject unsupported model ids.
+    printf 'Unsupported TARGET_MODEL_ID=%s\n' "$TARGET_MODEL_ID" >&2 # Emit unsupported-model error to stderr.
     return 2 2>/dev/null || exit 2
     ;;
 esac
-export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
-export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HUB_CACHE}"
-export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
-export UV_CACHE_DIR="$INFER_RUNTIME_ROOT/uv-cache"
-export TMPDIR="$INFER_RUNTIME_ROOT/tmp"
-export TORCH_EXTENSIONS_DIR="$INFER_RUNTIME_ROOT/torch-extensions"
-export TRITON_CACHE_DIR="$INFER_RUNTIME_ROOT/triton-cache"
-export PYTHONPYCACHEPREFIX="$INFER_RUNTIME_ROOT/pycache"
-mkdir -p "$UV_CACHE_DIR" "$TMPDIR" "$TORCH_EXTENSIONS_DIR" "$TRITON_CACHE_DIR" "$PYTHONPYCACHEPREFIX" "$HF_HOME" "$HF_HUB_CACHE" "$HUGGINGFACE_HUB_CACHE" "$TRANSFORMERS_CACHE"
+export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}" # Keep hub artifacts under selected model cache root.
+export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HUB_CACHE}" # Mirror legacy cache env to shared hub path.
+export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}" # Keep transformers cache colocated with model cache.
+export UV_CACHE_DIR="$INFER_RUNTIME_ROOT/uv-cache" # Store uv cache under workspace runtime root.
+export TMPDIR="$INFER_RUNTIME_ROOT/tmp" # Keep temporary build/runtime files local to workspace.
+export TORCH_EXTENSIONS_DIR="$INFER_RUNTIME_ROOT/torch-extensions" # Place torch extension builds in runtime root.
+export TRITON_CACHE_DIR="$INFER_RUNTIME_ROOT/triton-cache" # Place Triton kernels in runtime root.
+export PYTHONPYCACHEPREFIX="$INFER_RUNTIME_ROOT/pycache" # Redirect Python bytecode cache out of source tree.
+mkdir -p "$UV_CACHE_DIR" "$TMPDIR" "$TORCH_EXTENSIONS_DIR" "$TRITON_CACHE_DIR" "$PYTHONPYCACHEPREFIX" "$HF_HOME" "$HF_HUB_CACHE" "$HUGGINGFACE_HUB_CACHE" "$TRANSFORMERS_CACHE" # Create all runtime/cache directories.
 
-uv python install 3.12
-uv sync --locked
+uv python install 3.12 # Ensure expected Python runtime is available to uv.
+uv sync --locked # Realize baseline locked environment before Evo2 extra.
 
-export CC="$(which gcc)"
-export CXX="$(which g++)"
-export CUDAHOSTCXX="$(which g++)"
-export CUDA_HOME="$(dirname "$(dirname "$(which nvcc)")")"
+export CC="$(which gcc)" # Pin C compiler for extension builds.
+export CXX="$(which g++)" # Pin C++ compiler for extension builds.
+export CUDAHOSTCXX="$(which g++)" # Set CUDA host compiler explicitly.
+export CUDA_HOME="$(dirname "$(dirname "$(which nvcc)")")" # Resolve CUDA install prefix from nvcc path.
 
-NVIDIA_INCLUDE_DIRS="$($UV_PROJECT_ENVIRONMENT/bin/python - <<'PY'
+NVIDIA_INCLUDE_DIRS="$($UV_PROJECT_ENVIRONMENT/bin/python - <<'PY' # Gather include dirs from nvidia wheels.
 import site
 from pathlib import Path
 parts = []
@@ -192,23 +197,23 @@ for sp in site.getsitepackages():
             parts.append(str(include_dir))
 print(":".join(parts))
 PY
-)"
-export CPATH="$CUDA_HOME/include${NVIDIA_INCLUDE_DIRS:+:$NVIDIA_INCLUDE_DIRS}${CPATH:+:$CPATH}"
-export CPLUS_INCLUDE_PATH="$CPATH"
+)" # Close include-dir probe substitution.
+export CPATH="$CUDA_HOME/include${NVIDIA_INCLUDE_DIRS:+:$NVIDIA_INCLUDE_DIRS}${CPATH:+:$CPATH}" # Combine CUDA and nvidia-wheel headers.
+export CPLUS_INCLUDE_PATH="$CPATH" # Mirror include path for C++ compilation.
 
 # Build controls.
 # Apply the profile gate above first. These defaults are fallback values.
-export UV_CONCURRENT_BUILDS="${UV_CONCURRENT_BUILDS:-1}"
-export UV_CONCURRENT_INSTALLS="${UV_CONCURRENT_INSTALLS:-1}"
-export MAX_JOBS="${MAX_JOBS:-2}"
-export CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-2}"
-export OMP_NUM_THREADS="${OMP_NUM_THREADS:-2}"
+export UV_CONCURRENT_BUILDS="${UV_CONCURRENT_BUILDS:-1}" # Bound concurrent source-build workers.
+export UV_CONCURRENT_INSTALLS="${UV_CONCURRENT_INSTALLS:-1}" # Bound concurrent install workers.
+export MAX_JOBS="${MAX_JOBS:-2}" # Bound compile parallelism to safe default.
+export CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-2}" # Bound CMake job fanout.
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-2}" # Bound OpenMP threads during builds.
 
 # Keep explicit flags for reproducibility and constrained fallback runs.
-export FLASH_ATTENTION_FORCE_BUILD="${FLASH_ATTENTION_FORCE_BUILD:-TRUE}"
-export FLASH_ATTN_CUDA_ARCHS="${FLASH_ATTN_CUDA_ARCHS:-89}"
+export FLASH_ATTENTION_FORCE_BUILD="${FLASH_ATTENTION_FORCE_BUILD:-TRUE}" # Keep flash-attn source-build behavior explicit.
+export FLASH_ATTN_CUDA_ARCHS="${FLASH_ATTN_CUDA_ARCHS:-89}" # Keep CUDA arch targeting explicit.
 
-uv sync --locked --extra infer-evo2
+uv sync --locked --extra infer-evo2 # Install Evo2 GPU dependency stack from lockfile.
 
 # Fail-fast runtime verification. Do not continue when any required import is missing.
 uv run python - <<'PY'
@@ -240,8 +245,8 @@ if missing:
     raise SystemExit(1)
 PY
 
-uv run infer adapters list
-uv run infer validate config --config src/dnadesign/infer/workspaces/test_stress_ethanol/config.yaml
+uv run infer adapters list # Confirm Evo2 adapter visibility in this environment.
+uv run infer validate config --config src/dnadesign/infer/workspaces/test_stress_ethanol/config.yaml # Validate workspace config contracts.
 
 # Real execution smoke (loads evo2_7b and runs one inference).
 uv run infer extract \
@@ -269,7 +274,7 @@ Use these checks to verify Evo2 usage contracts in infer:
 - mean pooling follows `e = (1/n) * Σ_j E_j` over token positions.
 
 ```bash
-uv run python - <<'PY'
+uv run python - <<'PY' # Run API-level extraction and generation sanity checks.
 from dnadesign.infer import run_extract, run_generate
 
 seqs = ["ACGTACGT", "ACGT"]
@@ -323,12 +328,12 @@ PY
 Model prefetch without runtime:
 
 ```bash
-TARGET_MODEL_ID=evo2_7b HF_HOME="$HF_HOME_7B" uv run python - <<'PY'
+TARGET_MODEL_ID=evo2_7b HF_HOME="$HF_HOME_7B" uv run python - <<'PY' # Prefetch evo2_7b weights into cache.
 from huggingface_hub import snapshot_download
 print(snapshot_download("arcinstitute/evo2_7b"))
 PY
 
-TARGET_MODEL_ID=evo2_20b HF_HOME="$HF_HOME_20B" uv run python - <<'PY'
+TARGET_MODEL_ID=evo2_20b HF_HOME="$HF_HOME_20B" uv run python - <<'PY' # Prefetch evo2_20b weights into cache.
 from huggingface_hub import snapshot_download
 print(snapshot_download("arcinstitute/evo2_20b"))
 PY
@@ -341,6 +346,7 @@ PY
 If the verification block prints `MISSING_REQUIRED`, rebuild the two compiled extensions explicitly:
 
 ```bash
+# Rebuild compiled GPU extensions in the locked Evo2 environment.
 uv sync --locked --extra infer-evo2 \
   --reinstall-package flash-attn \
   --reinstall-package transformer-engine-torch
@@ -349,17 +355,17 @@ uv sync --locked --extra infer-evo2 \
 If this same environment also needs test/lint tools, keep extras and group together:
 
 ```bash
-uv sync --locked --group dev --extra infer-evo2
+uv sync --locked --group dev --extra infer-evo2 # Add dev tooling alongside Evo2 runtime extras.
 ```
 
 If the node is memory-constrained, rerun with:
 
 ```bash
-export UV_CONCURRENT_BUILDS=1
-export UV_CONCURRENT_INSTALLS=1
-export MAX_JOBS=1
-export CMAKE_BUILD_PARALLEL_LEVEL=1
-export OMP_NUM_THREADS=1
+export UV_CONCURRENT_BUILDS=1 # Serialize concurrent build operations.
+export UV_CONCURRENT_INSTALLS=1 # Serialize concurrent install operations.
+export MAX_JOBS=1 # Limit compiler worker jobs.
+export CMAKE_BUILD_PARALLEL_LEVEL=1 # Limit CMake parallelism.
+export OMP_NUM_THREADS=1 # Limit OpenMP thread usage.
 ```
 
 ### Why this setup works

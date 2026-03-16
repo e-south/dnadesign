@@ -13,11 +13,12 @@ Dunlop Lab
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 import torch
+
+from dnadesign.usr_roots import normalize_usr_root, resolve_usr_root_from_env
 
 from .._logging import get_logger
 from ..errors import ValidationError
@@ -73,13 +74,11 @@ def load_pt_file_input(path: str, field: str) -> Tuple[List[str], List[Dict]]:
 
 
 def _default_usr_root() -> Path:
-    """Default to env var DNADESIGN_USR_ROOT if set, else repo layout."""
-    env = os.environ.get("DNADESIGN_USR_ROOT")
-    if env:
-        return Path(env).expanduser().resolve()
-    import dnadesign.usr as usr_pkg
-
-    return (Path(usr_pkg.__file__).resolve().parent / "datasets").resolve()
+    """Return the configured USR root from DNADESIGN_USR_ROOT."""
+    resolved = resolve_usr_root_from_env()
+    if resolved is None:
+        raise ValidationError("USR ingest requires ingest.root or DNADESIGN_USR_ROOT.")
+    return resolved
 
 
 def load_usr_input(
@@ -94,7 +93,7 @@ def load_usr_input(
     except Exception as e:
         raise ValidationError("dnadesign.usr is not importable. Is dnadesign installed in editable mode?") from e
 
-    ds_root = Path(root) if root else _default_usr_root()
+    ds_root = normalize_usr_root(root) if root else _default_usr_root()
     ds = Dataset(ds_root, dataset_name)
 
     rec_path = ds.records_path
@@ -132,3 +131,34 @@ def load_usr_input(
     if bad:
         raise ValidationError(f"{len(bad)} empty/invalid sequences found in USR ingest.")
     return seqs, ids, ds
+
+
+def preflight_usr_input(
+    *,
+    dataset_name: str,
+    field: str = "sequence",
+    root: str | Path | None = None,
+) -> None:
+    """Validate that a USR dataset exists and exposes the required columns."""
+    try:
+        from dnadesign.usr import Dataset  # local package, same repo
+    except Exception as e:
+        raise ValidationError("dnadesign.usr is not importable. Is dnadesign installed in editable mode?") from e
+
+    ds_root = normalize_usr_root(root) if root else _default_usr_root()
+    ds = Dataset(ds_root, dataset_name)
+    rec_path = ds.records_path
+    if not rec_path.exists():
+        raise ValidationError(f"USR dataset not initialized or missing: {rec_path}")
+
+    import pyarrow.parquet as pq
+
+    try:
+        schema_names = set(pq.read_schema(rec_path).names)
+    except Exception as error:
+        raise ValidationError(f"Unable to read USR dataset schema: {rec_path}") from error
+
+    missing = [name for name in ("id", field) if name not in schema_names]
+    if missing:
+        rendered = ", ".join(missing)
+        raise ValidationError(f"USR dataset missing required column(s): {rendered}")

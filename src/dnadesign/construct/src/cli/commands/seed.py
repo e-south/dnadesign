@@ -19,6 +19,7 @@ from dnadesign.usr import default_usr_root
 
 from ...errors import ConstructError
 from ...seed import bootstrap_promoter_swap_demo, import_seed_manifest
+from ._errors import exit_with_error
 
 seed_app = typer.Typer(
     no_args_is_help=True,
@@ -43,9 +44,8 @@ def import_manifest(
 ) -> None:
     try:
         result = import_seed_manifest(root=root, manifest=manifest)
-    except ConstructError as exc:
-        typer.echo(f"Error: {exc}")
-        raise typer.Exit(1) from exc
+    except (ConstructError, OSError) as exc:
+        exit_with_error(exc, code=1)
 
     typer.echo(f"seed_root: {result.root}")
     typer.echo(f"manifest_id: {result.manifest_id}")
@@ -78,9 +78,8 @@ def promoter_swap_demo(
 ) -> None:
     try:
         result = bootstrap_promoter_swap_demo(root=root, manifest=manifest)
-    except ConstructError as exc:
-        typer.echo(f"Error: {exc}")
-        raise typer.Exit(1) from exc
+    except (ConstructError, OSError) as exc:
+        exit_with_error(exc, code=1)
 
     typer.echo(f"seed_root: {result.root}")
     typer.echo(f"anchor_dataset: {result.anchor_dataset}")

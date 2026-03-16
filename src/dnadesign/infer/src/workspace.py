@@ -90,13 +90,18 @@ def resolve_workspace_template(template: Optional[Path], *, profile: str = "loca
     resolved = (_infer_root() / "docs" / "operations" / "examples" / template_name).resolve()
     if not resolved.exists() or not resolved.is_file():
         raise ConfigError(
-            "default workspace template not found: "
-            f"{resolved}. Pass --template with an explicit config path."
+            f"default workspace template not found: {resolved}. Pass --template with an explicit config path."
         )
     return resolved
 
 
-def init_workspace(*, workspace_id: str, root: Optional[Path], template: Optional[Path], profile: str = "local") -> Path:
+def init_workspace(
+    *,
+    workspace_id: str,
+    root: Optional[Path],
+    template: Optional[Path],
+    profile: str = "local",
+) -> Path:
     workspace_name = normalize_workspace_id(workspace_id)
     root_path, _source = resolve_workspace_root(root)
     template_path = resolve_workspace_template(template, profile=profile)

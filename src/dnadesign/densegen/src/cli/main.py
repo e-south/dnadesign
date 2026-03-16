@@ -691,6 +691,8 @@ _REGISTER_TARGET_TO_CALLABLE: dict[str, Callable[[], None]] = {
     "run": _register_run_commands,
 }
 
+_LAZY_REGISTER_ATTR = "__densegen_lazy_register__"
+
 
 def _ensure_commands_registered(scope: str | None) -> None:
     targets = sorted(_registration_targets_for_scope(scope))
@@ -704,8 +706,11 @@ def _ensure_commands_registered(scope: str | None) -> None:
         _REGISTERED_TARGETS.add(target)
 
 
+setattr(app, _LAZY_REGISTER_ATTR, _ensure_commands_registered)
+
+
 def _patch_typer_testing_get_command(
-    patched_get_command: Callable,
+    patched_get_command: Callable | None = None,
     *,
     typer_testing_module=None,
 ) -> None:
@@ -714,24 +719,40 @@ def _patch_typer_testing_get_command(
         import typer.testing as testing
     if not hasattr(testing, "_get_command"):
         raise RuntimeError("typer.testing._get_command hook is unavailable.")
-    testing._get_command = patched_get_command
+    patch_flag = "__densegen_testing_lazy_patch__"
+    original = testing._get_command
+    if getattr(original, patch_flag, False):
+        return
+
+    def _patched_testing_get_command(typer_instance):
+        register = getattr(typer_instance, _LAZY_REGISTER_ATTR, None)
+        if callable(register):
+            # typer.testing.CliRunner.invoke() passes args directly and does not
+            # expose the invoked subcommand via sys.argv.
+            register(None)
+        delegate = patched_get_command if patched_get_command is not None else original
+        return delegate(typer_instance)
+
+    setattr(_patched_testing_get_command, patch_flag, True)
+    testing._get_command = _patched_testing_get_command
 
 
 def _patch_typer_get_command_for_lazy_registration() -> None:
-    patch_flag = "__densegen_lazy_patch__"
+    patch_flag = "__densegen_runtime_lazy_patch__"
     original = typer.main.get_command
     if getattr(original, patch_flag, False):
         return
 
     def _patched_get_command(typer_instance):
-        if typer_instance is app:
+        register = getattr(typer_instance, _LAZY_REGISTER_ATTR, None)
+        if callable(register):
             scope = _command_scope_from_argv(sys.argv[1:])
-            _ensure_commands_registered(scope=scope)
+            register(scope)
         return original(typer_instance)
 
     setattr(_patched_get_command, patch_flag, True)
     typer.main.get_command = _patched_get_command
-    _patch_typer_testing_get_command(_patched_get_command)
+    _patch_typer_testing_get_command()
 
 
 _patch_typer_get_command_for_lazy_registration()

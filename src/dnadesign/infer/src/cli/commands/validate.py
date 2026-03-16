@@ -18,8 +18,8 @@ import typer
 import yaml
 
 from ...config import RootConfig
-from ...input_parsing import read_ids_arg
 from ...ingest.sources import load_usr_input
+from ...input_parsing import read_ids_arg
 from ...runtime.capacity_planner import probe_gpu_inventory, validate_model_hardware_contract
 from ...usr_registry import derive_usr_registry_spec
 from ..common import discovery_config, raise_cli_error
@@ -40,7 +40,8 @@ def register(app: typer.Typer) -> None:
             if root.model.device.startswith("cuda") and inventory.count == 0:
                 console.print(
                     "[yellow]Capacity check skipped: no local GPU inventory detected. "
-                    "Run this check on a GPU node or use ops runbook planning for declared scheduler resources.[/yellow]"
+                    "Run this check on a GPU node or use ops runbook planning "
+                    "for declared scheduler resources.[/yellow]"
                 )
             else:
                 validate_model_hardware_contract(model=root.model, inventory=inventory)
@@ -68,7 +69,10 @@ def register(app: typer.Typer) -> None:
         except Exception as error:
             raise_cli_error(error)
 
-    @validate_app.command("usr-registry", help="Render the required USR namespace registration spec for infer write-back jobs.")
+    @validate_app.command(
+        "usr-registry",
+        help="Render the required USR namespace registration spec for infer write-back jobs.",
+    )
     def validate_usr_registry(
         config: Optional[Path] = typer.Option(None, "--config"),
         job: Optional[str] = typer.Option(None, "--job", help="Restrict to one job id."),

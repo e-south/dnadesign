@@ -42,9 +42,17 @@ def echo_validate_result(*, config_path: Path, loaded: JobConfig, preflight: Pre
     typer.echo(f"template_sha256: {preflight.template_sha256}")
     typer.echo(f"realize_mode: {preflight.realize_mode}")
     typer.echo(f"focal_part: {preflight.focal_part or ''}")
-    typer.echo(f"focal_point: {preflight.focal_point}")
-    typer.echo(f"anchor_offset_bp: {preflight.anchor_offset_bp}")
-    typer.echo(f"window_bp: {preflight.window_bp if preflight.window_bp is not None else ''}")
+    typer.echo(f"window_semantics: {preflight.window_semantics or ''}")
+    typer.echo(f"window_reference: {preflight.window_reference or ''}")
+    typer.echo(f"window_direction: {preflight.window_direction or ''}")
+    typer.echo(f"window_size_bp: {preflight.window_size_bp if preflight.window_size_bp is not None else ''}")
+    typer.echo(
+        f"window_upstream_bp: {preflight.window_upstream_bp if preflight.window_upstream_bp is not None else ''}"
+    )
+    typer.echo(
+        f"window_downstream_bp: {preflight.window_downstream_bp if preflight.window_downstream_bp is not None else ''}"
+    )
+    typer.echo(f"window_offset_bp: {preflight.window_offset_bp if preflight.window_offset_bp is not None else ''}")
     typer.echo(f"spec_id: {preflight.spec_id}")
     typer.echo(f"output_on_conflict: {preflight.output_on_conflict}")
     typer.echo(f"existing_output_collisions: {preflight.existing_output_collisions}")
@@ -67,7 +75,8 @@ def echo_validate_result(*, config_path: Path, loaded: JobConfig, preflight: Pre
             "row: "
             f"input_id={row.input_id} "
             f"output_id={row.output_id} "
-            f"anchor_length={row.anchor_length} "
+            f"input_length={row.input_length} "
+            f"focal_part_length={row.focal_part_length if row.focal_part_length is not None else ''} "
             f"full_construct_length={row.full_construct_length} "
             f"output_length={row.output_length}"
         )

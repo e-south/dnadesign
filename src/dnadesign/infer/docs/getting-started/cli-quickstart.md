@@ -1,5 +1,8 @@
 ## infer CLI quickstart
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-03-15
+
 This quickstart validates the infer command surface before full pressure-test workflows.
 
 ### 1) Validate a config contract

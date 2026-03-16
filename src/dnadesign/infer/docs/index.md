@@ -1,7 +1,7 @@
 ## infer docs index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-07
+**Last verified:** 2026-03-15
 
 Use [docs/README.md](README.md) as the workflow-first entrypoint. This page is a compact by-type index.
 
@@ -13,6 +13,10 @@ Use [docs/README.md](README.md) as the workflow-first entrypoint. This page is a
 ### Tutorials
 
 - [End-to-end pressure-test demo (infer + usr + ops + notify)](tutorials/demo_pressure_test_usr_ops_notify.md)
+- [Multi-source source-of-truth assembly](../../usr/docs/operations/multi-source-source-of-truth-assembly.md)
+- [Construct -> USR -> Infer source-of-truth demo](../../usr/docs/operations/construct-infer-source-of-truth-demo.md)
+- [Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md)
+- [USR dataset with infer-derived X -> OPAL active learning](../../opal/docs/workflows/usr-infer-x-active-learning.md)
 
 ### Operations
 

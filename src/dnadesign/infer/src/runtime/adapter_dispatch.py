@@ -43,9 +43,7 @@ def invoke_extract_callable(
     if method_name == "embedding":
         layer = params.get("layer")
         if not isinstance(layer, str) or not layer.strip():
-            raise CapabilityError(
-                "embedding output requires params.layer with a non-empty layer name."
-            )
+            raise CapabilityError("embedding output requires params.layer with a non-empty layer name.")
         return fn(chunk, **params, fmt=output_format)
     raise CapabilityError(f"Unsupported extract function '{method_name}' in v1")
 

@@ -50,7 +50,13 @@ if ! uv run infer validate config --config "$INFER_CONFIG"; then
   exit 3
 fi
 
-if ! uv run infer run --config "$INFER_CONFIG"; then
+infer_run_args=()
+if [[ -n "${INFER_RUN_ARGS:-}" ]]; then
+  # shellcheck disable=SC2206
+  infer_run_args=($INFER_RUN_ARGS)
+fi
+
+if ! uv run infer run --config "$INFER_CONFIG" "${infer_run_args[@]}"; then
   echo "infer run failed" >&2
   exit 4
 fi

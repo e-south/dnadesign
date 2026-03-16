@@ -79,6 +79,20 @@ def test_densegen_usr_notify_tutorial_keeps_walkthrough_progression() -> None:
         ],
         label=path.name,
     )
+    assert 'notify setup resolve-events --tool densegen --config "$CONFIG" --json' in text
+    assert (
+        'notify usr-events watch --tool densegen --config "$CONFIG" --provider generic --url "$NOTIFY_WEBHOOK" '
+        "--dry-run --no-advance-cursor-on-dry-run" in text
+    )
+    assert (
+        'notify setup slack --tool densegen --config "$CONFIG" --secret-source env --url-env NOTIFY_WEBHOOK' not in text
+    )
+
+
+def test_densegen_docs_route_to_shared_multi_source_runbook() -> None:
+    text = _read(DOCS_ROOT / "README.md")
+    assert "../../usr/docs/operations/multi-source-source-of-truth-assembly.md" in text
+    assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" in text
 
 
 def test_densegen_howto_guides_keep_scope_sentence() -> None:

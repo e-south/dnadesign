@@ -122,6 +122,72 @@ jobs:
     assert captured["job_root"] == usr_root.resolve().as_posix()
 
 
+def test_run_config_usr_ingest_requires_explicit_root_or_env(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: j1
+    operation: extract
+    ingest:
+      source: usr
+      dataset: demo
+      field: sequence
+    outputs:
+      - id: ll
+        fn: evo2.log_likelihood
+        format: float
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(app, ["run", "--config", config_path.as_posix(), "--dry-run"])
+
+    assert result.exit_code != 0
+    assert "USR ingest requires ingest.root or DNADESIGN_USR_ROOT." in (result.stdout or "")
+
+
+def test_run_config_dry_run_fails_when_usr_dataset_is_missing(tmp_path: Path) -> None:
+    usr_root = tmp_path / "outputs" / "usr_datasets"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: j1
+    operation: extract
+    ingest:
+      source: usr
+      dataset: missing_demo
+      root: outputs/usr_datasets
+      field: sequence
+    outputs:
+      - id: ll
+        fn: evo2.log_likelihood
+        format: float
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(app, ["run", "--config", config_path.as_posix(), "--dry-run"])
+
+    assert result.exit_code != 0
+    assert "USR dataset not initialized or missing" in (result.stdout or "")
+
+
 def test_run_rejects_mixed_config_and_preset_modes(tmp_path: Path) -> None:
     (tmp_path / "inputs").mkdir(parents=True, exist_ok=True)
     (tmp_path / "inputs" / "seqs.txt").write_text("ACGT\n", encoding="utf-8")

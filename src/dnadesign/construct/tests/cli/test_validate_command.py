@@ -17,6 +17,7 @@ from typer.testing import CliRunner
 
 from dnadesign.construct.cli import app
 from dnadesign.usr import Dataset
+from dnadesign.usr import SchemaError as USRSchemaError
 
 _RUNNER = CliRunner()
 
@@ -54,6 +55,7 @@ job:
   input:
     source: usr
     dataset: anchors_demo
+    root: outputs/usr_datasets
   template:
     id: template_demo
     sequence: AAAATTTTCCCCGGGG
@@ -88,6 +90,48 @@ job:
     assert "job_id: demo_job" in (result.stdout or "")
 
 
+def test_validate_config_rejects_usr_input_without_explicit_root(tmp_path: Path) -> None:
+    config_path = tmp_path / "config_missing_root.yaml"
+    config_path.write_text(
+        """
+job:
+  id: demo_job
+  input:
+    source: usr
+    dataset: anchors_demo
+  template:
+    id: template_demo
+    sequence: AAAATTTTCCCCGGGG
+    circular: true
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        start: 4
+        end: 8
+        orientation: forward
+        expected_template_sequence: TTTT
+  realize:
+    mode: window
+    focal_part: anchor
+    focal_point: center
+    window_bp: 8
+  output:
+    dataset: anchors_demo_constructed
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "config", "--config", config_path.as_posix()])
+
+    assert result.exit_code == 1
+    assert "job.input.root is required for construct jobs that read USR datasets" in (result.stdout or "")
+
+
 def test_validate_config_rejects_missing_input_driven_part(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
@@ -97,6 +141,7 @@ job:
   input:
     source: usr
     dataset: anchors_demo
+    root: outputs/usr_datasets
   template:
     id: template_demo
     sequence: AAAATTTTCCCCGGGG
@@ -124,6 +169,100 @@ job:
 
     assert result.exit_code == 1
     assert "must include at least one source='input_field' part" in (result.stdout or "")
+
+
+def test_validate_config_accepts_explicit_window_block(tmp_path: Path) -> None:
+    config_path = tmp_path / "config_window_block.yaml"
+    config_path.write_text(
+        """
+job:
+  id: demo_window_block
+  input:
+    source: usr
+    dataset: anchors_demo
+    root: outputs/usr_datasets
+  template:
+    id: template_demo
+    sequence: AAAATTTTCCCCGGGG
+    circular: true
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        start: 4
+        end: 8
+        orientation: forward
+        expected_template_sequence: TTTT
+  realize:
+    mode: window
+    focal_part: anchor
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 8
+      offset_bp: 0
+  output:
+    dataset: anchors_demo_constructed
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "config", "--config", config_path.as_posix()])
+
+    assert result.exit_code == 0, result.stdout
+    assert "Config OK:" in (result.stdout or "")
+
+
+def test_validate_config_rejects_mixed_window_and_legacy_fields(tmp_path: Path) -> None:
+    config_path = tmp_path / "config_mixed_window_legacy.yaml"
+    config_path.write_text(
+        """
+job:
+  id: demo_mixed_window
+  input:
+    source: usr
+    dataset: anchors_demo
+    root: outputs/usr_datasets
+  template:
+    id: template_demo
+    sequence: AAAATTTTCCCCGGGG
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        start: 4
+        end: 8
+        orientation: forward
+        expected_template_sequence: TTTT
+  realize:
+    mode: window
+    focal_part: anchor
+    focal_point: center
+    window_bp: 8
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 8
+  output:
+    dataset: anchors_demo_constructed
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "config", "--config", config_path.as_posix()])
+
+    assert result.exit_code == 1
+    assert "Use either realize.window or the legacy" in (result.stdout or "")
 
 
 def test_validate_config_runtime_reports_preflight_summary(tmp_path: Path) -> None:
@@ -186,9 +325,11 @@ job:
     assert "template_sha256:" in output
     assert "realize_mode: window" in output
     assert "focal_part: anchor" in output
-    assert "focal_point: center" in output
-    assert "anchor_offset_bp: 0" in output
-    assert "window_bp: 8" in output
+    assert "window_semantics: fixed_total" in output
+    assert "window_reference: center" in output
+    assert "window_direction: symmetric" in output
+    assert "window_size_bp: 8" in output
+    assert "window_offset_bp: 0" in output
     assert "spec_id:" in output
     assert "output_on_conflict: error" in output
     assert "existing_output_collisions: 0" in output
@@ -198,6 +339,52 @@ job:
     assert "expected_template_sequence=CCCC" in output
     assert "rows_total: 1" in output
     assert "output_id=" in output
+
+
+def test_validate_config_runtime_shapes_usr_preflight_errors(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "config_runtime_usr_error.yaml"
+    config_path.write_text(
+        """
+job:
+  id: runtime_usr_error
+  input:
+    source: usr
+    dataset: anchors_demo
+    root: outputs/usr_datasets
+  template:
+    id: template_demo
+    sequence: AAAATTTTCCCCGGGG
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        start: 4
+        end: 8
+        orientation: forward
+        expected_template_sequence: TTTT
+  realize:
+    mode: window
+    focal_part: anchor
+    focal_point: center
+    window_bp: 8
+  output:
+    dataset: anchors_demo_constructed
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "dnadesign.construct.src.api._runtime_preflight_from_config",
+        lambda path: (_ for _ in ()).throw(USRSchemaError("registry schema mismatch")),
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "config", "--config", config_path.as_posix(), "--runtime"])
+
+    assert result.exit_code == 1
+    assert "construct preflight failed while reading USR inputs: registry schema mismatch" in (result.stdout or "")
 
 
 def test_validate_config_runtime_shields_template_path_io_errors(tmp_path: Path) -> None:

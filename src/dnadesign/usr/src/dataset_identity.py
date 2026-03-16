@@ -62,4 +62,10 @@ def open_dataset(
         except ValueError as error:
             raise SequencesError(f"Dataset path must live under root: {root_path}") from error
         return dataset_factory(root_path, rel.as_posix())
-    return dataset_factory(root_path, normalize_dataset_id(str(name_or_path), legacy_dataset_prefix=legacy_dataset_prefix))
+    return dataset_factory(
+        root_path,
+        normalize_dataset_id(
+            str(name_or_path),
+            legacy_dataset_prefix=legacy_dataset_prefix,
+        ),
+    )

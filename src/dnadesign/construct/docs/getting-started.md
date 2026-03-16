@@ -1,11 +1,11 @@
 ## construct getting started
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-14
+**Last verified:** 2026-03-15
 
 This page gets you from zero to a validated construct run with the fewest moving parts.
 
-### Path 1: packaged demo
+### Path 1: packaged isolated demo
 
 ```bash
 uv run construct workspace init --id demo_promoter_swap --profile promoter-swap-demo
@@ -16,7 +16,18 @@ uv run construct workspace doctor --workspace .
 
 Use this path when you want a known-good tracer bullet. By default it keeps construct IO inside `outputs/usr_datasets` in the workspace. If the workspace lives outside the repo tree, reuse the `uv run --project /path/to/dnadesign construct ...` commands printed by `workspace init`.
 
-### Path 2: blank custom workspace
+### Path 2: packaged shared source-of-truth demo
+
+```bash
+uv run construct workspace init --id demo_construct_source_of_truth --profile promoter-swap-source-of-truth-demo
+cd src/dnadesign/construct/workspaces/demo_construct_source_of_truth
+uv run construct workspace doctor --workspace .
+./runbook.sh --mode dry-run-all
+```
+
+Use this path when both packaged window projects should accumulate into one semantic USR dataset before infer or Notify pick it up. The profile keeps the source-of-truth contract explicit in `construct.workspace.yaml` instead of relying on manual config repointing.
+
+### Path 3: blank custom workspace
 
 ```bash
 uv run construct workspace init --id my_construct_study
@@ -28,6 +39,8 @@ uv run construct seed import-manifest \
 ```
 
 Then edit `config.yaml`, update `construct.workspace.yaml`, run `workspace validate-project --runtime`, and finish with `workspace run-project --dry-run`.
+
+The blank scaffold now writes explicit workspace-local `root: outputs/usr_datasets` entries into `config.yaml` so custom studies stay fail-fast and workspace-scoped by default.
 
 ### Keep the model simple
 
@@ -41,5 +54,6 @@ Then edit `config.yaml`, update `construct.workspace.yaml`, run `workspace valid
 - [Docs overview](README.md)
 - [Docs index](index.md)
 - [Workspaces guide](../workspaces/README.md)
+- [Construct -> USR -> Infer source-of-truth demo](../../usr/docs/operations/construct-infer-source-of-truth-demo.md)
 - [Config reference](reference/config.md)
 - [Workspace registry reference](reference/workspace-registry.md)

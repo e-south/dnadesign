@@ -49,7 +49,7 @@ The wrapper also carries a project-root hint for `uv run --project ...`; overrid
 Run these commands from the workspace root:
 
 ```bash
-set -euo pipefail
+set -euo pipefail # Fail fast on errors, unset variables, and pipe failures.
 
 # Bootstrap the local demo inputs and write a manifest with record ids.
 uv run construct seed promoter-swap-demo \
@@ -57,24 +57,26 @@ uv run construct seed promoter-swap-demo \
   --manifest "$PWD/inputs/seed_manifest.yaml"
 
 # Inspect the workspace registry, verify drift, and inspect seeded labels.
-uv run construct workspace show --workspace .
-uv run construct workspace doctor --workspace .
+uv run construct workspace show --workspace . # Print workspace registry entries and resolved paths.
+uv run construct workspace doctor --workspace . # Check workspace registry/config consistency.
+# Inspect seeded promoter records and label fields.
 uv run usr --root "$PWD/outputs/usr_datasets" head mg1655_promoters -n 10 \
-  --columns id,usr_label__primary,usr_label__aliases,sequence
+  --columns id,usr_label__primary,usr_label__aliases,sequence # Show seeded promoter labels and aliases.
+# Inspect seeded plasmid records and label fields.
 uv run usr --root "$PWD/outputs/usr_datasets" head plasmids -n 10 \
-  --columns id,usr_label__primary,usr_label__aliases,sequence
+  --columns id,usr_label__primary,usr_label__aliases,sequence # Show seeded plasmid labels and aliases.
 
 # Validate and dry-run a 1 kb context realization around the slot_a incumbent.
-uv run construct validate config --config "$PWD/config.slot_a.window.yaml" --runtime
-uv run construct run --config "$PWD/config.slot_a.window.yaml" --dry-run
+uv run construct validate config --config "$PWD/config.slot_a.window.yaml" --runtime # Validate slot_a window config with runtime paths.
+uv run construct run --config "$PWD/config.slot_a.window.yaml" --dry-run # Preview slot_a window outputs without mutating USR state.
 
 # Materialize the slot_a 1 kb outputs into workspace-local USR.
-uv run construct run --config "$PWD/config.slot_a.window.yaml"
-uv run usr --root "$PWD/outputs/usr_datasets" validate pdual10_slot_a_window_1kb_demo --strict
+uv run construct run --config "$PWD/config.slot_a.window.yaml" # Materialize slot_a window outputs.
+uv run usr --root "$PWD/outputs/usr_datasets" validate pdual10_slot_a_window_1kb_demo --strict # Confirm the written output dataset satisfies the active USR registry.
 
 # Validate and dry-run the full-plasmid realization for the same slot.
-uv run construct validate config --config "$PWD/config.slot_a.full.yaml" --runtime
-uv run construct run --config "$PWD/config.slot_a.full.yaml" --dry-run
+uv run construct validate config --config "$PWD/config.slot_a.full.yaml" --runtime # Validate slot_a full-plasmid config with runtime paths.
+uv run construct run --config "$PWD/config.slot_a.full.yaml" --dry-run # Preview the slot_a full-plasmid output without writing records.
 ```
 
 ### Variations

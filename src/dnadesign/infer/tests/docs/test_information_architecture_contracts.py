@@ -78,6 +78,11 @@ def test_infer_docs_readme_keeps_workflow_then_type_progressive_disclosure() -> 
     assert "../workspaces/README.md" in docs_readme
     assert "operations/pressure-test-agnostic-models.md" in docs_readme
     assert "tutorials/demo_pressure_test_usr_ops_notify.md" in docs_readme
+    assert "../../usr/docs/operations/multi-source-source-of-truth-assembly.md" in docs_readme
+    assert "../../usr/docs/operations/construct-infer-source-of-truth-demo.md" in docs_readme
+    assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" in docs_readme
+    assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" in docs_readme
+    assert "../../cluster/README.md" in docs_readme
     assert "reference/README.md" in docs_readme
     assert "architecture/README.md" in docs_readme
     assert "dev/README.md" in docs_readme
@@ -93,6 +98,10 @@ def test_infer_docs_index_exists_and_points_back_to_docs_readme() -> None:
     assert "### Operations" in docs_index
     assert "### Reference" in docs_index
     assert "### Developer notes" in docs_index
+    assert "../../usr/docs/operations/multi-source-source-of-truth-assembly.md" in docs_index
+    assert "../../usr/docs/operations/construct-infer-source-of-truth-demo.md" in docs_index
+    assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" in docs_index
+    assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" in docs_index
 
 
 def test_infer_operations_index_links_pressure_test_demo_and_runbook() -> None:
@@ -100,6 +109,7 @@ def test_infer_operations_index_links_pressure_test_demo_and_runbook() -> None:
     assert "pressure-test-agnostic-models.md" in ops_index
     assert "../tutorials/demo_pressure_test_usr_ops_notify.md" in ops_index
     assert "scc-evo2-gpu-uv-runbook.md" in ops_index
+    assert "../../../usr/docs/operations/construct-infer-source-of-truth-demo.md" in ops_index
 
 
 def test_infer_pressure_test_tutorial_covers_local_and_ops_paths() -> None:
@@ -112,6 +122,7 @@ def test_infer_pressure_test_tutorial_covers_local_and_ops_paths() -> None:
     assert "layer` values `mid` and `final`" in tutorial
     assert "uv run ops runbook init" in tutorial
     assert "uv run ops runbook execute" in tutorial
+    assert 'export OPS_RUNBOOK="$WORKSPACE_ROOT/outputs/logs/ops/runbooks/infer-pressure.runbook.yaml"' in tutorial
     assert "--no-submit" in tutorial
     assert "--submit" in tutorial
     assert "uv run usr --root" in tutorial

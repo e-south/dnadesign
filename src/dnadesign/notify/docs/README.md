@@ -3,12 +3,12 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-01
 
-Tool-local docs live here. Cross-tool workflows stay in top-level `docs/`.
+Tool-local docs live here. Cross-tool workflows stay in shared operator docs, either under top-level `docs/` or the boundary-owning tool's operations docs when one tool owns the durable handoff.
 
 ### Ownership boundary
 
 - Tool-local (`src/dnadesign/notify/docs/`): command/reference contracts and maintainer internals.
-- Top-level (`docs/notify/`): operator route map and shared workflow runbook.
+- Shared operator docs (`docs/notify/` and boundary-owning operations docs such as `src/dnadesign/usr/docs/operations/`): operator route maps and cross-tool runbooks.
 
 ### Start here
 

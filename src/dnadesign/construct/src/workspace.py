@@ -25,6 +25,7 @@ from .errors import ConfigError
 
 _WORKSPACE_PROFILE_DIR = {
     "promoter-swap-demo": "demo_promoter_swap_pdual10",
+    "promoter-swap-source-of-truth-demo": "demo_promoter_swap_pdual10_source_of_truth",
 }
 _WORKSPACE_REGISTRY_NAME = "construct.workspace.yaml"
 
@@ -32,9 +33,12 @@ _INPUTS_README = """# construct workspace inputs
 
 - `construct` now expects both anchors and templates to live in USR datasets.
 - Keep workspace-level project inventory and provenance in `construct.workspace.yaml`.
-- Use `uv run construct seed promoter-swap-demo --manifest inputs/seed_manifest.yaml`
-  when you want the curated `mg1655_promoters` and `plasmids` datasets seeded into this
+- Use `uv run construct seed import-manifest --manifest inputs/import_manifest.template.yaml`
+  when you want to materialize your own curated inputs and templates into this
   workspace's `outputs/usr_datasets/` root.
+- When you want the packaged `mg1655_promoters` and `plasmids` tracer-bullet datasets,
+  scaffold a packaged promoter-swap workspace with `construct workspace init --profile promoter-swap-demo`
+  or `construct workspace init --profile promoter-swap-source-of-truth-demo`.
 - Omit `--root` only when you deliberately want to seed the canonical shared USR root at
   `src/dnadesign/usr/datasets/`.
 - Keep human-readable sequence names in `usr_label__primary` / `usr_label__aliases`; keep
@@ -49,7 +53,7 @@ datasets:
     notes: Example anchor inputs for a custom construct study.
     records:
       - label: example_anchor
-        role: anchor
+        intended_role: anchor
         topology: linear
         aliases: [example_anchor_alias]
         source_ref: replace-with-canonical-source
@@ -58,7 +62,7 @@ datasets:
     notes: Example template records for a custom construct study.
     records:
       - label: example_template
-        role: template
+        intended_role: template
         topology: circular
         aliases: [example_template_alias]
         source_ref: replace-with-canonical-source
@@ -70,13 +74,13 @@ _CONFIG_TEMPLATE = """job:
   input:
     source: usr
     dataset: REPLACE_WITH_ANCHOR_DATASET
-    # root: outputs/usr_datasets
+    root: outputs/usr_datasets
     field: sequence
   template:
     id: REPLACE_WITH_TEMPLATE_LABEL
     kind: usr
     dataset: REPLACE_WITH_TEMPLATE_DATASET
-    # root: outputs/usr_datasets
+    root: outputs/usr_datasets
     record_id: REPLACE_WITH_TEMPLATE_RECORD_ID
     field: sequence
     circular: true
@@ -95,12 +99,15 @@ _CONFIG_TEMPLATE = """job:
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    anchor_offset_bp: 0
-    window_bp: 1000
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 1000
+      offset_bp: 0
   output:
     dataset: REPLACE_WITH_OUTPUT_DATASET
-    # root: outputs/usr_datasets
+    root: outputs/usr_datasets
 """
 
 
@@ -503,21 +510,35 @@ def init_workspace(*, workspace_id: str, root: str | None = None, profile: str =
     workspace_dir = workspace_root / workspace_id
     if workspace_dir.exists():
         raise ConfigError(f"workspace already exists: {workspace_dir}")
+    if workspace_root.exists() and not workspace_root.is_dir():
+        raise ConfigError(f"workspace root must be a directory: {workspace_root}")
 
-    workspace_root.mkdir(parents=True, exist_ok=True)
     resolved_profile = validate_workspace_profile(profile)
     template_dir, _template_source = workspace_template_with_source(resolved_profile)
-    if template_dir is None:
-        workspace_dir.mkdir(parents=False, exist_ok=False)
-        _copy_blank_workspace(workspace_dir, workspace_id=workspace_id)
-    else:
-        shutil.copytree(template_dir, workspace_dir)
-        _rewrite_workspace_registry_identity(
-            workspace_dir=workspace_dir,
-            workspace_id=workspace_id,
-            profile=resolved_profile,
-        )
-        _rewrite_packaged_runbook_project_root(workspace_dir=workspace_dir)
-
-    (workspace_dir / "outputs" / "logs" / "ops" / "audit").mkdir(parents=True, exist_ok=True)
+    created_workspace = False
+    try:
+        workspace_root.mkdir(parents=True, exist_ok=True)
+        if template_dir is None:
+            workspace_dir.mkdir(parents=False, exist_ok=False)
+            created_workspace = True
+            _copy_blank_workspace(workspace_dir, workspace_id=workspace_id)
+        else:
+            created_workspace = True
+            shutil.copytree(template_dir, workspace_dir)
+            _rewrite_workspace_registry_identity(
+                workspace_dir=workspace_dir,
+                workspace_id=workspace_id,
+                profile=resolved_profile,
+            )
+            _rewrite_packaged_runbook_project_root(workspace_dir=workspace_dir)
+        (workspace_dir / "outputs" / "logs" / "ops" / "audit").mkdir(parents=True, exist_ok=True)
+    except ConfigError:
+        if created_workspace and workspace_dir.exists():
+            shutil.rmtree(workspace_dir, ignore_errors=True)
+        raise
+    except OSError as exc:
+        if created_workspace and workspace_dir.exists():
+            shutil.rmtree(workspace_dir, ignore_errors=True)
+        detail = exc.strerror or str(exc)
+        raise ConfigError(f"construct workspace could not be created at {workspace_dir}: {detail}") from exc
     return workspace_dir

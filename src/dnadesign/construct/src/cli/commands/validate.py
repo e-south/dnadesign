@@ -17,6 +17,7 @@ import typer
 
 from ...api import load_job_config, preflight_from_config
 from ...errors import ConstructError
+from ._errors import exit_with_error
 from ._render import echo_validate_result
 
 validate_app = typer.Typer(no_args_is_help=True, help="Validation commands for construct.")
@@ -33,14 +34,12 @@ def validate_config(
 ) -> None:
     try:
         loaded, config_path = load_job_config(config)
-    except ConstructError as exc:
-        typer.echo(f"Error: {exc}")
-        raise typer.Exit(1) from exc
+    except (ConstructError, OSError) as exc:
+        exit_with_error(exc, code=1)
     preflight = None
     if runtime:
         try:
             preflight = preflight_from_config(config)
-        except ConstructError as exc:
-            typer.echo(f"Error: {exc}")
-            raise typer.Exit(1) from exc
+        except (ConstructError, OSError) as exc:
+            exit_with_error(exc, code=1)
     echo_validate_result(config_path=config_path, loaded=loaded, preflight=preflight)

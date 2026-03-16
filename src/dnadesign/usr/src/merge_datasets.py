@@ -28,6 +28,7 @@ from .events import record_event
 from .io import PARQUET_COMPRESSION, iter_parquet_batches, now_utc, write_parquet_atomic_batches
 from .locks import dataset_write_lock
 from .maintenance import require_maintenance
+from .merge_overlay_carry import apply_overlay_carry, plan_overlay_carry
 from .schema import REQUIRED_COLUMNS
 
 # -------------------- public enums & preview --------------------
@@ -60,6 +61,15 @@ class MergePreview:
     # column summary (names count)
     columns_total: int
     overlapping_columns: int
+    carried_namespace_counts: tuple[tuple[str, int], ...] = ()
+
+    @property
+    def carried_namespaces(self) -> tuple[str, ...]:
+        return tuple(namespace for namespace, _rows in self.carried_namespace_counts)
+
+    @property
+    def carried_overlay_rows(self) -> int:
+        return sum(rows for _namespace, rows in self.carried_namespace_counts)
 
 
 # -------------------- helpers --------------------
@@ -345,6 +355,7 @@ def merge_usr_to_usr(
     note: str = "",
     overlap_coercion: str = "none",  # "none" | "to-dest"
     avoid_casefold_dups: bool = True,
+    carry_namespaces: Optional[Sequence[str]] = None,
 ) -> MergePreview:
     """
     Merge rows from a source USR dataset into a destination dataset.
@@ -398,6 +409,7 @@ def merge_usr_to_usr(
             missing_dependency_message="duckdb is required for merge-datasets (install duckdb).",
             error_context="merge-datasets",
         )
+        carry_plans = ()
         try:
             dest_sql = str(ds_dest.records_path).replace("'", "''")
             src_sql = str(ds_src.records_path).replace("'", "''")
@@ -471,6 +483,14 @@ def merge_usr_to_usr(
 
             dest_rows_after = int(con.execute(f"SELECT COUNT(*) FROM ({union_query})").fetchone()[0])
             new_rows = int(dest_rows_after - dest_rows_before)
+            carry_plans = plan_overlay_carry(
+                con=con,
+                dest_dataset=ds_dest,
+                src_dataset=ds_src,
+                src_keep_relation="src_final",
+                namespaces=carry_namespaces,
+                dry_run=dry_run,
+            )
 
             if not dry_run:
                 tmp_path = ds_dest.records_path.with_suffix(".merge.parquet")
@@ -494,6 +514,11 @@ def merge_usr_to_usr(
                     metadata=metadata,
                 )
                 tmp_path.unlink(missing_ok=True)
+                apply_overlay_carry(
+                    dataset=ds_dest,
+                    plans=carry_plans,
+                    src_name=src,
+                )
 
                 payload = {
                     "dest": dest,
@@ -509,6 +534,12 @@ def merge_usr_to_usr(
                     "overlapping_columns": overlapping_columns,
                     "note": note,
                 }
+                if carry_plans:
+                    payload["carried_namespaces"] = [plan.namespace for plan in carry_plans]
+                    payload["carried_namespace_rows"] = {
+                        plan.namespace: int(plan.rows_from_src) for plan in carry_plans
+                    }
+                    payload["carried_overlay_rows"] = int(sum(plan.rows_from_src for plan in carry_plans))
                 if coercion_notes:
                     payload["overlap_coercions"] = coercion_notes
                 payload["maintenance_reason"] = ctx.reason
@@ -536,4 +567,5 @@ def merge_usr_to_usr(
             dest_rows_after=dest_rows_after,
             columns_total=columns_total,
             overlapping_columns=overlapping_columns,
+            carried_namespace_counts=tuple((plan.namespace, int(plan.rows_from_src)) for plan in carry_plans),
         )

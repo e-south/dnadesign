@@ -23,10 +23,9 @@ def _repo_root() -> Path:
 
 
 def test_pressure_runbook_docs_include_standalone_and_ops_paths() -> None:
-    doc = (
-        _repo_root()
-        / "src/dnadesign/infer/docs/operations/pressure-test-agnostic-models.md"
-    ).read_text(encoding="utf-8")
+    doc = (_repo_root() / "src/dnadesign/infer/docs/operations/pressure-test-agnostic-models.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "uv run infer workspace init --id test_stress_ethanol --profile usr-pressure" in doc
     assert "uv run infer validate config --config" in doc
@@ -43,6 +42,7 @@ def test_pressure_runbook_docs_include_standalone_and_ops_paths() -> None:
     assert "layer: final" in doc
     assert "list<float64>" in doc
     assert "outputs/logs/ops/audit/" in doc
+    assert "outputs/logs/ops/runbooks/" in doc
     assert 'export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets"' in doc
     assert "/projectnb/dunlop/esouth/outputs/usr_datasets" not in doc
     assert "infer__<model_id>__<job_id>__<out_id>" in doc

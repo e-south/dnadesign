@@ -21,6 +21,7 @@ class Evo2Adapter:
 
         return _Evo2Adapter(model_id, device, precision)
 
+
 _REGISTERED = False
 
 

@@ -118,7 +118,8 @@ Use that direct submit as the default `evo2_7b` lane. For `evo2_20b`, keep the s
 `evo2-gpu-infer.qsub` command defaults:
 - fail-fast gate: `INFER_CONFIG` is required
 - preflight: `uv run infer validate config --config "$INFER_CONFIG"`
-- run: `uv run infer run --config "$INFER_CONFIG"`
+- run: `uv run infer run --config "$INFER_CONFIG" ${INFER_RUN_ARGS:-}`
+- optional reset contract: set `INFER_RUN_ARGS=--overwrite` when an orchestration layer intentionally wants infer to recompute the requested write-back outputs in place
 
 Before first submit on a host, run deterministic environment bootstrap:
 - [BU SCC install GPU setup and verification runbook](../install.md#gpu-setup-and-verification-runbook)

@@ -129,7 +129,9 @@ def build_dataset_info(
         if column not in all_columns:
             all_columns.append(column)
     required_names = {name for name, _ in required_columns}
-    namespaces = sorted({column.split("__", 1)[0] for column in all_columns if column not in required_names and "__" in column})
+    namespaces = sorted(
+        {column.split("__", 1)[0] for column in all_columns if column not in required_names and "__" in column}
+    )
     return DatasetInfo(
         name=dataset.name,
         path=str(dataset.records_path),

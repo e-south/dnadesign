@@ -15,6 +15,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from dnadesign._contracts import (
+    resolve_construct_usr_output_contract,
     resolve_densegen_usr_output_contract,
     resolve_infer_usr_output_contract,
 )
@@ -40,9 +41,22 @@ def _resolve_infer_events_from_config(config_path: Path) -> Path:
     return (contract.usr_root / contract.usr_dataset / ".events.log").resolve()
 
 
+def _resolve_construct_events_from_config(config_path: Path) -> Path:
+    try:
+        contract = resolve_construct_usr_output_contract(config_path)
+    except ValueError as exc:
+        raise NotifyConfigError(str(exc)) from exc
+    return (contract.usr_root / contract.usr_dataset / ".events.log").resolve()
+
+
 def register_builtin_tool_events_sources(register: ToolEventsSourceRegister) -> None:
     if not callable(register):
         raise TypeError("register must be callable")
+    register(
+        tool="construct",
+        resolver=_resolve_construct_events_from_config,
+        default_policy="generic",
+    )
     register(
         tool="densegen",
         resolver=_resolve_densegen_events_from_config,

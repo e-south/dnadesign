@@ -128,6 +128,37 @@ jobs:
     assert "ingest.path is not allowed for source='usr'" in (result.stdout or "")
 
 
+def test_validate_config_rejects_rootless_usr_writeback_job(tmp_path: Path) -> None:
+    bad = _write(
+        tmp_path / "bad_usr_writeback_rootless.yaml",
+        """
+model:
+  id: evo2_7b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: j1
+    operation: extract
+    ingest:
+      source: usr
+      dataset: demo_dataset
+    outputs:
+      - id: ll
+        fn: evo2.log_likelihood
+        format: float
+    io:
+      write_back: true
+""".strip()
+        + "\n",
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "config", "--config", bad.as_posix()])
+
+    assert result.exit_code == 2
+    assert "USR write-back jobs must set ingest.root explicitly." in (result.stdout or "")
+
+
 def test_validate_config_fails_capacity_for_40b_on_single_gpu(monkeypatch, tmp_path: Path) -> None:
     cfg = _write(
         tmp_path / "capacity_fail_40b.yaml",
@@ -245,14 +276,12 @@ jobs:
 
     assert result.exit_code == 0, result.stdout
     output = result.stdout or ""
+    resolved_root = Path("/tmp/usr-root").resolve().as_posix()
     assert "namespace: infer" in output
-    assert "root: /tmp/usr-root" in output
+    assert f"root: {resolved_root}" in output
+    assert ("columns: infer__evo2_7b__j1__ll_mean:float64,infer__evo2_7b__j1__logits_mean:list<float64>") in output
     assert (
-        "columns: infer__evo2_7b__j1__ll_mean:float64,"
-        "infer__evo2_7b__j1__logits_mean:list<float64>"
-    ) in output
-    assert (
-        "uv run usr --root /tmp/usr-root namespace register infer --columns "
+        f"uv run usr --root {resolved_root} namespace register infer --columns "
         "'infer__evo2_7b__j1__ll_mean:float64,"
         "infer__evo2_7b__j1__logits_mean:list<float64>'"
     ) in output

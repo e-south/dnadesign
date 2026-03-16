@@ -57,8 +57,10 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
     assert "start an infer workspace watcher and send to slack" in text
     assert "i already have a profile, just validate wiring" in text
     assert "resume failed deliveries from spool" in text
+    assert "multi-source-source-of-truth-assembly.md" in text
     assert "--secret-source file" in text
     assert "--secret-ref file://" in text
+    assert "--url-env" in text
     assert "--secret-source auto" not in text
     assert "`notify setup slack` mode contract" in text
     assert "`notify usr-events watch` mode contract" in text
@@ -80,8 +82,14 @@ def test_notify_usr_events_manual_keeps_setup_run_recover_flow() -> None:
     )
     assert "--secret-source file" in text
     assert "--secret-ref file://" in text
+    assert "--url-env" in text
     assert "chmod 600" in text
     assert "--secret-source auto" not in text
+    assert "--only-actions merge_datasets,attach,materialize" in text
+    assert "NOTIFY_ACTIONS" in text
+    assert "Workspace shorthand for any tool is repo-rooted" in text
+    assert "DNADESIGN_REPO_ROOT=<repo-root>" in text
+    assert "Multi-destination infer configs must use explicit `--events <path>`" in text
 
 
 def test_notify_module_readme_is_lightweight_router_and_links_top_level_runbook() -> None:
@@ -116,6 +124,7 @@ def test_notify_module_docs_index_has_progressive_disclosure_workflow_and_type_m
     assert "notify send contract" in text
     assert "Runtime evidence pointers" in text
     assert "../../../../docs/notify/usr-events.md" in text
+    assert "boundary-owning tool's operations docs" in text
 
 
 def test_notify_command_contracts_cover_setup_helpers_and_send() -> None:
@@ -138,6 +147,10 @@ def test_notify_command_contracts_cover_setup_helpers_and_send() -> None:
         ],
         label="src/dnadesign/notify/docs/reference/command-contracts.md",
     )
+    assert "Workspace shorthand is repo-rooted for all resolver-mode tools." in text
+    assert "ingest.root" in text
+    assert "requires exactly one USR write-back destination and explicit `ingest.root`" in text
+    assert "Multi-destination infer configs must use explicit `--events <path>`" in text
 
 
 def test_notify_maintainer_docs_use_deps_package_paths_not_removed_monolith() -> None:

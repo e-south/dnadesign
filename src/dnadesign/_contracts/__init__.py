@@ -11,6 +11,15 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from .construct_usr_output import (
+    ConstructUSROutputContract,
+    load_construct_config_mapping,
+    resolve_construct_usr_output_contract,
+)
+from .construct_workspace import (
+    list_construct_workspaces,
+    resolve_construct_workspace_config_path,
+)
 from .densegen_usr_output import (
     DensegenUSROutputContract,
     load_densegen_config_mapping,
@@ -35,6 +44,7 @@ from .usr_producer import (
 )
 
 __all__ = [
+    "ConstructUSROutputContract",
     "DensegenUSROutputContract",
     "DEFAULT_SYSTEM_TLS_CA_BUNDLE_CANDIDATES",
     "DEFAULT_NOTIFY_WEBHOOK_SOURCES",
@@ -42,8 +52,12 @@ __all__ = [
     "ResumeReadinessPolicy",
     "TLSCABundleResolutionError",
     "USRProducerContract",
+    "list_construct_workspaces",
+    "load_construct_config_mapping",
     "load_densegen_config_mapping",
     "parse_notify_profile_webhook",
+    "resolve_construct_usr_output_contract",
+    "resolve_construct_workspace_config_path",
     "resolve_resume_readiness_policy",
     "resolve_infer_usr_output_contract",
     "resolve_densegen_usr_output_contract",

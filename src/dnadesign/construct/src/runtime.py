@@ -13,78 +13,18 @@ from __future__ import annotations
 
 import hashlib
 import json
-import tempfile
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List
 
-import pyarrow as pa
-import pyarrow.parquet as pq
-import yaml
-
 from dnadesign.usr import Dataset, compute_id, default_usr_root, normalize_sequence, normalize_usr_root
 
-from .config import JobConfig, PartConfig, load_job_config
+from .config import JobConfig, PartConfig, WindowConfig, load_job_config
 from .errors import ValidationError
+from .output_store import _construct_metadata_table, _ensure_construct_registry, _existing_output_ids, _usr_label_table
 
 _DNA_COMPLEMENT = str.maketrans("ACGTNacgtn", "TGCANtgcan")
-
-_USR_STATE_COLUMNS = [
-    {"name": "usr_state__masked", "type": "bool"},
-    {"name": "usr_state__qc_status", "type": "string"},
-    {"name": "usr_state__split", "type": "string"},
-    {"name": "usr_state__supersedes", "type": "string"},
-    {"name": "usr_state__lineage", "type": "list<string>"},
-]
-
-_CONSTRUCT_COLUMNS = [
-    {"name": "construct__job", "type": "string"},
-    {"name": "construct__spec_id", "type": "string"},
-    {"name": "construct__template_id", "type": "string"},
-    {"name": "construct__template_kind", "type": "string"},
-    {"name": "construct__template_source", "type": "string"},
-    {"name": "construct__template_dataset", "type": "string"},
-    {"name": "construct__template_field", "type": "string"},
-    {"name": "construct__template_record_id", "type": "string"},
-    {"name": "construct__template_sha256", "type": "string"},
-    {"name": "construct__template_length", "type": "int64"},
-    {"name": "construct__template_circular", "type": "bool"},
-    {"name": "construct__input_dataset", "type": "string"},
-    {"name": "construct__input_field", "type": "string"},
-    {"name": "construct__input_fields", "type": "list<string>"},
-    {"name": "construct__anchor_id", "type": "string"},
-    {"name": "construct__anchor_length", "type": "int64"},
-    {"name": "construct__mode", "type": "string"},
-    {"name": "construct__focal_part", "type": "string"},
-    {"name": "construct__window_bp", "type": "int64"},
-    {"name": "construct__window_start", "type": "int64"},
-    {"name": "construct__window_end", "type": "int64"},
-    {"name": "construct__full_construct_length", "type": "int64"},
-    {"name": "construct__part_count", "type": "int64"},
-    {"name": "construct__part_names", "type": "list<string>"},
-    {"name": "construct__part_roles", "type": "list<string>"},
-    {"name": "construct__part_kinds", "type": "list<string>"},
-    {"name": "construct__part_starts", "type": "list<int64>"},
-    {"name": "construct__part_ends", "type": "list<int64>"},
-    {"name": "construct__part_orientations", "type": "list<string>"},
-    {"name": "construct__part_template_starts", "type": "list<int64>"},
-    {"name": "construct__part_template_ends", "type": "list<int64>"},
-]
-
-_CONSTRUCT_SEED_COLUMNS = [
-    {"name": "construct_seed__label", "type": "string"},
-    {"name": "construct_seed__manifest_id", "type": "string"},
-    {"name": "construct_seed__role", "type": "string"},
-    {"name": "construct_seed__source_ref", "type": "string"},
-    {"name": "construct_seed__topology", "type": "string"},
-    {"name": "construct_seed__sha256", "type": "string"},
-]
-
-_USR_LABEL_COLUMNS = [
-    {"name": "usr_label__primary", "type": "string"},
-    {"name": "usr_label__aliases", "type": "list<string>"},
-]
 
 
 @dataclass(frozen=True)
@@ -104,7 +44,8 @@ class RunResult:
 class PlannedRow:
     input_id: str
     output_id: str
-    anchor_length: int
+    input_length: int
+    focal_part_length: int | None
     output_length: int
     full_construct_length: int
 
@@ -140,9 +81,13 @@ class PreflightResult:
     template_circular: bool
     realize_mode: str
     focal_part: str | None
-    focal_point: str
-    anchor_offset_bp: int
-    window_bp: int | None
+    window_semantics: str | None
+    window_reference: str | None
+    window_direction: str | None
+    window_size_bp: int | None
+    window_upstream_bp: int | None
+    window_downstream_bp: int | None
+    window_offset_bp: int | None
     spec_id: str
     records_total: int
     existing_output_collisions: int
@@ -156,6 +101,8 @@ class _ResolvedPart:
     name: str
     role: str
     kind: str
+    sequence_source: str
+    sequence_field: str | None
     orientation: str
     start: int
     end: int
@@ -170,6 +117,8 @@ class _BuiltRecord:
     sequence: str
     alphabet: str
     metadata: Dict[str, object]
+    label_primary: str | None
+    label_aliases: List[str]
 
 
 @dataclass(frozen=True)
@@ -182,6 +131,22 @@ class _ResolvedTemplate:
     field: str | None
     record_id: str | None
     circular: bool
+
+
+@dataclass(frozen=True)
+class _WindowGeometry:
+    start_raw: int
+    end_raw: int
+    start: int
+    end: int
+    span_bp: int
+
+
+@dataclass(frozen=True)
+class _PlannedRun:
+    cfg: JobConfig
+    preflight: PreflightResult
+    built: List[_BuiltRecord]
 
 
 def _default_usr_root() -> Path:
@@ -197,8 +162,11 @@ def _resolve_optional_path(base_dir: Path, value: str | None) -> Path | None:
     return path
 
 
-def _resolve_usr_root(base_dir: Path, value: str | None) -> Path:
-    return normalize_usr_root(_resolve_optional_path(base_dir, value))
+def _resolve_usr_root(base_dir: Path, value: str | None, *, label: str) -> Path:
+    resolved = _resolve_optional_path(base_dir, value)
+    if resolved is None:
+        raise ValidationError(f"{label} is required for USR-backed construct jobs.")
+    return normalize_usr_root(resolved)
 
 
 def _ensure_dna_text(text: str, *, label: str) -> str:
@@ -285,7 +253,11 @@ def _load_template_sequence(base_dir: Path, cfg: JobConfig) -> _ResolvedTemplate
     if template.kind != "usr":
         raise ValidationError(f"Unsupported template.kind '{template.kind}'.")
 
-    template_root = _resolve_usr_root(base_dir, template.root or cfg.job.input.root)
+    template_root = _resolve_usr_root(
+        base_dir,
+        template.root or cfg.job.input.root,
+        label="template.root or job.input.root",
+    )
     template_ds = Dataset(template_root, str(template.dataset))
     if not template_ds.records_path.exists():
         raise ValidationError(f"Template dataset not initialized: {template_ds.records_path}")
@@ -347,6 +319,36 @@ def _input_fields(cfg: JobConfig) -> List[str]:
         if part.sequence.source == "input_field":
             fields.add(str(part.sequence.field))
     return sorted(fields)
+
+
+def _input_scan_fields(ds: Dataset, cfg: JobConfig) -> List[str]:
+    fields = set(_input_fields(cfg))
+    available = set(ds.schema().names)
+    if "usr_label__primary" in available:
+        fields.add("usr_label__primary")
+    if "usr_label__aliases" in available:
+        fields.add("usr_label__aliases")
+    return sorted(fields)
+
+
+def _input_usr_labels(row: dict[str, object]) -> tuple[str | None, List[str]]:
+    primary_raw = row.get("usr_label__primary")
+    primary = str(primary_raw).strip() if primary_raw is not None and str(primary_raw).strip() else None
+
+    aliases_raw = row.get("usr_label__aliases")
+    aliases: list[str] = []
+    if isinstance(aliases_raw, list):
+        raw_values = aliases_raw
+    elif aliases_raw is None:
+        raw_values = []
+    else:
+        raw_values = [aliases_raw]
+    for value in raw_values:
+        text = str(value or "").strip()
+        if not text or text == primary or text in aliases:
+            continue
+        aliases.append(text)
+    return primary, aliases
 
 
 def _planned_placements(parts: Iterable[PartConfig]) -> List[PlannedPlacement]:
@@ -450,6 +452,8 @@ def _assemble_full_construct(
             name=part.name,
             role=part.role,
             kind=part.placement.kind,
+            sequence_source=part.sequence.source,
+            sequence_field=str(part.sequence.field) if part.sequence.field is not None else None,
             orientation=part.placement.orientation,
             start=part.placement.start,
             end=part.placement.end,
@@ -465,12 +469,107 @@ def _assemble_full_construct(
     return "".join(out), realized_ordered, realized
 
 
-def _focal_index(part: _ResolvedPart, *, focal_point: str) -> int:
-    if focal_point == "start":
+def _window_reference_index(part: _ResolvedPart, *, reference: str) -> int:
+    if reference == "start":
         return part.realized_start
-    if focal_point == "end":
+    if reference == "end":
         return part.realized_end - 1
     return part.realized_start + (len(part.sequence) // 2)
+
+
+def _orientation_step(*, orientation: str, direction: str) -> int:
+    if direction == "five_prime":
+        return -1 if orientation == "forward" else 1
+    if direction == "three_prime":
+        return 1 if orientation == "forward" else -1
+    raise ValidationError(f"Unsupported window direction '{direction}'.")
+
+
+def _window_raw_bounds(
+    *,
+    full_construct_length: int,
+    focal: _ResolvedPart,
+    window: WindowConfig,
+) -> tuple[int, int]:
+    if window.semantics == "fixed_total":
+        window_bp = int(window.size_bp)
+        if window_bp > full_construct_length:
+            raise ValidationError(
+                f"Requested fixed_total window size_bp={window_bp} exceeds realized construct length "
+                f"{full_construct_length}."
+            )
+        if len(focal.sequence) > window_bp:
+            raise ValidationError(
+                f"Focal part '{focal.name}' length {len(focal.sequence)} exceeds "
+                f"fixed_total window size_bp={window_bp}. "
+                "Choose a larger fixed_total window or use anchor_plus_context semantics."
+            )
+        point = _window_reference_index(focal, reference=window.reference)
+        offset_bp = int(window.offset_bp)
+        if window.direction == "symmetric":
+            start_raw = point - (window_bp // 2) + offset_bp
+            return start_raw, start_raw + window_bp
+
+        step = _orientation_step(orientation=focal.orientation, direction=window.direction)
+        if step > 0:
+            start_raw = point + offset_bp
+            return start_raw, start_raw + window_bp
+
+        end_raw = point + 1 + offset_bp
+        return end_raw - window_bp, end_raw
+
+    upstream_bp = int(window.upstream_bp)
+    downstream_bp = int(window.downstream_bp)
+    window_bp = len(focal.sequence) + upstream_bp + downstream_bp
+    if window_bp > full_construct_length:
+        raise ValidationError(
+            f"Requested anchor_plus_context window length {window_bp} exceeds realized construct length "
+            f"{full_construct_length}."
+        )
+    if focal.orientation == "forward":
+        return focal.realized_start - upstream_bp, focal.realized_end + downstream_bp
+    return focal.realized_start - downstream_bp, focal.realized_end + upstream_bp
+
+
+def _normalize_window_geometry(
+    *,
+    full_construct_length: int,
+    template_circular: bool,
+    focal: _ResolvedPart,
+    window: WindowConfig,
+) -> _WindowGeometry:
+    start_raw, end_raw = _window_raw_bounds(
+        full_construct_length=full_construct_length,
+        focal=focal,
+        window=window,
+    )
+    span_bp = end_raw - start_raw
+    if span_bp > full_construct_length:
+        raise ValidationError(
+            f"Requested window span {span_bp} exceeds realized construct length {full_construct_length}."
+        )
+    if template_circular:
+        start = start_raw % full_construct_length
+        end = (start + span_bp) % full_construct_length
+        return _WindowGeometry(
+            start_raw=start_raw,
+            end_raw=end_raw,
+            start=start,
+            end=end,
+            span_bp=span_bp,
+        )
+    if start_raw < 0 or end_raw > full_construct_length:
+        raise ValidationError(
+            "Requested window extends beyond the linear construct boundaries. "
+            "Adjust the window settings or choose a circular template."
+        )
+    return _WindowGeometry(
+        start_raw=start_raw,
+        end_raw=end_raw,
+        start=start_raw,
+        end=end_raw,
+        span_bp=span_bp,
+    )
 
 
 def _extract_output_sequence(
@@ -482,26 +581,22 @@ def _extract_output_sequence(
     if cfg.job.realize.mode == "full_construct":
         return full_construct, 0, len(full_construct)
 
+    window = cfg.job.realize.window
+    if window is None:
+        raise ValidationError("realize.window must resolve before runtime extraction.")
     focal = realized_parts[cfg.job.realize.focal_part]
-    point = _focal_index(focal, focal_point=cfg.job.realize.focal_point)
-    window_bp = int(cfg.job.realize.window_bp)
-    if window_bp > len(full_construct):
-        raise ValidationError(
-            f"Requested window_bp={window_bp} exceeds realized construct length {len(full_construct)}."
-        )
-    start_raw = point - (window_bp // 2) + int(cfg.job.realize.anchor_offset_bp)
-    end_raw = start_raw + window_bp
+    geometry = _normalize_window_geometry(
+        full_construct_length=len(full_construct),
+        template_circular=cfg.job.template.circular,
+        focal=focal,
+        window=window,
+    )
     if cfg.job.template.circular:
-        seq = "".join(full_construct[(start_raw + idx) % len(full_construct)] for idx in range(window_bp))
-        start = start_raw % len(full_construct)
-        end = (start + window_bp) % len(full_construct)
-        return seq, start, end
-    if start_raw < 0 or end_raw > len(full_construct):
-        raise ValidationError(
-            "Requested window extends beyond the linear construct boundaries. "
-            "Adjust window_bp, anchor_offset_bp, or choose a circular template."
+        seq = "".join(
+            full_construct[(geometry.start_raw + idx) % len(full_construct)] for idx in range(geometry.span_bp)
         )
-    return full_construct[start_raw:end_raw], start_raw, end_raw
+        return seq, geometry.start, geometry.end
+    return full_construct[geometry.start : geometry.end], geometry.start, geometry.end
 
 
 def _spec_id(
@@ -512,6 +607,7 @@ def _spec_id(
     input_root: Path,
     output_root: Path,
 ) -> str:
+    window = cfg.job.realize.window
     payload = {
         "job_id": cfg.job.id,
         "input": {
@@ -552,9 +648,19 @@ def _spec_id(
         "realize": {
             "mode": cfg.job.realize.mode,
             "focal_part": cfg.job.realize.focal_part,
-            "focal_point": cfg.job.realize.focal_point,
-            "anchor_offset_bp": cfg.job.realize.anchor_offset_bp,
-            "window_bp": cfg.job.realize.window_bp,
+            "window": (
+                {
+                    "semantics": window.semantics,
+                    "reference": window.reference,
+                    "direction": window.direction,
+                    "size_bp": window.size_bp,
+                    "upstream_bp": window.upstream_bp,
+                    "downstream_bp": window.downstream_bp,
+                    "offset_bp": window.offset_bp,
+                }
+                if window is not None
+                else None
+            ),
         },
         "output": {
             "dataset": cfg.job.output.dataset,
@@ -566,119 +672,6 @@ def _spec_id(
     }
     text = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def _registry_path(root: Path) -> Path:
-    return root / "registry.yaml"
-
-
-def _load_registry_payload(root: Path) -> dict:
-    path = _registry_path(root)
-    if not path.exists():
-        return {"namespaces": {}}
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except OSError as exc:
-        raise ValidationError(f"USR registry could not be read: {path}") from exc
-    namespaces = data.get("namespaces") or {}
-    if not isinstance(namespaces, dict):
-        raise ValidationError(f"USR registry at {path} must contain a 'namespaces' mapping.")
-    return {"namespaces": namespaces}
-
-
-def _validated_registry_columns(namespace_name: str, payload: dict) -> dict[str, str]:
-    columns = payload.get("columns")
-    if columns is None:
-        payload["columns"] = []
-        return {}
-    if not isinstance(columns, list):
-        raise ValidationError(f"USR registry namespace '{namespace_name}' must define columns as a list.")
-    observed: dict[str, str] = {}
-    for index, item in enumerate(columns):
-        if not isinstance(item, dict):
-            raise ValidationError(f"USR registry namespace '{namespace_name}' column #{index + 1} must be a mapping.")
-        name = str(item.get("name") or "").strip()
-        type_name = str(item.get("type") or "").strip()
-        if not name or not type_name:
-            raise ValidationError(
-                f"USR registry namespace '{namespace_name}' column #{index + 1} must define name and type."
-            )
-        if name in observed:
-            raise ValidationError(f"USR registry namespace '{namespace_name}' duplicates column '{name}'.")
-        observed[name] = type_name
-    return observed
-
-
-def _ensure_registry_namespace(
-    *,
-    namespace_name: str,
-    namespaces: dict,
-    owner: str,
-    description: str,
-    expected_columns: list[dict[str, str]],
-) -> None:
-    payload = namespaces.setdefault(
-        namespace_name,
-        {
-            "owner": owner,
-            "description": description,
-            "columns": [],
-        },
-    )
-    if not isinstance(payload, dict):
-        raise ValidationError(f"USR registry namespace '{namespace_name}' must be a mapping.")
-    payload.setdefault("owner", owner)
-    payload.setdefault("description", description)
-    observed = _validated_registry_columns(namespace_name, payload)
-    missing = []
-    for column in expected_columns:
-        observed_type = observed.get(column["name"])
-        if observed_type is None:
-            missing.append(column)
-            continue
-        if observed_type != column["type"]:
-            raise ValidationError(
-                f"USR registry namespace '{namespace_name}' column '{column['name']}' has type "
-                f"'{observed_type}', expected '{column['type']}'."
-            )
-    if missing:
-        payload["columns"] = list(payload.get("columns", [])) + missing
-
-
-def _ensure_construct_registry(root: Path) -> None:
-    root.mkdir(parents=True, exist_ok=True)
-    payload = _load_registry_payload(root)
-    namespaces = payload["namespaces"]
-    _ensure_registry_namespace(
-        namespace_name="usr_state",
-        namespaces=namespaces,
-        owner="usr",
-        description="Reserved record-state overlay (masked/qc/split/lineage).",
-        expected_columns=_USR_STATE_COLUMNS,
-    )
-    _ensure_registry_namespace(
-        namespace_name="construct",
-        namespaces=namespaces,
-        owner="construct",
-        description="Construct lineage overlays for realized DNA sequences.",
-        expected_columns=_CONSTRUCT_COLUMNS,
-    )
-    _ensure_registry_namespace(
-        namespace_name="construct_seed",
-        namespaces=namespaces,
-        owner="construct",
-        description="Construct bootstrap/import metadata for seeded input datasets.",
-        expected_columns=_CONSTRUCT_SEED_COLUMNS,
-    )
-    _ensure_registry_namespace(
-        namespace_name="usr_label",
-        namespaces=namespaces,
-        owner="usr",
-        description="Human-readable labels and aliases for canonical sequence records.",
-        expected_columns=_USR_LABEL_COLUMNS,
-    )
-    path = _registry_path(root)
-    path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
 
 
 def _build_record(
@@ -695,6 +688,7 @@ def _build_record(
         ordered_parts,
         row,
     )
+    window = cfg.job.realize.window
     output_sequence, window_start, window_end = _extract_output_sequence(
         full_construct=full_construct,
         realized_parts=realized_parts,
@@ -703,8 +697,10 @@ def _build_record(
     alphabet = _alphabet_for_sequence(output_sequence)
     sequence_norm = normalize_sequence(output_sequence, "dna", alphabet)
     output_id = compute_id("dna", sequence_norm)
+    label_primary, label_aliases = _input_usr_labels(row)
 
-    input_fields = [str(part.sequence.field) for part in cfg.job.parts if part.sequence.source == "input_field"]
+    input_fields = [field for field in _input_fields(cfg) if field != "id"]
+    focal_part = realized_parts.get(cfg.job.realize.focal_part or "")
     metadata = {
         "id": output_id,
         "construct__job": cfg.job.id,
@@ -719,85 +715,67 @@ def _build_record(
         "construct__template_length": len(template.sequence),
         "construct__template_circular": bool(template.circular),
         "construct__input_dataset": cfg.job.input.dataset,
-        "construct__input_field": cfg.job.input.field,
         "construct__input_fields": input_fields,
-        "construct__anchor_id": str(row["id"]),
-        "construct__anchor_length": len(str(row[cfg.job.input.field]).strip()),
+        "construct__input_id": str(row["id"]),
+        "construct__input_length": len(str(row[cfg.job.input.field]).strip()),
         "construct__mode": cfg.job.realize.mode,
         "construct__focal_part": cfg.job.realize.focal_part or "",
-        "construct__window_bp": int(cfg.job.realize.window_bp) if cfg.job.realize.window_bp is not None else -1,
+        "construct__focal_part_length": len(focal_part.sequence) if focal_part is not None else None,
+        "construct__window_semantics": window.semantics if window is not None else "",
+        "construct__window_reference": window.reference if window is not None else "",
+        "construct__window_direction": window.direction if window is not None else "",
+        "construct__window_size_bp": int(window.size_bp) if window is not None and window.size_bp is not None else None,
+        "construct__window_upstream_bp": (
+            int(window.upstream_bp) if window is not None and window.upstream_bp is not None else None
+        ),
+        "construct__window_downstream_bp": (
+            int(window.downstream_bp) if window is not None and window.downstream_bp is not None else None
+        ),
+        "construct__window_offset_bp": (
+            int(window.offset_bp) if window is not None and window.semantics == "fixed_total" else None
+        ),
         "construct__window_start": window_start,
         "construct__window_end": window_end,
         "construct__full_construct_length": len(full_construct),
-        "construct__part_count": len(ordered_realized_parts),
-        "construct__part_names": [part.name for part in ordered_realized_parts],
-        "construct__part_roles": [part.role for part in ordered_realized_parts],
-        "construct__part_kinds": [part.kind for part in ordered_realized_parts],
-        "construct__part_starts": [part.realized_start for part in ordered_realized_parts],
-        "construct__part_ends": [part.realized_end for part in ordered_realized_parts],
-        "construct__part_orientations": [part.orientation for part in ordered_realized_parts],
-        "construct__part_template_starts": [part.start for part in ordered_realized_parts],
-        "construct__part_template_ends": [part.end for part in ordered_realized_parts],
-    }
-    return _BuiltRecord(output_id=output_id, sequence=output_sequence, alphabet=alphabet, metadata=metadata)
-
-
-def _attach_construct_metadata(ds: Dataset, metadata_rows: List[dict[str, object]]) -> None:
-    if not metadata_rows:
-        return
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        path = Path(tmp_dir) / "construct_attach.parquet"
-        schema = pa.schema(
-            [pa.field("id", pa.string())]
-            + [pa.field(col["name"], _registry_arrow_type(col["type"])) for col in _CONSTRUCT_COLUMNS]
-        )
-        table = pa.table(
+        "construct__parts": [
             {
-                field.name: pa.array(
-                    [row.get(field.name) for row in metadata_rows],
-                    type=field.type,
-                )
-                for field in schema
-            },
-            schema=schema,
-        )
-        pq.write_table(table, path)
-        ds.attach(
-            path,
-            namespace="construct",
-            key="id",
-            key_col="id",
-            columns=[field.name for field in schema if field.name != "id"],
-            allow_overwrite=True,
-            note="dnadesign.construct lineage attach",
-        )
-
-
-def _existing_output_ids(root: Path, dataset_name: str) -> set[str]:
-    ds = Dataset(root, dataset_name)
-    if not ds.records_path.exists():
-        return set()
-    return {str(row["id"]) for row in _scan_usr_rows(ds, columns=["id"], ids=None)}
-
-
-def _registry_arrow_type(type_name: str) -> pa.DataType:
-    mapping: dict[str, pa.DataType] = {
-        "bool": pa.bool_(),
-        "string": pa.string(),
-        "int64": pa.int64(),
-        "list<string>": pa.list_(pa.string()),
-        "list<int64>": pa.list_(pa.int64()),
+                "name": part.name,
+                "role": part.role,
+                "sequence_source": part.sequence_source,
+                "sequence_field": part.sequence_field or "",
+                "placement_kind": part.kind,
+                "orientation": part.orientation,
+                "template_start": part.start,
+                "template_end": part.end,
+                "realized_start": part.realized_start,
+                "realized_end": part.realized_end,
+                "length": len(part.sequence),
+            }
+            for part in ordered_realized_parts
+        ],
     }
-    if type_name not in mapping:
-        raise ValidationError(f"Unsupported registry column type '{type_name}' for construct overlay attach.")
-    return mapping[type_name]
+    return _BuiltRecord(
+        output_id=output_id,
+        sequence=output_sequence,
+        alphabet=alphabet,
+        metadata=metadata,
+        label_primary=label_primary,
+        label_aliases=label_aliases,
+    )
 
 
-def _plan_from_config(path: str | Path) -> tuple[PreflightResult, List[_BuiltRecord]]:
-    cfg, config_path = load_job_config(path)
+def _plan_loaded_config(
+    cfg: JobConfig,
+    *,
+    config_path: Path,
+) -> tuple[PreflightResult, List[_BuiltRecord]]:
     base_dir = config_path.parent
-    input_root = _resolve_usr_root(base_dir, cfg.job.input.root)
-    output_root = _resolve_usr_root(base_dir, cfg.job.output.root or cfg.job.input.root)
+    input_root = _resolve_usr_root(base_dir, cfg.job.input.root, label="job.input.root")
+    output_root = _resolve_usr_root(
+        base_dir,
+        cfg.job.output.root or cfg.job.input.root,
+        label="job.output.root or job.input.root",
+    )
 
     input_ds = Dataset(input_root, cfg.job.input.dataset)
     if not input_ds.records_path.exists():
@@ -823,7 +801,7 @@ def _plan_from_config(path: str | Path) -> tuple[PreflightResult, List[_BuiltRec
         output_root=output_root,
     )
 
-    rows = _scan_usr_rows(input_ds, columns=_input_fields(cfg), ids=cfg.job.input.ids)
+    rows = _scan_usr_rows(input_ds, columns=_input_scan_fields(input_ds, cfg), ids=cfg.job.input.ids)
     if not rows:
         raise ValidationError("Input selection resolved to zero rows.")
 
@@ -858,12 +836,18 @@ def _plan_from_config(path: str | Path) -> tuple[PreflightResult, List[_BuiltRec
         PlannedRow(
             input_id=str(row["id"]),
             output_id=record.output_id,
-            anchor_length=int(record.metadata["construct__anchor_length"]),
+            input_length=int(record.metadata["construct__input_length"]),
+            focal_part_length=(
+                int(record.metadata["construct__focal_part_length"])
+                if record.metadata["construct__focal_part_length"] is not None
+                else None
+            ),
             output_length=len(record.sequence),
             full_construct_length=int(record.metadata["construct__full_construct_length"]),
         )
         for row, record in zip(rows, built)
     ]
+    window = cfg.job.realize.window
     preflight = PreflightResult(
         job_id=cfg.job.id,
         input_dataset=cfg.job.input.dataset,
@@ -881,9 +865,15 @@ def _plan_from_config(path: str | Path) -> tuple[PreflightResult, List[_BuiltRec
         template_circular=bool(template.circular),
         realize_mode=cfg.job.realize.mode,
         focal_part=cfg.job.realize.focal_part,
-        focal_point=cfg.job.realize.focal_point,
-        anchor_offset_bp=cfg.job.realize.anchor_offset_bp,
-        window_bp=cfg.job.realize.window_bp,
+        window_semantics=window.semantics if window is not None else None,
+        window_reference=window.reference if window is not None else None,
+        window_direction=window.direction if window is not None else None,
+        window_size_bp=int(window.size_bp) if window is not None and window.size_bp is not None else None,
+        window_upstream_bp=(int(window.upstream_bp) if window is not None and window.upstream_bp is not None else None),
+        window_downstream_bp=(
+            int(window.downstream_bp) if window is not None and window.downstream_bp is not None else None
+        ),
+        window_offset_bp=int(window.offset_bp) if window is not None else None,
         spec_id=spec_id,
         records_total=len(built),
         existing_output_collisions=collision_count,
@@ -894,55 +884,101 @@ def _plan_from_config(path: str | Path) -> tuple[PreflightResult, List[_BuiltRec
     return preflight, built
 
 
-def preflight_from_config(path: str | Path) -> PreflightResult:
-    preflight, _ = _plan_from_config(path)
-    return preflight
+def _planned_run_from_config(path: str | Path) -> _PlannedRun:
+    cfg, config_path = load_job_config(path)
+    preflight, built = _plan_loaded_config(cfg, config_path=config_path)
+    return _PlannedRun(cfg=cfg, preflight=preflight, built=built)
 
 
-def run_from_config(path: str | Path, *, dry_run: bool = False) -> RunResult:
-    cfg, _ = load_job_config(path)
-    preflight, built = _plan_from_config(path)
+def _plan_from_config(path: str | Path) -> tuple[PreflightResult, List[_BuiltRecord]]:
+    planned = _planned_run_from_config(path)
+    return planned.preflight, planned.built
 
-    if dry_run:
-        return RunResult(
-            job_id=cfg.job.id,
-            input_dataset=cfg.job.input.dataset,
-            output_dataset=cfg.job.output.dataset,
-            output_root=preflight.output_root,
-            records_total=preflight.records_total,
-            records_written=0,
-            records_skipped_existing=preflight.existing_output_collisions,
-            spec_id=preflight.spec_id,
-            dry_run=True,
-        )
 
+def _dry_run_result(planned: _PlannedRun) -> RunResult:
+    cfg = planned.cfg
+    preflight = planned.preflight
+    return RunResult(
+        job_id=cfg.job.id,
+        input_dataset=cfg.job.input.dataset,
+        output_dataset=cfg.job.output.dataset,
+        output_root=preflight.output_root,
+        records_total=preflight.records_total,
+        records_written=0,
+        records_skipped_existing=preflight.existing_output_collisions,
+        spec_id=preflight.spec_id,
+        dry_run=True,
+    )
+
+
+def _ensure_output_dataset(planned: _PlannedRun) -> Dataset:
+    cfg = planned.cfg
+    preflight = planned.preflight
     _ensure_construct_registry(preflight.output_root)
-    output_ds = Dataset(preflight.output_root, cfg.job.output.dataset)
-    if not output_ds.records_path.exists():
-        output_ds.init(source="construct", notes=f"Initialized by construct job {cfg.job.id}.")
+    return Dataset(preflight.output_root, cfg.job.output.dataset)
 
+
+def _records_to_write(planned: _PlannedRun) -> List[_BuiltRecord]:
+    cfg = planned.cfg
+    preflight = planned.preflight
     existing_ids = _existing_output_ids(preflight.output_root, cfg.job.output.dataset)
-    built_to_write = [
-        record for record in built if cfg.job.output.on_conflict != "ignore" or record.output_id not in existing_ids
+    return [
+        record
+        for record in planned.built
+        if cfg.job.output.on_conflict != "ignore" or record.output_id not in existing_ids
     ]
 
-    base_rows = [
-        {
-            "sequence": record.sequence,
-            "bio_type": "dna",
-            "alphabet": record.alphabet,
-            "source": cfg.job.output.source or f"construct run {cfg.job.id}",
-        }
-        for record in built_to_write
-    ]
-    if base_rows:
-        output_ds.import_rows(
-            base_rows,
+
+def _write_output_records(output_ds: Dataset, *, cfg: JobConfig, records: List[_BuiltRecord]) -> None:
+    with output_ds.write_session() as session:
+        session.init_if_missing(source="construct", notes=f"Initialized by construct job {cfg.job.id}.")
+        if not records:
+            return
+        source = cfg.job.output.source or f"construct run {cfg.job.id}"
+        session.import_rows(
+            [
+                {
+                    "sequence": record.sequence,
+                    "bio_type": "dna",
+                    "alphabet": record.alphabet,
+                    "source": source,
+                }
+                for record in records
+            ],
             default_bio_type="dna",
-            source=cfg.job.output.source or f"construct run {cfg.job.id}",
+            source=source,
         )
-        _attach_construct_metadata(output_ds, [record.metadata for record in built_to_write])
+        session.write_overlay(
+            "construct",
+            _construct_metadata_table([record.metadata for record in records]),
+            key="id",
+            overwrite=True,
+            note="dnadesign.construct lineage attach",
+        )
+        label_rows = [
+            {
+                "id": record.output_id,
+                "usr_label__primary": record.label_primary,
+                "usr_label__aliases": record.label_aliases,
+            }
+            for record in records
+            if record.label_primary is not None or record.label_aliases
+        ]
+        if label_rows:
+            session.write_overlay(
+                "usr_label",
+                _usr_label_table(label_rows),
+                overwrite=True,
+                note="dnadesign.construct upstream label carry-through",
+            )
 
+
+def _persist_construct_run(planned: _PlannedRun) -> RunResult:
+    cfg = planned.cfg
+    preflight = planned.preflight
+    output_ds = _ensure_output_dataset(planned)
+    built_to_write = _records_to_write(planned)
+    _write_output_records(output_ds, cfg=cfg, records=built_to_write)
     return RunResult(
         job_id=cfg.job.id,
         input_dataset=cfg.job.input.dataset,
@@ -954,3 +990,14 @@ def run_from_config(path: str | Path, *, dry_run: bool = False) -> RunResult:
         spec_id=preflight.spec_id,
         dry_run=False,
     )
+
+
+def preflight_from_config(path: str | Path) -> PreflightResult:
+    return _planned_run_from_config(path).preflight
+
+
+def run_from_config(path: str | Path, *, dry_run: bool = False) -> RunResult:
+    planned = _planned_run_from_config(path)
+    if dry_run:
+        return _dry_run_result(planned)
+    return _persist_construct_run(planned)

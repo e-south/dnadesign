@@ -22,7 +22,10 @@ from dnadesign.infer.src.runtime.ingest_loading import load_extract_ingest
 
 def test_load_extract_ingest_returns_payload_object(monkeypatch) -> None:
     ingest = IngestConfig(source="sequences", field="sequence")
-    monkeypatch.setattr("dnadesign.infer.src.runtime.ingest_loading.load_sequences_input", lambda _inputs: ["ACGT", "TGCA"])
+    monkeypatch.setattr(
+        "dnadesign.infer.src.runtime.ingest_loading.load_sequences_input",
+        lambda _inputs: ["ACGT", "TGCA"],
+    )
 
     payload = load_extract_ingest(["ACGT", "TGCA"], ingest=ingest)
 
@@ -35,7 +38,10 @@ def test_load_extract_ingest_returns_payload_object(monkeypatch) -> None:
 
 def test_load_extract_ingest_sequences_path(monkeypatch) -> None:
     ingest = IngestConfig(source="sequences", field="sequence")
-    monkeypatch.setattr("dnadesign.infer.src.runtime.ingest_loading.load_sequences_input", lambda _inputs: ["ACGT", "TGCA"])
+    monkeypatch.setattr(
+        "dnadesign.infer.src.runtime.ingest_loading.load_sequences_input",
+        lambda _inputs: ["ACGT", "TGCA"],
+    )
 
     payload = load_extract_ingest(["ACGT", "TGCA"], ingest=ingest)
 

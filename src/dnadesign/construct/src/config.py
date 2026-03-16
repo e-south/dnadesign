@@ -158,23 +158,112 @@ class PartConfig(StrictConfigModel):
         return text
 
 
+class WindowConfig(StrictConfigModel):
+    semantics: Literal["fixed_total", "anchor_plus_context"] = "fixed_total"
+    reference: Literal["start", "center", "end"] = "center"
+    direction: Literal["symmetric", "five_prime", "three_prime"] = "symmetric"
+    size_bp: Optional[int] = Field(default=None, ge=1)
+    upstream_bp: Optional[int] = Field(default=None, ge=0)
+    downstream_bp: Optional[int] = Field(default=None, ge=0)
+    offset_bp: int = 0
+
+    @model_validator(mode="after")
+    def _validate_shape(self) -> "WindowConfig":
+        if self.semantics == "fixed_total":
+            if self.size_bp is None:
+                raise ValueError("realize.window.size_bp is required when realize.window.semantics='fixed_total'.")
+            if self.upstream_bp is not None or self.downstream_bp is not None:
+                raise ValueError(
+                    "realize.window.upstream_bp/downstream_bp are only allowed when "
+                    "realize.window.semantics='anchor_plus_context'."
+                )
+            return self
+
+        if self.size_bp is not None:
+            raise ValueError("realize.window.size_bp is only allowed when realize.window.semantics='fixed_total'.")
+        if self.upstream_bp is None or self.downstream_bp is None:
+            raise ValueError(
+                "realize.window.upstream_bp and realize.window.downstream_bp are required when "
+                "realize.window.semantics='anchor_plus_context'."
+            )
+        if self.direction != "symmetric":
+            raise ValueError(
+                "realize.window.direction must stay 'symmetric' when semantics='anchor_plus_context'. "
+                "Use upstream_bp/downstream_bp to express asymmetric flanks."
+            )
+        if self.reference != "center":
+            raise ValueError(
+                "realize.window.reference must stay 'center' when semantics='anchor_plus_context'. "
+                "The extracted span is defined by the focal part plus explicit upstream/downstream flanks."
+            )
+        if self.offset_bp != 0:
+            raise ValueError("realize.window.offset_bp is only supported when semantics='fixed_total'.")
+        return self
+
+
+def _normalized_realize_window(
+    *,
+    mode: Literal["window", "full_construct"],
+    window: WindowConfig | None,
+    focal_point: Literal["start", "center", "end"],
+    anchor_offset_bp: int,
+    window_bp: int | None,
+    explicit_fields: set[str],
+) -> WindowConfig | None:
+    uses_window_block = "window" in explicit_fields
+    uses_legacy_window_fields = bool({"focal_point", "anchor_offset_bp", "window_bp"} & explicit_fields)
+
+    if mode != "window":
+        if window is not None or window_bp is not None:
+            raise ValueError("realize.window and realize.window_bp are only allowed when realize.mode='window'.")
+        return window
+
+    if uses_window_block and uses_legacy_window_fields:
+        raise ValueError(
+            "Use either realize.window or the legacy realize.focal_point/window_bp/anchor_offset_bp fields, "
+            "not both in the same config."
+        )
+    if uses_window_block:
+        if window is None:
+            raise ValueError("realize.window must be a mapping when realize.mode='window'.")
+        return window
+    if window_bp is None:
+        raise ValueError(
+            "realize.window is required when realize.mode='window', or use the legacy "
+            "realize.window_bp compatibility fields."
+        )
+    return WindowConfig(
+        semantics="fixed_total",
+        reference=focal_point,
+        direction="symmetric",
+        size_bp=window_bp,
+        offset_bp=anchor_offset_bp,
+    )
+
+
 class RealizeConfig(StrictConfigModel):
     mode: Literal["window", "full_construct"] = "window"
     focal_part: Optional[str] = None
+    window: Optional[WindowConfig] = None
     focal_point: Literal["start", "center", "end"] = "center"
     anchor_offset_bp: int = 0
     window_bp: Optional[int] = Field(default=None, ge=1)
 
     @model_validator(mode="after")
     def _validate_mode(self) -> "RealizeConfig":
+        explicit_fields = set(self.model_fields_set)
+
         if self.mode == "window":
             if not str(self.focal_part or "").strip():
                 raise ValueError("realize.focal_part is required when realize.mode='window'.")
-            if self.window_bp is None:
-                raise ValueError("realize.window_bp is required when realize.mode='window'.")
-        else:
-            if self.window_bp is not None:
-                raise ValueError("realize.window_bp is only allowed when realize.mode='window'.")
+        self.window = _normalized_realize_window(
+            mode=self.mode,
+            window=self.window,
+            focal_point=self.focal_point,
+            anchor_offset_bp=self.anchor_offset_bp,
+            window_bp=self.window_bp,
+            explicit_fields=explicit_fields,
+        )
         return self
 
 
@@ -206,6 +295,8 @@ class InnerJobConfig(StrictConfigModel):
     def _validate_parts(self) -> "InnerJobConfig":
         if not self.parts:
             raise ValueError("job.parts must define at least one part.")
+        if not str(self.input.root or "").strip():
+            raise ValueError("job.input.root is required for construct jobs that read USR datasets.")
         seen: set[str] = set()
         input_driven = 0
         for part in self.parts:

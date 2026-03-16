@@ -19,7 +19,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from dnadesign.usr import Dataset, NamespaceError, SchemaError
-from dnadesign.usr.src import dataset as dataset_module
+from dnadesign.usr.src import dataset_overlay_ops as dataset_overlay_ops_module
 from dnadesign.usr.src.dataset_query import create_overlay_view
 from dnadesign.usr.src.duckdb_runtime import connect_duckdb_utc
 from dnadesign.usr.src.overlays import OVERLAY_META_CREATED, with_overlay_metadata
@@ -60,6 +60,35 @@ def test_attach_creates_overlay_and_head_includes_derived(tmp_path: Path) -> Non
     head = ds.head(1)
     assert "mock__score" in head.columns
     assert head["mock__score"].iloc[0] == 3.5
+
+
+def test_write_overlay_accepts_registered_list_columns_and_logs_note(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    register_test_namespace(root, namespace="labels", columns_spec="labels__aliases:list<string>")
+    ds = Dataset(root, "demo")
+    ds.init(source="test")
+    ds.import_rows(
+        [{"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "test"}],
+        source="test",
+    )
+    target_id = ds.head(1)["id"].iloc[0]
+
+    with ds.write_session() as session:
+        rows = session.write_overlay(
+            "labels",
+            pa.table({"id": [target_id], "labels__aliases": [["alias-a", "alias-b"]]}),
+            key="id",
+            note="labels overlay write",
+        )
+
+    assert rows == 1
+    overlay_path = ds.dir / "_derived" / "labels.parquet"
+    overlay = pq.read_table(overlay_path)
+    assert overlay.column("labels__aliases").to_pylist() == [["alias-a", "alias-b"]]
+
+    events = [json.loads(line) for line in ds.events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    attach_events = [row for row in events if row.get("action") == "attach"]
+    assert attach_events[-1]["args"]["note"] == "labels overlay write"
 
 
 def test_materialize_folds_overlays(tmp_path: Path) -> None:
@@ -290,7 +319,7 @@ def test_overlay_parts_last_writer_wins_on_read(tmp_path: Path, monkeypatch: pyt
         counter["step"] += 1
         return value.isoformat()
 
-    monkeypatch.setattr(dataset_module, "now_utc", _next_time)
+    monkeypatch.setattr(dataset_overlay_ops_module, "now_utc", _next_time)
 
     ds.write_overlay_part("mock", pa.table({"id": [target_id], "mock__score": [1.0]}), key="id")
     ds.write_overlay_part("mock", pa.table({"id": [target_id], "mock__score": [9.0]}), key="id")
@@ -310,7 +339,7 @@ def test_overlay_parts_last_writer_wins_on_materialize(tmp_path: Path, monkeypat
         counter["step"] += 1
         return value.isoformat()
 
-    monkeypatch.setattr(dataset_module, "now_utc", _next_time)
+    monkeypatch.setattr(dataset_overlay_ops_module, "now_utc", _next_time)
 
     ds.write_overlay_part("mock", pa.table({"id": [target_id], "mock__score": [2.0]}), key="id")
     ds.write_overlay_part("mock", pa.table({"id": [target_id], "mock__score": [7.0]}), key="id")
@@ -336,7 +365,7 @@ def test_overlay_read_handles_many_parts_when_duckdb_expression_depth_is_low(
         counter["step"] += 1
         return value.isoformat()
 
-    monkeypatch.setattr(dataset_module, "now_utc", _next_time)
+    monkeypatch.setattr(dataset_overlay_ops_module, "now_utc", _next_time)
 
     for score in range(40):
         ds.write_overlay_part("mock", pa.table({"id": [target_id], "mock__score": [float(score)]}), key="id")
@@ -386,7 +415,7 @@ def test_overlay_view_construction_scales_without_per_part_temp_views(
         counter["step"] += 1
         return value.isoformat()
 
-    monkeypatch.setattr(dataset_module, "now_utc", _next_time)
+    monkeypatch.setattr(dataset_overlay_ops_module, "now_utc", _next_time)
 
     for score in range(30):
         ds.write_overlay_part("mock", pa.table({"id": [target_id], "mock__score": [float(score)]}), key="id")
@@ -429,7 +458,7 @@ def test_overlay_view_reuses_part_created_at_metadata_across_calls(
         counter["step"] += 1
         return value.isoformat()
 
-    monkeypatch.setattr(dataset_module, "now_utc", _next_time)
+    monkeypatch.setattr(dataset_overlay_ops_module, "now_utc", _next_time)
 
     for score in range(5):
         ds.write_overlay_part("mock", pa.table({"id": [target_id], "mock__score": [float(score)]}), key="id")
@@ -563,7 +592,7 @@ def test_multi_part_overlay_duplicate_key_validation_is_reused_across_calls(
         counter["step"] += 1
         return value.isoformat()
 
-    monkeypatch.setattr(dataset_module, "now_utc", _next_time)
+    monkeypatch.setattr(dataset_overlay_ops_module, "now_utc", _next_time)
 
     for score in range(5):
         ds.write_overlay_part("mock", pa.table({"id": [target_id], "mock__score": [float(score)]}), key="id")

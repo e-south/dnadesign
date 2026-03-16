@@ -99,15 +99,11 @@ def _cuda_device_index(device: str) -> int:
         return 0
     _, _, suffix = device.partition(":")
     if not suffix:
-        raise ValidationError(
-            "CAPACITY_FAIL model.device must be 'cuda' or 'cuda:<index>' when using CUDA."
-        )
+        raise ValidationError("CAPACITY_FAIL model.device must be 'cuda' or 'cuda:<index>' when using CUDA.")
     try:
         index = int(suffix)
     except ValueError as exc:
-        raise ValidationError(
-            "CAPACITY_FAIL model.device must be 'cuda' or 'cuda:<index>' when using CUDA."
-        ) from exc
+        raise ValidationError("CAPACITY_FAIL model.device must be 'cuda' or 'cuda:<index>' when using CUDA.") from exc
     if index < 0:
         raise ValidationError("CAPACITY_FAIL model.device cuda index must be >= 0")
     return index
@@ -136,8 +132,7 @@ def validate_model_hardware_contract(
     device = str(model.device or "").strip()
     if model.parallelism.strategy == "multi_gpu_vortex" and not device.startswith("cuda"):
         raise ValidationError(
-            "CAPACITY_FAIL "
-            "parallelism.strategy=multi_gpu_vortex requires model.device to start with 'cuda'."
+            "CAPACITY_FAIL parallelism.strategy=multi_gpu_vortex requires model.device to start with 'cuda'."
         )
 
     if not device.startswith("cuda"):
@@ -147,19 +142,12 @@ def validate_model_hardware_contract(
     active_inventory = inventory or probe_gpu_inventory()
     if device_index >= active_inventory.count:
         raise ValidationError(
-            "CAPACITY_FAIL "
-            f"device={device} "
-            f"device_index={device_index} "
-            f"gpus_available={active_inventory.count}"
+            f"CAPACITY_FAIL device={device} device_index={device_index} gpus_available={active_inventory.count}"
         )
 
     required_gpus = _required_gpu_count(model)
     if active_inventory.count < required_gpus:
-        raise ValidationError(
-            "CAPACITY_FAIL "
-            f"required_gpus={required_gpus} "
-            f"gpus_available={active_inventory.count}"
-        )
+        raise ValidationError(f"CAPACITY_FAIL required_gpus={required_gpus} gpus_available={active_inventory.count}")
 
     selected = _selected_devices(model, active_inventory)
     if len(selected) < required_gpus:

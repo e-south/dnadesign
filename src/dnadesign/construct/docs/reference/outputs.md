@@ -1,7 +1,7 @@
 ## construct outputs reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-14
+**Last verified:** 2026-03-15
 
 ### Output root choices
 
@@ -31,9 +31,11 @@ Construct writes standardized `construct__*` lineage columns, including:
 
 - job and spec fingerprint
 - template identity, source, and checksum
-- input dataset/field provenance
-- focal window coordinates and full construct length
-- part count, execution order, realized coordinates, and template coordinates
+- input dataset plus input record provenance
+- focal-part length plus resolved window semantics, bounds, and emitted geometry
+- one compact `construct__parts` column with execution order, placement kind, orientation, realized coordinates, and template coordinates
+
+When the input dataset already carries `usr_label__primary` / `usr_label__aliases`, construct carries those labels onto the derived output rows as the analyst-facing source names. Those labels are convenience labels, not uniqueness guarantees for derived construct outputs; use `construct__*` lineage to disambiguate source/template/window context.
 
 Use `uv run usr head <dataset>` or `uv run usr validate <dataset> --strict` to inspect or verify the resulting records.
 
@@ -51,6 +53,10 @@ Use `uv run usr head <dataset>` or `uv run usr validate <dataset> --strict` to i
 - one anchor dataset, one template record, one output dataset
 - one anchor dataset, one template record, multiple output datasets across multiple workspace projects
 - one anchor dataset, one template record, one accumulating output dataset with `output.on_conflict=ignore`
+- one anchor dataset, one template record, one accumulating output dataset with `output.on_conflict=error` when distinct projects emit distinct output ids
 - workspace-local demo roots or explicit shared USR roots
 
 Matrix orchestration across multiple templates or slots is currently expressed as multiple project entries in the workspace registry, not a multi-template runtime schema.
+
+For the cross-tool pattern where multiple construct projects feed one canonical USR dataset before infer adds derived namespaces, use the shared runbook:
+[Construct -> USR -> Infer source-of-truth demo](../../../usr/docs/operations/construct-infer-source-of-truth-demo.md).

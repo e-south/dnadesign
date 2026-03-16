@@ -180,7 +180,10 @@ def test_write_back_usr_overwrite_guard_allows_new_columns_missing_from_existing
     assert frame["infer__evo2_7b__job_a__logits_mean"].tolist() == [2.0]
 
 
-def test_write_back_usr_overwrite_guard_reads_only_requested_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_write_back_usr_overwrite_guard_reads_only_requested_ids(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     overlay_path = tmp_path / "infer.parquet"
     table = pa.table(
         {
@@ -298,7 +301,7 @@ def test_run_extract_job_usr_write_back_does_not_duplicate_final_call(monkeypatc
     job = JobConfig(
         id="job_a",
         operation="extract",
-        ingest={"source": "usr", "dataset": "demo"},
+        ingest={"source": "usr", "dataset": "demo", "root": "/tmp/usr-root"},
         outputs=[{"id": "ll_mean", "fn": "evo2.log_likelihood", "format": "float", "params": {}}],
         io={"write_back": True, "overwrite": False},
     )

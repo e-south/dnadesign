@@ -109,7 +109,7 @@ where = ["src"]
 ]
 
 [tool.pytest.ini_options]
-addopts = "-ra -q --strict-markers"
+addopts = "-ra -q --strict-markers --import-mode=importlib"
 testpaths = ["src/dnadesign"]
 pythonpath = ["src"]
 norecursedirs = ["*/archived/*", ".venv", "venv", "build", "dist", "*.egg-info"]

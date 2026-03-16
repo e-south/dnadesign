@@ -32,9 +32,7 @@ def resolve_extract_params(
     if "layer" in resolved:
         layer = resolved.get("layer")
         if not isinstance(layer, str) or not layer.strip():
-            raise CapabilityError(
-                "embedding output requires params.layer with a non-empty layer name."
-            )
+            raise CapabilityError("embedding output requires params.layer with a non-empty layer name.")
         resolved["layer"] = layer.strip()
         return resolved
 
@@ -45,6 +43,5 @@ def resolve_extract_params(
         return resolved
 
     raise CapabilityError(
-        f"embedding output requires params.layer for model_id='{model_id}'; "
-        "no default embedding layer is registered."
+        f"embedding output requires params.layer for model_id='{model_id}'; no default embedding layer is registered."
     )

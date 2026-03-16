@@ -28,9 +28,12 @@ job:
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    anchor_offset_bp: 0
-    window_bp: 1000
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 1000
+      offset_bp: 0
   output:
     dataset: pdual10_slot_b_window_1kb_demo
     root: outputs/usr_datasets

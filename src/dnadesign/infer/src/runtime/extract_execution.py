@@ -14,8 +14,8 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, List, Optional
 
 from .._logging import get_logger
-from .adapter_dispatch import invoke_extract_callable
 from ..errors import RuntimeOOMError
+from .adapter_dispatch import invoke_extract_callable
 
 _LOG = get_logger(__name__)
 

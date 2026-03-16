@@ -1,5 +1,8 @@
 ## infer getting started
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-03-15
+
 Use this section for first-run command validation before moving to large pressure tests.
 
 - [CLI quickstart](cli-quickstart.md): local command sequence for `validate`, `extract`, and `generate`.

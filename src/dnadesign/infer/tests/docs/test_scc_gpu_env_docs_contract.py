@@ -24,10 +24,7 @@ def _repo_root() -> Path:
 
 
 def test_infer_scc_gpu_env_runbook_exists_and_covers_uv_stack_contract() -> None:
-    doc = (
-        _repo_root()
-        / "src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md"
-    ).read_text(encoding="utf-8")
+    doc = (_repo_root() / "src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md").read_text(encoding="utf-8")
 
     assert "UV default groups" in doc
     assert "infer-evo2 extra" in doc

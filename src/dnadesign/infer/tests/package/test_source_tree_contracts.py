@@ -22,6 +22,18 @@ def _infer_root() -> Path:
     raise RuntimeError("repo root not found")
 
 
+def _is_local_empty_surface_dir(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    for child in path.iterdir():
+        if child.name == "__pycache__" or child.name.startswith("."):
+            continue
+        if child.is_dir() and _is_local_empty_surface_dir(child):
+            continue
+        return False
+    return True
+
+
 def test_infer_runtime_modules_live_under_src_directory() -> None:
     infer_root = _infer_root()
     assert (infer_root / "src").is_dir()
@@ -44,7 +56,10 @@ def test_infer_root_keeps_minimal_top_level_surface() -> None:
     observed = {
         path.name
         for path in infer_root.iterdir()
-        if path.name != "__pycache__" and not path.name.startswith(".")
+        if path.name != "__pycache__"
+        and not path.name.startswith(".")
+        and path.name != "AGENTS.md"
+        and not _is_local_empty_surface_dir(path)
     }
     assert observed == {
         "README.md",

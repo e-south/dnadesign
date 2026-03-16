@@ -16,7 +16,7 @@ datasets:
     notes: Example anchor inputs for a custom construct study.
     records:
       - label: example_anchor
-        role: anchor
+        intended_role: anchor
         topology: linear
         aliases: [example_anchor_alias]
         source_ref: replace-with-canonical-source
@@ -25,7 +25,7 @@ datasets:
     notes: Example template records for a custom construct study.
     records:
       - label: example_template
-        role: template
+        intended_role: template
         topology: circular
         aliases: [example_template_alias]
         source_ref: replace-with-canonical-source
@@ -39,7 +39,7 @@ datasets:
 - `datasets[].id`: semantic USR dataset id, preferably flat and biological
 - `datasets[].records`: required non-empty list
 - `records[].label`: preferred human-readable record name
-- `records[].role`: intended construct role such as `anchor` or `template`
+- `records[].intended_role`: optional hint such as `anchor` or `template`; runtime construct configs still decide how a record is used
 - `records[].topology`: free text today, but use stable values like `linear` or `circular`
 - `records[].sequence`: required DNA sequence
 - `records[].aliases`: optional alternate labels
@@ -51,7 +51,7 @@ datasets:
 - `usr_label__primary` / `usr_label__aliases` for human-readable names
 - `construct_seed__label`
 - `construct_seed__manifest_id`
-- `construct_seed__role`
+- `construct_seed__role` as an optional intent hint, not a runtime binding
 - `construct_seed__source_ref`
 - `construct_seed__topology`
 - `construct_seed__sha256`
@@ -60,7 +60,7 @@ datasets:
 
 - malformed YAML: fail before any dataset mutation
 - empty dataset/record lists: fail before any dataset mutation
-- blank ids, labels, roles, or topology: fail before any dataset mutation
+- blank ids, labels, or topology: fail before any dataset mutation
 - duplicate dataset ids inside one manifest: fail before any dataset mutation
 - invalid DNA sequences: fail before any dataset mutation
 

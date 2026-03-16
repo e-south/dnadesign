@@ -12,21 +12,18 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
-import tempfile
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 from typing import Iterable, List
 
-import pandas as pd
 import pyarrow as pa
-import pyarrow.parquet as pq
 import yaml
 
 from dnadesign.usr import Dataset, compute_id, default_usr_root, normalize_sequence, normalize_usr_root
 
 from .errors import ConfigError
-from .runtime import _ensure_construct_registry
+from .output_store import _ensure_construct_registry
 
 _SEED_ASSET = "promoter_swap_demo.yaml"
 
@@ -35,7 +32,7 @@ _SEED_ASSET = "promoter_swap_demo.yaml"
 class SeedDatasetEntry:
     label: str
     manifest_id: str
-    role: str
+    role: str | None
     source_ref: str
     topology: str
     sequence: str
@@ -104,16 +101,23 @@ def _seed_entries(items: Iterable[dict], *, manifest_id: str) -> List[SeedDatase
         if not isinstance(item, dict):
             raise ConfigError("Seed entries must be YAML mappings.")
         label = str(item.get("label") or "").strip()
-        role = str(item.get("role") or "").strip()
+        role = str(item.get("intended_role") or item.get("role") or "").strip() or None
         source_ref = str(item.get("source_ref") or "").strip()
         topology = str(item.get("topology") or "").strip()
-        if not label or not role or not topology:
-            raise ConfigError("Seed entries require non-empty label, role, and topology values.")
+        if not label or not topology:
+            raise ConfigError("Seed entries require non-empty label and topology values.")
         seq = _normalize_seed_sequence(str(item.get("sequence") or ""), label=label)
         raw_aliases = item.get("aliases") or []
         if raw_aliases and not isinstance(raw_aliases, list):
             raise ConfigError(f"Seed entry '{label}' aliases must be a YAML list of strings.")
-        aliases = tuple(sorted({str(alias).strip() for alias in raw_aliases if str(alias).strip()}))
+        aliases_out: list[str] = []
+        for alias in raw_aliases:
+            if not isinstance(alias, str):
+                raise ConfigError(f"Seed entry '{label}' aliases must contain only strings.")
+            alias_text = alias.strip()
+            if alias_text:
+                aliases_out.append(alias_text)
+        aliases = tuple(sorted(set(aliases_out)))
         digest = hashlib.sha256(seq.encode("utf-8")).hexdigest()
         expected_sha = str(item.get("sha256") or "").strip().lower()
         if expected_sha and digest != expected_sha:
@@ -151,6 +155,10 @@ def _seed_slots(items: Iterable[dict]) -> List[SeedSlot]:
             end = int(item.get("end"))
         except (TypeError, ValueError) as exc:
             raise ConfigError(f"Seed slot '{slot}' start/end must be integers.") from exc
+        if start < 0 or end < 0:
+            raise ConfigError(f"Seed slot '{slot}' start/end must be >= 0.")
+        if end <= start:
+            raise ConfigError(f"Seed slot '{slot}' end must be greater than start.")
         slots.append(
             SeedSlot(
                 slot=slot,
@@ -169,65 +177,84 @@ def _seed_slots(items: Iterable[dict]) -> List[SeedSlot]:
     return slots
 
 
-def _ensure_dataset(root: Path, name: str, *, notes: str) -> Dataset:
-    dataset = Dataset(root, name)
-    if not dataset.records_path.exists():
-        dataset.init(source="construct seed promoter-swap-demo", notes=notes)
-    return dataset
-
-
-def _attach_seed_overlay(dataset: Dataset, entries: List[SeedDatasetEntry]) -> None:
-    frame = pd.DataFrame(
+def _seed_overlay_table(entries: List[SeedDatasetEntry]) -> pa.Table:
+    schema = pa.schema(
         [
-            {
-                "id": entry.record_id,
-                "construct_seed__label": entry.label,
-                "construct_seed__manifest_id": entry.manifest_id,
-                "construct_seed__role": entry.role,
-                "construct_seed__source_ref": entry.source_ref,
-                "construct_seed__topology": entry.topology,
-                "construct_seed__sha256": entry.sha256,
-            }
-            for entry in entries
+            pa.field("id", pa.string()),
+            pa.field("construct_seed__label", pa.string()),
+            pa.field("construct_seed__manifest_id", pa.string()),
+            pa.field("construct_seed__role", pa.string()),
+            pa.field("construct_seed__source_ref", pa.string()),
+            pa.field("construct_seed__topology", pa.string()),
+            pa.field("construct_seed__sha256", pa.string()),
         ]
     )
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        path = Path(tmp_dir) / "construct_seed.parquet"
-        pq.write_table(pa.Table.from_pandas(frame, preserve_index=False), path)
-        dataset.attach(
-            path,
-            namespace="construct_seed",
-            key="id",
-            key_col="id",
-            columns=[col for col in frame.columns if col != "id"],
-            allow_overwrite=True,
+    return pa.table(
+        {
+            "id": pa.array([entry.record_id for entry in entries], type=pa.string()),
+            "construct_seed__label": pa.array([entry.label for entry in entries], type=pa.string()),
+            "construct_seed__manifest_id": pa.array([entry.manifest_id for entry in entries], type=pa.string()),
+            "construct_seed__role": pa.array([entry.role or "" for entry in entries], type=pa.string()),
+            "construct_seed__source_ref": pa.array([entry.source_ref for entry in entries], type=pa.string()),
+            "construct_seed__topology": pa.array([entry.topology for entry in entries], type=pa.string()),
+            "construct_seed__sha256": pa.array([entry.sha256 for entry in entries], type=pa.string()),
+        },
+        schema=schema,
+    )
+
+
+def _usr_label_overlay_table(entries: List[SeedDatasetEntry]) -> pa.Table:
+    schema = pa.schema(
+        [
+            pa.field("id", pa.string()),
+            pa.field("usr_label__primary", pa.string()),
+            pa.field("usr_label__aliases", pa.list_(pa.string())),
+        ]
+    )
+    return pa.table(
+        {
+            "id": pa.array([entry.record_id for entry in entries], type=pa.string()),
+            "usr_label__primary": pa.array([entry.label for entry in entries], type=pa.string()),
+            "usr_label__aliases": pa.array([list(entry.aliases) for entry in entries], type=pa.list_(pa.string())),
+        },
+        schema=schema,
+    )
+
+
+def _materialize_usr_labels(dataset: Dataset) -> None:
+    with dataset.maintenance(reason="materialize"):
+        dataset.materialize(namespaces=["usr_label"])
+
+
+def _seed_dataset(
+    dataset: Dataset,
+    *,
+    entries: List[SeedDatasetEntry],
+    notes: str,
+    source: str,
+) -> None:
+    with dataset.write_session() as session:
+        session.init_if_missing(source=source, notes=notes)
+        session.add_sequences(
+            [entry.sequence for entry in entries],
+            bio_type="dna",
+            alphabet="dna_4",
+            source=source,
+            on_conflict="ignore",
+        )
+        session.write_overlay(
+            "construct_seed",
+            _seed_overlay_table(entries),
+            overwrite=True,
             note="dnadesign.construct curated seed metadata",
         )
-
-
-def _attach_usr_label_overlay(dataset: Dataset, entries: List[SeedDatasetEntry]) -> None:
-    frame = pd.DataFrame(
-        [
-            {
-                "id": entry.record_id,
-                "usr_label__primary": entry.label,
-                "usr_label__aliases": list(entry.aliases),
-            }
-            for entry in entries
-        ]
-    )
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        path = Path(tmp_dir) / "usr_label.parquet"
-        pq.write_table(pa.Table.from_pandas(frame, preserve_index=False), path)
-        dataset.attach(
-            path,
-            namespace="usr_label",
-            key="id",
-            key_col="id",
-            columns=[col for col in frame.columns if col != "id"],
-            allow_overwrite=True,
+        session.write_overlay(
+            "usr_label",
+            _usr_label_overlay_table(entries),
+            overwrite=True,
             note="dnadesign.usr standardized human-readable sequence labels",
         )
+    _materialize_usr_labels(dataset)
 
 
 def _write_manifest(
@@ -336,18 +363,12 @@ def import_seed_manifest(*, root: str | Path, manifest: str | Path) -> ManifestI
 
     _ensure_construct_registry(root_path)
     for dataset_result in datasets:
-        dataset = _ensure_dataset(root_path, dataset_result.dataset, notes=dataset_result.notes)
-        dataset.add_sequences(
-            [entry.sequence for entry in dataset_result.entries],
-            bio_type="dna",
-            alphabet="dna_4",
+        _seed_dataset(
+            Dataset(root_path, dataset_result.dataset),
+            entries=dataset_result.entries,
+            notes=dataset_result.notes,
             source=f"construct seed import-manifest {manifest_id}",
-            on_conflict="ignore",
         )
-        _attach_seed_overlay(dataset, dataset_result.entries)
-        _attach_usr_label_overlay(dataset, dataset_result.entries)
-        with dataset.maintenance(reason="materialize"):
-            dataset.materialize(namespaces=["usr_label"])
 
     return ManifestImportResult(root=root_path, manifest_id=manifest_id, datasets=datasets)
 
@@ -367,39 +388,21 @@ def bootstrap_promoter_swap_demo(*, root: str | Path, manifest: str | Path | Non
     slots = _seed_slots(payload.get("slots") or [])
 
     _ensure_construct_registry(root_path)
-    anchor_ds = _ensure_dataset(
-        root_path,
-        anchor_dataset,
-        notes="Curated control anchors for construct tracer bullet.",
-    )
-    template_ds = _ensure_dataset(
-        root_path,
-        template_dataset,
-        notes="Curated template records for construct tracer bullet.",
-    )
+    anchor_ds = Dataset(root_path, anchor_dataset)
+    template_ds = Dataset(root_path, template_dataset)
 
-    anchor_ds.add_sequences(
-        [entry.sequence for entry in anchor_entries],
-        bio_type="dna",
-        alphabet="dna_4",
+    _seed_dataset(
+        anchor_ds,
+        entries=anchor_entries,
+        notes="Curated control anchors for construct tracer bullet.",
         source="construct seed promoter-swap-demo",
-        on_conflict="ignore",
     )
-    template_ds.add_sequences(
-        [entry.sequence for entry in template_entries],
-        bio_type="dna",
-        alphabet="dna_4",
+    _seed_dataset(
+        template_ds,
+        entries=template_entries,
+        notes="Curated template records for construct tracer bullet.",
         source="construct seed promoter-swap-demo",
-        on_conflict="ignore",
     )
-    _attach_seed_overlay(anchor_ds, anchor_entries)
-    _attach_seed_overlay(template_ds, template_entries)
-    _attach_usr_label_overlay(anchor_ds, anchor_entries)
-    _attach_usr_label_overlay(template_ds, template_entries)
-    with anchor_ds.maintenance(reason="materialize"):
-        anchor_ds.materialize(namespaces=["usr_label"])
-    with template_ds.maintenance(reason="materialize"):
-        template_ds.materialize(namespaces=["usr_label"])
 
     manifest_path = Path(manifest).expanduser().resolve() if manifest is not None else None
     if manifest_path is not None:

@@ -39,9 +39,12 @@ job:
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    anchor_offset_bp: 0
-    window_bp: 1000
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 1000
+      offset_bp: 0
   output:
     dataset: pdual10_slot_a_window_1kb_demo
     root: outputs/usr_datasets
@@ -52,9 +55,10 @@ job:
 ### Input
 
 - `input.dataset`: required USR dataset id
-- `input.root`: optional explicit USR root; omit only when the intended default root is unambiguous
+- `input.root`: required explicit USR root for construct jobs that read USR datasets
 - `input.field`: sequence-bearing field for `input_field` parts
 - `input.ids`: optional subset of record ids for selective realization
+- construct decides whether a sequence is used as a focal part or as a template; do not encode that role in the USR dataset id itself
 
 ### Template
 
@@ -68,6 +72,7 @@ Fail-fast template rules:
 
 - `kind: path` rejects multi-record FASTA input
 - `kind: usr` requires `dataset` plus `record_id`
+- `template.root` defaults to `input.root` when omitted
 - `circular` is explicit in the construct config so window extraction semantics stay audit-visible
 
 ### Parts and placement
@@ -83,14 +88,21 @@ Fail-fast template rules:
 ### Realization
 
 - `mode: full_construct`: write the entire realized construct
-- `mode: window`: extract a fixed-length window around `focal_part`
+- `mode: window`: extract a focal window around `focal_part`
+- `realize.window.semantics=fixed_total`: emitted output length is fixed by `size_bp`
+- `realize.window.reference=start|center|end`: choose the focal point inside the realized part
+- `realize.window.direction=symmetric|five_prime|three_prime`: symmetric is the default; `five_prime` and `three_prime` are resolved relative to part orientation
+- `realize.window.semantics=anchor_plus_context`: emitted output spans the full focal part plus explicit `upstream_bp` and `downstream_bp`
+- `realize.window.offset_bp`: optional fixed-total shift for compatibility with older centered-window configs
+- legacy `focal_point`, `window_bp`, and `anchor_offset_bp` are still accepted as a compatibility path, but new configs should prefer `realize.window`
 - circular templates support wraparound extraction
 - linear templates fail if the requested window would exceed boundaries
+- fixed-total windows fail if the focal part itself is longer than the requested emitted size
 
 ### Output
 
 - `output.dataset`: required USR dataset id
-- `output.root`: explicit output USR root; packaged workspaces should default to `outputs/usr_datasets`
+- `output.root`: explicit output USR root; when omitted it defaults to `input.root`
 - `output.on_conflict`:
   - `error`: fail during preflight if any planned output id already exists
   - `ignore`: skip already-present output ids during run

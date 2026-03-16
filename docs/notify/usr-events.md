@@ -1,7 +1,7 @@
 ## Notify: consuming Universal Sequence Record events
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-03
+**Last verified:** 2026-03-15
 
 Use this runbook to set up, run, and recover `notify` watcher loops.
 Notify consumes USR `.events.log` only. It does not consume DenseGen telemetry (`outputs/meta/events.jsonl`).
@@ -9,7 +9,11 @@ Notify consumes USR `.events.log` only. It does not consume DenseGen telemetry (
 ### Entry contract
 
 - Audience: operators running local or scheduler-backed Notify watch loops.
-- Prerequisites: workspace config, USR `.events.log`, and one file-backed webhook secret reference (`--secret-source file` + `--secret-ref file://...`).
+- Prerequisites: workspace config and USR `.events.log`.
+- Live delivery requires one webhook source.
+- Reusable Slack/profile workflows use one file-backed webhook secret reference (`--secret-source file` + `--secret-ref file://...`).
+- Explicit local-receiver drills can use runtime overrides such as `--url` or `--url-env`.
+- `--dry-run` can validate event parsing and routing without webhook URL resolution.
 - Verify next: `uv run notify profile doctor --profile <profile.json>` before live delivery.
 
 ### Minimal operator quickstart
@@ -66,6 +70,12 @@ Fail-fast reminders:
 
 ### Setup flow
 
+Resolver shorthand notes:
+- DenseGen and Infer use `--workspace <workspace-name>`.
+- Construct uses `--workspace <workspace-name>` only when the workspace registry has one project, otherwise use `--workspace <workspace-name>:<project-id>`.
+- Workspace shorthand for any tool is repo-rooted. Outside the repo checkout, set `DNADESIGN_REPO_ROOT=<repo-root>` or pass `--config` explicitly.
+- External construct workspace roots can be exposed to Notify with `CONSTRUCT_WORKSPACE_ROOT`.
+
 Default resolver-mode artifact paths:
 - `<config-dir>/outputs/notify/<tool>/profile.json`
 - `<config-dir>/outputs/notify/<tool>/cursor`
@@ -80,7 +90,25 @@ uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --secret-sour
 
 # Create profile from explicit config path.
 uv run notify setup slack --tool densegen --config "$CONFIG" --secret-source file --secret-ref file://<abs-path-to-webhook-secret> --policy densegen
+
+# Example construct resolver inputs.
+CONSTRUCT_CONFIG=/abs/path/to/construct/config.yaml
+CONSTRUCT_WORKSPACE=demo_construct
+CONSTRUCT_PROJECT=slot_a_window
+# export DNADESIGN_REPO_ROOT=/abs/path/to/dnadesign
+# export CONSTRUCT_WORKSPACE_ROOT=/abs/path/to/construct/workspaces
+
+# Resolve a construct dataset from its config without guessing workspace project selection.
+uv run notify setup resolve-events --tool construct --config "$CONSTRUCT_CONFIG" --json
+
+# Optional construct workspace shorthand when the workspace is discoverable.
+uv run notify setup resolve-events --tool construct --workspace "$CONSTRUCT_WORKSPACE:$CONSTRUCT_PROJECT" --json
 ```
+
+Infer resolver reminder:
+- `notify setup resolve-events --tool infer --config <config>` requires exactly one USR write-back destination.
+- Infer resolver fails fast unless the config supplies `ingest.root` for every `ingest.source=usr` + `io.write_back=true` job.
+- Multi-destination infer configs must use explicit `--events <path>` selection instead of resolver mode.
 
 ### Run flow
 
@@ -122,6 +150,7 @@ uv run notify spool drain --profile "$PROFILE" --fail-fast
 - Running live HTTPS delivery without trust roots.
 - Expecting Notify to consume DenseGen telemetry (`outputs/meta/events.jsonl`).
 - Sharing one cursor or spool path across unrelated runs.
+- Expecting default policy filters to surface USR maintenance merge actions. If merge/carry operations must be visible, pass `--only-actions merge_datasets,attach,materialize` or set `NOTIFY_ACTIONS` explicitly.
 
 ### DenseGen progress semantics
 
@@ -144,4 +173,5 @@ uv run notify spool drain --profile "$PROFILE" --fail-fast
 - Notify route map: [docs/notify/README.md](README.md)
 - Notify package docs index: [src/dnadesign/notify/docs/README.md](../../src/dnadesign/notify/docs/README.md)
 - Notify command contracts: [src/dnadesign/notify/docs/reference/command-contracts.md](../../src/dnadesign/notify/docs/reference/command-contracts.md)
+- Construct-backed consolidated dataset handoff: [Construct -> USR -> Infer source-of-truth demo](../../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md)
 - DenseGen integration walkthrough: [DenseGen -> USR -> Notify tutorial](../../src/dnadesign/densegen/docs/tutorials/demo_usr_notify.md)

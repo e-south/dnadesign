@@ -16,6 +16,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from dnadesign._contracts import (
+    list_construct_workspaces,
+    resolve_construct_workspace_config_path,
+)
+
 from ..errors import NotifyConfigError
 
 
@@ -133,7 +138,10 @@ def resolve_tool_workspace_config_path(*, tool: str, workspace: str, search_star
         raise NotifyConfigError("workspace must be a workspace name (not a path); pass --config for explicit paths")
 
     repo_root = _resolve_repo_root(search_start)
-    config_path = resolver.resolve_config(workspace_name, repo_root)
+    try:
+        config_path = resolver.resolve_config(workspace_name, repo_root)
+    except ValueError as exc:
+        raise NotifyConfigError(str(exc)) from exc
     if not isinstance(config_path, Path):
         config_path = Path(config_path)
     config_resolved = config_path.expanduser().resolve()
@@ -174,6 +182,14 @@ def _list_workspace_names(repo_root: Path, relative_root: Path) -> list[str]:
     return sorted(names)
 
 
+register_tool_workspace_resolver(
+    tool="construct",
+    resolve_config=lambda workspace_name, repo_root: resolve_construct_workspace_config_path(
+        repo_root=repo_root,
+        workspace_selector=workspace_name,
+    ),
+    list_workspaces=lambda repo_root: list_construct_workspaces(repo_root),
+)
 register_tool_workspace_resolver(
     tool="densegen",
     resolve_config=lambda workspace_name, repo_root: _resolve_config_from_workspace_root(

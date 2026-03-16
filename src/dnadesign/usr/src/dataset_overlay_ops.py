@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 import uuid
 from collections import defaultdict
 from pathlib import Path
@@ -41,23 +40,14 @@ from .storage.locking import dataset_write_lock
 from .storage.parquet import PARQUET_COMPRESSION, now_utc, read_parquet, write_parquet_atomic_batches
 
 
-def attach_dataset(
+def _validate_overlay_target(
     *,
     dataset: Any,
-    path: Path,
     namespace: str,
     key: str,
-    key_col: Optional[str] = None,
-    columns: Optional[Iterable[str]] = None,
-    allow_overwrite: bool = False,
-    allow_missing: bool = False,
-    parse_json: bool = True,
-    backend: str = "pyarrow",
-    note: str = "",
     namespace_pattern: Any,
     reserved_namespaces: set[str],
-) -> int:
-    """Attach derived columns into an overlay keyed by an explicit join key."""
+) -> str:
     dataset._require_exists()
     if not namespace_pattern.match(namespace):
         raise NamespaceError(
@@ -65,54 +55,55 @@ def attach_dataset(
         )
     if namespace in reserved_namespaces:
         raise NamespaceError(f"Namespace '{namespace}' is reserved.")
-    if backend not in {"pyarrow", "duckdb"}:
-        raise SchemaError(f"Unsupported backend '{backend}'.")
-    if backend == "duckdb" and parse_json:
-        raise SchemaError("duckdb backend does not support JSON parsing. Use --no-parse-json or the pyarrow backend.")
-    key = str(key).strip()
-    if key not in {"id", "sequence", "sequence_norm", "sequence_ci"}:
-        raise SchemaError(f"Unsupported join key '{key}'.")
-    if key_col is None:
-        key_col = "sequence" if key in {"sequence", "sequence_norm", "sequence_ci"} else key
+    resolved_key = str(key).strip()
+    if resolved_key not in {"id", "sequence", "sequence_norm", "sequence_ci"}:
+        raise SchemaError(f"Unsupported join key '{resolved_key}'.")
     part_dir = overlay_dir_path(dataset.dir, namespace)
     if part_dir.exists():
         raise SchemaError(
             f"Overlay parts already exist for namespace '{namespace}'. "
             "Use write_overlay_part or compact the parts first."
         )
+    return resolved_key
 
-    if backend == "duckdb":
-        return attach_duckdb_dataset(
-            dataset=dataset,
-            path=path,
-            namespace=namespace,
-            key=key,
-            key_col=key_col,
-            columns=columns,
-            allow_overwrite=allow_overwrite,
-            allow_missing=allow_missing,
-            note=note,
-        )
 
-    if path.suffix.lower() == ".parquet":
-        inc = pq.read_table(path).to_pandas()
-    elif path.suffix.lower() in {".csv"}:
-        inc = pd.read_csv(path)
-    elif path.suffix.lower() in {".jsonl", ".json"}:
-        inc = pd.read_json(path, lines=(path.suffix.lower() == ".jsonl"))
-    else:
-        raise SchemaError("Unsupported input format. Use parquet|csv|jsonl.")
-    if key_col not in inc.columns:
+def _read_attach_input(path: Path) -> pd.DataFrame:
+    suffix = path.suffix.lower()
+    if suffix == ".parquet":
+        return pq.read_table(path).to_pandas()
+    if suffix == ".csv":
+        return pd.read_csv(path)
+    if suffix in {".jsonl", ".json"}:
+        return pd.read_json(path, lines=(suffix == ".jsonl"))
+    raise SchemaError("Unsupported input format. Use parquet|csv|jsonl.")
+
+
+def _attach_frame_dataset(
+    *,
+    dataset: Any,
+    incoming: pd.DataFrame,
+    namespace: str,
+    key: str,
+    key_col: str,
+    columns: Optional[Iterable[str]] = None,
+    allow_overwrite: bool = False,
+    allow_missing: bool = False,
+    parse_json: bool = True,
+    note: str = "",
+    reserved_namespaces: set[str],
+    write_lock=dataset_write_lock,
+) -> int:
+    if key_col not in incoming.columns:
         raise SchemaError(f"Missing key column '{key_col}' in incoming data.")
 
-    rows_incoming = int(len(inc))
+    rows_incoming = int(len(incoming))
     row_nums = list(range(1, rows_incoming + 1))
 
-    attach_cols = [c for c in inc.columns if c != key_col] if columns is None else list(columns)
+    attach_cols = [c for c in incoming.columns if c != key_col] if columns is None else list(columns)
     if not attach_cols:
         return 0
 
-    work = inc[[key_col] + attach_cols].copy()
+    work = incoming[[key_col] + attach_cols].copy()
 
     def _normalize_optional_str(x: object) -> Optional[str]:
         if x is None:
@@ -176,25 +167,25 @@ def attach_dataset(
         raise SchemaError(f"{len(missing_key_rows)} row(s) have missing key values (rows: {sample}).")
 
     dup_map: Dict[str, List[int]] = defaultdict(list)
-    for k, row_num in zip(key_vals, row_nums):
-        dup_map[str(k)].append(row_num)
-    dup = {k: rows for k, rows in dup_map.items() if len(rows) > 1}
+    for resolved_key, row_num in zip(key_vals, row_nums):
+        dup_map[str(resolved_key)].append(row_num)
+    dup = {resolved_key: rows for resolved_key, rows in dup_map.items() if len(rows) > 1}
     if dup:
         preview = []
-        for k, rows in list(dup.items())[:3]:
+        for resolved_key, rows in list(dup.items())[:3]:
             rows_str = ",".join(str(r) for r in rows[:5])
-            preview.append(f"{k} (rows {rows_str})")
+            preview.append(f"{resolved_key} (rows {rows_str})")
         sample = "; ".join(preview)
         raise SchemaError(f"Duplicate keys in attachment input: {len(dup)} key(s) repeated. Sample: {sample}.")
 
     work.columns = [key] + targets
 
-    essential = {k for k, _ in REQUIRED_COLUMNS}
-    for t in targets:
-        if t in essential:
-            raise NamespaceError(f"Refusing to write essential column: {t}")
-        if "__" not in t:
-            raise NamespaceError(f"Derived columns must be namespaced (got '{t}').")
+    essential = {column_name for column_name, _ in REQUIRED_COLUMNS}
+    for target in targets:
+        if target in essential:
+            raise NamespaceError(f"Refusing to write essential column: {target}")
+        if "__" not in target:
+            raise NamespaceError(f"Derived columns must be namespaced (got '{target}').")
 
     def _write_overlay() -> int:
         dataset._auto_freeze_registry()
@@ -203,20 +194,20 @@ def attach_dataset(
         key_vals_local = list(key_vals)
         work_local = work.copy()
         if key == "id":
-            base_keys_list = [str(r) for r in base_tbl.column("id").to_pylist()]
+            base_keys_list = [str(record_id) for record_id in base_tbl.column("id").to_pylist()]
             base_keys = set(base_keys_list)
         elif key in {"sequence", "sequence_norm", "sequence_ci"}:
-            bio_vals = [str(b) for b in base_tbl.column("bio_type").to_pylist()]
-            if any(b.strip() == "" for b in bio_vals):
+            bio_vals = [str(bio_type) for bio_type in base_tbl.column("bio_type").to_pylist()]
+            if any(bio_type.strip() == "" for bio_type in bio_vals):
                 raise SchemaError("Missing bio_type values in base dataset.")
             if len(set(bio_vals)) != 1:
                 raise SchemaError("Attach by sequence requires dataset with a single bio_type.")
-            seq_vals = [str(s).strip() for s in base_tbl.column("sequence").to_pylist()]
+            seq_vals = [str(sequence).strip() for sequence in base_tbl.column("sequence").to_pylist()]
             if key == "sequence_ci":
-                alph = [str(a) for a in base_tbl.column("alphabet").to_pylist()]
-                if any(a != "dna_4" for a in alph):
+                alph = [str(alphabet) for alphabet in base_tbl.column("alphabet").to_pylist()]
+                if any(alphabet != "dna_4" for alphabet in alph):
                     raise SchemaError("sequence_ci is only valid for dna_4 datasets.")
-                base_keys_list = [s.upper() for s in seq_vals]
+                base_keys_list = [sequence.upper() for sequence in seq_vals]
             else:
                 base_keys_list = seq_vals
             if len(base_keys_list) != len(set(base_keys_list)):
@@ -226,17 +217,17 @@ def attach_dataset(
             raise SchemaError(f"Unsupported join key '{key}'.")
 
         rows_missing_local = 0
-        missing_keys = [k for k in key_vals_local if k not in base_keys]
+        missing_keys = [resolved_key for resolved_key in key_vals_local if resolved_key not in base_keys]
         if missing_keys:
             if not allow_missing:
-                sample = ", ".join(str(k) for k in missing_keys[:5])
+                sample = ", ".join(str(resolved_key) for resolved_key in missing_keys[:5])
                 raise SchemaError(
                     f"{len(missing_keys)} row(s) reference keys not present in the dataset (sample: {sample})."
                 )
             rows_missing_local = len(missing_keys)
-            keep_mask = [k in base_keys for k in key_vals_local]
+            keep_mask = [resolved_key in base_keys for resolved_key in key_vals_local]
             work_local = work_local[keep_mask].reset_index(drop=True)
-            key_vals_local = [k for k in key_vals_local if k in base_keys]
+            key_vals_local = [resolved_key for resolved_key in key_vals_local if resolved_key in base_keys]
 
         overlay_df = work_local.copy()
         overlay_df[key] = key_vals_local
@@ -306,8 +297,70 @@ def attach_dataset(
         )
         return rows_matched
 
-    with dataset_write_lock(dataset.dir):
+    with write_lock(dataset.dir):
         return _write_overlay()
+
+
+def attach_dataset(
+    *,
+    dataset: Any,
+    path: Path,
+    namespace: str,
+    key: str,
+    key_col: Optional[str] = None,
+    columns: Optional[Iterable[str]] = None,
+    allow_overwrite: bool = False,
+    allow_missing: bool = False,
+    parse_json: bool = True,
+    backend: str = "pyarrow",
+    note: str = "",
+    namespace_pattern: Any,
+    reserved_namespaces: set[str],
+    write_lock=dataset_write_lock,
+) -> int:
+    """Attach derived columns into an overlay keyed by an explicit join key."""
+    key = _validate_overlay_target(
+        dataset=dataset,
+        namespace=namespace,
+        key=key,
+        namespace_pattern=namespace_pattern,
+        reserved_namespaces=reserved_namespaces,
+    )
+    if backend not in {"pyarrow", "duckdb"}:
+        raise SchemaError(f"Unsupported backend '{backend}'.")
+    if backend == "duckdb" and parse_json:
+        raise SchemaError("duckdb backend does not support JSON parsing. Use --no-parse-json or the pyarrow backend.")
+    if key_col is None:
+        key_col = "sequence" if key in {"sequence", "sequence_norm", "sequence_ci"} else key
+
+    if backend == "duckdb":
+        return attach_duckdb_dataset(
+            dataset=dataset,
+            path=path,
+            namespace=namespace,
+            key=key,
+            key_col=key_col,
+            columns=columns,
+            allow_overwrite=allow_overwrite,
+            allow_missing=allow_missing,
+            note=note,
+            write_lock=write_lock,
+        )
+
+    return _attach_frame_dataset(
+        dataset=dataset,
+        incoming=_read_attach_input(path),
+        namespace=namespace,
+        key=key,
+        key_col=key_col,
+        columns=columns,
+        allow_overwrite=allow_overwrite,
+        allow_missing=allow_missing,
+        parse_json=parse_json,
+        note=note,
+        reserved_namespaces=reserved_namespaces,
+        write_lock=write_lock,
+    )
 
 
 def _overlay_table_from_registry(overlay_df: pd.DataFrame, *, entry: Any, key: str) -> pa.Table:
@@ -426,6 +479,7 @@ def attach_duckdb_dataset(
     allow_overwrite: bool,
     allow_missing: bool,
     note: str,
+    write_lock=dataset_write_lock,
 ) -> int:
     """Attach derived columns using DuckDB for large parquet inputs."""
     if path.suffix.lower() != ".parquet":
@@ -654,7 +708,7 @@ def attach_duckdb_dataset(
         finally:
             con.close()
 
-    with dataset_write_lock(dataset.dir):
+    with write_lock(dataset.dir):
         return _write_overlay_duckdb()
 
 
@@ -673,6 +727,7 @@ def attach_columns_dataset(
     note: str = "",
     namespace_pattern: Any,
     reserved_namespaces: set[str],
+    write_lock=dataset_write_lock,
 ) -> int:
     return attach_dataset(
         dataset=dataset,
@@ -688,6 +743,7 @@ def attach_columns_dataset(
         note=note,
         namespace_pattern=namespace_pattern,
         reserved_namespaces=reserved_namespaces,
+        write_lock=write_lock,
     )
 
 
@@ -699,8 +755,10 @@ def write_overlay_dataset(
     key: str = "id",
     overwrite: bool = False,
     allow_missing: bool = False,
+    note: str = "",
     namespace_pattern: Any,
     reserved_namespaces: set[str],
+    write_lock=dataset_write_lock,
 ) -> int:
     """Attach a derived overlay from an Arrow/Pandas table or batches."""
     if isinstance(table_or_batches, pa.Table):
@@ -716,24 +774,27 @@ def write_overlay_dataset(
     attach_cols = [c for c in tbl.schema.names if c != key]
     if not attach_cols:
         return 0
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp_path = Path(tmpdir) / "overlay.parquet"
-        pq.write_table(tbl, tmp_path, compression=PARQUET_COMPRESSION)
-        return attach_dataset(
-            dataset=dataset,
-            path=tmp_path,
-            namespace=namespace,
-            key=key,
-            key_col=key,
-            columns=attach_cols,
-            allow_overwrite=overwrite,
-            allow_missing=allow_missing,
-            parse_json=False,
-            backend="pyarrow",
-            note="",
-            namespace_pattern=namespace_pattern,
-            reserved_namespaces=reserved_namespaces,
-        )
+    _validate_overlay_target(
+        dataset=dataset,
+        namespace=namespace,
+        key=key,
+        namespace_pattern=namespace_pattern,
+        reserved_namespaces=reserved_namespaces,
+    )
+    return _attach_frame_dataset(
+        dataset=dataset,
+        incoming=tbl.to_pandas(),
+        namespace=namespace,
+        key=key,
+        key_col=key,
+        columns=attach_cols,
+        allow_overwrite=overwrite,
+        allow_missing=allow_missing,
+        parse_json=False,
+        note=note,
+        reserved_namespaces=reserved_namespaces,
+        write_lock=write_lock,
+    )
 
 
 def write_overlay_part_dataset(
@@ -746,6 +807,7 @@ def write_overlay_part_dataset(
     allow_missing: bool = False,
     actor: Optional[dict] = None,
     reserved_namespaces: set[str],
+    write_lock=dataset_write_lock,
 ) -> int:
     """Append an overlay part file under _derived/<namespace>/part-*.parquet."""
     dataset._require_exists()
@@ -919,6 +981,6 @@ def write_overlay_part_dataset(
         )
         return rows_written
 
-    with dataset_write_lock(dataset.dir):
+    with write_lock(dataset.dir):
         dataset._auto_freeze_registry()
         return _write_part()

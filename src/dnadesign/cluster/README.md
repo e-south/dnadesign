@@ -7,7 +7,7 @@ The system is built around two *composable* concepts:
 - **Presets** — reusable partials by **kind** (`fit`, `umap`, `plot`, `analysis`) that capture algorithm knobs and plotting style;
 - **Jobs** — concrete, checked‑in invocations you can run repeatedly (dataset bindings, names, I/O, highlights, etc.).
 
-See the [repository docs index](../../../docs/README.md) for cross-tool workflow routes and runbooks.
+See the [repository docs index](../../../docs/README.md) for cross-tool workflow routes and runbooks. For the authoritative cross-tool source-of-truth path that builds an infer-annotated promoter feature matrix before clustering, use [promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md).
 
 ---
 

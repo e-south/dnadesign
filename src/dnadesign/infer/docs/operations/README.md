@@ -1,5 +1,8 @@
 ## infer operations
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-03-15
+
 ### Start path
 
 1. Validate command contracts locally:
@@ -14,12 +17,13 @@
 - [Agnostic model + USR pressure test](pressure-test-agnostic-models.md): standalone and ops-runbook paths.
 - [SCC Evo2 GPU environment runbook (UV + infer)](scc-evo2-gpu-uv-runbook.md): deterministic environment build + infer capability checks.
 - [End-to-end pressure-test demo](../tutorials/demo_pressure_test_usr_ops_notify.md): infer + usr + ops + notify full walkthrough.
+- [Construct -> USR -> Infer source-of-truth demo](../../../usr/docs/operations/construct-infer-source-of-truth-demo.md): construct-led data-plane handoff into infer.
 
 ### Integration boundary
 
 - Ops workflow contracts consumed by infer:
   - `infer_batch_submit`
-  - `infer_batch_with_notify_slack`
+  - `infer_batch_with_notify`
 - Shared producer contract path:
   - `src/dnadesign/_contracts/usr_producer.py`
 

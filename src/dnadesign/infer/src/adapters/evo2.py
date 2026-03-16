@@ -27,8 +27,8 @@ import torch
 
 from .._logging import get_logger
 from ..errors import CapabilityError, ModelLoadError
-from . import EVO2_DEFAULT_EMBEDDING_LAYER
 from ..utils import pool_tensor, to_format
+from . import EVO2_DEFAULT_EMBEDDING_LAYER
 
 _LOG = get_logger(__name__)
 _BLOCK_MLP_LAYER_PATTERN = re.compile(r"^blocks\.(\d+)\.mlp\.l3$")
@@ -248,8 +248,7 @@ class Evo2Adapter:
 
         if self._torch_module is None or not hasattr(self._torch_module, "named_modules"):
             raise CapabilityError(
-                "Evo2 endpoint embedding layer could not be resolved automatically. "
-                "Pass an explicit layer string."
+                "Evo2 endpoint embedding layer could not be resolved automatically. Pass an explicit layer string."
             )
 
         candidates: list[tuple[int, str]] = []
@@ -260,8 +259,7 @@ class Evo2Adapter:
             candidates.append((int(match.group(1)), str(name)))
         if not candidates:
             raise CapabilityError(
-                "Evo2 endpoint embedding layer could not be resolved automatically. "
-                "Pass an explicit layer string."
+                "Evo2 endpoint embedding layer could not be resolved automatically. Pass an explicit layer string."
             )
         return max(candidates, key=lambda item: item[0])[1]
 
@@ -428,12 +426,7 @@ class Evo2Adapter:
         # whose first element is the generated sequence list.
         seqs = getattr(out, "sequences", None)
         if seqs is None:
-            if (
-                isinstance(out, tuple)
-                and out
-                and isinstance(out[0], list)
-                and all(isinstance(x, str) for x in out[0])
-            ):
+            if isinstance(out, tuple) and out and isinstance(out[0], list) and all(isinstance(x, str) for x in out[0]):
                 seqs = out[0]
             elif isinstance(out, list) and all(isinstance(x, str) for x in out):
                 seqs = out

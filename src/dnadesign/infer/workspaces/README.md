@@ -5,7 +5,7 @@ Use this directory as the default root for infer pressure-test workspaces.
 ### Quick start
 
 ```bash
-uv run infer workspace init --id test_stress_ethanol
+uv run infer workspace init --id test_stress_ethanol # Create a default infer workspace scaffold.
 ```
 
 This creates:
@@ -41,7 +41,7 @@ Relative `ingest.path` values are resolved from the directory that contains `con
 For USR-backed workspaces, reset only infer outputs with:
 
 ```bash
-uv run infer prune --usr <dataset-id> --usr-root <usr-root>
+uv run infer prune --usr <dataset-id> --usr-root <usr-root> # Archive infer output namespace for one dataset.
 ```
 
 This archives the `infer` overlay namespace only. It does not delete the workspace or the base USR records table.

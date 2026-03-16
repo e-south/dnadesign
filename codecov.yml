@@ -58,6 +58,10 @@ component_management:
       name: infer
       paths:
         - src/dnadesign/infer/**
+    - component_id: construct
+      name: construct
+      paths:
+        - src/dnadesign/construct/**
     - component_id: opal
       name: opal
       paths:

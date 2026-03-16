@@ -22,7 +22,10 @@ from dnadesign.infer.src.runtime.ingest_loading import load_generate_ingest
 
 def test_load_generate_ingest_sequences_path(monkeypatch) -> None:
     ingest = IngestConfig(source="sequences", field="sequence")
-    monkeypatch.setattr("dnadesign.infer.src.runtime.ingest_loading.load_sequences_input", lambda _inputs: ["ACGT", "TGCA"])
+    monkeypatch.setattr(
+        "dnadesign.infer.src.runtime.ingest_loading.load_sequences_input",
+        lambda _inputs: ["ACGT", "TGCA"],
+    )
 
     prompts = load_generate_ingest(["ACGT", "TGCA"], ingest=ingest)
 

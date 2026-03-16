@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 
 import typer
@@ -27,6 +28,7 @@ from ...workspace import (
     workspace_root_with_source,
     workspace_template_with_source,
 )
+from ._errors import exit_with_error
 from ._render import echo_run_result, echo_validate_result
 
 workspace_app = typer.Typer(no_args_is_help=True, help="Workspace scaffolding for construct.")
@@ -38,21 +40,28 @@ def _construct_command_prefix(*, workspace_dir: Path | None = None) -> str:
         try:
             workspace_dir.resolve().relative_to(repo_root)
         except ValueError:
-            return f"uv run --project {repo_root} construct"
+            return f"uv run --project {shlex.quote(repo_root.as_posix())} construct"
     return "uv run construct"
+
+
+def _quoted(path: Path) -> str:
+    return shlex.quote(path.as_posix())
 
 
 @workspace_app.command("where")
 def where(
     root: str | None = typer.Option(None, "--root", help="Override workspace root."),
-    profile: str = typer.Option("blank", "--profile", help="Workspace profile: blank | promoter-swap-demo."),
+    profile: str = typer.Option(
+        "blank",
+        "--profile",
+        help="Workspace profile: blank | promoter-swap-demo | promoter-swap-source-of-truth-demo.",
+    ),
 ) -> None:
     try:
         workspace_root, source = workspace_root_with_source(root)
         template_path, template_source = workspace_template_with_source(profile)
-    except ConstructError as exc:
-        typer.echo(f"Error: {exc}")
-        raise typer.Exit(2) from exc
+    except (ConstructError, OSError) as exc:
+        exit_with_error(exc, code=2)
     typer.echo(f"workspace_root: {workspace_root}")
     typer.echo(f"workspace_root_source: {source}")
     typer.echo(f"workspace_profile: {profile}")
@@ -65,41 +74,54 @@ def where(
 def init(
     workspace_id: str = typer.Option(..., "--id", help="Workspace directory name."),
     root: str | None = typer.Option(None, "--root", help="Override workspace root."),
-    profile: str = typer.Option("blank", "--profile", help="Workspace profile: blank | promoter-swap-demo."),
+    profile: str = typer.Option(
+        "blank",
+        "--profile",
+        help="Workspace profile: blank | promoter-swap-demo | promoter-swap-source-of-truth-demo.",
+    ),
 ) -> None:
     try:
         workspace_dir = init_workspace(workspace_id=workspace_id, root=root, profile=profile)
-    except ConstructError as exc:
-        typer.echo(f"Error: {exc}")
-        raise typer.Exit(2) from exc
+    except (ConstructError, OSError) as exc:
+        exit_with_error(exc, code=2)
 
     config_path = workspace_dir / "config.yaml"
     registry_path = workspace_registry_path(workspace_dir)
     command_prefix = _construct_command_prefix(workspace_dir=workspace_dir)
+    workspace_arg = _quoted(workspace_dir)
+    config_arg = _quoted(config_path)
+    outputs_root_arg = _quoted(workspace_dir / "outputs" / "usr_datasets")
+    demo_manifest_arg = _quoted(workspace_dir / "inputs" / "seed_manifest.yaml")
+    import_manifest_arg = _quoted(workspace_dir / "inputs" / "import_manifest.template.yaml")
     typer.echo(f"workspace: {workspace_dir}")
     typer.echo(f"profile: {profile}")
     typer.echo(f"workspace_registry: {registry_path}")
     if config_path.exists():
         typer.echo(f"config: {config_path}")
-        typer.echo(f"Next: {command_prefix} workspace show --workspace {workspace_dir}")
-        typer.echo(f"Next: {command_prefix} validate config --config {config_path}")
+        typer.echo(f"Next: {command_prefix} workspace show --workspace {workspace_arg}")
+        typer.echo(f"Next: {command_prefix} validate config --config {config_arg}")
     else:
         typer.echo("config: choose one of the packaged config.*.yaml files in this workspace")
-        typer.echo(f"Next: {command_prefix} workspace show --workspace {workspace_dir}")
+        typer.echo(f"Next: {command_prefix} workspace show --workspace {workspace_arg}")
     if profile == "promoter-swap-demo":
         typer.echo(
-            f"Then: {command_prefix} seed promoter-swap-demo "
-            f"--root {workspace_dir / 'outputs' / 'usr_datasets'} "
-            f"--manifest {workspace_dir / 'inputs' / 'seed_manifest.yaml'}"
+            f"Then: {command_prefix} seed promoter-swap-demo --root {outputs_root_arg} --manifest {demo_manifest_arg}"
         )
         typer.echo("Then: run ./runbook.sh --mode dry-run --config <chosen-config>")
+    elif profile == "promoter-swap-source-of-truth-demo":
+        typer.echo(
+            f"Then: {command_prefix} seed promoter-swap-demo --root {outputs_root_arg} --manifest {demo_manifest_arg}"
+        )
+        typer.echo("Then: run ./runbook.sh --mode dry-run-all")
     else:
         typer.echo("Then: update construct.workspace.yaml with your project inventory and USR root choice.")
         typer.echo(f"Then: edit {workspace_dir / 'inputs' / 'import_manifest.template.yaml'} for your own inputs.")
         typer.echo(
-            f"Optional demo bootstrap: {command_prefix} seed promoter-swap-demo "
-            f"--root {workspace_dir / 'outputs' / 'usr_datasets'} "
-            f"--manifest {workspace_dir / 'inputs' / 'seed_manifest.yaml'}"
+            f"Then: {command_prefix} seed import-manifest --manifest {import_manifest_arg} --root {outputs_root_arg}"
+        )
+        typer.echo(
+            "Then: if you want the curated demo instead, initialize a separate workspace "
+            "with --profile promoter-swap-demo or --profile promoter-swap-source-of-truth-demo."
         )
 
 
@@ -109,9 +131,8 @@ def show(
 ) -> None:
     try:
         registry, registry_path = load_workspace_registry(workspace)
-    except ConstructError as exc:
-        typer.echo(f"Error: {exc}")
-        raise typer.Exit(2) from exc
+    except (ConstructError, OSError) as exc:
+        exit_with_error(exc, code=2)
 
     payload = registry.workspace
     typer.echo(f"workspace_registry: {registry_path}")
@@ -139,9 +160,8 @@ def doctor(
 ) -> None:
     try:
         report = doctor_workspace_registry(workspace)
-    except ConstructError as exc:
-        typer.echo(f"Error: {exc}")
-        raise typer.Exit(2) from exc
+    except (ConstructError, OSError) as exc:
+        exit_with_error(exc, code=2)
 
     typer.echo(f"workspace_registry: {report.registry_path}")
     typer.echo(f"workspace_id: {report.workspace_id}")
@@ -167,17 +187,15 @@ def validate_project(
 ) -> None:
     try:
         resolution = resolve_workspace_project(workspace, project_id=project)
-    except ConstructError as exc:
-        typer.echo(f"Error: {exc}")
-        raise typer.Exit(2) from exc
+    except (ConstructError, OSError) as exc:
+        exit_with_error(exc, code=2)
 
     preflight = None
     if runtime:
         try:
             preflight = preflight_from_config(resolution.config_path)
-        except ConstructError as exc:
-            typer.echo(f"Error: {exc}")
-            raise typer.Exit(1) from exc
+        except (ConstructError, OSError) as exc:
+            exit_with_error(exc, code=1)
     echo_validate_result(config_path=resolution.config_path, loaded=resolution.config, preflight=preflight)
 
 
@@ -194,7 +212,6 @@ def run_project(
     try:
         resolution = resolve_workspace_project(workspace, project_id=project)
         result = run_from_config(resolution.config_path, dry_run=dry_run)
-    except ConstructError as exc:
-        typer.echo(f"Error: {exc}")
-        raise typer.Exit(1) from exc
+    except (ConstructError, OSError) as exc:
+        exit_with_error(exc, code=1)
     echo_run_result(result)

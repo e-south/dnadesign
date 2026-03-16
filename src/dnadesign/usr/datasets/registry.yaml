@@ -31,19 +31,31 @@ namespaces:
       type: bool
     - name: construct__input_dataset
       type: string
-    - name: construct__input_field
-      type: string
     - name: construct__input_fields
       type: list<string>
-    - name: construct__anchor_id
+    - name: construct__input_id
       type: string
-    - name: construct__anchor_length
+    - name: construct__input_length
       type: int64
     - name: construct__mode
       type: string
     - name: construct__focal_part
       type: string
-    - name: construct__window_bp
+    - name: construct__focal_part_length
+      type: int64
+    - name: construct__window_semantics
+      type: string
+    - name: construct__window_reference
+      type: string
+    - name: construct__window_direction
+      type: string
+    - name: construct__window_size_bp
+      type: int64
+    - name: construct__window_upstream_bp
+      type: int64
+    - name: construct__window_downstream_bp
+      type: int64
+    - name: construct__window_offset_bp
       type: int64
     - name: construct__window_start
       type: int64
@@ -51,24 +63,8 @@ namespaces:
       type: int64
     - name: construct__full_construct_length
       type: int64
-    - name: construct__part_count
-      type: int64
-    - name: construct__part_names
-      type: list<string>
-    - name: construct__part_roles
-      type: list<string>
-    - name: construct__part_kinds
-      type: list<string>
-    - name: construct__part_starts
-      type: list<int64>
-    - name: construct__part_ends
-      type: list<int64>
-    - name: construct__part_orientations
-      type: list<string>
-    - name: construct__part_template_starts
-      type: list<int64>
-    - name: construct__part_template_ends
-      type: list<int64>
+    - name: construct__parts
+      type: list<struct<name:string,role:string,sequence_source:string,sequence_field:string,placement_kind:string,orientation:string,template_start:int64,template_end:int64,realized_start:int64,realized_end:int64,length:int64>>
     description: Construct lineage overlays for realized DNA sequences.
     owner: construct
   construct_seed:

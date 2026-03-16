@@ -1,5 +1,8 @@
 ## Infer Development Journal
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-03-15
+
 This journal tracks `dnadesign.infer` refactor work over time: scope, decisions, evidence, tasks, and validation outcomes.
 
 ### Working Agreements

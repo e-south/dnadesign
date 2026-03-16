@@ -1,5 +1,8 @@
 ## infer command contracts
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-03-15
+
 ### infer run
 
 - Accepts `--config` for YAML-driven runs or `--preset` for single preset-driven runs.
@@ -7,7 +10,10 @@
 - For `sequences` and `records`, set `ingest.path` in the job config (path is resolved relative to config directory when not absolute).
 - For `pt_file`, `ingest.path` is optional; when omitted, infer uses `<config-dir>/<job_id>.pt`.
 - For `usr`, `ingest.path` is invalid and fails validation.
+- For `usr`, runtime ingest requires either explicit `ingest.root` or `DNADESIGN_USR_ROOT`; it no longer falls back to packaged datasets implicitly.
+- USR write-back jobs remain stricter: they must set `ingest.root` explicitly even if `DNADESIGN_USR_ROOT` is set.
 - `--dry-run` validates and prints summary without model execution.
+- For config-mode `ingest.source: usr` jobs, `--dry-run` also preflights the resolved USR dataset path and required columns so mis-targeted roots or datasets fail before execution.
 - Unknown or missing selected jobs fail fast with non-zero exit.
 
 ### infer extract

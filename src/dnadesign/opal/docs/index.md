@@ -9,6 +9,7 @@ This documentation covers end-to-end workflows, plugin contracts and math, runti
 ### Workflows
 
 These guides are the primary user path and show complete command sequences for each supported flow.
+- [USR dataset with infer-derived X -> OPAL active learning](./workflows/usr-infer-x-active-learning.md): downstream active-learning path once infer has already written the chosen `X` column into a USR dataset.
 - [RF + SFXI + top_n](./workflows/rf-sfxi-topn.md): baseline campaign flow from config to selected candidates.
 - [GP + SFXI + top_n](./workflows/gp-sfxi-topn.md): GP-driven scoring flow with top_n selection.
 - [GP + SFXI + expected_improvement](./workflows/gp-sfxi-ei.md): GP-driven scoring flow with EI selection.

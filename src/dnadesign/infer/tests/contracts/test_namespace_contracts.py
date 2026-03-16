@@ -128,7 +128,7 @@ def test_agnostic_model_usr_pressure_path_writes_namespaced_columns(monkeypatch)
     job = JobConfig(
         id="pressure_job",
         operation="extract",
-        ingest={"source": "usr", "dataset": "demo"},
+        ingest={"source": "usr", "dataset": "demo", "root": "/tmp/usr-root"},
         outputs=[
             {"id": "logits", "fn": f"{namespace}.logits", "format": "list", "params": {}},
             {

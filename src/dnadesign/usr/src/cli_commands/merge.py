@@ -41,6 +41,9 @@ def cmd_merge_datasets(args, *, deps: MergeDeps) -> None:
     dry_run = bool(getattr(args, "dry_run", False))
     assume_yes = bool(getattr(args, "yes", False))
     note = str(getattr(args, "note", "") or "")
+    carry_namespaces = [
+        str(value).strip() for value in list(getattr(args, "carry_namespaces", []) or []) if str(value).strip()
+    ]
     if hasattr(args, "avoid_casefold_dups"):
         avoid_casefold_dups = bool(getattr(args, "avoid_casefold_dups", True))
     else:
@@ -60,10 +63,11 @@ def cmd_merge_datasets(args, *, deps: MergeDeps) -> None:
             note=note,
             overlap_coercion=("to-dest" if coerce_overlap == "to-dest" else "none"),
             avoid_casefold_dups=avoid_casefold_dups,
+            carry_namespaces=carry_namespaces,
         )
 
     action = "DRY-RUN" if dry_run else "MERGED"
-    print(
+    message = (
         f"[{action}] dest='{args.dest}'  src='{args.src}'  "
         f"rows_src={preview.src_rows}  "
         f"duplicates_total={preview.duplicates_total}  "
@@ -74,12 +78,18 @@ def cmd_merge_datasets(args, *, deps: MergeDeps) -> None:
         f"columns(total={preview.columns_total}, overlap={preview.overlapping_columns})  "
         f"dup_policy={preview.duplicate_policy.value}"
     )
+    if preview.carried_namespace_counts:
+        carried = ",".join(f"{namespace}:{rows}" for namespace, rows in preview.carried_namespace_counts)
+        message += f"  carried({carried})"
+    print(message)
     if not dry_run:
         cmd = (
             f"usr merge-datasets --dest {args.dest} --src {args.src} "
             f"{'--require-same-columns' if require_same else '--union-columns'} "
             f"--if-duplicate {dup_policy}"
         )
+        if carry_namespaces:
+            cmd += "".join(f" --carry-namespace {namespace}" for namespace in carry_namespaces)
         ds_dest.append_meta_note(
             f"Merged from '{args.src}' -> '{args.dest}' (added {preview.new_rows} rows; dup_policy={preview.duplicate_policy.value})",  # noqa: E501
             cmd,

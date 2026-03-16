@@ -15,31 +15,34 @@ from __future__ import annotations
 from typing import Dict, List
 
 from ._logging import get_logger
-from .runtime.adapter_runtime import (
-    auto_derate_enabled as _auto_derate_enabled,
-    clear_adapter_cache,
-    get_adapter as _get_adapter,
-    is_oom as _is_oom,
-)
-from .runtime.adapter_dispatch import resolve_extract_callable, resolve_generate_callable
-from .runtime.batch_policy import resolve_extract_batch_policy, resolve_micro_batch_size
 from .config import JobConfig, ModelConfig
 from .contracts import resolve_generate_namespaced_fn, validate_extract_output_namespace
-from .errors import (
-    ValidationError,
+from .errors import ValidationError
+from .ingest.validators import validate_dna, validate_protein
+from .runtime.adapter_dispatch import (
+    resolve_extract_callable,
+    resolve_generate_callable,
 )
+from .runtime.adapter_runtime import auto_derate_enabled as _auto_derate_enabled
+from .runtime.adapter_runtime import clear_adapter_cache as _clear_adapter_cache
+from .runtime.adapter_runtime import get_adapter as _get_adapter
+from .runtime.adapter_runtime import is_oom as _is_oom
+from .runtime.batch_policy import resolve_extract_batch_policy, resolve_micro_batch_size
 from .runtime.extract_chunk_writeback import build_extract_chunk_write_back
 from .runtime.extract_execution import execute_extract_output
 from .runtime.extract_params import resolve_extract_params
 from .runtime.generate_execution import execute_generate_batches, validate_generate_payload
 from .runtime.ingest_loading import load_extract_ingest, load_generate_ingest
-from .ingest.validators import validate_dna, validate_protein
 from .runtime.progress import ProgressFactory, create_progress_handle
 from .runtime.resume_planner import plan_resume_for_usr as _plan_resume_for_usr
 from .runtime.writeback_dispatch import run_extract_write_back
 from .writers.usr import write_back_usr
 
 _LOG = get_logger(__name__)
+
+
+def clear_adapter_cache() -> None:
+    _clear_adapter_cache()
 
 
 def _validate_alphabet(alphabet: str, seqs: List[str]) -> None:

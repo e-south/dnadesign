@@ -1,6 +1,6 @@
 ![construct banner](docs/assets/construct-banner.svg)
 
-construct takes an input dataset, a template, and explicit placement rules, then writes realized sequences back to USR with `construct__*` lineage.
+construct places focal DNA parts into larger sequence contexts. Use it to expand promoters and other parts into explicit regions, plasmids, and related template-backed constructs. Any canonical sequence record can serve as an input part or a template; the construct config decides the role.
 
 ## Documentation map
 

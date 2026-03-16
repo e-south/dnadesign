@@ -1,7 +1,7 @@
 ## Notify command contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-01
+**Last verified:** 2026-03-15
 
 This page is the tool-local source for Notify command invocation contracts and fail-fast behavior.
 
@@ -16,12 +16,24 @@ This page is the tool-local source for Notify command invocation contracts and f
 
 - Purpose: list available workspace names for a resolver-mode tool.
 - Requires `--tool <name>`.
+- `construct` lists workspace ids only; select a specific project later with `--workspace <workspace>:<project-id>` when the registry has multiple projects.
 - Emits one workspace name per line, or machine-readable output with `--json`.
 
 ### notify setup resolve-events
 
 - Purpose: resolve expected USR `.events.log` path and default policy without writing profile artifacts.
 - Requires resolver mode with `--tool` and exactly one of `--config` or `--workspace`.
+- Built-in resolver policies:
+  - `densegen` -> `densegen`
+  - `infer` -> `infer`
+  - `construct` -> `generic`
+- Workspace shorthand is repo-rooted for all resolver-mode tools. Outside the repo checkout, set `DNADESIGN_REPO_ROOT=<repo-root>` or pass `--config` explicitly.
+- `infer` resolver requires exactly one USR write-back destination and explicit `ingest.root` for every `ingest.source='usr'` + `io.write_back=true` job.
+- Multi-destination infer configs must use explicit `--events <path>` instead of resolver mode.
+- `construct --workspace` uses a workspace selector, not a raw filesystem path:
+  - `<workspace>` when the workspace registry has exactly one project
+  - `<workspace>:<project-id>` when selecting from `construct.workspace.yaml`
+  - external construct workspaces are discoverable through `CONSTRUCT_WORKSPACE_ROOT`
 - `--print-policy` and `--json` are mutually exclusive.
 - Fails fast on invalid resolver inputs and unknown workspace/config paths.
 
@@ -49,6 +61,7 @@ This page is the tool-local source for Notify command invocation contracts and f
   - `--events <path>`
   - resolver mode: `--tool` with exactly one of `--config` or `--workspace`
 - `--config/--workspace` cannot be combined with `--profile` or `--events`.
+- `construct` workspace shorthand follows the same selector rules as `notify setup resolve-events`.
 - `--on-truncate` contract is explicit:
   - `error` (default) fails fast on truncation/replacement/disappearance while following.
   - `restart` reopens from start and resumes follow loop.

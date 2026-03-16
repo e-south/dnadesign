@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from typing import Any
 
-import torch
 import pytest
+import torch
 
 from dnadesign.infer.src.adapters.evo2 import Evo2Adapter
 from dnadesign.infer.src.errors import CapabilityError
@@ -41,20 +41,12 @@ class _Model:
     ) -> tuple[Any, Any]:
         self.forward_calls += 1
         batch, length = x.shape
-        logits = (
-            torch.arange(batch * length * 4, dtype=torch.float32)
-            .reshape(batch, length, 4)
-            .to(x.device)
-        )
+        logits = torch.arange(batch * length * 4, dtype=torch.float32).reshape(batch, length, 4).to(x.device)
         if not return_embeddings:
             return (logits,), None
         assert layer_names is not None and len(layer_names) == 1
         self.embedding_layers.append(layer_names[0])
-        embeddings = (
-            torch.arange(batch * length * 3, dtype=torch.float32)
-            .reshape(batch, length, 3)
-            .to(x.device)
-        )
+        embeddings = torch.arange(batch * length * 3, dtype=torch.float32).reshape(batch, length, 3).to(x.device)
         return logits, {layer_names[0]: embeddings}
 
     def score_sequences(self, seqs: list[str], *, reduce_method: str) -> list[float]:

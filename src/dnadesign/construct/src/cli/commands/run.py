@@ -17,6 +17,7 @@ import typer
 
 from ...api import run_from_config
 from ...errors import ConstructError
+from ._errors import exit_with_error
 from ._render import echo_run_result
 
 
@@ -30,8 +31,7 @@ def run(
 ) -> None:
     try:
         result = run_from_config(config, dry_run=dry_run)
-    except ConstructError as exc:
-        typer.echo(f"Error: {exc}")
-        raise typer.Exit(1) from exc
+    except (ConstructError, OSError) as exc:
+        exit_with_error(exc, code=1)
 
     echo_run_result(result)

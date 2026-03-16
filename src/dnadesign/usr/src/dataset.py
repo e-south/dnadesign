@@ -33,8 +33,8 @@ from .dataset_ingest import (
     prepare_import_rows_dataset,
     write_import_df_dataset,
 )
-from .dataset_overlay_catalog import build_dataset_info, load_overlay_catalog, merge_dataset_schema
 from .dataset_materialize import materialize_dataset
+from .dataset_overlay_catalog import build_dataset_info, load_overlay_catalog, merge_dataset_schema
 from .dataset_overlay_maintenance import (
     compact_overlay_namespace,
     list_overlay_infos,
@@ -47,8 +47,8 @@ from .dataset_overlay_ops import (
     write_overlay_part_dataset,
 )
 from .dataset_overlay_query import build_overlay_query
-from .dataset_read_keys import key_list_from_batch
 from .dataset_query import create_overlay_view, sql_ident, sql_str
+from .dataset_read_keys import key_list_from_batch
 from .dataset_reporting import describe_dataset, manifest_dataset, manifest_dict_dataset
 from .dataset_reserved_overlay import write_reserved_overlay
 from .dataset_state_facade import (
@@ -61,6 +61,7 @@ from .dataset_state_facade import (
 )
 from .dataset_validate import validate_dataset
 from .dataset_views import export_dataset, get_dataset, grep_dataset, head_dataset, scan_dataset
+from .dataset_write_session import DatasetWriteSession, init_dataset
 from .errors import (
     SchemaError,
     SequencesError,
@@ -68,7 +69,6 @@ from .errors import (
 from .maintenance import maintenance as maintenance_context
 from .maintenance import require_maintenance
 from .overlays import (
-    list_overlays,
     overlay_path,
 )
 from .registry import (
@@ -78,13 +78,11 @@ from .registry import (
     registry_hash,
     validate_overlay_schema,
 )
-from .schema import ARROW_SCHEMA, META_REGISTRY_HASH, REQUIRED_COLUMNS, merge_base_metadata, with_base_metadata
+from .schema import META_REGISTRY_HASH, REQUIRED_COLUMNS, merge_base_metadata
 from .storage.locking import dataset_write_lock
 from .storage.parquet import (
     iter_parquet_batches,
-    now_utc,
     snapshot_parquet_file,
-    write_parquet_atomic,
     write_parquet_atomic_batches,
 )
 from .types import AddSequencesResult, DatasetInfo, Manifest, OverlayInfo
@@ -110,6 +108,8 @@ USR_STATE_SCHEMA_TYPES = {
 }
 USR_STATE_QC_STATUS_ALLOWED = {"pass", "fail", "warn", "unknown"}
 USR_STATE_SPLIT_ALLOWED = {"train", "val", "test", "holdout"}
+
+
 @dataclass(frozen=True)
 class DedupeStats:
     rows_total: int
@@ -177,32 +177,11 @@ class Dataset:
 
     def init(self, source: str = "", notes: str = "") -> None:
         """Create a new, empty dataset directory with canonical schema."""
-        with dataset_write_lock(self.dir):
-            self._require_registry_for_mutation("init")
-            self.dir.mkdir(parents=True, exist_ok=True)
-            if self.records_path.exists():
-                raise SequencesError(f"Dataset already initialized: {self.records_path}")
-            ts = now_utc()
-            empty = pa.Table.from_arrays([pa.array([], type=f.type) for f in ARROW_SCHEMA], schema=ARROW_SCHEMA)
-            reg_hash = self._registry_hash(required=True)
-            empty = with_base_metadata(empty, created_at=ts, registry_hash=reg_hash)
-            write_parquet_atomic(empty, self.records_path, self.snapshot_dir)
-            self._auto_freeze_registry()
-            date = ts.split("T")[0]
-            meta_md = (
-                f"name: {self.name}\n"
-                f"created_at: {ts}\n"
-                f"source: {source}\n"
-                f"notes: {notes}\n"
-                f"schema: USR v1\n\n"
-                f"### Updates ({date})\n"
-                f"- {ts}: initialized dataset.\n"
-            )
-            self.meta_path.write_text(meta_md, encoding="utf-8")
-            self._record_event(
-                "init",
-                args={"source": source},
-            )
+        init_dataset(self, source=source, notes=notes, write_lock=dataset_write_lock)
+
+    def write_session(self) -> DatasetWriteSession:
+        """Return an explicit single-lock producer write session."""
+        return DatasetWriteSession(self)
 
     # --- lightweight, best-effort scratch-pad logging in meta.md ---
     def append_meta_note(self, title: str, code_block: Optional[str] = None) -> None:
@@ -496,6 +475,7 @@ class Dataset:
         actor: Optional[dict] = None,
         return_ids: bool = False,
         prevalidated_new_ids: bool = False,
+        write_lock=dataset_write_lock,
     ) -> int | tuple[int, list[str], list[str]]:
         return write_import_df_dataset(
             self,
@@ -505,7 +485,7 @@ class Dataset:
             actor=actor,
             return_ids=return_ids,
             prevalidated_new_ids=prevalidated_new_ids,
-            write_lock=dataset_write_lock,
+            write_lock=write_lock,
         )
 
     def import_rows(
@@ -546,6 +526,7 @@ class Dataset:
             strict_id_check=strict_id_check,
             actor=actor,
             prevalidated_new_ids=_prevalidated_new_ids,
+            write_lock=dataset_write_lock,
         )
 
     def add_sequences(
@@ -576,6 +557,7 @@ class Dataset:
             created_at=created_at,
             on_conflict=on_conflict,
             actor=actor,
+            write_lock=dataset_write_lock,
         )
 
     # Legacy file import entry points now route to import_rows (no special logic)
@@ -639,6 +621,7 @@ class Dataset:
             note=note,
             namespace_pattern=_NS_RE,
             reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
+            write_lock=dataset_write_lock,
         )
 
     # Friendly alias for didactic API name in README/examples
@@ -670,6 +653,7 @@ class Dataset:
             note=note,
             namespace_pattern=_NS_RE,
             reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
+            write_lock=dataset_write_lock,
         )
 
     def write_overlay(
@@ -690,6 +674,7 @@ class Dataset:
             allow_missing=allow_missing,
             namespace_pattern=_NS_RE,
             reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
+            write_lock=dataset_write_lock,
         )
 
     def write_overlay_part(
@@ -711,6 +696,7 @@ class Dataset:
             allow_missing=allow_missing,
             actor=actor,
             reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
+            write_lock=dataset_write_lock,
         )
 
     def list_overlays(self) -> List[OverlayInfo]:

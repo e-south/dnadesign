@@ -61,10 +61,7 @@ def cmd_overlay_remove(args, *, deps: MaintenanceDeps) -> None:
     if result.get("removed"):
         archived_path = result.get("archived_path")
         if archived_path:
-            print(
-                f"[overlay-remove] removed namespace={result['namespace']} "
-                f"mode={mode} archived_path={archived_path}"
-            )
+            print(f"[overlay-remove] removed namespace={result['namespace']} mode={mode} archived_path={archived_path}")
             return
         print(f"[overlay-remove] removed namespace={result['namespace']} mode={mode}")
         return

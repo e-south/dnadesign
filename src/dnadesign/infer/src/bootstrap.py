@@ -22,4 +22,3 @@ def initialize_registry() -> None:
         return
     register_defaults()
     _BOOTSTRAPPED = True
-

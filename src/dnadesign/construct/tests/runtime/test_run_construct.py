@@ -13,10 +13,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pyarrow as pa
 import pytest
 
 from dnadesign.construct.src.api import preflight_from_config, run_from_config
 from dnadesign.construct.src.errors import ValidationError
+from dnadesign.construct.src.output_store import _ensure_construct_registry
 from dnadesign.usr import Dataset
 
 
@@ -106,9 +108,9 @@ job:
     output_ds = Dataset(usr_root, "anchors_constructed")
     frame = output_ds.head(n=5)
     assert frame.iloc[0]["sequence"] == "TTACGTGG"
-    assert frame.iloc[0]["construct__anchor_id"]
-    assert frame.iloc[0]["construct__part_count"] == 2
-    assert list(frame.iloc[0]["construct__part_names"]) == ["tag", "anchor"]
+    assert frame.iloc[0]["construct__input_id"]
+    assert frame.iloc[0]["construct__window_semantics"] == "fixed_total"
+    assert [part["name"] for part in frame.iloc[0]["construct__parts"]] == ["tag", "anchor"]
     assert frame.iloc[0]["construct__template_kind"] == "literal"
 
 
@@ -168,7 +170,7 @@ job:
     assert bool(frame.iloc[0]["construct__template_circular"]) is True
     assert frame.iloc[0]["construct__window_start"] == 4
     assert frame.iloc[0]["construct__window_end"] == 2
-    assert list(frame.iloc[0]["construct__part_kinds"]) == ["replace"]
+    assert [part["placement_kind"] for part in frame.iloc[0]["construct__parts"]] == ["replace"]
 
 
 def test_run_construct_supports_negative_anchor_offset_on_circular_window(tmp_path: Path) -> None:
@@ -229,6 +231,128 @@ job:
     assert frame.iloc[0]["construct__window_end"] == 0
 
 
+def test_run_construct_supports_fixed_total_three_prime_window_semantics(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["ACGT"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct_three_prime.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: demo_three_prime
+  input:
+    source: usr
+    dataset: anchors_demo
+    root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    sequence: AAAATTTTCCCCGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        start: 8
+        end: 12
+        orientation: forward
+        expected_template_sequence: CCCC
+  realize:
+    mode: window
+    focal_part: anchor
+    window:
+      semantics: fixed_total
+      reference: start
+      direction: three_prime
+      size_bp: 5
+      offset_bp: 0
+  output:
+    dataset: anchors_constructed
+    root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = run_from_config(config_path)
+
+    assert result.records_total == 1
+    frame = Dataset(usr_root, "anchors_constructed").head(n=5)
+    assert frame.iloc[0]["sequence"] == "ACGTG"
+    assert frame.iloc[0]["construct__window_semantics"] == "fixed_total"
+    assert frame.iloc[0]["construct__window_reference"] == "start"
+    assert frame.iloc[0]["construct__window_direction"] == "three_prime"
+    assert frame.iloc[0]["construct__window_size_bp"] == 5
+
+
+def test_run_construct_supports_anchor_plus_context_window_semantics(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["ACGTAA"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct_anchor_plus_context.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: demo_anchor_plus_context
+  input:
+    source: usr
+    dataset: anchors_demo
+    root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    sequence: AAAATTTTCCCCGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        start: 8
+        end: 12
+        orientation: forward
+        expected_template_sequence: CCCC
+  realize:
+    mode: window
+    focal_part: anchor
+    window:
+      semantics: anchor_plus_context
+      upstream_bp: 2
+      downstream_bp: 3
+  output:
+    dataset: anchors_constructed
+    root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = run_from_config(config_path)
+
+    assert result.records_total == 1
+    frame = Dataset(usr_root, "anchors_constructed").head(n=5)
+    assert frame.iloc[0]["sequence"] == "TTACGTAAGGG"
+    assert frame.iloc[0]["construct__window_semantics"] == "anchor_plus_context"
+    assert frame.iloc[0]["construct__window_upstream_bp"] == 2
+    assert frame.iloc[0]["construct__window_downstream_bp"] == 3
+    assert frame.iloc[0]["construct__focal_part_length"] == 6
+
+
 def test_run_construct_supports_reverse_complement_orientation(tmp_path: Path) -> None:
     usr_root = tmp_path / "usr_root"
     usr_root.mkdir(parents=True, exist_ok=True)
@@ -279,7 +403,7 @@ job:
     output_ds = Dataset(usr_root, "anchors_constructed")
     frame = output_ds.head(n=5)
     assert frame.iloc[0]["sequence"] == "AAAAACT"
-    assert list(frame.iloc[0]["construct__part_orientations"]) == ["reverse_complement"]
+    assert [part["orientation"] for part in frame.iloc[0]["construct__parts"]] == ["reverse_complement"]
 
 
 def test_run_construct_rejects_mismatched_expected_template_sequence(tmp_path: Path) -> None:
@@ -588,7 +712,7 @@ job:
     output_ds = Dataset(usr_root, "anchors_constructed")
     frame = output_ds.head(n=5)
     assert frame.iloc[0]["sequence"] == "AAAAGGTTCCAC"
-    assert list(frame.iloc[0]["construct__part_names"]) == ["z_insert", "a_insert", "anchor"]
+    assert [part["name"] for part in frame.iloc[0]["construct__parts"]] == ["z_insert", "a_insert", "anchor"]
 
 
 def test_preflight_reports_equal_coordinate_insert_order_consistently_with_lineage(tmp_path: Path) -> None:
@@ -660,7 +784,7 @@ job:
 
     run_from_config(config_path)
     frame = Dataset(usr_root, "anchors_constructed").head(n=5)
-    assert list(frame.iloc[0]["construct__part_names"]) == ["z_insert", "a_insert", "anchor"]
+    assert [part["name"] for part in frame.iloc[0]["construct__parts"]] == ["z_insert", "a_insert", "anchor"]
 
 
 def test_preflight_rejects_same_start_mixed_intervals(tmp_path: Path) -> None:
@@ -718,6 +842,120 @@ job:
     )
 
     with pytest.raises(ValidationError, match="Same-start placements with different intervals are ambiguous"):
+        preflight_from_config(config_path)
+
+
+def test_preflight_rejects_partial_overlap(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["ACGT"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct_partial_overlap.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: demo_partial_overlap
+  input:
+    source: usr
+    dataset: anchors_demo
+    root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    sequence: AAAATTTTCCCCGGGG
+    circular: false
+  parts:
+    - name: helper
+      role: helper
+      sequence:
+        source: literal
+        literal: GG
+      placement:
+        kind: replace
+        start: 4
+        end: 8
+        orientation: forward
+        expected_template_sequence: TTTT
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        start: 6
+        end: 10
+        orientation: forward
+        expected_template_sequence: TTCC
+  realize:
+    mode: full_construct
+  output:
+    dataset: anchors_constructed
+    root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="overlaps prior placement"):
+        preflight_from_config(config_path)
+
+
+def test_preflight_rejects_fixed_total_window_shorter_than_focal_part(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["ACGTAA"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct_fixed_total_too_small.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: demo_fixed_total_too_small
+  input:
+    source: usr
+    dataset: anchors_demo
+    root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    sequence: AAAATTTTCCCCGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        start: 8
+        end: 12
+        orientation: forward
+        expected_template_sequence: CCCC
+  realize:
+    mode: window
+    focal_part: anchor
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 5
+      offset_bp: 0
+  output:
+    dataset: anchors_constructed
+    root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="exceeds fixed_total window size_bp=5"):
         preflight_from_config(config_path)
 
 
@@ -1062,3 +1300,72 @@ job:
     assert len(frame) == 2
     assert "AAAACCGG" in set(frame["sequence"])
     assert "construct__job" in frame.columns
+
+
+def test_run_construct_carries_forward_upstream_usr_labels(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    _ensure_construct_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    with input_ds.write_session() as session:
+        session.init_if_missing(source="test", notes="runtime test")
+        result = session.add_sequences(["ACGT"], bio_type="dna", alphabet="dna_4", source="test")
+        session.write_overlay(
+            "usr_label",
+            pa.table(
+                {
+                    "id": [result.ids[0]],
+                    "usr_label__primary": ["J23105"],
+                    "usr_label__aliases": [["BBa_J23105"]],
+                }
+            ),
+            overwrite=True,
+            note="test labels",
+        )
+
+    config_path = tmp_path / "construct_with_labels.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: demo_labels
+  input:
+    source: usr
+    dataset: anchors_demo
+    root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    sequence: AAAATTTTCCCCGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        start: 8
+        end: 12
+        orientation: forward
+        expected_template_sequence: CCCC
+  realize:
+    mode: window
+    focal_part: anchor
+    focal_point: center
+    window_bp: 8
+  output:
+    dataset: anchors_constructed
+    root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = run_from_config(config_path)
+
+    assert result.records_total == 1
+    output_ds = Dataset(usr_root, "anchors_constructed")
+    frame = output_ds.head(n=5)
+    assert frame.iloc[0]["usr_label__primary"] == "J23105"
+    assert frame.iloc[0]["usr_label__aliases"] == ["BBa_J23105"]
+    assert frame.iloc[0]["construct__input_id"]

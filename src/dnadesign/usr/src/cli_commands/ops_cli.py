@@ -189,6 +189,7 @@ def register_ops_commands(
         union_columns: bool = typer.Option(False, "--union-columns"),
         dup_policy: str = typer.Option("error", "--if-duplicate"),
         coerce_overlap: str = typer.Option("none", "--coerce-overlap"),
+        carry_namespaces: list[str] | None = typer.Option(None, "--carry-namespace"),
         no_avoid_casefold_dups: bool = typer.Option(False, "--no-avoid-casefold-dups"),
         dry_run: bool = typer.Option(False, "--dry-run"),
     ) -> None:
@@ -201,6 +202,7 @@ def register_ops_commands(
                 union_columns=union_columns,
                 dup_policy=dup_policy,
                 coerce_overlap=coerce_overlap,
+                carry_namespaces=carry_namespaces,
                 no_avoid_casefold_dups=no_avoid_casefold_dups,
                 dry_run=dry_run,
             )

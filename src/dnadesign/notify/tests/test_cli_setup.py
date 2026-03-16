@@ -420,6 +420,71 @@ def test_setup_resolve_events_can_emit_json_output(tmp_path: Path, monkeypatch) 
     assert payload["policy"] == "densegen"
 
 
+def test_setup_resolve_events_supports_construct_workspace_project_selector(tmp_path: Path, monkeypatch) -> None:
+    repo_root = tmp_path / "repo"
+    workspace_dir = repo_root / "src" / "dnadesign" / "construct" / "workspaces" / "demo_construct"
+    config_path = workspace_dir / "config.slot_a.window.yaml"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "job:",
+                "  id: slot_a_window",
+                "  input:",
+                "    source: usr",
+                "    dataset: anchors_demo",
+                "  output:",
+                "    dataset: construct/demo_window",
+                "    root: outputs/usr_datasets",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (workspace_dir / "construct.workspace.yaml").write_text(
+        "\n".join(
+            [
+                "workspace:",
+                "  id: demo_construct",
+                "  profile: promoter-swap-demo",
+                "  projects:",
+                "    - id: slot_a_window",
+                "      config: config.slot_a.window.yaml",
+                "      flow: replace-anchor-in-template",
+                "      input_dataset: anchors_demo",
+                "      output_dataset: construct/demo_window",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\n", encoding="utf-8")
+    monkeypatch.chdir(repo_root)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "resolve-events",
+            "--tool",
+            "construct",
+            "--workspace",
+            "demo_construct:slot_a_window",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["tool"] == "construct"
+    assert payload["config"] == str(config_path.resolve())
+    assert payload["events"] == str(
+        (workspace_dir / "outputs" / "usr_datasets" / "construct" / "demo_window" / ".events.log").resolve()
+    )
+    assert payload["policy"] == "generic"
+
+
 def test_setup_list_workspaces_emits_names_and_json(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(

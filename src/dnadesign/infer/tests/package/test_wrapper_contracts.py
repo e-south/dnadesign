@@ -16,8 +16,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-import dnadesign.infer as infer
 import pytest
+
+import dnadesign.infer as infer
 from dnadesign.infer.cli import main as infer_cli_main
 
 

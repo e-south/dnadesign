@@ -312,6 +312,7 @@ def import_rows_dataset(
     strict_id_check: bool = True,
     actor: Optional[dict] = None,
     prevalidated_new_ids: bool = False,
+    write_lock=dataset_write_lock,
 ) -> int:
     dataset._require_exists()  # noqa: SLF001
     out_df = dataset._prepare_import_rows(  # noqa: SLF001
@@ -327,6 +328,7 @@ def import_rows_dataset(
         on_conflict="error",
         actor=actor,
         prevalidated_new_ids=prevalidated_new_ids,
+        write_lock=write_lock,
     )
 
 
@@ -340,6 +342,7 @@ def add_sequences_dataset(
     created_at: Optional[str] = None,
     on_conflict: str = "error",
     actor: Optional[dict] = None,
+    write_lock=dataset_write_lock,
 ) -> AddSequencesResult:
     if on_conflict not in {"error", "ignore"}:
         raise SchemaError(f"Unsupported on_conflict '{on_conflict}'.")
@@ -367,6 +370,7 @@ def add_sequences_dataset(
         on_conflict=on_conflict,
         actor=actor,
         return_ids=True,
+        write_lock=write_lock,
     )
     return AddSequencesResult(
         added=int(out_count),

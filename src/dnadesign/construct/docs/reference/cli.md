@@ -1,7 +1,7 @@
 ## construct CLI reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-14
+**Last verified:** 2026-03-15
 
 ### Command map
 
@@ -91,3 +91,4 @@ Workspace registry contract:
 - every construct workspace should carry `construct.workspace.yaml`
 - each project entry maps one config file to its intended input/template/output contract
 - multi-template studies are represented as multiple project entries, not multiple templates inside one construct job
+- packaged profiles currently include `promoter-swap-demo` and `promoter-swap-source-of-truth-demo`

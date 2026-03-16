@@ -17,6 +17,7 @@ from typer.testing import CliRunner
 
 from dnadesign.construct.cli import app
 from dnadesign.usr import Dataset
+from dnadesign.usr import SchemaError as USRSchemaError
 
 _RUNNER = CliRunner()
 
@@ -164,3 +165,22 @@ job:
 
     assert result.exit_code == 1
     assert "Error: Template path must resolve to a readable file" in (result.stdout or "")
+
+
+def test_run_command_shapes_usr_write_errors(tmp_path: Path, monkeypatch) -> None:
+    usr_root = tmp_path / "usr_root"
+    _write_registry(usr_root)
+    dataset = Dataset(usr_root, "anchors_demo")
+    dataset.init(source="test", notes="run cli")
+    dataset.add_sequences(["ACGT"], bio_type="dna", alphabet="dna_4", source="test")
+    config_path = _write_valid_config(tmp_path=tmp_path, usr_root=usr_root)
+
+    monkeypatch.setattr(
+        "dnadesign.construct.src.api._persist_construct_run",
+        lambda planned: (_ for _ in ()).throw(USRSchemaError("overlay attach rejected")),
+    )
+
+    result = _RUNNER.invoke(app, ["run", "--config", config_path.as_posix()])
+
+    assert result.exit_code == 1
+    assert "construct run failed while writing USR outputs: overlay attach rejected" in (result.stdout or "")

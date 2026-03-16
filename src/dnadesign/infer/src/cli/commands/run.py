@@ -20,6 +20,7 @@ import yaml
 from ...api import run_job
 from ...config import JobConfig, OutputSpec, RootConfig
 from ...errors import ConfigError
+from ...ingest.sources import preflight_usr_input
 from ...input_parsing import read_ids_arg
 from ...presets import load_preset
 from ...runtime.capacity_planner import probe_gpu_inventory, validate_model_hardware_contract
@@ -193,6 +194,20 @@ def register(app: typer.Typer) -> None:
                 validate_model_hardware_contract(model=model, inventory=config_inventory)
 
             if dry_run:
+                for selected_job in jobs:
+                    if selected_job.ingest.source != "usr":
+                        continue
+                    resolve_config_job_inputs(
+                        job=selected_job,
+                        config_dir=cfg_path.parent,
+                        i_know_this_is_pickle=i_know_this_is_pickle,
+                        guard_pickle=guard_pickle,
+                    )
+                    preflight_usr_input(
+                        dataset_name=str(selected_job.ingest.dataset),
+                        field=str(selected_job.ingest.field or "sequence"),
+                        root=selected_job.ingest.root,
+                    )
                 render_config_summary(model, jobs)
                 console.print("[green]✔ Config validated (dry run).[/green]")
                 raise typer.Exit(code=0)

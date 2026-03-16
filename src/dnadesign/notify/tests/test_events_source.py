@@ -55,9 +55,7 @@ def test_resolve_tool_events_path_infer_from_single_usr_writeback_job(tmp_path: 
     assert policy == "infer"
 
 
-def test_resolve_tool_events_path_infer_uses_env_usr_root_when_ingest_root_absent(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_resolve_tool_events_path_infer_requires_explicit_root_even_with_env(tmp_path: Path, monkeypatch) -> None:
     config = tmp_path / "infer.yaml"
     usr_root = tmp_path / "env_usr_root"
     config.write_text(
@@ -85,10 +83,8 @@ def test_resolve_tool_events_path_infer_uses_env_usr_root_when_ingest_root_absen
     )
     monkeypatch.setenv("DNADESIGN_USR_ROOT", str(usr_root))
 
-    events_path, policy = resolve_tool_events_path(tool="infer", config=config)
-
-    assert events_path == (usr_root / "infer_demo" / ".events.log").resolve()
-    assert policy == "infer"
+    with pytest.raises(NotifyConfigError, match="requires ingest.root for source='usr' write-back jobs"):
+        resolve_tool_events_path(tool="infer", config=config)
 
 
 def test_resolve_tool_events_path_infer_requires_explicit_root_without_env(tmp_path: Path, monkeypatch) -> None:
@@ -118,7 +114,7 @@ def test_resolve_tool_events_path_infer_requires_explicit_root_without_env(tmp_p
     )
     monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
 
-    with pytest.raises(NotifyConfigError, match="requires ingest.root or DNADESIGN_USR_ROOT"):
+    with pytest.raises(NotifyConfigError, match="requires ingest.root for source='usr' write-back jobs"):
         resolve_tool_events_path(tool="infer", config=config)
 
 
@@ -188,6 +184,106 @@ def test_resolve_tool_events_path_infer_requires_usr_writeback_job(tmp_path: Pat
 
     with pytest.raises(NotifyConfigError, match="ingest.source='usr'"):
         resolve_tool_events_path(tool="infer", config=config)
+
+
+def test_resolve_tool_events_path_construct_from_explicit_output_root(tmp_path: Path) -> None:
+    workspace = tmp_path / "construct_workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    config = workspace / "config.yaml"
+    config.write_text(
+        "\n".join(
+            [
+                "job:",
+                "  id: slot_a_window",
+                "  input:",
+                "    source: usr",
+                "    dataset: anchors_demo",
+                "    root: shared_inputs",
+                "  output:",
+                "    dataset: construct/demo_window",
+                "    root: outputs/usr_datasets",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    events_path, policy = resolve_tool_events_path(tool="construct", config=config)
+
+    assert (
+        events_path == (workspace / "outputs" / "usr_datasets" / "construct" / "demo_window" / ".events.log").resolve()
+    )
+    assert policy == "generic"
+
+
+def test_resolve_tool_events_path_construct_falls_back_to_input_root(tmp_path: Path) -> None:
+    config = tmp_path / "config.yaml"
+    usr_root = tmp_path / "shared_usr"
+    config.write_text(
+        "\n".join(
+            [
+                "job:",
+                "  id: slot_a_window",
+                "  input:",
+                "    source: usr",
+                "    dataset: anchors_demo",
+                f"    root: {usr_root}",
+                "  output:",
+                "    dataset: construct/demo_window",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    events_path, policy = resolve_tool_events_path(tool="construct", config=config)
+
+    assert events_path == (usr_root / "construct" / "demo_window" / ".events.log").resolve()
+    assert policy == "generic"
+
+
+def test_resolve_tool_events_path_construct_requires_job_output_dataset(tmp_path: Path) -> None:
+    config = tmp_path / "construct.yaml"
+    config.write_text(
+        "\n".join(
+            [
+                "job:",
+                "  id: slot_a_window",
+                "  input:",
+                "    source: usr",
+                "    dataset: anchors_demo",
+                "  output:",
+                "    root: outputs/usr_datasets",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(NotifyConfigError, match="job.output.dataset"):
+        resolve_tool_events_path(tool="construct", config=config)
+
+
+def test_resolve_tool_events_path_construct_requires_explicit_usr_root(tmp_path: Path) -> None:
+    config = tmp_path / "construct.yaml"
+    config.write_text(
+        "\n".join(
+            [
+                "job:",
+                "  id: slot_a_window",
+                "  input:",
+                "    source: usr",
+                "    dataset: anchors_demo",
+                "  output:",
+                "    dataset: construct/demo_window",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(NotifyConfigError, match="construct resolver requires job.input.root or job.output.root"):
+        resolve_tool_events_path(tool="construct", config=config)
 
 
 def test_resolve_tool_events_path_rejects_legacy_infer_alias(tmp_path: Path) -> None:

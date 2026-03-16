@@ -12,7 +12,7 @@
   <circle cx="1464" cy="320" r="128" fill="#5eead4" opacity="0.1"/>
   <g fill="#f8fafc" font-family="'Helvetica Neue', Arial, sans-serif">
     <text x="84" y="150" font-size="66" font-weight="700">construct</text>
-    <text x="84" y="214" font-size="30" opacity="0.95">Explicit template-based DNA sequence realization</text>
+    <text x="84" y="214" font-size="30" opacity="0.95">Place DNA parts into larger sequence contexts</text>
   </g>
   <g transform="translate(1016 74)">
     <g fill="none" stroke="#99f6e4" stroke-width="6" stroke-linecap="round" opacity="0.9">

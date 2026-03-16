@@ -101,6 +101,7 @@ def test_docs_index_links_progressive_usr_sync_workflows() -> None:
     assert "src/dnadesign/usr/docs/operations/sync-audit-loop.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md" in docs_index
+    assert "src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync-fidelity-drills.md" in docs_index
 
 
@@ -110,9 +111,14 @@ def test_docs_index_exposes_task_first_workflow_map() -> None:
     assert "Sync iterative HPC outputs to local analysis safely" in docs_index
     assert "Run cross-machine sync with stricter failure checks" in docs_index
     assert "Chain DenseGen -> USR -> Infer -> USR updates" in docs_index
+    assert (
+        "Consolidate construct realizations into one USR-backed source-of-truth dataset, then hand off to Infer"
+        in docs_index
+    )
     assert "Run BU SCC batch jobs with notifications" in docs_index
     assert "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md" in docs_index
+    assert "src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync-fidelity-drills.md" in docs_index
 
 
@@ -143,11 +149,13 @@ def test_docs_index_includes_progressive_entrypoint_ladders() -> None:
     assert "Workflow routes" in docs_index
     assert "Design a sequence library in a workspace" in docs_index
     assert "Run model inference and write outputs back to datasets" in docs_index
+    assert "Construct -> USR -> Infer source-of-truth demo" in docs_index
     assert "Sync iterative HPC outputs to local analysis safely" in docs_index
     assert "Run cross-machine sync with stricter failure checks" in docs_index
     assert "src/dnadesign/usr/docs/operations/workflow-map.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md" in docs_index
+    assert "src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync-fidelity-drills.md" in docs_index
 
 
@@ -208,6 +216,7 @@ def test_usr_docs_index_exposes_sync_runbooks() -> None:
     sync_ops = _read("src/dnadesign/usr/docs/operations/sync.md")
     runbook = _read("src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md")
     chained = _read("src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md")
+    construct_handoff = _read("src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md")
     fidelity = _read("src/dnadesign/usr/docs/operations/sync-fidelity-drills.md")
     ops_index = _read("src/dnadesign/usr/docs/operations/README.md")
 
@@ -217,11 +226,13 @@ def test_usr_docs_index_exposes_sync_runbooks() -> None:
     assert "sync-audit-loop.md" in ops_index
     assert "hpc-agent-sync-flow.md" in ops_index
     assert "chained-densegen-infer-sync-demo.md" in ops_index
+    assert "construct-infer-source-of-truth-demo.md" in ops_index
     assert "sync-fidelity-drills.md" in ops_index
     assert "pressure-test-loop-mock-batch--adversarial-schemas" in ops_index
     assert "hpc-agent-sync-flow.md" in usr_docs
     assert "sync-audit-loop.md" in usr_docs
     assert "chained-densegen-infer-sync-demo.md" in usr_docs
+    assert "construct-infer-source-of-truth-demo.md" in usr_docs
     assert "sync-fidelity-drills.md" in usr_docs
     assert "Preflight" in runbook
     assert "Run loop" in runbook
@@ -231,8 +242,13 @@ def test_usr_docs_index_exposes_sync_runbooks() -> None:
     assert "uv run usr push" in runbook
     assert "Full chained loop" in chained
     assert "uv run infer run --preset evo2/extract_logits_ll --usr" in chained
+    assert '--usr-root "$LOCAL_USR_ROOT"' in chained
     assert "qsub -P <project>" in chained
     assert "_derived changed" in chained
+    assert "Construct -> USR -> Infer Source-of-Truth Demo" in construct_handoff
+    assert "uv run construct workspace run-project" in construct_handoff
+    assert "uv run infer validate usr-registry" in construct_handoff
+    assert "notify usr-events watch" in construct_handoff
     assert "Drill 1: Pull must fail when `_derived` payload is missing" in fidelity
     assert "Drill 2: Push must fail when remote misses local overlays" in fidelity
     assert "Drill 3: Overlay schema attack surface" in fidelity
@@ -301,16 +317,126 @@ def test_usr_workflow_map_runbook_is_indexed_with_command_chains() -> None:
     assert "workflow-map.md" in docs_index
     assert "workflow-map.md" in usr_docs
     assert "workflow-map.md" in ops_index
+    assert "multi-source-source-of-truth-assembly.md" in docs_index
+    assert "multi-source-source-of-truth-assembly.md" in usr_docs
+    assert "multi-source-source-of-truth-assembly.md" in ops_index
+    assert "promoter-characterization-feature-matrix.md" in docs_index
+    assert "promoter-characterization-feature-matrix.md" in usr_docs
+    assert "promoter-characterization-feature-matrix.md" in ops_index
     assert "Bootstrap from remote -> local clone" in workflow_map
     assert "Iterative HPC batch loop" in workflow_map
     assert "DenseGen -> USR -> Infer -> USR chained loop" in workflow_map
+    assert "Multi-source USR assembly -> Construct -> Infer" in workflow_map
+    assert "Construct -> USR -> Infer source-of-truth loop" in workflow_map
+    assert "Promoter feature matrix -> Cluster or OPAL" in workflow_map
+    assert "summary fragments, not fully self-contained procedures" in workflow_map
     assert "Pressure-test loop (mock batch + adversarial schemas)" in workflow_map
     assert 'uv run usr diff "$DATASET_ID" bu-scc' in workflow_map
     assert 'uv run usr pull "$DATASET_ID" bu-scc -y' in workflow_map
     assert 'uv run usr push "$DATASET_ID" bu-scc -y' in workflow_map
+    assert (
+        'uv run infer run --preset evo2/extract_logits_ll --usr "$DATASET_ID" --usr-root "$LOCAL_USR_ROOT"'
+        in workflow_map
+    )
+    assert (
+        'uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_a_window' in workflow_map
+    )
+    assert (
+        'uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_b_window' in workflow_map
+    )
+    assert 'DATASET_ID="pdual10_source_of_truth_demo"' in workflow_map
+    assert (
+        'uv run notify usr-events watch --events "$USR_ROOT/$DATASET_ID/.events.log" --provider generic '
+        "--dry-run --no-advance-cursor-on-dry-run" in workflow_map
+    )
+    assert 'uv run cluster fit --dataset "$FEATURE_DATASET"' in workflow_map
+    assert 'uv run opal validate -c "$OPAL_WORKDIR/configs/campaign.yaml"' in workflow_map
     assert "run_usr_harness_cycle.sh" in workflow_map
     assert "test_sync_schema_adversarial.py" in workflow_map
     assert "--audit-json-out" in workflow_map
+
+
+def test_multi_source_source_of_truth_runbook_routes_to_shared_downstream_handoff() -> None:
+    runbook = _read("src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md")
+
+    assert 'uv run usr --root "$USR_ROOT" maintenance merge' in runbook
+    assert "--carry-namespace usr_label" in runbook
+    assert (
+        'uv run construct workspace validate-project --workspace "$WORKSPACE_ROOT" --project slot_a_window --runtime'
+        in runbook
+    )
+    assert 'uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_b_window' in runbook
+    assert 'export DATASET_ID="$DOWNSTREAM_DATASET"' in runbook
+    assert (
+        "construct-infer-source-of-truth-demo.md#5-shared-downstream-continuation-prepare-infer-handoff-"
+        "against-the-construct-dataset" in runbook
+    )
+    assert (
+        "construct-infer-source-of-truth-demo.md#6-shared-downstream-continuation-verify-downstream-event-"
+        "consumption" in runbook
+    )
+    assert "promoter-characterization-feature-matrix.md" in runbook
+    assert "../../../../../docs/operations/orchestration-runbooks.md" in runbook
+
+
+def test_construct_source_of_truth_runbook_documents_construct_notify_resolver_modes() -> None:
+    runbook = _read("src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md")
+
+    assert "promoter-swap-source-of-truth-demo" in runbook
+    assert 'export CONSTRUCT_CONFIG="$WORKSPACE_ROOT/config.slot_a.window.yaml"' in runbook
+    assert 'export DATASET_ID="pdual10_source_of_truth_demo"' in runbook
+    assert 'config["jobs"][0]["ingest"]["dataset"] = os.environ["DATASET_ID"]' in runbook
+    assert "uv run python - <<'PY'" in runbook
+    assert "perl -0pi -e" not in runbook
+    assert 'notify setup resolve-events --tool construct --config "$CONSTRUCT_CONFIG"' in runbook
+    assert (
+        'notify setup resolve-events --tool construct --workspace "source_of_truth_demo:slot_a_window" --json'
+        in runbook
+    )
+    assert "CONSTRUCT_WORKSPACE_ROOT" in runbook
+    assert "DNADESIGN_REPO_ROOT" in runbook
+    assert "promoter-characterization-feature-matrix.md" in runbook
+    assert "is not supported today" not in runbook
+    assert "--project slot_b_window" in runbook
+
+
+def test_usr_merge_docs_make_overlay_limit_explicit() -> None:
+    maintenance = _read("src/dnadesign/usr/docs/reference/maintenance.md")
+    runbook = _read("src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md")
+
+    assert "does not implicitly copy source overlay namespaces or `_derived` sidecars" in maintenance
+    assert "--carry-namespace <namespace>" in maintenance
+    assert "only `id`-keyed overlays are supported" in maintenance
+    assert "rewrites canonical base rows only" in runbook
+    assert "--carry-namespace <namespace>" in runbook
+    assert "--carry-namespace usr_label" in runbook
+
+
+def test_notify_and_ops_routes_link_construct_source_of_truth_runbook() -> None:
+    notify_index = _read("docs/notify/README.md")
+    notify_runbook = _read("docs/notify/usr-events.md")
+    ops_index = _read("docs/operations/README.md")
+    docs_index = _read("docs/README.md")
+
+    assert "construct-infer-source-of-truth-demo.md" in notify_index
+    assert "construct-infer-source-of-truth-demo.md" in notify_runbook
+    assert "construct-infer-source-of-truth-demo.md" in ops_index
+    assert "multi-source-source-of-truth-assembly.md" in docs_index
+    assert "multi-source-source-of-truth-assembly.md" in ops_index
+    assert "promoter-characterization-feature-matrix.md" in docs_index
+    assert "promoter-characterization-feature-matrix.md" in ops_index
+
+
+def test_promoter_feature_matrix_runbook_routes_to_cluster_and_opal() -> None:
+    runbook = _read("src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md")
+
+    assert 'uv run usr --root "$USR_ROOT" maintenance merge' in runbook
+    assert 'uv run infer run --config "$INFER_CONFIG_7B" --dry-run' in runbook
+    assert 'uv run infer run --config "$INFER_CONFIG_7B"' in runbook
+    assert "uv run cluster fit \\" in runbook
+    assert 'uv run opal validate -c "$OPAL_WORKDIR/configs/campaign.yaml"' in runbook
+    assert "../../../cluster/README.md" in runbook
+    assert "../../../opal/docs/workflows/usr-infer-x-active-learning.md" in runbook
 
 
 def test_usr_harness_script_is_documented_in_workflow_map() -> None:
