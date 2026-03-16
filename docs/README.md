@@ -1,7 +1,7 @@
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-07
+**Last verified:** 2026-03-15
 
 This is the central documentation map for workflows, tool references, and repository policy.
 
@@ -20,6 +20,9 @@ This is the central documentation map for workflows, tool references, and reposi
 | --- | --- | --- |
 | Design a sequence library in a workspace | [DenseGen docs overview](../src/dnadesign/densegen/docs/README.md) | Verify generated artifacts and metadata with [DenseGen outputs reference](../src/dnadesign/densegen/docs/reference/outputs.md). |
 | Realize contextualized or multi-part DNA constructs into derived datasets | [construct docs overview](../src/dnadesign/construct/docs/README.md) | Verify resulting lineage and sequence identity in [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
+| Assemble multiple USR-backed inputs into one downstream source-of-truth flow, then hand off through construct and infer | [Multi-source source-of-truth assembly](../src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md) | Verify carried overlays, construct lineage, and infer write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
+| Consolidate construct realizations into one USR-backed source-of-truth dataset, then hand off to Infer | [Construct -> USR -> Infer source-of-truth demo](../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md) | Verify lineage plus downstream write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
+| Build one promoter feature matrix from DenseGen anchors, wildtype/manual promoters, optional construct-expanded contexts, and infer-derived representations | [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md) | Verify the chosen `infer__...` column, then continue into [cluster](../src/dnadesign/cluster/README.md) or [USR dataset with infer-derived X -> OPAL active learning](../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md). |
 | Run model inference and write outputs back to datasets | [Infer docs index](../src/dnadesign/infer/docs/README.md) | Verify write-back columns and types with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
 | Build SCC Evo2 infer GPU environment deterministically | [BU SCC install bootstrap](bu-scc/install.md#gpu-setup-and-verification-runbook) | Verify infer model capabilities with [infer SCC Evo2 GPU runbook](../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md). |
 | Operate Notify for local event watching and webhook setup | [Notify docs index](notify/README.md) | Verify mode and delivery contracts in [Notify command contracts](../src/dnadesign/notify/docs/reference/command-contracts.md). |
@@ -28,7 +31,7 @@ This is the central documentation map for workflows, tool references, and reposi
 | Run cross-machine sync with stricter failure checks | [USR sync command contract](../src/dnadesign/usr/docs/operations/sync.md) | Verify sidecar and overlay fidelity with [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync-fidelity-drills.md). |
 | Chain DenseGen -> USR -> Infer -> USR updates | [Chained workflow demo](../src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md) | Verify downstream dataset state with [Infer docs](../src/dnadesign/infer/docs/README.md). |
 | Run BU SCC batch jobs with notifications | [BU SCC batch + notify runbook](bu-scc/batch-notify.md) | Verify event delivery contract in [Notify USR events contract](notify/usr-events.md). |
-| Plan and execute deterministic HPC runbooks | [Ops operations index](operations/README.md) | Verify command ordering and outcomes in [orchestration audit contract](operations/orchestration-runbooks.md#contract-rules). |
+| Plan and execute deterministic HPC orchestration runbooks | [Ops orchestration index](operations/README.md) | Verify command ordering and outcomes in [orchestration audit contract](operations/orchestration-runbooks.md#contract-rules). |
 
 ### Tool docs
 
@@ -60,15 +63,16 @@ This is the central documentation map for workflows, tool references, and reposi
 - [Security](../SECURITY.md): secrets, dependency, and supply-chain handling policy.
 - [Plans](../PLANS.md): proposal, execution-plan, and decision lifecycle.
 - [Quality score](../QUALITY_SCORE.md): quality rubric and improvement framework.
-- Cross-tool information architecture contract lives in [Architecture](../ARCHITECTURE.md#cross-tool-information-architecture), [Design](../DESIGN.md#information-architecture-invariants), and [Ops orchestration runbook contracts](operations/orchestration-runbooks.md#single-study-accumulation-contract).
+- Cross-tool data-plane source-of-truth contract lives in [Architecture](../ARCHITECTURE.md#cross-tool-information-architecture), [Design](../DESIGN.md#information-architecture-invariants), [Multi-source source-of-truth assembly](../src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md), [Construct -> USR -> Infer source-of-truth demo](../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md), and [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md).
+- Adjacent control-plane accumulation policy for scheduler loops lives in [Ops orchestration runbook contracts](operations/orchestration-runbooks.md#single-study-accumulation-contract); Ops does not own the construct-led source-of-truth data-plane procedure.
 
 ### Operations
 
 - [Installation](installation.md): environment setup and verification baseline.
-- [Ops operations index](operations/README.md): task-first runbook planning and execution routes.
+- [Ops orchestration index](operations/README.md): task-first control-plane runbook planning and execution routes.
 - [BU SCC docs index](bu-scc/README.md): cluster setup, submission, and operator runbooks.
 - [Notify docs index](notify/README.md): notifier setup, runtime behavior, and recovery routes.
-- [USR operations index](../src/dnadesign/usr/docs/operations/README.md): sync and transfer runbooks for iterative workspace updates.
+- [USR operations index](../src/dnadesign/usr/docs/operations/README.md): sync, transfer, and cross-tool source-of-truth runbooks for iterative workspace updates.
 
 ### Maintainer references
 

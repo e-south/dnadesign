@@ -19,10 +19,15 @@ WorkflowTool = Literal["densegen", "infer"]
 NotifyPolicy = Literal["densegen", "infer", "generic"]
 OrchestrationWorkflowId = Literal[
     "densegen_batch_submit",
-    "densegen_batch_with_notify_slack",
+    "densegen_batch_with_notify",
     "infer_batch_submit",
-    "infer_batch_with_notify_slack",
+    "infer_batch_with_notify",
 ]
+
+_LEGACY_WORKFLOW_ID_ALIASES: dict[str, OrchestrationWorkflowId] = {
+    "densegen_batch_with_notify_slack": "densegen_batch_with_notify",
+    "infer_batch_with_notify_slack": "infer_batch_with_notify",
+}
 
 
 @dataclass(frozen=True)
@@ -42,8 +47,8 @@ _WORKFLOW_METADATA_BY_ID: dict[str, WorkflowMetadata] = {
         requires_gpus=False,
         allowed_notify_policies=(),
     ),
-    "densegen_batch_with_notify_slack": WorkflowMetadata(
-        workflow_id="densegen_batch_with_notify_slack",
+    "densegen_batch_with_notify": WorkflowMetadata(
+        workflow_id="densegen_batch_with_notify",
         tool="densegen",
         requires_notify=True,
         requires_gpus=False,
@@ -56,8 +61,8 @@ _WORKFLOW_METADATA_BY_ID: dict[str, WorkflowMetadata] = {
         requires_gpus=True,
         allowed_notify_policies=(),
     ),
-    "infer_batch_with_notify_slack": WorkflowMetadata(
-        workflow_id="infer_batch_with_notify_slack",
+    "infer_batch_with_notify": WorkflowMetadata(
+        workflow_id="infer_batch_with_notify",
         tool="infer",
         requires_notify=True,
         requires_gpus=True,
@@ -70,12 +75,17 @@ def list_workflow_ids() -> tuple[OrchestrationWorkflowId, ...]:
     return tuple(sorted(_WORKFLOW_METADATA_BY_ID))
 
 
+def normalize_workflow_id(workflow_id: str) -> str:
+    workflow = str(workflow_id or "").strip()
+    return _LEGACY_WORKFLOW_ID_ALIASES.get(workflow, workflow)
+
+
 def list_workflow_tools() -> tuple[WorkflowTool, ...]:
     return tuple(sorted({metadata.tool for metadata in _WORKFLOW_METADATA_BY_ID.values()}))
 
 
 def resolve_workflow_metadata(workflow_id: str) -> WorkflowMetadata:
-    workflow = str(workflow_id or "").strip()
+    workflow = normalize_workflow_id(workflow_id)
     metadata = _WORKFLOW_METADATA_BY_ID.get(workflow)
     if metadata is None:
         supported = ", ".join(list_workflow_ids())
@@ -101,12 +111,12 @@ def resolve_workflow_id(*, tool: WorkflowTool, with_notify: bool) -> Orchestrati
 
 
 def is_densegen_workflow_id(workflow_id: str) -> bool:
-    metadata = _WORKFLOW_METADATA_BY_ID.get(str(workflow_id or "").strip())
+    metadata = _WORKFLOW_METADATA_BY_ID.get(normalize_workflow_id(workflow_id))
     return metadata is not None and metadata.tool == "densegen"
 
 
 def is_infer_workflow_id(workflow_id: str) -> bool:
-    metadata = _WORKFLOW_METADATA_BY_ID.get(str(workflow_id or "").strip())
+    metadata = _WORKFLOW_METADATA_BY_ID.get(normalize_workflow_id(workflow_id))
     return metadata is not None and metadata.tool == "infer"
 
 

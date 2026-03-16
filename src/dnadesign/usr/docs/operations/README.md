@@ -1,12 +1,19 @@
 # USR operations runbooks
 
+**Type:** route
+**Plane:** data-plane
+**Owner-boundary:** usr
+**Entry artifact:** USR dataset, sync, or cross-tool source-of-truth intent that still needs an authoritative route
+**Exit artifact:** authoritative USR data-plane runbook or downstream handoff route
+
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-03-16
 
+This directory holds authoritative USR-backed data-plane runbooks in lifecycle order.
 
-This directory holds operator runbooks in progressive order.
+## Lifecycle routes
 
-## Task shortcuts
+### Sync and transfer
 
 | Need | Runbook |
 | --- | --- |
@@ -19,23 +26,48 @@ This directory holds operator runbooks in progressive order.
 | Emit machine-readable transfer decisions for chained commands | [sync-audit-loop.md](sync-audit-loop.md) |
 | Iterate HPC batch writes with local pull/verify checkpoints | [hpc-agent-sync-flow.md](hpc-agent-sync-flow.md) |
 | Chain DenseGen and Infer updates with bidirectional sync | [chained-densegen-infer-sync-demo.md](chained-densegen-infer-sync-demo.md) |
+
+### Assembly and source of truth
+
+| Need | Runbook |
+| --- | --- |
+| Assemble multiple USR-backed producer datasets before construct and infer share one downstream dataset | [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md) |
+| Build one construct-backed source-of-truth dataset, then hand it to infer | [construct-infer-source-of-truth-demo.md](construct-infer-source-of-truth-demo.md) |
+
+### Downstream branch handoff
+
+| Need | Runbook |
+| --- | --- |
+| Build one infer-annotated promoter feature matrix, then branch into cluster or OPAL | [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md) |
+
+### Validation and drills
+
+| Need | Runbook |
+| --- | --- |
 | Pressure-test schema, sidecar, and overlay fidelity failure paths | [sync-fidelity-drills.md](sync-fidelity-drills.md) |
 | Run one-pass mock batch plus adversarial pressure checks | [workflow-map.md](workflow-map.md#pressure-test-loop-mock-batch--adversarial-schemas) |
 | Run deterministic preflight/run/verify cycle (optional drill toggle) | [workflow-map.md](workflow-map.md#deterministic-harness-cycle) |
-| Run deterministic local `diff`/`pull`/`push` audit drill | [workflow-map.md](workflow-map.md#deterministic-sync-audit-drill) |
+| Run deterministic local `diff`/`pull`/`push` audit drill | [workflow-map.md](workflow-map.md#deterministic-sync-audit-drill) using `run_usr_sync_audit_drill.py` |
 
 ## Read order
 
 1. [workflow-map.md](workflow-map.md): task-first command chains.
-2. [sync-quickstart.md](sync-quickstart.md): baseline operator loop.
-3. [sync-setup.md](sync-setup.md): key and remote setup contract.
-4. [sync-modes.md](sync-modes.md): dataset/file mode mapping contract.
-5. [sync-troubleshooting.md](sync-troubleshooting.md): failure diagnosis sequence.
-6. [sync-audit-loop.md](sync-audit-loop.md): machine-readable sync audit loop for automation and notebook/tool chaining.
-7. [hpc-agent-sync-flow.md](hpc-agent-sync-flow.md): preflight/run/verify loop for iterative HPC pulls.
-8. [chained-densegen-infer-sync-demo.md](chained-densegen-infer-sync-demo.md): chained DenseGen and Infer workflow with bidirectional sync.
-9. [sync-fidelity-drills.md](sync-fidelity-drills.md): adversarial drills for strict sidecar plus overlay fidelity.
-10. [workflow-map.md#deterministic-sync-audit-drill](workflow-map.md#deterministic-sync-audit-drill): deterministic `run_usr_sync_audit_drill.py` command path with machine-readable audit output.
+2. Sync lifecycle:
+   [sync-quickstart.md](sync-quickstart.md),
+   [sync-setup.md](sync-setup.md),
+   [sync-modes.md](sync-modes.md),
+   [sync-troubleshooting.md](sync-troubleshooting.md),
+   [sync-audit-loop.md](sync-audit-loop.md),
+   [hpc-agent-sync-flow.md](hpc-agent-sync-flow.md),
+   [chained-densegen-infer-sync-demo.md](chained-densegen-infer-sync-demo.md)
+3. Source-of-truth assembly:
+   [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md),
+   [construct-infer-source-of-truth-demo.md](construct-infer-source-of-truth-demo.md)
+4. Downstream branch handoff:
+   [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md)
+5. Validation drills:
+   [sync-fidelity-drills.md](sync-fidelity-drills.md),
+   [workflow-map.md#deterministic-sync-audit-drill](workflow-map.md#deterministic-sync-audit-drill) using `run_usr_sync_audit_drill.py`
 
 ## Operator contract
 

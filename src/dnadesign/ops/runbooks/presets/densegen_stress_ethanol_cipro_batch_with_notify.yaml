@@ -1,7 +1,7 @@
 runbook:
   schema_version: 1
   id: study_stress_ethanol_cipro_batch_with_notify
-  workflow_id: densegen_batch_with_notify_slack
+  workflow_id: densegen_batch_with_notify
   project: dunlop
   workspace_root: ../../../densegen/workspaces/study_stress_ethanol_cipro
   logging:

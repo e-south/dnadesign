@@ -3,6 +3,7 @@
 Ops is the cross-tool orchestration control plane for deterministic batch workflows. It compiles runbook intent into explicit preflight, verification, and submit phases with auditable outputs.
 
 Use Ops when you need repeatable scheduler handoffs across producer and observer tools while preserving workspace-scoped logging and fail-fast contracts.
+Use USR operations docs instead when the durable owner is a shared USR-backed data-plane workflow rather than scheduler orchestration.
 
 For repository-wide routing, start with the [repository docs index](../../../docs/README.md).
 
@@ -10,9 +11,9 @@ For repository-wide routing, start with the [repository docs index](../../../doc
 
 Read in this order:
 
-1. [Ops operations index](../../../docs/operations/README.md): task-first router for runbook lifecycle choices.
+1. [Ops orchestration index](../../../docs/operations/README.md): task-first router for runbook lifecycle choices.
 2. [Orchestration runbooks](../../../docs/operations/orchestration-runbooks.md): runbook schema, command sequence, and contract rules.
-3. [Packaged runbook precedents](runbooks/presets): checked-in starter runbooks for common orchestration routes; keep run-specific variants in `<workspace-root>/outputs/logs/ops/runbooks/`.
+3. [Packaged runbook presets](runbooks/presets): checked-in starter runbooks for common orchestration routes; keep run-specific variants in `<workspace-root>/outputs/logs/ops/runbooks/`.
 4. [Repository docs index](../../../docs/README.md): cross-tool routes that connect Ops with workload and storage tools.
 
 ## Entrypoint contract

@@ -31,6 +31,7 @@ uv run usr remotes doctor --remote bu-scc
 ```bash
 # Local root example (canonical repo-local datasets root)
 LOCAL_USR_ROOT="src/dnadesign/usr/datasets"
+# Print the chosen local datasets root before using it in sync commands.
 echo "$LOCAL_USR_ROOT"
 # Remote base_dir is shown by:
 # Print the configured remote profile and dataset base path.

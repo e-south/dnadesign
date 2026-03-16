@@ -1,10 +1,16 @@
 # USR Workflow Map
 
+**Type:** route
+**Plane:** data-plane
+**Owner-boundary:** usr
+**Entry artifact:** operator intent for a USR-backed workflow branch
+**Exit artifact:** authoritative runbook link plus summary command chain
+
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-03-16
 
 
-Use this page to pick a command chain quickly, then open the linked runbook for full detail.
+Use this page to pick a command chain quickly, then open the linked runbook for full detail. The command blocks below are summary fragments, not fully self-contained procedures.
 
 ## Bootstrap from remote -> local clone
 
@@ -68,12 +74,83 @@ DATASET_ID="my_dataset"
 # Pull the latest dataset state from HPC.
 uv run usr pull "$DATASET_ID" bu-scc -y
 # Run infer against the USR dataset and write derived outputs.
-uv run infer run --preset evo2/extract_logits_ll --usr "$DATASET_ID" --root "$LOCAL_USR_ROOT"
+uv run infer run --preset evo2/extract_logits_ll --usr "$DATASET_ID" --usr-root "$LOCAL_USR_ROOT"
 # Push derived outputs back to HPC.
 uv run usr push "$DATASET_ID" bu-scc -y
 ```
 
 Details: [chained-densegen-infer-sync-demo.md](chained-densegen-infer-sync-demo.md)
+
+## Multi-source USR assembly -> Construct -> Infer
+
+Use this when upstream records already live in multiple USR datasets and one downstream construct dataset should remain the durable infer/notify handoff boundary.
+
+```bash
+# Choose one existing USR dataset to mutate as the merged construct-input dataset.
+PRIMARY_INPUT_DATASET="promoter_sources_control"
+# Choose one additional upstream source dataset to fold into that construct-input dataset.
+EXTRA_INPUT_DATASET="promoter_sources_densegen"
+# Choose one downstream construct/infer handoff dataset id.
+DOWNSTREAM_DATASET="multi_source_construct_truth_demo"
+# Validate both upstream source datasets before the merge step.
+uv run usr --root "$USR_ROOT" validate "$PRIMARY_INPUT_DATASET" --strict # Validate the primary construct-input dataset before it is mutated.
+uv run usr --root "$USR_ROOT" validate "$EXTRA_INPUT_DATASET" --strict # Validate the extra upstream source dataset before it is merged.
+# Merge the extra source into the primary input dataset and carry source labels explicitly.
+uv run usr --root "$USR_ROOT" maintenance merge --dest "$PRIMARY_INPUT_DATASET" --src "$EXTRA_INPUT_DATASET" --union-columns --if-duplicate error --carry-namespace usr_label # Merge rows into the primary construct-input dataset and carry `usr_label`.
+# Validate each construct project against the merged input dataset and shared downstream dataset.
+uv run construct workspace validate-project --workspace "$WORKSPACE_ROOT" --project slot_a_window --runtime # Validate slot_a against the merged input dataset and shared downstream dataset.
+uv run construct workspace validate-project --workspace "$WORKSPACE_ROOT" --project slot_b_window --runtime # Validate slot_b against the merged input dataset and shared downstream dataset.
+# Materialize both construct projects after validation succeeds.
+uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_a_window # Materialize slot_a rows into the shared downstream dataset.
+uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_b_window # Materialize slot_b rows into the shared downstream dataset.
+# Dry-run infer against the same downstream dataset after the shared continuation creates the infer config.
+uv run infer run --config "$WORKSPACE_ROOT/infer.construct-source-of-truth.yaml" --dry-run # Dry-run infer against the same downstream dataset.
+# Dry-run downstream event consumption against the same downstream dataset.
+uv run notify usr-events watch --events "$USR_ROOT/$DOWNSTREAM_DATASET/.events.log" --provider generic --dry-run --no-advance-cursor-on-dry-run # Dry-run downstream event watching against the same downstream dataset.
+```
+
+Details: [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md)
+
+## Construct -> USR -> Infer source-of-truth loop
+
+Use this when construct should consolidate explicit source/template pairs into one USR-backed dataset before infer adds namespaced overlays.
+
+```bash
+# Create or reuse one semantic downstream dataset id.
+DATASET_ID="pdual10_source_of_truth_demo"
+# Validate both construct projects that feed the shared dataset.
+uv run construct workspace validate-project --workspace "$WORKSPACE_ROOT" --project slot_a_window --runtime # Validate slot_a runtime roots and output contract.
+uv run construct workspace validate-project --workspace "$WORKSPACE_ROOT" --project slot_b_window --runtime # Validate slot_b runtime roots and output contract.
+# Materialize both construct projects after validation succeeds.
+uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_a_window # Materialize slot_a rows into the shared dataset.
+uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_b_window # Materialize slot_b rows into the shared dataset.
+# Dry-run infer against the construct dataset before any model execution.
+uv run infer run --config "$WORKSPACE_ROOT/infer.construct-source-of-truth.yaml" --dry-run
+# Dry-run downstream event consumption against the same dataset.
+uv run notify usr-events watch --events "$USR_ROOT/$DATASET_ID/.events.log" --provider generic --dry-run --no-advance-cursor-on-dry-run
+```
+
+Details: [construct-infer-source-of-truth-demo.md](construct-infer-source-of-truth-demo.md)
+
+## Promoter feature matrix -> Cluster or OPAL
+
+Use this when DenseGen anchors, wildtype/manual promoters, and optional construct-expanded contexts should all feed one infer-annotated dataset before downstream clustering or active learning begins.
+
+```bash
+# Reuse one merged source dataset or one construct-expanded downstream dataset as the infer target plane.
+FEATURE_DATASET="promoter_feature_matrix_demo"
+# Dry-run the first infer matrix lane before model execution.
+uv run infer run --config "$INFER_CONFIG_7B" --dry-run
+# Execute the selected infer matrix lane and write namespaced feature columns back to the dataset.
+uv run infer run --config "$INFER_CONFIG_7B"
+# Explore one explicit infer-derived X column with cluster.
+uv run cluster fit --dataset "$FEATURE_DATASET" --x-col infer__evo2_7b__anchor_7b_emb_mid__emb_mid --name promoter_matrix_ldn_v1 --write --allow-overwrite
+# Hand the same dataset plus explicit X column into OPAL.
+uv run opal validate -c "$OPAL_WORKDIR/configs/campaign.yaml" # Validate the USR-backed OPAL campaign before any rounds run.
+uv run opal run -c "$OPAL_WORKDIR/configs/campaign.yaml" --labels-as-of 0 # Train, score, and select against the chosen infer-derived X column.
+```
+
+Details: [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md)
 
 ## Machine-readable sync decisions
 

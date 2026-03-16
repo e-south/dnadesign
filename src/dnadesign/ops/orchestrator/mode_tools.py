@@ -88,8 +88,7 @@ def _resolve_infer_usr_output_for_mode_probe(infer_config: Path):
         if "at least one job with ingest.source='usr' and io.write_back=true" in message:
             return None
         raise ValueError(
-            "infer mode probe requires a single resolvable USR destination in infer config "
-            f"{infer_config}: {message}"
+            f"infer mode probe requires a single resolvable USR destination in infer config {infer_config}: {message}"
         ) from exc
 
 
@@ -116,12 +115,8 @@ def _has_densegen_resume_artifacts(runbook: OrchestrationRunbookV1) -> bool:
 
 
 def _has_infer_resume_artifacts(runbook: OrchestrationRunbookV1) -> bool:
-    workspace_root = runbook.workspace_root
-    manifest_path = workspace_root / "outputs" / "meta" / "run_manifest.json"
-    if manifest_path.exists():
-        return True
     infer_config = runbook.infer.config if runbook.infer is not None else None
-    return bool(_infer_overlay_artifacts(workspace_root, infer_config=infer_config))
+    return bool(_infer_overlay_artifacts(runbook.workspace_root, infer_config=infer_config))
 
 
 def _run_args_for_densegen(runbook: OrchestrationRunbookV1, mode: ResolvedMode) -> str:
@@ -132,7 +127,9 @@ def _run_args_for_densegen(runbook: OrchestrationRunbookV1, mode: ResolvedMode) 
     return runbook.densegen.run_args.resume
 
 
-def _run_args_for_infer(_runbook: OrchestrationRunbookV1, _mode: ResolvedMode) -> str:
+def _run_args_for_infer(_runbook: OrchestrationRunbookV1, mode: ResolvedMode) -> str:
+    if mode == "fresh":
+        return "--overwrite"
     return ""
 
 

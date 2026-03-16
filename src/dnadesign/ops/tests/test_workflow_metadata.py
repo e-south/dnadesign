@@ -25,7 +25,7 @@ def test_workflow_metadata_covers_all_schema_workflow_ids() -> None:
 
 
 def test_infer_notify_workflow_metadata_is_explicit() -> None:
-    definition = workflow_metadata.resolve_workflow_metadata("infer_batch_with_notify_slack")
+    definition = workflow_metadata.resolve_workflow_metadata("infer_batch_with_notify")
 
     assert definition.tool == "infer"
     assert definition.requires_notify is True
@@ -44,15 +44,26 @@ def test_densegen_submit_workflow_metadata_is_explicit() -> None:
 
 def test_resolve_workflow_id_for_tool_and_notify_contract() -> None:
     assert workflow_metadata.resolve_workflow_id(tool="densegen", with_notify=False) == "densegen_batch_submit"
-    assert workflow_metadata.resolve_workflow_id(tool="densegen", with_notify=True) == "densegen_batch_with_notify_slack"
+    assert workflow_metadata.resolve_workflow_id(tool="densegen", with_notify=True) == "densegen_batch_with_notify"
     assert workflow_metadata.resolve_workflow_id(tool="infer", with_notify=False) == "infer_batch_submit"
-    assert workflow_metadata.resolve_workflow_id(tool="infer", with_notify=True) == "infer_batch_with_notify_slack"
+    assert workflow_metadata.resolve_workflow_id(tool="infer", with_notify=True) == "infer_batch_with_notify"
+
+
+def test_legacy_notify_workflow_ids_normalize_to_transport_neutral_ids() -> None:
+    assert (
+        workflow_metadata.resolve_workflow_metadata("densegen_batch_with_notify_slack").workflow_id
+        == "densegen_batch_with_notify"
+    )
+    assert (
+        workflow_metadata.resolve_workflow_metadata("infer_batch_with_notify_slack").workflow_id
+        == "infer_batch_with_notify"
+    )
 
 
 def test_validate_workflow_contract_rejects_infer_notify_policy_densegen() -> None:
     try:
         workflow_metadata.validate_workflow_contract(
-            workflow_id="infer_batch_with_notify_slack",
+            workflow_id="infer_batch_with_notify",
             densegen_present=False,
             infer_present=True,
             notify_present=True,

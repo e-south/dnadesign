@@ -28,8 +28,17 @@ from .workflow_metadata import (
     is_densegen_workflow_id,
     is_infer_workflow_id,
     list_workflow_tools,
+    normalize_workflow_id,
     resolve_workflow_tool,
     validate_workflow_contract,
+)
+
+# Re-export workflow metadata helpers for downstream imports from schema.
+_WORKFLOW_METADATA_HELPERS = (
+    is_densegen_workflow_id,
+    is_infer_workflow_id,
+    list_workflow_tools,
+    resolve_workflow_tool,
 )
 
 _HRT_PATTERN = re.compile(r"^[0-9]{2}:[0-9]{2}:[0-9]{2}$")
@@ -186,6 +195,16 @@ class InferWorkloadContract(StrictBaseModel):
             raise ValueError("module name must be non-empty")
         return text
 
+    @field_validator("overlay_guard")
+    @classmethod
+    def _validate_overlay_guard_contract(cls, value: UsrOverlayGuardContract) -> UsrOverlayGuardContract:
+        if value.overlay_namespace != "infer":
+            raise ValueError(
+                'infer.overlay_guard.overlay_namespace must be exactly "infer" because infer write-back '
+                "and prune operate on the fixed infer namespace"
+            )
+        return value
+
 
 class NotifyContract(StrictBaseModel):
     tool: WorkflowTool
@@ -310,6 +329,7 @@ class OrchestrationRunbookV1(StrictBaseModel):
 class OrchestrationRunbookRoot(StrictBaseModel):
     runbook: OrchestrationRunbookV1
 
+
 def load_orchestration_runbook(path: Path, *, raw: dict | None = None) -> OrchestrationRunbookV1:
     runbook_path = path.expanduser().resolve()
     if raw is None:
@@ -318,6 +338,11 @@ def load_orchestration_runbook(path: Path, *, raw: dict | None = None) -> Orches
         raw = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or "runbook" not in raw:
         raise ValueError("orchestration runbook schema v1 requires root key: runbook")
+    runbook_payload = raw.get("runbook")
+    if isinstance(runbook_payload, dict):
+        workflow_id = runbook_payload.get("workflow_id")
+        if isinstance(workflow_id, str):
+            runbook_payload["workflow_id"] = normalize_workflow_id(workflow_id)
     runbook = OrchestrationRunbookRoot.model_validate(raw).runbook
     resolved_runbook = resolve_runbook_paths(runbook, runbook_base_dir=runbook_path.parent)
     return enforce_workspace_layout(resolved_runbook)

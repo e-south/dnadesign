@@ -46,6 +46,7 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
 - Curated workspace and runbook examples must default USR dataset roots to `<workspace-root>/outputs/usr_datasets`.
 - External USR roots remain allowed only when the workflow makes that storage boundary explicit.
 - Shared data-plane behaviors such as overlay compaction and part-management are expressed with USR semantics (`usr-overlay-*`) instead of tool-specific command names.
+- Cross-dataset overlay carry must stay explicit and narrow: no implicit merge-side overlay copying, no non-`id` carry keys, and no reserved-namespace transfer hidden behind convenience defaults.
 - No hidden path fallback is allowed for orchestration accumulation; when required paths are missing or invalid, commands fail with actionable errors.
 - Transient operational working directories are never root-level repo paths; disposable working state uses `/scratch`, while durable orchestration state remains workspace-scoped.
 
@@ -58,8 +59,23 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
 
 ## Documentation model
 - Root system-of-record docs define durable contracts and navigation.
-- `docs/` holds runbooks, references, decisions, quality guidance, and execution plans.
+- Deep procedures may live in top-level `docs/` or in the boundary-owning tool's docs when that tool owns the durable handoff contract.
+- Root docs must route to one authoritative deep procedure for each cross-tool workflow.
 - Keep indexes short and link outward; avoid duplicating long procedures in multiple places.
+- Terminology is controlled:
+  - `route`: index entry only
+  - `runbook`: authoritative operator procedure with ordered commands and verification
+  - `workflow`: downstream tool-owned branch or state-machine procedure when the tool intentionally uses a `workflows/` subtree
+  - `tutorial`: pedagogical walkthrough, not the authority contract
+  - `demo`: packaged sample assets or tracer-bullet profiles, not the authority contract
+- Cross-tool route/runbook/workflow docs must declare:
+  - `Type`
+  - `Plane`
+  - `Owner-boundary`
+  - `Entry artifact`
+  - `Exit artifact`
+- `registry` must always be domain-qualified in docs and code-facing prose (for example `USR namespace registry`, `construct workspace registry`, `OPAL plugin registry`).
+- `docs/operations/` is the control-plane orchestration surface; durable USR-backed data-plane procedures belong under `src/dnadesign/usr/docs/operations/`.
 
 ## References
 - Architecture map: `ARCHITECTURE.md`

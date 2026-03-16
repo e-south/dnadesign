@@ -22,8 +22,8 @@ from dnadesign._contracts import (
     resolve_resume_readiness_policy,
 )
 
-from .mode_tools import resolve_mode_tool_adapter
 from ..runbooks.schema import OrchestrationRunbookV1
+from .mode_tools import resolve_mode_tool_adapter
 
 RunMode = Literal["auto", "fresh", "resume"]
 SubmitBehavior = Literal["submit", "hold_jid", "blocked"]
@@ -31,7 +31,11 @@ ResumeState = Literal["none", "resume_ready", "partial"]
 
 
 def _run_probe(argv: Sequence[str]) -> tuple[int, str, str]:
-    result = subprocess.run(list(argv), check=False, capture_output=True, text=True)
+    try:
+        result = subprocess.run(list(argv), check=False, capture_output=True, text=True)
+    except OSError as exc:
+        cmd = str(argv[0]) if argv else "command"
+        return 127, "", f"{cmd} unavailable: {exc}"
     return int(result.returncode), result.stdout, result.stderr
 
 

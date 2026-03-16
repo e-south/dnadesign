@@ -36,9 +36,13 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - `RELIABILITY.md` and `SECURITY.md` specialize runtime and secret-handling policy without overriding architecture boundaries.
 - `docs/operations/orchestration-runbooks.md` is the executable operator contract for batch orchestration behavior.
 - `PLANS.md` governs lifecycle/process for promoting or changing these contracts.
+- Root docs route readers to one authoritative deep procedure; cross-tool runbooks may live either in top-level `docs/` or in the boundary-owning tool's operations docs when that tool owns the durable handoff.
+- `docs/operations/` is the root control-plane orchestration surface only; it is not the generic registry for durable cross-tool data-plane workflows.
+- `src/dnadesign/usr/docs/operations/` is the default home for durable cross-tool data-plane procedures when the shared handoff artifact is a USR dataset, overlay set, or `.events.log`.
 
 ## Cross-tool information architecture
 - Workspace-rooted accumulation is the contract for repeated campaigns; orchestration state must not fan out into repository-root ad-hoc files.
+- Root `docs/README.md` is the only top-level router. It routes by user intent and ownership plane, then hands off to exactly one authoritative deep procedure for each cross-tool workflow.
 - `ops` owns orchestration artifacts under `<workspace-root>/outputs/logs/ops/`:
   - runbooks: `<workspace-root>/outputs/logs/ops/runbooks/<runbook-id>.yaml`
   - audit trail: `<workspace-root>/outputs/logs/ops/audit/latest.json`
@@ -46,11 +50,28 @@ This file is the architecture map: it names system boundaries, major flows, and 
   - runtime traces: `<workspace-root>/outputs/logs/ops/runtime/`
 - `densegen` and `infer` own workload execution using `<workspace-root>/config.yaml` and write domain outputs under workspace outputs/tables and dataset materialization paths.
 - `usr` owns dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
+- Cross-dataset USR overlay transfer is explicit-only: maintenance merge defaults to base-row merge, while any overlay carry must be opt-in, namespace-scoped, schema-compatible, and auditable in events.
 - Curated dnadesign workspaces default USR dataset roots to `<workspace-root>/outputs/usr_datasets`.
 - Explicit external USR roots remain allowed for sync and mirror workflows when the operator chooses them deliberately.
 - `notify` owns delivery wiring under `<workspace-root>/outputs/notify/<tool>/` and consumes USR events without mutating DenseGen/Infer domain artifacts.
 - Cross-tool coupling is file/event contract based; packages must not depend on internal `src.*` modules across tool boundaries.
 - Utility modules must stay tool-local (`src/dnadesign/<tool>/...`); top-level shared `src/dnadesign/utils` is not an allowed boundary.
+- Document-type semantics are explicit:
+  - `route`: index entry or decision surface only
+  - `runbook`: authoritative operator procedure with ordered commands and verification
+  - `workflow`: downstream tool-owned branch or state-machine procedure when a tool intentionally uses a `workflows/` subtree
+  - `tutorial`: pedagogical walkthrough, not the authority surface
+  - `demo`: packaged sample assets or tracer-bullet workspace/profile, not the authority surface
+- Cross-tool deep procedures must declare:
+  - `Type`
+  - `Plane`
+  - `Owner-boundary`
+  - `Entry artifact`
+  - `Exit artifact`
+- `Plane` values are limited to the ownership planes in this repo:
+  - `control-plane`
+  - `data-plane`
+  - `downstream-tool`
 
 ## High-level data flows
 - DenseGen/other producers -> USR event stream (`.events.log`) -> Notify watcher/webhook sink.
@@ -61,6 +82,11 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - No silent fallbacks: missing required inputs/dependencies must fail fast with actionable errors.
 - Boundary contracts are explicit: CI scope, tool coverage baselines, and marker-based external integration tests are enforced in code.
 - Docs are layered: root docs are maps and deep procedures stay in runbooks/reference docs.
+- Cross-tool deep procedures must have one authoritative location with root-doc routing; do not duplicate the same operator sequence in multiple tool trees.
+- Cross-tool placement is ownership-driven:
+  - use `docs/operations/` when the owner is scheduler/audit/log sequencing
+  - use `src/dnadesign/usr/docs/operations/` when the owner is a durable USR dataset, overlay set, or `.events.log`
+  - use the downstream tool docs after the handoff when that tool owns the next state machine
 - Cross-tool path ownership is explicit: repeated runs accumulate in workspace-scoped directories, not repository-root runbook/log fan-out.
 - Repository-root transient operational working directories (for example `.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) are disallowed by policy; disposable working state belongs under `/scratch` and durable state belongs under `<workspace-root>/outputs/logs/ops/`.
 

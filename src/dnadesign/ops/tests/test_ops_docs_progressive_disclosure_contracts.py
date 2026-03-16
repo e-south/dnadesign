@@ -49,6 +49,7 @@ def test_ops_module_readme_has_banner_narrative_and_doc_map() -> None:
         label="src/dnadesign/ops/README.md",
     )
     assert "cross-tool orchestration control plane" in text
+    assert "shared USR-backed data-plane workflow" in text
     assert "tool-specific workflow semantics" in text.lower()
     assert "docs/operations/README.md" in text
     assert "docs/operations/orchestration-runbooks.md" in text
@@ -73,8 +74,12 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
     assert "runbook init command contract" in text
     assert "runbook plan command contract" in text
     assert "runbook execute command contract" in text
+    assert "**Type:** route" in text
+    assert "**Plane:** control-plane" in text
+    assert "**Owner-boundary:** ops" in text
     assert "ops runbook init --workflow" in text
     assert "orchestration-runbooks.md" in text
+    assert "multi-source-source-of-truth-assembly.md" in text
     assert "../README.md" in text
     assert "../../src/dnadesign/ops/README.md" in text
     assert "progressive disclosure" not in text.lower()
@@ -96,8 +101,12 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
         label="docs/operations/orchestration-runbooks.md",
     )
     assert "uv run ops runbook init" in text
-    assert "uv run ops runbook precedents" in text
+    assert "uv run ops runbook presets" in text
     assert "uv run ops runbook active-jobs" in text
+    assert "Infer scaffolds also include notify by default" in text
+    assert "**Type:** runbook" in text
+    assert "**Plane:** control-plane" in text
+    assert "**Owner-boundary:** ops" in text
     assert "default is `300`" in text
     assert "operator and agent review" not in text
     assert "--command-timeout-seconds" in text
@@ -122,6 +131,17 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     assert "model.parallelism" in text
     assert "gpu_capability=8.9 -> 45.0 GiB" in text
     assert "gpu_capability=9.0 -> 80.0 GiB" in text
+    assert "including overlays that arrived through explicit USR merge carry" in text
+    assert "passes `--overwrite` to `infer run`" in text
+    assert "without implicitly pruning the namespace" in text
+    assert "--mode fresh --allow-fresh-reset" in text
+    assert "--no-discover-active-jobs" in text
+    assert "operator-visible warning" in text
+    assert "infer.overlay_guard.overlay_namespace` is fixed to `infer`" in text
+    assert "densegen_batch_with_notify" in text
+    assert "infer_batch_with_notify" in text
+    assert text.count("with_notify_slack") == 1
+    assert "Legacy `*_with_notify_slack` workflow ids are accepted only as explicit migration aliases" in text
 
 
 def test_repo_docs_index_exposes_ops_tool_and_operations_route() -> None:
@@ -129,7 +149,7 @@ def test_repo_docs_index_exposes_ops_tool_and_operations_route() -> None:
     assert "### Workflow routes" in text
     assert "### Workflow lanes" not in text
     assert "[Workflow routes](#workflow-routes)" in text
-    assert "[Ops operations index](operations/README.md)" in text
+    assert "[Ops orchestration index](operations/README.md)" in text
     assert "| `ops` | `uv run ops --help` | [ops README](../src/dnadesign/ops/README.md) |" in text
 
 

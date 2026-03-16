@@ -69,6 +69,30 @@ def test_find_undeclared_cross_tool_imports_allows_ops_to_usr_default_edge(tmp_p
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_allows_construct_to_usr_default_edge(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "construct" / "runtime.py", "from dnadesign.usr import Dataset\n")
+    _write(tmp_path / "src" / "dnadesign" / "usr" / "__init__.py", "class Dataset:\n    pass\n")
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_allows_ops_to_infer_default_edge(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "ops" / "plan.py",
+        "from dnadesign.infer import validate_runbook_gpu_resources\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "infer" / "__init__.py",
+        "def validate_runbook_gpu_resources(**_kwargs):\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
 def test_find_undeclared_cross_tool_imports_reports_relative_cross_tool_edge(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "foo" / "subpkg" / "api.py", "from ...bar.api import run\n")
     _write(tmp_path / "src" / "dnadesign" / "bar" / "api.py", "def run():\n    return 1\n")

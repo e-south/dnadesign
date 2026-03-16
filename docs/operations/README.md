@@ -1,9 +1,15 @@
-## Ops operations index
+## Ops orchestration index
+
+**Type:** route
+**Plane:** control-plane
+**Owner-boundary:** ops
+**Entry artifact:** batch orchestration intent that still needs a runbook lifecycle route
+**Exit artifact:** authoritative ops schema, plan, or execute contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-03
+**Last verified:** 2026-03-16
 
-Ops is the repository-level orchestration surface for deterministic batch workflows. This page is a route map; detailed command behavior and schema rules live in [orchestration runbooks](orchestration-runbooks.md).
+Ops is the repository-level control-plane orchestration surface for deterministic batch workflows. This page is a route map; detailed command behavior and schema rules live in [orchestration runbooks](orchestration-runbooks.md). It is not the registry for durable USR-backed data-plane workflows.
 
 ### What Ops is for
 
@@ -18,7 +24,7 @@ Ops is the repository-level orchestration surface for deterministic batch workfl
 2. Choose a route in [Workflow routes](#workflow-routes) based on batch intent.
 3. Confirm contract details in [Contracts](#contracts).
 4. Run the [Verification loop](#verification-loop) before any submit.
-5. Return to the [repository docs index](../README.md) for cross-tool routing.
+5. Return to the [repository docs index](../README.md) for cross-tool routing across control-plane and data-plane surfaces.
 
 ### Workflow routes
 
@@ -30,6 +36,14 @@ Ops is the repository-level orchestration surface for deterministic batch workfl
 | Run batch plus notify orchestration | [workflow routes](orchestration-runbooks.md#workflow-routes) | [notify command contracts](../../src/dnadesign/notify/docs/reference/command-contracts.md) |
 | Run generation now and refresh plots in the same submit chain | [runbook schema (v1)](orchestration-runbooks.md#runbook-schema-v1) | [contract rules](orchestration-runbooks.md#contract-rules) |
 
+### Adjacent routes outside Ops
+
+Ops does not own construct-led source-of-truth accumulation or other USR-backed data-plane procedures. When you want a shared USR-backed dataset that multiple construct projects feed before infer adds derived namespaces, use the shared cross-tool runbook:
+
+- [Multi-source source-of-truth assembly](../../src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md)
+- [Construct -> USR -> Infer source-of-truth demo](../../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md)
+- [Promoter characterization feature matrix](../../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md)
+
 ### Contracts
 
 1. [runbook init command contract](orchestration-runbooks.md#runbook-bootstrap-path)
@@ -37,7 +51,7 @@ Ops is the repository-level orchestration surface for deterministic batch workfl
 3. [runbook execute command contract](orchestration-runbooks.md#planner-and-executor-commands)
 4. [Runbook schema (v1)](orchestration-runbooks.md#runbook-schema-v1)
 5. [Contract rules](orchestration-runbooks.md#contract-rules)
-6. [Packaged runbook precedents](../../src/dnadesign/ops/runbooks/presets)
+6. [Packaged runbook presets](../../src/dnadesign/ops/runbooks/presets)
 
 ### Verification loop
 

@@ -89,10 +89,7 @@ def _validate_infer_resources(runbook: OrchestrationRunbookV1) -> None:
             gpu_memory_gib=runbook.resources.gpu_memory_gib,
         )
     except ValueError as exc:
-        raise ValueError(
-            "infer runbook resources are incompatible with infer model contract: "
-            f"{exc}"
-        ) from exc
+        raise ValueError(f"infer runbook resources are incompatible with infer model contract: {exc}") from exc
 
 
 def _densegen_notify_config_path(runbook: OrchestrationRunbookV1) -> Path:
@@ -300,6 +297,12 @@ def _infer_preflight_commands(
     ]
     if infer_overlay_guard.auto_compact_existing_overlay_parts:
         infer_overlay_guard_parts.append("--auto-compact-existing-overlay-parts")
+    infer_env = [f"INFER_CONFIG={config}"]
+    if mode_decision.run_args:
+        infer_env.append(f"INFER_RUN_ARGS={mode_decision.run_args}")
+    infer_env.append(f"CUDA_MODULE={runbook.infer.cuda_module}")
+    infer_env.append(f"GCC_MODULE={runbook.infer.gcc_module}")
+
     return (
         _tool_ops_gate(*infer_overlay_guard_parts),
         _tool_argv("uv", "run", "infer", "validate", "config", "--config", config),
@@ -322,7 +325,7 @@ def _infer_preflight_commands(
             "-l",
             f"gpu_c={runbook.resources.gpu_capability}",
             "-v",
-            f"CUDA_MODULE={runbook.infer.cuda_module},GCC_MODULE={runbook.infer.gcc_module}",
+            ",".join(infer_env),
             infer_template,
         ),
         _tool_ops_gate("qa-submit-preflight", "--template", infer_template),
@@ -391,12 +394,17 @@ def _densegen_submit_commands(
 
 def _infer_submit_commands(
     runbook: OrchestrationRunbookV1,
-    _mode_decision: ModeDecision,
+    mode_decision: ModeDecision,
     stdout_file: str,
     hold_fragment: tuple[str, ...],
 ) -> tuple[ToolCommandSpec, ...]:
     if runbook.infer is None:
         raise ValueError("infer plan adapter requires runbook.infer")
+    infer_env = [f"INFER_CONFIG={runbook.infer.config}"]
+    if mode_decision.run_args:
+        infer_env.append(f"INFER_RUN_ARGS={mode_decision.run_args}")
+    infer_env.append(f"CUDA_MODULE={runbook.infer.cuda_module}")
+    infer_env.append(f"GCC_MODULE={runbook.infer.gcc_module}")
     return (
         _tool_argv(
             "qsub",
@@ -418,8 +426,7 @@ def _infer_submit_commands(
             "-l",
             f"gpu_c={runbook.resources.gpu_capability}",
             "-v",
-            "INFER_CONFIG="
-            f"{runbook.infer.config},CUDA_MODULE={runbook.infer.cuda_module},GCC_MODULE={runbook.infer.gcc_module}",
+            ",".join(infer_env),
             str(runbook.infer.qsub_template),
         ),
     )

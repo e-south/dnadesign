@@ -11,8 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
 import inspect
+import json
 import os
 import shlex
 from pathlib import Path
@@ -109,7 +109,7 @@ def _write_runbook(
     runbook_payload: dict[str, object] = {
         "schema_version": 1,
         "id": "study_stress_ethanol_cipro",
-        "workflow_id": ("densegen_batch_with_notify_slack" if include_notify else "densegen_batch_submit"),
+        "workflow_id": ("densegen_batch_with_notify" if include_notify else "densegen_batch_submit"),
         "project": "dunlop",
         "workspace_root": str(workspace_root),
         "logging": {
@@ -235,6 +235,9 @@ def _set_notify_webhook_file_contract(tmp_path: Path, monkeypatch: pytest.Monkey
     webhook_file = tmp_path / "notify_webhook.secret"
     webhook_file.write_text("https://hooks.slack.com/services/T000/B000/TEST\n", encoding="utf-8")
     monkeypatch.setenv("NOTIFY_WEBHOOK_FILE", str(webhook_file.resolve()))
+    ca_bundle = tmp_path / "ca-bundle.pem"
+    ca_bundle.write_text("test-ca\n", encoding="utf-8")
+    monkeypatch.setenv("SSL_CERT_FILE", str(ca_bundle.resolve()))
     monkeypatch.delenv("NOTIFY_WEBHOOK", raising=False)
 
 
@@ -261,7 +264,7 @@ def test_runbook_relative_paths_resolve_against_runbook_parent(tmp_path: Path) -
         "runbook": {
             "schema_version": 1,
             "id": "study_stress_ethanol_cipro",
-            "workflow_id": "densegen_batch_with_notify_slack",
+            "workflow_id": "densegen_batch_with_notify",
             "project": "dunlop",
             "workspace_root": "workspace",
             "logging": {
@@ -404,6 +407,51 @@ def test_runbook_rejects_invalid_overlay_guard_namespace_pattern(tmp_path: Path)
         match="densegen\\.overlay_guard\\.overlay_namespace must match",
     ):
         load_orchestration_runbook(runbook_path, raw=payload)
+
+
+def test_infer_runbook_rejects_non_infer_overlay_namespace(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
+    infer_config = tmp_path / "infer_config.yaml"
+    infer_config.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    payload["runbook"]["workflow_id"] = "infer_batch_submit"
+    payload["runbook"]["densegen"] = None
+    payload["runbook"]["infer"] = {
+        "config": str(infer_config),
+        "qsub_template": "docs/bu-scc/jobs/evo2-gpu-infer.qsub",
+        "cuda_module": "cuda/12.4",
+        "gcc_module": "gcc/13.2.0",
+        "overlay_guard": {
+            "max_projected_overlay_parts": 10000,
+            "max_existing_overlay_parts": 1000,
+            "auto_compact_existing_overlay_parts": True,
+            "overlay_namespace": "custom_infer",
+        },
+    }
+    payload["runbook"]["notify"] = None
+    payload["runbook"]["resources"] = {
+        "pe_omp": 4,
+        "h_rt": "04:00:00",
+        "mem_per_core": "8G",
+        "gpus": 1,
+        "gpu_capability": "8.9",
+    }
+
+    with pytest.raises(
+        ValueError,
+        match='infer\\.overlay_guard\\.overlay_namespace must be exactly "infer"',
+    ):
+        load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
 
 
 def test_mode_auto_selects_fresh_without_artifacts(tmp_path: Path) -> None:
@@ -762,6 +810,21 @@ def test_discover_active_job_ids_raises_when_qstat_snapshot_fails(
     runbook = load_orchestration_runbook(runbook_path)
 
     monkeypatch.setattr(orchestrator_state, "_run_probe", lambda argv: (1, "", "qstat unavailable"))
+
+    with pytest.raises(RuntimeError, match="qstat unavailable"):
+        discover_active_job_ids_for_runbook(runbook, max_jobs=12)
+
+
+def test_discover_active_job_ids_raises_clean_error_when_qstat_binary_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    def _missing_qstat(*args, **kwargs):
+        raise FileNotFoundError(2, "No such file or directory", "qstat")
+
+    monkeypatch.setattr(orchestrator_state.subprocess, "run", _missing_qstat)
 
     with pytest.raises(RuntimeError, match="qstat unavailable"):
         discover_active_job_ids_for_runbook(runbook, max_jobs=12)
@@ -1319,7 +1382,7 @@ jobs: []
         "runbook": {
             "schema_version": 1,
             "id": "infer_evo2_demo",
-            "workflow_id": "infer_batch_with_notify_slack",
+            "workflow_id": "infer_batch_with_notify",
             "project": "dunlop",
             "workspace_root": str(workspace_root),
             "logging": {
@@ -1365,6 +1428,8 @@ jobs: []
     assert "evo2-gpu-infer.qsub" in submit_block
     assert "gpus=1" in submit_block
     assert "gpu_c=8.9" in submit_block
+    assert "INFER_RUN_ARGS=--overwrite" in preflight_block
+    assert "INFER_RUN_ARGS=--overwrite" in submit_block
     assert "NOTIFY_PROFILE" in submit_block
     assert "notify profile smoke --profile" in smoke_block
     assert "--tool infer " in smoke_block
@@ -1377,7 +1442,7 @@ def test_infer_workflow_rejects_notify_tool_mismatch() -> None:
         "runbook": {
             "schema_version": 1,
             "id": "infer_evo2_demo",
-            "workflow_id": "infer_batch_with_notify_slack",
+            "workflow_id": "infer_batch_with_notify",
             "project": "dunlop",
             "workspace_root": "/tmp/workspace",
             "logging": {
@@ -1465,6 +1530,7 @@ jobs: []
     assert plan.notify_smoke_commands == []
     assert "NOTIFY_PROFILE" not in submit_block
     assert "INFER_CONFIG=" in submit_block
+    assert "INFER_RUN_ARGS=--overwrite" in submit_block
 
 
 def test_infer_mode_auto_selects_fresh_when_only_usr_registry_exists(tmp_path: Path) -> None:
@@ -1481,7 +1547,24 @@ def test_infer_mode_auto_selects_fresh_when_only_usr_registry_exists(tmp_path: P
 
     decision = resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
     assert decision.selected_mode == "fresh"
-    assert decision.run_args == ""
+    assert decision.run_args == "--overwrite"
+
+
+def test_infer_mode_auto_selects_fresh_when_only_run_manifest_exists(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_mode_manifest_only"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_manifest_only",
+        mode_default="auto",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    marker = runbook.workspace_root / "outputs" / "meta" / "run_manifest.json"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("{}\n", encoding="utf-8")
+
+    decision = resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
+    assert decision.selected_mode == "fresh"
+    assert decision.run_args == "--overwrite"
 
 
 def test_infer_mode_auto_selects_resume_when_infer_overlay_exists(tmp_path: Path) -> None:
@@ -1646,6 +1729,7 @@ def test_infer_mode_fresh_requires_reset_ack_when_resume_artifacts_exist(tmp_pat
         allow_fresh_reset=True,
     )
     assert decision.selected_mode == "fresh"
+    assert decision.run_args == "--overwrite"
 
 
 def test_mode_auto_blocks_for_infer_when_resume_policy_marks_workspace_partial(
@@ -1773,7 +1857,7 @@ def test_densegen_workflow_rejects_gpu_fields() -> None:
         "runbook": {
             "schema_version": 1,
             "id": "study_stress_ethanol_cipro",
-            "workflow_id": "densegen_batch_with_notify_slack",
+            "workflow_id": "densegen_batch_with_notify",
             "project": "dunlop",
             "workspace_root": "/tmp/workspace",
             "logging": {
@@ -1996,7 +2080,7 @@ def test_cli_plan_invalid_runbook_shows_contract_error_without_traceback(tmp_pat
         "runbook": {
             "schema_version": 1,
             "id": "infer_bad_notify",
-            "workflow_id": "infer_batch_with_notify_slack",
+            "workflow_id": "infer_batch_with_notify",
             "project": "dunlop",
             "workspace_root": "/tmp/workspace",
             "logging": {
@@ -2038,7 +2122,7 @@ def test_cli_plan_invalid_runbook_shows_contract_error_without_traceback(tmp_pat
 
 def test_execute_batch_plan_fails_when_command_times_out(tmp_path: Path) -> None:
     plan = BatchPlan(
-        workflow_id="densegen_batch_with_notify_slack",
+        workflow_id="densegen_batch_with_notify",
         project="dunlop",
         selected_mode="fresh",
         selected_smoke="dry",
@@ -2068,7 +2152,7 @@ def test_execute_batch_plan_fails_when_command_times_out(tmp_path: Path) -> None
 
 def test_execute_batch_plan_requires_secret_ref_for_orchestration_notify(tmp_path: Path) -> None:
     plan = BatchPlan(
-        workflow_id="densegen_batch_with_notify_slack",
+        workflow_id="densegen_batch_with_notify",
         project="dunlop",
         selected_mode="fresh",
         selected_smoke="dry",
@@ -2220,7 +2304,7 @@ def test_cli_execute_defaults_timeout_to_300_seconds(tmp_path: Path, monkeypatch
     )
 
     assert result.exit_code == 0
-    assert captured["workflow_id"] == "densegen_batch_with_notify_slack"
+    assert captured["workflow_id"] == "densegen_batch_with_notify"
     assert captured["submit"] is False
     assert captured["command_timeout_seconds"] == 300.0
 
@@ -2274,7 +2358,7 @@ def test_cli_runbook_init_creates_valid_densegen_contract(tmp_path: Path) -> Non
     assert result.exit_code == 0
     assert runbook_path.exists()
     loaded = load_orchestration_runbook(runbook_path)
-    assert loaded.workflow_id == "densegen_batch_with_notify_slack"
+    assert loaded.workflow_id == "densegen_batch_with_notify"
     assert loaded.project == "dunlop"
     assert loaded.id == "densegen_demo"
     assert loaded.notify.smoke == "dry"
@@ -2801,7 +2885,7 @@ def test_cli_active_jobs_emits_discovered_ids(tmp_path: Path, monkeypatch: pytes
     assert "--no-discover-active-jobs --active-job-id 95001 --active-job-id 95002" in payload["plan_command_hint"]
 
 
-def test_packaged_runbook_precedents_exist_and_load() -> None:
+def test_packaged_runbook_presets_exist_and_load() -> None:
     repo_root = Path(__file__).resolve()
     for parent in repo_root.parents:
         if (parent / "pyproject.toml").exists():
@@ -2816,17 +2900,18 @@ def test_packaged_runbook_precedents_exist_and_load() -> None:
         loaded = load_orchestration_runbook(preset_path)
         assert loaded.workflow_id in {
             "densegen_batch_submit",
-            "densegen_batch_with_notify_slack",
+            "densegen_batch_with_notify",
             "infer_batch_submit",
-            "infer_batch_with_notify_slack",
+            "infer_batch_with_notify",
         }
 
 
-def test_cli_precedents_lists_packaged_runbooks() -> None:
+def test_cli_presets_lists_packaged_runbooks() -> None:
     runner = CliRunner()
-    result = runner.invoke(app, ["runbook", "precedents"])
+    result = runner.invoke(app, ["runbook", "presets"])
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert payload["precedents"]
-    assert all(entry["path"].endswith(".yaml") for entry in payload["precedents"])
+    assert payload["presets"]
+    assert payload["precedents"] == payload["presets"]
+    assert all(entry["path"].endswith(".yaml") for entry in payload["presets"])

@@ -16,6 +16,7 @@ from pathlib import Path
 
 from dnadesign.devtools.docs_checks import (
     _find_broken_links,
+    _find_cross_tool_doc_metadata_issues,
     _find_densegen_disallowed_term_issues,
     _find_deprecated_docs_entrypoint_issues,
     _find_docs_root_heading_style_issues,
@@ -500,7 +501,7 @@ def test_main_fails_when_operations_runbook_docs_missing_required_metadata(tmp_p
     today = dt.date.today().isoformat()
     _write(
         tmp_path / "docs" / "operations" / "README.md",
-        "## Ops operations index\n\nMissing metadata.\n",
+        "## Ops orchestration index\n\nMissing metadata.\n",
     )
     _write(
         tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
@@ -575,6 +576,50 @@ def test_find_operational_runbook_path_issues_allows_packaged_presets(tmp_path: 
     assert issues == []
 
 
+def test_find_operational_runbook_path_issues_allows_workspace_runbooks_dir(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "workspace" / "outputs" / "logs" / "ops" / "runbooks" / "densegen_demo.yaml",
+        "\n".join(
+            [
+                "runbook:",
+                "  schema_version: 1",
+                "  id: densegen_demo",
+                "  workflow_id: densegen_batch_submit",
+                "  project: dunlop",
+                "  workspace_root: /tmp/workspace",
+                "  logging:",
+                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/densegen_demo",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_operational_runbook_path_issues(tmp_path)
+
+    assert issues == []
+
+
+def test_find_operational_runbook_path_issues_skips_generated_output_yaml_noise(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "workspace" / "outputs" / "usr_datasets" / "registry.yaml",
+        "\n".join(
+            [
+                "runbook:",
+                "  schema_version: 1",
+                "  id: generated_noise",
+                "  workflow_id: densegen_batch_submit",
+                "  project: dunlop",
+                "  workspace_root: /tmp/workspace",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_operational_runbook_path_issues(tmp_path)
+
+    assert issues == []
+
+
 def test_find_packaged_runbook_variant_issues_flags_duration_suffixed_preset(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "ops" / "runbooks" / "presets" / "densegen_demo_with_notify_6h.yaml",
@@ -583,7 +628,7 @@ def test_find_packaged_runbook_variant_issues_flags_duration_suffixed_preset(tmp
                 "runbook:",
                 "  schema_version: 1",
                 "  id: densegen_demo_with_notify_6h",
-                "  workflow_id: densegen_batch_with_notify_slack",
+                "  workflow_id: densegen_batch_with_notify",
                 "  project: dunlop",
                 "  workspace_root: /tmp/workspace",
                 "  logging:",
@@ -613,7 +658,7 @@ def test_find_packaged_runbook_variant_issues_allows_base_preset_name(tmp_path: 
                 "runbook:",
                 "  schema_version: 1",
                 "  id: densegen_demo_with_notify",
-                "  workflow_id: densegen_batch_with_notify_slack",
+                "  workflow_id: densegen_batch_with_notify",
                 "  project: dunlop",
                 "  workspace_root: /tmp/workspace",
                 "  logging:",
@@ -1654,5 +1699,54 @@ def test_tool_docs_metadata_check_accepts_valid_owner_and_last_verified(tmp_path
     )
 
     issues = _find_tool_docs_metadata_issues(tmp_path, max_age_days=90)
+
+    assert issues == []
+
+
+def test_cross_tool_doc_metadata_check_flags_missing_semantic_fields(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "operations" / "README.md",
+        "\n".join(
+            [
+                "## Ops orchestration index",
+                "",
+                "**Type:** route",
+                "**Owner:** maintainers",
+                f"**Last verified:** {dt.date.today().isoformat()}",
+                "",
+                "Missing plane and artifact metadata.",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_cross_tool_doc_metadata_issues(tmp_path)
+
+    assert any("missing '**Plane:**'" in issue for issue in issues)
+    assert any("missing '**Owner-boundary:**'" in issue for issue in issues)
+    assert any("missing '**Entry artifact:**'" in issue for issue in issues)
+    assert any("missing '**Exit artifact:**'" in issue for issue in issues)
+
+
+def test_cross_tool_doc_metadata_check_accepts_expected_contract_values(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "operations" / "README.md",
+        "\n".join(
+            [
+                "## Ops orchestration index",
+                "",
+                "**Type:** route",
+                "**Plane:** control-plane",
+                "**Owner-boundary:** ops",
+                "**Entry artifact:** batch orchestration intent",
+                "**Exit artifact:** authoritative ops contract",
+                "**Owner:** maintainers",
+                f"**Last verified:** {dt.date.today().isoformat()}",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_cross_tool_doc_metadata_issues(tmp_path)
 
     assert issues == []

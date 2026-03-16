@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dnadesign._contracts import (
+    resolve_construct_usr_output_contract,
     resolve_densegen_usr_output_contract,
     resolve_infer_usr_output_contract,
     resolve_usr_producer_contract,
@@ -41,6 +42,9 @@ def parse_usr_overlay_guard_inputs(*, tool: str, config_path: Path) -> UsrOverla
     if tool_name == "densegen":
         # Keep densegen events-source contract explicit and shared with notify.
         resolve_densegen_usr_output_contract(config_path)
+    if tool_name == "construct":
+        # Keep construct events-source contract explicit and shared with notify.
+        resolve_construct_usr_output_contract(config_path)
     if tool_name == "infer":
         # Keep infer events-source contract explicit and shared with notify.
         resolve_infer_usr_output_contract(config_path)

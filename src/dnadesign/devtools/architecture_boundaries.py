@@ -32,6 +32,7 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("billboard", "aligner"),
     ("cluster", "aligner"),
     ("cluster", "usr"),
+    ("construct", "usr"),
     ("cruncher", "baserender"),
     ("densegen", "baserender"),
     ("densegen", "cruncher"),
@@ -40,6 +41,7 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("libshuffle", "aligner"),
     ("libshuffle", "billboard"),
     ("libshuffle", "nmf"),
+    ("ops", "infer"),
     ("ops", "usr"),
     ("permuter", "infer"),
 }

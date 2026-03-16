@@ -283,7 +283,7 @@ def _render_active_job_hints(*, runbook_path: Path, active_job_ids: Sequence[str
     }
 
 
-def _packaged_precedent_paths() -> list[Path]:
+def _packaged_preset_paths() -> list[Path]:
     preset_dir = Path(__file__).resolve().parent / "runbooks" / "presets"
     if not preset_dir.exists():
         return []
@@ -397,10 +397,19 @@ def runbook_init(
         )
 
 
-@runbook_app.command("precedents")
-def runbook_precedents() -> None:
-    precedents = [{"name": path.stem, "path": str(path)} for path in _packaged_precedent_paths()]
-    typer.echo(json.dumps({"precedents": precedents}, indent=2, sort_keys=True))
+def _emit_packaged_runbook_presets() -> None:
+    presets = [{"name": path.stem, "path": str(path)} for path in _packaged_preset_paths()]
+    typer.echo(json.dumps({"precedents": presets, "presets": presets}, indent=2, sort_keys=True))
+
+
+@runbook_app.command("presets")
+def runbook_presets() -> None:
+    _emit_packaged_runbook_presets()
+
+
+@runbook_app.command("precedents", hidden=True)
+def runbook_precedents_alias() -> None:
+    _emit_packaged_runbook_presets()
 
 
 @runbook_app.command("plan")

@@ -83,13 +83,15 @@ uv run usr --root "$LOCAL_USR_ROOT" events tail "$DATASET_ID" -n 10
 ### 4) Local Infer write-back and push to HPC
 
 ```bash
-# Write Infer outputs back to the same USR dataset namespace.
-uv run infer run --preset evo2/extract_logits_ll --usr "$DATASET_ID" --field sequence --device cpu --write-back
+# Write Infer outputs back to the synchronized local USR dataset namespace.
+uv run infer run --preset evo2/extract_logits_ll --usr "$DATASET_ID" --usr-root "$LOCAL_USR_ROOT" --field sequence --device cpu --write-back
 # Preview local-vs-remote drift after write-back.
 uv run usr --root "$LOCAL_USR_ROOT" diff "$DATASET_ID" bu-scc
 # Push local infer overlays and sidecars back to HPC.
 uv run usr --root "$LOCAL_USR_ROOT" push "$DATASET_ID" bu-scc -y
 ```
+
+If this is the first infer write-back into the dataset, make the namespace-registration step explicit before mutation. Prefer the config-driven infer pressure-test path when you need the exact `usr namespace register infer --columns ...` command rendered from the active infer contract.
 
 ### 5) HPC side pull (optional rebalance)
 

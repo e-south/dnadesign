@@ -1,9 +1,15 @@
 ## Orchestration runbooks
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-07
+**Type:** runbook
+**Plane:** control-plane
+**Owner-boundary:** ops
+**Entry artifact:** workspace-scoped ops runbook YAML plus scheduler and optional notify intent
+**Exit artifact:** audit JSON, rendered command plan, and optional submit or watcher contract
 
-This contract defines machine-readable runbooks for cross-tool BU SCC orchestration.
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-03-16
+
+This contract defines machine-readable runbooks for cross-tool BU SCC control-plane orchestration.
 
 ### Why this exists
 
@@ -55,6 +61,8 @@ uv run ops runbook init \
   --id <runbook-id>
 ```
 
+Infer scaffolds also include notify by default; add `--no-notify` only when you explicitly want batch-only submit.
+
 Use `--repo-root` when the runbook file is outside the repository so template paths resolve to runnable qsub templates.
 Relative `--workspace-root` values are resolved against `--repo-root` (or current working directory when `--repo-root` is omitted) before the runbook is written.
 
@@ -71,15 +79,15 @@ uv run ops runbook init \
   --no-notify
 ```
 
-### Packaged precedents
+### Packaged presets
 
 List checked-in runbooks that can be copied or run directly:
 
 ```bash
-uv run ops runbook precedents
+uv run ops runbook presets
 ```
 
-Current precedents include:
+Current presets include:
 
 1. `src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch.yaml`
 2. `src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml`
@@ -110,10 +118,12 @@ Result expectations:
 
 ### Workflow routes
 
+Workflow ids are transport-neutral. Notify transport and delivery wiring live in `runbook.notify`, not in `workflow_id`.
+
 1. `densegen_batch_submit`: CPU-focused DenseGen submit without notify smoke/watcher phases.
-2. `densegen_batch_with_notify_slack`: CPU-focused DenseGen submit with notify watcher chain.
+2. `densegen_batch_with_notify`: CPU-focused DenseGen submit with notify watcher chain.
 3. `infer_batch_submit`: GPU-focused Infer submit without notify smoke/watcher phases.
-4. `infer_batch_with_notify_slack`: GPU-focused Infer submit with notify watcher chain.
+4. `infer_batch_with_notify`: GPU-focused Infer submit with notify watcher chain.
 5. DenseGen routes reject GPU resource keys to prevent mismatched scheduler requests.
 6. Infer routes require `resources.gpus` and `resources.gpu_capability` to keep GPU requests explicit.
 7. Infer routes accept optional `resources.gpu_memory_gib` for explicit per-GPU capacity planning.
@@ -170,11 +180,12 @@ Path behavior:
 
 1. Relative paths are resolved from the runbook file parent directory.
 2. Absolute paths remain unchanged.
-3. `runbook.notify` is required only for `*_with_notify_slack` workflows.
-4. `runbook.logging.stdout_dir` is required and is used for all scheduler stdout (`qsub -o`) in verify and submit phases.
-5. Notify-enabled runbooks accept `notify.orchestration_events` (default `true`) to control direct orchestration lifecycle notifications.
-6. DenseGen runbooks accept `densegen.post_run.qsub_template` for the dependent analysis submit that runs plots after CPU generation completes.
-7. DenseGen runbooks can set `densegen.post_run.resources` to size analysis submits (`pe_omp`, `h_rt`, `mem_per_core`); when omitted, the default post-run sizing is `pe_omp=4`, `h_rt=01:00:00`, `mem_per_core=4G`.
+3. `runbook.notify` is required only for `*_with_notify` workflows.
+4. Legacy `*_with_notify_slack` workflow ids are accepted only as explicit migration aliases and normalize to `*_with_notify`.
+5. `runbook.logging.stdout_dir` is required and is used for all scheduler stdout (`qsub -o`) in verify and submit phases.
+6. Notify-enabled runbooks accept `notify.orchestration_events` (default `true`) to control direct orchestration lifecycle notifications.
+7. DenseGen runbooks accept `densegen.post_run.qsub_template` for the dependent analysis submit that runs plots after CPU generation completes.
+8. DenseGen runbooks can set `densegen.post_run.resources` to size analysis submits (`pe_omp`, `h_rt`, `mem_per_core`); when omitted, the default post-run sizing is `pe_omp=4`, `h_rt=01:00:00`, `mem_per_core=4G`.
 
 ### Single-study accumulation contract
 
@@ -273,43 +284,51 @@ uv run ops runbook execute \
 3. DenseGen `mode=auto` treats registry-only reset state (`outputs/usr_datasets/registry.yaml` with no run manifest and no non-empty records) as `none`, so dry-run scaffolds can proceed without an explicit mode override.
 4. Active-job behavior is explicit from `mode_policy.on_active_job` (`hold_jid` or `stop`), never implicit.
 5. `ops runbook plan` and `ops runbook execute` auto-discover matching active jobs by default using `qstat` + `qstat -j`; disable with `--no-discover-active-jobs`.
-6. Manual active-job input (`--active-job-id`) accepts repeat flags or comma-delimited values and normalizes to a deduplicated job-id set before `-hold_jid` chaining.
-7. Execution is fail-fast by phase: `preflight`, optional `notify_smoke`, then optional `submit`.
-8. `--command-timeout-seconds` applies per command and fails phase on timeout; default is `300`.
-9. DenseGen `mode=fresh` is blocked when resume artifacts already exist unless `--allow-fresh-reset` is explicitly provided.
-10. DenseGen routes reject `runbook.infer` and reject GPU resource fields.
-11. Infer routes reject `runbook.densegen` and require GPU resource fields.
-12. Infer planning validates runbook GPU resources against infer `model.parallelism` and capacity contracts before preflight command rendering.
-13. Infer capacity preflight uses `resources.gpu_memory_gib` when provided; otherwise it uses capability hints for known classes (`gpu_capability=8.9 -> 45.0 GiB`, `gpu_capability=9.0 -> 80.0 GiB`).
-14. Infer `validate config` on non-GPU hosts validates schema/contracts and reports capacity-check skip; runbook planning remains the deterministic place for declared scheduler-resource capacity checks.
-15. Notify workflows require `runbook.notify`, with policy matching workflow family (`densegen|generic` for DenseGen, `infer|generic` for Infer).
-16. Notify setup is non-interactive and file-only by contract: planner resolves webhook file with explicit precedence (`<notify.webhook_env>_FILE` first, otherwise `notify.profile` webhook `secret_ref` when it is a `file://` path) and uses `--secret-source file --secret-ref file://<resolved-path> --no-store-webhook`; missing/unreadable webhook file fails fast before submit.
-17. Notify setup writes an explicit TLS CA bundle in profile wiring (`--tls-ca-bundle`, defaulting to `SSL_CERT_FILE` or `/etc/pki/tls/certs/ca-bundle.crt`).
-18. Notify smoke bootstraps the resolved USR events file path before dry-watch so fresh workspaces do not fail on missing `.events.log`.
-19. Batch-only workflows reject `runbook.notify` to keep notify decoupled.
-20. Preflight creates and verifies `runbook.logging.stdout_dir` (`mkdir -p` + writable check) before any verify or submit command.
-21. Verify and submit commands always pass explicit `-o <runbook.logging.stdout_dir>/$JOB_NAME.$JOB_ID.out` to avoid cwd-dependent stdout placement.
-22. Preflight runs `dnadesign.ops.orchestrator.gates prune-ops-logs` before scheduler verify/submit for both `runbook.logging.stdout_dir` and `<workspace-root>/outputs/logs/ops/runtime`, with `--stdout-dir`, `--runbook-id`, `--keep-last`, and `--max-age-days` from runbook logging retention settings.
-23. `runbook.logging.stdout_dir` must be exactly `<workspace-root>/outputs/logs/ops/sge/<runbook.id>`; mismatched id variants are rejected at runbook load time to prevent path fan-out.
-24. DenseGen notify workflows run `dense inspect run --usr-events-path` in preflight so local-only output configs fail before submit.
-25. Notify watcher submit injects `NOTIFY_PROFILE`, `WEBHOOK_ENV`, and `WEBHOOK_FILE` in `qsub -v`; webhook values are not embedded in scheduler metadata.
-26. When `notify.orchestration_events=true`, execute emits direct notify lifecycle events for submit orchestration (`started`, then `success` or `failure`) in addition to watcher event notifications, using file-backed `--secret-ref`.
-27. Notify DenseGen progress semantics use workspace-session counters (`rows_written_session`, `run_quota`, and `fingerprint.rows`) and default heartbeat cadence is 1800 seconds (`progress_heartbeat_seconds`) unless explicitly overridden.
-28. Notify workflows resolve a TLS CA bundle from `SSL_CERT_FILE` or known system CA paths and pass it explicitly to notify setup/orchestration commands; when no readable CA bundle is resolvable, planning fails fast before submit.
-29. Preflight runs `usr-overlay-guard` using tool-specific adapters (`--tool densegen` for DenseGen, `--tool infer` for infer) with explicit thresholds from each workflow’s overlay-guard block; when projected overlay parts exceed `max_projected_overlay_parts`, planning fails fast with required tuning guidance.
-30. When existing overlay parts exceed `<tool>.overlay_guard.max_existing_overlay_parts`, preflight compacts the configured overlay namespace when `auto_compact_existing_overlay_parts=true`; otherwise planning fails fast with an explicit compaction command.
-31. `densegen.overlay_guard.overlay_namespace` and `infer.overlay_guard.overlay_namespace` must match `^[a-z][a-z0-9_]*$` so runbook contracts remain compatible with USR overlay namespace rules.
-32. `usr-overlay-guard` and `usr-records-part-guard` are explicit about degraded mode: tools that do not emit overlay parts or records-part files return `guard_status=skipped` with a reason (no silent fallback).
-33. DenseGen preflight runs `usr-records-part-guard` with explicit thresholds from `densegen.records_part_guard`; when projected records parts exceed `max_projected_records_parts`, planning fails fast with tuning guidance (`runtime.max_accepted_per_library`, `output.parquet.chunk_size`).
-34. When existing records parts exceed `densegen.records_part_guard.max_existing_records_parts` or oldest part age exceeds `max_existing_records_part_age_days`, preflight compacts `records__part-*.parquet` into `records.parquet` when `auto_compact_existing_records_parts=true`; otherwise planning fails fast with explicit maintenance guidance.
-35. DenseGen preflight runs `usr-archived-overlay-guard` with explicit thresholds from `densegen.archived_overlay_guard`; when `_derived/_archived` file count or byte total exceeds thresholds, planning fails fast with explicit retention guidance.
-36. `ops runbook execute --audit-json` must be exactly `<workspace-root>/outputs/logs/ops/audit/<file>.json`; non-workspace audit paths fail fast.
-37. transient operational working directories at repo root (for example `.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) are not allowed; place disposable operational working state under `/scratch` and keep durable orchestration artifacts under `<workspace-root>/outputs/logs/ops/`.
-38. DenseGen run args remain `--no-plot` by default for generation throughput; submit phase adds a dependent `densegen-analysis.qsub` job (`-hold_jid <densegen_cpu_job_name>`) that runs `dense plot --only "$DENSEGEN_ANALYSIS_PLOTS"` with a static default set (`stage_a_summary,placement_map,run_health,tfbs_usage`).
-39. DenseGen post-run submit always uses `densegen.post_run.resources`; default post-run resources are `pe_omp=4`, `h_rt=01:00:00`, `mem_per_core=4G`.
+6. On machines without scheduler clients, active-job discovery degrades to an operator-visible warning rather than a traceback; use `--no-discover-active-jobs` for deterministic local planning.
+7. Manual active-job input (`--active-job-id`) accepts repeat flags or comma-delimited values and normalizes to a deduplicated job-id set before `-hold_jid` chaining.
+8. Execution is fail-fast by phase: `preflight`, optional `notify_smoke`, then optional `submit`.
+9. `--command-timeout-seconds` applies per command and fails phase on timeout; default is `300`.
+10. DenseGen `mode=fresh` is blocked when resume artifacts already exist unless `--allow-fresh-reset` is explicitly provided.
+11. DenseGen routes reject `runbook.infer` and reject GPU resource fields.
+12. Infer routes reject `runbook.densegen` and require GPU resource fields.
+13. Infer planning validates runbook GPU resources against infer `model.parallelism` and capacity contracts before preflight command rendering.
+14. Infer capacity preflight uses `resources.gpu_memory_gib` when provided; otherwise it uses capability hints for known classes (`gpu_capability=8.9 -> 45.0 GiB`, `gpu_capability=9.0 -> 80.0 GiB`).
+15. Infer `validate config` on non-GPU hosts validates schema/contracts and reports capacity-check skip; runbook planning remains the deterministic place for declared scheduler-resource capacity checks.
+16. Notify workflows require `runbook.notify`, with policy matching workflow family (`densegen|generic` for DenseGen, `infer|generic` for Infer).
+17. Notify setup is non-interactive and file-only by contract: planner resolves webhook file with explicit precedence (`<notify.webhook_env>_FILE` first, otherwise `notify.profile` webhook `secret_ref` when it is a `file://` path) and uses `--secret-source file --secret-ref file://<resolved-path> --no-store-webhook`; missing/unreadable webhook file fails fast before submit.
+18. Notify setup writes an explicit TLS CA bundle in profile wiring (`--tls-ca-bundle`, defaulting to `SSL_CERT_FILE` or `/etc/pki/tls/certs/ca-bundle.crt`).
+19. Notify smoke bootstraps the resolved USR events file path before dry-watch so fresh workspaces do not fail on missing `.events.log`.
+20. Batch-only workflows reject `runbook.notify` to keep notify decoupled.
+21. Preflight creates and verifies `runbook.logging.stdout_dir` (`mkdir -p` + writable check) before any verify or submit command.
+22. Verify and submit commands always pass explicit `-o <runbook.logging.stdout_dir>/$JOB_NAME.$JOB_ID.out` to avoid cwd-dependent stdout placement.
+23. Preflight runs `dnadesign.ops.orchestrator.gates prune-ops-logs` before scheduler verify/submit for both `runbook.logging.stdout_dir` and `<workspace-root>/outputs/logs/ops/runtime`, with `--stdout-dir`, `--runbook-id`, `--keep-last`, and `--max-age-days` from runbook logging retention settings.
+24. `runbook.logging.stdout_dir` must be exactly `<workspace-root>/outputs/logs/ops/sge/<runbook.id>`; mismatched id variants are rejected at runbook load time to prevent path fan-out.
+25. DenseGen notify workflows run `dense inspect run --usr-events-path` in preflight so local-only output configs fail before submit.
+26. Notify watcher submit injects `NOTIFY_PROFILE`, `WEBHOOK_ENV`, and `WEBHOOK_FILE` in `qsub -v`; webhook values are not embedded in scheduler metadata.
+27. When `notify.orchestration_events=true`, execute emits direct notify lifecycle events for submit orchestration (`started`, then `success` or `failure`) in addition to watcher event notifications, using file-backed `--secret-ref`.
+28. Notify DenseGen progress semantics use workspace-session counters (`rows_written_session`, `run_quota`, and `fingerprint.rows`) and default heartbeat cadence is 1800 seconds (`progress_heartbeat_seconds`) unless explicitly overridden.
+29. Notify workflows resolve a TLS CA bundle from `SSL_CERT_FILE` or known system CA paths and pass it explicitly to notify setup/orchestration commands; when no readable CA bundle is resolvable, planning fails fast before submit.
+30. Preflight runs `usr-overlay-guard` using tool-specific adapters (`--tool densegen` for DenseGen, `--tool infer` for infer) with explicit thresholds from each workflow’s overlay-guard block; when projected overlay parts exceed `max_projected_overlay_parts`, planning fails fast with required tuning guidance. Today infer does not emit overlay parts, so the infer adapter returns explicit `guard_status=skipped` evidence rather than enforcing those thresholds.
+31. When existing overlay parts exceed `<tool>.overlay_guard.max_existing_overlay_parts`, preflight compacts the configured overlay namespace when `auto_compact_existing_overlay_parts=true`; otherwise planning fails fast with an explicit compaction command.
+32. `densegen.overlay_guard.overlay_namespace` must match `^[a-z][a-z0-9_]*$` so runbook contracts remain compatible with USR overlay namespace rules.
+33. `infer.overlay_guard.overlay_namespace` is fixed to `infer`; customizing it is rejected because infer write-back and prune use the canonical infer namespace.
+34. `usr-overlay-guard` and `usr-records-part-guard` are explicit about degraded mode: tools that do not emit overlay parts or records-part files return `guard_status=skipped` with a reason (no silent fallback).
+35. DenseGen preflight runs `usr-records-part-guard` with explicit thresholds from `densegen.records_part_guard`; when projected records parts exceed `max_projected_records_parts`, planning fails fast with tuning guidance (`runtime.max_accepted_per_library`, `output.parquet.chunk_size`).
+36. When existing records parts exceed `densegen.records_part_guard.max_existing_records_parts` or oldest part age exceeds `max_existing_records_part_age_days`, preflight compacts `records__part-*.parquet` into `records.parquet` when `auto_compact_existing_records_parts=true`; otherwise planning fails fast with explicit maintenance guidance.
+37. DenseGen preflight runs `usr-archived-overlay-guard` with explicit thresholds from `densegen.archived_overlay_guard`; when `_derived/_archived` file count or byte total exceeds thresholds, planning fails fast with explicit retention guidance.
+38. `ops runbook execute --audit-json` must be exactly `<workspace-root>/outputs/logs/ops/audit/<file>.json`; non-workspace audit paths fail fast.
+39. transient operational working directories at repo root (for example `.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) are not allowed; place disposable operational working state under `/scratch` and keep durable orchestration artifacts under `<workspace-root>/outputs/logs/ops/`.
+40. DenseGen run args remain `--no-plot` by default for generation throughput; submit phase adds a dependent `densegen-analysis.qsub` job (`-hold_jid <densegen_cpu_job_name>`) that runs `dense plot --only "$DENSEGEN_ANALYSIS_PLOTS"` with a static default set (`stage_a_summary,placement_map,run_health,tfbs_usage`).
+41. DenseGen post-run submit always uses `densegen.post_run.resources`; default post-run resources are `pe_omp=4`, `h_rt=01:00:00`, `mem_per_core=4G`.
+
+Infer resume note:
+
+- Infer `--mode auto` treats an existing `infer` overlay in the target dataset as a resume artifact, including overlays that arrived through explicit USR merge carry.
+- For infer, Ops `selected_mode=fresh` now passes `--overwrite` to `infer run`, which forces recomputation of the requested infer outputs without implicitly pruning the namespace.
+- If merge carry preserved stale `infer` values that should be removed rather than recomputed in place, prune the overlay first; use `--mode fresh --allow-fresh-reset` only when recomputing the current requested outputs is intentional.
 
 ### Related docs
 
-1. [Ops operations index](README.md)
+1. [Ops orchestration index](README.md)
 2. [Ops package README](../../src/dnadesign/ops/README.md)
 3. [BU SCC jobs docs](../bu-scc/jobs/README.md)

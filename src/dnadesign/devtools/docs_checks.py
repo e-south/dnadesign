@@ -97,6 +97,10 @@ RUNBOOK_MARKDOWN_FILES = (
 OWNER_PATTERN = re.compile(r"^\*\*Owner:\*\*\s*(.+?)\s*$", re.MULTILINE)
 LAST_VERIFIED_PATTERN = re.compile(r"^\*\*Last verified:\*\*\s*(.+?)\s*$", re.MULTILINE)
 TYPE_PATTERN = re.compile(r"^\*\*Type:\*\*\s*(.+?)\s*$", re.MULTILINE)
+PLANE_PATTERN = re.compile(r"^\*\*Plane:\*\*\s*(.+?)\s*$", re.MULTILINE)
+OWNER_BOUNDARY_PATTERN = re.compile(r"^\*\*Owner-boundary:\*\*\s*(.+?)\s*$", re.MULTILINE)
+ENTRY_ARTIFACT_PATTERN = re.compile(r"^\*\*Entry artifact:\*\*\s*(.+?)\s*$", re.MULTILINE)
+EXIT_ARTIFACT_PATTERN = re.compile(r"^\*\*Exit artifact:\*\*\s*(.+?)\s*$", re.MULTILINE)
 STATUS_PATTERN = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
 CREATED_PATTERN = re.compile(r"^\*\*Created:\*\*\s*(.+?)\s*$", re.MULTILINE)
 SECTION_HEADING_PATTERN = re.compile(r"^#{2,6}\s+(.+?)\s*$", re.MULTILINE)
@@ -138,10 +142,54 @@ DENSEGEN_DOC_LANGUAGE_PATHS = (
 DENSEGEN_DISALLOWED_TERM_PATTERN = re.compile(r"\bcanonical\b", flags=re.IGNORECASE)
 OPS_OPERATIONAL_WORKFLOW_IDS = {
     "densegen_batch_submit",
-    "densegen_batch_with_notify_slack",
+    "densegen_batch_with_notify",
     "infer_batch_submit",
-    "infer_batch_with_notify_slack",
+    "infer_batch_with_notify",
 }
+CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
+    "docs/operations/README.md": {
+        "type": "route",
+        "plane": "control-plane",
+        "owner_boundary": "ops",
+    },
+    "docs/operations/orchestration-runbooks.md": {
+        "type": "runbook",
+        "plane": "control-plane",
+        "owner_boundary": "ops",
+    },
+    "src/dnadesign/usr/docs/operations/README.md": {
+        "type": "route",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/usr/docs/operations/workflow-map.md": {
+        "type": "route",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md": {
+        "type": "runbook",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md": {
+        "type": "runbook",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md": {
+        "type": "runbook",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md": {
+        "type": "workflow",
+        "plane": "downstream-tool",
+        "owner_boundary": "opal",
+    },
+}
+_CROSS_TOOL_DOC_ALLOWED_TYPES = {"route", "runbook", "workflow"}
+_CROSS_TOOL_DOC_ALLOWED_PLANES = {"control-plane", "data-plane", "downstream-tool"}
 OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES = (
     PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
     Path("docs/templates"),
@@ -158,6 +206,24 @@ STALE_OVERLAY_GUARD_TERMS = (
     "densegen.overlay_guard.namespace",
 )
 PACKAGED_RUNBOOK_DURATION_SUFFIX_PATTERN = re.compile(r"_(?:\d+)(?:h|hr|hrs|hour|hours)$", re.IGNORECASE)
+OPERATIONAL_RUNBOOK_SCAN_PRUNE_DIRS = {
+    ".git",
+    ".pytest_cache",
+    ".venv",
+    "__pycache__",
+    "_archive",
+    "_auxiliary",
+    "_derived",
+    "_snapshots",
+    "archived",
+    "batch_results",
+    "build",
+    "dist",
+    "prototype",
+    "prototypes",
+    "runs",
+    "venv",
+}
 
 
 def _collect_markdown_files(repo_root: Path) -> tuple[list[Path], list[Path]]:
@@ -762,6 +828,56 @@ def _find_owner_last_verified_metadata_issues_for_files(
     return issues
 
 
+def _find_cross_tool_doc_metadata_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    for relative_path, contract in CROSS_TOOL_DOC_METADATA_CONTRACTS.items():
+        path = repo_root / relative_path
+        if not path.exists():
+            continue
+
+        text = path.read_text(encoding="utf-8")
+
+        doc_type = _extract_metadata_field(text, TYPE_PATTERN)
+        if doc_type is None:
+            issues.append(f"{path}: missing '**Type:**' metadata field.")
+        elif doc_type not in _CROSS_TOOL_DOC_ALLOWED_TYPES:
+            allowed = ", ".join(sorted(_CROSS_TOOL_DOC_ALLOWED_TYPES))
+            issues.append(f"{path}: '**Type:**' must be one of: {allowed}.")
+        elif doc_type != contract["type"]:
+            issues.append(f"{path}: '**Type:**' must be exactly '{contract['type']}'.")
+
+        plane = _extract_metadata_field(text, PLANE_PATTERN)
+        if plane is None:
+            issues.append(f"{path}: missing '**Plane:**' metadata field.")
+        elif plane not in _CROSS_TOOL_DOC_ALLOWED_PLANES:
+            allowed = ", ".join(sorted(_CROSS_TOOL_DOC_ALLOWED_PLANES))
+            issues.append(f"{path}: '**Plane:**' must be one of: {allowed}.")
+        elif plane != contract["plane"]:
+            issues.append(f"{path}: '**Plane:**' must be exactly '{contract['plane']}'.")
+
+        owner_boundary = _extract_metadata_field(text, OWNER_BOUNDARY_PATTERN)
+        if owner_boundary is None:
+            issues.append(f"{path}: missing '**Owner-boundary:**' metadata field.")
+        elif not owner_boundary:
+            issues.append(f"{path}: '**Owner-boundary:**' must not be empty.")
+        elif owner_boundary != contract["owner_boundary"]:
+            issues.append(f"{path}: '**Owner-boundary:**' must be exactly '{contract['owner_boundary']}'.")
+
+        entry_artifact = _extract_metadata_field(text, ENTRY_ARTIFACT_PATTERN)
+        if entry_artifact is None:
+            issues.append(f"{path}: missing '**Entry artifact:**' metadata field.")
+        elif not entry_artifact:
+            issues.append(f"{path}: '**Entry artifact:**' must not be empty.")
+
+        exit_artifact = _extract_metadata_field(text, EXIT_ARTIFACT_PATTERN)
+        if exit_artifact is None:
+            issues.append(f"{path}: missing '**Exit artifact:**' metadata field.")
+        elif not exit_artifact:
+            issues.append(f"{path}: '**Exit artifact:**' must not be empty.")
+
+    return issues
+
+
 def _find_exec_plan_metadata_issues(repo_root: Path) -> list[str]:
     issues: list[str] = []
     exec_root = repo_root / "docs" / "exec-plans"
@@ -1145,20 +1261,59 @@ def _is_allowed_operational_runbook_path(*, relative_path: Path) -> bool:
 
 def _find_operational_runbook_path_issues(repo_root: Path) -> list[str]:
     issues: list[str] = []
-    for suffix in ("*.yaml", "*.yml"):
-        for path in sorted(repo_root.rglob(suffix)):
-            if not path.is_file():
-                continue
-            if not _is_ops_operational_runbook_contract(path):
-                continue
-            relative_path = path.relative_to(repo_root)
-            if _is_allowed_operational_runbook_path(relative_path=relative_path):
-                continue
-            issues.append(
-                f"{path}: operational runbook path is outside allowed locations; "
-                "use workspace outputs/logs/ops/runbooks/ or src/dnadesign/ops/runbooks/presets/."
-            )
+    for path in _iter_operational_runbook_yaml_files(repo_root):
+        if not _is_ops_operational_runbook_contract(path):
+            continue
+        relative_path = path.relative_to(repo_root)
+        if _is_allowed_operational_runbook_path(relative_path=relative_path):
+            continue
+        issues.append(
+            f"{path}: operational runbook path is outside allowed locations; "
+            "use workspace outputs/logs/ops/runbooks/ or src/dnadesign/ops/runbooks/presets/."
+        )
     return issues
+
+
+def _iter_operational_runbook_yaml_files(repo_root: Path):
+    stack = [repo_root]
+    while stack:
+        current = stack.pop()
+        try:
+            entries = sorted(current.iterdir(), key=lambda entry: entry.name)
+        except OSError:
+            continue
+        for entry in reversed(entries):
+            if entry.is_dir():
+                rel_parts = entry.relative_to(repo_root).parts
+                if _should_descend_operational_runbook_dir(rel_parts):
+                    stack.append(entry)
+                continue
+            if entry.suffix.lower() in {".yaml", ".yml"}:
+                yield entry
+
+
+def _should_descend_operational_runbook_dir(relative_parts: tuple[str, ...]) -> bool:
+    if not relative_parts:
+        return True
+    name = relative_parts[-1]
+    if name in OPERATIONAL_RUNBOOK_SCAN_PRUNE_DIRS:
+        return False
+    if "outputs" in relative_parts:
+        outputs_idx = relative_parts.index("outputs")
+        tail = relative_parts[outputs_idx + 1 :]
+        if not tail:
+            return True
+        if tail[0] != "logs":
+            return False
+        if len(tail) == 1:
+            return True
+        if tail[1] != "ops":
+            return False
+        if len(tail) == 2:
+            return True
+        if tail[2] != "runbooks":
+            return False
+    return True
 
 
 def _find_packaged_runbook_variant_issues(repo_root: Path) -> list[str]:
@@ -1276,6 +1431,13 @@ def main(argv: list[str] | None = None) -> int:
     if tool_docs_metadata_issues:
         print("Tool docs metadata check failed:")
         for issue in tool_docs_metadata_issues:
+            print(f" - {issue}")
+        return 1
+
+    cross_tool_doc_metadata_issues = _find_cross_tool_doc_metadata_issues(repo_root)
+    if cross_tool_doc_metadata_issues:
+        print("Cross-tool doc metadata check failed:")
+        for issue in cross_tool_doc_metadata_issues:
             print(f" - {issue}")
         return 1
 
