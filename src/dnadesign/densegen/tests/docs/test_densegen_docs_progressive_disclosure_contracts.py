@@ -109,14 +109,16 @@ def test_densegen_docs_route_to_shared_multi_source_runbook() -> None:
 
 def test_densegen_top_level_readme_routes_to_downstream_shared_flows() -> None:
     text = _read(ROOT / "README.md")
-    assert "## Fast start" in text
+    assert "## Start here" in text
     assert "## Continue after generation" in text
+    assert "## Boundary reminder" in text
     assert "Want a first local run" in text
     assert "Want the shared downstream handoff after generation" in text
     assert "../usr/docs/operations/multi-source-source-of-truth-assembly.md" in text
     assert "../usr/docs/operations/promoter-characterization-feature-matrix.md" in text
     assert "downstream USR-backed workflows" in text
     assert "Use it when you need one design-generation tool" in text
+    assert "DenseGen owns workspace-local generation" in text
 
 
 def test_densegen_docs_index_keeps_cross_tool_handoff_routes_separate_from_tutorials() -> None:

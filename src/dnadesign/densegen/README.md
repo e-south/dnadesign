@@ -12,10 +12,11 @@ Use it when you need one design-generation tool with explicit run state, fail-fa
   </a>
 </p>
 
-## Fast start
+## Start here
 
-- Want a first local run: start with [TFBS baseline tutorial](docs/tutorials/demo_tfbs_baseline.md).
-- Want the shared downstream handoff after generation: start with [Promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md).
+- Want a first local run: start with [TFBS baseline tutorial](docs/tutorials/demo_tfbs_baseline.md). Verify next with the [Outputs reference](docs/reference/outputs.md).
+- Want to choose a packaged workspace before running: start with the [Workspaces guide](workspaces/README.md). Verify next with the [Config reference](docs/reference/config.md).
+- Want the shared downstream handoff after generation: start with [Promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md). Verify next there before switching to cluster or OPAL.
 
 ## Documentation map
 
@@ -40,3 +41,9 @@ Use it when you need one design-generation tool with explicit run state, fail-fa
 - [DenseGen to USR to Notify tutorial](docs/tutorials/demo_usr_notify.md): validate the event path when generated records should emit USR updates and watcher notifications.
 - [Multi-source source-of-truth assembly](../usr/docs/operations/multi-source-source-of-truth-assembly.md): merge DenseGen outputs with other USR-backed sources before construct and infer share one downstream dataset.
 - [Promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md): continue into infer-derived feature columns when clustering or OPAL should consume one consolidated promoter study.
+
+## Boundary reminder
+
+- DenseGen owns workspace-local generation, schema validation, and reproducible `outputs/` artifacts.
+- USR owns durable cross-tool dataset identity once generation results are merged or exported there.
+- DenseGen does not own infer feature generation, exploratory clustering, or OPAL active-learning loops.

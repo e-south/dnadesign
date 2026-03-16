@@ -2,6 +2,12 @@
 
 construct places focal DNA parts into larger sequence contexts. Use it to expand promoters and other parts into explicit regions, plasmids, and related template-backed constructs. Any canonical sequence record can serve as an input part or a template; the construct config decides the role.
 
+## Start here
+
+- Want the shortest validated run: start with [Getting started](docs/getting-started.md). Verify next with the [Outputs reference](docs/reference/outputs.md).
+- Want one packaged shared-dataset tracer bullet before infer: start with [Run the packaged source-of-truth demo](workspaces/demo_promoter_swap_pdual10_source_of_truth/README.md). Verify next with the shared [Construct -> USR -> Infer source-of-truth runbook](../usr/docs/operations/construct-infer-source-of-truth-runbook.md).
+- Want the downstream feature-matrix branch after construct expansion: start with [Promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md).
+
 ## Documentation map
 
 1. [Getting started](docs/getting-started.md): shortest path to a validated demo run or blank custom workspace.
@@ -20,7 +26,7 @@ construct places focal DNA parts into larger sequence contexts. Use it to expand
 - `uv run construct workspace init --id <workspace-id>`
 - `uv run construct workspace doctor --workspace <workspace-dir>`
 
-## Package boundary
+## Boundary reminder
 
 - `construct` owns sequence realization, placement semantics, and `construct__*` lineage.
 - USR owns dataset persistence, dataset ids, and downstream reuse.

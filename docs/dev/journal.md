@@ -527,3 +527,27 @@ This section lists dated entries so you can jump to a specific investigation win
     - add a `Start here in 3 commands` block to Notify package docs without creating a second authoritative runbook
     - align Ops docs examples with the workspace-scoped audit-path contract and replace `dunlop` placeholders with `<project>`
     - replace `/tmp` examples in the USR workflow map with a workspace-rooted artifact convention and add a shared context preamble
+- 2026-03-16 18:11 EDT: docs ontology hardening and downstream-branch clarity pass
+  - Intent:
+    - run another bounded swarm audit after the cluster docs refactor to catch residual semantic drift rather than re-open the whole docs tree
+    - keep the same ownership model intact:
+      - root `docs/README.md` remains the only top-level router
+      - `docs/operations/` remains control-plane only
+      - `src/dnadesign/usr/docs/operations/` remains the durable USR-backed cross-tool data-plane surface
+      - downstream exploratory and learning branches remain tool-owned after the infer handoff
+    - remove the remaining ontology footguns instead of documenting around them
+  - Swarm findings:
+    - authoritative USR cross-tool runbooks still carried `demo` in their filenames and one title, which conflicted with the root ontology where demos/tutorials are non-authoritative
+    - infer still made the `cluster` vs `OPAL` branch choice look symmetric even though OPAL requires a USR-backed dataset contract and `data.location.kind: usr`
+    - DenseGen and construct package entry surfaces were still lighter on explicit ownership and verification cues than the recently hardened cluster/opal surfaces
+    - the promoter feature-matrix runbook still duplicated downstream branch commands that properly belong in the downstream owner workflows
+    - `sync.md` still lacked the same metadata contract already enforced on the other major USR router surfaces
+  - Implementation targets for this slice:
+    - rename the two authoritative USR runbooks so their path/title semantics match their `Type: runbook` role
+    - update all root/tool/test references to the new runbook identities with no compatibility shims
+    - make the infer downstream branch decision explicit:
+      - `cluster` accepts a chosen `infer__...` column in file or USR inputs
+      - `OPAL` starts only from a USR-backed dataset and explicit `data.location.kind: usr`
+    - strengthen DenseGen and construct package entry surfaces with clearer `Start here` and boundary language
+    - keep the promoter feature-matrix doc as a routing/handoff artifact instead of a second home for downstream command sequences
+    - add metadata enforcement for `sync.md` and the chained DenseGen/Infer runbook via docs checks

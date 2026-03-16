@@ -36,7 +36,7 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
         "src/dnadesign/construct/workspaces/demo_promoter_swap_pdual10_source_of_truth/README.md"
     )
 
-    token = "../../usr/docs/operations/construct-infer-source-of-truth-demo.md"
+    token = "../../usr/docs/operations/construct-infer-source-of-truth-runbook.md"
     multi_source_token = "../../usr/docs/operations/multi-source-source-of-truth-assembly.md"
     feature_matrix_token = "../../usr/docs/operations/promoter-characterization-feature-matrix.md"
     assert token in readme
@@ -45,9 +45,11 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     assert multi_source_token in index_doc
     assert feature_matrix_token in readme
     assert feature_matrix_token in index_doc
+    assert "## Start here" in top_readme
+    assert "## Boundary reminder" in top_readme
     assert "Shared cross-tool handoff routes (USR-owned)" in top_readme
     assert "docs/README.md" in top_readme
-    assert "../../../usr/docs/operations/construct-infer-source-of-truth-demo.md" in outputs
+    assert "../../../usr/docs/operations/construct-infer-source-of-truth-runbook.md" in outputs
     assert "demo_promoter_swap_pdual10_source_of_truth" in readme
     assert "demo_promoter_swap_pdual10_source_of_truth" in index_doc
     assert "demo_promoter_swap_pdual10_source_of_truth" in workspaces
