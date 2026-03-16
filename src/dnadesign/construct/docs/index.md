@@ -17,7 +17,7 @@ Use [README.md](README.md) when you know the task. Use this page when you want t
 ### Shared cross-tool handoff routes
 
 - [Multi-source source-of-truth assembly](../../usr/docs/operations/multi-source-source-of-truth-assembly.md)
-- [Construct -> USR -> Infer source-of-truth demo](../../usr/docs/operations/construct-infer-source-of-truth-demo.md)
+- [Construct -> USR -> Infer source-of-truth runbook](../../usr/docs/operations/construct-infer-source-of-truth-runbook.md)
 - [Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md)
 
 ### Reference

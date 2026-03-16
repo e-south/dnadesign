@@ -96,7 +96,7 @@ export FEATURE_DATASET="$PRIMARY_INPUT_DATASET" # Reuse the merged anchor-only d
 When the representation study needs 1 kb windows, plasmid contexts, or other template-backed sequences, materialize those explicitly with construct first. Reuse the shared construct-backed source-of-truth runbooks instead of duplicating their unique steps here:
 
 - [Multi-source source-of-truth assembly](multi-source-source-of-truth-assembly.md): use when the merged source dataset should be realized through construct into one downstream dataset.
-- [Construct -> USR -> Infer source-of-truth demo](construct-infer-source-of-truth-demo.md): use when one construct-backed downstream dataset is already the intended canonical handoff.
+- [Construct -> USR -> Infer source-of-truth runbook](construct-infer-source-of-truth-runbook.md): use when one construct-backed downstream dataset is already the intended canonical handoff.
 
 After construct materializes the expanded context dataset, set:
 
@@ -224,25 +224,9 @@ Expected outcome:
 
 Use `cluster` when the immediate goal is exploratory structure, Leiden clustering, UMAP visualization, or OPAL-joined diagnostics later.
 
-```bash
-# Fit one Leiden clustering run against the chosen infer-derived feature column.
-uv run cluster fit \
-  --dataset "$FEATURE_DATASET" \
-  --x-col infer__evo2_7b__anchor_7b_emb_mid__emb_mid \
-  --name promoter_matrix_ldn_v1 \
-  --write \
-  --allow-overwrite
-# Render one UMAP view against the same infer-derived feature column.
-uv run cluster umap \
-  --dataset "$FEATURE_DATASET" \
-  --name promoter_matrix_ldn_v1 \
-  --x-col infer__evo2_7b__anchor_7b_emb_mid__emb_mid \
-  --attach-coords \
-  --write \
-  --allow-overwrite
-```
+Switch to the authoritative downstream workflow here:
 
-Continue with [cluster exploratory clustering workflow](../../../cluster/docs/workflows/exploratory-clustering.md) for preset, hue, and OPAL-join details.
+- [cluster exploratory clustering workflow](../../../cluster/docs/workflows/exploratory-clustering.md): choose one explicit `infer__...` column as `X`, then run `fit -> umap -> analyze` with the downstream `cluster` contract.
 
 #### OPAL branch
 
@@ -250,14 +234,11 @@ Use OPAL when the feature dataset is ready and the next step is explicit label/t
 
 - [USR dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/usr-infer-x-active-learning.md)
 
-That workflow starts after the feature dataset already has the chosen `infer__...` column:
+That workflow starts after the feature dataset already has the chosen `infer__...` column and OPAL is configured with `data.location.kind: usr`.
 
-```bash
-uv run opal validate -c "$OPAL_WORKDIR/configs/campaign.yaml" # Validate the USR-backed OPAL campaign against the chosen infer-derived X column.
-uv run opal run -c "$OPAL_WORKDIR/configs/campaign.yaml" --labels-as-of 0 # Train, score, and select once the first observed labels are available.
-```
+Continue with the OPAL-owned workflow for the full label-ingest and round-loop procedure:
 
-Continue with the OPAL-owned workflow for the full label-ingest and round-loop procedure.
+- [USR dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/usr-infer-x-active-learning.md)
 
 ## Verification checklist
 
@@ -273,7 +254,7 @@ Continue with the OPAL-owned workflow for the full label-ingest and round-loop p
 - USR operations index: [README.md](README.md)
 - USR workflow map: [workflow-map.md](workflow-map.md)
 - Multi-source upstream assembly: [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md)
-- Construct-backed source-of-truth handoff: [construct-infer-source-of-truth-demo.md](construct-infer-source-of-truth-demo.md)
+- Construct-backed source-of-truth handoff: [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md)
 - Infer docs router: [../../../infer/docs/README.md](../../../infer/docs/README.md)
 - Cluster exploratory workflow surface: [../../../cluster/docs/workflows/exploratory-clustering.md](../../../cluster/docs/workflows/exploratory-clustering.md)
 - OPAL downstream workflow: [../../../opal/docs/workflows/usr-infer-x-active-learning.md](../../../opal/docs/workflows/usr-infer-x-active-learning.md)

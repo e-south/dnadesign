@@ -18,6 +18,6 @@ This workspace keeps construct IO inside `outputs/usr_datasets` by default and r
   - [config.slot_a.window.yaml](config.slot_a.window.yaml)
   - [config.slot_b.window.yaml](config.slot_b.window.yaml)
 - Inputs notes: [inputs/README.md](inputs/README.md)
-- Shared cross-tool runbook: [../../../usr/docs/operations/construct-infer-source-of-truth-demo.md](../../../usr/docs/operations/construct-infer-source-of-truth-demo.md)
+- Shared cross-tool runbook: [../../../usr/docs/operations/construct-infer-source-of-truth-runbook.md](../../../usr/docs/operations/construct-infer-source-of-truth-runbook.md)
 - Broader feature-matrix runbook: [../../../usr/docs/operations/promoter-characterization-feature-matrix.md](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)
 - All workspaces: [../README.md](../README.md)

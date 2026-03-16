@@ -26,8 +26,8 @@
 - [Workspaces guide](../workspaces/README.md): initialize workspace roots with `infer workspace init`.
 
 #### Continue after infer-derived `X` exists
-- [cluster exploratory clustering workflow](../../cluster/docs/workflows/exploratory-clustering.md): Leiden, UMAP, and exploratory analysis over one chosen `infer__...` column.
-- [USR dataset with infer-derived X -> OPAL active learning](../../opal/docs/workflows/usr-infer-x-active-learning.md): start the label/train/select loop once the USR dataset already has the chosen infer-derived feature column.
+- [cluster exploratory clustering workflow](../../cluster/docs/workflows/exploratory-clustering.md): Leiden, UMAP, and exploratory analysis once one chosen `infer__...` column exists in a file or USR dataset.
+- [USR dataset with infer-derived X -> OPAL active learning](../../opal/docs/workflows/usr-infer-x-active-learning.md): start the label/train/select loop only after infer has written the chosen `infer__...` column into a USR dataset and OPAL `campaign.yaml` uses `data.location.kind: usr`.
 
 #### Run scheduler-oriented infer flows
 - [Operations index](operations/README.md): run no-submit preflight, then submit.
@@ -43,9 +43,9 @@
 ### Cross-tool handoff routes
 
 - [Multi-source source-of-truth assembly](../../usr/docs/operations/multi-source-source-of-truth-assembly.md): shared multi-source consolidation route before construct and infer share one downstream dataset.
-- [Construct -> USR -> Infer source-of-truth demo](../../usr/docs/operations/construct-infer-source-of-truth-demo.md): shared construct-led consolidation route once construct owns the current handoff.
+- [Construct -> USR -> Infer source-of-truth runbook](../../usr/docs/operations/construct-infer-source-of-truth-runbook.md): shared construct-led consolidation route once construct owns the current handoff.
 - [Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md): cross-tool feature-matrix assembly before downstream cluster or OPAL use.
-- [cluster exploratory branch](../../cluster/docs/workflows/exploratory-clustering.md): exploratory clustering and UMAP branch once one explicit `infer__...` column is chosen as `X`.
+- [cluster exploratory workflow](../../cluster/docs/workflows/exploratory-clustering.md): exploratory clustering and UMAP branch once one explicit `infer__...` column is chosen as `X`.
 - [USR dataset with infer-derived X -> OPAL active learning](../../opal/docs/workflows/usr-infer-x-active-learning.md): downstream OPAL workflow once infer-derived `X` already exists.
 
 ### Documentation by type

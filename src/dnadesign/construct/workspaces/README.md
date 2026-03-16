@@ -87,4 +87,4 @@ If you initialize a workspace outside the repo tree, reuse the `uv run --project
 - External/shared USR roots remain allowed, but only through explicit `root:` fields or `construct seed --root <path>`.
 - One construct job uses one template; multi-template or slot-matrix studies are represented as multiple project entries and config files in the workspace registry.
 - The packaged promoter-swap demo exposes `./runbook.sh --mode seed|validate|dry-run|run|validate-all` as the local workspace entrypoint.
-- The packaged source-of-truth demo exposes `./runbook.sh --mode seed|validate-all|dry-run-all|run-all` as the local workspace entrypoint for the shared-dataset flow; the authoritative cross-tool handoff still lives in `../../usr/docs/operations/construct-infer-source-of-truth-demo.md`.
+- The packaged source-of-truth demo exposes `./runbook.sh --mode seed|validate-all|dry-run-all|run-all` as the local workspace entrypoint for the shared-dataset flow; the authoritative cross-tool handoff still lives in `../../usr/docs/operations/construct-infer-source-of-truth-runbook.md`.

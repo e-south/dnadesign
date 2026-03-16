@@ -29,5 +29,5 @@ Use this sequence when sync commands fail or verification blocks transfer.
 - Target modes and mapping: [sync-modes.md](sync-modes.md)
 - Machine-readable decisions: [sync-audit-loop.md](sync-audit-loop.md)
 - HPC loop: [hpc-agent-sync-flow.md](hpc-agent-sync-flow.md)
-- Chained DenseGen/Infer flow: [chained-densegen-infer-sync-demo.md](chained-densegen-infer-sync-demo.md)
+- Chained DenseGen/Infer flow: [chained-densegen-infer-sync-runbook.md](chained-densegen-infer-sync-runbook.md)
 - Adversarial drills: [sync-fidelity-drills.md](sync-fidelity-drills.md)

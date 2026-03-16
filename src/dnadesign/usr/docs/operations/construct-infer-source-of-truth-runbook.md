@@ -1,4 +1,4 @@
-## Construct -> USR -> Infer Source-of-Truth Demo
+## Construct -> USR -> Infer Source-of-Truth Runbook
 
 **Type:** runbook
 **Plane:** data-plane

@@ -54,6 +54,6 @@ The blank scaffold now writes explicit workspace-local `root: outputs/usr_datase
 - [Docs overview](README.md)
 - [Docs index](index.md)
 - [Workspaces guide](../workspaces/README.md)
-- [Construct -> USR -> Infer source-of-truth demo](../../usr/docs/operations/construct-infer-source-of-truth-demo.md)
+- [Construct -> USR -> Infer source-of-truth runbook](../../usr/docs/operations/construct-infer-source-of-truth-runbook.md)
 - [Config reference](reference/config.md)
 - [Workspace registry reference](reference/workspace-registry.md)

@@ -41,7 +41,7 @@ Ops is the repository-level control-plane orchestration surface for deterministi
 Ops does not own construct-led source-of-truth accumulation or other USR-backed data-plane procedures. When you want a shared USR-backed dataset that multiple construct projects feed before infer adds derived namespaces, use the shared cross-tool runbook:
 
 - [Multi-source source-of-truth assembly](../../src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md)
-- [Construct -> USR -> Infer source-of-truth demo](../../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md)
+- [Construct -> USR -> Infer source-of-truth runbook](../../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-runbook.md)
 - [Promoter characterization feature matrix](../../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md)
 
 ### Contracts

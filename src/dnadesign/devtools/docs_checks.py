@@ -167,12 +167,22 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
+    "src/dnadesign/usr/docs/operations/sync.md": {
+        "type": "route",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
     "src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md": {
+    "src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-runbook.md": {
+        "type": "runbook",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-runbook.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "usr",

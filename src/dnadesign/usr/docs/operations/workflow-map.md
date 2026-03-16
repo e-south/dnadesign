@@ -108,7 +108,7 @@ uv run infer run --preset evo2/extract_logits_ll --usr "$DATASET_ID" --usr-root 
 uv run usr push "$DATASET_ID" bu-scc -y
 ```
 
-Details: [chained-densegen-infer-sync-demo.md](chained-densegen-infer-sync-demo.md)
+Details: [chained-densegen-infer-sync-runbook.md](chained-densegen-infer-sync-runbook.md)
 
 ## Multi-source USR assembly -> Construct -> Infer
 
@@ -159,7 +159,7 @@ uv run infer run --config "$WORKSPACE_ROOT/infer.construct-source-of-truth.yaml"
 uv run notify usr-events watch --events "$USR_ROOT/$DATASET_ID/.events.log" --provider generic --dry-run --no-advance-cursor-on-dry-run
 ```
 
-Details: [construct-infer-source-of-truth-demo.md](construct-infer-source-of-truth-demo.md)
+Details: [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md)
 
 ## Promoter feature matrix -> Cluster or OPAL
 

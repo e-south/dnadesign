@@ -7,7 +7,7 @@
 **Exit artifact:** synchronized USR dataset with transfer-verified infer overlays on both hosts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-03-16
 
 
 Use this runbook for the full asynchronous loop where DenseGen writes on HPC and Infer writes back overlays locally, with USR sync as the transfer contract.

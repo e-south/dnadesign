@@ -17,9 +17,9 @@ Use [docs/README.md](README.md) as the workflow-first entrypoint. This page is a
 ### Cross-tool handoff routes
 
 - [Multi-source source-of-truth assembly](../../usr/docs/operations/multi-source-source-of-truth-assembly.md)
-- [Construct -> USR -> Infer source-of-truth demo](../../usr/docs/operations/construct-infer-source-of-truth-demo.md)
+- [Construct -> USR -> Infer source-of-truth runbook](../../usr/docs/operations/construct-infer-source-of-truth-runbook.md)
 - [Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md)
-- [cluster exploratory branch](../../cluster/docs/workflows/exploratory-clustering.md)
+- [cluster exploratory workflow](../../cluster/docs/workflows/exploratory-clustering.md)
 - [USR dataset with infer-derived X -> OPAL active learning](../../opal/docs/workflows/usr-infer-x-active-learning.md)
 
 ### Operations

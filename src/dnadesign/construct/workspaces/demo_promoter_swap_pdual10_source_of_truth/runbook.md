@@ -100,5 +100,5 @@ uv run usr --root "$PWD/outputs/usr_datasets" head pdual10_source_of_truth_demo 
 
 For the infer and downstream handoff that continues from this workspace, use the shared runbooks:
 
-- [Construct -> USR -> Infer source-of-truth demo](../../../usr/docs/operations/construct-infer-source-of-truth-demo.md)
+- [Construct -> USR -> Infer source-of-truth runbook](../../../usr/docs/operations/construct-infer-source-of-truth-runbook.md)
 - [Promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)

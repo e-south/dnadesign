@@ -1,5 +1,11 @@
 ## USR Sync over SSH
 
+**Type:** route
+**Plane:** data-plane
+**Owner-boundary:** usr
+**Entry artifact:** sync intent that still needs a task-specific transfer route
+**Exit artifact:** authoritative sync runbook for setup, execution, or troubleshooting
+
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-16
 
@@ -35,5 +41,5 @@ uv run usr push my_dataset bu-scc -y
 
 - [sync-audit-loop.md](sync-audit-loop.md)
 - [hpc-agent-sync-flow.md](hpc-agent-sync-flow.md)
-- [chained-densegen-infer-sync-demo.md](chained-densegen-infer-sync-demo.md)
+- [chained-densegen-infer-sync-runbook.md](chained-densegen-infer-sync-runbook.md)
 - [sync-fidelity-drills.md](sync-fidelity-drills.md)

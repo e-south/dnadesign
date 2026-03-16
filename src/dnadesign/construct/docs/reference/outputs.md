@@ -59,4 +59,4 @@ Use `uv run usr head <dataset>` or `uv run usr validate <dataset> --strict` to i
 Matrix orchestration across multiple templates or slots is currently expressed as multiple project entries in the workspace registry, not a multi-template runtime schema.
 
 For the cross-tool pattern where multiple construct projects feed one canonical USR dataset before infer adds derived namespaces, use the shared runbook:
-[Construct -> USR -> Infer source-of-truth demo](../../../usr/docs/operations/construct-infer-source-of-truth-demo.md).
+[Construct -> USR -> Infer source-of-truth runbook](../../../usr/docs/operations/construct-infer-source-of-truth-runbook.md).

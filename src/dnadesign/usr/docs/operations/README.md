@@ -25,14 +25,14 @@ This directory holds authoritative USR-backed data-plane runbooks in lifecycle o
 | Diagnose transfer and verification failures in deterministic order | [sync-troubleshooting.md](sync-troubleshooting.md) |
 | Emit machine-readable transfer decisions for chained commands | [sync-audit-loop.md](sync-audit-loop.md) |
 | Iterate HPC batch writes with local pull/verify checkpoints | [hpc-agent-sync-flow.md](hpc-agent-sync-flow.md) |
-| Chain DenseGen and Infer updates with bidirectional sync | [chained-densegen-infer-sync-demo.md](chained-densegen-infer-sync-demo.md) |
+| Chain DenseGen and Infer updates with bidirectional sync | [chained-densegen-infer-sync-runbook.md](chained-densegen-infer-sync-runbook.md) |
 
 ### Assembly and source of truth
 
 | Need | Runbook |
 | --- | --- |
 | Assemble multiple USR-backed producer datasets before construct and infer share one downstream dataset | [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md) |
-| Build one construct-backed source-of-truth dataset, then hand it to infer | [construct-infer-source-of-truth-demo.md](construct-infer-source-of-truth-demo.md) |
+| Build one construct-backed source-of-truth dataset, then hand it to infer | [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md) |
 
 ### Downstream branch handoff
 
@@ -59,10 +59,10 @@ This directory holds authoritative USR-backed data-plane runbooks in lifecycle o
    [sync-troubleshooting.md](sync-troubleshooting.md),
    [sync-audit-loop.md](sync-audit-loop.md),
    [hpc-agent-sync-flow.md](hpc-agent-sync-flow.md),
-   [chained-densegen-infer-sync-demo.md](chained-densegen-infer-sync-demo.md)
+   [chained-densegen-infer-sync-runbook.md](chained-densegen-infer-sync-runbook.md)
 3. Source-of-truth assembly:
    [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md),
-   [construct-infer-source-of-truth-demo.md](construct-infer-source-of-truth-demo.md)
+   [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md)
 4. Downstream branch handoff:
    [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md)
 5. Validation drills:

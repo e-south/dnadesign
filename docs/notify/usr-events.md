@@ -173,5 +173,5 @@ uv run notify spool drain --profile "$PROFILE" --fail-fast
 - Notify route map: [docs/notify/README.md](README.md)
 - Notify package docs index: [src/dnadesign/notify/docs/README.md](../../src/dnadesign/notify/docs/README.md)
 - Notify command contracts: [src/dnadesign/notify/docs/reference/command-contracts.md](../../src/dnadesign/notify/docs/reference/command-contracts.md)
-- Construct-backed consolidated dataset handoff: [Construct -> USR -> Infer source-of-truth demo](../../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md)
+- Construct-backed consolidated dataset handoff: [Construct -> USR -> Infer source-of-truth runbook](../../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-runbook.md)
 - DenseGen integration walkthrough: [DenseGen -> USR -> Notify tutorial](../../src/dnadesign/densegen/docs/tutorials/demo_usr_notify.md)

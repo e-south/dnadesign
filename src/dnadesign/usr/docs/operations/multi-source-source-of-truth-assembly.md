@@ -173,15 +173,15 @@ Expected outcome:
 
 ### 6) Continue through the shared downstream construct-backed handoff
 
-Once the merged upstream dataset has been realized into `"$DOWNSTREAM_DATASET"`, switch to the shared downstream continuation in [construct-infer-source-of-truth-demo.md](construct-infer-source-of-truth-demo.md):
+Once the merged upstream dataset has been realized into `"$DOWNSTREAM_DATASET"`, switch to the shared downstream continuation in [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md):
 
 ```bash
 # Reuse the same downstream dataset id under the shared continuation contract.
 export DATASET_ID="$DOWNSTREAM_DATASET"
 # Continue with the shared infer handoff section.
-# See: construct-infer-source-of-truth-demo.md#5-shared-downstream-continuation-prepare-infer-handoff-against-the-construct-dataset
+# See: construct-infer-source-of-truth-runbook.md#5-shared-downstream-continuation-prepare-infer-handoff-against-the-construct-dataset
 # Then verify the shared events path.
-# See: construct-infer-source-of-truth-demo.md#6-shared-downstream-continuation-verify-downstream-event-consumption
+# See: construct-infer-source-of-truth-runbook.md#6-shared-downstream-continuation-verify-downstream-event-consumption
 ```
 
 ### 7) Continue into scheduler orchestration only after the data-plane passes
@@ -199,13 +199,13 @@ The Ops control plane is downstream from this runbook. It should not replace the
 - `usr head "$PRIMARY_INPUT_DATASET" --columns id,usr_label__primary` shows labels from all surviving source rows
 - `construct workspace validate-project --runtime` succeeds for every project that targets the shared downstream dataset
 - `usr validate "$DOWNSTREAM_DATASET" --strict` passes after construct writes
-- the shared downstream continuation in `construct-infer-source-of-truth-demo.md` succeeds for infer config validation, infer dry-run, and notify event resolution against the same downstream dataset
+- the shared downstream continuation in `construct-infer-source-of-truth-runbook.md` succeeds for infer config validation, infer dry-run, and notify event resolution against the same downstream dataset
 
 ## Related docs
 
 - Root docs router: [../../../../../docs/README.md](../../../../../docs/README.md)
 - USR workflow map: [workflow-map.md](workflow-map.md)
-- Construct-only downstream handoff: [construct-infer-source-of-truth-demo.md](construct-infer-source-of-truth-demo.md)
+- Construct-only downstream handoff: [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md)
 - USR maintenance merge contract: [../reference/maintenance.md](../reference/maintenance.md)
 - Construct workflow docs: [../../../construct/docs/README.md](../../../construct/docs/README.md)
 - DenseGen workflow docs: [../../../densegen/docs/README.md](../../../densegen/docs/README.md)

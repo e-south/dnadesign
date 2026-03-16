@@ -8,7 +8,7 @@
 - [Create or inspect one dataset locally](getting-started/cli-quickstart.md): shortest path to one validated USR lifecycle.
 - [Sync an existing dataset between local and HPC](operations/workflow-map.md): task-first router for clone, pull, push, and audit flows.
 - [Assemble multiple producer datasets into one source-of-truth dataset](operations/multi-source-source-of-truth-assembly.md): shared USR-backed merge/carry path before construct and infer.
-- [Hand a construct-backed shared dataset to infer and downstream watchers](operations/construct-infer-source-of-truth-demo.md): one construct -> USR -> infer handoff.
+- [Hand a construct-backed shared dataset to infer and downstream watchers](operations/construct-infer-source-of-truth-runbook.md): one construct -> USR -> infer handoff.
 - [Build an infer-annotated promoter feature matrix for cluster or OPAL](operations/promoter-characterization-feature-matrix.md): shared downstream branch once DenseGen/manual/construct inputs should all become one feature dataset.
 
 ### Read order
@@ -35,9 +35,9 @@
 - [Sync troubleshooting](operations/sync-troubleshooting.md): failure signatures with deterministic diagnosis order.
 - [Sync audit loop](operations/sync-audit-loop.md): machine-readable transfer decisions for chained command execution.
 - [HPC sync flow](operations/hpc-agent-sync-flow.md): preflight/run/verify loop for batch-driven workspace updates.
-- [Chained DenseGen and Infer sync demo](operations/chained-densegen-infer-sync-demo.md): end-to-end cross-tool update loop with bidirectional sync.
+- [Chained DenseGen and Infer sync runbook](operations/chained-densegen-infer-sync-runbook.md): end-to-end cross-tool update loop with bidirectional sync.
 - [Multi-source source-of-truth assembly](operations/multi-source-source-of-truth-assembly.md): merge multiple USR-backed producer datasets before construct and infer share one downstream dataset.
-- [Construct -> USR -> Infer source-of-truth demo](operations/construct-infer-source-of-truth-demo.md): construct-led consolidation path for one USR-backed dataset plus infer handoff.
+- [Construct -> USR -> Infer source-of-truth runbook](operations/construct-infer-source-of-truth-runbook.md): construct-led consolidation path for one USR-backed dataset plus infer handoff.
 - [Promoter characterization feature matrix](operations/promoter-characterization-feature-matrix.md): combine DenseGen/manual sources, optional construct expansion, and infer feature-matrix write-back before downstream cluster or OPAL use.
 - [Sync fidelity drills](operations/sync-fidelity-drills.md): adversarial checks for sidecar, overlay, and hash parity.
 
