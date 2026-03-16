@@ -97,6 +97,13 @@ def test_usr_sync_docs_cover_iterative_hpc_clone_safety_loop() -> None:
 def test_docs_index_links_progressive_usr_sync_workflows() -> None:
     docs_index = _read("docs/README.md")
     assert "Workflow routes" in docs_index
+    assert "How docs are organized" in docs_index
+    assert "#### Single-tool starts" in docs_index
+    assert "#### Shared USR-backed data-plane flows" in docs_index
+    assert "#### Operations and infrastructure" in docs_index
+    assert "Choose this section when the next authoritative document is still package-local" in docs_index
+    assert "Choose this section when the next durable artifact is a shared USR dataset" in docs_index
+    assert "Choose this section when the next artifact is orchestration state" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync-audit-loop.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md" in docs_index
@@ -111,11 +118,13 @@ def test_docs_index_exposes_task_first_workflow_map() -> None:
     assert "Sync iterative HPC outputs to local analysis safely" in docs_index
     assert "Run cross-machine sync with stricter failure checks" in docs_index
     assert "Chain DenseGen -> USR -> Infer -> USR updates" in docs_index
+    assert "chosen as `X`" in docs_index
     assert (
         "Consolidate construct realizations into one USR-backed source-of-truth dataset, then hand off to Infer"
         in docs_index
     )
     assert "Run BU SCC batch jobs with notifications" in docs_index
+    assert "Plan and execute deterministic DenseGen/Infer HPC orchestration runbooks" in docs_index
     assert "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md" in docs_index
@@ -139,6 +148,8 @@ def test_top_level_readme_exposes_workflow_docs_map() -> None:
 
     assert "## Documentation" in readme
     assert "docs/README.md" in readme
+    assert "choose the next deep procedure by ownership plane" in readme
+    assert "cluster` exploration and OPAL active learning" in readme
     assert "Workflow and docs map" not in readme
     assert "## Repository map" not in readme
 
@@ -178,12 +189,16 @@ def test_usr_top_readme_is_lightweight_router() -> None:
 def test_usr_docs_index_exposes_getting_started_and_reference_paths() -> None:
     usr_docs = _read("src/dnadesign/usr/docs/README.md")
 
+    assert "### Choose a task" in usr_docs
     assert "getting-started/README.md" in usr_docs
     assert "getting-started/cli-quickstart.md" in usr_docs
     assert "operations/README.md" in usr_docs
     assert "reference/README.md" in usr_docs
     assert "reference/schema-contract.md" in usr_docs
     assert "reference/event-log.md" in usr_docs
+    assert "operations/multi-source-source-of-truth-assembly.md" in usr_docs
+    assert "operations/construct-infer-source-of-truth-demo.md" in usr_docs
+    assert "operations/promoter-characterization-feature-matrix.md" in usr_docs
 
 
 def test_usr_docs_index_avoids_anchor_coupling_to_top_readme() -> None:
@@ -228,12 +243,16 @@ def test_usr_docs_index_exposes_sync_runbooks() -> None:
     assert "chained-densegen-infer-sync-demo.md" in ops_index
     assert "construct-infer-source-of-truth-demo.md" in ops_index
     assert "sync-fidelity-drills.md" in ops_index
+    assert "cluster (exploratory) or OPAL (active learning)" in ops_index
     assert "pressure-test-loop-mock-batch--adversarial-schemas" in ops_index
     assert "hpc-agent-sync-flow.md" in usr_docs
     assert "sync-audit-loop.md" in usr_docs
     assert "chained-densegen-infer-sync-demo.md" in usr_docs
     assert "construct-infer-source-of-truth-demo.md" in usr_docs
     assert "sync-fidelity-drills.md" in usr_docs
+    assert "**Type:** runbook" in runbook
+    assert "**Plane:** data-plane" in runbook
+    assert "**Owner-boundary:** usr" in runbook
     assert "Preflight" in runbook
     assert "Run loop" in runbook
     assert "Verify loop" in runbook
@@ -241,6 +260,10 @@ def test_usr_docs_index_exposes_sync_runbooks() -> None:
     assert "uv run usr pull" in runbook
     assert "uv run usr push" in runbook
     assert "Full chained loop" in chained
+    assert "# Chained DenseGen and Infer Sync Runbook" in chained
+    assert "**Type:** runbook" in chained
+    assert "**Plane:** data-plane" in chained
+    assert "**Owner-boundary:** usr" in chained
     assert "uv run infer run --preset evo2/extract_logits_ll --usr" in chained
     assert '--usr-root "$LOCAL_USR_ROOT"' in chained
     assert "qsub -P <project>" in chained
@@ -261,6 +284,15 @@ def test_usr_docs_index_exposes_sync_runbooks() -> None:
     assert "sync-audit-loop.md" in sync_ops
     assert "chained-densegen-infer-sync-demo.md" in sync_ops
     assert "sync-fidelity-drills.md" in sync_ops
+
+
+def test_multi_source_runbook_makes_upstream_dataset_mapping_explicit() -> None:
+    runbook = _read("src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md")
+
+    assert "### 1b) Map those ids to real upstream datasets before validation" in runbook
+    assert "does not create `promoter_sources_control` or `promoter_sources_densegen` for you" in runbook
+    assert 'export PRIMARY_INPUT_DATASET="mg1655_promoters"' in runbook
+    assert 'export EXTRA_INPUT_DATASET="<existing_densegen_or_manual_usr_dataset>"' in runbook
 
 
 def test_usr_sync_docs_are_split_into_progressive_runbooks() -> None:

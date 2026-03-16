@@ -5,7 +5,7 @@ Use this directory for construct studies. Each workspace keeps its configs, regi
 ### Start with one of two paths
 
 - [Packaged demo](demo_promoter_swap_pdual10/README.md): curated pDual-10 promoter-swap tracer bullet with both 1 kb window and full-plasmid configs.
-- [Packaged source-of-truth demo](demo_promoter_swap_pdual10_source_of_truth/README.md): curated pDual-10 promoter-swap workspace that writes both window projects into one shared USR dataset for infer/notify handoff.
+- [Packaged source-of-truth demo](demo_promoter_swap_pdual10_source_of_truth/README.md): curated pDual-10 promoter-swap workspace that writes both window projects into one shared USR dataset for infer and downstream handoff.
 - Blank workspace: scaffold your own study and import your own input/template datasets.
 
 ### Quick start

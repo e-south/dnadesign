@@ -1,9 +1,10 @@
 ## Notify documentation index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-01
+**Last verified:** 2026-03-16
 
 Tool-local docs live here. Cross-tool workflows stay in shared operator docs, either under top-level `docs/` or the boundary-owning tool's operations docs when one tool owns the durable handoff.
+Operators who just need to set up, run, or recover a watcher should start with [Notify USR events runbook](../../../../docs/notify/usr-events.md) first, then return here only when they need package-local reference or maintainer routes.
 
 ### Ownership boundary
 
@@ -12,7 +13,7 @@ Tool-local docs live here. Cross-tool workflows stay in shared operator docs, ei
 
 ### Start here
 
-1. Choose one task under **Documentation by workflow** and run its first command.
+1. If you are operating a watcher, start with [Notify USR events runbook](../../../../docs/notify/usr-events.md); if you are maintaining package-local behavior, continue with **Documentation by workflow** below.
 2. Confirm mode/schema rules in [command contracts](reference/command-contracts.md).
 3. Open [maintainer architecture map](dev/architecture.md) only when extending internals.
 
@@ -42,10 +43,10 @@ Tool-local docs live here. Cross-tool workflows stay in shared operator docs, ei
 #### Send one-off notifications
 - [notify send contract](reference/command-contracts.md#notify-send): required flags, webhook source rules, and dry-run behavior.
 
-#### Run cross-tool or cluster workflows
-- [DenseGen -> USR -> Notify tutorial](../../densegen/docs/tutorials/demo_usr_notify.md): local cross-tool path.
-- [Notify operations route map](../../../../docs/notify/README.md): repository-level operator routing.
-- [BU SCC batch + notify runbook](../../../../docs/bu-scc/batch-notify.md): scheduler-oriented workflow.
+#### Route to shared cross-tool and scheduler docs
+- [DenseGen -> USR -> Notify tutorial](../../densegen/docs/tutorials/demo_usr_notify.md): shared tutorial for one local cross-tool path.
+- [Notify operations route map](../../../../docs/notify/README.md): shared repository-level operator routing.
+- [BU SCC batch + notify runbook](../../../../docs/bu-scc/batch-notify.md): shared scheduler-oriented workflow.
 
 #### Extend and debug internals
 - [Maintainer architecture map](dev/architecture.md): module boundaries and extension seams.

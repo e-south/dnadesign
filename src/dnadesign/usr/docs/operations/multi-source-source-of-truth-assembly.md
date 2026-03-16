@@ -66,6 +66,22 @@ export DOWNSTREAM_DATASET="multi_source_construct_truth_demo" # Reuse one downst
 
 This runbook assumes the upstream datasets already exist in `"$USR_ROOT"`. Their rows may have been produced by different tools or created by earlier import/attach flows.
 
+### 1b) Map those ids to real upstream datasets before validation
+
+The packaged seed step above creates control/template datasets such as `mg1655_promoters` and `plasmids`; it does not create `promoter_sources_control` or `promoter_sources_densegen` for you.
+
+Before step 2, do one of the following explicitly:
+
+- point `PRIMARY_INPUT_DATASET` and `EXTRA_INPUT_DATASET` at real upstream datasets that already exist under `"$USR_ROOT"`; or
+- create/import those datasets through your own upstream DenseGen/manual USR flow first, then return here.
+
+Tracer-bullet example when the seeded control dataset should act as the primary input:
+
+```bash
+export PRIMARY_INPUT_DATASET="mg1655_promoters" # Reuse the seeded promoter controls as the primary merged input.
+export EXTRA_INPUT_DATASET="<existing_densegen_or_manual_usr_dataset>" # Replace with the real upstream dataset that should be folded into the primary input dataset.
+```
+
 ### 2) Validate and consolidate the upstream USR datasets
 
 ```bash

@@ -408,3 +408,97 @@ This section lists dated entries so you can jump to a specific investigation win
   - remove notifier transport leakage from Ops `workflow_id` values so workflow identity stays about orchestration shape, not delivery provider
   - tighten Ops terminology from `precedents` toward `presets` where the shipped surface is a reusable starter catalog rather than a historical exemplar catalog
   - regroup the USR operations index by lifecycle before adding more cross-tool runbooks so routing stays one-hop from the root docs map
+- No-shim IA hardening follow-up:
+  - User constraint raised the bar from "explicit compatibility" to "no compatibility shims" for runbook/documentation semantics.
+  - This follow-up slice should therefore remove, not preserve:
+    - legacy ops CLI aliases such as `runbook precedents`
+    - legacy JSON keys such as `precedents`
+    - legacy transport-specific workflow ids such as `*_with_notify_slack`
+  - Fail-fast contract for deprecated names:
+    - deprecated ops workflow ids must error with an actionable replacement hint instead of normalizing and continuing
+    - authoritative docs must not mention deprecated aliases as supported behavior
+  - Additional semantics tightening for this slice:
+    - reduce `workflow` overload inside Ops prose by preferring `orchestration routes` or `orchestration workflow ids` for the control-plane catalog
+    - keep root docs as the only top-level router
+    - keep `docs/operations/` scoped to orchestration only and avoid any prose that sounds like a universal cross-tool registry
+- 2026-03-16 13:37 EDT: docs IA pressure-test follow-up
+  - Intent:
+    - pressure test whether a naive user or agent can reliably find:
+      - top-level workflow routing,
+      - tool-specific runbooks and demos,
+      - durable cross-tool data-plane flows,
+      - downstream cluster/OPAL branches after infer-derived `X` exists.
+    - keep the repo aligned with the current ownership model:
+      - root `docs/README.md` as the only top-level router,
+      - `docs/operations/` as control-plane orchestration only,
+      - `src/dnadesign/usr/docs/operations/` as the default durable USR-backed cross-tool data-plane surface,
+      - tool-local docs as package-scoped command/reference surfaces,
+      - downstream-tool workflows living with the downstream owner after the handoff.
+  - Pressure-test findings:
+    - root routing is mostly coherent but still too flat for first-pass scanning; the workflow table mixes single-tool starts, USR-backed data-plane flows, and control-plane orchestration without visual grouping.
+    - DenseGen docs had semantic drift: downstream infer/feature-matrix routes were filed under a Notify heading, which hides them from users looking for representation or learning flows.
+    - infer had a doc-type drift: the by-type index grouped shared runbooks and the OPAL downstream workflow under `Tutorials` instead of treating them as cross-tool handoff routes.
+    - cluster remained capability-rich but router-poor; it linked back to the feature-matrix flow without giving first-time readers a small task-first entry section.
+    - OPAL discoverability was good once found, but the docs index still benefited from a short start-here section that names the infer-derived-`X` branch first.
+    - notify package docs still had one mislabeled heading (`cluster workflows`) even though the section actually described cross-tool or scheduler routes.
+  - Implementation targets for this slice:
+    - add plain-language doc taxonomy help to the root docs router
+    - group root workflow routes by ownership plane and user intent
+    - separate DenseGen Notify guidance from downstream infer/feature-matrix guidance
+    - add a short goal-based router to infer and a start-here section to cluster/OPAL
+    - tighten tests so cross-tool routes are not silently reclassified as tutorials or Notify-only flows later
+- 2026-03-16 13:48 EDT: docs coherence and semantic-drift follow-up
+  - Intent:
+    - run one more bounded audit after the recent IA fixes to catch residual semantic drift before it re-hardens into more docs/tests.
+    - keep the existing ownership model unchanged:
+      - root `docs/README.md` remains the only top-level router,
+      - `docs/operations/` remains control-plane orchestration only,
+      - `src/dnadesign/usr/docs/operations/` remains the durable USR-backed cross-tool data-plane surface,
+      - downstream-tool workflows remain tool-owned after handoff.
+  - Pressure-test findings:
+    - `infer/docs/README.md` still mixed shared cross-tool routes into a section labeled `Documentation by type`, which weakens the route/runbook/workflow ontology.
+    - `construct/docs/index.md` and `densegen/docs/index.md` still blended tool-local and shared cross-tool routes without an explicit ownership split, which makes the next deep procedure less obvious for naive readers.
+    - `docs/notify/README.md` said it was a route map only even though it also acted as a compact operator router with command-level guidance.
+    - `cluster/README.md` was clearer than before but still did not state its downstream ownership boundary explicitly enough at the top of the page.
+    - `usr/docs/README.md` remained more read-order-driven than task-driven compared with the other recently hardened tool entry surfaces.
+  - Implementation targets for this slice:
+    - keep `Documentation by type` sections local-only when they claim to be local-only
+    - separate local tool docs from shared cross-tool handoff routes in `construct` and `densegen` indexes
+    - reword Notify's top-level operator page so its stated purpose matches its actual content
+    - add an explicit ownership-boundary note to `cluster`
+    - add task-first routing to `usr/docs/README.md`
+    - encode the new structure with targeted docs-contract tests so drift fails fast
+- 2026-03-16 15:34 EDT: docs IA pressure-test follow-up
+  - Intent:
+    - run another bounded swarm pass over root docs plus `ops`, `densegen`, `infer`, `construct`, `usr`, `notify`, `opal`, and `cluster`
+    - pressure-test whether a naive user or agent can find tool docs, tool-specific runbooks, demos, cross-tool flows, and downstream handoffs without guessing ownership
+    - preserve the current ownership model: root router only at top level, `ops` as control-plane only, `usr` as durable USR-backed data-plane owner, downstream tool state machines owned by the downstream tool
+  - Pressure-test findings:
+    - the remaining issues were mostly entry-surface quality rather than broken routing: cross-plane choice was still implied in a few places, Notify still mixed reference and operator routing, infer still duplicated shared handoffs inside an infer-local pressure-test section, DenseGen's package intro was still too dense for first-pass scanning, and cluster still needed a clearer quick route once `X` already existed
+    - `ops`, `usr`, and `opal` remained directionally coherent; the work in this slice was to make the ownership and next-step language more didactic and less guessy
+  - Implementation targets for this slice:
+    - make plane decisions explicit sooner in root docs and Ops orchestration docs
+    - keep Notify reference-first when the page claims to be a reference index
+    - keep infer shared handoff links in the dedicated handoff section only
+    - sharpen top-level package entry prose for DenseGen and construct
+    - make cluster's first-step routing clearer for users who already arrived after infer write-back
+- 2026-03-16 16:08 EDT: swarm pressure-test and branch cleanup pass
+  - Intent:
+    - run a fresh bounded swarm audit over root docs plus `ops`, `densegen`, `infer`, `construct`, `usr`, `notify`, `opal`, and `cluster`
+    - verify that a naive user or agent can find:
+      - tool entry docs,
+      - tool-specific runbooks and demos,
+      - durable cross-tool flows,
+      - downstream branches such as `cluster` and `OPAL`,
+      - the correct owner for each deep procedure without guessing
+    - close the loop by making any last small IA fixes, verifying them, and then committing the accumulated docs hardening work in sensible slices
+  - Constraints:
+    - keep root `docs/README.md` as the only top-level router
+    - keep `docs/operations/` scoped to control-plane orchestration
+    - keep `src/dnadesign/usr/docs/operations/` as the durable USR-backed cross-tool data-plane surface
+    - keep downstream-tool workflows with the downstream owner after handoff
+    - do not add compatibility shims or duplicate deep procedures
+  - Audit lanes:
+    - root + `ops` + `usr` ownership and routing
+    - tool-local entry surfaces for `densegen`, `infer`, `construct`, and `notify`
+    - downstream consumer surfaces for `opal` and `cluster`

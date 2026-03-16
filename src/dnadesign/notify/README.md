@@ -2,6 +2,7 @@
 
 Notify watches Universal Sequence Record events and sends webhook notifications with strict fail-fast contracts.
 Use it when you need reliable status delivery from local workspaces or scheduler-managed runs without adding hidden runtime state or fallback behavior.
+For day-to-day operator workflows, start with the [Notify USR events runbook](../../../docs/notify/usr-events.md).
 
 For cross-tool routing, start at the [repository docs index](../../../docs/README.md).
 
@@ -9,9 +10,9 @@ For cross-tool routing, start at the [repository docs index](../../../docs/READM
 
 Read in this order:
 
-1. [Notify docs index](docs/README.md): comprehensive table of contents for Notify workflows, references, and maintainer internals.
-2. [Notify USR events runbook](../../../docs/notify/usr-events.md): day-to-day setup, watch, and recovery commands for operator workflows.
-3. [Notify operations route](../../../docs/notify/README.md): repository-level task router for local watchers, recovery, and cross-tool operations.
+1. [Notify USR events runbook](../../../docs/notify/usr-events.md): first stop for day-to-day operator setup, watch, and recovery commands.
+2. [Notify operations route](../../../docs/notify/README.md): repository-level operator router for local watchers, recovery, and cross-tool operations.
+3. [Notify docs index](docs/README.md): package-local task router for tool workflows, references, and maintainer internals.
 4. [Reference index](docs/reference/README.md): strict command, profile, and boundary contracts to confirm behavior before automation.
 5. [Maintainer architecture map](docs/dev/architecture.md): package module map and extension seams for command/runtime changes.
 6. [BU SCC batch + notify](../../../docs/bu-scc/batch-notify.md): scheduler-oriented execution path for cluster submission and verification.
@@ -19,9 +20,9 @@ Read in this order:
 
 ## Entrypoint contract
 
-8. Audience: Notify operators and maintainers working in this package.
-9. Prerequisites: workspace config and one webhook source (`--url`, `--url-env`, or `--secret-ref`).
-10. Verify next: [watch command contract](docs/reference/command-contracts.md#notify-usr-events-watch).
+1. Audience: Notify operators and maintainers working in this package.
+2. Prerequisites: workspace config and one webhook source (`--url`, `--url-env`, or `--secret-ref`).
+3. Verify next: [watch command contract](docs/reference/command-contracts.md#notify-usr-events-watch).
 
 ## Boundary reminder
 

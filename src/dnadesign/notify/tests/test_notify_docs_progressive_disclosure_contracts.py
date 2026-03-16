@@ -58,12 +58,15 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
     assert "i already have a profile, just validate wiring" in text
     assert "resume failed deliveries from spool" in text
     assert "multi-source-source-of-truth-assembly.md" in text
+    assert "promoter-characterization-feature-matrix.md" in text
     assert "--secret-source file" in text
     assert "--secret-ref file://" in text
     assert "--url-env" in text
     assert "--secret-source auto" not in text
     assert "`notify setup slack` mode contract" in text
     assert "`notify usr-events watch` mode contract" in text
+    assert "route map only" not in text
+    assert "repository-level operator router plus a compact command map" in text
 
 
 def test_notify_usr_events_manual_keeps_setup_run_recover_flow() -> None:
@@ -106,6 +109,9 @@ def test_notify_module_readme_is_lightweight_router_and_links_top_level_runbook(
     assert "docs/README.md" in text
     assert "docs/notify/usr-events.md" in text
     assert "Universal Sequence Record `<dataset>/.events.log`" in text
+    assert text.find("docs/notify/usr-events.md") < text.find("docs/README.md")
+    assert "1. Audience:" in text
+    assert "8. Audience:" not in text
 
 
 def test_notify_module_docs_index_has_progressive_disclosure_workflow_and_type_maps() -> None:
@@ -123,8 +129,29 @@ def test_notify_module_docs_index_has_progressive_disclosure_workflow_and_type_m
     )
     assert "notify send contract" in text
     assert "Runtime evidence pointers" in text
+    assert "Route to shared cross-tool and scheduler docs" in text
+    assert "Run cross-tool or cluster workflows" not in text
     assert "../../../../docs/notify/usr-events.md" in text
     assert "boundary-owning tool's operations docs" in text
+    assert "Operators who just need to set up, run, or recover a watcher should start with" in text
+
+
+def test_notify_reference_index_keeps_reference_first_and_routes_operator_steps_outward() -> None:
+    text = _read(_repo_root() / "src" / "dnadesign" / "notify" / "docs" / "reference" / "README.md")
+    _assert_token_order(
+        text,
+        [
+            "### Read order",
+            "[Command contracts](command-contracts.md)",
+            "[USR event schema reference](../../../usr/docs/reference/event-log.md)",
+            "### Need operator steps instead?",
+            "../../../../docs/notify/usr-events.md",
+            "### Coverage",
+            "### Verify next",
+        ],
+        label="src/dnadesign/notify/docs/reference/README.md",
+    )
+    assert "strict command, profile, and boundary contracts" in text
 
 
 def test_notify_command_contracts_cover_setup_helpers_and_send() -> None:

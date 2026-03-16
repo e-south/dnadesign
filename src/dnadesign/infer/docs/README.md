@@ -1,7 +1,7 @@
 ## infer docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-03-16
 
 ### Read order
 
@@ -23,9 +23,6 @@
 #### Pressure-test agnostic model writes into USR
 - [Agnostic-model pressure-test runbook](operations/pressure-test-agnostic-models.md): standalone CLI and ops-runbook paths.
 - [End-to-end pressure-test demo](tutorials/demo_pressure_test_usr_ops_notify.md): reproducible infer -> usr -> ops -> notify walkthrough.
-- [Multi-source source-of-truth assembly](../../usr/docs/operations/multi-source-source-of-truth-assembly.md): broader USR-owned flow when multiple upstream producer datasets must be merged before construct writes the infer handoff dataset.
-- [Construct -> USR -> Infer source-of-truth demo](../../usr/docs/operations/construct-infer-source-of-truth-demo.md): construct-led handoff when one USR dataset remains canonical across realization and inference.
-- [Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md): broader cross-tool flow when anchor-only and construct-expanded promoter contexts should both receive infer-derived feature columns before clustering or active learning.
 - [Workspaces guide](../workspaces/README.md): initialize workspace roots with `infer workspace init`.
 
 #### Continue after infer-derived `X` exists
@@ -43,16 +40,20 @@
 - [Dev index](dev/README.md): maintainer loop and evidence logging.
 - [Development journal](dev/journal.md): refactor slices and validation record.
 
+### Cross-tool handoff routes
+
+- [Multi-source source-of-truth assembly](../../usr/docs/operations/multi-source-source-of-truth-assembly.md): shared multi-source consolidation route before construct and infer share one downstream dataset.
+- [Construct -> USR -> Infer source-of-truth demo](../../usr/docs/operations/construct-infer-source-of-truth-demo.md): shared construct-led consolidation route once construct owns the current handoff.
+- [Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md): cross-tool feature-matrix assembly before downstream cluster or OPAL use.
+- [cluster exploratory branch](../../cluster/README.md): exploratory clustering and UMAP branch once one explicit `infer__...` column is chosen as `X`.
+- [USR dataset with infer-derived X -> OPAL active learning](../../opal/docs/workflows/usr-infer-x-active-learning.md): downstream OPAL workflow once infer-derived `X` already exists.
+
 ### Documentation by type
 
 - [docs index by type](index.md)
 - [getting-started/](getting-started/): first-run commands and prerequisites.
 - [tutorials/](tutorials/): full end-to-end walkthroughs.
 - [operations/](operations/): operational runbooks and pressure-test routes.
-- [../../usr/docs/operations/multi-source-source-of-truth-assembly.md](../../usr/docs/operations/multi-source-source-of-truth-assembly.md): shared multi-source consolidation route before construct and infer share one downstream dataset.
-- [../../usr/docs/operations/construct-infer-source-of-truth-demo.md](../../usr/docs/operations/construct-infer-source-of-truth-demo.md): shared construct-led consolidation route.
-- [../../usr/docs/operations/promoter-characterization-feature-matrix.md](../../usr/docs/operations/promoter-characterization-feature-matrix.md): cross-tool feature-matrix assembly before cluster or OPAL.
-- [../../opal/docs/workflows/usr-infer-x-active-learning.md](../../opal/docs/workflows/usr-infer-x-active-learning.md): downstream OPAL workflow once infer-derived `X` already exists.
 - [reference/](reference/): command and contract documentation.
 - [architecture/](architecture/): package boundary map.
 - [dev/](dev/): maintainer process and journal.

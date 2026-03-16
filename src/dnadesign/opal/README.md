@@ -2,6 +2,9 @@
 
 **OPAL** is an [EVOLVEpro-style](https://www.science.org/doi/10.1126/science.adr6006) active-learning engine for biological sequence design.
 
+Precondition for the shared USR-backed branch: infer has already written the chosen feature column into the dataset, and OPAL will consume that explicit `X` column rather than generating it.
+If you only need exploratory structure, UMAPs, or cluster-level summaries over that chosen `infer__...` column, use [cluster](../cluster/README.md) instead.
+
 See the [repository docs index](../../../docs/README.md) for cross-tool workflows and runbooks.
 
 1. Train a configured model on your chosen representation **X** and observed labels **Y**.

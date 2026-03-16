@@ -7,8 +7,9 @@ construct places focal DNA parts into larger sequence contexts. Use it to expand
 1. [Getting started](docs/getting-started.md): shortest path to a validated demo run or blank custom workspace.
 2. [Docs overview](docs/README.md): choose the next document by task.
 3. [Docs index](docs/index.md): choose the next document by type.
-4. [Workspaces guide](workspaces/README.md): scaffold a workspace or copy the packaged demo.
-5. [Developer notes](docs/dev/README.md): maintainer notes, internal architecture, and journal entries.
+4. [Shared cross-tool handoff routes (USR-owned)](docs/README.md): route into shared USR-backed source-of-truth and downstream feature-matrix procedures after construct materializes a dataset.
+5. [Workspaces guide](workspaces/README.md): scaffold a workspace or copy the packaged demo.
+6. [Developer notes](docs/dev/README.md): maintainer notes, internal architecture, and journal entries.
 
 ## Primary entrypoints
 

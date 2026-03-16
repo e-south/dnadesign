@@ -1,12 +1,21 @@
 ![DenseGen banner](assets/densegen-banner.svg)
 
-DenseGen wraps the [dense-arrays](https://github.com/e-south/dense-arrays) optimizer to execute DNA design workflows from workspace-local configuration and inputs. A run validates strict input schema contracts, resolves input sources, builds Stage-A candidate pools composed of transcription factor binding sites when sampling is enabled, executes Stage-B library generation by combining those binding sites into larger compound sequences until quota is reached, and writes reproducible artifacts (records, metadata, events, plots, and marimo notebooks) under the workspace `outputs/` tree. The package is designed for maintainable operations: explicit run state, strict fail-fast validation, deterministic path contracts, and direct integration points for downstream USR and Notify workflows.
+DenseGen wraps the [dense-arrays](https://github.com/e-south/dense-arrays) optimizer to run DNA design workflows from workspace-local configuration and inputs.
+
+It validates input schemas, resolves input sources, builds TFBS candidate pools when sampling is enabled, generates compound sequences until quota is reached, and writes reproducible outputs under the workspace `outputs/` tree.
+
+Use it when you need one design-generation tool with explicit run state, fail-fast validation, deterministic path contracts, and clean handoff into downstream USR-backed workflows.
 
 <p align="center">
   <a href="assets/videos/demo_tfbs_baseline_showcase.mp4">
     <img src="assets/videos/demo_tfbs_baseline_showcase_preview.gif" alt="DenseGen TFBS baseline showcase preview" />
   </a>
 </p>
+
+## Fast start
+
+- Want a first local run: start with [TFBS baseline tutorial](docs/tutorials/demo_tfbs_baseline.md).
+- Want the shared downstream handoff after generation: start with [Promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md).
 
 ## Documentation map
 
@@ -25,3 +34,9 @@ DenseGen wraps the [dense-arrays](https://github.com/e-south/dense-arrays) optim
 13. [BU SCC run guide](docs/howto/bu-scc.md): BU SCC-specific execution path and submission details.
 14. [Architecture notes](docs/dev/architecture.md): internal lifecycle and module boundary map.
 15. [Development journal](docs/dev/journal.md): maintainer decisions, investigations, and audit notes.
+
+## Continue after generation
+
+- [DenseGen to USR to Notify tutorial](docs/tutorials/demo_usr_notify.md): validate the event path when generated records should emit USR updates and watcher notifications.
+- [Multi-source source-of-truth assembly](../usr/docs/operations/multi-source-source-of-truth-assembly.md): merge DenseGen outputs with other USR-backed sources before construct and infer share one downstream dataset.
+- [Promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md): continue into infer-derived feature columns when clustering or OPAL should consume one consolidated promoter study.

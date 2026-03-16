@@ -1,10 +1,10 @@
 ## Notify Operations
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-03-16
 
 `notify` sends webhook notifications from Universal Sequence Record (USR) `.events.log` streams.
-This page is a route map only. Operator steps live in [Notify USR events operator manual](usr-events.md).
+This page is the repository-level operator router plus a compact command map. Use [Notify USR events operator manual](usr-events.md) when you need the full ordered setup/watch/recover procedure.
 
 ### Entry contract
 
@@ -34,8 +34,9 @@ This page is a route map only. Operator steps live in [Notify USR events operato
 2. Confirm strict mode rules in [Notify command contracts](../../src/dnadesign/notify/docs/reference/command-contracts.md).
 3. Use [Multi-source source-of-truth assembly](../../src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md) when upstream datasets are explicitly merged before construct writes the dataset that Notify should watch.
 4. Use [Construct -> USR -> Infer source-of-truth demo](../../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md) when Notify needs to observe a construct-backed consolidated dataset instead of a tool-local workspace loop.
-5. Use [Notify package docs index](../../src/dnadesign/notify/docs/README.md) only when you need internals.
-6. Use [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md) only for scheduler paths.
+5. When watcher validation is done and you need the downstream feature/learning branch, return to [Promoter characterization feature matrix](../../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md) or the [repository docs index](../README.md); Notify does not own that handoff.
+6. Use [Notify package docs index](../../src/dnadesign/notify/docs/README.md) only when you need internals.
+7. Use [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md) only for scheduler paths.
 
 ### Prompt-to-command router
 
@@ -90,6 +91,7 @@ For the full quickstart (including webhook setup and dry-run checks), use [Minim
 - Watcher onboarding and lifecycle: [Notify USR events operator manual](usr-events.md).
 - Multi-source downstream handoff: [Multi-source source-of-truth assembly](../../src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md).
 - Construct-backed consolidated dataset handoff: [Construct -> USR -> Infer source-of-truth demo](../../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-demo.md).
+- Downstream feature/learning branch after watcher validation: [Promoter characterization feature matrix](../../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md).
 - Scheduler workflows: [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md).
 - Package docs index: [src/dnadesign/notify/docs/README.md](../../src/dnadesign/notify/docs/README.md).
 - Reference index: [src/dnadesign/notify/docs/reference/README.md](../../src/dnadesign/notify/docs/reference/README.md).

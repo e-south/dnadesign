@@ -1,7 +1,15 @@
 ## USR docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-03-16
+
+### Choose a task
+
+- [Create or inspect one dataset locally](getting-started/cli-quickstart.md): shortest path to one validated USR lifecycle.
+- [Sync an existing dataset between local and HPC](operations/workflow-map.md): task-first router for clone, pull, push, and audit flows.
+- [Assemble multiple producer datasets into one source-of-truth dataset](operations/multi-source-source-of-truth-assembly.md): shared USR-backed merge/carry path before construct and infer.
+- [Hand a construct-backed shared dataset to infer and downstream watchers](operations/construct-infer-source-of-truth-demo.md): one construct -> USR -> infer handoff.
+- [Build an infer-annotated promoter feature matrix for cluster or OPAL](operations/promoter-characterization-feature-matrix.md): shared downstream branch once DenseGen/manual/construct inputs should all become one feature dataset.
 
 ### Read order
 

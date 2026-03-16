@@ -1,5 +1,11 @@
 # USR HPC Sync Flow
 
+**Type:** runbook
+**Plane:** data-plane
+**Owner-boundary:** usr
+**Entry artifact:** one USR dataset with pending cross-host drift and an explicit sync intent
+**Exit artifact:** transfer-verified local/remote USR dataset state with no unexpected drift
+
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-14
 

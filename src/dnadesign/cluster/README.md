@@ -11,6 +11,38 @@ See the [repository docs index](../../../docs/README.md) for cross-tool workflow
 
 ---
 
+## Ownership boundary
+
+- `cluster` is a downstream exploratory consumer. It does not generate `infer__...` columns or own the upstream USR handoff.
+- Precondition: one explicit `infer__...` column is already present and chosen as `X` in the input dataset or file before you run `cluster fit`, `cluster umap`, or `cluster analyze`.
+- For feature generation and durable dataset assembly, return to [promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md), [infer docs](../infer/docs/README.md), or the [repository docs index](../../../docs/README.md).
+
+---
+
+## Start here
+
+- If you do not yet have one explicit `infer__...` column chosen as `X`, start with [promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md) and return here after infer write-back is complete.
+- If you already arrived here from that runbook with a chosen `X` column, jump to [Quick recipes](#quick-recipes-copypaste) and start with `cluster fit`.
+- If you need supervised label/train/select instead of exploratory clustering, switch to [USR dataset with infer-derived X -> OPAL active learning](../opal/docs/workflows/usr-infer-x-active-learning.md).
+- If you need to color UMAPs with OPAL outputs, read [OPAL joins](#opal-joins-predictions--objectives) before running `cluster umap` or `cluster analyze`.
+- If you need to understand preset/job layout before editing configs, read [Folder layout](#folder-layout).
+
+## Task routes
+
+- `cluster fit`: compute one clustering assignment for a chosen `X` matrix.
+- `cluster umap`: render embeddings and hue-specific plots for one fitted run.
+- `cluster analyze`: run composition, diversity, differential, or numeric summaries for that fitted run.
+- `cluster intra-sim`: attach intra-cluster similarity metrics before plotting or downstream joins.
+
+## Documentation map
+
+- [Quick recipes](#quick-recipes-copypaste): first runnable `fit`, `umap`, `intra-sim`, and `analyze` commands.
+- [OPAL joins](#opal-joins-predictions--objectives): attach OPAL objective or prediction columns when cluster should color or summarize them.
+- [Folder layout](#folder-layout): understand presets, jobs, and results layout before editing configs.
+- [Troubleshooting & tips](#troubleshooting--tips): diagnose common runtime and data-shape failures.
+
+---
+
 ## Install
 
 Add to `pyproject.toml`:

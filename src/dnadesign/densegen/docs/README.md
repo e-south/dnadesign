@@ -1,7 +1,7 @@
 ## DenseGen documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-03-16
 
 ### Documentation by workflow
 
@@ -13,9 +13,11 @@
 
 #### Run with Notify
 - [DenseGen to USR to Notify tutorial](tutorials/demo_usr_notify.md): run event-producing flow across DenseGen, USR, and Notify.
+- [Observability and events](concepts/observability_and_events.md): interpret run events, status transitions, and emitted metadata.
+
+#### Continue into shared downstream data-plane flows
 - [Multi-source source-of-truth assembly](../../usr/docs/operations/multi-source-source-of-truth-assembly.md): treat DenseGen outputs as one upstream USR source when construct and infer should share one downstream dataset.
 - [Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md): treat DenseGen outputs as one upstream source when downstream clustering or active learning should consume infer-derived feature columns.
-- [Observability and events](concepts/observability_and_events.md): interpret run events, status transitions, and emitted metadata.
 
 #### Debug a run
 1. [Quick checklist](concepts/quick-checklist.md): run preflight checks before executing jobs.

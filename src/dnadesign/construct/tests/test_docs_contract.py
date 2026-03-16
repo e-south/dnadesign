@@ -27,6 +27,7 @@ def _read(rel_path: str) -> str:
 
 
 def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
+    top_readme = _read("src/dnadesign/construct/README.md")
     readme = _read("src/dnadesign/construct/docs/README.md")
     index_doc = _read("src/dnadesign/construct/docs/index.md")
     outputs = _read("src/dnadesign/construct/docs/reference/outputs.md")
@@ -44,9 +45,14 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     assert multi_source_token in index_doc
     assert feature_matrix_token in readme
     assert feature_matrix_token in index_doc
+    assert "Shared cross-tool handoff routes (USR-owned)" in top_readme
+    assert "docs/README.md" in top_readme
     assert "../../../usr/docs/operations/construct-infer-source-of-truth-demo.md" in outputs
     assert "demo_promoter_swap_pdual10_source_of_truth" in readme
     assert "demo_promoter_swap_pdual10_source_of_truth" in index_doc
     assert "demo_promoter_swap_pdual10_source_of_truth" in workspaces
     assert "downstream consumers" in source_of_truth_workspace
     assert "promoter-characterization-feature-matrix.md" in source_of_truth_workspace
+    assert "### Construct-local starts" in index_doc
+    assert "### Shared cross-tool handoff routes" in index_doc
+    assert index_doc.index("### Construct-local starts") < index_doc.index("### Shared cross-tool handoff routes")

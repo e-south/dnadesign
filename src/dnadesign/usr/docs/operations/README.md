@@ -38,7 +38,7 @@ This directory holds authoritative USR-backed data-plane runbooks in lifecycle o
 
 | Need | Runbook |
 | --- | --- |
-| Build one infer-annotated promoter feature matrix, then branch into cluster or OPAL | [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md) |
+| Build one infer-annotated promoter feature matrix, then branch to cluster (exploratory) or OPAL (active learning) | [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md) |
 
 ### Validation and drills
 

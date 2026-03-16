@@ -2,9 +2,21 @@
 
 infer runs model-agnostic sequence inference and writes namespaced outputs back to datasets with explicit fail-fast contracts.
 
+## Choose a task
+
+- [Get to a first local validate or dry-run](docs/getting-started/cli-quickstart.md): shortest path for ad-hoc validation and extraction commands.
+- [Pressure-test write-back into USR](docs/operations/pressure-test-agnostic-models.md): contract-first runbook for local and ops-managed infer execution.
+- [Continue to cluster after infer-derived `X` exists](../cluster/README.md): exploratory Leiden, UMAP, and OPAL-join path over one chosen `infer__...` column.
+- [Continue to OPAL after infer-derived `X` exists](../opal/docs/workflows/usr-infer-x-active-learning.md): downstream active-learning branch once the USR dataset already has the chosen infer-derived feature column.
+
+## Shared handoffs before infer runs
+
+- [Multi-source source-of-truth assembly](../usr/docs/operations/multi-source-source-of-truth-assembly.md): start here when multiple USR-backed producer datasets must be consolidated before infer touches the shared downstream dataset.
+- [Construct -> USR -> Infer source-of-truth demo](../usr/docs/operations/construct-infer-source-of-truth-demo.md): start here when construct has already materialized the shared dataset that infer should annotate next.
+
 ## Documentation map
 
-Read in this order:
+Read in this order when you want the full docs ladder:
 
 1. [infer docs index by workflow](docs/README.md)
 2. [infer docs index by type](docs/index.md)

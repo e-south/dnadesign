@@ -45,7 +45,7 @@ The wrapper also carries a project-root hint for `uv run --project ...`; overrid
 - The provided full `pDual-10` record contains two exact `J23105` matches:
   - `slot_a`: `[2300, 2335)`
   - `slot_b`: `[3621, 3656)`
-- This packaged source-of-truth demo only uses the two 1 kb window projects because they are the intended infer/notify handoff shape.
+- This packaged source-of-truth demo only uses the two 1 kb window projects because they are the intended infer-ready downstream handoff shape.
 
 ### Step-by-step commands
 

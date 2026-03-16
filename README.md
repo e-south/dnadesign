@@ -9,6 +9,7 @@
 ## Documentation
 
 - [Docs index](docs/README.md): central route map for workflow and tool documentation.
+- [Docs workflow routes](docs/README.md#workflow-routes): choose the next deep procedure by ownership plane, including the downstream split between `cluster` exploration and OPAL active learning once infer-derived `X` exists.
 - [Installation](docs/installation.md): bootstrap the environment and run baseline verification commands.
 - [Architecture](ARCHITECTURE.md), [Design](DESIGN.md), [Reliability](RELIABILITY.md), [Security](SECURITY.md), [Plans](PLANS.md), [Quality score](QUALITY_SCORE.md): repository-level contracts and governance records.
 - [Developer docs](docs/dev/README.md): CI contracts, maintenance runbooks, and execution-planning references.

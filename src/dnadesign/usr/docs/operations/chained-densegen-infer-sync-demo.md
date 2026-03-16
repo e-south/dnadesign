@@ -1,4 +1,10 @@
-# Chained DenseGen and Infer Sync Demo
+# Chained DenseGen and Infer Sync Runbook
+
+**Type:** runbook
+**Plane:** data-plane
+**Owner-boundary:** usr
+**Entry artifact:** one USR dataset updated asynchronously by DenseGen on HPC and infer locally
+**Exit artifact:** synchronized USR dataset with transfer-verified infer overlays on both hosts
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-02-27
