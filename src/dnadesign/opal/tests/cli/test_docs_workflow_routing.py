@@ -35,7 +35,7 @@ def test_opal_docs_index_routes_to_usr_infer_x_workflow() -> None:
     assert "./docs/workflows/usr-infer-x-active-learning.md" in top_readme
     assert "infer has already written the chosen feature column into the dataset" in top_readme
     assert "If you only need exploratory structure" in top_readme
-    assert "../cluster/README.md" in top_readme
+    assert "../cluster/docs/workflows/exploratory-clustering.md" in top_readme
 
 
 def test_opal_usr_infer_x_workflow_keeps_upstream_preconditions_explicit() -> None:

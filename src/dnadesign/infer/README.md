@@ -6,7 +6,7 @@ infer runs model-agnostic sequence inference and writes namespaced outputs back 
 
 - [Get to a first local validate or dry-run](docs/getting-started/cli-quickstart.md): shortest path for ad-hoc validation and extraction commands.
 - [Pressure-test write-back into USR](docs/operations/pressure-test-agnostic-models.md): contract-first runbook for local and ops-managed infer execution.
-- [Continue to cluster after infer-derived `X` exists](../cluster/README.md): exploratory Leiden, UMAP, and OPAL-join path over one chosen `infer__...` column.
+- [Continue to cluster after infer-derived `X` exists](../cluster/docs/workflows/exploratory-clustering.md): exploratory Leiden, UMAP, and OPAL-join path over one chosen `infer__...` column.
 - [Continue to OPAL after infer-derived `X` exists](../opal/docs/workflows/usr-infer-x-active-learning.md): downstream active-learning branch once the USR dataset already has the chosen infer-derived feature column.
 
 ## Shared handoffs before infer runs

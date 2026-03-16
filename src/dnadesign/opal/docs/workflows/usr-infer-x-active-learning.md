@@ -148,4 +148,4 @@ The infer-to-OPAL handoff contract does not change across those choices. Only `x
 - OPAL docs index: [../index.md](../index.md)
 - OPAL configuration contract: [../reference/configuration.md](../reference/configuration.md)
 - OPAL CLI reference: [../reference/cli.md](../reference/cli.md)
-- Cluster exploratory branch: [../../../cluster/README.md](../../../cluster/README.md)
+- Cluster exploratory branch: [../../../cluster/docs/workflows/exploratory-clustering.md](../../../cluster/docs/workflows/exploratory-clustering.md)

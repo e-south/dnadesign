@@ -57,7 +57,7 @@ def test_infer_top_readme_is_lightweight_router() -> None:
     assert "docs/tutorials/demo_pressure_test_usr_ops_notify.md" in readme
     assert "../usr/docs/operations/multi-source-source-of-truth-assembly.md" in readme
     assert "../usr/docs/operations/construct-infer-source-of-truth-demo.md" in readme
-    assert "../cluster/README.md" in readme
+    assert "../cluster/docs/workflows/exploratory-clustering.md" in readme
     assert "../opal/docs/workflows/usr-infer-x-active-learning.md" in readme
     assert "docs/reference/README.md" in readme
     assert "docs/dev/README.md" in readme
@@ -89,7 +89,7 @@ def test_infer_docs_readme_keeps_workflow_then_type_progressive_disclosure() -> 
     assert "../../usr/docs/operations/construct-infer-source-of-truth-demo.md" in docs_readme
     assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" in docs_readme
     assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" in docs_readme
-    assert "../../cluster/README.md" in docs_readme
+    assert "../../cluster/docs/workflows/exploratory-clustering.md" in docs_readme
     assert "[Multi-source source-of-truth assembly]" in docs_readme
     assert "[Construct -> USR -> Infer source-of-truth demo]" in docs_readme
     assert "[cluster exploratory branch]" in docs_readme
@@ -107,7 +107,7 @@ def test_infer_docs_readme_keeps_workflow_then_type_progressive_disclosure() -> 
     assert "../../usr/docs/operations/construct-infer-source-of-truth-demo.md" not in by_type
     assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" not in by_type
     assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" not in by_type
-    assert "../../cluster/README.md" not in by_type
+    assert "../../cluster/docs/workflows/exploratory-clustering.md" not in by_type
 
 
 def test_infer_docs_index_exists_and_points_back_to_docs_readme() -> None:
@@ -123,7 +123,7 @@ def test_infer_docs_index_exists_and_points_back_to_docs_readme() -> None:
     assert "../../usr/docs/operations/multi-source-source-of-truth-assembly.md" in docs_index
     assert "../../usr/docs/operations/construct-infer-source-of-truth-demo.md" in docs_index
     assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" in docs_index
-    assert "../../cluster/README.md" in docs_index
+    assert "../../cluster/docs/workflows/exploratory-clustering.md" in docs_index
     assert "cluster exploratory branch" in docs_index
     assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" in docs_index
 
