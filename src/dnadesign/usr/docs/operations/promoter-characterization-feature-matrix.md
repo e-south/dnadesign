@@ -34,7 +34,7 @@ This runbook owns the data-plane workflow through infer write-back. It does not 
 - anchor-only sequences from DenseGen or curated wildtype promoters should be compared in the same study,
 - one branch should stay at the original sequence length while another branch is expanded through construct,
 - infer should annotate those branches with log likelihoods, pooled logits, or pooled embeddings,
-- downstream exploration should use one consolidated dataset contract before Leiden clustering or active learning starts.
+- downstream exploration should use one consolidated dataset contract before clustering or active learning starts.
 
 ### Design stance
 
@@ -222,7 +222,7 @@ Expected outcome:
 
 #### Cluster branch
 
-Use `cluster` when the immediate goal is exploratory structure, Leiden clustering, UMAP visualization, or OPAL-joined diagnostics later.
+Use `cluster` when the immediate goal is exploratory structure, clustering, UMAP visualization, or OPAL-joined diagnostics later.
 
 Switch to the authoritative downstream workflow here:
 

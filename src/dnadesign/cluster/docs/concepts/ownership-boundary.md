@@ -16,23 +16,23 @@ Use this page when you need the package-role decision before choosing a downstre
 
 - upstream USR source-of-truth assembly
 - construct-based context expansion
-- infer feature generation or the choice of which upstream representation should become `X`
+- upstream feature generation when the chosen feature definition does not yet exist
 - supervised label/train/select loops
 
 ### Preconditions
 
-- one explicit `infer__...` column is already present and chosen as `X`
+- one explicit chosen feature definition is already present
 - the dataset or file already satisfies any sequence/hue prerequisites for the views you want
 
 ### Choose cluster when
 
 - you want exploratory structure before modeling
-- you need Leiden clusters, UMAPs, or cluster-level summaries
+- you need clustering outputs, UMAPs, or cluster-level summaries
 - you want to color exploratory views with OPAL outputs without entering a supervised loop
 
 ### Do not stay in cluster when
 
-- the chosen `X` column does not exist yet: return to [promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md) or [infer docs](../../../infer/docs/README.md)
+- the chosen feature definition does not exist yet: return to [promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md) or [infer docs](../../../infer/docs/README.md)
 - the next task is supervised label/train/select: continue with [USR dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/usr-infer-x-active-learning.md)
 
 ### Related docs
@@ -40,3 +40,4 @@ Use this page when you need the package-role decision before choosing a downstre
 - [cluster docs by workflow](../README.md)
 - [exploratory clustering workflow](../workflows/exploratory-clustering.md)
 - [cluster CLI contracts](../reference/cli-contracts.md)
+- [cluster semantic surface](semantic-surface.md)

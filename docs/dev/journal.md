@@ -551,3 +551,25 @@ This section lists dated entries so you can jump to a specific investigation win
     - strengthen DenseGen and construct package entry surfaces with clearer `Start here` and boundary language
     - keep the promoter feature-matrix doc as a routing/handoff artifact instead of a second home for downstream command sequences
     - add metadata enforcement for `sync.md` and the chained DenseGen/Infer runbook via docs checks
+- 2026-03-16 19:02 EDT: cluster method-contract and runtime-path hardening
+  - Intent:
+    - treat `cluster` as a generic downstream clustering tool with explicit method contracts, not a Leiden-specific tool hiding behind generic command names
+    - remove the two deepest ontology footguns in one bounded slice:
+      - package/runtime state defaulting into the package tree
+      - fit/preset/job semantics that implicitly equate `cluster fit` with Leiden
+    - keep current behavior limited to Leiden while making the source tree and checked-in assets extensible without semantic drift
+  - Audit findings:
+    - `cluster` code, signatures, reuse, presets, and docs still encoded `fit = leiden` in multiple generic surfaces
+    - the default run store still resolved under the package directory instead of an explicit writable project or working directory
+    - checked-in jobs still carried machine-specific absolute paths and a Leiden-shaped example alias (`ldn_v1`)
+    - preset ontology was command-shaped (`fit`) rather than concept-shaped (`method`)
+  - Implementation targets for this slice:
+    - move clustering implementations under a `methods/` surface with an explicit registry
+    - rename signature and metadata surfaces from `algo` to `method`
+    - make preset ontology `method`-first and rename bundled preset ids accordingly
+    - rename the checked-in promoter example from `ldn_v1` to a method-agnostic run alias
+    - resolve results to an explicit writable root:
+      - `DNADESIGN_CLUSTER_RESULTS_DIR`
+      - nearest project `cluster/results/`
+      - `./results`
+    - make checked-in job paths portable by resolving path-like params relative to the job file

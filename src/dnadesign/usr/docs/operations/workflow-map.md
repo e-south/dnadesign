@@ -173,7 +173,7 @@ uv run infer run --config "$INFER_CONFIG_7B" --dry-run
 # Execute the selected infer matrix lane and write namespaced feature columns back to the dataset.
 uv run infer run --config "$INFER_CONFIG_7B"
 # Explore one explicit infer-derived X column with cluster.
-uv run cluster fit --dataset "$FEATURE_DATASET" --x-col infer__evo2_7b__anchor_7b_emb_mid__emb_mid --name promoter_matrix_ldn_v1 --write --allow-overwrite
+uv run cluster fit --dataset "$FEATURE_DATASET" --x-col infer__evo2_7b__anchor_7b_emb_mid__emb_mid --name promoter_matrix_clusters_v1 --write --allow-overwrite
 # Hand the same dataset plus explicit X column into OPAL.
 uv run opal validate -c "$OPAL_WORKDIR/configs/campaign.yaml" # Validate the USR-backed OPAL campaign before any rounds run.
 uv run opal run -c "$OPAL_WORKDIR/configs/campaign.yaml" --labels-as-of 0 # Train, score, and select against the chosen infer-derived X column.
