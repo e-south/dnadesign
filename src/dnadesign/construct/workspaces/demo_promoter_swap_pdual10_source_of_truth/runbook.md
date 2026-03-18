@@ -1,7 +1,7 @@
 ## demo_promoter_swap_pdual10_source_of_truth Runbook
 
 **Workspace Path**
-- `src/dnadesign/construct/workspaces/<your-workspace-id>/`
+- The workspace path printed by `construct workspace init` (default: `<cwd>/<your-workspace-id>/`).
 
 **Purpose**
 - Seed curated promoter and plasmid datasets into the workspace-local USR root at `outputs/usr_datasets/`.

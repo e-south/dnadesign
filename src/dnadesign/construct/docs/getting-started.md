@@ -9,18 +9,18 @@ This page gets you from zero to a validated construct run with the fewest moving
 
 ```bash
 uv run construct workspace init --id demo_promoter_swap --profile promoter-swap-demo
-cd src/dnadesign/construct/workspaces/demo_promoter_swap
+cd demo_promoter_swap
 uv run construct workspace doctor --workspace .
 ./runbook.sh --mode dry-run --config config.slot_a.window.yaml
 ```
 
-Use this path when you want a known-good tracer bullet. By default it keeps construct IO inside `outputs/usr_datasets` in the workspace. If the workspace lives outside the repo tree, reuse the `uv run --project /path/to/dnadesign construct ...` commands printed by `workspace init`.
+Use this path when you want a known-good tracer bullet. By default, `workspace init` creates the workspace under your current working directory and keeps construct IO inside `outputs/usr_datasets` in that workspace. If you use `--root` or `CONSTRUCT_WORKSPACE_ROOT`, `cd` into the printed workspace path instead. If the workspace lives outside the repo tree, reuse the `uv run --project /path/to/dnadesign construct ...` commands printed by `workspace init`.
 
 ### Path 2: packaged shared source-of-truth demo
 
 ```bash
 uv run construct workspace init --id demo_construct_source_of_truth --profile promoter-swap-source-of-truth-demo
-cd src/dnadesign/construct/workspaces/demo_construct_source_of_truth
+cd demo_construct_source_of_truth
 uv run construct workspace doctor --workspace .
 ./runbook.sh --mode dry-run-all
 ```
@@ -31,7 +31,7 @@ Use this path when both packaged window projects should accumulate into one sema
 
 ```bash
 uv run construct workspace init --id my_construct_study
-cd src/dnadesign/construct/workspaces/my_construct_study
+cd my_construct_study
 uv run construct workspace doctor --workspace .
 uv run construct seed import-manifest \
   --manifest inputs/import_manifest.template.yaml \

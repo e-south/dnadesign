@@ -89,6 +89,7 @@ Use this when you have your own anchors or templates and want construct to mater
 Workspace registry contract:
 
 - every construct workspace should carry `construct.workspace.yaml`
+- the default workspace root is the current working directory; use `--root` or `CONSTRUCT_WORKSPACE_ROOT` to override it
 - each project entry maps one config file to its intended input/template/output contract
 - multi-template studies are represented as multiple project entries, not multiple templates inside one construct job
 - packaged profiles currently include `promoter-swap-demo` and `promoter-swap-source-of-truth-demo`

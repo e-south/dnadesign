@@ -1,6 +1,6 @@
 ## construct workspaces
 
-Use this directory for construct studies. Each workspace keeps its configs, registry, and default outputs together.
+Use this directory for packaged construct workspace templates and examples. New workspaces default to the current working directory unless `--root` or `CONSTRUCT_WORKSPACE_ROOT` is set.
 
 ### Start with one of two paths
 
@@ -13,19 +13,19 @@ Use this directory for construct studies. Each workspace keeps its configs, regi
 ```bash
 # Blank workspace for a custom construct study.
 uv run construct workspace init --id demo_construct # Create a blank construct workspace scaffold.
-uv run construct workspace show --workspace src/dnadesign/construct/workspaces/demo_construct # Review workspace registry/config paths.
-uv run construct workspace doctor --workspace src/dnadesign/construct/workspaces/demo_construct # Verify workspace registry/config health before editing or running.
+uv run construct workspace show --workspace demo_construct # Review workspace registry/config paths.
+uv run construct workspace doctor --workspace demo_construct # Verify workspace registry/config health before editing or running.
 
 # Packaged promoter-swap demo copied into a new workspace id.
 uv run construct workspace init --id demo_promoter_swap --profile promoter-swap-demo # Copy the packaged promoter-swap demo into a new workspace id.
-# The cd path below assumes the default workspace root from repo root.
+# The cd path below assumes the default workspace root from the current working directory.
 # If you used --root or CONSTRUCT_WORKSPACE_ROOT, cd into the printed workspace path instead.
-cd src/dnadesign/construct/workspaces/demo_promoter_swap # Enter the newly initialized demo workspace.
+cd demo_promoter_swap # Enter the newly initialized demo workspace.
 ./runbook.sh --mode dry-run --config config.slot_a.window.yaml # Execute the packaged tracer-bullet dry run for the slot_a window config.
 
 # Packaged shared-dataset source-of-truth demo.
 uv run construct workspace init --id demo_construct_source_of_truth --profile promoter-swap-source-of-truth-demo # Copy the packaged shared-dataset demo into a new workspace id.
-cd src/dnadesign/construct/workspaces/demo_construct_source_of_truth # Enter the newly initialized source-of-truth workspace.
+cd demo_construct_source_of_truth # Enter the newly initialized source-of-truth workspace.
 ./runbook.sh --mode dry-run-all # Dry-run both packaged projects into one semantic USR dataset.
 ```
 

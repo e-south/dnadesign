@@ -4,7 +4,7 @@ Copy this packaged workspace into a new local workspace id with:
 
 ```bash
 uv run construct workspace init --id my_promoter_source_of_truth --profile promoter-swap-source-of-truth-demo
-cd src/dnadesign/construct/workspaces/my_promoter_source_of_truth
+cd my_promoter_source_of_truth
 uv run construct workspace show --workspace .
 ./runbook.sh --mode dry-run-all
 ```

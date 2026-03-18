@@ -224,7 +224,7 @@ def default_workspace_root() -> Path:
     env_root = os.environ.get("CONSTRUCT_WORKSPACE_ROOT")
     if env_root:
         return Path(env_root).expanduser().resolve()
-    return (_construct_root() / "workspaces").resolve()
+    return Path.cwd().resolve()
 
 
 def workspace_root_with_source(explicit_root: str | None = None) -> tuple[Path, str]:
@@ -233,7 +233,7 @@ def workspace_root_with_source(explicit_root: str | None = None) -> tuple[Path, 
     env_root = os.environ.get("CONSTRUCT_WORKSPACE_ROOT")
     if env_root:
         return Path(env_root).expanduser().resolve(), "env"
-    return default_workspace_root(), "package"
+    return default_workspace_root(), "cwd"
 
 
 def validate_workspace_id(workspace_id: str) -> str:

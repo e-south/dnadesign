@@ -101,6 +101,10 @@ where = ["src"]
   "workspaces/demo_promoter_swap_pdual10/*.sh",
   "workspaces/demo_promoter_swap_pdual10/*.yaml",
   "workspaces/demo_promoter_swap_pdual10/inputs/*.md",
+  "workspaces/demo_promoter_swap_pdual10_source_of_truth/*.md",
+  "workspaces/demo_promoter_swap_pdual10_source_of_truth/*.sh",
+  "workspaces/demo_promoter_swap_pdual10_source_of_truth/*.yaml",
+  "workspaces/demo_promoter_swap_pdual10_source_of_truth/inputs/*.md",
 ]
 "dnadesign.cruncher.ingest.certs" = ["*.pem"]
 "dnadesign.densegen" = [

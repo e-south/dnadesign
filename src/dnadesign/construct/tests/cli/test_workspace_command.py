@@ -38,6 +38,18 @@ def test_workspace_where_uses_env_root_when_set(monkeypatch, tmp_path: Path) -> 
     assert "workspace_profile: blank" in output
 
 
+def test_workspace_where_defaults_to_cwd_when_unset(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("CONSTRUCT_WORKSPACE_ROOT", raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    result = _RUNNER.invoke(app, ["workspace", "where"])
+
+    assert result.exit_code == 0, result.stdout
+    output = result.stdout or ""
+    assert f"workspace_root: {tmp_path.resolve()}" in output
+    assert "workspace_root_source: cwd" in output
+
+
 def test_workspace_init_creates_default_layout_and_config(tmp_path: Path) -> None:
     root = tmp_path / "ws_root"
     command_prefix = f"uv run --project {shlex.quote(project_root().as_posix())} construct"
@@ -66,6 +78,18 @@ def test_workspace_init_creates_default_layout_and_config(tmp_path: Path) -> Non
     assert "seed_manifest.yaml" not in output
     assert "--profile promoter-swap-demo" in output
     assert "./runbook.sh" not in output
+
+
+def test_workspace_init_without_root_uses_cwd(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("CONSTRUCT_WORKSPACE_ROOT", raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    result = _RUNNER.invoke(app, ["workspace", "init", "--id", "demo_construct"])
+
+    workspace_dir = tmp_path / "demo_construct"
+    assert result.exit_code == 0, result.stdout
+    assert workspace_dir.is_dir()
+    assert (workspace_dir / "construct.workspace.yaml").is_file()
 
 
 def test_workspace_init_copies_packaged_promoter_swap_demo_profile(tmp_path: Path) -> None:
