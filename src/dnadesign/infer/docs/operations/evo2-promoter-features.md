@@ -43,34 +43,34 @@ Use the authoritative cross-tool workflow here:
 Minimal example:
 
 ```yaml
-model:
-  id: evo2_7b
-  device: cpu
-  precision: fp32
-  alphabet: dna
+model: # Keep one model stanza per infer config.
+  id: evo2_7b # Use the 7B lane for the first green path.
+  device: cpu # Keep the smoke example CPU-safe.
+  precision: fp32 # Use fp32 for the portable smoke path.
+  alphabet: dna # Match Evo2's DNA alphabet contract.
 
-jobs:
-  - id: anchor_only_7b_features
-    operation: extract
-    ingest:
-      source: records
-      path: inputs/anchor_only_promoters.jsonl
-      field: sequence
-    feature_bundle:
-      intermediate_block: 26
-      context:
-        kind: anchor_only
+jobs: # Keep contexts explicit as separate infer jobs.
+  - id: anchor_only_7b_features # Collect anchor-only promoter features.
+    operation: extract # Run the feature extraction surface.
+    ingest: # Read direct records for the anchor-only lane.
+      source: records # Load sequence records from a JSONL file.
+      path: inputs/anchor_only_promoters.jsonl # Point at the anchor-only input plane.
+      field: sequence # Read the sequence field from each input record.
+    feature_bundle: # Let the bundle surface choose the default feature groups.
+      intermediate_block: 26 # Use the project-default intermediate block.
+      context: # Record the explicit context metadata for this job.
+        kind: anchor_only # Mark this lane as the anchor-only context.
 
-  - id: template_1kb_7b_features
-    operation: extract
-    ingest:
-      source: records
-      path: inputs/template_1kb_promoters.jsonl
-      field: sequence
-    feature_bundle:
-      intermediate_block: 26
-      context:
-        kind: template_1kb
+  - id: template_1kb_7b_features # Collect construct-expanded promoter features.
+    operation: extract # Reuse the same extract operation for the templated lane.
+    ingest: # Read direct records for the 1 kb templated context.
+      source: records # Load sequence records from a JSONL file.
+      path: inputs/template_1kb_promoters.jsonl # Point at the construct-expanded input plane.
+      field: sequence # Read the sequence field from each input record.
+    feature_bundle: # Keep feature collection consistent across contexts.
+      intermediate_block: 26 # Use the same project-default block for comparison.
+      context: # Record the explicit context metadata for this job.
+        kind: template_1kb # Mark this lane as the default templated context.
 ```
 
 ### Choosing 7B vs 20B

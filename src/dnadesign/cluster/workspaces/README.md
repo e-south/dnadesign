@@ -24,10 +24,15 @@ Workspace contract:
 Typical lifecycle:
 
 ```bash
+# Show the active built-in workspace root.
 uv run cluster workspaces where
+# Scaffold a new workspace under an explicit writable root.
 uv run cluster workspaces init --id my_run --root /tmp
+# Fit one clustering run from the checked-in demo workspace.
 uv run cluster fit --workspace promoter_clusters_v1
+# Render UMAP artifacts for that fitted workspace run.
 uv run cluster umap --workspace promoter_clusters_v1
+# Generate analysis outputs for the same workspace run.
 uv run cluster analyze --workspace promoter_clusters_v1
 ```
 

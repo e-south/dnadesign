@@ -34,6 +34,7 @@ uv run cluster umap --workspace promoter_clusters_v1
 For large runs where you only need coordinates or downstream overlays, disable PNG rendering explicitly:
 
 ```bash
+# Render coordinates only when plots are not needed.
 uv run cluster umap --workspace promoter_clusters_v1 --no-plots
 ```
 
@@ -104,6 +105,7 @@ See [cluster CLI contracts](../reference/cli-contracts.md#opal-join-contract) fo
 If you are not using a checked-in workspace, keep the run store explicit:
 
 ```bash
+# Fit one standalone clustering run into an explicit results root.
 uv run cluster fit \
   --results-root /tmp/cluster-promoter-demo \
   --dataset 60bp_dual_promoter_cpxR_LexA \
@@ -116,6 +118,7 @@ uv run cluster fit \
 Standalone method-scoped sweeps use the same explicit artifact-root contract:
 
 ```bash
+# Sweep one method family into an explicit standalone results root.
 uv run cluster sweep \
   --results-root /tmp/cluster-promoter-demo \
   --dataset 60bp_dual_promoter_cpxR_LexA \

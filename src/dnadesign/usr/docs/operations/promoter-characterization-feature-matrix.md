@@ -160,8 +160,8 @@ jobs: # Keep context choice explicit as job ids inside the model lane.
       context:
         kind: template_1kb # Templated lane; construct must provide anchor coordinates.
       pooling:
-        seq_mean: true
-        anchor_mean_for_templated: true
+        seq_mean: true # Preserve the full-context pooled view for downstream comparisons.
+        anchor_mean_for_templated: true # Preserve anchor-local pooling inside templated contexts.
 ```
 
 Notes:
