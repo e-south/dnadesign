@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./rg_compat.sh
+source "$SCRIPT_DIR/rg_compat.sh"
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILL_FILE="$ROOT_DIR/SKILL.md"
 GENERIC_AUDIT="$ROOT_DIR/scripts/audit-skill.sh"

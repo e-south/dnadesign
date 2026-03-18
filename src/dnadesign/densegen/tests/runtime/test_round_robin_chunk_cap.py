@@ -1027,7 +1027,9 @@ def test_solver_exception_records_failed_attempt_without_crashing(tmp_path: Path
     assert "No feasible solution was found" in str(detail.get("solver_error"))
 
 
-def test_min_total_sites_shortfall_is_classified_as_no_solution(tmp_path: Path) -> None:
+def test_min_total_sites_shortfall_is_classified_as_no_solution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     (run_dir / "outputs" / "parquet").mkdir(parents=True)
@@ -1187,6 +1189,11 @@ def test_min_total_sites_shortfall_is_classified_as_no_solution(tmp_path: Path) 
         output_alphabet="dna_4",
     )
     execution_state = PlanExecutionState(inputs_manifest={})
+
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.core.pipeline.stage_b_runtime_callbacks._countable_variable_motif_indices",
+        lambda **_: [1],
+    )
 
     plan_item = loaded.root.densegen.generation.resolve_plan()[0]
     produced, _stats = _process_plan_for_source(

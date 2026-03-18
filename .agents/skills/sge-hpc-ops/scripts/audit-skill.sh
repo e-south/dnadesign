@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./rg_compat.sh
+source "$SCRIPT_DIR/rg_compat.sh"
+
 skill_dir="${1:-.}"
 skill_file="$skill_dir/SKILL.md"
 folder_name="$(basename "$skill_dir")"

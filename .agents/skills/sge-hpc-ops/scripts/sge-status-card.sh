@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./rg_compat.sh
+source "$SCRIPT_DIR/rg_compat.sh"
+
 warn_over_running=3
 qstat_file=""
 json_output=0
@@ -83,8 +87,8 @@ main() {
   status_output="$("${status_cmd[@]}")"
 
   local session_line jobs_line locus running queued eqw threshold
-  session_line="$(printf '%s\n' "$status_output" | rg '^SESSION ' -m 1 || true)"
-  jobs_line="$(printf '%s\n' "$status_output" | rg '^JOBS ' -m 1 || true)"
+  session_line="$(printf '%s\n' "$status_output" | rg -m 1 '^SESSION ' || true)"
+  jobs_line="$(printf '%s\n' "$status_output" | rg -m 1 '^JOBS ' || true)"
 
   locus="$(extract_field "$session_line" "execution_locus_guess")"
   running="$(extract_field "$jobs_line" "running_jobs")"

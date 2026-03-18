@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./rg_compat.sh
+source "$SCRIPT_DIR/rg_compat.sh"
+
 warn_over_running=3
 planned_submits=1
 requires_order=0
@@ -124,9 +128,9 @@ main() {
   advisor_output="$("${advisor_args[@]}")"
 
   local advisor_line advisor_reason_line advisor_recommendation_line
-  advisor_line="$(printf '%s\n' "$advisor_output" | rg '^ADVISOR ' -m 1 || true)"
-  advisor_reason_line="$(printf '%s\n' "$advisor_output" | rg '^REASON ' -m 1 || true)"
-  advisor_recommendation_line="$(printf '%s\n' "$advisor_output" | rg '^RECOMMENDATION ' -m 1 || true)"
+  advisor_line="$(printf '%s\n' "$advisor_output" | rg -m 1 '^ADVISOR ' || true)"
+  advisor_reason_line="$(printf '%s\n' "$advisor_output" | rg -m 1 '^REASON ' || true)"
+  advisor_recommendation_line="$(printf '%s\n' "$advisor_output" | rg -m 1 '^RECOMMENDATION ' || true)"
 
   local health execution_locus running_line queued_jobs eqw_jobs reason recommendation
   health="$(parse_status_card_field "$status_card" "Health")"

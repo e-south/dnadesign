@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./rg_compat.sh
+source "$SCRIPT_DIR/rg_compat.sh"
+
 warn_over_running=3
 planned_submits=1
 requires_order=0
@@ -104,7 +108,7 @@ main() {
   status_output="$("${status_cmd[@]}")"
 
   local jobs_line running eqw threshold
-  jobs_line="$(printf '%s\n' "$status_output" | rg '^JOBS ' -m 1 || true)"
+  jobs_line="$(printf '%s\n' "$status_output" | rg -m 1 '^JOBS ' || true)"
 
   running="$(extract_field "$jobs_line" "running_jobs")"
   eqw="$(extract_field "$jobs_line" "eqw_jobs")"

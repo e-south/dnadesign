@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./rg_compat.sh
+source "$SCRIPT_DIR/rg_compat.sh"
+
 max_runtime_hours=12
 require_project_flag=0
 require_mem_per_core=0
@@ -134,7 +138,7 @@ check_template() {
   if rg -q '^[[:space:]]*#\$[[:space:]]*-l[[:space:]]+h_rt=' "$template"; then
     pass_msg "$template" "explicit h_rt found"
     local runtime_raw runtime_sec max_runtime_sec
-    runtime_raw="$(rg -o --pcre2 '(?<=h_rt=)\d{1,3}:\d{2}:\d{2}' "$template" -m 1 || true)"
+    runtime_raw="$(sed -nE 's/.*h_rt=([0-9]{1,3}:[0-9]{2}:[0-9]{2}).*/\1/p' "$template" | head -n 1 || true)"
     if [[ -n "$runtime_raw" ]]; then
       runtime_sec="$(to_seconds "$runtime_raw")"
       max_runtime_sec=$((max_runtime_hours * 3600))
@@ -178,7 +182,9 @@ check_template() {
 
   if rg -q '^[[:space:]]*#\$[[:space:]]*-pe[[:space:]]+omp[[:space:]]+[0-9]+' "$template"; then
     local omp_slots
-    omp_slots="$(rg -o --pcre2 '^[[:space:]]*#\$[[:space:]]*-pe[[:space:]]+omp[[:space:]]+\K[0-9]+' "$template" -m 1 || true)"
+    omp_slots="$(
+      sed -nE 's/^[[:space:]]*#\$[[:space:]]*-pe[[:space:]]+omp[[:space:]]+([0-9]+).*/\1/p' "$template" | head -n 1 || true
+    )"
     if [[ -z "$omp_slots" ]]; then
       fail_msg "$template" "unable to parse omp slots from -pe directive"
     elif ((omp_slots <= 1)); then
