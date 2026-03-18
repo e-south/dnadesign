@@ -8,6 +8,14 @@ MANIFEST="$WORKSPACE_DIR/inputs/seed_manifest.yaml"
 USR_ROOT="${CONSTRUCT_RUNBOOK_USR_ROOT:-$WORKSPACE_DIR/outputs/usr_datasets}"
 PROJECT_ROOT="${CONSTRUCT_RUNBOOK_PROJECT_ROOT:-__CONSTRUCT_PROJECT_ROOT__}"
 
+construct_cmd() {
+  if [[ -n "${PROJECT_ROOT:-}" ]]; then
+    uv run --project "$PROJECT_ROOT" construct "$@"
+  else
+    uv run construct "$@"
+  fi
+}
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -51,21 +59,21 @@ while [[ $# -gt 0 ]]; do
 done
 
 seed_demo() {
-  uv run --project "$PROJECT_ROOT" construct seed promoter-swap-demo \
+  construct_cmd seed promoter-swap-demo \
     --root "$USR_ROOT" \
     --manifest "$MANIFEST"
 }
 
 validate_one() {
-  uv run --project "$PROJECT_ROOT" construct validate config --config "$1" --runtime
+  construct_cmd validate config --config "$1" --runtime
 }
 
 dry_run_one() {
-  uv run --project "$PROJECT_ROOT" construct run --config "$1" --dry-run
+  construct_cmd run --config "$1" --dry-run
 }
 
 run_one() {
-  uv run --project "$PROJECT_ROOT" construct run --config "$1"
+  construct_cmd run --config "$1"
 }
 
 validate_all() {

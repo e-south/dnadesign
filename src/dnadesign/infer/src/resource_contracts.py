@@ -73,6 +73,7 @@ def validate_runbook_gpu_resources(
     memory_hint = _gpu_memory_hint(gpu_capability=gpu_capability, gpu_memory_gib=gpu_memory_gib)
 
     from .errors import ValidationError
+    from .runtime.adapter_runtime import validate_adapter_runtime_contract
     from .runtime.capacity_planner import (
         GpuDeviceInfo,
         GpuInventory,
@@ -96,6 +97,7 @@ def validate_runbook_gpu_resources(
             validate_model_gpu_topology_contract(model=model, inventory=inventory)
         else:
             validate_model_hardware_contract(model=model, inventory=inventory)
+        validate_adapter_runtime_contract(model=model)
     except ValidationError as exc:
         raise ValueError(str(exc)) from exc
 

@@ -11,13 +11,16 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.infer.src.config import ModelConfig
-from dnadesign.infer.src.errors import InferError, ModelLoadError
+import pytest
+
+from dnadesign.infer.src.config import ModelConfig, ModelParallelismConfig
+from dnadesign.infer.src.errors import InferError, ModelLoadError, ValidationError
 from dnadesign.infer.src.runtime.adapter_runtime import (
     auto_derate_enabled,
     clear_adapter_cache,
     get_adapter,
     is_oom,
+    validate_adapter_runtime_contract,
 )
 
 
@@ -56,6 +59,54 @@ def test_get_adapter_accepts_positional_model_argument() -> None:
 
     adapter = get_adapter(_model(), resolver=_resolver)
     assert adapter.key == ("evo2_7b", "cpu", "fp32")
+
+
+def test_get_adapter_passes_parallelism_to_adapter_when_supported() -> None:
+    clear_adapter_cache()
+    calls = {"count": 0}
+
+    class _Adapter:
+        supported_parallelism_strategies = ("single_device", "multi_gpu_vortex")
+
+        def __init__(self, model_id: str, device: str, precision: str, *, parallelism) -> None:
+            calls["count"] += 1
+            self.key = (model_id, device, precision, parallelism.strategy, tuple(parallelism.gpu_ids or ()))
+
+    def _resolver(_model_id: str):
+        return _Adapter
+
+    model = ModelConfig(
+        id="evo2_20b",
+        device="cuda:0",
+        precision="bf16",
+        alphabet="dna",
+        parallelism=ModelParallelismConfig(strategy="multi_gpu_vortex", min_gpus=2, gpu_ids=[0, 1]),
+    )
+    first = get_adapter(model=model, resolver=_resolver)
+    second = get_adapter(model=model, resolver=_resolver)
+
+    assert first is second
+    assert calls["count"] == 1
+    assert first.key == ("evo2_20b", "cuda:0", "bf16", "multi_gpu_vortex", (0, 1))
+
+
+def test_validate_adapter_runtime_contract_rejects_unwired_parallelism() -> None:
+    class _Adapter:
+        supported_parallelism_strategies = ("single_device",)
+
+    def _resolver(_model_id: str):
+        return _Adapter
+
+    model = ModelConfig(
+        id="evo2_20b",
+        device="cuda:0",
+        precision="bf16",
+        alphabet="dna",
+        parallelism=ModelParallelismConfig(strategy="multi_gpu_vortex", min_gpus=2),
+    )
+
+    with pytest.raises(ValidationError, match="ADAPTER_CONTRACT_FAIL"):
+        validate_adapter_runtime_contract(model=model, resolver=_resolver)
 
 
 def test_get_adapter_re_raises_infer_error() -> None:

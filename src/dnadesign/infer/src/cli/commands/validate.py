@@ -20,6 +20,7 @@ import yaml
 from ...config import RootConfig
 from ...ingest.sources import load_usr_input
 from ...input_parsing import read_ids_arg
+from ...runtime.adapter_runtime import validate_adapter_runtime_contract
 from ...runtime.capacity_planner import probe_gpu_inventory, validate_model_hardware_contract
 from ...usr_registry import derive_usr_registry_spec
 from ..common import discovery_config, raise_cli_error
@@ -45,6 +46,7 @@ def register(app: typer.Typer) -> None:
                 )
             else:
                 validate_model_hardware_contract(model=root.model, inventory=inventory)
+            validate_adapter_runtime_contract(model=root.model)
             render_config_summary(root.model, root.jobs)
             console.print("[green]✔ Config validated.[/green]")
         except Exception as error:

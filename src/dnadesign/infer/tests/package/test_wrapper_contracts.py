@@ -169,3 +169,32 @@ jobs: []
             gpu_capability=None,
             gpu_memory_gib=None,
         )
+
+
+def test_runbook_gpu_validation_rejects_unwired_parallelism_strategy(tmp_path: Path) -> None:
+    from dnadesign.infer import validate_runbook_gpu_resources
+
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        """
+model:
+  id: evo2_20b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+  parallelism:
+    strategy: multi_gpu_vortex
+    min_gpus: 2
+    gpu_ids: [0, 1]
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="ADAPTER_CONTRACT_FAIL"):
+        validate_runbook_gpu_resources(
+            config_path=config,
+            declared_gpus=2,
+            gpu_capability="9.0",
+            gpu_memory_gib=80.0,
+        )

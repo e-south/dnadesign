@@ -105,15 +105,20 @@ where = ["src"]
   "workspaces/demo_promoter_swap_pdual10/*.sh",
   "workspaces/demo_promoter_swap_pdual10/*.yaml",
   "workspaces/demo_promoter_swap_pdual10/inputs/*.md",
+  "workspaces/demo_promoter_swap_pdual10/inputs/*.yaml",
   "workspaces/demo_promoter_swap_pdual10_source_of_truth/*.md",
   "workspaces/demo_promoter_swap_pdual10_source_of_truth/*.sh",
   "workspaces/demo_promoter_swap_pdual10_source_of_truth/*.yaml",
   "workspaces/demo_promoter_swap_pdual10_source_of_truth/inputs/*.md",
+  "workspaces/demo_promoter_swap_pdual10_source_of_truth/inputs/*.yaml",
 ]
 "dnadesign.cruncher.ingest.certs" = ["*.pem"]
 "dnadesign.densegen" = [
-  "workspaces/demo_meme_three_tfs/config.yaml",
-  "workspaces/demo_meme_three_tfs/inputs/*.txt",
+  "workspaces/_shared/*.sh",
+  "workspaces/*/*.md",
+  "workspaces/*/*.sh",
+  "workspaces/*/*.yaml",
+  "workspaces/*/inputs/*",
 ]
 "dnadesign.infer" = [
   "docs/operations/examples/*.yaml",

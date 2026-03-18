@@ -54,6 +54,7 @@ from dnadesign.cluster.src.runs.contracts import FIT_REUSE_REQUIRED_COLUMNS, Swe
 from dnadesign.cluster.src.runs.index import add_or_update_index, compact_index, list_runs
 from dnadesign.cluster.src.runs.reuse import find_equivalent_fit
 from dnadesign.cluster.src.runs.signatures import InputSignature, MethodSignature, UmapSignature
+from dnadesign.cluster.src.workspaces.paths import resolve_workspace_dir
 
 
 def _repo_root() -> Path:
@@ -77,6 +78,15 @@ def test_load_workspace_config_resolves_paths_relative_to_config() -> None:
     assert promoter_workspace.results_root == (
         repo_root / "src/dnadesign/cluster/workspaces/promoter_clusters_v1/outputs/cluster"
     )
+
+
+def test_local_workspace_dir_wins_over_packaged_workspace_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    local_workspace = tmp_path / "perm_v1"
+    local_workspace.mkdir()
+    (local_workspace / "config.yaml").write_text("input: {}\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    assert resolve_workspace_dir("perm_v1") == local_workspace.resolve()
 
 
 def test_explicit_results_root_is_required_and_rejects_builtin_package_tree() -> None:

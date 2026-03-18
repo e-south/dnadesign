@@ -22,7 +22,7 @@ from ...workspace import (
     doctor_workspace_registry,
     init_workspace,
     load_workspace_registry,
-    project_root,
+    project_root_or_none,
     resolve_workspace_project,
     workspace_registry_path,
     workspace_root_with_source,
@@ -35,7 +35,9 @@ workspace_app = typer.Typer(no_args_is_help=True, help="Workspace scaffolding fo
 
 
 def _construct_command_prefix(*, workspace_dir: Path | None = None) -> str:
-    repo_root = project_root()
+    repo_root = project_root_or_none()
+    if repo_root is None:
+        return "uv run construct"
     if workspace_dir is not None:
         try:
             workspace_dir.resolve().relative_to(repo_root)

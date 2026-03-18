@@ -62,5 +62,7 @@ def test_construct_package_data_includes_both_packaged_workspace_profiles() -> N
     repo_root = _construct_root().parents[2]
     pyproject = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
     assert "workspaces/demo_promoter_swap_pdual10/*.yaml" in pyproject
+    assert "workspaces/demo_promoter_swap_pdual10/inputs/*.yaml" in pyproject
     assert "workspaces/demo_promoter_swap_pdual10_source_of_truth/*.yaml" in pyproject
     assert "workspaces/demo_promoter_swap_pdual10_source_of_truth/inputs/*.md" in pyproject
+    assert "workspaces/demo_promoter_swap_pdual10_source_of_truth/inputs/*.yaml" in pyproject

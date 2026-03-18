@@ -24,6 +24,7 @@ class ESM2Adapter:
         "log_likelihood": False,  # set True when implemented
         "generate": False,
     }
+    supported_parallelism_strategies = ("single_device",)
 
     def __init__(self, model_id: str, device: str, precision: str) -> None:
         raise ModelLoadError("ESM2 adapter is stubbed in v1")

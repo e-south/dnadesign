@@ -23,6 +23,7 @@ from ...errors import ConfigError
 from ...ingest.sources import preflight_usr_input
 from ...input_parsing import read_ids_arg
 from ...presets import load_preset
+from ...runtime.adapter_runtime import validate_adapter_runtime_contract
 from ...runtime.capacity_planner import probe_gpu_inventory, validate_model_hardware_contract
 from ..builders import build_model_config, run_with_progress
 from ..common import discovery_config, guard_pickle, raise_cli_error
@@ -149,6 +150,7 @@ def register(app: typer.Typer) -> None:
                 preset_inventory = probe_gpu_inventory()
                 if not (dry_run and model.device.startswith("cuda") and preset_inventory.count == 0):
                     validate_model_hardware_contract(model=model, inventory=preset_inventory)
+                validate_adapter_runtime_contract(model=model)
 
                 if dry_run:
                     render_config_summary(model, [job_cfg])
@@ -192,6 +194,7 @@ def register(app: typer.Typer) -> None:
             config_inventory = probe_gpu_inventory()
             if not (dry_run and model.device.startswith("cuda") and config_inventory.count == 0):
                 validate_model_hardware_contract(model=model, inventory=config_inventory)
+            validate_adapter_runtime_contract(model=model)
 
             if dry_run:
                 for selected_job in jobs:

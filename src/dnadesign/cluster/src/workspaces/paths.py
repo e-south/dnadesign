@@ -67,8 +67,8 @@ def resolve_workspace_dir(workspace: str | Path) -> Path:
     elif len(spec.parts) > 1 or "/" in str(workspace) or str(workspace).startswith("."):
         candidates.append((Path.cwd() / spec).resolve())
     else:
-        candidates.append((builtin_workspaces_dir() / str(workspace)).resolve())
         candidates.append((Path.cwd() / str(workspace)).resolve())
+        candidates.append((builtin_workspaces_dir() / str(workspace)).resolve())
 
     tried: list[str] = []
     for candidate in candidates:

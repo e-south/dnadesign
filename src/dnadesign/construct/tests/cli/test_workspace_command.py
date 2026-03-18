@@ -165,12 +165,32 @@ def test_workspace_init_quotes_project_root_in_external_workspace_commands(tmp_p
     root = tmp_path / "ws_root"
     fake_repo_root = tmp_path / "repo with spaces"
     expected_prefix = f"uv run --project {shlex.quote(fake_repo_root.as_posix())} construct"
-    monkeypatch.setattr("dnadesign.construct.src.cli.commands.workspace.project_root", lambda: fake_repo_root)
+    monkeypatch.setattr("dnadesign.construct.src.cli.commands.workspace.project_root_or_none", lambda: fake_repo_root)
 
     result = _RUNNER.invoke(app, ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix()])
 
     assert result.exit_code == 0, result.stdout
     assert expected_prefix in (result.stdout or "")
+
+
+def test_workspace_init_uses_plain_uv_run_when_repo_checkout_is_unavailable(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "ws_root"
+    monkeypatch.setattr("dnadesign.construct.src.cli.commands.workspace.project_root_or_none", lambda: None)
+    monkeypatch.setattr("dnadesign.construct.src.workspace.project_root_or_none", lambda: None)
+
+    result = _RUNNER.invoke(
+        app,
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "promoter-swap-demo"],
+    )
+
+    workspace_dir = root / "demo_construct"
+    assert result.exit_code == 0, result.stdout
+    output = result.stdout or ""
+    assert "uv run construct workspace show --workspace" in output
+    assert "uv run --project" not in output
+    runbook = (workspace_dir / "runbook.sh").read_text(encoding="utf-8")
+    assert "__CONSTRUCT_PROJECT_ROOT__" not in runbook
+    assert 'PROJECT_ROOT="${CONSTRUCT_RUNBOOK_PROJECT_ROOT:-}"' in runbook
 
 
 def test_workspace_init_rejects_path_like_workspace_id(tmp_path: Path) -> None:

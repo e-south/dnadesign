@@ -126,6 +126,7 @@ class Evo2Adapter:
         "log_likelihood": True,
         "generate": True,
     }
+    supported_parallelism_strategies = ("single_device",)
 
     def __init__(self, model_id: str, device: str, precision: str) -> None:
         if _Evo2 is None:

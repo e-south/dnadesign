@@ -212,11 +212,18 @@ def _construct_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def project_root() -> Path:
+def project_root_or_none() -> Path | None:
     current = _construct_root().resolve()
     for parent in [current, *current.parents]:
         if (parent / "pyproject.toml").exists():
             return parent
+    return None
+
+
+def project_root() -> Path:
+    resolved = project_root_or_none()
+    if resolved is not None:
+        return resolved
     raise ConfigError("project root with pyproject.toml not found for construct workspace scaffolding.")
 
 
@@ -486,7 +493,8 @@ def _rewrite_packaged_runbook_project_root(*, workspace_dir: Path) -> None:
     if not runbook_path.exists():
         return
     text = runbook_path.read_text(encoding="utf-8")
-    text = text.replace("__CONSTRUCT_PROJECT_ROOT__", project_root().as_posix())
+    project_root_hint = project_root_or_none()
+    text = text.replace("__CONSTRUCT_PROJECT_ROOT__", project_root_hint.as_posix() if project_root_hint else "")
     runbook_path.write_text(text, encoding="utf-8")
 
 
