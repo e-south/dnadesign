@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/umap/plot.py
 
 Module Author(s): Eric J. South
@@ -15,149 +15,10 @@ from typing import Callable, Literal, Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pandas.api.types as ptypes
 import seaborn as sns
 from matplotlib import rc_context
 
-
-def _compute_gc(seq: str) -> float:
-    if not isinstance(seq, str) or not seq:
-        return 0.0
-    s = seq.upper()
-    return float((s.count("G") + s.count("C")) / len(s))
-
-
-def _ensure_numeric_series(df: pd.DataFrame, col: str, *, allow_non_finite: bool = False) -> pd.Series:
-    if col not in df.columns:
-        raise KeyError(f"Numeric hue column '{col}' not found.")
-    s = df[col]
-    # First: require numeric dtype or values strictly castable to numeric
-    try:
-        s = pd.to_numeric(s, errors="raise")
-    except Exception as e:
-        # Find which values were non‑numeric to aid debugging
-        coerced = pd.to_numeric(s, errors="coerce")
-        bad_mask = coerced.isna() & s.notna()
-        # Prefer the df index if it is 'id'; else fall back to an 'id' column if present
-        ids = (
-            df.index.astype(str)
-            if df.index.name == "id"
-            else (df["id"].astype(str) if "id" in df.columns else pd.Series(["?"] * len(df)))
-        )
-        offenders = pd.DataFrame({"id": ids[bad_mask], "value": s[bad_mask].astype(str)})
-        sample = offenders.head(15).to_dict(orient="records")
-        raise TypeError(
-            "Column '{col}' is not numeric. Found {n} non‑numeric value(s). "
-            "Sample offenders (id→value): {sample}".format(col=col, n=int(bad_mask.sum()), sample=sample)
-        ) from e
-    # Second: reject NaN/±Inf with detailed context
-    arr = s.to_numpy(dtype="float64", copy=False)
-    non_finite_mask = ~np.isfinite(arr)
-    if non_finite_mask.any() and not allow_non_finite:
-        ids = (
-            df.index.astype(str)
-            if df.index.name == "id"
-            else (df["id"].astype(str) if "id" in df.columns else pd.Series(["?"] * len(df)))
-        )
-        n_bad = int(non_finite_mask.sum())
-        n_nan = int(np.isnan(arr).sum())
-        n_pinf = int(np.isposinf(arr).sum())
-        n_ninf = int(np.isneginf(arr).sum())
-        offenders = pd.DataFrame(
-            {
-                "row": np.flatnonzero(non_finite_mask),
-                "id": ids[non_finite_mask].values,
-                "value": s[non_finite_mask].astype(object).values,
-            }
-        ).head(25)
-        # Render a compact sample of offenders
-        preview = [
-            {"row": int(r), "id": str(i), "value": (None if pd.isna(v) else float(v))}
-            for r, i, v in offenders.itertuples(index=False, name=None)
-        ]
-        raise ValueError(
-            (
-                "Column '{col}' contains {n_bad} non‑finite value(s) "
-                "(NaN={n_nan}, +Inf={n_pinf}, -Inf={n_ninf}).\n"
-                "First offenders: {preview}"
-            ).format(
-                col=col,
-                n_bad=n_bad,
-                n_nan=n_nan,
-                n_pinf=n_pinf,
-                n_ninf=n_ninf,
-                preview=preview,
-            )
-        )
-    return s.astype(float)
-
-
-def _prepare_numeric_hue(
-    df: pd.DataFrame,
-    col: str,
-    *,
-    missing_policy: Literal["error", "drop_and_log"] = "error",
-    log_fn: Optional[Callable[[str], None]] = None,
-):
-    """
-    Return (values: Series[float], mask: np.ndarray[bool]) for a numeric hue.
-    If missing_policy='drop_and_log', rows with non-finite values are excluded via the mask
-    and a concise message is logged via log_fn (if provided).
-    """
-    # First, coerce/validate numerics (this raises on non-numeric strings etc.)
-    # 1) Coerce to numeric (assertive), but allow NaN/Inf to pass through.
-    #    Non‑numeric strings etc. will still raise here (as desired).
-    s = _ensure_numeric_series(df, col, allow_non_finite=True)
-    arr = s.to_numpy(dtype="float64", copy=False)
-    non_finite_mask = ~np.isfinite(arr)
-    if not non_finite_mask.any():
-        # Keep all rows
-        import numpy as _np
-
-        return s, _np.ones(len(s), dtype=bool)
-    if missing_policy == "error":
-        # Reproduce the detailed error from _ensure_numeric_series (which we bypassed by design here),
-        # but with the non-finite counts and a preview.
-        import numpy as _np
-
-        n_bad = int(non_finite_mask.sum())
-        n_nan = int(_np.isnan(arr).sum())
-        n_pinf = int(_np.isposinf(arr).sum())
-        n_ninf = int(_np.isneginf(arr).sum())
-        ids = (
-            df.index.astype(str)
-            if df.index.name == "id"
-            else (df["id"].astype(str) if "id" in df.columns else _np.array(["?"] * len(df)))
-        )
-        offenders = [
-            {
-                "row": int(i),
-                "id": str(ids[i]),
-                "value": (None if _np.isnan(arr[i]) else float(arr[i])),
-            }
-            for i in _np.flatnonzero(non_finite_mask)[:25]
-        ]
-        raise ValueError(
-            f"Column '{col}' contains {n_bad} non-finite value(s) (NaN={n_nan}, +Inf={n_pinf}, -Inf={n_ninf}). "
-            f"First offenders: {offenders}"
-        )
-    # missing_policy == "drop_and_log": build keep-mask and log a concise note
-    keep_mask = ~non_finite_mask
-    if log_fn is not None:
-        # Log count and a small, stable preview of ids for traceability
-        bad_idx = np.flatnonzero(non_finite_mask)
-        ids = (
-            df.index.astype(str)
-            if df.index.name == "id"
-            else (df["id"].astype(str) if "id" in df.columns else pd.Series(["?"] * len(df)))
-        )
-        sample = [{"id": str(ids[i])} for i in bad_idx[:6]]
-        msg = f"Hue '{col}': dropping {int(non_finite_mask.sum())}/{len(df)} row(s) with NaN/Inf (e.g., {sample})."
-        try:
-            log_fn(msg)
-        except Exception:
-            pass
-    return s, keep_mask
+from .hues import normalize_highlight_style, resolve_hue
 
 
 def _font_rc(font_scale: float) -> dict:
@@ -171,145 +32,6 @@ def _font_rc(font_scale: float) -> dict:
         "xtick.labelsize": base * 1.2,
         "ytick.labelsize": base * 1.2,
     }
-
-
-def _ensure_categorical_series(df: pd.DataFrame, col: str) -> pd.Series:
-    if col not in df.columns:
-        raise KeyError(f"Categorical hue column '{col}' not found.")
-    s = df[col]
-    # Allow ints, strings, categories – treat everything as string categories.
-    if ptypes.is_float_dtype(s) and s.isna().any():
-        raise ValueError(f"Column '{col}' has NaNs; fill or drop before plotting.")
-    return s.astype(str)
-
-
-def resolve_hue(
-    df: pd.DataFrame,
-    color_specs: list[str],
-    name: str,
-    default_norm: str = "none",
-    *,
-    missing_policy: Literal["error", "drop_and_log"] = "error",
-    log_fn: Optional[Callable[[str], None]] = None,
-    highlight: Optional[dict] = None,
-) -> list[tuple[str, dict]]:
-    """Return list of (label, dict with 'values' and 'is_categorical')."""
-    out = []
-    for spec in color_specs:
-        if spec == "cluster":
-            col = f"cluster__{name}"
-            if col not in df.columns:
-                raise ValueError(
-                    f"Cluster column '{col}' not found; run 'cluster fit' first or choose a different hue."
-                )
-            out.append(("cluster", {"values": df[col].astype(str), "categorical": True}))
-            continue
-        if spec == "gc_content":
-            if "sequence" not in df.columns:
-                raise KeyError("Hue 'gc_content' requires a 'sequence' column.")
-            vals = df["sequence"].astype(str).apply(_compute_gc)
-            out.append(("gc_content", {"values": vals, "categorical": False}))
-            continue
-        if spec == "seq_length" and "sequence" in df.columns:
-            out.append(
-                (
-                    "seq_length",
-                    {
-                        "values": df["sequence"].astype(str).str.len(),
-                        "categorical": False,
-                    },
-                )
-            )
-            continue
-        if spec == "seq_length" and "sequence" not in df.columns:
-            raise KeyError("Hue 'seq_length' requires a 'sequence' column.")
-        if spec == "intra_sim":
-            col = f"cluster__{name}__intra_sim"
-            if col not in df.columns:
-                raise ValueError(f"Intra-sim column '{col}' missing; run 'cluster intra-sim'.")
-            out.append(("intra_sim", {"values": df[col], "categorical": False}))
-            continue
-        # numeric:<col> or categorical:<col>
-        if spec.startswith("numeric:"):
-            col = spec.split(":", 1)[1]
-            s, mask = _prepare_numeric_hue(df, col, missing_policy=missing_policy, log_fn=log_fn)
-            out.append((col, {"values": s, "categorical": False, "mask": mask}))
-            continue
-        if spec.startswith("categorical:"):
-            col = spec.split(":", 1)[1]
-            s = _ensure_categorical_series(df, col)
-            out.append((col, {"values": s, "categorical": True}))
-            continue
-        if spec == "highlight":
-            # Requires highlight ids; no auto-refit/projection for missing ids.
-            if not highlight or not highlight.get("ids"):
-                raise ValueError("Hue 'highlight' requires --highlight <file> to supply ids.")
-            idx_ids = df.index.astype(str) if df.index.name == "id" else df["id"].astype(str)
-            ids_set = set(map(str, highlight["ids"]))
-            # Mode A: categorical highlight if labels are provided (id -> category)
-            if isinstance(highlight.get("labels"), dict) and len(highlight["labels"]) > 0:
-                labels_map = {str(k): str(v) for k, v in highlight["labels"].items()}
-                vals = np.where(
-                    idx_ids.isin(ids_set),
-                    idx_ids.map(lambda z: labels_map.get(str(z), None)),
-                    "background",
-                )
-                out.append(
-                    (
-                        "highlight",
-                        {
-                            "values": pd.Series(vals, index=df.index),
-                            "categorical": True,
-                            "highlight_categories": list(sorted(set(labels_map.values()))),
-                            "highlight_by": str(highlight.get("by", "")),
-                        },
-                    )
-                )
-            else:
-                # Mode B: single‑hue highlight (background vs highlight)
-                vals = np.where(idx_ids.isin(ids_set), "highlight", "background")
-                out.append(
-                    (
-                        "highlight",
-                        {
-                            "values": pd.Series(vals, index=df.index),
-                            "categorical": True,
-                        },
-                    )
-                )
-            continue
-        raise ValueError(f"Unknown hue spec: {spec}")
-    return out
-
-
-def _normalize_highlight_style(style: Optional[dict], base_size: float) -> dict:
-    """
-    Normalize a user-provided highlight style mapping into a concrete style dict
-    with assertive defaults. We avoid hidden fallbacks in control flow — if the user
-    specifies keys, they are taken verbatim; otherwise, we use explicit safe defaults.
-    """
-    style = dict(style or {})
-    out: dict = {}
-    # Size: choose explicit 'size' if provided, else apply a multiplier to base size
-    if "size" in style and style["size"] is not None:
-        out["size"] = float(style["size"])
-    else:
-        mul = float(style.get("size_multiplier", 1.6))
-        out["size"] = float(base_size) * mul
-    overlay_size = style.get("overlay_size", None)
-    out["overlay_size"] = float(overlay_size) if overlay_size is not None else out["size"]
-    out["alpha"] = float(style.get("alpha", 0.95))
-    out["facecolor"] = style.get("facecolor", "none")
-    if "ring" in style:
-        out["facecolor"] = "none" if bool(style["ring"]) else out.get("edgecolor", "red")
-    out["edgecolor"] = style.get("edgecolor", "red")
-    out["linewidth"] = float(style.get("linewidth", 0.9))
-    out["marker"] = style.get("marker", "o")
-    out["legend"] = bool(style.get("legend", False))
-    out["overlay"] = bool(style.get("overlay", True))
-    if "palette" in style:
-        out["palette"] = style["palette"]  # str (palette name) or dict {category: color}
-    return out
 
 
 def scatter(
@@ -370,7 +92,7 @@ def scatter(
         return {cat: cols[i] for i, cat in enumerate(categories)}
 
     # Normalize overlay style once with the *base* size
-    hstyle = _normalize_highlight_style(highlight_style, base_size=size)
+    hstyle = normalize_highlight_style(highlight_style, base_size=size)
     # Whether we will overlay highlights on non-'highlight' hues
     do_overlay = bool(hi_ids) and bool(overlay_highlight) and bool(hstyle.get("overlay", True))
     for label, obj in hues:

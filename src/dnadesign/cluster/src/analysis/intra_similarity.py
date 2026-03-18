@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/analysis/intra_similarity.py
 
 Module Author(s): Eric J. South

@@ -17,14 +17,19 @@ import sys
 from pathlib import Path
 
 
-def test_cluster_cli_bootstrap_does_not_import_matplotlib() -> None:
+def test_cluster_cli_bootstrap_stays_lightweight() -> None:
     repo_root = Path(__file__).resolve().parents[6]
     env = os.environ.copy()
     env["PYTHONPATH"] = str(repo_root / "src")
     probe = (
-        "import sys; "
+        "import json, sys; "
         "import dnadesign.cluster.src.cli.app as _app; "
-        "print(any(name.startswith('matplotlib') for name in sys.modules))"
+        "print(json.dumps({"
+        "'matplotlib': any(name.startswith('matplotlib') for name in sys.modules), "
+        "'execution': any(name.startswith('dnadesign.cluster.src.execution') for name in sys.modules), "
+        "'numpy': any(name.startswith('numpy') for name in sys.modules), "
+        "'pandas': any(name.startswith('pandas') for name in sys.modules)"
+        "}, sort_keys=True))"
     )
     result = subprocess.run(
         [sys.executable, "-c", probe],
@@ -34,7 +39,7 @@ def test_cluster_cli_bootstrap_does_not_import_matplotlib() -> None:
         env=env,
     )
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "False"
+    assert result.stdout.strip() == '{"execution": false, "matplotlib": false, "numpy": false, "pandas": false}'
 
 
 def test_cluster_public_contracts_do_not_import_heavy_plotting_or_method_stacks() -> None:
@@ -42,9 +47,15 @@ def test_cluster_public_contracts_do_not_import_heavy_plotting_or_method_stacks(
     env = os.environ.copy()
     env["PYTHONPATH"] = str(repo_root / "src")
     probe = (
-        "import sys; "
+        "import json, sys; "
         "import dnadesign.cluster as _cluster; "
-        "print(any(name.startswith('matplotlib') or name.startswith('scanpy') for name in sys.modules))"
+        "print(json.dumps({"
+        "'execution': any(name.startswith('dnadesign.cluster.src.execution') for name in sys.modules), "
+        "'matplotlib': any(name.startswith('matplotlib') for name in sys.modules), "
+        "'numpy': any(name.startswith('numpy') for name in sys.modules), "
+        "'pandas': any(name.startswith('pandas') for name in sys.modules), "
+        "'scanpy': any(name.startswith('scanpy') for name in sys.modules)"
+        "}, sort_keys=True))"
     )
     result = subprocess.run(
         [sys.executable, "-c", probe],
@@ -54,7 +65,10 @@ def test_cluster_public_contracts_do_not_import_heavy_plotting_or_method_stacks(
         env=env,
     )
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "False"
+    assert (
+        result.stdout.strip()
+        == '{"execution": false, "matplotlib": false, "numpy": false, "pandas": false, "scanpy": false}'
+    )
 
 
 def test_cluster_analysis_helpers_do_not_import_plotting_until_needed() -> None:

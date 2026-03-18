@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/runs/store.py
+
+Cluster run-store helpers.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -10,25 +12,16 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pandas as pd
 
-from ..layout import default_results_root
+from ..layout import explicit_results_root
 from .contracts import RunIndexEntry
 
-DEFAULT_ENV_KEY = "DNADESIGN_CLUSTER_RESULTS_DIR"
 
-
-def runs_root(default_base: Path | None = None) -> Path:
-    env = os.environ.get(DEFAULT_ENV_KEY)
-    if env:
-        root = Path(env).expanduser().resolve()
-    elif default_base is not None:
-        root = Path(default_base).expanduser().resolve()
-    else:
-        root = default_results_root()
+def runs_root(root: Path | str | None = None) -> Path:
+    root = explicit_results_root(root)
     root.mkdir(parents=True, exist_ok=True)
     # Ensure index file exists
     idx = root / "index.parquet"
@@ -37,9 +30,33 @@ def runs_root(default_base: Path | None = None) -> Path:
     return root
 
 
-def create_run_dir(root: Path, slug: str) -> Path:
-    d = root / slug
+def alias_dir(root: Path, alias: str) -> Path:
+    d = root / alias
     d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def fit_run_dir(root: Path, alias: str, slug: str) -> Path:
+    d = alias_dir(root, alias) / "fits" / slug
+    d.mkdir(parents=True, exist_ok=False)
+    return d
+
+
+def umap_run_dir(root: Path, alias: str, slug: str) -> Path:
+    d = alias_dir(root, alias) / "umap" / slug
+    d.mkdir(parents=True, exist_ok=False)
+    return d
+
+
+def analysis_run_dir(root: Path, alias: str, slug: str) -> Path:
+    d = alias_dir(root, alias) / "analysis" / slug
+    d.mkdir(parents=True, exist_ok=False)
+    return d
+
+
+def sweep_run_dir(root: Path, alias: str, slug: str) -> Path:
+    d = alias_dir(root, alias) / "sweeps" / slug
+    d.mkdir(parents=True, exist_ok=False)
     return d
 
 
@@ -79,20 +96,16 @@ def append_records_md(run_dir: Path, markdown: str) -> Path:
     return p
 
 
-# ---------------- UMAP helpers ----------------
-def umap_dir(run_dir: Path) -> Path:
-    # Flat layout: all UMAP artifacts directly under <run_dir>/umap/
-    d = run_dir / "umap"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
-
-
 def write_umap_meta(umap_dir_path: Path, meta: dict) -> Path:
     return _write_json_artifact(umap_dir_path / "umap.json", meta)
 
 
 def write_analysis_meta(analysis_dir_path: Path, meta: dict) -> Path:
     return _write_json_artifact(analysis_dir_path / "analysis.json", meta)
+
+
+def write_sweep_meta(sweep_dir_path: Path, meta: dict) -> Path:
+    return _write_json_artifact(sweep_dir_path / "sweep.json", meta)
 
 
 def write_umap_coords(umap_dir_path: Path, coords_df: pd.DataFrame) -> Path:

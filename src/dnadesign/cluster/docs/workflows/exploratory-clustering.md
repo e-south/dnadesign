@@ -13,47 +13,28 @@ Use this workflow when one explicit feature definition already exists and the ne
 
 ### First fit, UMAP, and analysis pass
 
-The examples below use `promoter_clusters_v1` as a fit alias and a USR dataset named `60bp_dual_promoter_cpxR_LexA`.
+The examples below use the packaged workspace `promoter_clusters_v1`, which targets the USR dataset `60bp_dual_promoter_cpxR_LexA`.
 
 #### 1. Fit
 
 ```bash
-# Fit one clustering over the chosen feature column using the current Leiden method preset.
-uv run cluster fit \
-  --dataset 60bp_dual_promoter_cpxR_LexA \
-  --x-col infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean \
-  --preset method.leiden.fine \
-  --name promoter_clusters_v1 \
-  --write --allow-overwrite
+# Fit one clustering over the chosen feature column using the packaged workspace config.
+uv run cluster fit --workspace promoter_clusters_v1
 ```
 
 If you need to override one method-specific knob without editing the preset, use repeatable `--method-param key=value` flags such as `--method-param resolution=0.9`.
-
-Job-driven equivalent:
-
-```bash
-# Run the checked-in fit job for the same configuration.
-uv run cluster fit --job src/dnadesign/cluster/jobs/promoter_clusters_v1/fit.yaml
-```
 
 #### 2. UMAP
 
 ```bash
 # Render one UMAP view over the same chosen feature column.
-uv run cluster umap \
-  --dataset 60bp_dual_promoter_cpxR_LexA \
-  --name promoter_clusters_v1 \
-  --x-col infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean \
-  --preset umap.promoter_set1 \
-  --attach-coords \
-  --write --allow-overwrite
+uv run cluster umap --workspace promoter_clusters_v1
 ```
 
-Job-driven equivalent:
+For large runs where you only need coordinates or downstream overlays, disable PNG rendering explicitly:
 
 ```bash
-# Run the checked-in UMAP job for the same configuration.
-uv run cluster umap --job src/dnadesign/cluster/jobs/promoter_clusters_v1/umap.yaml
+uv run cluster umap --workspace promoter_clusters_v1 --no-plots
 ```
 
 #### 3. Optional intra-cluster similarity
@@ -63,7 +44,6 @@ uv run cluster umap --job src/dnadesign/cluster/jobs/promoter_clusters_v1/umap.y
 uv run cluster intra-sim \
   --dataset 60bp_dual_promoter_cpxR_LexA \
   --cluster-col cluster__promoter_clusters_v1 \
-  --out-col cluster__promoter_clusters_v1__intra_sim \
   --write --allow-overwrite
 ```
 
@@ -73,17 +53,7 @@ Re-run `cluster umap` after this step when you want the `intra_sim` hue.
 
 ```bash
 # Run the default analysis battery for the fitted clustering.
-uv run cluster analyze \
-  --dataset 60bp_dual_promoter_cpxR_LexA \
-  --cluster-col cluster__promoter_clusters_v1 \
-  --preset analysis.promoter_set1
-```
-
-Job-driven equivalent:
-
-```bash
-# Run the checked-in analysis job for the same fitted clustering.
-uv run cluster analyze --job src/dnadesign/cluster/jobs/promoter_clusters_v1/analyze.yaml
+uv run cluster analyze --workspace promoter_clusters_v1
 ```
 
 ### Highlight variants
@@ -129,10 +99,37 @@ Required flags:
 
 See [cluster CLI contracts](../reference/cli-contracts.md#opal-join-contract) for exact contract details.
 
+### Standalone direct invocation
+
+If you are not using a checked-in workspace, keep the run store explicit:
+
+```bash
+uv run cluster fit \
+  --results-root /tmp/cluster-promoter-demo \
+  --dataset 60bp_dual_promoter_cpxR_LexA \
+  --x-col infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean \
+  --preset method.leiden.fine \
+  --name promoter_clusters_v1 \
+  --write --allow-overwrite
+```
+
+Standalone method-scoped sweeps use the same explicit artifact-root contract:
+
+```bash
+uv run cluster sweep \
+  --results-root /tmp/cluster-promoter-demo \
+  --dataset 60bp_dual_promoter_cpxR_LexA \
+  --x-col infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean \
+  --method leiden
+```
+
+If another Python tool needs to run the same flow in-process, use the public helpers in [`../../api.py`](../../api.py) instead of importing `dnadesign.cluster.src.*`. Use workspace helpers for reusable checked-in workspaces and ad hoc helpers for one-off file or USR executions.
+
 ### Verify next
 
-- Inspect the resolved results root under `<fit_alias>/` for `run.json`, `records.md`, `umap/`, `analysis/`, and `analysis/analysis.json`.
-- Confirm `analysis/analysis.json` captures the resolved analysis request, including any OPAL join campaign or round selectors.
+- Inspect the workspace artifact root under `workspaces/promoter_clusters_v1/outputs/cluster/promoter_clusters_v1/` for `records.md`, `fits/<run-slug>/run.json`, `umap/<run-slug>/`, and `analysis/<run-slug>/analysis.json`.
+- Inspect `workspaces/promoter_clusters_v1/outputs/cluster/<alias>/sweeps/<run-slug>/` for first-class `sweep.json` artifacts when you run `cluster sweep`.
+- Confirm `analysis/<run-slug>/analysis.json` captures the resolved analysis request, including any OPAL join campaign or round selectors.
 - Confirm the chosen `cluster__<name>` columns and optional coordinate columns exist when `--write` or `--attach-coords` was used.
 - If you are editing package code or docs rather than only running the workflow, use the [cluster verification contract](../reference/verification.md) before widening to broader repo checks.
 - If exploratory work has answered the structural question and you now need supervised label/train/select, continue with [USR dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/usr-infer-x-active-learning.md).

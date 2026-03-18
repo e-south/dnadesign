@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/methods/leiden_resolution_sweep.py
 
 Leiden resolution sweep helpers.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/presets/schema.py
 
 Module Author(s): Eric J. South
@@ -19,7 +19,6 @@ class Preset(BaseModel):
     kind: Literal["method", "umap", "plot", "analysis"]
     params: Dict[str, Any] = Field(default_factory=dict)
     plot: Dict[str, Any] = Field(default_factory=dict)
-    hue: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("name")
     @classmethod

@@ -1,7 +1,7 @@
 ![cluster banner](assets/cluster-banner.svg)
 
 `cluster` is the exploratory downstream surface for unsupervised clustering, UMAP visualization, and related summaries over one chosen feature matrix from a USR dataset or a CSV/Parquet file.
-It records reusable outputs in a writable results root and stays decoupled from upstream feature generation.
+It records reusable outputs in a workspace-scoped artifact root and stays decoupled from upstream feature generation.
 
 See the [repository docs index](../../../docs/README.md) for cross-tool workflow routes and runbooks. For the authoritative cross-tool source-of-truth path that builds an infer-annotated promoter feature matrix before clustering, use [promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md).
 
@@ -20,24 +20,26 @@ See the [repository docs index](../../../docs/README.md) for cross-tool workflow
 
 - If you do not yet have one explicit chosen feature definition, start with [promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md) for the repository's canonical infer-backed route, then return here after feature write-back is complete.
 - If you already have that chosen feature definition and want the first runnable path, open [cluster docs by workflow](docs/README.md) and start with [exploratory clustering workflow](docs/workflows/exploratory-clustering.md).
-- If you need command, preset, results, or OPAL-join semantics before running, use [cluster CLI contracts](docs/reference/cli-contracts.md).
+- If you need workspace, preset, results, or OPAL-join semantics before running, use [cluster CLI contracts](docs/reference/cli-contracts.md).
+- If you need an in-process automation boundary instead of CLI shelling, use the public [`dnadesign.cluster.api`](api.py) ad hoc and workspace helpers. They execute the same shared runtime as the CLI and do not bounce through Typer.
 - If you need the package-level ownership split versus USR and OPAL, use [cluster ownership boundary](docs/concepts/ownership-boundary.md) and [cluster semantic surface](docs/concepts/semantic-surface.md).
 
 ## Task routes
 
 - Run the first `fit -> umap -> analyze` pass for a chosen feature definition: [exploratory clustering workflow](docs/workflows/exploratory-clustering.md).
 - Reuse OPAL outputs for exploratory plots or summaries: [cluster CLI contracts](docs/reference/cli-contracts.md#opal-join-contract).
-- Inspect presets, jobs, and results layout before editing configs: [cluster CLI contracts](docs/reference/cli-contracts.md#jobs-presets-and-results-layout).
-- Verify the package after contract, docs, or job changes: [cluster verification contract](docs/reference/verification.md).
+- Inspect workspaces, presets, and results layout before editing configs: [cluster CLI contracts](docs/reference/cli-contracts.md#workspaces-presets-and-results-layout).
+- Verify the package after contract, docs, or workspace changes: [cluster verification contract](docs/reference/verification.md).
 - Decide whether you should stay in `cluster` or switch to OPAL: [cluster ownership boundary](docs/concepts/ownership-boundary.md).
 
-## Documentation map
+## Documentation
 
-- [cluster docs by workflow](docs/README.md): task-first router for clustering work once a chosen feature definition already exists.
+- [cluster docs by workflow](docs/README.md): comprehensive index for usage flows, maintainers, demos, and reference routes.
 - [cluster docs by type](docs/index.md): workflow, concept, and reference split.
 - [exploratory clustering workflow](docs/workflows/exploratory-clustering.md): first runnable `fit`, `umap`, `intra-sim`, and `analyze` path.
-- [cluster CLI contracts](docs/reference/cli-contracts.md): command surface, jobs/presets layout, OPAL joins, env vars, and troubleshooting.
+- [cluster CLI contracts](docs/reference/cli-contracts.md): command surface, workspace/preset layout, public API, OPAL joins, env vars, and troubleshooting.
 - [cluster verification contract](docs/reference/verification.md): deterministic preflight/run/verify path for maintainers and refactors.
+- [`dnadesign.cluster.api`](api.py): public in-process ad hoc and workspace execution helpers plus run listing.
 - [cluster ownership boundary](docs/concepts/ownership-boundary.md): downstream role relative to USR, infer, and OPAL.
 - [cluster semantic surface](docs/concepts/semantic-surface.md): package nouns and runtime boundary rules.
 - [repository docs index](../../../docs/README.md): cross-tool workflow routes.
@@ -54,14 +56,18 @@ uv run cluster analyze --help
 uv run cluster intra-sim --help
 uv run cluster sweep --help
 uv run cluster delete-columns --help
+uv run cluster workspaces where
+uv run cluster workspaces init --help
+uv run cluster workspaces list
 ```
 
 ## Results and artifacts
 
-- Checked-in inputs live under `jobs/` and `presets/`.
-- Generated outputs live under the resolved results root:
-  - `DNADESIGN_CLUSTER_RESULTS_DIR` when explicitly set
-  - otherwise the nearest project `cluster/results/`
-  - otherwise `./results` in the current working directory when that directory is outside the built-in package tree
-- Running from inside `src/dnadesign/cluster/` requires an explicit writable workspace or results root; `cluster` will not write runtime state under the package tree.
+- Checked-in reusable inputs live under `workspaces/` and `presets/`.
+- Built-in workspace outputs live under `workspaces/<workspace-id>/outputs/cluster/`.
+- Ad hoc standalone runs require an explicit `--results-root`.
+- `cluster` does not infer runtime state from the current directory.
+- Runtime state under the package tree is allowed only for an explicitly selected workspace-owned `workspaces/<workspace-id>/outputs/cluster/` root.
+- Attached overlay columns use one contract for both USR datasets and generic files: `cluster__<run>__...`.
+- First-class recorded artifacts include fit `fits/<run-slug>/run.json`, UMAP `umap/<run-slug>/umap.json`, analysis `analysis/<run-slug>/analysis.json`, and sweep `sweeps/<run-slug>/sweep.json`.
 - For exact results, reuse, and cleanup semantics, see [cluster CLI contracts](docs/reference/cli-contracts.md#results-and-artifacts).

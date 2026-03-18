@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/analysis/contracts.py
 
 Typed analysis-request contracts for cluster.
@@ -106,7 +106,7 @@ class AnalysisRequest:
                     "When --out-dir is omitted, --cluster-col must be a fit label column of the form 'cluster__<NAME>'."
                 )
             if results_root is None:
-                raise ValueError("Analysis requires an explicit results root when --out-dir is omitted.")
+                raise ValueError("Analysis requires a workspace or explicit results root when --out-dir is omitted.")
             resolved_out_dir = Path(results_root) / fit_alias / "analysis"
         else:
             resolved_out_dir = Path(out_dir)
@@ -168,8 +168,16 @@ class AnalysisRequest:
             "out_dir": str(self.out_dir),
         }
 
-    def to_run(self, *, created_utc: str | None = None) -> AnalysisRun:
+    def to_run(
+        self,
+        *,
+        alias: str,
+        slug: str,
+        created_utc: str | None = None,
+    ) -> AnalysisRun:
         return AnalysisRun(
+            alias=alias,
+            slug=slug,
             cluster_col=self.cluster_col,
             created_utc=created_utc or utc_now_iso(),
             source=self.source,

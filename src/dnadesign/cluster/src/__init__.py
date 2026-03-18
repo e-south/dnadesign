@@ -1,13 +1,26 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/__init__.py
 
-Cluster — Parquet/CSV-first exploratory clustering with explicit method contracts.
+Cluster runtime package.
 
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-__all__ = ["cli", "io", "methods", "umap", "analysis", "opal", "runs", "presets", "util", "layout", "runtime_contracts"]
+__all__ = [
+    "analysis",
+    "cli",
+    "io",
+    "layout",
+    "methods",
+    "opal",
+    "presets",
+    "runs",
+    "runtime_contracts",
+    "umap",
+    "util",
+    "workspaces",
+]

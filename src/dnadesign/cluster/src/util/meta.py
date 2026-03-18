@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/util/meta.py
 
 Module Author(s): Eric J. South
@@ -26,7 +26,7 @@ def compact_meta(
 ) -> str:
     obj = {
         "ver": ver,
-        "utc": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "utc": datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "method_id": method_id,
         "x_col": x_col,
         "n": n,

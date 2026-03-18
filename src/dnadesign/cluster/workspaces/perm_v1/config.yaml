@@ -1,0 +1,36 @@
+schema_version: 1
+input:
+  file: "../../../permuter/results/rt_combine_from_dms/records.parquet"
+
+fit:
+  name: "perm_v1"
+  x_col: "permuter__observed__logits_mean"
+  preset: "method.leiden.fine"
+  write: true
+  allow_overwrite: true
+  inplace: true
+
+umap:
+  name: "perm_v1"
+  x_col: "permuter__observed__logits_mean"
+  preset: "umap.permuter"
+  attach_coords: false
+  write: true
+  allow_overwrite: true
+  inplace: true
+  plot:
+    dims: [10, 10]
+    alpha: 0.1
+    size: 14.0
+
+analyze:
+  cluster_col: "cluster__perm_v1"
+  numeric:
+    - "permuter__expected__llr_mean"
+    - "permuter__observed__llr_mean"
+  plots: true
+  numeric_plots: true
+  composition: true
+  diversity: true
+  difffeat: false
+  group_by: "permuter__mut_count"

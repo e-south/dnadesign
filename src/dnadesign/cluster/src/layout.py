@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/layout.py
 
 Cluster project-layout helpers.
@@ -11,7 +11,6 @@ Module Author(s): Codex
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 
@@ -24,9 +23,9 @@ def builtin_cluster_dir() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def package_cluster_dir() -> Path:
-    """Compatibility alias for the built-in package asset root."""
-    return builtin_cluster_dir()
+def builtin_workspaces_dir() -> Path:
+    """Return the built-in cluster workspace directory."""
+    return builtin_cluster_dir() / "workspaces"
 
 
 def is_builtin_cluster_path(path: Path) -> bool:
@@ -35,82 +34,37 @@ def is_builtin_cluster_path(path: Path) -> bool:
     return resolved == builtin or resolved.is_relative_to(builtin)
 
 
-def configured_workspace_cluster_dir() -> Path | None:
-    value = os.environ.get("DNADESIGN_CLUSTER_ROOT")
-    if not value:
-        return None
-    resolved = Path(value).expanduser().resolve()
-    if is_builtin_cluster_path(resolved):
-        raise ClusterLayoutError(
-            "DNADESIGN_CLUSTER_ROOT must point to a writable workspace 'cluster/' directory, "
-            f"not the built-in package tree at '{builtin_cluster_dir()}'."
-        )
-    return resolved
-
-
-def configured_cluster_dir() -> Path | None:
-    """Compatibility alias for the configured workspace cluster directory."""
-    return configured_workspace_cluster_dir()
-
-
-def nearest_workspace_cluster_dir(start: Path | None = None) -> Path | None:
+def is_builtin_workspace_results_root(path: Path) -> bool:
     """
-    Walk upward from ``start`` (or CWD) and return the nearest project-level
-    ``cluster/`` directory. This is a project workspace lookup, not a package
-    install lookup.
+    Return whether ``path`` is the canonical artifact root for one checked-in workspace.
+
+    The only package-tree runtime state cluster allows is ``workspaces/<id>/outputs/cluster``.
     """
-    origin = (start or Path.cwd()).resolve()
-    for base in [origin, *origin.parents]:
-        candidate: Path | None = None
-        if (base / "cluster").is_dir():
-            candidate = (base / "cluster").resolve()
-        elif base.name == "cluster":
-            candidate = base.resolve()
-        if candidate is None or is_builtin_cluster_path(candidate):
-            continue
-        return candidate
-    return None
-
-
-def nearest_cluster_dir(start: Path | None = None) -> Path | None:
-    """Compatibility alias for workspace cluster discovery."""
-    return nearest_workspace_cluster_dir(start)
-
-
-def preferred_workspace_cluster_dir(start: Path | None = None) -> Path | None:
-    """
-    Prefer an explicit project/workspace root over ambient discovery.
-    Never fall back to the installed package directory for mutable runtime state.
-    """
-    return configured_workspace_cluster_dir() or nearest_workspace_cluster_dir(start)
-
-
-def preferred_cluster_dir(start: Path | None = None) -> Path | None:
-    """Compatibility alias for preferred workspace cluster discovery."""
-    return preferred_workspace_cluster_dir(start)
+    resolved = path.resolve()
+    workspaces_root = builtin_workspaces_dir().resolve()
+    if resolved == workspaces_root or not resolved.is_relative_to(workspaces_root):
+        return False
+    parts = resolved.relative_to(workspaces_root).parts
+    return len(parts) == 3 and parts[1] == "outputs" and parts[2] == "cluster"
 
 
 def _package_tree_runtime_error(origin: Path) -> ClusterLayoutError:
     return ClusterLayoutError(
-        "Cluster runtime state cannot default under the built-in package tree. "
+        "Cluster runtime state cannot default under the built-in package tree "
+        "outside an explicit workspace outputs/cluster root. "
         f"Current path '{origin}' resolves inside '{builtin_cluster_dir()}'. "
-        "Set DNADESIGN_CLUSTER_RESULTS_DIR, set DNADESIGN_CLUSTER_ROOT to a writable workspace "
-        "'cluster/' directory, or run the command from your workspace."
+        "Pass an explicit cluster workspace or results root outside the package tree."
     )
 
 
-def default_results_root(start: Path | None = None) -> Path:
+def explicit_results_root(results_root: str | Path | None) -> Path:
     """
-    Choose a writable default results root.
-
-    Order:
-    1. nearest configured/discovered project ``cluster/`` directory
-    2. current working directory ``./results`` when outside the built-in package tree
+    Cluster artifact roots are explicit-only.
+    Callers must pass a workspace-local root or a deliberate standalone results root.
     """
-    project_cluster = preferred_workspace_cluster_dir(start)
-    if project_cluster is not None:
-        return project_cluster / "results"
-    origin = (start or Path.cwd()).resolve()
-    if is_builtin_cluster_path(origin):
+    if results_root is None:
+        raise ClusterLayoutError("Cluster artifact roots are explicit. Pass --workspace or --results-root.")
+    origin = Path(results_root).expanduser().resolve()
+    if is_builtin_cluster_path(origin) and not is_builtin_workspace_results_root(origin):
         raise _package_tree_runtime_error(origin)
-    return origin / "results"
+    return origin

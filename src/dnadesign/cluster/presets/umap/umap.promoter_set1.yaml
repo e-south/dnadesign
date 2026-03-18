@@ -8,7 +8,7 @@ params:
   min_dist: 0.10
   metric: "euclidean"
 
-# Plotting block (can be overridden in job.plot or CLI)
+# Plotting block (can be overridden in workspace config or CLI)
 plot:
   dims: [12, 9]
   alpha: 0.45

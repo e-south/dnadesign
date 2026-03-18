@@ -1,0 +1,36 @@
+schema_version: 1
+input:
+  dataset: "60bp_dual_promoter_cpxR_LexA"
+  usr_root: "../../../usr"
+
+fit:
+  name: "promoter_clusters_v1"
+  x_col: "infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean"
+  preset: "method.leiden.fine"
+  write: true
+  allow_overwrite: true
+
+umap:
+  name: "promoter_clusters_v1"
+  x_col: "infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean"
+  preset: "umap.promoter_set1"
+  highlight: "../../../opal/campaigns/prom60-etoh-cipro-andgate/outputs/ledger.labels/part-1e5a6a5834f14a22b7d5e2794b1a7b25.parquet"
+  opal_campaign: "prom60-etoh-cipro-andgate"
+  opal_as_of_round: 0
+  opal_fields:
+    - "obj__logic_fidelity"
+    - "obj__effect_scaled"
+  attach_coords: true
+  write: true
+  allow_overwrite: true
+  plot:
+    dims: [14, 10]
+    alpha: 0.6
+    size: 6.0
+    highlight:
+      overlay: true
+      size: 60.0
+
+analyze:
+  cluster_col: "cluster__promoter_clusters_v1"
+  preset: "analysis.promoter_set1"
