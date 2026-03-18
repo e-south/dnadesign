@@ -107,9 +107,20 @@ def _cuda_device_index(device: str) -> int:
     return index
 
 
-def _selected_devices(model: ModelConfig, inventory: GpuInventory) -> tuple[GpuDeviceInfo, ...]:
+def _selected_devices(
+    model: ModelConfig,
+    inventory: GpuInventory,
+    *,
+    device_index: int,
+    required_gpus: int,
+) -> tuple[GpuDeviceInfo, ...]:
     if model.parallelism.gpu_ids is None:
-        return inventory.devices
+        if model.parallelism.strategy == "single_device":
+            return (inventory.devices[device_index],)
+        end_index = device_index + required_gpus
+        if end_index > inventory.count:
+            return ()
+        return tuple(inventory.devices[idx] for idx in range(device_index, end_index))
 
     invalid = [idx for idx in model.parallelism.gpu_ids if idx >= inventory.count]
     if invalid:
@@ -119,14 +130,29 @@ def _selected_devices(model: ModelConfig, inventory: GpuInventory) -> tuple[GpuD
             f"invalid_gpu_ids={invalid} "
             f"gpus_available={inventory.count}"
         )
+    if model.parallelism.strategy == "single_device":
+        if tuple(model.parallelism.gpu_ids) != (device_index,):
+            raise ValidationError(
+                "CAPACITY_FAIL "
+                f"device_index={device_index} "
+                f"gpu_ids={model.parallelism.gpu_ids} "
+                "model.device must match model.parallelism.gpu_ids for single_device configs"
+            )
+    elif device_index not in model.parallelism.gpu_ids:
+        raise ValidationError(
+            "CAPACITY_FAIL "
+            f"device_index={device_index} "
+            f"gpu_ids={model.parallelism.gpu_ids} "
+            "model.device must be included in model.parallelism.gpu_ids for multi_gpu_vortex configs"
+        )
     return tuple(inventory.devices[idx] for idx in model.parallelism.gpu_ids)
 
 
-def validate_model_hardware_contract(
+def _resolve_capacity_devices(
     *,
     model: ModelConfig,
-    inventory: GpuInventory | None = None,
-) -> None:
+    inventory: GpuInventory | None,
+) -> tuple[GpuInventory, tuple[GpuDeviceInfo, ...]]:
     device = str(model.device or "").strip()
     if model.parallelism.strategy == "multi_gpu_vortex" and not device.startswith("cuda"):
         raise ValidationError(
@@ -134,7 +160,8 @@ def validate_model_hardware_contract(
         )
 
     if not device.startswith("cuda"):
-        return
+        active_inventory = inventory or probe_gpu_inventory()
+        return active_inventory, ()
 
     device_index = _cuda_device_index(device)
     active_inventory = inventory or probe_gpu_inventory()
@@ -147,15 +174,42 @@ def validate_model_hardware_contract(
     if active_inventory.count < required_gpus:
         raise ValidationError(f"CAPACITY_FAIL required_gpus={required_gpus} gpus_available={active_inventory.count}")
 
-    selected = _selected_devices(model, active_inventory)
+    selected = _selected_devices(
+        model,
+        active_inventory,
+        device_index=device_index,
+        required_gpus=required_gpus,
+    )
     if len(selected) < required_gpus:
         raise ValidationError(
             "CAPACITY_FAIL "
+            f"device={device} "
             f"gpu_ids={model.parallelism.gpu_ids} "
             f"required_gpus={required_gpus} "
             f"selected_gpus={len(selected)}"
         )
-    selected = selected[:required_gpus]
+    return active_inventory, selected[:required_gpus]
+
+
+def validate_model_gpu_topology_contract(
+    *,
+    model: ModelConfig,
+    inventory: GpuInventory | None = None,
+) -> tuple[GpuDeviceInfo, ...]:
+    _active_inventory, selected = _resolve_capacity_devices(model=model, inventory=inventory)
+    return selected
+
+
+def validate_model_hardware_contract(
+    *,
+    model: ModelConfig,
+    inventory: GpuInventory | None = None,
+) -> None:
+    device = str(model.device or "").strip()
+    active_inventory, selected = _resolve_capacity_devices(model=model, inventory=inventory)
+    if not device.startswith("cuda"):
+        return
+    required_gpus = _required_gpu_count(model)
     _validate_evo2_gpu_arch_contract(model=model, devices=selected)
 
     required_gib = estimate_required_gib(model_id=model.id, precision=model.precision)
@@ -180,5 +234,6 @@ __all__ = [
     "GpuInventory",
     "estimate_required_gib",
     "probe_gpu_inventory",
+    "validate_model_gpu_topology_contract",
     "validate_model_hardware_contract",
 ]

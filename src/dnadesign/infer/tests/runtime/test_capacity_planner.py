@@ -140,3 +140,37 @@ def test_single_device_fails_when_device_index_is_out_of_range() -> None:
 
     with pytest.raises(ValidationError, match="device_index=3"):
         validate_model_hardware_contract(model=model, inventory=_inventory(count=2))
+
+
+def test_single_device_uses_requested_cuda_index_for_capacity_selection() -> None:
+    model = ModelConfig(
+        id="evo2_7b",
+        device="cuda:3",
+        precision="bf16",
+        alphabet="dna",
+        parallelism=ModelParallelismConfig(strategy="single_device"),
+    )
+    inventory = GpuInventory(
+        devices=(
+            GpuDeviceInfo(index=0, name="gpu0", total_memory_gib=80.0, compute_capability="8.9"),
+            GpuDeviceInfo(index=1, name="gpu1", total_memory_gib=80.0, compute_capability="8.9"),
+            GpuDeviceInfo(index=2, name="gpu2", total_memory_gib=80.0, compute_capability="8.9"),
+            GpuDeviceInfo(index=3, name="gpu3", total_memory_gib=1.0, compute_capability="8.9"),
+        )
+    )
+
+    with pytest.raises(ValidationError, match="usable_gib=0.9"):
+        validate_model_hardware_contract(model=model, inventory=inventory)
+
+
+def test_single_device_requires_gpu_ids_to_match_device_index() -> None:
+    model = ModelConfig(
+        id="evo2_7b",
+        device="cuda:0",
+        precision="bf16",
+        alphabet="dna",
+        parallelism=ModelParallelismConfig(strategy="single_device", gpu_ids=[1]),
+    )
+
+    with pytest.raises(ValidationError, match="model.device must match model.parallelism.gpu_ids"):
+        validate_model_hardware_contract(model=model, inventory=_inventory(count=2))

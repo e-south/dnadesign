@@ -85,7 +85,12 @@ def _resolve_infer_usr_output_for_mode_probe(infer_config: Path):
         return resolve_usr_producer_contract(tool="infer", config_path=infer_config)
     except ValueError as exc:
         message = str(exc)
-        if "at least one job with ingest.source='usr' and io.write_back=true" in message:
+        non_fatal_fragments = (
+            "at least one job with ingest.source='usr' and io.write_back=true",
+            "multiple USR destinations",
+            "requires ingest.root for source='usr' write-back jobs",
+        )
+        if any(fragment in message for fragment in non_fatal_fragments):
             return None
         raise ValueError(
             f"infer mode probe requires a single resolvable USR destination in infer config {infer_config}: {message}"

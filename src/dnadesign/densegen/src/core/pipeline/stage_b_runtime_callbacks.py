@@ -380,6 +380,7 @@ class StageBLibraryRuntimeCallbacks:
                 countable_indices=_countable_variable_motif_indices(
                     library_for_opt=library_for_opt,
                     fixed_elements=self._context.fixed_elements,
+                    source_by_index=source_by_index,
                 ),
                 source_label=self._context.source_label,
                 plan_name=self._context.plan_name,

@@ -160,3 +160,19 @@ def test_countable_variable_motif_indices_excludes_promoter_motifs() -> None:
         },
     )
     assert indices == [1, 3]
+
+
+def test_countable_variable_motif_indices_keeps_source_labeled_variable_promoter_match() -> None:
+    indices = _countable_variable_motif_indices(
+        library_for_opt=["TTGACA", "GGGG"],
+        fixed_elements={
+            "promoter_constraints": [
+                {
+                    "upstream": "ttgaca",
+                    "downstream": "tataat",
+                }
+            ]
+        },
+        source_by_index=["stage_a_pool", None],
+    )
+    assert indices == [0, 1]

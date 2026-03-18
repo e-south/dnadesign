@@ -24,8 +24,10 @@ _GPU_CAPABILITY_MEMORY_HINT_GIB: dict[str, float] = {
 def _load_model_config(config_path: Path):
     from pydantic import ValidationError as PydanticValidationError
 
+    from .bootstrap import initialize_registry
     from .config import ModelConfig
     from .errors import ConfigError
+    from .registry import get_adapter_cls
 
     try:
         payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
@@ -40,7 +42,10 @@ def _load_model_config(config_path: Path):
     if not isinstance(model_payload, dict):
         raise ValueError(f"infer config must include a model block: {config_path}")
     try:
-        return ModelConfig(**model_payload)
+        model = ModelConfig(**model_payload)
+        initialize_registry()
+        get_adapter_cls(model.id)
+        return model
     except (PydanticValidationError, ValueError, ConfigError) as exc:
         raise ValueError(f"infer model contract invalid in config {config_path}: {exc}") from exc
 
@@ -67,38 +72,30 @@ def validate_runbook_gpu_resources(
     resolved_declared_gpus = int(declared_gpus)
     memory_hint = _gpu_memory_hint(gpu_capability=gpu_capability, gpu_memory_gib=gpu_memory_gib)
 
-    if memory_hint is None:
-        required_gpus = model.parallelism.min_gpus if model.parallelism.strategy == "multi_gpu_vortex" else 1
-        if resolved_declared_gpus < int(required_gpus):
-            raise ValueError(
-                "infer runbook resources do not satisfy model.parallelism contract: "
-                f"required_gpus={required_gpus} resources.gpus={resolved_declared_gpus}"
-            )
-        if model.parallelism.gpu_ids is not None:
-            invalid = [idx for idx in model.parallelism.gpu_ids if idx >= resolved_declared_gpus]
-            if invalid:
-                raise ValueError(
-                    "infer runbook resources do not satisfy model.parallelism.gpu_ids contract: "
-                    f"invalid_gpu_ids={invalid} resources.gpus={resolved_declared_gpus}"
-                )
-        return
-
     from .errors import ValidationError
-    from .runtime.capacity_planner import GpuDeviceInfo, GpuInventory, validate_model_hardware_contract
+    from .runtime.capacity_planner import (
+        GpuDeviceInfo,
+        GpuInventory,
+        validate_model_gpu_topology_contract,
+        validate_model_hardware_contract,
+    )
 
     inventory = GpuInventory(
         devices=tuple(
             GpuDeviceInfo(
                 index=index,
                 name=f"declared_gpu_{index}",
-                total_memory_gib=float(memory_hint),
+                total_memory_gib=float(memory_hint or 0.0),
                 compute_capability=str(gpu_capability or ""),
             )
             for index in range(resolved_declared_gpus)
         )
     )
     try:
-        validate_model_hardware_contract(model=model, inventory=inventory)
+        if memory_hint is None:
+            validate_model_gpu_topology_contract(model=model, inventory=inventory)
+        else:
+            validate_model_hardware_contract(model=model, inventory=inventory)
     except ValidationError as exc:
         raise ValueError(str(exc)) from exc
 

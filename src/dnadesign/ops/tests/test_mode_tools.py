@@ -108,6 +108,122 @@ def test_infer_overlay_probe_uses_workspace_fallback_when_no_usr_destination(
     assert calls["count"] == 1
 
 
+def test_infer_overlay_probe_uses_workspace_fallback_when_usr_destination_is_ambiguous(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    overlay_path = workspace_root / "outputs" / "usr_datasets" / "demo" / "_derived" / "infer.parquet"
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    overlay_path.write_text("x\n", encoding="utf-8")
+
+    infer_config = tmp_path / "infer.yaml"
+    infer_config.write_text(
+        f"""
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs:
+  - id: job_a
+    operation: extract
+    ingest:
+      source: usr
+      root: "{tmp_path / "usr_a"}"
+      dataset: "dataset_a"
+      field: sequence
+    outputs:
+      - id: ll_mean
+        fn: log_likelihood
+        format: float
+        params:
+          reduction: mean
+    io:
+      write_back: true
+  - id: job_b
+    operation: extract
+    ingest:
+      source: usr
+      root: "{tmp_path / "usr_b"}"
+      dataset: "dataset_b"
+      field: sequence
+    outputs:
+      - id: ll_mean
+        fn: log_likelihood
+        format: float
+        params:
+          reduction: mean
+    io:
+      write_back: true
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    calls = {"count": 0}
+
+    def _workspace_probe(_workspace_root: Path) -> tuple[Path, ...]:
+        calls["count"] += 1
+        return (overlay_path,)
+
+    monkeypatch.setattr(mode_tools, "_infer_workspace_overlay_candidates", _workspace_probe)
+    artifacts = mode_tools._infer_overlay_artifacts(workspace_root, infer_config=infer_config)
+    assert artifacts == (overlay_path,)
+    assert calls["count"] == 1
+
+
+def test_infer_overlay_probe_uses_workspace_fallback_when_usr_root_is_implicit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    overlay_path = workspace_root / "outputs" / "usr_datasets" / "demo" / "_derived" / "infer.parquet"
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    overlay_path.write_text("x\n", encoding="utf-8")
+
+    infer_config = tmp_path / "infer.yaml"
+    infer_config.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs:
+  - id: job_a
+    operation: extract
+    ingest:
+      source: usr
+      dataset: "demo"
+      field: sequence
+    outputs:
+      - id: ll_mean
+        fn: log_likelihood
+        format: float
+        params:
+          reduction: mean
+    io:
+      write_back: true
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    calls = {"count": 0}
+
+    def _workspace_probe(_workspace_root: Path) -> tuple[Path, ...]:
+        calls["count"] += 1
+        return (overlay_path,)
+
+    monkeypatch.setattr(mode_tools, "_infer_workspace_overlay_candidates", _workspace_probe)
+    artifacts = mode_tools._infer_overlay_artifacts(workspace_root, infer_config=infer_config)
+    assert artifacts == (overlay_path,)
+    assert calls["count"] == 1
+
+
 def test_register_mode_tool_adapter_rejects_duplicate_tool() -> None:
     adapter = mode_tools.resolve_mode_tool_adapter_for_workflow_id("infer_batch_submit")
     with pytest.raises(ValueError, match="mode tool adapter already registered"):

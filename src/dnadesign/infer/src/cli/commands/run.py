@@ -195,14 +195,14 @@ def register(app: typer.Typer) -> None:
 
             if dry_run:
                 for selected_job in jobs:
-                    if selected_job.ingest.source != "usr":
-                        continue
                     resolve_config_job_inputs(
                         job=selected_job,
                         config_dir=cfg_path.parent,
                         i_know_this_is_pickle=i_know_this_is_pickle,
                         guard_pickle=guard_pickle,
                     )
+                    if selected_job.ingest.source != "usr":
+                        continue
                     preflight_usr_input(
                         dataset_name=str(selected_job.ingest.dataset),
                         field=str(selected_job.ingest.field or "sequence"),

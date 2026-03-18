@@ -105,8 +105,10 @@ def test_densegen_analysis_qsub_is_plot_only_without_notebook_generation() -> No
     assert "dense_array_video_showcase requires ffmpeg executable in PATH." in qsub_script
     assert 'ATTEMPTS_PARQUET="$TABLES_DIR/attempts.parquet"' in qsub_script
     assert 'COMPOSITION_PARQUET="$TABLES_DIR/composition.parquet"' in qsub_script
-    assert "requires attempts artifacts" in qsub_script
-    assert "requires composition artifacts" in qsub_script
+    assert "needs_attempts_artifact=0" in qsub_script
+    assert "needs_composition_artifact=0" in qsub_script
+    assert "Selected DenseGen analysis plots require attempts artifacts." in qsub_script
+    assert "Selected DenseGen analysis plots require composition artifacts." in qsub_script
     assert "resolve_run_root" in qsub_script
     assert 'dirname "$DENSEGEN_CONFIG"' not in qsub_script
     assert "dense notebook generate" not in qsub_script

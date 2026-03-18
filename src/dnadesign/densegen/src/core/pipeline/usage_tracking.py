@@ -40,12 +40,17 @@ def _promoter_constraint_motifs(fixed_elements) -> set[str]:
     return motifs
 
 
-def _countable_variable_motif_indices(*, library_for_opt, fixed_elements) -> list[int]:
+def _countable_variable_motif_indices(*, library_for_opt, fixed_elements, source_by_index=None) -> list[int]:
     promoter_motifs = _promoter_constraint_motifs(fixed_elements)
     indices: list[int] = []
     for idx, motif in enumerate(list(library_for_opt)):
         motif_norm = str(motif).strip().upper()
-        if motif_norm in promoter_motifs:
+        source = None
+        if source_by_index is not None and idx < len(source_by_index):
+            raw_source = source_by_index[idx]
+            if raw_source is not None:
+                source = str(raw_source).strip().lower()
+        if motif_norm in promoter_motifs and source in {None, "", "fixed_element", "promoter_constraint"}:
             continue
         indices.append(int(idx))
     return indices

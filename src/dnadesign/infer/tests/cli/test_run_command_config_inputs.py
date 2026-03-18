@@ -188,6 +188,15 @@ jobs:
     assert "USR dataset not initialized or missing" in (result.stdout or "")
 
 
+def test_run_config_dry_run_validates_non_usr_job_inputs(tmp_path: Path) -> None:
+    config_path = _write_minimal_config(tmp_path)
+
+    result = _RUNNER.invoke(app, ["run", "--config", config_path.as_posix(), "--dry-run"])
+
+    assert result.exit_code != 0
+    assert "ingest.path not found" in (result.stdout or "")
+
+
 def test_run_rejects_mixed_config_and_preset_modes(tmp_path: Path) -> None:
     (tmp_path / "inputs").mkdir(parents=True, exist_ok=True)
     (tmp_path / "inputs" / "seqs.txt").write_text("ACGT\n", encoding="utf-8")

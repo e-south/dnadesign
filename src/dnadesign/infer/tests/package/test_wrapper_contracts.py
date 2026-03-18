@@ -144,3 +144,28 @@ jobs: []
             gpu_capability=None,
             gpu_memory_gib=None,
         )
+
+
+def test_runbook_gpu_validation_without_memory_hint_still_checks_device_topology(tmp_path: Path) -> None:
+    from dnadesign.infer import validate_runbook_gpu_resources
+
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:3
+  precision: bf16
+  alphabet: dna
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="device_index=3"):
+        validate_runbook_gpu_resources(
+            config_path=config,
+            declared_gpus=1,
+            gpu_capability=None,
+            gpu_memory_gib=None,
+        )

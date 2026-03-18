@@ -1709,8 +1709,9 @@ jobs:
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="infer mode probe requires a single resolvable USR destination"):
-        resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
+    decision = resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
+    assert decision.selected_mode == "fresh"
+    assert decision.resume_artifacts_found is False
 
 
 def test_infer_mode_fresh_requires_reset_ack_when_resume_artifacts_exist(tmp_path: Path) -> None:
