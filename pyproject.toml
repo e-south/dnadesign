@@ -95,6 +95,10 @@ dev  = [{ include-group = "test" }, { include-group = "lint" }]
 where = ["src"]
 
 [tool.setuptools.package-data]
+"dnadesign.cluster" = [
+  "presets/*/*.yaml",
+  "workspaces/*/config.yaml",
+]
 "dnadesign.construct" = [
   "src/seeds/*.yaml",
   "workspaces/demo_promoter_swap_pdual10/*.md",
@@ -110,6 +114,10 @@ where = ["src"]
 "dnadesign.densegen" = [
   "workspaces/demo_meme_three_tfs/config.yaml",
   "workspaces/demo_meme_three_tfs/inputs/*.txt",
+]
+"dnadesign.infer" = [
+  "docs/operations/examples/*.yaml",
+  "src/presets/*/*.yaml",
 ]
 
 [tool.pytest.ini_options]

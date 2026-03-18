@@ -74,6 +74,14 @@ def test_cluster_workspaces_scaffold_exists() -> None:
     assert (workspaces_root / "perm_v1" / "config.yaml").is_file()
 
 
+def test_cluster_package_data_includes_builtin_workspaces_and_presets() -> None:
+    repo_root = _cluster_root().parents[2]
+    pyproject = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
+    assert '"dnadesign.cluster"' in pyproject
+    assert "workspaces/*/config.yaml" in pyproject
+    assert "presets/*/*.yaml" in pyproject
+
+
 def test_cluster_root_does_not_track_jobs_or_runtime_results() -> None:
     cluster_root = _cluster_root()
     assert not (cluster_root / "jobs").exists()

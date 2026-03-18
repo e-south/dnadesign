@@ -144,6 +144,14 @@ def test_infer_root_does_not_track_runtime_log_artifacts() -> None:
     assert tracked_logs == []
 
 
+def test_infer_package_data_includes_workspace_templates_and_presets() -> None:
+    repo_root = _infer_root().parents[2]
+    pyproject = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
+    assert '"dnadesign.infer"' in pyproject
+    assert "docs/operations/examples/*.yaml" in pyproject
+    assert "src/presets/*/*.yaml" in pyproject
+
+
 def test_infer_tests_are_grouped_by_area() -> None:
     tests_root = _infer_root() / "tests"
     assert (tests_root / "cli").is_dir()
