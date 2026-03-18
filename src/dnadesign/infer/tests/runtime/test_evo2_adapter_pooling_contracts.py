@@ -63,7 +63,9 @@ class _TorchModule:
     def named_modules(self):
         yield ("", object())
         yield ("blocks.0.mlp.l3", object())
+        yield ("blocks.1.mlp.l3", object())
         yield ("blocks.20.mlp.l3", object())
+        yield ("blocks.26.mlp.l3", object())
         yield ("blocks.31.mlp.l3", object())
 
 
@@ -145,7 +147,7 @@ def test_embedding_alias_mid_uses_registered_default_layer() -> None:
     )
 
     assert len(out) == 1
-    assert adapter.model.embedding_layers == ["blocks.20.mlp.l3"]
+    assert adapter.model.embedding_layers == ["blocks.26.mlp.l3"]
 
 
 def test_embedding_alias_final_resolves_to_last_block() -> None:

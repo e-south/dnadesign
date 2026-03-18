@@ -48,9 +48,9 @@ def test_7b_single_device_passes_on_single_45g_gpu() -> None:
     validate_model_hardware_contract(model=model, inventory=_inventory(count=1))
 
 
-def test_40b_single_device_fails_on_single_45g_gpu() -> None:
+def test_20b_single_device_fails_on_single_45g_hopper_gpu() -> None:
     model = ModelConfig(
-        id="evo2_40b",
+        id="evo2_20b",
         device="cuda:0",
         precision="bf16",
         alphabet="dna",
@@ -58,7 +58,7 @@ def test_40b_single_device_fails_on_single_45g_gpu() -> None:
     )
 
     with pytest.raises(ValidationError, match="CAPACITY_FAIL"):
-        validate_model_hardware_contract(model=model, inventory=_inventory(count=1))
+        validate_model_hardware_contract(model=model, inventory=_inventory(count=1, cc="9.0"))
 
 
 def test_20b_fails_on_non_hopper_gpu_even_when_memory_is_sufficient() -> None:
@@ -74,22 +74,22 @@ def test_20b_fails_on_non_hopper_gpu_even_when_memory_is_sufficient() -> None:
         validate_model_hardware_contract(model=model, inventory=_inventory(count=1, gib_per_gpu=80.0, cc="8.9"))
 
 
-def test_40b_multi_gpu_vortex_fails_on_non_hopper_gpus_even_when_aggregate_capacity_is_sufficient() -> None:
+def test_20b_multi_gpu_vortex_fails_on_non_hopper_gpus_even_when_aggregate_capacity_is_sufficient() -> None:
     model = ModelConfig(
-        id="evo2_40b",
+        id="evo2_20b",
         device="cuda:0",
         precision="bf16",
         alphabet="dna",
-        parallelism=ModelParallelismConfig(strategy="multi_gpu_vortex", min_gpus=3),
+        parallelism=ModelParallelismConfig(strategy="multi_gpu_vortex", min_gpus=2),
     )
 
     with pytest.raises(ValidationError, match="requires Hopper"):
-        validate_model_hardware_contract(model=model, inventory=_inventory(count=3, gib_per_gpu=45.0, cc="8.9"))
+        validate_model_hardware_contract(model=model, inventory=_inventory(count=2, gib_per_gpu=45.0, cc="8.9"))
 
 
 def test_multi_gpu_vortex_requires_at_least_two_gpus() -> None:
     model = ModelConfig(
-        id="evo2_40b",
+        id="evo2_20b",
         device="cuda:0",
         precision="bf16",
         alphabet="dna",
@@ -100,21 +100,21 @@ def test_multi_gpu_vortex_requires_at_least_two_gpus() -> None:
         validate_model_hardware_contract(model=model, inventory=_inventory(count=1))
 
 
-def test_40b_multi_gpu_vortex_passes_when_aggregate_capacity_is_sufficient() -> None:
+def test_20b_multi_gpu_vortex_passes_when_aggregate_capacity_is_sufficient() -> None:
     model = ModelConfig(
-        id="evo2_40b",
+        id="evo2_20b",
         device="cuda:0",
         precision="bf16",
         alphabet="dna",
-        parallelism=ModelParallelismConfig(strategy="multi_gpu_vortex", min_gpus=3),
+        parallelism=ModelParallelismConfig(strategy="multi_gpu_vortex", min_gpus=2),
     )
 
-    validate_model_hardware_contract(model=model, inventory=_inventory(count=3, cc="9.0"))
+    validate_model_hardware_contract(model=model, inventory=_inventory(count=2, cc="9.0"))
 
 
 def test_multi_gpu_vortex_fails_when_gpu_ids_do_not_cover_required_gpus() -> None:
     model = ModelConfig(
-        id="evo2_40b",
+        id="evo2_20b",
         device="cuda:0",
         precision="bf16",
         alphabet="dna",

@@ -5,6 +5,7 @@ infer runs model-agnostic sequence inference and writes namespaced outputs back 
 ## Choose a task
 
 - [Get to a first local validate or dry-run](docs/getting-started/cli-quickstart.md): shortest path for ad-hoc validation and extraction commands.
+- [Run Evo2 promoter feature extraction](docs/operations/evo2-promoter-features.md): infer-owned runbook for the repo-aligned promoter bundle surface.
 - [Pressure-test write-back into USR](docs/operations/pressure-test-agnostic-models.md): contract-first runbook for local and ops-managed infer execution.
 - [Continue to cluster after infer-derived `X` exists](../cluster/docs/workflows/exploratory-clustering.md): exploratory Leiden, UMAP, and OPAL-join path once one chosen `infer__...` column exists in a file or USR dataset.
 - [Continue to OPAL after infer-derived `X` exists in USR](../opal/docs/workflows/usr-infer-x-active-learning.md): downstream active-learning branch only after infer has written the chosen `infer__...` column into a USR dataset and OPAL `campaign.yaml` uses `data.location.kind: usr`.
@@ -25,12 +26,15 @@ Read in this order when you want the full docs ladder:
 5. [workspaces guide](workspaces/README.md)
 6. [operations index](docs/operations/README.md)
 7. [SCC Evo2 GPU environment runbook](docs/operations/scc-evo2-gpu-uv-runbook.md)
-8. [agnostic-model pressure-test runbook](docs/operations/pressure-test-agnostic-models.md)
-9. [end-to-end pressure-test demo (infer + usr + ops + notify)](docs/tutorials/demo_pressure_test_usr_ops_notify.md)
-10. [reference index](docs/reference/README.md)
-11. [source-tree map](src/README.md)
-12. [developer docs](docs/dev/README.md)
-13. [repository docs index](../../../docs/README.md)
+8. [Evo2 promoter feature runbook](docs/operations/evo2-promoter-features.md)
+9. [agnostic-model pressure-test runbook](docs/operations/pressure-test-agnostic-models.md)
+10. [end-to-end pressure-test demo (infer + usr + ops + notify)](docs/tutorials/demo_pressure_test_usr_ops_notify.md)
+11. [reference index](docs/reference/README.md)
+12. [Evo2 provider reference](docs/reference/evo2-provider.md)
+13. [feature schema and selector contract](docs/reference/feature-schema.md)
+14. [source-tree map](src/README.md)
+15. [developer docs](docs/dev/README.md)
+16. [repository docs index](../../../docs/README.md)
 
 ## Entrypoint contract
 

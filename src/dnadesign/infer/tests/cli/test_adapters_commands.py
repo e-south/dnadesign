@@ -25,7 +25,6 @@ def test_adapters_list_reports_registered_default_model_ids() -> None:
     output = result.stdout or ""
     assert "evo2_7b" in output
     assert "evo2_20b" in output
-    assert "evo2_40b" in output
     assert "evo2_1b_base" in output
 
 

@@ -11,7 +11,10 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import pytest
+
 from dnadesign.infer.src.cli.requests import build_extract_request, build_generate_request
+from dnadesign.infer.src.errors import ConfigError
 
 
 def test_build_extract_request_from_single_output_flags() -> None:
@@ -101,3 +104,23 @@ def test_build_extract_request_preserves_explicit_embedding_layer() -> None:
 
     assert request.job.outputs is not None
     assert request.job.outputs[0].params["layer"] == "blocks.19.mlp.l3"
+
+
+def test_build_extract_request_rejects_pool_dim_zero() -> None:
+    with pytest.raises(ConfigError, match="pool.dim must be >= 1"):
+        build_extract_request(
+            model_id="evo2_7b",
+            device="cpu",
+            precision="fp32",
+            alphabet="dna",
+            batch_size=4,
+            preset=None,
+            fn="evo2.embedding",
+            format="list",
+            out_id="emb",
+            pool_method="mean",
+            pool_dim=0,
+            layer=None,
+            write_back=False,
+            overwrite=False,
+        )

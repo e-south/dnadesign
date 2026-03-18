@@ -30,7 +30,9 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     top_readme = _read("src/dnadesign/construct/README.md")
     readme = _read("src/dnadesign/construct/docs/README.md")
     index_doc = _read("src/dnadesign/construct/docs/index.md")
+    config_doc = _read("src/dnadesign/construct/docs/reference/config.md")
     outputs = _read("src/dnadesign/construct/docs/reference/outputs.md")
+    template_contexts = _read("src/dnadesign/construct/docs/reference/template-contexts.md")
     workspaces = _read("src/dnadesign/construct/workspaces/README.md")
     source_of_truth_workspace = _read(
         "src/dnadesign/construct/workspaces/demo_promoter_swap_pdual10_source_of_truth/README.md"
@@ -49,7 +51,12 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     assert "## Boundary reminder" in top_readme
     assert "Shared cross-tool handoff routes (USR-owned)" in top_readme
     assert "docs/README.md" in top_readme
+    assert "reference/template-contexts.md" in readme
+    assert "reference/template-contexts.md" in index_doc
+    assert "template-contexts.md" in config_doc
     assert "../../../usr/docs/operations/construct-infer-source-of-truth-runbook.md" in outputs
+    assert "construct__anchor_start" in outputs
+    assert "construct__anchor_start" in template_contexts
     assert "demo_promoter_swap_pdual10_source_of_truth" in readme
     assert "demo_promoter_swap_pdual10_source_of_truth" in index_doc
     assert "demo_promoter_swap_pdual10_source_of_truth" in workspaces

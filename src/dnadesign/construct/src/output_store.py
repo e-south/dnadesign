@@ -31,6 +31,8 @@ _USR_STATE_COLUMNS = [
 _CONSTRUCT_COLUMNS = [
     {"name": "construct__job", "type": "string"},
     {"name": "construct__spec_id", "type": "string"},
+    {"name": "construct__context_id", "type": "string"},
+    {"name": "construct__context_kind", "type": "string"},
     {"name": "construct__template_id", "type": "string"},
     {"name": "construct__template_kind", "type": "string"},
     {"name": "construct__template_source", "type": "string"},
@@ -44,6 +46,10 @@ _CONSTRUCT_COLUMNS = [
     {"name": "construct__input_fields", "type": "list<string>"},
     {"name": "construct__input_id", "type": "string"},
     {"name": "construct__input_length", "type": "int64"},
+    {"name": "construct__anchor_id", "type": "string"},
+    {"name": "construct__anchor_orientation", "type": "string"},
+    {"name": "construct__anchor_start", "type": "int64"},
+    {"name": "construct__anchor_end", "type": "int64"},
     {"name": "construct__mode", "type": "string"},
     {"name": "construct__focal_part", "type": "string"},
     {"name": "construct__focal_part_length", "type": "int64"},
@@ -56,6 +62,7 @@ _CONSTRUCT_COLUMNS = [
     {"name": "construct__window_offset_bp", "type": "int64"},
     {"name": "construct__window_start", "type": "int64"},
     {"name": "construct__window_end", "type": "int64"},
+    {"name": "construct__resolved_length", "type": "int64"},
     {"name": "construct__full_construct_length", "type": "int64"},
     {
         "name": "construct__parts",

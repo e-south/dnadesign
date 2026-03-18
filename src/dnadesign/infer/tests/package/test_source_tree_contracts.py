@@ -127,6 +127,17 @@ def test_infer_runtime_modules_are_grouped_under_runtime_package() -> None:
     assert (runtime_dir / "writeback_dispatch.py").is_file()
 
 
+def test_infer_feature_contracts_are_grouped_under_features_package() -> None:
+    features_dir = _infer_root() / "src" / "features"
+    assert features_dir.is_dir()
+    assert (features_dir / "__init__.py").is_file()
+    assert (features_dir / "contracts.py").is_file()
+    assert (features_dir / "selectors.py").is_file()
+    assert (features_dir / "context.py").is_file()
+    assert (features_dir / "execution.py").is_file()
+    assert (features_dir / "export.py").is_file()
+
+
 def test_infer_root_does_not_track_runtime_log_artifacts() -> None:
     infer_root = _infer_root()
     tracked_logs = sorted(path.name for path in infer_root.glob("*.log"))

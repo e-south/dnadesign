@@ -163,3 +163,71 @@ def plan_resume_for_usr(
         if any(existing[output.id][row_index] is None for output in outputs):
             todo_idx.append(row_index)
     return todo_idx, existing
+
+
+def read_usr_column_values(
+    *,
+    ds,
+    ids: List[str],
+    column_name: str,
+) -> List[object]:
+    values: List[object] = [None] * len(ids)
+    if ds is None or len(ids) == 0:
+        return values
+
+    id_positions = _positions_by_id(ids)
+
+    try:
+        import pyarrow.parquet as pq
+
+        filter_chunk_size = resolve_resume_filter_chunk_size()
+
+        records_path = ds.records_path  # type: ignore[attr-defined]
+        records_parquet = pq.ParquetFile(records_path)
+        records_columns = set(records_parquet.schema_arrow.names)  # type: ignore[attr-defined]
+        selected_columns = ["id", column_name] if column_name in records_columns else ["id"]
+        if len(selected_columns) > 1:
+            for records_table in _read_subset_table(
+                pq=pq,
+                path=Path(records_path),
+                columns=selected_columns,
+                ids=ids,
+                filter_chunk_size=filter_chunk_size,
+            ):
+                table_ids = records_table.column("id").to_pylist()
+                table_values = records_table.column(column_name).to_pylist()
+                for table_index, table_id in enumerate(table_ids):
+                    for row_index in id_positions.get(str(table_id), []):
+                        values[row_index] = table_values[table_index]
+
+        if hasattr(ds, "list_overlays"):
+            overlays = ds.list_overlays()  # type: ignore[attr-defined]
+            infer_overlay = next(
+                (overlay for overlay in overlays if getattr(overlay, "namespace", None) == "infer"),
+                None,
+            )
+            if infer_overlay is not None:
+                overlay_path = Path(str(infer_overlay.path))
+                overlay_parquet = pq.ParquetFile(str(overlay_path))
+                overlay_columns = set(overlay_parquet.schema_arrow.names)
+                selected_overlay_columns = ["id", column_name] if column_name in overlay_columns else ["id"]
+                if len(selected_overlay_columns) > 1:
+                    for overlay_table in _read_subset_table(
+                        pq=pq,
+                        path=overlay_path,
+                        columns=selected_overlay_columns,
+                        ids=ids,
+                        filter_chunk_size=filter_chunk_size,
+                    ):
+                        table_ids = overlay_table.column("id").to_pylist()
+                        table_values = overlay_table.column(column_name).to_pylist()
+                        for table_index, table_id in enumerate(table_ids):
+                            overlay_value = table_values[table_index]
+                            if overlay_value is None:
+                                continue
+                            for row_index in id_positions.get(str(table_id), []):
+                                values[row_index] = overlay_value
+    except Exception as exc:
+        raise WriteBackError(f"USR column scan failed for records table {ds.records_path}: {exc}") from exc
+
+    return values

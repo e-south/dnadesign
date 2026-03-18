@@ -109,6 +109,12 @@ job:
     frame = output_ds.head(n=5)
     assert frame.iloc[0]["sequence"] == "TTACGTGG"
     assert frame.iloc[0]["construct__input_id"]
+    assert frame.iloc[0]["construct__context_id"] == "demo_linear:linear_template"
+    assert frame.iloc[0]["construct__context_kind"] == "template"
+    assert frame.iloc[0]["construct__anchor_id"] == frame.iloc[0]["construct__input_id"]
+    assert frame.iloc[0]["construct__anchor_start"] == 2
+    assert frame.iloc[0]["construct__anchor_end"] == 6
+    assert frame.iloc[0]["construct__resolved_length"] == len(frame.iloc[0]["sequence"])
     assert frame.iloc[0]["construct__window_semantics"] == "fixed_total"
     assert [part["name"] for part in frame.iloc[0]["construct__parts"]] == ["tag", "anchor"]
     assert frame.iloc[0]["construct__template_kind"] == "literal"

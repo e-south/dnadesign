@@ -120,3 +120,6 @@ This keeps each construct spec auditable and avoids hiding a job matrix inside o
 
 Use `construct workspace doctor` to keep the registry and those config files aligned, then use
 `construct workspace validate-project` or `construct workspace run-project` to execute by project id.
+
+For the downstream handoff fields that infer reads from templated rows, see
+[template-contexts.md](template-contexts.md).

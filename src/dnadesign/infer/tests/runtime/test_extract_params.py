@@ -39,7 +39,7 @@ def test_resolve_extract_params_sets_evo2_default_embedding_layer_when_missing()
         params=params,
     )
 
-    assert resolved["layer"] == "blocks.20.mlp.l3"
+    assert resolved["layer"] == "block26_mlp_out"
     assert "layer" not in params
 
 

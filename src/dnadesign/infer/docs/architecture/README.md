@@ -15,6 +15,7 @@
   - CLI command groups: `src/cli/commands/run.py`, `src/cli/commands/extract.py`, `src/cli/commands/generate.py`, `src/cli/commands/presets.py`, `src/cli/commands/adapters.py`, `src/cli/commands/validate.py`, `src/cli/commands/workspace.py`
   - application API: `src/api.py`
   - runtime orchestration: `src/engine.py`
+  - promoter feature contract seam: `src/features/*`
   - runtime package: `src/runtime/adapter_runtime.py`, `src/runtime/adapter_dispatch.py`, `src/runtime/batch_policy.py`, `src/runtime/resume_policy.py`, `src/runtime/ingest_loading.py`, `src/runtime/extract_execution.py`, `src/runtime/generate_execution.py`, `src/runtime/progress.py`, `src/runtime/extract_chunk_writeback.py`, `src/runtime/writeback_dispatch.py`, `src/runtime/resume_planner.py`
   - contracts and schema: `src/config.py`, `src/contracts.py`, `src/errors.py`, `src/registry.py`, `src/utils.py`, `src/workspace.py`
   - boundary subpackages: `src/ingest/*`, `src/writers/*`
@@ -28,6 +29,10 @@
 - Pooling contracts remain explicit and fail fast:
   - `pool.dim >= 1` is required for logits/embedding extract outputs.
   - pooling over the batch axis is rejected.
+- Evo2 promoter feature bundles stay out of the generic engine surface:
+  - `construct` owns template-backed resolved sequences plus `construct__*` anchor metadata.
+  - `infer/src/features/*` owns Evo2-specific selector resolution, anchor-aware pooling, feature digests, and OPAL-ready export.
+  - `opal` consumes stable flattened matrices or explicit `X` columns and does not learn Evo2 layer-path details.
 
 ### Cross-Tool Boundaries
 

@@ -23,6 +23,7 @@ Use this page when you know what you want to do. Use [index.md](index.md) when y
 - [Getting started](getting-started.md): shortest runnable path.
 - [CLI reference](reference/cli.md): command surface and failure posture.
 - [Config reference](reference/config.md): job shape, placement rules, and output policy.
+- [Template context contract](reference/template-contexts.md): the `construct__*` fields downstream infer uses for anchor-aware pooling.
 - [Outputs reference](reference/outputs.md): write behavior and lineage surfaces.
 - [Seed/import manifest reference](reference/seed-manifest.md): import schema for your own input and template records.
 - [Workspace registry reference](reference/workspace-registry.md): project inventory and registry-backed execution.

@@ -20,6 +20,12 @@
 - [CLI quickstart](getting-started/cli-quickstart.md): run `validate`, ad-hoc `extract`, and ad-hoc `generate`.
 - [Reference index](reference/README.md): command and contract lookups before automation.
 
+#### Run Evo2 promoter feature extraction
+- [Evo2 promoter feature runbook](operations/evo2-promoter-features.md): repo-aligned feature-bundle flow with explicit anchor-only and templated contexts.
+- [Evo2 provider reference](reference/evo2-provider.md): supported checkpoints, default block 26 selector, and storage/debug defaults.
+- [Feature schema and selector contract](reference/feature-schema.md): output ids, metadata out ids, digests, and OPAL export ordering.
+- [promoter_evo2_smoke workspace](../workspaces/promoter_evo2_smoke/README.md): packaged promoter smoke path with designed and wildtype examples.
+
 #### Pressure-test agnostic model writes into USR
 - [Agnostic-model pressure-test runbook](operations/pressure-test-agnostic-models.md): standalone CLI and ops-runbook paths.
 - [End-to-end pressure-test demo](tutorials/demo_pressure_test_usr_ops_notify.md): reproducible infer -> usr -> ops -> notify walkthrough.

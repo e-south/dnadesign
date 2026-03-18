@@ -18,6 +18,7 @@ from ._logging import get_logger
 from .config import JobConfig, ModelConfig
 from .contracts import resolve_generate_namespaced_fn, validate_extract_output_namespace
 from .errors import ValidationError
+from .features.execution import execute_feature_bundle, feature_metadata_output_ids
 from .ingest.validators import validate_dna, validate_protein
 from .runtime.adapter_dispatch import (
     resolve_extract_callable,
@@ -93,6 +94,83 @@ def run_extract_job(
 
     # execute
     columnar: Dict[str, List[object]] = {}
+
+    if job.feature_bundle is not None:
+        if job.outputs is None:
+            raise ValidationError("feature_bundle extract jobs must resolve output specs before execution.")
+        adapter = _get_adapter(model)
+        on_chunk_by_output = {
+            out.id: build_extract_chunk_write_back(
+                source=source,
+                write_back=bool(job.io.write_back),
+                ds=ds,
+                ids=ids,
+                model_id=model.id,
+                job_id=job.id,
+                out_id=out.id,
+                overwrite=bool(job.io.overwrite),
+                writer=write_back_usr,
+            )
+            for out in job.outputs
+        }
+        on_chunk_by_metadata = {
+            out_id: build_extract_chunk_write_back(
+                source=source,
+                write_back=bool(job.io.write_back),
+                ds=ds,
+                ids=ids,
+                model_id=model.id,
+                job_id=job.id,
+                out_id=out_id,
+                overwrite=bool(job.io.overwrite),
+                writer=write_back_usr,
+            )
+            for out_id in feature_metadata_output_ids()
+        }
+        pbar = create_progress_handle(
+            progress_factory=progress_factory,
+            label=f"{job.id}/feature_bundle",
+            total=len(todo_idx),
+            unit="seq",
+        )
+        try:
+            columnar, _metadata_rows = execute_feature_bundle(
+                seqs=seqs,
+                source=source,
+                ids=ids,
+                records=records,
+                ds=ds,
+                model_id=model.id,
+                job_id=job.id,
+                bundle=job.feature_bundle,
+                existing=existing,
+                need_idx=todo_idx,
+                adapter=adapter,
+                micro_batch_size=micro_bs,
+                default_batch_size=default_bs,
+                auto_derate=auto_derate,
+                is_oom=_is_oom,
+                on_progress=pbar.update,
+                on_chunk_by_output=on_chunk_by_output,
+                on_chunk_by_metadata=on_chunk_by_metadata,
+            )
+        finally:
+            pbar.close()
+
+        run_extract_write_back(
+            write_back=bool(job.io.write_back),
+            source=source,
+            records=records,
+            pt_path=pt_path,
+            ds=ds,
+            ids=ids,
+            model_id=model.id,
+            job_id=job.id,
+            columnar=columnar,
+            overwrite=bool(job.io.overwrite),
+        )
+        return columnar
+
     adapter = None
 
     for out in job.outputs or []:

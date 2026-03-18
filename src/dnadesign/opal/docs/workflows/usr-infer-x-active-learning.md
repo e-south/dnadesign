@@ -13,6 +13,8 @@ Use this workflow when a USR dataset already contains one or more infer-derived 
 
 This is the authoritative downstream workflow for the active-learning branch. It starts after infer write-back is already complete.
 
+For the Evo2 promoter feature bundle, `infer` may write several coordinated `infer__...` columns per job. In that case, use `dnadesign.infer.export_evo2_promoter_opal_matrix(...)` to flatten the chosen bundle into one deterministic `X` matrix before entering the OPAL round loop.
+
 ### Boundary decisions
 
 - upstream source assembly, optional construct expansion, and infer write-back remain outside OPAL
@@ -23,7 +25,8 @@ This is the authoritative downstream workflow for the active-learning branch. It
 ### Preconditions
 
 - one USR dataset already exists at a known root
-- that dataset already has the chosen infer-derived `X` column such as `infer__evo2_7b__anchor_7b_emb_mid__emb_mid`
+- that dataset already has the chosen infer-derived `X` column such as `infer__evo2_7b__anchor_only_7b_features__intermediate_embedding__block26_mlp_out__seq_mean`
+- or the Evo2 promoter bundle has already been exported into one deterministic `X` matrix outside OPAL
 - labels will be ingested incrementally through OPAL rounds rather than attached silently during infer
 
 For the upstream source-of-truth and infer matrix assembly, use:
@@ -37,7 +40,7 @@ For the upstream source-of-truth and infer matrix assembly, use:
 ```bash
 export USR_ROOT=/abs/path/to/usr_root # Reuse the same explicit USR root used for infer write-back.
 export DATASET_ID="promoter_feature_matrix_demo" # Choose the infer-annotated dataset that OPAL should consume.
-export X_COLUMN="infer__evo2_7b__anchor_7b_emb_mid__emb_mid" # Choose one concrete infer-derived feature column for this campaign.
+export X_COLUMN="infer__evo2_7b__anchor_only_7b_features__intermediate_embedding__block26_mlp_out__seq_mean" # Choose one concrete infer-derived feature column for this campaign.
 export OPAL_WORKDIR=/abs/path/to/opal_campaign # Keep OPAL campaign state and ledgers outside the USR dataset root.
 ```
 
@@ -48,7 +51,7 @@ The cross-tool-specific contract is the `data` block in `campaign.yaml`:
 ```yaml
 data: # Point OPAL at the infer-annotated USR dataset.
   location: { kind: usr, path: /abs/path/to/usr_root, dataset: promoter_feature_matrix_demo } # Resolve the USR root and dataset explicitly.
-  x_column_name: "infer__evo2_7b__anchor_7b_emb_mid__emb_mid" # Choose one infer-derived feature column as X.
+  x_column_name: "infer__evo2_7b__anchor_only_7b_features__intermediate_embedding__block26_mlp_out__seq_mean" # Choose one infer-derived feature column as X.
   y_column_name: "measured_activity" # Name the observed label column for this campaign.
   y_expected_length: 1 # Keep the baseline workflow on scalar labels.
 ```

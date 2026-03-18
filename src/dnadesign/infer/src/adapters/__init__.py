@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from ..registry import register_default_embedding_layer, register_fn, register_model
 
-EVO2_DEFAULT_EMBEDDING_LAYER = "blocks.20.mlp.l3"
+EVO2_DEFAULT_EMBEDDING_LAYER = "block26_mlp_out"
 
 
 class Evo2Adapter:
@@ -33,7 +33,6 @@ def register_defaults() -> None:
     # Register models
     register_model("evo2_7b", Evo2Adapter)
     register_model("evo2_20b", Evo2Adapter)
-    register_model("evo2_40b", Evo2Adapter)
     register_model("evo2_1b_base", Evo2Adapter)  # convenience
     # ESM2 is stubbed but keep an example for future
     # register_model("esm2_t33_650M_UR50D", ESM2Adapter)

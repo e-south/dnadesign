@@ -27,6 +27,7 @@ import torch
 
 from .._logging import get_logger
 from ..errors import CapabilityError, ModelLoadError
+from ..features.selectors import provider_layer_from_selector
 from ..utils import pool_tensor, to_format
 from . import EVO2_DEFAULT_EMBEDDING_LAYER
 
@@ -241,10 +242,15 @@ class Evo2Adapter:
 
         alias = value.lower()
         if alias in {"mid", "default"}:
-            return EVO2_DEFAULT_EMBEDDING_LAYER
+            resolved = provider_layer_from_selector(EVO2_DEFAULT_EMBEDDING_LAYER)
+            return self._validate_resolved_embedding_layer(resolved, original=value)
 
         if alias not in {"final", "endpoint"}:
-            return value
+            try:
+                resolved = provider_layer_from_selector(value)
+            except CapabilityError:
+                resolved = value
+            return self._validate_resolved_embedding_layer(resolved, original=value)
 
         if self._torch_module is None or not hasattr(self._torch_module, "named_modules"):
             raise CapabilityError(
@@ -262,6 +268,26 @@ class Evo2Adapter:
                 "Evo2 endpoint embedding layer could not be resolved automatically. Pass an explicit layer string."
             )
         return max(candidates, key=lambda item: item[0])[1]
+
+    def _validate_resolved_embedding_layer(self, resolved: str, *, original: str) -> str:
+        if self._torch_module is None or not hasattr(self._torch_module, "named_modules"):
+            return resolved
+
+        candidates: list[str] = []
+        for name, _module in self._torch_module.named_modules():
+            match = _BLOCK_MLP_LAYER_PATTERN.fullmatch(str(name))
+            if match is None:
+                continue
+            candidates.append(str(name))
+
+        if not candidates or resolved in candidates:
+            return resolved
+
+        supported = ", ".join(name.replace("blocks.", "block").replace(".mlp.l3", "_mlp_out") for name in candidates)
+        raise CapabilityError(
+            f"Evo2 embedding layer '{original}' resolved to unavailable provider layer '{resolved}'. "
+            f"Supported selectors/layers: {supported}"
+        )
 
     # -------------------------------------------------------------------------
     # Ops

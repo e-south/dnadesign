@@ -18,7 +18,6 @@ For BU SCC platform details and scheduler policy, see [BU SCC install bootstrap]
 - Keep one canonical uv environment at `<dnadesign_repo>/.venv`.
 - Keep `evo2_7b` and `evo2_20b` caches on `/project`, with one explicit root per model.
 - Keep `HF_HOME` pointed at the active model-specific cache root.
-- Treat `evo2_40b` as optional and non-default on SCC until a dedicated multi-Hopper lane is validated.
 - Keep runtime transients inside infer workspace `outputs/runtime/...`.
 
 ### Lockfile preflight
@@ -48,13 +47,13 @@ import sys
 model_id = os.environ.get("TARGET_MODEL_ID", "evo2_7b")
 precision = os.environ.get("TARGET_PRECISION", "bf16")
 
-params_b = {"evo2_7b": 7.0, "evo2_20b": 20.0, "evo2_40b": 40.0}
+params_b = {"evo2_7b": 7.0, "evo2_20b": 20.0}
 bytes_per = {"fp32": 4.0, "fp16": 2.0, "bf16": 2.0}
 
 if model_id not in params_b:
     raise SystemExit(
         f"Unsupported TARGET_MODEL_ID={model_id}. "
-        "Supported: evo2_7b, evo2_20b, evo2_40b."
+        "Supported: evo2_7b, evo2_20b."
     )
 if precision not in bytes_per:
     raise SystemExit(
@@ -85,7 +84,7 @@ gpu_usable_gib = gpu_total_gib * 0.90
 flash_arch = gpu_cc.replace(".", "")
 gpu_cc_tuple = tuple(int(part) for part in gpu_cc.split("."))
 
-if model_id in {"evo2_20b", "evo2_40b"} and gpu_cc_tuple < (9, 0):
+if model_id == "evo2_20b" and gpu_cc_tuple < (9, 0):
     print(
         "RUN_CAPACITY_FAIL "
         f"model={model_id} precision={precision} gpu_cc={gpu_cc} "
@@ -111,11 +110,7 @@ if required_gib > gpu_usable_gib:
     )
     print(
         "single L40S-class 45-48 GiB GPUs are a safe fit for evo2_7b in this infer stack; "
-        "evo2_20b/evo2_40b require Hopper-class GPUs and additional memory headroom.",
-        file=sys.stderr,
-    )
-    print(
-        "infer exposes fp32/fp16/bf16 only. Quantized/offloaded 40B execution is not currently wired.",
+        "evo2_20b requires Hopper-class GPUs and additional memory headroom.",
         file=sys.stderr,
     )
     raise SystemExit(2)
@@ -141,9 +136,9 @@ PY
 )"
 ```
 
-`infer` currently supports `evo2_7b`, `evo2_20b`, and `evo2_40b`. A 400B model is out of scope for this stack and is not a supported `model.id`.
+This SCC runbook documents the promoted Evo2 lane set for `infer`: `evo2_7b` and `evo2_20b`. A 400B model is out of scope for this stack and is not a supported `model.id`.
 
-Use `evo2_7b` as the default SCC smoke and pressure-test lane. Use `evo2_20b` only on Hopper/H200 with `gpu_c=9.0`. Keep `evo2_40b` out of the default SCC path unless a dedicated multi-Hopper lane is explicitly being validated.
+Use `evo2_7b` as the default SCC smoke and pressure-test lane. Use `evo2_20b` only on Hopper/H200 with `gpu_c=9.0`.
 
 ### Setup and verification steps
 
@@ -267,7 +262,8 @@ Use these checks to verify Evo2 usage contracts in infer:
 
 - logits/embedding pooling uses sequence dimension with `pool.dim=1`.
 - `pool.dim=0` is rejected to avoid consuming batch axis.
-- `evo2.embedding` defaults to `blocks.20.mlp.l3` when `params.layer` is omitted.
+- `evo2.embedding` defaults to the canonical selector `block26_mlp_out` when `params.layer` is omitted.
+- `block26_mlp_out` maps to the current provider layer path `blocks.26.mlp.l3`.
 - `params.layer: mid` resolves to the default pooled embedding layer.
 - `params.layer: final` resolves to the last Evo2 embedding block exposed by the loaded torch module.
 - set `params.layer` to an explicit adapter-specific name only when you need a particular block.

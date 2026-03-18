@@ -35,6 +35,12 @@ def test_ensure_construct_registry_writes_required_namespaces(tmp_path: Path) ->
     assert set(namespaces) >= {"construct", "construct_seed", "usr_label", "usr_state"}
     construct_columns = {column["name"]: column["type"] for column in namespaces["construct"]["columns"]}
     assert construct_columns["construct__parts"].startswith("list<struct<")
+    assert construct_columns["construct__context_id"] == "string"
+    assert construct_columns["construct__context_kind"] == "string"
+    assert construct_columns["construct__anchor_id"] == "string"
+    assert construct_columns["construct__anchor_start"] == "int64"
+    assert construct_columns["construct__anchor_end"] == "int64"
+    assert construct_columns["construct__resolved_length"] == "int64"
 
 
 def test_existing_output_ids_returns_ids_for_initialized_dataset(tmp_path: Path) -> None:

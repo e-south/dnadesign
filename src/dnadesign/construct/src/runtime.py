@@ -599,6 +599,42 @@ def _extract_output_sequence(
     return full_construct[geometry.start : geometry.end], geometry.start, geometry.end
 
 
+def _resolve_anchor_part(
+    *,
+    realized_parts: Dict[str, _ResolvedPart],
+    ordered_realized_parts: List[_ResolvedPart],
+    focal_part_name: str | None,
+) -> _ResolvedPart | None:
+    if focal_part_name:
+        candidate = realized_parts.get(focal_part_name)
+        if candidate is not None:
+            return candidate
+    for part in ordered_realized_parts:
+        if part.role == "anchor" or part.name == "anchor":
+            return part
+    return None
+
+
+def _relative_anchor_bounds(
+    *,
+    anchor_part: _ResolvedPart | None,
+    output_length: int,
+    full_construct_length: int,
+    window_start: int,
+    mode: str,
+) -> tuple[int | None, int | None]:
+    if anchor_part is None:
+        return None, None
+    if mode == "full_construct":
+        return anchor_part.realized_start, anchor_part.realized_end
+
+    anchor_start = (anchor_part.realized_start - window_start) % full_construct_length
+    anchor_end = anchor_start + len(anchor_part.sequence)
+    if anchor_end > output_length:
+        return None, None
+    return anchor_start, anchor_end
+
+
 def _spec_id(
     cfg: JobConfig,
     *,
@@ -701,10 +737,24 @@ def _build_record(
 
     input_fields = [field for field in _input_fields(cfg) if field != "id"]
     focal_part = realized_parts.get(cfg.job.realize.focal_part or "")
+    anchor_part = _resolve_anchor_part(
+        realized_parts=realized_parts,
+        ordered_realized_parts=ordered_realized_parts,
+        focal_part_name=cfg.job.realize.focal_part,
+    )
+    anchor_start, anchor_end = _relative_anchor_bounds(
+        anchor_part=anchor_part,
+        output_length=len(output_sequence),
+        full_construct_length=len(full_construct),
+        window_start=window_start,
+        mode=cfg.job.realize.mode,
+    )
     metadata = {
         "id": output_id,
         "construct__job": cfg.job.id,
         "construct__spec_id": spec_id,
+        "construct__context_id": f"{cfg.job.id}:{template.id}",
+        "construct__context_kind": "template",
         "construct__template_id": template.id,
         "construct__template_kind": template.kind,
         "construct__template_source": template.source,
@@ -718,6 +768,10 @@ def _build_record(
         "construct__input_fields": input_fields,
         "construct__input_id": str(row["id"]),
         "construct__input_length": len(str(row[cfg.job.input.field]).strip()),
+        "construct__anchor_id": str(row["id"]),
+        "construct__anchor_orientation": anchor_part.orientation if anchor_part is not None else "",
+        "construct__anchor_start": anchor_start,
+        "construct__anchor_end": anchor_end,
         "construct__mode": cfg.job.realize.mode,
         "construct__focal_part": cfg.job.realize.focal_part or "",
         "construct__focal_part_length": len(focal_part.sequence) if focal_part is not None else None,
@@ -736,6 +790,7 @@ def _build_record(
         ),
         "construct__window_start": window_start,
         "construct__window_end": window_end,
+        "construct__resolved_length": len(output_sequence),
         "construct__full_construct_length": len(full_construct),
         "construct__parts": [
             {

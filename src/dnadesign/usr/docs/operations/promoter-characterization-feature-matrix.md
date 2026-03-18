@@ -108,23 +108,25 @@ export FEATURE_DATASET="multi_source_construct_truth_demo" # Reuse the construct
 
 Use one infer config per model lane. Inside that config, keep the job ids explicit so downstream tools can choose feature columns without ambiguity.
 
+For the Evo2 promoter slice, prefer the infer-owned `feature_bundle` surface over hand-assembled output lists. That keeps the selector, pooling, metadata, and digest contract in one place.
+
 Recommended job-id pattern:
 
-- `<context>_<model>_<signal>`
+- `<context>_<model>_features`
 - examples:
-  - `anchor_7b_ll`
-  - `anchor_7b_emb_mid`
-  - `window_7b_emb_mid`
-  - `window_20b_emb_final`
+  - `anchor_only_7b_features`
+  - `template_1kb_7b_features`
+  - `anchor_only_20b_features`
+  - `template_1kb_20b_features`
 
 Recommended first-pass matrix:
 
-| Context plane | Model lane | Output plane | Why start here |
+| Context plane | Model lane | Feature bundle | Why start here |
 | --- | --- | --- | --- |
-| anchor-only | `evo2_7b` | `ll_mean` | cheapest scalar signal and easiest write-back smoke |
-| anchor-only | `evo2_7b` | `emb_mid` | stable pooled intermediate embedding baseline |
-| construct-expanded | `evo2_7b` | `emb_mid` | compare larger-context representation without changing model lane |
-| construct-expanded | `evo2_20b` | `emb_mid` | optional higher-capacity comparison once the 7B path is green |
+| anchor-only | `evo2_7b` | defaults (`log_likelihood`, `output_layer_mean`, `intermediate_embedding`) | cheapest full-contract tracer bullet |
+| construct-expanded | `evo2_7b` | defaults plus templated `anchor_mean` pooling | compare anchor-local vs whole-context representation without changing model lane |
+| anchor-only | `evo2_20b` | same bundle, model lane changed only | optional higher-capacity comparison once the 7B path is green |
+| construct-expanded | `evo2_20b` | same bundle, model lane changed only | optional higher-capacity templated comparison |
 
 Example infer config fragment for one model lane:
 
@@ -135,52 +137,38 @@ model: # Configure one explicit Evo2 model lane per infer config.
   precision: fp32 # Use an explicit precision for repeatable local validation.
   batch_size: 2 # Keep the first smoke batch small and reversible.
 
-jobs: # Keep context and output variation explicit as job ids inside the model lane.
-  - id: anchor_7b_ll # Anchor-only scalar likelihood baseline.
+jobs: # Keep context choice explicit as job ids inside the model lane.
+  - id: anchor_only_7b_features # Anchor-only promoter feature bundle.
     ingest: # Read directly from the anchor-only USR dataset.
       source: usr # Use the USR ingest surface.
       root: /abs/path/to/usr_root # Resolve the canonical USR root explicitly.
       dataset: promoter_sources_control # Consume the merged anchor-only promoter dataset.
       field: sequence # Read the sequence field from USR rows.
-    outputs: # Emit one explicit scalar output plane.
-      - id: ll_mean # Stable output id for the pooled likelihood signal.
-        fn: evo2.log_likelihood # Call the Evo2 likelihood extractor.
-        format: float # Persist the result as a scalar column.
+    feature_bundle:
+      intermediate_block: 26 # Repo default for promoter feature extraction.
+      context:
+        kind: anchor_only # Anchor-only lane.
 
-  - id: anchor_7b_emb_mid # Anchor-only pooled intermediate embedding baseline.
-    ingest: # Read the same anchor-only USR dataset.
-      source: usr # Use the USR ingest surface.
-      root: /abs/path/to/usr_root # Resolve the canonical USR root explicitly.
-      dataset: promoter_sources_control # Consume the merged anchor-only promoter dataset.
-      field: sequence # Read the sequence field from USR rows.
-    outputs: # Emit one pooled embedding output plane.
-      - id: emb_mid # Stable output id for the pooled intermediate embedding.
-        fn: evo2.embedding # Call the Evo2 embedding extractor.
-        params: # Configure the semantic layer alias and pooling policy.
-          layer: mid # Use the common intermediate-layer alias.
-          pool: { method: mean, dim: 1 } # Mean-pool across the sequence axis.
-        format: list # Persist the result as a vector column.
-
-  - id: window_7b_emb_mid # Construct-expanded pooled intermediate embedding baseline.
+  - id: template_1kb_7b_features # Construct-expanded promoter feature bundle.
     ingest: # Read from the larger construct-backed context dataset.
       source: usr # Use the USR ingest surface.
       root: /abs/path/to/usr_root # Resolve the canonical USR root explicitly.
       dataset: multi_source_construct_truth_demo # Consume the construct-expanded context dataset.
       field: sequence # Read the sequence field from USR rows.
-    outputs: # Emit one pooled embedding output plane.
-      - id: emb_mid # Stable output id for the pooled intermediate embedding.
-        fn: evo2.embedding # Call the Evo2 embedding extractor.
-        params: # Configure the semantic layer alias and pooling policy.
-          layer: mid # Use the common intermediate-layer alias.
-          pool: { method: mean, dim: 1 } # Mean-pool across the sequence axis.
-        format: list # Persist the result as a vector column.
+    feature_bundle:
+      intermediate_block: 26 # Same project default; keep model change separate from layer change.
+      context:
+        kind: template_1kb # Templated lane; construct must provide anchor coordinates.
+      pooling:
+        seq_mean: true
+        anchor_mean_for_templated: true
 ```
 
 Notes:
 
-- use `layer: mid` as the stable semantic intermediate-layer alias for pooled Evo2 embeddings
-- use `layer: final` only as an explicit comparison lane
 - keep sequence-window choice outside infer by pointing different jobs at the anchor-only or construct-expanded dataset plane
+- keep `intermediate_block: 26` as the project default unless repo-local benchmarks justify another block
+- the stored schema prefers `output_layer_mean`; `output_embedding` is only a continuity alias in config/docs
 - copy the config and change `model.id` when you need a second model lane such as `evo2_20b`
 
 ### 5) Validate, register, and dry-run the infer matrix
@@ -208,7 +196,7 @@ uv run infer run --config "$INFER_CONFIG_20B" --dry-run # Preflight the second m
 uv run infer run --config "$INFER_CONFIG_7B"
 # Inspect the resulting infer-derived feature columns on the feature dataset.
 uv run usr --root "$USR_ROOT" head "$FEATURE_DATASET" -n 5 \
-  --columns id,usr_label__primary,infer__evo2_7b__anchor_7b_ll__ll_mean,infer__evo2_7b__anchor_7b_emb_mid__emb_mid
+  --columns id,usr_label__primary,infer__evo2_7b__anchor_only_7b_features__log_likelihood__mean_per_token,infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__anchor_mean
 ```
 
 Expected outcome:
@@ -236,6 +224,8 @@ Use OPAL when the feature dataset is ready and the next step is explicit label/t
 
 That workflow starts after the feature dataset already has the chosen `infer__...` column and OPAL is configured with `data.location.kind: usr`.
 
+When the promoter bundle should be consumed as one flattened `X` matrix instead of one raw infer column, export it explicitly with `dnadesign.infer.export_evo2_promoter_opal_matrix(...)` before switching to the downstream OPAL-owned procedure.
+
 Continue with the OPAL-owned workflow for the full label-ingest and round-loop procedure:
 
 - [USR dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/usr-infer-x-active-learning.md)
@@ -246,6 +236,7 @@ Continue with the OPAL-owned workflow for the full label-ingest and round-loop p
 - the chosen feature dataset validates under `uv run usr --root "$USR_ROOT" validate "$FEATURE_DATASET" --strict`
 - `infer validate config`, `infer validate usr-registry`, and `infer run --dry-run` pass for every model-lane config
 - `usr head "$FEATURE_DATASET"` shows explicit `infer__...` columns for the selected job ids
+- templated lanes expose both `seq_mean` and `anchor_mean` outputs when construct metadata is present
 - `cluster fit` or the OPAL workflow can consume one chosen `infer__...` column without additional hidden repointing
 
 ## Related docs

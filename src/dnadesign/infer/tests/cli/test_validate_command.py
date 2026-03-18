@@ -159,12 +159,14 @@ jobs:
     assert "USR write-back jobs must set ingest.root explicitly." in (result.stdout or "")
 
 
-def test_validate_config_fails_capacity_for_40b_on_single_gpu(monkeypatch, tmp_path: Path) -> None:
+def test_validate_config_fails_capacity_for_20b_on_single_hopper_with_insufficient_memory(
+    monkeypatch, tmp_path: Path
+) -> None:
     cfg = _write(
-        tmp_path / "capacity_fail_40b.yaml",
+        tmp_path / "capacity_fail_20b_hopper_memory.yaml",
         """
 model:
-  id: evo2_40b
+  id: evo2_20b
   device: cuda:0
   precision: bf16
   alphabet: dna
@@ -187,9 +189,9 @@ jobs:
             devices=(
                 GpuDeviceInfo(
                     index=0,
-                    name="L40S",
+                    name="H100",
                     total_memory_gib=45.0,
-                    compute_capability="8.9",
+                    compute_capability="9.0",
                 ),
             )
         ),

@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .bootstrap import initialize_registry
 from .errors import ConfigError
+from .features.contracts import PromoterFeatureBundleConfig
 from .registry import resolve_fn
 
 Precision = Literal["fp32", "fp16", "bf16"]
@@ -110,6 +111,29 @@ class OutputSpec(StrictConfigModel):
         resolve_fn(v)
         return v
 
+    @model_validator(mode="after")
+    def _validate_output_params(self) -> "OutputSpec":
+        fn_name = self.fn.split(".")[-1]
+        pool = self.params.get("pool")
+        if fn_name in {"logits", "embedding"} and pool is not None:
+            if not isinstance(pool, dict):
+                raise ConfigError("output.params.pool must be a mapping for logits/embedding outputs.")
+            try:
+                dim = int(pool.get("dim", 1))
+            except (TypeError, ValueError) as exc:
+                raise ConfigError(f"output.params.pool.dim must be an integer: {exc}") from exc
+            if dim < 1:
+                raise ConfigError("output.params.pool.dim must be >= 1 for logits/embedding outputs.")
+        if fn_name == "embedding" and "layer" in self.params:
+            layer = self.params.get("layer")
+            if not isinstance(layer, str) or not layer.strip():
+                raise ConfigError("embedding outputs require params.layer to be a non-empty string when provided.")
+        if fn_name == "log_likelihood":
+            reduction = self.params.get("reduction")
+            if reduction is not None and str(reduction) not in {"sum", "mean"}:
+                raise ConfigError("log_likelihood outputs require params.reduction='sum' or 'mean'.")
+        return self
+
 
 class CheckpointConfig(StrictConfigModel):
     enabled: bool = False
@@ -128,6 +152,7 @@ class JobConfig(StrictConfigModel):
     ingest: IngestConfig
     # extract
     outputs: Optional[List[OutputSpec]] = None
+    feature_bundle: Optional[PromoterFeatureBundleConfig] = None
     # generate
     fn: Optional[str] = None  # NEW: optional namespaced fn for generation
     params: Optional[Dict[str, Any]] = None
@@ -138,9 +163,19 @@ class JobConfig(StrictConfigModel):
     @model_validator(mode="after")
     def _by_kind(self) -> "JobConfig":
         if self.operation == "extract":
+            if self.outputs and self.feature_bundle is not None:
+                raise ConfigError("extract job must use either 'outputs' or 'feature_bundle', not both.")
+            if self.feature_bundle is not None:
+                from .features.execution import build_feature_bundle_outputs
+
+                self.outputs = [
+                    OutputSpec(**payload) for payload in build_feature_bundle_outputs(bundle=self.feature_bundle)
+                ]
             if not self.outputs:
-                raise ConfigError("extract job requires 'outputs'")
+                raise ConfigError("extract job requires 'outputs' or 'feature_bundle'")
         elif self.operation == "generate":
+            if self.feature_bundle is not None:
+                raise ConfigError("generate job does not support 'feature_bundle'.")
             if not self.params:
                 raise ConfigError("generate job requires 'params'")
         if self.io.write_back and self.ingest.source == "usr" and not str(self.ingest.root or "").strip():

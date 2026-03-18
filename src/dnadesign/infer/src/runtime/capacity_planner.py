@@ -19,13 +19,11 @@ _MODEL_PARAM_BILLIONS = {
     "evo2_1b_base": 1.0,
     "evo2_7b": 7.0,
     "evo2_20b": 20.0,
-    "evo2_40b": 40.0,
 }
 
 _HOPPER_REQUIRED_MODELS = {
     "evo2_1b_base",
     "evo2_20b",
-    "evo2_40b",
 }
 
 _PRECISION_BYTES = {

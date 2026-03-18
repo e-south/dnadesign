@@ -174,4 +174,4 @@ def test_extract_embedding_uses_registered_default_layer_when_missing(monkeypatc
     out = run_extract_job(inputs=["ACGT"], model=model, job=job, progress_factory=None)
 
     assert out == {"emb": [[0.0]]}
-    assert observed["layer"] == "blocks.20.mlp.l3"
+    assert observed["layer"] == "block26_mlp_out"

@@ -34,6 +34,7 @@ Construct writes standardized `construct__*` lineage columns, including:
 - input dataset plus input record provenance
 - focal-part length plus resolved window semantics, bounds, and emitted geometry
 - one compact `construct__parts` column with execution order, placement kind, orientation, realized coordinates, and template coordinates
+- template-context fields such as `construct__context_id`, `construct__anchor_id`, `construct__anchor_start`, `construct__anchor_end`, and `construct__resolved_length`
 
 When the input dataset already carries `usr_label__primary` / `usr_label__aliases`, construct carries those labels onto the derived output rows as the analyst-facing source names. Those labels are convenience labels, not uniqueness guarantees for derived construct outputs; use `construct__*` lineage to disambiguate source/template/window context.
 
@@ -60,3 +61,5 @@ Matrix orchestration across multiple templates or slots is currently expressed a
 
 For the cross-tool pattern where multiple construct projects feed one canonical USR dataset before infer adds derived namespaces, use the shared runbook:
 [Construct -> USR -> Infer source-of-truth runbook](../../../usr/docs/operations/construct-infer-source-of-truth-runbook.md).
+
+For the explicit downstream infer handoff fields, see [template-contexts.md](template-contexts.md).

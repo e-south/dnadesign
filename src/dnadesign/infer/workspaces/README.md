@@ -15,6 +15,10 @@ This creates:
 - `workspaces/<id>/outputs/logs/ops/audit/`
 - `workspaces/<id>/outputs/usr_datasets/` when `--profile usr-pressure` is used
 
+### Packaged promoter smoke path
+
+- [promoter_evo2_smoke](promoter_evo2_smoke/README.md): small anchor-only plus templated promoter records for the Evo2 promoter feature bundle.
+
 ### Contract
 
 - Workspace names must be directory names, not paths.

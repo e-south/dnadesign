@@ -24,6 +24,7 @@ Use [README.md](README.md) when you know the task. Use this page when you want t
 
 - [CLI reference](reference/cli.md)
 - [Config reference](reference/config.md)
+- [Template context contract](reference/template-contexts.md)
 - [Outputs reference](reference/outputs.md)
 - [Seed/import manifest reference](reference/seed-manifest.md)
 - [Workspace registry reference](reference/workspace-registry.md)

@@ -13,6 +13,7 @@
 - `config.py`, `errors.py`, `contracts.py`: schema and runtime contract boundaries.
 - `registry.py`: model/function registration and resolution.
 - `runtime/`: execution policies, ingest loading, adapter dispatch/runtime, progress, and write-back/resume flows.
+- `features/`: Evo2 promoter feature-bundle contracts, selector resolution, context handling, pooling, and OPAL export helpers.
 
 ### Internal subpackages
 

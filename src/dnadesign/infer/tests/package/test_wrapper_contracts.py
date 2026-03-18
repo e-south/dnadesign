@@ -24,8 +24,10 @@ from dnadesign.infer.cli import main as infer_cli_main
 
 def test_infer_public_api_exports_callable_wrappers() -> None:
     assert callable(infer.run_extract)
+    assert callable(infer.run_evo2_promoter_features)
     assert callable(infer.run_generate)
     assert callable(infer.run_job)
+    assert callable(infer.export_evo2_promoter_opal_matrix)
 
 
 def test_infer_cli_wrapper_exposes_main_callable() -> None:
@@ -73,7 +75,7 @@ def test_infer_public_contract_exposes_runbook_gpu_validation(tmp_path: Path) ->
     config.write_text(
         """
 model:
-  id: evo2_40b
+  id: evo2_20b
   device: cuda:0
   precision: bf16
   alphabet: dna
@@ -86,8 +88,8 @@ jobs: []
         validate_runbook_gpu_resources(
             config_path=config,
             declared_gpus=1,
-            gpu_capability="8.9",
-            gpu_memory_gib=None,
+            gpu_capability="9.0",
+            gpu_memory_gib=45.0,
         )
 
 
