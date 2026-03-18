@@ -156,7 +156,14 @@ jobs:
         run: uv sync --locked --dev
 
       - name: Install FFmpeg
+        if: >
+          needs.detect-ci-scope.outputs.run-full-core == 'true' ||
+          contains(format(',{0},', needs.detect-ci-scope.outputs.affected-tools-csv), ',baserender,')
         run: |
+          if command -v ffmpeg >/dev/null 2>&1; then
+            ffmpeg -version
+            exit 0
+          fi
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 

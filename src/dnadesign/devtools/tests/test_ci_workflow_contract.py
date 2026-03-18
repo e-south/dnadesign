@@ -33,7 +33,13 @@ def test_ci_workflow_uses_core_and_external_integration_lane_ids() -> None:
 def test_core_lane_installs_ffmpeg() -> None:
     workflow = _workflow()
     steps = workflow["jobs"]["core-lint-test-build"]["steps"]
-    assert any(step.get("name") == "Install FFmpeg" for step in steps)
+    ffmpeg_step = next(step for step in steps if step.get("name") == "Install FFmpeg")
+    condition = str(ffmpeg_step.get("if", ""))
+    run_script = str(ffmpeg_step.get("run", ""))
+    assert "run-full-core == 'true'" in condition
+    assert "baserender" in condition
+    assert "command -v ffmpeg" in run_script
+    assert "sudo apt-get install -y ffmpeg" in run_script
 
 
 def test_ci_gate_is_the_required_aggregate_check() -> None:
