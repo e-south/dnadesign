@@ -42,19 +42,37 @@ def test_ops_module_readme_has_banner_narrative_and_doc_map() -> None:
         text,
         [
             "![Ops banner](assets/ops-banner.svg)",
-            "## Documentation map",
-            "## Entrypoint contract",
-            "## Boundary reminder",
+            "## Documentation",
         ],
         label="src/dnadesign/ops/README.md",
     )
     assert "cross-tool orchestration control plane" in text
-    assert "shared USR-backed data-plane workflow" in text
-    assert "tool-specific workflow semantics" in text.lower()
-    assert "docs/operations/README.md" in text
-    assert "docs/operations/orchestration-runbooks.md" in text
+    assert "data-plane workflow" in text
+    assert "docs/README.md" in text
+    assert "../../../docs/operations/README.md" in text
+    assert "../../../docs/operations/orchestration-runbooks.md" in text
+    assert "runbooks/presets" in text
     assert "../../../docs/README.md" in text
+    assert "## Entrypoint contract" not in text
+    assert "## Boundary reminder" not in text
     assert "progressive disclosure" not in text.lower()
+
+
+def test_ops_package_local_docs_index_routes_to_shared_runbook_surface() -> None:
+    text = _read(_repo_root() / "src" / "dnadesign" / "ops" / "docs" / "README.md")
+    _assert_token_order(
+        text,
+        [
+            "### Start here",
+            "### Package-local surfaces",
+            "### Boundary reminders",
+        ],
+        label="src/dnadesign/ops/docs/README.md",
+    )
+    assert "../../../../docs/operations/README.md" in text
+    assert "../../../../docs/operations/orchestration-runbooks.md" in text
+    assert "../runbooks/presets" in text
+    assert "../../../../docs/README.md" in text
 
 
 def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
@@ -164,6 +182,8 @@ def test_repo_docs_index_exposes_ops_tool_and_operations_route() -> None:
 def test_repo_root_readme_lists_ops_in_docs_and_tool_catalog() -> None:
     text = _read(_repo_root() / "README.md")
     assert "[Docs index](docs/README.md)" in text
+    assert "[Docs workflow routes](docs/README.md#workflow-routes)" not in text
+    assert "including the downstream split between" not in text
     assert "[Ops operations](docs/operations/README.md)" not in text
     assert "[Notify operations](docs/notify/README.md)" not in text
     assert "[Workflow lanes](docs/README.md#workflow-lanes)" not in text
@@ -212,6 +232,7 @@ def test_core_docs_avoid_contrived_doc_language() -> None:
         "docs/notify/README.md",
         "docs/operations/README.md",
         "src/dnadesign/ops/README.md",
+        "src/dnadesign/ops/docs/README.md",
         "src/dnadesign/notify/README.md",
         "src/dnadesign/notify/docs/README.md",
         "src/dnadesign/usr/README.md",
@@ -234,6 +255,7 @@ def test_ops_docs_remove_legacy_presets_and_workflow_alias_terms() -> None:
         _repo_root() / "docs" / "operations" / "README.md",
         _repo_root() / "docs" / "operations" / "orchestration-runbooks.md",
         _repo_root() / "src" / "dnadesign" / "ops" / "README.md",
+        _repo_root() / "src" / "dnadesign" / "ops" / "docs" / "README.md",
     ]
     for path in docs_targets:
         text = _read(path)

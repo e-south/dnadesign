@@ -47,16 +47,23 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     assert multi_source_token in index_doc
     assert feature_matrix_token in readme
     assert feature_matrix_token in index_doc
-    assert "## Start here" in top_readme
-    assert "## Boundary reminder" in top_readme
-    assert "Shared cross-tool handoff routes (USR-owned)" in top_readme
+    assert "## Documentation" in top_readme
     assert "docs/README.md" in top_readme
+    assert "docs/index.md" in top_readme
+    assert "docs/getting-started.md" in top_readme
+    assert "workspaces/README.md" in top_readme
+    assert "docs/reference/template-contexts.md" in top_readme
+    assert "../../../docs/README.md" in top_readme
+    assert "## Start here" not in top_readme
+    assert "## Boundary reminder" not in top_readme
     assert "reference/template-contexts.md" in readme
     assert "reference/template-contexts.md" in index_doc
     assert "template-contexts.md" in config_doc
     assert "../../../usr/docs/operations/construct-infer-source-of-truth-runbook.md" in outputs
     assert "construct__anchor_start" in outputs
     assert "construct__anchor_start" in template_contexts
+    assert "### Primary entrypoints" in readme
+    assert "### Boundary reminders" in readme
     assert "demo_promoter_swap_pdual10_source_of_truth" in readme
     assert "demo_promoter_swap_pdual10_source_of_truth" in index_doc
     assert "demo_promoter_swap_pdual10_source_of_truth" in workspaces

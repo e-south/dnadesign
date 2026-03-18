@@ -41,11 +41,7 @@ def test_infer_top_readme_is_lightweight_router() -> None:
     _assert_token_order(
         readme,
         [
-            "## Choose a task",
-            "## Shared handoffs before infer runs",
-            "## Documentation map",
-            "## Entrypoint contract",
-            "## Boundary reminder",
+            "## Documentation",
         ],
         label="src/dnadesign/infer/README.md",
     )
@@ -55,20 +51,12 @@ def test_infer_top_readme_is_lightweight_router() -> None:
     assert "workspaces/README.md" in readme
     assert "docs/operations/evo2-promoter-features.md" in readme
     assert "docs/operations/pressure-test-agnostic-models.md" in readme
-    assert "docs/reference/evo2-provider.md" in readme
-    assert "docs/reference/feature-schema.md" in readme
-    assert "docs/tutorials/demo_pressure_test_usr_ops_notify.md" in readme
-    assert "../usr/docs/operations/multi-source-source-of-truth-assembly.md" in readme
-    assert "../usr/docs/operations/construct-infer-source-of-truth-runbook.md" in readme
-    assert "../cluster/docs/workflows/exploratory-clustering.md" in readme
-    assert "../opal/docs/workflows/usr-infer-x-active-learning.md" in readme
-    assert "file or USR dataset" in readme
-    assert "data.location.kind: usr" in readme
     assert "docs/reference/README.md" in readme
-    assert "docs/dev/README.md" in readme
-    assert "### CLI Quick Reference" not in readme
-    assert "### Python API" not in readme
-    assert "### Extending Presets" not in readme
+    assert "../../../docs/README.md" in readme
+    assert "## Choose a task" not in readme
+    assert "## Shared handoffs before infer runs" not in readme
+    assert "## Entrypoint contract" not in readme
+    assert "## Boundary reminder" not in readme
 
 
 def test_infer_docs_readme_keeps_workflow_then_type_progressive_disclosure() -> None:

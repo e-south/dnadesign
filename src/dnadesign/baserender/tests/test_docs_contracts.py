@@ -24,6 +24,7 @@ def test_docs_surface_stays_compact() -> None:
     root = _pkg_root()
     docs_md = sorted(str(p.relative_to(root)) for p in (root / "docs").rglob("*.md"))
     assert docs_md == [
+        "docs/README.md",
         "docs/demos/workspaces.md",
         "docs/dev/journal.md",
         "docs/integrations/README.md",
@@ -35,10 +36,21 @@ def test_docs_surface_stays_compact() -> None:
 
 def test_readme_points_to_single_reference_and_examples() -> None:
     readme = (_pkg_root() / "README.md").read_text()
+    assert "docs/README.md" in readme
     assert "docs/reference.md" in readme
     assert "docs/demos/workspaces.md" in readme
     assert "docs/integrations/README.md" in readme
-    assert "docs/examples/*.yaml" in readme
+    assert "docs/examples" in readme
+
+
+def test_baserender_docs_index_routes_to_reference_integrations_and_demos() -> None:
+    text = (_pkg_root() / "docs" / "README.md").read_text()
+    assert "### Start here" in text
+    assert "### Documentation by type" in text
+    assert "reference.md" in text
+    assert "integrations/README.md" in text
+    assert "demos/workspaces.md" in text
+    assert "examples" in text
 
 
 def test_readme_stays_tool_agnostic() -> None:

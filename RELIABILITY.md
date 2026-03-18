@@ -24,11 +24,10 @@ It summarizes what must fail fast, what should be observable, and where recovery
 ## Operational signals
 - USR event logs (`.events.log`) are the primary integration signal stream for watcher workflows.
 - Cursor/spool state in notifier workflows must be explicit, restart-safe, and scoped to the intended workspace/run.
-- DenseGen running heartbeats default to a 30-minute cadence (`progress_heartbeat_seconds=1800`) unless explicitly configured otherwise.
 - Failures should include actionable context, not generic error wrappers.
 
 ## CI reliability lanes
-- Core lane: lint/docs/format + standard-marker test selection + per-tool coverage gate; installs `ffmpeg` so baserender rendering tests run without environment skips.
+- Core lane: lint/docs/format + standard-marker test selection + per-tool coverage gate; installs optional system packages only when in-scope tool tests require them.
 - External integration lane: real FIMO/integration tests with explicit MEME/FIMO setup and verification; JUnit gate fails if all external integration tests are skipped and if any in-scope external integration tool executes zero non-skipped tests.
 - CI gate lane: explicit merge gate that requires core lane success and requires external integration lane success whenever external integration scope is active.
 

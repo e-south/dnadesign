@@ -35,14 +35,12 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
 - For repeated batch attempts, orchestration state is workspace-scoped by default:
   - runbook file: `<workspace-root>/outputs/logs/ops/runbooks/<runbook-id>.yaml`
   - audit file: `<workspace-root>/outputs/logs/ops/audit/latest.json`
-- DenseGen run-mode behavior stays explicit and fail-fast:
-  - `--mode auto` must resolve from workspace state
-  - `--mode fresh` is blocked when resume artifacts exist unless reset is explicitly acknowledged
+- Tool run-mode behavior must stay explicit and fail-fast; resume/fresh transitions may not be inferred from ambiguous state.
 - Cross-tool output ownership is orthogonal:
-  - `ops`: orchestration logs/audits/runbooks
-  - `notify`: profile/cursor/spool and webhook delivery
-  - `usr`: dataset records and `.events.log`
-  - `densegen` and `infer`: workload-domain artifacts and dataset updates
+  - control-plane state belongs to orchestration tooling
+  - durable dataset state belongs to USR
+  - notifier delivery state belongs to notifier tooling
+  - workload-domain artifacts belong to the producing tool
 - Curated workspace and runbook examples must default USR dataset roots to `<workspace-root>/outputs/usr_datasets`.
 - External USR roots remain allowed only when the workflow makes that storage boundary explicit.
 - Shared data-plane behaviors such as overlay compaction and part-management are expressed with USR semantics (`usr-overlay-*`) instead of tool-specific command names.
@@ -60,8 +58,9 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
 ## Documentation model
 - Root system-of-record docs define durable contracts and navigation.
 - Deep procedures may live in top-level `docs/` or in the boundary-owning tool's docs when that tool owns the durable handoff contract.
-- Root docs must route to one authoritative deep procedure for each cross-tool workflow.
-- Keep indexes short and link outward; avoid duplicating long procedures in multiple places.
+- Root docs must stay abstract and route to one authoritative deep procedure for each cross-tool workflow.
+- Tool top-level READMEs stay lightweight: one narrative paragraph plus quick links, with the tool-local docs index listed first.
+- Keep indexes short and link outward; avoid duplicating long procedures in multiple places or repeating adjacent links to the same file.
 - Terminology is controlled:
   - `route`: index entry only
   - `runbook`: authoritative operator procedure with ordered commands and verification

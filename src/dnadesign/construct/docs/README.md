@@ -17,6 +17,23 @@ Use this page when you know what you want to do. Use [index.md](index.md) when y
 - [Build a downstream promoter feature matrix for cluster or OPAL](../../usr/docs/operations/promoter-characterization-feature-matrix.md): use the shared USR-owned runbook when construct-expanded contexts should be compared against anchor-only promoters through infer-derived feature columns.
 - [Debug a construct run](reference/cli.md): start with runtime validation, then check the [config reference](reference/config.md), [workspace registry reference](reference/workspace-registry.md), and [outputs reference](reference/outputs.md).
 
+### Primary entrypoints
+
+- `uv run construct --help`
+- `uv run construct validate config --config <path> --runtime`
+- `uv run construct run --config <path>`
+- `uv run construct seed import-manifest --manifest <path>`
+- `uv run construct workspace init --id <workspace-id>`
+- `uv run construct workspace doctor --workspace <workspace-dir>`
+
+### Boundary reminders
+
+- `construct` owns sequence realization, placement semantics, and `construct__*` lineage.
+- USR owns dataset persistence, dataset ids, and downstream reuse.
+- One construct job uses one template plus one or more placed parts.
+- Larger studies stay explicit as multiple workspace projects, not one oversized config.
+- Packaged workspaces default to workspace-local `outputs/usr_datasets`; shared USR roots are always explicit.
+
 ### Read by document type
 
 - [Docs index](index.md): compact by-type map.

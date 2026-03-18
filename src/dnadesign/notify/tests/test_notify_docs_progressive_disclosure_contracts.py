@@ -100,22 +100,20 @@ def test_notify_module_readme_is_lightweight_router_and_links_top_level_runbook(
     _assert_token_order(
         text,
         [
-            "## Start here in 3 commands",
-            "## Documentation map",
-            "## Entrypoint contract",
-            "## Boundary reminder",
+            "## Documentation",
         ],
         label="src/dnadesign/notify/README.md",
     )
     assert "docs/README.md" in text
     assert "docs/notify/usr-events.md" in text
-    assert "Universal Sequence Record `<dataset>/.events.log`" in text
-    assert text.find("docs/notify/usr-events.md") < text.find("docs/README.md")
-    assert "uv run notify setup list-workspaces --tool <tool>" in text
-    assert "--secret-source file --secret-ref file://<path-to-webhook-file>" in text
-    assert "uv run notify usr-events watch --tool <tool> --workspace <workspace-name> --follow" in text
-    assert "1. Audience:" in text
-    assert "8. Audience:" not in text
+    assert "../../../docs/notify/README.md" in text
+    assert "docs/reference/README.md" in text
+    assert "docs/dev/architecture.md" in text
+    assert "../../../docs/README.md" in text
+    assert text.find("docs/README.md") < text.find("docs/reference/README.md")
+    assert "## Start here in 3 commands" not in text
+    assert "## Entrypoint contract" not in text
+    assert "## Boundary reminder" not in text
 
 
 def test_notify_module_docs_index_has_progressive_disclosure_workflow_and_type_maps() -> None:

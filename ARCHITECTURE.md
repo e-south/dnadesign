@@ -43,17 +43,12 @@ This file is the architecture map: it names system boundaries, major flows, and 
 ## Cross-tool information architecture
 - Workspace-rooted accumulation is the contract for repeated campaigns; orchestration state must not fan out into repository-root ad-hoc files.
 - Root `docs/README.md` is the only top-level router. It routes by user intent and ownership plane, then hands off to exactly one authoritative deep procedure for each cross-tool workflow.
-- `ops` owns orchestration artifacts under `<workspace-root>/outputs/logs/ops/`:
-  - runbooks: `<workspace-root>/outputs/logs/ops/runbooks/<runbook-id>.yaml`
-  - audit trail: `<workspace-root>/outputs/logs/ops/audit/latest.json`
-  - scheduler stdout: `<workspace-root>/outputs/logs/ops/sge/<runbook-id>/`
-  - runtime traces: `<workspace-root>/outputs/logs/ops/runtime/`
-- `densegen` and `infer` own workload execution using `<workspace-root>/config.yaml` and write domain outputs under workspace outputs/tables and dataset materialization paths.
-- `usr` owns dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
+- Control-plane orchestration artifacts stay under workspace-scoped logging roots; tool-local docs define exact subpaths and artifact names.
+- Tool packages own their workload configs, runtime outputs, and package-local workspace templates.
+- USR owns durable dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
 - Cross-dataset USR overlay transfer is explicit-only: maintenance merge defaults to base-row merge, while any overlay carry must be opt-in, namespace-scoped, schema-compatible, and auditable in events.
 - Curated dnadesign workspaces default USR dataset roots to `<workspace-root>/outputs/usr_datasets`.
 - Explicit external USR roots remain allowed for sync and mirror workflows when the operator chooses them deliberately.
-- `notify` owns delivery wiring under `<workspace-root>/outputs/notify/<tool>/` and consumes USR events without mutating DenseGen/Infer domain artifacts.
 - Cross-tool coupling is file/event contract based; packages must not depend on internal `src.*` modules across tool boundaries.
 - Utility modules must stay tool-local (`src/dnadesign/<tool>/...`); top-level shared `src/dnadesign/utils` is not an allowed boundary.
 - Document-type semantics are explicit:
@@ -77,8 +72,8 @@ This file is the architecture map: it names system boundaries, major flows, and 
   - `downstream-tool`
 
 ## High-level data flows
-- DenseGen/other producers -> USR event stream (`.events.log`) -> Notify watcher/webhook sink.
-- Tool outputs -> dataset artifacts (for example Parquet tables) -> downstream analysis tools (cluster, billboard, nmf, latdna, cruncher, tfkdanalysis).
+- Producer tools -> USR event stream (`.events.log`) -> observer tools and webhook sinks.
+- Tool outputs -> dataset artifacts or workspace outputs -> downstream analysis or optimization tools.
 - Developer workflow -> core CI lane (lint/docs/standard tests + coverage gate) and external integration lane (FIMO/integration) when required.
 
 ## Architecture invariants

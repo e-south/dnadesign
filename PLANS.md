@@ -20,6 +20,7 @@ Use it to navigate proposals, execution plans, accepted decisions, and implement
 4. Capture accepted architectural decisions in ADR form.
 5. Record notable implementation outcomes in the development journal.
 6. When cross-tool workflow contracts change, align `ARCHITECTURE.md`, `DESIGN.md`, `QUALITY_SCORE.md`, and `docs/operations/orchestration-runbooks.md` in the same change.
+7. When README or docs-index routing changes, keep top-level docs at the highest useful abstraction and move tool-specific procedures into the boundary-owning docs tree.
 
 Execution plans are living records during implementation, not static TODO lists. Keep progress, discoveries, and decisions current as work evolves.
 

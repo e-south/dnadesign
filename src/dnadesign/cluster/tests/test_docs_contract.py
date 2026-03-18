@@ -25,36 +25,19 @@ def _repo_root() -> Path:
 def test_cluster_readme_routes_back_to_root_docs_and_usr_feature_matrix_flow() -> None:
     readme = (_repo_root() / "src/dnadesign/cluster/README.md").read_text(encoding="utf-8")
 
-    assert "## Ownership boundary" in readme
-    assert "## Start here" in readme
-    assert "## Task routes" in readme
     assert "## Documentation" in readme
-    assert "../../../docs/README.md" in readme
     assert "docs/README.md" in readme
     assert "docs/index.md" in readme
     assert "docs/workflows/exploratory-clustering.md" in readme
     assert "docs/reference/cli-contracts.md" in readme
     assert "docs/reference/verification.md" in readme
-    assert "api.py" in readme
-    assert "docs/concepts/ownership-boundary.md" in readme
     assert "docs/concepts/semantic-surface.md" in readme
-    assert "../usr/docs/operations/promoter-characterization-feature-matrix.md" in readme
-    assert "Precondition: one explicit chosen feature definition is already present" in readme
-    assert "If you do not yet have one explicit chosen feature definition" in readme
-    assert "If you need supervised label/train/select rather than exploratory structure" in readme
-    assert "../opal/docs/workflows/usr-infer-x-active-learning.md" in readme
-    assert "uv run cluster fit --help" in readme
-    assert "uv run cluster umap --help" in readme
-    assert "uv run cluster analyze --help" in readme
-    assert "uv run cluster workspaces where" in readme
-    assert "uv run cluster workspaces init --help" in readme
-    assert "uv run cluster workspaces list" in readme
-    assert "workspaces/<workspace-id>/outputs/cluster/" in readme
-    assert "Ad hoc standalone runs require an explicit `--results-root`" in readme
-    assert "does not infer runtime state from the current directory" in readme
-    assert "Attached overlay columns use one contract" in readme
-    assert "fits/<run-slug>/run.json" in readme
-    assert "sweep `sweep.json`" in readme or "sweep.json" in readme
+    assert "../../../docs/README.md" in readme
+    assert "## Ownership boundary" not in readme
+    assert "## Start here" not in readme
+    assert "## Task routes" not in readme
+    assert "## CLI surface" not in readme
+    assert "## Results and artifacts" not in readme
 
 
 def test_cluster_docs_tree_exposes_workflow_reference_and_concept_surfaces() -> None:

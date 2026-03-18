@@ -19,8 +19,8 @@ It is a policy map with links to operator runbooks and implementation details.
 ## Secrets and credentials
 - Never commit credentials or webhook URLs to git-tracked files.
 - Prefer secret backends and file-backed secret references for runtime secrets.
-- Notify webhook and profile operations must keep secret material out of logs/history where possible.
-- For batch notify workflows, require file-backed webhook references (`*_FILE` / `file://`) so secret values are not embedded in scheduler submit metadata.
+- Runtime tooling must keep secret material out of logs, command history, and generated configs where possible.
+- Batch workflows should prefer file-backed secret references (`*_FILE` / `file://`) so secret values are not embedded in scheduler submit metadata.
 
 ## Dependency and supply-chain controls
 - Python dependencies are pinned via `uv.lock` and installed with `uv sync --locked`.
