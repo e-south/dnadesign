@@ -152,6 +152,12 @@ def test_infer_package_data_includes_workspace_templates_and_presets() -> None:
     assert "src/presets/*/*.yaml" in pyproject
 
 
+def test_infer_evo2_extra_stays_linux_x86_64_only() -> None:
+    repo_root = _infer_root().parents[2]
+    pyproject = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
+    assert "\"evo2>=0.5.3; sys_platform == 'linux' and platform_machine == 'x86_64'\"" in pyproject
+
+
 def test_infer_tests_are_grouped_by_area() -> None:
     tests_root = _infer_root() / "tests"
     assert (tests_root / "cli").is_dir()

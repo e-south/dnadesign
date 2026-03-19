@@ -157,7 +157,7 @@ def test_top_level_readme_exposes_workflow_docs_map() -> None:
     assert "## Documentation" in readme
     assert "docs/README.md" in readme
     assert "choose the next deep procedure by ownership plane" in readme
-    assert "cluster` exploration and OPAL active learning" in readme
+    assert "cluster` exploration and OPAL active learning" not in readme
     assert "Workflow and docs map" not in readme
     assert "## Repository map" not in readme
 

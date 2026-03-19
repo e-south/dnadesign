@@ -8,6 +8,8 @@
 
 ## Documentation
 
+Use the docs index to choose the next deep procedure by ownership plane, then drop into the owning tool docs for operational detail.
+
 - [Docs index](docs/README.md): central route map for workflow and tool documentation.
 - [Installation](docs/installation.md): bootstrap the environment and run baseline verification commands.
 - [Architecture](ARCHITECTURE.md), [Design](DESIGN.md), [Reliability](RELIABILITY.md), [Security](SECURITY.md), [Plans](PLANS.md), [Quality score](QUALITY_SCORE.md): repository-level contracts and governance records.

@@ -1,6 +1,6 @@
 ![infer banner](assets/infer-banner.svg)
 
-infer runs model-agnostic sequence inference and writes namespaced outputs back to datasets with explicit fail-fast contracts.
+infer runs model-agnostic sequence inference and writes namespaced outputs like `infer__<model_id>__<job_id>__<out_id>` back to datasets with explicit fail-fast contracts.
 
 ## Documentation
 
