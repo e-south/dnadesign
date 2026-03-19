@@ -14,6 +14,8 @@ Use this workflow when one explicit feature definition already exists and the ne
 ### First fit, UMAP, and analysis pass
 
 The examples below use the packaged workspace `promoter_clusters_v1`, which targets the USR dataset `60bp_dual_promoter_cpxR_LexA`.
+When you run a packaged workspace id directly, cluster reads the built-in config as a template and writes runtime artifacts under `./workspaces/<id>/outputs/cluster/`, not under the installed package tree.
+Outside a source checkout, resolve the dataset via `--usr-root` or `DNADESIGN_USR_ROOT`.
 
 #### 1. Fit
 

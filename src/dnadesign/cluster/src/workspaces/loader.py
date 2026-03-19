@@ -14,15 +14,18 @@ from __future__ import annotations
 from pathlib import Path
 
 from .contracts import WorkspaceConfig
-from .paths import resolve_workspace_dir
+from .paths import builtin_workspaces_dir, resolve_workspace_dir
 from .schema import load_workspace_payload
 
 
 def load_workspace_config(workspace: str | Path) -> WorkspaceConfig:
     workspace_dir = resolve_workspace_dir(workspace)
     payload = load_workspace_payload(workspace_dir / "config.yaml")
+    builtin_root = builtin_workspaces_dir().resolve()
+    source = "builtin" if workspace_dir.resolve().is_relative_to(builtin_root) else "local"
     return WorkspaceConfig(
         workspace_dir=workspace_dir,
+        source=source,
         schema_version=payload.schema_version,
         input=payload.input,
         fit=payload.fit,

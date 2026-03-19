@@ -20,10 +20,7 @@ plot:
     - "cluster"
     - "gc_content"           # requires 'sequence'
     - "seq_length"           # requires 'sequence'
-    - "highlight"            # dedicated highlight-only plot (gray bg + filled points)
     - "numeric:infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__ll_mean"
-    - "numeric:obj__logic_fidelity"
-    - "numeric:obj__effect_scaled"
     - "categorical:densegen__plan"
     # Optional hue (requires 'cluster__<NAME>__intra_sim'; compute via cluster intra-sim)
     # - "intra_sim"

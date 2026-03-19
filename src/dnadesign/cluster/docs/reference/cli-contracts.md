@@ -41,6 +41,7 @@ This page collects the stable command, layout, and data-shape contracts for `clu
 - `presets/`: reusable partials by kind (`method`, `umap`, `plot`, `analysis`)
 - `workspaces/`: canonical checked-in runnable configs that bind datasets/files, names, and I/O
 - workspace config path fields such as `file`, `usr_root`, `highlight`, `out`, and `out_dir` resolve relative to the workspace `config.yaml`
+- packaged workspace ids are read-only built-in configs; when used directly they materialize runtime outputs under `./workspaces/<id>/outputs/cluster/` from the current working directory
 
 Layout:
 
@@ -87,7 +88,7 @@ The CLI resolves the OPAL slice and records which parquet parts were used.
 - `fit`, `umap`, `analyze`, `sweep`, and `runs list` require exactly one of:
   - `--workspace <workspace-id|path>`
   - `--results-root <path>`
-- Built-in workspace outputs live under `workspaces/<workspace-id>/outputs/cluster/`
+- Built-in workspace outputs live under `./workspaces/<workspace-id>/outputs/cluster/`
 - Run store contents group by stable alias and immutable run slug
 - Fit artifacts live under `<results-root>/<alias>/fits/<run-slug>/`
 - UMAP artifacts live under `<results-root>/<alias>/umap/<run-slug>/`

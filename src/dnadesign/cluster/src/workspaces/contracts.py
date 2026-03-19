@@ -19,6 +19,7 @@ from typing import Any
 @dataclass(frozen=True, slots=True)
 class WorkspaceConfig:
     workspace_dir: Path
+    source: str
     schema_version: int
     input: dict[str, Any]
     fit: dict[str, Any]
@@ -38,6 +39,8 @@ class WorkspaceConfig:
 
     @property
     def results_root(self) -> Path:
+        if self.source == "builtin":
+            return (Path.cwd() / "workspaces" / self.workspace_id / "outputs" / "cluster").resolve()
         return self.workspace_dir / "outputs" / "cluster"
 
     def section_params(self, section: str) -> dict[str, Any]:

@@ -65,19 +65,59 @@ def _repo_root() -> Path:
     raise RuntimeError("repo root not found")
 
 
-def test_load_workspace_config_resolves_paths_relative_to_config() -> None:
+def test_builtin_workspace_configs_stay_portable_and_use_cwd_results_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repo_root = _repo_root()
+    monkeypatch.chdir(tmp_path)
     promoter_workspace = load_workspace_config("promoter_clusters_v1")
     perm_workspace = load_workspace_config("perm_v1")
 
     assert isinstance(promoter_workspace, WorkspaceConfig)
-    assert promoter_workspace.input["usr_root"] == str((repo_root / "src/dnadesign/usr").resolve())
-    assert perm_workspace.input["file"] == str(
-        (repo_root / "src/dnadesign/permuter/results/rt_combine_from_dms/records.parquet").resolve()
+    assert promoter_workspace.source == "builtin"
+    assert perm_workspace.source == "builtin"
+    assert "usr_root" not in promoter_workspace.input
+    assert "highlight" not in promoter_workspace.umap
+    assert "file" not in perm_workspace.input
+    assert promoter_workspace.results_root == (tmp_path / "workspaces" / "promoter_clusters_v1" / "outputs" / "cluster")
+    assert (
+        promoter_workspace.workspace_dir
+        == (repo_root / "src/dnadesign/cluster/workspaces/promoter_clusters_v1").resolve()
     )
-    assert promoter_workspace.results_root == (
-        repo_root / "src/dnadesign/cluster/workspaces/promoter_clusters_v1/outputs/cluster"
+
+
+def test_local_workspace_config_resolves_paths_relative_to_config(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "local_ws"
+    workspace_dir.mkdir()
+    input_file = workspace_dir / "inputs" / "records.parquet"
+    input_file.parent.mkdir()
+    input_file.write_text("stub", encoding="utf-8")
+    highlight_file = workspace_dir / "inputs" / "ids.parquet"
+    highlight_file.write_text("stub", encoding="utf-8")
+    (workspace_dir / "config.yaml").write_text(
+        (
+            "schema_version: 1\n"
+            "input:\n"
+            "  file: inputs/records.parquet\n"
+            "fit:\n"
+            "  name: local_ws\n"
+            "  x_col: infer__x\n"
+            "umap:\n"
+            "  name: local_ws\n"
+            "  x_col: infer__x\n"
+            "  highlight: inputs/ids.parquet\n"
+            "analyze:\n"
+            "  cluster_col: cluster__local_ws\n"
+        ),
+        encoding="utf-8",
     )
+
+    config = load_workspace_config(workspace_dir)
+
+    assert config.source == "local"
+    assert config.input["file"] == str(input_file.resolve())
+    assert config.umap["highlight"] == str(highlight_file.resolve())
+    assert config.results_root == workspace_dir / "outputs" / "cluster"
 
 
 def test_local_workspace_dir_wins_over_packaged_workspace_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -97,7 +137,10 @@ def test_explicit_results_root_is_required_and_rejects_builtin_package_tree() ->
         explicit_results_root(builtin_cluster_dir() / "results")
 
 
-def test_explicit_results_root_accepts_checked_in_workspace_output_root() -> None:
+def test_explicit_results_root_accepts_workspace_output_root_from_current_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
     promoter_workspace = load_workspace_config("promoter_clusters_v1")
 
     assert explicit_results_root(promoter_workspace.results_root) == promoter_workspace.results_root

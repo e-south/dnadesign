@@ -1,6 +1,8 @@
 schema_version: 1
 input:
-  file: "../../../permuter/results/rt_combine_from_dms/records.parquet"
+  # This packaged template stays repo-agnostic. Pass --file at runtime or copy
+  # it into a local workspace and set one concrete file path there.
+  # file: "/absolute/path/to/records.parquet"
 
 fit:
   name: "perm_v1"
