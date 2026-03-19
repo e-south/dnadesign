@@ -1714,6 +1714,78 @@ jobs:
     assert decision.resume_artifacts_found is False
 
 
+def test_infer_mode_auto_ignores_stale_workspace_overlay_when_usr_destination_is_ambiguous(tmp_path: Path) -> None:
+    pyarrow = pytest.importorskip("pyarrow")
+    pyarrow_parquet = pytest.importorskip("pyarrow.parquet")
+
+    workspace_root = tmp_path / "infer_mode_ambiguous_destination_stale_overlay"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_ambiguous_destination_stale_overlay",
+        mode_default="auto",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    stale_overlay = workspace_root / "outputs" / "usr_datasets" / "stale" / "_derived" / "infer.parquet"
+    stale_overlay.parent.mkdir(parents=True, exist_ok=True)
+    pyarrow_parquet.write_table(
+        pyarrow.table(
+            {
+                "id": ["id-1"],
+                "infer__evo2_7b__job_a__ll_mean": [1.0],
+            }
+        ),
+        stale_overlay,
+    )
+    runbook.infer.config.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs:
+  - id: job_a
+    operation: extract
+    ingest:
+      source: usr
+      root: "__USR_ROOT_A__"
+      dataset: "dataset_a"
+      field: sequence
+    outputs:
+      - id: ll_mean
+        fn: log_likelihood
+        format: float
+        params:
+          reduction: mean
+    io:
+      write_back: true
+  - id: job_b
+    operation: extract
+    ingest:
+      source: usr
+      root: "__USR_ROOT_B__"
+      dataset: "dataset_b"
+      field: sequence
+    outputs:
+      - id: ll_mean
+        fn: log_likelihood
+        format: float
+        params:
+          reduction: mean
+    io:
+      write_back: true
+""".strip()
+        .replace("__USR_ROOT_A__", str(tmp_path / "external_usr_a"))
+        .replace("__USR_ROOT_B__", str(tmp_path / "external_usr_b"))
+        + "\n",
+        encoding="utf-8",
+    )
+
+    decision = resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
+    assert decision.selected_mode == "fresh"
+    assert decision.resume_artifacts_found is False
+
+
 def test_infer_mode_fresh_requires_reset_ack_when_resume_artifacts_exist(tmp_path: Path) -> None:
     pyarrow = pytest.importorskip("pyarrow")
     pyarrow_parquet = pytest.importorskip("pyarrow.parquet")

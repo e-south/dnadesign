@@ -83,7 +83,7 @@ def test_infer_overlay_probe_avoids_workspace_fallback_when_usr_destination_reso
     assert artifacts == (overlay_path,)
 
 
-def test_infer_overlay_probe_uses_workspace_fallback_when_no_usr_destination(
+def test_infer_overlay_probe_returns_no_artifacts_when_no_usr_destination(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -96,19 +96,17 @@ def test_infer_overlay_probe_uses_workspace_fallback_when_no_usr_destination(
     infer_config = tmp_path / "infer.yaml"
     _write_infer_config(infer_config, usr_root=None)
 
-    calls = {"count": 0}
+    def _unexpected_workspace_probe(_workspace_root: Path) -> tuple[Path, ...]:
+        raise AssertionError(
+            "workspace fallback should stay disabled for infer configs without a scoped USR destination"
+        )
 
-    def _workspace_probe(_workspace_root: Path) -> tuple[Path, ...]:
-        calls["count"] += 1
-        return (overlay_path,)
-
-    monkeypatch.setattr(mode_tools, "_infer_workspace_overlay_candidates", _workspace_probe)
+    monkeypatch.setattr(mode_tools, "_infer_workspace_overlay_candidates", _unexpected_workspace_probe)
     artifacts = mode_tools._infer_overlay_artifacts(workspace_root, infer_config=infer_config)
-    assert artifacts == (overlay_path,)
-    assert calls["count"] == 1
+    assert artifacts == ()
 
 
-def test_infer_overlay_probe_uses_workspace_fallback_when_usr_destination_is_ambiguous(
+def test_infer_overlay_probe_returns_no_artifacts_when_usr_destination_is_ambiguous(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -162,19 +160,15 @@ jobs:
         encoding="utf-8",
     )
 
-    calls = {"count": 0}
+    def _unexpected_workspace_probe(_workspace_root: Path) -> tuple[Path, ...]:
+        raise AssertionError("workspace fallback should stay disabled for ambiguous infer configs")
 
-    def _workspace_probe(_workspace_root: Path) -> tuple[Path, ...]:
-        calls["count"] += 1
-        return (overlay_path,)
-
-    monkeypatch.setattr(mode_tools, "_infer_workspace_overlay_candidates", _workspace_probe)
+    monkeypatch.setattr(mode_tools, "_infer_workspace_overlay_candidates", _unexpected_workspace_probe)
     artifacts = mode_tools._infer_overlay_artifacts(workspace_root, infer_config=infer_config)
-    assert artifacts == (overlay_path,)
-    assert calls["count"] == 1
+    assert artifacts == ()
 
 
-def test_infer_overlay_probe_uses_workspace_fallback_when_usr_root_is_implicit(
+def test_infer_overlay_probe_returns_no_artifacts_when_usr_root_is_implicit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -212,16 +206,12 @@ jobs:
         encoding="utf-8",
     )
 
-    calls = {"count": 0}
+    def _unexpected_workspace_probe(_workspace_root: Path) -> tuple[Path, ...]:
+        raise AssertionError("workspace fallback should stay disabled when infer ingest.root is implicit")
 
-    def _workspace_probe(_workspace_root: Path) -> tuple[Path, ...]:
-        calls["count"] += 1
-        return (overlay_path,)
-
-    monkeypatch.setattr(mode_tools, "_infer_workspace_overlay_candidates", _workspace_probe)
+    monkeypatch.setattr(mode_tools, "_infer_workspace_overlay_candidates", _unexpected_workspace_probe)
     artifacts = mode_tools._infer_overlay_artifacts(workspace_root, infer_config=infer_config)
-    assert artifacts == (overlay_path,)
-    assert calls["count"] == 1
+    assert artifacts == ()
 
 
 def test_register_mode_tool_adapter_rejects_duplicate_tool() -> None:

@@ -71,13 +71,15 @@ def _infer_dataset_overlay_candidates(dataset_root: Path) -> tuple[Path, ...]:
 
 
 def _infer_overlay_artifacts(workspace_root: Path, *, infer_config: Path | None) -> tuple[Path, ...]:
-    if infer_config is not None:
-        contract = _resolve_infer_usr_output_for_mode_probe(infer_config)
-        if contract is not None:
-            dataset_root = contract.usr_root / contract.usr_dataset
-            return _dedupe_existing_paths(_infer_dataset_overlay_candidates(dataset_root))
+    if infer_config is None:
+        return _dedupe_existing_paths(_infer_workspace_overlay_candidates(workspace_root))
 
-    return _dedupe_existing_paths(_infer_workspace_overlay_candidates(workspace_root))
+    contract = _resolve_infer_usr_output_for_mode_probe(infer_config)
+    if contract is None:
+        return ()
+
+    dataset_root = contract.usr_root / contract.usr_dataset
+    return _dedupe_existing_paths(_infer_dataset_overlay_candidates(dataset_root))
 
 
 def _resolve_infer_usr_output_for_mode_probe(infer_config: Path):
