@@ -1,8 +1,6 @@
 ![Ops banner](assets/ops-banner.svg)
 
-Ops is the cross-tool orchestration control plane for deterministic batch workflows. It compiles runbook intent into explicit preflight, verification, and submit phases with auditable outputs.
-
-Use Ops when you need repeatable scheduler handoffs across producer and observer tools while preserving workspace-scoped logging and fail-fast contracts. Use shared USR operations docs instead when the durable owner is a data-plane workflow rather than scheduler orchestration.
+Ops is the cross-tool orchestration control plane for deterministic batch workflows. It compiles runbook intent into explicit preflight, verification, and submit phases with auditable outputs, and it is the right entrypoint when the durable owner is scheduler orchestration rather than a USR data-plane workflow.
 
 ## Documentation
 
