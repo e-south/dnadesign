@@ -1,0 +1,19 @@
+schema_version: 1
+catalog_order: 4
+tool: infer
+summary: Tool-owned feature extraction runbooks, Evo2 docs, feature-schema contracts, and pressure-test flows.
+keywords:
+  - evo2
+  - promoter
+  - feature matrix
+  - active learning
+routes:
+  - id: architecture
+    path: architecture/README.md
+    summary: Package shape, provider registry boundary, runtime execution contracts, and cross-tool ownership seams.
+  - id: evo2-provider
+    path: reference/evo2-provider.md
+    summary: Evo2 lane set, block-26 default, output naming, pooling, and persistence contract.
+  - id: evo2-promoter-features
+    path: operations/evo2-promoter-features.md
+    summary: Infer-owned Evo2 promoter feature runbook with validate, dry-run, run, and OPAL export handoff.

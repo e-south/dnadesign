@@ -1,0 +1,13 @@
+schema_version: 1
+catalog_order: 2
+tool: construct
+summary: Tool-owned workspace demos, template realization docs, and anchor-placement contracts.
+keywords:
+  - promoter
+  - templates
+  - contexts
+  - feature matrix
+routes:
+  - id: template-contexts
+    path: reference/template-contexts.md
+    summary: Construct-owned anchor placement, template realization, and anchor-coordinate contract for infer.

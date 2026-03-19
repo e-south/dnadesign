@@ -1,0 +1,12 @@
+schema_version: 1
+catalog_order: 20
+registry_id: usr.data-plane.hpc-sync
+type: runbook
+plane: data-plane
+owner_boundary: usr
+entry_artifact: one USR dataset with pending cross-host drift and an explicit sync intent
+exit_artifact: transfer-verified local/remote USR dataset state with no unexpected drift
+summary: Keep one USR dataset synchronized between HPC and local analysis with explicit diff, pull, and push verification.
+execution_kind: iterative
+progress_kind: usr-sync-audit
+relations: []

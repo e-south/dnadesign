@@ -1,0 +1,20 @@
+schema_version: 1
+catalog_order: 70
+registry_id: cluster.downstream.exploratory-clustering
+type: workflow
+plane: downstream-tool
+owner_boundary: cluster
+entry_artifact: one explicit chosen feature definition in a USR dataset or file input
+exit_artifact: cluster run records, embeddings, plots, and downstream exploratory summaries
+summary: Explore one chosen feature definition through clustering, UMAP, and downstream summaries.
+execution_kind: exploratory
+progress_kind: cluster-run-index
+related_tools:
+  - usr
+  - infer
+  - opal
+relations:
+  - type: depends-on
+    target: usr.data-plane.promoter-feature-matrix
+  - type: see-also
+    target: opal.downstream.usr-infer-x-active-learning

@@ -19,7 +19,14 @@ from urllib.parse import parse_qs, urlparse
 
 import yaml
 
-from dnadesign.ops.catalog import CatalogProcedureEntry, load_runbook_catalog, resolve_catalog_doc_path
+from dnadesign.ops.catalog import (
+    CatalogProcedureEntry,
+    load_runbook_catalog,
+    render_catalog_procedure_section,
+    render_catalog_tool_source_section,
+    resolve_catalog_doc_path,
+    resolve_registry_metadata_path_for_doc_path,
+)
 from dnadesign.ops.runbooks.path_policy import (
     PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
     REPO_TRANSIENT_OPERATIONAL_DIR_NAMES,
@@ -107,6 +114,7 @@ REGISTRY_ID_METADATA_PATTERN = re.compile(r"^\*\*Registry-id:\*\*\s*(.+?)\s*$", 
 SUMMARY_METADATA_PATTERN = re.compile(r"^\*\*Summary:\*\*\s*(.+?)\s*$", re.MULTILINE)
 EXECUTION_KIND_METADATA_PATTERN = re.compile(r"^\*\*Execution-kind:\*\*\s*(.+?)\s*$", re.MULTILINE)
 PROGRESS_KIND_METADATA_PATTERN = re.compile(r"^\*\*Progress-kind:\*\*\s*(.+?)\s*$", re.MULTILINE)
+PROGRESS_SURFACE_GLOSSARY_ROW_PATTERN = re.compile(r"^\|\s*`(?P<kind>[^`]+)`\s*\|")
 STATUS_PATTERN = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
 CREATED_PATTERN = re.compile(r"^\*\*Created:\*\*\s*(.+?)\s*$", re.MULTILINE)
 SECTION_HEADING_PATTERN = re.compile(r"^#{2,6}\s+(.+?)\s*$", re.MULTILINE)
@@ -220,6 +228,7 @@ _RUNBOOK_CATALOG_METADATA_TYPES = {"runbook", "workflow"}
 _REGISTRY_ID_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$")
 _METADATA_TOKEN_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:-[a-z0-9]+)*$")
 RUNBOOK_CATALOG_DOC_PATH = "docs/runbooks/README.md"
+RUNBOOK_PROGRESS_GLOSSARY_HEADING = "### Progress surface glossary"
 OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES = (
     PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
     Path("docs/templates"),
@@ -991,6 +1000,7 @@ def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
         return issues
 
     catalog_entries_by_path: dict[str, CatalogProcedureEntry] = {}
+    catalog_progress_kinds = {entry.progress_kind for entry in catalog.procedures}
     expected_catalog_paths: set[str] = set()
     for entry in catalog.procedures:
         resolved_path = resolve_catalog_doc_path(catalog_path=catalog.catalog_path, doc_path=entry.doc_path)
@@ -1010,6 +1020,28 @@ def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
             continue
         catalog_entries_by_path[relative_path] = entry
 
+    procedure_section = _extract_markdown_section(catalog_text, heading="### Authoritative cross-tool procedures")
+    if procedure_section is None:
+        issues.append(f"{catalog_path}: missing '### Authoritative cross-tool procedures' section.")
+    else:
+        expected_section = render_catalog_procedure_section(catalog)
+        if procedure_section.strip() != expected_section.strip():
+            issues.append(
+                f"{catalog_path}: authoritative cross-tool procedures section is stale; "
+                "regenerate it with `uv run python -m dnadesign.devtools.generate_runbook_catalog`."
+            )
+
+    tool_source_section = _extract_markdown_section(catalog_text, heading="### Tool-local runbook sources")
+    if tool_source_section is None:
+        issues.append(f"{catalog_path}: missing '### Tool-local runbook sources' section.")
+    else:
+        expected_tool_source_section = render_catalog_tool_source_section(catalog)
+        if tool_source_section.strip() != expected_tool_source_section.strip():
+            issues.append(
+                f"{catalog_path}: tool-local runbook sources section is stale; "
+                "regenerate it with `uv run python -m dnadesign.devtools.generate_runbook_catalog`."
+            )
+
     for relative_path, contract in CROSS_TOOL_DOC_METADATA_CONTRACTS.items():
         if contract["type"] not in _RUNBOOK_CATALOG_METADATA_TYPES:
             continue
@@ -1021,47 +1053,97 @@ def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
         registry_id = _extract_metadata_field(text, REGISTRY_ID_METADATA_PATTERN)
         if not registry_id:
             continue
+        metadata_relative_path = resolve_registry_metadata_path_for_doc_path(relative_path)
+        metadata_path = repo_root / metadata_relative_path
+        if not metadata_path.exists():
+            issues.append(f"{metadata_path}: missing registry metadata sidecar for {relative_path}.")
+            continue
+        metadata_payload = yaml.safe_load(metadata_path.read_text(encoding="utf-8")) or {}
+        if not isinstance(metadata_payload, dict):
+            issues.append(f"{metadata_path}: registry metadata must be a mapping.")
+            continue
 
         entry = catalog_entries_by_path.get(relative_path)
         if entry is None:
             issues.append(f"{catalog_path}: missing registry id '{registry_id}' for {relative_path}.")
-            issues.append(f"{catalog_path}: missing markdown link target for {relative_path}.")
             continue
 
         expected_metadata = {
             "Registry-id": registry_id,
             "Type": _extract_metadata_field(text, TYPE_PATTERN),
             "Plane": _extract_metadata_field(text, PLANE_PATTERN),
+            "Owner-boundary": _extract_metadata_field(text, OWNER_BOUNDARY_PATTERN),
+            "Entry artifact": _extract_metadata_field(text, ENTRY_ARTIFACT_PATTERN),
+            "Exit artifact": _extract_metadata_field(text, EXIT_ARTIFACT_PATTERN),
             "Execution-kind": _extract_metadata_field(text, EXECUTION_KIND_METADATA_PATTERN),
             "Progress-kind": _extract_metadata_field(text, PROGRESS_KIND_METADATA_PATTERN),
             "Summary": _extract_metadata_field(text, SUMMARY_METADATA_PATTERN),
         }
-        catalog_metadata = {
-            "Registry-id": entry.registry_id,
-            "Type": entry.entry_type,
-            "Plane": entry.plane,
-            "Execution-kind": entry.execution_kind,
-            "Progress-kind": entry.progress_kind,
-            "Summary": entry.summary,
+        metadata_file_values = {
+            "Registry-id": metadata_payload.get("registry_id"),
+            "Type": metadata_payload.get("type"),
+            "Plane": metadata_payload.get("plane"),
+            "Owner-boundary": metadata_payload.get("owner_boundary"),
+            "Entry artifact": metadata_payload.get("entry_artifact"),
+            "Exit artifact": metadata_payload.get("exit_artifact"),
+            "Execution-kind": metadata_payload.get("execution_kind"),
+            "Progress-kind": metadata_payload.get("progress_kind"),
+            "Summary": metadata_payload.get("summary"),
         }
         for field_name, expected_value in expected_metadata.items():
             if not expected_value:
                 continue
-            actual_value = catalog_metadata[field_name]
+            actual_value = metadata_file_values[field_name]
             if actual_value != expected_value:
                 issues.append(
-                    f"{catalog_path}: {field_name} for {relative_path} must match owner-local metadata "
-                    f"(catalog={actual_value!r}, doc={expected_value!r})."
+                    f"{metadata_path}: {field_name} for {relative_path} must match owner-local metadata "
+                    f"(metadata={actual_value!r}, doc={expected_value!r})."
                 )
 
     for relative_path, entry in sorted(catalog_entries_by_path.items()):
         if relative_path not in expected_catalog_paths:
             issues.append(
                 f"{catalog_path}: unexpected catalog procedure '{entry.registry_id}' for {relative_path}; "
-                "add a matching cross-tool metadata contract or remove the catalog entry."
+                "add a matching cross-tool metadata contract or remove the registry metadata sidecar."
             )
 
+    glossary_text = _extract_markdown_section(catalog_text, heading=RUNBOOK_PROGRESS_GLOSSARY_HEADING)
+    if glossary_text is None:
+        issues.append(f"{catalog_path}: missing '{RUNBOOK_PROGRESS_GLOSSARY_HEADING}' section.")
+        return issues
+
+    glossary_progress_kinds = {
+        match.group("kind").strip()
+        for line in glossary_text.splitlines()
+        for match in [PROGRESS_SURFACE_GLOSSARY_ROW_PATTERN.match(line.strip())]
+        if match is not None
+    }
+    if not glossary_progress_kinds:
+        issues.append(f"{catalog_path}: progress surface glossary section has no data table.")
+        return issues
+
+    for progress_kind in sorted(catalog_progress_kinds - glossary_progress_kinds):
+        issues.append(f"{catalog_path}: missing progress surface glossary entry for '{progress_kind}'.")
+    for progress_kind in sorted(glossary_progress_kinds - catalog_progress_kinds):
+        issues.append(f"{catalog_path}: unexpected progress surface glossary entry for '{progress_kind}'.")
+
     return issues
+
+
+def _extract_markdown_section(text: str, *, heading: str) -> str | None:
+    lines = text.splitlines()
+    try:
+        heading_index = next(index for index, line in enumerate(lines) if line.strip() == heading)
+    except StopIteration:
+        return None
+
+    section_lines: list[str] = []
+    for line in lines[heading_index + 1 :]:
+        stripped = line.strip()
+        if stripped.startswith("### "):
+            break
+        section_lines.append(line)
+    return "\n".join(section_lines)
 
 
 def _find_exec_plan_metadata_issues(repo_root: Path) -> list[str]:

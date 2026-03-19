@@ -1,0 +1,9 @@
+schema_version: 1
+catalog_order: 3
+tool: usr
+summary: Tool-owned dataset lifecycle docs, source-of-truth runbooks, sync routes, and promoter feature-matrix handoffs.
+keywords:
+  - promoter
+  - feature matrix
+  - source of truth
+  - active learning

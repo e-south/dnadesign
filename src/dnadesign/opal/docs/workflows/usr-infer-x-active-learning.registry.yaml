@@ -1,0 +1,20 @@
+schema_version: 1
+catalog_order: 80
+registry_id: opal.downstream.usr-infer-x-active-learning
+type: workflow
+plane: downstream-tool
+owner_boundary: opal
+entry_artifact: USR dataset plus one explicit infer-derived X column
+exit_artifact: initialized OPAL campaign state plus round outputs and selection ledgers
+summary: Start the label, train, and select loop once one explicit infer-derived X column or exported matrix already exists.
+execution_kind: round-loop
+progress_kind: opal-campaign-state
+related_tools:
+  - usr
+  - infer
+  - cluster
+relations:
+  - type: depends-on
+    target: usr.data-plane.promoter-feature-matrix
+  - type: see-also
+    target: cluster.downstream.exploratory-clustering
