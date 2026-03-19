@@ -31,11 +31,11 @@ For deterministic SCC GPU environment setup before pressure runs, use the [SCC E
 ### 1) Prepare workspace and variables
 
 ```bash
-uv run infer workspace init --id test_stress_ethanol --profile usr-pressure # Create the pressure-test workspace scaffold.
-export WORKSPACE_ROOT="$PWD/src/dnadesign/infer/workspaces/test_stress_ethanol" # Pin workspace root for subsequent commands.
+uv run infer workspace init --id demo_usr_pressure --profile usr-pressure # Create the pressure-test workspace scaffold.
+export WORKSPACE_ROOT="$PWD/workspaces/demo_usr_pressure" # Pin workspace root for subsequent commands.
 export INFER_CONFIG="$WORKSPACE_ROOT/config.yaml" # Reuse one config path across checks and runs.
 export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Point USR tooling at workspace-local datasets.
-export DATASET_ID="test_stress_ethanol" # Set target dataset id once for repeatable CLI calls.
+export DATASET_ID="infer_pressure_demo" # Set target dataset id once for repeatable CLI calls.
 ```
 
 ### 2) Contract preflight

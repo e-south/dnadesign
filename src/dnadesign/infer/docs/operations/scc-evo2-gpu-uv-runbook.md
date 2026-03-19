@@ -150,7 +150,7 @@ module load cuda/12.8 # Load CUDA toolchain for torch/flash-attn builds.
 module load gcc/13.2.0 # Load compiler toolchain compatible with CUDA build flow.
 
 export UV_PROJECT_ENVIRONMENT="$PWD/.venv" # Use a single canonical uv environment path.
-export INFER_WORKSPACE_ROOT=/project/dunlop/esouth/dnadesign/src/dnadesign/infer/workspaces/test_stress_ethanol # Pin infer workspace root.
+export INFER_WORKSPACE_ROOT=/project/dunlop/esouth/dnadesign/workspaces/demo_usr_pressure # Pin infer workspace root.
 export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}" # Keep runtime artifacts workspace-scoped.
 export TARGET_MODEL_ID="${TARGET_MODEL_ID:-evo2_7b}" # Default to the 7B SCC lane.
 export HF_HOME_7B="${HF_HOME_7B:-/project/dunlop/esouth/cache/huggingface/evo2_7b}" # Define cache root for evo2_7b.
@@ -241,7 +241,7 @@ if missing:
 PY
 
 uv run infer adapters list # Confirm Evo2 adapter visibility in this environment.
-uv run infer validate config --config src/dnadesign/infer/workspaces/test_stress_ethanol/config.yaml # Validate workspace config contracts.
+uv run infer validate config --config "$INFER_WORKSPACE_ROOT/config.yaml" # Validate workspace config contracts.
 
 # Real execution smoke (loads evo2_7b and runs one inference).
 uv run infer extract \

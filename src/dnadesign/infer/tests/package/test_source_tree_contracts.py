@@ -80,6 +80,15 @@ def test_infer_workspaces_scaffold_exists() -> None:
     assert (workspaces_root / "README.md").is_file()
 
 
+def test_infer_packaged_workspace_examples_exist() -> None:
+    workspaces_root = _infer_root() / "workspaces"
+    assert (workspaces_root / "evo2_feature_bundle_smoke" / "README.md").is_file()
+    assert (workspaces_root / "evo2_feature_bundle_smoke" / "config.yaml").is_file()
+    assert (workspaces_root / "evo2_feature_bundle_smoke" / "inputs" / "anchor_only_records.jsonl").is_file()
+    assert (workspaces_root / "evo2_feature_bundle_smoke" / "inputs" / "template_1kb_records.jsonl").is_file()
+    assert (workspaces_root / "demo_usr_pressure" / "config.yaml").is_file()
+
+
 def test_infer_internal_cli_is_packaged_and_not_flat() -> None:
     infer_src = _infer_root() / "src"
     cli_dir = infer_src / "cli"
@@ -150,6 +159,10 @@ def test_infer_package_data_includes_workspace_templates_and_presets() -> None:
     assert '"dnadesign.infer"' in pyproject
     assert "docs/operations/examples/*.yaml" in pyproject
     assert "src/presets/*/*.yaml" in pyproject
+    assert "workspaces/*.md" in pyproject
+    assert "workspaces/*/*.md" in pyproject
+    assert "workspaces/*/*.yaml" in pyproject
+    assert "workspaces/*/inputs/*" in pyproject
 
 
 def test_infer_evo2_extra_stays_linux_x86_64_only() -> None:

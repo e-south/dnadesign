@@ -126,7 +126,7 @@ printf 'TRANSFORMERS_CACHE=%s\n' "$TRANSFORMERS_CACHE"
 Keep long-lived model shards in `HF_HOME`, and route infer runtime transients inside the infer workspace so transient outputs stay colocated with the run context.
 
 ```bash
-export INFER_WORKSPACE_ROOT="${INFER_WORKSPACE_ROOT:-/project/<your_project>/$USER/dnadesign/src/dnadesign/infer/workspaces/test_stress_ethanol}"
+export INFER_WORKSPACE_ROOT="${INFER_WORKSPACE_ROOT:-/project/<your_project>/$USER/dnadesign/workspaces/demo_usr_pressure}"
 export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}"
 export TMPDIR="${TMPDIR:-$INFER_RUNTIME_ROOT/tmp}"
 export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-$INFER_RUNTIME_ROOT/torch-extensions}"
@@ -205,7 +205,7 @@ export CUDA_HOME="$(dirname "$(dirname "$(which nvcc)")")"
 
 # Runtime/cache roots.
 export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
-export INFER_WORKSPACE_ROOT="${INFER_WORKSPACE_ROOT:-/project/<your_project>/$USER/dnadesign/src/dnadesign/infer/workspaces/test_stress_ethanol}"
+export INFER_WORKSPACE_ROOT="${INFER_WORKSPACE_ROOT:-/project/<your_project>/$USER/dnadesign/workspaces/demo_usr_pressure}"
 export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}"
 export TARGET_MODEL_ID="${TARGET_MODEL_ID:-evo2_7b}"
 export HF_HOME_7B="${HF_HOME_7B:-/project/<your_project>/$USER/cache/huggingface/evo2_7b}"

@@ -123,6 +123,10 @@ where = ["src"]
 "dnadesign.infer" = [
   "docs/operations/examples/*.yaml",
   "src/presets/*/*.yaml",
+  "workspaces/*.md",
+  "workspaces/*/*.md",
+  "workspaces/*/*.yaml",
+  "workspaces/*/inputs/*",
 ]
 
 [tool.pytest.ini_options]

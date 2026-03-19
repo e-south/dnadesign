@@ -1,11 +1,11 @@
 ## infer workspaces
 
-Use this directory as the default root for infer pressure-test workspaces.
+Infer ships packaged workspace templates and public smoke inputs here. New workspaces created with `infer workspace init` default to `./workspaces/<id>` in the current working directory so the scaffold works both inside and outside a source checkout.
 
 ### Quick start
 
 ```bash
-uv run infer workspace init --id test_stress_ethanol # Create a default infer workspace scaffold.
+uv run infer workspace init --id demo_local_workspace # Create a default infer workspace scaffold under ./workspaces/.
 ```
 
 This creates:
@@ -15,9 +15,9 @@ This creates:
 - `workspaces/<id>/outputs/logs/ops/audit/`
 - `workspaces/<id>/outputs/usr_datasets/` when `--profile usr-pressure` is used
 
-### Packaged promoter smoke path
+### Packaged feature-bundle smoke path
 
-- [promoter_evo2_smoke](promoter_evo2_smoke/README.md): small anchor-only plus templated promoter records for the Evo2 promoter feature bundle.
+- [evo2_feature_bundle_smoke](evo2_feature_bundle_smoke/README.md): small anchor-only plus templated records for the Evo2 feature-bundle contract.
 
 ### Contract
 
@@ -26,7 +26,7 @@ This creates:
 - Config template defaults to:
   - `src/dnadesign/infer/docs/operations/examples/workspace_local_records_config.yaml` (`--profile local`)
 - Pressure-test USR template profile:
-  - `uv run infer workspace init --id test_stress_ethanol --profile usr-pressure`
+  - `uv run infer workspace init --id demo_usr_pressure --profile usr-pressure`
   - `src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml`
   - `ingest.root: outputs/usr_datasets` resolves relative to the workspace `config.yaml`
 

@@ -25,13 +25,13 @@ Use the authoritative cross-tool workflow here:
 ### Common path
 
 1. Start from the packaged smoke workspace:
-   - [promoter_evo2_smoke workspace](../../workspaces/promoter_evo2_smoke/README.md)
+   - [evo2_feature_bundle_smoke workspace](../../workspaces/evo2_feature_bundle_smoke/README.md)
 2. Validate the config:
-   - `uv run infer validate config --config src/dnadesign/infer/workspaces/promoter_evo2_smoke/config.yaml`
+   - `uv run infer validate config --config src/dnadesign/infer/workspaces/evo2_feature_bundle_smoke/config.yaml`
 3. Dry-run the jobs:
-   - `uv run infer run --config src/dnadesign/infer/workspaces/promoter_evo2_smoke/config.yaml --dry-run`
+   - `uv run infer run --config src/dnadesign/infer/workspaces/evo2_feature_bundle_smoke/config.yaml --dry-run`
 4. Run the selected model lane once dependencies are installed:
-   - `uv run infer run --config src/dnadesign/infer/workspaces/promoter_evo2_smoke/config.yaml`
+   - `uv run infer run --config src/dnadesign/infer/workspaces/evo2_feature_bundle_smoke/config.yaml`
 
 ### Config stance
 
@@ -50,22 +50,22 @@ model: # Keep one model stanza per infer config.
   alphabet: dna # Match Evo2's DNA alphabet contract.
 
 jobs: # Keep contexts explicit as separate infer jobs.
-  - id: anchor_only_7b_features # Collect anchor-only promoter features.
+  - id: anchor_only_7b_bundle # Collect anchor-only bundle outputs.
     operation: extract # Run the feature extraction surface.
     ingest: # Read direct records for the anchor-only lane.
       source: records # Load sequence records from a JSONL file.
-      path: inputs/anchor_only_promoters.jsonl # Point at the anchor-only input plane.
+      path: inputs/anchor_only_records.jsonl # Point at the anchor-only input plane.
       field: sequence # Read the sequence field from each input record.
     feature_bundle: # Let the bundle surface choose the default feature groups.
       intermediate_block: 26 # Use the project-default intermediate block.
       context: # Record the explicit context metadata for this job.
         kind: anchor_only # Mark this lane as the anchor-only context.
 
-  - id: template_1kb_7b_features # Collect construct-expanded promoter features.
+  - id: template_1kb_7b_bundle # Collect construct-expanded bundle outputs.
     operation: extract # Reuse the same extract operation for the templated lane.
     ingest: # Read direct records for the 1 kb templated context.
       source: records # Load sequence records from a JSONL file.
-      path: inputs/template_1kb_promoters.jsonl # Point at the construct-expanded input plane.
+      path: inputs/template_1kb_records.jsonl # Point at the construct-expanded input plane.
       field: sequence # Read the sequence field from each input record.
     feature_bundle: # Keep feature collection consistent across contexts.
       intermediate_block: 26 # Use the same project-default block for comparison.

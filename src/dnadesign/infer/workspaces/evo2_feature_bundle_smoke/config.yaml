@@ -6,11 +6,11 @@ model:
   batch_size: 2
 
 jobs:
-  - id: anchor_only_7b_features
+  - id: anchor_only_7b_bundle
     operation: extract
     ingest:
       source: records
-      path: inputs/anchor_only_promoters.jsonl
+      path: inputs/anchor_only_records.jsonl
       field: sequence
     feature_bundle:
       intermediate_block: 26
@@ -20,11 +20,11 @@ jobs:
         seq_mean: true
         anchor_mean_for_templated: true
 
-  - id: template_1kb_7b_features
+  - id: template_1kb_7b_bundle
     operation: extract
     ingest:
       source: records
-      path: inputs/template_1kb_promoters.jsonl
+      path: inputs/template_1kb_records.jsonl
       field: sequence
     feature_bundle:
       intermediate_block: 26

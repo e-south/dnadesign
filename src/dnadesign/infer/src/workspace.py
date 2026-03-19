@@ -24,17 +24,6 @@ _WORKSPACE_TEMPLATE_BY_PROFILE = {
 }
 
 
-def _repo_root_from(start: Path) -> Path | None:
-    try:
-        cursor = start.resolve()
-    except Exception:
-        cursor = start
-    for root in [cursor, *cursor.parents]:
-        if (root / "pyproject.toml").exists() or (root / ".git").exists():
-            return root
-    return None
-
-
 def _infer_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
@@ -63,15 +52,7 @@ def resolve_workspace_root(root: Optional[Path]) -> tuple[Path, str]:
     if env_root:
         return _ensure_directory_path(Path(env_root), label="INFER_WORKSPACE_ROOT"), "env"
 
-    repo_root = _repo_root_from(Path.cwd())
-    if repo_root is None:
-        raise ConfigError(
-            "Unable to determine workspace root. Pass --root, set INFER_WORKSPACE_ROOT, "
-            "or run from inside the dnadesign repository."
-        )
-    return _ensure_directory_path(repo_root / "src" / "dnadesign" / "infer" / "workspaces", label="workspace root"), (
-        "repo-default"
-    )
+    return _ensure_directory_path(Path.cwd() / "workspaces", label="workspace root"), "cwd-default"
 
 
 def resolve_workspace_template(template: Optional[Path], *, profile: str = "local") -> Path:

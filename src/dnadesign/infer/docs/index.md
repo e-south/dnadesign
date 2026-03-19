@@ -26,7 +26,7 @@ Use [docs/README.md](README.md) as the workflow-first entrypoint. This page is a
 
 - [Operations index](operations/README.md)
 - [SCC Evo2 GPU environment runbook (UV + infer)](operations/scc-evo2-gpu-uv-runbook.md)
-- [Evo2 promoter feature runbook](operations/evo2-promoter-features.md)
+- [Evo2 feature-bundle runbook](operations/evo2-promoter-features.md)
 - [Agnostic-model pressure-test runbook](operations/pressure-test-agnostic-models.md)
 - [Workspaces guide](../workspaces/README.md)
 

@@ -97,7 +97,7 @@ esac
 export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
 export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HUB_CACHE}"
 export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
-export INFER_WORKSPACE_ROOT="${INFER_WORKSPACE_ROOT:-/project/<project>/$USER/dnadesign/src/dnadesign/infer/workspaces/test_stress_ethanol}"
+export INFER_WORKSPACE_ROOT="${INFER_WORKSPACE_ROOT:-/project/<project>/$USER/dnadesign/workspaces/demo_usr_pressure}"
 export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}"
 export TMPDIR="${TMPDIR:-$INFER_RUNTIME_ROOT/tmp}"
 export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-$INFER_RUNTIME_ROOT/torch-extensions}"

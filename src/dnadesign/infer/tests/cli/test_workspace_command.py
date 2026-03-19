@@ -72,7 +72,7 @@ def test_workspace_init_usr_pressure_profile_uses_usr_template(tmp_path: Path) -
     assert result.exit_code == 0, result.stdout
     config = (workspace_dir / "config.yaml").read_text(encoding="utf-8")
     assert "source: usr" in config
-    assert "dataset: test_stress_ethanol" in config
+    assert "dataset: infer_pressure_demo" in config
     assert "root: outputs/usr_datasets" in config
     assert (workspace_dir / "outputs" / "usr_datasets").is_dir()
     output = result.stdout or ""
@@ -141,3 +141,14 @@ def test_workspace_init_fails_if_workspace_already_exists(tmp_path: Path) -> Non
 
     assert result.exit_code == 2
     assert "workspace already exists" in (result.stdout or "")
+
+
+def test_workspace_init_defaults_to_cwd_workspaces_without_repo_root(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    result = _RUNNER.invoke(app, ["workspace", "init", "--id", "demo_cwd_default"])
+
+    workspace_dir = tmp_path / "workspaces" / "demo_cwd_default"
+    assert result.exit_code == 0, result.stdout
+    assert workspace_dir.is_dir()
+    assert (workspace_dir / "config.yaml").is_file()

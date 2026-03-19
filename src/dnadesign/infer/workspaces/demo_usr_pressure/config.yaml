@@ -10,7 +10,7 @@ jobs:
     operation: extract
     ingest:
       source: usr
-      dataset: test_stress_ethanol
+      dataset: infer_pressure_demo
       root: outputs/usr_datasets
       field: sequence
     outputs:

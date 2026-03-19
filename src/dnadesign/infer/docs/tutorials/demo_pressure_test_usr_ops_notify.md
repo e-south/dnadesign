@@ -16,11 +16,11 @@ This demo executes infer in an end-to-end pressure-test loop that can run standa
 ### 1) Prepare workspace and config
 
 ```bash
-uv run infer workspace init --id test_stress_ethanol --profile usr-pressure # Create pressure-test workspace and config.
-export WORKSPACE_ROOT="$PWD/src/dnadesign/infer/workspaces/test_stress_ethanol" # Reuse workspace root across steps.
+uv run infer workspace init --id demo_usr_pressure --profile usr-pressure # Create pressure-test workspace and config.
+export WORKSPACE_ROOT="$PWD/workspaces/demo_usr_pressure" # Reuse workspace root across steps.
 export INFER_CONFIG="$WORKSPACE_ROOT/config.yaml" # Pin infer config path.
 export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Point USR tools at workspace-local datasets.
-export DATASET_ID="test_stress_ethanol" # Set dataset id for repeatable commands.
+export DATASET_ID="infer_pressure_demo" # Set dataset id for repeatable commands.
 ```
 
 ### 2) Validate infer contract surface
