@@ -48,10 +48,21 @@ def test_ops_module_readme_has_banner_narrative_and_doc_map() -> None:
     )
     assert "cross-tool orchestration control plane" in text
     assert "data-plane workflow" in text
+    assert "read-only lens over the shared catalog" in text
+    assert "typed related procedures" in text
     assert "docs/README.md" in text
     assert "../../../docs/runbooks/README.md" in text
     assert "uv run ops catalog list" in text
+    assert "uv run ops catalog show" in text
     assert "--plane data-plane --query infer" in text
+    assert "--section tool-sources" in text
+    assert "--related-to <registry-id>" in text
+    assert "typed related tool docs" in text
+    assert "exact deep docs when declared" in text
+    assert "uv run ops progress show" in text
+    assert "uv run ops progress scaffold" in text
+    assert "uv run ops progress scaffold --related-to" in text
+    assert "uv run ops progress campaign" in text
     assert "../../../docs/operations/README.md" in text
     assert "../../../docs/operations/orchestration-runbooks.md" in text
     assert "runbooks/presets" in text
@@ -73,8 +84,19 @@ def test_ops_package_local_docs_index_routes_to_shared_runbook_surface() -> None
         label="src/dnadesign/ops/docs/README.md",
     )
     assert "../../../../docs/runbooks/README.md" in text
+    assert "read-only lens over the shared catalog" in text
+    assert "typed related procedures" in text
     assert "uv run ops catalog list" in text
+    assert "uv run ops catalog show <registry-id>" in text
     assert "--plane data-plane --query infer" in text
+    assert "--section tool-sources" in text
+    assert "--related-to <registry-id>" in text
+    assert "typed related tool docs" in text
+    assert "exact deep docs when declared" in text
+    assert "uv run ops progress show <registry-id> ..." in text
+    assert "uv run ops progress scaffold <registry-id> ..." in text
+    assert "uv run ops progress scaffold --related-to <registry-id>" in text
+    assert "uv run ops progress campaign --manifest <manifest.yaml>" in text
     assert "../../../../docs/operations/README.md" in text
     assert "../../../../docs/operations/orchestration-runbooks.md" in text
     assert "../runbooks/presets" in text
@@ -90,6 +112,7 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
             "### Start here",
             "### Orchestration routes",
             "### Contracts",
+            "### Read-only progress routes",
             "### Verification loop",
             "### Operator quickstart",
         ],
@@ -103,7 +126,17 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
     assert "**Owner-boundary:** ops" in text
     assert "ops runbook init --workflow" in text
     assert "uv run ops catalog list" in text
+    assert "uv run ops catalog show <registry-id>" in text
+    assert "typed related procedures around one path" in text
     assert "--plane data-plane --query infer" in text
+    assert "--section tool-sources" in text
+    assert "--related-to <registry-id>" in text
+    assert "typed related tool docs around one path" in text
+    assert "exact deep docs when declared" in text
+    assert "uv run ops progress show <registry-id> ..." in text
+    assert "uv run ops progress scaffold <registry-id> ..." in text
+    assert "uv run ops progress scaffold --related-to <registry-id>" in text
+    assert "uv run ops progress campaign --manifest <manifest.yaml>" in text
     assert "--project <project>" in text
     assert "project dunlop" not in text
     assert "orchestration-runbooks.md" in text
@@ -186,6 +219,15 @@ def test_repo_docs_index_exposes_ops_tool_and_operations_route() -> None:
     assert "[Workflow routes](#workflow-routes)" in text
     assert "[Runbook catalog](runbooks/README.md)" in text
     assert "uv run ops catalog list --query <term>" in text
+    assert "uv run ops catalog show <registry-id>" in text
+    assert "exact deep docs when declared" in text
+    assert "uv run ops catalog list --section tool-sources" in text
+    assert "uv run ops catalog list --related-to <registry-id>" in text
+    assert "uv run ops catalog list --section tool-sources --related-to <registry-id>" in text
+    assert "uv run ops progress show <registry-id> ..." in text
+    assert "uv run ops progress scaffold <registry-id> ..." in text
+    assert "uv run ops progress scaffold --related-to <registry-id>" in text
+    assert "uv run ops progress campaign --manifest <manifest.yaml>" in text
     assert "[Ops orchestration index](operations/README.md)" in text
     assert "| `ops` | `uv run ops --help` | [ops README](../src/dnadesign/ops/README.md) |" in text
 
@@ -196,9 +238,21 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "## Runbook Catalog" in text
     assert "uv run ops catalog list" in text
     assert "--plane data-plane --query infer" in text
+    assert "--section tool-sources" in text
+    assert "--related-to usr.data-plane.promoter-feature-matrix" in text
     assert "uv run ops catalog show <registry-id>" in text
+    assert "required progress inputs" in text
+    assert "exact deep docs when declared" in text
+    assert "next shell commands" in text
+    assert "uv run ops progress show <registry-id> ..." in text
+    assert "uv run ops progress scaffold <registry-id> ..." in text
+    assert "uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix" in text
+    assert "uv run ops progress campaign --manifest <manifest.yaml>" in text
+    assert "### Discovery shortcuts" in text
     assert "### Authoritative cross-tool procedures" in text
     assert "### Tool-local runbook sources" in text
+    assert "### Progress surface glossary" in text
+    assert "### Explicit campaign manifest shape" in text
     assert "### Boundary reminders" in text
     assert "ops.control-plane.orchestration" in text
     assert "usr.data-plane.hpc-sync" in text
@@ -217,7 +271,10 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "../../src/dnadesign/infer/docs/README.md" in text
     assert "It does not replace the owner-local runbook or workflow" in text
     assert "drift is a docs-check failure" in text
-    assert "It is not yet a unified multi-tool campaign status API." in text
+    assert "This is still not an inferred global campaign engine." in text
+    assert "Relative artifact paths in the manifest resolve from the manifest directory" in text
+    assert "`ops-audit-json`" in text
+    assert "`opal-campaign-state`" in text
     assert "Ops is not" not in text
 
 

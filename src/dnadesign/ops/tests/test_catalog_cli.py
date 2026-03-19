@@ -35,6 +35,7 @@ def test_load_runbook_catalog_reads_shared_registry() -> None:
     assert catalog.tool_sources
     assert catalog.find_procedure("ops.control-plane.orchestration") is not None
     assert catalog.find_procedure("cluster.downstream.exploratory-clustering") is not None
+    assert catalog.find_tool_source("usr") is not None
 
 
 def test_catalog_query_filters_procedures_without_touching_registry_ownership() -> None:
@@ -63,7 +64,8 @@ def test_cli_catalog_list_emits_grouped_text_inventory() -> None:
     assert "ops.control-plane.orchestration" in result.output
     assert "cluster.downstream.exploratory-clustering" in result.output
     assert "Tool-local runbook sources" in result.output
-    assert "densegen: DenseGen docs" in result.output
+    assert "densegen: DenseGen documentation" in result.output
+    assert "usr: USR docs" in result.output
 
 
 def test_cli_catalog_list_supports_json_and_section_filter() -> None:
@@ -118,6 +120,95 @@ def test_cli_catalog_list_supports_queryable_filters() -> None:
     assert payload["tool_sources"] == []
 
 
+def test_cli_catalog_list_supports_tool_source_queries_for_promoter_path() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--section",
+            "tool-sources",
+            "--query",
+            "promoter feature matrix",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["filters"] == {"query": "promoter feature matrix"}
+    tools = {entry["tool"] for entry in payload["tool_sources"]}
+    assert {"usr", "infer", "opal"}.issubset(tools)
+    assert "procedures" not in payload
+
+
+def test_cli_catalog_list_supports_related_tool_sources() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--section",
+            "tool-sources",
+            "--related-to",
+            "usr.data-plane.promoter-feature-matrix",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["filters"] == {"related_to": "usr.data-plane.promoter-feature-matrix"}
+    assert payload["counts"] == {"tool_sources": 5}
+    assert [entry["tool"] for entry in payload["tool_sources"]] == [
+        "densegen",
+        "construct",
+        "infer",
+        "cluster",
+        "opal",
+    ]
+    assert "procedures" not in payload
+
+
+def test_cli_catalog_list_supports_related_to_filter() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--section",
+            "procedures",
+            "--related-to",
+            "usr.data-plane.promoter-feature-matrix",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["filters"] == {"related_to": "usr.data-plane.promoter-feature-matrix"}
+    assert payload["counts"] == {"procedures": 4}
+    assert [entry["registry_id"] for entry in payload["procedures"]] == [
+        "usr.data-plane.multi-source-source-of-truth",
+        "usr.data-plane.construct-infer-source-of-truth",
+        "cluster.downstream.exploratory-clustering",
+        "opal.downstream.usr-infer-x-active-learning",
+    ]
+    assert "tool_sources" not in payload
+
+
 def test_cli_catalog_show_emits_registered_entry() -> None:
     runner = CliRunner()
 
@@ -134,7 +225,129 @@ def test_cli_catalog_show_emits_registered_entry() -> None:
 
     assert result.exit_code == 0
     assert "Registry id: usr.data-plane.promoter-feature-matrix" in result.output
+    assert "Owner boundary: usr" in result.output
+    assert "Entry artifact: one or more USR-backed promoter datasets" in result.output
+    assert "Exit artifact: infer-annotated USR feature matrix ready for cluster or OPAL" in result.output
     assert "Progress kind: usr-dataset-state" in result.output
+    assert "Owner docs:" in result.output
+    assert "- usr: USR docs" in result.output
+    assert "Related tool docs:" in result.output
+    assert "- densegen: DenseGen documentation" in result.output
+    assert "- construct: construct docs" in result.output
+    assert "- infer: infer docs" in result.output
+    assert "- cluster: cluster docs" in result.output
+    assert "- opal: OPAL Documentation" in result.output
+    assert "Related deep docs:" in result.output
+    assert "- construct/template-contexts: Construct Template Contexts" in result.output
+    assert "- infer/architecture: Infer Architecture" in result.output
+    assert "- infer/evo2-provider: Evo2 Provider Reference" in result.output
+    assert "- infer/evo2-promoter-features: Evo2 Promoter Feature Runbook" in result.output
+    assert "- cluster/exploratory-clustering: Exploratory clustering workflow" in result.output
+    assert "- opal/usr-infer-x-active-learning: USR Dataset With Infer-Derived X -> OPAL Active Learning" in (
+        result.output
+    )
+    assert "Required progress inputs:" in result.output
+    assert "--usr-root <usr-root>" in result.output
+    assert "--dataset <dataset>" in result.output
+    assert "Related procedures:" in result.output
+    assert "depends-on: usr.data-plane.multi-source-source-of-truth" in result.output
+    assert "depends-on: usr.data-plane.construct-infer-source-of-truth" in result.output
+    assert "handoff-to: cluster.downstream.exploratory-clustering" in result.output
+    assert "handoff-to: opal.downstream.usr-infer-x-active-learning" in result.output
+    assert "Next commands:" in result.output
+    assert (
+        "uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>"
+    ) in result.output
+    assert "uv run ops progress scaffold usr.data-plane.promoter-feature-matrix" in result.output
+    assert "uv run ops catalog list --section tool-sources --tool usr" in result.output
+    assert "uv run ops catalog list --section tool-sources --related-to usr.data-plane.promoter-feature-matrix" in (
+        result.output
+    )
+    assert (
+        "uv run ops catalog list --section procedures --related-to usr.data-plane.promoter-feature-matrix"
+    ) in result.output
+    assert "uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix" in result.output
+
+
+def test_cli_catalog_show_json_includes_related_procedures() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "show",
+            "usr.data-plane.promoter-feature-matrix",
+            "--repo-root",
+            str(_repo_root()),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["owner_boundary"] == "usr"
+    assert payload["entry_artifact"].startswith("one or more USR-backed promoter datasets")
+    assert payload["exit_artifact"] == "infer-annotated USR feature matrix ready for cluster or OPAL"
+    assert payload["owner_tool_source"]["tool"] == "usr"
+    assert payload["owner_tool_source"]["doc_path"] == "src/dnadesign/usr/docs/README.md"
+    assert [entry["tool"] for entry in payload["related_tool_sources"]] == [
+        "densegen",
+        "construct",
+        "infer",
+        "cluster",
+        "opal",
+    ]
+    assert [(entry["tool"], entry["route_id"]) for entry in payload["related_tool_routes"]] == [
+        ("construct", "template-contexts"),
+        ("infer", "architecture"),
+        ("infer", "evo2-provider"),
+        ("infer", "evo2-promoter-features"),
+        ("cluster", "exploratory-clustering"),
+        ("opal", "usr-infer-x-active-learning"),
+    ]
+    assert payload["related_tool_routes"][0]["doc_path"] == (
+        "src/dnadesign/construct/docs/reference/template-contexts.md"
+    )
+    assert payload["related_tool_routes"][1]["doc_path"] == "src/dnadesign/infer/docs/architecture/README.md"
+    assert payload["progress_required_inputs"] == [
+        {
+            "cli_flag": "--usr-root",
+            "manifest_key": "usr_root",
+            "placeholder": "<usr-root>",
+            "summary": "USR root containing the target dataset directory.",
+        },
+        {
+            "cli_flag": "--dataset",
+            "manifest_key": "dataset",
+            "placeholder": "<dataset>",
+            "summary": "USR dataset id to summarize.",
+        },
+    ]
+    assert payload["next_commands"]["progress_show"] == (
+        "uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>"
+    )
+    assert payload["next_commands"]["progress_scaffold"] == (
+        "uv run ops progress scaffold usr.data-plane.promoter-feature-matrix"
+    )
+    assert payload["next_commands"]["catalog_owner_tool_source"] == (
+        "uv run ops catalog list --section tool-sources --tool usr"
+    )
+    assert payload["next_commands"]["catalog_related_tool_sources"] == (
+        "uv run ops catalog list --section tool-sources --related-to usr.data-plane.promoter-feature-matrix"
+    )
+    assert payload["next_commands"]["catalog_related"] == (
+        "uv run ops catalog list --section procedures --related-to usr.data-plane.promoter-feature-matrix"
+    )
+    assert payload["next_commands"]["progress_scaffold_related"] == (
+        "uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix"
+    )
+    assert [(entry["relation_type"], entry["registry_id"]) for entry in payload["related_procedures"]] == [
+        ("depends-on", "usr.data-plane.multi-source-source-of-truth"),
+        ("depends-on", "usr.data-plane.construct-infer-source-of-truth"),
+        ("handoff-to", "cluster.downstream.exploratory-clustering"),
+        ("handoff-to", "opal.downstream.usr-infer-x-active-learning"),
+    ]
 
 
 def test_cli_catalog_show_rejects_unknown_registry_id() -> None:
@@ -171,6 +384,26 @@ def test_cli_catalog_show_suggests_close_registry_ids() -> None:
 
     assert result.exit_code == 2
     assert "Did you mean:" in result.output
+    assert "usr.data-plane.promoter-feature-matrix" in result.output
+
+
+def test_cli_catalog_list_rejects_unknown_related_to_registry_id() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--related-to",
+            "usr.data-plane.promoter-feature",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "unknown --related-to registry id: usr.data-plane.promoter-feature" in result.output
     assert "usr.data-plane.promoter-feature-matrix" in result.output
 
 

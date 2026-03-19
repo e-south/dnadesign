@@ -21,10 +21,15 @@ import yaml
 from pydantic import ValidationError
 
 from .catalog import (
+    CatalogProcedureDetails,
     CatalogProcedureEntry,
     CatalogQuery,
     CatalogToolSourceEntry,
+    RunbookCatalog,
     filter_runbook_catalog,
+    load_catalog_procedure_details,
+    load_catalog_related_tool_routes,
+    load_catalog_related_tool_sources,
     load_runbook_catalog,
     repo_relative_catalog_doc_path,
     suggest_procedure_registry_ids,
@@ -32,6 +37,17 @@ from .catalog import (
 from .orchestrator.execute import execute_batch_plan
 from .orchestrator.plan import build_batch_plan
 from .orchestrator.state import discover_active_job_ids_for_runbook
+from .progress import (
+    CampaignProgress,
+    CampaignScaffold,
+    ProcedureProgress,
+    ProgressFieldSpec,
+    ProgressInputs,
+    build_campaign_scaffold,
+    build_procedure_progress,
+    load_campaign_progress,
+    load_progress_required_inputs,
+)
 from .runbooks.path_policy import (
     REPO_TRANSIENT_OPERATIONAL_DIR_NAMES,
     WORKSPACE_AUDIT_RELATIVE_DIR,
@@ -51,6 +67,8 @@ runbook_app = typer.Typer(help="Runbook contract commands.")
 app.add_typer(runbook_app, name="runbook")
 catalog_app = typer.Typer(help="Read-only discovery commands for the shared runbook catalog.")
 app.add_typer(catalog_app, name="catalog")
+progress_app = typer.Typer(help="Read-only progress commands for registered runbooks and explicit campaigns.")
+app.add_typer(progress_app, name="progress")
 
 
 def _load_runbook_or_exit(runbook_path: Path):
@@ -397,13 +415,31 @@ def _emit_catalog_list_json(
                     doc_path=entry.doc_path,
                 ),
                 "summary": entry.summary,
+                "keywords": list(entry.keywords),
             }
             for entry in tool_sources
         ]
     typer.echo(json.dumps(payload, indent=2, sort_keys=True))
 
 
-def _emit_catalog_show_text(*, repo_root: Path, catalog_path: Path, entry: CatalogProcedureEntry) -> None:
+def _emit_catalog_show_text(
+    *,
+    repo_root: Path,
+    catalog_path: Path,
+    details: CatalogProcedureDetails,
+    catalog: RunbookCatalog,
+) -> None:
+    entry = details.entry
+    progress_inputs = load_progress_required_inputs(entry.progress_kind)
+    owner_tool_source = catalog.find_tool_source(details.owner_boundary)
+    related_tool_sources = load_catalog_related_tool_sources(catalog, entry.registry_id)
+    related_tool_routes = load_catalog_related_tool_routes(catalog, entry.registry_id)
+    next_commands = _catalog_next_commands(
+        entry=entry,
+        details=details,
+        owner_tool_source=owner_tool_source,
+        related_tool_sources=related_tool_sources,
+    )
     lines = [
         f"Registry id: {entry.registry_id}",
         f"Procedure: {entry.title}",
@@ -415,14 +451,99 @@ def _emit_catalog_show_text(*, repo_root: Path, catalog_path: Path, entry: Catal
         ),
         f"Type: {entry.entry_type}",
         f"Plane: {entry.plane}",
+        f"Owner boundary: {details.owner_boundary}",
+        f"Entry artifact: {details.entry_artifact}",
+        f"Exit artifact: {details.exit_artifact}",
         f"Execution kind: {entry.execution_kind}",
         f"Progress kind: {entry.progress_kind}",
         f"Summary: {entry.summary}",
     ]
+    if owner_tool_source is not None:
+        lines.extend(
+            [
+                "Owner docs:",
+                f"- {owner_tool_source.tool}: {owner_tool_source.title}",
+                f"  {owner_tool_source.summary}",
+                "  Doc: "
+                + repo_relative_catalog_doc_path(
+                    repo_root=repo_root,
+                    catalog_path=catalog_path,
+                    doc_path=owner_tool_source.doc_path,
+                ),
+            ]
+        )
+    if related_tool_sources:
+        lines.append("Related tool docs:")
+        for related_tool in related_tool_sources:
+            lines.extend(
+                [
+                    f"- {related_tool.tool}: {related_tool.title}",
+                    f"  {related_tool.summary}",
+                    "  Doc: "
+                    + repo_relative_catalog_doc_path(
+                        repo_root=repo_root,
+                        catalog_path=catalog_path,
+                        doc_path=related_tool.doc_path,
+                    ),
+                ]
+            )
+    if related_tool_routes:
+        lines.append("Related deep docs:")
+        for route in related_tool_routes:
+            lines.extend(
+                [
+                    f"- {route.tool}/{route.route_id}: {route.title}",
+                    f"  {route.summary}",
+                    "  Doc: "
+                    + repo_relative_catalog_doc_path(
+                        repo_root=repo_root,
+                        catalog_path=catalog_path,
+                        doc_path=route.doc_path,
+                    ),
+                ]
+            )
+    lines.append("Required progress inputs:")
+    if progress_inputs:
+        for field in progress_inputs:
+            lines.append(f"- {field.cli_flag} {field.placeholder}: {field.summary}")
+    else:
+        lines.append("- none")
+    if details.relations:
+        lines.append("Related procedures:")
+        for relation in details.relations:
+            related_entry = catalog.find_procedure(relation.target_registry_id)
+            if related_entry is None:
+                continue
+            status_summary = (
+                f"{related_entry.entry_type} | {related_entry.plane} | "
+                f"{related_entry.execution_kind} | {related_entry.progress_kind}"
+            )
+            lines.append(f"- {relation.relation_type}: {related_entry.registry_id} [{status_summary}]")
+            lines.append(f"  {related_entry.summary}")
+    lines.append("Next commands:")
+    for label, command in next_commands:
+        lines.append(f"- {label}: {command}")
     typer.echo("\n".join(lines))
 
 
-def _emit_catalog_show_json(*, repo_root: Path, catalog_path: Path, entry: CatalogProcedureEntry) -> None:
+def _emit_catalog_show_json(
+    *,
+    repo_root: Path,
+    catalog_path: Path,
+    details: CatalogProcedureDetails,
+    catalog: RunbookCatalog,
+) -> None:
+    entry = details.entry
+    progress_inputs = load_progress_required_inputs(entry.progress_kind)
+    owner_tool_source = catalog.find_tool_source(details.owner_boundary)
+    related_tool_sources = load_catalog_related_tool_sources(catalog, entry.registry_id)
+    related_tool_routes = load_catalog_related_tool_routes(catalog, entry.registry_id)
+    next_commands = _catalog_next_commands(
+        entry=entry,
+        details=details,
+        owner_tool_source=owner_tool_source,
+        related_tool_sources=related_tool_sources,
+    )
     typer.echo(
         json.dumps(
             {
@@ -435,14 +556,201 @@ def _emit_catalog_show_json(*, repo_root: Path, catalog_path: Path, entry: Catal
                 ),
                 "type": entry.entry_type,
                 "plane": entry.plane,
+                "owner_boundary": details.owner_boundary,
+                "entry_artifact": details.entry_artifact,
+                "exit_artifact": details.exit_artifact,
                 "execution_kind": entry.execution_kind,
                 "progress_kind": entry.progress_kind,
+                "progress_required_inputs": [field.as_dict() for field in progress_inputs],
                 "summary": entry.summary,
+                "owner_tool_source": (
+                    {
+                        "tool": owner_tool_source.tool,
+                        "title": owner_tool_source.title,
+                        "doc_path": repo_relative_catalog_doc_path(
+                            repo_root=repo_root,
+                            catalog_path=catalog_path,
+                            doc_path=owner_tool_source.doc_path,
+                        ),
+                        "summary": owner_tool_source.summary,
+                        "keywords": list(owner_tool_source.keywords),
+                    }
+                    if owner_tool_source is not None
+                    else None
+                ),
+                "related_tool_sources": [
+                    {
+                        "tool": related_tool.tool,
+                        "title": related_tool.title,
+                        "doc_path": repo_relative_catalog_doc_path(
+                            repo_root=repo_root,
+                            catalog_path=catalog_path,
+                            doc_path=related_tool.doc_path,
+                        ),
+                        "summary": related_tool.summary,
+                        "keywords": list(related_tool.keywords),
+                    }
+                    for related_tool in related_tool_sources
+                ],
+                "related_tool_routes": [
+                    {
+                        "tool": route.tool,
+                        "route_id": route.route_id,
+                        "title": route.title,
+                        "doc_path": repo_relative_catalog_doc_path(
+                            repo_root=repo_root,
+                            catalog_path=catalog_path,
+                            doc_path=route.doc_path,
+                        ),
+                        "summary": route.summary,
+                    }
+                    for route in related_tool_routes
+                ],
+                "next_commands": {name: command for name, command in next_commands},
+                "related_procedures": [
+                    {
+                        "relation_type": relation.relation_type,
+                        "registry_id": related_entry.registry_id,
+                        "title": related_entry.title,
+                        "doc_path": repo_relative_catalog_doc_path(
+                            repo_root=repo_root,
+                            catalog_path=catalog_path,
+                            doc_path=related_entry.doc_path,
+                        ),
+                        "type": related_entry.entry_type,
+                        "plane": related_entry.plane,
+                        "execution_kind": related_entry.execution_kind,
+                        "progress_kind": related_entry.progress_kind,
+                        "summary": related_entry.summary,
+                    }
+                    for relation in details.relations
+                    for related_entry in [catalog.find_procedure(relation.target_registry_id)]
+                    if related_entry is not None
+                ],
             },
             indent=2,
             sort_keys=True,
         )
     )
+
+
+def _emit_progress_show_text(
+    *,
+    repo_root: Path,
+    catalog_path: Path,
+    result: ProcedureProgress,
+) -> None:
+    doc_path = repo_relative_catalog_doc_path(
+        repo_root=repo_root,
+        catalog_path=catalog_path,
+        doc_path=result.doc_path,
+    )
+    lines = [
+        f"Registry id: {result.registry_id}",
+        f"Procedure: {result.title}",
+        f"Doc: {doc_path}",
+        f"Owner boundary: {result.owner_boundary}",
+        f"Progress kind: {result.progress_kind}",
+        f"State: {result.state}",
+        f"Summary: {result.summary}",
+        "Evidence:",
+    ]
+    for key, value in result.evidence.items():
+        lines.append(f"- {key}: {json.dumps(value, sort_keys=True) if isinstance(value, (dict, list)) else value}")
+    typer.echo("\n".join(lines))
+
+
+def _emit_progress_show_json(
+    *,
+    repo_root: Path,
+    catalog_path: Path,
+    result: ProcedureProgress,
+) -> None:
+    payload = result.as_dict()
+    payload["doc_path"] = repo_relative_catalog_doc_path(
+        repo_root=repo_root,
+        catalog_path=catalog_path,
+        doc_path=result.doc_path,
+    )
+    typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _emit_campaign_progress_text(
+    *,
+    repo_root: Path,
+    catalog_path: Path,
+    result: CampaignProgress,
+) -> None:
+    counts = result.counts()
+    lines = [
+        "Campaign progress",
+        f"Campaign id: {result.campaign_id}",
+        f"Manifest: {result.manifest_path}",
+        f"Overall state: {result.overall_state()}",
+        f"Counts: ok={counts['ok']} attention={counts['attention']} missing={counts['missing']}",
+        "",
+        "Steps",
+    ]
+    for step in result.steps:
+        label = step.label
+        heading = f"- {label}: {step.registry_id}" if label else f"- {step.registry_id}"
+        lines.append(f"{heading} [{step.state} | {step.progress_kind}]")
+        lines.append(f"  {step.summary}")
+        lines.append(
+            "  Doc: "
+            + repo_relative_catalog_doc_path(
+                repo_root=repo_root,
+                catalog_path=catalog_path,
+                doc_path=step.doc_path,
+            )
+        )
+    typer.echo("\n".join(lines))
+
+
+def _emit_campaign_progress_json(
+    *,
+    repo_root: Path,
+    catalog_path: Path,
+    result: CampaignProgress,
+) -> None:
+    payload = result.as_dict()
+    payload["steps"] = [
+        {
+            **step.as_dict(),
+            "doc_path": repo_relative_catalog_doc_path(
+                repo_root=repo_root,
+                catalog_path=catalog_path,
+                doc_path=step.doc_path,
+            ),
+        }
+        for step in result.steps
+    ]
+    typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _emit_progress_scaffold_yaml(*, result: CampaignScaffold) -> str:
+    return yaml.safe_dump(result.as_manifest_dict(), sort_keys=False)
+
+
+def _emit_progress_scaffold_json(
+    *,
+    repo_root: Path,
+    catalog_path: Path,
+    result: CampaignScaffold,
+) -> None:
+    payload = result.as_dict()
+    payload["steps"] = [
+        {
+            **step.as_dict(),
+            "doc_path": repo_relative_catalog_doc_path(
+                repo_root=repo_root,
+                catalog_path=catalog_path,
+                doc_path=step.doc_path,
+            ),
+        }
+        for step in result.steps
+    ]
+    typer.echo(json.dumps(payload, indent=2, sort_keys=True))
 
 
 def _catalog_counts(
@@ -484,11 +792,136 @@ def _render_catalog_filters(filters: CatalogQuery) -> str | None:
     return "Filters: " + rendered
 
 
+def _render_command(parts: Sequence[str]) -> str:
+    return " ".join(parts)
+
+
+def _catalog_progress_show_command(
+    *,
+    registry_id: str,
+    required_inputs: Sequence[ProgressFieldSpec],
+) -> str:
+    parts = ["uv", "run", "ops", "progress", "show", registry_id]
+    for field in required_inputs:
+        parts.extend((field.cli_flag, field.placeholder))
+    return _render_command(parts)
+
+
+def _catalog_next_commands(
+    *,
+    entry: CatalogProcedureEntry,
+    details: CatalogProcedureDetails,
+    owner_tool_source: CatalogToolSourceEntry | None,
+    related_tool_sources: Sequence[CatalogToolSourceEntry],
+) -> tuple[tuple[str, str], ...]:
+    required_inputs = load_progress_required_inputs(entry.progress_kind)
+    commands: list[tuple[str, str]] = [
+        (
+            "progress_show",
+            _catalog_progress_show_command(registry_id=entry.registry_id, required_inputs=required_inputs),
+        ),
+        (
+            "progress_scaffold",
+            _render_command(["uv", "run", "ops", "progress", "scaffold", entry.registry_id]),
+        ),
+    ]
+    if owner_tool_source is not None:
+        commands.append(
+            (
+                "catalog_owner_tool_source",
+                _render_command(
+                    [
+                        "uv",
+                        "run",
+                        "ops",
+                        "catalog",
+                        "list",
+                        "--section",
+                        "tool-sources",
+                        "--tool",
+                        owner_tool_source.tool,
+                    ]
+                ),
+            )
+        )
+    if related_tool_sources:
+        commands.append(
+            (
+                "catalog_related_tool_sources",
+                _render_command(
+                    [
+                        "uv",
+                        "run",
+                        "ops",
+                        "catalog",
+                        "list",
+                        "--section",
+                        "tool-sources",
+                        "--related-to",
+                        entry.registry_id,
+                    ]
+                ),
+            )
+        )
+    if details.related_registry_ids:
+        commands.extend(
+            (
+                (
+                    "catalog_related",
+                    _render_command(
+                        [
+                            "uv",
+                            "run",
+                            "ops",
+                            "catalog",
+                            "list",
+                            "--section",
+                            "procedures",
+                            "--related-to",
+                            entry.registry_id,
+                        ]
+                    ),
+                ),
+                (
+                    "progress_scaffold_related",
+                    _render_command(
+                        [
+                            "uv",
+                            "run",
+                            "ops",
+                            "progress",
+                            "scaffold",
+                            "--related-to",
+                            entry.registry_id,
+                        ]
+                    ),
+                ),
+            )
+        )
+    return tuple(commands)
+
+
 def _normalize_optional_filter(value: str | None) -> str | None:
     if value is None:
         return None
     normalized = value.strip()
     return normalized or None
+
+
+def _first_unknown_registry_id(
+    catalog: RunbookCatalog,
+    *,
+    registry_ids: Sequence[str],
+    related_to: str | None = None,
+) -> str | None:
+    normalized_related_to = _normalize_optional_filter(related_to)
+    if normalized_related_to is not None and catalog.find_procedure(normalized_related_to) is None:
+        return normalized_related_to
+    for registry_id in registry_ids:
+        normalized_registry_id = registry_id.strip()
+        if normalized_registry_id and catalog.find_procedure(normalized_registry_id) is None:
+            return normalized_registry_id
+    return None
 
 
 @runbook_app.command("init")
@@ -640,6 +1073,13 @@ def catalog_list(
         str | None,
         typer.Option("--progress-kind", help="Exact Progress-kind filter for cross-tool procedures."),
     ] = None,
+    related_to: Annotated[
+        str | None,
+        typer.Option(
+            "--related-to",
+            help="List only typed related procedures or typed related tool docs for one registered procedure.",
+        ),
+    ] = None,
     tool: Annotated[
         str | None,
         typer.Option("--tool", help="Exact tool filter for tool-local runbook sources."),
@@ -661,12 +1101,22 @@ def catalog_list(
         typer.echo(f"Catalog contract error: {exc}", err=True)
         raise typer.Exit(code=2) from exc
 
+    normalized_related_to = _normalize_optional_filter(related_to)
+    if normalized_related_to is not None and catalog.find_procedure(normalized_related_to) is None:
+        suggestions = suggest_procedure_registry_ids(catalog, normalized_related_to)
+        message = f"Catalog contract error: unknown --related-to registry id: {normalized_related_to}"
+        if suggestions:
+            message += "\nDid you mean:\n" + "\n".join(f"- {candidate}" for candidate in suggestions)
+        typer.echo(message, err=True)
+        raise typer.Exit(code=2)
+
     filters = CatalogQuery(
         query=_normalize_optional_filter(query),
         entry_type=_normalize_optional_filter(entry_type),
         plane=_normalize_optional_filter(plane),
         execution_kind=_normalize_optional_filter(execution_kind),
         progress_kind=_normalize_optional_filter(progress_kind),
+        related_to=normalized_related_to,
         tool=_normalize_optional_filter(tool),
     )
     procedures, tool_sources = filter_runbook_catalog(catalog, query=filters)
@@ -721,12 +1171,246 @@ def catalog_show(
             message += "\nDid you mean:\n" + "\n".join(f"- {candidate}" for candidate in suggestions)
         typer.echo(message, err=True)
         raise typer.Exit(code=2)
+    try:
+        details = load_catalog_procedure_details(catalog, entry)
+    except ValueError as exc:
+        typer.echo(f"Catalog contract error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
 
     if as_json:
-        _emit_catalog_show_json(repo_root=catalog.repo_root, catalog_path=catalog.catalog_path, entry=entry)
+        _emit_catalog_show_json(
+            repo_root=catalog.repo_root,
+            catalog_path=catalog.catalog_path,
+            details=details,
+            catalog=catalog,
+        )
         return
 
-    _emit_catalog_show_text(repo_root=catalog.repo_root, catalog_path=catalog.catalog_path, entry=entry)
+    _emit_catalog_show_text(
+        repo_root=catalog.repo_root,
+        catalog_path=catalog.catalog_path,
+        details=details,
+        catalog=catalog,
+    )
+
+
+@progress_app.command("show")
+def progress_show(
+    registry_id: Annotated[str, typer.Argument(help="Registered runbook or workflow registry id.")],
+    repo_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--repo-root",
+            help="Repository root containing docs/runbooks/README.md when invoking outside the repository.",
+        ),
+    ] = None,
+    audit_json: Annotated[
+        Path | None,
+        typer.Option("--audit-json", help="Audit JSON artifact for ops-audit-json surfaces."),
+    ] = None,
+    sync_audit_json: Annotated[
+        Path | None,
+        typer.Option("--sync-audit-json", help="USR sync audit JSON artifact for usr-sync-audit surfaces."),
+    ] = None,
+    usr_root: Annotated[
+        Path | None,
+        typer.Option("--usr-root", help="USR root for usr-dataset-state surfaces."),
+    ] = None,
+    dataset: Annotated[
+        str | None,
+        typer.Option("--dataset", help="USR dataset id for usr-dataset-state surfaces."),
+    ] = None,
+    cluster_results_root: Annotated[
+        Path | None,
+        typer.Option("--cluster-results-root", help="Cluster results root containing index.parquet."),
+    ] = None,
+    opal_config: Annotated[
+        Path | None,
+        typer.Option("--opal-config", help="OPAL campaign config path for opal-campaign-state surfaces."),
+    ] = None,
+    opal_workdir: Annotated[
+        Path | None,
+        typer.Option("--opal-workdir", help="OPAL campaign workdir when config resolution is not desired."),
+    ] = None,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json/--no-json", help="Emit machine-readable JSON instead of plain text."),
+    ] = False,
+) -> None:
+    try:
+        catalog = load_runbook_catalog(repo_root=repo_root)
+        result = build_procedure_progress(
+            catalog,
+            registry_id,
+            inputs=ProgressInputs(
+                audit_json=audit_json,
+                sync_audit_json=sync_audit_json,
+                usr_root=usr_root,
+                dataset=dataset,
+                cluster_results_root=cluster_results_root,
+                opal_config=opal_config,
+                opal_workdir=opal_workdir,
+            ),
+        )
+    except ValueError as exc:
+        message = f"Progress contract error: {exc}"
+        if "requires --" in str(exc):
+            message += (
+                f"\nHint: use `uv run ops progress scaffold {registry_id}` to emit a manifest step "
+                "with the required fields."
+            )
+        typer.echo(message, err=True)
+        raise typer.Exit(code=2) from exc
+
+    if as_json:
+        _emit_progress_show_json(
+            repo_root=catalog.repo_root,
+            catalog_path=catalog.catalog_path,
+            result=result,
+        )
+        return
+
+    _emit_progress_show_text(
+        repo_root=catalog.repo_root,
+        catalog_path=catalog.catalog_path,
+        result=result,
+    )
+
+
+@progress_app.command("campaign")
+def progress_campaign(
+    manifest: Annotated[
+        Path,
+        typer.Option("--manifest", help="YAML manifest listing explicit campaign progress steps."),
+    ],
+    repo_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--repo-root",
+            help="Repository root containing docs/runbooks/README.md when invoking outside the repository.",
+        ),
+    ] = None,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json/--no-json", help="Emit machine-readable JSON instead of plain text."),
+    ] = False,
+) -> None:
+    try:
+        catalog = load_runbook_catalog(repo_root=repo_root)
+        result = load_campaign_progress(catalog, manifest_path=manifest)
+    except ValueError as exc:
+        typer.echo(f"Progress contract error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    if as_json:
+        _emit_campaign_progress_json(
+            repo_root=catalog.repo_root,
+            catalog_path=catalog.catalog_path,
+            result=result,
+        )
+        return
+
+    _emit_campaign_progress_text(
+        repo_root=catalog.repo_root,
+        catalog_path=catalog.catalog_path,
+        result=result,
+    )
+
+
+@progress_app.command("scaffold")
+def progress_scaffold(
+    registry_ids: Annotated[
+        list[str] | None,
+        typer.Argument(help="Zero or more registered runbook or workflow registry ids."),
+    ] = None,
+    repo_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--repo-root",
+            help="Repository root containing docs/runbooks/README.md when invoking outside the repository.",
+        ),
+    ] = None,
+    campaign_id: Annotated[
+        str | None,
+        typer.Option("--campaign-id", help="Campaign id for the scaffolded manifest."),
+    ] = None,
+    related_to: Annotated[
+        str | None,
+        typer.Option(
+            "--related-to",
+            help=(
+                "Expand one registered procedure into a manifest starting point: the named procedure first, "
+                "then its typed related procedures."
+            ),
+        ),
+    ] = None,
+    out: Annotated[
+        Path | None,
+        typer.Option("--out", help="Write scaffolded campaign manifest YAML to this path."),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option("--force/--no-force", help="Overwrite --out when the file already exists."),
+    ] = False,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json/--no-json", help="Emit scaffold metadata as JSON instead of YAML."),
+    ] = False,
+) -> None:
+    if as_json and out is not None:
+        typer.echo("Progress contract error: --json cannot be combined with --out", err=True)
+        raise typer.Exit(code=2)
+
+    try:
+        catalog = load_runbook_catalog(repo_root=repo_root)
+    except ValueError as exc:
+        typer.echo(f"Progress contract error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    normalized_campaign_id = _normalize_optional_filter(campaign_id)
+    normalized_related_to = _normalize_optional_filter(related_to)
+    requested_registry_ids = registry_ids or []
+    try:
+        result = build_campaign_scaffold(
+            catalog,
+            registry_ids=requested_registry_ids,
+            campaign_id=normalized_campaign_id,
+            related_to=normalized_related_to,
+        )
+    except ValueError as exc:
+        missing_registry_id = _first_unknown_registry_id(
+            catalog,
+            registry_ids=requested_registry_ids,
+            related_to=normalized_related_to,
+        )
+        message = f"Progress contract error: {exc}"
+        if missing_registry_id is not None:
+            suggestions = suggest_procedure_registry_ids(catalog, missing_registry_id)
+            if suggestions:
+                message += "\nDid you mean:\n" + "\n".join(f"- {candidate}" for candidate in suggestions)
+        typer.echo(message, err=True)
+        raise typer.Exit(code=2) from exc
+
+    if as_json:
+        _emit_progress_scaffold_json(
+            repo_root=catalog.repo_root,
+            catalog_path=catalog.catalog_path,
+            result=result,
+        )
+        return
+
+    rendered_yaml = _emit_progress_scaffold_yaml(result=result)
+    if out is None:
+        typer.echo(rendered_yaml.rstrip())
+        return
+
+    out_path = out.expanduser()
+    if out_path.exists() and not force:
+        typer.echo(f"Progress contract error: file exists: {out_path}", err=True)
+        raise typer.Exit(code=2)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(rendered_yaml, encoding="utf-8")
+    typer.echo(str(out_path.resolve()))
 
 
 @runbook_app.command("plan")
