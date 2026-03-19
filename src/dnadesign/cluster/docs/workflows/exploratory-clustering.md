@@ -1,7 +1,17 @@
 ## Exploratory clustering workflow
 
+**Type:** workflow
+**Plane:** downstream-tool
+**Owner-boundary:** cluster
+**Entry artifact:** one explicit chosen feature definition in a USR dataset or file input
+**Exit artifact:** cluster run records, embeddings, plots, and downstream exploratory summaries
+**Registry-id:** cluster.downstream.exploratory-clustering
+**Summary:** Explore one chosen feature definition through clustering, UMAP, and downstream summaries.
+**Execution-kind:** exploratory
+**Progress-kind:** cluster-run-index
+
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-03-19
 
 Use this workflow when one explicit feature definition already exists and the next task is exploratory clustering, UMAP visualization, or unsupervised summaries.
 

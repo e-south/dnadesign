@@ -5,9 +5,13 @@
 **Owner-boundary:** opal
 **Entry artifact:** USR dataset plus one explicit infer-derived X column
 **Exit artifact:** initialized OPAL campaign state plus round outputs and selection ledgers
+**Registry-id:** opal.downstream.usr-infer-x-active-learning
+**Summary:** Start the label, train, and select loop once one explicit infer-derived X column or exported matrix already exists.
+**Execution-kind:** round-loop
+**Progress-kind:** opal-campaign-state
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-03-19
 
 Use this workflow when a USR dataset already contains one or more infer-derived feature columns and OPAL should own the label/train/select loop.
 

@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-03
+**Last verified:** 2026-03-19
 
 ## At a glance
 This document defines how `dnadesign` grades quality across tool domains and architectural layers.
@@ -66,6 +66,7 @@ Each score uses a `0-4` rubric:
 | Quality score input generation | `dnadesign.devtools.coverage_summary` + `dnadesign.devtools.quality_score` in CI | enforced |
 | Tool-inventory alignment | `dnadesign.devtools.ci_changes` contracts | enforced |
 | Root README tool catalog integrity | `dnadesign.devtools.docs_checks` tool table + path checks | enforced |
+| Runbook catalog completeness and registry metadata | `dnadesign.devtools.docs_checks` + CI | enforced |
 | Selected runbook metadata | `dnadesign.devtools.docs_checks` + CI | enforced |
 | Operational runbook path placement | `dnadesign.devtools.docs_checks` + CI | enforced |
 | Transient operational artifact placement (`.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) | `dnadesign.devtools.docs_checks` + CI | enforced |

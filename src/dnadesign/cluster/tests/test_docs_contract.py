@@ -72,6 +72,12 @@ def test_cluster_docs_tree_exposes_workflow_reference_and_concept_surfaces() -> 
     assert "concepts/semantic-surface.md" in by_type
 
     assert "### Preconditions" in workflow
+    assert "**Type:** workflow" in workflow
+    assert "**Plane:** downstream-tool" in workflow
+    assert "**Owner-boundary:** cluster" in workflow
+    assert "**Registry-id:** cluster.downstream.exploratory-clustering" in workflow
+    assert "**Execution-kind:** exploratory" in workflow
+    assert "**Progress-kind:** cluster-run-index" in workflow
     assert "### First fit, UMAP, and analysis pass" in workflow
     assert "### Optional OPAL-join path" in workflow
     assert "--opal-campaign" in workflow

@@ -5,9 +5,13 @@
 **Owner-boundary:** ops
 **Entry artifact:** workspace-scoped ops runbook YAML plus scheduler and optional notify intent
 **Exit artifact:** audit JSON, rendered command plan, and optional submit or watcher contract
+**Registry-id:** ops.control-plane.orchestration
+**Summary:** Deterministic control-plane runbook contract for DenseGen or Infer batch submit flows with optional Notify chaining.
+**Execution-kind:** executable
+**Progress-kind:** ops-audit-json
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-03-19
 
 This contract defines machine-readable runbooks for cross-tool BU SCC control-plane orchestration.
 It does not own durable USR-backed data-plane workflows; return to the root docs router or USR operations docs when the next authoritative procedure is about source-of-truth datasets rather than scheduler sequencing.

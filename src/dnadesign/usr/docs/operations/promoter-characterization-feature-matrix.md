@@ -5,9 +5,13 @@
 **Owner-boundary:** usr
 **Entry artifact:** one or more USR-backed promoter datasets plus optional construct-expanded context datasets
 **Exit artifact:** infer-annotated USR feature matrix ready for cluster or OPAL
+**Registry-id:** usr.data-plane.promoter-feature-matrix
+**Summary:** Build one infer-annotated feature matrix from mixed promoter sources before branching into Cluster or OPAL.
+**Execution-kind:** staged
+**Progress-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-03-19
 
 Use this runbook when promoter candidates come from multiple USR-backed sources and downstream consumers should see one infer-annotated feature matrix with explicit provenance.
 

@@ -5,9 +5,13 @@
 **Owner-boundary:** usr
 **Entry artifact:** one USR dataset updated asynchronously by DenseGen on HPC and infer locally
 **Exit artifact:** synchronized USR dataset with transfer-verified infer overlays on both hosts
+**Registry-id:** usr.data-plane.chained-densegen-infer-sync
+**Summary:** Coordinate DenseGen-on-HPC and Infer-local writes against one USR dataset with explicit sync checkpoints.
+**Execution-kind:** iterative
+**Progress-kind:** usr-sync-audit
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-03-19
 
 
 Use this runbook for the full asynchronous loop where DenseGen writes on HPC and Infer writes back overlays locally, with USR sync as the transfer contract.

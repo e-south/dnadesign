@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-03
+**Last verified:** 2026-03-19
 
 ## At a glance
 `dnadesign` is a uv-managed monorepo of modular bioinformatics tools under `src/dnadesign/`, with shared CI/devtools and operator runbooks in `docs/`.
@@ -37,12 +37,14 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - `docs/operations/orchestration-runbooks.md` is the executable operator contract for batch orchestration behavior.
 - `PLANS.md` governs lifecycle/process for promoting or changing these contracts.
 - Root docs route readers to one authoritative deep procedure; cross-tool runbooks may live either in top-level `docs/` or in the boundary-owning tool's operations docs when that tool owns the durable handoff.
+- `docs/runbooks/README.md` is the centralized inventory of authoritative cross-tool procedures and tool-local runbook sources; it is a discovery surface, not the owner of those procedures.
 - `docs/operations/` is the root control-plane orchestration surface only; it is not the generic registry for durable cross-tool data-plane workflows.
 - `src/dnadesign/usr/docs/operations/` is the default home for durable cross-tool data-plane procedures when the shared handoff artifact is a USR dataset, overlay set, or `.events.log`.
 
 ## Cross-tool information architecture
 - Workspace-rooted accumulation is the contract for repeated campaigns; orchestration state must not fan out into repository-root ad-hoc files.
 - Root `docs/README.md` is the only top-level router. It routes by user intent and ownership plane, then hands off to exactly one authoritative deep procedure for each cross-tool workflow.
+- `docs/runbooks/README.md` is the concise inventory surface for authoritative procedures; it links to owner-local runbooks and workflows without relocating them.
 - Control-plane orchestration artifacts stay under workspace-scoped logging roots; tool-local docs define exact subpaths and artifact names.
 - Tool packages own their workload configs, runtime outputs, and package-local workspace templates.
 - USR owns durable dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.

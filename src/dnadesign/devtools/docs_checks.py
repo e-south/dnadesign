@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, urlparse
 
 import yaml
 
+from dnadesign.ops.catalog import CatalogProcedureEntry, load_runbook_catalog, resolve_catalog_doc_path
 from dnadesign.ops.runbooks.path_policy import (
     PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
     REPO_TRANSIENT_OPERATIONAL_DIR_NAMES,
@@ -71,6 +72,7 @@ SOR_MARKDOWN_FILES = (
 )
 INDEX_MARKDOWN_FILES = (
     "docs/README.md",
+    "docs/runbooks/README.md",
     "docs/architecture/README.md",
     "docs/architecture/decisions/README.md",
     "docs/security/README.md",
@@ -101,6 +103,10 @@ PLANE_PATTERN = re.compile(r"^\*\*Plane:\*\*\s*(.+?)\s*$", re.MULTILINE)
 OWNER_BOUNDARY_PATTERN = re.compile(r"^\*\*Owner-boundary:\*\*\s*(.+?)\s*$", re.MULTILINE)
 ENTRY_ARTIFACT_PATTERN = re.compile(r"^\*\*Entry artifact:\*\*\s*(.+?)\s*$", re.MULTILINE)
 EXIT_ARTIFACT_PATTERN = re.compile(r"^\*\*Exit artifact:\*\*\s*(.+?)\s*$", re.MULTILINE)
+REGISTRY_ID_METADATA_PATTERN = re.compile(r"^\*\*Registry-id:\*\*\s*(.+?)\s*$", re.MULTILINE)
+SUMMARY_METADATA_PATTERN = re.compile(r"^\*\*Summary:\*\*\s*(.+?)\s*$", re.MULTILINE)
+EXECUTION_KIND_METADATA_PATTERN = re.compile(r"^\*\*Execution-kind:\*\*\s*(.+?)\s*$", re.MULTILINE)
+PROGRESS_KIND_METADATA_PATTERN = re.compile(r"^\*\*Progress-kind:\*\*\s*(.+?)\s*$", re.MULTILINE)
 STATUS_PATTERN = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
 CREATED_PATTERN = re.compile(r"^\*\*Created:\*\*\s*(.+?)\s*$", re.MULTILINE)
 SECTION_HEADING_PATTERN = re.compile(r"^#{2,6}\s+(.+?)\s*$", re.MULTILINE)
@@ -172,6 +178,11 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
+    "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md": {
+        "type": "runbook",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
     "src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md": {
         "type": "runbook",
         "plane": "data-plane",
@@ -192,6 +203,11 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
+    "src/dnadesign/cluster/docs/workflows/exploratory-clustering.md": {
+        "type": "workflow",
+        "plane": "downstream-tool",
+        "owner_boundary": "cluster",
+    },
     "src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md": {
         "type": "workflow",
         "plane": "downstream-tool",
@@ -200,6 +216,10 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
 }
 _CROSS_TOOL_DOC_ALLOWED_TYPES = {"route", "runbook", "workflow"}
 _CROSS_TOOL_DOC_ALLOWED_PLANES = {"control-plane", "data-plane", "downstream-tool"}
+_RUNBOOK_CATALOG_METADATA_TYPES = {"runbook", "workflow"}
+_REGISTRY_ID_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$")
+_METADATA_TOKEN_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:-[a-z0-9]+)*$")
+RUNBOOK_CATALOG_DOC_PATH = "docs/runbooks/README.md"
 OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES = (
     PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
     Path("docs/templates"),
@@ -850,6 +870,7 @@ def _find_owner_last_verified_metadata_issues_for_files(
 
 def _find_cross_tool_doc_metadata_issues(repo_root: Path) -> list[str]:
     issues: list[str] = []
+    registry_ids_by_path: dict[str, str] = {}
     for relative_path, contract in CROSS_TOOL_DOC_METADATA_CONTRACTS.items():
         path = repo_root / relative_path
         if not path.exists():
@@ -894,6 +915,151 @@ def _find_cross_tool_doc_metadata_issues(repo_root: Path) -> list[str]:
             issues.append(f"{path}: missing '**Exit artifact:**' metadata field.")
         elif not exit_artifact:
             issues.append(f"{path}: '**Exit artifact:**' must not be empty.")
+
+        if contract["type"] not in _RUNBOOK_CATALOG_METADATA_TYPES:
+            continue
+
+        registry_id = _extract_metadata_field(text, REGISTRY_ID_METADATA_PATTERN)
+        if registry_id is None:
+            issues.append(f"{path}: missing '**Registry-id:**' metadata field.")
+        elif not registry_id:
+            issues.append(f"{path}: '**Registry-id:**' must not be empty.")
+        elif _REGISTRY_ID_VALUE_PATTERN.fullmatch(registry_id) is None:
+            issues.append(f"{path}: '**Registry-id:**' must be dot-qualified lowercase tokens.")
+        else:
+            registry_ids_by_path[relative_path] = registry_id
+
+        summary = _extract_metadata_field(text, SUMMARY_METADATA_PATTERN)
+        if summary is None:
+            issues.append(f"{path}: missing '**Summary:**' metadata field.")
+        elif not summary:
+            issues.append(f"{path}: '**Summary:**' must not be empty.")
+
+        execution_kind = _extract_metadata_field(text, EXECUTION_KIND_METADATA_PATTERN)
+        if execution_kind is None:
+            issues.append(f"{path}: missing '**Execution-kind:**' metadata field.")
+        elif not execution_kind:
+            issues.append(f"{path}: '**Execution-kind:**' must not be empty.")
+        elif _METADATA_TOKEN_VALUE_PATTERN.fullmatch(execution_kind) is None:
+            issues.append(f"{path}: '**Execution-kind:**' must use lowercase slug tokens.")
+
+        progress_kind = _extract_metadata_field(text, PROGRESS_KIND_METADATA_PATTERN)
+        if progress_kind is None:
+            issues.append(f"{path}: missing '**Progress-kind:**' metadata field.")
+        elif not progress_kind:
+            issues.append(f"{path}: '**Progress-kind:**' must not be empty.")
+        elif _METADATA_TOKEN_VALUE_PATTERN.fullmatch(progress_kind) is None:
+            issues.append(f"{path}: '**Progress-kind:**' must use lowercase slug tokens.")
+
+    seen_registry_ids: dict[str, str] = {}
+    for relative_path, registry_id in registry_ids_by_path.items():
+        existing_path = seen_registry_ids.get(registry_id)
+        if existing_path is not None:
+            issues.append(
+                "cross-tool docs must not reuse registry ids: "
+                f"{registry_id} appears in both {existing_path} and {relative_path}."
+            )
+            continue
+        seen_registry_ids[registry_id] = relative_path
+
+    return issues
+
+
+def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    resolved_repo_root = repo_root.resolve()
+    catalog_paths = [
+        repo_root / relative_path
+        for relative_path, contract in CROSS_TOOL_DOC_METADATA_CONTRACTS.items()
+        if contract["type"] in _RUNBOOK_CATALOG_METADATA_TYPES and (repo_root / relative_path).exists()
+    ]
+    if not catalog_paths:
+        return issues
+
+    catalog_path = repo_root / RUNBOOK_CATALOG_DOC_PATH
+    if not catalog_path.exists():
+        return [f"{catalog_path}: missing runbook catalog."]
+
+    catalog_text = catalog_path.read_text(encoding="utf-8")
+    if "## Runbook Catalog" not in catalog_text:
+        issues.append(f"{catalog_path}: missing '## Runbook Catalog' heading.")
+
+    try:
+        catalog = load_runbook_catalog(repo_root=repo_root)
+    except ValueError as exc:
+        issues.append(f"{catalog_path}: {exc}")
+        return issues
+
+    catalog_entries_by_path: dict[str, CatalogProcedureEntry] = {}
+    expected_catalog_paths: set[str] = set()
+    for entry in catalog.procedures:
+        resolved_path = resolve_catalog_doc_path(catalog_path=catalog.catalog_path, doc_path=entry.doc_path)
+        try:
+            relative_path = str(resolved_path.relative_to(resolved_repo_root))
+        except ValueError:
+            issues.append(
+                f"{catalog_path}: registry id '{entry.registry_id}' resolves outside the repository: {entry.doc_path}."
+            )
+            continue
+        existing_entry = catalog_entries_by_path.get(relative_path)
+        if existing_entry is not None:
+            issues.append(
+                f"{catalog_path}: duplicate catalog procedure entry for {relative_path} "
+                f"({existing_entry.registry_id}, {entry.registry_id})."
+            )
+            continue
+        catalog_entries_by_path[relative_path] = entry
+
+    for relative_path, contract in CROSS_TOOL_DOC_METADATA_CONTRACTS.items():
+        if contract["type"] not in _RUNBOOK_CATALOG_METADATA_TYPES:
+            continue
+        path = repo_root / relative_path
+        if not path.exists():
+            continue
+        expected_catalog_paths.add(relative_path)
+        text = path.read_text(encoding="utf-8")
+        registry_id = _extract_metadata_field(text, REGISTRY_ID_METADATA_PATTERN)
+        if not registry_id:
+            continue
+
+        entry = catalog_entries_by_path.get(relative_path)
+        if entry is None:
+            issues.append(f"{catalog_path}: missing registry id '{registry_id}' for {relative_path}.")
+            issues.append(f"{catalog_path}: missing markdown link target for {relative_path}.")
+            continue
+
+        expected_metadata = {
+            "Registry-id": registry_id,
+            "Type": _extract_metadata_field(text, TYPE_PATTERN),
+            "Plane": _extract_metadata_field(text, PLANE_PATTERN),
+            "Execution-kind": _extract_metadata_field(text, EXECUTION_KIND_METADATA_PATTERN),
+            "Progress-kind": _extract_metadata_field(text, PROGRESS_KIND_METADATA_PATTERN),
+            "Summary": _extract_metadata_field(text, SUMMARY_METADATA_PATTERN),
+        }
+        catalog_metadata = {
+            "Registry-id": entry.registry_id,
+            "Type": entry.entry_type,
+            "Plane": entry.plane,
+            "Execution-kind": entry.execution_kind,
+            "Progress-kind": entry.progress_kind,
+            "Summary": entry.summary,
+        }
+        for field_name, expected_value in expected_metadata.items():
+            if not expected_value:
+                continue
+            actual_value = catalog_metadata[field_name]
+            if actual_value != expected_value:
+                issues.append(
+                    f"{catalog_path}: {field_name} for {relative_path} must match owner-local metadata "
+                    f"(catalog={actual_value!r}, doc={expected_value!r})."
+                )
+
+    for relative_path, entry in sorted(catalog_entries_by_path.items()):
+        if relative_path not in expected_catalog_paths:
+            issues.append(
+                f"{catalog_path}: unexpected catalog procedure '{entry.registry_id}' for {relative_path}; "
+                "add a matching cross-tool metadata contract or remove the catalog entry."
+            )
 
     return issues
 
@@ -1475,6 +1641,13 @@ def main(argv: list[str] | None = None) -> int:
     if cross_tool_doc_metadata_issues:
         print("Cross-tool doc metadata check failed:")
         for issue in cross_tool_doc_metadata_issues:
+            print(f" - {issue}")
+        return 1
+
+    runbook_catalog_issues = _find_runbook_catalog_issues(repo_root)
+    if runbook_catalog_issues:
+        print("Runbook catalog check failed:")
+        for issue in runbook_catalog_issues:
             print(f" - {issue}")
         return 1
 

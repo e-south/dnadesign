@@ -5,9 +5,13 @@
 **Owner-boundary:** usr
 **Entry artifact:** construct workspace plus one shared USR dataset target
 **Exit artifact:** one infer-ready USR dataset plus downstream event stream
+**Registry-id:** usr.data-plane.construct-infer-source-of-truth
+**Summary:** Realize construct outputs into one shared USR dataset and use that dataset as the durable Infer handoff.
+**Execution-kind:** staged
+**Progress-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-03-19
 
 Use this runbook when you want one USR-backed dataset that consolidates construct realizations from explicit source/template pairs, then serves as the handoff boundary for infer and downstream consumers.
 

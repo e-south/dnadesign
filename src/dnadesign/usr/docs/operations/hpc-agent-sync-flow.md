@@ -5,9 +5,13 @@
 **Owner-boundary:** usr
 **Entry artifact:** one USR dataset with pending cross-host drift and an explicit sync intent
 **Exit artifact:** transfer-verified local/remote USR dataset state with no unexpected drift
+**Registry-id:** usr.data-plane.hpc-sync
+**Summary:** Keep one USR dataset synchronized between HPC and local analysis with explicit diff, pull, and push verification.
+**Execution-kind:** iterative
+**Progress-kind:** usr-sync-audit
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-14
+**Last verified:** 2026-03-19
 
 
 Use this runbook when a dataset is produced incrementally on BU SCC (or similar HPC) and local analysis must stay in sync without moving data through git.

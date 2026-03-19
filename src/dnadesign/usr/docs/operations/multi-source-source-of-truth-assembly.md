@@ -5,9 +5,13 @@
 **Owner-boundary:** usr
 **Entry artifact:** multiple USR-backed input datasets plus explicit merge, carry, and construct intent
 **Exit artifact:** one construct-backed downstream USR dataset ready for infer and notify handoff
+**Registry-id:** usr.data-plane.multi-source-source-of-truth
+**Summary:** Merge multiple USR-backed sources, preserve explicit carry, and hand one construct-backed downstream dataset to Infer and Notify.
+**Execution-kind:** staged
+**Progress-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-03-19
 
 Use this runbook when inputs already span multiple USR-backed datasets, but downstream consumers should still see one consolidated construct-backed dataset plus one event stream.
 
