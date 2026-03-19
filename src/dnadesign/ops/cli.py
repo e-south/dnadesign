@@ -20,6 +20,15 @@ import typer
 import yaml
 from pydantic import ValidationError
 
+from .catalog import (
+    CatalogProcedureEntry,
+    CatalogQuery,
+    CatalogToolSourceEntry,
+    filter_runbook_catalog,
+    load_runbook_catalog,
+    repo_relative_catalog_doc_path,
+    suggest_procedure_registry_ids,
+)
 from .orchestrator.execute import execute_batch_plan
 from .orchestrator.plan import build_batch_plan
 from .orchestrator.state import discover_active_job_ids_for_runbook
@@ -40,6 +49,8 @@ app = typer.Typer(
 
 runbook_app = typer.Typer(help="Runbook contract commands.")
 app.add_typer(runbook_app, name="runbook")
+catalog_app = typer.Typer(help="Read-only discovery commands for the shared runbook catalog.")
+app.add_typer(catalog_app, name="catalog")
 
 
 def _load_runbook_or_exit(runbook_path: Path):
@@ -290,6 +301,196 @@ def _packaged_preset_paths() -> list[Path]:
     return sorted(path.resolve() for path in preset_dir.glob("*.yaml"))
 
 
+def _emit_catalog_list_text(
+    *,
+    repo_root: Path,
+    catalog_path: Path,
+    procedures: Sequence[CatalogProcedureEntry],
+    tool_sources: Sequence[CatalogToolSourceEntry],
+    section: Literal["all", "procedures", "tool-sources"],
+    filters: CatalogQuery,
+) -> None:
+    lines: list[str] = [
+        "Catalog inventory",
+        _render_catalog_counts(procedures=procedures, tool_sources=tool_sources, section=section),
+    ]
+    rendered_filters = _render_catalog_filters(filters)
+    if rendered_filters is not None:
+        lines.append(rendered_filters)
+    lines.append("")
+    if section in {"all", "procedures"}:
+        lines.append("Cross-tool procedures")
+        for entry in procedures:
+            status_summary = f"{entry.entry_type} | {entry.plane} | {entry.execution_kind} | {entry.progress_kind}"
+            lines.append(f"- {entry.registry_id} [{status_summary}]")
+            lines.append(f"  {entry.summary}")
+            lines.append(
+                "  Doc: "
+                + repo_relative_catalog_doc_path(
+                    repo_root=repo_root,
+                    catalog_path=catalog_path,
+                    doc_path=entry.doc_path,
+                )
+            )
+        if not procedures:
+            lines.append("- none")
+    if section == "all":
+        lines.append("")
+    if section in {"all", "tool-sources"}:
+        lines.append("Tool-local runbook sources")
+        for entry in tool_sources:
+            lines.append(f"- {entry.tool}: {entry.title}")
+            lines.append(f"  {entry.summary}")
+            lines.append(
+                "  Doc: "
+                + repo_relative_catalog_doc_path(
+                    repo_root=repo_root,
+                    catalog_path=catalog_path,
+                    doc_path=entry.doc_path,
+                )
+            )
+        if not tool_sources:
+            lines.append("- none")
+    typer.echo("\n".join(lines))
+
+
+def _emit_catalog_list_json(
+    *,
+    repo_root: Path,
+    catalog_path: Path,
+    procedures: Sequence[CatalogProcedureEntry],
+    tool_sources: Sequence[CatalogToolSourceEntry],
+    section: Literal["all", "procedures", "tool-sources"],
+    filters: CatalogQuery,
+) -> None:
+    payload: dict[str, object] = {
+        "section": section,
+        "filters": filters.as_dict(),
+        "counts": _catalog_counts(procedures=procedures, tool_sources=tool_sources, section=section),
+    }
+    if section in {"all", "procedures"}:
+        payload["procedures"] = [
+            {
+                "registry_id": entry.registry_id,
+                "title": entry.title,
+                "doc_path": repo_relative_catalog_doc_path(
+                    repo_root=repo_root,
+                    catalog_path=catalog_path,
+                    doc_path=entry.doc_path,
+                ),
+                "type": entry.entry_type,
+                "plane": entry.plane,
+                "execution_kind": entry.execution_kind,
+                "progress_kind": entry.progress_kind,
+                "summary": entry.summary,
+            }
+            for entry in procedures
+        ]
+    if section in {"all", "tool-sources"}:
+        payload["tool_sources"] = [
+            {
+                "tool": entry.tool,
+                "title": entry.title,
+                "doc_path": repo_relative_catalog_doc_path(
+                    repo_root=repo_root,
+                    catalog_path=catalog_path,
+                    doc_path=entry.doc_path,
+                ),
+                "summary": entry.summary,
+            }
+            for entry in tool_sources
+        ]
+    typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _emit_catalog_show_text(*, repo_root: Path, catalog_path: Path, entry: CatalogProcedureEntry) -> None:
+    lines = [
+        f"Registry id: {entry.registry_id}",
+        f"Procedure: {entry.title}",
+        "Doc: "
+        + repo_relative_catalog_doc_path(
+            repo_root=repo_root,
+            catalog_path=catalog_path,
+            doc_path=entry.doc_path,
+        ),
+        f"Type: {entry.entry_type}",
+        f"Plane: {entry.plane}",
+        f"Execution kind: {entry.execution_kind}",
+        f"Progress kind: {entry.progress_kind}",
+        f"Summary: {entry.summary}",
+    ]
+    typer.echo("\n".join(lines))
+
+
+def _emit_catalog_show_json(*, repo_root: Path, catalog_path: Path, entry: CatalogProcedureEntry) -> None:
+    typer.echo(
+        json.dumps(
+            {
+                "registry_id": entry.registry_id,
+                "title": entry.title,
+                "doc_path": repo_relative_catalog_doc_path(
+                    repo_root=repo_root,
+                    catalog_path=catalog_path,
+                    doc_path=entry.doc_path,
+                ),
+                "type": entry.entry_type,
+                "plane": entry.plane,
+                "execution_kind": entry.execution_kind,
+                "progress_kind": entry.progress_kind,
+                "summary": entry.summary,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+def _catalog_counts(
+    *,
+    procedures: Sequence[CatalogProcedureEntry],
+    tool_sources: Sequence[CatalogToolSourceEntry],
+    section: Literal["all", "procedures", "tool-sources"],
+) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    if section in {"all", "procedures"}:
+        counts["procedures"] = len(procedures)
+    if section in {"all", "tool-sources"}:
+        counts["tool_sources"] = len(tool_sources)
+    return counts
+
+
+def _render_catalog_counts(
+    *,
+    procedures: Sequence[CatalogProcedureEntry],
+    tool_sources: Sequence[CatalogToolSourceEntry],
+    section: Literal["all", "procedures", "tool-sources"],
+) -> str:
+    counts = _catalog_counts(procedures=procedures, tool_sources=tool_sources, section=section)
+    parts: list[str] = []
+    if "procedures" in counts:
+        noun = "procedure" if counts["procedures"] == 1 else "procedures"
+        parts.append(f"{counts['procedures']} cross-tool {noun}")
+    if "tool_sources" in counts:
+        noun = "source" if counts["tool_sources"] == 1 else "sources"
+        parts.append(f"{counts['tool_sources']} tool-local {noun}")
+    return "Counts: " + ", ".join(parts)
+
+
+def _render_catalog_filters(filters: CatalogQuery) -> str | None:
+    items = filters.as_dict().items()
+    rendered = ", ".join(f"{name}={value}" for name, value in items)
+    if not rendered:
+        return None
+    return "Filters: " + rendered
+
+
+def _normalize_optional_filter(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
 @runbook_app.command("init")
 def runbook_init(
     runbook: Annotated[Path, typer.Option("--runbook", help="Output path for orchestration runbook yaml.")],
@@ -405,6 +606,127 @@ def _emit_packaged_runbook_presets() -> None:
 @runbook_app.command("presets")
 def runbook_presets() -> None:
     _emit_packaged_runbook_presets()
+
+
+@catalog_app.command("list")
+def catalog_list(
+    repo_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--repo-root",
+            help="Repository root containing docs/runbooks/README.md when invoking outside the repository.",
+        ),
+    ] = None,
+    section: Annotated[
+        Literal["all", "procedures", "tool-sources"],
+        typer.Option(
+            "--section",
+            help="Which catalog section to show: cross-tool procedures, tool-local sources, or both.",
+        ),
+    ] = "all",
+    entry_type: Annotated[
+        str | None,
+        typer.Option("--type", help="Exact Type filter for cross-tool procedures."),
+    ] = None,
+    plane: Annotated[
+        str | None,
+        typer.Option("--plane", help="Exact Plane filter for cross-tool procedures."),
+    ] = None,
+    execution_kind: Annotated[
+        str | None,
+        typer.Option("--execution-kind", help="Exact Execution-kind filter for cross-tool procedures."),
+    ] = None,
+    progress_kind: Annotated[
+        str | None,
+        typer.Option("--progress-kind", help="Exact Progress-kind filter for cross-tool procedures."),
+    ] = None,
+    tool: Annotated[
+        str | None,
+        typer.Option("--tool", help="Exact tool filter for tool-local runbook sources."),
+    ] = None,
+    query: Annotated[
+        str | None,
+        typer.Option(
+            "--query", help="Case-insensitive token query across registry ids, titles, summaries, and doc paths."
+        ),
+    ] = None,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json/--no-json", help="Emit machine-readable JSON instead of plain text."),
+    ] = False,
+) -> None:
+    try:
+        catalog = load_runbook_catalog(repo_root=repo_root)
+    except ValueError as exc:
+        typer.echo(f"Catalog contract error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    filters = CatalogQuery(
+        query=_normalize_optional_filter(query),
+        entry_type=_normalize_optional_filter(entry_type),
+        plane=_normalize_optional_filter(plane),
+        execution_kind=_normalize_optional_filter(execution_kind),
+        progress_kind=_normalize_optional_filter(progress_kind),
+        tool=_normalize_optional_filter(tool),
+    )
+    procedures, tool_sources = filter_runbook_catalog(catalog, query=filters)
+
+    if as_json:
+        _emit_catalog_list_json(
+            repo_root=catalog.repo_root,
+            catalog_path=catalog.catalog_path,
+            procedures=procedures,
+            tool_sources=tool_sources,
+            section=section,
+            filters=filters,
+        )
+        return
+
+    _emit_catalog_list_text(
+        repo_root=catalog.repo_root,
+        catalog_path=catalog.catalog_path,
+        procedures=procedures,
+        tool_sources=tool_sources,
+        section=section,
+        filters=filters,
+    )
+
+
+@catalog_app.command("show")
+def catalog_show(
+    registry_id: Annotated[str, typer.Argument(help="Cross-tool runbook or workflow registry id.")],
+    repo_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--repo-root",
+            help="Repository root containing docs/runbooks/README.md when invoking outside the repository.",
+        ),
+    ] = None,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json/--no-json", help="Emit machine-readable JSON instead of plain text."),
+    ] = False,
+) -> None:
+    try:
+        catalog = load_runbook_catalog(repo_root=repo_root)
+    except ValueError as exc:
+        typer.echo(f"Catalog contract error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    entry = catalog.find_procedure(registry_id)
+    if entry is None:
+        suggestions = suggest_procedure_registry_ids(catalog, registry_id)
+        message = f"Catalog contract error: unknown registry id: {registry_id}"
+        if suggestions:
+            message += "\nDid you mean:\n" + "\n".join(f"- {candidate}" for candidate in suggestions)
+        typer.echo(message, err=True)
+        raise typer.Exit(code=2)
+
+    if as_json:
+        _emit_catalog_show_json(repo_root=catalog.repo_root, catalog_path=catalog.catalog_path, entry=entry)
+        return
+
+    _emit_catalog_show_text(repo_root=catalog.repo_root, catalog_path=catalog.catalog_path, entry=entry)
 
 
 @runbook_app.command("plan")

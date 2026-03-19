@@ -1,7 +1,7 @@
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-03-19
 
 This is the central documentation map for workflows, tool references, and repository policy.
 
@@ -9,10 +9,11 @@ This is the central documentation map for workflows, tool references, and reposi
 
 1. If this is a new machine, start with [Installation](installation.md) first.
 2. Continue to [Workflow routes](#workflow-routes) and follow the preflight -> run -> verify sequence for the relevant outcome.
-3. Follow the route's "Verify next" target before moving to downstream tools.
-4. Use [Tool docs](#tool-docs) when you need package-level commands and data contracts.
-5. Use [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for policy, operations, and governance detail.
-6. Return to this page as the central docs map.
+3. Use the [Runbook catalog](runbooks/README.md) when you want a concise inventory of authoritative runbooks, workflows, and tool-local runbook sources, or `uv run ops catalog list --query <term>` when you want the same discovery surface from the shell.
+4. Follow the route's "Verify next" target before moving to downstream tools.
+5. Use [Tool docs](#tool-docs) when you need package-level commands and data contracts.
+6. Use [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for policy, operations, and governance detail.
+7. Return to this page as the central docs map.
 
 ### How docs are organized
 
@@ -97,6 +98,7 @@ Choose this section when the next artifact is orchestration state, environment s
 ### Operations
 
 - [Installation](installation.md): environment setup and verification baseline.
+- [Runbook catalog](runbooks/README.md): concise inventory of authoritative cross-tool procedures plus tool-local runbook sources.
 - [Ops orchestration index](operations/README.md): task-first control-plane runbook planning and execution routes.
 - [BU SCC docs index](bu-scc/README.md): cluster setup, submission, and operator runbooks.
 - [Notify docs index](notify/README.md): notifier setup, runtime behavior, and recovery routes.

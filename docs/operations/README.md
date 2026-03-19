@@ -7,9 +7,9 @@
 **Exit artifact:** authoritative ops schema, plan, or execute contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-03-19
 
-Ops is the repository-level control-plane orchestration surface for deterministic batch workflows. This page is a route map; detailed command behavior and schema rules live in [orchestration runbooks](orchestration-runbooks.md). It is not the registry for durable USR-backed data-plane workflows.
+Ops is the repository-level control-plane orchestration surface for deterministic batch workflows. This page is a route map; detailed command behavior and schema rules live in [orchestration runbooks](orchestration-runbooks.md). It is not the registry for durable USR-backed data-plane workflows. For a repo-wide inventory of authoritative procedures and tool-local runbook sources, use the [runbook catalog](../runbooks/README.md) or `uv run ops catalog list`.
 
 ### What Ops is for
 
@@ -21,10 +21,11 @@ Ops is the repository-level control-plane orchestration surface for deterministi
 ### Start here
 
 1. Start with [Ops package README](../../src/dnadesign/ops/README.md) for scope and boundaries.
-2. Choose a route in [Orchestration routes](#orchestration-routes) based on batch intent.
-3. Confirm contract details in [Contracts](#contracts).
-4. Run the [Verification loop](#verification-loop) before any submit.
-5. Return to the [repository docs index](../README.md) for cross-tool routing across control-plane and data-plane surfaces.
+2. Use `uv run ops catalog list` when you want the shared runbook inventory from the terminal, or add filters such as `--plane data-plane --query infer` to narrow it quickly.
+3. Choose a route in [Orchestration routes](#orchestration-routes) based on batch intent.
+4. Confirm contract details in [Contracts](#contracts).
+5. Run the [Verification loop](#verification-loop) before any submit.
+6. Return to the [repository docs index](../README.md) for cross-tool routing across control-plane and data-plane surfaces.
 
 ### Orchestration routes
 

@@ -106,6 +106,7 @@ def test_docs_index_links_progressive_usr_sync_workflows() -> None:
     docs_index = _read("docs/README.md")
     assert "Workflow routes" in docs_index
     assert "How docs are organized" in docs_index
+    assert "runbooks/README.md" in docs_index
     assert "#### Single-tool starts" in docs_index
     assert "#### Shared USR-backed data-plane flows" in docs_index
     assert "#### Operations and infrastructure" in docs_index

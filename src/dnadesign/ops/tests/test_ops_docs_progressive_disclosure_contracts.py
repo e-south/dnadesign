@@ -49,6 +49,9 @@ def test_ops_module_readme_has_banner_narrative_and_doc_map() -> None:
     assert "cross-tool orchestration control plane" in text
     assert "data-plane workflow" in text
     assert "docs/README.md" in text
+    assert "../../../docs/runbooks/README.md" in text
+    assert "uv run ops catalog list" in text
+    assert "--plane data-plane --query infer" in text
     assert "../../../docs/operations/README.md" in text
     assert "../../../docs/operations/orchestration-runbooks.md" in text
     assert "runbooks/presets" in text
@@ -69,6 +72,9 @@ def test_ops_package_local_docs_index_routes_to_shared_runbook_surface() -> None
         ],
         label="src/dnadesign/ops/docs/README.md",
     )
+    assert "../../../../docs/runbooks/README.md" in text
+    assert "uv run ops catalog list" in text
+    assert "--plane data-plane --query infer" in text
     assert "../../../../docs/operations/README.md" in text
     assert "../../../../docs/operations/orchestration-runbooks.md" in text
     assert "../runbooks/presets" in text
@@ -96,9 +102,12 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
     assert "**Plane:** control-plane" in text
     assert "**Owner-boundary:** ops" in text
     assert "ops runbook init --workflow" in text
+    assert "uv run ops catalog list" in text
+    assert "--plane data-plane --query infer" in text
     assert "--project <project>" in text
     assert "project dunlop" not in text
     assert "orchestration-runbooks.md" in text
+    assert "../runbooks/README.md" in text
     assert "multi-source-source-of-truth-assembly.md" in text
     assert "../README.md" in text
     assert "../../src/dnadesign/ops/README.md" in text
@@ -175,8 +184,41 @@ def test_repo_docs_index_exposes_ops_tool_and_operations_route() -> None:
     assert "### Workflow routes" in text
     assert "### Workflow lanes" not in text
     assert "[Workflow routes](#workflow-routes)" in text
+    assert "[Runbook catalog](runbooks/README.md)" in text
+    assert "uv run ops catalog list --query <term>" in text
     assert "[Ops orchestration index](operations/README.md)" in text
     assert "| `ops` | `uv run ops --help` | [ops README](../src/dnadesign/ops/README.md) |" in text
+
+
+def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners() -> None:
+    text = _read(_repo_root() / "docs" / "runbooks" / "README.md")
+
+    assert "## Runbook Catalog" in text
+    assert "uv run ops catalog list" in text
+    assert "--plane data-plane --query infer" in text
+    assert "uv run ops catalog show <registry-id>" in text
+    assert "### Authoritative cross-tool procedures" in text
+    assert "### Tool-local runbook sources" in text
+    assert "### Boundary reminders" in text
+    assert "ops.control-plane.orchestration" in text
+    assert "usr.data-plane.hpc-sync" in text
+    assert "usr.data-plane.chained-densegen-infer-sync" in text
+    assert "usr.data-plane.multi-source-source-of-truth" in text
+    assert "usr.data-plane.construct-infer-source-of-truth" in text
+    assert "usr.data-plane.promoter-feature-matrix" in text
+    assert "cluster.downstream.exploratory-clustering" in text
+    assert "opal.downstream.usr-infer-x-active-learning" in text
+    assert "../operations/orchestration-runbooks.md" in text
+    assert "../../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md" in text
+    assert "../../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md" in text
+    assert "../../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md" in text
+    assert "../../src/dnadesign/densegen/docs/README.md" in text
+    assert "../../src/dnadesign/construct/docs/README.md" in text
+    assert "../../src/dnadesign/infer/docs/README.md" in text
+    assert "It does not replace the owner-local runbook or workflow" in text
+    assert "drift is a docs-check failure" in text
+    assert "It is not yet a unified multi-tool campaign status API." in text
+    assert "Ops is not" not in text
 
 
 def test_repo_root_readme_lists_ops_in_docs_and_tool_catalog() -> None:
