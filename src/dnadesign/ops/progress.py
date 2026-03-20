@@ -516,6 +516,24 @@ def _opal_campaign_state_progress(
     opal_config: Path | None,
     opal_workdir: Path | None,
 ) -> tuple[str, str, dict[str, object]]:
+    if opal_workdir is None:
+        resolved_config = _required_path(
+            opal_config,
+            flag_name="--opal-config or --opal-workdir",
+            progress_kind="opal-campaign-state",
+        )
+        if not resolved_config.exists():
+            inferred_workdir = _resolve_opal_campaign_root(resolved_config)
+            return (
+                "missing",
+                "OPAL config not found",
+                {
+                    "opal_workdir": str(inferred_workdir),
+                    "opal_config": str(resolved_config),
+                    "state_path": str(inferred_workdir / "state.json"),
+                    "ledger_runs_path": str(inferred_workdir / "outputs" / "ledger" / "runs.parquet"),
+                },
+            )
     workdir, config_path = _resolve_opal_workdir(opal_config=opal_config, opal_workdir=opal_workdir)
     state_path = workdir / "state.json"
     ledger_runs_path = workdir / "outputs" / "ledger" / "runs.parquet"
@@ -581,6 +599,8 @@ def _resolve_opal_workdir(*, opal_config: Path | None, opal_workdir: Path | None
         flag_name="--opal-config or --opal-workdir",
         progress_kind="opal-campaign-state",
     )
+    if not resolved_config.exists():
+        raise ValueError(f"OPAL config not found: {resolved_config}")
     payload = yaml.safe_load(resolved_config.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
         raise ValueError(f"OPAL config must be a mapping: {resolved_config}")
@@ -590,7 +610,21 @@ def _resolve_opal_workdir(*, opal_config: Path | None, opal_workdir: Path | None
     workdir = str(campaign_payload.get("workdir") or "").strip()
     if not workdir:
         raise ValueError(f"OPAL config missing campaign.workdir: {resolved_config}")
-    return Path(workdir).expanduser().resolve(), resolved_config
+    return _resolve_opal_config_workdir(config_path=resolved_config, workdir=workdir), resolved_config
+
+
+def _resolve_opal_config_workdir(*, config_path: Path, workdir: str) -> Path:
+    workdir_path = Path(workdir).expanduser()
+    if workdir_path.is_absolute():
+        return workdir_path.resolve()
+    campaign_root = _resolve_opal_campaign_root(config_path)
+    return (campaign_root / workdir_path).resolve()
+
+
+def _resolve_opal_campaign_root(config_path: Path) -> Path:
+    if config_path.parent.name == "configs":
+        return config_path.parent.parent.resolve()
+    return config_path.parent.resolve()
 
 
 def _ops_audit_adapter(inputs: ProgressInputs) -> tuple[str, str, dict[str, object]]:

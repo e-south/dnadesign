@@ -123,6 +123,24 @@ def _write_opal_campaign(config_path: Path, *, rounds: list[dict[str, object]]) 
     (workdir / "state.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def _write_relative_opal_campaign(config_path: Path, *, rounds: list[dict[str, object]]) -> None:
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    campaign_root = config_path.parent.parent if config_path.parent.name == "configs" else config_path.parent
+    campaign_root.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        yaml.safe_dump({"campaign": {"workdir": "."}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    payload = {
+        "campaign_slug": "demo_campaign",
+        "campaign_name": "Demo campaign",
+        "x_column_name": "infer__demo",
+        "y_column_name": "measured_activity",
+        "rounds": rounds,
+    }
+    (campaign_root / "state.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
 def test_cli_progress_show_reports_ops_audit_surface() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -276,6 +294,32 @@ def test_cli_progress_show_reports_opal_campaign_surface() -> None:
         assert payload["evidence"]["latest_round"]["run_id"] == "run_001"
 
 
+def test_cli_progress_show_resolves_opal_workdir_relative_to_campaign_root() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        config_path = Path("demo_campaign") / "configs" / "campaign.yaml"
+        _write_relative_opal_campaign(config_path, rounds=[])
+
+        result = runner.invoke(
+            app,
+            [
+                "progress",
+                "show",
+                "opal.downstream.usr-infer-x-active-learning",
+                "--repo-root",
+                str(_repo_root()),
+                "--opal-config",
+                str(config_path),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["evidence"]["opal_workdir"].endswith("demo_campaign")
+        assert payload["evidence"]["state_path"].endswith("demo_campaign/state.json")
+
+
 def test_cli_progress_show_reports_missing_artifact_state_without_exiting() -> None:
     runner = CliRunner()
 
@@ -408,6 +452,77 @@ def test_cli_progress_campaign_resolves_manifest_relative_artifact_paths() -> No
         assert payload["counts"] == {"ok": 1, "attention": 0, "missing": 0}
         assert payload["steps"][0]["label"] == "orchestration"
         assert payload["steps"][0]["evidence"]["audit_json"].endswith("artifacts/latest.json")
+
+
+def test_cli_progress_show_reports_missing_opal_config_state_without_exiting() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        missing_config = Path("demo_campaign") / "configs" / "campaign.yaml"
+
+        result = runner.invoke(
+            app,
+            [
+                "progress",
+                "show",
+                "opal.downstream.usr-infer-x-active-learning",
+                "--repo-root",
+                str(_repo_root()),
+                "--opal-config",
+                str(missing_config),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["state"] == "missing"
+        assert payload["summary"] == "OPAL config not found"
+        assert payload["evidence"]["opal_config"].endswith("demo_campaign/configs/campaign.yaml")
+        assert payload["evidence"]["opal_workdir"].endswith("demo_campaign")
+
+
+def test_cli_progress_campaign_reports_missing_step_for_scaffold_placeholder_paths() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        manifest_path = Path("manifests") / "campaign_status.yaml"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(
+            yaml.safe_dump(
+                {
+                    "campaign_id": "placeholder_manifest",
+                    "steps": [
+                        {
+                            "label": "active-learning",
+                            "registry_id": "opal.downstream.usr-infer-x-active-learning",
+                            "opal_config": "<opal-workdir>/configs/campaign.yaml",
+                        }
+                    ],
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "progress",
+                "campaign",
+                "--repo-root",
+                str(_repo_root()),
+                "--manifest",
+                str(manifest_path),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["overall_state"] == "missing"
+        assert payload["counts"] == {"ok": 0, "attention": 0, "missing": 1}
+        assert payload["steps"][0]["state"] == "missing"
+        assert payload["steps"][0]["summary"] == "OPAL config not found"
+        assert payload["steps"][0]["evidence"]["opal_config"].endswith("<opal-workdir>/configs/campaign.yaml")
 
 
 def test_cli_progress_scaffold_emits_yaml_manifest() -> None:
