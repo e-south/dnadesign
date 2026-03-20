@@ -1,30 +1,27 @@
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-19
+**Last verified:** 2026-03-20
 
 This is the central documentation map for workflows, tool references, and repository policy.
 
 ### Use this index
 
 1. If this is a new machine, start with [Installation](installation.md) first.
-   Once baseline verification passes, return here or start from the shell with `uv run ops catalog list --simple`.
+   Once baseline verification passes, return here.
 2. Continue to [Workflow routes](#workflow-routes) and follow the preflight -> run -> verify sequence for the relevant outcome.
-3. Use the [Runbook catalog](runbooks/README.md) when you want a concise inventory of authoritative procedures, workflows, and owner-local tool entrypoints. Use [Shell routes](#shell-routes) when terminal discovery is faster than browsing docs.
+3. Use the [Runbook catalog](runbooks/README.md) when you want a concise inventory of authoritative procedures, workflows, and owner-local tool entrypoints from the shell.
 4. Follow the route's "Verify next" target before moving to downstream tools.
 5. Use [Tool docs](#tool-docs) when you need package-level commands and data contracts.
 6. Use [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for policy, operations, and governance detail.
 7. Return to this page as the central docs map.
 
-### Fast start
+### New here?
 
-```bash
-uv run ops catalog list --simple
-uv run ops catalog show usr.data-plane.promoter-feature-matrix
-uv run ops progress explain usr.data-plane.promoter-feature-matrix
-```
-
-- Use the fast start only after the environment is already usable on this machine.
+- If the environment is not ready yet, start with [Installation](installation.md).
+- If you want a shell-first inventory after setup, start with [Runbook catalog](runbooks/README.md) or run `uv run ops catalog list --simple`.
+- If you already know the owner boundary, jump to [Tool docs](#tool-docs).
+- If you already know the next step is control-plane orchestration, go to [Ops orchestration index](operations/README.md).
 - DenseGen docs live under `densegen`, while the CLI entrypoint is `uv run dense --help`.
 
 ### Quick terms
@@ -33,21 +30,6 @@ uv run ops progress explain usr.data-plane.promoter-feature-matrix
 - `data-plane`: durable dataset and model-output workflows owned by the tool that mutates the data.
 - `registry id`: the stable catalog name for one registered runbook or workflow.
 - `progress surface`: the explicit read-only status view for one registered route.
-
-### Shell routes
-
-| If you want to... | Use this command | What you get next |
-| --- | --- | --- |
-| Start with a task-first inventory | `uv run ops catalog list --simple` | Registered workflows and tool docs without leading type/plane terminology. |
-| Browse the shared inventory | `uv run ops catalog list --query <term>` | Matching procedures and tool-local docs without guessing the owner first. Start with `uv run ops catalog list` when you want the full map before narrowing. |
-| Inspect one registered procedure | `uv run ops catalog show <registry-id>` | Owner docs, related docs, exact deep docs when declared, required progress inputs, and next shell commands. |
-| Explain one status surface before running it | `uv run ops progress explain <registry-id>` | Required flags, direct `progress show` command, and special notes for the chosen progress adapter. |
-| Browse owner-local docs only | `uv run ops catalog list --section tool-sources` | Tool entrypoints when you already know you need the owner-local docs layer. |
-| Browse typed related procedures | `uv run ops catalog list --related-to <registry-id>` | Neighboring procedures around one registered route. |
-| Browse typed related tool docs | `uv run ops catalog list --section tool-sources --related-to <registry-id>` | Tool-owned docs around one registered route. |
-| Check one status surface | `uv run ops progress show <registry-id> ...` | Read-only summary for one explicit artifact-backed route. |
-| Start a campaign manifest | `uv run ops progress scaffold <registry-id> ...` or `uv run ops progress scaffold --related-to <registry-id>` | YAML placeholders for one route or one related route set. The command prints to stdout unless you pass `--out`. |
-| Check a campaign | `uv run ops progress campaign --manifest <manifest.yaml>` | Read-only summary across the explicit steps in one manifest. |
 
 ### How docs are organized
 

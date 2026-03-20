@@ -42,6 +42,7 @@ def test_ops_module_readme_has_banner_narrative_and_doc_map() -> None:
         text,
         [
             "![Ops banner](assets/ops-banner.svg)",
+            "## Common entrypoints",
             "## Documentation",
         ],
         label="src/dnadesign/ops/README.md",
@@ -52,6 +53,8 @@ def test_ops_module_readme_has_banner_narrative_and_doc_map() -> None:
     assert "shared catalog view" in text
     assert "uv run ops catalog list" in text
     assert "Typical flow: browse the catalog" in text
+    assert "uv run ops catalog show <registry-id>" in text
+    assert "uv run ops progress explain <registry-id>" in text
     assert "docs/README.md" in text
     assert "docs/how-to-use-ops.md" in text
     assert "../../../docs/runbooks/README.md" in text
@@ -251,23 +254,18 @@ def test_repo_docs_index_exposes_ops_tool_and_operations_route() -> None:
     text = _read(_repo_root() / "docs" / "README.md")
     assert "### Workflow routes" in text
     assert "### Quick terms" in text
-    assert "### Shell routes" in text
+    assert "### New here?" in text
+    assert "### Shell routes" not in text
     assert "### Workflow lanes" not in text
     assert "[Workflow routes](#workflow-routes)" in text
     assert "[Runbook catalog](runbooks/README.md)" in text
-    assert "uv run ops catalog list --query <term>" in text
     assert "uv run ops catalog list --simple" in text
-    assert "uv run ops catalog show <registry-id>" in text
-    assert "uv run ops progress explain <registry-id>" in text
-    assert "exact deep docs when declared" in text
-    assert "uv run ops catalog list --section tool-sources" in text
-    assert "uv run ops catalog list --related-to <registry-id>" in text
-    assert "uv run ops catalog list --section tool-sources --related-to <registry-id>" in text
-    assert "uv run ops progress show <registry-id> ..." in text
-    assert "uv run ops progress scaffold <registry-id> ..." in text
-    assert "prints to stdout unless you pass `--out`" in text
-    assert "uv run ops progress scaffold --related-to <registry-id>" in text
-    assert "uv run ops progress campaign --manifest <manifest.yaml>" in text
+    assert "uv run ops catalog show <registry-id>" not in text
+    assert "uv run ops progress explain <registry-id>" not in text
+    assert "exact deep docs when declared" not in text
+    assert "uv run ops catalog list --section tool-sources" not in text
+    assert "uv run ops catalog list --related-to <registry-id>" not in text
+    assert "uv run ops progress scaffold <registry-id> ..." not in text
     assert "[Ops orchestration index](operations/README.md)" in text
     assert "| `ops` | `uv run ops --help` | [ops README](../src/dnadesign/ops/README.md) |" in text
 
@@ -324,13 +322,11 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
 
 def test_repo_root_readme_lists_ops_in_docs_and_tool_catalog() -> None:
     text = _read(_repo_root() / "README.md")
-    assert "## New here?" in text
-    assert "uv run ops catalog list" in text
-    assert "uv run ops catalog list --simple" in text
-    assert "uv run ops progress explain" in text
-    assert "DenseGen lives under `densegen`, but the CLI command is `uv run dense --help`." in text
+    assert "## New here?" not in text
+    assert "uv run ops catalog list" not in text
+    assert "uv run ops progress explain" not in text
     assert "[Docs index](docs/README.md)" in text
-    assert "find the next concrete workflow or tool doc" in text
+    assert "best place to start if you are orienting to the repo" in text
     assert "[Docs workflow routes](docs/README.md#workflow-routes)" not in text
     assert "including the downstream split between" not in text
     assert "[Ops operations](docs/operations/README.md)" not in text

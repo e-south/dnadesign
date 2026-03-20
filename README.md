@@ -6,33 +6,11 @@
 
 ---
 
-## New here?
-
-```bash
-uv sync --locked --group dev
-uv run ops catalog list --simple
-uv run ops progress explain usr.data-plane.promoter-feature-matrix
-```
-
-- If `uv` is not installed or the environment is not usable yet, start with [Installation](docs/installation.md). Once `uv run <tool> --help` works, return here or go straight to `uv run ops catalog list --simple`.
-
-| Start here if you want to... | Use this first | What you get next |
-| --- | --- | --- |
-| Understand the repository from the shell | `uv run ops catalog list --simple` | A task-first view of registered workflows and tool docs before you need taxonomy. |
-| Inspect one registered route in detail | `uv run ops catalog show <registry-id>` | Owner docs, related routes, required status inputs, and next commands. |
-| Understand what a status command needs | `uv run ops progress explain <registry-id>` | Required flags, ready-to-paste `progress show` command, and notes for special cases like OPAL config resolution. |
-| Browse the full docs map | [Docs index](docs/README.md) | Workflow routes, shell routes, tool docs, and repository policy. |
-
-- To orchestrate or inspect batch workflows: start with [Ops](src/dnadesign/ops/README.md) or run `uv run ops catalog list --simple`.
-- DenseGen lives under `densegen`, but the CLI command is `uv run dense --help`.
-
----
-
 ## Documentation
 
 Use the docs index to choose the next deep procedure by ownership plane, find the next concrete workflow or tool doc, then drop into the owning package for operational detail.
 
-- [Docs index](docs/README.md): central route map for workflow and tool documentation.
+- [Docs index](docs/README.md): central route map for workflow and tool documentation, and the best place to start if you are orienting to the repo.
 - [Installation](docs/installation.md): bootstrap the environment and run baseline verification commands.
 - [Architecture](ARCHITECTURE.md), [Design](DESIGN.md), [Reliability](RELIABILITY.md), [Security](SECURITY.md), [Plans](PLANS.md), [Quality score](QUALITY_SCORE.md): repository-level contracts and governance records.
 - [Developer docs](docs/dev/README.md): CI contracts, maintenance runbooks, and execution-planning references.

@@ -13,6 +13,13 @@ Do not use Ops when:
 For repo-wide runbook discovery, `ops` exposes a shared catalog view in `docs/runbooks/README.md`; it does not own a second registry.
 Typical flow: browse the catalog, inspect one registered procedure, explain the status surface if needed, then either scaffold a manifest or move into the runbook lifecycle commands.
 
+## Common entrypoints
+
+- `uv run ops catalog list --simple`: start with a task-first inventory from the shell.
+- `uv run ops catalog show <registry-id>`: inspect one registered route, its owner docs, and related procedures.
+- `uv run ops progress explain <registry-id>`: print the required flags before you use a progress surface.
+- Use [How to use Ops](docs/how-to-use-ops.md) for the expanded command ladder and [Ops orchestration index](../../../docs/operations/README.md) once you are in the runbook lifecycle.
+
 ## Documentation
 
 - [Ops docs index](docs/README.md): package-local map for when to use Ops, packaged presets, and the repo-wide control-plane surfaces it points to.
