@@ -33,10 +33,12 @@ Ops is the repository-level control-plane orchestration surface for deterministi
 
 | If you want to... | Use this command | What happens next |
 | --- | --- | --- |
+| Browse the shared inventory without taxonomy first | `uv run ops catalog list --simple` | Task-first inventory from the terminal before you care about route metadata fields. |
 | Browse the shared inventory | `uv run ops catalog list` | Shared runbook inventory from the terminal, plus suggested next steps for narrowing or inspection. |
 | Narrow the inventory by rough intent | `uv run ops catalog list --plane data-plane --query infer` | Smaller result set when the next route is data-plane and infer-adjacent. |
 | Find the promoter-feature-matrix route by topic | `uv run ops catalog list --query "promoter feature matrix"` | Matches the registered procedure and adjacent tool docs around that phrase. |
 | Inspect one registered procedure | `uv run ops catalog show <registry-id>` | Owner docs, typed related procedures, typed related tool docs, exact deep docs when declared, required progress inputs, and typed relations. |
+| Explain one status surface before running it | `uv run ops progress explain <registry-id>` | Required flags, direct `progress show` command, and adapter-specific notes for that route. |
 | Browse owner-local docs only | `uv run ops catalog list --section tool-sources` | Owner-local entrypoints when you already know you want the docs layer first. |
 | Browse typed related procedures | `uv run ops catalog list --related-to usr.data-plane.promoter-feature-matrix` | Typed related procedures around one path once you know the anchor registry id. |
 | Browse typed related tool docs | `uv run ops catalog list --section tool-sources --related-to usr.data-plane.promoter-feature-matrix` | Typed related tool docs around one path once you know the anchor registry id. |
@@ -73,14 +75,15 @@ Ops does not own construct-led source-of-truth accumulation or other USR-backed 
 
 ### Status and manifest routes
 
-1. Use `uv run ops progress show ops.control-plane.orchestration --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json` to summarize one control-plane runbook execution from the registered progress contract.
-2. Use `uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <repo-root> --usr-root <usr-root> --dataset <dataset>` to summarize one staged USR-backed data-plane procedure from explicit artifacts.
-3. `ops progress show` and `ops progress campaign` are read-only status surfaces. Inspect the required flags in `ops catalog show <registry-id>` before you run them if you do not already know the artifact contract.
-4. Use `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` to emit the smallest explicit manifest skeleton with the right required fields. It prints to stdout unless you pass `--out`.
-5. Use `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` when you want the named registered procedure plus its typed related procedures as an explicit starting point.
-6. Use `uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>` when the work spans multiple runtimes or pauses between steps.
-7. Keep the manifest explicit. Ops reads the owner-local evidence you name there; it does not infer hidden campaign state.
-8. For progress-kind meanings and owner-local follow-up surfaces, return to the [runbook catalog glossary](../runbooks/README.md#progress-surface-glossary).
+1. Use `uv run ops progress explain <registry-id>` to see the required flags and a ready-to-paste `progress show` command before you touch artifacts.
+2. Use `uv run ops progress show ops.control-plane.orchestration --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json` to summarize one control-plane runbook execution from the registered progress contract.
+3. Use `uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <repo-root> --usr-root <usr-root> --dataset <dataset>` to summarize one staged USR-backed data-plane procedure from explicit artifacts.
+4. `ops progress show` and `ops progress campaign` are read-only status surfaces. Inspect the required flags in `ops progress explain <registry-id>` or `ops catalog show <registry-id>` before you run them if you do not already know the artifact contract.
+5. Use `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` to emit the smallest explicit manifest skeleton with the right required fields. It prints to stdout unless you pass `--out`.
+6. Use `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` when you want the named registered procedure plus its typed related procedures as an explicit starting point.
+7. Use `uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>` when the work spans multiple runtimes or pauses between steps.
+8. Keep the manifest explicit. Ops reads the owner-local evidence you name there; it does not infer hidden campaign state.
+9. For progress-kind meanings and owner-local follow-up surfaces, return to the [runbook catalog glossary](../runbooks/README.md#progress-surface-glossary).
 
 ### Verification loop
 
@@ -99,6 +102,7 @@ uv run ops runbook init --workflow <workflow> --runbook <runbook.yaml> --workspa
 uv run ops runbook plan --runbook <runbook.yaml> --repo-root <repo-root>
 uv run ops runbook execute --runbook <runbook.yaml> --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json --no-submit
 uv run ops runbook execute --runbook <runbook.yaml> --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json --submit
+uv run ops progress explain ops.control-plane.orchestration
 uv run ops progress show ops.control-plane.orchestration --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json
 uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix --repo-root <repo-root>
 uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>

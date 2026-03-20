@@ -133,5 +133,6 @@ export MPLCONFIGDIR="${TMPDIR:-/tmp}/matplotlib"
 - If you are on Windows, confirm commands are running inside WSL2 (`uname -a` should report Linux).
 
 ### 8) Continue with workflow docs
-- For workflow execution, use [docs/README.md](README.md).
+- If you want the shortest shell-first route after baseline verification, start with `uv run ops catalog list --simple`.
+- For workflow execution from the docs map, use [docs/README.md](README.md).
 - For BU SCC workflows, follow this order: [BU SCC quickstart](bu-scc/quickstart.md), [BU SCC install bootstrap](bu-scc/install.md), then [BU SCC batch plus Notify runbook](bu-scc/batch-notify.md).

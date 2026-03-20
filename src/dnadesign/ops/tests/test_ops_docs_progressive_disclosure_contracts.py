@@ -104,6 +104,7 @@ def test_ops_how_to_doc_carries_quick_usage_commands() -> None:
     assert "progress surface" in text
     assert "campaign manifest" in text
     assert "uv run ops catalog list" in text
+    assert "uv run ops catalog list --simple" in text
     assert 'uv run ops catalog list --query "promoter feature matrix"' in text
     assert "uv run ops catalog show <registry-id>" in text
     assert "--plane data-plane --query infer" in text
@@ -112,6 +113,7 @@ def test_ops_how_to_doc_carries_quick_usage_commands() -> None:
     assert "typed related procedures" in text
     assert "typed related tool docs" in text
     assert "exact deep docs when declared" in text
+    assert "uv run ops progress explain <registry-id>" in text
     assert (
         "uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>"
         in text
@@ -151,8 +153,10 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
     assert "**Owner-boundary:** ops" in text
     assert "ops runbook init --workflow" in text
     assert "uv run ops catalog list" in text
+    assert "uv run ops catalog list --simple" in text
     assert 'uv run ops catalog list --query "promoter feature matrix"' in text
     assert "uv run ops catalog show <registry-id>" in text
+    assert "uv run ops progress explain <registry-id>" in text
     assert "related procedures around one path" in text
     assert "--plane data-plane --query infer" in text
     assert "--section tool-sources" in text
@@ -252,7 +256,9 @@ def test_repo_docs_index_exposes_ops_tool_and_operations_route() -> None:
     assert "[Workflow routes](#workflow-routes)" in text
     assert "[Runbook catalog](runbooks/README.md)" in text
     assert "uv run ops catalog list --query <term>" in text
+    assert "uv run ops catalog list --simple" in text
     assert "uv run ops catalog show <registry-id>" in text
+    assert "uv run ops progress explain <registry-id>" in text
     assert "exact deep docs when declared" in text
     assert "uv run ops catalog list --section tool-sources" in text
     assert "uv run ops catalog list --related-to <registry-id>" in text
@@ -271,6 +277,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
 
     assert "## Runbook Catalog" in text
     assert "uv run ops catalog list" in text
+    assert "uv run ops catalog list --simple" in text
     assert "### Shell decision table" in text
     assert "--plane data-plane --query infer" in text
     assert "--section tool-sources" in text
@@ -279,6 +286,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "required progress inputs" in text
     assert "exact deep docs when declared" in text
     assert "next shell commands" in text
+    assert "uv run ops progress explain <registry-id>" in text
     assert "uv run ops progress show <registry-id> ..." in text
     assert "uv run ops progress scaffold <registry-id> ..." in text
     assert "uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix" in text
@@ -318,6 +326,9 @@ def test_repo_root_readme_lists_ops_in_docs_and_tool_catalog() -> None:
     text = _read(_repo_root() / "README.md")
     assert "## New here?" in text
     assert "uv run ops catalog list" in text
+    assert "uv run ops catalog list --simple" in text
+    assert "uv run ops progress explain" in text
+    assert "DenseGen lives under `densegen`, but the CLI command is `uv run dense --help`." in text
     assert "[Docs index](docs/README.md)" in text
     assert "find the next concrete workflow or tool doc" in text
     assert "[Docs workflow routes](docs/README.md#workflow-routes)" not in text

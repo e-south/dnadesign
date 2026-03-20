@@ -62,7 +62,7 @@ app = typer.Typer(
     no_args_is_help=True,
     help=(
         "Cross-tool orchestration commands for deterministic batch plans. "
-        "Start with `uv run ops catalog list` to browse routes from the terminal."
+        "Start with `uv run ops catalog list --simple` to browse routes from the terminal."
     ),
 )
 
@@ -71,13 +71,14 @@ app.add_typer(runbook_app, name="runbook")
 catalog_app = typer.Typer(
     help=(
         "Discovery commands for the shared runbook catalog. "
-        "Start with `ops catalog list` or `ops catalog list --query <term>`."
+        "Start with `ops catalog list --simple`, `ops catalog list`, or `ops catalog list --query <term>`."
     )
 )
 app.add_typer(catalog_app, name="catalog")
 progress_app = typer.Typer(
     help=(
-        "Status inspection and manifest scaffold commands for registered runbooks and explicit campaigns. "
+        "Status inspection, status explanation, and manifest scaffold commands "
+        "for registered runbooks and explicit campaigns. "
         "`show` and `campaign` are read-only; `scaffold` prints YAML unless `--out` is used."
     )
 )
@@ -332,6 +333,74 @@ def _packaged_preset_paths() -> list[Path]:
     return sorted(path.resolve() for path in preset_dir.glob("*.yaml"))
 
 
+def _emit_catalog_list_simple_text(
+    *,
+    repo_root: Path,
+    catalog_path: Path,
+    procedures: Sequence[CatalogProcedureEntry],
+    tool_sources: Sequence[CatalogToolSourceEntry],
+    section: Literal["all", "procedures", "tool-sources"],
+    filters: CatalogQuery,
+) -> None:
+    lines: list[str] = [
+        "Catalog inventory",
+        _render_catalog_counts(procedures=procedures, tool_sources=tool_sources, section=section),
+    ]
+    rendered_filters = _render_catalog_filters(filters)
+    if rendered_filters is not None:
+        lines.append(rendered_filters)
+    lines.append("")
+    if section in {"all", "procedures"}:
+        lines.append("Task-first procedures")
+        for entry in procedures:
+            lines.append(f"- {entry.summary}")
+            lines.append(f"  Registry id: {entry.registry_id}")
+            lines.append(f"  Inspect: {_render_command(['uv', 'run', 'ops', 'catalog', 'show', entry.registry_id])}")
+            lines.append(
+                "  Doc: "
+                + repo_relative_catalog_doc_path(
+                    repo_root=repo_root,
+                    catalog_path=catalog_path,
+                    doc_path=entry.doc_path,
+                )
+            )
+        if not procedures:
+            lines.append("- none")
+    if section == "all":
+        lines.append("")
+    if section in {"all", "tool-sources"}:
+        lines.append("Tool docs")
+        for entry in tool_sources:
+            lines.append(f"- {entry.tool}: {entry.summary}")
+            lines.append(
+                "  Doc: "
+                + repo_relative_catalog_doc_path(
+                    repo_root=repo_root,
+                    catalog_path=catalog_path,
+                    doc_path=entry.doc_path,
+                )
+            )
+        if not tool_sources:
+            lines.append("- none")
+    next_steps = _catalog_list_next_steps(
+        repo_root=repo_root,
+        catalog_path=catalog_path,
+        procedures=procedures,
+        tool_sources=tool_sources,
+        section=section,
+        filters=filters,
+    )
+    if next_steps:
+        lines.append("")
+        if not procedures and not tool_sources:
+            lines.append("No matching catalog entries. Try:")
+        else:
+            lines.append("Suggested next steps")
+        for label, value in next_steps:
+            lines.append(f"- {label}: {value}")
+    typer.echo("\n".join(lines))
+
+
 def _emit_catalog_list_text(
     *,
     repo_root: Path,
@@ -409,9 +478,11 @@ def _emit_catalog_list_json(
     tool_sources: Sequence[CatalogToolSourceEntry],
     section: Literal["all", "procedures", "tool-sources"],
     filters: CatalogQuery,
+    simple: bool,
 ) -> None:
     payload: dict[str, object] = {
         "section": section,
+        "view": "simple" if simple else "full",
         "filters": filters.as_dict(),
         "counts": _catalog_counts(procedures=procedures, tool_sources=tool_sources, section=section),
         "next_steps": [
@@ -715,6 +786,145 @@ def _emit_progress_show_json(
     typer.echo(json.dumps(payload, indent=2, sort_keys=True))
 
 
+def _progress_kind_description(progress_kind: str) -> str:
+    descriptions = {
+        "ops-audit-json": "Read one workspace-scoped orchestration audit JSON emitted by `ops runbook execute`.",
+        "usr-sync-audit": "Read one USR sync audit JSON emitted by `usr diff`, `usr pull`, or `usr push`.",
+        "usr-dataset-state": "Read one USR dataset directory, its records.parquet, and related overlay sidecars.",
+        "cluster-run-index": "Read one cluster results root and summarize the run index for that workspace.",
+        "opal-campaign-state": "Read one OPAL campaign workdir and summarize state.json plus round ledgers.",
+    }
+    return descriptions.get(progress_kind, "Read one explicit, artifact-backed status surface.")
+
+
+def _progress_optional_inputs(progress_kind: str) -> tuple[tuple[str, str], ...]:
+    if progress_kind == "opal-campaign-state":
+        return (
+            (
+                "--opal-workdir",
+                "Use when you want to point directly at the OPAL campaign workdir instead of resolving it from config.",
+            ),
+        )
+    return ()
+
+
+def _progress_notes(entry: CatalogProcedureEntry) -> tuple[str, ...]:
+    notes: list[str] = []
+    if entry.progress_kind == "ops-audit-json":
+        notes.append(
+            "Smallest positive control-plane demo: run "
+            "`uv run ops runbook execute ... --no-submit "
+            "--audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json`, "
+            "then pass the same audit path to `ops progress show`."
+        )
+        notes.append(
+            "On workstations without `qstat`, add `--allow-missing-qstat` so the queue probe stays explicit "
+            "but non-fatal during a dry-run demo."
+        )
+    if entry.progress_kind == "opal-campaign-state":
+        notes.append(
+            "Prefer `--opal-config` so Ops resolves `campaign.workdir` relative "
+            "to the campaign root, matching OPAL's config contract."
+        )
+    return tuple(notes)
+
+
+def _emit_progress_explain_text(
+    *,
+    repo_root: Path,
+    catalog_path: Path,
+    entry: CatalogProcedureEntry,
+    owner_boundary: str,
+    has_related_routes: bool,
+) -> None:
+    required_inputs = load_progress_required_inputs(entry.progress_kind)
+    optional_inputs = _progress_optional_inputs(entry.progress_kind)
+    progress_show_command = _catalog_progress_show_command(
+        registry_id=entry.registry_id,
+        required_inputs=required_inputs,
+    )
+    lines = [
+        f"Registry id: {entry.registry_id}",
+        f"Procedure: {entry.title}",
+        "Doc: "
+        + repo_relative_catalog_doc_path(
+            repo_root=repo_root,
+            catalog_path=catalog_path,
+            doc_path=entry.doc_path,
+        ),
+        f"Owner boundary: {owner_boundary}",
+        f"Progress kind: {entry.progress_kind}",
+        f"What this status reads: {_progress_kind_description(entry.progress_kind)}",
+        "Required inputs:",
+    ]
+    if required_inputs:
+        for field in required_inputs:
+            lines.append(f"- {field.cli_flag} {field.placeholder}: {field.summary}")
+    else:
+        lines.append("- none")
+    if optional_inputs:
+        lines.append("Also accepted:")
+        for flag, summary in optional_inputs:
+            lines.append(f"- {flag}: {summary}")
+    lines.append("Next commands:")
+    lines.append(f"- catalog_show: {_render_command(['uv', 'run', 'ops', 'catalog', 'show', entry.registry_id])}")
+    lines.append(f"- progress_show: {progress_show_command}")
+    lines.append(
+        f"- progress_scaffold: {_render_command(['uv', 'run', 'ops', 'progress', 'scaffold', entry.registry_id])}"
+    )
+    if has_related_routes:
+        lines.append(
+            "- progress_scaffold_related: "
+            + _render_command(["uv", "run", "ops", "progress", "scaffold", "--related-to", entry.registry_id])
+        )
+    notes = _progress_notes(entry)
+    if notes:
+        lines.append("Notes:")
+        for note in notes:
+            lines.append(f"- {note}")
+    typer.echo("\n".join(lines))
+
+
+def _emit_progress_explain_json(
+    *,
+    repo_root: Path,
+    catalog_path: Path,
+    entry: CatalogProcedureEntry,
+    owner_boundary: str,
+    has_related_routes: bool,
+) -> None:
+    required_inputs = load_progress_required_inputs(entry.progress_kind)
+    optional_inputs = _progress_optional_inputs(entry.progress_kind)
+    payload = {
+        "registry_id": entry.registry_id,
+        "title": entry.title,
+        "doc_path": repo_relative_catalog_doc_path(
+            repo_root=repo_root,
+            catalog_path=catalog_path,
+            doc_path=entry.doc_path,
+        ),
+        "owner_boundary": owner_boundary,
+        "progress_kind": entry.progress_kind,
+        "description": _progress_kind_description(entry.progress_kind),
+        "required_inputs": [field.as_dict() for field in required_inputs],
+        "optional_inputs": [{"cli_flag": flag, "summary": summary} for flag, summary in optional_inputs],
+        "next_commands": {
+            "catalog_show": _render_command(["uv", "run", "ops", "catalog", "show", entry.registry_id]),
+            "progress_show": _catalog_progress_show_command(
+                registry_id=entry.registry_id,
+                required_inputs=required_inputs,
+            ),
+            "progress_scaffold": _render_command(["uv", "run", "ops", "progress", "scaffold", entry.registry_id]),
+        },
+        "notes": list(_progress_notes(entry)),
+    }
+    if has_related_routes:
+        payload["next_commands"]["progress_scaffold_related"] = _render_command(
+            ["uv", "run", "ops", "progress", "scaffold", "--related-to", entry.registry_id]
+        )
+    typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+
+
 def _emit_campaign_progress_text(
     *,
     repo_root: Path,
@@ -876,10 +1086,22 @@ def _catalog_list_next_steps(
                     _render_command(["uv", "run", "ops", "catalog", "list", "--query", "<term>"]),
                 )
             )
+            next_steps.append(
+                (
+                    "Use the task-first view",
+                    _render_command(["uv", "run", "ops", "catalog", "list", "--simple"]),
+                )
+            )
         next_steps.append(
             (
                 "Inspect the first matching procedure",
                 _render_command(["uv", "run", "ops", "catalog", "show", first_procedure.registry_id]),
+            )
+        )
+        next_steps.append(
+            (
+                "See the required status inputs",
+                _render_command(["uv", "run", "ops", "progress", "explain", first_procedure.registry_id]),
             )
         )
         if filters.related_to:
@@ -972,6 +1194,10 @@ def _catalog_next_commands(
 ) -> tuple[tuple[str, str], ...]:
     required_inputs = load_progress_required_inputs(entry.progress_kind)
     commands: list[tuple[str, str]] = [
+        (
+            "progress_explain",
+            _render_command(["uv", "run", "ops", "progress", "explain", entry.registry_id]),
+        ),
         (
             "progress_show",
             _catalog_progress_show_command(registry_id=entry.registry_id, required_inputs=required_inputs),
@@ -1090,6 +1316,24 @@ def _progress_required_input_lines(entry: CatalogProcedureEntry) -> tuple[str, .
     for field in required_inputs:
         lines.append(f"- {field.cli_flag} {field.placeholder}: {field.summary}")
     return tuple(lines)
+
+
+def _progress_optional_input_lines(entry: CatalogProcedureEntry) -> tuple[str, ...]:
+    optional_inputs = _progress_optional_inputs(entry.progress_kind)
+    if not optional_inputs:
+        return ()
+    lines = ["Also accepted:"]
+    for flag, summary in optional_inputs:
+        lines.append(f"- {flag}: {summary}")
+    return tuple(lines)
+
+
+def _progress_scaffold_recovery_hint() -> str:
+    return (
+        "Hint: start with `uv run ops catalog list --simple`, inspect a route with "
+        "`uv run ops catalog show <registry-id>`, or bootstrap a related manifest with "
+        "`uv run ops progress scaffold --related-to <registry-id>`."
+    )
 
 
 def _first_unknown_registry_id(
@@ -1274,6 +1518,13 @@ def catalog_list(
             "--query", help="Case-insensitive token query across registry ids, titles, summaries, and doc paths."
         ),
     ] = None,
+    simple: Annotated[
+        bool,
+        typer.Option(
+            "--simple/--no-simple",
+            help="Show a task-first plain-text view that hides type/plane taxonomy on first contact.",
+        ),
+    ] = False,
     as_json: Annotated[
         bool,
         typer.Option("--json/--no-json", help="Emit machine-readable JSON instead of plain text."),
@@ -1307,6 +1558,18 @@ def catalog_list(
 
     if as_json:
         _emit_catalog_list_json(
+            repo_root=catalog.repo_root,
+            catalog_path=catalog.catalog_path,
+            procedures=procedures,
+            tool_sources=tool_sources,
+            section=section,
+            filters=filters,
+            simple=simple,
+        )
+        return
+
+    if simple:
+        _emit_catalog_list_simple_text(
             repo_root=catalog.repo_root,
             catalog_path=catalog.catalog_path,
             procedures=procedures,
@@ -1451,6 +1714,12 @@ def progress_show(
         message = f"Progress contract error: {exc}"
         if "requires --" in str(exc):
             message += "\n" + "\n".join(_progress_required_input_lines(entry))
+            optional_lines = _progress_optional_input_lines(entry)
+            if optional_lines:
+                message += "\n" + "\n".join(optional_lines)
+            message += (
+                f"\nHint: use `uv run ops progress explain {registry_id}` to see the required flags and next commands."
+            )
             message += (
                 f"\nHint: use `uv run ops progress scaffold {registry_id}` to emit a manifest step "
                 "with the required fields."
@@ -1470,6 +1739,55 @@ def progress_show(
         repo_root=catalog.repo_root,
         catalog_path=catalog.catalog_path,
         result=result,
+    )
+
+
+@progress_app.command("explain")
+def progress_explain(
+    registry_id: Annotated[str, typer.Argument(help="Registered runbook or workflow registry id.")],
+    repo_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--repo-root",
+            help="Repository root containing docs/runbooks/README.md when invoking outside the repository.",
+        ),
+    ] = None,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json/--no-json", help="Emit machine-readable JSON instead of plain text."),
+    ] = False,
+) -> None:
+    try:
+        catalog = load_runbook_catalog(repo_root=repo_root)
+    except ValueError as exc:
+        typer.echo(f"Progress contract error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    entry = catalog.find_procedure(registry_id)
+    if entry is None:
+        message = f"Progress contract error: unknown registry id: {registry_id}"
+        message = _append_registry_suggestions(message=message, catalog=catalog, registry_id=registry_id)
+        typer.echo(message, err=True)
+        raise typer.Exit(code=2)
+
+    details = load_catalog_procedure_details(catalog, entry)
+    owner_boundary = details.owner_boundary
+    if as_json:
+        _emit_progress_explain_json(
+            repo_root=catalog.repo_root,
+            catalog_path=catalog.catalog_path,
+            entry=entry,
+            owner_boundary=owner_boundary,
+            has_related_routes=bool(details.related_registry_ids),
+        )
+        return
+
+    _emit_progress_explain_text(
+        repo_root=catalog.repo_root,
+        catalog_path=catalog.catalog_path,
+        entry=entry,
+        owner_boundary=owner_boundary,
+        has_related_routes=bool(details.related_registry_ids),
     )
 
 
@@ -1499,7 +1817,7 @@ def progress_campaign(
 
     try:
         result = load_campaign_progress(catalog, manifest_path=manifest)
-    except ValueError as exc:
+    except (FileNotFoundError, ValueError) as exc:
         error_text = str(exc)
         message = f"Progress contract error: {error_text}"
         unknown_registry_prefix = "unknown registry id: "
@@ -1603,6 +1921,8 @@ def progress_scaffold(
             suggestions = suggest_procedure_registry_ids(catalog, missing_registry_id)
             if suggestions:
                 message += "\nDid you mean:\n" + "\n".join(f"- {candidate}" for candidate in suggestions)
+        if str(exc) == "progress scaffold requires at least one registry id or --related-to":
+            message += "\n" + _progress_scaffold_recovery_hint()
         typer.echo(message, err=True)
         raise typer.Exit(code=2) from exc
 

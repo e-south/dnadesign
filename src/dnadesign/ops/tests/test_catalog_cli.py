@@ -68,18 +68,20 @@ def test_cli_catalog_list_emits_grouped_text_inventory() -> None:
     assert "usr: USR docs" in result.output
     assert "Suggested next steps" in result.output
     assert "uv run ops catalog list --query <term>" in result.output
+    assert "uv run ops catalog list --simple" in result.output
     assert "uv run ops catalog show ops.control-plane.orchestration" in result.output
+    assert "uv run ops progress explain ops.control-plane.orchestration" in result.output
     assert "uv run ops progress scaffold ops.control-plane.orchestration" in result.output
 
 
-def test_cli_help_points_new_users_to_catalog_list() -> None:
+def test_cli_help_points_new_users_to_task_first_catalog_list() -> None:
     runner = CliRunner()
 
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
     normalized_output = " ".join(result.output.split())
-    assert "Start with `uv run ops catalog list` to browse routes from the terminal." in normalized_output
+    assert "Start with `uv run ops catalog list --simple` to browse routes from the terminal." in normalized_output
 
 
 def test_cli_catalog_list_supports_json_and_section_filter() -> None:
@@ -101,6 +103,7 @@ def test_cli_catalog_list_supports_json_and_section_filter() -> None:
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["section"] == "procedures"
+    assert payload["view"] == "full"
     assert payload["filters"] == {}
     assert payload["counts"]["procedures"] >= 1
     assert "procedures" in payload
@@ -158,6 +161,28 @@ def test_cli_catalog_list_matches_procedure_keywords_for_promoter_alias_queries(
         assert any(
             entry["registry_id"] == "usr.data-plane.promoter-feature-matrix" for entry in payload["procedures"]
         ), query
+
+
+def test_cli_catalog_list_supports_simple_text_view() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--simple",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Task-first procedures" in result.output
+    assert "Tool docs" in result.output
+    assert "Registry id: ops.control-plane.orchestration" in result.output
+    assert "Inspect: uv run ops catalog show ops.control-plane.orchestration" in result.output
+    assert "[runbook | control-plane | executable | ops-audit-json]" not in result.output
 
 
 def test_cli_catalog_list_supports_tool_source_queries_for_promoter_path() -> None:
@@ -317,6 +342,7 @@ def test_cli_catalog_show_emits_registered_entry() -> None:
     assert "handoff-to: cluster.downstream.exploratory-clustering" in result.output
     assert "handoff-to: opal.downstream.usr-infer-x-active-learning" in result.output
     assert "Next commands:" in result.output
+    assert "uv run ops progress explain usr.data-plane.promoter-feature-matrix" in result.output
     assert (
         "uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>"
     ) in result.output
@@ -386,6 +412,9 @@ def test_cli_catalog_show_json_includes_related_procedures() -> None:
             "summary": "USR dataset id to summarize.",
         },
     ]
+    assert payload["next_commands"]["progress_explain"] == (
+        "uv run ops progress explain usr.data-plane.promoter-feature-matrix"
+    )
     assert payload["next_commands"]["progress_show"] == (
         "uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>"
     )

@@ -11,25 +11,30 @@ If you prefer terminal discovery, use the shell decision table below.
 
 | If you want to... | Use this command | What it does |
 | --- | --- | --- |
+| Browse a task-first inventory | `uv run ops catalog list --simple` | Registered procedures and tool docs without leading type/plane labels. |
 | Browse the full inventory | `uv run ops catalog list` | Grouped inventory of authoritative cross-tool procedures plus tool-local docs entrypoints. |
 | Narrow by rough intent | `uv run ops catalog list --plane data-plane --query infer` | Smaller procedure set when you already know the downstream path is data-plane and infer-adjacent. |
 | Browse owner-local docs only | `uv run ops catalog list --section tool-sources` | Tool entrypoints when you want the owner-local docs layer first. |
 | Inspect one registered procedure | `uv run ops catalog show <registry-id>` | Owner docs, typed relations, exact deep docs when declared, required progress inputs, and next shell commands. |
+| Explain one status surface | `uv run ops progress explain <registry-id>` | Required flags, direct `progress show` command, and adapter-specific notes before you touch artifacts. |
 | Check one status surface | `uv run ops progress show <registry-id> ...` | One registered progress surface with explicit artifact inputs. |
 | Start a campaign manifest | `uv run ops progress scaffold <registry-id> ...` or `uv run ops progress scaffold --related-to <registry-id>` | YAML manifest skeleton for one route or one related route set. It prints to stdout unless you pass `--out`. |
 | Check a campaign | `uv run ops progress campaign --manifest <manifest.yaml>` | Explicit multi-step summary without inventing a second registry. |
 
 ### Discovery shortcuts
 
+- `uv run ops catalog list --simple`: task-first inventory when you are new to the registry and do not want the taxonomy first.
 - `uv run ops catalog list`: full inventory of authoritative cross-tool procedures plus tool-local runbook sources.
 - `uv run ops catalog list --section tool-sources`: only tool-local docs entrypoints when you already know you want a tool-owned demo, tutorial, or runbook family.
 - `uv run ops catalog list --section tool-sources --query "promoter feature matrix"`: owner-local docs entrypoints for the USR, Infer, Cluster, and OPAL surfaces around the promoter/Evo2 path.
 - `uv run ops catalog list --section tool-sources --related-to usr.data-plane.promoter-feature-matrix`: typed related tool docs for the DenseGen -> construct -> infer -> cluster/OPAL path around one registered procedure.
 - `uv run ops catalog list --related-to usr.data-plane.promoter-feature-matrix`: procedures related through typed owner-local registry metadata, not inferred from prose link placement.
 - `uv run ops catalog show usr.data-plane.promoter-feature-matrix`: one procedure with owner-boundary, owner docs, typed related tool docs, exact deep docs when declared, entry/exit artifact, typed relation detail, required progress inputs, and next shell commands for progress interrogation or relation-based scaffolding.
+- `uv run ops progress explain usr.data-plane.promoter-feature-matrix`: required flags, direct `progress show` command, and notes before you read that status surface.
 - `uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>`: one registered progress surface with an explicit artifact contract.
 - `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix`: emit an explicit multi-step manifest skeleton with required field placeholders derived from the shared registry.
 - `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`: expand one registered procedure into a starting manifest with the named procedure first and its typed related procedures after it.
+- If you do not know the registry id yet, return to `uv run ops catalog list --simple`; bare `uv run ops progress scaffold` intentionally refuses to guess.
 - `uv run ops progress campaign --manifest <manifest.yaml>`: read-only summary for an explicit multi-step campaign without inventing a second registry.
 
 ### Authoritative cross-tool procedures

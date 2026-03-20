@@ -784,6 +784,8 @@ def test_cli_progress_scaffold_requires_registry_ids_or_related_to() -> None:
 
     assert result.exit_code == 2
     assert "progress scaffold requires at least one registry id or --related-to" in result.output
+    assert "uv run ops catalog list --simple" in result.output
+    assert "uv run ops progress scaffold --related-to <registry-id>" in result.output
 
 
 def test_cli_progress_show_suggests_close_registry_ids() -> None:
@@ -825,7 +827,98 @@ def test_cli_progress_show_rejects_missing_required_surface_arguments() -> None:
     assert "Required inputs for ops.control-plane.orchestration:" in result.output
     assert "--audit-json <workspace-root>/outputs/logs/ops/audit/latest.json" in result.output
     assert "Workspace-scoped orchestration audit JSON emitted by ops runbook execute." in result.output
+    assert "uv run ops progress explain ops.control-plane.orchestration" in result.output
     assert "uv run ops progress scaffold ops.control-plane.orchestration" in result.output
+
+
+def test_cli_progress_show_surfaces_optional_opal_workdir_hint_when_inputs_are_missing() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "progress",
+            "show",
+            "opal.downstream.usr-infer-x-active-learning",
+            "--repo-root",
+            str(_repo_root()),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "progress kind 'opal-campaign-state' requires --opal-config or --opal-workdir" in result.output
+    assert "Required inputs for opal.downstream.usr-infer-x-active-learning:" in result.output
+    assert "Also accepted:" in result.output
+    assert "--opal-workdir" in result.output
+
+
+def test_cli_progress_explain_reports_required_inputs_and_next_commands() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "progress",
+            "explain",
+            "opal.downstream.usr-infer-x-active-learning",
+            "--repo-root",
+            str(_repo_root()),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["progress_kind"] == "opal-campaign-state"
+    assert payload["required_inputs"] == [
+        {
+            "cli_flag": "--opal-config",
+            "manifest_key": "opal_config",
+            "placeholder": "<opal-workdir>/configs/campaign.yaml",
+            "summary": "Canonical OPAL campaign config used to resolve campaign.workdir.",
+        }
+    ]
+    assert payload["optional_inputs"] == [
+        {
+            "cli_flag": "--opal-workdir",
+            "summary": (
+                "Use when you want to point directly at the OPAL campaign workdir instead of resolving it from config."
+            ),
+        }
+    ]
+    assert payload["next_commands"]["catalog_show"] == (
+        "uv run ops catalog show opal.downstream.usr-infer-x-active-learning"
+    )
+    assert payload["next_commands"]["progress_show"] == (
+        "uv run ops progress show opal.downstream.usr-infer-x-active-learning "
+        "--opal-config <opal-workdir>/configs/campaign.yaml"
+    )
+    assert payload["notes"] == [
+        "Prefer `--opal-config` so Ops resolves `campaign.workdir` relative "
+        "to the campaign root, matching OPAL's config contract."
+    ]
+
+
+def test_cli_progress_explain_includes_related_scaffold_when_route_has_neighbors() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "progress",
+            "explain",
+            "usr.data-plane.promoter-feature-matrix",
+            "--repo-root",
+            str(_repo_root()),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["next_commands"]["progress_scaffold_related"] == (
+        "uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix"
+    )
 
 
 def test_cli_progress_campaign_missing_manifest_suggests_scaffold() -> None:

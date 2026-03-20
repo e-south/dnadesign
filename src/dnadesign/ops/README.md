@@ -4,14 +4,14 @@ Ops is the cross-tool orchestration control plane for deterministic batch workfl
 
 Use Ops when:
 - you need a shared orchestration layer for scheduler work, packaged runbooks, or read-only status over a registered route
-- you want to browse the shared route map from the terminal with `uv run ops catalog list`
+- you want to browse the shared route map from the terminal with `uv run ops catalog list --simple` or `uv run ops catalog list`
 
 Do not use Ops when:
 - a tool already owns the durable dataset mutation, such as Construct -> USR -> Infer source-of-truth work
 - you need the boundary-local runtime semantics first; start from the tool docs or shared USR workflow docs, then return to Ops if you need orchestration around that route
 
 For repo-wide runbook discovery, `ops` exposes a shared catalog view in `docs/runbooks/README.md`; it does not own a second registry.
-Typical flow: browse the catalog, inspect one registered procedure, then either scaffold a manifest or move into the runbook lifecycle commands.
+Typical flow: browse the catalog, inspect one registered procedure, explain the status surface if needed, then either scaffold a manifest or move into the runbook lifecycle commands.
 
 ## Documentation
 

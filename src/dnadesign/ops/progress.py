@@ -216,19 +216,29 @@ def load_campaign_progress(catalog: RunbookCatalog, *, manifest_path: Path) -> C
         registry_id = str(step_payload.get("registry_id") or "").strip()
         if not registry_id:
             raise ValueError(f"campaign manifest step {index} missing 'registry_id'")
-        step = build_procedure_progress(
-            catalog,
-            registry_id,
-            inputs=ProgressInputs(
-                audit_json=_path_or_none(step_payload.get("audit_json"), base_dir=manifest_dir),
-                sync_audit_json=_path_or_none(step_payload.get("sync_audit_json"), base_dir=manifest_dir),
-                usr_root=_path_or_none(step_payload.get("usr_root"), base_dir=manifest_dir),
-                dataset=_string_or_none(step_payload.get("dataset")),
-                cluster_results_root=_path_or_none(step_payload.get("cluster_results_root"), base_dir=manifest_dir),
-                opal_config=_path_or_none(step_payload.get("opal_config"), base_dir=manifest_dir),
-                opal_workdir=_path_or_none(step_payload.get("opal_workdir"), base_dir=manifest_dir),
-            ),
-        )
+        if catalog.find_procedure(registry_id) is None:
+            raise ValueError(f"unknown registry id: {registry_id}")
+        try:
+            step = build_procedure_progress(
+                catalog,
+                registry_id,
+                inputs=ProgressInputs(
+                    audit_json=_path_or_none(step_payload.get("audit_json"), base_dir=manifest_dir),
+                    sync_audit_json=_path_or_none(step_payload.get("sync_audit_json"), base_dir=manifest_dir),
+                    usr_root=_path_or_none(step_payload.get("usr_root"), base_dir=manifest_dir),
+                    dataset=_string_or_none(step_payload.get("dataset")),
+                    cluster_results_root=_path_or_none(step_payload.get("cluster_results_root"), base_dir=manifest_dir),
+                    opal_config=_path_or_none(step_payload.get("opal_config"), base_dir=manifest_dir),
+                    opal_workdir=_path_or_none(step_payload.get("opal_workdir"), base_dir=manifest_dir),
+                ),
+            )
+        except FileNotFoundError as exc:
+            missing_path = exc.filename or str(exc)
+            raise ValueError(
+                f"campaign manifest step {index} ({registry_id}) references a missing file: {missing_path}"
+            ) from exc
+        except ValueError as exc:
+            raise ValueError(f"campaign manifest step {index} ({registry_id}): {exc}") from exc
         label = str(step_payload.get("label") or "").strip()
         if label:
             step = ProcedureProgress(

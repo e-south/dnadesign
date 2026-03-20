@@ -12,7 +12,8 @@ Use this index for package-local Ops documentation. Shared operator procedures s
 - [Ops orchestration index](../../../../docs/operations/README.md): task-first router for init, plan, execute, and verification flows.
 - [Orchestration runbooks](../../../../docs/operations/orchestration-runbooks.md): authoritative runbook schema, command order, and execution contracts.
 - [Repository docs index](../../../../docs/README.md): repo-wide route map when the next step is outside Ops.
-- Start from `uv run ops catalog list` when you are entering from the shell rather than browsing docs first.
+- Start from `uv run ops catalog list --simple` when you are entering from the shell rather than browsing docs first.
+- Use `uv run ops progress explain <registry-id>` when you know the route id but not the required status flags yet.
 
 ### Package-local surfaces
 

@@ -8,12 +8,24 @@ This is the central documentation map for workflows, tool references, and reposi
 ### Use this index
 
 1. If this is a new machine, start with [Installation](installation.md) first.
+   Once baseline verification passes, return here or start from the shell with `uv run ops catalog list --simple`.
 2. Continue to [Workflow routes](#workflow-routes) and follow the preflight -> run -> verify sequence for the relevant outcome.
 3. Use the [Runbook catalog](runbooks/README.md) when you want a concise inventory of authoritative procedures, workflows, and owner-local tool entrypoints. Use [Shell routes](#shell-routes) when terminal discovery is faster than browsing docs.
 4. Follow the route's "Verify next" target before moving to downstream tools.
 5. Use [Tool docs](#tool-docs) when you need package-level commands and data contracts.
 6. Use [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for policy, operations, and governance detail.
 7. Return to this page as the central docs map.
+
+### Fast start
+
+```bash
+uv run ops catalog list --simple
+uv run ops catalog show usr.data-plane.promoter-feature-matrix
+uv run ops progress explain usr.data-plane.promoter-feature-matrix
+```
+
+- Use the fast start only after the environment is already usable on this machine.
+- DenseGen docs live under `densegen`, while the CLI entrypoint is `uv run dense --help`.
 
 ### Quick terms
 
@@ -26,8 +38,10 @@ This is the central documentation map for workflows, tool references, and reposi
 
 | If you want to... | Use this command | What you get next |
 | --- | --- | --- |
+| Start with a task-first inventory | `uv run ops catalog list --simple` | Registered workflows and tool docs without leading type/plane terminology. |
 | Browse the shared inventory | `uv run ops catalog list --query <term>` | Matching procedures and tool-local docs without guessing the owner first. Start with `uv run ops catalog list` when you want the full map before narrowing. |
 | Inspect one registered procedure | `uv run ops catalog show <registry-id>` | Owner docs, related docs, exact deep docs when declared, required progress inputs, and next shell commands. |
+| Explain one status surface before running it | `uv run ops progress explain <registry-id>` | Required flags, direct `progress show` command, and special notes for the chosen progress adapter. |
 | Browse owner-local docs only | `uv run ops catalog list --section tool-sources` | Tool entrypoints when you already know you need the owner-local docs layer. |
 | Browse typed related procedures | `uv run ops catalog list --related-to <registry-id>` | Neighboring procedures around one registered route. |
 | Browse typed related tool docs | `uv run ops catalog list --section tool-sources --related-to <registry-id>` | Tool-owned docs around one registered route. |

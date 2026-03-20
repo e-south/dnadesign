@@ -5,6 +5,8 @@
 
 Use this page when you already know you need the Ops control plane and want the shortest route to the next command. If you are entering from the shell, start with `uv run ops catalog list`.
 
+If this is your first stop in Ops, prefer `uv run ops catalog list --simple` for a task-first inventory before you narrow by taxonomy.
+
 ### Quick terms
 
 - `registry id`: one named procedure or workflow in the shared catalog.
@@ -14,6 +16,7 @@ Use this page when you already know you need the Ops control plane and want the 
 
 ### Discover the right runbook
 
+- `uv run ops catalog list --simple`: browse the shared runbook catalog in a task-first view before you care about type, plane, or progress-kind labels.
 - `uv run ops catalog list`: browse the shared runbook catalog from the shell.
 - `uv run ops catalog list --plane data-plane --query infer`: narrow the catalog by intent when you already know the downstream path.
 - `uv run ops catalog list --query "promoter feature matrix"`: find the registered route and adjacent tool docs for that topic without knowing the registry id first.
@@ -27,10 +30,12 @@ Use this page when you already know you need the Ops control plane and want the 
 
 ### Check status and build manifests
 
+- `uv run ops progress explain <registry-id>`: print the required progress flags, a ready-to-paste `progress show` command, and any adapter-specific notes before you touch artifacts.
 - `uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>`: summarize one registered progress surface once you have the explicit artifact inputs.
 - `uv run ops catalog show <registry-id>`: inspect the required progress flags before you run `progress show` if you do not already know the artifact contract.
 - `uv run ops progress scaffold <registry-id> ...`: emit an explicit manifest skeleton for one or more registered procedures. It prints YAML to stdout unless you pass `--out`.
 - `uv run ops progress scaffold --related-to <registry-id>`: expand one registered procedure into a relation-based manifest starting point. It can cross tool boundaries when the registry metadata declares related routes.
+- If you do not know the registry id yet, return to `uv run ops catalog list --simple`; bare `uv run ops progress scaffold` intentionally refuses to guess.
 - `uv run ops progress campaign --manifest <manifest.yaml>`: read-only multi-step summary driven by an explicit manifest, not an inferred global engine.
 
 ### Continue reading

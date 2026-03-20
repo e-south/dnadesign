@@ -8,8 +8,23 @@
 
 ## New here?
 
-- To understand the repository: start with the [Docs index](docs/README.md) for the main workflow map, then follow the tool or runbook that matches your task.
-- To orchestrate or inspect batch workflows: start with [Ops](src/dnadesign/ops/README.md) or run `uv run ops catalog list` to browse the shared route map from the terminal.
+```bash
+uv sync --locked --group dev
+uv run ops catalog list --simple
+uv run ops progress explain usr.data-plane.promoter-feature-matrix
+```
+
+- If `uv` is not installed or the environment is not usable yet, start with [Installation](docs/installation.md). Once `uv run <tool> --help` works, return here or go straight to `uv run ops catalog list --simple`.
+
+| Start here if you want to... | Use this first | What you get next |
+| --- | --- | --- |
+| Understand the repository from the shell | `uv run ops catalog list --simple` | A task-first view of registered workflows and tool docs before you need taxonomy. |
+| Inspect one registered route in detail | `uv run ops catalog show <registry-id>` | Owner docs, related routes, required status inputs, and next commands. |
+| Understand what a status command needs | `uv run ops progress explain <registry-id>` | Required flags, ready-to-paste `progress show` command, and notes for special cases like OPAL config resolution. |
+| Browse the full docs map | [Docs index](docs/README.md) | Workflow routes, shell routes, tool docs, and repository policy. |
+
+- To orchestrate or inspect batch workflows: start with [Ops](src/dnadesign/ops/README.md) or run `uv run ops catalog list --simple`.
+- DenseGen lives under `densegen`, but the CLI command is `uv run dense --help`.
 
 ---
 
@@ -25,6 +40,8 @@ Use the docs index to choose the next deep procedure by ownership plane, find th
 ---
 
 ## Available tools
+
+Package names and CLI command names are usually aligned, but not always. DenseGen is the main exception: the package/docs name is `densegen`, while the CLI entrypoint is `dense`.
 
 | Tool | Description | Coverage |
 | --- | --- | --- |
