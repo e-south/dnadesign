@@ -9,6 +9,7 @@
 - [Sync an existing dataset between local and HPC](operations/workflow-map.md): task-first router for clone, pull, push, and audit flows.
 - [Assemble multiple producer datasets into one source-of-truth dataset](operations/multi-source-source-of-truth-assembly.md): shared USR-backed merge/carry path before construct and infer.
 - [Hand a construct-backed shared dataset to infer and downstream watchers](operations/construct-infer-source-of-truth-runbook.md): one construct -> USR -> infer handoff.
+- [Understand the full promoter Evo2 path before choosing a concrete branch](operations/promoter-evo2-journey.md): linked route from DenseGen/manual/wildtype inputs through optional construct contexts, infer Evo2 bundles, Notify watcher validation, and Cluster/OPAL branches.
 - [Build an infer-annotated promoter feature matrix for cluster or OPAL](operations/promoter-characterization-feature-matrix.md): shared downstream branch once DenseGen/manual/construct inputs should all become one feature dataset.
 
 ### Read order

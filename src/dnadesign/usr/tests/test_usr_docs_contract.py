@@ -176,6 +176,7 @@ def test_docs_index_includes_progressive_entrypoint_ladders() -> None:
     assert "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-runbook.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-runbook.md" in docs_index
+    assert "src/dnadesign/usr/docs/operations/promoter-evo2-journey.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync-fidelity-drills.md" in docs_index
 
 
@@ -207,7 +208,20 @@ def test_usr_docs_index_exposes_getting_started_and_reference_paths() -> None:
     assert "reference/event-log.md" in usr_docs
     assert "operations/multi-source-source-of-truth-assembly.md" in usr_docs
     assert "operations/construct-infer-source-of-truth-runbook.md" in usr_docs
+    assert "operations/promoter-evo2-journey.md" in usr_docs
     assert "operations/promoter-characterization-feature-matrix.md" in usr_docs
+
+
+def test_usr_promoter_journey_doc_links_cross_tool_owner_surfaces() -> None:
+    journey = _read("src/dnadesign/usr/docs/operations/promoter-evo2-journey.md")
+
+    assert "ops catalog show usr.data-plane.promoter-feature-matrix" in journey
+    assert "multi-source-source-of-truth-assembly.md" in journey
+    assert "construct-infer-source-of-truth-runbook.md" in journey
+    assert "evo2-promoter-features.md" in journey
+    assert "evo2-provider.md" in journey
+    assert "docs/notify/README.md" in journey
+    assert "usr-infer-x-active-learning.md" in journey
 
 
 def test_usr_docs_index_avoids_anchor_coupling_to_top_readme() -> None:

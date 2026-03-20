@@ -102,6 +102,7 @@ class CatalogProcedureEntry:
     progress_kind: str
     summary: str
     catalog_order: int = field(repr=False)
+    keywords: tuple[str, ...] = field(default_factory=tuple, repr=False)
     related_tools: tuple[str, ...] = field(default_factory=tuple, repr=False)
     related_tool_routes: tuple[CatalogProcedureToolRouteReference, ...] = field(default_factory=tuple, repr=False)
 
@@ -613,6 +614,7 @@ def _load_registry_metadata_file(
         execution_kind=_required_string(payload, field_name="execution_kind", metadata_path=metadata_path),
         progress_kind=_required_string(payload, field_name="progress_kind", metadata_path=metadata_path),
         summary=_required_string(payload, field_name="summary", metadata_path=metadata_path),
+        keywords=_optional_metadata_keywords(payload, metadata_path=metadata_path),
         related_tools=_optional_related_tools(payload, metadata_path=metadata_path),
         related_tool_routes=_optional_related_tool_routes(payload, metadata_path=metadata_path),
         catalog_order=_required_positive_int(payload, field_name="catalog_order", metadata_path=metadata_path),
@@ -816,7 +818,7 @@ def _optional_related_tool_routes(
     return tuple(route_refs)
 
 
-def _optional_tool_source_keywords(
+def _optional_metadata_keywords(
     payload: dict[str, object],
     *,
     metadata_path: Path,
@@ -839,6 +841,14 @@ def _optional_tool_source_keywords(
         seen.add(keyword)
         keywords.append(keyword)
     return tuple(keywords)
+
+
+def _optional_tool_source_keywords(
+    payload: dict[str, object],
+    *,
+    metadata_path: Path,
+) -> tuple[str, ...]:
+    return _optional_metadata_keywords(payload, metadata_path=metadata_path)
 
 
 def _optional_tool_source_routes(
@@ -1117,6 +1127,7 @@ def _procedure_haystack(entry: CatalogProcedureEntry) -> str:
             entry.summary,
             entry.entry_artifact,
             entry.exit_artifact,
+            *entry.keywords,
         )
     ).lower()
 

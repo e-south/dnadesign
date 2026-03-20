@@ -15,7 +15,7 @@
 
 ## Documentation
 
-Use the docs index to find the next concrete workflow or tool doc, then drop into the owning package for operational detail.
+Use the docs index to choose the next deep procedure by ownership plane, find the next concrete workflow or tool doc, then drop into the owning package for operational detail.
 
 - [Docs index](docs/README.md): central route map for workflow and tool documentation.
 - [Installation](docs/installation.md): bootstrap the environment and run baseline verification commands.

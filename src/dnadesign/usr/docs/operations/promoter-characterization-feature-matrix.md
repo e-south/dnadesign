@@ -15,6 +15,8 @@
 
 Use this runbook when promoter candidates come from multiple USR-backed sources and downstream consumers should see one infer-annotated feature matrix with explicit provenance.
 
+If you need the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL route first, start with [Promoter Evo2 workflow journey](promoter-evo2-journey.md).
+
 This is the authoritative cross-tool runbook for:
 
 - upstream promoter sources such as DenseGen anchors plus wildtype or manually imported promoters,

@@ -9,6 +9,15 @@ exit_artifact: infer-annotated USR feature matrix ready for cluster or OPAL
 summary: Build one infer-annotated feature matrix from mixed promoter sources before branching into Cluster or OPAL.
 execution_kind: staged
 progress_kind: usr-dataset-state
+keywords:
+  - evo2
+  - wildtype
+  - manual promoters
+  - anchor_only
+  - template_1kb
+  - feature bundle
+  - promoter
+  - active learning
 related_tools:
   - densegen
   - construct

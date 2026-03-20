@@ -38,6 +38,7 @@ This directory holds authoritative USR-backed data-plane runbooks in lifecycle o
 
 | Need | Runbook |
 | --- | --- |
+| Understand the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL route before choosing one concrete branch | [promoter-evo2-journey.md](promoter-evo2-journey.md) |
 | Build one infer-annotated promoter feature matrix, then branch to cluster (exploratory) or OPAL (active learning) | [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md) |
 
 ### Validation and drills
@@ -64,6 +65,7 @@ This directory holds authoritative USR-backed data-plane runbooks in lifecycle o
    [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md),
    [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md)
 4. Downstream branch handoff:
+   [promoter-evo2-journey.md](promoter-evo2-journey.md),
    [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md)
 5. Validation drills:
    [sync-fidelity-drills.md](sync-fidelity-drills.md),

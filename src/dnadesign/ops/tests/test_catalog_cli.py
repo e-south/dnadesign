@@ -134,6 +134,32 @@ def test_cli_catalog_list_supports_queryable_filters() -> None:
     assert payload["tool_sources"] == []
 
 
+def test_cli_catalog_list_matches_procedure_keywords_for_promoter_alias_queries() -> None:
+    runner = CliRunner()
+
+    for query in ("wildtype promoter", "evo2 promoter"):
+        result = runner.invoke(
+            app,
+            [
+                "catalog",
+                "list",
+                "--repo-root",
+                str(_repo_root()),
+                "--section",
+                "procedures",
+                "--query",
+                query,
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert any(
+            entry["registry_id"] == "usr.data-plane.promoter-feature-matrix" for entry in payload["procedures"]
+        ), query
+
+
 def test_cli_catalog_list_supports_tool_source_queries_for_promoter_path() -> None:
     runner = CliRunner()
 
