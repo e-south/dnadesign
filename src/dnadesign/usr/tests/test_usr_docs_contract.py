@@ -105,6 +105,7 @@ def test_usr_sync_router_declares_route_metadata() -> None:
 def test_docs_index_links_progressive_usr_sync_workflows() -> None:
     docs_index = _read("docs/README.md")
     assert "Workflow routes" in docs_index
+    assert "Workspace and dataset lookup" in docs_index
     assert "Quick notes" in docs_index
     assert "runbooks/README.md" in docs_index
     assert "#### Single-tool starts" in docs_index
@@ -119,6 +120,11 @@ def test_docs_index_links_progressive_usr_sync_workflows() -> None:
     assert "src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-runbook.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-runbook.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync-fidelity-drills.md" in docs_index
+    assert "uv run dense workspace list" in docs_index
+    assert "uv run construct workspace list" in docs_index
+    assert "uv run infer workspace list" in docs_index
+    assert "uv run cluster workspace list" in docs_index
+    assert "uv run usr ls --root <usr-root>" in docs_index
 
 
 def test_docs_index_exposes_task_first_workflow_map() -> None:
@@ -297,15 +303,26 @@ def test_usr_docs_index_exposes_sync_runbooks() -> None:
     assert "Construct -> USR -> Infer Source-of-Truth Runbook" in construct_handoff
     assert "uv run construct workspace run-project" in construct_handoff
     assert "uv run infer validate usr-registry" in construct_handoff
+    assert 'export DNADESIGN_REPO_ROOT="$(git rev-parse --show-toplevel)"' in construct_handoff
+    assert (
+        'cp "$DNADESIGN_REPO_ROOT/src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml"'
+        in construct_handoff
+    )
     assert "notify usr-events watch" in construct_handoff
     assert "Drill 1: Pull must fail when `_derived` payload is missing" in fidelity
     assert "Drill 2: Push must fail when remote misses local overlays" in fidelity
     assert "Drill 3: Overlay schema attack surface" in fidelity
+    assert 'export LOCAL_USR_ROOT="src/dnadesign/usr/datasets"' in fidelity
+    assert '--usr-root "$LOCAL_USR_ROOT"' in fidelity
     assert "--verify-sidecars" in fidelity
     assert "--no-verify-sidecars" in fidelity
     assert "--verify-derived-hashes" in fidelity
     assert "post-pull-sidecars" in fidelity
     assert "post-push-sidecars" in fidelity
+    assert 'export LOCAL_USR_ROOT="src/dnadesign/usr/datasets"' in chained
+    assert 'export DATASET_ID="my_dataset"' in chained
+    assert "HPC_USR_ROOT" not in chained
+    assert "No extra HPC-side `pull` is required" in chained
     assert "hpc-agent-sync-flow.md" in sync_ops
     assert "sync-audit-loop.md" in sync_ops
     assert "chained-densegen-infer-sync-runbook.md" in sync_ops

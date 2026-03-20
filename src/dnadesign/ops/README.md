@@ -1,6 +1,7 @@
 ![Ops banner](assets/ops-banner.svg)
 
 Ops manages batch orchestration across tools. It turns a runbook into preflight, verification, and submit steps with audit output, so scheduler work stays readable instead of turning into ad hoc shell commands.
+If you do not know a route id yet, start with `uv run ops catalog list --simple`.
 
 Use Ops when:
 - you need a shared orchestration layer for scheduler work, packaged runbooks, or read-only status over a registered route

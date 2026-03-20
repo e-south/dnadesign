@@ -11,7 +11,7 @@
 **Progress-kind:** usr-sync-audit
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-19
+**Last verified:** 2026-03-20
 
 
 Use this runbook for the full asynchronous loop where DenseGen writes on HPC and Infer writes back overlays locally, with USR sync as the transfer contract.
@@ -25,6 +25,17 @@ Default sync contract:
 - Dataset source of truth: USR dataset roots, not git.
 - Transfer boundary: `uv run usr diff/pull/push` over SSH remotes.
 - Chained tools: DenseGen batch writes plus Infer write-back overlays.
+
+## One-time setup
+
+```bash
+# Local root example (canonical repo-local datasets root)
+export LOCAL_USR_ROOT="src/dnadesign/usr/datasets"
+# Confirm the configured remote profile and remote base_dir before syncing.
+uv run usr remotes show bu-scc
+# Reuse one dataset id across local and HPC phases.
+export DATASET_ID="my_dataset"
+```
 
 ## Quick path
 
@@ -44,10 +55,10 @@ uv run usr --root "$LOCAL_USR_ROOT" push "$DATASET_ID" bu-scc -y
 ```bash
 # Validate remote connectivity, transfer prerequisites, and lock support.
 uv run usr remotes doctor --remote bu-scc
-# Show remote base_dir and profile wiring used by sync calls.
-uv run usr remotes show bu-scc
-# Set the canonical dataset id used by both hosts.
-DATASET_ID="my_dataset"
+# Print the local root used by the remaining steps.
+echo "$LOCAL_USR_ROOT"
+# Print the dataset id used by the remaining steps.
+echo "$DATASET_ID"
 ```
 
 ### 2) HPC side DenseGen batch increment
@@ -103,14 +114,11 @@ uv run usr --root "$LOCAL_USR_ROOT" push "$DATASET_ID" bu-scc -y
 
 If this is the first infer write-back into the dataset, make the namespace-registration step explicit before mutation. Prefer the config-driven infer pressure-test path when you need the exact `usr namespace register infer --columns ...` command rendered from the active infer contract.
 
-### 5) HPC side pull (optional rebalance)
+### 5) Next HPC batch phase
 
-Run this on HPC when local-first updates should become the new remote baseline before the next batch phase.
+After Step 4, the remote `bu-scc` dataset is already updated by the local `push`. No extra HPC-side `pull` is required when the next batch job reads from that same remote root.
 
-```bash
-# Pull the latest dataset state into the HPC workspace copy.
-uv run usr --root "$HPC_USR_ROOT" pull "$DATASET_ID" bu-scc -y
-```
+If the next batch phase reads from a different HPC clone or a second USR root, sync that environment explicitly with the remote profile defined there before submitting the job.
 
 ## Audit interpretation
 

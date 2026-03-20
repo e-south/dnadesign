@@ -258,11 +258,13 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
 def test_repo_docs_index_exposes_ops_tool_and_operations_route() -> None:
     text = _read(_repo_root() / "docs" / "README.md")
     assert "### Workflow routes" in text
-    assert "### Quick terms" in text
+    assert "### Workspace and dataset lookup" in text
+    assert "### Quick notes" in text
     assert "### Start here" in text
     assert "### Shell routes" not in text
     assert "### Workflow lanes" not in text
     assert "[Workflow routes](#workflow-routes)" in text
+    assert "[Workspace and dataset lookup](#workspace-and-dataset-lookup)" in text
     assert "[Runbook catalog](runbooks/README.md)" in text
     assert "uv run ops catalog list --simple" not in text
     assert "uv run ops catalog show <registry-id>" not in text
@@ -273,6 +275,7 @@ def test_repo_docs_index_exposes_ops_tool_and_operations_route() -> None:
     assert "uv run ops progress scaffold <registry-id> ..." not in text
     assert "[Ops orchestration index](operations/README.md)" in text
     assert "| `ops` | `uv run ops --help` | [ops README](../src/dnadesign/ops/README.md) |" in text
+    assert "uv run cluster workspace list" in text
 
 
 def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners() -> None:

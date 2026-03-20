@@ -8,26 +8,33 @@ Start here when you need the next workflow, tool doc, or repository record.
 ### Start here
 
 1. If this is a new machine, start with [Installation](installation.md).
-2. Use [Workflow routes](#workflow-routes) to choose the next task.
-3. Use the [Runbook catalog](runbooks/README.md) when you need commands first.
-4. Jump to [Tool docs](#tool-docs) when you already know which package owns the next step.
-5. Use [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for repo contracts, operational docs, and maintainer references.
+2. Use [Workspace and dataset lookup](#workspace-and-dataset-lookup) when you need to see what already exists.
+3. Use [Workflow routes](#workflow-routes) to choose the next task.
+4. Use the [Runbook catalog](runbooks/README.md) when you need commands first.
+5. Jump to [Tool docs](#tool-docs) when you already know which package owns the next step.
+6. Use [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for repo contracts, operational docs, and maintainer references.
 
 DenseGen docs live under `densegen`, while the CLI entrypoint is `uv run dense --help`.
 
-### Quick terms
+### Workspace and dataset lookup
 
-- `control-plane`: orchestration, scheduler wiring, and audit output.
-- `data-plane`: durable dataset and model-output workflows owned by the tool that changes the data.
-- `registry id`: the stable catalog name for one registered runbook or workflow.
-- `status view`: the read-only status summary for one registered route.
+Use this table when the first question is "what is available right now?" rather than "which workflow should I run?"
+
+| Tool | What to inspect | First command | Next doc |
+| --- | --- | --- | --- |
+| `densegen` | packaged workspaces plus current output state | `uv run dense workspace list` | [DenseGen workspaces](../src/dnadesign/densegen/workspaces/README.md) |
+| `construct` | packaged workspaces plus current output state | `uv run construct workspace list` | [Construct workspaces](../src/dnadesign/construct/workspaces/README.md) |
+| `infer` | packaged workspaces plus current output state | `uv run infer workspace list` | [infer workspaces](../src/dnadesign/infer/workspaces/README.md) |
+| `cluster` | packaged workspaces plus current output state | `uv run cluster workspace list` | [Cluster workspaces](../src/dnadesign/cluster/workspaces/README.md) |
+| `usr` | datasets under one root, not workspaces | `uv run usr --help` to see the default root, then `uv run usr ls --root <usr-root>` | [USR CLI quickstart](../src/dnadesign/usr/docs/getting-started/cli-quickstart.md) |
+
+The singular `cluster workspace ...` form matches the other workspace-owning tools. `cluster workspaces ...` still works.
 
 ### Quick notes
 
-- `route`: choose the next maintained page for a task.
-- `runbook`: ordered commands plus verification for a maintained procedure.
-- `workflow`: a downstream tool-owned branch after a handoff.
-- `tutorial` or `demo`: a sample path; use the linked runbook or workflow when you need the maintained procedure.
+- workflows and runbooks are maintained task paths; tutorials and demos are examples first
+- workspace discovery is tool-local; `usr` uses dataset roots rather than a workspace tree.
+- reference pages are for flags, schemas, and artifact contracts once you know the next tool
 
 ### Workflow routes
 

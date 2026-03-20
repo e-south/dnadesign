@@ -5,6 +5,8 @@
 
 Use this page to find a command and the doc that owns it. It links to the maintained runbooks and tool docs; it does not replace them.
 
+If you do not know a registry id yet, start with `uv run ops catalog list --simple`. Use the decision table first; treat the generated tables later on as reference.
+
 ### Shell decision table
 
 | If you want to... | Use this command | What it does |
@@ -26,6 +28,8 @@ Use this page to find a command and the doc that owns it. It links to the mainta
 - `uv run ops progress explain usr.data-plane.promoter-feature-matrix`: required flags, direct `progress show` command, and notes before you read that status surface.
 - `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`: expand one registered procedure into a starting manifest with the named procedure first and its related procedures after it.
 - `uv run ops progress campaign --manifest <manifest.yaml>`: read-only summary for the steps listed in the manifest.
+
+You can ignore `Type`, `Plane`, and `Progress kind` until you need to disambiguate similar routes.
 
 ### Authoritative cross-tool procedures
 
@@ -59,6 +63,8 @@ This table is generated from `*.tool-source.yaml` sidecars. Edit those files ins
 | `ops` | [Ops docs](../../src/dnadesign/ops/docs/README.md) | Control-plane orchestration docs, packaged presets, and runbook lifecycle commands. |
 
 ### Progress surface glossary
+
+You only need this section after `uv run ops progress explain <registry-id>` or `uv run ops catalog show <registry-id>` points you to a specific status surface.
 
 `Progress kind` names the status adapter used by `ops progress show`. Use `uv run ops progress scaffold <registry-id> ...` to emit the required manifest keys, then `uv run ops progress campaign --manifest <manifest.yaml>` when you want one multi-step summary. `ops progress scaffold` prints YAML to stdout by default and only writes when you pass `--out`. This command only summarizes the manifest you provide.
 

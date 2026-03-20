@@ -5,6 +5,7 @@
 
 `notify` sends webhook notifications from Universal Sequence Record (USR) `.events.log` streams.
 Start here for setup, watching, and recovery. Use [Notify USR events operator manual](usr-events.md) when you want the full ordered procedure.
+If you already have a workspace and a webhook secret file, jump to [Quick path](#quick-path). Use the workflow table when you need a specific handoff or recovery route.
 
 ### Before you start
 

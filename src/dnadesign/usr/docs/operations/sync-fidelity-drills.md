@@ -1,7 +1,7 @@
 # USR Sync Fidelity Drills (Adversarial)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-03-20
 
 
 Use this runbook to pressure test strict sync fidelity for iterative batch workflows (`densegen`, `infer`, and sibling tools) across local and HPC clones.
@@ -21,8 +21,10 @@ Use this runbook to pressure test strict sync fidelity for iterative batch workf
 ```bash
 # Remote profile health must be clean before drills.
 uv run usr remotes doctor --remote bu-scc
+# Local root example (canonical repo-local datasets root).
+export LOCAL_USR_ROOT="src/dnadesign/usr/datasets"
 # Use the canonical dataset id.
-DATASET_ID="my_dataset"
+export DATASET_ID="my_dataset"
 ```
 
 ## Drill 1: Pull must fail when `_derived` payload is missing
@@ -50,7 +52,7 @@ Goal: ensure strict push rejects remote post-transfer state that drops overlays.
 
 ```bash
 # Local write-back from sibling tool (example: infer).
-uv run infer run --preset evo2/extract_logits_ll --usr "$DATASET_ID" --field sequence --device cpu --write-back
+uv run infer run --preset evo2/extract_logits_ll --usr "$DATASET_ID" --usr-root "$LOCAL_USR_ROOT" --field sequence --device cpu --write-back
 # Preview drift before transfer.
 uv run usr --root "$LOCAL_USR_ROOT" diff "$DATASET_ID" bu-scc --verify parquet
 # Strict push requires post-transfer sidecar and overlay parity.
@@ -84,11 +86,11 @@ Expected contract:
 Use this loop in automation or operator sessions:
 
 1. `uv run usr remotes doctor --remote bu-scc`
-2. `uv run usr diff "$DATASET_ID" bu-scc --verify parquet`
-3. `uv run usr pull "$DATASET_ID" bu-scc -y --verify parquet --verify-sidecars`
+2. `uv run usr --root "$LOCAL_USR_ROOT" diff "$DATASET_ID" bu-scc --verify parquet`
+3. `uv run usr --root "$LOCAL_USR_ROOT" pull "$DATASET_ID" bu-scc -y --verify parquet --verify-sidecars`
 4. Run local notebook or sibling tool write-back.
-5. `uv run usr diff "$DATASET_ID" bu-scc --verify parquet`
-6. `uv run usr push "$DATASET_ID" bu-scc -y --verify parquet --verify-sidecars`
+5. `uv run usr --root "$LOCAL_USR_ROOT" diff "$DATASET_ID" bu-scc --verify parquet`
+6. `uv run usr --root "$LOCAL_USR_ROOT" push "$DATASET_ID" bu-scc -y --verify parquet --verify-sidecars`
 7. Re-run `diff` and require `up-to-date`.
 
 Use sync audit lines (`Primary`, `.events.log`, `_snapshots`, `_derived`, `_auxiliary`) as the final transfer decision summary.

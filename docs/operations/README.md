@@ -9,7 +9,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-20
 
-Ops covers repo-level batch orchestration for deterministic workflows. Start here when you need runbook setup, planning, execution, or status checks. Detailed command behavior and schema rules live in [orchestration runbooks](orchestration-runbooks.md). Use the [runbook catalog](../runbooks/README.md) when you need command lookup across tools.
+Use this page when the next step is batch orchestration or a read-only Ops status check. If the work is dataset assembly, construct realization, or infer write-back, leave this page and continue in the shared USR runbooks. Detailed command behavior and schema rules live in [orchestration runbooks](orchestration-runbooks.md). Use the [runbook catalog](../runbooks/README.md) when you need command lookup across tools.
 
 ### What Ops is for
 

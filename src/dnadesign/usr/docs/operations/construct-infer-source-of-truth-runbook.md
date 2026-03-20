@@ -11,7 +11,7 @@
 **Progress-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-19
+**Last verified:** 2026-03-20
 
 Use this runbook when construct should write one shared USR dataset and infer plus Notify should read that same dataset next.
 
@@ -48,6 +48,8 @@ If upstream inputs still span multiple USR datasets, start with [multi-source-so
 ```bash
 # Create a disposable root for this tracer-bullet workflow.
 export WORK_ROOT="$(mktemp -d /tmp/construct-usr-infer-XXXXXX)"
+# Pin the repo checkout so later file copies do not depend on the current shell directory.
+export DNADESIGN_REPO_ROOT="$(git rev-parse --show-toplevel)"
 # Scaffold the packaged shared-dataset construct workspace under that root.
 uv run construct workspace init --id source_of_truth_demo --root "$WORK_ROOT" --profile promoter-swap-source-of-truth-demo
 # Reuse one workspace path across the remaining commands.
@@ -111,7 +113,7 @@ Create a config dedicated to the construct output dataset. This keeps infer writ
 
 ```bash
 # Copy the packaged infer pressure-test config into the construct workspace.
-cp src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml \
+cp "$DNADESIGN_REPO_ROOT/src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml" \
   "$WORKSPACE_ROOT/infer.construct-source-of-truth.yaml"
 # Retarget the infer config to the construct output dataset and local CPU runtime.
 uv run python - <<'PY'
