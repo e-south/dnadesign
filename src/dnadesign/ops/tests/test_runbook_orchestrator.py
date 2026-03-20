@@ -1231,6 +1231,24 @@ def test_batch_plan_includes_session_counts_gate_instead_of_qstat_shell_awk(tmp_
     assert 'qstat -u "$USER" | awk' not in preflight_block
 
 
+def test_batch_plan_can_render_explicit_degraded_queue_probe_flags(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    plan = build_batch_plan(
+        runbook=runbook,
+        requested_mode=None,
+        requested_smoke=None,
+        active_job_ids=(),
+        allow_missing_qstat=True,
+    )
+    preflight_block = _render_block(plan.preflight_commands)
+
+    assert "dnadesign.ops.orchestrator.gates session-counts --allow-missing-qstat" in preflight_block
+    assert "dnadesign.ops.orchestrator.gates submit-shape-advisor --planned-submits" in preflight_block
+    assert "--allow-missing-qstat" in preflight_block
+    assert "dnadesign.ops.orchestrator.gates operator-brief --planned-submits" in preflight_block
+
+
 def test_densegen_notify_preflight_requires_usr_events_path_contract(tmp_path: Path) -> None:
     runbook_path = _write_runbook(tmp_path)
     runbook = load_orchestration_runbook(runbook_path)
@@ -2397,6 +2415,61 @@ def test_cli_execute_defaults_timeout_to_300_seconds(tmp_path: Path, monkeypatch
     assert captured["workflow_id"] == "densegen_batch_with_notify"
     assert captured["submit"] is False
     assert captured["command_timeout_seconds"] == 300.0
+
+
+def test_cli_execute_forwards_allow_missing_qstat_to_plan_builder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    audit_path = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "audit" / "result.json"
+    captured: dict[str, object] = {}
+
+    class _Plan:
+        workflow_id = "densegen_batch_with_notify"
+        project = "demo"
+
+    class _Result:
+        ok = True
+
+        @staticmethod
+        def as_dict() -> dict[str, object]:
+            return {
+                "ok": True,
+                "failed_phase": None,
+                "audit_json_path": str(audit_path),
+                "commands": [],
+            }
+
+    def _fake_build_batch_plan(
+        *, runbook, requested_mode, requested_smoke, active_job_ids, allow_fresh_reset=False, allow_missing_qstat=False
+    ):
+        captured["allow_missing_qstat"] = allow_missing_qstat
+        return _Plan()
+
+    def _fake_execute_batch_plan(*, plan, audit_json_path, submit, command_timeout_seconds):
+        return _Result()
+
+    monkeypatch.setattr("dnadesign.ops.cli.build_batch_plan", _fake_build_batch_plan)
+    monkeypatch.setattr("dnadesign.ops.cli.execute_batch_plan", _fake_execute_batch_plan)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "execute",
+            "--runbook",
+            str(runbook_path),
+            "--audit-json",
+            str(audit_path),
+            "--no-submit",
+            "--no-discover-active-jobs",
+            "--allow-missing-qstat",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert captured["allow_missing_qstat"] is True
 
 
 def test_cli_execute_rejects_audit_json_outside_workspace_ops_audit(tmp_path: Path) -> None:

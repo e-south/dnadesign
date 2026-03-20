@@ -224,6 +224,34 @@ def test_main_session_counts_emits_record(monkeypatch: pytest.MonkeyPatch, capsy
     assert "eqw_jobs=0" in captured.out
 
 
+def test_main_session_counts_can_degrade_explicitly_when_qstat_is_missing(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    monkeypatch.setattr(gates, "_load_session_counts", lambda: (_ for _ in ()).throw(RuntimeError("qstat unavailable")))
+
+    exit_code = main(["session-counts", "--allow-missing-qstat"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "queue_probe=degraded" in captured.out
+    assert "running_jobs=unknown" in captured.out
+    assert "queue probe degraded:" in captured.err
+
+
+def test_main_operator_brief_can_degrade_explicitly_when_qstat_is_missing(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    monkeypatch.setattr(gates, "_load_session_counts", lambda: (_ for _ in ()).throw(RuntimeError("qstat unavailable")))
+
+    exit_code = main(["operator-brief", "--planned-submits", "2", "--warn-over-running", "3", "--allow-missing-qstat"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "submit_gate=degraded" in captured.out
+    assert "queue_probe=degraded" in captured.out
+    assert "next_action=queue_probe_unavailable" in captured.out
+
+
 def test_main_ensure_dir_writable_creates_directory_and_emits_record(tmp_path: Path, capsys) -> None:
     target = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "runtime"
     exit_code = main(["ensure-dir-writable", "--path", str(target)])

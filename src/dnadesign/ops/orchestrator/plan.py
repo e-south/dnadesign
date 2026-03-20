@@ -125,6 +125,7 @@ def _preflight_commands(
     mode_decision: ModeDecision,
     planned_submits: int,
     requires_order: bool,
+    allow_missing_qstat: bool,
 ) -> list[CommandSpec]:
     stdout_dir = str(runbook.logging.stdout_dir)
     runtime_log_dir = str((runbook.workspace_root / WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR).resolve())
@@ -142,6 +143,8 @@ def _preflight_commands(
     ]
     if requires_order:
         shape_command_parts.append("--requires-order")
+    if allow_missing_qstat:
+        shape_command_parts.append("--allow-missing-qstat")
 
     shared = [
         _ops_gate_command(
@@ -186,7 +189,7 @@ def _preflight_commands(
             runtime_retention_manifest_path,
             "--json",
         ),
-        _ops_gate_command("session-counts"),
+        _ops_gate_command("session-counts", *(("--allow-missing-qstat",) if allow_missing_qstat else ())),
     ]
     if runbook.notify is not None:
         notify_template = str(runbook.notify.qsub_template)
@@ -222,6 +225,7 @@ def _preflight_commands(
             str(planned_submits),
             "--warn-over-running",
             "3",
+            *(("--allow-missing-qstat",) if allow_missing_qstat else ()),
         ),
     ]
 
@@ -352,6 +356,7 @@ def build_batch_plan(
     requested_smoke: SmokeMode | None,
     active_job_ids: Sequence[str],
     allow_fresh_reset: bool = False,
+    allow_missing_qstat: bool = False,
 ) -> BatchPlan:
     if runbook.notify is None and requested_smoke is not None:
         raise ValueError("notify smoke override is not valid when runbook.notify is absent")
@@ -388,6 +393,7 @@ def build_batch_plan(
             mode_decision=mode_decision,
             planned_submits=planned_submits,
             requires_order=requires_order,
+            allow_missing_qstat=allow_missing_qstat,
         ),
         notify_smoke_commands=_notify_smoke_commands(runbook, smoke_mode=selected_smoke),
         submit_commands=submit_commands,

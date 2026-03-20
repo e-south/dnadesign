@@ -1673,6 +1673,16 @@ def runbook_plan(
             help="Allow --mode fresh when resume artifacts already exist in the workspace.",
         ),
     ] = False,
+    allow_missing_qstat: Annotated[
+        bool,
+        typer.Option(
+            "--allow-missing-qstat/--no-allow-missing-qstat",
+            help=(
+                "Render preflight gate commands with explicit degraded queue-probe mode when `qstat` is unavailable. "
+                "Useful for workstation dry-run demos."
+            ),
+        ),
+    ] = False,
 ) -> None:
     if max_discovery_jobs <= 0:
         typer.echo("Runbook contract error: --max-discovery-jobs must be > 0", err=True)
@@ -1697,6 +1707,7 @@ def runbook_plan(
             requested_smoke=smoke,
             active_job_ids=resolved_active_job_ids,
             allow_fresh_reset=allow_fresh_reset,
+            allow_missing_qstat=allow_missing_qstat,
         )
     except ValueError as exc:
         typer.echo(f"Runbook contract error: {exc}", err=True)
@@ -1804,6 +1815,16 @@ def runbook_execute(
             help="Allow --mode fresh when resume artifacts already exist in the workspace.",
         ),
     ] = False,
+    allow_missing_qstat: Annotated[
+        bool,
+        typer.Option(
+            "--allow-missing-qstat/--no-allow-missing-qstat",
+            help=(
+                "Allow qstat-dependent preflight gates to emit explicit degraded advisory records instead of failing "
+                "when `qstat` is unavailable. Intended for workstation dry-run demos."
+            ),
+        ),
+    ] = False,
 ) -> None:
     if command_timeout_seconds is not None and command_timeout_seconds <= 0:
         typer.echo("Runbook contract error: --command-timeout-seconds must be > 0", err=True)
@@ -1839,6 +1860,7 @@ def runbook_execute(
             requested_smoke=smoke,
             active_job_ids=resolved_active_job_ids,
             allow_fresh_reset=allow_fresh_reset,
+            allow_missing_qstat=allow_missing_qstat,
         )
     except ValueError as exc:
         typer.echo(f"Runbook contract error: {exc}", err=True)

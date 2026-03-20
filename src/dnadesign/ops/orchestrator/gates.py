@@ -39,6 +39,13 @@ class SessionCounts:
     eqw_jobs: int
 
 
+@dataclass(frozen=True)
+class SessionCountsProbe:
+    counts: SessionCounts | None
+    queue_probe: Literal["ok", "degraded"]
+    probe_error: str | None = None
+
+
 def _validate_runbook_id(runbook_id: str) -> str:
     text = str(runbook_id).strip()
     if not text:
@@ -253,16 +260,45 @@ def build_operator_brief(
 
 def _load_session_counts() -> SessionCounts:
     user = os.environ.get("USER", "")
-    result = subprocess.run(
-        ["qstat", "-u", user],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["qstat", "-u", user],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"qstat unavailable: {exc}") from exc
     if result.returncode != 0:
         stderr = result.stderr.strip() or result.stdout.strip() or "qstat failed"
-        raise RuntimeError(stderr)
+        raise RuntimeError(f"qstat unavailable: {stderr}")
     return parse_qstat_output(result.stdout)
+
+
+def _load_session_counts_probe(*, allow_missing_qstat: bool) -> SessionCountsProbe:
+    try:
+        return SessionCountsProbe(counts=_load_session_counts(), queue_probe="ok")
+    except RuntimeError as exc:
+        if not allow_missing_qstat:
+            raise
+        return SessionCountsProbe(counts=None, queue_probe="degraded", probe_error=str(exc))
+
+
+def _unknown_queue_counts() -> dict[str, str]:
+    return {
+        "running_jobs": "unknown",
+        "queued_jobs": "unknown",
+        "eqw_jobs": "unknown",
+    }
+
+
+def _emit_degraded_queue_probe_warning(probe: SessionCountsProbe) -> None:
+    if probe.queue_probe != "degraded" or probe.probe_error is None:
+        return
+    print(
+        f"queue probe degraded: {probe.probe_error}. Continue only for dry-run/demo use; submit readiness is unknown.",
+        file=sys.stderr,
+    )
 
 
 def _format_record(record: dict[str, str]) -> str:
@@ -499,10 +535,20 @@ def main(argv: list[str] | None = None) -> int:
     shape_parser.add_argument("--planned-submits", type=_non_negative_int, required=True)
     shape_parser.add_argument("--warn-over-running", type=_positive_int, default=3)
     shape_parser.add_argument("--requires-order", action="store_true")
+    shape_parser.add_argument(
+        "--allow-missing-qstat",
+        action="store_true",
+        help="Emit an explicit degraded advisory record instead of failing when qstat is unavailable.",
+    )
 
     brief_parser = subparsers.add_parser("operator-brief", help="Emit submit gate readiness brief.")
     brief_parser.add_argument("--planned-submits", type=_non_negative_int, required=True)
     brief_parser.add_argument("--warn-over-running", type=_positive_int, default=3)
+    brief_parser.add_argument(
+        "--allow-missing-qstat",
+        action="store_true",
+        help="Emit an explicit degraded readiness record instead of failing when qstat is unavailable.",
+    )
 
     prune_parser = subparsers.add_parser(
         "prune-ops-logs",
@@ -528,9 +574,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     ensure_dir_parser.add_argument("--path", required=True, help="Directory path to create and validate.")
 
-    subparsers.add_parser(
+    session_counts_parser = subparsers.add_parser(
         "session-counts",
         help="Emit running/queued/Eqw qstat counts for the current user.",
+    )
+    session_counts_parser.add_argument(
+        "--allow-missing-qstat",
+        action="store_true",
+        help="Emit an explicit degraded queue-probe record instead of failing when qstat is unavailable.",
     )
 
     usr_overlay_parser = subparsers.add_parser(
@@ -649,23 +700,57 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "submit-shape-advisor":
-        counts = _load_session_counts()
-        advisor = build_shape_advisor(
-            counts=counts,
-            planned_submits=args.planned_submits,
-            warn_over_running=args.warn_over_running,
-            requires_order=bool(args.requires_order),
-        )
+        try:
+            probe = _load_session_counts_probe(allow_missing_qstat=bool(args.allow_missing_qstat))
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        if probe.queue_probe == "degraded":
+            _emit_degraded_queue_probe_warning(probe)
+            advisor = {
+                "advisor": "unknown",
+                "next_action": "queue_probe_unavailable",
+                "queue_policy": "queue_probe_unavailable",
+                "queue_probe": "degraded",
+                **_unknown_queue_counts(),
+            }
+        else:
+            assert probe.counts is not None
+            advisor = build_shape_advisor(
+                counts=probe.counts,
+                planned_submits=args.planned_submits,
+                warn_over_running=args.warn_over_running,
+                requires_order=bool(args.requires_order),
+            )
+            advisor["queue_probe"] = "ok"
         print(_format_record(advisor))
         return 0
 
     if args.command == "operator-brief":
-        counts = _load_session_counts()
-        brief, exit_code = build_operator_brief(
-            counts=counts,
-            planned_submits=args.planned_submits,
-            warn_over_running=args.warn_over_running,
-        )
+        try:
+            probe = _load_session_counts_probe(allow_missing_qstat=bool(args.allow_missing_qstat))
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        if probe.queue_probe == "degraded":
+            _emit_degraded_queue_probe_warning(probe)
+            brief = {
+                "submit_gate": "degraded",
+                "advisor": "unknown",
+                "next_action": "queue_probe_unavailable",
+                "queue_policy": "queue_probe_unavailable",
+                "queue_probe": "degraded",
+                **_unknown_queue_counts(),
+            }
+            exit_code = 0
+        else:
+            assert probe.counts is not None
+            brief, exit_code = build_operator_brief(
+                counts=probe.counts,
+                planned_submits=args.planned_submits,
+                warn_over_running=args.warn_over_running,
+            )
+            brief["queue_probe"] = "ok"
         print(_format_record(brief))
         return exit_code
 
@@ -715,13 +800,23 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "session-counts":
-        counts = _load_session_counts()
+        try:
+            probe = _load_session_counts_probe(allow_missing_qstat=bool(args.allow_missing_qstat))
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        if probe.queue_probe == "degraded":
+            _emit_degraded_queue_probe_warning(probe)
+            print(_format_record({"queue_probe": "degraded", **_unknown_queue_counts()}))
+            return 0
+        assert probe.counts is not None
         print(
             _format_record(
                 {
-                    "running_jobs": str(counts.running_jobs),
-                    "queued_jobs": str(counts.queued_jobs),
-                    "eqw_jobs": str(counts.eqw_jobs),
+                    "queue_probe": "ok",
+                    "running_jobs": str(probe.counts.running_jobs),
+                    "queued_jobs": str(probe.counts.queued_jobs),
+                    "eqw_jobs": str(probe.counts.eqw_jobs),
                 }
             )
         )

@@ -30,7 +30,13 @@ def _repo_root() -> Path:
     raise RuntimeError("repo root not found")
 
 
-def _write_ops_audit(path: Path, *, ok: bool) -> None:
+def _write_ops_audit(path: Path, *, ok: bool, queue_probe: str | None = None) -> None:
+    preflight_stdout = ""
+    preflight_stderr = ""
+    if queue_probe is not None:
+        preflight_stdout = f"queue_probe={queue_probe} running_jobs=unknown queued_jobs=unknown eqw_jobs=unknown"
+        if queue_probe == "degraded":
+            preflight_stderr = "queue probe degraded: qstat unavailable"
     payload = {
         "plan": {
             "workflow_id": "densegen_batch_submit",
@@ -42,7 +48,13 @@ def _write_ops_audit(path: Path, *, ok: bool) -> None:
             "ok": ok,
             "failed_phase": None if ok else "submit",
             "commands": [
-                {"phase": "preflight", "command": "echo preflight", "returncode": 0, "stdout": "", "stderr": ""},
+                {
+                    "phase": "preflight",
+                    "command": "uv run python -m dnadesign.ops.orchestrator.gates session-counts",
+                    "returncode": 0,
+                    "stdout": preflight_stdout,
+                    "stderr": preflight_stderr,
+                },
                 {
                     "phase": "submit",
                     "command": "echo submit",
@@ -342,6 +354,33 @@ def test_cli_progress_show_reports_missing_artifact_state_without_exiting() -> N
     assert payload["progress_kind"] == "ops-audit-json"
     assert payload["state"] == "missing"
     assert payload["summary"] == "audit artifact not found"
+
+
+def test_cli_progress_show_reports_attention_for_degraded_queue_probe() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        audit_path = Path("artifacts") / "latest.json"
+        _write_ops_audit(audit_path, ok=True, queue_probe="degraded")
+
+        result = runner.invoke(
+            app,
+            [
+                "progress",
+                "show",
+                "ops.control-plane.orchestration",
+                "--repo-root",
+                str(_repo_root()),
+                "--audit-json",
+                str(audit_path),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["state"] == "attention"
+        assert payload["summary"] == "latest orchestration audit passed with degraded queue probe"
+        assert payload["evidence"]["queue_probe"]["status"] == "degraded"
 
 
 def test_cli_progress_campaign_aggregates_explicit_steps() -> None:

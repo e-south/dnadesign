@@ -332,13 +332,15 @@ def _ops_audit_progress(audit_json: Path | None) -> tuple[str, str, dict[str, ob
     phase_counts = Counter(str(command.get("phase") or "unknown") for command in commands)
     ok = bool(execution.get("ok", False))
     failed_phase = execution.get("failed_phase")
-    summary = (
-        "latest orchestration audit passed"
-        if ok
-        else f"latest orchestration audit failed at {failed_phase or 'unknown'}"
-    )
+    queue_probe = _extract_queue_probe_evidence(commands)
+    if ok and queue_probe is not None and queue_probe["status"] == "degraded":
+        summary = "latest orchestration audit passed with degraded queue probe"
+    elif ok:
+        summary = "latest orchestration audit passed"
+    else:
+        summary = f"latest orchestration audit failed at {failed_phase or 'unknown'}"
     return (
-        "ok" if ok else "attention",
+        "attention" if (not ok or (queue_probe is not None and queue_probe["status"] == "degraded")) else "ok",
         summary,
         {
             "audit_json": str(resolved_audit),
@@ -350,8 +352,52 @@ def _ops_audit_progress(audit_json: Path | None) -> tuple[str, str, dict[str, ob
             "failed_phase": failed_phase,
             "command_count": len(commands),
             "phase_counts": dict(sorted(phase_counts.items())),
+            "queue_probe": queue_probe,
         },
     )
+
+
+def _extract_queue_probe_evidence(commands: list[object]) -> dict[str, object] | None:
+    queue_probe_commands: list[dict[str, object]] = []
+    status = "ok"
+    for command in commands:
+        if not isinstance(command, dict):
+            continue
+        fields = _parse_record_fields(command.get("stdout"))
+        queue_probe = fields.get("queue_probe")
+        if queue_probe is None:
+            continue
+        if queue_probe != "ok":
+            status = "degraded"
+        queue_probe_commands.append(
+            {
+                "phase": command.get("phase"),
+                "command": command.get("command"),
+                "queue_probe": queue_probe,
+                "next_action": fields.get("next_action"),
+                "submit_gate": fields.get("submit_gate"),
+                "advisor": fields.get("advisor"),
+                "stderr": str(command.get("stderr") or "").strip() or None,
+            }
+        )
+    if not queue_probe_commands:
+        return None
+    return {
+        "status": status,
+        "commands": queue_probe_commands,
+    }
+
+
+def _parse_record_fields(raw_text: object) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for line in str(raw_text or "").splitlines():
+        for token in line.split():
+            if "=" not in token:
+                continue
+            key, value = token.split("=", maxsplit=1)
+            if key:
+                fields[key] = value
+    return fields
 
 
 def _usr_sync_audit_progress(sync_audit_json: Path | None) -> tuple[str, str, dict[str, object]]:

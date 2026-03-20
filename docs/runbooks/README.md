@@ -99,6 +99,7 @@ steps:
 - Relative artifact paths in the manifest resolve from the manifest directory, not from the shell's current working directory.
 - `--related-to` expands the named procedure first, then typed related procedures in owner-local registry metadata relation order. Reorder the manifest explicitly when your campaign chronology differs.
 - The manifest is explicit by design. Ops does not infer hidden steps or invent owner-local progress semantics.
+- Smallest positive control-plane status demo: run `uv run ops runbook execute ... --no-submit --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json`. On workstations without `qstat`, add `--allow-missing-qstat` so the queue probe is explicit but non-fatal. Then pass the same audit path to `uv run ops progress show ops.control-plane.orchestration --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json`.
 
 ### Boundary reminders
 

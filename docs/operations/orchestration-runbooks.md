@@ -112,6 +112,7 @@ uv run ops runbook execute \
 ```
 
 Only workspace-scoped audit paths are accepted; `--audit-json` must stay under `<workspace-root>/outputs/logs/ops/audit/`.
+On workstations without `qstat`, add `--allow-missing-qstat` to keep the queue probe explicit but non-fatal for dry-run/demo use. The resulting audit remains readable, and `ops progress show ops.control-plane.orchestration` will report attention when queue readiness is degraded.
 
 Result expectations:
 

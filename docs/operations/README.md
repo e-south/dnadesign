@@ -87,6 +87,7 @@ Ops does not own construct-led source-of-truth accumulation or other USR-backed 
 1. Create or validate runbook shape with `uv run ops runbook init --workflow <workflow> ...`.
 2. Render deterministic commands with `uv run ops runbook plan --runbook <runbook.yaml> --repo-root <repo-root>`.
 3. Execute dry gates with `uv run ops runbook execute --runbook <runbook.yaml> --repo-root <repo-root> --audit-json <audit.json> --no-submit`.
+   On workstations without `qstat`, add `--allow-missing-qstat`; the queue probe remains explicit and the resulting audit will summarize as attention rather than hiding the degraded state.
 4. Review audit JSON fields (`execution.ok`, `execution.failed_phase`, ordered command records).
 5. Optionally summarize the latest runbook state with `uv run ops progress show ops.control-plane.orchestration --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json`.
 6. Submit only after dry gates remain green.
@@ -105,6 +106,7 @@ uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>
 ```
 
 - Keep runbooks workspace-scoped (for example `<workspace-root>/outputs/logs/ops/runbooks/<runbook-id>.yaml`).
+- The dry run above is the smallest positive control-plane status demo because it emits the audit JSON that `ops progress show ops.control-plane.orchestration` reads. On non-SCC workstations, add `--allow-missing-qstat` so queue readiness degrades explicitly instead of failing opaquely.
 - Keep `<project>` aligned with the scheduler account or project configured for the workspace or study.
 - Do not create transient operational working directories at repo root (`.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`); use `/scratch` for disposable state.
 - For manual chaining, `--active-job-id` accepts repeat flags or a comma-delimited list and normalizes before `-hold_jid` submit wiring.
