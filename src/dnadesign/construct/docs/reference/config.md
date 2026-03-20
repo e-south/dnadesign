@@ -1,4 +1,4 @@
-## construct config reference
+## Construct config reference
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-14

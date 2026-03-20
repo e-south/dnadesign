@@ -27,12 +27,12 @@ def test_cluster_readme_routes_back_to_root_docs_and_usr_feature_matrix_flow() -
 
     assert "## Documentation" in readme
     assert "docs/README.md" in readme
-    assert "docs/index.md" in readme
     assert "docs/workflows/exploratory-clustering.md" in readme
     assert "docs/reference/cli-contracts.md" in readme
     assert "docs/reference/verification.md" in readme
     assert "docs/concepts/semantic-surface.md" in readme
     assert "../../../docs/README.md" in readme
+    assert "Cluster is the exploratory downstream surface" in readme
     assert "## Ownership boundary" not in readme
     assert "## Start here" not in readme
     assert "## Task routes" not in readme
@@ -52,8 +52,8 @@ def test_cluster_docs_tree_exposes_workflow_reference_and_concept_surfaces() -> 
     semantic = (repo_root / "src/dnadesign/cluster/docs/concepts/semantic-surface.md").read_text(encoding="utf-8")
 
     assert "### Start here" in workflow_index
-    assert "### Documentation by workflow" in workflow_index
-    assert "### Documentation by type" in workflow_index
+    assert "### Route map" in workflow_index
+    assert "### Adjacent handoffs" in workflow_index
     assert "workflows/exploratory-clustering.md" in workflow_index
     assert "reference/cli-contracts.md" in workflow_index
     assert "reference/verification.md" in workflow_index
@@ -61,15 +61,12 @@ def test_cluster_docs_tree_exposes_workflow_reference_and_concept_surfaces() -> 
     assert "concepts/ownership-boundary.md" in workflow_index
     assert "concepts/semantic-surface.md" in workflow_index
     assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" in workflow_index
+    assert "../../infer/docs/README.md" in workflow_index
     assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" in workflow_index
 
-    assert "### Read order" in by_type
-    assert "### Documentation by type" in by_type
-    assert "workflows/exploratory-clustering.md" in by_type
-    assert "reference/cli-contracts.md" in by_type
-    assert "reference/verification.md" in by_type
-    assert "concepts/ownership-boundary.md" in by_type
-    assert "concepts/semantic-surface.md" in by_type
+    assert "unified [Cluster docs](README.md) index" in by_type
+    assert "Open the Cluster docs index" in by_type
+    assert "exploratory clustering workflow" in by_type
 
     assert "### Preconditions" in workflow
     assert "**Type:** workflow" in workflow

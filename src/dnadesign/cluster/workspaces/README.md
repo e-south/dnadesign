@@ -1,4 +1,4 @@
-## cluster workspaces
+## Cluster workspaces
 
 `cluster` workspaces are the canonical local operating surface for reusable runs.
 Each workspace owns one `config.yaml`, its local inputs, and its generated outputs under `outputs/cluster/`.

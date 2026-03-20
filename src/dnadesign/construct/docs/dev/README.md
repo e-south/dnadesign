@@ -1,9 +1,9 @@
-## construct developer notes
+## Construct developer notes
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-14
 
-Use this area for construct implementation notes, evolution records, and future design follow-ups.
+Use this area for Construct implementation notes, evolution records, and future design follow-ups.
 
 ### Current records
 

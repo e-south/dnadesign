@@ -42,33 +42,27 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     multi_source_token = "../../usr/docs/operations/multi-source-source-of-truth-assembly.md"
     feature_matrix_token = "../../usr/docs/operations/promoter-characterization-feature-matrix.md"
     assert token in readme
-    assert token in index_doc
     assert multi_source_token in readme
-    assert multi_source_token in index_doc
     assert feature_matrix_token in readme
-    assert feature_matrix_token in index_doc
     assert "## Documentation" in top_readme
     assert "docs/README.md" in top_readme
-    assert "docs/index.md" in top_readme
     assert "docs/getting-started.md" in top_readme
     assert "workspaces/README.md" in top_readme
     assert "docs/reference/template-contexts.md" in top_readme
     assert "../../../docs/README.md" in top_readme
     assert "## Start here" not in top_readme
     assert "## Boundary reminder" not in top_readme
+    assert "Construct takes focal DNA parts" in top_readme
     assert "reference/template-contexts.md" in readme
-    assert "reference/template-contexts.md" in index_doc
     assert "template-contexts.md" in config_doc
     assert "../../../usr/docs/operations/construct-infer-source-of-truth-runbook.md" in outputs
     assert "construct__anchor_start" in outputs
     assert "construct__anchor_start" in template_contexts
-    assert "### Primary entrypoints" in readme
+    assert "### Reference map" in readme
     assert "### Boundary reminders" in readme
     assert "demo_promoter_swap_pdual10_source_of_truth" in readme
-    assert "demo_promoter_swap_pdual10_source_of_truth" in index_doc
     assert "demo_promoter_swap_pdual10_source_of_truth" in workspaces
     assert "downstream consumers" in source_of_truth_workspace
     assert "promoter-characterization-feature-matrix.md" in source_of_truth_workspace
-    assert "### Construct-local starts" in index_doc
-    assert "### Shared cross-tool handoff routes" in index_doc
-    assert index_doc.index("### Construct-local starts") < index_doc.index("### Shared cross-tool handoff routes")
+    assert "unified [Construct docs](README.md) index" in index_doc
+    assert "Open the Construct docs index" in index_doc

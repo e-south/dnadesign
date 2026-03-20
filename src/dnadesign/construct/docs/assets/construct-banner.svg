@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="420" viewBox="0 0 1600 420" role="img" aria-labelledby="title desc">
-  <title id="title">construct banner</title>
-  <desc id="desc">construct title banner with subtitle and template-placement iconography.</desc>
+  <title id="title">Construct banner</title>
+  <desc id="desc">Construct title banner with subtitle and template-placement iconography.</desc>
   <defs>
     <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
       <stop offset="0%" stop-color="#0f172a"/>
@@ -11,7 +11,7 @@
   <circle cx="1324" cy="78" r="170" fill="#99f6e4" opacity="0.09"/>
   <circle cx="1464" cy="320" r="128" fill="#5eead4" opacity="0.1"/>
   <g fill="#f8fafc" font-family="'Helvetica Neue', Arial, sans-serif">
-    <text x="84" y="150" font-size="66" font-weight="700">construct</text>
+    <text x="84" y="150" font-size="66" font-weight="700">Construct</text>
     <text x="84" y="214" font-size="30" opacity="0.95">Place DNA parts into larger sequence contexts</text>
   </g>
   <g transform="translate(1016 74)">

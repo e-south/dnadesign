@@ -1,4 +1,4 @@
-## construct outputs reference
+## Construct outputs reference
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-15

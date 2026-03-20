@@ -1,4 +1,4 @@
-## cluster CLI contracts
+## Cluster CLI contracts
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-16

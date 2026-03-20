@@ -1,4 +1,4 @@
-## construct seed/import manifest reference
+## Construct seed/import manifest reference
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-14

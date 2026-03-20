@@ -1,4 +1,4 @@
-## construct workspaces
+## Construct workspaces
 
 Use this directory for packaged construct workspace templates and examples. New workspaces default to the current working directory unless `--root` or `CONSTRUCT_WORKSPACE_ROOT` is set.
 

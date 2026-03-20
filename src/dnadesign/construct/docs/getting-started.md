@@ -1,9 +1,9 @@
-## construct getting started
+## Construct getting started
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-15
 
-This page gets you from zero to a validated construct run with the fewest moving parts.
+This page gets you from zero to a validated Construct run with the fewest moving parts.
 
 ### Path 1: packaged isolated demo
 
@@ -51,8 +51,7 @@ The blank scaffold now writes explicit workspace-local `root: outputs/usr_datase
 
 ### Continue reading
 
-- [Docs overview](README.md)
-- [Docs index](index.md)
+- [Construct docs](README.md)
 - [Workspaces guide](../workspaces/README.md)
 - [Construct -> USR -> Infer source-of-truth runbook](../../usr/docs/operations/construct-infer-source-of-truth-runbook.md)
 - [Config reference](reference/config.md)

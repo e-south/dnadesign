@@ -1,4 +1,4 @@
-## construct workspace registry reference
+## Construct workspace registry reference
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-14

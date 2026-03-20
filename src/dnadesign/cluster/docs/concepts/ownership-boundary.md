@@ -1,4 +1,4 @@
-## cluster ownership boundary
+## Cluster ownership boundary
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-16

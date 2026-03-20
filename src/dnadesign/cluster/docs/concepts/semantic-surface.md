@@ -1,4 +1,4 @@
-## cluster semantic surface
+## Cluster semantic surface
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-16
