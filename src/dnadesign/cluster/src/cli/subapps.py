@@ -22,6 +22,7 @@ from ..workspaces import (
     WorkspaceConfigError,
     builtin_workspaces_dir,
     init_workspace,
+    list_builtin_workspace_inventory,
     list_builtin_workspaces,
     load_workspace_config,
 )
@@ -128,10 +129,33 @@ def build_workspaces_app(*, console: Console) -> typer.Typer:
             )
         )
 
-    @workspaces_app.command("list")
-    def workspaces_list() -> None:
-        for workspace_id in list_builtin_workspaces():
-            typer.echo(workspace_id)
+    @workspaces_app.command("list", help="List packaged workspaces and workspace-local output state.")
+    def workspaces_list(
+        fmt: str = typer.Option("text", "--format", help="Output format: text, json, or ids."),
+    ) -> None:
+        inventory = list_builtin_workspace_inventory()
+        fmt_norm = str(fmt).strip().lower()
+        if fmt_norm == "json":
+            typer.echo(json.dumps(inventory, separators=(",", ":")))
+            return
+        if fmt_norm == "ids":
+            for workspace_id in list_builtin_workspaces():
+                typer.echo(workspace_id)
+            return
+        if fmt_norm != "text":
+            raise typer.BadParameter("format must be one of: text, json, ids.")
+        for entry in inventory:
+            typer.echo(
+                "\t".join(
+                    [
+                        str(entry["workspace_id"]),
+                        f"workspace_state={entry['workspace_state']}",
+                        f"output_files={entry['output_files']}",
+                        f"latest_output_mtime={entry['latest_output_mtime'] or '-'}",
+                        f"workspace_dir={entry['workspace_dir']}",
+                    ]
+                )
+            )
 
     @workspaces_app.command("show")
     def workspaces_show(workspace: str) -> None:

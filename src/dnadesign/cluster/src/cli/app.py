@@ -40,6 +40,7 @@ def _global_opts(
 
 register_all(app, console=console)
 app.add_typer(build_runs_app(console=console), name="runs")
+app.add_typer(build_workspaces_app(console=console), name="workspace")
 app.add_typer(build_workspaces_app(console=console), name="workspaces")
 app.add_typer(build_presets_app(console=console), name="presets")
 

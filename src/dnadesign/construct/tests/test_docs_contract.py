@@ -58,10 +58,11 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     assert "../../../usr/docs/operations/construct-infer-source-of-truth-runbook.md" in outputs
     assert "construct__anchor_start" in outputs
     assert "construct__anchor_start" in template_contexts
-    assert "### Reference map" in readme
+    assert "### Key docs" in readme
     assert "### Boundary reminders" in readme
     assert "demo_promoter_swap_pdual10_source_of_truth" in readme
     assert "demo_promoter_swap_pdual10_source_of_truth" in workspaces
+    assert "uv run construct workspace list" in workspaces
     assert "downstream consumers" in source_of_truth_workspace
     assert "promoter-characterization-feature-matrix.md" in source_of_truth_workspace
     assert "unified [Construct docs](README.md) index" in index_doc

@@ -2,6 +2,8 @@
 
 `cluster` workspaces are the canonical local operating surface for reusable runs.
 Each workspace owns one `config.yaml`, its local inputs, and its generated outputs under `outputs/cluster/`.
+List the packaged workspaces and their current output state with `uv run cluster workspace list`.
+The singular `workspace` form matches the other workspace-owning tools. `uv run cluster workspaces ...` still works.
 
 Expected layout:
 
@@ -24,10 +26,12 @@ Workspace contract:
 Typical lifecycle:
 
 ```bash
+# Inspect the packaged cluster workspaces and their current output state.
+uv run cluster workspace list
 # Show the active built-in workspace root.
-uv run cluster workspaces where
+uv run cluster workspace where
 # Scaffold a new workspace under an explicit writable root.
-uv run cluster workspaces init --id my_run --root /tmp
+uv run cluster workspace init --id my_run --root /tmp
 # Fit one clustering run from the checked-in demo workspace.
 uv run cluster fit --workspace promoter_clusters_v1
 # Render UMAP artifacts for that fitted workspace run.

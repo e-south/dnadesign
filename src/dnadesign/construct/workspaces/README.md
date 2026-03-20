@@ -2,6 +2,8 @@
 
 Use this directory for packaged construct workspace templates and examples. New workspaces default to the current working directory unless `--root` or `CONSTRUCT_WORKSPACE_ROOT` is set.
 
+List the packaged workspaces and their current output state with `uv run construct workspace list`.
+
 ### Start with one of two paths
 
 - [Packaged demo](demo_promoter_swap_pdual10/README.md): curated pDual-10 promoter-swap tracer bullet with both 1 kb window and full-plasmid configs.
@@ -11,6 +13,9 @@ Use this directory for packaged construct workspace templates and examples. New 
 ### Quick start
 
 ```bash
+# Inspect the packaged construct workspaces before copying one.
+uv run construct workspace list
+
 # Blank workspace for a custom construct study.
 uv run construct workspace init --id demo_construct # Create a blank construct workspace scaffold.
 uv run construct workspace show --workspace demo_construct # Review workspace registry/config paths.

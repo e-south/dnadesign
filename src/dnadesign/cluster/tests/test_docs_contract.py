@@ -27,6 +27,7 @@ def test_cluster_readme_routes_back_to_root_docs_and_usr_feature_matrix_flow() -
 
     assert "## Documentation" in readme
     assert "docs/README.md" in readme
+    assert "workspaces/README.md" in readme
     assert "docs/workflows/exploratory-clustering.md" in readme
     assert "docs/reference/cli-contracts.md" in readme
     assert "docs/reference/verification.md" in readme
@@ -122,6 +123,10 @@ def test_cluster_docs_tree_exposes_workflow_reference_and_concept_surfaces() -> 
     assert "method signature" in reference
     assert "including any OPAL join inputs" in reference
     assert "immutable run slug" in reference or "immutable run" in reference
+
+    workspaces = (repo_root / "src/dnadesign/cluster/workspaces/README.md").read_text(encoding="utf-8")
+    assert "uv run cluster workspace list" in workspaces
+    assert "uv run cluster workspaces ..." in workspaces
 
     assert "### What cluster owns" in concept
     assert "### What cluster does not own" in concept

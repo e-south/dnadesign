@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -153,3 +154,27 @@ def test_workspace_init_defaults_to_cwd_workspaces_without_repo_root(monkeypatch
     assert result.exit_code == 0, result.stdout
     assert workspace_dir.is_dir()
     assert (workspace_dir / "config.yaml").is_file()
+
+
+def test_workspace_list_json_reports_packaged_workspace_state(monkeypatch, tmp_path: Path) -> None:
+    infer_root = tmp_path / "infer_root"
+    workspaces_root = infer_root / "workspaces"
+    for workspace_id in ("demo_usr_pressure", "evo2_feature_bundle_smoke"):
+        (workspaces_root / workspace_id).mkdir(parents=True, exist_ok=True)
+        (workspaces_root / workspace_id / "config.yaml").write_text("ingest:\n  source: records\n", encoding="utf-8")
+    (workspaces_root / "evo2_feature_bundle_smoke" / "outputs" / "logs").mkdir(parents=True, exist_ok=True)
+    (workspaces_root / "evo2_feature_bundle_smoke" / "outputs" / "logs" / "run.log").write_text(
+        "ok\n", encoding="utf-8"
+    )
+    monkeypatch.setattr("dnadesign.infer.src.workspace._infer_root", lambda: infer_root)
+
+    result = _RUNNER.invoke(app, ["workspace", "list", "--format", "json"])
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    by_id = {entry["workspace_id"]: entry for entry in payload}
+    assert by_id["demo_usr_pressure"]["workspace_state"] == "clean"
+    assert by_id["demo_usr_pressure"]["output_files"] == 0
+    assert by_id["evo2_feature_bundle_smoke"]["workspace_state"] == "attention"
+    assert by_id["evo2_feature_bundle_smoke"]["output_files"] == 1
+    assert by_id["evo2_feature_bundle_smoke"]["latest_output_mtime"] is not None

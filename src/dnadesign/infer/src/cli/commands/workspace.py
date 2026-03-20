@@ -11,12 +11,18 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Optional
 
 import typer
 
-from ...workspace import init_workspace, resolve_workspace_root, resolve_workspace_template
+from ...workspace import (
+    init_workspace,
+    list_packaged_workspace_inventory,
+    resolve_workspace_root,
+    resolve_workspace_template,
+)
 from ..common import raise_cli_error
 
 
@@ -38,6 +44,37 @@ def register(app: typer.Typer) -> None:
             typer.echo(f"workspace_template: {template_path}")
         except Exception as error:
             raise_cli_error(error)
+
+    @workspace_app.command("list", help="List packaged workspaces and workspace-local output state.")
+    def workspace_list(
+        fmt: str = typer.Option("text", "--format", help="Output format: text, json, or ids."),
+    ) -> None:
+        try:
+            inventory = list_packaged_workspace_inventory()
+        except Exception as error:
+            raise_cli_error(error)
+        fmt_norm = str(fmt).strip().lower()
+        if fmt_norm == "json":
+            typer.echo(json.dumps(inventory, separators=(",", ":")))
+            return
+        if fmt_norm == "ids":
+            for entry in inventory:
+                typer.echo(str(entry["workspace_id"]))
+            return
+        if fmt_norm != "text":
+            raise_cli_error(ValueError("format must be one of: text, json, ids."))
+        for entry in inventory:
+            typer.echo(
+                "\t".join(
+                    [
+                        str(entry["workspace_id"]),
+                        f"workspace_state={entry['workspace_state']}",
+                        f"output_files={entry['output_files']}",
+                        f"latest_output_mtime={entry['latest_output_mtime'] or '-'}",
+                        f"workspace_dir={entry['workspace_dir']}",
+                    ]
+                )
+            )
 
     @workspace_app.command("init", help="Create a workspace with config.yaml and infer output folders.")
     def workspace_init(

@@ -2,9 +2,12 @@
 
 Infer ships packaged workspace templates and public smoke inputs here. New workspaces created with `infer workspace init` default to `./workspaces/<id>` in the current working directory so the scaffold works both inside and outside a source checkout.
 
+List the packaged workspaces and their current output state with `uv run infer workspace list`.
+
 ### Quick start
 
 ```bash
+uv run infer workspace list # Inspect packaged infer workspaces before choosing one.
 uv run infer workspace init --id demo_local_workspace # Create a default infer workspace scaffold under ./workspaces/.
 ```
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import shutil
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -273,6 +274,49 @@ def workspace_template_with_source(profile: str) -> tuple[Path | None, str]:
     if not resolved_path.exists() or not resolved_path.is_dir():
         raise ConfigError(f"packaged workspace template not found: {resolved_path}")
     return resolved_path, "package-profile"
+
+
+def _workspace_inventory_entry(*, workspace_dir: Path) -> dict[str, object]:
+    outputs_dir = workspace_dir / "outputs"
+    output_files = 0
+    latest_output_timestamp: float | None = None
+    if outputs_dir.exists():
+        for candidate in outputs_dir.rglob("*"):
+            if not candidate.is_file():
+                continue
+            output_files += 1
+            try:
+                stat_result = candidate.stat()
+            except OSError:
+                continue
+            if latest_output_timestamp is None or stat_result.st_mtime > latest_output_timestamp:
+                latest_output_timestamp = stat_result.st_mtime
+    latest_output_mtime = (
+        datetime.fromtimestamp(latest_output_timestamp).astimezone().isoformat(timespec="seconds")
+        if latest_output_timestamp is not None
+        else None
+    )
+    return {
+        "workspace_id": workspace_dir.name,
+        "workspace_dir": str(workspace_dir.resolve()),
+        "workspace_state": "attention" if output_files else "clean",
+        "output_files": output_files,
+        "latest_output_mtime": latest_output_mtime,
+    }
+
+
+def list_packaged_workspace_inventory() -> list[dict[str, object]]:
+    root = (_construct_root() / "workspaces").resolve()
+    if not root.exists():
+        return []
+    inventory: list[dict[str, object]] = []
+    for workspace_dir in sorted(root.iterdir()):
+        if not workspace_dir.is_dir():
+            continue
+        if not (workspace_dir / _WORKSPACE_REGISTRY_NAME).is_file():
+            continue
+        inventory.append(_workspace_inventory_entry(workspace_dir=workspace_dir))
+    return inventory
 
 
 def workspace_registry_path(workspace: str | Path) -> Path:

@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
 
@@ -85,10 +86,50 @@ def resolve_workspace_dir(workspace: str | Path) -> Path:
 
 
 def list_builtin_workspaces() -> list[str]:
+    return [str(entry["workspace_id"]) for entry in list_builtin_workspace_inventory()]
+
+
+def _workspace_inventory_entry(*, workspace_dir: Path) -> dict[str, object]:
+    outputs_dir = workspace_dir / "outputs"
+    output_files = 0
+    latest_output_timestamp: float | None = None
+    if outputs_dir.exists():
+        for candidate in outputs_dir.rglob("*"):
+            if not candidate.is_file():
+                continue
+            output_files += 1
+            try:
+                stat_result = candidate.stat()
+            except OSError:
+                continue
+            if latest_output_timestamp is None or stat_result.st_mtime > latest_output_timestamp:
+                latest_output_timestamp = stat_result.st_mtime
+    latest_output_mtime = (
+        datetime.fromtimestamp(latest_output_timestamp).astimezone().isoformat(timespec="seconds")
+        if latest_output_timestamp is not None
+        else None
+    )
+    return {
+        "workspace_id": workspace_dir.name,
+        "workspace_dir": str(workspace_dir.resolve()),
+        "workspace_state": "attention" if output_files else "clean",
+        "output_files": output_files,
+        "latest_output_mtime": latest_output_mtime,
+    }
+
+
+def list_builtin_workspace_inventory() -> list[dict[str, object]]:
     root = builtin_workspaces_dir()
     if not root.exists():
         return []
-    return sorted(path.name for path in root.iterdir() if path.is_dir() and (path / "config.yaml").is_file())
+    inventory: list[dict[str, object]] = []
+    for path in sorted(root.iterdir()):
+        if not path.is_dir():
+            continue
+        if not (path / "config.yaml").is_file():
+            continue
+        inventory.append(_workspace_inventory_entry(workspace_dir=path))
+    return inventory
 
 
 def init_workspace(*, workspace_id: str, root: str | Path | None = None) -> Path:
@@ -109,6 +150,7 @@ def init_workspace(*, workspace_id: str, root: str | Path | None = None) -> Path
 __all__ = [
     "builtin_workspaces_dir",
     "init_workspace",
+    "list_builtin_workspace_inventory",
     "list_builtin_workspaces",
     "render_workspace_template",
     "resolve_workspace_dir",

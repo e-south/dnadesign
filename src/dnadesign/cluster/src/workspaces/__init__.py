@@ -15,6 +15,7 @@ from .loader import load_workspace_config
 from .paths import (
     builtin_workspaces_dir,
     init_workspace,
+    list_builtin_workspace_inventory,
     list_builtin_workspaces,
     render_workspace_template,
     validate_workspace_id,
@@ -25,6 +26,7 @@ __all__ = [
     "WorkspaceConfigError",
     "builtin_workspaces_dir",
     "init_workspace",
+    "list_builtin_workspace_inventory",
     "list_builtin_workspaces",
     "load_workspace_config",
     "render_workspace_template",

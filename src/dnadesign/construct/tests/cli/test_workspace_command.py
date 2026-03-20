@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 import shlex
 from pathlib import Path
 
@@ -258,6 +259,38 @@ def test_workspace_show_reports_registry_summary(tmp_path: Path) -> None:
     assert "shared_usr_root: src/dnadesign/usr/datasets (repo-relative hint)" in output
     assert "workspace_usr_root: outputs/usr_datasets (workspace-relative default)" in output
     assert "project: id=slot_a_window" in output
+
+
+def test_workspace_list_json_reports_packaged_workspace_state(monkeypatch, tmp_path: Path) -> None:
+    construct_root = tmp_path / "construct_root"
+    workspaces_root = construct_root / "workspaces"
+    for workspace_id in ("demo_promoter_swap_pdual10", "demo_promoter_swap_pdual10_source_of_truth"):
+        workspace_dir = workspaces_root / workspace_id
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+        (workspace_dir / "construct.workspace.yaml").write_text(
+            "workspace:\n  id: demo\n  profile: demo\n  projects: []\n",
+            encoding="utf-8",
+        )
+    (workspaces_root / "demo_promoter_swap_pdual10_source_of_truth" / "outputs" / "logs").mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    (workspaces_root / "demo_promoter_swap_pdual10_source_of_truth" / "outputs" / "logs" / "run.log").write_text(
+        "ok\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("dnadesign.construct.src.workspace._construct_root", lambda: construct_root)
+
+    result = _RUNNER.invoke(app, ["workspace", "list", "--format", "json"])
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    by_id = {entry["workspace_id"]: entry for entry in payload}
+    assert by_id["demo_promoter_swap_pdual10"]["workspace_state"] == "clean"
+    assert by_id["demo_promoter_swap_pdual10"]["output_files"] == 0
+    assert by_id["demo_promoter_swap_pdual10_source_of_truth"]["workspace_state"] == "attention"
+    assert by_id["demo_promoter_swap_pdual10_source_of_truth"]["output_files"] == 1
+    assert by_id["demo_promoter_swap_pdual10_source_of_truth"]["latest_output_mtime"] is not None
 
 
 def test_workspace_doctor_reports_ok_for_packaged_demo(tmp_path: Path) -> None:

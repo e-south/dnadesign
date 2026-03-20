@@ -2,6 +2,8 @@
 
 This directory contains packaged workspace templates and local run directories created with `dense workspace init`.
 
+List the packaged workspaces and their current output state with `uv run dense workspace list`.
+
 ### Choose a packaged workspace
 - [`demo_tfbs_baseline`](demo_tfbs_baseline/README.md): smallest local baseline without PWM mining.
 - [`demo_sampling_baseline`](demo_sampling_baseline/README.md): PWM sampling baseline with ethanol/ciprofloxacin plans.
@@ -24,6 +26,7 @@ Runbook mode is explicit: `fresh|resume|analysis`. Wrappers default to `fresh` a
 - Use `runbook.sh` when you want the test-backed default sequence from `runbook.md`.
 - Use direct `dense` CLI commands when you need partial flows (`run`, `inspect`, `plot`, `notebook`) or custom resume/extend behavior.
 - Use `dense workspace init --output-mode local|usr|both` when you need a separate run root with explicit output placement.
+- Use `dense workspace list --format json` when you need a machine-readable inventory with output-file counts and latest output timestamps.
 
 ### Directory policy
 - `demo_*`: small baseline templates used for onboarding and checks.

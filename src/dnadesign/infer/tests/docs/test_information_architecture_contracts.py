@@ -160,6 +160,11 @@ def test_infer_pressure_test_tutorial_covers_local_and_ops_paths() -> None:
     assert "uv run usr --root" in tutorial
 
 
+def test_infer_workspaces_readme_mentions_workspace_inventory_command() -> None:
+    workspaces = _read("src/dnadesign/infer/workspaces/README.md")
+    assert "uv run infer workspace list" in workspaces
+
+
 def test_infer_docs_excluding_journal_avoid_legacy_flat_module_paths() -> None:
     docs_root = _repo_root() / "src" / "dnadesign" / "infer" / "docs"
     legacy_tokens = [

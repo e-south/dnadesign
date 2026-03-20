@@ -23,6 +23,7 @@ import yaml
 
 from ..config import LATEST_SCHEMA_VERSION, resolve_relative_path
 from .context import CliContext
+from .workspace_sources import list_packaged_workspace_inventory
 
 
 def _repo_root_from(start: Path) -> Path | None:
@@ -163,6 +164,43 @@ def register_workspace_commands(
         console.print(f"workspace_root_source: {payload['workspace_root_source']}")
         console.print(f"workspace_source_root: {payload['workspace_source_root']}")
         console.print("Tip: set DENSEGEN_WORKSPACE_ROOT to choose a custom workspace root directory.")
+
+    @app.command("list", help="List packaged workspaces and workspace-local output state.")
+    def workspace_list(
+        fmt: str = typer.Option(
+            "text",
+            "--format",
+            help="Output format: text, json, or ids.",
+        ),
+    ) -> None:
+        try:
+            inventory = list_packaged_workspace_inventory()
+        except RuntimeError as exc:
+            console.print(f"[bold red]{exc}[/]")
+            raise typer.Exit(code=1) from exc
+        fmt_norm = str(fmt).strip().lower()
+        if fmt_norm == "json":
+            typer.echo(json.dumps(inventory, separators=(",", ":")))
+            return
+        if fmt_norm == "ids":
+            for entry in inventory:
+                typer.echo(str(entry["workspace_id"]))
+            return
+        if fmt_norm != "text":
+            console.print("[bold red]format must be one of: text, json, ids.[/]")
+            raise typer.Exit(code=1)
+        for entry in inventory:
+            typer.echo(
+                "\t".join(
+                    [
+                        str(entry["workspace_id"]),
+                        f"workspace_state={entry['workspace_state']}",
+                        f"output_files={entry['output_files']}",
+                        f"latest_output_mtime={entry['latest_output_mtime'] or '-'}",
+                        f"workspace_dir={entry['workspace_dir']}",
+                    ]
+                )
+            )
 
     @app.command(
         "init",

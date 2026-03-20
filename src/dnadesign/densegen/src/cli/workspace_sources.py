@@ -13,6 +13,7 @@ Dunlop Lab
 from __future__ import annotations
 
 import contextlib
+from datetime import datetime
 from importlib import resources
 from pathlib import Path
 from typing import Callable, Iterator, Optional
@@ -28,17 +29,50 @@ PACKAGED_WORKSPACE_IDS: tuple[str, ...] = (
 
 
 def list_packaged_workspace_ids() -> list[str]:
+    return [str(entry["workspace_id"]) for entry in list_packaged_workspace_inventory()]
+
+
+def _workspace_inventory_entry(*, workspace_id: str, workspace_dir: Path) -> dict[str, object]:
+    outputs_dir = workspace_dir / "outputs"
+    output_files = 0
+    latest_output_timestamp: float | None = None
+    if outputs_dir.exists():
+        for candidate in outputs_dir.rglob("*"):
+            if not candidate.is_file():
+                continue
+            output_files += 1
+            try:
+                stat_result = candidate.stat()
+            except OSError:
+                continue
+            if latest_output_timestamp is None or stat_result.st_mtime > latest_output_timestamp:
+                latest_output_timestamp = stat_result.st_mtime
+    latest_output_mtime = (
+        datetime.fromtimestamp(latest_output_timestamp).astimezone().isoformat(timespec="seconds")
+        if latest_output_timestamp is not None
+        else None
+    )
+    return {
+        "workspace_id": workspace_id,
+        "workspace_dir": str(workspace_dir.resolve()),
+        "workspace_state": "attention" if output_files else "clean",
+        "output_files": output_files,
+        "latest_output_mtime": latest_output_mtime,
+    }
+
+
+def list_packaged_workspace_inventory() -> list[dict[str, object]]:
     package_root = resources.files("dnadesign.densegen")
     workspaces_dir = package_root.joinpath("workspaces")
     with resources.as_file(workspaces_dir) as resolved_root:
         missing: list[str] = []
-        available: list[str] = []
+        available: list[dict[str, object]] = []
         for workspace_id in PACKAGED_WORKSPACE_IDS:
             cfg_path = Path(resolved_root) / workspace_id / "config.yaml"
             if not cfg_path.is_file():
                 missing.append(str(workspace_id))
                 continue
-            available.append(str(workspace_id))
+            available.append(_workspace_inventory_entry(workspace_id=str(workspace_id), workspace_dir=cfg_path.parent))
     if missing:
         raise RuntimeError("Packaged workspaces are missing config.yaml: " + ", ".join(missing))
     return available

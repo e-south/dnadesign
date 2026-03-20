@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 import shlex
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from ...runtime import preflight_from_config, run_from_config
 from ...workspace import (
     doctor_workspace_registry,
     init_workspace,
+    list_packaged_workspace_inventory,
     load_workspace_registry,
     project_root_or_none,
     resolve_workspace_project,
@@ -70,6 +72,35 @@ def where(
     typer.echo(f"workspace_template_source: {template_source}")
     if template_path is not None:
         typer.echo(f"workspace_template: {template_path}")
+
+
+@workspace_app.command("list", help="List packaged workspaces and workspace-local output state.")
+def list_workspaces(
+    fmt: str = typer.Option("text", "--format", help="Output format: text, json, or ids."),
+) -> None:
+    inventory = list_packaged_workspace_inventory()
+    fmt_norm = str(fmt).strip().lower()
+    if fmt_norm == "json":
+        typer.echo(json.dumps(inventory, separators=(",", ":")))
+        return
+    if fmt_norm == "ids":
+        for entry in inventory:
+            typer.echo(str(entry["workspace_id"]))
+        return
+    if fmt_norm != "text":
+        exit_with_error(ConstructError("format must be one of: text, json, ids."), code=2)
+    for entry in inventory:
+        typer.echo(
+            "\t".join(
+                [
+                    str(entry["workspace_id"]),
+                    f"workspace_state={entry['workspace_state']}",
+                    f"output_files={entry['output_files']}",
+                    f"latest_output_mtime={entry['latest_output_mtime'] or '-'}",
+                    f"workspace_dir={entry['workspace_dir']}",
+                ]
+            )
+        )
 
 
 @workspace_app.command("init")
