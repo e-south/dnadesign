@@ -820,6 +820,41 @@ job-ID prior name user state submit/start at queue slots ja-task-ID
     assert discovered == ("81001", "81002")
 
 
+def test_discover_active_job_ids_scans_full_qstat_listing_before_capping_matches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    assert runbook.densegen is not None
+    qstat_lines = [
+        "job-ID prior name user state submit/start at queue slots ja-task-ID",
+        "--------------------------------------------------------------------------------",
+    ]
+    job_details = {str(81000 + idx): "env_list: DENSEGEN_CONFIG=/tmp/other/config.yaml" for idx in range(1, 27)}
+    job_details["81025"] = f"env_list: DENSEGEN_CONFIG={runbook.densegen.config}"
+    for idx in range(1, 27):
+        qstat_lines.append(f"{81000 + idx} 0.555 a b qw 03/01/2026 queueA 1")
+    qstat_table = "\n".join(qstat_lines)
+    seen_job_probes: list[str] = []
+
+    def _probe(argv: tuple[str, ...]) -> tuple[int, str, str]:
+        if argv[:2] == ("qstat", "-u"):
+            return 0, qstat_table, ""
+        if argv[:2] == ("qstat", "-j"):
+            seen_job_probes.append(str(argv[2]))
+            return 0, job_details.get(argv[2], ""), ""
+        raise AssertionError(f"Unexpected probe argv: {argv}")
+
+    monkeypatch.setattr(orchestrator_state, "_run_probe", _probe)
+
+    discovered = discover_active_job_ids_for_runbook(runbook, max_jobs=1)
+
+    assert discovered == ("81025",)
+    assert seen_job_probes[-1] == "81025"
+    assert "81026" not in seen_job_probes
+
+
 def test_discover_active_job_ids_raises_when_qstat_snapshot_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1056,6 +1091,21 @@ def test_notify_submit_aligns_runtime_and_idle_timeout_with_runbook(
     assert "-l h_rt=08:00:00" in notify_submit
     assert "NOTIFY_IDLE_TIMEOUT_SECONDS=28800" in notify_submit
     assert "NOTIFY_ENFORCE_TERMINAL_ON_IDLE=1" in notify_submit
+
+
+def test_notify_submit_inherits_hold_jid_when_active_jobs_are_detected(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    plan = build_batch_plan(
+        runbook=runbook,
+        requested_mode=None,
+        requested_smoke=None,
+        active_job_ids=("81234",),
+    )
+
+    notify_submit = plan.submit_commands[0].render_shell()
+    assert "-hold_jid 81234" in notify_submit
 
 
 def test_notify_submit_includes_tls_ca_bundle_for_watcher(

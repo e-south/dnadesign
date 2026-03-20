@@ -300,6 +300,9 @@ def _submit_commands(runbook: OrchestrationRunbookV1, *, mode_decision: ModeDeci
 
     stdout_file = _stdout_file_path(runbook)
     submit_commands: list[CommandSpec] = []
+    hold_fragment: list[str] = []
+    if mode_decision.submit_behavior == "hold_jid" and mode_decision.hold_jid:
+        hold_fragment = ["-hold_jid", mode_decision.hold_jid]
     if runbook.notify is not None:
         webhook_env_name = runbook.notify.webhook_env
         notify_runtime = resolve_notify_runtime_contract(
@@ -324,6 +327,7 @@ def _submit_commands(runbook: OrchestrationRunbookV1, *, mode_decision: ModeDeci
                 runbook.project,
                 "-o",
                 stdout_file,
+                *hold_fragment,
                 "-l",
                 f"h_rt={runbook.resources.h_rt}",
                 "-v",
@@ -331,10 +335,6 @@ def _submit_commands(runbook: OrchestrationRunbookV1, *, mode_decision: ModeDeci
                 str(runbook.notify.qsub_template),
             )
         )
-
-    hold_fragment: list[str] = []
-    if mode_decision.submit_behavior == "hold_jid" and mode_decision.hold_jid:
-        hold_fragment = ["-hold_jid", mode_decision.hold_jid]
 
     tool_adapter = resolve_plan_tool_adapter(runbook)
     submit_commands.extend(

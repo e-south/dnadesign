@@ -73,7 +73,9 @@ def discover_active_job_ids_for_runbook(
     unique_tokens = tuple(dict.fromkeys(token for token in tokens if token))
 
     active_job_ids: list[str] = []
-    for job_id in _parse_job_ids_from_qstat_output(stdout)[:max_jobs]:
+    for job_id in _parse_job_ids_from_qstat_output(stdout):
+        if len(active_job_ids) >= max_jobs:
+            break
         rc, job_stdout, _job_stderr = _run_probe(("qstat", "-j", str(job_id)))
         if rc != 0:
             continue
