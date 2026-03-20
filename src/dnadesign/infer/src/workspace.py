@@ -22,6 +22,7 @@ _WORKSPACE_TEMPLATE_BY_PROFILE = {
     "local": "workspace_local_records_config.yaml",
     "usr-pressure": "pressure_test_infer_config.yaml",
 }
+_LOCAL_RECORDS_TEMPLATE = '{"id":"example_record","sequence":"ACGTACGT"}\n'
 
 
 def _infer_root() -> Path:
@@ -93,9 +94,12 @@ def init_workspace(
         raise ConfigError(f"workspace already exists: {workspace_dir}")
 
     workspace_dir.mkdir(parents=False, exist_ok=False)
-    (workspace_dir / "inputs").mkdir(parents=True, exist_ok=True)
+    inputs_dir = workspace_dir / "inputs"
+    inputs_dir.mkdir(parents=True, exist_ok=True)
     (workspace_dir / "outputs" / "logs" / "ops" / "audit").mkdir(parents=True, exist_ok=True)
     if profile == "usr-pressure":
         (workspace_dir / "outputs" / "usr_datasets").mkdir(parents=True, exist_ok=True)
+    if profile == "local":
+        (inputs_dir / "records.jsonl").write_text(_LOCAL_RECORDS_TEMPLATE, encoding="utf-8")
     shutil.copy2(template_path, workspace_dir / "config.yaml")
     return workspace_dir

@@ -13,12 +13,30 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 from typer.testing import CliRunner
 
 from dnadesign.infer.cli import app
 from dnadesign.infer.src.runtime.capacity_planner import GpuDeviceInfo, GpuInventory
 
 _RUNNER = CliRunner()
+
+
+def _write_usr_dataset(root: Path, dataset: str, *, field: str = "sequence") -> Path:
+    dataset_dir = root / dataset
+    dataset_dir.mkdir(parents=True, exist_ok=True)
+    records_path = dataset_dir / "records.parquet"
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["r1"]),
+                field: pa.array(["ACGT"]),
+            }
+        ),
+        records_path,
+    )
+    return records_path
 
 
 def _write_minimal_config(tmp_path: Path) -> Path:
@@ -219,6 +237,28 @@ def test_run_preset_requires_usr_dataset_flag() -> None:
 
     assert result.exit_code == 2
     assert "--usr is required when using --preset" in (result.stdout or "")
+
+
+def test_run_preset_dry_run_preflights_usr_dataset_and_field(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(usr_root, "demo", field="not_sequence")
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "run",
+            "--preset",
+            "evo2/extract_logits_ll",
+            "--usr",
+            "demo",
+            "--usr-root",
+            usr_root.as_posix(),
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "USR dataset missing required column(s): sequence" in (result.stdout or "")
 
 
 def test_run_rejects_preset_only_flags_when_config_mode_is_selected(tmp_path: Path) -> None:

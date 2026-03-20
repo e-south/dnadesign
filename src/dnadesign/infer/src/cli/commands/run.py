@@ -151,6 +151,12 @@ def register(app: typer.Typer) -> None:
                 if not (dry_run and model.device.startswith("cuda") and preset_inventory.count == 0):
                     validate_model_hardware_contract(model=model, inventory=preset_inventory)
                 validate_adapter_runtime_contract(model=model)
+                if dry_run and job_cfg.ingest.source == "usr":
+                    preflight_usr_input(
+                        dataset_name=str(job_cfg.ingest.dataset),
+                        field=str(job_cfg.ingest.field or "sequence"),
+                        root=job_cfg.ingest.root,
+                    )
 
                 if dry_run:
                     render_config_summary(model, [job_cfg])

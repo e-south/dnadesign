@@ -42,10 +42,12 @@ def test_workspace_init_creates_default_layout_and_config(tmp_path: Path) -> Non
     config_path = workspace_dir / "config.yaml"
     assert config_path.is_file()
     assert (workspace_dir / "inputs").is_dir()
+    assert (workspace_dir / "inputs" / "records.jsonl").is_file()
     assert (workspace_dir / "outputs" / "logs" / "ops" / "audit").is_dir()
     config = config_path.read_text(encoding="utf-8")
     assert "source: records" in config
     assert "path: inputs/records.jsonl" in config
+    assert '"sequence":"ACGTACGT"' in (workspace_dir / "inputs" / "records.jsonl").read_text(encoding="utf-8")
     output = result.stdout or ""
     assert "infer validate config --config" in output
     assert "infer run --config" in output
@@ -113,7 +115,6 @@ def test_workspace_local_profile_supports_validate_and_dry_run(tmp_path: Path) -
 
     workspace_dir = root / workspace_id
     config_path = workspace_dir / "config.yaml"
-    (workspace_dir / "inputs" / "records.jsonl").write_text('{"id":"r1","sequence":"ACGT"}\n', encoding="utf-8")
 
     validate_result = _RUNNER.invoke(app, ["validate", "config", "--config", config_path.as_posix()])
     assert validate_result.exit_code == 0, validate_result.stdout
