@@ -632,6 +632,26 @@ def test_cli_progress_scaffold_requires_registry_ids_or_related_to() -> None:
     assert "progress scaffold requires at least one registry id or --related-to" in result.output
 
 
+def test_cli_progress_show_suggests_close_registry_ids() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "progress",
+            "show",
+            "usr.data-plane.promoter-feature",
+            "--repo-root",
+            str(_repo_root()),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "Progress contract error: unknown registry id: usr.data-plane.promoter-feature" in result.output
+    assert "Did you mean:" in result.output
+    assert "usr.data-plane.promoter-feature-matrix" in result.output
+
+
 def test_cli_progress_show_rejects_missing_required_surface_arguments() -> None:
     runner = CliRunner()
 
@@ -648,3 +668,29 @@ def test_cli_progress_show_rejects_missing_required_surface_arguments() -> None:
 
     assert result.exit_code == 2
     assert "progress kind 'ops-audit-json' requires --audit-json" in result.output
+    assert "Required inputs for ops.control-plane.orchestration:" in result.output
+    assert "--audit-json <workspace-root>/outputs/logs/ops/audit/latest.json" in result.output
+    assert "Workspace-scoped orchestration audit JSON emitted by ops runbook execute." in result.output
+    assert "uv run ops progress scaffold ops.control-plane.orchestration" in result.output
+
+
+def test_cli_progress_campaign_missing_manifest_suggests_scaffold() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "progress",
+            "campaign",
+            "--repo-root",
+            str(_repo_root()),
+            "--manifest",
+            "missing/campaign.yaml",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "Progress contract error: campaign manifest not found" in result.output
+    assert "Hint: check the manifest path from `pwd` or pass an absolute path." in result.output
+    assert "uv run ops progress scaffold <registry-id> ..." in result.output
+    assert "uv run ops progress scaffold --related-to <registry-id>" in result.output

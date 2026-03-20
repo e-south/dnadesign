@@ -66,6 +66,20 @@ def test_cli_catalog_list_emits_grouped_text_inventory() -> None:
     assert "Tool-local runbook sources" in result.output
     assert "densegen: DenseGen documentation" in result.output
     assert "usr: USR docs" in result.output
+    assert "Suggested next steps" in result.output
+    assert "uv run ops catalog list --query <term>" in result.output
+    assert "uv run ops catalog show ops.control-plane.orchestration" in result.output
+    assert "uv run ops progress scaffold ops.control-plane.orchestration" in result.output
+
+
+def test_cli_help_points_new_users_to_catalog_list() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    normalized_output = " ".join(result.output.split())
+    assert "Start with `uv run ops catalog list` to browse routes from the terminal." in normalized_output
 
 
 def test_cli_catalog_list_supports_json_and_section_filter() -> None:
@@ -209,6 +223,28 @@ def test_cli_catalog_list_supports_related_to_filter() -> None:
     assert "tool_sources" not in payload
 
 
+def test_cli_catalog_list_tool_sources_suggests_tool_source_specific_next_steps() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--section",
+            "tool-sources",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Narrow the docs by topic" in result.output
+    assert "uv run ops catalog list --section tool-sources --query <term>" in result.output
+    assert "Browse all registered procedures" in result.output
+    assert "Inspect the first matching procedure" not in result.output
+
+
 def test_cli_catalog_show_emits_registered_entry() -> None:
     runner = CliRunner()
 
@@ -233,9 +269,9 @@ def test_cli_catalog_show_emits_registered_entry() -> None:
     assert "- usr: USR docs" in result.output
     assert "Related tool docs:" in result.output
     assert "- densegen: DenseGen documentation" in result.output
-    assert "- construct: construct docs" in result.output
+    assert "- construct: Construct docs" in result.output
     assert "- infer: infer docs" in result.output
-    assert "- cluster: cluster docs" in result.output
+    assert "- cluster: Cluster docs" in result.output
     assert "- opal: OPAL Documentation" in result.output
     assert "Related deep docs:" in result.output
     assert "- construct/template-contexts: Construct Template Contexts" in result.output
@@ -405,6 +441,27 @@ def test_cli_catalog_list_rejects_unknown_related_to_registry_id() -> None:
     assert result.exit_code == 2
     assert "unknown --related-to registry id: usr.data-plane.promoter-feature" in result.output
     assert "usr.data-plane.promoter-feature-matrix" in result.output
+
+
+def test_cli_catalog_list_emits_recovery_steps_for_empty_results() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--query",
+            "no-such-catalog-entry",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "No matching catalog entries. Try:" in result.output
+    assert "uv run ops catalog list" in result.output
+    assert "uv run ops catalog list --section tool-sources" in result.output
 
 
 def test_cli_catalog_uses_module_checkout_when_cwd_is_outside_repo(tmp_path: Path, monkeypatch) -> None:

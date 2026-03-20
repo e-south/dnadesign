@@ -60,14 +60,27 @@ from .runbooks.workflow_metadata import resolve_workflow_id, resolve_workflow_to
 app = typer.Typer(
     add_completion=True,
     no_args_is_help=True,
-    help="Cross-tool orchestration commands for deterministic HPC batch plans.",
+    help=(
+        "Cross-tool orchestration commands for deterministic batch plans. "
+        "Start with `uv run ops catalog list` to browse routes from the terminal."
+    ),
 )
 
 runbook_app = typer.Typer(help="Runbook contract commands.")
 app.add_typer(runbook_app, name="runbook")
-catalog_app = typer.Typer(help="Read-only discovery commands for the shared runbook catalog.")
+catalog_app = typer.Typer(
+    help=(
+        "Discovery commands for the shared runbook catalog. "
+        "Start with `ops catalog list` or `ops catalog list --query <term>`."
+    )
+)
 app.add_typer(catalog_app, name="catalog")
-progress_app = typer.Typer(help="Read-only progress commands for registered runbooks and explicit campaigns.")
+progress_app = typer.Typer(
+    help=(
+        "Status inspection and manifest scaffold commands for registered runbooks and explicit campaigns. "
+        "`show` and `campaign` are read-only; `scaffold` prints YAML unless `--out` is used."
+    )
+)
 app.add_typer(progress_app, name="progress")
 
 
@@ -369,6 +382,22 @@ def _emit_catalog_list_text(
             )
         if not tool_sources:
             lines.append("- none")
+    next_steps = _catalog_list_next_steps(
+        repo_root=repo_root,
+        catalog_path=catalog_path,
+        procedures=procedures,
+        tool_sources=tool_sources,
+        section=section,
+        filters=filters,
+    )
+    if next_steps:
+        lines.append("")
+        if not procedures and not tool_sources:
+            lines.append("No matching catalog entries. Try:")
+        else:
+            lines.append("Suggested next steps")
+        for label, value in next_steps:
+            lines.append(f"- {label}: {value}")
     typer.echo("\n".join(lines))
 
 
@@ -385,6 +414,17 @@ def _emit_catalog_list_json(
         "section": section,
         "filters": filters.as_dict(),
         "counts": _catalog_counts(procedures=procedures, tool_sources=tool_sources, section=section),
+        "next_steps": [
+            {"label": label, "value": value}
+            for label, value in _catalog_list_next_steps(
+                repo_root=repo_root,
+                catalog_path=catalog_path,
+                procedures=procedures,
+                tool_sources=tool_sources,
+                section=section,
+                filters=filters,
+            )
+        ],
     }
     if section in {"all", "procedures"}:
         payload["procedures"] = [
@@ -796,6 +836,122 @@ def _render_command(parts: Sequence[str]) -> str:
     return " ".join(parts)
 
 
+def _catalog_query_is_broad(filters: CatalogQuery) -> bool:
+    return all(
+        value is None
+        for value in (
+            filters.query,
+            filters.entry_type,
+            filters.plane,
+            filters.execution_kind,
+            filters.progress_kind,
+            filters.related_to,
+            filters.tool,
+        )
+    )
+
+
+def _catalog_list_next_steps(
+    *,
+    repo_root: Path,
+    catalog_path: Path,
+    procedures: Sequence[CatalogProcedureEntry],
+    tool_sources: Sequence[CatalogToolSourceEntry],
+    section: Literal["all", "procedures", "tool-sources"],
+    filters: CatalogQuery,
+) -> tuple[tuple[str, str], ...]:
+    next_steps: list[tuple[str, str]] = []
+    visible_procedures = procedures if section in {"all", "procedures"} else ()
+    visible_tool_sources = tool_sources if section in {"all", "tool-sources"} else ()
+    first_procedure = visible_procedures[0] if visible_procedures else None
+    first_tool_source = visible_tool_sources[0] if visible_tool_sources else None
+    broad_inventory = _catalog_query_is_broad(filters)
+    multiple_visible_matches = len(visible_procedures) + len(visible_tool_sources) > 1
+
+    if first_procedure is not None:
+        if broad_inventory and multiple_visible_matches:
+            next_steps.append(
+                (
+                    "Narrow the inventory by topic",
+                    _render_command(["uv", "run", "ops", "catalog", "list", "--query", "<term>"]),
+                )
+            )
+        next_steps.append(
+            (
+                "Inspect the first matching procedure",
+                _render_command(["uv", "run", "ops", "catalog", "show", first_procedure.registry_id]),
+            )
+        )
+        if filters.related_to:
+            next_steps.append(
+                (
+                    "Start a manifest from this related route set",
+                    _render_command(["uv", "run", "ops", "progress", "scaffold", "--related-to", filters.related_to]),
+                )
+            )
+        else:
+            next_steps.append(
+                (
+                    "Emit a manifest skeleton for the first match",
+                    _render_command(["uv", "run", "ops", "progress", "scaffold", first_procedure.registry_id]),
+                )
+            )
+        return tuple(next_steps)
+
+    if first_tool_source is not None:
+        if broad_inventory and len(visible_tool_sources) > 1:
+            next_steps.append(
+                (
+                    "Narrow the docs by topic",
+                    _render_command(
+                        ["uv", "run", "ops", "catalog", "list", "--section", "tool-sources", "--query", "<term>"]
+                    ),
+                )
+            )
+        if filters.related_to:
+            next_steps.append(
+                (
+                    "Inspect the route behind these related tool docs",
+                    _render_command(["uv", "run", "ops", "catalog", "show", filters.related_to]),
+                )
+            )
+        else:
+            next_steps.append(
+                (
+                    "Browse all registered procedures",
+                    _render_command(["uv", "run", "ops", "catalog", "list", "--section", "procedures"]),
+                )
+            )
+        next_steps.append(
+            (
+                "Read the first matching owner docs",
+                repo_relative_catalog_doc_path(
+                    repo_root=repo_root,
+                    catalog_path=catalog_path,
+                    doc_path=first_tool_source.doc_path,
+                ),
+            )
+        )
+        return tuple(next_steps)
+
+    next_steps.append(("Browse the full inventory", _render_command(["uv", "run", "ops", "catalog", "list"])))
+    if section == "tool-sources":
+        next_steps.append(
+            (
+                "Browse all registered procedures",
+                _render_command(["uv", "run", "ops", "catalog", "list", "--section", "procedures"]),
+            )
+        )
+    else:
+        next_steps.append(
+            (
+                "Browse owner-local docs only",
+                _render_command(["uv", "run", "ops", "catalog", "list", "--section", "tool-sources"]),
+            )
+        )
+    return tuple(next_steps)
+
+
 def _catalog_progress_show_command(
     *,
     registry_id: str,
@@ -906,6 +1062,34 @@ def _normalize_optional_filter(value: str | None) -> str | None:
         return None
     normalized = value.strip()
     return normalized or None
+
+
+def _append_registry_suggestions(*, message: str, catalog: RunbookCatalog, registry_id: str) -> str:
+    suggestions = suggest_procedure_registry_ids(catalog, registry_id)
+    if suggestions:
+        message += "\nDid you mean:\n" + "\n".join(f"- {candidate}" for candidate in suggestions)
+    return message
+
+
+def _progress_campaign_recovery_hint() -> str:
+    return (
+        "Hint: use `uv run ops progress scaffold <registry-id> ...` to emit a manifest skeleton, "
+        "or `uv run ops progress scaffold --related-to <registry-id>` to start from one registered route."
+    )
+
+
+def _progress_campaign_path_hint() -> str:
+    return "Hint: check the manifest path from `pwd` or pass an absolute path."
+
+
+def _progress_required_input_lines(entry: CatalogProcedureEntry) -> tuple[str, ...]:
+    required_inputs = load_progress_required_inputs(entry.progress_kind)
+    if not required_inputs:
+        return ()
+    lines = [f"Required inputs for {entry.registry_id}:"]
+    for field in required_inputs:
+        lines.append(f"- {field.cli_flag} {field.placeholder}: {field.summary}")
+    return tuple(lines)
 
 
 def _first_unknown_registry_id(
@@ -1165,10 +1349,8 @@ def catalog_show(
 
     entry = catalog.find_procedure(registry_id)
     if entry is None:
-        suggestions = suggest_procedure_registry_ids(catalog, registry_id)
         message = f"Catalog contract error: unknown registry id: {registry_id}"
-        if suggestions:
-            message += "\nDid you mean:\n" + "\n".join(f"- {candidate}" for candidate in suggestions)
+        message = _append_registry_suggestions(message=message, catalog=catalog, registry_id=registry_id)
         typer.echo(message, err=True)
         raise typer.Exit(code=2)
     try:
@@ -1239,6 +1421,19 @@ def progress_show(
 ) -> None:
     try:
         catalog = load_runbook_catalog(repo_root=repo_root)
+    except ValueError as exc:
+        message = f"Progress contract error: {exc}"
+        typer.echo(message, err=True)
+        raise typer.Exit(code=2) from exc
+
+    entry = catalog.find_procedure(registry_id)
+    if entry is None:
+        message = f"Progress contract error: unknown registry id: {registry_id}"
+        message = _append_registry_suggestions(message=message, catalog=catalog, registry_id=registry_id)
+        typer.echo(message, err=True)
+        raise typer.Exit(code=2)
+
+    try:
         result = build_procedure_progress(
             catalog,
             registry_id,
@@ -1255,6 +1450,7 @@ def progress_show(
     except ValueError as exc:
         message = f"Progress contract error: {exc}"
         if "requires --" in str(exc):
+            message += "\n" + "\n".join(_progress_required_input_lines(entry))
             message += (
                 f"\nHint: use `uv run ops progress scaffold {registry_id}` to emit a manifest step "
                 "with the required fields."
@@ -1297,9 +1493,28 @@ def progress_campaign(
 ) -> None:
     try:
         catalog = load_runbook_catalog(repo_root=repo_root)
-        result = load_campaign_progress(catalog, manifest_path=manifest)
     except ValueError as exc:
         typer.echo(f"Progress contract error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    try:
+        result = load_campaign_progress(catalog, manifest_path=manifest)
+    except ValueError as exc:
+        error_text = str(exc)
+        message = f"Progress contract error: {error_text}"
+        unknown_registry_prefix = "unknown registry id: "
+        if error_text.startswith(unknown_registry_prefix):
+            registry_id = error_text.removeprefix(unknown_registry_prefix).strip()
+            message = _append_registry_suggestions(message=message, catalog=catalog, registry_id=registry_id)
+        if error_text.startswith("campaign manifest not found: "):
+            message += "\n" + _progress_campaign_path_hint()
+        if (
+            "campaign manifest" in error_text
+            or "missing 'registry_id'" in error_text
+            or "must define a non-empty 'steps' list" in error_text
+        ):
+            message += "\n" + _progress_campaign_recovery_hint()
+        typer.echo(message, err=True)
         raise typer.Exit(code=2) from exc
 
     if as_json:
