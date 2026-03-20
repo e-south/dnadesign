@@ -15,13 +15,11 @@
 
 Use this runbook when inputs already span multiple USR-backed datasets, but downstream consumers should still see one consolidated construct-backed dataset plus one event stream.
 
-This is the authoritative runbook for the broader multi-source flow:
+Use this runbook to:
 
 - explicit USR merge/carry
 - construct realization into one downstream dataset
 - handoff into the shared downstream infer/notify continuation once that construct-backed dataset exists
-
-Tool-local docs should link here instead of reconstructing this sequence from side notes. This runbook owns the unique multi-source assembly steps, then hands off to the shared construct-backed downstream continuation contract to avoid duplicating infer/notify procedure text.
 
 ### Boundary decisions
 
@@ -63,8 +61,8 @@ uv run construct seed promoter-swap-demo \
   --manifest "$WORKSPACE_ROOT/inputs/seed_manifest.yaml" # Materialize packaged promoter and plasmid inputs under the workspace-local USR root.
 
 # Reuse explicit dataset ids across merge, construct, infer, and notify.
-export PRIMARY_INPUT_DATASET="promoter_sources_control" # Choose the dataset that will be mutated by the merge step.
-export EXTRA_INPUT_DATASET="promoter_sources_densegen" # Choose the additional upstream dataset to fold into the primary input dataset.
+export PRIMARY_INPUT_DATASET="mg1655_promoters" # Use the seeded promoter controls as the primary dataset for the tracer bullet.
+export EXTRA_INPUT_DATASET="<existing_densegen_or_manual_usr_dataset>" # Replace this with a real upstream dataset that already exists under "$USR_ROOT".
 export DOWNSTREAM_DATASET="multi_source_construct_truth_demo" # Reuse one downstream dataset id across construct, infer, and notify.
 ```
 
@@ -72,17 +70,17 @@ This runbook assumes the upstream datasets already exist in `"$USR_ROOT"`. Their
 
 ### 1b) Map those ids to real upstream datasets before validation
 
-The packaged seed step above creates control/template datasets such as `mg1655_promoters` and `plasmids`; it does not create `promoter_sources_control` or `promoter_sources_densegen` for you.
+The packaged seed step above creates control/template datasets such as `mg1655_promoters` and `plasmids`; it does not create the extra upstream dataset for you.
 
 Before step 2, do one of the following explicitly:
 
-- point `PRIMARY_INPUT_DATASET` and `EXTRA_INPUT_DATASET` at real upstream datasets that already exist under `"$USR_ROOT"`; or
-- create/import those datasets through your own upstream DenseGen/manual USR flow first, then return here.
+- keep `PRIMARY_INPUT_DATASET="mg1655_promoters"` and replace `EXTRA_INPUT_DATASET` with a real upstream dataset that already exists under `"$USR_ROOT"`; or
+- point both ids at real upstream datasets that already exist under `"$USR_ROOT"`; or
+- create/import the missing dataset through your own upstream DenseGen/manual USR flow first, then return here.
 
 Tracer-bullet example when the seeded control dataset should act as the primary input:
 
 ```bash
-export PRIMARY_INPUT_DATASET="mg1655_promoters" # Reuse the seeded promoter controls as the primary merged input.
 export EXTRA_INPUT_DATASET="<existing_densegen_or_manual_usr_dataset>" # Replace with the real upstream dataset that should be folded into the primary input dataset.
 ```
 
@@ -207,7 +205,7 @@ The Ops control plane is downstream from this runbook. It should not replace the
 
 ## Related docs
 
-- Root docs router: [../../../../../docs/README.md](../../../../../docs/README.md)
+- Docs index: [../../../../../docs/README.md](../../../../../docs/README.md)
 - USR workflow map: [workflow-map.md](workflow-map.md)
 - Construct-only downstream handoff: [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md)
 - USR maintenance merge contract: [../reference/maintenance.md](../reference/maintenance.md)

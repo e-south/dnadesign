@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-20
 
-Construct places focal DNA parts into explicit larger sequence contexts, then hands those realized sequences to downstream tools through stable USR datasets and `construct__*` lineage. Use this page as the single route map for demos, custom workspaces, reference material, and shared handoffs.
+Construct places focal DNA parts into explicit larger sequence contexts, then hands those realized sequences to downstream tools through stable USR datasets and `construct__*` lineage. Use this page to choose the next Construct task.
 
 ### Start here
 
@@ -17,7 +17,7 @@ Construct places focal DNA parts into explicit larger sequence contexts, then ha
 - [Build a downstream promoter feature matrix for Cluster or OPAL](../../usr/docs/operations/promoter-characterization-feature-matrix.md): use the shared USR-owned runbook when construct-expanded contexts should be compared against anchor-only promoters through infer-derived feature columns.
 - [Debug a Construct run](reference/cli.md): start with runtime validation, then check the [config reference](reference/config.md), [workspace registry reference](reference/workspace-registry.md), and [outputs reference](reference/outputs.md).
 
-### Reference map
+### Key docs
 
 - [Getting started](getting-started.md): shortest runnable path for demos and blank workspaces.
 - [Workspaces guide](../workspaces/README.md): scaffold, inspect, and organize workspace-local studies.

@@ -4,13 +4,13 @@
 **Plane:** data-plane
 **Owner-boundary:** usr
 **Entry artifact:** operator intent for a USR-backed workflow branch
-**Exit artifact:** authoritative runbook link plus summary command chain
+**Exit artifact:** chosen runbook link plus summary command chain
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-16
 
 
-Use this page to pick a command chain quickly, then open the linked runbook for full detail. The command blocks below are summary fragments, not fully self-contained procedures.
+Use this page to pick a command chain quickly, then open the linked runbook for full detail. The command blocks below are short summaries, not full procedures.
 
 ## Context preamble
 
@@ -102,8 +102,8 @@ Use this when DenseGen runs on HPC and Infer annotations are produced locally or
 DATASET_ID="my_dataset"
 # Pull the latest dataset state from HPC.
 uv run usr pull "$DATASET_ID" bu-scc -y
-# Run infer against the USR dataset and write derived outputs.
-uv run infer run --preset evo2/extract_logits_ll --usr "$DATASET_ID" --usr-root "$LOCAL_USR_ROOT"
+# Run infer against the USR dataset and write derived outputs back into the dataset.
+uv run infer run --preset evo2/extract_logits_ll --usr "$DATASET_ID" --usr-root "$LOCAL_USR_ROOT" --field sequence --device cpu --write-back
 # Push derived outputs back to HPC.
 uv run usr push "$DATASET_ID" bu-scc -y
 ```
@@ -161,7 +161,7 @@ uv run notify usr-events watch --events "$USR_ROOT/$DATASET_ID/.events.log" --pr
 
 Details: [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md)
 
-## Promoter feature matrix -> Cluster or OPAL
+## Promoter feature matrix -> Cluster or OPAL prep
 
 Use this when DenseGen anchors, wildtype/manual promoters, and optional construct-expanded contexts should all feed one infer-annotated dataset before downstream clustering or active learning begins.
 
@@ -172,9 +172,9 @@ FEATURE_DATASET="promoter_feature_matrix_demo"
 uv run infer run --config "$INFER_CONFIG_7B" --dry-run
 # Execute the selected infer matrix lane and write namespaced feature columns back to the dataset.
 uv run infer run --config "$INFER_CONFIG_7B"
-# Explore one explicit infer-derived X column with cluster.
-uv run cluster fit --dataset "$FEATURE_DATASET" --x-col infer__evo2_7b__anchor_7b_emb_mid__emb_mid --name promoter_matrix_clusters_v1 --write --allow-overwrite
-# Hand the same dataset plus explicit X column into OPAL.
+# Explore one explicit infer-derived vector column with cluster.
+uv run cluster fit --dataset "$FEATURE_DATASET" --x-col infer__evo2_7b__anchor_only_7b_features__intermediate_embedding__block26_mlp_out__seq_mean --name promoter_matrix_clusters_v1 --write --allow-overwrite
+# Hand the same dataset plus the chosen X column into OPAL after campaign.yaml points at that dataset.
 uv run opal validate -c "$OPAL_WORKDIR/configs/campaign.yaml" # Validate the USR-backed OPAL campaign before any rounds run.
 uv run opal run -c "$OPAL_WORKDIR/configs/campaign.yaml" --labels-as-of 0 # Train, score, and select against the chosen infer-derived X column.
 ```
@@ -190,8 +190,8 @@ Use this when command chains are orchestrated by scripts, notebooks, or higher-l
 DATASET_ID="my_dataset"
 # Emit machine-readable sync decision artifact.
 uv run usr diff "$DATASET_ID" bu-scc --audit-json-out "$ARTIFACT_ROOT/usr-sync-audit.json"
-# Read the diff decision payload for orchestration logic.
-jq -r '.changes' "$ARTIFACT_ROOT/usr-sync-audit.json"
+# Read the high-level decision payload for orchestration logic.
+jq -r '.data | {action, transfer_state, primary_changed: .primary.changed, derived_changed: ._derived.changed, aux_changed: ._auxiliary.changed}' "$ARTIFACT_ROOT/usr-sync-audit.json"
 # Read exact sidecar file deltas for transfer decisions.
 jq -r '.data | {derived_local_only: ._derived.local_only, derived_remote_only: ._derived.remote_only, aux_local_only: ._auxiliary.local_only, aux_remote_only: ._auxiliary.remote_only}' "$ARTIFACT_ROOT/usr-sync-audit.json"
 ```

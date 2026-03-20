@@ -8,7 +8,7 @@ This documentation covers end-to-end workflows, plugin contracts and math, runti
 
 ### Start here
 
-1. If infer has already written the chosen feature column into USR, start with [USR dataset with infer-derived X -> OPAL active learning](./workflows/usr-infer-x-active-learning.md).
+1. Only if infer has already written the chosen feature column into USR, start with [USR dataset with infer-derived X -> OPAL active learning](./workflows/usr-infer-x-active-learning.md).
 2. If you want a tool-local baseline campaign, start with [RF + SFXI + top_n](./workflows/rf-sfxi-topn.md).
 3. If you need config or CLI lookup before running a workflow, jump to [Configuration (`campaign.yaml`)](./reference/configuration.md) or [CLI commands](./reference/cli.md).
 

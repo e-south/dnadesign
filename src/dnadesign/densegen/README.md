@@ -4,7 +4,7 @@ DenseGen wraps the [dense-arrays](https://github.com/e-south/dense-arrays) optim
 
 It validates input schemas, resolves input sources, builds TFBS candidate pools when sampling is enabled, generates compound sequences until quota is reached, and writes reproducible outputs under the workspace `outputs/` tree.
 
-Use it when you need one design-generation tool with explicit run state, fail-fast validation, deterministic path contracts, and clean handoff into downstream USR-backed workflows.
+Use it when you need one design-generation tool with explicit run state, fail-fast validation, deterministic path contracts, and a clean handoff into shared USR workflows.
 
 <p align="center">
   <a href="assets/videos/demo_tfbs_baseline_showcase.mp4">
@@ -16,9 +16,9 @@ Use it when you need one design-generation tool with explicit run state, fail-fa
 
 - Want a first local run: start with [TFBS baseline tutorial](docs/tutorials/demo_tfbs_baseline.md). Verify next with the [Outputs reference](docs/reference/outputs.md).
 - Want to choose a packaged workspace before running: start with the [Workspaces guide](workspaces/README.md). Verify next with the [Config reference](docs/reference/config.md).
-- Want the shared downstream handoff after generation: start with [Promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md). Verify next there before switching to cluster or OPAL.
+- Want the next shared cross-tool step after generation: start with [Promoter Evo2 workflow journey](../usr/docs/operations/promoter-evo2-journey.md). Verify next there once you know whether the study needs source assembly, construct expansion, or infer-derived features.
 
-### Documentation map
+### Documentation
 
 1. [Docs overview](docs/README.md): route to tutorials, runbooks, concepts, and references by task.
 2. [Workspaces guide](workspaces/README.md): choose a packaged workspace and expected inputs before running.
@@ -35,12 +35,6 @@ Use it when you need one design-generation tool with explicit run state, fail-fa
 13. [BU SCC run guide](docs/howto/bu-scc.md): BU SCC-specific execution path and submission details.
 14. [Architecture notes](docs/dev/architecture.md): internal lifecycle and module boundary map.
 15. [Development journal](docs/dev/journal.md): maintainer decisions, investigations, and audit notes.
-
-### Continue after generation
-
-- [DenseGen to USR to Notify tutorial](docs/tutorials/demo_usr_notify.md): validate the event path when generated records should emit USR updates and watcher notifications.
-- [Multi-source source-of-truth assembly](../usr/docs/operations/multi-source-source-of-truth-assembly.md): merge DenseGen outputs with other USR-backed sources before construct and infer share one downstream dataset.
-- [Promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md): continue into infer-derived feature columns when clustering or OPAL should consume one consolidated promoter study.
 
 ### Boundary reminder
 

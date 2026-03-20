@@ -11,13 +11,9 @@
 
 Use this page when you need the whole promoter/Evo2 path in one place before choosing a concrete runbook. The linked runbooks hold the command, schema, and failure-handling details.
 
-### If you are entering from Ops
+If you are entering from Ops, use `uv run ops catalog show usr.data-plane.promoter-feature-matrix` for the linked docs and `uv run ops progress explain usr.data-plane.promoter-feature-matrix` for the required status inputs.
 
-- `uv run ops catalog show usr.data-plane.promoter-feature-matrix`: inspect the cross-tool feature-matrix route plus related tool docs.
-- `uv run ops progress explain usr.data-plane.promoter-feature-matrix`: see the required read-only status inputs before you touch artifacts.
-- `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`: emit a starting manifest across the related route set when you want a read-only campaign view.
-
-### Route at a glance
+### Workflow summary
 
 1. Start with promoter anchors.
    DenseGen-generated anchors: [DenseGen documentation](../../../densegen/docs/README.md)
@@ -32,9 +28,10 @@ Use this page when you need the whole promoter/Evo2 path in one place before cho
    Use [Evo2 provider reference](../../../infer/docs/reference/evo2-provider.md) for `evo2_7b`, `evo2_20b`, block-26 default, pooling, and stored output names.
 5. Validate the optional Notify side branch only when watcher behavior matters.
    Use [Notify operations route](../../../../../docs/notify/README.md) or the operator manual [Notify: consuming Universal Sequence Record events](../../../../../docs/notify/usr-events.md).
-6. Hand off into the cross-tool feature matrix route, then branch downstream.
+6. Hand off into the cross-tool feature-matrix route, then branch downstream.
    Use [Promoter characterization feature matrix](promoter-characterization-feature-matrix.md) once the study should become one infer-annotated USR dataset.
-   After that handoff, choose either [cluster exploratory clustering workflow](../../../cluster/docs/workflows/exploratory-clustering.md) or [USR dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/usr-infer-x-active-learning.md).
+   Continue to [cluster exploratory clustering workflow](../../../cluster/docs/workflows/exploratory-clustering.md) when you want exploratory analysis next.
+   Continue to [USR dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/usr-infer-x-active-learning.md) only after one explicit `infer__...` column is chosen as `X` and OPAL is pointed at that dataset.
 
 ### Boundary reminders
 
@@ -53,7 +50,7 @@ Use this page when you need the whole promoter/Evo2 path in one place before cho
 
 ### Related docs
 
-- Root docs router: [../../../../../docs/README.md](../../../../../docs/README.md)
+- Docs index: [../../../../../docs/README.md](../../../../../docs/README.md)
 - USR docs index: [../README.md](../README.md)
 - USR operations index: [README.md](README.md)
 - DenseGen docs: [../../../densegen/docs/README.md](../../../densegen/docs/README.md)

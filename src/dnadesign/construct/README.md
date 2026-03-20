@@ -4,8 +4,8 @@ Construct takes focal DNA parts and realizes them inside explicit larger sequenc
 
 ## Documentation
 
-- [Construct docs](docs/README.md): unified route map for first runs, workspaces, references, and cross-tool handoffs.
+- [Construct docs](docs/README.md): first runs, workspaces, references, and cross-tool handoffs.
 - [Getting started](docs/getting-started.md): shortest validated path for a demo run or blank custom workspace.
 - [Workspace guide](workspaces/README.md): scaffold a blank workspace or copy a packaged demo profile.
 - [Template/context contract](docs/reference/template-contexts.md): downstream `construct__*` fields and anchor-placement metadata.
-- [Repository docs index](../../../docs/README.md): repo-wide route map for cross-tool workflows.
+- [Repository docs index](../../../docs/README.md): repo-wide index for cross-tool workflows.

@@ -4,14 +4,13 @@
 **Plane:** data-plane
 **Owner-boundary:** usr
 **Entry artifact:** sync intent that still needs a task-specific transfer route
-**Exit artifact:** authoritative sync runbook for setup, execution, or troubleshooting
+**Exit artifact:** chosen sync runbook for setup, execution, or troubleshooting
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-16
 
 
-This page is the sync router for USR dataset and file transfers over SSH.
-Use the split runbooks below to follow progressive disclosure by task.
+Use this page to choose setup, daily sync, or troubleshooting for USR dataset and file transfers over SSH.
 
 ### Read this first
 

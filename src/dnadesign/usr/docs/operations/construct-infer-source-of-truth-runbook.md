@@ -13,9 +13,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-19
 
-Use this runbook when you want one USR-backed dataset that consolidates construct realizations from explicit source/template pairs, then serves as the handoff boundary for infer and downstream consumers.
-
-This is the authoritative runbook for the construct -> USR -> infer source-of-truth flow. Tool-local docs should link here rather than restating the full procedure.
+Use this runbook when construct should write one shared USR dataset and infer plus Notify should read that same dataset next.
 
 If upstream inputs still span multiple USR datasets, start with [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md) first, then return here once one construct-input dataset is already consolidated.
 
@@ -83,7 +81,7 @@ uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project s
 ```bash
 # Reuse the workspace-local USR root and one semantic dataset id.
 export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets"
-# Reuse the construct output dataset id across verification and downstream tools.
+# Reuse the packaged construct output dataset id across verification and downstream tools.
 export DATASET_ID="pdual10_source_of_truth_demo"
 # Confirm the written dataset satisfies the active USR registry.
 uv run usr --root "$USR_ROOT" validate "$DATASET_ID" --strict
@@ -200,5 +198,5 @@ Resolver contract:
 - Broader feature-matrix branch: [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md)
 - Infer write-back contract: [../../../infer/docs/reference/command-contracts.md](../../../infer/docs/reference/command-contracts.md)
 - Notify USR events contract: [../../../../../docs/notify/usr-events.md](../../../../../docs/notify/usr-events.md)
-- Root docs router: [../../../../../docs/README.md](../../../../../docs/README.md)
+- Docs index: [../../../../../docs/README.md](../../../../../docs/README.md)
 - Ops orchestration contracts: [../../../../../docs/operations/orchestration-runbooks.md](../../../../../docs/operations/orchestration-runbooks.md)

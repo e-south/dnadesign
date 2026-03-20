@@ -15,14 +15,14 @@
 
 Use this runbook when promoter candidates come from multiple USR-backed sources and downstream consumers should see one infer-annotated feature matrix with explicit provenance.
 
-If you need the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL route first, start with [Promoter Evo2 workflow journey](promoter-evo2-journey.md).
+If you still need to choose between source assembly, construct expansion, and feature extraction, start with [Promoter Evo2 workflow journey](promoter-evo2-journey.md) first.
 
-This is the authoritative cross-tool runbook for:
+Use this runbook to:
 
-- upstream promoter sources such as DenseGen anchors plus wildtype or manually imported promoters,
-- optional construct expansion into larger contexts such as 1 kb windows,
-- explicit infer job matrices across model lanes and output planes, and
-- downstream handoff into clustering, OPAL, or other tools that consume one chosen `infer__...` column.
+- upstream promoter sources such as DenseGen anchors plus wildtype or manually imported promoters
+- optional construct expansion into larger contexts such as 1 kb windows
+- explicit infer job matrices across model lanes and output planes
+- downstream handoff into clustering or OPAL once one chosen `infer__...` column exists
 
 This runbook owns the data-plane workflow through infer write-back. It does not own cluster internals or the OPAL active-learning loop; those remain downstream tool docs.
 
@@ -134,7 +134,8 @@ Recommended first-pass matrix:
 | anchor-only | `evo2_20b` | same bundle, model lane changed only | optional higher-capacity comparison once the 7B path is green |
 | construct-expanded | `evo2_20b` | same bundle, model lane changed only | optional higher-capacity templated comparison |
 
-Example infer config fragment for one model lane:
+Example infer config fragment for one model lane.
+Replace the dataset placeholders below with the anchor-only and construct-expanded dataset ids chosen earlier in this runbook:
 
 ```yaml
 model: # Configure one explicit Evo2 model lane per infer config.
@@ -145,10 +146,11 @@ model: # Configure one explicit Evo2 model lane per infer config.
 
 jobs: # Keep context choice explicit as job ids inside the model lane.
   - id: anchor_only_7b_features # Anchor-only promoter feature bundle.
+    operation: extract # Run the feature extraction surface.
     ingest: # Read directly from the anchor-only USR dataset.
       source: usr # Use the USR ingest surface.
       root: /abs/path/to/usr_root # Resolve the canonical USR root explicitly.
-      dataset: promoter_sources_control # Consume the merged anchor-only promoter dataset.
+      dataset: <anchor-only-feature-dataset> # Replace with the anchor-only dataset id chosen above.
       field: sequence # Read the sequence field from USR rows.
     feature_bundle:
       intermediate_block: 26 # Repo default for promoter feature extraction.
@@ -156,10 +158,11 @@ jobs: # Keep context choice explicit as job ids inside the model lane.
         kind: anchor_only # Anchor-only lane.
 
   - id: template_1kb_7b_features # Construct-expanded promoter feature bundle.
+    operation: extract # Reuse the extract surface for the templated lane.
     ingest: # Read from the larger construct-backed context dataset.
       source: usr # Use the USR ingest surface.
       root: /abs/path/to/usr_root # Resolve the canonical USR root explicitly.
-      dataset: multi_source_construct_truth_demo # Consume the construct-expanded context dataset.
+      dataset: <construct-expanded-feature-dataset> # Replace with the construct-expanded dataset id chosen above.
       field: sequence # Read the sequence field from USR rows.
     feature_bundle:
       intermediate_block: 26 # Same project default; keep model change separate from layer change.
@@ -218,13 +221,13 @@ Expected outcome:
 
 Use `cluster` when the immediate goal is exploratory structure, clustering, UMAP visualization, or OPAL-joined diagnostics later.
 
-Switch to the authoritative downstream workflow here:
+Continue in the downstream workflow here:
 
 - [cluster exploratory clustering workflow](../../../cluster/docs/workflows/exploratory-clustering.md): choose one explicit `infer__...` column as `X`, then run `fit -> umap -> analyze` with the downstream `cluster` contract.
 
 #### OPAL branch
 
-Use OPAL when the feature dataset is ready and the next step is explicit label/train/select rounds. The downstream owner is:
+Use OPAL only after the feature dataset already contains the chosen `infer__...` column and `campaign.yaml` points at that same USR dataset. The downstream owner is:
 
 - [USR dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/usr-infer-x-active-learning.md)
 
@@ -247,11 +250,11 @@ Continue with the OPAL-owned workflow for the full label-ingest and round-loop p
 
 ## Related docs
 
-- Root docs router: [../../../../../docs/README.md](../../../../../docs/README.md)
+- Docs index: [../../../../../docs/README.md](../../../../../docs/README.md)
 - USR operations index: [README.md](README.md)
 - USR workflow map: [workflow-map.md](workflow-map.md)
 - Multi-source upstream assembly: [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md)
 - Construct-backed source-of-truth handoff: [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md)
-- Infer docs router: [../../../infer/docs/README.md](../../../infer/docs/README.md)
+- Infer docs index: [../../../infer/docs/README.md](../../../infer/docs/README.md)
 - Cluster exploratory workflow surface: [../../../cluster/docs/workflows/exploratory-clustering.md](../../../cluster/docs/workflows/exploratory-clustering.md)
 - OPAL downstream workflow: [../../../opal/docs/workflows/usr-infer-x-active-learning.md](../../../opal/docs/workflows/usr-infer-x-active-learning.md)

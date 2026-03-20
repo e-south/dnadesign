@@ -9,7 +9,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-16
 
-This directory holds USR-backed runbooks in lifecycle order.
+Use this index to choose the next USR-backed runbook.
 
 ## Lifecycle routes
 
@@ -18,7 +18,7 @@ This directory holds USR-backed runbooks in lifecycle order.
 | Need | Runbook |
 | --- | --- |
 | Pick a command chain by scenario, then drill into exact steps | [workflow-map.md](workflow-map.md) |
-| Open the sync contract router before choosing quickstart/setup/modes/troubleshooting | [sync.md](sync.md) |
+| Choose sync quickstart, setup, modes, or troubleshooting | [sync.md](sync.md) |
 | Run the minimum daily `diff` -> `pull` -> `push` loop | [sync-quickstart.md](sync-quickstart.md) |
 | Configure one-time SSH keys, remote profiles, and rotation | [sync-setup.md](sync-setup.md) |
 | Map source and target paths for dataset-directory vs file mode | [sync-modes.md](sync-modes.md) |
@@ -39,7 +39,7 @@ This directory holds USR-backed runbooks in lifecycle order.
 | Need | Runbook |
 | --- | --- |
 | Understand the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL route before choosing one concrete branch | [promoter-evo2-journey.md](promoter-evo2-journey.md) |
-| Build one infer-annotated promoter feature matrix, then branch to cluster (exploratory) or OPAL (active learning) | [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md) |
+| Build one infer-annotated promoter feature dataset, then continue to cluster or prepare OPAL after choosing one explicit `X` column | [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md) |
 
 ### Validation and drills
 

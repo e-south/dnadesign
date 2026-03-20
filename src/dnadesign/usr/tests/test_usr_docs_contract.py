@@ -105,13 +105,13 @@ def test_usr_sync_router_declares_route_metadata() -> None:
 def test_docs_index_links_progressive_usr_sync_workflows() -> None:
     docs_index = _read("docs/README.md")
     assert "Workflow routes" in docs_index
-    assert "How docs are organized" in docs_index
+    assert "Quick notes" in docs_index
     assert "runbooks/README.md" in docs_index
     assert "#### Single-tool starts" in docs_index
-    assert "#### Shared USR-backed data-plane flows" in docs_index
+    assert "#### Cross-tool USR dataset flows" in docs_index
     assert "#### Operations and infrastructure" in docs_index
     assert "Use these when one tool still owns the work" in docs_index
-    assert "Use these when the handoff already runs through a shared USR dataset" in docs_index
+    assert "Use these when work already moves through a shared USR dataset" in docs_index
     assert "Use these when the next step is orchestration, environment setup, or audit output" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync-audit-loop.md" in docs_index
@@ -128,6 +128,7 @@ def test_docs_index_exposes_task_first_workflow_map() -> None:
     assert "Run cross-machine sync with stricter failure checks" in docs_index
     assert "Chain DenseGen -> USR -> Infer -> USR updates" in docs_index
     assert "chosen as `X`" in docs_index
+    assert "once OPAL is pointed at that dataset and `X`" in docs_index
     assert (
         "Consolidate construct realizations into one USR-backed source-of-truth dataset, then hand off to Infer"
         in docs_index
@@ -210,6 +211,7 @@ def test_usr_docs_index_exposes_getting_started_and_reference_paths() -> None:
     assert "operations/construct-infer-source-of-truth-runbook.md" in usr_docs
     assert "operations/promoter-evo2-journey.md" in usr_docs
     assert "operations/promoter-characterization-feature-matrix.md" in usr_docs
+    assert "choose cluster or prepare OPAL" in usr_docs
 
 
 def test_usr_promoter_journey_doc_links_cross_tool_owner_surfaces() -> None:
@@ -222,6 +224,7 @@ def test_usr_promoter_journey_doc_links_cross_tool_owner_surfaces() -> None:
     assert "evo2-provider.md" in journey
     assert "docs/notify/README.md" in journey
     assert "usr-infer-x-active-learning.md" in journey
+    assert "only after one explicit `infer__...` column is chosen as `X`" in journey
 
 
 def test_usr_docs_index_avoids_anchor_coupling_to_top_readme() -> None:
@@ -266,7 +269,7 @@ def test_usr_docs_index_exposes_sync_runbooks() -> None:
     assert "chained-densegen-infer-sync-runbook.md" in ops_index
     assert "construct-infer-source-of-truth-runbook.md" in ops_index
     assert "sync-fidelity-drills.md" in ops_index
-    assert "cluster (exploratory) or OPAL (active learning)" in ops_index
+    assert "continue to cluster or prepare OPAL after choosing one explicit `X` column" in ops_index
     assert "pressure-test-loop-mock-batch--adversarial-schemas" in ops_index
     assert "hpc-agent-sync-flow.md" in usr_docs
     assert "sync-audit-loop.md" in usr_docs
@@ -313,7 +316,7 @@ def test_multi_source_runbook_makes_upstream_dataset_mapping_explicit() -> None:
     runbook = _read("src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md")
 
     assert "### 1b) Map those ids to real upstream datasets before validation" in runbook
-    assert "does not create `promoter_sources_control` or `promoter_sources_densegen` for you" in runbook
+    assert "does not create the extra upstream dataset for you" in runbook
     assert 'export PRIMARY_INPUT_DATASET="mg1655_promoters"' in runbook
     assert 'export EXTRA_INPUT_DATASET="<existing_densegen_or_manual_usr_dataset>"' in runbook
 
@@ -383,8 +386,8 @@ def test_usr_workflow_map_runbook_is_indexed_with_command_chains() -> None:
     assert "DenseGen -> USR -> Infer -> USR chained loop" in workflow_map
     assert "Multi-source USR assembly -> Construct -> Infer" in workflow_map
     assert "Construct -> USR -> Infer source-of-truth loop" in workflow_map
-    assert "Promoter feature matrix -> Cluster or OPAL" in workflow_map
-    assert "summary fragments, not fully self-contained procedures" in workflow_map
+    assert "Promoter feature matrix -> Cluster or OPAL prep" in workflow_map
+    assert "short summaries, not full procedures" in workflow_map
     assert "## Context preamble" in workflow_map
     assert 'WORKFLOW_ROOT="${WORKFLOW_ROOT:-$PWD}"' in workflow_map
     assert 'ARTIFACT_ROOT="${ARTIFACT_ROOT:-$WORKFLOW_ROOT/outputs/logs/usr-workflow-map}"' in workflow_map
@@ -393,8 +396,8 @@ def test_usr_workflow_map_runbook_is_indexed_with_command_chains() -> None:
     assert 'uv run usr pull "$DATASET_ID" bu-scc -y' in workflow_map
     assert 'uv run usr push "$DATASET_ID" bu-scc -y' in workflow_map
     assert (
-        'uv run infer run --preset evo2/extract_logits_ll --usr "$DATASET_ID" --usr-root "$LOCAL_USR_ROOT"'
-        in workflow_map
+        'uv run infer run --preset evo2/extract_logits_ll --usr "$DATASET_ID" '
+        '--usr-root "$LOCAL_USR_ROOT" --field sequence --device cpu --write-back' in workflow_map
     )
     assert (
         'uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_a_window' in workflow_map
@@ -408,10 +411,14 @@ def test_usr_workflow_map_runbook_is_indexed_with_command_chains() -> None:
         "--dry-run --no-advance-cursor-on-dry-run" in workflow_map
     )
     assert 'uv run cluster fit --dataset "$FEATURE_DATASET"' in workflow_map
+    assert "infer__evo2_7b__anchor_only_7b_features__intermediate_embedding__block26_mlp_out__seq_mean" in workflow_map
     assert 'uv run opal validate -c "$OPAL_WORKDIR/configs/campaign.yaml"' in workflow_map
     assert "run_usr_harness_cycle.sh" in workflow_map
     assert "test_sync_schema_adversarial.py" in workflow_map
     assert "--audit-json-out" in workflow_map
+    assert "primary_changed: .primary.changed" in workflow_map
+    assert "derived_changed: ._derived.changed" in workflow_map
+    assert "aux_changed: ._auxiliary.changed" in workflow_map
     assert "/tmp/usr-sync-audit.json" not in workflow_map
     assert '"$ARTIFACT_ROOT/usr-sync-audit.json"' in workflow_map
     assert '"$ARTIFACT_ROOT/usr-harness-report.json"' in workflow_map
@@ -440,6 +447,14 @@ def test_multi_source_source_of_truth_runbook_routes_to_shared_downstream_handof
     )
     assert "promoter-characterization-feature-matrix.md" in runbook
     assert "../../../../../docs/operations/orchestration-runbooks.md" in runbook
+
+
+def test_promoter_feature_matrix_runbook_uses_extract_ops_and_dataset_placeholders() -> None:
+    runbook = _read("src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md")
+
+    assert "operation: extract" in runbook
+    assert "dataset: <anchor-only-feature-dataset>" in runbook
+    assert "dataset: <construct-expanded-feature-dataset>" in runbook
 
 
 def test_construct_source_of_truth_runbook_documents_construct_notify_resolver_modes() -> None:
