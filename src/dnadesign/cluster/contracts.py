@@ -5,7 +5,7 @@ src/dnadesign/cluster/contracts.py
 
 Public cluster contract exports.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

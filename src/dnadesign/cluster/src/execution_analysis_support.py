@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/execution_analysis_support.py
 
 Shared request planning and dispatch helpers for cluster analysis execution.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

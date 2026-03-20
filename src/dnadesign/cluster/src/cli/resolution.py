@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/cli/resolution.py
 
 Cluster CLI boundary-resolution helpers.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

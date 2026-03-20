@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/umap/contracts.py
 
 Typed UMAP runtime request contracts.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

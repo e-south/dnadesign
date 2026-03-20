@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/umap/hues.py
 
 UMAP hue-resolution and highlight-style helpers.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

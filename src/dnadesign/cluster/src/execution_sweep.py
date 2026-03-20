@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/execution_sweep.py
 
 Resolution-sweep execution runtime for cluster.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

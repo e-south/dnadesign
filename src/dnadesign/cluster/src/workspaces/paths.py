@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/workspaces/paths.py
 
 Workspace path and scaffold helpers for cluster.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

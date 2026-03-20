@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/workspaces/__init__.py
 
 Cluster workspace loading helpers.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

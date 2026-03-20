@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/workspaces/contracts.py
 
 Typed workspace contracts for cluster.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

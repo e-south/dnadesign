@@ -5,7 +5,7 @@ src/dnadesign/cluster/api.py
 
 Public cluster execution helpers.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

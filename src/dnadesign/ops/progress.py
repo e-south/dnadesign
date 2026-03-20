@@ -5,7 +5,7 @@ src/dnadesign/ops/progress.py
 
 Read-only progress adapters for registered runbooks and explicit campaigns.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

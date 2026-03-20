@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/cli/commands_table.py
 
 Table-mutation cluster CLI command registration.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

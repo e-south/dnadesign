@@ -5,7 +5,7 @@ src/dnadesign/ops/tests/test_progress_cli.py
 
 Contract tests for the read-only ops progress surface.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

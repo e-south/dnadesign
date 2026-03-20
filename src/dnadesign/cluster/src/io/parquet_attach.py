@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/io/parquet_attach.py
 
 Parquet-native attachment materialization for large generic file writes.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cluster/tests/test_runtime_contracts.py
 
 Runtime path and method-contract tests for cluster.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

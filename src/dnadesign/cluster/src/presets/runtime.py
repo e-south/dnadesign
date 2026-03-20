@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/presets/runtime.py
 
 Runtime helpers for resolving cluster presets.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

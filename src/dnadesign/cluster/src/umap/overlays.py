@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/umap/overlays.py
 
 UMAP overlay attachment helpers.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cluster/__init__.py
 
 Public cluster package exports.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

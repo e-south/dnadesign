@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/runs/recorder.py
 
 Persist typed run artifacts and command records.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

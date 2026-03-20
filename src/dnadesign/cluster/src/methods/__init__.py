@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/methods/__init__.py
 
 Public clustering-method surface.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/cli/umap_resolution.py
 
 UMAP CLI resolution helpers for cluster.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

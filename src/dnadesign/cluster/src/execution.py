@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/execution.py
 
 Thin cluster execution facade that re-exports shared command runtimes.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

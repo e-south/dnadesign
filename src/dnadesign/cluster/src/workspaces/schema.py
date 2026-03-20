@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/workspaces/schema.py
 
 Workspace schema loading and validation for cluster.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/cli/app.py
 
 Cluster CLI root app and callback wiring.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

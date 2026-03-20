@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/workspaces/loader.py
 
 Thin workspace config loading facade for cluster.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

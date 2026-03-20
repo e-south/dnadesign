@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/execution_support.py
 
 Shared helpers for cluster execution command modules.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

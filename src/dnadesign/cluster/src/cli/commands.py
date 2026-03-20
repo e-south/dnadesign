@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/cli/commands.py
 
 Cluster CLI command registration.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

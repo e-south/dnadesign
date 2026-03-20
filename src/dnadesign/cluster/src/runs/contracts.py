@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/runs/contracts.py
 
 Typed run-artifact contracts for cluster.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

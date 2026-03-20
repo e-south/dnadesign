@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/methods/registry.py
 
 Registry of supported clustering methods.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

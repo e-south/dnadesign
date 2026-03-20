@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/cli/subapps.py
 
 Cluster CLI sub-application builders.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

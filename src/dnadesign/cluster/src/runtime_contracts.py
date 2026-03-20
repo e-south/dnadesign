@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/runtime_contracts.py
 
 Typed runtime contracts for cluster.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

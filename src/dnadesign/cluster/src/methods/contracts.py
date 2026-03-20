@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/methods/contracts.py
 
 Clustering-method contracts.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

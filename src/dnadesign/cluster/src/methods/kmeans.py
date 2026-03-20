@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/methods/kmeans.py
 
 MiniBatch K-Means clustering implementation for faster local and large-scale runs.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

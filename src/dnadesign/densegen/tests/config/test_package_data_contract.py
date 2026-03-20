@@ -5,7 +5,7 @@ src/dnadesign/densegen/tests/config/test_package_data_contract.py
 
 Package-data contracts for DenseGen packaged workspace templates.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

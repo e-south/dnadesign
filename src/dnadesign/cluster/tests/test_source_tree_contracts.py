@@ -5,7 +5,7 @@ src/dnadesign/cluster/tests/test_source_tree_contracts.py
 
 Information-architecture source-tree contracts for cluster package layout.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

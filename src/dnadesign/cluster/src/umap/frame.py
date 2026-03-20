@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/umap/frame.py
 
 UMAP input-frame preparation helpers.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

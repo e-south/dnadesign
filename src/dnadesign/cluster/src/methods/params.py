@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/methods/params.py
 
 Lightweight parsing helpers for clustering-method CLI parameters.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

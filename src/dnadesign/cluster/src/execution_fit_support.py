@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/execution_fit_support.py
 
 Shared load and attachment helpers for fit execution.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

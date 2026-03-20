@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/execution_umap.py
 
 UMAP execution runtime for cluster.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/workspaces/errors.py
 
 Workspace error contracts for cluster.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

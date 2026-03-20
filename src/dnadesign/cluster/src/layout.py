@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/layout.py
 
 Cluster project-layout helpers.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

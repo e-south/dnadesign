@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/umap/requests.py
 
 UMAP request normalization helpers.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/runs/index_store.py
 
 Append-friendly storage helpers for the cluster run index.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

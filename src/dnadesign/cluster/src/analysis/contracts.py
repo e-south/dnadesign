@@ -5,7 +5,7 @@ src/dnadesign/cluster/src/analysis/contracts.py
 
 Typed analysis-request contracts for cluster.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

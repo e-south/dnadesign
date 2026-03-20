@@ -6,7 +6,7 @@ src/dnadesign/devtools/generate_runbook_catalog.py
 Regenerates the shared runbook catalog procedure and tool-source sections from
 owner-local metadata sidecars.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
