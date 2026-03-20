@@ -3,9 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-20
 
-Use this page to find a command, runbook, workflow, or tool doc. It points to the owning docs; it does not replace them.
-
-If you prefer terminal discovery, use the shell decision table below.
+Use this page to find a command and the doc that owns it. It links to the maintained runbooks and tool docs; it does not replace them.
 
 ### Shell decision table
 
@@ -21,20 +19,12 @@ If you prefer terminal discovery, use the shell decision table below.
 | Start a campaign manifest | `uv run ops progress scaffold <registry-id> ...` or `uv run ops progress scaffold --related-to <registry-id>` | YAML manifest skeleton for one route or one related route set. It prints to stdout unless you pass `--out`. |
 | Check a campaign | `uv run ops progress campaign --manifest <manifest.yaml>` | Summary of the steps you list in the manifest. |
 
-### Discovery shortcuts
+### Common examples
 
 - `uv run ops catalog list --simple`: shorter inventory when you are new to the registry and do not need the taxonomy first.
-- `uv run ops catalog list`: full inventory of cross-tool procedures plus tool-local runbook sources.
-- `uv run ops catalog list --section tool-sources`: only tool docs when you already know which package you need.
-- `uv run ops catalog list --section tool-sources --query "promoter feature matrix"`: tool docs for the USR, Infer, Cluster, and OPAL surfaces around the promoter/Evo2 path.
-- `uv run ops catalog list --section tool-sources --related-to usr.data-plane.promoter-feature-matrix`: related tool docs for the DenseGen -> construct -> infer -> cluster/OPAL path around one registered procedure.
-- `uv run ops catalog list --related-to usr.data-plane.promoter-feature-matrix`: procedures linked to that route in the catalog.
 - `uv run ops catalog show usr.data-plane.promoter-feature-matrix`: one procedure with its owner docs, related tool docs, linked deeper docs, required progress inputs, and next commands.
 - `uv run ops progress explain usr.data-plane.promoter-feature-matrix`: required flags, direct `progress show` command, and notes before you read that status surface.
-- `uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>`: one registered progress surface with an explicit artifact contract.
-- `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix`: emit an explicit multi-step manifest skeleton with required field placeholders derived from the shared registry.
 - `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`: expand one registered procedure into a starting manifest with the named procedure first and its related procedures after it.
-- If you do not know the registry id yet, return to `uv run ops catalog list --simple`; bare `uv run ops progress scaffold` intentionally refuses to guess.
 - `uv run ops progress campaign --manifest <manifest.yaml>`: read-only summary for the steps listed in the manifest.
 
 ### Authoritative cross-tool procedures
@@ -111,5 +101,5 @@ steps:
 - Keep runbooks and workflows in the docs that own them. This catalog links to them; it does not duplicate them.
 - Catalog rows are generated from `*.registry.yaml` sidecars and must stay aligned with the linked procedure metadata fields; drift is a docs-check failure.
 - `ops` owns executable control-plane runbooks. It does not own durable USR-backed data-plane procedures.
-- `docs/README.md` remains the top-level router by ownership plane. Use this catalog when you want a concise inventory view first.
+- Use this catalog when you want commands first, then open the linked runbook or tool doc for the full procedure.
 - `Progress kind` names the owner-local status surface plus the corresponding read-only `ops progress show` adapter. `ops progress scaffold` emits placeholders only for the explicit registered steps you name, and `ops progress campaign` summarizes only the explicit steps named in a manifest.

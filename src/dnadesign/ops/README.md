@@ -11,7 +11,7 @@ Do not use Ops when:
 - you need the boundary-local runtime semantics first; start from the tool docs or shared USR workflow docs, then return to Ops if you need orchestration around that route
 
 For repo-wide runbook discovery, start with `docs/runbooks/README.md`; `ops` does not keep a second registry.
-Typical flow: browse the catalog, inspect one registered procedure, explain the status surface if needed, then either scaffold a manifest or move into the runbook lifecycle commands.
+Use this README for package scope, the shared command entrypoints below, and links into the maintained Ops docs.
 
 ## Common entrypoints
 

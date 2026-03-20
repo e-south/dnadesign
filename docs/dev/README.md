@@ -3,13 +3,13 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-03
 
-Use this index to find maintainer workflows, CI parity commands, and planning records.
+Use this index to find maintainer workflows, checks, and planning records.
 
 ### Start here
 
-1. Read [repository docs index](../README.md) for the full docs map.
-2. Review [PLANS](../../PLANS.md) before changing architecture or execution flow.
-3. Use [architecture decisions index](../architecture/decisions/README.md) for approved decisions.
+1. Review [PLANS](../../PLANS.md) before changing architecture or execution flow.
+2. Use [architecture decisions index](../architecture/decisions/README.md) for approved decisions.
+3. Use [CI and quality checks](#ci-and-quality-checks) before merging maintainer changes.
 
 ### Day-to-day tasks
 

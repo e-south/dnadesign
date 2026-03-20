@@ -67,7 +67,7 @@ def test_infer_docs_readme_keeps_workflow_then_type_progressive_disclosure() -> 
         [
             "### Read order",
             "### Documentation by workflow",
-            "### Cross-tool handoff routes",
+            "### Shared dataset handoffs into infer",
             "### Documentation by type",
         ],
         label="src/dnadesign/infer/docs/README.md",
@@ -91,7 +91,7 @@ def test_infer_docs_readme_keeps_workflow_then_type_progressive_disclosure() -> 
     assert "data.location.kind: usr" in docs_readme
     assert "[Multi-source source-of-truth assembly]" in docs_readme
     assert "[Construct -> USR -> Infer source-of-truth runbook]" in docs_readme
-    assert "[cluster exploratory workflow]" in docs_readme
+    assert "[cluster exploratory clustering workflow]" in docs_readme
     assert "reference/README.md" in docs_readme
     assert "architecture/README.md" in docs_readme
     assert "dev/README.md" in docs_readme
@@ -101,12 +101,17 @@ def test_infer_docs_readme_keeps_workflow_then_type_progressive_disclosure() -> 
     assert "../../usr/docs/operations/multi-source-source-of-truth-assembly.md" not in pressure_test_section
     assert "../../usr/docs/operations/construct-infer-source-of-truth-runbook.md" not in pressure_test_section
     assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" not in pressure_test_section
+    shared_handoff_section = docs_readme.split("### Shared dataset handoffs into infer", maxsplit=1)[1]
+    shared_handoff_section = shared_handoff_section.split("### Documentation by type", maxsplit=1)[0]
+    assert "../../cluster/docs/workflows/exploratory-clustering.md" not in shared_handoff_section
+    assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" not in shared_handoff_section
     by_type = docs_readme.split("### Documentation by type", maxsplit=1)[1]
     assert "../../usr/docs/operations/multi-source-source-of-truth-assembly.md" not in by_type
     assert "../../usr/docs/operations/construct-infer-source-of-truth-runbook.md" not in by_type
     assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" not in by_type
     assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" not in by_type
     assert "../../cluster/docs/workflows/exploratory-clustering.md" not in by_type
+    assert "[Section index](index.md)" in docs_readme
 
 
 def test_infer_docs_index_exists_and_points_back_to_docs_readme() -> None:

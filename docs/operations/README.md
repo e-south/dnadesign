@@ -9,31 +9,30 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-20
 
-Ops covers repo-level batch orchestration for deterministic workflows. Start here when you need runbook setup, planning, execution, or status checks. Detailed command behavior and schema rules live in [orchestration runbooks](orchestration-runbooks.md). For command lookup across tools, use the [runbook catalog](../runbooks/README.md).
+Ops covers repo-level batch orchestration for deterministic workflows. Start here when you need runbook setup, planning, execution, or status checks. Detailed command behavior and schema rules live in [orchestration runbooks](orchestration-runbooks.md). Use the [runbook catalog](../runbooks/README.md) when you need command lookup across tools.
 
 ### What Ops is for
 
-1. Turn runbook intent into deterministic preflight, verification, and submit phases.
-2. Keep runbook, scheduler-log, and audit artifacts workspace-scoped for repeated campaigns.
-3. Fail fast on schema, secret, and storage-guard violations before submission.
-4. Produce machine-readable audit output that records command order and outcomes.
-5. Expose read-only progress summaries over registered procedures and explicit campaigns without taking ownership away from boundary-local tools.
+- Turn runbook intent into deterministic preflight, verification, and submit phases.
+- Keep runbook, scheduler-log, and audit artifacts workspace-scoped for repeated campaigns.
+- Fail fast on schema, secret, and storage-guard violations before submission.
+- Produce machine-readable audit output that records command order and outcomes.
+- Expose read-only status summaries over registered procedures and explicit campaigns without taking ownership away from boundary-local tools.
 
 ### Start here
 
-1. Start with [Ops package README](../../src/dnadesign/ops/README.md) for scope and boundaries.
-2. Use [Discovery handoff](#discovery-handoff) when you still need the catalog or status commands.
-3. Choose a route in [Orchestration routes](#orchestration-routes) based on batch intent.
-4. Confirm contract details in [Contracts](#contracts).
-5. Use [Status and manifest routes](#status-and-manifest-routes) when you need status or an explicit manifest rather than command planning.
-6. Run the [Verification loop](#verification-loop) before any submit.
-7. Return to the [repository docs index](../README.md) if the next step is outside Ops.
+1. Use [Command lookup](#command-lookup) when you need the catalog or status commands first.
+2. Use [Orchestration routes](#orchestration-routes) when you are starting, dry-running, or submitting a runbook.
+3. Use [Contracts](#contracts) when you need the exact schema or command rules.
+4. Use [Status and manifest routes](#status-and-manifest-routes) when you need a read-only summary or an explicit manifest.
+5. Run the [Verification loop](#verification-loop) before any submit.
+6. Leave Ops for the shared USR runbooks when the next step changes datasets rather than scheduler state.
 
-### Discovery handoff
+### Command lookup
 
 Use these when you still need command lookup before choosing a runbook lifecycle step.
 
-- [Runbook catalog](../runbooks/README.md): shared command table for `ops catalog` and `ops progress`.
+- [Runbook catalog](../runbooks/README.md): shared command index for `ops catalog` and `ops progress`.
 - [How to use Ops](../../src/dnadesign/ops/docs/how-to-use-ops.md): package command guide for inspection, status, and manifest commands.
 - `uv run ops catalog list --simple`: quick inventory command before choosing a lifecycle route.
 
@@ -46,14 +45,6 @@ Use these when you still need command lookup before choosing a runbook lifecycle
 | Run batch-only orchestration | [orchestration workflow ids](orchestration-runbooks.md#orchestration-workflow-ids) | [planner and executor commands](orchestration-runbooks.md#planner-and-executor-commands) |
 | Run batch plus notify orchestration | [orchestration workflow ids](orchestration-runbooks.md#orchestration-workflow-ids) | [notify command contracts](../../src/dnadesign/notify/docs/reference/command-contracts.md) |
 | Run generation now and refresh plots in the same submit chain | [runbook schema (v1)](orchestration-runbooks.md#runbook-schema-v1) | [contract rules](orchestration-runbooks.md#contract-rules) |
-
-### Adjacent routes outside Ops
-
-Ops does not own construct-led source-of-truth accumulation or other USR-backed workflows. When you want a shared USR-backed dataset that multiple construct projects feed before infer adds derived namespaces, use the shared runbook:
-
-- [Multi-source source-of-truth assembly](../../src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md)
-- [Construct -> USR -> Infer source-of-truth runbook](../../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-runbook.md)
-- [Promoter characterization feature matrix](../../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md)
 
 ### Contracts
 
@@ -74,7 +65,11 @@ Ops does not own construct-led source-of-truth accumulation or other USR-backed 
 6. Use `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` when you want the named registered procedure plus its related procedures as a starting point.
 7. Use `uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>` when the work spans multiple runtimes or pauses between steps.
 8. Keep the manifest explicit. Ops reads the files you name there; it does not infer hidden campaign state.
-9. For progress-kind meanings and the next checks for each one, return to the [runbook catalog glossary](../runbooks/README.md#progress-surface-glossary).
+9. For progress-kind meanings and the next checks for each one, see the [runbook catalog glossary](../runbooks/README.md#progress-surface-glossary).
+10. If the next step is dataset assembly, construct realization, or infer write-back, leave Ops and continue in the shared USR runbooks:
+    [Multi-source source-of-truth assembly](../../src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md),
+    [Construct -> USR -> Infer source-of-truth runbook](../../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-runbook.md),
+    or [Promoter characterization feature matrix](../../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md).
 
 ### Verification loop
 

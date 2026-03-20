@@ -52,7 +52,7 @@ def test_ops_module_readme_has_banner_narrative_and_doc_map() -> None:
     assert "Do not use Ops when:" in text
     assert "shared command index" in text
     assert "uv run ops catalog list" in text
-    assert "Typical flow: browse the catalog" in text
+    assert "shared command entrypoints below" in text
     assert "uv run ops catalog show <registry-id>" in text
     assert "uv run ops progress explain <registry-id>" in text
     assert "docs/README.md" in text
@@ -79,7 +79,7 @@ def test_ops_package_local_docs_index_routes_to_shared_runbook_surface() -> None
         label="src/dnadesign/ops/docs/README.md",
     )
     assert "../../../../docs/runbooks/README.md" in text
-    assert "command lookup" in text
+    assert "full command list" in text
     assert "how-to-use-ops.md" in text
     assert "../../../../docs/operations/README.md" in text
     assert "../../../../docs/operations/orchestration-runbooks.md" in text
@@ -140,7 +140,7 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
         [
             "### What Ops is for",
             "### Start here",
-            "### Discovery handoff",
+            "### Command lookup",
             "### Orchestration routes",
             "### Contracts",
             "### Status and manifest routes",
@@ -159,7 +159,7 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
     assert "../runbooks/README.md" in text
     assert "../../src/dnadesign/ops/docs/how-to-use-ops.md" in text
     assert "uv run ops catalog list --simple" in text
-    assert "shared command table for `ops catalog` and `ops progress`" in text
+    assert "shared command index for `ops catalog` and `ops progress`" in text
     assert 'uv run ops catalog list --query "promoter feature matrix"' not in text
     assert "uv run ops catalog show <registry-id>" not in text
     assert "--plane data-plane --query infer" not in text
@@ -187,8 +187,6 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
     assert "orchestration-runbooks.md" in text
     assert "../runbooks/README.md" in text
     assert "multi-source-source-of-truth-assembly.md" in text
-    assert "../README.md" in text
-    assert "../../src/dnadesign/ops/README.md" in text
     assert "progressive disclosure" not in text.lower()
 
 
@@ -281,7 +279,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     text = _read(_repo_root() / "docs" / "runbooks" / "README.md")
 
     assert "## Runbook Catalog" in text
-    assert "find a command, runbook, workflow, or tool doc" in text
+    assert "find a command and the doc that owns it" in text
     assert "uv run ops catalog list" in text
     assert "uv run ops catalog list --simple" in text
     assert "### Shell decision table" in text
@@ -298,7 +296,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix" in text
     assert "uv run ops progress campaign --manifest <manifest.yaml>" in text
     assert "prints to stdout unless you pass `--out`" in text
-    assert "### Discovery shortcuts" in text
+    assert "### Common examples" in text
     assert "### Authoritative cross-tool procedures" in text
     assert "### Tool-local runbook sources" in text
     assert "### Progress surface glossary" in text
@@ -319,7 +317,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "../../src/dnadesign/densegen/docs/README.md" in text
     assert "../../src/dnadesign/construct/docs/README.md" in text
     assert "../../src/dnadesign/infer/docs/README.md" in text
-    assert "It points to the owning docs; it does not replace them." in text
+    assert "It links to the maintained runbooks and tool docs; it does not replace them." in text
     assert "drift is a docs-check failure" in text
     assert "This command only summarizes the manifest you provide." in text
     assert "Relative artifact paths in the manifest resolve from the manifest directory" in text
