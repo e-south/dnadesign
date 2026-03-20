@@ -1,31 +1,31 @@
 ![Ops banner](assets/ops-banner.svg)
 
-Ops is the cross-tool orchestration control plane for deterministic batch workflows. It turns runbook intent into explicit preflight, verification, and submit phases with auditable outputs, so scheduler work stays legible instead of dissolving into ad hoc shell glue.
+Ops manages batch orchestration across tools. It turns a runbook into preflight, verification, and submit steps with audit output, so scheduler work stays readable instead of turning into ad hoc shell commands.
 
 Use Ops when:
 - you need a shared orchestration layer for scheduler work, packaged runbooks, or read-only status over a registered route
-- you want to browse the shared route map from the terminal with `uv run ops catalog list --simple` or `uv run ops catalog list`
+- you want to browse the shared command index from the terminal with `uv run ops catalog list --simple` or `uv run ops catalog list`
 
 Do not use Ops when:
 - a tool already owns the durable dataset mutation, such as Construct -> USR -> Infer source-of-truth work
 - you need the boundary-local runtime semantics first; start from the tool docs or shared USR workflow docs, then return to Ops if you need orchestration around that route
 
-For repo-wide runbook discovery, `ops` exposes a shared catalog view in `docs/runbooks/README.md`; it does not own a second registry.
+For repo-wide runbook discovery, start with `docs/runbooks/README.md`; `ops` does not keep a second registry.
 Typical flow: browse the catalog, inspect one registered procedure, explain the status surface if needed, then either scaffold a manifest or move into the runbook lifecycle commands.
 
 ## Common entrypoints
 
-- `uv run ops catalog list --simple`: start with a task-first inventory from the shell.
+- `uv run ops catalog list --simple`: start with a quick inventory from the shell.
 - `uv run ops catalog show <registry-id>`: inspect one registered route, its owner docs, and related procedures.
 - `uv run ops progress explain <registry-id>`: print the required flags before you use a progress surface.
 - Use [How to use Ops](docs/how-to-use-ops.md) for the expanded command ladder and [Ops orchestration index](../../../docs/operations/README.md) once you are in the runbook lifecycle.
 
 ## Documentation
 
-- [Ops docs index](docs/README.md): package-local map for when to use Ops, packaged presets, and the repo-wide control-plane surfaces it points to.
-- [How to use Ops](docs/how-to-use-ops.md): quick command guide for catalog discovery, runbook inspection, status checks, and manifest scaffolding.
-- [Runbook catalog](../../../docs/runbooks/README.md): repo-level inventory of authoritative cross-tool procedures and owner-local tool entrypoints.
-- [Ops orchestration index](../../../docs/operations/README.md): task-first router for runbook lifecycle choices.
+- [Ops docs index](docs/README.md): Ops package docs, packaged presets, and links to repo-level control-plane docs.
+- [How to use Ops](docs/how-to-use-ops.md): command guide for catalog discovery, runbook inspection, status checks, and manifest scaffolding.
+- [Runbook catalog](../../../docs/runbooks/README.md): repo-level command index for cross-tool procedures and tool entrypoints.
+- [Ops orchestration index](../../../docs/operations/README.md): runbook lifecycle docs for init, plan, execute, and status checks.
 - [Orchestration runbooks](../../../docs/operations/orchestration-runbooks.md): runbook schema, command sequence, and contract rules.
 - [Packaged runbook presets](runbooks/presets): checked-in starter runbooks for common orchestration routes.
-- [Repository docs index](../../../docs/README.md): repo-wide route map for cross-tool workflows.
+- [Repository docs index](../../../docs/README.md): repo-wide docs index for cross-tool workflows.

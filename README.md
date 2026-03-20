@@ -2,15 +2,15 @@
 
 ![dnadesign banner](assets/dnadesign-banner.svg)
 
-`dnadesign` is a collection of modular bioinformatic pipelines and helper packages for biological sequence design. The repository is organized as interoperable tools so generation, realization, inference, clustering, optimization, and workflow orchestration can stay explicit at their boundaries instead of collapsing into one opaque pipeline.
+`dnadesign` is a collection of modular bioinformatic pipelines and helper packages for biological sequence design. The repository is organized as interoperable tools so generation, realization, inference, clustering, optimization, and workflow orchestration can remain separate instead of being forced into one pipeline.
 
 ---
 
 ## Documentation
 
-Use the docs index to choose the next deep procedure by ownership plane, find the next concrete workflow or tool doc, then drop into the owning package for operational detail.
+Start with the docs index for workflows, tool docs, and repository records.
 
-- [Docs index](docs/README.md): central route map for workflow and tool documentation, and the best place to start if you are orienting to the repo.
+- [Docs index](docs/README.md): main index for workflow, tool, and repository docs.
 - [Installation](docs/installation.md): bootstrap the environment and run baseline verification commands.
 - [Architecture](ARCHITECTURE.md), [Design](DESIGN.md), [Reliability](RELIABILITY.md), [Security](SECURITY.md), [Plans](PLANS.md), [Quality score](QUALITY_SCORE.md): repository-level contracts and governance records.
 - [Developer docs](docs/dev/README.md): CI contracts, maintenance runbooks, and execution-planning references.

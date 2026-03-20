@@ -4,16 +4,16 @@
 **Plane:** data-plane
 **Owner-boundary:** usr
 **Entry artifact:** promoter anchors or wildtype/manual promoter records that still need a concrete cross-tool route
-**Exit artifact:** chosen owner-local runbook for source assembly, optional construct contextualization, Evo2 feature extraction, notification, or downstream analysis
+**Exit artifact:** chosen runbook for source assembly, optional construct contextualization, Evo2 feature extraction, notification, or downstream analysis
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-20
 
-Use this page when you need the whole promoter/Evo2 route in one place before choosing a concrete runbook. This page is a route map only. The linked owner-local runbooks remain authoritative for commands, schemas, and failure handling.
+Use this page when you need the whole promoter/Evo2 path in one place before choosing a concrete runbook. The linked runbooks hold the command, schema, and failure-handling details.
 
 ### If you are entering from Ops
 
-- `uv run ops catalog show usr.data-plane.promoter-feature-matrix`: inspect the authoritative cross-tool feature-matrix route plus related tool docs.
+- `uv run ops catalog show usr.data-plane.promoter-feature-matrix`: inspect the cross-tool feature-matrix route plus related tool docs.
 - `uv run ops progress explain usr.data-plane.promoter-feature-matrix`: see the required read-only status inputs before you touch artifacts.
 - `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`: emit a starting manifest across the related route set when you want a read-only campaign view.
 
@@ -32,7 +32,7 @@ Use this page when you need the whole promoter/Evo2 route in one place before ch
    Use [Evo2 provider reference](../../../infer/docs/reference/evo2-provider.md) for `evo2_7b`, `evo2_20b`, block-26 default, pooling, and stored output names.
 5. Validate the optional Notify side branch only when watcher behavior matters.
    Use [Notify operations route](../../../../../docs/notify/README.md) or the operator manual [Notify: consuming Universal Sequence Record events](../../../../../docs/notify/usr-events.md).
-6. Hand off into the authoritative cross-tool feature matrix route, then branch downstream.
+6. Hand off into the cross-tool feature matrix route, then branch downstream.
    Use [Promoter characterization feature matrix](promoter-characterization-feature-matrix.md) once the study should become one infer-annotated USR dataset.
    After that handoff, choose either [cluster exploratory clustering workflow](../../../cluster/docs/workflows/exploratory-clustering.md) or [USR dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/usr-infer-x-active-learning.md).
 

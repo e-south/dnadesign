@@ -437,7 +437,7 @@ def _emit_catalog_list_text(
     if section == "all":
         lines.append("")
     if section in {"all", "tool-sources"}:
-        lines.append("Tool-local runbook sources")
+        lines.append("Tool docs")
         for entry in tool_sources:
             lines.append(f"- {entry.tool}: {entry.title}")
             lines.append(f"  {entry.summary}")
@@ -1167,7 +1167,7 @@ def _catalog_list_next_steps(
     else:
         next_steps.append(
             (
-                "Browse owner-local docs only",
+                "Browse tool docs only",
                 _render_command(["uv", "run", "ops", "catalog", "list", "--section", "tool-sources"]),
             )
         )

@@ -6,7 +6,7 @@
 ### Choose a task
 
 - [Create or inspect one dataset locally](getting-started/cli-quickstart.md): shortest path to one validated USR lifecycle.
-- [Sync an existing dataset between local and HPC](operations/workflow-map.md): task-first router for clone, pull, push, and audit flows.
+- [Sync an existing dataset between local and HPC](operations/workflow-map.md): choose the sync doc for clone, pull, push, and audit work.
 - [Assemble multiple producer datasets into one source-of-truth dataset](operations/multi-source-source-of-truth-assembly.md): shared USR-backed merge/carry path before construct and infer.
 - [Hand a construct-backed shared dataset to infer and downstream watchers](operations/construct-infer-source-of-truth-runbook.md): one construct -> USR -> infer handoff.
 - [Understand the full promoter Evo2 path before choosing a concrete branch](operations/promoter-evo2-journey.md): linked route from DenseGen/manual/wildtype inputs through optional construct contexts, infer Evo2 bundles, Notify watcher validation, and Cluster/OPAL branches.
@@ -16,8 +16,8 @@
 
 1. [Top README](../README.md): package intent, hard boundaries, and where to branch next.
 2. [Getting started index](getting-started/README.md): first local run paths for CLI and notebook setup.
-3. [Operations index](operations/README.md): task-first sync and cross-tool source-of-truth runbooks for iterative remote and HPC updates.
-4. [Reference index](reference/README.md): authoritative contracts for schema, overlays, events, and API usage.
+3. [Operations index](operations/README.md): sync and cross-tool source-of-truth runbooks for iterative remote and HPC updates.
+4. [Reference index](reference/README.md): schema, overlay, event, and API contracts.
 5. [Architecture introspection](architecture-introspection.md): deep lifecycle and module interaction map for integration work.
 
 ### Getting started

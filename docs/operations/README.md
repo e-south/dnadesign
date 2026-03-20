@@ -3,13 +3,13 @@
 **Type:** route
 **Plane:** control-plane
 **Owner-boundary:** ops
-**Entry artifact:** batch orchestration intent that still needs a runbook lifecycle route
-**Exit artifact:** authoritative ops schema, plan, execute, or read-only progress contract
+**Entry artifact:** batch job setup that still needs an Ops runbook route
+**Exit artifact:** Ops schema, plan, execute, or read-only progress docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-19
+**Last verified:** 2026-03-20
 
-Ops is the repository-level control-plane orchestration surface for deterministic batch workflows. This page is a route map; detailed command behavior and schema rules live in [orchestration runbooks](orchestration-runbooks.md). It is not the registry for durable USR-backed data-plane workflows. For a repo-wide inventory of authoritative procedures and tool-local runbook sources, use the [runbook catalog](../runbooks/README.md) or start from `uv run ops catalog list`.
+Ops covers repo-level batch orchestration for deterministic workflows. Start here when you need runbook setup, planning, execution, or status checks. Detailed command behavior and schema rules live in [orchestration runbooks](orchestration-runbooks.md). For command lookup across tools, use the [runbook catalog](../runbooks/README.md).
 
 ### What Ops is for
 
@@ -22,29 +22,20 @@ Ops is the repository-level control-plane orchestration surface for deterministi
 ### Start here
 
 1. Start with [Ops package README](../../src/dnadesign/ops/README.md) for scope and boundaries.
-2. Use the shell routes below when terminal discovery is faster than browsing docs.
+2. Use [Discovery handoff](#discovery-handoff) when you still need the catalog or status commands.
 3. Choose a route in [Orchestration routes](#orchestration-routes) based on batch intent.
 4. Confirm contract details in [Contracts](#contracts).
 5. Use [Status and manifest routes](#status-and-manifest-routes) when you need status or an explicit manifest rather than command planning.
 6. Run the [Verification loop](#verification-loop) before any submit.
-7. Return to the [repository docs index](../README.md) for cross-tool routing across control-plane and data-plane surfaces.
+7. Return to the [repository docs index](../README.md) if the next step is outside Ops.
 
-### Shell routes
+### Discovery handoff
 
-| If you want to... | Use this command | What happens next |
-| --- | --- | --- |
-| Browse the shared inventory without taxonomy first | `uv run ops catalog list --simple` | Task-first inventory from the terminal before you care about route metadata fields. |
-| Browse the shared inventory | `uv run ops catalog list` | Shared runbook inventory from the terminal, plus suggested next steps for narrowing or inspection. |
-| Narrow the inventory by rough intent | `uv run ops catalog list --plane data-plane --query infer` | Smaller result set when the next route is data-plane and infer-adjacent. |
-| Find the promoter-feature-matrix route by topic | `uv run ops catalog list --query "promoter feature matrix"` | Matches the registered procedure and adjacent tool docs around that phrase. |
-| Inspect one registered procedure | `uv run ops catalog show <registry-id>` | Owner docs, typed related procedures, typed related tool docs, exact deep docs when declared, required progress inputs, and typed relations. |
-| Explain one status surface before running it | `uv run ops progress explain <registry-id>` | Required flags, direct `progress show` command, and adapter-specific notes for that route. |
-| Browse owner-local docs only | `uv run ops catalog list --section tool-sources` | Owner-local entrypoints when you already know you want the docs layer first. |
-| Browse typed related procedures | `uv run ops catalog list --related-to usr.data-plane.promoter-feature-matrix` | Typed related procedures around one path once you know the anchor registry id. |
-| Browse typed related tool docs | `uv run ops catalog list --section tool-sources --related-to usr.data-plane.promoter-feature-matrix` | Typed related tool docs around one path once you know the anchor registry id. |
-| Check one USR dataset-state surface | `uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>` | Read-only summary for that registered route once you have the explicit artifact inputs. |
-| Start a manifest skeleton | `uv run ops progress scaffold <registry-id> ...` or `uv run ops progress scaffold --related-to <registry-id>` | Explicit manifest starter for one route or one related route set. It prints YAML to stdout unless you pass `--out`. |
-| Check a campaign | `uv run ops progress campaign --manifest <manifest.yaml>` | Explicit multi-step summary from one manifest. |
+Use these when you still need command lookup before choosing a runbook lifecycle step.
+
+- [Runbook catalog](../runbooks/README.md): shared command table for `ops catalog` and `ops progress`.
+- [How to use Ops](../../src/dnadesign/ops/docs/how-to-use-ops.md): package command guide for inspection, status, and manifest commands.
+- `uv run ops catalog list --simple`: quick inventory command before choosing a lifecycle route.
 
 ### Orchestration routes
 
@@ -58,7 +49,7 @@ Ops is the repository-level control-plane orchestration surface for deterministi
 
 ### Adjacent routes outside Ops
 
-Ops does not own construct-led source-of-truth accumulation or other USR-backed data-plane procedures. When you want a shared USR-backed dataset that multiple construct projects feed before infer adds derived namespaces, use the shared cross-tool runbook:
+Ops does not own construct-led source-of-truth accumulation or other USR-backed workflows. When you want a shared USR-backed dataset that multiple construct projects feed before infer adds derived namespaces, use the shared runbook:
 
 - [Multi-source source-of-truth assembly](../../src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md)
 - [Construct -> USR -> Infer source-of-truth runbook](../../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-runbook.md)
@@ -79,11 +70,11 @@ Ops does not own construct-led source-of-truth accumulation or other USR-backed 
 2. Use `uv run ops progress show ops.control-plane.orchestration --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json` to summarize one control-plane runbook execution from the registered progress contract.
 3. Use `uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <repo-root> --usr-root <usr-root> --dataset <dataset>` to summarize one staged USR-backed data-plane procedure from explicit artifacts.
 4. `ops progress show` and `ops progress campaign` are read-only status surfaces. Inspect the required flags in `ops progress explain <registry-id>` or `ops catalog show <registry-id>` before you run them if you do not already know the artifact contract.
-5. Use `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` to emit the smallest explicit manifest skeleton with the right required fields. It prints to stdout unless you pass `--out`.
-6. Use `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` when you want the named registered procedure plus its typed related procedures as an explicit starting point.
+5. Use `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` to emit a manifest template with the right required fields. It prints to stdout unless you pass `--out`.
+6. Use `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` when you want the named registered procedure plus its related procedures as a starting point.
 7. Use `uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>` when the work spans multiple runtimes or pauses between steps.
-8. Keep the manifest explicit. Ops reads the owner-local evidence you name there; it does not infer hidden campaign state.
-9. For progress-kind meanings and owner-local follow-up surfaces, return to the [runbook catalog glossary](../runbooks/README.md#progress-surface-glossary).
+8. Keep the manifest explicit. Ops reads the files you name there; it does not infer hidden campaign state.
+9. For progress-kind meanings and the next checks for each one, return to the [runbook catalog glossary](../runbooks/README.md#progress-surface-glossary).
 
 ### Verification loop
 
@@ -110,7 +101,7 @@ uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>
 ```
 
 - Keep runbooks workspace-scoped (for example `<workspace-root>/outputs/logs/ops/runbooks/<runbook-id>.yaml`).
-- The dry run above is the smallest positive control-plane status demo because it emits the audit JSON that `ops progress show ops.control-plane.orchestration` reads. On non-SCC workstations, add `--allow-missing-qstat` so queue readiness degrades explicitly instead of failing opaquely.
+- The dry run above is the smallest working status example because it emits the audit JSON that `ops progress show ops.control-plane.orchestration` reads. On non-SCC workstations, add `--allow-missing-qstat` so queue readiness degrades explicitly instead of failing opaquely.
 - Keep `<project>` aligned with the scheduler account or project configured for the workspace or study.
 - Do not create transient operational working directories at repo root (`.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`); use `/scratch` for disposable state.
 - For manual chaining, `--active-job-id` accepts repeat flags or a comma-delimited list and normalizes before `-hold_jid` submit wiring.

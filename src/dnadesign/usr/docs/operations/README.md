@@ -3,13 +3,13 @@
 **Type:** route
 **Plane:** data-plane
 **Owner-boundary:** usr
-**Entry artifact:** USR dataset, sync, or cross-tool source-of-truth intent that still needs an authoritative route
-**Exit artifact:** authoritative USR data-plane runbook or downstream handoff route
+**Entry artifact:** USR dataset, sync, or cross-tool source-of-truth work that still needs a route
+**Exit artifact:** USR runbook or downstream handoff route
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-16
 
-This directory holds authoritative USR-backed data-plane runbooks in lifecycle order.
+This directory holds USR-backed runbooks in lifecycle order.
 
 ## Lifecycle routes
 
@@ -52,7 +52,7 @@ This directory holds authoritative USR-backed data-plane runbooks in lifecycle o
 
 ## Read order
 
-1. [workflow-map.md](workflow-map.md): task-first command chains.
+1. [workflow-map.md](workflow-map.md): command chains by task.
 2. Sync lifecycle:
    [sync-quickstart.md](sync-quickstart.md),
    [sync-setup.md](sync-setup.md),

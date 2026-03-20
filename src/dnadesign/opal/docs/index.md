@@ -42,7 +42,7 @@ These pages describe runtime architecture and RoundCtx contract auditing behavio
 ### Reference
 
 These pages are contract-oriented lookups for schema, data surfaces, CLI behavior, and plotting.
-- [Configuration (`campaign.yaml`)](./reference/configuration.md): canonical campaign schema and field meanings.
+- [Configuration (`campaign.yaml`)](./reference/configuration.md): campaign schema and field meanings.
 - [Data contracts and ledgers](./reference/data-contracts.md): artifact schemas, ledgers, and persistence surfaces.
 - [CLI commands](./reference/cli.md): command interfaces and argument contracts.
 - [Plots](./reference/plots.md): plotting outputs, expectations, and usage.

@@ -3,26 +3,19 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-20
 
-This is the central documentation map for workflows, tool references, and repository policy.
+Start here when you need a workflow, tool doc, or repository record.
 
-### Use this index
+### Start here
 
 1. If this is a new machine, start with [Installation](installation.md) first.
    Once baseline verification passes, return here.
-2. Continue to [Workflow routes](#workflow-routes) and follow the preflight -> run -> verify sequence for the relevant outcome.
-3. Use the [Runbook catalog](runbooks/README.md) when you want a concise inventory of authoritative procedures, workflows, and owner-local tool entrypoints from the shell.
-4. Follow the route's "Verify next" target before moving to downstream tools.
-5. Use [Tool docs](#tool-docs) when you need package-level commands and data contracts.
-6. Use [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for policy, operations, and governance detail.
-7. Return to this page as the central docs map.
+2. Continue to [Workflow routes](#workflow-routes) and choose the section that matches the task.
+3. Use the [Runbook catalog](runbooks/README.md) when you need a command index.
+4. Jump to [Tool docs](#tool-docs) when you already know which package owns the next step.
+5. Use [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for policy, operations, and governance detail.
+6. Return here when you need a different branch.
 
-### New here?
-
-- If the environment is not ready yet, start with [Installation](installation.md).
-- If you want a shell-first inventory after setup, start with [Runbook catalog](runbooks/README.md) or run `uv run ops catalog list --simple`.
-- If you already know the owner boundary, jump to [Tool docs](#tool-docs).
-- If you already know the next step is control-plane orchestration, go to [Ops orchestration index](operations/README.md).
-- DenseGen docs live under `densegen`, while the CLI entrypoint is `uv run dense --help`.
+DenseGen docs live under `densegen`, while the CLI entrypoint is `uv run dense --help`.
 
 ### Quick terms
 
@@ -34,16 +27,16 @@ This is the central documentation map for workflows, tool references, and reposi
 ### How docs are organized
 
 - `route`: tells you where to go next.
-- `runbook`: authoritative operator procedure with ordered commands and verification.
+- `runbook`: maintained operator procedure with ordered commands and verification.
 - `workflow`: downstream tool-owned branch after a handoff into that tool.
-- `tutorial` or `demo`: sample or pedagogical path; use the linked runbook/workflow when you need the authoritative contract.
-- The workflow routes below are grouped by the owner of the next deep procedure so you do not have to infer control-plane versus data-plane ownership from path names alone.
+- `tutorial` or `demo`: sample path; use the linked runbook or workflow when you need the maintained procedure.
+- The sections below move from single-tool work to shared USR flows and then operations.
 
 ### Workflow routes
 
 #### Single-tool starts
 
-Choose this section when the next authoritative document is still package-local and you do not yet need a shared durable USR handoff.
+Use these when one tool still owns the work and no shared USR handoff is involved.
 
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
@@ -56,14 +49,13 @@ Choose this section when the next authoritative document is still package-local 
 
 #### Shared USR-backed data-plane flows
 
-These routes hand off into authoritative USR-backed runbooks or downstream tool workflows after the USR handoff is already explicit.
-Choose this section when the next durable artifact is a shared USR dataset, overlay namespace, or infer-annotated feature matrix.
+Use these when the handoff already runs through a shared USR dataset, overlay namespace, or infer-annotated feature matrix.
 
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
 | Assemble multiple USR-backed inputs into one downstream source-of-truth flow, then hand off through construct and infer | [Multi-source source-of-truth assembly](../src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md) | Verify carried overlays, construct lineage, and infer write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
 | Consolidate construct realizations into one USR-backed source-of-truth dataset, then hand off to Infer | [Construct -> USR -> Infer source-of-truth runbook](../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-runbook.md) | Verify lineage plus downstream write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
-| Understand the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL promoter route before choosing a branch | [Promoter Evo2 workflow journey](../src/dnadesign/usr/docs/operations/promoter-evo2-journey.md) | Verify the authoritative cross-tool handoff in [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md). |
+| Understand the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL promoter route before choosing a branch | [Promoter Evo2 workflow journey](../src/dnadesign/usr/docs/operations/promoter-evo2-journey.md) | Continue to [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md) for the shared handoff. |
 | Build one promoter feature matrix from DenseGen anchors, wildtype/manual promoters, optional construct-expanded contexts, and infer-derived representations | [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md) | Verify one explicit `infer__...` column is chosen as `X`, then branch into the exploratory [cluster workflow](../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) or the downstream [USR dataset with infer-derived X -> OPAL active learning](../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md) workflow. |
 | Sync iterative HPC outputs to local analysis safely | [USR workflow map](../src/dnadesign/usr/docs/operations/workflow-map.md) -> [USR HPC sync flow](../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md) | Verify transfer parity with [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync-audit-loop.md). |
 | Run cross-machine sync with stricter failure checks | [USR sync command contract](../src/dnadesign/usr/docs/operations/sync.md) | Verify sidecar and overlay fidelity with [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync-fidelity-drills.md). |
@@ -71,8 +63,7 @@ Choose this section when the next durable artifact is a shared USR dataset, over
 
 #### Operations and infrastructure
 
-These routes hand off into control-plane or environment runbooks rather than durable USR-backed data-plane procedures.
-Choose this section when the next artifact is orchestration state, environment setup, or audit output rather than a durable USR dataset mutation.
+Use these when the next step is orchestration, environment setup, or audit output rather than dataset mutation.
 
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
@@ -115,8 +106,8 @@ Choose this section when the next artifact is orchestration state, environment s
 ### Operations
 
 - [Installation](installation.md): environment setup and verification baseline.
-- [Runbook catalog](runbooks/README.md): concise inventory of authoritative cross-tool procedures plus generated owner-local tool entrypoints.
-- [Ops orchestration index](operations/README.md): task-first control-plane runbook planning and execution routes.
+- [Runbook catalog](runbooks/README.md): shell command index for cross-tool procedures and tool entrypoints.
+- [Ops orchestration index](operations/README.md): orchestration docs for init, plan, execute, and status checks.
 - [BU SCC docs index](bu-scc/README.md): cluster setup, submission, and operator runbooks.
 - [Notify docs index](notify/README.md): notifier setup, runtime behavior, and recovery routes.
 - [USR operations index](../src/dnadesign/usr/docs/operations/README.md): sync, transfer, and cross-tool source-of-truth runbooks for iterative workspace updates.

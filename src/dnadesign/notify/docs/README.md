@@ -3,13 +3,13 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-16
 
-Tool-local docs live here. Cross-tool workflows stay in shared operator docs, either under top-level `docs/` or the boundary-owning tool's operations docs when one tool owns the durable handoff.
-Operators who just need to set up, run, or recover a watcher should start with [Notify USR events runbook](../../../../docs/notify/usr-events.md) first, then return here only when they need package-local reference or maintainer routes.
+Notify tool docs live here. Shared watcher workflows stay in top-level `docs/notify/` or in the package that owns the dataset handoff.
+If you need to set up, run, or recover a watcher, start with [Notify USR events runbook](../../../../docs/notify/usr-events.md). Return here for package reference or maintainer docs.
 
 ### Ownership boundary
 
 - Tool-local (`src/dnadesign/notify/docs/`): command/reference contracts and maintainer internals.
-- Shared operator docs (`docs/notify/` and boundary-owning operations docs such as `src/dnadesign/usr/docs/operations/`): operator route maps and cross-tool runbooks.
+- Shared operator docs (`docs/notify/` and operations docs such as `src/dnadesign/usr/docs/operations/`): operator guides and cross-tool runbooks.
 
 ### Start here
 
@@ -55,7 +55,6 @@ Use [Notify USR events runbook](../../../../docs/notify/usr-events.md) for expli
 
 #### Route to shared cross-tool and scheduler docs
 - [DenseGen -> USR -> Notify tutorial](../../densegen/docs/tutorials/demo_usr_notify.md): shared tutorial for one local cross-tool path.
-- [Notify operations route map](../../../../docs/notify/README.md): shared repository-level operator routing.
 - [BU SCC batch + notify runbook](../../../../docs/bu-scc/batch-notify.md): shared scheduler-oriented workflow.
 
 #### Extend and debug internals
@@ -67,5 +66,4 @@ Use [Notify USR events runbook](../../../../docs/notify/usr-events.md) for expli
 - [Operator runbook](../../../../docs/notify/usr-events.md): runnable setup/watch/recover paths.
 - [Reference index](reference/README.md): strict command, schema, and boundary contracts.
 - [Maintainer internals](dev/architecture.md): architecture map for package extension work.
-- [Package entrypoint](../README.md): lightweight tool README for repo-level routing.
-- [Repository docs index](../../../../docs/README.md): cross-tool workflow routes.
+- [Package entrypoint](../README.md): package README for repo-level routing.

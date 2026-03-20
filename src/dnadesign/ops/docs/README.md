@@ -3,22 +3,22 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-20
 
-Use this index for package-local Ops documentation. Shared operator procedures stay under top-level `docs/operations/` because Ops owns the repository's control-plane runbook surface, while `ops` itself stays a shared catalog view over `docs/runbooks/README.md` rather than a second registry.
+Ops package docs live here. Use top-level `docs/operations/` for runbook procedures and `docs/runbooks/README.md` for command lookup.
 
 ### Start here
 
-- [Runbook catalog](../../../../docs/runbooks/README.md): repo-level inventory when you want a concise list of authoritative procedures first.
-- [How to use Ops](how-to-use-ops.md): quick command guide for catalog discovery, procedure inspection, status checks, and manifest scaffolds.
-- [Ops orchestration index](../../../../docs/operations/README.md): task-first router for init, plan, execute, and verification flows.
-- [Orchestration runbooks](../../../../docs/operations/orchestration-runbooks.md): authoritative runbook schema, command order, and execution contracts.
-- [Repository docs index](../../../../docs/README.md): repo-wide route map when the next step is outside Ops.
-- Start from `uv run ops catalog list --simple` when you are entering from the shell rather than browsing docs first.
-- Use `uv run ops progress explain <registry-id>` when you know the route id but not the required status flags yet.
+- [Runbook catalog](../../../../docs/runbooks/README.md): repo-level command index when you want the procedure list first.
+- [How to use Ops](how-to-use-ops.md): command guide for catalog discovery, procedure inspection, status checks, and manifest scaffolds.
+- [Ops orchestration index](../../../../docs/operations/README.md): docs for init, plan, execute, and verification.
+- [Orchestration runbooks](../../../../docs/operations/orchestration-runbooks.md): runbook schema, command order, and execution contracts.
+- [Repository docs index](../../../../docs/README.md): repo-wide docs index when the next step is outside Ops.
+
+If you are entering from the shell rather than browsing docs first, start with `uv run ops catalog list --simple`, then open [How to use Ops](how-to-use-ops.md) for the command summary.
 
 ### Package-local surfaces
 
 - [Packaged runbook presets](../runbooks/presets): checked-in starter runbooks for common orchestration routes.
-- [`dnadesign.ops`](../README.md): lightweight package entrypoint for repo-level routing.
+- [`dnadesign.ops`](../README.md): package README for repo-level routing.
 - [Runbook catalog progress surfaces](../../../../docs/runbooks/README.md#progress-surface-glossary): glossary for registered progress adapters and explicit campaign manifests.
 
 ### Boundary reminders

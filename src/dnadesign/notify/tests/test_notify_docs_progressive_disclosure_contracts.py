@@ -66,7 +66,7 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
     assert "`notify setup slack` mode contract" in text
     assert "`notify usr-events watch` mode contract" in text
     assert "route map only" not in text
-    assert "repository-level operator router plus a compact command map" in text
+    assert "Start here for Notify setup, watch, and recovery." in text
 
 
 def test_notify_usr_events_manual_keeps_setup_run_recover_flow() -> None:
@@ -135,8 +135,8 @@ def test_notify_module_docs_index_has_progressive_disclosure_workflow_and_type_m
     assert "Route to shared cross-tool and scheduler docs" in text
     assert "Run cross-tool or cluster workflows" not in text
     assert "../../../../docs/notify/usr-events.md" in text
-    assert "boundary-owning tool's operations docs" in text
-    assert "Operators who just need to set up, run, or recover a watcher should start with" in text
+    assert "Shared watcher workflows stay in top-level `docs/notify/`" in text
+    assert "If you need to set up, run, or recover a watcher, start with" in text
     assert "uv run notify setup list-workspaces --tool <tool>" in text
     assert "uv run notify usr-events watch --tool <tool> --workspace <workspace-name> --follow" in text
 

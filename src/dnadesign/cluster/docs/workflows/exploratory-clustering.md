@@ -19,7 +19,7 @@ Use this workflow when one explicit feature definition already exists and the ne
 
 - One explicit chosen feature definition is already present.
 - The input is a USR dataset (`--dataset`) or a file (`--file`) with that chosen feature definition.
-- If the chosen feature definition does not exist yet, return to [promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md) for the repository's canonical infer-backed route.
+- If the chosen feature definition does not exist yet, return to [promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md) for the shared infer-backed workflow.
 
 ### First fit, UMAP, and analysis pass
 

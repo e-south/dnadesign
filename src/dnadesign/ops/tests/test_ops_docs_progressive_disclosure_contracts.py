@@ -47,10 +47,10 @@ def test_ops_module_readme_has_banner_narrative_and_doc_map() -> None:
         ],
         label="src/dnadesign/ops/README.md",
     )
-    assert "cross-tool orchestration control plane" in text
+    assert "Ops manages batch orchestration across tools." in text
     assert "Use Ops when:" in text
     assert "Do not use Ops when:" in text
-    assert "shared catalog view" in text
+    assert "shared command index" in text
     assert "uv run ops catalog list" in text
     assert "Typical flow: browse the catalog" in text
     assert "uv run ops catalog show <registry-id>" in text
@@ -79,13 +79,14 @@ def test_ops_package_local_docs_index_routes_to_shared_runbook_surface() -> None
         label="src/dnadesign/ops/docs/README.md",
     )
     assert "../../../../docs/runbooks/README.md" in text
-    assert "shared catalog view over" in text
+    assert "command lookup" in text
     assert "how-to-use-ops.md" in text
     assert "../../../../docs/operations/README.md" in text
     assert "../../../../docs/operations/orchestration-runbooks.md" in text
     assert "../runbooks/presets" in text
     assert "../../../../docs/README.md" in text
-    assert "uv run ops catalog list" in text
+    assert "uv run ops catalog list --simple" in text
+    assert "How to use Ops" in text
     assert "prints YAML to stdout unless you pass `--out`" in text
 
 
@@ -102,9 +103,9 @@ def test_ops_how_to_doc_carries_quick_usage_commands() -> None:
         ],
         label="src/dnadesign/ops/docs/how-to-use-ops.md",
     )
-    assert "registry id" in text
-    assert "related route" in text
-    assert "progress surface" in text
+    assert "procedure id" in text
+    assert "related procedure" in text
+    assert "status view" in text
     assert "campaign manifest" in text
     assert "uv run ops catalog list" in text
     assert "uv run ops catalog list --simple" in text
@@ -113,9 +114,9 @@ def test_ops_how_to_doc_carries_quick_usage_commands() -> None:
     assert "--plane data-plane --query infer" in text
     assert "--section tool-sources" in text
     assert "--related-to usr.data-plane.promoter-feature-matrix" in text
-    assert "typed related procedures" in text
-    assert "typed related tool docs" in text
-    assert "exact deep docs when declared" in text
+    assert "related procedures" in text
+    assert "related tool docs" in text
+    assert "deeper docs when listed" in text
     assert "uv run ops progress explain <registry-id>" in text
     assert (
         "uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>"
@@ -124,7 +125,7 @@ def test_ops_how_to_doc_carries_quick_usage_commands() -> None:
     assert "inspect the required progress flags before you run `progress show`" in text
     assert "uv run ops progress scaffold <registry-id> ..." in text
     assert "prints YAML to stdout unless you pass `--out`" in text
-    assert "can cross tool boundaries" in text
+    assert "can include more than one tool" in text
     assert "uv run ops progress scaffold --related-to <registry-id>" in text
     assert "uv run ops progress campaign --manifest <manifest.yaml>" in text
     assert "../../../../docs/runbooks/README.md" in text
@@ -139,7 +140,7 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
         [
             "### What Ops is for",
             "### Start here",
-            "### Shell routes",
+            "### Discovery handoff",
             "### Orchestration routes",
             "### Contracts",
             "### Status and manifest routes",
@@ -155,26 +156,32 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
     assert "**Plane:** control-plane" in text
     assert "**Owner-boundary:** ops" in text
     assert "ops runbook init --workflow" in text
-    assert "uv run ops catalog list" in text
+    assert "../runbooks/README.md" in text
+    assert "../../src/dnadesign/ops/docs/how-to-use-ops.md" in text
     assert "uv run ops catalog list --simple" in text
-    assert 'uv run ops catalog list --query "promoter feature matrix"' in text
-    assert "uv run ops catalog show <registry-id>" in text
-    assert "uv run ops progress explain <registry-id>" in text
-    assert "related procedures around one path" in text
-    assert "--plane data-plane --query infer" in text
-    assert "--section tool-sources" in text
-    assert "--related-to usr.data-plane.promoter-feature-matrix" in text
-    assert "related tool docs around one path" in text
-    assert "exact deep docs when declared" in text
-    assert (
-        "uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>"
-        in text
+    assert "shared command table for `ops catalog` and `ops progress`" in text
+    assert 'uv run ops catalog list --query "promoter feature matrix"' not in text
+    assert "uv run ops catalog show <registry-id>" not in text
+    assert "--plane data-plane --query infer" not in text
+    assert "--section tool-sources" not in text
+    assert "uv run ops catalog list --related-to" not in text
+    progress_show = (
+        "uv run ops progress show usr.data-plane.promoter-feature-matrix "
+        "--repo-root <repo-root> --usr-root <usr-root> --dataset <dataset>"
     )
-    assert "uv run ops progress scaffold <registry-id> ..." in text
-    assert "prints YAML to stdout unless you pass `--out`" in text
+    assert progress_show in text
+    scaffold_example = (
+        "uv run ops progress scaffold ops.control-plane.orchestration "
+        "usr.data-plane.promoter-feature-matrix --repo-root <repo-root>"
+    )
+    assert scaffold_example in text
+    assert "prints to stdout unless you pass `--out`" in text
     assert "`ops progress show` and `ops progress campaign` are read-only" in text
-    assert "uv run ops progress scaffold --related-to <registry-id>" in text
-    assert "uv run ops progress campaign --manifest <manifest.yaml>" in text
+    related_scaffold_example = (
+        "uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>"
+    )
+    assert related_scaffold_example in text
+    assert "uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>" in text
     assert "--project <project>" in text
     assert "project dunlop" not in text
     assert "orchestration-runbooks.md" in text
@@ -254,12 +261,12 @@ def test_repo_docs_index_exposes_ops_tool_and_operations_route() -> None:
     text = _read(_repo_root() / "docs" / "README.md")
     assert "### Workflow routes" in text
     assert "### Quick terms" in text
-    assert "### New here?" in text
+    assert "### Start here" in text
     assert "### Shell routes" not in text
     assert "### Workflow lanes" not in text
     assert "[Workflow routes](#workflow-routes)" in text
     assert "[Runbook catalog](runbooks/README.md)" in text
-    assert "uv run ops catalog list --simple" in text
+    assert "uv run ops catalog list --simple" not in text
     assert "uv run ops catalog show <registry-id>" not in text
     assert "uv run ops progress explain <registry-id>" not in text
     assert "exact deep docs when declared" not in text
@@ -274,6 +281,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     text = _read(_repo_root() / "docs" / "runbooks" / "README.md")
 
     assert "## Runbook Catalog" in text
+    assert "find a command, runbook, workflow, or tool doc" in text
     assert "uv run ops catalog list" in text
     assert "uv run ops catalog list --simple" in text
     assert "### Shell decision table" in text
@@ -282,7 +290,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "--related-to usr.data-plane.promoter-feature-matrix" in text
     assert "uv run ops catalog show <registry-id>" in text
     assert "required progress inputs" in text
-    assert "exact deep docs when declared" in text
+    assert "linked deeper docs" in text
     assert "next shell commands" in text
     assert "uv run ops progress explain <registry-id>" in text
     assert "uv run ops progress show <registry-id> ..." in text
@@ -311,9 +319,9 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "../../src/dnadesign/densegen/docs/README.md" in text
     assert "../../src/dnadesign/construct/docs/README.md" in text
     assert "../../src/dnadesign/infer/docs/README.md" in text
-    assert "It does not replace the owner-local runbook or workflow" in text
+    assert "It points to the owning docs; it does not replace them." in text
     assert "drift is a docs-check failure" in text
-    assert "This is still not an inferred global campaign engine." in text
+    assert "This command only summarizes the manifest you provide." in text
     assert "Relative artifact paths in the manifest resolve from the manifest directory" in text
     assert "`ops-audit-json`" in text
     assert "`opal-campaign-state`" in text
@@ -326,7 +334,8 @@ def test_repo_root_readme_lists_ops_in_docs_and_tool_catalog() -> None:
     assert "uv run ops catalog list" not in text
     assert "uv run ops progress explain" not in text
     assert "[Docs index](docs/README.md)" in text
-    assert "best place to start if you are orienting to the repo" in text
+    assert "main index for workflow, tool, and repository docs" in text
+    assert "Start with the docs index for workflows, tool docs, and repository records." in text
     assert "[Docs workflow routes](docs/README.md#workflow-routes)" not in text
     assert "including the downstream split between" not in text
     assert "[Ops operations](docs/operations/README.md)" not in text

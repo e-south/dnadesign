@@ -3,11 +3,11 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-20
 
-Cluster is where you explore one chosen feature definition before committing to a supervised downstream branch. Use this page as the single route map for runnable workflows, command and artifact contracts, ownership boundaries, and adjacent handoffs back to USR, infer, or OPAL.
+Cluster is where you explore one chosen feature definition before committing to a supervised downstream branch. Use this page to choose a workflow, reference page, or handoff back to USR, infer, or OPAL.
 
 ### Start here
 
-1. If you do not yet have one explicit chosen feature definition, return to [promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md) for the repository's canonical infer-backed route.
+1. If you do not yet have one explicit chosen feature definition, return to [promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md) for the shared infer-backed workflow.
 2. If you already have a chosen feature definition and want the first runnable path, open [exploratory clustering workflow](workflows/exploratory-clustering.md).
 3. If you need flag, workspace, preset, OPAL-join, or results semantics before running, open [Cluster CLI contracts](reference/cli-contracts.md).
 4. If you need the public in-process automation boundary, open [`dnadesign.cluster.api`](../api.py).
@@ -24,7 +24,7 @@ Cluster is where you explore one chosen feature definition before committing to 
 
 ### Adjacent handoffs
 
-- [promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md): upstream durable data-plane handoff that creates one chosen feature definition.
+- [promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md): upstream feature-matrix workflow that creates one chosen feature definition.
 - [infer docs](../../infer/docs/README.md): return here when the chosen feature definition does not exist yet.
 - [USR dataset with infer-derived X -> OPAL active learning](../../opal/docs/workflows/usr-infer-x-active-learning.md): supervised downstream branch once exploratory clustering is no longer the next task.
-- [Repository docs index](../../../../docs/README.md): repo-wide route map for upstream and downstream workflows.
+- [Repository docs index](../../../../docs/README.md): repo-wide docs index for upstream and downstream workflows.

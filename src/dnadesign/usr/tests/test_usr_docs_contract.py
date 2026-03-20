@@ -110,9 +110,9 @@ def test_docs_index_links_progressive_usr_sync_workflows() -> None:
     assert "#### Single-tool starts" in docs_index
     assert "#### Shared USR-backed data-plane flows" in docs_index
     assert "#### Operations and infrastructure" in docs_index
-    assert "Choose this section when the next authoritative document is still package-local" in docs_index
-    assert "Choose this section when the next durable artifact is a shared USR dataset" in docs_index
-    assert "Choose this section when the next artifact is orchestration state" in docs_index
+    assert "Use these when one tool still owns the work" in docs_index
+    assert "Use these when the handoff already runs through a shared USR dataset" in docs_index
+    assert "Use these when the next step is orchestration, environment setup, or audit output" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync-audit-loop.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md" in docs_index
@@ -157,7 +157,7 @@ def test_top_level_readme_exposes_workflow_docs_map() -> None:
 
     assert "## Documentation" in readme
     assert "docs/README.md" in readme
-    assert "choose the next deep procedure by ownership plane" in readme
+    assert "Start with the docs index for workflows, tool docs, and repository records." in readme
     assert "cluster` exploration and OPAL active learning" not in readme
     assert "Workflow and docs map" not in readme
     assert "## Repository map" not in readme

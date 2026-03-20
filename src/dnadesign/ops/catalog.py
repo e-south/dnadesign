@@ -23,13 +23,11 @@ _LINK_PATTERN = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 _TITLE_HEADING_PATTERN = re.compile(r"^#{1,6}\s+(.+?)\s*$", re.MULTILINE)
 _PROCEDURES_SECTION_HEADING = "### Authoritative cross-tool procedures"
 _PROCEDURES_SECTION_INTRO = (
-    "This table is generated from owner-local `*.registry.yaml` metadata sidecars. "
-    "Edit those files instead of hand-editing rows here."
+    "This table is generated from `*.registry.yaml` sidecars. Edit those files instead of hand-editing rows here."
 )
 _TOOL_SOURCES_SECTION_HEADING = "### Tool-local runbook sources"
 _TOOL_SOURCES_SECTION_INTRO = (
-    "This table is generated from owner-local `*.tool-source.yaml` metadata sidecars. "
-    "Edit those files instead of hand-editing rows here."
+    "This table is generated from `*.tool-source.yaml` sidecars. Edit those files instead of hand-editing rows here."
 )
 _REGISTRY_METADATA_SUFFIX = ".registry.yaml"
 _TOOL_SOURCE_METADATA_SUFFIX = ".tool-source.yaml"
