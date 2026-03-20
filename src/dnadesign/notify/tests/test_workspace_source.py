@@ -54,9 +54,59 @@ def test_resolve_tool_workspace_config_path_supports_infer_tool(tmp_path: Path) 
     assert resolved == config_path.resolve()
 
 
+def test_resolve_tool_workspace_config_path_supports_local_infer_workspace_root(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    config_path = repo_root / "workspaces" / "demo_i" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("jobs: []\n", encoding="utf-8")
+    (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\n", encoding="utf-8")
+
+    resolved = resolve_tool_workspace_config_path(
+        tool="infer",
+        workspace="demo_i",
+        search_start=repo_root,
+    )
+
+    assert resolved == config_path.resolve()
+
+
 def test_resolve_tool_workspace_config_path_supports_construct_tool_with_project_selector(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     workspace_dir = repo_root / "src" / "dnadesign" / "construct" / "workspaces" / "demo_c"
+    config_path = workspace_dir / "config.slot_a.window.yaml"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("job:\n  id: slot_a_window\n  output:\n    dataset: demo_output\n", encoding="utf-8")
+    (workspace_dir / "construct.workspace.yaml").write_text(
+        "\n".join(
+            [
+                "workspace:",
+                "  id: demo_c",
+                "  profile: promoter-swap-demo",
+                "  projects:",
+                "    - id: slot_a_window",
+                "      config: config.slot_a.window.yaml",
+                "      flow: replace-anchor-in-template",
+                "      input_dataset: anchors_demo",
+                "      output_dataset: demo_output",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\n", encoding="utf-8")
+
+    resolved = resolve_tool_workspace_config_path(
+        tool="construct",
+        workspace="demo_c:slot_a_window",
+        search_start=repo_root,
+    )
+
+    assert resolved == config_path.resolve()
+
+
+def test_resolve_tool_workspace_config_path_supports_local_construct_workspace_root(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    workspace_dir = repo_root / "demo_c"
     config_path = workspace_dir / "config.slot_a.window.yaml"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     config_path.write_text("job:\n  id: slot_a_window\n  output:\n    dataset: demo_output\n", encoding="utf-8")
@@ -210,6 +260,21 @@ def test_list_tool_workspaces_reports_construct_workspace_names(tmp_path: Path) 
     names = list_tool_workspaces(tool="construct", search_start=repo_root)
 
     assert names == ["demo_a", "demo_b"]
+
+
+def test_list_tool_workspaces_merges_repo_and_local_infer_workspace_roots(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_scoped = repo_root / "src" / "dnadesign" / "infer" / "workspaces" / "repo_demo" / "config.yaml"
+    local_scoped = repo_root / "workspaces" / "local_demo" / "config.yaml"
+    repo_scoped.parent.mkdir(parents=True, exist_ok=True)
+    local_scoped.parent.mkdir(parents=True, exist_ok=True)
+    repo_scoped.write_text("jobs: []\n", encoding="utf-8")
+    local_scoped.write_text("jobs: []\n", encoding="utf-8")
+    (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\n", encoding="utf-8")
+
+    names = list_tool_workspaces(tool="infer", search_start=repo_root)
+
+    assert names == ["local_demo", "repo_demo"]
 
 
 def test_resolve_tool_workspace_config_path_construct_supports_external_workspace_root_env(

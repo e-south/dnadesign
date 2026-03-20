@@ -21,9 +21,11 @@ import pyarrow as pa
 import yaml
 
 from dnadesign.usr import Dataset, compute_id, default_usr_root, normalize_sequence, normalize_usr_root
+from dnadesign.usr_roots import resolve_usr_root_from_env
 
 from .errors import ConfigError
 from .output_store import _ensure_construct_registry
+from .workspace import project_root_or_none
 
 _SEED_ASSET = "promoter_swap_demo.yaml"
 
@@ -322,6 +324,23 @@ def _load_manifest_payload(path: Path) -> dict:
     return payload
 
 
+def _resolve_seed_usr_root(root: str | Path | None) -> Path:
+    if root is not None:
+        return normalize_usr_root(root)
+
+    env_root = resolve_usr_root_from_env()
+    if env_root is not None:
+        return env_root
+
+    repo_root = project_root_or_none()
+    if repo_root is not None:
+        usr_pkg_root = (repo_root / "src" / "dnadesign" / "usr").resolve()
+        if (usr_pkg_root / "__init__.py").exists():
+            return default_usr_root(pkg_root=usr_pkg_root)
+
+    raise ConfigError("construct seed requires --root outside a dnadesign checkout unless DNADESIGN_USR_ROOT is set.")
+
+
 def _dataset_results_from_manifest(payload: dict) -> tuple[str, List[ManifestDatasetResult]]:
     manifest_id = str(payload.get("manifest_id") or "").strip()
     if not manifest_id:
@@ -355,8 +374,8 @@ def _dataset_results_from_manifest(payload: dict) -> tuple[str, List[ManifestDat
     return manifest_id, results
 
 
-def import_seed_manifest(*, root: str | Path, manifest: str | Path) -> ManifestImportResult:
-    root_path = normalize_usr_root(root or default_usr_root())
+def import_seed_manifest(*, root: str | Path | None, manifest: str | Path) -> ManifestImportResult:
+    root_path = _resolve_seed_usr_root(root)
     manifest_path = Path(manifest).expanduser().resolve()
     payload = _load_manifest_payload(manifest_path)
     manifest_id, datasets = _dataset_results_from_manifest(payload)
@@ -373,8 +392,8 @@ def import_seed_manifest(*, root: str | Path, manifest: str | Path) -> ManifestI
     return ManifestImportResult(root=root_path, manifest_id=manifest_id, datasets=datasets)
 
 
-def bootstrap_promoter_swap_demo(*, root: str | Path, manifest: str | Path | None = None) -> SeedResult:
-    root_path = normalize_usr_root(root or default_usr_root())
+def bootstrap_promoter_swap_demo(*, root: str | Path | None, manifest: str | Path | None = None) -> SeedResult:
+    root_path = _resolve_seed_usr_root(root)
     payload = _seed_asset_payload()
     datasets = payload.get("datasets") or {}
     manifest_id = str(payload.get("demo_id") or "promoter_swap_demo").strip()

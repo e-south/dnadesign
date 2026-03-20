@@ -15,8 +15,6 @@ from pathlib import Path
 
 import typer
 
-from dnadesign.usr import default_usr_root
-
 from ...errors import ConstructError
 from ...seed import bootstrap_promoter_swap_demo, import_seed_manifest
 from ._errors import exit_with_error
@@ -36,10 +34,10 @@ def import_manifest(
         readable=True,
         help="Manifest YAML describing one or more input/template datasets to materialize into USR.",
     ),
-    root: Path = typer.Option(
-        default_usr_root(),
+    root: Path | None = typer.Option(
+        None,
         "--root",
-        help="Target local USR datasets root. Passing src/dnadesign/usr is also accepted and normalized.",
+        help="Target local USR datasets root. Omit only inside a dnadesign checkout or when DNADESIGN_USR_ROOT is set.",
     ),
 ) -> None:
     try:
@@ -65,10 +63,10 @@ def import_manifest(
 
 @seed_app.command("promoter-swap-demo")
 def promoter_swap_demo(
-    root: Path = typer.Option(
-        default_usr_root(),
+    root: Path | None = typer.Option(
+        None,
         "--root",
-        help="Target local USR datasets root. Passing src/dnadesign/usr is also accepted and normalized.",
+        help="Target local USR datasets root. Omit only inside a dnadesign checkout or when DNADESIGN_USR_ROOT is set.",
     ),
     manifest: Path | None = typer.Option(
         None,

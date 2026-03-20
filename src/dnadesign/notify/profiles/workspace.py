@@ -17,8 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dnadesign._contracts import (
-    list_construct_workspaces,
-    resolve_construct_workspace_config_path,
+    list_construct_workspaces_from_root,
+    resolve_construct_workspace_config_path_from_root,
 )
 
 from ..errors import NotifyConfigError
@@ -26,8 +26,8 @@ from ..errors import NotifyConfigError
 
 @dataclass(frozen=True)
 class ToolWorkspaceResolver:
-    resolve_config: Callable[[str, Path], Path]
-    list_workspaces: Callable[[Path], list[str]]
+    resolve_config: Callable[[str, Path, Path], Path]
+    list_workspaces: Callable[[Path, Path], list[str]]
 
 
 _TOOL_WORKSPACE_RESOLVERS: dict[str, ToolWorkspaceResolver] = {}
@@ -69,6 +69,22 @@ def _resolve_repo_root(search_start: Path | None) -> Path:
             "run from inside dnadesign repo, set DNADESIGN_REPO_ROOT, or pass --config explicitly"
         )
     return repo_root
+
+
+def _resolve_search_root(search_start: Path | None) -> Path:
+    return (search_start or Path.cwd()).expanduser().resolve()
+
+
+def _dedupe_paths(paths: list[Path]) -> tuple[Path, ...]:
+    deduped: list[Path] = []
+    seen: set[Path] = set()
+    for path in paths:
+        resolved = path.expanduser().resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        deduped.append(resolved)
+    return tuple(deduped)
 
 
 def register_tool_workspace_resolver(
@@ -118,8 +134,10 @@ def list_tool_workspaces(*, tool: str, search_start: Path | None = None) -> list
     if resolver is None:
         allowed = ", ".join(sorted(_TOOL_WORKSPACE_RESOLVERS))
         raise NotifyConfigError(f"unsupported tool '{tool}'. Supported values: {allowed}")
-    repo_root = _resolve_repo_root(search_start)
-    return sorted(dict.fromkeys(str(name).strip() for name in resolver.list_workspaces(repo_root) if str(name).strip()))
+    search_root = _resolve_search_root(search_start)
+    repo_root = _resolve_repo_root(search_root)
+    names = resolver.list_workspaces(repo_root, search_root)
+    return sorted(dict.fromkeys(str(name).strip() for name in names if str(name).strip()))
 
 
 def resolve_tool_workspace_config_path(*, tool: str, workspace: str, search_start: Path | None = None) -> Path:
@@ -137,9 +155,10 @@ def resolve_tool_workspace_config_path(*, tool: str, workspace: str, search_star
     if any(ch in workspace_name for ch in ("/", "\\")):
         raise NotifyConfigError("workspace must be a workspace name (not a path); pass --config for explicit paths")
 
-    repo_root = _resolve_repo_root(search_start)
+    search_root = _resolve_search_root(search_start)
+    repo_root = _resolve_repo_root(search_root)
     try:
-        config_path = resolver.resolve_config(workspace_name, repo_root)
+        config_path = resolver.resolve_config(workspace_name, repo_root, search_root)
     except ValueError as exc:
         raise NotifyConfigError(str(exc)) from exc
     if not isinstance(config_path, Path):
@@ -148,7 +167,7 @@ def resolve_tool_workspace_config_path(*, tool: str, workspace: str, search_star
     if config_resolved.exists() and config_resolved.is_file():
         return config_resolved
 
-    available = list_tool_workspaces(tool=tool_name, search_start=repo_root)
+    available = list_tool_workspaces(tool=tool_name, search_start=search_root)
     if available:
         available_text = ", ".join(available[:12])
         if len(available) > 12:
@@ -164,12 +183,7 @@ def _workspace_root(repo_root: Path, relative_root: Path) -> Path:
     return (repo_root / relative_root).resolve()
 
 
-def _resolve_config_from_workspace_root(workspace_name: str, repo_root: Path, relative_root: Path) -> Path:
-    return _workspace_root(repo_root, relative_root) / workspace_name / "config.yaml"
-
-
-def _list_workspace_names(repo_root: Path, relative_root: Path) -> list[str]:
-    root = _workspace_root(repo_root, relative_root)
+def _list_workspace_names_from_root(root: Path) -> list[str]:
     if not root.exists() or not root.is_dir():
         return []
     names: list[str] = []
@@ -182,25 +196,90 @@ def _list_workspace_names(repo_root: Path, relative_root: Path) -> list[str]:
     return sorted(names)
 
 
+def _resolve_config_from_workspace_root(workspace_name: str, repo_root: Path, relative_root: Path) -> Path:
+    return _workspace_root(repo_root, relative_root) / workspace_name / "config.yaml"
+
+
+def _list_workspace_names(repo_root: Path, relative_root: Path) -> list[str]:
+    return _list_workspace_names_from_root(_workspace_root(repo_root, relative_root))
+
+
+def _construct_workspace_roots(repo_root: Path, search_root: Path) -> tuple[Path, ...]:
+    roots = [(repo_root / "src/dnadesign/construct/workspaces").resolve(), search_root]
+    env_root = str(os.environ.get("CONSTRUCT_WORKSPACE_ROOT") or "").strip()
+    if env_root:
+        roots.insert(0, Path(env_root))
+    return _dedupe_paths(roots)
+
+
+def _resolve_construct_config_from_known_roots(workspace_name: str, repo_root: Path, search_root: Path) -> Path:
+    missing_registry_error: str | None = None
+    for root in _construct_workspace_roots(repo_root, search_root):
+        try:
+            return resolve_construct_workspace_config_path_from_root(
+                workspaces_root=root,
+                workspace_selector=workspace_name,
+            )
+        except ValueError as exc:
+            message = str(exc)
+            if message.startswith("construct workspace registry not found:"):
+                if missing_registry_error is None:
+                    missing_registry_error = message
+                continue
+            raise
+    if missing_registry_error is not None:
+        raise ValueError(missing_registry_error)
+    return (search_root / workspace_name / "config.yaml").resolve()
+
+
+def _list_construct_workspace_names(repo_root: Path, search_root: Path) -> list[str]:
+    names: list[str] = []
+    for root in _construct_workspace_roots(repo_root, search_root):
+        names.extend(list_construct_workspaces_from_root(root))
+    return sorted(dict.fromkeys(names))
+
+
+def _infer_workspace_roots(repo_root: Path, search_root: Path) -> tuple[Path, ...]:
+    roots = [(repo_root / "src/dnadesign/infer/workspaces").resolve(), (search_root / "workspaces").resolve()]
+    env_root = str(os.environ.get("INFER_WORKSPACE_ROOT") or "").strip()
+    if env_root:
+        roots.insert(0, Path(env_root))
+    return _dedupe_paths(roots)
+
+
+def _resolve_infer_config_from_known_roots(workspace_name: str, repo_root: Path, search_root: Path) -> Path:
+    roots = _infer_workspace_roots(repo_root, search_root)
+    for root in roots:
+        candidate = root / workspace_name / "config.yaml"
+        if candidate.exists() and candidate.is_file():
+            return candidate.resolve()
+    return (roots[0] / workspace_name / "config.yaml").resolve()
+
+
+def _list_infer_workspace_names(repo_root: Path, search_root: Path) -> list[str]:
+    names: list[str] = []
+    for root in _infer_workspace_roots(repo_root, search_root):
+        names.extend(_list_workspace_names_from_root(root))
+    return sorted(dict.fromkeys(names))
+
+
 register_tool_workspace_resolver(
     tool="construct",
-    resolve_config=lambda workspace_name, repo_root: resolve_construct_workspace_config_path(
-        repo_root=repo_root,
-        workspace_selector=workspace_name,
-    ),
-    list_workspaces=lambda repo_root: list_construct_workspaces(repo_root),
+    resolve_config=_resolve_construct_config_from_known_roots,
+    list_workspaces=_list_construct_workspace_names,
 )
 register_tool_workspace_resolver(
     tool="densegen",
-    resolve_config=lambda workspace_name, repo_root: _resolve_config_from_workspace_root(
+    resolve_config=lambda workspace_name, repo_root, search_root: _resolve_config_from_workspace_root(
         workspace_name, repo_root, Path("src/dnadesign/densegen/workspaces")
     ),
-    list_workspaces=lambda repo_root: _list_workspace_names(repo_root, Path("src/dnadesign/densegen/workspaces")),
+    list_workspaces=lambda repo_root, search_root: _list_workspace_names(
+        repo_root,
+        Path("src/dnadesign/densegen/workspaces"),
+    ),
 )
 register_tool_workspace_resolver(
     tool="infer",
-    resolve_config=lambda workspace_name, repo_root: _resolve_config_from_workspace_root(
-        workspace_name, repo_root, Path("src/dnadesign/infer/workspaces")
-    ),
-    list_workspaces=lambda repo_root: _list_workspace_names(repo_root, Path("src/dnadesign/infer/workspaces")),
+    resolve_config=_resolve_infer_config_from_known_roots,
+    list_workspaces=_list_infer_workspace_names,
 )

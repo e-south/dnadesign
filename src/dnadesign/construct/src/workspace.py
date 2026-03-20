@@ -39,8 +39,9 @@ _INPUTS_README = """# construct workspace inputs
 - When you want the packaged `mg1655_promoters` and `plasmids` tracer-bullet datasets,
   scaffold a packaged promoter-swap workspace with `construct workspace init --profile promoter-swap-demo`
   or `construct workspace init --profile promoter-swap-source-of-truth-demo`.
-- Omit `--root` only when you deliberately want to seed the canonical shared USR root at
-  `src/dnadesign/usr/datasets/`.
+- Omit `--root` only when you are running inside a dnadesign checkout and deliberately want to seed
+  the canonical shared USR root at `src/dnadesign/usr/datasets/`, or when `DNADESIGN_USR_ROOT`
+  points at a writable datasets root.
 - Keep human-readable sequence names in `usr_label__primary` / `usr_label__aliases`; keep
   construct-specific seed provenance in `construct_seed__*`.
 - Keep canonical template records in USR; do not fall back to ad hoc FASTA files for ordinary construct runs.

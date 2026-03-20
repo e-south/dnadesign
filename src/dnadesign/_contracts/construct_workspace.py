@@ -81,8 +81,8 @@ def _workspace_registry_payload(registry_path: Path) -> dict[str, object]:
     return _required_mapping(raw, label="construct workspace registry")
 
 
-def list_construct_workspaces(repo_root: Path) -> list[str]:
-    workspaces_root = _construct_workspaces_root(repo_root)
+def list_construct_workspaces_from_root(workspaces_root: Path) -> list[str]:
+    workspaces_root = Path(workspaces_root).expanduser().resolve()
     if not workspaces_root.exists() or not workspaces_root.is_dir():
         return []
     names: list[str] = []
@@ -95,9 +95,13 @@ def list_construct_workspaces(repo_root: Path) -> list[str]:
     return names
 
 
-def resolve_construct_workspace_config_path(*, repo_root: Path, workspace_selector: str) -> Path:
+def list_construct_workspaces(repo_root: Path) -> list[str]:
+    return list_construct_workspaces_from_root(_construct_workspaces_root(repo_root))
+
+
+def resolve_construct_workspace_config_path_from_root(*, workspaces_root: Path, workspace_selector: str) -> Path:
     workspace_name, project_id = _parse_workspace_selector(workspace_selector)
-    workspace_dir = (_construct_workspaces_root(repo_root) / workspace_name).resolve()
+    workspace_dir = (Path(workspaces_root).expanduser().resolve() / workspace_name).resolve()
     registry_path = workspace_dir / _WORKSPACE_REGISTRY_NAME
     payload = _workspace_registry_payload(registry_path)
 
@@ -153,3 +157,10 @@ def resolve_construct_workspace_config_path(*, repo_root: Path, workspace_select
             f"'{workspace_name}' project '{resolved_project_id}' config is not a file: {config_path}"
         )
     return config_path
+
+
+def resolve_construct_workspace_config_path(*, repo_root: Path, workspace_selector: str) -> Path:
+    return resolve_construct_workspace_config_path_from_root(
+        workspaces_root=_construct_workspaces_root(repo_root),
+        workspace_selector=workspace_selector,
+    )

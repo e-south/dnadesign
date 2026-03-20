@@ -14,10 +14,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pyarrow.parquet as pq
+import pytest
 import yaml
 from typer.testing import CliRunner
 
 from dnadesign.construct.cli import app
+from dnadesign.construct.src import seed as seed_module
 from dnadesign.usr import Dataset
 
 _RUNNER = CliRunner()
@@ -197,6 +199,68 @@ datasets:
     assert "manifest_id: custom_construct_inputs" in output
     assert "dataset: custom_promoters" in output
     assert "dataset: custom_templates" in output
+
+
+def test_seed_import_manifest_uses_env_root_when_root_is_omitted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    usr_root = tmp_path / "usr_root"
+    manifest_path = tmp_path / "import_manifest.yaml"
+    manifest_path.write_text(
+        """
+manifest_id: custom_construct_inputs
+datasets:
+  - id: custom_promoters
+    records:
+      - label: sulAp
+        topology: linear
+        sequence: ACGT
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DNADESIGN_USR_ROOT", str(usr_root))
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "seed",
+            "import-manifest",
+            "--manifest",
+            manifest_path.as_posix(),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    anchors = Dataset(usr_root, "custom_promoters")
+    assert len(anchors.head(n=10)) == 1
+
+
+def test_seed_import_manifest_requires_root_outside_checkout_without_env(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = tmp_path / "import_manifest.yaml"
+    manifest_path.write_text(
+        """
+manifest_id: custom_construct_inputs
+datasets:
+  - id: custom_promoters
+    records:
+      - label: sulAp
+        topology: linear
+        sequence: ACGT
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
+    monkeypatch.setattr(seed_module, "project_root_or_none", lambda: None)
+
+    with pytest.raises(
+        seed_module.ConfigError,
+        match="construct seed requires --root outside a dnadesign checkout unless DNADESIGN_USR_ROOT is set",
+    ):
+        seed_module.import_seed_manifest(root=None, manifest=manifest_path)
 
 
 def test_seed_import_manifest_requires_manifest_id(tmp_path: Path) -> None:
