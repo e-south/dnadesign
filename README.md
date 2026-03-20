@@ -2,13 +2,20 @@
 
 ![dnadesign banner](assets/dnadesign-banner.svg)
 
-`dnadesign` is a collection of modular bioinformatic pipelines and helper packages related to biological sequence design. It bundles reusable tool packages for sequence generation, inference, optimization, clustering, and workflow operations.
+`dnadesign` is a collection of modular bioinformatic pipelines and helper packages for biological sequence design. The repository is organized as interoperable tools so generation, realization, inference, clustering, optimization, and workflow orchestration can stay explicit at their boundaries instead of collapsing into one opaque pipeline.
+
+---
+
+## New here?
+
+- To understand the repository: start with the [Docs index](docs/README.md) for the main workflow map, then follow the tool or runbook that matches your task.
+- To orchestrate or inspect batch workflows: start with [Ops](src/dnadesign/ops/README.md) or run `uv run ops catalog list` to browse the shared route map from the terminal.
 
 ---
 
 ## Documentation
 
-Use the docs index to choose the next deep procedure by ownership plane, then drop into the owning tool docs for operational detail.
+Use the docs index to find the next concrete workflow or tool doc, then drop into the owning package for operational detail.
 
 - [Docs index](docs/README.md): central route map for workflow and tool documentation.
 - [Installation](docs/installation.md): bootstrap the environment and run baseline verification commands.

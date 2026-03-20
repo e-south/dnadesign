@@ -9,11 +9,31 @@ This is the central documentation map for workflows, tool references, and reposi
 
 1. If this is a new machine, start with [Installation](installation.md) first.
 2. Continue to [Workflow routes](#workflow-routes) and follow the preflight -> run -> verify sequence for the relevant outcome.
-3. Use the [Runbook catalog](runbooks/README.md) when you want a concise inventory of authoritative procedures, workflows, and owner-local tool entrypoints, or use `uv run ops catalog list --query <term>`, `uv run ops catalog show <registry-id>` for owner docs plus exact deep docs when declared, `uv run ops catalog list --section tool-sources`, `uv run ops catalog list --section tool-sources --related-to <registry-id>`, `uv run ops catalog list --related-to <registry-id>`, `uv run ops progress show <registry-id> ...`, `uv run ops progress scaffold <registry-id> ...`, `uv run ops progress scaffold --related-to <registry-id>`, or `uv run ops progress campaign --manifest <manifest.yaml>` for the same discovery and read-only progress surface from the shell.
+3. Use the [Runbook catalog](runbooks/README.md) when you want a concise inventory of authoritative procedures, workflows, and owner-local tool entrypoints. Use [Shell routes](#shell-routes) when terminal discovery is faster than browsing docs.
 4. Follow the route's "Verify next" target before moving to downstream tools.
 5. Use [Tool docs](#tool-docs) when you need package-level commands and data contracts.
 6. Use [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for policy, operations, and governance detail.
 7. Return to this page as the central docs map.
+
+### Quick terms
+
+- `control-plane`: orchestration, scheduler wiring, and audit output.
+- `data-plane`: durable dataset and model-output workflows owned by the tool that mutates the data.
+- `registry id`: the stable catalog name for one registered runbook or workflow.
+- `progress surface`: the explicit read-only status view for one registered route.
+
+### Shell routes
+
+| If you want to... | Use this command | What you get next |
+| --- | --- | --- |
+| Browse the shared inventory | `uv run ops catalog list --query <term>` | Matching procedures and tool-local docs without guessing the owner first. Start with `uv run ops catalog list` when you want the full map before narrowing. |
+| Inspect one registered procedure | `uv run ops catalog show <registry-id>` | Owner docs, related docs, exact deep docs when declared, required progress inputs, and next shell commands. |
+| Browse owner-local docs only | `uv run ops catalog list --section tool-sources` | Tool entrypoints when you already know you need the owner-local docs layer. |
+| Browse typed related procedures | `uv run ops catalog list --related-to <registry-id>` | Neighboring procedures around one registered route. |
+| Browse typed related tool docs | `uv run ops catalog list --section tool-sources --related-to <registry-id>` | Tool-owned docs around one registered route. |
+| Check one status surface | `uv run ops progress show <registry-id> ...` | Read-only summary for one explicit artifact-backed route. |
+| Start a campaign manifest | `uv run ops progress scaffold <registry-id> ...` or `uv run ops progress scaffold --related-to <registry-id>` | YAML placeholders for one route or one related route set. The command prints to stdout unless you pass `--out`. |
+| Check a campaign | `uv run ops progress campaign --manifest <manifest.yaml>` | Read-only summary across the explicit steps in one manifest. |
 
 ### How docs are organized
 
@@ -32,7 +52,7 @@ Choose this section when the next authoritative document is still package-local 
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
 | Design a sequence library in a workspace | [DenseGen docs overview](../src/dnadesign/densegen/docs/README.md) | Verify generated artifacts and metadata with [DenseGen outputs reference](../src/dnadesign/densegen/docs/reference/outputs.md). |
-| Realize contextualized or multi-part DNA constructs into derived datasets | [construct docs overview](../src/dnadesign/construct/docs/README.md) | Verify resulting lineage and sequence identity in [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
+| Realize contextualized or multi-part DNA constructs into derived datasets | [Construct docs overview](../src/dnadesign/construct/docs/README.md) | Verify resulting lineage and sequence identity in [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
 | Run model inference and write outputs back to datasets | [Infer docs index](../src/dnadesign/infer/docs/README.md) | Verify write-back columns and types with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
 | Build SCC Evo2 infer GPU environment deterministically | [BU SCC install bootstrap](bu-scc/install.md#gpu-setup-and-verification-runbook) | Verify infer model capabilities with [infer SCC Evo2 GPU runbook](../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md). |
 | Operate Notify for local event watching and webhook setup | [Notify docs index](notify/README.md) | Verify mode and delivery contracts in [Notify command contracts](../src/dnadesign/notify/docs/reference/command-contracts.md). |

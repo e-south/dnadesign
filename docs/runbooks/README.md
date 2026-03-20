@@ -5,7 +5,19 @@
 
 Use this page when you want a concise inventory of authoritative runbooks, workflows, and owner-local tool entrypoints without guessing which tool owns the next deep procedure. This page is a discovery surface only. It does not replace the owner-local runbook or workflow that each entry links to, and it does not replace the owner-local docs entrypoint for each tool either.
 
-If you prefer terminal discovery, use `uv run ops catalog list` for the grouped inventory, `uv run ops catalog list --plane data-plane --query infer` to narrow the inventory by intent, `uv run ops catalog list --section tool-sources` when you only want owner-local entrypoints, `uv run ops catalog list --section tool-sources --query "promoter feature matrix"` when you want a broad owner-local search around the Evo2/promoter downstream path, `uv run ops catalog list --section tool-sources --related-to usr.data-plane.promoter-feature-matrix` when you want typed related tool docs around one registered procedure, `uv run ops catalog list --related-to usr.data-plane.promoter-feature-matrix` for typed related procedures around one cross-tool path, `uv run ops catalog show <registry-id>` for one registered cross-tool procedure with owner-boundary, owner docs, typed relation detail, typed related tool docs, exact deep docs when declared, required progress inputs, and next shell commands, `uv run ops progress show <registry-id> ...` for one registered progress surface, `uv run ops progress scaffold <registry-id> ...` to emit a manifest skeleton with the right required inputs, `uv run ops progress scaffold --related-to <registry-id>` to turn one related-procedure view into an explicit campaign starting point, and `uv run ops progress campaign --manifest <manifest.yaml>` for an explicit multi-step summary.
+If you prefer terminal discovery, use the shell decision table below.
+
+### Shell decision table
+
+| If you want to... | Use this command | What it does |
+| --- | --- | --- |
+| Browse the full inventory | `uv run ops catalog list` | Grouped inventory of authoritative cross-tool procedures plus tool-local docs entrypoints. |
+| Narrow by rough intent | `uv run ops catalog list --plane data-plane --query infer` | Smaller procedure set when you already know the downstream path is data-plane and infer-adjacent. |
+| Browse owner-local docs only | `uv run ops catalog list --section tool-sources` | Tool entrypoints when you want the owner-local docs layer first. |
+| Inspect one registered procedure | `uv run ops catalog show <registry-id>` | Owner docs, typed relations, exact deep docs when declared, required progress inputs, and next shell commands. |
+| Check one status surface | `uv run ops progress show <registry-id> ...` | One registered progress surface with explicit artifact inputs. |
+| Start a campaign manifest | `uv run ops progress scaffold <registry-id> ...` or `uv run ops progress scaffold --related-to <registry-id>` | YAML manifest skeleton for one route or one related route set. It prints to stdout unless you pass `--out`. |
+| Check a campaign | `uv run ops progress campaign --manifest <manifest.yaml>` | Explicit multi-step summary without inventing a second registry. |
 
 ### Discovery shortcuts
 
@@ -42,18 +54,18 @@ This table is generated from owner-local `*.tool-source.yaml` metadata sidecars.
 | Tool | Docs entrypoint | What you will find |
 | --- | --- | --- |
 | `densegen` | [DenseGen documentation](../../src/dnadesign/densegen/docs/README.md) | Tool-owned tutorials, HPC runbooks, and event-producing demo flows. |
-| `construct` | [construct docs](../../src/dnadesign/construct/docs/README.md) | Tool-owned workspace demos, template realization docs, and anchor-placement contracts. |
+| `construct` | [Construct docs](../../src/dnadesign/construct/docs/README.md) | Tool-owned workspace demos, template realization docs, and anchor-placement contracts. |
 | `usr` | [USR docs](../../src/dnadesign/usr/docs/README.md) | Tool-owned dataset lifecycle docs, source-of-truth runbooks, sync routes, and promoter feature-matrix handoffs. |
 | `infer` | [infer docs](../../src/dnadesign/infer/docs/README.md) | Tool-owned feature extraction runbooks, Evo2 docs, feature-schema contracts, and pressure-test flows. |
-| `cluster` | [cluster docs](../../src/dnadesign/cluster/docs/README.md) | Tool-owned exploratory analysis workflow plus CLI, results, and artifact contracts. |
+| `cluster` | [Cluster docs](../../src/dnadesign/cluster/docs/README.md) | Tool-owned exploratory analysis workflow plus CLI, results, and artifact contracts. |
 | `opal` | [OPAL Documentation](../../src/dnadesign/opal/docs/index.md) | Tool-owned active-learning workflows, campaign configuration references, and downstream infer-to-OPAL routes. |
 | `notify` | [Notify Operations](../notify/README.md) | Tool-owned operator routes for watcher setup, delivery validation, recovery, and scheduler-adjacent notification flows. |
 | `cruncher` | [Cruncher Documentation Index](../../src/dnadesign/cruncher/docs/README.md) | Tool-owned demos, studies, analysis guides, and optimization references. |
-| `ops` | [ops docs](../../src/dnadesign/ops/docs/README.md) | Control-plane orchestration docs, packaged presets, and runbook lifecycle commands. |
+| `ops` | [Ops docs](../../src/dnadesign/ops/docs/README.md) | Control-plane orchestration docs, packaged presets, and runbook lifecycle commands. |
 
 ### Progress surface glossary
 
-`Progress kind` names the owner-local status surface and the corresponding read-only `ops progress show` adapter. Use `uv run ops progress scaffold <registry-id> ...` to emit the required manifest keys for one or more registered procedures, then use `uv run ops progress campaign --manifest <manifest.yaml>` when you want one explicit multi-step summary. This is still not an inferred global campaign engine.
+`Progress kind` names the owner-local status surface and the corresponding read-only `ops progress show` adapter. Use `uv run ops progress scaffold <registry-id> ...` to emit the required manifest keys for one or more registered procedures, then use `uv run ops progress campaign --manifest <manifest.yaml>` when you want one explicit multi-step summary. `ops progress scaffold` prints YAML to stdout by default and only writes when you pass `--out`. This is still not an inferred global campaign engine.
 
 | Progress kind | Meaning | Check next |
 | --- | --- | --- |
@@ -65,7 +77,7 @@ This table is generated from owner-local `*.tool-source.yaml` metadata sidecars.
 
 ### Explicit campaign manifest shape
 
-Use `ops progress scaffold <registry-id> ...` when you want the smallest explicit manifest skeleton with the right placeholder fields, use `ops progress scaffold --related-to <registry-id>` when you want a relation-based starting point from one registered procedure, then use `ops progress campaign` when you want one concise progress summary across multiple registered procedures while still keeping every step pointed back to owner-local artifacts.
+Use `ops progress scaffold <registry-id> ...` when you want the smallest explicit manifest skeleton with the right placeholder fields, use `ops progress scaffold --related-to <registry-id>` when you want a relation-based starting point from one registered procedure, then use `ops progress campaign` when you want one concise progress summary across multiple registered procedures while still keeping every step pointed back to owner-local artifacts. `scaffold` prints to stdout unless you pass `--out`.
 
 ```yaml
 campaign_id: demo_cross_tool_campaign
