@@ -26,8 +26,8 @@ from ..errors import NotifyConfigError
 
 @dataclass(frozen=True)
 class ToolWorkspaceResolver:
-    resolve_config: Callable[[str, Path, Path], Path]
-    list_workspaces: Callable[[Path, Path], list[str]]
+    resolve_config: Callable[[str, Path | None, Path], Path]
+    list_workspaces: Callable[[Path | None, Path], list[str]]
 
 
 _TOOL_WORKSPACE_RESOLVERS: dict[str, ToolWorkspaceResolver] = {}
@@ -55,6 +55,16 @@ def _repo_root_from(start: Path) -> Path | None:
 
 
 def _resolve_repo_root(search_start: Path | None) -> Path:
+    repo_root = _optional_repo_root(search_start)
+    if repo_root is not None:
+        return repo_root
+    raise NotifyConfigError(
+        "unable to determine repo root for --workspace mode; "
+        "run from inside dnadesign repo, set DNADESIGN_REPO_ROOT, or pass --config explicitly"
+    )
+
+
+def _optional_repo_root(search_start: Path | None) -> Path | None:
     env_root = str(os.environ.get("DNADESIGN_REPO_ROOT") or "").strip()
     if env_root:
         repo_root = Path(env_root).expanduser().resolve()
@@ -62,13 +72,7 @@ def _resolve_repo_root(search_start: Path | None) -> Path:
             raise NotifyConfigError(f"DNADESIGN_REPO_ROOT is not a readable directory: {repo_root}")
         return repo_root
     start = (search_start or Path.cwd()).expanduser().resolve()
-    repo_root = _repo_root_from(start)
-    if repo_root is None:
-        raise NotifyConfigError(
-            "unable to determine repo root for --workspace mode; "
-            "run from inside dnadesign repo, set DNADESIGN_REPO_ROOT, or pass --config explicitly"
-        )
-    return repo_root
+    return _repo_root_from(start)
 
 
 def _resolve_search_root(search_start: Path | None) -> Path:
@@ -135,7 +139,7 @@ def list_tool_workspaces(*, tool: str, search_start: Path | None = None) -> list
         allowed = ", ".join(sorted(_TOOL_WORKSPACE_RESOLVERS))
         raise NotifyConfigError(f"unsupported tool '{tool}'. Supported values: {allowed}")
     search_root = _resolve_search_root(search_start)
-    repo_root = _resolve_repo_root(search_root)
+    repo_root = _optional_repo_root(search_root)
     names = resolver.list_workspaces(repo_root, search_root)
     return sorted(dict.fromkeys(str(name).strip() for name in names if str(name).strip()))
 
@@ -156,7 +160,7 @@ def resolve_tool_workspace_config_path(*, tool: str, workspace: str, search_star
         raise NotifyConfigError("workspace must be a workspace name (not a path); pass --config for explicit paths")
 
     search_root = _resolve_search_root(search_start)
-    repo_root = _resolve_repo_root(search_root)
+    repo_root = _optional_repo_root(search_root)
     try:
         config_path = resolver.resolve_config(workspace_name, repo_root, search_root)
     except ValueError as exc:
@@ -179,8 +183,17 @@ def resolve_tool_workspace_config_path(*, tool: str, workspace: str, search_star
     raise NotifyConfigError(f"workspace '{workspace_name}' not found for tool '{tool_name}' at {config_resolved}")
 
 
-def _workspace_root(repo_root: Path, relative_root: Path) -> Path:
-    return (repo_root / relative_root).resolve()
+def _require_repo_root(repo_root: Path | None) -> Path:
+    if repo_root is None:
+        raise ValueError(
+            "unable to determine repo root for --workspace mode; "
+            "run from inside dnadesign repo, set DNADESIGN_REPO_ROOT, or pass --config explicitly"
+        )
+    return repo_root
+
+
+def _workspace_root(repo_root: Path | None, relative_root: Path) -> Path:
+    return (_require_repo_root(repo_root) / relative_root).resolve()
 
 
 def _list_workspace_names_from_root(root: Path) -> list[str]:
@@ -196,23 +209,33 @@ def _list_workspace_names_from_root(root: Path) -> list[str]:
     return sorted(names)
 
 
-def _resolve_config_from_workspace_root(workspace_name: str, repo_root: Path, relative_root: Path) -> Path:
+def _resolve_config_from_workspace_root(workspace_name: str, repo_root: Path | None, relative_root: Path) -> Path:
     return _workspace_root(repo_root, relative_root) / workspace_name / "config.yaml"
 
 
-def _list_workspace_names(repo_root: Path, relative_root: Path) -> list[str]:
+def _list_workspace_names(repo_root: Path | None, relative_root: Path) -> list[str]:
+    if repo_root is None:
+        return []
     return _list_workspace_names_from_root(_workspace_root(repo_root, relative_root))
 
 
-def _construct_workspace_roots(repo_root: Path, search_root: Path) -> tuple[Path, ...]:
-    roots = [(repo_root / "src/dnadesign/construct/workspaces").resolve(), search_root]
+def _construct_workspace_roots(repo_root: Path | None, search_root: Path) -> tuple[Path, ...]:
+    roots = [search_root]
+    if repo_root is not None:
+        roots.append((repo_root / "src/dnadesign/construct/workspaces").resolve())
     env_root = str(os.environ.get("CONSTRUCT_WORKSPACE_ROOT") or "").strip()
     if env_root:
         roots.insert(0, Path(env_root))
     return _dedupe_paths(roots)
 
 
-def _resolve_construct_config_from_known_roots(workspace_name: str, repo_root: Path, search_root: Path) -> Path:
+def _resolve_construct_config_from_known_roots(workspace_name: str, repo_root: Path | None, search_root: Path) -> Path:
+    workspace_id, _, _ = workspace_name.partition(":")
+    if search_root.name == workspace_id and (search_root / "construct.workspace.yaml").exists():
+        return resolve_construct_workspace_config_path_from_root(
+            workspaces_root=search_root.parent,
+            workspace_selector=workspace_name,
+        )
     missing_registry_error: str | None = None
     for root in _construct_workspace_roots(repo_root, search_root):
         try:
@@ -232,22 +255,29 @@ def _resolve_construct_config_from_known_roots(workspace_name: str, repo_root: P
     return (search_root / workspace_name / "config.yaml").resolve()
 
 
-def _list_construct_workspace_names(repo_root: Path, search_root: Path) -> list[str]:
+def _list_construct_workspace_names(repo_root: Path | None, search_root: Path) -> list[str]:
     names: list[str] = []
+    if (search_root / "construct.workspace.yaml").exists():
+        names.append(search_root.name)
     for root in _construct_workspace_roots(repo_root, search_root):
         names.extend(list_construct_workspaces_from_root(root))
     return sorted(dict.fromkeys(names))
 
 
-def _infer_workspace_roots(repo_root: Path, search_root: Path) -> tuple[Path, ...]:
-    roots = [(repo_root / "src/dnadesign/infer/workspaces").resolve(), (search_root / "workspaces").resolve()]
+def _infer_workspace_roots(repo_root: Path | None, search_root: Path) -> tuple[Path, ...]:
+    roots = [(search_root / "workspaces").resolve()]
+    if repo_root is not None:
+        roots.append((repo_root / "src/dnadesign/infer/workspaces").resolve())
     env_root = str(os.environ.get("INFER_WORKSPACE_ROOT") or "").strip()
     if env_root:
         roots.insert(0, Path(env_root))
     return _dedupe_paths(roots)
 
 
-def _resolve_infer_config_from_known_roots(workspace_name: str, repo_root: Path, search_root: Path) -> Path:
+def _resolve_infer_config_from_known_roots(workspace_name: str, repo_root: Path | None, search_root: Path) -> Path:
+    direct_config = search_root / "config.yaml"
+    if search_root.name == workspace_name and direct_config.exists() and direct_config.is_file():
+        return direct_config.resolve()
     roots = _infer_workspace_roots(repo_root, search_root)
     for root in roots:
         candidate = root / workspace_name / "config.yaml"
@@ -256,8 +286,11 @@ def _resolve_infer_config_from_known_roots(workspace_name: str, repo_root: Path,
     return (roots[0] / workspace_name / "config.yaml").resolve()
 
 
-def _list_infer_workspace_names(repo_root: Path, search_root: Path) -> list[str]:
+def _list_infer_workspace_names(repo_root: Path | None, search_root: Path) -> list[str]:
     names: list[str] = []
+    direct_config = search_root / "config.yaml"
+    if direct_config.exists() and direct_config.is_file():
+        names.append(search_root.name)
     for root in _infer_workspace_roots(repo_root, search_root):
         names.extend(_list_workspace_names_from_root(root))
     return sorted(dict.fromkeys(names))
