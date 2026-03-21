@@ -282,3 +282,31 @@ def test_merge_carry_namespace_rejects_reserved_namespace(tmp_path: Path) -> Non
                 carry_namespaces=["usr_state"],
                 dry_run=True,
             )
+
+
+def test_merge_carry_namespace_ignores_reserved_state_overlays(tmp_path: Path) -> None:
+    root, dest, src = _make_merge_datasets(tmp_path)
+    _register_usr_label_namespace(root)
+    dest.import_rows([_row("ACGT")], source="unit-test")
+    src.import_rows([_row("TGCA")], source="unit-test")
+
+    dest_id = dest.head(1)["id"].iloc[0]
+    src_id = src.head(1)["id"].iloc[0]
+    dest.set_state([dest_id], qc_status="pass")
+    src.set_state([src_id], qc_status="fail")
+    _write_usr_labels(src, {src_id: ("src-label", ["src-alias"])})
+
+    with dest.maintenance(reason="merge"):
+        preview = merge_usr_to_usr(
+            root=root,
+            dest="dest",
+            src="src",
+            columns_mode=MergeColumnsMode.UNION,
+            duplicate_policy=MergePolicy.SKIP,
+            carry_namespaces=["usr_label"],
+        )
+
+    rows = dest.head(10, columns=["sequence", "usr_label__primary"]).to_dict(orient="records")
+    by_sequence = {str(row["sequence"]): row for row in rows}
+    assert by_sequence["TGCA"]["usr_label__primary"] == "src-label"
+    assert preview.carried_namespace_counts == (("usr_label", 1),)

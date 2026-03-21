@@ -91,11 +91,11 @@ def plan_overlay_carry(
 
     src_catalog = {
         str(overlay["namespace"]): overlay
-        for overlay in load_overlay_catalog(src_dataset, reserved_namespaces=frozenset())
+        for overlay in load_overlay_catalog(src_dataset, reserved_namespaces=reserved_namespaces)
     }
     dest_catalog = {
         str(overlay["namespace"]): overlay
-        for overlay in load_overlay_catalog(dest_dataset, reserved_namespaces=frozenset())
+        for overlay in load_overlay_catalog(dest_dataset, reserved_namespaces=reserved_namespaces)
     }
 
     plans: list[OverlayCarryPlan] = []

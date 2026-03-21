@@ -286,12 +286,38 @@ def test_resolve_tool_events_path_construct_requires_explicit_usr_root(tmp_path:
         resolve_tool_events_path(tool="construct", config=config)
 
 
-def test_resolve_tool_events_path_rejects_legacy_infer_alias(tmp_path: Path) -> None:
+def test_resolve_tool_events_path_accepts_legacy_infer_alias(tmp_path: Path) -> None:
     config = tmp_path / "infer.yaml"
-    config.write_text("jobs: []\n", encoding="utf-8")
+    usr_root = tmp_path / "usr_root"
+    config.write_text(
+        "\n".join(
+            [
+                "model:",
+                "  id: evo2",
+                "  device: cpu",
+                "  precision: fp32",
+                "  alphabet: dna",
+                "jobs:",
+                "  - id: j1",
+                "    operation: generate",
+                "    ingest:",
+                "      source: usr",
+                "      dataset: infer_demo",
+                f"      root: {usr_root}",
+                "    params:",
+                "      max_new_tokens: 8",
+                "    io:",
+                "      write_back: true",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
-    with pytest.raises(NotifyConfigError, match="unsupported tool"):
-        resolve_tool_events_path(tool="infer_evo2", config=config)
+    events_path, policy = resolve_tool_events_path(tool="infer_evo2", config=config)
+
+    assert events_path == (usr_root / "infer_demo" / ".events.log").resolve()
+    assert policy == "infer"
 
 
 def test_resolve_tool_events_path_densegen_from_usr_output_config(tmp_path: Path) -> None:

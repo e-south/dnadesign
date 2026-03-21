@@ -259,6 +259,43 @@ def test_resolve_tool_workspace_config_path_construct_rejects_ambiguous_workspac
         )
 
 
+def test_list_tool_workspaces_returns_project_qualified_construct_selectors(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    workspace_dir = repo_root / "src" / "dnadesign" / "construct" / "workspaces" / "demo_c"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    (workspace_dir / "config.slot_a.window.yaml").write_text("job:\n  id: slot_a_window\n", encoding="utf-8")
+    (workspace_dir / "config.slot_b.window.yaml").write_text("job:\n  id: slot_b_window\n", encoding="utf-8")
+    (workspace_dir / "construct.workspace.yaml").write_text(
+        "\n".join(
+            [
+                "workspace:",
+                "  id: demo_c",
+                "  profile: promoter-swap-demo",
+                "  projects:",
+                "    - id: slot_a_window",
+                "      config: config.slot_a.window.yaml",
+                "      flow: replace-anchor-in-template",
+                "      input_dataset: anchors_demo",
+                "      output_dataset: demo_output_a",
+                "    - id: slot_b_window",
+                "      config: config.slot_b.window.yaml",
+                "      flow: replace-anchor-in-template",
+                "      input_dataset: anchors_demo",
+                "      output_dataset: demo_output_b",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\n", encoding="utf-8")
+
+    workspaces = list_tool_workspaces(tool="construct", search_start=repo_root)
+
+    assert "demo_c:slot_a_window" in workspaces
+    assert "demo_c:slot_b_window" in workspaces
+    assert "demo_c" not in workspaces
+
+
 def test_resolve_tool_workspace_config_path_rejects_legacy_infer_alias(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir(parents=True, exist_ok=True)
