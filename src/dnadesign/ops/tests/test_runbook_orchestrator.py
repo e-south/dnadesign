@@ -1050,10 +1050,11 @@ def test_densegen_batch_submit_plan_skips_notify_smoke_and_watcher_submit(tmp_pa
     assert plan.notify_smoke_commands == []
     assert "NOTIFY_PROFILE" not in submit_block
     assert "DENSEGEN_CONFIG" in submit_block
-    assert "DENSEGEN_RUN_ARGS=--fresh --no-plot" in submit_block
+    assert "DENSEGEN_RUN_ARGS='--fresh --no-plot'" in submit_block
     assert f"DENSEGEN_TRACE_DIR={runbook.workspace_root}/outputs/logs/ops/runtime" in submit_block
     assert "docs/bu-scc/jobs/densegen-analysis.qsub" in submit_block
     assert "-hold_jid study_stress_ethanol_cipro_densegen_cpu" in submit_block
+    assert "-v DENSEGEN_CONFIG,DENSEGEN_RUN_ARGS,DENSEGEN_TRACE_DIR" in submit_block
     assert "DENSEGEN_NOTEBOOK_FORCE" not in submit_block
 
 
@@ -1160,6 +1161,42 @@ def test_notify_submit_includes_webhook_file_when_present(
 
     assert f"WEBHOOK_FILE={webhook_file}" in submit_block
     assert "WEBHOOK_ENV=NOTIFY_WEBHOOK" in submit_block
+
+
+def test_densegen_and_notify_qsub_commands_export_comma_bearing_values_via_env(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path / "study,2026")
+    runbook = load_orchestration_runbook(runbook_path)
+
+    plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
+
+    densegen_submit = next(
+        command
+        for command in plan.submit_commands
+        if command.argv is not None and command.argv[-1].endswith("densegen-cpu.qsub")
+    )
+    notify_submit = next(
+        command
+        for command in plan.submit_commands
+        if command.argv is not None and command.argv[-1].endswith("notify-watch.qsub")
+    )
+
+    assert densegen_submit.argv is not None
+    assert densegen_submit.argv[densegen_submit.argv.index("-v") + 1] == (
+        "DENSEGEN_CONFIG,DENSEGEN_RUN_ARGS,DENSEGEN_TRACE_DIR"
+    )
+    assert "," in densegen_submit.env["DENSEGEN_CONFIG"]
+    assert "-v DENSEGEN_CONFIG,DENSEGEN_RUN_ARGS,DENSEGEN_TRACE_DIR" in densegen_submit.render_shell()
+
+    assert notify_submit.argv is not None
+    assert notify_submit.argv[notify_submit.argv.index("-v") + 1] == (
+        "NOTIFY_PROFILE,WEBHOOK_ENV,NOTIFY_IDLE_TIMEOUT_SECONDS,"
+        "NOTIFY_ENFORCE_TERMINAL_ON_IDLE,NOTIFY_TLS_CA_BUNDLE,WEBHOOK_FILE"
+    )
+    assert "," in notify_submit.env["NOTIFY_PROFILE"]
+    assert (
+        "-v NOTIFY_PROFILE,WEBHOOK_ENV,NOTIFY_IDLE_TIMEOUT_SECONDS,"
+        "NOTIFY_ENFORCE_TERMINAL_ON_IDLE,NOTIFY_TLS_CA_BUNDLE,WEBHOOK_FILE"
+    ) in notify_submit.render_shell()
 
 
 def test_notify_submit_aligns_runtime_and_idle_timeout_with_runbook(
@@ -1729,6 +1766,33 @@ jobs: []
     assert "NOTIFY_PROFILE" not in submit_block
     assert "INFER_CONFIG=" in submit_block
     assert "INFER_RUN_ARGS=--overwrite" in submit_block
+
+
+def test_infer_qsub_commands_export_comma_bearing_values_via_env(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer,workspace"
+    payload = _infer_runbook_payload(workspace_root, runbook_id="infer_qsub_comma_paths")
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+
+    plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
+
+    infer_verify = next(
+        command
+        for command in plan.preflight_commands
+        if command.argv is not None
+        and command.argv[:2] == ("qsub", "-verify")
+        and command.argv[-1].endswith("evo2-gpu-infer.qsub")
+    )
+    infer_submit = next(
+        command
+        for command in plan.submit_commands
+        if command.argv is not None and command.argv[-1].endswith("evo2-gpu-infer.qsub")
+    )
+
+    for command in (infer_verify, infer_submit):
+        assert command.argv is not None
+        assert command.argv[command.argv.index("-v") + 1] == "INFER_CONFIG,INFER_RUN_ARGS,CUDA_MODULE,GCC_MODULE"
+        assert "," in command.env["INFER_CONFIG"]
+        assert "-v INFER_CONFIG,INFER_RUN_ARGS,CUDA_MODULE,GCC_MODULE" in command.render_shell()
 
 
 def test_infer_mode_auto_selects_fresh_when_only_usr_registry_exists(tmp_path: Path) -> None:

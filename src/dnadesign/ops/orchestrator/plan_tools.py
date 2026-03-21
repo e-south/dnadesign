@@ -61,6 +61,13 @@ def _tool_ops_gate(*parts: object) -> ToolCommandSpec:
     return ToolCommandSpec(kind="ops_gate", parts=tuple(str(part) for part in parts))
 
 
+def _qsub_export_names(env_vars: dict[str, str]) -> str:
+    names = [str(name).strip() for name in env_vars.keys() if str(name).strip()]
+    if not names:
+        raise ValueError("qsub export list requires at least one environment variable")
+    return ",".join(names)
+
+
 def _densegen_post_run_resource_values(runbook: OrchestrationRunbookV1) -> tuple[str, str, str]:
     if runbook.densegen is None:
         raise ValueError("densegen plan adapter requires runbook.densegen")
@@ -297,11 +304,11 @@ def _infer_preflight_commands(
     ]
     if infer_overlay_guard.auto_compact_existing_overlay_parts:
         infer_overlay_guard_parts.append("--auto-compact-existing-overlay-parts")
-    infer_env = [f"INFER_CONFIG={config}"]
+    infer_env: dict[str, str] = {"INFER_CONFIG": config}
     if mode_decision.run_args:
-        infer_env.append(f"INFER_RUN_ARGS={mode_decision.run_args}")
-    infer_env.append(f"CUDA_MODULE={runbook.infer.cuda_module}")
-    infer_env.append(f"GCC_MODULE={runbook.infer.gcc_module}")
+        infer_env["INFER_RUN_ARGS"] = mode_decision.run_args
+    infer_env["CUDA_MODULE"] = runbook.infer.cuda_module
+    infer_env["GCC_MODULE"] = runbook.infer.gcc_module
 
     return (
         _tool_ops_gate(*infer_overlay_guard_parts),
@@ -325,8 +332,9 @@ def _infer_preflight_commands(
             "-l",
             f"gpu_c={runbook.resources.gpu_capability}",
             "-v",
-            ",".join(infer_env),
+            _qsub_export_names(infer_env),
             infer_template,
+            env=infer_env,
         ),
         _tool_ops_gate("qa-submit-preflight", "--template", infer_template),
     )
@@ -344,6 +352,12 @@ def _densegen_submit_commands(
     runtime_trace_dir = (runbook.workspace_root / WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR).resolve()
     densegen_job_name = _sge_job_name(runbook_id=runbook.id, suffix="densegen_cpu")
     densegen_post_run_job_name = _sge_job_name(runbook_id=runbook.id, suffix="densegen_postrun")
+    densegen_env = {
+        "DENSEGEN_CONFIG": str(runbook.densegen.config),
+        "DENSEGEN_RUN_ARGS": mode_decision.run_args,
+        "DENSEGEN_TRACE_DIR": str(runtime_trace_dir),
+    }
+    densegen_post_run_env = {"DENSEGEN_CONFIG": str(runbook.densegen.config)}
     return (
         _tool_argv(
             "qsub",
@@ -363,9 +377,9 @@ def _densegen_submit_commands(
             "-l",
             f"mem_per_core={runbook.resources.mem_per_core}",
             "-v",
-            "DENSEGEN_CONFIG="
-            f"{runbook.densegen.config},DENSEGEN_RUN_ARGS={mode_decision.run_args},DENSEGEN_TRACE_DIR={runtime_trace_dir}",
+            _qsub_export_names(densegen_env),
             str(runbook.densegen.qsub_template),
+            env=densegen_env,
         ),
         _tool_argv(
             "qsub",
@@ -386,8 +400,9 @@ def _densegen_submit_commands(
             "-l",
             f"mem_per_core={post_run_mem_per_core}",
             "-v",
-            f"DENSEGEN_CONFIG={runbook.densegen.config}",
+            _qsub_export_names(densegen_post_run_env),
             str(runbook.densegen.post_run.qsub_template),
+            env=densegen_post_run_env,
         ),
     )
 
@@ -400,11 +415,11 @@ def _infer_submit_commands(
 ) -> tuple[ToolCommandSpec, ...]:
     if runbook.infer is None:
         raise ValueError("infer plan adapter requires runbook.infer")
-    infer_env = [f"INFER_CONFIG={runbook.infer.config}"]
+    infer_env: dict[str, str] = {"INFER_CONFIG": str(runbook.infer.config)}
     if mode_decision.run_args:
-        infer_env.append(f"INFER_RUN_ARGS={mode_decision.run_args}")
-    infer_env.append(f"CUDA_MODULE={runbook.infer.cuda_module}")
-    infer_env.append(f"GCC_MODULE={runbook.infer.gcc_module}")
+        infer_env["INFER_RUN_ARGS"] = mode_decision.run_args
+    infer_env["CUDA_MODULE"] = runbook.infer.cuda_module
+    infer_env["GCC_MODULE"] = runbook.infer.gcc_module
     return (
         _tool_argv(
             "qsub",
@@ -426,8 +441,9 @@ def _infer_submit_commands(
             "-l",
             f"gpu_c={runbook.resources.gpu_capability}",
             "-v",
-            ",".join(infer_env),
+            _qsub_export_names(infer_env),
             str(runbook.infer.qsub_template),
+            env=infer_env,
         ),
     )
 

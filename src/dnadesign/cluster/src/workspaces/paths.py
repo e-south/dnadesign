@@ -89,8 +89,7 @@ def list_builtin_workspaces() -> list[str]:
     return [str(entry["workspace_id"]) for entry in list_builtin_workspace_inventory()]
 
 
-def _workspace_inventory_entry(*, workspace_dir: Path) -> dict[str, object]:
-    outputs_dir = workspace_dir / "outputs"
+def _count_workspace_output_files(outputs_dir: Path) -> tuple[int, float | None]:
     output_files = 0
     latest_output_timestamp: float | None = None
     if outputs_dir.exists():
@@ -104,6 +103,12 @@ def _workspace_inventory_entry(*, workspace_dir: Path) -> dict[str, object]:
                 continue
             if latest_output_timestamp is None or stat_result.st_mtime > latest_output_timestamp:
                 latest_output_timestamp = stat_result.st_mtime
+    return output_files, latest_output_timestamp
+
+
+def _workspace_inventory_entry(*, workspace_dir: Path, outputs_dir: Path | None = None) -> dict[str, object]:
+    runtime_outputs_dir = outputs_dir or (workspace_dir / "outputs")
+    output_files, latest_output_timestamp = _count_workspace_output_files(runtime_outputs_dir)
     latest_output_mtime = (
         datetime.fromtimestamp(latest_output_timestamp).astimezone().isoformat(timespec="seconds")
         if latest_output_timestamp is not None
@@ -112,6 +117,7 @@ def _workspace_inventory_entry(*, workspace_dir: Path) -> dict[str, object]:
     return {
         "workspace_id": workspace_dir.name,
         "workspace_dir": str(workspace_dir.resolve()),
+        "results_root": str(runtime_outputs_dir.resolve()),
         "workspace_state": "attention" if output_files else "clean",
         "output_files": output_files,
         "latest_output_mtime": latest_output_mtime,
@@ -128,7 +134,12 @@ def list_builtin_workspace_inventory() -> list[dict[str, object]]:
             continue
         if not (path / "config.yaml").is_file():
             continue
-        inventory.append(_workspace_inventory_entry(workspace_dir=path))
+        inventory.append(
+            _workspace_inventory_entry(
+                workspace_dir=path,
+                outputs_dir=(Path.cwd() / "workspaces" / path.name / "outputs" / "cluster").resolve(),
+            )
+        )
     return inventory
 
 

@@ -72,6 +72,13 @@ def _ops_gate_command(*parts: object) -> CommandSpec:
     return _argv_command("uv", "run", "python", "-m", "dnadesign.ops.orchestrator.gates", *parts)
 
 
+def _qsub_export_names(env_vars: dict[str, str]) -> str:
+    names = [str(name).strip() for name in env_vars.keys() if str(name).strip()]
+    if not names:
+        raise ValueError("qsub export list requires at least one environment variable")
+    return ",".join(names)
+
+
 def _render_tool_command(command: ToolCommandSpec) -> CommandSpec:
     if command.kind == "ops_gate":
         return _ops_gate_command(*command.parts)
@@ -311,14 +318,14 @@ def _submit_commands(runbook: OrchestrationRunbookV1, *, mode_decision: ModeDeci
         )
         notify_idle_timeout_seconds = str(_runtime_to_seconds(runbook.resources.h_rt))
         notify_submit_parts = [
-            f"NOTIFY_PROFILE={runbook.notify.profile}",
-            f"WEBHOOK_ENV={webhook_env_name}",
-            f"NOTIFY_IDLE_TIMEOUT_SECONDS={notify_idle_timeout_seconds}",
-            "NOTIFY_ENFORCE_TERMINAL_ON_IDLE=1",
-            f"NOTIFY_TLS_CA_BUNDLE={notify_runtime.tls_ca_bundle}",
-            f"WEBHOOK_FILE={notify_runtime.webhook_file}",
+            ("NOTIFY_PROFILE", str(runbook.notify.profile)),
+            ("WEBHOOK_ENV", webhook_env_name),
+            ("NOTIFY_IDLE_TIMEOUT_SECONDS", notify_idle_timeout_seconds),
+            ("NOTIFY_ENFORCE_TERMINAL_ON_IDLE", "1"),
+            ("NOTIFY_TLS_CA_BUNDLE", notify_runtime.tls_ca_bundle),
+            ("WEBHOOK_FILE", notify_runtime.webhook_file),
         ]
-        notify_submit_env = ",".join(notify_submit_parts)
+        notify_submit_env = {name: value for name, value in notify_submit_parts}
         submit_commands.append(
             _argv_command(
                 "qsub",
@@ -331,8 +338,9 @@ def _submit_commands(runbook: OrchestrationRunbookV1, *, mode_decision: ModeDeci
                 "-l",
                 f"h_rt={runbook.resources.h_rt}",
                 "-v",
-                notify_submit_env,
+                _qsub_export_names(notify_submit_env),
                 str(runbook.notify.qsub_template),
+                env=notify_submit_env,
             )
         )
 
