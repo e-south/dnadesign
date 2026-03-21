@@ -1,6 +1,6 @@
 ![cluster banner](assets/cluster-banner.svg)
 
-Cluster is the downstream tool for exploratory clustering, UMAP visualization, and related summaries after one feature column or exported matrix already exists. It works from a chosen feature matrix in a USR dataset or a CSV/Parquet file and records reusable outputs in a workspace-scoped artifact root. It does not generate upstream features.
+Cluster is the exploratory downstream surface for exploratory clustering, UMAP visualization, and related summaries after one feature column or exported matrix already exists. It works from a chosen feature matrix in a USR dataset or a CSV/Parquet file and records reusable outputs in a workspace-scoped artifact root. It does not generate upstream features.
 
 ## Documentation
 

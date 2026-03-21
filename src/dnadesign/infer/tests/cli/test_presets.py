@@ -25,6 +25,13 @@ from dnadesign.infer.src.presets import registry as preset_registry
 runner = CliRunner()
 
 
+@pytest.fixture(autouse=True)
+def _clear_preset_registry_cache() -> None:
+    preset_registry.clear_preset_cache()
+    yield
+    preset_registry.clear_preset_cache()
+
+
 def test_presets_registry_has_evo2_extract():
     items = list_presets()
     ids = [it["id"] for it in items]

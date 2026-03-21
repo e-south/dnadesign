@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -26,6 +27,9 @@ def _repo_root() -> Path:
         if (parent / "pyproject.toml").exists():
             return parent
     raise RuntimeError("repo root not found")
+
+
+_ANSI_ESCAPE_RE = re.compile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
 
 
 def test_load_runbook_catalog_reads_shared_registry() -> None:
@@ -88,7 +92,7 @@ def test_cli_help_points_new_users_to_task_first_catalog_list() -> None:
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    normalized_output = " ".join(result.output.split())
+    normalized_output = " ".join(_ANSI_ESCAPE_RE.sub("", result.output).split())
     assert "Start with `uv run ops catalog list --simple` to browse routes from the terminal." in normalized_output
 
 

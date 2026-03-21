@@ -354,7 +354,7 @@ def test_resolve_tool_events_path_densegen_from_usr_output_config(tmp_path: Path
     assert policy == "densegen"
 
 
-def test_resolve_tool_events_path_densegen_rejects_usr_root_outside_outputs(tmp_path: Path) -> None:
+def test_resolve_tool_events_path_densegen_supports_shared_usr_root_outside_outputs(tmp_path: Path) -> None:
     run_root = tmp_path / "workspace"
     run_root.mkdir(parents=True, exist_ok=True)
     config = run_root / "config.yaml"
@@ -379,8 +379,12 @@ def test_resolve_tool_events_path_densegen_rejects_usr_root_outside_outputs(tmp_
         encoding="utf-8",
     )
 
-    with pytest.raises(NotifyConfigError, match="output\\.usr\\.root must be within outputs/"):
-        resolve_tool_events_path(tool="densegen", config=config)
+    events_path, policy = resolve_tool_events_path(tool="densegen", config=config)
+
+    assert (
+        events_path == (tmp_path / "external_usr" / "densegen" / "study_stress_ethanol_cipro" / ".events.log").resolve()
+    )
+    assert policy == "densegen"
 
 
 def test_register_tool_events_source_supports_custom_tool(tmp_path: Path) -> None:
