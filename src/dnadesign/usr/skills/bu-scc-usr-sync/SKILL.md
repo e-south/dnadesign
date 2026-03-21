@@ -32,7 +32,8 @@ Run `usr diff` / `usr pull` / `usr push` against BU SCC with the dnadesign-speci
 
 1. Verify locus and config
 - Confirm you are operating on the intended local clone and intended SCC remote.
-- Confirm `USR_REMOTES_PATH` is set or pass the configured remotes file.
+- Prefer `uv run usr --remotes-config <remotes.yaml> ...` for each sync command.
+- Use `USR_REMOTES_PATH` only as a shell-session fallback when repeated commands need the same remotes file.
 
 2. Preflight
 - Run `uv run usr remotes doctor --remote <name>`.

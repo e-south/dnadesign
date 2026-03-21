@@ -15,7 +15,7 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
   - Legacy archive roots are not operational:
     - `datasets/archived/**` and `usr/archived/**` should be treated as historical only.
 - Notebooks: `src/dnadesign/usr/notebooks/`
-- Remote sync config: set `USR_REMOTES_PATH` to your remotes YAML
+- Remote sync config: prefer `uv run usr --remotes-config <remotes.yaml> ...`; `USR_REMOTES_PATH` is the fallback for shell-scoped sessions
 - Namespace registry: `registry.yaml` under the datasets root
 - Sync details: `src/dnadesign/usr/docs/operations/sync.md`
 - Repo-local BU SCC sync skill: `src/dnadesign/usr/skills/bu-scc-usr-sync/SKILL.md`
@@ -61,9 +61,11 @@ uv run usr export <dataset> --fmt csv --out /tmp/out.csv
 uv run usr materialize <dataset>
 
 # Remote sync (see docs/operations/sync.md)
-uv run usr diff <dataset-or-path> <remote-name>
-uv run usr pull <dataset-or-path> <remote-name> -y
-uv run usr push <dataset-or-path> <remote-name> -y
+uv run usr --remotes-config <remotes.yaml> diff <dataset-or-path> <remote-name>
+uv run usr --remotes-config <remotes.yaml> pull <dataset-or-path> <remote-name> -y
+uv run usr --remotes-config <remotes.yaml> push <dataset-or-path> <remote-name> -y
+# Fallback for a shell session:
+export USR_REMOTES_PATH=<remotes.yaml>
 ```
 
 ### Notes

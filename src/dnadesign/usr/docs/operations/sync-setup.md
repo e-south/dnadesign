@@ -70,14 +70,13 @@ Host <alias>
 
 ## Configure a USR remote
 
-`USR_REMOTES_PATH` is required.
+Prefer `--remotes-config <path>` for each `usr` command so the chosen remotes
+file is explicit in the command line. `USR_REMOTES_PATH` is the fallback for a
+shell session that will reuse the same remotes file repeatedly.
 
 ```bash
-# Set remote config path for USR CLI commands.
-export USR_REMOTES_PATH="$HOME/.config/dnadesign/usr-remotes.yaml"
-
-# Create remote profile.
-uv run usr remotes wizard \
+# Create remote profile in an explicit remotes file.
+uv run usr --remotes-config "$HOME/.config/dnadesign/usr-remotes.yaml" remotes wizard \
   --preset bu-scc \
   --name bu-scc \
   --user <user> \
@@ -85,14 +84,14 @@ uv run usr remotes wizard \
   --base-dir /project/<user>/dnadesign/src/dnadesign/usr/datasets
 
 # Validate remote profile wiring.
-uv run usr remotes doctor --remote bu-scc
+uv run usr --remotes-config "$HOME/.config/dnadesign/usr-remotes.yaml" remotes doctor --remote bu-scc
 ```
 
-One-shot explicit config path without exporting shell state:
+Shell-session fallback:
 
 ```bash
-# Use this remotes file only for the current CLI invocation.
-uv run usr --remotes-config src/dnadesign/usr/remotes.yaml remotes list
+# Reuse one remotes file across many commands in the current shell.
+export USR_REMOTES_PATH="$HOME/.config/dnadesign/usr-remotes.yaml"
 ```
 
 Inspect remote config:
@@ -123,7 +122,7 @@ remotes:
     # ssh_key_env: USR_SSH_KEY
 ```
 
-If BU SCC auth fails with `Permission denied (keyboard-interactive,hostbased)` under strict batch mode, re-save the remote with `--no-batch-mode` or set `batch_mode: false` in `USR_REMOTES_PATH`.
+If BU SCC auth fails with `Permission denied (keyboard-interactive,hostbased)` under strict batch mode, re-save the remote with `--no-batch-mode` or set `batch_mode: false` in the remotes YAML passed through `--remotes-config` or `USR_REMOTES_PATH`.
 
 If SCC still requires Duo or other keyboard-interactive follow-up after publickey auth, establish `ssh scc1` or `ssh scc1.bu.edu` once in a terminal first so the SSH ControlMaster socket is already live before running `usr remotes doctor`, `usr diff`, `usr pull`, or `usr push`. This matters because the sync lock handshake and other preflight probes run through piped SSH helpers that cannot complete a fresh keyboard-interactive prompt on their own.
 

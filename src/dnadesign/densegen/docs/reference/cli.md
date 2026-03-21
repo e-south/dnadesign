@@ -169,10 +169,16 @@ Key options:
 - `--from-config PATH`
 - `--copy-inputs / --no-copy-inputs`
 - `--output-mode local|usr|both`
+- `--usr-root PATH`
 
 Notes:
-- `--output-mode usr|both` points `output.usr.root` at the repo shared USR root
-  relative to the new workspace by default.
+- `--output-mode usr|both` points `output.usr.root` at a shared USR root
+  relative to the new workspace.
+- Inside a source checkout, `dense workspace init` uses the repo shared USR
+  root by default.
+- Outside a source checkout, pass `--usr-root` or set `DNADESIGN_USR_ROOT`;
+  the command does not guess a writable shared root from an installed package
+  path.
 - `--output-mode usr|both` seeds the configured shared USR root `registry.yaml` when a seed file is available.
 - `--output-mode usr|both` sets `output.usr.dataset` to the workspace id so each initialized workspace writes to its own USR dataset path.
 

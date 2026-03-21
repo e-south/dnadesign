@@ -186,6 +186,17 @@ def test_docs_index_includes_progressive_entrypoint_ladders() -> None:
     assert "studies/README.md" in docs_index
 
 
+def test_docs_index_routes_study_root_semantics_to_study_records() -> None:
+    docs_index = _read("docs/README.md")
+    studies_index = _read("docs/studies/README.md")
+
+    assert "Naming rule for study work:" not in docs_index
+    assert "Check study dataset-root semantics and affiliated-dataset registry terms" in docs_index
+    assert "workspace_local_export" in studies_index
+    assert "shared" in studies_index
+    assert "external_usr" in studies_index
+
+
 def test_usr_top_readme_is_lightweight_router() -> None:
     usr_readme = _read("src/dnadesign/usr/README.md")
 
@@ -200,6 +211,19 @@ def test_usr_top_readme_is_lightweight_router() -> None:
     assert "## Package boundary" not in usr_readme
     assert "## CLI" not in usr_readme
     assert "### Schema contract" not in usr_readme
+
+
+def test_usr_agent_and_sync_docs_prefer_explicit_remotes_config() -> None:
+    usr_agents = _read("src/dnadesign/usr/AGENTS.md")
+    sync_setup = _read("src/dnadesign/usr/docs/operations/sync-setup.md")
+    sync_skill = _read("src/dnadesign/usr/skills/bu-scc-usr-sync/SKILL.md")
+
+    assert "--remotes-config <remotes.yaml>" in usr_agents
+    assert "USR_REMOTES_PATH" in usr_agents
+    assert "fallback" in usr_agents
+    assert "--remotes-config" in sync_setup
+    assert "USR_REMOTES_PATH" in sync_setup
+    assert "Prefer `uv run usr --remotes-config <remotes.yaml> ...`" in sync_skill
 
 
 def test_usr_docs_index_exposes_getting_started_and_reference_paths() -> None:

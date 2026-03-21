@@ -26,15 +26,6 @@ Use this table when the first question is "what is available right now?" rather 
 | `cluster` | packaged workspaces and their current output state | `uv run cluster workspace list` | [Cluster workspaces](../src/dnadesign/cluster/workspaces/README.md) |
 | `usr` | dataset roots and datasets, not workspaces | `uv run usr --help` to see the default root, then `uv run usr ls --root <usr-root>` | [USR CLI quickstart](../src/dnadesign/usr/docs/getting-started/cli-quickstart.md) |
 
-Naming rule for study work:
-
-- `outputs/usr_datasets/` inside a tool workspace is a workspace-local USR
-  export root.
-- `src/dnadesign/usr/datasets` is the repo-local shared USR root.
-- Study status records should name the shared study root explicitly and use
-  the dataset registry to mention workspace-export mirrors when they still
-  matter operationally.
-
 ### Choose a workflow
 
 #### Single-tool workflows
@@ -60,6 +51,7 @@ Use these when data moves through more than one tool and the shared record lives
 | Hand one construct-backed dataset to infer and downstream watchers | [Construct -> USR -> Infer shared dataset runbook](../src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md) | Verify lineage plus downstream write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
 | Review the promoter-study Evo2 route before choosing a branch | [Promoter study Evo2 workflow journey](../src/dnadesign/usr/docs/operations/promoter-evo2-journey.md) | Continue to [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md) for the shared handoff. |
 | Keep one real promoter-study status surface that naive agents can refresh | [Promoter study status contract](../src/dnadesign/usr/docs/operations/promoter-study-status-contract.md) | Verify the live study with [Promoter study registry](studies/promoter/README.md), `ops progress campaign`, `ops progress show usr.data-plane.promoter-feature-matrix`, and the sync-aware study record under [Study records](studies/README.md). |
+| Check study dataset-root semantics and affiliated-dataset registry terms | [Study records index](studies/README.md) | Verify the active promoter-study selector in [Promoter study registry](studies/promoter/README.md). |
 | Build a promoter-study feature dataset from anchors, wildtype/manual promoters, optional construct contexts, and infer outputs | [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md) | Verify one explicit `infer__...` column is chosen as `X` or export a flattened matrix before continuing to the exploratory [cluster workflow](../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) or the downstream [USR dataset with infer-derived X -> OPAL active learning](../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md) workflow. |
 | Sync iterative HPC outputs to local analysis safely | [USR workflow map](../src/dnadesign/usr/docs/operations/workflow-map.md) -> [USR HPC sync flow](../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md) | Verify transfer parity with [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync-audit-loop.md). |
 | Run cross-machine sync with stricter failure checks | [USR sync command contract](../src/dnadesign/usr/docs/operations/sync.md) | Verify sidecar and overlay fidelity with [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync-fidelity-drills.md). |

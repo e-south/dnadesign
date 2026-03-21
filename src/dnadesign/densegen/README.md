@@ -3,7 +3,7 @@
 DenseGen wraps the [dense-arrays](https://github.com/e-south/dense-arrays) optimizer to run DNA design workflows from workspace-local configuration and inputs.
 Run `uv run dense --help` for the CLI.
 
-It validates input schemas, resolves input sources, builds TFBS candidate pools when sampling is enabled, generates compound sequences until quota is reached, and writes reproducible outputs under the workspace `outputs/` tree.
+It validates input schemas, resolves input sources, builds TFBS candidate pools when sampling is enabled, generates compound sequences until quota is reached, and writes reproducible local artifacts under the workspace `outputs/` tree. When `output.targets` includes `usr`, DenseGen can also write directly into an explicit shared USR root outside the workspace.
 
 Use it when you need one design-generation tool with explicit run state, fail-fast validation, deterministic path contracts, and a clean handoff into shared USR workflows.
 
@@ -18,7 +18,7 @@ Use it when you need one design-generation tool with explicit run state, fail-fa
 - Want a first local run: start with [TFBS baseline tutorial](docs/tutorials/demo_tfbs_baseline.md). Verify next with the [Outputs reference](docs/reference/outputs.md).
 - Want to choose a packaged workspace before running: start with the [Workspaces guide](workspaces/README.md). Verify next with the [Config reference](docs/reference/config.md).
 
-## Continue after generation
+### Continue after generation
 
 - Want the shared downstream handoff after generation: start with the [USR operations index](../usr/docs/operations/README.md) when generated records need downstream USR-backed workflows.
 - Use [Multi-source shared dataset assembly](../usr/docs/operations/multi-source-shared-dataset-assembly.md) when DenseGen output must be merged with other upstream datasets before construct or infer.
