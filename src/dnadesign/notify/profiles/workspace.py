@@ -185,19 +185,6 @@ def resolve_tool_workspace_config_path(*, tool: str, workspace: str, search_star
     raise NotifyConfigError(f"workspace '{workspace_name}' not found for tool '{tool_name}' at {config_resolved}")
 
 
-def _require_repo_root(repo_root: Path | None) -> Path:
-    if repo_root is None:
-        raise ValueError(
-            "unable to determine repo root for --workspace mode; "
-            "run from inside dnadesign repo, set DNADESIGN_REPO_ROOT, or pass --config explicitly"
-        )
-    return repo_root
-
-
-def _workspace_root(repo_root: Path | None, relative_root: Path) -> Path:
-    return (_require_repo_root(repo_root) / relative_root).resolve()
-
-
 def _list_workspace_names_from_root(root: Path) -> list[str]:
     if not root.exists() or not root.is_dir():
         return []
@@ -209,16 +196,6 @@ def _list_workspace_names_from_root(root: Path) -> list[str]:
         if config.exists() and config.is_file():
             names.append(candidate.name)
     return sorted(names)
-
-
-def _resolve_config_from_workspace_root(workspace_name: str, repo_root: Path | None, relative_root: Path) -> Path:
-    return _workspace_root(repo_root, relative_root) / workspace_name / "config.yaml"
-
-
-def _list_workspace_names(repo_root: Path | None, relative_root: Path) -> list[str]:
-    if repo_root is None:
-        return []
-    return _list_workspace_names_from_root(_workspace_root(repo_root, relative_root))
 
 
 def _construct_workspace_roots(repo_root: Path | None, search_root: Path) -> tuple[Path, ...]:
@@ -297,6 +274,38 @@ def _list_construct_workspace_names(repo_root: Path | None, search_root: Path) -
     return sorted(dict.fromkeys(names))
 
 
+def _densegen_workspace_roots(repo_root: Path | None, search_root: Path) -> tuple[Path, ...]:
+    roots = [search_root]
+    if repo_root is not None:
+        roots.append((repo_root / "src/dnadesign/densegen/workspaces").resolve())
+    env_root = str(os.environ.get("DENSEGEN_WORKSPACE_ROOT") or "").strip()
+    if env_root:
+        roots.insert(0, Path(env_root))
+    return _dedupe_paths(roots)
+
+
+def _resolve_densegen_config_from_known_roots(workspace_name: str, repo_root: Path | None, search_root: Path) -> Path:
+    direct_config = search_root / "config.yaml"
+    if search_root.name == workspace_name and direct_config.exists() and direct_config.is_file():
+        return direct_config.resolve()
+    roots = _densegen_workspace_roots(repo_root, search_root)
+    for root in roots:
+        candidate = root / workspace_name / "config.yaml"
+        if candidate.exists() and candidate.is_file():
+            return candidate.resolve()
+    return (roots[0] / workspace_name / "config.yaml").resolve()
+
+
+def _list_densegen_workspace_names(repo_root: Path | None, search_root: Path) -> list[str]:
+    names: list[str] = []
+    direct_config = search_root / "config.yaml"
+    if direct_config.exists() and direct_config.is_file():
+        names.append(search_root.name)
+    for root in _densegen_workspace_roots(repo_root, search_root):
+        names.extend(_list_workspace_names_from_root(root))
+    return sorted(dict.fromkeys(names))
+
+
 def _infer_workspace_roots(repo_root: Path | None, search_root: Path) -> tuple[Path, ...]:
     roots = [(search_root / "workspaces").resolve()]
     if repo_root is not None:
@@ -336,13 +345,8 @@ register_tool_workspace_resolver(
 )
 register_tool_workspace_resolver(
     tool="densegen",
-    resolve_config=lambda workspace_name, repo_root, search_root: _resolve_config_from_workspace_root(
-        workspace_name, repo_root, Path("src/dnadesign/densegen/workspaces")
-    ),
-    list_workspaces=lambda repo_root, search_root: _list_workspace_names(
-        repo_root,
-        Path("src/dnadesign/densegen/workspaces"),
-    ),
+    resolve_config=_resolve_densegen_config_from_known_roots,
+    list_workspaces=_list_densegen_workspace_names,
 )
 register_tool_workspace_resolver(
     tool="infer",

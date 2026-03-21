@@ -324,6 +324,55 @@ def test_list_tool_workspaces_reports_available_workspace_names(tmp_path: Path) 
     assert names == ["demo_a", "demo_b"]
 
 
+def test_list_tool_workspaces_supports_env_densegen_root_outside_repo_checkout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    external_root = tmp_path / "external_densegen_workspaces"
+    config_path = external_root / "demo_d" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    monkeypatch.setenv("DENSEGEN_WORKSPACE_ROOT", str(external_root))
+
+    names = list_tool_workspaces(tool="densegen", search_start=tmp_path / "outside_repo")
+
+    assert names == ["demo_d"]
+
+
+def test_resolve_tool_workspace_config_path_supports_env_densegen_root_outside_repo_checkout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    external_root = tmp_path / "external_densegen_workspaces"
+    config_path = external_root / "demo_d" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    monkeypatch.setenv("DENSEGEN_WORKSPACE_ROOT", str(external_root))
+
+    resolved = resolve_tool_workspace_config_path(
+        tool="densegen",
+        workspace="demo_d",
+        search_start=tmp_path / "outside_repo",
+    )
+
+    assert resolved == config_path.resolve()
+
+
+def test_resolve_tool_workspace_config_path_supports_current_densegen_workspace_dir(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "external_densegen_workspaces" / "demo_d"
+    config_path = workspace_dir / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+
+    resolved = resolve_tool_workspace_config_path(
+        tool="densegen",
+        workspace="demo_d",
+        search_start=workspace_dir,
+    )
+
+    assert resolved == config_path.resolve()
+
+
 def test_list_tool_workspaces_reports_construct_workspace_names(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     workspaces_root = repo_root / "src" / "dnadesign" / "construct" / "workspaces"
