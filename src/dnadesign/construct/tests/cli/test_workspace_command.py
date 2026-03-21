@@ -288,9 +288,42 @@ def test_workspace_list_json_reports_packaged_workspace_state(monkeypatch, tmp_p
     by_id = {entry["workspace_id"]: entry for entry in payload}
     assert by_id["demo_promoter_swap_pdual10"]["workspace_state"] == "clean"
     assert by_id["demo_promoter_swap_pdual10"]["output_files"] == 0
+    assert by_id["demo_promoter_swap_pdual10"]["workspace_source"] == "packaged"
     assert by_id["demo_promoter_swap_pdual10_source_of_truth"]["workspace_state"] == "attention"
     assert by_id["demo_promoter_swap_pdual10_source_of_truth"]["output_files"] == 1
+    assert by_id["demo_promoter_swap_pdual10_source_of_truth"]["workspace_source"] == "packaged"
     assert by_id["demo_promoter_swap_pdual10_source_of_truth"]["latest_output_mtime"] is not None
+
+
+def test_workspace_list_json_reports_local_copied_workspace_state(monkeypatch, tmp_path: Path) -> None:
+    construct_root = tmp_path / "construct_root"
+    packaged_root = construct_root / "workspaces" / "demo_promoter_swap_pdual10"
+    packaged_root.mkdir(parents=True, exist_ok=True)
+    (packaged_root / "construct.workspace.yaml").write_text(
+        "workspace:\n  id: demo_promoter_swap_pdual10\n  profile: demo\n  projects: []\n",
+        encoding="utf-8",
+    )
+    local_workspace = tmp_path / "demo_construct"
+    (local_workspace / "outputs" / "logs").mkdir(parents=True, exist_ok=True)
+    (local_workspace / "construct.workspace.yaml").write_text(
+        "workspace:\n  id: demo_construct\n  profile: promoter-swap-demo\n  projects: []\n",
+        encoding="utf-8",
+    )
+    (local_workspace / "outputs" / "logs" / "run.log").write_text("ok\n", encoding="utf-8")
+    monkeypatch.setattr("dnadesign.construct.src.workspace._construct_root", lambda: construct_root)
+    monkeypatch.chdir(tmp_path)
+
+    result = _RUNNER.invoke(app, ["workspace", "list", "--format", "json"])
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    by_id = {entry["workspace_id"]: entry for entry in payload}
+    assert by_id["demo_construct"]["workspace_source"] == "local"
+    assert by_id["demo_construct"]["workspace_state"] == "attention"
+    assert by_id["demo_construct"]["output_files"] == 1
+    assert by_id["demo_construct"]["workspace_root_source"] == "cwd"
+    assert by_id["demo_construct"]["workspace_dir"] == str(local_workspace.resolve())
+    assert by_id["demo_promoter_swap_pdual10"]["workspace_source"] == "packaged"
 
 
 def test_workspace_doctor_reports_ok_for_packaged_demo(tmp_path: Path) -> None:

@@ -2,7 +2,7 @@
 
 Use this directory for packaged construct workspace templates and examples. New workspaces default to the current working directory unless `--root` or `CONSTRUCT_WORKSPACE_ROOT` is set.
 
-List the packaged workspaces and their current output state with `uv run construct workspace list`.
+List the local construct workspaces in the active root plus the packaged templates with `uv run construct workspace list`.
 
 ### Start with one of two paths
 

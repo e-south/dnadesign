@@ -81,6 +81,7 @@ Use this when you have your own anchors or templates and want construct to mater
 
 - `workspace where`: show workspace root resolution plus packaged profile source
 - `workspace init`: scaffold a blank workspace or copy a packaged profile
+- `workspace list`: show local workspaces in the active root first, then packaged templates that have not been copied locally
 - `workspace show`: read `construct.workspace.yaml` and print the workspace project inventory
 - `workspace doctor`: fail if any workspace project entry drifts from its config file or points at a missing config
 - `workspace validate-project`: resolve one project by registry id and run the same validation surface as `validate config`

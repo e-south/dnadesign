@@ -22,7 +22,7 @@ from ...runtime import preflight_from_config, run_from_config
 from ...workspace import (
     doctor_workspace_registry,
     init_workspace,
-    list_packaged_workspace_inventory,
+    list_workspace_inventory,
     load_workspace_registry,
     project_root_or_none,
     resolve_workspace_project,
@@ -74,11 +74,11 @@ def where(
         typer.echo(f"workspace_template: {template_path}")
 
 
-@workspace_app.command("list", help="List packaged workspaces and workspace-local output state.")
+@workspace_app.command("list", help="List local construct workspaces in the active root plus packaged templates.")
 def list_workspaces(
     fmt: str = typer.Option("text", "--format", help="Output format: text, json, or ids."),
 ) -> None:
-    inventory = list_packaged_workspace_inventory()
+    inventory = list_workspace_inventory()
     fmt_norm = str(fmt).strip().lower()
     if fmt_norm == "json":
         typer.echo(json.dumps(inventory, separators=(",", ":")))
@@ -94,6 +94,7 @@ def list_workspaces(
             "\t".join(
                 [
                     str(entry["workspace_id"]),
+                    f"workspace_source={entry['workspace_source']}",
                     f"workspace_state={entry['workspace_state']}",
                     f"output_files={entry['output_files']}",
                     f"latest_output_mtime={entry['latest_output_mtime'] or '-'}",
