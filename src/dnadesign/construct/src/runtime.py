@@ -635,6 +635,35 @@ def _relative_anchor_bounds(
     return anchor_start, anchor_end
 
 
+def _require_window_anchor_handoff_bounds(
+    *,
+    row_id: object,
+    anchor_part: _ResolvedPart | None,
+    anchor_start: int | None,
+    anchor_end: int | None,
+    cfg: JobConfig,
+) -> None:
+    if anchor_part is None or cfg.job.realize.mode == "full_construct":
+        return
+    if anchor_start is not None and anchor_end is not None:
+        return
+    window = cfg.job.realize.window
+    window_desc = "window"
+    if window is not None:
+        if window.semantics == "fixed_total":
+            window_desc = (
+                f"fixed_total(reference={window.reference}, direction={window.direction}, size_bp={window.size_bp})"
+            )
+        else:
+            window_desc = f"anchor_plus_context(upstream_bp={window.upstream_bp}, downstream_bp={window.downstream_bp})"
+    raise ValidationError(
+        "Construct window does not preserve the focal anchor as one contiguous span in the emitted sequence, "
+        "so construct__anchor_start/end cannot be emitted for downstream infer handoff. "
+        f"row_id={row_id} anchor={anchor_part.name} mode={cfg.job.realize.mode} window={window_desc}. "
+        "Choose full_construct, anchor_plus_context, or a fixed_total window that contains the full anchor span."
+    )
+
+
 def _spec_id(
     cfg: JobConfig,
     *,
@@ -748,6 +777,13 @@ def _build_record(
         full_construct_length=len(full_construct),
         window_start=window_start,
         mode=cfg.job.realize.mode,
+    )
+    _require_window_anchor_handoff_bounds(
+        row_id=row.get("id"),
+        anchor_part=anchor_part,
+        anchor_start=anchor_start,
+        anchor_end=anchor_end,
+        cfg=cfg,
     )
     metadata = {
         "id": output_id,

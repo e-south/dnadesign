@@ -36,6 +36,9 @@ Construct writes standardized `construct__*` lineage columns, including:
 - one compact `construct__parts` column with execution order, placement kind, orientation, realized coordinates, and template coordinates
 - template-context fields such as `construct__context_id`, `construct__anchor_id`, `construct__anchor_start`, `construct__anchor_end`, and `construct__resolved_length`
 
+For template-backed downstream handoffs, construct rejects window configs that clip or split the focal anchor, because
+those runs cannot emit valid `construct__anchor_start` / `construct__anchor_end` coordinates.
+
 When the input dataset already carries `usr_label__primary` / `usr_label__aliases`, construct carries those labels onto the derived output rows as the analyst-facing source names. Those labels are convenience labels, not uniqueness guarantees for derived construct outputs; use `construct__*` lineage to disambiguate source/template/window context.
 
 Use `uv run usr head <dataset>` or `uv run usr validate <dataset> --strict` to inspect or verify the resulting records.

@@ -37,6 +37,9 @@ These values are emitted relative to the realized sequence that construct writes
 
 Templated infer jobs fail fast when the required `construct__*` fields are missing.
 
+Construct now also fails fast during preflight when a windowed output would clip or wrap the focal anchor so that
+`construct__anchor_start` / `construct__anchor_end` cannot be emitted as one contiguous span.
+
 ### Template strategy
 
 The current construct schema remains one-template-per-job.

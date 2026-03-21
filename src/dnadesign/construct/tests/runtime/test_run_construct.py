@@ -299,6 +299,61 @@ job:
     assert frame.iloc[0]["construct__window_size_bp"] == 5
 
 
+def test_preflight_rejects_fixed_total_window_that_clips_anchor_handoff_span(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["ACGT"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct_clipped_anchor_window.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: demo_clipped_anchor_window
+  input:
+    source: usr
+    dataset: anchors_demo
+    root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    sequence: AAAATTTTCCCCGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        start: 8
+        end: 12
+        orientation: forward
+        expected_template_sequence: CCCC
+  realize:
+    mode: window
+    focal_part: anchor
+    window:
+      semantics: fixed_total
+      reference: start
+      direction: five_prime
+      size_bp: 5
+      offset_bp: 0
+  output:
+    dataset: anchors_constructed
+    root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="construct__anchor_start/end cannot be emitted"):
+        preflight_from_config(config_path)
+
+
 def test_run_construct_supports_anchor_plus_context_window_semantics(tmp_path: Path) -> None:
     usr_root = tmp_path / "usr_root"
     usr_root.mkdir(parents=True, exist_ok=True)
