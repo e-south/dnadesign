@@ -45,6 +45,7 @@ Treat this file as a navigation map; canonical policy and operational detail liv
 - Notify event contract: `docs/notify/usr-events.md`
 - Repo-local promoter-study status skill: `.agents/skills/promoter-study-status/SKILL.md`
 - Checked-in live study records: `docs/studies/README.md`
+- Promoter study active-study registry: `docs/studies/promoter/index.yaml`
 - Maintainer docs and CI/testing notes: `docs/dev/README.md`
 
 ## Repository patterns

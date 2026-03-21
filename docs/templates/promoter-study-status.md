@@ -9,17 +9,19 @@ placeholder behind.
 - Affiliated dataset registry: `datasets.yaml`
 - USR root:
 - Target row count:
+- Current shared feature dataset: `<dataset>` or `n/a`
 - Current feature-dataset row count:
 
 ### Source datasets
 
-- DenseGen anchor dataset: `<dataset>` (`<rows>` rows, last batch audit: `<path or runbook id>`)
+- DenseGen anchor shared dataset: `<dataset>` (`<rows>` rows, last batch audit: `<path or runbook id>`)
 - Wildtype or manual dataset: `<dataset>` (`<rows>` rows)
+- Construct template seed dataset: `<dataset>` (`<rows>` rows) or `n/a`
 - Optional construct context dataset: `<dataset>` (`<rows>` rows) or `n/a`
 
 ### Canonical downstream datasets
 
-- Anchor-only feature dataset: `<dataset>`
+- Anchor-only feature dataset: `<dataset>` or `n/a`
 - Construct-expanded feature dataset: `<dataset>` or `n/a`
 - Cluster results root: `<path>` or `n/a`
 - OPAL config: `<path>` or `n/a`
@@ -29,11 +31,12 @@ placeholder behind.
 - `anchor_only`: `pending|dry-run-green|written`
   - config: `<path>`
   - outputs expected: `ll`, `output_layer_mean`, `intermediate_embedding`
-- `template_plus_anchor`: `pending|dry-run-green|written`
+- `anchor_plus_template`: `pending|dry-run-green|written`
   - config: `<path>`
-  - outputs expected: `seq_mean`, `anchor_mean`
+  - outputs expected: `ll`, `output_layer_mean`, `intermediate_embedding`
 - `full_lane_set`: `pending|dry-run-green|written`
   - config: `<path>`
+  - outputs expected: `ll`, `output_layer_mean`, `intermediate_embedding`
   - model lanes: `evo2_7b`, `evo2_20b`
 
 ### Rollback and maintenance

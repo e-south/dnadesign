@@ -34,18 +34,24 @@ Out of scope:
 - the answer names explicit dataset ids, row counts, infer slices, and next
   actions from the checked-in record
 - the answer includes affiliated dataset sync posture from `datasets.yaml`
+- the answer distinguishes canonical shared datasets from workspace-local export
+  roots
 - every freshness claim is backed by an explicit command run in the refresh loop
 - missing records or ambiguous study selection fail visibly instead of causing
   guessed status
 
 ## Guardrails
 
-- Start with `docs/studies/README.md` and
+- Start with `docs/studies/README.md`, `docs/studies/promoter/README.md`, and
   `src/dnadesign/usr/docs/operations/promoter-study-status-contract.md`.
-- Treat `docs/studies/promoter/<study-id>/campaign.yaml`,
+- Treat `docs/studies/promoter/index.yaml`,
+  `docs/studies/promoter/<study-id>/campaign.yaml`,
   `docs/studies/promoter/<study-id>/datasets.yaml`, and `status.md` as the only
   valid source for live dataset ids, local-vs-remote sync posture, row targets,
   completed infer slices, and next actions.
+- Use `root_kind` and `status` in `datasets.yaml` to tell canonical shared USR
+  roots apart from workspace-local export roots and planned-but-not-yet-created
+  datasets.
 - Use `ops progress ...` and `usr ...` commands only to refresh those checked-in
   study records; do not infer live study state from demo workspaces, journal
   notes, or generic runbooks.
@@ -55,16 +61,23 @@ Out of scope:
 ## Workflow
 
 1. Locate the active study record
-- Look under `docs/studies/promoter/`.
-- If exactly one study directory contains `campaign.yaml`, `datasets.yaml`, and
-  `status.md`, treat it as the active study.
-- If more than one candidate exists, require an explicit study id or path.
+- Read `docs/studies/promoter/index.yaml`.
+- If `active_study: null`, report that no live promoter study record is checked
+  in yet.
+- If `active_study` names a study id, require the same id under `studies:` and
+  require `campaign.yaml`, `datasets.yaml`, and `status.md` in the matching
+  study directory.
+- If the registry and checked-in study directory disagree, fail visibly instead
+  of scanning for a best guess.
 
 2. Refresh the shared status surface
 - Run:
   `uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/promoter/<study-id>/campaign.yaml`
-- Run:
+- If `status.md` names a current canonical feature dataset, run:
   `uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <repo-root> --usr-root <usr-root> --dataset <feature-dataset>`
+- If the study record says the canonical feature dataset is still `n/a`, report
+  that the study is still in source-assembly mode and skip the feature-matrix
+  refresh instead of inventing one.
 
 3. Refresh the data-plane evidence
 - Run `uv run usr --root <usr-root> validate <feature-dataset> --strict`.
@@ -73,7 +86,8 @@ Out of scope:
 
 4. Refresh affiliated-dataset sync posture
 - For each sync-enabled entry in `docs/studies/promoter/<study-id>/datasets.yaml`, run:
-  `uv run usr --root <usr-root> info <dataset-id> --format json`
+  `uv run usr --root <usr-root> info <dataset-id> --format json` when that
+  entry is locally present
 - Then run:
   `uv run usr --root <usr-root> diff <dataset-id> <remote-name> --audit-json-out docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json`
 - Then run:
@@ -97,7 +111,8 @@ Out of scope:
 
 Return:
 - study id
-- live feature dataset and row count
+- live feature dataset and row count, or an explicit statement that the study is
+  still source-phase with no canonical feature dataset yet
 - source datasets named in the checked-in study record
 - affiliated dataset registry entries and sync posture
 - completed versus pending infer slices

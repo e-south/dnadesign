@@ -240,6 +240,9 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     usr_docs = _read("src/dnadesign/usr/docs/README.md")
     ops_index = _read("src/dnadesign/usr/docs/operations/README.md")
     studies_index = _read("docs/studies/README.md")
+    promoter_registry = _read("docs/studies/promoter/README.md")
+    promoter_index = _read("docs/studies/promoter/index.yaml")
+    index_template = _read("docs/templates/promoter-study-index.yaml")
     datasets_template = _read("docs/templates/promoter-study-datasets.yaml")
     template = _read("docs/templates/promoter-study-status.md")
     templates_index = _read("docs/templates/README.md")
@@ -251,16 +254,23 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "promoter-study-status-contract.md" in usr_docs
     assert "promoter-study-status-contract.md" in ops_index
     assert "studies/README.md" in docs_index
+    assert "studies/promoter/README.md" in docs_index
+    assert "promoter-study-index.yaml" in templates_index
     assert "promoter-study-datasets.yaml" in templates_index
     assert "promoter-study-status.md" in templates_index
     assert ".agents/skills/promoter-study-status/SKILL.md" in root_agents
     assert ".agents/skills/promoter-study-status/SKILL.md" in usr_agents
     assert "docs/studies/README.md" in skill
+    assert "docs/studies/promoter/README.md" in skill
+    assert "docs/studies/promoter/index.yaml" in skill
     assert "docs/studies/promoter/<study-id>/campaign.yaml" in skill
     assert "docs/studies/promoter/<study-id>/datasets.yaml" in skill
     assert "docs/studies/promoter/<study-id>/status.md" in skill
+    assert "docs/studies/promoter/index.yaml" in contract
     assert "docs/studies/promoter/<study-id>/" in contract
     assert "docs/studies/README.md" in contract
+    assert "docs/studies/promoter/README.md" in contract
+    assert "docs/templates/promoter-study-index.yaml" in contract
     assert "docs/templates/promoter-study-datasets.yaml" in contract
     assert "docs/templates/promoter-study-status.md" in contract
     assert "ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix" in contract
@@ -269,37 +279,54 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
         in contract
     )
     assert "ops progress show usr.data-plane.promoter-feature-matrix" in contract
+    assert "docs/studies/promoter/index.yaml" in studies_index
+    assert "docs/studies/promoter/index.yaml" in promoter_registry
+    assert "active_study: stress_ethanol_cipro_growth" in promoter_index
+    assert "status: active" in promoter_index
+    assert "active_study: <study-id-or-null>" in index_template
+    assert "status: active|planned|archived" in index_template
     assert "docs/studies/promoter/<study-id>/datasets.yaml" in studies_index
+    assert "If `docs/studies/promoter/index.yaml` is missing" in studies_index
+    assert "cp docs/templates/promoter-study-index.yaml docs/studies/promoter/index.yaml" in studies_index
     assert (
         "cp docs/templates/promoter-study-datasets.yaml docs/studies/promoter/<study-id>/datasets.yaml" in studies_index
     )
-    assert "If exactly one `docs/studies/promoter/<study-id>/` directory contains" in contract
-    assert "If more than one candidate exists" in contract
+    assert "Read `docs/studies/promoter/index.yaml` first." in contract
+    assert "If the registry already exists, edit it in place instead of replacing it." in contract
     assert "live study record is missing" in studies_index
     assert "docs/studies/promoter/<study-id>/" in studies_index
     assert "cp docs/templates/promoter-study-status.md docs/studies/promoter/<study-id>/status.md" in studies_index
     assert "dataset registry" in studies_index
     assert "role: densegen_anchor" in datasets_template
     assert "role: feature_matrix" in datasets_template
+    assert "root_kind: shared|workspace_local_export|external_usr" in datasets_template
+    assert "status: present|planned" in datasets_template
     assert "onboard_mode: existing_local|existing_remote|existing_both|create_new" in datasets_template
     assert "authority: local|remote|shared" in datasets_template
+    assert "notes: <how this location relates to the shared study root>" in datasets_template
     assert "default_direction: pull|push|bidirectional|none" in datasets_template
     assert "audit_json:" in datasets_template
     assert "strict_bootstrap_id: true" in datasets_template
+    assert "remote_root_kind: shared|workspace_local_export|external_usr" in datasets_template
     assert "remote_path: n/a" in datasets_template
     assert "Target row count:" in template
+    assert "Current shared feature dataset:" in template
     assert "Current feature-dataset row count:" in template
     assert "Affiliated dataset registry: `datasets.yaml`" in template
-    assert "DenseGen anchor dataset:" in template
+    assert "DenseGen anchor shared dataset:" in template
     assert "Wildtype or manual dataset:" in template
+    assert "Construct template seed dataset:" in template
     assert "anchor_only" in template
-    assert "template_plus_anchor" in template
+    assert "anchor_plus_template" in template
     assert "full_lane_set" in template
     assert "uv run infer prune --usr <dataset> --usr-root <usr-root>" in template
     assert "uv run usr maintenance overlay-remove <dataset> --namespace infer --mode archive" in template
     assert "uv run usr maintenance overlay-compact <dataset> --namespace densegen" in template
     assert "notify usr-events watch --events <usr-root>/<feature-dataset>/.events.log --dry-run" in template
     assert "usr.data-plane.hpc-sync" in contract
+    assert "root_kind" in contract
+    assert "workspace_local_export" in contract
+    assert "If `status.md` still marks the shared feature dataset as `n/a`, skip this" in contract
     assert "uv run usr --root <usr-root> info <dataset-id> --format json" in contract
     assert "--audit-json-out docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json" in contract
     assert "ops progress show usr.data-plane.hpc-sync --sync-audit-json" in contract
@@ -307,6 +334,7 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "onboard_mode: existing_remote" in skill
     assert "docs/studies/promoter/<study-id>/datasets.yaml" in skill
     assert "usr.data-plane.hpc-sync" in skill
+    assert "source-assembly mode" in skill
     assert not (_repo_root() / "src/dnadesign/usr/skills/promoter-study-status/SKILL.md").exists()
 
 
@@ -314,6 +342,26 @@ def test_usr_docs_index_avoids_anchor_coupling_to_top_readme() -> None:
     usr_docs = _read("src/dnadesign/usr/docs/README.md")
 
     assert "../README.md#" not in usr_docs
+
+
+def test_promoter_study_record_is_checked_in_for_stress_ethanol_cipro_growth() -> None:
+    index_yaml = _read("docs/studies/promoter/index.yaml")
+    campaign = _read("docs/studies/promoter/stress_ethanol_cipro_growth/campaign.yaml")
+    datasets = _read("docs/studies/promoter/stress_ethanol_cipro_growth/datasets.yaml")
+    status = _read("docs/studies/promoter/stress_ethanol_cipro_growth/status.md")
+
+    assert "active_study: stress_ethanol_cipro_growth" in index_yaml
+    assert "promoter/stress_ethanol_cipro_feature_matrix" in campaign
+    assert "role: densegen_anchor" in datasets
+    assert "remote_name: cluster" in datasets
+    assert "root_kind: shared" in datasets
+    assert "role: densegen_anchor" in datasets
+    assert "remote_name: cluster" in datasets
+    assert "mg1655_promoters" in datasets
+    assert "plasmids" in datasets
+    assert "densegen/study_stress_ethanol_cipro" in status
+    assert "77680" in status
+    assert "100000" in status
 
 
 def test_usr_reference_docs_cover_core_contracts() -> None:

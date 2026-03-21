@@ -1,0 +1,10 @@
+# Checked-in registry for real promoter-study efforts.
+# Set `active_study` only when the corresponding study directory is ready to
+# answer live-status questions.
+active_study: stress_ethanol_cipro_growth
+studies:
+  - study_id: stress_ethanol_cipro_growth
+    path: docs/studies/promoter/stress_ethanol_cipro_growth
+    status: active
+    owner: Shockwing
+    summary: Stress-condition promoter study growing DenseGen anchors toward 100k before construct and infer feature-matrix assembly.

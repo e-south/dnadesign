@@ -4,7 +4,7 @@
 **Plane:** data-plane
 **Owner-boundary:** usr
 **Entry artifact:** one real promoter-study effort that needs agent-readable status
-**Exit artifact:** one checked-in study record under `docs/studies/promoter/<study-id>/`
+**Exit artifact:** one checked-in study record selected through `docs/studies/promoter/index.yaml`
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-21
@@ -14,11 +14,18 @@ Use this contract when the question is not only "which runbook applies?" but
 optional Construct -> Infer -> Cluster or OPAL study?"
 
 The shared runbooks explain procedure. They do not know your real dataset ids,
-local-vs-remote sync posture, row targets, completed infer slices, or the next
-batch call. Without a maintained study-status record, a naive agent can
-reconstruct mechanics but cannot answer current-study questions honestly.
+shared-root versus workspace-export semantics, local-vs-remote sync posture,
+row targets, completed infer slices, or the next batch call. Without a
+maintained study-status record, a naive agent can reconstruct mechanics but
+cannot answer current-study questions honestly.
 
 ### Canonical checked-in location
+
+Keep the study selector at:
+
+```text
+docs/studies/promoter/index.yaml
+```
 
 Keep promoter-study records under:
 
@@ -30,22 +37,25 @@ docs/studies/promoter/<study-id>/
   audits/
 ```
 
-Read [Study records](../../../../../docs/studies/README.md) first when the
-question is "which study record should I trust?" rather than "which workflow
-route applies?"
+Read [Study records](../../../../../docs/studies/README.md) plus
+[Promoter study registry](../../../../../docs/studies/promoter/README.md) first
+when the question is "which study record should I trust?" rather than "which
+workflow route applies?"
 
 ### Keep these three artifacts for every real study
 
 1. A checked-in campaign manifest that names the real artifacts.
 2. A machine-readable dataset registry that names the affiliated USR datasets,
-   onboarding mode, and sync posture.
+   onboarding mode, root semantics, and sync posture.
 3. A checked-in status note that answers the human questions the manifest and
    dataset registry do not encode.
 
 Recommended bootstrap for the manifest:
 
 ```bash
-# Create the canonical checked-in directory for one real promoter study.
+# Bootstrap the promoter-study registry only if it is missing.
+cp docs/templates/promoter-study-index.yaml docs/studies/promoter/index.yaml
+# Create the checked-in directory for one real promoter study.
 mkdir -p docs/studies/promoter/<study-id>
 # Emit a related-procedure campaign skeleton for the checked-in study record.
 uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root> > docs/studies/promoter/<study-id>/campaign.yaml
@@ -57,6 +67,7 @@ cp docs/templates/promoter-study-status.md docs/studies/promoter/<study-id>/stat
 mkdir -p docs/studies/promoter/<study-id>/audits
 ```
 
+If the registry already exists, edit it in place instead of replacing it.
 Then replace the placeholders with the real `usr_root`, `dataset`,
 `cluster_results_root`, and `opal_config` values for the current study.
 Delete steps that are not part of the active branch of work.
@@ -71,13 +82,27 @@ Each dataset entry should declare:
 - `role`: the study role such as anchor source, wildtype/manual source,
   construct context, or feature matrix
 - `dataset` plus `usr_root`: the explicit local USR location
+- `root_kind`: `shared`, `workspace_local_export`, or `external_usr`
+- `status`: whether the dataset is already `present` or still `planned`
 - `onboard_mode`: `existing_local`, `existing_remote`, `existing_both`, or
   `create_new`
 - `authority`: whether local, remote, or both sides are the current source of
   truth
+- `notes`: the operator-facing explanation for why this location exists
 - `sync`: whether sync is enabled, which remote profile is used, the default
   direction, the audit JSON path, whether `strict_bootstrap_id` must stay on,
-  and whether explicit `remote_path` mapping is needed
+  which remote root kind applies, and whether explicit `remote_path` mapping is
+  needed
+
+Keep the semantics explicit:
+
+- `workspace_local_export` means the dataset is owned by a tool workspace such
+  as `outputs/usr_datasets/` and is not automatically the cross-tool study
+  source of truth
+- `shared` means the dataset is the shared study copy intended for
+  downstream status, infer, cluster, or OPAL routes
+- `external_usr` means the dataset is still a USR root, but lives outside the
+  repo-owned shared path and must stay explicit in the study record
 
 Keep a filled `status.md` next to the manifest. This is the document a naive
 agent should read first when asked for "where are we now?" or "what should run
@@ -86,13 +111,14 @@ next?" Copy the template from
 
 Discovery rules:
 
-- If exactly one `docs/studies/promoter/<study-id>/` directory contains both
-  `campaign.yaml`, `datasets.yaml`, and `status.md`, a naive agent may treat it
-  as the active study.
-- If more than one candidate exists, the user or a higher-level record must
-  identify the intended study.
-- If no study record exists, answer that the live study record is missing
-  instead of inferring current status from generic runbooks.
+- Read `docs/studies/promoter/index.yaml` first.
+- If `active_study: null`, answer that the live study record is missing instead
+  of inferring current status from generic runbooks.
+- If `active_study` names a study id, that same id must appear under
+  `studies:` and the corresponding study directory must contain `campaign.yaml`,
+  `datasets.yaml`, and `status.md`.
+- If the registry and study directory contents disagree, fail visibly and fix
+  the registry before asking a naive agent for live status.
 
 ### Refresh loop
 
@@ -103,12 +129,16 @@ Discovery rules:
 uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/promoter/<study-id>/campaign.yaml
 ```
 
-2. Refresh the current feature-dataset summary:
+2. Refresh the current feature-dataset summary only when a shared feature
+   dataset already exists:
 
 ```bash
 # Summarize the live feature dataset from explicit USR artifacts.
 uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <repo-root> --usr-root <usr-root> --dataset <feature-dataset>
 ```
+
+If `status.md` still marks the shared feature dataset as `n/a`, skip this
+step and report that the study is still in source-assembly mode.
 
 3. Validate the dataset and inspect lineage plus one explicit infer column:
 
@@ -150,7 +180,9 @@ uv run ops progress show usr.data-plane.hpc-sync --sync-audit-json docs/studies/
 
 If a dataset starts remote-only, keep `strict_bootstrap_id: true` and use an
 explicit dataset id on the first `usr pull` so bootstrap never relies on local
-name guessing.
+name guessing. When the producer writes to a workspace-local export root on
+SCC, declare that root explicitly in `datasets.yaml` instead of pretending it
+is the shared USR root.
 
 ### What each artifact answers
 
@@ -165,6 +197,8 @@ From `datasets.yaml`:
 
 - which USR datasets are affiliated with the study across source, handoff, and
   downstream stages
+- whether each declared location is shared storage or only a
+  workspace-local export
 - whether each dataset is already present locally, remotely, or both
 - which remote profile and sync direction apply for each dataset
 - which sync audit JSON file should be refreshed and summarized
@@ -187,6 +221,9 @@ From `status.md`:
 - USR overlay parts and sync contracts are explicit. If `usr pull` or
   `usr push` is interrupted, rerun the command instead of copying files by
   hand.
+- Strict `pull` or `push` can still spend time proving `_derived` parity before
+  concluding `NO-OP`. Use `usr diff` first for a quick drift preview, then run
+  `pull` or `push` when you want transfer or final fidelity verification.
 - Remote-only bootstrap should stay explicit: prefer `--strict-bootstrap-id`
   for the first pull when `datasets.yaml` marks a dataset as `existing_remote`.
 - Notify recovery depends on workspace-scoped `cursor` and `spool` paths. Keep
@@ -195,6 +232,8 @@ From `status.md`:
 ### Related docs
 
 - [Study records](../../../../../docs/studies/README.md)
+- [Promoter study registry](../../../../../docs/studies/promoter/README.md)
+- [Promoter study index template](../../../../../docs/templates/promoter-study-index.yaml)
 - [Promoter study datasets template](../../../../../docs/templates/promoter-study-datasets.yaml)
 - [Promoter study status template](../../../../../docs/templates/promoter-study-status.md)
 - [Promoter study Evo2 workflow journey](promoter-evo2-journey.md)
