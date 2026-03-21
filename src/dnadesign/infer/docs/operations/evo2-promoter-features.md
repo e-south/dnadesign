@@ -1,9 +1,9 @@
-## Evo2 Promoter Feature Runbook
+## Evo2 Promoter-Study Feature Runbook
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-18
 
-Use this runbook when you want the infer-owned part of the promoter feature flow without duplicating the USR-owned cross-tool workflow.
+Use this runbook when you want the infer-owned part of a promoter-study feature flow without duplicating the USR-owned cross-tool workflow.
 
 This page owns:
 
@@ -14,11 +14,11 @@ This page owns:
 
 This page does not own:
 
-- multi-source promoter dataset assembly
+- multi-source promoter-study dataset assembly
 - template realization with `construct`
 - downstream OPAL round logic
 
-Use the authoritative cross-tool workflow here:
+Use the shared cross-tool promoter-study workflow here:
 
 - [Promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)
 

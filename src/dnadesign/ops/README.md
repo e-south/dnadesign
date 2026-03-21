@@ -8,7 +8,7 @@ Use Ops when:
 - you want to browse the shared command index from the terminal with `uv run ops catalog list --simple` or `uv run ops catalog list`
 
 Do not use Ops when:
-- a tool already owns the durable dataset mutation, such as Construct -> USR -> Infer source-of-truth work
+- a tool already owns the durable dataset mutation, such as Construct -> USR -> Infer shared-dataset work
 - you need the boundary-local runtime semantics first; start from the tool docs or shared USR workflow docs, then return to Ops if you need orchestration around that route
 
 For repo-wide runbook discovery, start with `docs/runbooks/README.md`; `ops` does not keep a second registry.

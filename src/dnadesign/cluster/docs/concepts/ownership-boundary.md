@@ -14,7 +14,7 @@ Use this page when you need the package-role decision before choosing a downstre
 
 ### What cluster does not own
 
-- upstream USR source-of-truth assembly
+- upstream USR shared-dataset assembly
 - construct-based context expansion
 - upstream feature generation when the chosen feature definition does not yet exist
 - supervised label/train/select loops

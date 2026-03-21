@@ -14,7 +14,7 @@
 **Last verified:** 2026-03-19
 
 This contract defines machine-readable runbooks for cross-tool BU SCC control-plane orchestration.
-It does not own durable USR-backed data-plane workflows; return to the root docs router or USR operations docs when the next authoritative procedure is about source-of-truth datasets rather than scheduler sequencing.
+It does not own durable USR-backed data-plane workflows; return to the root docs router or USR operations docs when the next procedure is about shared datasets rather than scheduler sequencing.
 
 ### Why this exists
 

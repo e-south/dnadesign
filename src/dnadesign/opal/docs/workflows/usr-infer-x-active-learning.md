@@ -33,7 +33,7 @@ For the Evo2 promoter feature bundle, `infer` may write several coordinated `inf
 - or the Evo2 promoter bundle has already been exported into one deterministic `X` matrix outside OPAL
 - labels will be ingested incrementally through OPAL rounds rather than attached silently during infer
 
-For the upstream source-of-truth and infer matrix assembly, use:
+For the upstream shared-dataset and infer matrix assembly, use:
 
 - [Promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)
 
@@ -151,7 +151,7 @@ The infer-to-OPAL handoff contract does not change across those choices. Only `x
 ## Related docs
 
 - Root docs router: [../../../../../docs/README.md](../../../../../docs/README.md)
-- Upstream source-of-truth and infer matrix assembly: [../../../usr/docs/operations/promoter-characterization-feature-matrix.md](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)
+- Upstream shared-dataset and infer matrix assembly: [../../../usr/docs/operations/promoter-characterization-feature-matrix.md](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)
 - OPAL docs index: [../index.md](../index.md)
 - OPAL configuration contract: [../reference/configuration.md](../reference/configuration.md)
 - OPAL CLI reference: [../reference/cli.md](../reference/cli.md)

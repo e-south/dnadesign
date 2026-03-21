@@ -328,7 +328,7 @@ def test_cli_catalog_show_emits_registered_entry() -> None:
     assert "- construct/template-contexts: Construct Template Contexts" in result.output
     assert "- infer/architecture: Infer Architecture" in result.output
     assert "- infer/evo2-provider: Evo2 Provider Reference" in result.output
-    assert "- infer/evo2-promoter-features: Evo2 Promoter Feature Runbook" in result.output
+    assert "- infer/evo2-promoter-features: Evo2 Promoter-Study Feature Runbook" in result.output
     assert "- cluster/exploratory-clustering: Exploratory clustering workflow" in result.output
     assert "- opal/usr-infer-x-active-learning: USR Dataset With Infer-Derived X -> OPAL Active Learning" in (
         result.output
