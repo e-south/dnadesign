@@ -386,6 +386,25 @@ def test_runbook_default_templates_fall_back_to_packaged_qsub_templates_when_rep
     assert "runbooks/templates" in infer_runbook.infer.qsub_template.as_posix()
 
 
+def test_packaged_qsub_templates_match_repo_docs_templates() -> None:
+    repo_root = Path(__file__).resolve()
+    for parent in repo_root.parents:
+        if (parent / "pyproject.toml").exists():
+            repo_root = parent
+            break
+
+    template_names = (
+        "densegen-cpu.qsub",
+        "densegen-analysis.qsub",
+        "evo2-gpu-infer.qsub",
+        "notify-watch.qsub",
+    )
+    for template_name in template_names:
+        docs_template = repo_root / "docs" / "bu-scc" / "jobs" / template_name
+        packaged_template = repo_root / "src" / "dnadesign" / "ops" / "runbooks" / "templates" / template_name
+        assert packaged_template.read_text(encoding="utf-8") == docs_template.read_text(encoding="utf-8")
+
+
 def test_runbook_notify_policy_defaults_to_generic_when_omitted(tmp_path: Path) -> None:
     runbook_path = _write_runbook(tmp_path)
     payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
