@@ -15,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable
 
-from ...config import DenseGenConfig, resolve_outputs_scoped_path, resolve_run_root
+from ...config import DenseGenConfig, resolve_outputs_scoped_path, resolve_run_root, resolve_usr_root_scoped_path
 from ...core.run_paths import id_index_path
 from .base import DEFAULT_NAMESPACE, SinkBase, USRSink
 from .parquet import ParquetSink
@@ -43,7 +43,7 @@ def build_sinks(cfg: DenseGenConfig, cfg_path: Path) -> Iterable[SinkBase]:
         usr_cfg = out_cfg.usr
         if usr_cfg is None:
             raise ValueError("output.usr is required when output.targets includes 'usr'")
-        root = resolve_outputs_scoped_path(cfg_path, run_root, usr_cfg.root, label="output.usr.root")
+        root = resolve_usr_root_scoped_path(cfg_path, usr_cfg.root, label="output.usr.root")
         from .usr_writer import USRWriter
 
         writer = USRWriter(

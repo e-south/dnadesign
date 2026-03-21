@@ -8,6 +8,9 @@
 
 **Purpose**
 - Run the stress campaign workspace with dual-sink outputs, expanded plans, GUROBI solver defaults, and workspace-local plot/notebook generation.
+- Keep DenseGen accumulation in the shared USR root
+  `src/dnadesign/usr/datasets/` so the study record and downstream tools read
+  the same producer dataset directly.
 
 **σ70 promoter context**
 - This workspace keeps a constitutive σ70 promoter core and uses RNAP -35 and -10 hexamer sets from *Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors* (DOI: 10.1038/s41467-017-02473-5; source: https://www.nature.com/articles/s41467-017-02473-5).
@@ -27,7 +30,7 @@ Use `--mode resume` to continue generation without wiping outputs, or `--mode an
     set -euo pipefail
     # Pin the workspace config path for repeated CLI calls.
     CONFIG="$PWD/config.yaml"
-    # dense run auto-seeds outputs/usr_datasets/registry.yaml when missing.
+    # dense run auto-seeds the configured shared USR root registry when missing.
 
     # Verify FIMO is available before PWM-backed sampling and validation.
     pixi run fimo --version

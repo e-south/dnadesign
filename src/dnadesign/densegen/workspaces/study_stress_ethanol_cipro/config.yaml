@@ -138,7 +138,7 @@ densegen:
       deduplicate: true
       chunk_size: 8192
     usr:
-      root: outputs/usr_datasets
+      root: ../../../usr/datasets
       dataset: densegen/study_stress_ethanol_cipro
       chunk_size: 8192
       health_event_interval_seconds: 60

@@ -26,6 +26,7 @@ from .base import (
     _StrictLoader,
     resolve_outputs_scoped_path,
     resolve_run_root,
+    resolve_usr_root_scoped_path,
 )
 from .generation import GenerationConfig, expand_generation_plans, normalize_motif_sets
 from .inputs import InputConfig
@@ -216,12 +217,7 @@ def _validate_run_scoped_paths(cfg_path: Path, root_cfg: RootConfig) -> None:
             label="output.parquet.path",
         )
     if out_cfg.usr is not None:
-        resolve_outputs_scoped_path(
-            cfg_path,
-            run_root,
-            out_cfg.usr.root,
-            label="output.usr.root",
-        )
+        resolve_usr_root_scoped_path(cfg_path, out_cfg.usr.root, label="output.usr.root")
 
     log_dir = root_cfg.densegen.logging.log_dir
     resolve_outputs_scoped_path(cfg_path, run_root, log_dir, label="logging.log_dir")

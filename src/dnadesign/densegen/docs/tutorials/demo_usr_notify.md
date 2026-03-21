@@ -142,8 +142,8 @@ uv run dense run --resume --extend-quota 2 --no-plot -c "$CONFIG"
 ### Expected outputs
 
 - DenseGen diagnostics: `outputs/meta/events.jsonl`
-- USR dataset table: `outputs/usr_datasets/<dataset>/records.parquet`
-- USR event stream: `outputs/usr_datasets/<dataset>/.events.log`
+- USR dataset table: `<output.usr.root>/<dataset>/records.parquet`
+- USR event stream: `<output.usr.root>/<dataset>/.events.log`
 - Notify resolver output: the `notify setup resolve-events --tool densegen --config "$CONFIG"` JSON payload
 - Optional Notify Slack profile: `outputs/notify/densegen/profile.json`
 - Optional Notify cursor and spool: `outputs/notify/densegen/cursor`, `outputs/notify/densegen/spool/`

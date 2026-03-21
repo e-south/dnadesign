@@ -70,8 +70,8 @@ inputs:                                     # Input definitions used by Stage-A 
 
 ### Step-by-step commands
 
-Start by pinning the config path used across run commands. This workspace writes local tables to `outputs/tables/` and USR outputs to `outputs/usr_datasets/`.
-`dense run` auto-seeds `outputs/usr_datasets/registry.yaml` when it is missing, so no manual registry copy step is required.
+Start by pinning the config path used across run commands. This workspace writes local tables to `outputs/tables/` and its shared USR sink to `src/dnadesign/usr/datasets/`.
+`dense run` auto-seeds the configured shared USR root registry when it is missing, so no manual registry copy step is required.
 
 ```bash
 # Enter the workspace directory so relative paths resolve correctly.
@@ -136,7 +136,7 @@ uv run cruncher catalog export-densegen --set 1 --source demo_merged_meme_oops_m
 
 - `outputs/pools/pool_manifest.json`
 - `outputs/tables/records.parquet`
-- `outputs/usr_datasets/densegen/demo_sampling_baseline/.events.log`
+- `src/dnadesign/usr/datasets/densegen/demo_sampling_baseline/.events.log`
 - `outputs/plots/`
 - `outputs/notebooks/densegen_run_overview.py`
 

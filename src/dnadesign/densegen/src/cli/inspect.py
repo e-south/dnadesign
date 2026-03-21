@@ -18,7 +18,13 @@ from typing import Optional
 import pandas as pd
 import typer
 
-from ..config import load_config, resolve_outputs_scoped_path, resolve_relative_path, resolve_run_root
+from ..config import (
+    load_config,
+    resolve_outputs_scoped_path,
+    resolve_relative_path,
+    resolve_run_root,
+    resolve_usr_root_scoped_path,
+)
 from ..core.artifacts.pool import pool_status_by_input
 from ..core.event_log import load_events
 from ..core.motif_labels import input_motifs
@@ -64,8 +70,7 @@ def _resolve_usr_events_log_path(loaded, *, context: CliContext) -> Path:
     usr_cfg = out_cfg.usr
     if "usr" not in out_cfg.targets or usr_cfg is None:
         raise ValueError("output.targets must include 'usr' with output.usr configured.")
-    run_root = context.run_root_for(loaded)
-    usr_root = resolve_outputs_scoped_path(loaded.path, run_root, usr_cfg.root, label="output.usr.root")
+    usr_root = resolve_usr_root_scoped_path(loaded.path, usr_cfg.root, label="output.usr.root")
     dataset = str(usr_cfg.dataset).strip()
     if not dataset:
         raise ValueError("output.usr.dataset must be a non-empty string.")

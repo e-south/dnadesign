@@ -23,7 +23,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from ..adapters.outputs import load_records_from_config
-from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
+from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root, resolve_usr_root_scoped_path
 from .artifacts.pool import POOL_MODE_TFBS, load_pool_data
 from .event_log import load_events
 from .motif_labels import input_motifs, motif_display_name
@@ -150,7 +150,7 @@ def _resolve_output_records_path(root_cfg: RootConfig, cfg_path: Path, run_root:
         usr_cfg = out_cfg.usr
         if usr_cfg is None:
             raise ValueError("output.usr is required when selected output source is usr")
-        usr_root = resolve_outputs_scoped_path(cfg_path, run_root, usr_cfg.root, label="output.usr.root")
+        usr_root = resolve_usr_root_scoped_path(cfg_path, usr_cfg.root, label="output.usr.root")
         return os.path.relpath(usr_root / usr_cfg.dataset / "records.parquet", run_root)
 
     if source == "parquet":

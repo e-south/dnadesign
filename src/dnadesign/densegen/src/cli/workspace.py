@@ -21,6 +21,8 @@ from typing import Callable, Optional
 import typer
 import yaml
 
+from dnadesign.usr_roots import default_usr_root, resolve_usr_root_from_config
+
 from ..config import LATEST_SCHEMA_VERSION, resolve_relative_path
 from .context import CliContext
 from .workspace_sources import list_packaged_workspace_inventory
@@ -59,7 +61,12 @@ def _workspace_source_root() -> Path:
     return Path(__file__).resolve().parents[2] / "workspaces"
 
 
-def _apply_output_mode(output: dict, *, run_id: str, output_mode: str) -> dict:
+def _shared_usr_root_for_workspace(workspace_dir: Path) -> str:
+    rel = os.path.relpath(default_usr_root(), workspace_dir)
+    return Path(rel).as_posix()
+
+
+def _apply_output_mode(output: dict, *, run_id: str, output_mode: str, workspace_dir: Path) -> dict:
     mode = str(output_mode).strip().lower()
     if mode not in {"local", "usr", "both"}:
         raise ValueError("output_mode must be one of: local, usr, both.")
@@ -77,7 +84,7 @@ def _apply_output_mode(output: dict, *, run_id: str, output_mode: str) -> dict:
         out["parquet"] = parquet_cfg
 
     if mode in {"usr", "both"}:
-        usr_cfg["root"] = "outputs/usr_datasets"
+        usr_cfg["root"] = _shared_usr_root_for_workspace(workspace_dir)
         usr_cfg["dataset"] = run_id
         usr_cfg.setdefault("chunk_size", 128)
         out["usr"] = usr_cfg
@@ -101,7 +108,13 @@ def _seed_usr_registry(*, run_dir: Path, output: dict, console, display_path: Ca
     root_raw = usr_cfg.get("root")
     if not isinstance(root_raw, str) or not root_raw.strip():
         return
-    usr_root = run_dir / Path(root_raw)
+    usr_root = resolve_usr_root_from_config(
+        root_raw,
+        config_path=run_dir / "config.yaml",
+        label="output.usr.root",
+    )
+    if usr_root is None:
+        return
     registry_path = usr_root / "registry.yaml"
     if registry_path.exists():
         return
@@ -111,13 +124,13 @@ def _seed_usr_registry(*, run_dir: Path, output: dict, console, display_path: Ca
         candidate = repo_root / "src" / "dnadesign" / "usr" / "datasets" / "registry.yaml"
         if candidate.exists() and candidate.is_file():
             seed_path = candidate
-    usr_root.mkdir(parents=True, exist_ok=True)
     if seed_path is None:
         console.print(
             "[yellow]USR output selected but no registry seed file was found.[/] "
-            "Create outputs/usr_datasets/registry.yaml before running `uv run dense run`."
+            "Create the configured USR root `registry.yaml` before running `uv run dense run`."
         )
         return
+    usr_root.mkdir(parents=True, exist_ok=True)
     shutil.copy2(seed_path, registry_path)
     console.print(
         f":bookmark_tabs: [bold green]Seeded USR registry[/]: {display_path(registry_path, run_dir, absolute=False)}"
@@ -289,7 +302,12 @@ def register_workspace_commands(
                 console.print("[bold red]Template output block must be a mapping.[/]")
                 raise typer.Exit(code=1)
             try:
-                output = _apply_output_mode(output, run_id=workspace_id_clean, output_mode=output_mode)
+                output = _apply_output_mode(
+                    output,
+                    run_id=workspace_id_clean,
+                    output_mode=output_mode,
+                    workspace_dir=workspace_dir,
+                )
             except ValueError as exc:
                 console.print(f"[bold red]{exc}[/]")
                 raise typer.Exit(code=1)

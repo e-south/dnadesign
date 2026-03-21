@@ -34,6 +34,15 @@ Runbook mode is explicit: `fresh|resume|analysis`. Wrappers default to `fresh` a
 - `archived/`: preserved historical local runs.
 - Local workspaces created by `dense workspace init` are expected under this root unless you set `DENSEGEN_WORKSPACE_ROOT`.
 
+### USR root semantics
+
+- DenseGen `usr` workspaces should write to an explicit shared USR root in the
+  config, typically `src/dnadesign/usr/datasets/` for repo-local study work.
+- Use a workspace-local export root only when a study record or runbook says
+  the dataset is intentionally not yet the shared cross-tool copy.
+- The shared study copy is the root used by downstream status, infer, cluster,
+  or OPAL routes.
+
 ### Expected packaged workspace shape
 - `README.md`
 - `config.yaml`

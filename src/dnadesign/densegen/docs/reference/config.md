@@ -187,6 +187,8 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
 
 Input paths resolve relative to the config file directory.
 Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen.run.root`.
+The USR sink may point at an explicit shared USR root outside `outputs/` when
+the study record routes DenseGen directly to the shared dataset.
 
 ---
 
@@ -212,7 +214,9 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
 - `parquet` (required when `targets` includes `parquet`)
   - `path` (file), `deduplicate`, `chunk_size`
   - `path` must be a `.parquet` file (single-file output)
-- `output.usr.root` and `output.parquet.path` must be inside `outputs/` under `densegen.run.root`
+- `output.parquet.path` must be inside `outputs/` under `densegen.run.root`
+- `output.usr.root` may point at a shared USR root outside `outputs/` when the
+  study routes DenseGen directly to the shared dataset
 
 ---
 

@@ -585,7 +585,7 @@ def test_notebook_generate_supports_usr_output_target(tmp_path: Path) -> None:
                   alphabet: dna_4
                 usr:
                   dataset: demo
-                  root: outputs/usr_datasets
+                  root: ../usr_root
               generation:
                 sequence_length: 10
                 plan:
@@ -641,7 +641,7 @@ def test_notebook_generate_uses_plots_source_when_output_targets_are_both(tmp_pa
                   path: outputs/tables/records.parquet
                 usr:
                   dataset: demo
-                  root: outputs/usr_datasets
+                  root: ../usr_root
               generation:
                 sequence_length: 10
                 plan:
@@ -2323,7 +2323,7 @@ def test_plot_missing_records_with_dual_sinks_reports_plots_source_hint(tmp_path
                 parquet:
                   path: outputs/tables/records.parquet
                 usr:
-                  root: outputs/usr_datasets
+                  root: ../usr_root
                   dataset: densegen/demo
               generation:
                 sequence_length: 10

@@ -31,7 +31,7 @@ If you want copy/paste commands for this flow, use **[DenseGen quick checklist](
 - `outputs/pools/pool_manifest.json` for Stage-A pool inventory.
 - `outputs/libraries/` for Stage-B library membership and summaries.
 - `outputs/tables/records.parquet` when parquet sink is enabled.
-- `outputs/usr_datasets/<dataset>/records.parquet` when USR sink is enabled.
+- `<output.usr.root>/<dataset>/records.parquet` when the USR sink is enabled.
 
 ### Output modes and analysis source selection
 
@@ -45,8 +45,15 @@ When both sinks are enabled, plots and notebooks resolve records from `plots.sou
 
 - `dense run --resume` continues from existing run state.
 - `dense run --resume --extend-quota <n>` grows quotas without editing config.
-- `dense run --fresh` clears run artifacts under `outputs/` and restarts from clean state while preserving `outputs/notify` and `outputs/logs` scaffolding.
-- `dense campaign-reset` applies the same reset contract as `dense run --fresh`; by default it also preserves `output.usr.root/registry.yaml` unless `--purge-usr-registry` is set.
+- `dense run --fresh` clears run artifacts under `outputs/` and restarts from
+  clean state while preserving `outputs/notify` and `outputs/logs`
+  scaffolding.
+- When `output.usr.root` points at a shared USR dataset outside `outputs/`,
+  `dense run --fresh` refuses to proceed if that dataset already has state.
+- `dense campaign-reset` applies the same workspace-output reset contract as
+  `dense run --fresh`; by default it preserves `output.usr.root/registry.yaml`
+  unless `--purge-usr-registry` is set, and it refuses to orphan an attached
+  shared USR dataset.
 
 ### Strand handling by stage
 

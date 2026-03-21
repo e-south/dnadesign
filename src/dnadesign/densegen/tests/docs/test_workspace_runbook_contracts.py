@@ -171,7 +171,7 @@ def test_usr_workspace_runbooks_document_usr_registry_auto_seed() -> None:
         assert '--ensure-usr-registry "true"' in script
 
         runbook_text = _read_runbook(workspace_id)
-        assert "auto-seeds outputs/usr_datasets/registry.yaml when missing." in runbook_text
+        assert "auto-seeds the configured shared USR root registry when missing." in runbook_text
 
 
 def test_shared_runbook_lib_keeps_canonical_dense_command_sequence() -> None:

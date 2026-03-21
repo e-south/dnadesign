@@ -290,7 +290,7 @@ def test_inspect_run_usr_events_path_prints_absolute_path(tmp_path: Path) -> Non
                   bio_type: dna
                   alphabet: dna_4
                 usr:
-                  root: outputs/usr_datasets
+                  root: ../usr_root
                   dataset: densegen/demo
                   chunk_size: 16
               generation:
@@ -316,7 +316,7 @@ def test_inspect_run_usr_events_path_prints_absolute_path(tmp_path: Path) -> Non
     runner = CliRunner()
     result = runner.invoke(app, ["inspect", "run", "-c", str(cfg_path), "--usr-events-path"])
 
-    expected = tmp_path / "outputs" / "usr_datasets" / "densegen" / "demo" / ".events.log"
+    expected = tmp_path.parent / "usr_root" / "densegen" / "demo" / ".events.log"
     assert result.exit_code == 0, result.output
     assert str(expected.resolve()) in result.output.strip()
     assert "Run:" not in result.output

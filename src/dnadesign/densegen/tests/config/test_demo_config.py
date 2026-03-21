@@ -151,7 +151,7 @@ def test_demo_sampling_baseline_uses_both_outputs_and_cbc_solver() -> None:
     assert output.parquet is not None
     assert output.parquet.path == "outputs/tables/records.parquet"
     assert output.usr is not None
-    assert output.usr.root == "outputs/usr_datasets"
+    assert output.usr.root == "../../../usr/datasets"
     assert output.usr.dataset == "densegen/demo_sampling_baseline"
     assert solver.backend == "CBC"
     assert solver.threads is None
@@ -545,7 +545,7 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     assert output.targets == ["parquet", "usr"]
     assert output.usr is not None
     assert output.usr.dataset == "densegen/study_stress_ethanol_cipro"
-    assert output.usr.root == "outputs/usr_datasets"
+    assert output.usr.root == "../../../usr/datasets"
     assert float(output.usr.health_event_interval_seconds) > 0
     assert solver.backend == "GUROBI"
     assert solver.strategy == "iterate"

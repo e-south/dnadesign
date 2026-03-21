@@ -673,16 +673,17 @@ def test_output_paths_must_live_under_outputs(tmp_path: Path) -> None:
         load_config(cfg_path)
 
 
-def test_usr_root_must_live_under_outputs(tmp_path: Path) -> None:
+def test_usr_root_can_live_outside_outputs(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["output"] = {
         "targets": ["usr"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-        "usr": {"dataset": "demo", "root": "usr"},
+        "usr": {"dataset": "demo", "root": "../usr_root"},
     }
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
-    with pytest.raises(ConfigError, match="output.usr.root must be within outputs"):
-        load_config(cfg_path)
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.output.usr is not None
+    assert loaded.root.densegen.output.usr.root == "../usr_root"
 
 
 def test_logging_dir_must_live_under_outputs(tmp_path: Path) -> None:

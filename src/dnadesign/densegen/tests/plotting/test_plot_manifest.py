@@ -548,7 +548,7 @@ def test_placement_map_uses_selected_output_source_for_solutions(
                   bio_type: dna
                   alphabet: dna_4
                 usr:
-                  root: outputs/usr_datasets
+                  root: ../usr_root
                   dataset: densegen/demo
               generation:
                 sequence_length: 10

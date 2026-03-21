@@ -4,7 +4,7 @@
 **Last verified:** 2026-02-28
 
 
-Use this tutorial to run the largest packaged DenseGen campaign. It combines expanded stress-condition plans, a GUROBI solver backend, and USR-ready outputs around a constitutive σ70 promoter core.
+Use this tutorial to run the largest packaged DenseGen campaign. It combines expanded stress-condition plans, a GUROBI solver backend, and a shared USR sink around a constitutive σ70 promoter core.
 The σ70 core in this workspace is defined by fixed RNAP -35 and -10 hexamer sets from *Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors* (DOI: 10.1038/s41467-017-02473-5; source: https://www.nature.com/articles/s41467-017-02473-5).
 
 ### Runbook command
@@ -90,8 +90,8 @@ inputs:                                      # Input definitions used by Stage-A
 
 ### Step-by-step commands
 
-Start by pinning the config path used across run commands. This workspace writes local tables to `outputs/tables/` and USR outputs to `outputs/usr_datasets/`.
-`dense run` auto-seeds `outputs/usr_datasets/registry.yaml` when it is missing, so no manual registry copy step is required.
+Start by pinning the config path used across run commands. This workspace writes local tables to `outputs/tables/` and its shared USR sink to `src/dnadesign/usr/datasets/`.
+`dense run` auto-seeds the configured shared USR root registry when it is missing, so no manual registry copy step is required.
 
 ```bash
 # Enter the workspace directory so relative paths resolve correctly.
@@ -191,7 +191,7 @@ uv run cruncher catalog export-densegen --set 1 --source demo_merged_meme_oops_m
 ### Expected outputs
 
 - `outputs/tables/records.parquet`
-- `outputs/usr_datasets/densegen/study_stress_ethanol_cipro/.events.log`
+- `src/dnadesign/usr/datasets/densegen/study_stress_ethanol_cipro/.events.log`
 - `outputs/plots/`
 - `outputs/notebooks/densegen_run_overview.py`
 

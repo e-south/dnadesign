@@ -171,7 +171,9 @@ Key options:
 - `--output-mode local|usr|both`
 
 Notes:
-- `--output-mode usr|both` seeds `outputs/usr_datasets/registry.yaml` when a seed file is available.
+- `--output-mode usr|both` points `output.usr.root` at the repo shared USR root
+  relative to the new workspace by default.
+- `--output-mode usr|both` seeds the configured shared USR root `registry.yaml` when a seed file is available.
 - `--output-mode usr|both` sets `output.usr.dataset` to the workspace id so each initialized workspace writes to its own USR dataset path.
 
 ### `dense workspace where`
@@ -198,6 +200,11 @@ Key options:
 
 Notes:
 - If prior run outputs exist, default behavior is resume-like unless `--fresh` is set.
+- `--fresh` refuses to reset a workspace when `output.usr.root` points at a
+  shared USR dataset that already has state.
+- If a shared USR dataset already exists but this workspace has no run outputs,
+  `dense run` fails fast instead of guessing whether it should resume or append
+  as a new run.
 - Missing/stale Stage-A pools for plan-active `include_inputs` are rebuilt automatically.
 - Stale pools for configured-but-unused inputs are ignored with an explicit warning.
 - For FIMO-backed inputs, ensure `fimo` is available (for example via `pixi run ...`).
@@ -214,7 +221,14 @@ Key options:
 
 Notes:
 - Runs in danger-zone mode by default and prompts before deleting outputs.
-- Preserves workspace-local USR registry by default so post-reset `dense run` remains ergonomic.
+- `campaign-reset` refuses to clear workspace outputs when a shared USR dataset
+  already has state, because that would orphan the live dataset from its run
+  history.
+- Preserves the configured USR registry by default so post-reset `dense run`
+  remains ergonomic when the USR root is still part of the same workspace
+  state.
+- `--purge-usr-registry` only applies to workspace-local USR roots under
+  `outputs/`.
 - Preserves `outputs/notify` and `outputs/logs` scaffolding so watcher/profile wiring and ops log roots remain stable across fresh resets.
 
 ### `dense plot`

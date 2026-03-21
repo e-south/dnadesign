@@ -31,6 +31,7 @@ from typing import Callable, Literal, Optional
 
 import typer
 
+from ..config import resolve_usr_root_scoped_path
 from . import notebook_runtime
 from .context import CliContext
 from .notebook_template import NotebookTemplateContext, render_notebook_template
@@ -262,14 +263,7 @@ def _resolve_notebook_records_path(*, loaded, run_root: Path, context: CliContex
         dataset = str(usr_cfg.dataset).strip()
         if not dataset:
             raise ValueError("output.usr.dataset must be a non-empty string")
-        usr_root = Path(
-            context.resolve_outputs_path_or_exit(
-                loaded.path,
-                run_root,
-                usr_cfg.root,
-                label="output.usr.root",
-            )
-        )
+        usr_root = Path(resolve_usr_root_scoped_path(loaded.path, usr_cfg.root, label="output.usr.root"))
         return NotebookRecordsSource(
             source="usr",
             records_path=usr_root / dataset / "records.parquet",

@@ -5,7 +5,9 @@
 This page defines what DenseGen writes, where it writes it, and which event stream each
 consumer should read.
 
-DenseGen can emit Parquet outputs locally and/or write through USR.
+DenseGen can emit Parquet outputs locally and/or write through USR. When USR
+is enabled for a shared study, DenseGen writes to the shared root declared in
+the config rather than inventing a workspace-local mirror.
 
 For a compact run-and-artifact checklist, use **[DenseGen quick checklist](../concepts/quick-checklist.md)**.
 
