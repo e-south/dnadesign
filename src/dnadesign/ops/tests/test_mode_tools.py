@@ -106,7 +106,7 @@ def test_infer_overlay_probe_returns_no_artifacts_when_no_usr_destination(
     assert artifacts == ()
 
 
-def test_infer_overlay_probe_returns_no_artifacts_when_usr_destination_is_ambiguous(
+def test_infer_overlay_probe_raises_when_usr_destination_is_ambiguous(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -164,11 +164,11 @@ jobs:
         raise AssertionError("workspace fallback should stay disabled for ambiguous infer configs")
 
     monkeypatch.setattr(mode_tools, "_infer_workspace_overlay_candidates", _unexpected_workspace_probe)
-    artifacts = mode_tools._infer_overlay_artifacts(workspace_root, infer_config=infer_config)
-    assert artifacts == ()
+    with pytest.raises(mode_tools.InferModeProbeError, match="multiple USR destinations"):
+        mode_tools._infer_overlay_artifacts(workspace_root, infer_config=infer_config)
 
 
-def test_infer_overlay_probe_returns_no_artifacts_when_usr_root_is_implicit(
+def test_infer_overlay_probe_raises_when_usr_root_is_implicit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -210,8 +210,8 @@ jobs:
         raise AssertionError("workspace fallback should stay disabled when infer ingest.root is implicit")
 
     monkeypatch.setattr(mode_tools, "_infer_workspace_overlay_candidates", _unexpected_workspace_probe)
-    artifacts = mode_tools._infer_overlay_artifacts(workspace_root, infer_config=infer_config)
-    assert artifacts == ()
+    with pytest.raises(mode_tools.InferModeProbeError, match="requires ingest.root"):
+        mode_tools._infer_overlay_artifacts(workspace_root, infer_config=infer_config)
 
 
 def test_register_mode_tool_adapter_rejects_duplicate_tool() -> None:

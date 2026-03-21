@@ -322,6 +322,39 @@ def test_runbook_default_post_run_template_resolves_to_repo_jobs_template(tmp_pa
     assert runbook.densegen.post_run.qsub_template == expected_template
 
 
+def test_runbook_default_densegen_and_notify_templates_resolve_to_repo_jobs_templates(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
+    del payload["runbook"]["densegen"]["qsub_template"]
+    del payload["runbook"]["notify"]["qsub_template"]
+
+    runbook = load_orchestration_runbook(runbook_path, raw=payload)
+    assert runbook.densegen is not None
+
+    repo_root = Path(__file__).resolve()
+    for parent in repo_root.parents:
+        if (parent / "pyproject.toml").exists():
+            repo_root = parent
+            break
+    assert runbook.densegen.qsub_template == (repo_root / "docs" / "bu-scc" / "jobs" / "densegen-cpu.qsub").resolve()
+    assert runbook.notify.qsub_template == (repo_root / "docs" / "bu-scc" / "jobs" / "notify-watch.qsub").resolve()
+
+
+def test_runbook_default_infer_template_resolves_to_repo_jobs_template(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_workspace"
+    payload = _infer_runbook_payload(workspace_root, runbook_id="infer_default_template")
+    del payload["runbook"]["infer"]["qsub_template"]
+
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    repo_root = Path(__file__).resolve()
+    for parent in repo_root.parents:
+        if (parent / "pyproject.toml").exists():
+            repo_root = parent
+            break
+    assert runbook.infer is not None
+    assert runbook.infer.qsub_template == (repo_root / "docs" / "bu-scc" / "jobs" / "evo2-gpu-infer.qsub").resolve()
+
+
 def test_runbook_notify_policy_defaults_to_generic_when_omitted(tmp_path: Path) -> None:
     runbook_path = _write_runbook(tmp_path)
     payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
@@ -1446,6 +1479,23 @@ def test_densegen_qsub_template_requires_explicit_mode_and_failure_messages() ->
     assert "dense run failed" in template_text
 
 
+def test_infer_qsub_template_exports_usr_actor_tags() -> None:
+    repo_root = Path(__file__).resolve().parents[4]
+    template_text = (repo_root / "docs" / "bu-scc" / "jobs" / "evo2-gpu-infer.qsub").read_text(encoding="utf-8")
+
+    assert 'export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-infer}"' in template_text
+    assert 'export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-${JOB_ID:-manual}.${SGE_TASK_ID:-0}}"' in template_text
+
+
+def test_densegen_analysis_template_requires_records_for_placement_map() -> None:
+    repo_root = Path(__file__).resolve().parents[4]
+    template_text = (repo_root / "docs" / "bu-scc" / "jobs" / "densegen-analysis.qsub").read_text(encoding="utf-8")
+
+    assert 'RECORDS_PARQUET="$TABLES_DIR/records.parquet"' in template_text
+    assert "needs_records_artifact=0" in template_text
+    assert "Missing records.parquet and records__part-*.parquet under: $TABLES_DIR" in template_text
+
+
 def test_infer_runbook_uses_gpu_submit_template_and_filters(tmp_path: Path) -> None:
     workspace_root = tmp_path / "infer_workspace"
     workspace_root.mkdir(parents=True, exist_ok=True)
@@ -1520,6 +1570,19 @@ jobs: []
     assert "--tool infer " in smoke_block
     assert "setup resolve-events --tool infer --config" not in smoke_block
     assert "--only-tools infer" in smoke_block
+
+
+def test_infer_preflight_uses_run_dry_run_contract(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_workspace"
+    payload = _infer_runbook_payload(workspace_root, runbook_id="infer_preflight_dry_run")
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+
+    plan = build_batch_plan(runbook=runbook, requested_mode="fresh", requested_smoke=None, active_job_ids=())
+    preflight_block = _render_block(plan.preflight_commands)
+
+    assert "uv run infer run --config" in preflight_block
+    assert "--dry-run" in preflight_block
+    assert "uv run infer validate config --config" not in preflight_block
 
 
 def test_infer_workflow_rejects_notify_tool_mismatch() -> None:
@@ -1777,12 +1840,13 @@ jobs:
         encoding="utf-8",
     )
 
-    decision = resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
-    assert decision.selected_mode == "fresh"
-    assert decision.resume_artifacts_found is False
+    with pytest.raises(ValueError, match="auto mode blocked: infer resume destination is ambiguous or incomplete"):
+        resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
 
 
-def test_infer_mode_auto_ignores_stale_workspace_overlay_when_usr_destination_is_ambiguous(tmp_path: Path) -> None:
+def test_infer_mode_auto_blocks_when_usr_destination_is_ambiguous_even_with_stale_workspace_overlay(
+    tmp_path: Path,
+) -> None:
     pyarrow = pytest.importorskip("pyarrow")
     pyarrow_parquet = pytest.importorskip("pyarrow.parquet")
 
@@ -1849,9 +1913,66 @@ jobs:
         encoding="utf-8",
     )
 
-    decision = resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
+    with pytest.raises(ValueError, match="auto mode blocked: infer resume destination is ambiguous or incomplete"):
+        resolve_mode_decision(runbook=runbook, requested_mode="auto", active_job_ids=())
+
+
+def test_infer_mode_fresh_allows_explicit_multi_job_overwrite(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_mode_explicit_fresh_multi_job"
+    payload = _infer_runbook_payload(
+        workspace_root,
+        runbook_id="infer_mode_explicit_fresh_multi_job",
+        mode_default="fresh",
+    )
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+    runbook.infer.config.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs:
+  - id: job_a
+    operation: extract
+    ingest:
+      source: usr
+      root: "__USR_ROOT_A__"
+      dataset: "dataset_a"
+      field: sequence
+    outputs:
+      - id: ll_mean
+        fn: log_likelihood
+        format: float
+        params:
+          reduction: mean
+    io:
+      write_back: true
+  - id: job_b
+    operation: extract
+    ingest:
+      source: usr
+      root: "__USR_ROOT_B__"
+      dataset: "dataset_b"
+      field: sequence
+    outputs:
+      - id: ll_mean
+        fn: log_likelihood
+        format: float
+        params:
+          reduction: mean
+    io:
+      write_back: true
+""".strip()
+        .replace("__USR_ROOT_A__", str(tmp_path / "external_usr_a"))
+        .replace("__USR_ROOT_B__", str(tmp_path / "external_usr_b"))
+        + "\n",
+        encoding="utf-8",
+    )
+
+    decision = resolve_mode_decision(runbook=runbook, requested_mode="fresh", active_job_ids=())
     assert decision.selected_mode == "fresh"
-    assert decision.resume_artifacts_found is False
+    assert decision.run_args == "--overwrite"
 
 
 def test_infer_mode_fresh_requires_reset_ack_when_resume_artifacts_exist(tmp_path: Path) -> None:
@@ -2232,6 +2353,36 @@ def test_execute_batch_plan_fails_fast_before_submits(tmp_path: Path) -> None:
     assert all("qsub -terse" not in cmd for cmd in seen_commands)
 
 
+def test_execute_batch_plan_blocks_submit_when_plan_uses_allow_missing_qstat(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    plan = build_batch_plan(
+        runbook=runbook,
+        requested_mode=None,
+        requested_smoke=None,
+        active_job_ids=(),
+        allow_missing_qstat=True,
+    )
+    audit_path = tmp_path / "audit" / "allow-missing-qstat-blocked.json"
+    seen_commands: list[str] = []
+
+    def _runner(command: CommandSpec) -> tuple[int, str, str]:
+        seen_commands.append(command.render_shell())
+        return 0, "ok", ""
+
+    result = execute_batch_plan(
+        plan=plan,
+        audit_json_path=audit_path,
+        submit=True,
+        command_runner=_runner,
+    )
+
+    assert result.ok is False
+    assert result.failed_phase == "preflight"
+    assert any("--allow-missing-qstat" in command for command in seen_commands)
+    assert all("qsub -terse" not in command for command in seen_commands)
+
+
 def test_cli_plan_invalid_runbook_shows_contract_error_without_traceback(tmp_path: Path) -> None:
     runbook_path = tmp_path / "invalid-runbook.yaml"
     payload = {
@@ -2520,6 +2671,30 @@ def test_cli_execute_forwards_allow_missing_qstat_to_plan_builder(
 
     assert result.exit_code == 0
     assert captured["allow_missing_qstat"] is True
+
+
+def test_cli_execute_rejects_submit_with_allow_missing_qstat(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    audit_path = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "audit" / "result.json"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "execute",
+            "--runbook",
+            str(runbook_path),
+            "--audit-json",
+            str(audit_path),
+            "--submit",
+            "--no-discover-active-jobs",
+            "--allow-missing-qstat",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "--allow-missing-qstat is only allowed with --no-submit" in result.output
 
 
 def test_cli_execute_rejects_audit_json_outside_workspace_ops_audit(tmp_path: Path) -> None:

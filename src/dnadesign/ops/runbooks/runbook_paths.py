@@ -17,7 +17,18 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .schema import OrchestrationRunbookV1
 
+DENSEGEN_QSUB_TEMPLATE_DEFAULT = Path("docs/bu-scc/jobs/densegen-cpu.qsub")
 DENSEGEN_POST_RUN_TEMPLATE_DEFAULT = Path("docs/bu-scc/jobs/densegen-analysis.qsub")
+INFER_QSUB_TEMPLATE_DEFAULT = Path("docs/bu-scc/jobs/evo2-gpu-infer.qsub")
+NOTIFY_QSUB_TEMPLATE_DEFAULT = Path("docs/bu-scc/jobs/notify-watch.qsub")
+_REPO_ROOT_DEFAULT_TEMPLATES = frozenset(
+    {
+        DENSEGEN_QSUB_TEMPLATE_DEFAULT,
+        DENSEGEN_POST_RUN_TEMPLATE_DEFAULT,
+        INFER_QSUB_TEMPLATE_DEFAULT,
+        NOTIFY_QSUB_TEMPLATE_DEFAULT,
+    }
+)
 
 
 def _resolve_path_from_runbook_base(path_value: Path, *, runbook_base_dir: Path) -> Path:
@@ -35,11 +46,11 @@ def _resolve_repo_root_from_module() -> Path | None:
     return None
 
 
-def _resolve_densegen_post_run_template(path_value: Path, *, runbook_base_dir: Path) -> Path:
+def _resolve_template_path(path_value: Path, *, runbook_base_dir: Path) -> Path:
     expanded = path_value.expanduser()
     if expanded.is_absolute():
         return expanded
-    if expanded == DENSEGEN_POST_RUN_TEMPLATE_DEFAULT:
+    if expanded in _REPO_ROOT_DEFAULT_TEMPLATES:
         repo_root = _resolve_repo_root_from_module()
         if repo_root is not None:
             return (repo_root / expanded).resolve()
@@ -51,7 +62,7 @@ def resolve_runbook_paths(runbook: "OrchestrationRunbookV1", *, runbook_base_dir
     if densegen is not None:
         post_run = densegen.post_run.model_copy(
             update={
-                "qsub_template": _resolve_densegen_post_run_template(
+                "qsub_template": _resolve_template_path(
                     densegen.post_run.qsub_template,
                     runbook_base_dir=runbook_base_dir,
                 )
@@ -60,9 +71,7 @@ def resolve_runbook_paths(runbook: "OrchestrationRunbookV1", *, runbook_base_dir
         densegen = densegen.model_copy(
             update={
                 "config": _resolve_path_from_runbook_base(densegen.config, runbook_base_dir=runbook_base_dir),
-                "qsub_template": _resolve_path_from_runbook_base(
-                    densegen.qsub_template, runbook_base_dir=runbook_base_dir
-                ),
+                "qsub_template": _resolve_template_path(densegen.qsub_template, runbook_base_dir=runbook_base_dir),
                 "post_run": post_run,
             }
         )
@@ -72,9 +81,7 @@ def resolve_runbook_paths(runbook: "OrchestrationRunbookV1", *, runbook_base_dir
         infer = infer.model_copy(
             update={
                 "config": _resolve_path_from_runbook_base(infer.config, runbook_base_dir=runbook_base_dir),
-                "qsub_template": _resolve_path_from_runbook_base(
-                    infer.qsub_template, runbook_base_dir=runbook_base_dir
-                ),
+                "qsub_template": _resolve_template_path(infer.qsub_template, runbook_base_dir=runbook_base_dir),
             }
         )
 
@@ -85,9 +92,7 @@ def resolve_runbook_paths(runbook: "OrchestrationRunbookV1", *, runbook_base_dir
                 "profile": _resolve_path_from_runbook_base(notify.profile, runbook_base_dir=runbook_base_dir),
                 "cursor": _resolve_path_from_runbook_base(notify.cursor, runbook_base_dir=runbook_base_dir),
                 "spool_dir": _resolve_path_from_runbook_base(notify.spool_dir, runbook_base_dir=runbook_base_dir),
-                "qsub_template": _resolve_path_from_runbook_base(
-                    notify.qsub_template, runbook_base_dir=runbook_base_dir
-                ),
+                "qsub_template": _resolve_template_path(notify.qsub_template, runbook_base_dir=runbook_base_dir),
             }
         )
 

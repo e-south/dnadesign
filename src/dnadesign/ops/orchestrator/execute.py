@@ -135,6 +135,15 @@ def _orchestration_notify_command(*, plan: BatchPlan, status: str, message: str)
     )
 
 
+def _plan_uses_allow_missing_qstat(plan: BatchPlan) -> bool:
+    for command in plan.preflight_commands:
+        if command.argv is not None and "--allow-missing-qstat" in command.argv:
+            return True
+        if command.shell is not None and "--allow-missing-qstat" in command.shell:
+            return True
+    return False
+
+
 def execute_batch_plan(
     *,
     plan: BatchPlan,
@@ -159,6 +168,10 @@ def execute_batch_plan(
     for phase, phase_commands in phase_map:
         if phase == "submit" and plan.submit_behavior == "blocked":
             failed_phase = "submit"
+            ok = False
+            break
+        if phase == "submit" and _plan_uses_allow_missing_qstat(plan):
+            failed_phase = "preflight"
             ok = False
             break
         if phase == "submit" and plan.orchestration_notify is not None:

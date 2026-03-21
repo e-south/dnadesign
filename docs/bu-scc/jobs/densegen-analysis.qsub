@@ -30,9 +30,11 @@ RUN_ROOT="$(
 TABLES_DIR="$RUN_ROOT/outputs/tables"
 ATTEMPTS_PARQUET="$TABLES_DIR/attempts.parquet"
 COMPOSITION_PARQUET="$TABLES_DIR/composition.parquet"
+RECORDS_PARQUET="$TABLES_DIR/records.parquet"
 
 needs_attempts_artifact=0
 needs_composition_artifact=0
+needs_records_artifact=0
 IFS=',' read -r -a DENSEGEN_ANALYSIS_PLOT_ARRAY <<< "$DENSEGEN_ANALYSIS_PLOTS"
 for raw_plot in "${DENSEGEN_ANALYSIS_PLOT_ARRAY[@]}"; do
   plot="${raw_plot//[[:space:]]/}"
@@ -41,8 +43,12 @@ for raw_plot in "${DENSEGEN_ANALYSIS_PLOT_ARRAY[@]}"; do
       needs_attempts_artifact=1
       needs_composition_artifact=1
       ;;
-    placement_map|tfbs_usage)
+    tfbs_usage)
       needs_composition_artifact=1
+      ;;
+    placement_map)
+      needs_composition_artifact=1
+      needs_records_artifact=1
       ;;
   esac
 done
@@ -67,6 +73,18 @@ if [[ "$needs_composition_artifact" -eq 1 ]]; then
   if [[ "$has_composition_artifact" -ne 1 ]]; then
     echo "Selected DenseGen analysis plots require composition artifacts." >&2
     echo "Missing composition.parquet and composition_part-*.parquet under: $TABLES_DIR" >&2
+    exit 2
+  fi
+fi
+
+if [[ "$needs_records_artifact" -eq 1 ]]; then
+  has_records_artifact=0
+  if [[ -f "$RECORDS_PARQUET" ]] || compgen -G "$TABLES_DIR/records__part-*.parquet" > /dev/null; then
+    has_records_artifact=1
+  fi
+  if [[ "$has_records_artifact" -ne 1 ]]; then
+    echo "Selected DenseGen analysis plots require records artifacts." >&2
+    echo "Missing records.parquet and records__part-*.parquet under: $TABLES_DIR" >&2
     exit 2
   fi
 fi

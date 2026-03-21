@@ -50,6 +50,9 @@ if ! uv run infer validate config --config "$INFER_CONFIG"; then
   exit 3
 fi
 
+export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-infer}"
+export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-${JOB_ID:-manual}.${SGE_TASK_ID:-0}}"
+
 infer_run_args=()
 if [[ -n "${INFER_RUN_ARGS:-}" ]]; then
   # shellcheck disable=SC2206

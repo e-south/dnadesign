@@ -23,7 +23,7 @@ from dnadesign._contracts import (
 )
 
 from ..runbooks.schema import OrchestrationRunbookV1
-from .mode_tools import resolve_mode_tool_adapter
+from .mode_tools import InferModeProbeError, resolve_mode_tool_adapter
 
 RunMode = Literal["auto", "fresh", "resume"]
 SubmitBehavior = Literal["submit", "hold_jid", "blocked"]
@@ -264,7 +264,19 @@ def resolve_mode_decision(
     workflow_tool = tool_adapter.tool
     resume_policy = resolve_resume_readiness_policy(workflow_tool)
     has_explicit_resume_policy = resume_policy is not None
-    artifacts_found = tool_adapter.has_resume_artifacts(runbook)
+    try:
+        artifacts_found = tool_adapter.has_resume_artifacts(runbook)
+    except InferModeProbeError as exc:
+        if selected_requested_mode == "auto":
+            raise ValueError(
+                "auto mode blocked: infer resume destination is ambiguous or incomplete "
+                f"({exc}). Choose --mode explicitly before re-running."
+            ) from exc
+        if selected_requested_mode == "resume":
+            raise ValueError(
+                f"resume mode blocked: infer resume destination is ambiguous or incomplete ({exc})."
+            ) from exc
+        artifacts_found = False
     resume_state: ResumeState = "none"
     resume_readiness_reason = "not-evaluated"
     if has_explicit_resume_policy:

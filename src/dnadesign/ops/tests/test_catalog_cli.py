@@ -38,6 +38,13 @@ def test_load_runbook_catalog_reads_shared_registry() -> None:
     assert catalog.find_tool_source("usr") is not None
 
 
+def test_ops_package_data_declares_packaged_runbook_presets() -> None:
+    pyproject = (_repo_root() / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert '"dnadesign.ops"' in pyproject
+    assert "runbooks/presets/*.yaml" in pyproject
+
+
 def test_catalog_query_filters_procedures_without_touching_registry_ownership() -> None:
     catalog = load_runbook_catalog(repo_root=_repo_root())
 

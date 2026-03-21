@@ -2152,6 +2152,12 @@ def runbook_execute(
     if max_discovery_jobs <= 0:
         typer.echo("Runbook contract error: --max-discovery-jobs must be > 0", err=True)
         raise typer.Exit(code=2)
+    if submit and allow_missing_qstat:
+        typer.echo(
+            "Runbook contract error: --allow-missing-qstat is only allowed with --no-submit dry-run demos.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
     repo_base = _resolve_repo_base(repo_root)
     try:
         _validate_runbook_input_path_for_runtime(runbook_path=runbook.expanduser(), repo_base=repo_base)

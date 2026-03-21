@@ -30,6 +30,10 @@ from .workflow_tools import (
 ResolvedMode = Literal["fresh", "resume"]
 
 
+class InferModeProbeError(ValueError):
+    """Raised when infer mode probing cannot safely infer a single resume target."""
+
+
 @dataclass(frozen=True)
 class ModeToolAdapter:
     tool: str
@@ -87,13 +91,10 @@ def _resolve_infer_usr_output_for_mode_probe(infer_config: Path):
         return resolve_usr_producer_contract(tool="infer", config_path=infer_config)
     except ValueError as exc:
         message = str(exc)
-        non_fatal_fragments = (
-            "at least one job with ingest.source='usr' and io.write_back=true",
-            "multiple USR destinations",
-            "requires ingest.root for source='usr' write-back jobs",
-        )
-        if any(fragment in message for fragment in non_fatal_fragments):
+        if "at least one job with ingest.source='usr' and io.write_back=true" in message:
             return None
+        if "multiple USR destinations" in message or "requires ingest.root for source='usr' write-back jobs" in message:
+            raise InferModeProbeError(message) from exc
         raise ValueError(
             f"infer mode probe requires a single resolvable USR destination in infer config {infer_config}: {message}"
         ) from exc

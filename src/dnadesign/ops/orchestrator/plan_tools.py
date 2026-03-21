@@ -305,7 +305,7 @@ def _infer_preflight_commands(
 
     return (
         _tool_ops_gate(*infer_overlay_guard_parts),
-        _tool_argv("uv", "run", "infer", "validate", "config", "--config", config),
+        _tool_argv("uv", "run", "infer", "run", "--config", config, "--dry-run"),
         _tool_argv(
             "qsub",
             "-verify",
