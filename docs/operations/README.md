@@ -7,7 +7,7 @@
 **Exit artifact:** Ops schema, plan, execute, or read-only progress docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-20
+**Last verified:** 2026-03-21
 
 Use this page when the next step is batch orchestration or a read-only Ops status check. If the work is dataset assembly, construct realization, or infer write-back, leave this page and continue in the shared USR runbooks. Detailed command behavior and schema rules live in [orchestration runbooks](orchestration-runbooks.md). Use the [runbook catalog](../runbooks/README.md) when you need command lookup across tools.
 
@@ -65,8 +65,9 @@ Use these when you still need command lookup before choosing a runbook lifecycle
 6. Use `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` when you want the named registered procedure plus its related procedures as a starting point.
 7. Use `uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>` when the work spans multiple runtimes or pauses between steps.
 8. Keep the manifest explicit. Ops reads the files you name there; it does not infer hidden campaign state.
-9. For progress-kind meanings and the next checks for each one, see the [runbook catalog progress views](../runbooks/README.md#progress-views).
-10. If the next step is dataset assembly, construct realization, or infer write-back, leave Ops and continue in the shared USR runbooks:
+9. For live promoter-study status, keep the checked-in manifest at `docs/studies/promoter/<study-id>/campaign.yaml`, the affiliated-dataset registry at `docs/studies/promoter/<study-id>/datasets.yaml`, and the status note at `docs/studies/promoter/<study-id>/status.md`.
+10. For progress-kind meanings and the next checks for each one, see the [runbook catalog progress views](../runbooks/README.md#progress-views).
+11. If the next step is dataset assembly, construct realization, or infer write-back, leave Ops and continue in the shared USR runbooks:
     [Multi-source shared dataset assembly](../../src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md),
     [Construct -> USR -> Infer shared dataset runbook](../../src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md),
     or [Promoter characterization feature matrix](../../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md).

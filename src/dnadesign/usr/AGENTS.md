@@ -19,6 +19,8 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
 - Namespace registry: `registry.yaml` under the datasets root
 - Sync details: `src/dnadesign/usr/docs/operations/sync.md`
 - Repo-local BU SCC sync skill: `src/dnadesign/usr/skills/bu-scc-usr-sync/SKILL.md`
+- Repo-local promoter-study status skill: `.agents/skills/promoter-study-status/SKILL.md`
+- Checked-in promoter-study records: `docs/studies/README.md`
 - Historical artifacts: `src/dnadesign/usr/archived/` (treat as generated)
 - Dataset naming ontology: prefer the least-coupled semantic dataset ids, usually flat ids such as `mg1655_promoters`, `plasmids`, or `pdual10_slot_a_window_1kb_demo`; use namespace-qualified ids only when they genuinely improve disambiguation. Keep tool provenance in overlay namespaces, not dataset ids.
 - Human-readable record names belong in `usr_label__primary` / `usr_label__aliases`.

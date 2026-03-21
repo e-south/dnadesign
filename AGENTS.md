@@ -43,6 +43,8 @@ Treat this file as a navigation map; canonical policy and operational detail liv
 - Submit-ready BU SCC jobs: `docs/bu-scc/jobs/README.md`
 - Notify operator docs: `docs/notify/README.md`
 - Notify event contract: `docs/notify/usr-events.md`
+- Repo-local promoter-study status skill: `.agents/skills/promoter-study-status/SKILL.md`
+- Checked-in live study records: `docs/studies/README.md`
 - Maintainer docs and CI/testing notes: `docs/dev/README.md`
 
 ## Repository patterns

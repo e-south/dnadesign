@@ -1,7 +1,7 @@
 ## Runbook Catalog
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-20
+**Last verified:** 2026-03-21
 
 Use this page when you want a command first. Start with `uv run ops catalog list --simple`, then open the linked runbook or tool doc once you know the route.
 
@@ -28,6 +28,7 @@ Use the command table first. The generated tables later on are reference.
 - `uv run ops progress explain usr.data-plane.promoter-feature-matrix`: required flags, direct `progress show` command, and notes before you read that status surface.
 - `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`: expand one registered procedure into a starting manifest with the named procedure first and its related procedures after it.
 - `uv run ops progress campaign --manifest <manifest.yaml>`: read-only summary for the steps listed in the manifest.
+- For one live promoter study, keep the checked-in manifest at `docs/studies/promoter/<study-id>/campaign.yaml`, the affiliated-dataset registry at `docs/studies/promoter/<study-id>/datasets.yaml`, and the status note at `docs/studies/promoter/<study-id>/status.md`.
 
 Start with the summary and linked doc. The extra labels matter only when two routes look similar.
 
@@ -97,6 +98,7 @@ steps:
 
 - Generate the same skeleton from registry ids with `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix opal.downstream.usr-infer-x-active-learning`.
 - Expand one registered procedure into a relation-based starting point with `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`.
+- For a real promoter effort, store that manifest under `docs/studies/promoter/<study-id>/campaign.yaml` and keep the paired `datasets.yaml` registry there so naive agents can find both workflow and sync posture deterministically.
 - Relative artifact paths in the manifest resolve from the manifest directory, not from the shell's current working directory.
 - `--related-to` expands the named procedure first, then related procedures in catalog order. Reorder the manifest when your campaign chronology differs.
 - The manifest is explicit by design. Ops does not infer hidden steps.

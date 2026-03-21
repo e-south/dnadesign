@@ -12,6 +12,7 @@
 Use this page when you need the whole promoter-study Evo2 path in one place before choosing a concrete runbook. The linked runbooks hold the command, schema, and failure-handling details.
 
 If you are entering from Ops, use `uv run ops catalog show usr.data-plane.promoter-feature-matrix` for the linked docs and `uv run ops progress explain usr.data-plane.promoter-feature-matrix` for the required status inputs.
+If you need the current study status rather than route discovery, keep one checked-in study record with [Promoter study status contract](promoter-study-status-contract.md), including the affiliated-dataset registry for sync-aware local and remote tracking.
 
 ### Workflow summary
 
@@ -44,6 +45,7 @@ If you are entering from Ops, use `uv run ops catalog show usr.data-plane.promot
 ### Choose the next deep procedure
 
 - If you already have one merged anchor-only dataset and need infer-derived columns next, use [Promoter characterization feature matrix](promoter-characterization-feature-matrix.md).
+- If you need one maintained study snapshot that a naive agent can refresh without reconstructing the whole route, use [Promoter study status contract](promoter-study-status-contract.md).
 - If you need template-backed contexts such as `template_1kb` before feature extraction, use [Construct -> USR -> Infer shared dataset runbook](construct-infer-shared-dataset-runbook.md).
 - If DenseGen, manual, and wildtype sources still need explicit merge/carry setup, use [Multi-source shared dataset assembly](multi-source-shared-dataset-assembly.md).
 - If the data-plane handoff is already clear and you only need the infer-owned Evo2 contract, use [Evo2 promoter-study feature runbook](../../../infer/docs/operations/evo2-promoter-features.md).
