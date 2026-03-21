@@ -60,12 +60,12 @@ Use these when you still need command lookup before choosing a runbook lifecycle
 1. Use `uv run ops progress explain <registry-id>` to see the required flags and a ready-to-paste `progress show` command before you touch artifacts.
 2. Use `uv run ops progress show ops.control-plane.orchestration --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json` to summarize one control-plane runbook execution from the registered progress contract.
 3. Use `uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <repo-root> --usr-root <usr-root> --dataset <dataset>` to summarize one staged USR-backed data-plane procedure from explicit artifacts.
-4. `ops progress show` and `ops progress campaign` are read-only status surfaces. Inspect the required flags in `ops progress explain <registry-id>` or `ops catalog show <registry-id>` before you run them if you do not already know the artifact contract.
+4. `ops progress show` and `ops progress campaign` are read-only status commands. Inspect the required flags in `ops progress explain <registry-id>` or `ops catalog show <registry-id>` before you run them if you do not already know the artifact contract.
 5. Use `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` to emit a manifest template with the right required fields. It prints to stdout unless you pass `--out`.
 6. Use `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` when you want the named registered procedure plus its related procedures as a starting point.
 7. Use `uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>` when the work spans multiple runtimes or pauses between steps.
 8. Keep the manifest explicit. Ops reads the files you name there; it does not infer hidden campaign state.
-9. For live promoter-study status, keep the checked-in manifest at `docs/studies/promoter/<study-id>/campaign.yaml`, the affiliated-dataset registry at `docs/studies/promoter/<study-id>/datasets.yaml`, and the status note at `docs/studies/promoter/<study-id>/status.md`.
+9. For live promoter-study status, keep the study files under `docs/studies/promoter/<study-id>/`. Use [Study records index](../studies/README.md) for the required layout and selector rules.
 10. For progress-kind meanings and the next checks for each one, see the [runbook catalog progress views](../runbooks/README.md#progress-views).
 11. If the next step is dataset assembly, construct realization, or infer write-back, leave Ops and continue in the shared USR runbooks:
     [Multi-source shared dataset assembly](../../src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md),

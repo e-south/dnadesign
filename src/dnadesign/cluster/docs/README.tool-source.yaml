@@ -10,4 +10,4 @@ keywords:
 routes:
   - id: exploratory-clustering
     path: workflows/exploratory-clustering.md
-    summary: Cluster-owned exploratory workflow for one chosen feature definition, UMAP, and downstream summaries.
+    summary: Cluster-owned exploratory workflow for one chosen feature column or exported matrix, UMAP, and downstream summaries.

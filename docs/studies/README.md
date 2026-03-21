@@ -9,6 +9,11 @@ than "which generic workflow should I use?"
 Study records are checked-in status artifacts for one live effort. They are not
 runbooks, and they are not generated outputs.
 
+Authority chain: `docs/studies/promoter/index.yaml` selects the active study,
+the matching `docs/studies/promoter/<study-id>/` directory holds
+`campaign.yaml`, `datasets.yaml`, and `status.md`, and the promoter-study
+status contract explains how to refresh them.
+
 Keep three complementary artifacts for each real study:
 
 - `campaign.yaml`: workflow progress and registered procedure evidence
@@ -105,7 +110,7 @@ uv run usr --root <usr-root> info <dataset-id> --format json
 # Capture remote drift against the study's declared remote profile.
 uv run usr --root <usr-root> diff <dataset-id> <remote-name> \
   --audit-json-out docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
-# Summarize the same sync audit through the registered status surface.
+# Summarize the same sync audit through the registered progress view.
 uv run ops progress show usr.data-plane.hpc-sync \
   --sync-audit-json docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
 ```
@@ -114,11 +119,11 @@ If a dataset is being onboarded from a remote-only starting point, keep
 `strict_bootstrap_id: true` in `datasets.yaml` and use an explicit dataset id
 for the first pull rather than relying on local name guessing.
 
-### Agent discovery rules
+### Status lookup rules
 
 - Read `docs/studies/promoter/index.yaml` first.
-- If `active_study: null`, agents should say the live study record is missing
-  and route the user to the promoter-study status contract instead of guessing.
+- If `active_study: null`, say the live study record is missing and route the
+  reader to the promoter-study status contract instead of guessing.
 - If `active_study` names a study, that same id must appear under `studies:`
   and its directory must contain `campaign.yaml`, `datasets.yaml`, and
   `status.md`.

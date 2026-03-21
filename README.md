@@ -2,7 +2,7 @@
 
 ![dnadesign banner](assets/dnadesign-banner.svg)
 
-`dnadesign` is a collection of modular bioinformatics tools for biological sequence design. It brings dataset management, sequence generation, construct realization, inference, clustering, optimization, and workflow orchestration into one repository.
+`dnadesign` is a collection of modular bioinformatics tools for biological sequence design. It brings dataset management, sequence generation, assembly of designed or wild-type sequences into larger constructs, sequence-model inference over shared datasets, unsupervised analysis of learned sequence representations, optimization toward defined phenotypes, and cross-tool workflow orchestration into one repository.
 
 ---
 

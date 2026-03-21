@@ -3,23 +3,23 @@
 **Type:** workflow
 **Plane:** downstream-tool
 **Owner-boundary:** cluster
-**Entry artifact:** one explicit chosen feature definition in a USR dataset or file input
+**Entry artifact:** one chosen feature column or exported matrix in a USR dataset or file input
 **Exit artifact:** cluster run records, embeddings, plots, and downstream exploratory summaries
 **Registry-id:** cluster.downstream.exploratory-clustering
-**Summary:** Explore one chosen feature definition through clustering, UMAP, and downstream summaries.
+**Summary:** Explore one chosen feature column or exported matrix through clustering, UMAP, and downstream summaries.
 **Execution-kind:** exploratory
 **Progress-kind:** cluster-run-index
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-19
 
-Use this workflow when one explicit feature definition already exists and the next task is exploratory clustering, UMAP visualization, or unsupervised summaries.
+Use this workflow when one feature column or exported matrix already exists and the next task is exploratory clustering, UMAP visualization, or unsupervised summaries.
 
 ### Preconditions
 
-- One explicit chosen feature definition is already present.
-- The input is a USR dataset (`--dataset`) or a file (`--file`) with that chosen feature definition.
-- If the chosen feature definition does not exist yet, return to [promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md) for the shared infer-backed workflow.
+- One chosen feature column or exported matrix is already present.
+- The input is a USR dataset (`--dataset`) or a file (`--file`) with that chosen feature column or matrix.
+- If that feature column or matrix does not exist yet, return to [promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md) for the shared infer-backed workflow.
 
 ### First fit, UMAP, and analysis pass
 

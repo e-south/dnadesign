@@ -37,7 +37,7 @@ Use this index to pick the next dataset, sync, or handoff step.
 | Need | Runbook |
 | --- | --- |
 | Review the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL path before choosing one branch | [promoter-evo2-journey.md](promoter-evo2-journey.md) |
-| Keep one real promoter-study status record that naive agents can refresh | [promoter-study-status-contract.md](promoter-study-status-contract.md) |
+| Keep one checked-in promoter-study record for current-status checks | [promoter-study-status-contract.md](promoter-study-status-contract.md) |
 | Build one infer-annotated promoter-study feature dataset, then continue to cluster or prepare OPAL after choosing one explicit `X` column | [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md) |
 
 ## Validation and drills

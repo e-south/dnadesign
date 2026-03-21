@@ -1,6 +1,6 @@
 ## <study-id>
 
-Replace every placeholder before relying on this file for live-status answers.
+Replace every placeholder before relying on this file for current-status checks.
 If a branch of work is not active, mark it `n/a` explicitly instead of leaving a
 placeholder behind.
 

@@ -21,7 +21,7 @@ Default sync contract:
 - Use `--no-verify-derived-hashes` only when an operator intentionally trades content-hash fidelity for speed.
 - DenseGen may write first into a workspace-local USR export root; make the
   shared study root explicit before using the dataset as the cross-tool
-  status surface.
+  study record.
 
 ## Scope
 
@@ -29,7 +29,7 @@ Default sync contract:
 - Transfer boundary: `uv run usr diff/pull/push` over SSH remotes.
 - Chained tools: DenseGen batch writes plus Infer write-back overlays.
 - Naming boundary: distinguish producer-owned workspace export roots from the
-  shared dataset used for downstream status.
+  shared dataset used for downstream study tracking.
 
 ## One-time setup
 

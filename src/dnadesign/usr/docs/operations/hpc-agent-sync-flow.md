@@ -59,7 +59,7 @@ If the producer writes to a workspace-local export root such as
 
 - create an explicit remote profile for that workspace-export root, or
 - mirror the approved dataset into the shared USR root before using it as the
-  study status surface
+  checked-in study record
 
 `usr --root src/dnadesign/usr ...` is also accepted and normalized automatically, but this runbook uses the shared datasets root to keep path ownership explicit.
 

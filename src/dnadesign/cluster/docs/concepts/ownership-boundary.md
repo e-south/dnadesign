@@ -16,12 +16,12 @@ Use this page when you need the package-role decision before choosing a downstre
 
 - upstream USR shared-dataset assembly
 - construct-based context expansion
-- upstream feature generation when the chosen feature definition does not yet exist
+- upstream feature generation when the feature column or exported matrix does not yet exist
 - supervised label/train/select loops
 
 ### Preconditions
 
-- one explicit chosen feature definition is already present
+- one feature column or exported matrix is already present
 - the dataset or file already satisfies any sequence/hue prerequisites for the views you want
 
 ### Choose cluster when
@@ -32,7 +32,7 @@ Use this page when you need the package-role decision before choosing a downstre
 
 ### Do not stay in cluster when
 
-- the chosen feature definition does not exist yet: return to [promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md) or [infer docs](../../../infer/docs/README.md)
+- the feature column or exported matrix does not exist yet: return to [promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md) or [infer docs](../../../infer/docs/README.md)
 - the next task is supervised label/train/select: continue with [USR dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/usr-infer-x-active-learning.md)
 
 ### Related docs

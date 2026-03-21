@@ -26,7 +26,7 @@ This page collects the stable command, layout, and data-shape contracts for `clu
 ### Dataset and feature-column contract
 
 - Work against a USR dataset (`--dataset`) or a CSV/Parquet file (`--file`).
-- `cluster` assumes one explicit chosen feature definition already exists.
+- `cluster` assumes one feature column or exported matrix already exists.
 - `fit` can consume one vector column (`--x-col`) or a multi-column matrix (`--x-cols`).
 - `fit` is method-based: built-in method ids are `leiden` and `kmeans`, and method presets live under `presets/method/`.
 - Method-specific fit knobs flow through `presets/method/*.yaml`, workspace `method_params`, or repeated `--method-param key=value`.

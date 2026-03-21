@@ -6,11 +6,12 @@
 Use this directory when the question is not just "how do promoter-study
 workflows operate?" but "which real promoter study is active right now?"
 
-Keep one checked-in registry at `docs/studies/promoter/index.yaml`. Naive
-agents should read that file before scanning for study directories.
-The active study may be source-phase or feature-phase, but it must still answer
-live-status questions honestly about what exists now versus what is only
-planned.
+Read `docs/studies/promoter/index.yaml` first for current-status checks. This
+README explains the layout; it is not the selector.
+The active study may still be in source assembly or feature generation, but the
+record must still say clearly what already exists and what is still planned.
+`index.yaml` selects the active study, the matching study directory holds the
+record, and the promoter-study status contract explains how to refresh it.
 
 ### Required files
 

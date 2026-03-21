@@ -45,7 +45,7 @@ If you need the current study status rather than route discovery, keep one check
 ### Choose the next deep procedure
 
 - If you already have one merged anchor-only dataset and need infer-derived columns next, use [Promoter characterization feature matrix](promoter-characterization-feature-matrix.md).
-- If you need one maintained study snapshot that a naive agent can refresh without reconstructing the whole route, use [Promoter study status contract](promoter-study-status-contract.md).
+- If you need one maintained study snapshot for current-status checks, use [Promoter study status contract](promoter-study-status-contract.md).
 - If you need template-backed contexts such as `template_1kb` before feature extraction, use [Construct -> USR -> Infer shared dataset runbook](construct-infer-shared-dataset-runbook.md).
 - If DenseGen, manual, and wildtype sources still need explicit merge/carry setup, use [Multi-source shared dataset assembly](multi-source-shared-dataset-assembly.md).
 - If the data-plane handoff is already clear and you only need the infer-owned Evo2 contract, use [Evo2 promoter-study feature runbook](../../../infer/docs/operations/evo2-promoter-features.md).

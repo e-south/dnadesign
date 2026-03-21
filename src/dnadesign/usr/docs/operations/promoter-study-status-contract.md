@@ -10,14 +10,14 @@
 **Last verified:** 2026-03-21
 
 Use this contract when the question is not only "which runbook applies?" but
-"what is the current status of our actual DenseGen/manual/wildtype ->
+"what is the current status of the actual DenseGen/manual/wildtype ->
 optional Construct -> Infer -> Cluster or OPAL study?"
 
-The shared runbooks explain procedure. They do not know your real dataset ids,
+The shared runbooks explain procedure. They do not carry your real dataset ids,
 shared-root versus workspace-export semantics, local-vs-remote sync posture,
 row targets, completed infer slices, or the next batch call. Without a
-maintained study-status record, a naive agent can reconstruct mechanics but
-cannot answer current-study questions honestly.
+maintained study record, the docs explain how the workflow works but not where
+the live study stands.
 
 ### Canonical checked-in location
 
@@ -37,10 +37,11 @@ docs/studies/promoter/<study-id>/
   audits/
 ```
 
-Read [Study records](../../../../../docs/studies/README.md) plus
-[Promoter study registry](../../../../../docs/studies/promoter/README.md) first
-when the question is "which study record should I trust?" rather than "which
-workflow route applies?"
+Read [Study records](../../../../../docs/studies/README.md) first, then
+`docs/studies/promoter/index.yaml`, when the question is "which study record
+should I trust?" rather than "which workflow route applies?"
+`index.yaml` selects the active study, the matching study directory holds the
+record, and this contract explains how to refresh it.
 
 ### Keep these three artifacts for every real study
 
@@ -104,9 +105,8 @@ Keep the semantics explicit:
 - `external_usr` means the dataset is still a USR root, but lives outside the
   repo-owned shared path and must stay explicit in the study record
 
-Keep a filled `status.md` next to the manifest. This is the document a naive
-agent should read first when asked for "where are we now?" or "what should run
-next?" Copy the template from
+Keep a filled `status.md` next to the manifest. Read it first when the question
+is "where are we now?" or "what should run next?" Copy the template from
 [docs/templates/promoter-study-status.md](../../../../../docs/templates/promoter-study-status.md).
 
 Discovery rules:
@@ -118,7 +118,7 @@ Discovery rules:
   `studies:` and the corresponding study directory must contain `campaign.yaml`,
   `datasets.yaml`, and `status.md`.
 - If the registry and study directory contents disagree, fail visibly and fix
-  the registry before asking a naive agent for live status.
+  the registry before asking for live status.
 
 ### Refresh loop
 
@@ -174,7 +174,7 @@ uv run notify usr-events watch --events <usr-root>/<feature-dataset>/.events.log
 uv run usr --root <usr-root> info <dataset-id> --format json
 # Capture local-vs-remote drift for one sync-enabled datasets.yaml entry.
 uv run usr --root <usr-root> diff <dataset-id> <remote-name> --audit-json-out docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
-# Summarize that same sync audit through the registered progress surface.
+# Summarize that same sync audit through the registered progress view.
 uv run ops progress show usr.data-plane.hpc-sync --sync-audit-json docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
 ```
 

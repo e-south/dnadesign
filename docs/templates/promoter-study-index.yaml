@@ -1,5 +1,5 @@
 # Set `active_study` to `null` until one checked-in study record is ready for
-# live-status answers.
+# current-status checks.
 active_study: <study-id-or-null>
 studies:
   - study_id: <study-id>
