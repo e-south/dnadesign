@@ -95,18 +95,13 @@ def test_ops_how_to_doc_carries_quick_usage_commands() -> None:
     _assert_token_order(
         text,
         [
-            "### Quick terms",
-            "### Discover the right runbook",
-            "### Inspect one registered procedure",
-            "### Check status and build manifests",
+            "### Find a route",
+            "### Inspect one route",
+            "### Check status or build a manifest",
             "### Continue reading",
         ],
         label="src/dnadesign/ops/docs/how-to-use-ops.md",
     )
-    assert "procedure id" in text
-    assert "related procedure" in text
-    assert "status view" in text
-    assert "campaign manifest" in text
     assert "uv run ops catalog list" in text
     assert "uv run ops catalog list --simple" in text
     assert 'uv run ops catalog list --query "promoter feature matrix"' in text
@@ -257,14 +252,14 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
 
 def test_repo_docs_index_exposes_ops_tool_and_operations_route() -> None:
     text = _read(_repo_root() / "docs" / "README.md")
-    assert "### Workflow routes" in text
-    assert "### Workspace and dataset lookup" in text
-    assert "### Quick notes" in text
-    assert "### Start here" in text
+    assert "### Choose a workflow" in text
+    assert "### Inspect available work" in text
+    assert "Start with:" in text
+    assert "### Quick notes" not in text
     assert "### Shell routes" not in text
     assert "### Workflow lanes" not in text
-    assert "[Workflow routes](#workflow-routes)" in text
-    assert "[Workspace and dataset lookup](#workspace-and-dataset-lookup)" in text
+    assert "[Choose a workflow](#choose-a-workflow)" in text
+    assert "[Inspect available work](#inspect-available-work)" in text
     assert "[Runbook catalog](runbooks/README.md)" in text
     assert "uv run ops catalog list --simple" not in text
     assert "uv run ops catalog show <registry-id>" not in text
@@ -282,10 +277,10 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     text = _read(_repo_root() / "docs" / "runbooks" / "README.md")
 
     assert "## Runbook Catalog" in text
-    assert "find a command and the doc that owns it" in text
+    assert "Use this page when you want a command first." in text
     assert "uv run ops catalog list" in text
     assert "uv run ops catalog list --simple" in text
-    assert "### Shell decision table" in text
+    assert "### Command lookup" in text
     assert "--plane data-plane --query infer" in text
     assert "--section tool-sources" in text
     assert "--related-to usr.data-plane.promoter-feature-matrix" in text
@@ -300,11 +295,11 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "uv run ops progress campaign --manifest <manifest.yaml>" in text
     assert "prints to stdout unless you pass `--out`" in text
     assert "### Common examples" in text
-    assert "### Authoritative cross-tool procedures" in text
-    assert "### Tool-local runbook sources" in text
-    assert "### Progress surface glossary" in text
+    assert "### Cross-tool procedures" in text
+    assert "### Tool docs" in text
+    assert "### Progress views" in text
     assert "### Explicit campaign manifest shape" in text
-    assert "### Boundary reminders" in text
+    assert "### Boundary reminders" not in text
     assert "ops.control-plane.orchestration" in text
     assert "usr.data-plane.hpc-sync" in text
     assert "usr.data-plane.chained-densegen-infer-sync" in text
@@ -320,8 +315,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "../../src/dnadesign/densegen/docs/README.md" in text
     assert "../../src/dnadesign/construct/docs/README.md" in text
     assert "../../src/dnadesign/infer/docs/README.md" in text
-    assert "It links to the maintained runbooks and tool docs; it does not replace them." in text
-    assert "drift is a docs-check failure" in text
+    assert "drift is a docs-check failure" not in text
     assert "This command only summarizes the manifest you provide." in text
     assert "Relative artifact paths in the manifest resolve from the manifest directory" in text
     assert "`ops-audit-json`" in text
@@ -336,7 +330,7 @@ def test_repo_root_readme_lists_ops_in_docs_and_tool_catalog() -> None:
     assert "uv run ops progress explain" not in text
     assert "[Docs index](docs/README.md)" in text
     assert "main index for workflow, tool, and repository docs" in text
-    assert "Start with the docs index for workflows, tool docs, and repository records." in text
+    assert "Use the docs index to choose a workflow, inspect existing work, or jump to a tool." in text
     assert "[Docs workflow routes](docs/README.md#workflow-routes)" not in text
     assert "including the downstream split between" not in text
     assert "[Ops operations](docs/operations/README.md)" not in text
@@ -353,10 +347,7 @@ def test_repo_root_readme_lists_ops_in_docs_and_tool_catalog() -> None:
 
 def test_root_ops_row_is_tool_agnostic() -> None:
     text = _read(_repo_root() / "README.md")
-    expected_row = (
-        "| [**ops**](src/dnadesign/ops/README.md) | "
-        "Runbook-driven orchestration for deterministic batch workflows across tools. |"
-    )
+    expected_row = "| [**ops**](src/dnadesign/ops/README.md) | Plan, submit, and inspect batch runbooks across tools. |"
     assert expected_row in text
 
 

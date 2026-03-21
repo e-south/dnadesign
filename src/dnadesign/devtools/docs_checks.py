@@ -228,7 +228,7 @@ _RUNBOOK_CATALOG_METADATA_TYPES = {"runbook", "workflow"}
 _REGISTRY_ID_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$")
 _METADATA_TOKEN_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:-[a-z0-9]+)*$")
 RUNBOOK_CATALOG_DOC_PATH = "docs/runbooks/README.md"
-RUNBOOK_PROGRESS_GLOSSARY_HEADING = "### Progress surface glossary"
+RUNBOOK_PROGRESS_GLOSSARY_HEADING = "### Progress views"
 OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES = (
     PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
     Path("docs/templates"),
@@ -1020,25 +1020,25 @@ def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
             continue
         catalog_entries_by_path[relative_path] = entry
 
-    procedure_section = _extract_markdown_section(catalog_text, heading="### Authoritative cross-tool procedures")
+    procedure_section = _extract_markdown_section(catalog_text, heading="### Cross-tool procedures")
     if procedure_section is None:
-        issues.append(f"{catalog_path}: missing '### Authoritative cross-tool procedures' section.")
+        issues.append(f"{catalog_path}: missing '### Cross-tool procedures' section.")
     else:
         expected_section = render_catalog_procedure_section(catalog)
         if procedure_section.strip() != expected_section.strip():
             issues.append(
-                f"{catalog_path}: authoritative cross-tool procedures section is stale; "
+                f"{catalog_path}: cross-tool procedures section is stale; "
                 "regenerate it with `uv run python -m dnadesign.devtools.generate_runbook_catalog`."
             )
 
-    tool_source_section = _extract_markdown_section(catalog_text, heading="### Tool-local runbook sources")
+    tool_source_section = _extract_markdown_section(catalog_text, heading="### Tool docs")
     if tool_source_section is None:
-        issues.append(f"{catalog_path}: missing '### Tool-local runbook sources' section.")
+        issues.append(f"{catalog_path}: missing '### Tool docs' section.")
     else:
         expected_tool_source_section = render_catalog_tool_source_section(catalog)
         if tool_source_section.strip() != expected_tool_source_section.strip():
             issues.append(
-                f"{catalog_path}: tool-local runbook sources section is stale; "
+                f"{catalog_path}: tool docs section is stale; "
                 "regenerate it with `uv run python -m dnadesign.devtools.generate_runbook_catalog`."
             )
 

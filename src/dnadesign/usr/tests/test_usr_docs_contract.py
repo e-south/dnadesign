@@ -104,15 +104,16 @@ def test_usr_sync_router_declares_route_metadata() -> None:
 
 def test_docs_index_links_progressive_usr_sync_workflows() -> None:
     docs_index = _read("docs/README.md")
-    assert "Workflow routes" in docs_index
-    assert "Workspace and dataset lookup" in docs_index
-    assert "Quick notes" in docs_index
+    assert "Choose a workflow" in docs_index
+    assert "Inspect available work" in docs_index
+    assert "Start with:" in docs_index
+    assert "Quick notes" not in docs_index
     assert "runbooks/README.md" in docs_index
-    assert "#### Single-tool starts" in docs_index
-    assert "#### Cross-tool USR dataset flows" in docs_index
-    assert "#### Operations and infrastructure" in docs_index
-    assert "Use these when one tool still owns the work" in docs_index
-    assert "Use these when work already moves through a shared USR dataset" in docs_index
+    assert "#### Single-tool workflows" in docs_index
+    assert "#### Cross-tool dataset workflows" in docs_index
+    assert "#### Scheduler and environment workflows" in docs_index
+    assert "Use these when one tool owns the next step" in docs_index
+    assert "Use these when data moves through more than one tool" in docs_index
     assert "Use these when the next step is orchestration, environment setup, or audit output" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync.md" in docs_index
     assert "src/dnadesign/usr/docs/operations/sync-audit-loop.md" in docs_index
@@ -129,16 +130,12 @@ def test_docs_index_links_progressive_usr_sync_workflows() -> None:
 
 def test_docs_index_exposes_task_first_workflow_map() -> None:
     docs_index = _read("docs/README.md")
-    assert "Workflow routes" in docs_index
+    assert "Choose a workflow" in docs_index
     assert "Sync iterative HPC outputs to local analysis safely" in docs_index
     assert "Run cross-machine sync with stricter failure checks" in docs_index
     assert "Chain DenseGen -> USR -> Infer -> USR updates" in docs_index
-    assert "chosen as `X`" in docs_index
-    assert "once OPAL is pointed at that dataset and `X`" in docs_index
-    assert (
-        "Consolidate construct realizations into one USR-backed source-of-truth dataset, then hand off to Infer"
-        in docs_index
-    )
+    assert "chosen as `X` or export a flattened matrix" in docs_index
+    assert "Turn construct outputs into one shared dataset for infer" in docs_index
     assert "Run BU SCC batch jobs with notifications" in docs_index
     assert "Plan and execute deterministic DenseGen/Infer HPC orchestration runbooks" in docs_index
     assert "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md" in docs_index
@@ -164,7 +161,7 @@ def test_top_level_readme_exposes_workflow_docs_map() -> None:
 
     assert "## Documentation" in readme
     assert "docs/README.md" in readme
-    assert "Start with the docs index for workflows, tool docs, and repository records." in readme
+    assert "Use the docs index to choose a workflow, inspect existing work, or jump to a tool." in readme
     assert "cluster` exploration and OPAL active learning" not in readme
     assert "Workflow and docs map" not in readme
     assert "## Repository map" not in readme
@@ -173,7 +170,7 @@ def test_top_level_readme_exposes_workflow_docs_map() -> None:
 def test_docs_index_includes_progressive_entrypoint_ladders() -> None:
     docs_index = _read("docs/README.md")
 
-    assert "Workflow routes" in docs_index
+    assert "Choose a workflow" in docs_index
     assert "Design a sequence library in a workspace" in docs_index
     assert "Run model inference and write outputs back to datasets" in docs_index
     assert "Construct -> USR -> Infer source-of-truth runbook" in docs_index
@@ -520,6 +517,14 @@ def test_notify_and_ops_routes_link_construct_source_of_truth_runbook() -> None:
     assert "multi-source-source-of-truth-assembly.md" in ops_index
     assert "promoter-characterization-feature-matrix.md" in docs_index
     assert "promoter-characterization-feature-matrix.md" in ops_index
+
+
+def test_top_level_docs_surfaces_avoid_meta_routing_jargon() -> None:
+    for rel_path in ("README.md", "docs/README.md", "docs/runbooks/README.md"):
+        text = _read(rel_path).lower()
+        assert "authoritative" not in text
+        assert "canonical" not in text
+        assert "progressive disclosure" not in text
 
 
 def test_promoter_feature_matrix_runbook_routes_to_cluster_and_opal() -> None:

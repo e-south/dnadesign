@@ -63,7 +63,7 @@ def test_cli_catalog_list_emits_grouped_text_inventory() -> None:
     assert "Cross-tool procedures" in result.output
     assert "ops.control-plane.orchestration" in result.output
     assert "cluster.downstream.exploratory-clustering" in result.output
-    assert "Tool-local runbook sources" in result.output
+    assert "Tool docs" in result.output
     assert "densegen: DenseGen documentation" in result.output
     assert "usr: USR docs" in result.output
     assert "Suggested next steps" in result.output

@@ -1,7 +1,7 @@
 schema_version: 1
 catalog_order: 9
 tool: ops
-summary: Control-plane orchestration docs, packaged presets, and runbook lifecycle commands.
+summary: Ops commands, packaged presets, and runbook lifecycle docs.
 keywords:
   - control-plane
   - orchestration

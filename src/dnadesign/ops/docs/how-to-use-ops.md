@@ -3,20 +3,13 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-20
 
-Use this page when you already know you need Ops and want the next command. Start with `uv run ops catalog list` if you are coming from the shell.
+Use this page when you already know you need Ops and want the next command. Start with `uv run ops catalog list --simple` if you are still choosing a route.
 
-If this is your first stop in Ops, prefer `uv run ops catalog list --simple` for a shorter catalog view before you narrow by taxonomy.
+Once you know the route, use `uv run ops progress explain <registry-id>` to see the required status inputs before you touch artifacts.
 
-### Quick terms
+### Find a route
 
-- `procedure id`: one named procedure or workflow in the shared catalog.
-- `related procedure`: a neighboring procedure or workflow linked from one registry entry.
-- `status view`: the read-only status view for one registered route.
-- `campaign manifest`: a YAML file listing the explicit steps that `ops progress campaign` should summarize.
-
-### Discover the right runbook
-
-- `uv run ops catalog list --simple`: browse the catalog in a shorter view before you care about type, plane, or progress-kind labels.
+- `uv run ops catalog list --simple`: browse the catalog in a shorter view before you care about the extra labels.
 - `uv run ops catalog list`: browse the shared runbook catalog from the shell.
 - `uv run ops catalog list --plane data-plane --query infer`: filter the catalog when you already know the downstream path.
 - `uv run ops catalog list --query "promoter feature matrix"`: find the registered route and adjacent tool docs for that topic without knowing the registry id first.
@@ -24,11 +17,11 @@ If this is your first stop in Ops, prefer `uv run ops catalog list --simple` for
 - `uv run ops catalog list --related-to usr.data-plane.promoter-feature-matrix`: inspect related procedures around one registered route once you know the anchor id.
 - `uv run ops catalog list --section tool-sources --related-to usr.data-plane.promoter-feature-matrix`: inspect related tool docs around one registered route once you know the anchor id.
 
-### Inspect one registered procedure
+### Inspect one route
 
 - `uv run ops catalog show <registry-id>`: open one registered procedure with owner docs, related procedures, related tool docs, deeper docs when listed, required progress inputs, and next shell commands.
 
-### Check status and build manifests
+### Check status or build a manifest
 
 - `uv run ops progress explain <registry-id>`: print the required progress flags, a ready-to-paste `progress show` command, and any adapter-specific notes before you touch artifacts.
 - `uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>`: summarize one status view once you have the explicit artifact inputs.

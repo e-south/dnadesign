@@ -21,11 +21,11 @@ import yaml
 
 _LINK_PATTERN = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 _TITLE_HEADING_PATTERN = re.compile(r"^#{1,6}\s+(.+?)\s*$", re.MULTILINE)
-_PROCEDURES_SECTION_HEADING = "### Authoritative cross-tool procedures"
+_PROCEDURES_SECTION_HEADING = "### Cross-tool procedures"
 _PROCEDURES_SECTION_INTRO = (
     "This table is generated from `*.registry.yaml` sidecars. Edit those files instead of hand-editing rows here."
 )
-_TOOL_SOURCES_SECTION_HEADING = "### Tool-local runbook sources"
+_TOOL_SOURCES_SECTION_HEADING = "### Tool docs"
 _TOOL_SOURCES_SECTION_INTRO = (
     "This table is generated from `*.tool-source.yaml` sidecars. Edit those files instead of hand-editing rows here."
 )

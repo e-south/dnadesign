@@ -3,11 +3,11 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-20
 
-Use this page to find a command and the doc that owns it. It links to the maintained runbooks and tool docs; it does not replace them.
+Use this page when you want a command first. Start with `uv run ops catalog list --simple`, then open the linked runbook or tool doc once you know the route.
 
-If you do not know a registry id yet, start with `uv run ops catalog list --simple`. Use the decision table first; treat the generated tables later on as reference.
+Use the command table first. The generated tables later on are reference.
 
-### Shell decision table
+### Command lookup
 
 | If you want to... | Use this command | What it does |
 | --- | --- | --- |
@@ -29,9 +29,9 @@ If you do not know a registry id yet, start with `uv run ops catalog list --simp
 - `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`: expand one registered procedure into a starting manifest with the named procedure first and its related procedures after it.
 - `uv run ops progress campaign --manifest <manifest.yaml>`: read-only summary for the steps listed in the manifest.
 
-You can ignore `Type`, `Plane`, and `Progress kind` until you need to disambiguate similar routes.
+Start with the summary and linked doc. The extra labels matter only when two routes look similar.
 
-### Authoritative cross-tool procedures
+### Cross-tool procedures
 
 This table is generated from `*.registry.yaml` sidecars. Edit those files instead of hand-editing rows here.
 
@@ -46,7 +46,7 @@ This table is generated from `*.registry.yaml` sidecars. Edit those files instea
 | `cluster.downstream.exploratory-clustering` | [Exploratory clustering workflow](../../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) | `workflow` | `downstream-tool` | `exploratory` | `cluster-run-index` | Explore one chosen feature definition through clustering, UMAP, and downstream summaries. |
 | `opal.downstream.usr-infer-x-active-learning` | [USR Dataset With Infer-Derived X -> OPAL Active Learning](../../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md) | `workflow` | `downstream-tool` | `round-loop` | `opal-campaign-state` | Start the label, train, and select loop once one explicit infer-derived X column or exported matrix already exists. |
 
-### Tool-local runbook sources
+### Tool docs
 
 This table is generated from `*.tool-source.yaml` sidecars. Edit those files instead of hand-editing rows here.
 
@@ -54,15 +54,15 @@ This table is generated from `*.tool-source.yaml` sidecars. Edit those files ins
 | --- | --- | --- |
 | `densegen` | [DenseGen documentation](../../src/dnadesign/densegen/docs/README.md) | Tool-owned tutorials, HPC runbooks, and event-producing demo flows. |
 | `construct` | [Construct docs](../../src/dnadesign/construct/docs/README.md) | Tool-owned workspace demos, template realization docs, and anchor-placement contracts. |
-| `usr` | [USR docs](../../src/dnadesign/usr/docs/README.md) | Tool-owned dataset lifecycle docs, source-of-truth runbooks, sync routes, and promoter feature-matrix handoffs. |
+| `usr` | [USR docs](../../src/dnadesign/usr/docs/README.md) | Tool-owned dataset lifecycle docs, dataset handoffs, sync routes, and promoter feature assembly. |
 | `infer` | [infer docs](../../src/dnadesign/infer/docs/README.md) | Tool-owned feature extraction runbooks, Evo2 docs, feature-schema contracts, and pressure-test flows. |
 | `cluster` | [Cluster docs](../../src/dnadesign/cluster/docs/README.md) | Tool-owned exploratory analysis workflow plus CLI, results, and artifact contracts. |
 | `opal` | [OPAL Documentation](../../src/dnadesign/opal/docs/index.md) | Tool-owned active-learning workflows, campaign configuration references, and downstream infer-to-OPAL routes. |
 | `notify` | [Notify Operations](../notify/README.md) | Tool-owned operator routes for watcher setup, delivery validation, recovery, and scheduler-adjacent notification flows. |
 | `cruncher` | [Cruncher Documentation Index](../../src/dnadesign/cruncher/docs/README.md) | Tool-owned demos, studies, analysis guides, and optimization references. |
-| `ops` | [Ops docs](../../src/dnadesign/ops/docs/README.md) | Control-plane orchestration docs, packaged presets, and runbook lifecycle commands. |
+| `ops` | [Ops docs](../../src/dnadesign/ops/docs/README.md) | Ops commands, packaged presets, and runbook lifecycle docs. |
 
-### Progress surface glossary
+### Progress views
 
 You only need this section after `uv run ops progress explain <registry-id>` or `uv run ops catalog show <registry-id>` points you to a specific status surface.
 
@@ -101,11 +101,3 @@ steps:
 - `--related-to` expands the named procedure first, then related procedures in catalog order. Reorder the manifest when your campaign chronology differs.
 - The manifest is explicit by design. Ops does not infer hidden steps.
 - Smallest working status example: run `uv run ops runbook execute ... --no-submit --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json`. On workstations without `qstat`, add `--allow-missing-qstat` so the queue probe is explicit but non-fatal. Then pass the same audit path to `uv run ops progress show ops.control-plane.orchestration --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json`.
-
-### Boundary reminders
-
-- Keep runbooks and workflows in the docs that own them. This catalog links to them; it does not duplicate them.
-- Catalog rows are generated from `*.registry.yaml` sidecars and must stay aligned with the linked procedure metadata fields; drift is a docs-check failure.
-- `ops` owns executable control-plane runbooks. It does not own durable USR-backed data-plane procedures.
-- Use this catalog when you want commands first, then open the linked runbook or tool doc for the full procedure.
-- `Progress kind` names the owner-local status surface plus the corresponding read-only `ops progress show` adapter. `ops progress scaffold` emits placeholders only for the explicit registered steps you name, and `ops progress campaign` summarizes only the explicit steps named in a manifest.

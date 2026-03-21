@@ -130,15 +130,15 @@ def _write_runbook_catalog_readme(
             [
                 "## Runbook Catalog",
                 "",
-                "### Authoritative cross-tool procedures",
+                "### Cross-tool procedures",
                 "",
                 procedure_section,
                 "",
-                "### Tool-local runbook sources",
+                "### Tool docs",
                 "",
                 tool_source_section,
                 "",
-                "### Progress surface glossary",
+                "### Progress views",
                 "",
                 "| Progress kind | Meaning | Check next |",
                 "| --- | --- | --- |",
@@ -2156,7 +2156,7 @@ def test_runbook_catalog_check_flags_stale_generated_procedure_section(tmp_path:
 
     issues = _find_runbook_catalog_issues(tmp_path)
 
-    assert any("authoritative cross-tool procedures section is stale" in issue for issue in issues)
+    assert any("cross-tool procedures section is stale" in issue for issue in issues)
 
 
 def test_runbook_catalog_check_flags_stale_generated_tool_source_section(tmp_path: Path) -> None:
@@ -2231,7 +2231,7 @@ def test_runbook_catalog_check_flags_stale_generated_tool_source_section(tmp_pat
 
     issues = _find_runbook_catalog_issues(tmp_path)
 
-    assert any("tool-local runbook sources section is stale" in issue for issue in issues)
+    assert any("tool docs section is stale" in issue for issue in issues)
 
 
 def test_runbook_catalog_check_flags_missing_progress_surface_glossary_entry(tmp_path: Path) -> None:
