@@ -204,6 +204,7 @@ def validate_model_hardware_contract(
     *,
     model: ModelConfig,
     inventory: GpuInventory | None = None,
+    enforce_memory_capacity: bool = True,
 ) -> None:
     device = str(model.device or "").strip()
     active_inventory, selected = _resolve_capacity_devices(model=model, inventory=inventory)
@@ -213,7 +214,7 @@ def validate_model_hardware_contract(
     _validate_evo2_gpu_arch_contract(model=model, devices=selected)
 
     required_gib = estimate_required_gib(model_id=model.id, precision=model.precision)
-    if required_gib is None:
+    if required_gib is None or not enforce_memory_capacity:
         return
 
     usable_gib = sum(device_info.total_memory_gib * _USABLE_MEMORY_FACTOR for device_info in selected)

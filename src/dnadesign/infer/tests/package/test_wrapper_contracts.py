@@ -196,6 +196,31 @@ jobs: []
         )
 
 
+def test_runbook_gpu_validation_without_memory_hint_skips_synthetic_memory_failure(tmp_path: Path) -> None:
+    from dnadesign.infer import validate_runbook_gpu_resources
+
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        """
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs: []
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    validate_runbook_gpu_resources(
+        config_path=config,
+        declared_gpus=1,
+        gpu_capability="8.0",
+        gpu_memory_gib=None,
+    )
+
+
 def test_runbook_gpu_validation_rejects_unwired_parallelism_strategy(tmp_path: Path) -> None:
     from dnadesign.infer import validate_runbook_gpu_resources
 

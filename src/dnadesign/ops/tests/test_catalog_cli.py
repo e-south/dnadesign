@@ -43,6 +43,7 @@ def test_ops_package_data_declares_packaged_runbook_presets() -> None:
 
     assert '"dnadesign.ops"' in pyproject
     assert "runbooks/presets/*.yaml" in pyproject
+    assert "runbooks/templates/*.qsub" in pyproject
 
 
 def test_catalog_query_filters_procedures_without_touching_registry_ownership() -> None:

@@ -130,6 +130,7 @@ where = ["src"]
 ]
 "dnadesign.ops" = [
   "runbooks/presets/*.yaml",
+  "runbooks/templates/*.qsub",
 ]
 
 [tool.pytest.ini_options]

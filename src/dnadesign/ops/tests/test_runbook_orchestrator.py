@@ -355,6 +355,37 @@ def test_runbook_default_infer_template_resolves_to_repo_jobs_template(tmp_path:
     assert runbook.infer.qsub_template == (repo_root / "docs" / "bu-scc" / "jobs" / "evo2-gpu-infer.qsub").resolve()
 
 
+def test_runbook_default_templates_fall_back_to_packaged_qsub_templates_when_repo_root_missing(tmp_path: Path) -> None:
+    from dnadesign.ops.runbooks import runbook_paths
+
+    runbook_path = _write_runbook(tmp_path)
+    payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
+    del payload["runbook"]["densegen"]["qsub_template"]
+    del payload["runbook"]["notify"]["qsub_template"]
+
+    infer_workspace = tmp_path / "infer_workspace"
+    infer_payload = _infer_runbook_payload(infer_workspace, runbook_id="infer_packaged_template")
+    del infer_payload["runbook"]["infer"]["qsub_template"]
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(runbook_paths, "_resolve_repo_root_from_module", lambda: None)
+    try:
+        densegen_runbook = load_orchestration_runbook(runbook_path, raw=payload)
+        infer_runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=infer_payload)
+    finally:
+        monkeypatch.undo()
+
+    assert densegen_runbook.densegen is not None
+    assert densegen_runbook.notify is not None
+    assert densegen_runbook.densegen.qsub_template.name == "densegen-cpu.qsub"
+    assert densegen_runbook.notify.qsub_template.name == "notify-watch.qsub"
+    assert "runbooks/templates" in densegen_runbook.densegen.qsub_template.as_posix()
+    assert "runbooks/templates" in densegen_runbook.notify.qsub_template.as_posix()
+    assert infer_runbook.infer is not None
+    assert infer_runbook.infer.qsub_template.name == "evo2-gpu-infer.qsub"
+    assert "runbooks/templates" in infer_runbook.infer.qsub_template.as_posix()
+
+
 def test_runbook_notify_policy_defaults_to_generic_when_omitted(tmp_path: Path) -> None:
     runbook_path = _write_runbook(tmp_path)
     payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))

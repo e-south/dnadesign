@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from importlib import resources
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -29,6 +30,12 @@ _REPO_ROOT_DEFAULT_TEMPLATES = frozenset(
         NOTIFY_QSUB_TEMPLATE_DEFAULT,
     }
 )
+_PACKAGED_DEFAULT_TEMPLATE_PATHS = {
+    DENSEGEN_QSUB_TEMPLATE_DEFAULT: Path("runbooks/templates/densegen-cpu.qsub"),
+    DENSEGEN_POST_RUN_TEMPLATE_DEFAULT: Path("runbooks/templates/densegen-analysis.qsub"),
+    INFER_QSUB_TEMPLATE_DEFAULT: Path("runbooks/templates/evo2-gpu-infer.qsub"),
+    NOTIFY_QSUB_TEMPLATE_DEFAULT: Path("runbooks/templates/notify-watch.qsub"),
+}
 
 
 def _resolve_path_from_runbook_base(path_value: Path, *, runbook_base_dir: Path) -> Path:
@@ -46,6 +53,20 @@ def _resolve_repo_root_from_module() -> Path | None:
     return None
 
 
+def _resolve_packaged_default_template(path_value: Path) -> Path | None:
+    packaged_relative = _PACKAGED_DEFAULT_TEMPLATE_PATHS.get(path_value)
+    if packaged_relative is None:
+        return None
+    try:
+        packaged_resource = resources.files("dnadesign.ops").joinpath(packaged_relative.as_posix())
+    except ModuleNotFoundError:
+        return None
+    packaged_path = Path(str(packaged_resource))
+    if not packaged_path.exists():
+        return None
+    return packaged_path.resolve()
+
+
 def _resolve_template_path(path_value: Path, *, runbook_base_dir: Path) -> Path:
     expanded = path_value.expanduser()
     if expanded.is_absolute():
@@ -54,6 +75,9 @@ def _resolve_template_path(path_value: Path, *, runbook_base_dir: Path) -> Path:
         repo_root = _resolve_repo_root_from_module()
         if repo_root is not None:
             return (repo_root / expanded).resolve()
+        packaged_template = _resolve_packaged_default_template(expanded)
+        if packaged_template is not None:
+            return packaged_template
     return (runbook_base_dir / expanded).resolve()
 
 
