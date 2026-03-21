@@ -205,127 +205,181 @@ def test_workspace_init_uses_env_workspace_root_when_root_not_provided(
 def test_workspace_init_output_mode_usr_sets_usr_target(tmp_path: Path) -> None:
     shared_usr_root = tmp_path / "usr_root"
     workspace_dir = tmp_path / "demo_run"
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(workspace_commands, "default_usr_root", lambda: shared_usr_root)
-    expected_root = workspace_commands._shared_usr_root_for_workspace(workspace_dir)
     runner = CliRunner()
-    try:
-        result = runner.invoke(
-            app,
-            [
-                "workspace",
-                "init",
-                "--id",
-                "demo_run",
-                "--root",
-                str(tmp_path),
-                "--from-workspace",
-                "demo_tfbs_baseline",
-                "--output-mode",
-                "usr",
-            ],
-        )
-        assert result.exit_code == 0, result.output
-        cfg = yaml.safe_load((tmp_path / "demo_run" / "config.yaml").read_text())
-        output = cfg["densegen"]["output"]
-        assert output["targets"] == ["usr"]
-        assert output["usr"]["root"] == expected_root
-        assert output["usr"]["dataset"] == "demo_run"
-        assert (shared_usr_root / "registry.yaml").exists()
-    finally:
-        monkeypatch.undo()
+    expected_root = workspace_commands._shared_usr_root_for_workspace(workspace_dir, usr_root=shared_usr_root)
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_tfbs_baseline",
+            "--output-mode",
+            "usr",
+            "--usr-root",
+            str(shared_usr_root),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    cfg = yaml.safe_load((tmp_path / "demo_run" / "config.yaml").read_text())
+    output = cfg["densegen"]["output"]
+    assert output["targets"] == ["usr"]
+    assert output["usr"]["root"] == expected_root
+    assert output["usr"]["dataset"] == "demo_run"
+    assert (shared_usr_root / "registry.yaml").exists()
 
 
 def test_workspace_init_output_mode_usr_rewrites_template_usr_dataset_to_workspace_id(tmp_path: Path) -> None:
     shared_usr_root = tmp_path / "usr_root"
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(workspace_commands, "default_usr_root", lambda: shared_usr_root)
     runner = CliRunner()
-    try:
-        result = runner.invoke(
-            app,
-            [
-                "workspace",
-                "init",
-                "--id",
-                "sampling_run",
-                "--root",
-                str(tmp_path),
-                "--from-workspace",
-                "demo_sampling_baseline",
-                "--output-mode",
-                "usr",
-            ],
-        )
-        assert result.exit_code == 0, result.output
-        cfg = yaml.safe_load((tmp_path / "sampling_run" / "config.yaml").read_text())
-        output = cfg["densegen"]["output"]
-        assert output["targets"] == ["usr"]
-        assert output["usr"]["dataset"] == "sampling_run"
-    finally:
-        monkeypatch.undo()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "sampling_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_sampling_baseline",
+            "--output-mode",
+            "usr",
+            "--usr-root",
+            str(shared_usr_root),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    cfg = yaml.safe_load((tmp_path / "sampling_run" / "config.yaml").read_text())
+    output = cfg["densegen"]["output"]
+    assert output["targets"] == ["usr"]
+    assert output["usr"]["dataset"] == "sampling_run"
 
 
 def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> None:
     shared_usr_root = tmp_path / "usr_root"
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(workspace_commands, "default_usr_root", lambda: shared_usr_root)
     runner = CliRunner()
-    try:
-        result = runner.invoke(
-            app,
-            [
-                "workspace",
-                "init",
-                "--id",
-                "demo_run",
-                "--root",
-                str(tmp_path),
-                "--from-workspace",
-                "demo_tfbs_baseline",
-                "--output-mode",
-                "both",
-            ],
-        )
-        assert result.exit_code == 0, result.output
-        cfg = yaml.safe_load((tmp_path / "demo_run" / "config.yaml").read_text())
-        output = cfg["densegen"]["output"]
-        assert set(output["targets"]) == {"parquet", "usr"}
-        assert output["parquet"]["path"] == "outputs/tables/records.parquet"
-        assert output["usr"]["root"] == workspace_commands._shared_usr_root_for_workspace(tmp_path / "demo_run")
-        assert (shared_usr_root / "registry.yaml").exists()
-    finally:
-        monkeypatch.undo()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_tfbs_baseline",
+            "--output-mode",
+            "both",
+            "--usr-root",
+            str(shared_usr_root),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    cfg = yaml.safe_load((tmp_path / "demo_run" / "config.yaml").read_text())
+    output = cfg["densegen"]["output"]
+    assert set(output["targets"]) == {"parquet", "usr"}
+    assert output["parquet"]["path"] == "outputs/tables/records.parquet"
+    assert output["usr"]["root"] == workspace_commands._shared_usr_root_for_workspace(
+        tmp_path / "demo_run",
+        usr_root=shared_usr_root,
+    )
+    assert (shared_usr_root / "registry.yaml").exists()
 
 
 def test_workspace_init_output_mode_both_rewrites_template_usr_dataset_to_workspace_id(tmp_path: Path) -> None:
     shared_usr_root = tmp_path / "usr_root"
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(workspace_commands, "default_usr_root", lambda: shared_usr_root)
     runner = CliRunner()
-    try:
-        result = runner.invoke(
-            app,
-            [
-                "workspace",
-                "init",
-                "--id",
-                "sampling_run",
-                "--root",
-                str(tmp_path),
-                "--from-workspace",
-                "demo_sampling_baseline",
-                "--output-mode",
-                "both",
-            ],
-        )
-        assert result.exit_code == 0, result.output
-        cfg = yaml.safe_load((tmp_path / "sampling_run" / "config.yaml").read_text())
-        output = cfg["densegen"]["output"]
-        assert set(output["targets"]) == {"parquet", "usr"}
-        assert output["usr"]["dataset"] == "sampling_run"
-    finally:
-        monkeypatch.undo()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "sampling_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_sampling_baseline",
+            "--output-mode",
+            "both",
+            "--usr-root",
+            str(shared_usr_root),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    cfg = yaml.safe_load((tmp_path / "sampling_run" / "config.yaml").read_text())
+    output = cfg["densegen"]["output"]
+    assert set(output["targets"]) == {"parquet", "usr"}
+    assert output["usr"]["dataset"] == "sampling_run"
+
+
+def test_workspace_init_output_mode_usr_requires_explicit_or_env_shared_root_outside_repo(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
+    monkeypatch.setattr(workspace_commands, "_repo_root_from", lambda _start: None)
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_tfbs_baseline",
+            "--output-mode",
+            "usr",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Shared USR root is ambiguous outside a dnadesign checkout" in result.output
+    assert "--usr-root" in result.output
+    assert "DNADESIGN_USR_ROOT" in result.output
+
+
+def test_workspace_init_output_mode_usr_uses_env_shared_root_when_explicit_not_passed(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    shared_usr_root = tmp_path / "usr_root"
+    monkeypatch.setenv("DNADESIGN_USR_ROOT", str(shared_usr_root))
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_tfbs_baseline",
+            "--output-mode",
+            "usr",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    cfg = yaml.safe_load((tmp_path / "demo_run" / "config.yaml").read_text())
+    output = cfg["densegen"]["output"]
+    assert output["usr"]["root"] == workspace_commands._shared_usr_root_for_workspace(
+        tmp_path / "demo_run",
+        usr_root=shared_usr_root,
+    )
 
 
 def test_workspace_init_existing_workspace_dir_shows_actionable_error(tmp_path: Path) -> None:

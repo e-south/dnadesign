@@ -21,7 +21,7 @@ from typing import Callable, Optional
 import typer
 import yaml
 
-from dnadesign.usr_roots import default_usr_root, resolve_usr_root_from_config
+from dnadesign.usr_roots import normalize_usr_root, resolve_usr_root_from_config, resolve_usr_root_from_env
 
 from ..config import LATEST_SCHEMA_VERSION, resolve_relative_path
 from .context import CliContext
@@ -61,12 +61,49 @@ def _workspace_source_root() -> Path:
     return Path(__file__).resolve().parents[2] / "workspaces"
 
 
-def _shared_usr_root_for_workspace(workspace_dir: Path) -> str:
-    rel = os.path.relpath(default_usr_root(), workspace_dir)
-    return Path(rel).as_posix()
+def _repo_shared_usr_root(repo_root: Path) -> Path:
+    return (repo_root / "src" / "dnadesign" / "usr" / "datasets").resolve()
 
 
-def _apply_output_mode(output: dict, *, run_id: str, output_mode: str, workspace_dir: Path) -> dict:
+def _default_shared_usr_root(*, workspace_dir: Path) -> Path:
+    env_root = resolve_usr_root_from_env()
+    if env_root is not None:
+        return env_root
+
+    for anchor in (workspace_dir, Path.cwd(), Path(__file__).resolve()):
+        repo_root = _repo_root_from(anchor)
+        if repo_root is None:
+            continue
+        candidate = _repo_shared_usr_root(repo_root)
+        if candidate.parent.exists():
+            return candidate
+
+    raise ValueError(
+        "Shared USR root is ambiguous outside a dnadesign checkout. Pass --usr-root or set DNADESIGN_USR_ROOT."
+    )
+
+
+def _shared_usr_root_for_workspace(workspace_dir: Path, *, usr_root: Path | None = None) -> str:
+    shared_root = (
+        normalize_usr_root(usr_root.expanduser().resolve())
+        if usr_root is not None
+        else _default_shared_usr_root(workspace_dir=workspace_dir)
+    )
+    try:
+        rel = os.path.relpath(shared_root, workspace_dir)
+        return Path(rel).as_posix()
+    except ValueError:
+        return shared_root.as_posix()
+
+
+def _apply_output_mode(
+    output: dict,
+    *,
+    run_id: str,
+    output_mode: str,
+    workspace_dir: Path,
+    usr_root: Path | None = None,
+) -> dict:
     mode = str(output_mode).strip().lower()
     if mode not in {"local", "usr", "both"}:
         raise ValueError("output_mode must be one of: local, usr, both.")
@@ -84,7 +121,7 @@ def _apply_output_mode(output: dict, *, run_id: str, output_mode: str, workspace
         out["parquet"] = parquet_cfg
 
     if mode in {"usr", "both"}:
-        usr_cfg["root"] = _shared_usr_root_for_workspace(workspace_dir)
+        usr_cfg["root"] = _shared_usr_root_for_workspace(workspace_dir, usr_root=usr_root)
         usr_cfg["dataset"] = run_id
         usr_cfg.setdefault("chunk_size", 128)
         out["usr"] = usr_cfg
@@ -245,6 +282,14 @@ def register_workspace_commands(
             "--output-mode",
             help="Output sink mode: local (parquet), usr, or both.",
         ),
+        usr_root: Optional[Path] = typer.Option(
+            None,
+            "--usr-root",
+            help=(
+                "Shared USR datasets root for --output-mode usr|both. "
+                "Required outside a dnadesign checkout unless DNADESIGN_USR_ROOT is set."
+            ),
+        ),
     ):
         workspace_id_clean = sanitize_filename(workspace_id)
         if workspace_id_clean != workspace_id:
@@ -307,6 +352,7 @@ def register_workspace_commands(
                     run_id=workspace_id_clean,
                     output_mode=output_mode,
                     workspace_dir=workspace_dir,
+                    usr_root=usr_root,
                 )
             except ValueError as exc:
                 console.print(f"[bold red]{exc}[/]")
