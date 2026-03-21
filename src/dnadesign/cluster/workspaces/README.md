@@ -1,9 +1,8 @@
 ## Cluster workspaces
 
-`cluster` workspaces are the canonical local operating surface for reusable runs.
-Each workspace owns one `config.yaml`, its local inputs, and its generated outputs under `outputs/cluster/`.
+`cluster` workspaces are reusable local run directories.
+Each workspace keeps one `config.yaml`, its local inputs, and its generated outputs under `outputs/cluster/`.
 List the packaged workspaces and their current output state with `uv run cluster workspace list`.
-The singular `workspace` form matches the other workspace-owning tools. `uv run cluster workspaces ...` still works.
 
 Expected layout:
 

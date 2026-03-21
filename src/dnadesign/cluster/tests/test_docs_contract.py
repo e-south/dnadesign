@@ -126,7 +126,6 @@ def test_cluster_docs_tree_exposes_workflow_reference_and_concept_surfaces() -> 
 
     workspaces = (repo_root / "src/dnadesign/cluster/workspaces/README.md").read_text(encoding="utf-8")
     assert "uv run cluster workspace list" in workspaces
-    assert "uv run cluster workspaces ..." in workspaces
 
     assert "### What cluster owns" in concept
     assert "### What cluster does not own" in concept

@@ -9,11 +9,9 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-16
 
-Use this index to choose the next USR-backed runbook.
+Use this index to pick the next dataset, sync, or handoff step.
 
-## Lifecycle routes
-
-### Sync and transfer
+## Sync and transfer
 
 | Need | Runbook |
 | --- | --- |
@@ -27,21 +25,21 @@ Use this index to choose the next USR-backed runbook.
 | Iterate HPC batch writes with local pull/verify checkpoints | [hpc-agent-sync-flow.md](hpc-agent-sync-flow.md) |
 | Chain DenseGen and Infer updates with bidirectional sync | [chained-densegen-infer-sync-runbook.md](chained-densegen-infer-sync-runbook.md) |
 
-### Assembly and source of truth
+## Dataset assembly
 
 | Need | Runbook |
 | --- | --- |
-| Assemble multiple USR-backed producer datasets before construct and infer share one downstream dataset | [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md) |
-| Build one construct-backed source-of-truth dataset, then hand it to infer | [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md) |
+| Combine multiple USR-backed producer datasets before construct and infer share one downstream dataset | [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md) |
+| Build one construct-backed dataset, then hand it to infer | [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md) |
 
-### Downstream branch handoff
+## Downstream workflows
 
 | Need | Runbook |
 | --- | --- |
-| Understand the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL route before choosing one concrete branch | [promoter-evo2-journey.md](promoter-evo2-journey.md) |
+| Review the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL path before choosing one branch | [promoter-evo2-journey.md](promoter-evo2-journey.md) |
 | Build one infer-annotated promoter feature dataset, then continue to cluster or prepare OPAL after choosing one explicit `X` column | [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md) |
 
-### Validation and drills
+## Validation and drills
 
 | Need | Runbook |
 | --- | --- |
@@ -64,7 +62,7 @@ Use this index to choose the next USR-backed runbook.
 3. Source-of-truth assembly:
    [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md),
    [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md)
-4. Downstream branch handoff:
+4. Downstream workflows:
    [promoter-evo2-journey.md](promoter-evo2-journey.md),
    [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md)
 5. Validation drills:

@@ -32,6 +32,7 @@
 - [Workspaces guide](../workspaces/README.md): initialize workspace roots with `infer workspace init`.
 
 #### Continue after infer-derived `X` exists
+- If infer writes a bundle of `infer__...` columns, choose one explicit `X` column or export a flattened matrix before moving to OPAL.
 - [cluster exploratory clustering workflow](../../cluster/docs/workflows/exploratory-clustering.md): Leiden, UMAP, and exploratory analysis once one chosen `infer__...` column exists in a file or USR dataset.
 - [USR dataset with infer-derived X -> OPAL active learning](../../opal/docs/workflows/usr-infer-x-active-learning.md): start the label/train/select loop only after infer has written the chosen `infer__...` column into a USR dataset and OPAL `campaign.yaml` uses `data.location.kind: usr`.
 

@@ -15,7 +15,7 @@
 
 Use this workflow when a USR dataset already contains one or more infer-derived feature columns and OPAL should own the label/train/select loop.
 
-This is the authoritative downstream workflow for the active-learning branch. It starts after infer write-back is already complete.
+This workflow starts after infer write-back is already complete.
 
 For the Evo2 promoter feature bundle, `infer` may write several coordinated `infer__...` columns per job. In that case, use `dnadesign.infer.export_evo2_promoter_opal_matrix(...)` to flatten the chosen bundle into one deterministic `X` matrix before entering the OPAL round loop.
 

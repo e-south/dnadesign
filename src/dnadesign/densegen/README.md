@@ -1,7 +1,7 @@
 ![DenseGen banner](assets/densegen-banner.svg)
 
 DenseGen wraps the [dense-arrays](https://github.com/e-south/dense-arrays) optimizer to run DNA design workflows from workspace-local configuration and inputs.
-CLI entrypoint: use `uv run dense --help`; the package and docs name remain `densegen`.
+Run `uv run dense --help` for the CLI.
 
 It validates input schemas, resolves input sources, builds TFBS candidate pools when sampling is enabled, generates compound sequences until quota is reached, and writes reproducible outputs under the workspace `outputs/` tree.
 
