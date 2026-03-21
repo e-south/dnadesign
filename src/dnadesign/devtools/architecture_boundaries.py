@@ -146,6 +146,16 @@ def find_undeclared_cross_tool_imports(
             imported_tool = parts[1]
             if imported_tool not in tool_names or imported_tool == owner_tool:
                 continue
+            if target == f"dnadesign.{imported_tool}.src" or target.startswith(f"dnadesign.{imported_tool}.src."):
+                violations.append(
+                    ImportViolation(
+                        owner_tool=owner_tool,
+                        imported_tool=imported_tool,
+                        file_path=file_path,
+                        import_target=target,
+                    )
+                )
+                continue
             if (owner_tool, imported_tool) in allowed:
                 continue
             violations.append(

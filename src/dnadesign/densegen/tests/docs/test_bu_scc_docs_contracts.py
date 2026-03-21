@@ -110,6 +110,8 @@ def test_densegen_analysis_qsub_is_plot_only_without_notebook_generation() -> No
     assert "Selected DenseGen analysis plots require attempts artifacts." in qsub_script
     assert "Selected DenseGen analysis plots require composition artifacts." in qsub_script
     assert "resolve_run_root" in qsub_script
+    assert "from dnadesign.densegen import load_config, resolve_run_root" in qsub_script
+    assert "dnadesign.densegen.src.config" not in qsub_script
     assert 'dirname "$DENSEGEN_CONFIG"' not in qsub_script
     assert "dense notebook generate" not in qsub_script
     assert "DENSEGEN_NOTEBOOK_FORCE" not in qsub_script
