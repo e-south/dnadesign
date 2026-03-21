@@ -773,6 +773,32 @@ def test_overlay_schema_validation_is_reused_across_repeated_dataset_reads(tmp_p
     assert calls["count"] == 1
 
 
+def test_overlay_catalog_cache_key_includes_reserved_namespaces(tmp_path: Path) -> None:
+    ds = _make_dataset(tmp_path)
+    target_id = ds.head(1)["id"].iloc[0]
+    ds.write_overlay_part("mock", pa.table({"id": [target_id], "mock__score": [1.0]}), key="id")
+    ds.set_state([target_id], masked=True)
+
+    from dnadesign.usr.src import dataset_overlay_catalog as overlay_catalog_module
+    from dnadesign.usr.src.dataset import MUTATION_RESERVED_NAMESPACES, RESERVED_NAMESPACES
+
+    overlay_catalog_module._LOAD_OVERLAYS_CACHE.clear()
+
+    normal_overlays = overlay_catalog_module.load_overlay_catalog(
+        ds,
+        include_tombstone=False,
+        reserved_namespaces=RESERVED_NAMESPACES,
+    )
+    mutation_overlays = overlay_catalog_module.load_overlay_catalog(
+        ds,
+        include_tombstone=False,
+        reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
+    )
+
+    assert {overlay["namespace"] for overlay in normal_overlays} == {"mock", "usr_state"}
+    assert {overlay["namespace"] for overlay in mutation_overlays} == {"mock"}
+
+
 def test_head_state_signature_uses_overlay_paths_without_resolve(tmp_path: Path) -> None:
     from dnadesign.usr.src import dataset_views as dataset_views_module
 

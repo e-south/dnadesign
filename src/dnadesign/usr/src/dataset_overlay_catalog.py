@@ -23,7 +23,7 @@ from .registry import validate_overlay_schema
 from .types import DatasetInfo
 
 _LOAD_OVERLAYS_CACHE: dict[
-    tuple[str, bool, tuple[str, ...] | None],
+    tuple[str, bool, tuple[str, ...] | None, tuple[str, ...]],
     tuple[tuple[tuple[str, int, int], ...], tuple[int, int] | None, tuple[dict, ...]],
 ] = {}
 _LOAD_OVERLAYS_CACHE_MAX = 4_096
@@ -60,7 +60,10 @@ def load_overlay_catalog(
     namespace_filter = set(namespaces) if namespaces else None
     require_registry = any(namespace not in reserved_namespaces for _, _, namespace in path_entries)
     namespace_key = tuple(sorted(namespace_filter)) if namespace_filter else None
-    cache_key = (str(dataset.dir), bool(include_tombstone), namespace_key)
+    reserved_namespaces_key = tuple(
+        sorted(str(namespace).strip() for namespace in reserved_namespaces if str(namespace))
+    )
+    cache_key = (str(dataset.dir), bool(include_tombstone), namespace_key, reserved_namespaces_key)
     path_sig = tuple(path_sig_rows)
     registry_sig: tuple[int, int] | None = None
     if require_registry:
