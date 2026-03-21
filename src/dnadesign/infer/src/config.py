@@ -186,3 +186,16 @@ class JobConfig(StrictConfigModel):
 class RootConfig(StrictConfigModel):
     model: ModelConfig
     jobs: List[JobConfig]
+
+    @model_validator(mode="after")
+    def _validate_feature_bundle_model_contracts(self) -> "RootConfig":
+        from .features.selectors import resolve_intermediate_selector
+
+        for job in self.jobs:
+            if job.feature_bundle is None:
+                continue
+            resolve_intermediate_selector(
+                model_id=self.model.id,
+                intermediate_block=job.feature_bundle.intermediate_block,
+            )
+        return self

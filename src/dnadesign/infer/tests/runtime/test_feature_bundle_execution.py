@@ -151,6 +151,49 @@ def test_run_extract_job_feature_bundle_templated_records_compute_anchor_mean(mo
     assert out["metadata__pooling_modes"] == [["seq_mean", "anchor_mean"]]
 
 
+def test_run_extract_job_feature_bundle_templated_can_disable_seq_mean(monkeypatch) -> None:
+    adapter = _FeatureAdapter()
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: adapter)
+
+    records = [
+        {
+            "id": "wt-promoter-1",
+            "sequence": "AAAACGTTTT",
+            "construct__context_id": "construct:template_1kb:wt-promoter-1",
+            "construct__template_id": "default_1kb",
+            "construct__anchor_id": "wt-promoter-1",
+            "construct__anchor_start": 4,
+            "construct__anchor_end": 8,
+            "construct__anchor_orientation": "forward",
+            "construct__resolved_length": 10,
+            "construct__spec_id": "construct-spec-v1",
+            "is_wildtype": True,
+        }
+    ]
+    model = ModelConfig(id="evo2_7b", device="cpu", precision="fp32", alphabet="dna")
+    job = JobConfig(
+        id="templated_bundle_anchor_only_pool",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={
+            "context": {"kind": "template_1kb"},
+            "pooling": {"seq_mean": False, "anchor_mean_for_templated": True},
+        },
+    )
+
+    out = run_extract_job(inputs=records, model=model, job=job, progress_factory=None)
+
+    logits = torch.arange(20, dtype=torch.float32).reshape(10, 2)
+    embeddings = torch.arange(30, dtype=torch.float32).reshape(10, 3)
+    assert "output_layer_mean__seq_mean" not in out
+    assert "intermediate_embedding__block26_mlp_out__seq_mean" not in out
+    _assert_list_close(out["output_layer_mean__anchor_mean"][0], logits[4:8].mean(dim=0).tolist())
+    _assert_list_close(
+        out["intermediate_embedding__block26_mlp_out__anchor_mean"][0], embeddings[4:8].mean(dim=0).tolist()
+    )
+    assert out["metadata__pooling_modes"] == [["anchor_mean"]]
+
+
 def test_run_extract_job_feature_bundle_templated_requires_construct_metadata(monkeypatch) -> None:
     monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: _FeatureAdapter())
 
@@ -206,6 +249,34 @@ def test_export_evo2_promoter_opal_matrix_keeps_deterministic_feature_order() ->
         "infer.evo2.evo2_7b.template_1kb.intermediate_embedding.block26_mlp_out.anchor_mean[2]",
     ]
     assert payload["x"] == [[1.5, 0.5, 10.0, 11.0, 12.0, 13.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0]]
+
+
+def test_export_evo2_promoter_opal_matrix_skips_seq_mean_when_disabled() -> None:
+    payload = export_evo2_promoter_opal_matrix(
+        row_ids=["row-1"],
+        model_id="evo2_7b",
+        bundle={
+            "context": {"kind": "template_1kb"},
+            "pooling": {"seq_mean": False, "anchor_mean_for_templated": True},
+        },
+        columnar={
+            "log_likelihood__total": [1.5],
+            "log_likelihood__mean_per_token": [0.5],
+            "output_layer_mean__anchor_mean": [[12.0, 13.0]],
+            "intermediate_embedding__block26_mlp_out__anchor_mean": [[23.0, 24.0, 25.0]],
+        },
+    )
+
+    assert payload["feature_names"] == [
+        "infer.evo2.evo2_7b.template_1kb.log_likelihood.total",
+        "infer.evo2.evo2_7b.template_1kb.log_likelihood.mean_per_token",
+        "infer.evo2.evo2_7b.template_1kb.output_layer_mean.anchor_mean[0]",
+        "infer.evo2.evo2_7b.template_1kb.output_layer_mean.anchor_mean[1]",
+        "infer.evo2.evo2_7b.template_1kb.intermediate_embedding.block26_mlp_out.anchor_mean[0]",
+        "infer.evo2.evo2_7b.template_1kb.intermediate_embedding.block26_mlp_out.anchor_mean[1]",
+        "infer.evo2.evo2_7b.template_1kb.intermediate_embedding.block26_mlp_out.anchor_mean[2]",
+    ]
+    assert payload["x"] == [[1.5, 0.5, 12.0, 13.0, 23.0, 24.0, 25.0]]
 
 
 def test_execute_feature_bundle_recomputes_usr_rows_when_digest_mismatches(monkeypatch) -> None:

@@ -46,12 +46,13 @@ def export_opal_matrix(
         )
 
     if bundle.collect_output_layer_mean:
-        ordered_columns.append(
-            (
-                _OUTPUT_LAYER_SEQ_MEAN,
-                f"infer.evo2.{model_id}.{bundle.context.kind}.output_layer_mean.seq_mean",
+        if bundle.pooling.seq_mean:
+            ordered_columns.append(
+                (
+                    _OUTPUT_LAYER_SEQ_MEAN,
+                    f"infer.evo2.{model_id}.{bundle.context.kind}.output_layer_mean.seq_mean",
+                )
             )
-        )
         if bundle.context.kind != "anchor_only" and bundle.pooling.anchor_mean_for_templated:
             ordered_columns.append(
                 (
@@ -61,13 +62,14 @@ def export_opal_matrix(
             )
 
     if bundle.collect_intermediate_embedding:
-        ordered_columns.append(
-            (
-                f"intermediate_embedding__{selector.intermediate_selector}__seq_mean",
-                f"infer.evo2.{model_id}.{bundle.context.kind}.intermediate_embedding."
-                f"{selector.intermediate_selector}.seq_mean",
+        if bundle.pooling.seq_mean:
+            ordered_columns.append(
+                (
+                    f"intermediate_embedding__{selector.intermediate_selector}__seq_mean",
+                    f"infer.evo2.{model_id}.{bundle.context.kind}.intermediate_embedding."
+                    f"{selector.intermediate_selector}.seq_mean",
+                )
             )
-        )
         if bundle.context.kind != "anchor_only" and bundle.pooling.anchor_mean_for_templated:
             ordered_columns.append(
                 (

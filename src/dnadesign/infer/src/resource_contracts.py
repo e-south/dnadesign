@@ -95,8 +95,7 @@ def validate_runbook_gpu_resources(
     try:
         if memory_hint is None:
             validate_model_gpu_topology_contract(model=model, inventory=inventory)
-        else:
-            validate_model_hardware_contract(model=model, inventory=inventory)
+        validate_model_hardware_contract(model=model, inventory=inventory)
         validate_adapter_runtime_contract(model=model)
     except ValidationError as exc:
         raise ValueError(str(exc)) from exc

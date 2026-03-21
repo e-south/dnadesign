@@ -56,6 +56,15 @@ def _templated_anchor_mean_enabled(bundle: PromoterFeatureBundleConfig) -> bool:
     return bundle.context.kind != "anchor_only" and bool(bundle.pooling.anchor_mean_for_templated)
 
 
+def _pooling_modes(bundle: PromoterFeatureBundleConfig) -> list[str]:
+    modes: list[str] = []
+    if bundle.pooling.seq_mean:
+        modes.append("seq_mean")
+    if _templated_anchor_mean_enabled(bundle):
+        modes.append("anchor_mean")
+    return modes
+
+
 def build_feature_bundle_outputs(*, bundle: PromoterFeatureBundleConfig) -> list[dict[str, object]]:
     selector = canonical_selector_for_block(bundle.intermediate_block)
     outputs: list[dict[str, object]] = []
@@ -79,18 +88,19 @@ def build_feature_bundle_outputs(*, bundle: PromoterFeatureBundleConfig) -> list
         )
 
     if bundle.collect_output_layer_mean:
-        outputs.append(
-            {
-                "id": _OUTPUT_LAYER_SEQ_MEAN,
-                "fn": "evo2.logits",
-                "params": {
-                    "pool": {"method": "mean", "dim": 1},
-                    "feature_group": "output_layer_mean",
-                    "pool_scope": "seq_mean",
-                },
-                "format": "list",
-            }
-        )
+        if bundle.pooling.seq_mean:
+            outputs.append(
+                {
+                    "id": _OUTPUT_LAYER_SEQ_MEAN,
+                    "fn": "evo2.logits",
+                    "params": {
+                        "pool": {"method": "mean", "dim": 1},
+                        "feature_group": "output_layer_mean",
+                        "pool_scope": "seq_mean",
+                    },
+                    "format": "list",
+                }
+            )
         if _templated_anchor_mean_enabled(bundle):
             outputs.append(
                 {
@@ -106,21 +116,22 @@ def build_feature_bundle_outputs(*, bundle: PromoterFeatureBundleConfig) -> list
             )
 
     if bundle.collect_intermediate_embedding:
-        outputs.append(
-            {
-                "id": f"intermediate_embedding__{selector}__seq_mean",
-                "fn": "evo2.embedding",
-                "params": {
-                    "layer": selector,
-                    "pool": {"method": "mean", "dim": 1},
-                    "feature_group": "intermediate_embedding",
-                    "intermediate_block": bundle.intermediate_block,
-                    "intermediate_selector": selector,
-                    "pool_scope": "seq_mean",
-                },
-                "format": "list",
-            }
-        )
+        if bundle.pooling.seq_mean:
+            outputs.append(
+                {
+                    "id": f"intermediate_embedding__{selector}__seq_mean",
+                    "fn": "evo2.embedding",
+                    "params": {
+                        "layer": selector,
+                        "pool": {"method": "mean", "dim": 1},
+                        "feature_group": "intermediate_embedding",
+                        "intermediate_block": bundle.intermediate_block,
+                        "intermediate_selector": selector,
+                        "pool_scope": "seq_mean",
+                    },
+                    "format": "list",
+                }
+            )
         if _templated_anchor_mean_enabled(bundle):
             outputs.append(
                 {
@@ -215,7 +226,7 @@ def build_feature_metadata_rows(
             "provider_version": None,
             "intermediate_block": selector.intermediate_block,
             "intermediate_selector": selector.intermediate_selector,
-            "pooling_modes": (["seq_mean", "anchor_mean"] if _templated_anchor_mean_enabled(bundle) else ["seq_mean"]),
+            "pooling_modes": _pooling_modes(bundle),
             "feature_schema_version": bundle.feature_schema_version,
             "construct_version": context.construct_version,
             "timestamp": timestamp,
@@ -345,9 +356,11 @@ def execute_feature_bundle(
                 anchor_means: list[list[float]] = []
                 for tensor, context in zip(logits_tensors, context_chunk, strict=True):
                     seq_mean, anchor_mean = _pool_tensor_scopes(tensor, context=context)
-                    seq_means.append(seq_mean)
+                    if bundle.pooling.seq_mean:
+                        seq_means.append(seq_mean)
                     anchor_means.append(anchor_mean)
-                chunk_outputs[_OUTPUT_LAYER_SEQ_MEAN] = seq_means
+                if bundle.pooling.seq_mean:
+                    chunk_outputs[_OUTPUT_LAYER_SEQ_MEAN] = seq_means
                 if _templated_anchor_mean_enabled(bundle):
                     chunk_outputs[_OUTPUT_LAYER_ANCHOR_MEAN] = anchor_means
 
@@ -361,10 +374,12 @@ def execute_feature_bundle(
                 anchor_means = []
                 for tensor, context in zip(embedding_tensors, context_chunk, strict=True):
                     seq_mean, anchor_mean = _pool_tensor_scopes(tensor, context=context)
-                    seq_means.append(seq_mean)
+                    if bundle.pooling.seq_mean:
+                        seq_means.append(seq_mean)
                     anchor_means.append(anchor_mean)
                 intermediate_seq_id = f"intermediate_embedding__{selector.intermediate_selector}__seq_mean"
-                chunk_outputs[intermediate_seq_id] = seq_means
+                if bundle.pooling.seq_mean:
+                    chunk_outputs[intermediate_seq_id] = seq_means
                 if _templated_anchor_mean_enabled(bundle):
                     intermediate_anchor_id = f"intermediate_embedding__{selector.intermediate_selector}__anchor_mean"
                     chunk_outputs[intermediate_anchor_id] = anchor_means

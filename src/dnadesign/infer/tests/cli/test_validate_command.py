@@ -245,6 +245,33 @@ jobs:
     assert "requires Hopper" in (result.stdout or "")
 
 
+def test_validate_config_rejects_unsupported_feature_bundle_model(tmp_path: Path) -> None:
+    cfg = _write(
+        tmp_path / "feature_bundle_model_contract.yaml",
+        """
+model:
+  id: evo2_1b_base
+  device: cpu
+  precision: fp32
+  alphabet: dna
+jobs:
+  - id: j1
+    operation: extract
+    ingest:
+      source: sequences
+    feature_bundle:
+      context:
+        kind: anchor_only
+""".strip()
+        + "\n",
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "config", "--config", cfg.as_posix()])
+
+    assert result.exit_code == 2
+    assert "supports model.id values" in (result.stdout or "")
+
+
 def test_validate_usr_registry_renders_exact_namespace_register_command(tmp_path: Path) -> None:
     cfg = _write(
         tmp_path / "usr_registry.yaml",
