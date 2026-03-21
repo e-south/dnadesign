@@ -16,16 +16,16 @@ uv run construct workspace doctor --workspace .
 
 Use this path when you want a known-good tracer bullet. By default, `workspace init` creates the workspace under your current working directory and keeps construct IO inside `outputs/usr_datasets` in that workspace. If you use `--root` or `CONSTRUCT_WORKSPACE_ROOT`, `cd` into the printed workspace path instead. If the workspace lives outside the repo tree, reuse the `uv run --project /path/to/dnadesign construct ...` commands printed by `workspace init`.
 
-### Path 2: packaged shared source-of-truth demo
+### Path 2: packaged shared-dataset demo
 
 ```bash
-uv run construct workspace init --id demo_construct_source_of_truth --profile promoter-swap-source-of-truth-demo
-cd demo_construct_source_of_truth
+uv run construct workspace init --id demo_construct_shared_dataset --profile promoter-swap-source-of-truth-demo
+cd demo_construct_shared_dataset
 uv run construct workspace doctor --workspace .
 ./runbook.sh --mode dry-run-all
 ```
 
-Use this path when both packaged window projects should accumulate into one semantic USR dataset before infer or Notify pick it up. The profile keeps the source-of-truth contract explicit in `construct.workspace.yaml` instead of relying on manual config repointing.
+Use this path when both packaged window projects should accumulate into one semantic USR dataset before infer or Notify pick it up. The profile keeps the shared-dataset contract explicit in `construct.workspace.yaml` instead of relying on manual config repointing.
 
 ### Path 3: blank custom workspace
 
@@ -53,6 +53,6 @@ The blank scaffold now writes explicit workspace-local `root: outputs/usr_datase
 
 - [Construct docs](README.md)
 - [Workspaces guide](../workspaces/README.md)
-- [Construct -> USR -> Infer source-of-truth runbook](../../usr/docs/operations/construct-infer-source-of-truth-runbook.md)
+- [Construct -> USR -> Infer shared dataset runbook](../../usr/docs/operations/construct-infer-shared-dataset-runbook.md)
 - [Config reference](reference/config.md)
 - [Workspace registry reference](reference/workspace-registry.md)

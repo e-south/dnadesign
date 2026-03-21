@@ -38,8 +38,8 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
         "src/dnadesign/construct/workspaces/demo_promoter_swap_pdual10_source_of_truth/README.md"
     )
 
-    token = "../../usr/docs/operations/construct-infer-source-of-truth-runbook.md"
-    multi_source_token = "../../usr/docs/operations/multi-source-source-of-truth-assembly.md"
+    token = "../../usr/docs/operations/construct-infer-shared-dataset-runbook.md"
+    multi_source_token = "../../usr/docs/operations/multi-source-shared-dataset-assembly.md"
     feature_matrix_token = "../../usr/docs/operations/promoter-characterization-feature-matrix.md"
     assert token in readme
     assert multi_source_token in readme
@@ -52,10 +52,10 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     assert "../../../docs/README.md" in top_readme
     assert "## Start here" not in top_readme
     assert "## Boundary reminder" not in top_readme
-    assert "Construct takes focal DNA parts" in top_readme
+    assert "Construct takes anchor sequences or other focal DNA parts" in top_readme
     assert "reference/template-contexts.md" in readme
     assert "template-contexts.md" in config_doc
-    assert "../../../usr/docs/operations/construct-infer-source-of-truth-runbook.md" in outputs
+    assert "../../../usr/docs/operations/construct-infer-shared-dataset-runbook.md" in outputs
     assert "construct__anchor_start" in outputs
     assert "construct__anchor_start" in template_contexts
     assert "### Key docs" in readme

@@ -49,7 +49,7 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
         ],
         label="docs/notify/README.md",
     )
-    assert "multi-source-source-of-truth-assembly.md" in text
+    assert "multi-source-shared-dataset-assembly.md" in text
     assert "promoter-characterization-feature-matrix.md" in text
     assert "--secret-source file" in text
     assert "--secret-ref file://" in text

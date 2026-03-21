@@ -7,7 +7,7 @@ List the packaged workspaces and their current output state with `uv run constru
 ### Start with one of two paths
 
 - [Packaged demo](demo_promoter_swap_pdual10/README.md): curated pDual-10 promoter-swap tracer bullet with both 1 kb window and full-plasmid configs.
-- [Packaged source-of-truth demo](demo_promoter_swap_pdual10_source_of_truth/README.md): curated pDual-10 promoter-swap workspace that writes both window projects into one shared USR dataset for infer and downstream handoff.
+- [Packaged shared-dataset demo](demo_promoter_swap_pdual10_source_of_truth/README.md): curated pDual-10 promoter-swap workspace that writes both window projects into one shared USR dataset for infer and downstream handoff.
 - Blank workspace: scaffold your own study and import your own input/template datasets.
 
 ### Quick start
@@ -28,9 +28,9 @@ uv run construct workspace init --id demo_promoter_swap --profile promoter-swap-
 cd demo_promoter_swap # Enter the newly initialized demo workspace.
 ./runbook.sh --mode dry-run --config config.slot_a.window.yaml # Execute the packaged tracer-bullet dry run for the slot_a window config.
 
-# Packaged shared-dataset source-of-truth demo.
-uv run construct workspace init --id demo_construct_source_of_truth --profile promoter-swap-source-of-truth-demo # Copy the packaged shared-dataset demo into a new workspace id.
-cd demo_construct_source_of_truth # Enter the newly initialized source-of-truth workspace.
+# Packaged shared-dataset demo.
+uv run construct workspace init --id demo_construct_shared_dataset --profile promoter-swap-source-of-truth-demo # Copy the packaged shared-dataset demo into a new workspace id.
+cd demo_construct_shared_dataset # Enter the newly initialized shared-dataset workspace.
 ./runbook.sh --mode dry-run-all # Dry-run both packaged projects into one semantic USR dataset.
 ```
 
@@ -92,4 +92,4 @@ If you initialize a workspace outside the repo tree, reuse the `uv run --project
 - External/shared USR roots remain allowed, but only through explicit `root:` fields or `construct seed --root <path>`.
 - One construct job uses one template; multi-template or slot-matrix studies are represented as multiple project entries and config files in the workspace registry.
 - The packaged promoter-swap demo exposes `./runbook.sh --mode seed|validate|dry-run|run|validate-all` as the local workspace entrypoint.
-- The packaged source-of-truth demo exposes `./runbook.sh --mode seed|validate-all|dry-run-all|run-all` as the local workspace entrypoint for the shared-dataset flow; the authoritative cross-tool handoff still lives in `../../usr/docs/operations/construct-infer-source-of-truth-runbook.md`.
+- The packaged shared-dataset demo exposes `./runbook.sh --mode seed|validate-all|dry-run-all|run-all` as the local workspace entrypoint for the shared-dataset flow; the authoritative cross-tool handoff still lives in `../../usr/docs/operations/construct-infer-shared-dataset-runbook.md`.

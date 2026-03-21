@@ -16,7 +16,7 @@
 - [Observability and events](concepts/observability_and_events.md): interpret run events, status transitions, and emitted metadata.
 
 #### Continue into shared downstream data-plane flows
-- [Multi-source source-of-truth assembly](../../usr/docs/operations/multi-source-source-of-truth-assembly.md): treat DenseGen outputs as one upstream USR source when construct and infer should share one downstream dataset.
+- [Multi-source shared dataset assembly](../../usr/docs/operations/multi-source-shared-dataset-assembly.md): treat DenseGen outputs as one upstream USR source when construct and infer should share one downstream dataset.
 - [Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md): treat DenseGen outputs as one upstream source when downstream clustering or active learning should consume infer-derived feature columns.
 
 #### Debug a run

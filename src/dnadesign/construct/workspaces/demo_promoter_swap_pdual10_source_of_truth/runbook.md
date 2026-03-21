@@ -35,7 +35,7 @@
   - `./runbook.sh --mode validate-all`
 - Dry-run both packaged projects:
   - `./runbook.sh --mode dry-run-all`
-- Materialize the shared source-of-truth dataset:
+- Materialize the shared dataset:
   - `./runbook.sh --mode run-all`
 
 `runbook.sh` seeds the curated demo inputs into `outputs/usr_datasets` before validation or execution so the packaged workspace stays self-contained by default. Set `CONSTRUCT_RUNBOOK_USR_ROOT=/path/to/shared/usr/root` only when a shared mirror is intentional.
@@ -45,7 +45,7 @@ The wrapper also carries a project-root hint for `uv run --project ...`; overrid
 - The provided full `pDual-10` record contains two exact `J23105` matches:
   - `slot_a`: `[2300, 2335)`
   - `slot_b`: `[3621, 3656)`
-- This packaged source-of-truth demo only uses the two 1 kb window projects because they are the intended infer-ready downstream handoff shape.
+- This packaged shared-dataset demo only uses the two 1 kb window projects because they are the intended infer-ready downstream handoff shape.
 
 ### Step-by-step commands
 
@@ -100,5 +100,5 @@ uv run usr --root "$PWD/outputs/usr_datasets" head pdual10_source_of_truth_demo 
 
 For the infer and downstream handoff that continues from this workspace, use the shared runbooks:
 
-- [Construct -> USR -> Infer source-of-truth runbook](../../../usr/docs/operations/construct-infer-source-of-truth-runbook.md)
+- [Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/construct-infer-shared-dataset-runbook.md)
 - [Promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)

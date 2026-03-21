@@ -181,7 +181,7 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
     assert "project dunlop" not in text
     assert "orchestration-runbooks.md" in text
     assert "../runbooks/README.md" in text
-    assert "multi-source-source-of-truth-assembly.md" in text
+    assert "multi-source-shared-dataset-assembly.md" in text
     assert "progressive disclosure" not in text.lower()
 
 

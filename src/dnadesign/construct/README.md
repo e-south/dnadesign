@@ -1,6 +1,6 @@
 ![Construct banner](docs/assets/construct-banner.svg)
 
-Construct takes focal DNA parts and realizes them inside explicit larger sequence contexts. That makes promoters, inserts, and other sequence elements usable as named regions, plasmids, and related template-backed products rather than isolated fragments. Any canonical sequence record can serve as an input part or a template; `construct` makes that role explicit in config and records the resulting lineage for downstream tools.
+Construct takes anchor sequences or other focal DNA parts and realizes them inside explicit larger sequence contexts. Any sequence record can serve as an anchor, a template, or a helper part; `construct` makes that role explicit in config and records the resulting lineage for downstream tools.
 
 ## Documentation
 

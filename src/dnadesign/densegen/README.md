@@ -17,7 +17,13 @@ Use it when you need one design-generation tool with explicit run state, fail-fa
 
 - Want a first local run: start with [TFBS baseline tutorial](docs/tutorials/demo_tfbs_baseline.md). Verify next with the [Outputs reference](docs/reference/outputs.md).
 - Want to choose a packaged workspace before running: start with the [Workspaces guide](workspaces/README.md). Verify next with the [Config reference](docs/reference/config.md).
-- Want the next shared cross-tool step after generation: start with [Promoter Evo2 workflow journey](../usr/docs/operations/promoter-evo2-journey.md). Verify next there once you know whether the study needs source assembly, construct expansion, or infer-derived features.
+
+## Continue after generation
+
+- Want the shared downstream handoff after generation: start with the [USR operations index](../usr/docs/operations/README.md) when generated records need downstream USR-backed workflows.
+- Use [Multi-source shared dataset assembly](../usr/docs/operations/multi-source-shared-dataset-assembly.md) when DenseGen output must be merged with other upstream datasets before construct or infer.
+- Use [Promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md) when the study should become one promoter-specific infer-annotated dataset before cluster or OPAL.
+- Use the [Promoter study Evo2 workflow journey](../usr/docs/operations/promoter-evo2-journey.md) when the downstream study is promoter-specific.
 
 ### Documentation
 

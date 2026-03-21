@@ -7,16 +7,16 @@
 
 - [Create or inspect one dataset locally](getting-started/cli-quickstart.md): shortest path to one validated USR lifecycle.
 - [Sync an existing dataset between local and HPC](operations/workflow-map.md): choose the sync doc for clone, pull, push, and audit work.
-- [Assemble multiple producer datasets into one source-of-truth dataset](operations/multi-source-source-of-truth-assembly.md): shared USR-backed merge/carry path before construct and infer.
-- [Hand a construct-backed shared dataset to infer and downstream watchers](operations/construct-infer-source-of-truth-runbook.md): one construct -> USR -> infer handoff.
-- [Understand the full promoter Evo2 path before choosing a concrete branch](operations/promoter-evo2-journey.md): linked route from DenseGen/manual/wildtype inputs through optional construct contexts, infer Evo2 bundles, Notify watcher validation, and Cluster/OPAL branches.
-- [Build an infer-annotated promoter feature dataset, then choose cluster or prepare OPAL](operations/promoter-characterization-feature-matrix.md): shared downstream branch once DenseGen/manual/construct inputs should all become one feature dataset and one explicit `X` column can be selected.
+- [Assemble multiple producer datasets into one shared dataset](operations/multi-source-shared-dataset-assembly.md): shared USR-backed merge/carry path before construct and infer.
+- [Hand a construct-backed shared dataset to infer and downstream watchers](operations/construct-infer-shared-dataset-runbook.md): one construct -> USR -> infer handoff.
+- [Understand the promoter-study Evo2 path before choosing a concrete branch](operations/promoter-evo2-journey.md): linked route from DenseGen/manual/wildtype inputs through optional construct contexts, infer Evo2 bundles, Notify watcher validation, and Cluster/OPAL branches.
+- [Build an infer-annotated promoter-study feature dataset, then choose cluster or prepare OPAL](operations/promoter-characterization-feature-matrix.md): shared downstream branch once DenseGen/manual/construct inputs should all become one feature dataset and one explicit `X` column can be selected.
 
 ### Read order
 
 1. [Top README](../README.md): package intent, hard boundaries, and where to branch next.
 2. [Getting started index](getting-started/README.md): first local run paths for CLI and notebook setup.
-3. [Operations index](operations/README.md): sync and cross-tool source-of-truth runbooks for iterative remote and HPC updates.
+3. [Operations index](operations/README.md): sync and cross-tool shared-dataset runbooks for iterative remote and HPC updates.
 4. [Reference index](reference/README.md): schema, overlay, event, and API contracts.
 5. [Architecture introspection](architecture-introspection.md): deep lifecycle and module interaction map for integration work.
 
@@ -37,9 +37,9 @@
 - [Sync audit loop](operations/sync-audit-loop.md): machine-readable transfer decisions for chained command execution.
 - [HPC sync flow](operations/hpc-agent-sync-flow.md): preflight/run/verify loop for batch-driven workspace updates.
 - [Chained DenseGen and Infer sync runbook](operations/chained-densegen-infer-sync-runbook.md): end-to-end cross-tool update loop with bidirectional sync.
-- [Multi-source source-of-truth assembly](operations/multi-source-source-of-truth-assembly.md): merge multiple USR-backed producer datasets before construct and infer share one downstream dataset.
-- [Construct -> USR -> Infer source-of-truth runbook](operations/construct-infer-source-of-truth-runbook.md): construct-led consolidation path for one USR-backed dataset plus infer handoff.
-- [Promoter characterization feature matrix](operations/promoter-characterization-feature-matrix.md): combine DenseGen/manual sources, optional construct expansion, and infer feature-matrix write-back before downstream cluster use or OPAL setup.
+- [Multi-source shared dataset assembly](operations/multi-source-shared-dataset-assembly.md): merge multiple USR-backed producer datasets before construct and infer share one downstream dataset.
+- [Construct -> USR -> Infer shared dataset runbook](operations/construct-infer-shared-dataset-runbook.md): construct-led consolidation path for one USR-backed dataset plus infer handoff.
+- [Promoter characterization feature matrix](operations/promoter-characterization-feature-matrix.md): combine DenseGen/manual sources, optional construct expansion, and infer feature write-back before downstream cluster use or OPAL setup.
 - [Sync fidelity drills](operations/sync-fidelity-drills.md): adversarial checks for sidecar, overlay, and hash parity.
 
 ### Reference

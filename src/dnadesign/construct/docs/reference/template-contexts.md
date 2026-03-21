@@ -13,7 +13,7 @@ Use this page when construct is supplying larger resolved contexts for infer or 
 
 ### Repo-aligned context contract
 
-For template-backed promoter feature extraction, the resolved construct row should carry:
+For template-backed inference or other downstream analysis, the resolved construct row should carry:
 
 - `construct__context_id`
 - `construct__context_kind`
@@ -43,7 +43,7 @@ The current construct schema remains one-template-per-job.
 
 Use multiple construct projects when you need:
 
-- a 1 kb promoter window
+- a 1 kb sequence window
 - a plasmid-scale context
 - multiple alternative template backbones
 
@@ -51,6 +51,7 @@ That keeps template choice explicit as workspace/config state instead of hiding 
 
 ### Cross-tool route
 
-For the authoritative data-plane workflow after construct materializes template-backed contexts, continue here:
+Use one of these next steps after construct materializes template-backed contexts:
 
-- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)
+- [Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/construct-infer-shared-dataset-runbook.md): generic shared-dataset handoff into infer and downstream watchers.
+- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md): promoter-study branch for feature extraction, cluster, and OPAL prep.

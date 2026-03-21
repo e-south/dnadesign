@@ -1,4 +1,4 @@
-## Construct -> USR -> Infer Source-of-Truth Runbook
+## Construct -> USR -> Infer Shared Dataset Runbook
 
 **Type:** runbook
 **Plane:** data-plane
@@ -15,11 +15,11 @@
 
 Use this runbook when construct should write one shared USR dataset and infer plus Notify should read that same dataset next.
 
-If upstream inputs still span multiple USR datasets, start with [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md) first, then return here once one construct-input dataset is already consolidated.
+If upstream inputs still span multiple USR datasets, start with [multi-source-shared-dataset-assembly.md](multi-source-shared-dataset-assembly.md) first, then return here once one construct-input dataset is already consolidated.
 
 ### Boundary decisions
 
-- USR dataset roots are the source of truth, not git or workspace metadata.
+- USR dataset roots are the durable data boundary, not git or workspace metadata.
 - Root precedence in this flow is explicit config root first, then documented tool-specific env roots where supported; no packaged-dataset fallback is part of the contract.
 - `construct` owns template realization and `construct__*` lineage.
 - `infer` owns `infer__*` derived namespaces added after construct writes.
@@ -51,9 +51,9 @@ export WORK_ROOT="$(mktemp -d /tmp/construct-usr-infer-XXXXXX)"
 # Pin the repo checkout so later file copies do not depend on the current shell directory.
 export DNADESIGN_REPO_ROOT="$(git rev-parse --show-toplevel)"
 # Scaffold the packaged shared-dataset construct workspace under that root.
-uv run construct workspace init --id source_of_truth_demo --root "$WORK_ROOT" --profile promoter-swap-source-of-truth-demo
+uv run construct workspace init --id shared_dataset_demo --root "$WORK_ROOT" --profile promoter-swap-source-of-truth-demo
 # Reuse one workspace path across the remaining commands.
-export WORKSPACE_ROOT="$WORK_ROOT/source_of_truth_demo"
+export WORKSPACE_ROOT="$WORK_ROOT/shared_dataset_demo"
 # Seed canonical promoter and template records into the workspace-local USR root.
 uv run construct seed promoter-swap-demo \
   --root "$WORKSPACE_ROOT/outputs/usr_datasets" \
@@ -78,7 +78,7 @@ uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project s
 uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_b_window # Materialize slot_b rows into the shared dataset.
 ```
 
-### 3) Verify the construct-backed source-of-truth dataset
+### 3) Verify the construct-backed shared dataset
 
 ```bash
 # Reuse the workspace-local USR root and one semantic dataset id.
@@ -102,19 +102,19 @@ Expected outcome:
 ### 4) Scale the same pattern to more sources or templates
 
 - represent each additional template or slot as another `construct.workspace.yaml` project
-- point multiple projects at the same `output.dataset` only when one semantic source-of-truth dataset is intentional
+- point multiple projects at the same `output.dataset` only when one semantic shared dataset is intentional
 - the packaged `promoter-swap-source-of-truth-demo` profile is the turnkey two-project accumulation preset; use it as the tracer bullet before widening the matrix
 - if multiple upstream USR datasets must be consolidated first, run `uv run usr maintenance merge ... --carry-namespace usr_label` when the upstream label overlay is compact and `id`-keyed; otherwise materialize or reattach the needed namespace explicitly before construct
 - rerun `construct workspace validate-project --runtime` for every project before `run-project`
 
 ### 5) Shared downstream continuation: prepare infer handoff against the construct dataset
 
-Create a config dedicated to the construct output dataset. This keeps infer write-back explicit and repeatable. This section is also the shared downstream continuation used by the broader [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md) runbook once one construct-backed downstream dataset already exists.
+Create a config dedicated to the construct output dataset. This keeps infer write-back explicit and repeatable. This section is also the shared downstream continuation used by the broader [multi-source-shared-dataset-assembly.md](multi-source-shared-dataset-assembly.md) runbook once one construct-backed downstream dataset already exists.
 
 ```bash
 # Copy the packaged infer pressure-test config into the construct workspace.
 cp "$DNADESIGN_REPO_ROOT/src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml" \
-  "$WORKSPACE_ROOT/infer.construct-source-of-truth.yaml"
+  "$WORKSPACE_ROOT/infer.construct-shared-dataset.yaml"
 # Retarget the infer config to the construct output dataset and local CPU runtime.
 uv run python - <<'PY'
 import os
@@ -123,7 +123,7 @@ from pathlib import Path
 import yaml
 
 workspace_root = Path(os.environ["WORKSPACE_ROOT"])
-config_path = workspace_root / "infer.construct-source-of-truth.yaml"
+config_path = workspace_root / "infer.construct-shared-dataset.yaml"
 config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 
 config["jobs"][0]["ingest"]["dataset"] = os.environ["DATASET_ID"]
@@ -136,11 +136,11 @@ config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
 print(config_path)
 PY
 # Validate infer config shape and the USR handoff contract.
-uv run infer validate config --config "$WORKSPACE_ROOT/infer.construct-source-of-truth.yaml"
+uv run infer validate config --config "$WORKSPACE_ROOT/infer.construct-shared-dataset.yaml"
 # Render the exact infer namespace registration required for write-back.
-uv run infer validate usr-registry --config "$WORKSPACE_ROOT/infer.construct-source-of-truth.yaml"
+uv run infer validate usr-registry --config "$WORKSPACE_ROOT/infer.construct-shared-dataset.yaml"
 # Dry-run infer against the construct dataset before any model execution.
-uv run infer run --config "$WORKSPACE_ROOT/infer.construct-source-of-truth.yaml" --dry-run
+uv run infer run --config "$WORKSPACE_ROOT/infer.construct-shared-dataset.yaml" --dry-run
 ```
 
 Use the rendered `namespace register infer --columns ...` command before the first real infer write-back, then continue with the infer pressure-test paths:
@@ -165,11 +165,11 @@ uv run notify usr-events watch \
 # Optional workspace shorthand:
 # export CONSTRUCT_WORKSPACE_ROOT="$WORK_ROOT"
 # export DNADESIGN_REPO_ROOT=/abs/path/to/dnadesign
-# uv run notify setup resolve-events --tool construct --workspace "source_of_truth_demo:slot_a_window" --json
+# uv run notify setup resolve-events --tool construct --workspace "shared_dataset_demo:slot_a_window" --json
 # Resolve the infer-managed events path once the infer config exists.
 uv run notify setup resolve-events \
   --tool infer \
-  --config "$WORKSPACE_ROOT/infer.construct-source-of-truth.yaml" \
+  --config "$WORKSPACE_ROOT/infer.construct-shared-dataset.yaml" \
   --json
 ```
 
@@ -192,7 +192,7 @@ Resolver contract:
 ## Related docs
 
 - Construct workflow and config surface: [../../../construct/docs/README.md](../../../construct/docs/README.md)
-- Broader upstream consolidation path: [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md)
+- Broader upstream consolidation path: [multi-source-shared-dataset-assembly.md](multi-source-shared-dataset-assembly.md)
 - Construct output contract: [../../../construct/docs/reference/outputs.md](../../../construct/docs/reference/outputs.md)
 - USR schema contract: [../reference/schema-contract.md](../reference/schema-contract.md)
 - USR maintenance merge patterns: [../reference/maintenance.md](../reference/maintenance.md)

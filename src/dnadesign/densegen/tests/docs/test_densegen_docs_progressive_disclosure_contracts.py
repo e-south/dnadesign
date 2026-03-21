@@ -91,7 +91,7 @@ def test_densegen_usr_notify_tutorial_keeps_walkthrough_progression() -> None:
 
 def test_densegen_docs_route_to_shared_multi_source_runbook() -> None:
     text = _read(DOCS_ROOT / "README.md")
-    assert "../../usr/docs/operations/multi-source-source-of-truth-assembly.md" in text
+    assert "../../usr/docs/operations/multi-source-shared-dataset-assembly.md" in text
     assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" in text
     _assert_token_order(
         text,
@@ -100,7 +100,7 @@ def test_densegen_docs_route_to_shared_multi_source_runbook() -> None:
             "tutorials/demo_usr_notify.md",
             "concepts/observability_and_events.md",
             "#### Continue into shared downstream data-plane flows",
-            "../../usr/docs/operations/multi-source-source-of-truth-assembly.md",
+            "../../usr/docs/operations/multi-source-shared-dataset-assembly.md",
             "../../usr/docs/operations/promoter-characterization-feature-matrix.md",
         ],
         label="densegen/docs/README.md",
@@ -114,7 +114,7 @@ def test_densegen_top_level_readme_routes_to_downstream_shared_flows() -> None:
     assert "## Boundary reminder" in text
     assert "Want a first local run" in text
     assert "Want the shared downstream handoff after generation" in text
-    assert "../usr/docs/operations/multi-source-source-of-truth-assembly.md" in text
+    assert "../usr/docs/operations/multi-source-shared-dataset-assembly.md" in text
     assert "../usr/docs/operations/promoter-characterization-feature-matrix.md" in text
     assert "downstream USR-backed workflows" in text
     assert "Use it when you need one design-generation tool" in text
@@ -129,7 +129,7 @@ def test_densegen_docs_index_keeps_cross_tool_handoff_routes_separate_from_tutor
             "### Tutorials",
             "tutorials/demo_usr_notify.md",
             "### Cross-tool handoff routes",
-            "../../usr/docs/operations/multi-source-source-of-truth-assembly.md",
+            "../../usr/docs/operations/multi-source-shared-dataset-assembly.md",
             "../../usr/docs/operations/promoter-characterization-feature-matrix.md",
             "### Workspace docs",
         ],

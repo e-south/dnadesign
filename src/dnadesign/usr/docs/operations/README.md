@@ -3,7 +3,7 @@
 **Type:** route
 **Plane:** data-plane
 **Owner-boundary:** usr
-**Entry artifact:** USR dataset, sync, or cross-tool source-of-truth work that still needs a route
+**Entry artifact:** USR dataset, sync, or cross-tool shared-dataset work that still needs a route
 **Exit artifact:** USR runbook or downstream handoff route
 
 **Owner:** dnadesign-maintainers
@@ -25,19 +25,19 @@ Use this index to pick the next dataset, sync, or handoff step.
 | Iterate HPC batch writes with local pull/verify checkpoints | [hpc-agent-sync-flow.md](hpc-agent-sync-flow.md) |
 | Chain DenseGen and Infer updates with bidirectional sync | [chained-densegen-infer-sync-runbook.md](chained-densegen-infer-sync-runbook.md) |
 
-## Dataset assembly
+## Shared dataset assembly
 
 | Need | Runbook |
 | --- | --- |
-| Combine multiple USR-backed producer datasets before construct and infer share one downstream dataset | [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md) |
-| Build one construct-backed dataset, then hand it to infer | [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md) |
+| Combine multiple USR-backed producer datasets before construct and infer share one downstream dataset | [multi-source-shared-dataset-assembly.md](multi-source-shared-dataset-assembly.md) |
+| Build one construct-backed dataset, then hand it to infer | [construct-infer-shared-dataset-runbook.md](construct-infer-shared-dataset-runbook.md) |
 
-## Downstream workflows
+## Promoter study workflows
 
 | Need | Runbook |
 | --- | --- |
 | Review the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL path before choosing one branch | [promoter-evo2-journey.md](promoter-evo2-journey.md) |
-| Build one infer-annotated promoter feature dataset, then continue to cluster or prepare OPAL after choosing one explicit `X` column | [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md) |
+| Build one infer-annotated promoter-study feature dataset, then continue to cluster or prepare OPAL after choosing one explicit `X` column | [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md) |
 
 ## Validation and drills
 
@@ -59,10 +59,10 @@ Use this index to pick the next dataset, sync, or handoff step.
    [sync-audit-loop.md](sync-audit-loop.md),
    [hpc-agent-sync-flow.md](hpc-agent-sync-flow.md),
    [chained-densegen-infer-sync-runbook.md](chained-densegen-infer-sync-runbook.md)
-3. Source-of-truth assembly:
-   [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md),
-   [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md)
-4. Downstream workflows:
+3. Shared dataset assembly:
+   [multi-source-shared-dataset-assembly.md](multi-source-shared-dataset-assembly.md),
+   [construct-infer-shared-dataset-runbook.md](construct-infer-shared-dataset-runbook.md)
+4. Promoter study workflows:
    [promoter-evo2-journey.md](promoter-evo2-journey.md),
    [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md)
 5. Validation drills:

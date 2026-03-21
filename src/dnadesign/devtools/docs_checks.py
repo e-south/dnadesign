@@ -191,7 +191,7 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md": {
+    "src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "usr",
@@ -201,7 +201,7 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-runbook.md": {
+    "src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "usr",

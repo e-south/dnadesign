@@ -14,7 +14,7 @@ Use **[docs/README.md](README.md)** as the primary docs entry. This page is a co
 - **[DenseGen to USR to Notify tutorial](tutorials/demo_usr_notify.md)**
 
 ### Cross-tool handoff routes
-- **[Multi-source source-of-truth assembly](../../usr/docs/operations/multi-source-source-of-truth-assembly.md)**: merge DenseGen outputs with other USR-backed sources before construct and infer share one downstream dataset.
+- **[Multi-source shared dataset assembly](../../usr/docs/operations/multi-source-shared-dataset-assembly.md)**: merge DenseGen outputs with other USR-backed sources before construct and infer share one downstream dataset.
 - **[Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md)**: continue from DenseGen outputs into infer-derived feature columns before clustering or OPAL.
 
 ### Workspace docs

@@ -20,8 +20,8 @@
 - [CLI quickstart](getting-started/cli-quickstart.md): run `validate`, ad-hoc `extract`, and ad-hoc `generate`.
 - [Reference index](reference/README.md): command and contract lookups before automation.
 
-#### Run Evo2 feature-bundle extraction
-- [Evo2 promoter feature runbook](operations/evo2-promoter-features.md): repo-aligned feature-bundle flow with explicit anchor-only and templated contexts.
+#### Run a study-specific Evo2 feature bundle
+- [Evo2 promoter-study feature runbook](operations/evo2-promoter-features.md): repo-aligned feature-bundle flow with explicit anchor-only and templated contexts for promoter datasets.
 - [Evo2 provider reference](reference/evo2-provider.md): supported checkpoints, default block 26 selector, and storage/debug defaults.
 - [Feature schema and selector contract](reference/feature-schema.md): output ids, metadata out ids, digests, and OPAL export ordering.
 - [evo2_feature_bundle_smoke workspace](../workspaces/evo2_feature_bundle_smoke/README.md): packaged feature-bundle smoke path with generic anchor and templated records.
@@ -49,9 +49,9 @@
 
 ### Shared dataset handoffs into infer
 
-- [Multi-source source-of-truth assembly](../../usr/docs/operations/multi-source-source-of-truth-assembly.md): shared multi-source consolidation route before construct and infer share one downstream dataset.
-- [Construct -> USR -> Infer source-of-truth runbook](../../usr/docs/operations/construct-infer-source-of-truth-runbook.md): shared construct-led consolidation route once construct owns the current handoff.
-- [Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md): cross-tool feature-matrix assembly before downstream cluster or OPAL use.
+- [Multi-source shared dataset assembly](../../usr/docs/operations/multi-source-shared-dataset-assembly.md): shared multi-source consolidation route before construct and infer share one downstream dataset.
+- [Construct -> USR -> Infer shared dataset runbook](../../usr/docs/operations/construct-infer-shared-dataset-runbook.md): shared construct-led consolidation route once construct owns the current handoff.
+- [Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md): study-specific feature-dataset assembly before downstream cluster or OPAL use.
 
 ### Documentation by type
 

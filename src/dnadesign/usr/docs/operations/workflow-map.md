@@ -133,14 +133,14 @@ uv run construct workspace validate-project --workspace "$WORKSPACE_ROOT" --proj
 uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_a_window # Materialize slot_a rows into the shared downstream dataset.
 uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_b_window # Materialize slot_b rows into the shared downstream dataset.
 # Dry-run infer against the same downstream dataset after the shared continuation creates the infer config.
-uv run infer run --config "$WORKSPACE_ROOT/infer.construct-source-of-truth.yaml" --dry-run # Dry-run infer against the same downstream dataset.
+uv run infer run --config "$WORKSPACE_ROOT/infer.construct-shared-dataset.yaml" --dry-run # Dry-run infer against the same downstream dataset.
 # Dry-run downstream event consumption against the same downstream dataset.
 uv run notify usr-events watch --events "$USR_ROOT/$DOWNSTREAM_DATASET/.events.log" --provider generic --dry-run --no-advance-cursor-on-dry-run # Dry-run downstream event watching against the same downstream dataset.
 ```
 
-Details: [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md)
+Details: [multi-source-shared-dataset-assembly.md](multi-source-shared-dataset-assembly.md)
 
-## Construct -> USR -> Infer source-of-truth loop
+## Construct -> USR -> Infer shared dataset loop
 
 Use this when construct should consolidate explicit source/template pairs into one USR-backed dataset before infer adds namespaced overlays.
 
@@ -154,12 +154,12 @@ uv run construct workspace validate-project --workspace "$WORKSPACE_ROOT" --proj
 uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_a_window # Materialize slot_a rows into the shared dataset.
 uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_b_window # Materialize slot_b rows into the shared dataset.
 # Dry-run infer against the construct dataset before any model execution.
-uv run infer run --config "$WORKSPACE_ROOT/infer.construct-source-of-truth.yaml" --dry-run
+uv run infer run --config "$WORKSPACE_ROOT/infer.construct-shared-dataset.yaml" --dry-run
 # Dry-run downstream event consumption against the same dataset.
 uv run notify usr-events watch --events "$USR_ROOT/$DATASET_ID/.events.log" --provider generic --dry-run --no-advance-cursor-on-dry-run
 ```
 
-Details: [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md)
+Details: [construct-infer-shared-dataset-runbook.md](construct-infer-shared-dataset-runbook.md)
 
 ## Promoter feature matrix -> Cluster or OPAL prep
 

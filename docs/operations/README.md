@@ -67,8 +67,8 @@ Use these when you still need command lookup before choosing a runbook lifecycle
 8. Keep the manifest explicit. Ops reads the files you name there; it does not infer hidden campaign state.
 9. For progress-kind meanings and the next checks for each one, see the [runbook catalog progress views](../runbooks/README.md#progress-views).
 10. If the next step is dataset assembly, construct realization, or infer write-back, leave Ops and continue in the shared USR runbooks:
-    [Multi-source source-of-truth assembly](../../src/dnadesign/usr/docs/operations/multi-source-source-of-truth-assembly.md),
-    [Construct -> USR -> Infer source-of-truth runbook](../../src/dnadesign/usr/docs/operations/construct-infer-source-of-truth-runbook.md),
+    [Multi-source shared dataset assembly](../../src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md),
+    [Construct -> USR -> Infer shared dataset runbook](../../src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md),
     or [Promoter characterization feature matrix](../../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md).
 
 ### Verification loop

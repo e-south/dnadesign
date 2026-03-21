@@ -15,7 +15,7 @@
 
 Use this runbook when promoter candidates come from multiple USR-backed sources and downstream consumers should see one infer-annotated feature matrix with explicit provenance.
 
-If you still need to choose between source assembly, construct expansion, and feature extraction, start with [Promoter Evo2 workflow journey](promoter-evo2-journey.md) first.
+If you still need to choose between source assembly, construct expansion, and feature extraction, start with [Promoter study Evo2 workflow journey](promoter-evo2-journey.md) first.
 
 Use this runbook to:
 
@@ -99,10 +99,10 @@ export FEATURE_DATASET="$PRIMARY_INPUT_DATASET" # Reuse the merged anchor-only d
 
 ### 3) Optionally materialize larger construct-backed contexts
 
-When the representation study needs 1 kb windows, plasmid contexts, or other template-backed sequences, materialize those explicitly with construct first. Reuse the shared construct-backed source-of-truth runbooks instead of duplicating their unique steps here:
+When the representation study needs 1 kb windows, plasmid contexts, or other template-backed sequences, materialize those explicitly with construct first. Reuse the shared construct-backed dataset runbooks instead of duplicating their unique steps here:
 
-- [Multi-source source-of-truth assembly](multi-source-source-of-truth-assembly.md): use when the merged source dataset should be realized through construct into one downstream dataset.
-- [Construct -> USR -> Infer source-of-truth runbook](construct-infer-source-of-truth-runbook.md): use when one construct-backed downstream dataset is already the intended canonical handoff.
+- [Multi-source shared dataset assembly](multi-source-shared-dataset-assembly.md): use when the merged source dataset should be realized through construct into one downstream dataset.
+- [Construct -> USR -> Infer shared dataset runbook](construct-infer-shared-dataset-runbook.md): use when one construct-backed downstream dataset is already the intended canonical handoff.
 
 After construct materializes the expanded context dataset, set:
 
@@ -253,8 +253,8 @@ Continue with the OPAL-owned workflow for the full label-ingest and round-loop p
 - Docs index: [../../../../../docs/README.md](../../../../../docs/README.md)
 - USR operations index: [README.md](README.md)
 - USR workflow map: [workflow-map.md](workflow-map.md)
-- Multi-source upstream assembly: [multi-source-source-of-truth-assembly.md](multi-source-source-of-truth-assembly.md)
-- Construct-backed source-of-truth handoff: [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md)
+- Multi-source upstream assembly: [multi-source-shared-dataset-assembly.md](multi-source-shared-dataset-assembly.md)
+- Construct-backed shared dataset handoff: [construct-infer-shared-dataset-runbook.md](construct-infer-shared-dataset-runbook.md)
 - Infer docs index: [../../../infer/docs/README.md](../../../infer/docs/README.md)
 - Cluster exploratory workflow surface: [../../../cluster/docs/workflows/exploratory-clustering.md](../../../cluster/docs/workflows/exploratory-clustering.md)
 - OPAL downstream workflow: [../../../opal/docs/workflows/usr-infer-x-active-learning.md](../../../opal/docs/workflows/usr-infer-x-active-learning.md)

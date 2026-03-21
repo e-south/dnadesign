@@ -1,4 +1,4 @@
-## Multi-Source Source-of-Truth Assembly
+## Multi-Source Shared Dataset Assembly
 
 **Type:** runbook
 **Plane:** data-plane
@@ -6,7 +6,7 @@
 **Entry artifact:** multiple USR-backed input datasets plus explicit merge, carry, and construct intent
 **Exit artifact:** one construct-backed downstream USR dataset ready for infer and notify handoff
 **Registry-id:** usr.data-plane.multi-source-source-of-truth
-**Summary:** Merge multiple USR-backed sources, preserve explicit carry, and hand one construct-backed downstream dataset to Infer and Notify.
+**Summary:** Merge multiple USR-backed sources, preserve explicit carry, and hand one construct-backed shared dataset to Infer and Notify.
 **Execution-kind:** staged
 **Progress-kind:** usr-dataset-state
 
@@ -34,7 +34,7 @@ Use this runbook to:
 
 - upstream records already exist in multiple USR datasets
 - one upstream source may come from DenseGen while another comes from seeded controls, manual imports, or other USR-backed producers
-- one downstream construct dataset should remain the durable handoff boundary for infer and downstream consumers
+- one downstream construct dataset should remain the durable shared handoff boundary for infer and downstream consumers
 - source labels or other carried overlays must survive the pre-construct consolidation step
 
 ### Design stance
@@ -51,8 +51,8 @@ Use this runbook to:
 ```bash
 # Create one disposable workspace root for the tracer-bullet flow.
 export WORK_ROOT="$(mktemp -d /tmp/dnadesign-multisource-XXXXXX)" # Allocate a disposable root for the shared workspace and USR datasets.
-uv run construct workspace init --id source_of_truth_demo --root "$WORK_ROOT" --profile promoter-swap-source-of-truth-demo # Scaffold the packaged construct workspace that will read merged USR inputs.
-export WORKSPACE_ROOT="$WORK_ROOT/source_of_truth_demo" # Reuse one workspace path across construct, infer, and notify commands.
+uv run construct workspace init --id shared_dataset_demo --root "$WORK_ROOT" --profile promoter-swap-source-of-truth-demo # Scaffold the packaged construct workspace that will read merged USR inputs.
+export WORKSPACE_ROOT="$WORK_ROOT/shared_dataset_demo" # Reuse one workspace path across construct, infer, and notify commands.
 export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Keep all USR mutations inside the workspace-local datasets root.
 
 # Seed packaged control/template inputs used by the tracer bullet.
@@ -156,7 +156,7 @@ uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project s
 uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_b_window # Materialize slot_b rows into the shared downstream dataset.
 ```
 
-### 5) Verify the downstream source-of-truth dataset
+### 5) Verify the downstream shared dataset
 
 ```bash
 # Confirm the downstream construct dataset satisfies the active USR registry.
@@ -175,15 +175,15 @@ Expected outcome:
 
 ### 6) Continue through the shared downstream construct-backed handoff
 
-Once the merged upstream dataset has been realized into `"$DOWNSTREAM_DATASET"`, switch to the shared downstream continuation in [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md):
+Once the merged upstream dataset has been realized into `"$DOWNSTREAM_DATASET"`, switch to the shared downstream continuation in [construct-infer-shared-dataset-runbook.md](construct-infer-shared-dataset-runbook.md):
 
 ```bash
 # Reuse the same downstream dataset id under the shared continuation contract.
 export DATASET_ID="$DOWNSTREAM_DATASET"
 # Continue with the shared infer handoff section.
-# See: construct-infer-source-of-truth-runbook.md#5-shared-downstream-continuation-prepare-infer-handoff-against-the-construct-dataset
+# See: construct-infer-shared-dataset-runbook.md#5-shared-downstream-continuation-prepare-infer-handoff-against-the-construct-dataset
 # Then verify the shared events path.
-# See: construct-infer-source-of-truth-runbook.md#6-shared-downstream-continuation-verify-downstream-event-consumption
+# See: construct-infer-shared-dataset-runbook.md#6-shared-downstream-continuation-verify-downstream-event-consumption
 ```
 
 ### 7) Continue into scheduler orchestration only after the data-plane passes
@@ -201,13 +201,13 @@ The Ops control plane is downstream from this runbook. It should not replace the
 - `usr head "$PRIMARY_INPUT_DATASET" --columns id,usr_label__primary` shows labels from all surviving source rows
 - `construct workspace validate-project --runtime` succeeds for every project that targets the shared downstream dataset
 - `usr validate "$DOWNSTREAM_DATASET" --strict` passes after construct writes
-- the shared downstream continuation in `construct-infer-source-of-truth-runbook.md` succeeds for infer config validation, infer dry-run, and notify event resolution against the same downstream dataset
+- the shared downstream continuation in `construct-infer-shared-dataset-runbook.md` succeeds for infer config validation, infer dry-run, and notify event resolution against the same downstream dataset
 
 ## Related docs
 
 - Docs index: [../../../../../docs/README.md](../../../../../docs/README.md)
 - USR workflow map: [workflow-map.md](workflow-map.md)
-- Construct-only downstream handoff: [construct-infer-source-of-truth-runbook.md](construct-infer-source-of-truth-runbook.md)
+- Construct-backed shared dataset handoff: [construct-infer-shared-dataset-runbook.md](construct-infer-shared-dataset-runbook.md)
 - USR maintenance merge contract: [../reference/maintenance.md](../reference/maintenance.md)
 - Construct workflow docs: [../../../construct/docs/README.md](../../../construct/docs/README.md)
 - DenseGen workflow docs: [../../../densegen/docs/README.md](../../../densegen/docs/README.md)
