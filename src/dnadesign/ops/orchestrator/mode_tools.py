@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal
 
-from dnadesign._contracts import resolve_usr_producer_contract
+from dnadesign._contracts import resolve_densegen_usr_output_contract, resolve_usr_producer_contract
 
 from ..runbooks.schema import OrchestrationRunbookV1
 from .workflow_tools import (
@@ -102,11 +102,13 @@ def _resolve_infer_usr_output_for_mode_probe(infer_config: Path):
 
 def _has_densegen_resume_artifacts(runbook: OrchestrationRunbookV1) -> bool:
     workspace_root = runbook.workspace_root
-    markers = (
+    markers = [
         workspace_root / "outputs" / "meta" / "run_manifest.json",
         workspace_root / "outputs" / "tables" / "records.parquet",
-        workspace_root / "outputs" / "usr_datasets" / "registry.yaml",
-    )
+    ]
+    if runbook.densegen is not None and runbook.densegen.config.exists() and runbook.densegen.config.is_file():
+        contract = resolve_densegen_usr_output_contract(runbook.densegen.config)
+        markers.append(contract.usr_root / contract.usr_dataset / "records.parquet")
     if any(path.exists() for path in markers):
         return True
     tables_root = workspace_root / "outputs" / "tables"

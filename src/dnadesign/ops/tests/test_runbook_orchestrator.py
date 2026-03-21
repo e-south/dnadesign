@@ -98,13 +98,30 @@ def _write_runbook(
     *,
     include_smoke: bool = True,
     include_notify: bool = True,
+    usr_root: Path | None = None,
+    usr_dataset: str = "densegen/study_stress_ethanol_cipro",
 ) -> Path:
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir(parents=True, exist_ok=True)
     notify_root = workspace_root / "outputs" / "notify" / "densegen"
     if include_notify:
         notify_root.mkdir(parents=True, exist_ok=True)
-    (workspace_root / "config.yaml").write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    selected_usr_root = usr_root or (workspace_root / "outputs" / "usr_datasets")
+    (workspace_root / "config.yaml").write_text(
+        f"""
+densegen:
+  run:
+    id: demo
+    root: .
+  output:
+    targets: [usr]
+    usr:
+      root: "{selected_usr_root}"
+      dataset: "{usr_dataset}"
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
 
     runbook_payload: dict[str, object] = {
         "schema_version": 1,
@@ -759,6 +776,50 @@ def test_mode_auto_selects_resume_when_attempt_artifacts_exist_with_usr_base_rec
     )
     usr_records_path.parent.mkdir(parents=True, exist_ok=True)
     base_records_table = pyarrow.table({"id": ["r1"], "sequence": ["ATGCATGC"]})
+    pyarrow_parquet.write_table(base_records_table, usr_records_path)
+
+    attempts_path = runbook.workspace_root / "outputs" / "tables" / "attempts_part-test.parquet"
+    attempts_path.parent.mkdir(parents=True, exist_ok=True)
+    attempts_table = pyarrow.table({"attempt_id": ["a1"]})
+    pyarrow_parquet.write_table(attempts_table, attempts_path)
+
+    decision = resolve_mode_decision(runbook=runbook, requested_mode=None, active_job_ids=())
+    assert decision.selected_mode == "resume"
+    assert decision.run_args == "--resume --no-plot"
+
+
+def test_mode_auto_selects_resume_when_attempt_artifacts_exist_with_external_usr_base_records(tmp_path: Path) -> None:
+    pyarrow = pytest.importorskip("pyarrow")
+    pyarrow_parquet = pytest.importorskip("pyarrow.parquet")
+
+    external_usr_root = tmp_path / "external_usr_root"
+    runbook_path = _write_runbook(
+        tmp_path,
+        usr_root=external_usr_root,
+        usr_dataset="densegen/study_stress_ethanol_cipro",
+    )
+    runbook = load_orchestration_runbook(runbook_path)
+
+    usr_records_path = external_usr_root / "densegen" / "study_stress_ethanol_cipro" / "records.parquet"
+    usr_records_path.parent.mkdir(parents=True, exist_ok=True)
+    used_tfbs_type = pyarrow.list_(
+        pyarrow.struct(
+            [
+                pyarrow.field("part_kind", pyarrow.string()),
+            ]
+        )
+    )
+    used_tfbs_detail = pyarrow.array([[{"part_kind": "tfbs"}]], type=used_tfbs_type)
+    base_records_table = pyarrow.table(
+        {
+            "id": ["r1"],
+            "sequence": ["ATGCATGC"],
+            "densegen__run_id": ["study_stress_ethanol_cipro"],
+            "densegen__input_name": ["plan_pool__ethanol__sig35_f"],
+            "densegen__plan": ["ethanol__sig35=f"],
+            "densegen__used_tfbs_detail": used_tfbs_detail,
+        }
+    )
     pyarrow_parquet.write_table(base_records_table, usr_records_path)
 
     attempts_path = runbook.workspace_root / "outputs" / "tables" / "attempts_part-test.parquet"

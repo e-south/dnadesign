@@ -19,6 +19,7 @@ from typing import Literal, Sequence
 
 from dnadesign._contracts import (
     ResumeReadinessPolicy,
+    resolve_densegen_usr_output_contract,
     resolve_resume_readiness_policy,
 )
 
@@ -110,7 +111,18 @@ class ModeDecision:
     reason: str
 
 
-def _candidate_record_paths_for_resume(workspace_root: Path) -> tuple[Path, ...]:
+def _densegen_usr_record_candidates(runbook: OrchestrationRunbookV1) -> tuple[Path, ...]:
+    if runbook.densegen is None:
+        return ()
+    if not runbook.densegen.config.exists() or not runbook.densegen.config.is_file():
+        return ()
+    contract = resolve_densegen_usr_output_contract(runbook.densegen.config)
+    dataset_root = contract.usr_root / contract.usr_dataset
+    return (dataset_root / "records.parquet",)
+
+
+def _candidate_record_paths_for_resume(runbook: OrchestrationRunbookV1) -> tuple[Path, ...]:
+    workspace_root = runbook.workspace_root
     tables_root = workspace_root / "outputs" / "tables"
     candidate_dirs = [tables_root]
     nested_tables_root = tables_root / "tables"
@@ -120,9 +132,7 @@ def _candidate_record_paths_for_resume(workspace_root: Path) -> tuple[Path, ...]
     for directory in candidate_dirs:
         candidates.append(directory / "records.parquet")
         candidates.extend(sorted(directory.glob("records__part-*.parquet")))
-    usr_root = workspace_root / "outputs" / "usr_datasets"
-    if usr_root.exists():
-        candidates.extend(sorted(usr_root.glob("**/records.parquet")))
+    candidates.extend(_densegen_usr_record_candidates(runbook))
     deduped: list[Path] = []
     seen: set[Path] = set()
     for path in candidates:
@@ -194,10 +204,11 @@ def _missing_required_resume_columns(path: Path, *, required_columns: Sequence[s
 
 
 def _classify_resume_state(
-    workspace_root: Path,
+    runbook: OrchestrationRunbookV1,
     *,
     policy: ResumeReadinessPolicy,
 ) -> tuple[ResumeState, str]:
+    workspace_root = runbook.workspace_root
     run_manifest = workspace_root / "outputs" / "meta" / "run_manifest.json"
     if run_manifest.exists():
         return "resume_ready", f"resume-ready via run manifest: {run_manifest}"
@@ -215,7 +226,7 @@ def _classify_resume_state(
         zero_row_attempt_paths.append(path)
 
     zero_row_paths: list[Path] = []
-    for path in _candidate_record_paths_for_resume(workspace_root):
+    for path in _candidate_record_paths_for_resume(runbook):
         if not path.exists():
             continue
         try:
@@ -282,7 +293,7 @@ def resolve_mode_decision(
     if has_explicit_resume_policy:
         assert resume_policy is not None
         resume_state, resume_readiness_reason = _classify_resume_state(
-            runbook.workspace_root,
+            runbook,
             policy=resume_policy,
         )
         artifacts_found = resume_state != "none"
