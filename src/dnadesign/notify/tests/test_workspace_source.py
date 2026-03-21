@@ -311,17 +311,32 @@ def test_list_tool_workspaces_returns_project_qualified_construct_selectors(tmp_
     assert "demo_c" not in workspaces
 
 
-def test_resolve_tool_workspace_config_path_rejects_legacy_infer_alias(tmp_path: Path) -> None:
+def test_resolve_tool_workspace_config_path_accepts_legacy_infer_alias(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
-    repo_root.mkdir(parents=True, exist_ok=True)
+    config_path = repo_root / "src" / "dnadesign" / "infer" / "workspaces" / "demo_i" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("jobs: []\n", encoding="utf-8")
     (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\n", encoding="utf-8")
 
-    with pytest.raises(NotifyConfigError, match="unsupported tool"):
-        resolve_tool_workspace_config_path(
-            tool="infer-evo2",
-            workspace="demo_i",
-            search_start=repo_root,
-        )
+    resolved = resolve_tool_workspace_config_path(
+        tool="infer-evo2",
+        workspace="demo_i",
+        search_start=repo_root,
+    )
+
+    assert resolved == config_path.resolve()
+
+
+def test_list_tool_workspaces_accepts_legacy_infer_alias(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    config_path = repo_root / "src" / "dnadesign" / "infer" / "workspaces" / "demo_i" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("jobs: []\n", encoding="utf-8")
+    (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\n", encoding="utf-8")
+
+    names = list_tool_workspaces(tool="infer_evo2", search_start=repo_root)
+
+    assert names == ["demo_i"]
 
 
 def test_list_tool_workspaces_reports_available_workspace_names(tmp_path: Path) -> None:

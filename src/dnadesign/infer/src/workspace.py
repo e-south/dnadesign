@@ -111,9 +111,8 @@ def _workspace_inventory_entry(*, workspace_dir: Path) -> dict[str, object]:
     }
 
 
-def list_packaged_workspace_inventory() -> list[dict[str, object]]:
-    root = _packaged_workspaces_root().resolve()
-    if not root.exists():
+def _workspace_inventory_from_root(root: Path) -> list[dict[str, object]]:
+    if not root.exists() or not root.is_dir():
         return []
     inventory: list[dict[str, object]] = []
     for workspace_dir in sorted(root.iterdir()):
@@ -123,6 +122,26 @@ def list_packaged_workspace_inventory() -> list[dict[str, object]]:
             continue
         inventory.append(_workspace_inventory_entry(workspace_dir=workspace_dir))
     return inventory
+
+
+def list_packaged_workspace_inventory() -> list[dict[str, object]]:
+    root = _packaged_workspaces_root().resolve()
+    inventory = _workspace_inventory_from_root(root)
+    for entry in inventory:
+        entry["workspace_source"] = "packaged"
+    return inventory
+
+
+def list_workspace_inventory(root: Optional[Path] = None) -> list[dict[str, object]]:
+    workspace_root, workspace_root_source = resolve_workspace_root(root)
+    inventory_by_id: dict[str, dict[str, object]] = {}
+    for entry in _workspace_inventory_from_root(workspace_root):
+        entry["workspace_source"] = "local"
+        entry["workspace_root_source"] = workspace_root_source
+        inventory_by_id[str(entry["workspace_id"])] = entry
+    for entry in list_packaged_workspace_inventory():
+        inventory_by_id.setdefault(str(entry["workspace_id"]), entry)
+    return [inventory_by_id[key] for key in sorted(inventory_by_id)]
 
 
 def init_workspace(

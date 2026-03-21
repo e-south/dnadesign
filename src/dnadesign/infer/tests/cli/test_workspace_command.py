@@ -175,6 +175,34 @@ def test_workspace_list_json_reports_packaged_workspace_state(monkeypatch, tmp_p
     by_id = {entry["workspace_id"]: entry for entry in payload}
     assert by_id["demo_usr_pressure"]["workspace_state"] == "clean"
     assert by_id["demo_usr_pressure"]["output_files"] == 0
+    assert by_id["demo_usr_pressure"]["workspace_source"] == "packaged"
     assert by_id["evo2_feature_bundle_smoke"]["workspace_state"] == "attention"
     assert by_id["evo2_feature_bundle_smoke"]["output_files"] == 1
+    assert by_id["evo2_feature_bundle_smoke"]["workspace_source"] == "packaged"
     assert by_id["evo2_feature_bundle_smoke"]["latest_output_mtime"] is not None
+
+
+def test_workspace_list_json_reports_local_copied_workspace_state(monkeypatch, tmp_path: Path) -> None:
+    infer_root = tmp_path / "infer_root"
+    packaged_root = infer_root / "workspaces" / "demo_usr_pressure"
+    packaged_root.mkdir(parents=True, exist_ok=True)
+    (packaged_root / "config.yaml").write_text("ingest:\n  source: records\n", encoding="utf-8")
+    local_root = tmp_path / "workspaces"
+    local_workspace = local_root / "demo_local"
+    (local_workspace / "outputs" / "logs").mkdir(parents=True, exist_ok=True)
+    (local_workspace / "config.yaml").write_text("ingest:\n  source: records\n", encoding="utf-8")
+    (local_workspace / "outputs" / "logs" / "run.log").write_text("ok\n", encoding="utf-8")
+    monkeypatch.setattr("dnadesign.infer.src.workspace._infer_root", lambda: infer_root)
+    monkeypatch.chdir(tmp_path)
+
+    result = _RUNNER.invoke(app, ["workspace", "list", "--format", "json"])
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    by_id = {entry["workspace_id"]: entry for entry in payload}
+    assert by_id["demo_local"]["workspace_source"] == "local"
+    assert by_id["demo_local"]["workspace_state"] == "attention"
+    assert by_id["demo_local"]["output_files"] == 1
+    assert by_id["demo_local"]["workspace_root_source"] == "cwd-default"
+    assert by_id["demo_local"]["workspace_dir"] == str(local_workspace.resolve())
+    assert by_id["demo_usr_pressure"]["workspace_source"] == "packaged"

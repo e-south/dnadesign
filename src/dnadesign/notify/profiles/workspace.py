@@ -356,4 +356,5 @@ register_tool_workspace_resolver(
     tool="infer",
     resolve_config=_resolve_infer_config_from_known_roots,
     list_workspaces=_list_infer_workspace_names,
+    aliases=("infer_evo2", "infer-evo2"),
 )

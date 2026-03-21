@@ -19,7 +19,7 @@ import typer
 
 from ...workspace import (
     init_workspace,
-    list_packaged_workspace_inventory,
+    list_workspace_inventory,
     resolve_workspace_root,
     resolve_workspace_template,
 )
@@ -45,12 +45,13 @@ def register(app: typer.Typer) -> None:
         except Exception as error:
             raise_cli_error(error)
 
-    @workspace_app.command("list", help="List packaged workspaces and workspace-local output state.")
+    @workspace_app.command("list", help="List local infer workspaces in the active root plus packaged templates.")
     def workspace_list(
         fmt: str = typer.Option("text", "--format", help="Output format: text, json, or ids."),
+        root: Optional[Path] = typer.Option(None, "--root", help="Explicit workspace root to inventory."),
     ) -> None:
         try:
-            inventory = list_packaged_workspace_inventory()
+            inventory = list_workspace_inventory(root)
         except Exception as error:
             raise_cli_error(error)
         fmt_norm = str(fmt).strip().lower()
@@ -68,6 +69,7 @@ def register(app: typer.Typer) -> None:
                 "\t".join(
                     [
                         str(entry["workspace_id"]),
+                        f"workspace_source={entry['workspace_source']}",
                         f"workspace_state={entry['workspace_state']}",
                         f"output_files={entry['output_files']}",
                         f"latest_output_mtime={entry['latest_output_mtime'] or '-'}",
