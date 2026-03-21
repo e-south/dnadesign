@@ -86,10 +86,11 @@ def resolve_fit_method_params(
 ) -> dict[str, Any]:
     params = _job_method_params(job_params)
     try:
-        params.update(parse_method_param_assignments(list(cli_assignments)))
+        cli_params = parse_method_param_assignments(list(cli_assignments))
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
     if not preset_name or not params:
+        params.update(cli_params)
         return params
     preset_params = apply_preset("method", preset_name)
     overlap = sorted(set(params).intersection(preset_params))
@@ -99,6 +100,7 @@ def resolve_fit_method_params(
             + ", ".join(overlap)
             + ". Keep reusable method knobs in the preset or override them exclusively via --method-param."
         )
+    params.update(cli_params)
     return params
 
 
