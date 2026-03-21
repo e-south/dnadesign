@@ -83,6 +83,7 @@ uv run usr push my_dataset bu-scc -y
 
 Safety guardrails:
 
+- `usr diff` / `usr pull` / `usr push` fail fast on SSH auth or transport errors instead of treating the remote dataset as silently missing.
 - `usr pull` fails fast when remote `records.parquet` is missing.
 - `usr push` fails fast when local `records.parquet` is missing.
 - Dataset transfers acquire the shared remote dataset lock (`.usr.lock`) to avoid cross-host write races.

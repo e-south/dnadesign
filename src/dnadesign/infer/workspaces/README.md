@@ -33,6 +33,11 @@ This creates:
   - `src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml`
   - `ingest.root: outputs/usr_datasets` resolves relative to the workspace `config.yaml`
 
+`outputs/usr_datasets` inside an infer workspace is a workspace-local USR export
+root. Use it for self-contained pressure tests or local ownership. Point infer
+at an explicit shared USR root when the dataset is the cross-tool study source
+of truth.
+
 ### Local data path option (non-USR)
 
 For config-driven local files, set `ingest.source` and `ingest.path` in `config.yaml`:

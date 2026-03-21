@@ -776,22 +776,24 @@ def test_usr_storage_policy_docs_distinguish_workspace_defaults_and_explicit_ext
     setup = _read("src/dnadesign/usr/docs/operations/sync-setup.md")
     quickstart = _read("src/dnadesign/usr/docs/operations/sync-quickstart.md")
 
-    assert (
-        "Curated dnadesign workspaces default USR dataset roots to `<workspace-root>/outputs/usr_datasets`."
-        in architecture
-    )
-    assert (
-        "Explicit external USR roots remain allowed for sync and mirror workflows "
-        "when the operator chooses them deliberately." in architecture
-    )
-    assert (
-        "Curated workspace and runbook examples must default USR dataset roots to "
-        "`<workspace-root>/outputs/usr_datasets`." in design
-    )
-    assert "External USR roots remain allowed only when the workflow makes that storage boundary explicit." in design
-    assert "Canonical repo-local datasets should live under `src/dnadesign/usr/datasets`." in setup
+    assert "Curated study-facing workspaces that enable USR sinks should default those" in architecture
+    assert "Workspace-local export roots remain allowed only as explicit opt-in producer" in architecture
+    assert "Curated study-facing workspace and runbook examples should default USR sinks" in design
+    assert "Workspace-local export roots and external USR roots remain allowed only when" in design
+    assert "Shared repo-local datasets should live under `src/dnadesign/usr/datasets`." in setup
     assert "External dataset roots are still allowed for ad-hoc sync or mirror workflows" in setup
     assert "The canonical repo-local datasets root is `src/dnadesign/usr/datasets`" in quickstart
+
+
+def test_construct_and_multi_source_runbooks_mark_workspace_local_paths_as_tracer_bullets() -> None:
+    construct_handoff = _read("src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md")
+    multi_source = _read("src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md")
+
+    assert "uses the packaged construct workspace as a local tracer bullet" in construct_handoff
+    assert "declared shared USR root authoritative" in construct_handoff
+    assert "local tracer-bullet USR root" in construct_handoff
+    assert "uses a packaged construct workspace as a local tracer bullet" in multi_source
+    assert "declared shared USR root authoritative" in multi_source
 
 
 def test_hpc_sync_runbook_covers_bootstrap_from_either_side() -> None:

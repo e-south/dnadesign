@@ -89,6 +89,9 @@ If you initialize a workspace outside the repo tree, reuse the `uv run --project
 - `construct workspace doctor` is the contract check for registry/config drift before project execution.
 - Packaged workspaces default construct IO to `outputs/usr_datasets`, consistent with repo workspace-scoping guidance.
 - Blank workspaces also scaffold explicit `root: outputs/usr_datasets` entries so custom studies do not fall back to repo-package datasets implicitly.
+- That workspace-local root is a construct-owned USR export surface. It becomes
+  the canonical shared study dataset only when the study record or operator
+  workflow promotes it into an explicit shared USR root deliberately.
 - External/shared USR roots remain allowed, but only through explicit `root:` fields or `construct seed --root <path>`.
 - One construct job uses one template; multi-template or slot-matrix studies are represented as multiple project entries and config files in the workspace registry.
 - The packaged promoter-swap demo exposes `./runbook.sh --mode seed|validate|dry-run|run|validate-all` as the local workspace entrypoint.

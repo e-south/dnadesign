@@ -41,8 +41,11 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
   - durable dataset state belongs to USR
   - notifier delivery state belongs to notifier tooling
   - workload-domain artifacts belong to the producing tool
-- Curated workspace and runbook examples must default USR dataset roots to `<workspace-root>/outputs/usr_datasets`.
-- External USR roots remain allowed only when the workflow makes that storage boundary explicit.
+- Curated study-facing workspace and runbook examples should default USR sinks
+  to an explicit shared USR root rather than an implicit workspace-local
+  dataset mirror.
+- Workspace-local export roots and external USR roots remain allowed only when
+  the workflow makes that storage boundary explicit.
 - Shared data-plane behaviors such as overlay compaction and part-management are expressed with USR semantics (`usr-overlay-*`) instead of tool-specific command names.
 - Cross-dataset overlay carry must stay explicit and narrow: no implicit merge-side overlay copying, no non-`id` carry keys, and no reserved-namespace transfer hidden behind convenience defaults.
 - No hidden path fallback is allowed for orchestration accumulation; when required paths are missing or invalid, commands fail with actionable errors.

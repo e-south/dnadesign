@@ -10,14 +10,18 @@ Use this page for one-time setup and periodic key hygiene.
 
 Recommended storage layout:
 
-- Canonical repo-local datasets should live under `src/dnadesign/usr/datasets`.
+- Shared repo-local datasets should live under `src/dnadesign/usr/datasets`.
 - External dataset roots are still allowed for ad-hoc sync or mirror workflows, for example `~/data/usr_datasets/` or another explicit operator-owned location.
 - SCC dataset roots should stay in project storage for long-lived runs, for example `/project/$USER/dnadesign/src/dnadesign/usr/datasets`.
 
 Notes:
 
 - Scratch may have retention/purge policies; use project storage for long-lived datasets.
-- Keep curated tool configs and logs in their tool workspaces, but keep canonical USR datasets under the package USR root.
+- Keep curated tool configs and logs in their tool workspaces.
+- Treat a tool workspace USR sink as explicit in the study record, whether it
+  writes to a workspace-local export root or directly to the shared root.
+- Keep shared USR datasets under the package USR root unless the study record
+  makes another shared root explicit.
 - Keep code in git, keep datasets in USR roots, and sync with `uv run usr diff/pull/push`.
 
 ## Prepare SSH keys (one-time)
@@ -84,6 +88,13 @@ uv run usr remotes wizard \
 uv run usr remotes doctor --remote bu-scc
 ```
 
+One-shot explicit config path without exporting shell state:
+
+```bash
+# Use this remotes file only for the current CLI invocation.
+uv run usr --remotes-config src/dnadesign/usr/remotes.yaml remotes list
+```
+
 Inspect remote config:
 
 ```bash
@@ -92,6 +103,9 @@ uv run usr remotes list
 
 # Show one remote in detail.
 uv run usr remotes show bu-scc
+
+# Show whether a reusable SSH control socket is already live.
+uv run usr remotes status --remote bu-scc
 ```
 
 File-based config example:
@@ -110,6 +124,15 @@ remotes:
 ```
 
 If BU SCC auth fails with `Permission denied (keyboard-interactive,hostbased)` under strict batch mode, re-save the remote with `--no-batch-mode` or set `batch_mode: false` in `USR_REMOTES_PATH`.
+
+If SCC still requires Duo or other keyboard-interactive follow-up after publickey auth, establish `ssh scc1` or `ssh scc1.bu.edu` once in a terminal first so the SSH ControlMaster socket is already live before running `usr remotes doctor`, `usr diff`, `usr pull`, or `usr push`. This matters because the sync lock handshake and other preflight probes run through piped SSH helpers that cannot complete a fresh keyboard-interactive prompt on their own.
+
+Repo-native bootstrap path:
+
+```bash
+# Establish or reuse the SSH control socket used by later sync commands.
+uv run usr remotes warm-auth --remote bu-scc
+```
 
 USR sync preserves dataset contents and sidecars across hosts, but it intentionally does not preserve remote owner/group/permission metadata on the destination.
 

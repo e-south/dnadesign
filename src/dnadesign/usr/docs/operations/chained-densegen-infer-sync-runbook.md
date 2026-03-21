@@ -19,23 +19,32 @@ Use this runbook for the full asynchronous loop where DenseGen writes on HPC and
 Default sync contract:
 - Dataset sync defaults to `--verify hash` plus strict sidecar and `_derived`/`_auxiliary` content-hash fidelity checks.
 - Use `--no-verify-derived-hashes` only when an operator intentionally trades content-hash fidelity for speed.
+- DenseGen may write first into a workspace-local USR export root; make the
+  shared study root explicit before using the dataset as the cross-tool
+  status surface.
 
 ## Scope
 
 - Dataset source of truth: USR dataset roots, not git.
 - Transfer boundary: `uv run usr diff/pull/push` over SSH remotes.
 - Chained tools: DenseGen batch writes plus Infer write-back overlays.
+- Naming boundary: distinguish producer-owned workspace export roots from the
+  shared dataset used for downstream status.
 
 ## One-time setup
 
 ```bash
-# Local root example (canonical repo-local datasets root)
+# Local root example (repo-local shared datasets root)
 export LOCAL_USR_ROOT="src/dnadesign/usr/datasets"
 # Confirm the configured remote profile and remote base_dir before syncing.
 uv run usr remotes show bu-scc
 # Reuse one dataset id across local and HPC phases.
 export DATASET_ID="my_dataset"
 ```
+
+If DenseGen writes first to a workspace-local export root on SCC, declare or
+create a remote profile for that root explicitly instead of pretending the
+workspace export is already the shared USR root.
 
 ## Quick path
 
@@ -55,10 +64,19 @@ uv run usr --root "$LOCAL_USR_ROOT" push "$DATASET_ID" bu-scc -y
 ```bash
 # Validate remote connectivity, transfer prerequisites, and lock support.
 uv run usr remotes doctor --remote bu-scc
+# Check whether the reusable SSH control socket is already live.
+uv run usr remotes status --remote bu-scc
 # Print the local root used by the remaining steps.
 echo "$LOCAL_USR_ROOT"
 # Print the dataset id used by the remaining steps.
 echo "$DATASET_ID"
+```
+
+If SCC MFA requires an interactive step before sync, run:
+
+```bash
+# Establish the reusable SSH control socket before sync.
+uv run usr remotes warm-auth --remote bu-scc
 ```
 
 ### 2) HPC side DenseGen batch increment
@@ -136,6 +154,9 @@ Recommended operator rule:
 1. If `_derived` or `_auxiliary` is `changed`, run transfer even when `.events.log` delta is small.
 2. If strict fidelity is required, keep default checks enabled and avoid `--no-verify-sidecars`, `--no-verify-derived-hashes`, `--primary-only`, and `--skip-snapshots`.
 3. Re-run `diff` after transfer; expected result is `up-to-date`.
+4. A large `_derived` inventory can make a strict no-op `pull` or `push`
+   spend noticeable time in post-transfer verification even when no payload
+   changes remain. Treat that as fidelity work, not silent corruption.
 
 ## Failure drills
 

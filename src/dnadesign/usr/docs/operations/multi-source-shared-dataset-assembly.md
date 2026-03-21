@@ -21,6 +21,12 @@ Use this runbook to:
 - construct realization into one downstream dataset
 - handoff into the shared downstream infer/notify continuation once that construct-backed dataset exists
 
+This runbook uses a packaged construct workspace as a local tracer bullet. The
+commands below intentionally keep early mutations inside that workspace-local
+USR root. For live promoter-study status and continuation, keep the study
+record's declared shared USR root authoritative and move or repoint the flow
+deliberately before treating the dataset as the cross-tool source of truth.
+
 ### Boundary decisions
 
 - USR owns cross-tool consolidation. Upstream producers only need to write valid USR datasets plus any overlays they want preserved.
@@ -53,7 +59,7 @@ Use this runbook to:
 export WORK_ROOT="$(mktemp -d /tmp/dnadesign-multisource-XXXXXX)" # Allocate a disposable root for the shared workspace and USR datasets.
 uv run construct workspace init --id shared_dataset_demo --root "$WORK_ROOT" --profile promoter-swap-source-of-truth-demo # Scaffold the packaged construct workspace that will read merged USR inputs.
 export WORKSPACE_ROOT="$WORK_ROOT/shared_dataset_demo" # Reuse one workspace path across construct, infer, and notify commands.
-export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Keep all USR mutations inside the workspace-local datasets root.
+export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Keep this tracer-bullet flow inside the packaged workspace-local datasets root.
 
 # Seed packaged control/template inputs used by the tracer bullet.
 uv run construct seed promoter-swap-demo \

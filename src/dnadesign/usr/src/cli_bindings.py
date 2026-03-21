@@ -67,6 +67,8 @@ class CliBindings:
     cmd_remotes_add: CommandBinding
     cmd_remotes_wizard: CommandBinding
     cmd_remotes_doctor: CommandBinding
+    cmd_remotes_status: CommandBinding
+    cmd_remotes_warm_auth: CommandBinding
     cmd_namespace_list: CommandBinding
     cmd_namespace_show: CommandBinding
     cmd_namespace_register: CommandBinding
@@ -216,6 +218,14 @@ def build_cli_bindings(
         remotes_commands.SSHRemote = get_ssh_remote_class()
         remotes_commands.cmd_remotes_doctor(args)
 
+    def cmd_remotes_status(args):
+        remotes_commands.SSHRemote = get_ssh_remote_class()
+        remotes_commands.cmd_remotes_status(args)
+
+    def cmd_remotes_warm_auth(args):
+        remotes_commands.SSHRemote = get_ssh_remote_class()
+        remotes_commands.cmd_remotes_warm_auth(args)
+
     def cmd_namespace_list(args):
         namespace_handlers_commands.cmd_namespace_list(args, deps=namespace_deps())
 
@@ -278,6 +288,8 @@ def build_cli_bindings(
         cmd_remotes_add=cmd_remotes_add,
         cmd_remotes_wizard=cmd_remotes_wizard,
         cmd_remotes_doctor=cmd_remotes_doctor,
+        cmd_remotes_status=cmd_remotes_status,
+        cmd_remotes_warm_auth=cmd_remotes_warm_auth,
         cmd_namespace_list=cmd_namespace_list,
         cmd_namespace_show=cmd_namespace_show,
         cmd_namespace_register=cmd_namespace_register,

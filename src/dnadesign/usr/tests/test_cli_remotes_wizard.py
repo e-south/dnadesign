@@ -17,6 +17,7 @@ import yaml
 from typer.testing import CliRunner
 
 import dnadesign.usr.src.cli as cli_module
+from dnadesign.usr.src.remote import SSHControlSessionStatus
 
 
 def _write_remotes(path: Path, text: str = "remotes: {}\n") -> None:
@@ -125,3 +126,167 @@ def test_remotes_doctor_reports_success(tmp_path: Path, monkeypatch) -> None:
     result = runner.invoke(cli_module.app, ["remotes", "doctor", "--remote", "bu-scc"])
     assert result.exit_code == 0, result.output
     assert "doctor checks passed" in result.output.lower()
+
+
+def test_remotes_doctor_guides_keyboard_interactive_auth(tmp_path: Path, monkeypatch) -> None:
+    remotes_path = tmp_path / "config" / "usr-remotes.yaml"
+    _write_remotes(
+        remotes_path,
+        text=(
+            "remotes:\n"
+            "  bu-scc:\n"
+            "    type: ssh\n"
+            "    host: scc1.bu.edu\n"
+            "    user: alice\n"
+            "    base_dir: /project/alice/usr_datasets\n"
+            "    batch_mode: true\n"
+        ),
+    )
+    monkeypatch.setenv("USR_REMOTES_PATH", str(remotes_path))
+
+    def _fake_which(name: str):
+        if name in {"ssh", "rsync"}:
+            return f"/usr/bin/{name}"
+        return None
+
+    class _FakeRemote:
+        def __init__(self, _cfg):
+            pass
+
+        def _ssh_run(self, _remote_cmd: str, check: bool = True):
+            del check
+            return 255, "", "Permission denied (keyboard-interactive,hostbased)"
+
+    monkeypatch.setattr(cli_module.shutil, "which", _fake_which)
+    monkeypatch.setattr(cli_module, "SSHRemote", _FakeRemote)
+
+    runner = CliRunner()
+    result = runner.invoke(cli_module.app, ["remotes", "doctor", "--remote", "bu-scc"])
+    assert result.exit_code != 0
+    assert "keyboard-interactive" in result.output
+    assert "--no-batch-mode" in result.output
+    assert "ssh scc1" in result.output
+
+
+def test_global_remotes_config_option_wires_commands_without_env(tmp_path: Path, monkeypatch) -> None:
+    remotes_path = tmp_path / "config" / "usr-remotes.yaml"
+    _write_remotes(
+        remotes_path,
+        text=(
+            "remotes:\n"
+            "  cluster:\n"
+            "    type: ssh\n"
+            "    host: scc1.bu.edu\n"
+            "    user: alice\n"
+            "    base_dir: /project/alice/usr_datasets\n"
+            "    batch_mode: false\n"
+        ),
+    )
+    monkeypatch.delenv("USR_REMOTES_PATH", raising=False)
+
+    runner = CliRunner()
+    result = runner.invoke(cli_module.app, ["--remotes-config", str(remotes_path), "remotes", "list"])
+    assert result.exit_code == 0, result.output
+    assert "cluster" in result.output
+    assert "interactive-auth" in result.output
+
+
+def test_remotes_status_emits_json(tmp_path: Path, monkeypatch) -> None:
+    remotes_path = tmp_path / "config" / "usr-remotes.yaml"
+    _write_remotes(
+        remotes_path,
+        text=(
+            "remotes:\n"
+            "  cluster:\n"
+            "    type: ssh\n"
+            "    host: scc1.bu.edu\n"
+            "    user: alice\n"
+            "    base_dir: /project/alice/usr_datasets\n"
+            "    batch_mode: false\n"
+        ),
+    )
+    monkeypatch.setenv("USR_REMOTES_PATH", str(remotes_path))
+
+    class _FakeRemote:
+        def __init__(self, _cfg):
+            pass
+
+        def control_session_status(self):
+            return SSHControlSessionStatus(
+                host="scc1.bu.edu",
+                user="alice",
+                ssh_target="alice@scc1.bu.edu",
+                batch_mode=False,
+                control_master="auto",
+                control_path="/tmp/cm.sock",
+                control_persist="600",
+                multiplex_enabled=True,
+                socket_exists=True,
+                socket_live=True,
+            )
+
+    monkeypatch.setattr(cli_module, "SSHRemote", _FakeRemote)
+
+    runner = CliRunner()
+    result = runner.invoke(cli_module.app, ["remotes", "status", "--remote", "cluster", "--json"])
+    assert result.exit_code == 0, result.output
+    assert '"remote":"cluster"' in result.output
+    assert '"socket_live":true' in result.output
+    assert '"recommendation":"ready for sync"' in result.output
+
+
+def test_remotes_warm_auth_reports_started_state(tmp_path: Path, monkeypatch) -> None:
+    remotes_path = tmp_path / "config" / "usr-remotes.yaml"
+    _write_remotes(
+        remotes_path,
+        text=(
+            "remotes:\n"
+            "  cluster:\n"
+            "    type: ssh\n"
+            "    host: scc1.bu.edu\n"
+            "    user: alice\n"
+            "    base_dir: /project/alice/usr_datasets\n"
+            "    batch_mode: false\n"
+        ),
+    )
+    monkeypatch.setenv("USR_REMOTES_PATH", str(remotes_path))
+
+    class _FakeRemote:
+        def __init__(self, _cfg):
+            pass
+
+        def control_session_status(self):
+            return SSHControlSessionStatus(
+                host="scc1.bu.edu",
+                user="alice",
+                ssh_target="alice@scc1.bu.edu",
+                batch_mode=False,
+                control_master="auto",
+                control_path="/tmp/cm.sock",
+                control_persist="600",
+                multiplex_enabled=True,
+                socket_exists=False,
+                socket_live=False,
+            )
+
+        def warm_auth_session(self):
+            return SSHControlSessionStatus(
+                host="scc1.bu.edu",
+                user="alice",
+                ssh_target="alice@scc1.bu.edu",
+                batch_mode=False,
+                control_master="auto",
+                control_path="/tmp/cm.sock",
+                control_persist="600",
+                multiplex_enabled=True,
+                socket_exists=True,
+                socket_live=True,
+            )
+
+    monkeypatch.setattr(cli_module, "SSHRemote", _FakeRemote)
+
+    runner = CliRunner()
+    result = runner.invoke(cli_module.app, ["remotes", "warm-auth", "--remote", "cluster", "--json"])
+    assert result.exit_code == 0, result.output
+    assert '"bootstrap_state":"started"' in result.output
+    assert '"socket_live":true' in result.output

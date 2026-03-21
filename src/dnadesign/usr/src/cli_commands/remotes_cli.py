@@ -25,6 +25,8 @@ def register_remotes_commands(
     cmd_remotes_add: Callable[[object], None],
     cmd_remotes_wizard: Callable[[object], None],
     cmd_remotes_doctor: Callable[[object], None],
+    cmd_remotes_status: Callable[[object], None],
+    cmd_remotes_warm_auth: Callable[[object], None],
 ) -> None:
     @remotes_app.command("list")
     def cli_remotes_list(ctx: typer.Context) -> None:
@@ -107,3 +109,19 @@ def register_remotes_commands(
         check_base_dir: bool = typer.Option(True, "--check-base-dir/--no-check-base-dir"),
     ) -> None:
         cmd_remotes_doctor(ctx_args_builder(ctx, remote=remote, check_base_dir=check_base_dir))
+
+    @remotes_app.command("status")
+    def cli_remotes_status(
+        ctx: typer.Context,
+        remote: str = typer.Option(..., "--remote", help="Configured remote name."),
+        json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    ) -> None:
+        cmd_remotes_status(ctx_args_builder(ctx, remote=remote, json=json))
+
+    @remotes_app.command("warm-auth")
+    def cli_remotes_warm_auth(
+        ctx: typer.Context,
+        remote: str = typer.Option(..., "--remote", help="Configured remote name."),
+        json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    ) -> None:
+        cmd_remotes_warm_auth(ctx_args_builder(ctx, remote=remote, json=json))

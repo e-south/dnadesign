@@ -18,11 +18,13 @@ Run `usr diff` / `usr pull` / `usr push` against BU SCC with the dnadesign-speci
 - Canonical local USR root in this repo: `src/dnadesign/usr/datasets`
 - Canonical SCC base dir for this repo: `/project/<user>/dnadesign/src/dnadesign/usr/datasets`
 - Use `uv run usr remotes doctor --remote <name>` before transfer
+- Use `uv run usr remotes status --remote <name>` to confirm whether a reusable SSH control socket is already live
 - Treat as pull-only unless the user explicitly asks to push
 - Never delete datasets from SCC as part of sync/bootstrap
 - Only treat directories with `records.parquet` as pullable datasets
 - Preserve dataset contents and sidecars; do not rely on owner/group/permission metadata parity across hosts
 - If SCC auth fails under `BatchMode=yes`, use `batch_mode: false`
+- If SCC still requires Duo or keyboard-interactive follow-up, run `uv run usr remotes warm-auth --remote <name>` in a real terminal before sync
 - Explicit missing dataset ids are valid bootstrap pull targets when strict bootstrap mode is off
 - Use the dataset id that is actually canonical in the repo, whether flat (`mg1655_promoters`) or namespace-qualified
 

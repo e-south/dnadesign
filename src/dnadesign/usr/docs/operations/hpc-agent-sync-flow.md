@@ -20,12 +20,16 @@ Default sync contract:
 - Dataset sync defaults to `--verify hash` plus strict sidecar and `_derived`/`_auxiliary` content-hash fidelity checks.
 - Dataset sync preserves contents and sidecars, not cross-host owner/group/permission bits.
 - Use `--no-verify-derived-hashes` only when an operator intentionally trades content-hash fidelity for speed.
+- Workspace-local USR roots are valid producer surfaces, but the study record
+  should still name which dataset copy is the shared cross-tool root.
 
 ## Scope
 
 - Source of truth for datasets: USR dataset roots (not git-tracked files).
 - Transfer path: `uv run usr diff/pull/push` over SSH remotes.
 - Target workflows: `densegen` and `infer` batch outputs feeding shared USR datasets.
+- Naming boundary: distinguish workspace-local export roots from shared USR
+  roots instead of treating them as the same thing implicitly.
 
 ## Preflight
 
@@ -34,12 +38,14 @@ Default sync contract:
 ```bash
 # Validate remote reachability, transfer tools, and lock capability.
 uv run usr remotes doctor --remote bu-scc
+# Check whether the reusable SSH control socket is already live.
+uv run usr remotes status --remote bu-scc
 ```
 
 2. Confirm dataset roots are correct on both hosts.
 
 ```bash
-# Local root example (canonical repo-local datasets root)
+# Local root example (repo-local shared datasets root)
 LOCAL_USR_ROOT="src/dnadesign/usr/datasets"
 # Print the chosen local datasets root before using it in sync commands.
 echo "$LOCAL_USR_ROOT"
@@ -48,14 +54,30 @@ echo "$LOCAL_USR_ROOT"
 uv run usr remotes show bu-scc
 ```
 
-`usr --root src/dnadesign/usr ...` is also accepted and normalized automatically, but this runbook uses the canonical datasets root to keep path ownership explicit.
+If the producer writes to a workspace-local export root such as
+`src/dnadesign/densegen/workspaces/<workspace>/outputs/usr_datasets`, either:
+
+- create an explicit remote profile for that workspace-export root, or
+- mirror the approved dataset into the shared USR root before using it as the
+  study status surface
+
+`usr --root src/dnadesign/usr ...` is also accepted and normalized automatically, but this runbook uses the shared datasets root to keep path ownership explicit.
 
 If BU SCC auth works in your shell only when SSH BatchMode is disabled, set `batch_mode: false` in the configured remote profile before running `diff` / `pull` / `push`.
 
-3. Confirm the dataset id you intend to sync is explicit and canonical.
+If SCC still requires keyboard-interactive follow-up after publickey auth, open `ssh scc1` or `ssh scc1.bu.edu` once in a terminal first so the SSH ControlMaster socket is already established before invoking `usr remotes doctor`, `usr diff`, `usr pull`, or `usr push`. The transfer lock handshake and rsync preflight do not create a brand-new MFA session reliably on their own.
+
+Equivalent repo-native bootstrap:
 
 ```bash
-# Set the canonical dataset id used for sync calls.
+# Establish the SSH control socket before sync when MFA requires an interactive step.
+uv run usr remotes warm-auth --remote bu-scc
+```
+
+3. Confirm the dataset id you intend to sync is explicit.
+
+```bash
+# Set the dataset id used for sync calls.
 DATASET_ID="my_dataset"
 ```
 
@@ -131,6 +153,10 @@ uv run usr --root "$LOCAL_USR_ROOT" diff "$DATASET_ID" bu-scc
 - `_auxiliary` indicator for non-core file inventory drift
 
 3. If strict fidelity is required, keep default checks enabled and avoid `--no-verify-sidecars`, `--no-verify-derived-hashes`, `--primary-only`, and `--skip-snapshots`.
+4. A strict `pull` or `push` may still take noticeable time before reporting
+   `NO-OP` when `_derived` inventory is large, because the command is proving
+   sidecar parity. Use `diff` first for quick preview; use `pull`/`push` for
+   actual transfer or final fidelity checks.
 
 ## Local annotations back to HPC
 

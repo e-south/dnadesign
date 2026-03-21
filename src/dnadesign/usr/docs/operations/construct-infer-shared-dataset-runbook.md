@@ -17,6 +17,12 @@ Use this runbook when construct should write one shared USR dataset and infer pl
 
 If upstream inputs still span multiple USR datasets, start with [multi-source-shared-dataset-assembly.md](multi-source-shared-dataset-assembly.md) first, then return here once one construct-input dataset is already consolidated.
 
+This runbook uses the packaged construct workspace as a local tracer bullet.
+Its early commands intentionally write into that packaged workspace-local USR
+root. For live promoter-study status and continuation, keep the study record's
+declared shared USR root authoritative and repoint construct configs
+deliberately before treating the dataset as the cross-tool source of truth.
+
 ### Boundary decisions
 
 - USR dataset roots are the durable data boundary, not git or workspace metadata.
@@ -54,7 +60,7 @@ export DNADESIGN_REPO_ROOT="$(git rev-parse --show-toplevel)"
 uv run construct workspace init --id shared_dataset_demo --root "$WORK_ROOT" --profile promoter-swap-source-of-truth-demo
 # Reuse one workspace path across the remaining commands.
 export WORKSPACE_ROOT="$WORK_ROOT/shared_dataset_demo"
-# Seed canonical promoter and template records into the workspace-local USR root.
+# Seed canonical promoter and template records into the local tracer-bullet USR root.
 uv run construct seed promoter-swap-demo \
   --root "$WORKSPACE_ROOT/outputs/usr_datasets" \
   --manifest "$WORKSPACE_ROOT/inputs/seed_manifest.yaml"
@@ -81,7 +87,7 @@ uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project s
 ### 3) Verify the construct-backed shared dataset
 
 ```bash
-# Reuse the workspace-local USR root and one semantic dataset id.
+# Reuse the local tracer-bullet USR root and one semantic dataset id.
 export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets"
 # Reuse the packaged construct output dataset id across verification and downstream tools.
 export DATASET_ID="pdual10_source_of_truth_demo"

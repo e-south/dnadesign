@@ -305,6 +305,8 @@ cmd_remotes_show = _bindings.cmd_remotes_show
 cmd_remotes_add = _bindings.cmd_remotes_add
 cmd_remotes_wizard = _bindings.cmd_remotes_wizard
 cmd_remotes_doctor = _bindings.cmd_remotes_doctor
+cmd_remotes_status = _bindings.cmd_remotes_status
+cmd_remotes_warm_auth = _bindings.cmd_remotes_warm_auth
 cmd_namespace_list = _bindings.cmd_namespace_list
 cmd_namespace_show = _bindings.cmd_namespace_show
 cmd_namespace_register = _bindings.cmd_namespace_register
@@ -328,7 +330,11 @@ state_app = _cli_apps.state_app
 
 
 def _ctx_args(ctx: typer.Context, **kwargs) -> NS:
-    base = {"root": ctx.obj["root"], "rich": ctx.obj["rich"]}
+    base = {
+        "root": ctx.obj["root"],
+        "rich": ctx.obj["rich"],
+        "remotes_config": ctx.obj.get("remotes_config"),
+    }
     base.update(kwargs)
     return NS(**base)
 
@@ -347,13 +353,23 @@ def _root(
         path_type=Path,
     ),
     rich: bool = typer.Option(True, "--rich/--no-rich", help="Use Rich formatting for supported commands"),
+    remotes_config: Path | None = typer.Option(
+        None,
+        "--remotes-config",
+        help="Explicit remotes config path for this invocation (sets USR_REMOTES_PATH).",
+        path_type=Path,
+        dir_okay=False,
+        file_okay=True,
+    ),
 ) -> None:
+    if remotes_config is not None:
+        os.environ["USR_REMOTES_PATH"] = str(remotes_config.expanduser())
     try:
         root = _normalize_usr_root(root)
         _assert_supported_root(root)
     except SequencesError as exc:
         raise typer.BadParameter(str(exc), param_hint="--root") from exc
-    ctx.obj = {"root": root, "rich": rich}
+    ctx.obj = {"root": root, "rich": rich, "remotes_config": remotes_config}
 
 
 register_sync_commands(
@@ -423,6 +439,8 @@ register_remotes_commands(
     cmd_remotes_add=cmd_remotes_add,
     cmd_remotes_wizard=cmd_remotes_wizard,
     cmd_remotes_doctor=cmd_remotes_doctor,
+    cmd_remotes_status=cmd_remotes_status,
+    cmd_remotes_warm_auth=cmd_remotes_warm_auth,
 )
 
 register_namespace_commands(

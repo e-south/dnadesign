@@ -38,7 +38,7 @@ remotes:
     local_repo_root: /path/to/local/dnadesign                                                          # Sets `local_repo_root` for this example configuration.
 ```
 
-Dataset-id mode against the canonical USR root remains the preferred path. Explicit path mode is for exceptional cases where dataset-id resolution is not enough.
+Dataset-id mode against the shared USR root remains the preferred path. Explicit path mode is for exceptional cases where dataset-id resolution is not enough.
 
 Examples:
 

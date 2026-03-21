@@ -49,8 +49,11 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - Tool packages own their workload configs, runtime outputs, and package-local workspace templates.
 - USR owns durable dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
 - Cross-dataset USR overlay transfer is explicit-only: maintenance merge defaults to base-row merge, while any overlay carry must be opt-in, namespace-scoped, schema-compatible, and auditable in events.
-- Curated dnadesign workspaces default USR dataset roots to `<workspace-root>/outputs/usr_datasets`.
-- Explicit external USR roots remain allowed for sync and mirror workflows when the operator chooses them deliberately.
+- Curated study-facing workspaces that enable USR sinks should default those
+  sinks to an explicit shared USR root such as `src/dnadesign/usr/datasets`.
+- Workspace-local export roots remain allowed only as explicit opt-in producer
+  mirrors, self-contained demos, or handoff surfaces named directly in a study
+  record or runbook.
 - Cross-tool coupling is file/event contract based; packages must not depend on internal `src.*` modules across tool boundaries.
 - Utility modules must stay tool-local (`src/dnadesign/<tool>/...`); top-level shared `src/dnadesign/utils` is not an allowed boundary.
 - Document-type semantics are explicit:

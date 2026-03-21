@@ -15,6 +15,6 @@ archived so collaborators can discover what exists without committing the data.
 ## Local Datasets (update as needed)
 - `demo/` — demo dataset for CLI examples
 - `60bp_dual_promoter_cpxR_LexA/` — canonical densegen dataset (do not edit without review)
-- `mg1655_promoters/` — optional construct demo/control promoter dataset created by `construct seed promoter-swap-demo`
-- `plasmids/` — optional construct demo plasmid dataset created by `construct seed promoter-swap-demo`
+- `mg1655_promoters/` — curated wildtype promoter source dataset currently used by construct and promoter-study assembly flows
+- `plasmids/` — curated plasmid/template source dataset currently used by construct and promoter-study assembly flows
 - `_archive/` — generated or historical datasets (do not hand-edit)

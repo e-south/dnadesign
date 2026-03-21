@@ -150,7 +150,7 @@ jobs: # Keep context choice explicit as job ids inside the model lane.
     operation: extract # Run the feature extraction surface.
     ingest: # Read directly from the anchor-only USR dataset.
       source: usr # Use the USR ingest surface.
-      root: /abs/path/to/usr_root # Resolve the canonical USR root explicitly.
+      root: /abs/path/to/usr_root # Resolve the shared USR root explicitly.
       dataset: <anchor-only-feature-dataset> # Replace with the anchor-only dataset id chosen above.
       field: sequence # Read the sequence field from USR rows.
     feature_bundle:
@@ -162,7 +162,7 @@ jobs: # Keep context choice explicit as job ids inside the model lane.
     operation: extract # Reuse the extract surface for the templated lane.
     ingest: # Read from the larger construct-backed context dataset.
       source: usr # Use the USR ingest surface.
-      root: /abs/path/to/usr_root # Resolve the canonical USR root explicitly.
+      root: /abs/path/to/usr_root # Resolve the shared USR root explicitly.
       dataset: <construct-expanded-feature-dataset> # Replace with the construct-expanded dataset id chosen above.
       field: sequence # Read the sequence field from USR rows.
     feature_bundle:
