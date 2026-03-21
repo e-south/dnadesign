@@ -307,7 +307,11 @@ def _list_densegen_workspace_names(repo_root: Path | None, search_root: Path) ->
 
 
 def _infer_workspace_roots(repo_root: Path | None, search_root: Path) -> tuple[Path, ...]:
-    roots = [(search_root / "workspaces").resolve()]
+    search_root_resolved = search_root.resolve()
+    if search_root_resolved.name == "workspaces":
+        roots = [search_root_resolved]
+    else:
+        roots = [(search_root_resolved / "workspaces").resolve()]
     if repo_root is not None:
         roots.append((repo_root / "src/dnadesign/infer/workspaces").resolve())
     env_root = str(os.environ.get("INFER_WORKSPACE_ROOT") or "").strip()

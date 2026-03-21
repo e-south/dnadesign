@@ -85,6 +85,21 @@ def test_resolve_tool_workspace_config_path_supports_current_infer_workspace_dir
     assert resolved == config_path.resolve()
 
 
+def test_resolve_tool_workspace_config_path_supports_workspaces_root_search_start_for_infer(tmp_path: Path) -> None:
+    workspaces_root = tmp_path / "workspaces"
+    config_path = workspaces_root / "demo_i" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("jobs: []\n", encoding="utf-8")
+
+    resolved = resolve_tool_workspace_config_path(
+        tool="infer",
+        workspace="demo_i",
+        search_start=workspaces_root,
+    )
+
+    assert resolved == config_path.resolve()
+
+
 def test_resolve_tool_workspace_config_path_supports_construct_tool_with_project_selector(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     workspace_dir = repo_root / "src" / "dnadesign" / "construct" / "workspaces" / "demo_c"
@@ -408,6 +423,17 @@ def test_list_tool_workspaces_merges_repo_and_local_infer_workspace_roots(tmp_pa
     names = list_tool_workspaces(tool="infer", search_start=repo_root)
 
     assert names == ["local_demo", "repo_demo"]
+
+
+def test_list_tool_workspaces_supports_workspaces_root_search_start_for_infer(tmp_path: Path) -> None:
+    workspaces_root = tmp_path / "workspaces"
+    config_path = workspaces_root / "demo_i" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("jobs: []\n", encoding="utf-8")
+
+    names = list_tool_workspaces(tool="infer", search_start=workspaces_root)
+
+    assert names == ["demo_i"]
 
 
 def test_list_tool_workspaces_supports_env_root_outside_repo_checkout(
