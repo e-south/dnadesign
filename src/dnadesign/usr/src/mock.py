@@ -28,7 +28,7 @@ from .io import read_parquet, write_parquet_atomic
 from .locks import dataset_write_lock
 from .normalize import compute_id, normalize_sequence
 from .overlays import overlay_metadata, overlay_path, with_overlay_metadata
-from .registry import registry_hash
+from .registry import namespace_contract_hash, registry_hash
 from .schema import ARROW_SCHEMA
 
 
@@ -134,12 +134,14 @@ def create_mock_dataset(root: Path, dataset: str, spec: MockSpec, *, force: bool
 
         ds._validate_registry_schema(namespace=spec.namespace, schema=overlay_tbl.schema, key="id")
         reg_hash = registry_hash(ds.root, required=True)
+        namespace_hash = namespace_contract_hash(ds.root, spec.namespace, required=True)
         overlay_tbl = with_overlay_metadata(
             overlay_tbl,
             namespace=spec.namespace,
             key="id",
             created_at=datetime.now(timezone.utc).isoformat(),
             registry_hash=reg_hash,
+            namespace_contract_hash=namespace_hash,
         )
         out_path = overlay_path(ds.dir, spec.namespace)
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -213,12 +215,14 @@ def add_demo_columns(
         )
         ds._validate_registry_schema(namespace=namespace, schema=overlay_tbl.schema, key="id")
         reg_hash = registry_hash(ds.root, required=True)
+        namespace_hash = namespace_contract_hash(ds.root, namespace, required=True)
         overlay_tbl = with_overlay_metadata(
             overlay_tbl,
             namespace=namespace,
             key="id",
             created_at=datetime.now(timezone.utc).isoformat(),
             registry_hash=reg_hash,
+            namespace_contract_hash=namespace_hash,
         )
 
         out_path = overlay_path(ds.dir, namespace)

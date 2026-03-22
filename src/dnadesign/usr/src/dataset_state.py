@@ -23,6 +23,13 @@ from .events import record_event
 from .overlays import overlay_dir_path, overlay_path
 from .storage.locking import dataset_write_lock
 
+TOMBSTONE_SCHEMA_TYPES = {
+    "id": pa.string(),
+    "usr__deleted": pa.bool_(),
+    "usr__deleted_at": pa.timestamp("us", tz="UTC"),
+    "usr__deleted_reason": pa.string(),
+}
+
 
 class DatasetStateHost(Protocol):
     dir: Path
@@ -101,7 +108,12 @@ def tombstone(
     )
 
     with dataset_write_lock(dataset.dir):
-        rows = dataset._write_reserved_overlay(tombstone_namespace, "id", overlay_df)
+        rows = dataset._write_reserved_overlay(
+            tombstone_namespace,
+            "id",
+            overlay_df,
+            schema_types=TOMBSTONE_SCHEMA_TYPES,
+        )
         record_event(
             dataset.events_path,
             "tombstone",
@@ -140,7 +152,12 @@ def restore(
     )
 
     with dataset_write_lock(dataset.dir):
-        rows = dataset._write_reserved_overlay(tombstone_namespace, "id", overlay_df)
+        rows = dataset._write_reserved_overlay(
+            tombstone_namespace,
+            "id",
+            overlay_df,
+            schema_types=TOMBSTONE_SCHEMA_TYPES,
+        )
         record_event(
             dataset.events_path,
             "restore",

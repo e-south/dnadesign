@@ -157,17 +157,47 @@ def registry_hash(root: Path, *, required: bool) -> Optional[str]:
         if required:
             raise SchemaError(f"Registry required but not found: {path}.")
         return None
-    data = registry_bytes(root)
-    h = hashlib.sha256()
-    h.update(data)
-    return h.hexdigest()
+    entries = load_registry(root, required=True)
+    return registry_hash_for_entries(entries)
 
 
 def registry_bytes(root: Path) -> bytes:
     entries = load_registry(root, required=True)
+    return registry_bytes_for_entries(entries)
+
+
+def registry_bytes_for_entries(entries: Dict[str, RegistryEntry]) -> bytes:
     payload = _registry_payload(entries)
     text = yaml.safe_dump(payload, sort_keys=True)
     return text.encode("utf-8")
+
+
+def registry_hash_for_entries(entries: Dict[str, RegistryEntry]) -> str:
+    h = hashlib.sha256()
+    h.update(registry_bytes_for_entries(entries))
+    return h.hexdigest()
+
+
+def namespace_contract_hash(root: Path, namespace: str, *, required: bool) -> Optional[str]:
+    path = registry_path(root)
+    if not path.exists():
+        if required:
+            raise SchemaError(f"Registry required but not found: {path}.")
+        return None
+    entries = load_registry(root, required=True)
+    return namespace_contract_hash_for_entries(entries, namespace)
+
+
+def namespace_contract_hash_for_entries(entries: Dict[str, RegistryEntry], namespace: str) -> str:
+    entry = registry_entry(entries, namespace)
+    payload = {
+        "namespace": entry.namespace,
+        "columns": [{"name": column.name, "type": column.type} for column in entry.columns],
+    }
+    text = yaml.safe_dump(payload, sort_keys=True)
+    h = hashlib.sha256()
+    h.update(text.encode("utf-8"))
+    return h.hexdigest()
 
 
 def register_namespace(

@@ -16,6 +16,7 @@ import pyarrow.parquet as pq
 
 from dnadesign.usr import Dataset
 from dnadesign.usr.src.overlays import overlay_metadata, overlay_path
+from dnadesign.usr.src.registry import load_registry, namespace_contract_hash_for_entries
 from dnadesign.usr.tests.registry_helpers import register_test_namespace
 
 
@@ -58,6 +59,10 @@ def test_attach_duckdb_writes_overlay(tmp_path: Path) -> None:
     meta = overlay_metadata(out_path)
     assert meta["namespace"] == "mock"
     assert meta["key"] == "id"
+    assert meta["namespace_contract_hash"] == namespace_contract_hash_for_entries(
+        load_registry(root, required=True),
+        "mock",
+    )
 
     out_tbl = pq.read_table(out_path)
     assert set(out_tbl.column_names) == {"id", "mock__score"}

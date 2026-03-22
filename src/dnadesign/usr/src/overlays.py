@@ -22,6 +22,7 @@ OVERLAY_META_NAMESPACE = "usr:overlay_namespace"
 OVERLAY_META_KEY = "usr:overlay_key"
 OVERLAY_META_CREATED = "usr:overlay_created_at"
 OVERLAY_META_REGISTRY_HASH = "usr:registry_hash"
+OVERLAY_META_NAMESPACE_CONTRACT_HASH = "usr:namespace_contract_hash"
 OVERLAY_PART_PREFIX = "part-"
 _OVERLAY_HEAD_CACHE: dict[str, tuple[int, int, dict[str, Optional[str]], pa.Schema]] = {}
 _OVERLAY_HEAD_CACHE_MAX = 20_000
@@ -136,6 +137,7 @@ def _overlay_head(path: Path) -> tuple[dict[str, Optional[str]], pa.Schema]:
         "key": _meta_get(md, OVERLAY_META_KEY),
         "created_at": _meta_get(md, OVERLAY_META_CREATED),
         "registry_hash": _meta_get(md, OVERLAY_META_REGISTRY_HASH),
+        "namespace_contract_hash": _meta_get(md, OVERLAY_META_NAMESPACE_CONTRACT_HASH),
     }
     _OVERLAY_HEAD_CACHE[cache_key] = (int(stat.st_mtime_ns), int(stat.st_size), dict(meta), schema)
     if len(_OVERLAY_HEAD_CACHE) > _OVERLAY_HEAD_CACHE_MAX:
@@ -160,6 +162,7 @@ def with_overlay_metadata(
     key: str,
     created_at: str,
     registry_hash: str | None = None,
+    namespace_contract_hash: str | None = None,
 ) -> pa.Table:
     md = dict(table.schema.metadata or {})
     md[OVERLAY_META_NAMESPACE.encode("utf-8")] = str(namespace).encode("utf-8")
@@ -167,4 +170,6 @@ def with_overlay_metadata(
     md[OVERLAY_META_CREATED.encode("utf-8")] = str(created_at).encode("utf-8")
     if registry_hash:
         md[OVERLAY_META_REGISTRY_HASH.encode("utf-8")] = str(registry_hash).encode("utf-8")
+    if namespace_contract_hash:
+        md[OVERLAY_META_NAMESPACE_CONTRACT_HASH.encode("utf-8")] = str(namespace_contract_hash).encode("utf-8")
     return table.replace_schema_metadata(md)

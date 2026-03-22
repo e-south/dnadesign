@@ -22,6 +22,7 @@ import pyarrow.parquet as pq
 
 from .errors import NamespaceError, SchemaError
 from .overlays import overlay_dir_path, overlay_metadata, overlay_path, with_overlay_metadata
+from .registry import namespace_contract_hash_for_entries
 from .storage.parquet import PARQUET_COMPRESSION, now_utc
 
 
@@ -31,6 +32,8 @@ class DatasetReservedOverlayHost(Protocol):
     def _auto_freeze_registry(self, *, record_auto_event: bool = True) -> tuple[Path, str, bool]: ...
 
     def _validate_registry_schema(self, *, namespace: str, schema: pa.Schema, key: str) -> None: ...
+
+    def _registry(self, *, required: bool) -> dict: ...
 
     def _registry_hash(self, *, required: bool) -> str | None: ...
 
@@ -88,13 +91,18 @@ def write_reserved_overlay(
     table = pa.Table.from_pandas(overlay_df, preserve_index=False, schema=schema)
     if validate_registry:
         dataset._validate_registry_schema(namespace=namespace, schema=table.schema, key=key)
+    registry = dataset._registry(required=False)
     reg_hash = dataset._registry_hash(required=False)
+    namespace_hash = None
+    if registry and namespace in registry:
+        namespace_hash = namespace_contract_hash_for_entries(registry, namespace)
     table = with_overlay_metadata(
         table,
         namespace=namespace,
         key=key,
         created_at=now_utc(),
         registry_hash=reg_hash,
+        namespace_contract_hash=namespace_hash,
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = out_path.with_suffix(".tmp.parquet")

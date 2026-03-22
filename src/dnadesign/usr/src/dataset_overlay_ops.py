@@ -28,13 +28,14 @@ from .overlays import (
     OVERLAY_META_CREATED,
     OVERLAY_META_KEY,
     OVERLAY_META_NAMESPACE,
+    OVERLAY_META_NAMESPACE_CONTRACT_HASH,
     OVERLAY_META_REGISTRY_HASH,
     overlay_dir_path,
     overlay_metadata,
     overlay_path,
     with_overlay_metadata,
 )
-from .registry import registry_entry
+from .registry import namespace_contract_hash_for_entries, registry_entry
 from .schema import REQUIRED_COLUMNS
 from .storage.locking import dataset_write_lock
 from .storage.parquet import PARQUET_COMPRESSION, now_utc, read_parquet, write_parquet_atomic_batches
@@ -269,13 +270,16 @@ def _attach_frame_dataset(
             entry = registry_entry(registry, namespace)
             tbl = _overlay_table_from_registry(overlay_df, entry=entry, key=key)
         dataset._validate_registry_schema(namespace=namespace, schema=tbl.schema, key=key)
+        registry = dataset._registry(required=True)
         reg_hash = dataset._registry_hash(required=True)
+        namespace_hash = namespace_contract_hash_for_entries(registry, namespace)
         tbl = with_overlay_metadata(
             tbl,
             namespace=namespace,
             key=key,
             created_at=now_utc(),
             registry_hash=reg_hash,
+            namespace_contract_hash=namespace_hash,
         )
         out_path.parent.mkdir(parents=True, exist_ok=True)
         tmp = out_path.with_suffix(".tmp.parquet")
@@ -684,9 +688,13 @@ def attach_duckdb_dataset(
             metadata[OVERLAY_META_NAMESPACE.encode("utf-8")] = str(namespace).encode("utf-8")
             metadata[OVERLAY_META_KEY.encode("utf-8")] = str(key).encode("utf-8")
             metadata[OVERLAY_META_CREATED.encode("utf-8")] = str(now_utc()).encode("utf-8")
+            registry = dataset._registry(required=True)
             reg_hash = dataset._registry_hash(required=True)
             if reg_hash:
                 metadata[OVERLAY_META_REGISTRY_HASH.encode("utf-8")] = str(reg_hash).encode("utf-8")
+            metadata[OVERLAY_META_NAMESPACE_CONTRACT_HASH.encode("utf-8")] = str(
+                namespace_contract_hash_for_entries(registry, namespace)
+            ).encode("utf-8")
 
             def _batches():
                 for batch in pf_tmp.iter_batches(batch_size=65536):
@@ -942,13 +950,16 @@ def write_overlay_part_dataset(
         if rows_written == 0:
             return 0
 
+        registry = dataset._registry(required=True)
         reg_hash = dataset._registry_hash(required=True)
+        namespace_hash = namespace_contract_hash_for_entries(registry, namespace)
         tbl_out = with_overlay_metadata(
             tbl_out,
             namespace=namespace,
             key=key,
             created_at=now_utc(),
             registry_hash=reg_hash,
+            namespace_contract_hash=namespace_hash,
         )
 
         if file_path.exists():

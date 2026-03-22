@@ -135,7 +135,7 @@ def register_query_commands(
         registry_mode: str = typer.Option(
             "current",
             "--registry-mode",
-            help="Registry mode: current|frozen|either",
+            help=("Registry mode: current|frozen|either|namespace-current|namespace-frozen|namespace-either"),
         ),
     ) -> None:
         cmd_validate(ctx_args_builder(ctx, dataset=dataset, strict=strict, registry_mode=registry_mode))
