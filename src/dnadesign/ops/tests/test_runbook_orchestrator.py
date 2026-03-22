@@ -3469,6 +3469,45 @@ def test_packaged_runbook_presets_exist_and_load() -> None:
         }
 
 
+def test_densegen_packaged_presets_use_repo_default_qsub_tokens() -> None:
+    repo_root = Path(__file__).resolve()
+    for parent in repo_root.parents:
+        if (parent / "pyproject.toml").exists():
+            repo_root = parent
+            break
+    preset_dir = repo_root / "src" / "dnadesign" / "ops" / "runbooks" / "presets"
+
+    expected_densegen = "docs/bu-scc/jobs/densegen-cpu.qsub"
+    expected_post_run = "docs/bu-scc/jobs/densegen-analysis.qsub"
+    expected_notify = "docs/bu-scc/jobs/notify-watch.qsub"
+
+    batch_payload = yaml.safe_load(
+        (preset_dir / "densegen_stress_ethanol_cipro_batch.yaml").read_text(encoding="utf-8")
+    )
+    assert batch_payload["runbook"]["densegen"]["qsub_template"] == expected_densegen
+    assert batch_payload["runbook"]["densegen"]["post_run"]["qsub_template"] == expected_post_run
+
+    notify_payload = yaml.safe_load(
+        (preset_dir / "densegen_stress_ethanol_cipro_batch_with_notify.yaml").read_text(encoding="utf-8")
+    )
+    assert notify_payload["runbook"]["densegen"]["qsub_template"] == expected_densegen
+    assert notify_payload["runbook"]["densegen"]["post_run"]["qsub_template"] == expected_post_run
+    assert notify_payload["runbook"]["notify"]["qsub_template"] == expected_notify
+
+
+def test_packaged_runbook_preset_path_is_rejected_without_repo_checkout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    preset_path = tmp_path / "site-packages" / "dnadesign" / "ops" / "runbooks" / "presets" / "demo.yaml"
+    preset_path.parent.mkdir(parents=True, exist_ok=True)
+    preset_path.write_text("runbook: {}\n", encoding="utf-8")
+    monkeypatch.setattr(runbook_schema, "_resolve_repo_root_from_module", lambda: None)
+
+    with pytest.raises(ValueError, match="starter assets only"):
+        load_orchestration_runbook(preset_path)
+
+
 def test_cli_presets_lists_packaged_runbooks() -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["runbook", "presets"])

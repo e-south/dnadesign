@@ -20,7 +20,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from .runbook_layout import enforce_workspace_layout
-from .runbook_paths import DENSEGEN_POST_RUN_TEMPLATE_DEFAULT, resolve_runbook_paths
+from .runbook_paths import DENSEGEN_POST_RUN_TEMPLATE_DEFAULT, _resolve_repo_root_from_module, resolve_runbook_paths
 from .workflow_metadata import (
     NotifyPolicy,
     OrchestrationWorkflowId,
@@ -45,6 +45,33 @@ _WORKFLOW_METADATA_HELPERS = (
 _HRT_PATTERN = re.compile(r"^[0-9]{2}:[0-9]{2}:[0-9]{2}$")
 _SLUG_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _USR_OVERLAY_NAMESPACE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def _looks_like_packaged_preset_path(path: Path) -> bool:
+    resolved = path.expanduser().resolve()
+    parent = resolved.parent
+    try:
+        return (
+            parent.name == "presets"
+            and parent.parent.name == "runbooks"
+            and parent.parent.parent.name == "ops"
+            and parent.parent.parent.parent.name == "dnadesign"
+        )
+    except IndexError:
+        return False
+
+
+def _reject_installed_packaged_preset_path(path: Path) -> None:
+    if _resolve_repo_root_from_module() is not None:
+        return
+    if not _looks_like_packaged_preset_path(path):
+        return
+    raise ValueError(
+        "installed packaged ops presets are starter assets only; materialize a workspace-scoped runbook with "
+        "`uv run ops runbook init` or copy the preset content into "
+        "<workspace-root>/outputs/logs/ops/runbooks/<runbook-id>.yaml and rewrite workspace-relative paths "
+        "before plan/execute"
+    )
 
 
 class StrictBaseModel(BaseModel):
@@ -337,6 +364,7 @@ def load_orchestration_runbook(path: Path, *, raw: dict | None = None) -> Orches
         if not runbook_path.exists():
             raise FileNotFoundError(f"Runbook not found: {runbook_path}")
         raw = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
+    _reject_installed_packaged_preset_path(runbook_path)
     if not isinstance(raw, dict) or "runbook" not in raw:
         raise ValueError("orchestration runbook schema v1 requires root key: runbook")
     runbook_payload = raw.get("runbook")

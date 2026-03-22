@@ -90,6 +90,13 @@ def test_tool_event_status_override_handles_infer_attach_events() -> None:
     assert tool_event_status_override("attach", event) == "running"
 
 
+def test_tool_event_status_override_handles_infer_materialize_as_terminal() -> None:
+    event = _event("materialize")
+    event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+
+    assert tool_event_status_override("materialize", event) == "success"
+
+
 def test_tool_event_message_override_formats_infer_attach_message() -> None:
     event = _event("attach")
     event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}

@@ -81,6 +81,12 @@ def _infer_attach_status_override(event: dict[str, Any]) -> str | None:
     return "running"
 
 
+def _infer_materialize_status_override(event: dict[str, Any]) -> str | None:
+    if not _is_infer_actor(event):
+        return None
+    return "success"
+
+
 def _infer_attach_message(
     event: dict[str, Any],
     *,
@@ -159,5 +165,6 @@ def register_infer_handlers(
     register_evaluator: Callable[[str, Callable[[dict[str, Any], str, ToolEventState], ToolEventDecision]], None],
 ) -> None:
     register_status_override("attach", _infer_attach_status_override)
+    register_status_override("materialize", _infer_materialize_status_override)
     register_message_override("attach", _infer_attach_message)
     register_evaluator("attach", _evaluate_infer_attach_event)
