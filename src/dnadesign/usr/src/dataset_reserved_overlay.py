@@ -94,7 +94,7 @@ def write_reserved_overlay(
     registry = dataset._registry(required=False)
     reg_hash = dataset._registry_hash(required=False)
     namespace_hash = None
-    if registry:
+    if registry and namespace in registry:
         namespace_hash = namespace_contract_hash_for_entries(registry, namespace)
     table = with_overlay_metadata(
         table,

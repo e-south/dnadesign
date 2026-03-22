@@ -38,6 +38,7 @@ class RegistryModeHandler:
     validate_with_registries: RegistryValidationRunner
     overlay_hash_from_metadata: OverlayMetadataHashResolver
     overlay_hash_label: str
+    skip_reserved_hash_validation: bool = False
 
 
 _REGISTRY_MODE_HANDLERS: dict[str, RegistryModeHandler] = {}
@@ -61,6 +62,7 @@ def register_registry_mode(
     validate_with_registries: RegistryValidationRunner,
     overlay_hash_from_metadata: OverlayMetadataHashResolver,
     overlay_hash_label: str,
+    skip_reserved_hash_validation: bool = False,
 ) -> None:
     mode_name = _normalize_mode_name(mode)
     if mode_name in _REGISTRY_MODE_HANDLERS:
@@ -73,11 +75,14 @@ def register_registry_mode(
         raise SchemaError("overlay_hash_from_metadata must be callable")
     if not str(overlay_hash_label or "").strip():
         raise SchemaError("overlay_hash_label must be a non-empty string")
+    if not isinstance(skip_reserved_hash_validation, bool):
+        raise SchemaError("skip_reserved_hash_validation must be a boolean")
     _REGISTRY_MODE_HANDLERS[mode_name] = RegistryModeHandler(
         allowed_hashes=allowed_hashes,
         validate_with_registries=validate_with_registries,
         overlay_hash_from_metadata=overlay_hash_from_metadata,
         overlay_hash_label=str(overlay_hash_label),
+        skip_reserved_hash_validation=skip_reserved_hash_validation,
     )
 
 
@@ -105,15 +110,16 @@ def validate_overlays_for_registry_mode(
             if not key:
                 raise SchemaError(f"Overlay missing required metadata key: {path}")
             ns = meta.get("namespace") or path.stem
-            reg_hash = handler.overlay_hash_from_metadata(meta)
-            if reg_hash is None:
-                raise SchemaError(f"Overlay missing {handler.overlay_hash_label} metadata: {path}")
-            allowed_hashes = handler.allowed_hashes(dataset, registry, ns)
-            if reg_hash not in allowed_hashes:
-                allowed = ", ".join(sorted(allowed_hashes))
-                raise SchemaError(
-                    f"Overlay {handler.overlay_hash_label} mismatch for {path}: {reg_hash} not in [{allowed}]."
-                )
+            if not (ns in reserved_namespaces and handler.skip_reserved_hash_validation):
+                reg_hash = handler.overlay_hash_from_metadata(meta)
+                if reg_hash is None:
+                    raise SchemaError(f"Overlay missing {handler.overlay_hash_label} metadata: {path}")
+                allowed_hashes = handler.allowed_hashes(dataset, registry, ns)
+                if reg_hash not in allowed_hashes:
+                    allowed = ", ".join(sorted(allowed_hashes))
+                    raise SchemaError(
+                        f"Overlay {handler.overlay_hash_label} mismatch for {path}: {reg_hash} not in [{allowed}]."
+                    )
             if ns in reserved_namespaces:
                 continue
             schema = overlay_schema(path)
@@ -189,6 +195,7 @@ register_registry_mode(
     validate_with_registries=_validate_with_current_registry,
     overlay_hash_from_metadata=_overlay_namespace_contract_hash_from_metadata,
     overlay_hash_label="namespace_contract_hash",
+    skip_reserved_hash_validation=True,
 )
 register_registry_mode(
     mode="namespace-frozen",
@@ -196,6 +203,7 @@ register_registry_mode(
     validate_with_registries=_validate_with_frozen_registry,
     overlay_hash_from_metadata=_overlay_namespace_contract_hash_from_metadata,
     overlay_hash_label="namespace_contract_hash",
+    skip_reserved_hash_validation=True,
 )
 register_registry_mode(
     mode="namespace-either",
@@ -203,4 +211,5 @@ register_registry_mode(
     validate_with_registries=_validate_with_either_registry,
     overlay_hash_from_metadata=_overlay_namespace_contract_hash_from_metadata,
     overlay_hash_label="namespace_contract_hash",
+    skip_reserved_hash_validation=True,
 )

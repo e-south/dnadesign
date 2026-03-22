@@ -16,6 +16,7 @@ from pathlib import Path
 import pandas as pd
 
 from dnadesign.usr import Dataset
+from dnadesign.usr.src.overlays import overlay_metadata, overlay_path
 from dnadesign.usr.tests.registry_helpers import ensure_registry
 
 
@@ -80,3 +81,17 @@ def test_export_include_deleted(tmp_path: Path) -> None:
     ds.export("csv", out_all, include_deleted=True)
     df_all = pd.read_csv(out_all)
     assert ids[0] in df_all["id"].tolist()
+
+
+def test_tombstone_namespace_current_validation_skips_namespace_hash(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    ds = _make_dataset(root)
+
+    rid = ds.head(1)["id"].tolist()[0]
+    ds.tombstone([rid], reason="bad")
+
+    meta = overlay_metadata(overlay_path(ds.dir, "usr"))
+    assert meta.get("namespace_contract_hash") is None
+
+    ds.validate(registry_mode="current")
+    ds.validate(registry_mode="namespace-current")
