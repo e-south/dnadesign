@@ -16,12 +16,23 @@ from pathlib import Path
 import yaml
 
 from dnadesign.construct.src.output_store import (
+    _CONSTRUCT_COLUMNS,
+    _CONSTRUCT_SEED_COLUMNS,
+    _USR_LABEL_COLUMNS,
     _construct_metadata_table,
     _ensure_construct_registry,
     _existing_output_ids,
     _usr_label_table,
 )
 from dnadesign.usr import Dataset
+
+
+def _repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    raise RuntimeError("repo root not found")
 
 
 def test_ensure_construct_registry_writes_required_namespaces(tmp_path: Path) -> None:
@@ -41,6 +52,19 @@ def test_ensure_construct_registry_writes_required_namespaces(tmp_path: Path) ->
     assert construct_columns["construct__anchor_start"] == "int64"
     assert construct_columns["construct__anchor_end"] == "int64"
     assert construct_columns["construct__resolved_length"] == "int64"
+
+
+def test_checked_in_shared_usr_registry_matches_construct_contract() -> None:
+    payload = yaml.safe_load((_repo_root() / "src/dnadesign/usr/datasets/registry.yaml").read_text(encoding="utf-8"))
+    namespaces = payload["namespaces"]
+
+    construct_columns = {column["name"]: column["type"] for column in namespaces["construct"]["columns"]}
+    construct_seed_columns = {column["name"]: column["type"] for column in namespaces["construct_seed"]["columns"]}
+    usr_label_columns = {column["name"]: column["type"] for column in namespaces["usr_label"]["columns"]}
+
+    assert construct_columns == {column["name"]: column["type"] for column in _CONSTRUCT_COLUMNS}
+    assert construct_seed_columns == {column["name"]: column["type"] for column in _CONSTRUCT_SEED_COLUMNS}
+    assert usr_label_columns == {column["name"]: column["type"] for column in _USR_LABEL_COLUMNS}
 
 
 def test_existing_output_ids_returns_ids_for_initialized_dataset(tmp_path: Path) -> None:
