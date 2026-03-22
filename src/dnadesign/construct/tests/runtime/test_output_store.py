@@ -19,6 +19,7 @@ from dnadesign.construct.src.output_store import (
     _CONSTRUCT_COLUMNS,
     _CONSTRUCT_SEED_COLUMNS,
     _USR_LABEL_COLUMNS,
+    _USR_STATE_COLUMNS,
     _construct_metadata_table,
     _ensure_construct_registry,
     _existing_output_ids,
@@ -75,7 +76,7 @@ def test_ensure_construct_registry_is_idempotent_for_checked_in_shared_registry(
     assert target.read_text(encoding="utf-8") == before
 
 
-def test_ensure_construct_registry_reorders_stale_construct_columns(tmp_path: Path) -> None:
+def test_ensure_construct_registry_preserves_existing_valid_construct_column_order(tmp_path: Path) -> None:
     root = tmp_path / "usr_root"
     stale_names = {
         "construct__context_id",
@@ -102,6 +103,57 @@ def test_ensure_construct_registry_reorders_stale_construct_columns(tmp_path: Pa
                 "description": "Construct lineage overlays for realized DNA sequences.",
                 "columns": stale_columns,
             },
+            "construct_seed": {
+                "owner": "construct",
+                "description": "Construct bootstrap/import metadata for seeded input datasets.",
+                "columns": [dict(column) for column in _CONSTRUCT_SEED_COLUMNS],
+            },
+            "usr_label": {
+                "owner": "usr",
+                "description": "Human-readable labels and aliases for canonical sequence records.",
+                "columns": [dict(column) for column in _USR_LABEL_COLUMNS],
+            },
+            "usr_state": {
+                "owner": "usr",
+                "description": "Reserved record-state overlay (masked/qc/split/lineage).",
+                "columns": [dict(column) for column in _USR_STATE_COLUMNS],
+            },
+        }
+    }
+    (root / "registry.yaml").parent.mkdir(parents=True, exist_ok=True)
+    registry_path = root / "registry.yaml"
+    registry_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+    before = registry_path.read_text(encoding="utf-8")
+
+    _ensure_construct_registry(root)
+
+    assert registry_path.read_text(encoding="utf-8") == before
+
+    repaired = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+    namespaces = repaired["namespaces"]
+    assert _column_pairs(namespaces["construct"]["columns"]) == _column_pairs(stale_columns)
+    assert namespaces["audit"]["columns"] == [{"name": "audit__score", "type": "float64"}]
+
+
+def test_ensure_construct_registry_appends_missing_construct_columns_without_reordering(tmp_path: Path) -> None:
+    root = tmp_path / "usr_root"
+    missing_names = {
+        "construct__context_id",
+        "construct__context_kind",
+        "construct__anchor_id",
+        "construct__anchor_orientation",
+        "construct__anchor_start",
+        "construct__anchor_end",
+        "construct__resolved_length",
+    }
+    existing_columns = [dict(column) for column in _CONSTRUCT_COLUMNS if column["name"] not in missing_names]
+    payload = {
+        "namespaces": {
+            "construct": {
+                "owner": "construct",
+                "description": "Construct lineage overlays for realized DNA sequences.",
+                "columns": existing_columns,
+            },
         }
     }
     (root / "registry.yaml").parent.mkdir(parents=True, exist_ok=True)
@@ -110,9 +162,11 @@ def test_ensure_construct_registry_reorders_stale_construct_columns(tmp_path: Pa
     _ensure_construct_registry(root)
 
     repaired = yaml.safe_load((root / "registry.yaml").read_text(encoding="utf-8"))
-    namespaces = repaired["namespaces"]
-    assert _column_pairs(namespaces["construct"]["columns"]) == _column_pairs(_CONSTRUCT_COLUMNS)
-    assert namespaces["audit"]["columns"] == [{"name": "audit__score", "type": "float64"}]
+    appended = repaired["namespaces"]["construct"]["columns"]
+    assert _column_pairs(appended[: len(existing_columns)]) == _column_pairs(existing_columns)
+    assert _column_pairs(appended[len(existing_columns) :]) == _column_pairs(
+        [column for column in _CONSTRUCT_COLUMNS if column["name"] in missing_names]
+    )
 
 
 def test_existing_output_ids_returns_ids_for_initialized_dataset(tmp_path: Path) -> None:
