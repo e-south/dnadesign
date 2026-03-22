@@ -22,7 +22,7 @@ This concept page explains how DenseGen artifacts are organized by runtime stage
 ### Records location
 
 - Parquet sink: `outputs/tables/records.parquet`.
-- USR sink: `outputs/usr_datasets/<dataset>/records.parquet`.
+- USR sink: `<output.usr.root>/<dataset>/records.parquet`.
 - Dual sink mode: both files exist; analysis commands resolve one source via `plots.source`.
 
 ### Join keys

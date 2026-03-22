@@ -17,35 +17,11 @@ from pathlib import Path
 
 from ...adapters.outputs import OutputRecord, SinkBase
 from ...config import resolve_relative_path
+from ..parquet_parts import consolidate_parquet_parts
 
 
 def _consolidate_parts(tables_root: Path, *, part_glob: str, final_name: str) -> bool:
-    parts = sorted(tables_root.glob(part_glob))
-    if not parts:
-        return False
-    try:
-        import pyarrow as pa
-        import pyarrow.dataset as ds
-        import pyarrow.parquet as pq
-    except Exception as exc:  # pragma: no cover - optional dependency
-        raise RuntimeError("pyarrow is required to consolidate parquet parts.") from exc
-    final_path = tables_root / final_name
-    sources = [str(p) for p in parts]
-    if final_path.exists():
-        sources.insert(0, str(final_path))
-    dataset = ds.dataset(sources, format="parquet")
-    tmp_path = tables_root / f".{final_name}.tmp"
-    writer = pq.ParquetWriter(tmp_path, schema=dataset.schema)
-    scanner = ds.Scanner.from_dataset(dataset, batch_size=4096)
-    for batch in scanner.to_batches():
-        if batch.num_rows == 0:
-            continue
-        writer.write_table(pa.Table.from_batches([batch], schema=dataset.schema))
-    writer.close()
-    tmp_path.replace(final_path)
-    for part in parts:
-        part.unlink()
-    return True
+    return consolidate_parquet_parts(tables_root, part_glob=part_glob, final_name=final_name)
 
 
 def _emit_event(events_path: Path, *, event: str, payload: dict) -> None:

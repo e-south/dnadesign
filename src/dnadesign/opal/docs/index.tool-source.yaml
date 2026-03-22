@@ -1,0 +1,13 @@
+schema_version: 1
+catalog_order: 6
+tool: opal
+summary: Tool-owned active-learning workflows, campaign configuration references, and downstream infer-to-OPAL routes.
+keywords:
+  - active learning
+  - promoter
+  - infer
+  - feature matrix
+routes:
+  - id: usr-infer-x-active-learning
+    path: workflows/usr-infer-x-active-learning.md
+    summary: OPAL-owned active-learning route once one infer-derived X column or exported matrix already exists.

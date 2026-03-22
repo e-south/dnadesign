@@ -19,6 +19,7 @@ from .watch_runner_contract import (
 )
 from .watch_runner_inputs import resolve_watch_runner_inputs
 from .watch_runner_resolution import (
+    resolve_profile_run_id,
     resolve_watch_mode,
     validate_profile_events_source_match,
 )
@@ -113,6 +114,11 @@ def run_usr_events_watch(
         profile_data=profile_data,
         resolve_profile_events_source=resolve_profile_events_source,
     )
+    resolved_run_id = run_id or resolve_profile_run_id(
+        mode=mode,
+        profile_data=profile_data,
+        resolve_profile_events_source=resolve_profile_events_source,
+    )
     resolved_inputs = resolve_watch_runner_inputs(
         mode=mode,
         profile_data=profile_data,
@@ -166,7 +172,7 @@ def run_usr_events_watch(
         progress_min_seconds=resolved_inputs.progress_min_seconds_value,
         progress_heartbeat_seconds=resolved_inputs.progress_heartbeat_seconds_value,
         tool=mode.tool_value_for_events,
-        run_id=run_id,
+        run_id=resolved_run_id,
         provider_value=resolved_inputs.provider_value,
         message=message,
         include_args_value=resolved_inputs.include_args_value,

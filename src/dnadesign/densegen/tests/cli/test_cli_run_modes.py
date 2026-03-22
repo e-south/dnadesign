@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -318,7 +319,7 @@ def _write_usr_config(run_root: Path) -> Path:
               bio_type: dna
               alphabet: dna_4
             usr:
-              root: outputs/usr_datasets
+              root: ../usr_root
               dataset: demo
               chunk_size: 16
           generation:
@@ -654,7 +655,7 @@ def test_run_handles_missing_usr_registry_runtime_errors_with_actionable_next_st
 
     def _fake_run_pipeline(*_args, **_kwargs):
         raise RuntimeError(
-            "USR registry not found at /tmp/demo/outputs/usr_datasets/registry.yaml. "
+            "USR registry not found at /tmp/demo/usr_root/registry.yaml. "
             "Create registry.yaml before writing USR outputs."
         )
 
@@ -728,7 +729,7 @@ def test_run_fresh_preserves_usr_registry(tmp_path: Path, monkeypatch) -> None:
     run_root.mkdir(parents=True)
     _write_inputs(run_root)
     cfg_path = _write_usr_config(run_root)
-    registry_path = run_root / "outputs" / "usr_datasets" / "registry.yaml"
+    registry_path = run_root / "usr_root" / "registry.yaml"
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     registry_path.write_text("namespaces: {}\n")
 
@@ -744,13 +745,72 @@ def test_run_fresh_preserves_usr_registry(tmp_path: Path, monkeypatch) -> None:
     assert registry_path.read_text() == "namespaces: {}\n"
 
 
+def test_run_refuses_fresh_when_shared_usr_dataset_already_has_state(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_usr_config(run_root)
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    (usr_root / "registry.yaml").write_text("namespaces: {}\n")
+    dataset_dir = usr_root / "demo"
+    dataset_dir.mkdir(parents=True, exist_ok=True)
+    (dataset_dir / "records.parquet").write_text("seed")
+
+    captured = {"called": False}
+
+    def _fake_run_pipeline(_loaded, **_kwargs):
+        captured["called"] = True
+        return None
+
+    runner = CliRunner()
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    result = runner.invoke(app, ["run", "--fresh", "--no-plot", "-c", str(cfg_path)])
+
+    assert result.exit_code == 1, result.output
+    assert captured["called"] is False
+    assert "--fresh only clears workspace outputs" in result.output
+    assert "inspect the attached dataset" in result.output
+    assert str(usr_root) in result.output
+
+
+def test_run_refuses_new_run_when_shared_usr_dataset_exists_without_workspace_outputs(
+    tmp_path: Path, monkeypatch
+) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_usr_config(run_root)
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    (usr_root / "registry.yaml").write_text("namespaces: {}\n")
+    dataset_dir = usr_root / "demo"
+    dataset_dir.mkdir(parents=True, exist_ok=True)
+    (dataset_dir / "records.parquet").write_text("seed")
+
+    captured = {"called": False}
+
+    def _fake_run_pipeline(_loaded, **_kwargs):
+        captured["called"] = True
+        return None
+
+    runner = CliRunner()
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    result = runner.invoke(app, ["run", "--no-plot", "-c", str(cfg_path)])
+
+    assert result.exit_code == 1, result.output
+    assert captured["called"] is False
+    assert "Shared USR dataset state already exists" in result.output
+    assert "restore workspace outputs and resume" in result.output
+
+
 def test_campaign_reset_preserves_usr_registry_by_default(tmp_path: Path) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
     _write_inputs(run_root)
     cfg_path = _write_usr_config(run_root)
     outputs_dir = run_root / "outputs"
-    registry_path = outputs_dir / "usr_datasets" / "registry.yaml"
+    registry_path = run_root / "usr_root" / "registry.yaml"
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     registry_path.write_text("namespaces: {}\n")
     stale_table = outputs_dir / "tables" / "records.parquet"
@@ -766,13 +826,92 @@ def test_campaign_reset_preserves_usr_registry_by_default(tmp_path: Path) -> Non
     assert not stale_table.exists()
 
 
-def test_campaign_reset_purge_usr_registry_removes_registry(tmp_path: Path) -> None:
+def test_campaign_reset_refuses_when_shared_usr_dataset_has_state(tmp_path: Path) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
     _write_inputs(run_root)
     cfg_path = _write_usr_config(run_root)
     outputs_dir = run_root / "outputs"
-    registry_path = outputs_dir / "usr_datasets" / "registry.yaml"
+    stale_table = outputs_dir / "tables" / "records.parquet"
+    stale_table.parent.mkdir(parents=True, exist_ok=True)
+    stale_table.write_text("seed")
+    usr_root = tmp_path / "usr_root"
+    registry_path = usr_root / "registry.yaml"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text("namespaces: {}\n")
+    dataset_dir = usr_root / "demo"
+    dataset_dir.mkdir(parents=True, exist_ok=True)
+    (dataset_dir / "records.parquet").write_text("seed")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["campaign-reset", "--yes", "-c", str(cfg_path)])
+
+    assert result.exit_code == 1, result.output
+    assert "campaign-reset only clears workspace outputs" in result.output
+    assert "inspect the attached dataset" in result.output
+    assert stale_table.exists()
+    assert registry_path.exists()
+
+
+def test_campaign_reset_preserves_notify_profile_scaffold(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+    outputs_dir = run_root / "outputs"
+    notify_dir = outputs_dir / "notify" / "densegen"
+    notify_dir.mkdir(parents=True, exist_ok=True)
+    profile_path = notify_dir / "profile.json"
+    cursor_path = notify_dir / "cursor"
+    profile_path.write_text('{"provider":"slack"}\n')
+    cursor_path.write_text("12345\n")
+    stale_table = outputs_dir / "tables" / "records.parquet"
+    stale_table.parent.mkdir(parents=True, exist_ok=True)
+    stale_table.write_text("seed")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["campaign-reset", "--yes", "-c", str(cfg_path)])
+
+    assert result.exit_code == 0, result.output
+    assert profile_path.exists()
+    assert profile_path.read_text() == '{"provider":"slack"}\n'
+    assert cursor_path.exists()
+    assert cursor_path.read_text() == "12345\n"
+    assert not stale_table.exists()
+
+
+def test_campaign_reset_reports_clear_outputs_errors(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+    outputs_dir = run_root / "outputs"
+    stale_table = outputs_dir / "tables" / "records.parquet"
+    stale_table.parent.mkdir(parents=True, exist_ok=True)
+    stale_table.write_text("seed")
+
+    def _raise_stale_file_handle(*, outputs_root: Path) -> None:
+        raise OSError(errno.ESTALE, "Stale file handle", str(outputs_root))
+
+    runner = CliRunner()
+    monkeypatch.setattr(run_command, "_clear_outputs_preserving_notify", _raise_stale_file_handle)
+    result = runner.invoke(app, ["campaign-reset", "--yes", "-c", str(cfg_path)])
+
+    assert result.exit_code == 1
+    assert "Failed to clear outputs" in result.output
+    assert "Stale file handle" in result.output
+    assert "Traceback" not in result.output
+    assert outputs_dir.exists()
+
+
+def test_campaign_reset_purge_usr_registry_removes_registry(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_usr_config(run_root)
+    usr_root = run_root.parent / "usr_root"
+    outputs_dir = run_root / "outputs"
+    registry_path = usr_root / "registry.yaml"
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     registry_path.write_text("namespaces: {}\n")
     stale_table = outputs_dir / "tables" / "records.parquet"
@@ -782,10 +921,10 @@ def test_campaign_reset_purge_usr_registry_removes_registry(tmp_path: Path) -> N
     runner = CliRunner()
     result = runner.invoke(app, ["campaign-reset", "--yes", "--purge-usr-registry", "-c", str(cfg_path)])
 
-    assert result.exit_code == 0, result.output
-    assert not registry_path.exists()
-    assert not stale_table.exists()
-    assert not outputs_dir.exists()
+    assert result.exit_code == 1, result.output
+    assert "--purge-usr-registry only applies to workspace-local USR roots" in result.output
+    assert registry_path.exists()
+    assert stale_table.exists()
 
 
 def test_run_auto_seeds_missing_usr_registry_when_enabled(tmp_path: Path, monkeypatch) -> None:
@@ -793,7 +932,7 @@ def test_run_auto_seeds_missing_usr_registry_when_enabled(tmp_path: Path, monkey
     run_root.mkdir(parents=True)
     _write_inputs(run_root)
     cfg_path = _write_usr_config(run_root)
-    registry_path = run_root / "outputs" / "usr_datasets" / "registry.yaml"
+    registry_path = run_root.parent / "usr_root" / "registry.yaml"
     assert not registry_path.exists()
 
     captured = {"called": False}
@@ -817,7 +956,7 @@ def test_run_fails_fast_when_usr_registry_missing_and_auto_seed_disabled(tmp_pat
     run_root.mkdir(parents=True)
     _write_inputs(run_root)
     cfg_path = _write_usr_config(run_root)
-    registry_path = run_root / "outputs" / "usr_datasets" / "registry.yaml"
+    registry_path = run_root.parent / "usr_root" / "registry.yaml"
     assert not registry_path.exists()
 
     captured = {"called": False}
@@ -865,6 +1004,35 @@ def test_run_fresh_preserves_notify_profile_and_cursor(tmp_path: Path, monkeypat
     assert cursor_path.exists()
     assert cursor_path.read_text() == "12345\n"
     assert not stale_marker.exists()
+
+
+def test_run_fresh_reports_clear_outputs_errors(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+    outputs_dir = run_root / "outputs"
+    stale_table = outputs_dir / "tables" / "records.parquet"
+    stale_table.parent.mkdir(parents=True, exist_ok=True)
+    stale_table.write_text("seed")
+
+    called = {"run_pipeline": False}
+
+    def _fake_run_pipeline(*_args, **_kwargs):
+        called["run_pipeline"] = True
+
+    def _raise_stale_file_handle(*, outputs_root: Path) -> None:
+        raise OSError(errno.ESTALE, "Stale file handle", str(outputs_root))
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    monkeypatch.setattr(run_command, "_clear_outputs_preserving_notify", _raise_stale_file_handle)
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "--fresh", "--no-plot", "-c", str(cfg_path)])
+
+    assert result.exit_code == 1
+    assert "Failed to clear outputs: Stale file handle" in result.output
+    assert "Traceback" not in result.output
+    assert called["run_pipeline"] is False
 
 
 def test_run_fresh_preserves_ops_logs_directory(tmp_path: Path, monkeypatch) -> None:

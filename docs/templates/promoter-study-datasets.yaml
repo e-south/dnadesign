@@ -1,0 +1,60 @@
+study_id: <study-id>
+usr_remotes_path: <path-to-remotes.yaml-or-n/a>
+datasets:
+  - role: densegen_anchor
+    dataset: <dataset-id>
+    usr_root: <usr-root>
+    root_kind: shared|workspace_local_export|external_usr
+    status: present|planned
+    lifecycle: source
+    owner_tool: densegen
+    onboard_mode: existing_local|existing_remote|existing_both|create_new
+    authority: local|remote|shared
+    notes: <how this location relates to the shared study root>
+    sync:
+      enabled: true
+      remote_name: cluster|cluster_workspace_export|n/a
+      remote_dataset: <dataset-id>
+      remote_root_kind: shared|workspace_local_export|external_usr
+      default_direction: pull|push|bidirectional|none
+      audit_json: docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
+      strict_bootstrap_id: true
+      remote_path: n/a
+  - role: wildtype_manual
+    dataset: <dataset-id>
+    usr_root: <usr-root>
+    root_kind: shared|workspace_local_export|external_usr
+    status: present|planned
+    lifecycle: source
+    owner_tool: usr
+    onboard_mode: existing_local|existing_remote|existing_both|create_new
+    authority: local|remote|shared
+    notes: <wildtype/manual provenance and study role>
+    sync:
+      enabled: false
+      remote_name: n/a
+      remote_dataset: n/a
+      remote_root_kind: n/a
+      default_direction: none
+      audit_json: n/a
+      strict_bootstrap_id: false
+      remote_path: n/a
+  - role: feature_matrix
+    dataset: <feature-dataset-id>
+    usr_root: <usr-root>
+    root_kind: shared|workspace_local_export|external_usr
+    status: present|planned
+    lifecycle: shared_handoff
+    owner_tool: usr
+    onboard_mode: create_new
+    authority: shared
+    notes: <shared dataset used by infer, cluster, and OPAL>
+    sync:
+      enabled: true
+      remote_name: cluster|cluster_workspace_export|n/a
+      remote_dataset: <feature-dataset-id>
+      remote_root_kind: shared|workspace_local_export|external_usr
+      default_direction: bidirectional
+      audit_json: docs/studies/promoter/<study-id>/audits/<feature-dataset-id>--<remote-name>-diff.json
+      strict_bootstrap_id: true
+      remote_path: n/a

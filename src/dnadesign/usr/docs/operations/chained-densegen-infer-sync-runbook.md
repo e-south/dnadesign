@@ -1,0 +1,170 @@
+# Chained DenseGen and Infer Sync Runbook
+
+**Type:** runbook
+**Plane:** data-plane
+**Owner-boundary:** usr
+**Entry artifact:** one USR dataset updated asynchronously by DenseGen on HPC and infer locally
+**Exit artifact:** synchronized USR dataset with transfer-verified infer overlays on both hosts
+**Registry-id:** usr.data-plane.chained-densegen-infer-sync
+**Summary:** Coordinate DenseGen-on-HPC and Infer-local writes against one USR dataset with explicit sync checkpoints.
+**Execution-kind:** iterative
+**Progress-kind:** usr-sync-audit
+
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-03-20
+
+
+Use this runbook for the full asynchronous loop where DenseGen writes on HPC and Infer writes back overlays locally, with USR sync as the transfer contract.
+
+Default sync contract:
+- Dataset sync defaults to `--verify hash` plus strict sidecar and `_derived`/`_auxiliary` content-hash fidelity checks.
+- Use `--no-verify-derived-hashes` only when an operator intentionally trades content-hash fidelity for speed.
+- DenseGen may write first into a workspace-local USR export root; make the
+  shared study root explicit before using the dataset as the cross-tool
+  study record.
+
+## Scope
+
+- Dataset source of truth: USR dataset roots, not git.
+- Transfer boundary: `uv run usr diff/pull/push` over SSH remotes.
+- Chained tools: DenseGen batch writes plus Infer write-back overlays.
+- Naming boundary: distinguish producer-owned workspace export roots from the
+  shared dataset used for downstream study tracking.
+
+## One-time setup
+
+```bash
+# Local root example (repo-local shared datasets root)
+export LOCAL_USR_ROOT="src/dnadesign/usr/datasets"
+# Confirm the configured remote profile and remote base_dir before syncing.
+uv run usr remotes show bu-scc
+# Reuse one dataset id across local and HPC phases.
+export DATASET_ID="my_dataset"
+```
+
+If DenseGen writes first to a workspace-local export root on SCC, declare or
+create a remote profile for that root explicitly instead of pretending the
+workspace export is already the shared USR root.
+
+## Quick path
+
+```bash
+# Compare local dataset state against HPC before any transfer.
+uv run usr --root "$LOCAL_USR_ROOT" diff "$DATASET_ID" bu-scc
+# Pull HPC updates locally with strict sidecar checks.
+uv run usr --root "$LOCAL_USR_ROOT" pull "$DATASET_ID" bu-scc -y
+# Push local overlay updates back to HPC with strict sidecar checks.
+uv run usr --root "$LOCAL_USR_ROOT" push "$DATASET_ID" bu-scc -y
+```
+
+## Full chained loop
+
+### 1) One-time preflight
+
+```bash
+# Validate remote connectivity, transfer prerequisites, and lock support.
+uv run usr remotes doctor --remote bu-scc
+# Check whether the reusable SSH control socket is already live.
+uv run usr remotes status --remote bu-scc
+# Print the local root used by the remaining steps.
+echo "$LOCAL_USR_ROOT"
+# Print the dataset id used by the remaining steps.
+echo "$DATASET_ID"
+```
+
+If SCC MFA requires an interactive step before sync, run:
+
+```bash
+# Establish the reusable SSH control socket before sync.
+uv run usr remotes warm-auth --remote bu-scc
+```
+
+### 2) HPC side DenseGen batch increment
+
+Submit the scheduler template using workspace config rooted at your HPC clone.
+
+```bash
+# Submit DenseGen CPU batch job to append USR output on HPC.
+qsub -P <project> \
+  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
+  docs/bu-scc/jobs/densegen-cpu.qsub
+```
+
+For resumed quota extension runs:
+
+```bash
+# Resume previous run and extend quota with explicit run args.
+qsub -P <project> \
+  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--resume --extend-quota 8 --no-plot' \
+  docs/bu-scc/jobs/densegen-cpu.qsub
+```
+
+### 3) Local pull and analysis loop
+
+```bash
+# Compare local against HPC before pulling.
+uv run usr --root "$LOCAL_USR_ROOT" diff "$DATASET_ID" bu-scc
+# Pull HPC updates into local dataset for notebooks/analysis.
+uv run usr --root "$LOCAL_USR_ROOT" pull "$DATASET_ID" bu-scc -y
+# Confirm no remaining drift after pull.
+uv run usr --root "$LOCAL_USR_ROOT" diff "$DATASET_ID" bu-scc
+```
+
+Optional local dataset view checks:
+
+```bash
+# Inspect latest records from the synchronized dataset.
+uv run usr --root "$LOCAL_USR_ROOT" head "$DATASET_ID" -n 5
+# Inspect the event stream tail for operator context.
+uv run usr --root "$LOCAL_USR_ROOT" events tail "$DATASET_ID" -n 10
+```
+
+### 4) Local Infer write-back and push to HPC
+
+```bash
+# Write Infer outputs back to the synchronized local USR dataset namespace.
+uv run infer run --preset evo2/extract_logits_ll --usr "$DATASET_ID" --usr-root "$LOCAL_USR_ROOT" --field sequence --device cpu --write-back
+# Preview local-vs-remote drift after write-back.
+uv run usr --root "$LOCAL_USR_ROOT" diff "$DATASET_ID" bu-scc
+# Push local infer overlays and sidecars back to HPC.
+uv run usr --root "$LOCAL_USR_ROOT" push "$DATASET_ID" bu-scc -y
+```
+
+If this is the first infer write-back into the dataset, make the namespace-registration step explicit before mutation. Prefer the config-driven infer pressure-test path when you need the exact `usr namespace register infer --columns ...` command rendered from the active infer contract.
+
+### 5) Next HPC batch phase
+
+After Step 4, the remote `bu-scc` dataset is already updated by the local `push`. No extra HPC-side `pull` is required when the next batch job reads from that same remote root.
+
+If the next batch phase reads from a different HPC clone or a second USR root, sync that environment explicitly with the remote profile defined there before submitting the job.
+
+## Audit interpretation
+
+Every pull/push prints an audit summary. Use it for low-friction decisions:
+
+- `Primary changed`: base table content changed by verify mode.
+- `meta.md changed`: metadata notes changed.
+- `.events.log local/remote`: event stream drift context.
+- `_snapshots changed`: snapshot inventory drift.
+- `_derived changed`: overlay-file inventory drift.
+- `_auxiliary changed`: non-core file inventory drift (for example `_artifacts`, `_registry`).
+
+Recommended operator rule:
+
+1. If `_derived` or `_auxiliary` is `changed`, run transfer even when `.events.log` delta is small.
+2. If strict fidelity is required, keep default checks enabled and avoid `--no-verify-sidecars`, `--no-verify-derived-hashes`, `--primary-only`, and `--skip-snapshots`.
+3. Re-run `diff` after transfer; expected result is `up-to-date`.
+4. A large `_derived` inventory can make a strict no-op `pull` or `push`
+   spend noticeable time in post-transfer verification even when no payload
+   changes remain. Treat that as fidelity work, not silent corruption.
+
+## Failure drills
+
+```bash
+# Re-check remote toolchain and lock support after failures.
+uv run usr remotes doctor --remote bu-scc
+# Re-run pull with explicit verification mode when auto-mode is insufficient.
+uv run usr --root "$LOCAL_USR_ROOT" pull "$DATASET_ID" bu-scc -y
+```
+
+If transfer fails mid-stream, rerun the same command. Pull stages payloads before promotion and push verifies post-transfer primary/sidecar contracts.

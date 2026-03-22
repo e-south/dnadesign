@@ -10,8 +10,8 @@ This tutorial shows the full event-driven operator path from DenseGen generation
 
 - Running DenseGen in USR output mode.
 - Locating the resolved USR `.events.log` path from workspace outputs.
-- Creating a Notify profile from DenseGen config.
-- Validating webhook delivery with a local receiver.
+- Resolving DenseGen-managed events for Notify without manual path guessing.
+- Validating webhook delivery with a local receiver through Notify's generic runtime mode.
 
 ### Prerequisites
 
@@ -96,32 +96,39 @@ ls -la outputs/meta/events.jsonl
 uv run dense inspect run --usr-events-path -c "$CONFIG"
 ```
 
-#### 4) Configure Notify profile from DenseGen config
-Create a profile without manual path guessing and bind it to the local webhook endpoint.
+#### 4) Resolve Notify inputs from DenseGen config
+Use resolver mode to confirm the exact `.events.log` path before delivery.
 
 ```bash
 # Export local webhook URL for env-backed secret resolution.
 export NOTIFY_WEBHOOK="http://127.0.0.1:8787/webhook"
 
-# Create Notify profile using DenseGen config resolution.
-uv run notify setup slack --tool densegen --config "$CONFIG" --secret-source env --url-env NOTIFY_WEBHOOK --policy densegen
-
-# Cache profile path for doctor/watch commands.
-PROFILE="outputs/notify/densegen/profile.json"
+# Resolve the exact USR events path without writing profile artifacts.
+uv run notify setup resolve-events --tool densegen --config "$CONFIG" --json
 ```
 
 #### 5) Validate and watch events
-Verify profile correctness, preview payloads, then start live delivery.
+Preview payloads with the generic provider, then start live delivery to the local receiver.
 
 ```bash
-# Validate profile and event-source resolution.
-uv run notify profile doctor --profile "$PROFILE"
-
 # Preview payloads without advancing cursor.
-uv run notify usr-events watch --profile "$PROFILE" --dry-run --no-advance-cursor-on-dry-run
+uv run notify usr-events watch --tool densegen --config "$CONFIG" --provider generic --url "$NOTIFY_WEBHOOK" --dry-run --no-advance-cursor-on-dry-run
 
 # Start live watcher and wait for events.
-uv run notify usr-events watch --profile "$PROFILE" --follow --wait-for-events --stop-on-terminal-status --idle-timeout 900
+uv run notify usr-events watch --tool densegen --config "$CONFIG" --provider generic --url "$NOTIFY_WEBHOOK" --follow --wait-for-events --stop-on-terminal-status --idle-timeout 900
+```
+
+If you want a reusable Slack watcher profile instead of a local generic receiver, use the Notify operator docs with a real Slack webhook secret:
+
+```bash
+# Create Notify profile using DenseGen config resolution and a real Slack webhook secret.
+uv run notify setup slack --tool densegen --config "$CONFIG" --secret-source file --secret-ref file://<abs-path-to-webhook-secret> --policy densegen
+
+# Cache profile path for doctor/watch commands.
+PROFILE="outputs/notify/densegen/profile.json"
+
+# Validate the saved Slack profile before live delivery.
+uv run notify profile doctor --profile "$PROFILE"
 ```
 
 #### 6) Emit additional events on demand
@@ -135,14 +142,15 @@ uv run dense run --resume --extend-quota 2 --no-plot -c "$CONFIG"
 ### Expected outputs
 
 - DenseGen diagnostics: `outputs/meta/events.jsonl`
-- USR dataset table: `outputs/usr_datasets/<dataset>/records.parquet`
-- USR event stream: `outputs/usr_datasets/<dataset>/.events.log`
-- Notify profile: `outputs/notify/densegen/profile.json`
-- Notify cursor and spool: `outputs/notify/densegen/cursor`, `outputs/notify/densegen/spool/`
+- USR dataset table: `<output.usr.root>/<dataset>/records.parquet`
+- USR event stream: `<output.usr.root>/<dataset>/.events.log`
+- Notify resolver output: the `notify setup resolve-events --tool densegen --config "$CONFIG"` JSON payload
+- Optional Notify Slack profile: `outputs/notify/densegen/profile.json`
+- Optional Notify cursor and spool: `outputs/notify/densegen/cursor`, `outputs/notify/densegen/spool/`
 
 ### Troubleshooting
 
 - No webhook posts appear: confirm terminal A receiver is running and `NOTIFY_WEBHOOK` is exported.
-- `notify profile doctor` fails: recreate profile with `notify setup slack --force ...`.
-- Watcher sees no events: rerun `uv run dense inspect run --usr-events-path -c "$CONFIG"` and verify profile points to that file.
+- `notify profile doctor` fails against a localhost URL: that path only works with a real Slack webhook host; use the generic `notify usr-events watch --provider generic --url "$NOTIFY_WEBHOOK"` path for local receiver drills.
+- Watcher sees no events: rerun `uv run notify setup resolve-events --tool densegen --config "$CONFIG"` and verify it matches the active dataset `.events.log`.
 - Confusing event sources: use **[observability and events](../concepts/observability_and_events.md)** as the boundary definition.

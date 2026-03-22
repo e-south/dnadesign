@@ -420,6 +420,144 @@ def test_setup_resolve_events_can_emit_json_output(tmp_path: Path, monkeypatch) 
     assert payload["policy"] == "densegen"
 
 
+def test_setup_resolve_events_supports_construct_workspace_project_selector(tmp_path: Path, monkeypatch) -> None:
+    repo_root = tmp_path / "repo"
+    workspace_dir = repo_root / "src" / "dnadesign" / "construct" / "workspaces" / "demo_construct"
+    config_path = workspace_dir / "config.slot_a.window.yaml"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "job:",
+                "  id: slot_a_window",
+                "  input:",
+                "    source: usr",
+                "    dataset: anchors_demo",
+                "  output:",
+                "    dataset: construct/demo_window",
+                "    root: outputs/usr_datasets",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (workspace_dir / "construct.workspace.yaml").write_text(
+        "\n".join(
+            [
+                "workspace:",
+                "  id: demo_construct",
+                "  profile: promoter-swap-demo",
+                "  projects:",
+                "    - id: slot_a_window",
+                "      config: config.slot_a.window.yaml",
+                "      flow: replace-anchor-in-template",
+                "      input_dataset: anchors_demo",
+                "      output_dataset: construct/demo_window",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\n", encoding="utf-8")
+    monkeypatch.chdir(repo_root)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "resolve-events",
+            "--tool",
+            "construct",
+            "--workspace",
+            "demo_construct:slot_a_window",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["tool"] == "construct"
+    assert payload["config"] == str(config_path.resolve())
+    assert payload["events"] == str(
+        (workspace_dir / "outputs" / "usr_datasets" / "construct" / "demo_window" / ".events.log").resolve()
+    )
+    assert payload["policy"] == "construct"
+
+
+def test_setup_slack_namespaces_construct_selector_profile_paths(tmp_path: Path, monkeypatch) -> None:
+    workspace = "demo_construct:slot_a_window"
+    repo_root = tmp_path / "repo"
+    workspace_dir = repo_root / "src" / "dnadesign" / "construct" / "workspaces" / "demo_construct"
+    config_path = workspace_dir / "config.slot_a.window.yaml"
+    events_path = tmp_path / "usr" / "construct_demo" / ".events.log"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    events_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "job:",
+                "  id: promoter_swap_slot_a_window_1kb",
+                "  input:",
+                "    source: usr",
+                "    dataset: mg1655_promoters",
+                "    root: outputs/usr_datasets",
+                "  output:",
+                "    dataset: pdual10_source_of_truth_demo",
+                "    root: outputs/usr_datasets",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (workspace_dir / "construct.workspace.yaml").write_text(
+        "\n".join(
+            [
+                "workspace:",
+                "  id: demo_construct",
+                "  profile: promoter-swap-source-of-truth-demo",
+                "  projects:",
+                "    - id: slot_a_window",
+                "      config: config.slot_a.window.yaml",
+                "      flow: replace-anchor-in-template",
+                "      input_dataset: mg1655_promoters",
+                "      output_dataset: pdual10_source_of_truth_demo",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\n", encoding="utf-8")
+    monkeypatch.chdir(repo_root)
+    monkeypatch.setattr(
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
+        lambda *, tool, config: (events_path, "construct"),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "slack",
+            "--tool",
+            "construct",
+            "--workspace",
+            workspace,
+            "--secret-source",
+            "env",
+        ],
+    )
+
+    assert result.exit_code == 0
+    profile = workspace_dir / "outputs" / "notify" / "construct" / "slot_a_window" / "profile.json"
+    assert profile.exists()
+    payload = json.loads(profile.read_text(encoding="utf-8"))
+    assert payload["policy"] == "construct"
+    assert payload["only_actions"] == "attach,materialize"
+    assert payload["only_tools"] == "construct"
+
+
 def test_setup_list_workspaces_emits_names_and_json(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
@@ -664,19 +802,19 @@ def test_setup_slack_events_mode_defaults_profile_to_policy_namespace(tmp_path: 
             "--events",
             str(events),
             "--policy",
-            "infer_evo2",
+            "infer",
             "--secret-source",
             "env",
         ],
     )
     assert result.exit_code == 0
-    profile = tmp_path / "outputs" / "notify" / "infer_evo2" / "profile.json"
+    profile = tmp_path / "outputs" / "notify" / "infer" / "profile.json"
     assert profile.exists()
     data = json.loads(profile.read_text(encoding="utf-8"))
     assert data["events"] == str(events.resolve())
-    assert data["policy"] == "infer_evo2"
-    assert data["cursor"] == str((tmp_path / "outputs" / "notify" / "infer_evo2" / "cursor").resolve())
-    assert data["spool_dir"] == str((tmp_path / "outputs" / "notify" / "infer_evo2" / "spool").resolve())
+    assert data["policy"] == "infer"
+    assert data["cursor"] == str((tmp_path / "outputs" / "notify" / "infer" / "cursor").resolve())
+    assert data["spool_dir"] == str((tmp_path / "outputs" / "notify" / "infer" / "spool").resolve())
 
 
 def test_setup_slack_env_uses_default_webhook_env_when_not_set(tmp_path: Path, monkeypatch) -> None:
@@ -839,7 +977,7 @@ def test_setup_slack_rejects_unsupported_tool(tmp_path: Path, monkeypatch) -> No
     assert "unsupported tool" in result.stdout.lower()
 
 
-def test_setup_slack_can_resolve_infer_evo2_events_from_config(tmp_path: Path, monkeypatch) -> None:
+def test_setup_slack_can_resolve_infer_events_from_config(tmp_path: Path, monkeypatch) -> None:
     config_path = tmp_path / "infer.yaml"
     profile = tmp_path / "notify.profile.json"
     usr_root = tmp_path / "usr_root"
@@ -878,7 +1016,7 @@ def test_setup_slack_can_resolve_infer_evo2_events_from_config(tmp_path: Path, m
             "--profile",
             str(profile),
             "--tool",
-            "infer_evo2",
+            "infer",
             "--config",
             str(config_path),
             "--secret-source",
@@ -890,5 +1028,5 @@ def test_setup_slack_can_resolve_infer_evo2_events_from_config(tmp_path: Path, m
     assert result.exit_code == 0
     data = json.loads(profile.read_text(encoding="utf-8"))
     assert data["events"] == str((usr_root / "infer_demo" / ".events.log").resolve())
-    assert data["policy"] == "infer_evo2"
-    assert data["events_source"] == {"tool": "infer_evo2", "config": str(config_path.resolve())}
+    assert data["policy"] == "infer"
+    assert data["events_source"] == {"tool": "infer", "config": str(config_path.resolve())}

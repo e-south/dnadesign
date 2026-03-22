@@ -3,7 +3,7 @@
 dnadesign
 dnadesign/src/dnadesign/usr/tests/test_cli_maintenance_registry.py
 
-CLI maintenance command tests for registry freeze and overlay compaction.
+CLI maintenance command tests for registry freeze and overlay maintenance.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -77,3 +77,54 @@ def test_cli_overlay_compact(tmp_path: Path) -> None:
     assert overlay_path(ds.dir, "audit").exists()
     archived = ds.dir / "_derived" / "_archived" / "audit"
     assert not archived.exists()
+
+
+def test_cli_overlay_remove_archives_overlay(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    ds = _make_dataset(root)
+
+    ids = ds.head(2)["id"].tolist()
+    tbl = pa.table({"id": ids, "audit__score": [0.1, 0.2]})
+    ds.write_overlay_part("audit", tbl, key="id", allow_missing=False)
+
+    parts_dir = overlay_dir_path(ds.dir, "audit")
+    assert parts_dir.exists()
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["--root", str(root), "maintenance", "overlay-remove", "demo", "--namespace", "audit", "--mode", "archive"],
+    )
+    assert result.exit_code == 0
+
+    archived_root = ds.dir / "_derived" / "_archived"
+    assert archived_root.exists()
+    assert not parts_dir.exists()
+    assert "archived_path" in result.output
+
+
+def test_cli_overlay_remove_rejects_reserved_namespace(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    ds = _make_dataset(root)
+
+    ids = ds.head(1)["id"].tolist()
+    ds.set_state(ids, masked=True)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "--root",
+            str(root),
+            "maintenance",
+            "overlay-remove",
+            "demo",
+            "--namespace",
+            "usr_state",
+            "--mode",
+            "archive",
+        ],
+    )
+    assert result.exit_code != 0
+    assert result.exception is not None
+    assert "reserved" in str(result.exception).lower()

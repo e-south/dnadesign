@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/io/read.py
 
 Module Author(s): Eric J. South
@@ -79,6 +79,9 @@ def extract_X(df: pd.DataFrame, x_col: str | None = None, x_cols: list[str] | No
         # Guard: all-null is not a valid feature vector
         if s.isna().all():
             raise ValueError(f"X column '{x_col}' has only null values.")
+        if s.isna().any():
+            first_missing = int(np.flatnonzero(s.isna().to_numpy())[0])
+            raise ValueError(f"X column '{x_col}' contains null values (first missing row: {first_missing}).")
         # Use the first non-null cell to determine representation
         first_valid_idx = s.first_valid_index()
         first = s.loc[first_valid_idx]
@@ -108,8 +111,7 @@ def extract_X(df: pd.DataFrame, x_col: str | None = None, x_cols: list[str] | No
             dim = int(arr0.shape[0])
             n = int(len(s))
             X = np.empty((n, dim), dtype=np.float32)
-            X[0, :] = arr0
-            for i, v in enumerate(s.iloc[1:], start=1):
+            for i, v in enumerate(s):
                 arr = _parse_json_array_cell(v)
                 if arr.ndim != 1:
                     raise ValueError(f"Row {i} in '{x_col}' is not 1-D.")

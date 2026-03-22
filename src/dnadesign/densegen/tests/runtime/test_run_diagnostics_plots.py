@@ -854,8 +854,39 @@ def test_run_health_tfbs_length_single_regulator_uses_length_axis() -> None:
 def test_run_health_outcomes_attempts_per_row_scales_by_workload() -> None:
     assert _outcomes_attempts_per_row_for_workload(9999) == 10
     assert _outcomes_attempts_per_row_for_workload(10_000) == 100
-    assert _outcomes_attempts_per_row_for_workload(999_999) == 100
+    assert _outcomes_attempts_per_row_for_workload(999_999) == 500
     assert _outcomes_attempts_per_row_for_workload(1_000_000) == 1000
+
+
+def test_run_health_outcomes_auto_scales_by_total_workload_across_plans() -> None:
+    matplotlib.use("Agg", force=True)
+    rows = []
+    attempt_index = 1
+    for plan_name in ("plan_a", "plan_b", "plan_c", "plan_d"):
+        for _ in range(3000):
+            rows.append(
+                {
+                    "attempt_index": attempt_index,
+                    "created_at": f"2026-01-26T00:00:{attempt_index % 60:02d}+00:00",
+                    "status": "ok",
+                    "reason": "ok",
+                    "plan_name": plan_name,
+                    "sampling_library_index": attempt_index,
+                }
+            )
+            attempt_index += 1
+    attempts = pd.DataFrame(rows)
+    fig, axes = _build_run_health_outcomes_figure(
+        attempts,
+        events_df=None,
+        style={},
+        plan_quotas={plan: 3000 for plan in ("plan_a", "plan_b", "plan_c", "plan_d")},
+    )
+    try:
+        x_lim = axes["outcome"].get_xlim()
+        assert x_lim[1] == pytest.approx(400.0)
+    finally:
+        fig.clf()
 
 
 def test_run_health_outcomes_legend_and_waste_subtitle() -> None:
@@ -1326,6 +1357,39 @@ def test_run_health_detail_reason_labels_start_capitalized() -> None:
         labels = [tick.get_text() for tick in axes["fail"].get_yticklabels() if tick.get_text()]
         assert labels
         assert all(label[0] == label[0].upper() for label in labels)
+    finally:
+        fig.clf()
+
+
+def test_run_health_detail_reason_labels_keep_full_text_without_truncation() -> None:
+    attempts_rows: list[dict[str, object]] = []
+    for idx in range(24):
+        attempts_rows.append(
+            {
+                "attempt_index": idx + 1,
+                "created_at": f"2026-01-26T00:00:{idx:02d}+00:00",
+                "status": "failed",
+                "reason": f"custom_reason_label_with_many_words_{idx:02d}_segment",
+                "plan_name": "demo_plan",
+                "sampling_library_index": 1,
+            }
+        )
+
+    attempts = pd.DataFrame(attempts_rows)
+    fig, axes = _build_run_health_detail_figure(
+        attempts,
+        events_df=None,
+        style={},
+        plan_quotas={"demo_plan": 24},
+    )
+    try:
+        labels = [tick.get_text() for tick in axes["fail"].get_yticklabels() if tick.get_text()]
+        assert labels
+        assert all("..." not in label for label in labels)
+        assert any("Custom reason label with many words 00 segment" == label for label in labels)
+        font_sizes = [float(tick.get_fontsize()) for tick in axes["fail"].get_yticklabels() if tick.get_text()]
+        assert font_sizes
+        assert max(font_sizes) <= 10.0
     finally:
         fig.clf()
 
@@ -1899,6 +1963,26 @@ def test_run_health_reason_breaks_out_forbidden_kmer_from_detail_json() -> None:
     attempts.loc[1, "status"] = "rejected"
     attempts.loc[1, "reason"] = "postprocess_forbidden_kmer"
     attempts.loc[1, "detail_json"] = '{"kmer":"ATGC","position":9}'
+    fig, axes = _build_run_health_figure(
+        attempts,
+        events_df=None,
+        style={},
+        plan_quotas={"demo_plan": 12},
+    )
+    try:
+        labels = [tick.get_text() for tick in axes["fail"].get_yticklabels()]
+        assert any("forbidden kmer" in label.lower() and "ATGC" in label for label in labels)
+    finally:
+        fig.clf()
+
+
+def test_run_health_reason_breaks_out_sequence_validation_forbidden_kmer_from_detail_json() -> None:
+    attempts = _attempts_df().copy()
+    attempts.loc[1, "status"] = "rejected"
+    attempts.loc[1, "reason"] = "sequence_validation_failed"
+    attempts.loc[1, "detail_json"] = (
+        '{"violations":[{"constraint":"forbid_sigma70_hexamers","pattern":"ATGC","position":9}]}'
+    )
     fig, axes = _build_run_health_figure(
         attempts,
         events_df=None,

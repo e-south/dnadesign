@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-03
+**Last verified:** 2026-03-19
 
 ## At a glance
 This document defines how `dnadesign` grades quality across tool domains and architectural layers.
@@ -42,7 +42,7 @@ Each score uses a `0-4` rubric:
 | `ci-devtools` | contract enforcement | 3 | stable | enforced | `.github/workflows/ci.yaml`; `src/dnadesign/devtools` | dnadesign-maintainers | 2026-02-18 | keep scope and boundary checks test-backed |
 | `tool-coverage` | correctness floor | 3 | stable | enforced | `.github/tool-coverage-baseline.json`; `https://codecov.io/gh/e-south/dnadesign` | dnadesign-maintainers | 2026-02-18 | raise non-zero baselines for currently unmeasured tools |
 | `docs-sor` | documentation fidelity | 3 | improving | enforced | `src/dnadesign/devtools/docs_checks.py`; `docs/exec-plans/README.md` | dnadesign-maintainers | 2026-02-18 | expand owner granularity to per-domain maintainers |
-| `ops-cross-tool-ia` | architecture invariants | 3 | improving | enforced | `ARCHITECTURE.md`; `DESIGN.md`; `docs/operations/orchestration-runbooks.md`; `src/dnadesign/devtools/docs_checks.py`; `src/dnadesign/ops/runbooks/schema.py`; `src/dnadesign/ops/tests/test_runbook_orchestrator.py` | dnadesign-maintainers | 2026-03-03 | keep USR overlay guard terminology and namespace contracts test-backed across docs and planner code |
+| `architecture-boundaries` | architecture invariants | 3 | improving | enforced | `ARCHITECTURE.md`; `DESIGN.md`; `src/dnadesign/devtools/docs_checks.py`; boundary contract tests in tool packages | dnadesign-maintainers | 2026-03-18 | keep root docs abstract, tool READMEs lightweight, and boundary contracts test-backed |
 
 ## Generated score inputs
 - Score inputs are generated in CI only for full-core scope (`run_full_core=true`) from:
@@ -66,13 +66,14 @@ Each score uses a `0-4` rubric:
 | Quality score input generation | `dnadesign.devtools.coverage_summary` + `dnadesign.devtools.quality_score` in CI | enforced |
 | Tool-inventory alignment | `dnadesign.devtools.ci_changes` contracts | enforced |
 | Root README tool catalog integrity | `dnadesign.devtools.docs_checks` tool table + path checks | enforced |
+| Runbook catalog completeness and registry metadata | `dnadesign.devtools.docs_checks` + CI | enforced |
 | Selected runbook metadata | `dnadesign.devtools.docs_checks` + CI | enforced |
 | Operational runbook path placement | `dnadesign.devtools.docs_checks` + CI | enforced |
 | Transient operational artifact placement (`.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) | `dnadesign.devtools.docs_checks` + CI | enforced |
-| Ops/USR overlay guard terminology drift prevention | `dnadesign.devtools.docs_checks` stale-term checks + CI | enforced |
+| Cross-tool boundary terminology drift prevention | `dnadesign.devtools.docs_checks` stale-term checks + CI | enforced |
 | Tool-boundary utility placement (`src/dnadesign/utils` disallowed) | `dnadesign.devtools.docs_checks` shared-utils path check + CI | enforced |
-| DenseGen resume/fresh mode safety and stdout-dir scope | `dnadesign.ops.runbooks.schema`; `dnadesign.ops.orchestrator.state`; `src/dnadesign/ops/tests/test_runbook_orchestrator.py` | enforced |
-| Overlay namespace validity at ops->usr boundary | `dnadesign.ops.runbooks.schema` + `src/dnadesign/ops/tests/test_runbook_orchestrator.py` | enforced |
+| Selected cross-tool runbook safety contracts | `dnadesign.ops.runbooks.schema`; orchestration contract tests | enforced |
+| Dataset overlay namespace validity at orchestration boundaries | `dnadesign.ops.runbooks.schema` + orchestration contract tests | enforced |
 
 ## Gap tracker
 | Gap | Impact | Tracking artifact | Exit criteria |

@@ -126,6 +126,7 @@ def test_merge_defaults_are_strict(tmp_path: Path, monkeypatch) -> None:
     def _fake_merge_usr_to_usr(**kwargs):
         captured["duplicate_policy"] = kwargs["duplicate_policy"]
         captured["overlap_coercion"] = kwargs["overlap_coercion"]
+        captured["carry_namespaces"] = kwargs["carry_namespaces"]
         return MergePreview(
             dest_rows_before=0,
             src_rows=0,
@@ -159,6 +160,52 @@ def test_merge_defaults_are_strict(tmp_path: Path, monkeypatch) -> None:
     assert result.exit_code == 0
     assert captured["duplicate_policy"] == MergePolicy.ERROR
     assert captured["overlap_coercion"] == "none"
+    assert captured["carry_namespaces"] == []
+
+
+def test_merge_passes_explicit_carry_namespaces(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "datasets"
+    root.mkdir(parents=True, exist_ok=True)
+    captured: dict[str, object] = {}
+
+    def _fake_merge_usr_to_usr(**kwargs):
+        captured["carry_namespaces"] = kwargs["carry_namespaces"]
+        return MergePreview(
+            dest_rows_before=0,
+            src_rows=0,
+            duplicates_total=0,
+            duplicates_skipped=0,
+            duplicates_replaced=0,
+            duplicate_policy=kwargs["duplicate_policy"],
+            new_rows=0,
+            dest_rows_after=0,
+            columns_total=0,
+            overlapping_columns=0,
+        )
+
+    monkeypatch.setattr("dnadesign.usr.src.cli.merge_usr_to_usr", _fake_merge_usr_to_usr)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "--root",
+            str(root),
+            "maintenance",
+            "merge",
+            "--dest",
+            "demo_dest",
+            "--src",
+            "demo_src",
+            "--carry-namespace",
+            "usr_label",
+            "--carry-namespace",
+            "infer",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    assert captured["carry_namespaces"] == ["usr_label", "infer"]
 
 
 def test_pull_help_mentions_verify_sidecars_option() -> None:

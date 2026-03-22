@@ -1,5 +1,10 @@
 ## study_stress_ethanol_cipro workspace
 
+This workspace writes its USR sink directly to the shared USR root
+`src/dnadesign/usr/datasets/`. Treat that shared root as the DenseGen producer
+surface for this study and as the cross-tool handoff source for downstream
+status.
+
 Run from this directory:
 
 ```bash

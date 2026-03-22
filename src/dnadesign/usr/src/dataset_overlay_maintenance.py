@@ -17,7 +17,7 @@ from typing import Protocol
 
 import pyarrow.parquet as pq
 
-from .errors import SchemaError
+from .errors import NamespaceError, SchemaError
 from .maintenance import require_maintenance
 from .overlays import (
     OVERLAY_META_CREATED,
@@ -116,9 +116,12 @@ def remove_overlay_namespace(
     namespace: str,
     *,
     mode: str = "error",
+    reserved_namespaces: set[str],
 ) -> dict:
     if mode not in {"error", "delete", "archive"}:
         raise SchemaError(f"Unsupported remove_overlay mode '{mode}'.")
+    if namespace in reserved_namespaces:
+        raise NamespaceError(f"Namespace '{namespace}' is reserved.")
     dataset._require_registry_for_mutation("remove_overlay")
     file_path = overlay_path(dataset.dir, namespace)
     dir_path = overlay_dir_path(dataset.dir, namespace)

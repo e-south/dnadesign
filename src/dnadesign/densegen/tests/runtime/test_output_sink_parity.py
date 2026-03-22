@@ -76,6 +76,8 @@ def test_parquet_and_usr_sinks_keep_same_metadata_and_stage_a_lineage(tmp_path: 
             "matched_strand": "+",
         }
     ]
+    meta["used_tf_counts"] = [{"tf": "lexA", "count": 1}]
+    meta["used_tfbs"] = ["lexA:AAA"]
     rec = OutputRecord.from_sequence(
         sequence="ACGTACGTAA",
         meta=meta,

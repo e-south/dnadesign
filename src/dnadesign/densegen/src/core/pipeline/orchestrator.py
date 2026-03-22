@@ -27,8 +27,8 @@ from ...config import (
     DenseGenConfig,
     LoadedConfig,
     ResolvedPlanItem,
-    resolve_outputs_scoped_path,
     resolve_run_root,
+    resolve_usr_root_scoped_path,
 )
 from ...utils.logging_utils import install_native_stderr_filters
 from ..artifacts.pool import POOL_MODE_TFBS, PoolData
@@ -89,7 +89,7 @@ def _replay_usr_overlay_backlog_for_resume(
     if not dataset_name:
         raise RuntimeError("output.usr.dataset must be a non-empty string.")
 
-    usr_root = resolve_outputs_scoped_path(cfg_path, run_root, usr_cfg.root, label="output.usr.root")
+    usr_root = resolve_usr_root_scoped_path(cfg_path, usr_cfg.root, label="output.usr.root")
     dataset_dir = (usr_root / dataset_name).resolve()
     pending_before = _pending_usr_overlay_backlog_parts(dataset_dir)
     if not pending_before:

@@ -15,6 +15,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from dnadesign._contracts import (
+    resolve_construct_workspace_project_id_from_config,
+    resolve_construct_workspace_root_from_config,
+)
+
 from ..delivery.secrets import is_secret_backend_available, resolve_secret_ref, store_secret_ref
 from ..errors import NotifyConfigError
 from ..runtime.spool import ensure_private_directory
@@ -41,6 +46,24 @@ def resolve_profile_path_for_wizard(*, profile: Path, policy: str | None) -> Pat
     return default_profile_path_for_tool(policy_namespace)
 
 
+def resolve_resolver_mode_profile_path(*, tool_name: str, config: Path) -> Path:
+    config_path = config.expanduser().resolve()
+    workspace_root = config_path.parent
+    if tool_name != "construct":
+        return workspace_root / default_profile_path_for_tool(tool_name)
+    try:
+        resolved_workspace_root = resolve_construct_workspace_root_from_config(config_path)
+        project_id = resolve_construct_workspace_project_id_from_config(config_path)
+    except ValueError as exc:
+        raise NotifyConfigError(str(exc)) from exc
+    if resolved_workspace_root is not None:
+        workspace_root = resolved_workspace_root
+    default_path = workspace_root / default_profile_path_for_tool(tool_name)
+    if project_id is None:
+        return default_path
+    return workspace_root / "outputs" / "notify" / "construct" / project_id / "profile.json"
+
+
 def resolve_profile_path_for_setup(
     *,
     profile: Path,
@@ -60,8 +83,7 @@ def resolve_profile_path_for_setup(
             )
         namespace = policy_namespace
     if config is not None and tool_name is not None:
-        config_path = config.expanduser().resolve()
-        return config_path.parent / default_profile_path_for_tool(namespace)
+        return resolve_resolver_mode_profile_path(tool_name=namespace, config=config)
     return default_profile_path_for_tool(namespace)
 
 

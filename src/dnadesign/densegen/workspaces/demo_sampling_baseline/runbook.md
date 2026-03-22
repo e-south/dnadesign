@@ -24,7 +24,7 @@ Use `--mode resume` to continue generation without wiping outputs, or `--mode an
     set -euo pipefail
     # Pin the workspace config path for repeated CLI calls.
     CONFIG="$PWD/config.yaml"
-    # dense run auto-seeds outputs/usr_datasets/registry.yaml when missing.
+    # dense run auto-seeds the configured shared USR root registry when missing.
 
     # Verify FIMO is available before PWM-backed sampling and validation.
     pixi run fimo --version

@@ -1,0 +1,46 @@
+workspace:
+  id: demo_promoter_swap_pdual10
+  profile: promoter-swap-demo
+  description: >
+    Construct workspace registry for the pDual-10 promoter-swap tracer bullet.
+    Each project entry maps one audited config to its intended input/template/output contract.
+  roots:
+    shared_usr_root: src/dnadesign/usr/datasets
+    workspace_usr_root: outputs/usr_datasets
+  projects:
+    - id: slot_a_window
+      config: config.slot_a.window.yaml
+      flow: replace-anchor-in-template
+      input_dataset: mg1655_promoters
+      template_id: pDual-10
+      template_dataset: plasmids
+      template_record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+      output_dataset: pdual10_slot_a_window_1kb_demo
+      notes: 1 kb centered context window around the slot_a J23105 incumbent.
+    - id: slot_a_full
+      config: config.slot_a.full.yaml
+      flow: replace-anchor-in-template
+      input_dataset: mg1655_promoters
+      template_id: pDual-10
+      template_dataset: plasmids
+      template_record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+      output_dataset: pdual10_slot_a_full_demo
+      notes: Full plasmid realization for the slot_a J23105 incumbent.
+    - id: slot_b_window
+      config: config.slot_b.window.yaml
+      flow: replace-anchor-in-template
+      input_dataset: mg1655_promoters
+      template_id: pDual-10
+      template_dataset: plasmids
+      template_record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+      output_dataset: pdual10_slot_b_window_1kb_demo
+      notes: 1 kb centered context window around the slot_b J23105 incumbent.
+    - id: slot_b_full
+      config: config.slot_b.full.yaml
+      flow: replace-anchor-in-template
+      input_dataset: mg1655_promoters
+      template_id: pDual-10
+      template_dataset: plasmids
+      template_record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+      output_dataset: pdual10_slot_b_full_demo
+      notes: Full plasmid realization for the slot_b J23105 incumbent.

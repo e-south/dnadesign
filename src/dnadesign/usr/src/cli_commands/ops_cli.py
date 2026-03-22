@@ -27,6 +27,7 @@ def register_ops_commands(
     cmd_dedupe_sequences: Callable[[object], None],
     cmd_registry_freeze: Callable[[object], None],
     cmd_overlay_compact: Callable[[object], None],
+    cmd_overlay_remove: Callable[[object], None],
     cmd_repair_densegen: Callable[[object], None],
     cmd_make_mock: Callable[[object], None],
     cmd_add_demo: Callable[[object], None],
@@ -69,6 +70,15 @@ def register_ops_commands(
         namespace: str = typer.Option(..., "--namespace"),
     ) -> None:
         cmd_overlay_compact(ctx_args_builder(ctx, dataset=dataset, namespace=namespace))
+
+    @maintenance_app.command("overlay-remove")
+    def cli_overlay_remove(
+        ctx: typer.Context,
+        dataset: str = typer.Argument(...),
+        namespace: str = typer.Option(..., "--namespace"),
+        mode: str = typer.Option("error", "--mode", help="Removal mode: error|delete|archive"),
+    ) -> None:
+        cmd_overlay_remove(ctx_args_builder(ctx, dataset=dataset, namespace=namespace, mode=mode))
 
     @densegen_app.command("repair")
     def cli_repair_densegen(
@@ -179,6 +189,7 @@ def register_ops_commands(
         union_columns: bool = typer.Option(False, "--union-columns"),
         dup_policy: str = typer.Option("error", "--if-duplicate"),
         coerce_overlap: str = typer.Option("none", "--coerce-overlap"),
+        carry_namespaces: list[str] | None = typer.Option(None, "--carry-namespace"),
         no_avoid_casefold_dups: bool = typer.Option(False, "--no-avoid-casefold-dups"),
         dry_run: bool = typer.Option(False, "--dry-run"),
     ) -> None:
@@ -191,6 +202,7 @@ def register_ops_commands(
                 union_columns=union_columns,
                 dup_policy=dup_policy,
                 coerce_overlap=coerce_overlap,
+                carry_namespaces=carry_namespaces,
                 no_avoid_casefold_dups=no_avoid_casefold_dups,
                 dry_run=dry_run,
             )

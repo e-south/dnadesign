@@ -45,8 +45,6 @@ _RESUME_READINESS_POLICIES: dict[str, ResumeReadinessPolicy] = {
 _TOOLS_WITHOUT_RESUME_POLICY = frozenset(
     {
         "infer",
-        "infer_evo2",
-        "infer-evo2",
     }
 )
 

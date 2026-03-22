@@ -32,6 +32,7 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("billboard", "aligner"),
     ("cluster", "aligner"),
     ("cluster", "usr"),
+    ("construct", "usr"),
     ("cruncher", "baserender"),
     ("densegen", "baserender"),
     ("densegen", "cruncher"),
@@ -40,6 +41,7 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("libshuffle", "aligner"),
     ("libshuffle", "billboard"),
     ("libshuffle", "nmf"),
+    ("ops", "infer"),
     ("ops", "usr"),
     ("permuter", "infer"),
 }
@@ -143,6 +145,16 @@ def find_undeclared_cross_tool_imports(
                 continue
             imported_tool = parts[1]
             if imported_tool not in tool_names or imported_tool == owner_tool:
+                continue
+            if target == f"dnadesign.{imported_tool}.src" or target.startswith(f"dnadesign.{imported_tool}.src."):
+                violations.append(
+                    ImportViolation(
+                        owner_tool=owner_tool,
+                        imported_tool=imported_tool,
+                        file_path=file_path,
+                        import_target=target,
+                    )
+                )
                 continue
             if (owner_tool, imported_tool) in allowed:
                 continue

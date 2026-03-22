@@ -21,7 +21,7 @@ class SyncExecutionDeps:
     is_dataset_dir_target: Callable[[str | None], bool]
     resolve_dataset_dir_target: Callable[[Path, Path], tuple[Path, str]]
     strict_bootstrap_id_enabled: Callable[[object], bool]
-    enforce_strict_bootstrap_dataset_id: Callable[[Path, str, bool], None]
+    enforce_strict_bootstrap_dataset_id: Callable[[Path, str, bool], str]
     resolve_dataset_id_for_diff_or_pull: Callable[[Path, str | None, bool], str | None]
     resolve_dataset_name_interactive: Callable[[Path, str | None, bool], str | None]
     opts_from_args: Callable[[object, bool], object]
@@ -77,11 +77,12 @@ def resolve_pull_dataset_target(args, *, deps: SyncExecutionDeps) -> tuple[Path,
         return deps.resolve_dataset_dir_target(Path(target), Path(args.root))
     root = Path(args.root)
     if deps.strict_bootstrap_id_enabled(args):
-        deps.enforce_strict_bootstrap_dataset_id(
+        dataset_id = deps.enforce_strict_bootstrap_dataset_id(
             root,
             str(getattr(args, "dataset", "")),
             bool(getattr(args, "rich", False)),
         )
+        return root, dataset_id
     ds_name = deps.resolve_dataset_id_for_diff_or_pull(
         root,
         getattr(args, "dataset", None),

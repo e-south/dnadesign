@@ -70,7 +70,7 @@ def register_profile_wizard_command(
         policy: str | None = typer.Option(
             None,
             "--policy",
-            help="Workflow policy defaults: densegen|infer_evo2|generic.",
+            help="Workflow policy defaults: densegen|infer|generic.",
         ),
         secret_source: str = typer.Option(
             "auto",

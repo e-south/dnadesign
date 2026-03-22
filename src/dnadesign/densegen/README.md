@@ -1,6 +1,11 @@
 ![DenseGen banner](assets/densegen-banner.svg)
 
-DenseGen wraps the [dense-arrays](https://github.com/e-south/dense-arrays) optimizer to execute DNA design workflows from workspace-local configuration and inputs. A run validates strict input schema contracts, resolves input sources, builds Stage-A candidate pools composed of transcription factor binding sites when sampling is enabled, executes Stage-B library generation by combining those binding sites into larger compound sequences until quota is reached, and writes reproducible artifacts (records, metadata, events, plots, and marimo notebooks) under the workspace `outputs/` tree. The package is designed for maintainable operations: explicit run state, strict fail-fast validation, deterministic path contracts, and direct integration points for downstream USR and Notify workflows.
+DenseGen wraps the [dense-arrays](https://github.com/e-south/dense-arrays) optimizer to run DNA design workflows from workspace-local configuration and inputs.
+Run `uv run dense --help` for the CLI.
+
+It validates input schemas, resolves input sources, builds TFBS candidate pools when sampling is enabled, generates compound sequences until quota is reached, and writes reproducible local artifacts under the workspace `outputs/` tree. When `output.targets` includes `usr`, DenseGen can also write directly into an explicit shared USR root outside the workspace.
+
+Use it when you need one design-generation tool with explicit run state, fail-fast validation, deterministic path contracts, and a clean handoff into shared USR workflows.
 
 <p align="center">
   <a href="assets/videos/demo_tfbs_baseline_showcase.mp4">
@@ -8,7 +13,19 @@ DenseGen wraps the [dense-arrays](https://github.com/e-south/dense-arrays) optim
   </a>
 </p>
 
-## Documentation map
+## Start here
+
+- Want a first local run: start with [TFBS baseline tutorial](docs/tutorials/demo_tfbs_baseline.md). Verify next with the [Outputs reference](docs/reference/outputs.md).
+- Want to choose a packaged workspace before running: start with the [Workspaces guide](workspaces/README.md). Verify next with the [Config reference](docs/reference/config.md).
+
+### Continue after generation
+
+- Want the shared downstream handoff after generation: start with the [USR operations index](../usr/docs/operations/README.md) when generated records need downstream USR-backed workflows.
+- Use [Multi-source shared dataset assembly](../usr/docs/operations/multi-source-shared-dataset-assembly.md) when DenseGen output must be merged with other upstream datasets before construct or infer.
+- Use [Promoter characterization feature matrix](../usr/docs/operations/promoter-characterization-feature-matrix.md) when the study should become one promoter-specific infer-annotated dataset before cluster or OPAL.
+- Use the [Promoter study Evo2 workflow journey](../usr/docs/operations/promoter-evo2-journey.md) when the downstream study is promoter-specific.
+
+### Documentation
 
 1. [Docs overview](docs/README.md): route to tutorials, runbooks, concepts, and references by task.
 2. [Workspaces guide](workspaces/README.md): choose a packaged workspace and expected inputs before running.
@@ -25,3 +42,9 @@ DenseGen wraps the [dense-arrays](https://github.com/e-south/dense-arrays) optim
 13. [BU SCC run guide](docs/howto/bu-scc.md): BU SCC-specific execution path and submission details.
 14. [Architecture notes](docs/dev/architecture.md): internal lifecycle and module boundary map.
 15. [Development journal](docs/dev/journal.md): maintainer decisions, investigations, and audit notes.
+
+### Boundary reminder
+
+- DenseGen owns workspace-local generation, schema validation, and reproducible `outputs/` artifacts.
+- USR owns durable cross-tool dataset identity once generation results are merged or exported there.
+- DenseGen does not own infer feature generation, exploratory clustering, or OPAL active-learning loops.

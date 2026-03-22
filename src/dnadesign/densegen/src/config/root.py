@@ -26,6 +26,7 @@ from .base import (
     _StrictLoader,
     resolve_outputs_scoped_path,
     resolve_run_root,
+    resolve_usr_root_scoped_path,
 )
 from .generation import GenerationConfig, expand_generation_plans, normalize_motif_sets
 from .inputs import InputConfig
@@ -136,6 +137,22 @@ class DenseGenConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def _solver_strategy_plan_constraints(self):
+        if self.solver.strategy != "approximate":
+            return self
+        plans_with_min_total_sites: list[str] = []
+        for plan in self.generation.plan or []:
+            min_total_sites = int(getattr(plan.regulator_constraints, "min_total_sites", 0) or 0)
+            if min_total_sites > 0:
+                plans_with_min_total_sites.append(str(plan.name))
+        if plans_with_min_total_sites:
+            names = ", ".join(plans_with_min_total_sites)
+            raise ValueError(
+                f"regulator_constraints.min_total_sites requires a non-approximate solver strategy. Plans: {names}"
+            )
+        return self
+
+    @model_validator(mode="after")
     def _background_pool_inputs(self):
         input_by_name = {i.name: i for i in self.inputs}
         pwm_inputs = {
@@ -200,12 +217,7 @@ def _validate_run_scoped_paths(cfg_path: Path, root_cfg: RootConfig) -> None:
             label="output.parquet.path",
         )
     if out_cfg.usr is not None:
-        resolve_outputs_scoped_path(
-            cfg_path,
-            run_root,
-            out_cfg.usr.root,
-            label="output.usr.root",
-        )
+        resolve_usr_root_scoped_path(cfg_path, out_cfg.usr.root, label="output.usr.root")
 
     log_dir = root_cfg.densegen.logging.log_dir
     resolve_outputs_scoped_path(cfg_path, run_root, log_dir, label="logging.log_dir")

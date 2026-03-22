@@ -23,6 +23,8 @@ import pyarrow.parquet as pq
 from .dataset_activity import append_meta_note as append_dataset_meta_note
 from .dataset_activity import record_dataset_activity_event
 from .dataset_dedupe import dedupe_dataset
+from .dataset_identity import normalize_dataset_id as normalize_dataset_id_impl
+from .dataset_identity import open_dataset
 from .dataset_ingest import (
     add_sequences_dataset,
     import_csv_dataset,
@@ -32,6 +34,7 @@ from .dataset_ingest import (
     write_import_df_dataset,
 )
 from .dataset_materialize import materialize_dataset
+from .dataset_overlay_catalog import build_dataset_info, load_overlay_catalog, merge_dataset_schema
 from .dataset_overlay_maintenance import (
     compact_overlay_namespace,
     list_overlay_infos,
@@ -45,6 +48,7 @@ from .dataset_overlay_ops import (
 )
 from .dataset_overlay_query import build_overlay_query
 from .dataset_query import create_overlay_view, sql_ident, sql_str
+from .dataset_read_keys import key_list_from_batch
 from .dataset_reporting import describe_dataset, manifest_dataset, manifest_dict_dataset
 from .dataset_reserved_overlay import write_reserved_overlay
 from .dataset_state_facade import (
@@ -57,18 +61,15 @@ from .dataset_state_facade import (
 )
 from .dataset_validate import validate_dataset
 from .dataset_views import export_dataset, get_dataset, grep_dataset, head_dataset, scan_dataset
+from .dataset_write_session import DatasetWriteSession, init_dataset
 from .errors import (
-    NamespaceError,
     SchemaError,
     SequencesError,
 )
 from .maintenance import maintenance as maintenance_context
 from .maintenance import require_maintenance
 from .overlays import (
-    list_overlays,
-    overlay_metadata,
     overlay_path,
-    overlay_schema,
 )
 from .registry import (
     USR_STATE_NAMESPACE,
@@ -77,13 +78,11 @@ from .registry import (
     registry_hash,
     validate_overlay_schema,
 )
-from .schema import ARROW_SCHEMA, META_REGISTRY_HASH, REQUIRED_COLUMNS, merge_base_metadata, with_base_metadata
+from .schema import META_REGISTRY_HASH, REQUIRED_COLUMNS, merge_base_metadata
 from .storage.locking import dataset_write_lock
 from .storage.parquet import (
     iter_parquet_batches,
-    now_utc,
     snapshot_parquet_file,
-    write_parquet_atomic,
     write_parquet_atomic_batches,
 )
 from .types import AddSequencesResult, DatasetInfo, Manifest, OverlayInfo
@@ -97,6 +96,7 @@ _NS_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 TOMBSTONE_NAMESPACE = "usr"
 TOMBSTONE_COLUMNS = ("usr__deleted", "usr__deleted_at", "usr__deleted_reason")
 RESERVED_NAMESPACES = {TOMBSTONE_NAMESPACE}
+MUTATION_RESERVED_NAMESPACES = {TOMBSTONE_NAMESPACE, USR_STATE_NAMESPACE}
 LEGACY_DATASET_PREFIX = "archived"
 USR_STATE_SCHEMA_TYPES = {
     "id": pa.string(),
@@ -108,11 +108,6 @@ USR_STATE_SCHEMA_TYPES = {
 }
 USR_STATE_QC_STATUS_ALLOWED = {"pass", "fail", "warn", "unknown"}
 USR_STATE_SPLIT_ALLOWED = {"train", "val", "test", "holdout"}
-_LOAD_OVERLAYS_CACHE: dict[
-    tuple[str, bool, tuple[str, ...] | None],
-    tuple[tuple[tuple[str, int, int], ...], tuple[int, int] | None, tuple[dict, ...]],
-] = {}
-_LOAD_OVERLAYS_CACHE_MAX = 4_096
 
 
 @dataclass(frozen=True)
@@ -125,20 +120,7 @@ class DedupeStats:
 
 
 def normalize_dataset_id(name: str) -> str:
-    ds = str(name or "").strip()
-    if not ds:
-        raise SequencesError("Dataset name cannot be empty.")
-    p = Path(ds)
-    if p.is_absolute():
-        raise SequencesError("Dataset name must be a relative path.")
-    if any(part in {".", ".."} for part in p.parts):
-        raise SequencesError("Dataset name must not contain '.' or '..'.")
-    if p.parts and p.parts[0] == LEGACY_DATASET_PREFIX:
-        raise SequencesError(
-            "legacy dataset paths under 'archived/' are not supported. "
-            "Use canonical datasets or datasets/_archive/<namespace>/<dataset>."
-        )
-    return Path(*p.parts).as_posix()
+    return normalize_dataset_id_impl(name, legacy_dataset_prefix=LEGACY_DATASET_PREFIX)
 
 
 @dataclass
@@ -153,21 +135,13 @@ class Dataset:
 
     @classmethod
     def open(cls, root: Path, name_or_path: str) -> "Dataset":
-        root_path = Path(root).resolve()
-        target = Path(str(name_or_path)).expanduser()
-        if target.exists():
-            if target.is_file() and target.name == RECORDS:
-                dataset_dir = target.parent
-            elif target.is_dir() and (target / RECORDS).exists():
-                dataset_dir = target
-            else:
-                raise SequencesError(f"Path does not point to a dataset: {target}")
-            try:
-                rel = dataset_dir.resolve().relative_to(root_path)
-            except ValueError as e:
-                raise SequencesError(f"Dataset path must live under root: {root_path}") from e
-            return cls(root_path, rel.as_posix())
-        return cls(root_path, normalize_dataset_id(str(name_or_path)))
+        return open_dataset(
+            root,
+            name_or_path,
+            dataset_factory=cls,
+            records_name=RECORDS,
+            legacy_dataset_prefix=LEGACY_DATASET_PREFIX,
+        )
 
     @property
     def dir(self) -> Path:
@@ -201,34 +175,13 @@ class Dataset:
     def maintenance(self, reason: Optional[str] = None, *, actor: Optional[dict] = None):
         return maintenance_context(reason=reason, actor=actor)
 
-    def init(self, source: str = "", notes: str = "") -> None:
+    def init(self, source: str = "", notes: str = "", actor: Optional[dict] = None) -> None:
         """Create a new, empty dataset directory with canonical schema."""
-        with dataset_write_lock(self.dir):
-            self._require_registry_for_mutation("init")
-            self.dir.mkdir(parents=True, exist_ok=True)
-            if self.records_path.exists():
-                raise SequencesError(f"Dataset already initialized: {self.records_path}")
-            ts = now_utc()
-            empty = pa.Table.from_arrays([pa.array([], type=f.type) for f in ARROW_SCHEMA], schema=ARROW_SCHEMA)
-            reg_hash = self._registry_hash(required=True)
-            empty = with_base_metadata(empty, created_at=ts, registry_hash=reg_hash)
-            write_parquet_atomic(empty, self.records_path, self.snapshot_dir)
-            self._auto_freeze_registry()
-            date = ts.split("T")[0]
-            meta_md = (
-                f"name: {self.name}\n"
-                f"created_at: {ts}\n"
-                f"source: {source}\n"
-                f"notes: {notes}\n"
-                f"schema: USR v1\n\n"
-                f"### Updates ({date})\n"
-                f"- {ts}: initialized dataset.\n"
-            )
-            self.meta_path.write_text(meta_md, encoding="utf-8")
-            self._record_event(
-                "init",
-                args={"source": source},
-            )
+        init_dataset(self, source=source, notes=notes, actor=actor, write_lock=dataset_write_lock)
+
+    def write_session(self) -> DatasetWriteSession:
+        """Return an explicit single-lock producer write session."""
+        return DatasetWriteSession(self)
 
     # --- lightweight, best-effort scratch-pad logging in meta.md ---
     def append_meta_note(self, title: str, code_block: Optional[str] = None) -> None:
@@ -389,29 +342,10 @@ class Dataset:
 
     def info(self) -> DatasetInfo:
         """Basic dataset metadata plus discovered namespaces."""
-        self._require_exists()
-        pf = pq.ParquetFile(str(self.records_path))
-        cols = list(pf.schema_arrow.names)
-        derived_cols = []
-        try:
-            overlay_data = self._load_overlays()
-            for ov in overlay_data:
-                derived_cols.extend(ov["cols"])
-        except FileNotFoundError:
-            overlay_data = []
-        all_cols = list(cols)
-        for col in derived_cols:
-            if col not in all_cols:
-                all_cols.append(col)
-        namespaces = sorted(
-            {c.split("__", 1)[0] for c in all_cols if c not in {k for k, _ in REQUIRED_COLUMNS} and "__" in c}
-        )
-        return DatasetInfo(
-            name=self.name,
-            path=str(self.records_path),
-            rows=int(pf.metadata.num_rows),
-            columns=all_cols,
-            namespaces=namespaces,
+        return build_dataset_info(
+            self,
+            required_columns=REQUIRED_COLUMNS,
+            reserved_namespaces=RESERVED_NAMESPACES,
         )
 
     def info_dict(self) -> dict:
@@ -419,23 +353,7 @@ class Dataset:
 
     def schema(self):
         """Return the Arrow schema of the current table (base + overlays)."""
-        self._require_exists()
-        base_schema = pq.ParquetFile(str(self.records_path)).schema_arrow
-        for ov in self._load_overlays():
-            for field in ov["schema"]:
-                if field.name == ov["key"]:
-                    continue
-                existing_idx = base_schema.get_field_index(field.name)
-                if existing_idx >= 0:
-                    existing_field = base_schema.field(existing_idx)
-                    if existing_field.type != field.type:
-                        raise NamespaceError(
-                            f"Derived column type mismatch in schema: {field.name} "
-                            f"(base={existing_field.type}, overlay={field.type})"
-                        )
-                    continue
-                base_schema = base_schema.append(field)
-        return base_schema
+        return merge_dataset_schema(self, reserved_namespaces=RESERVED_NAMESPACES)
 
     def scan(
         self,
@@ -470,33 +388,7 @@ class Dataset:
         )
 
     def _key_list_from_batch(self, batch: pa.RecordBatch, key: str) -> List[str]:
-        def _col(name: str) -> pa.Array:
-            idx = batch.schema.get_field_index(name)
-            if idx < 0:
-                raise SchemaError(f"Missing required column '{name}' for key '{key}'.")
-            return batch.column(idx)
-
-        if key == "id":
-            vals = _col("id").to_pylist()
-            if any(v is None or str(v).strip() == "" for v in vals):
-                raise SchemaError("Missing id values while computing dedupe key.")
-            return [str(v) for v in vals]
-        if key in {"sequence", "sequence_norm"}:
-            vals = _col("sequence").to_pylist()
-            if any(v is None or str(v).strip() == "" for v in vals):
-                raise SchemaError("Missing sequence values while computing dedupe key.")
-            return [str(v).strip() for v in vals]
-        if key == "sequence_ci":
-            alph = _col("alphabet").to_pylist()
-            if any(v is None or str(v).strip() == "" for v in alph):
-                raise SchemaError("Missing alphabet values while computing dedupe key.")
-            if any(str(v) != "dna_4" for v in alph):
-                raise SchemaError("sequence_ci is only valid for dna_4 datasets.")
-            seqs = _col("sequence").to_pylist()
-            if any(v is None or str(v).strip() == "" for v in seqs):
-                raise SchemaError("Missing sequence values while computing dedupe key.")
-            return [str(v).strip().upper() for v in seqs]
-        raise SchemaError(f"Unsupported join key '{key}'.")
+        return key_list_from_batch(batch, key)
 
     def _load_overlays(
         self,
@@ -504,68 +396,12 @@ class Dataset:
         include_tombstone: bool = True,
         namespaces: Optional[Sequence[str]] = None,
     ):
-        overlays = []
-        paths = list_overlays(self.dir)
-        path_entries = []
-        path_sig_rows: list[tuple[str, int, int]] = []
-        for path in paths:
-            path_stat = path.stat()
-            meta = overlay_metadata(path)
-            namespace = meta.get("namespace") or path.stem
-            path_entries.append((path, meta, namespace))
-            path_sig_rows.append((str(path), int(path_stat.st_mtime_ns), int(path_stat.st_size)))
-        namespace_filter = set(namespaces) if namespaces else None
-        require_registry = any(namespace not in RESERVED_NAMESPACES for _, _, namespace in path_entries)
-        namespace_key = tuple(sorted(namespace_filter)) if namespace_filter else None
-        cache_key = (str(self.dir), bool(include_tombstone), namespace_key)
-        path_sig = tuple(path_sig_rows)
-        registry_sig: tuple[int, int] | None = None
-        if require_registry:
-            reg_path = self.dir / "_registry" / "registry.yaml"
-            if reg_path.exists():
-                reg_stat = reg_path.stat()
-                registry_sig = (int(reg_stat.st_mtime_ns), int(reg_stat.st_size))
-        cached = _LOAD_OVERLAYS_CACHE.get(cache_key)
-        if cached is not None and cached[0] == path_sig and cached[1] == registry_sig:
-            return [dict(overlay) for overlay in cached[2]]
-
-        registry = self._registry(required=require_registry) if require_registry else {}
-        seen: Dict[str, Path] = {}
-        for path, meta, ns in path_entries:
-            key = meta.get("key")
-            if not key:
-                raise SchemaError(f"Overlay missing required metadata key: {path}")
-            if ns in seen:
-                raise SchemaError(
-                    f"Overlay namespace '{ns}' has multiple sources: {seen[ns]} and {path}. "
-                    "Resolve by compacting or removing one source."
-                )
-            seen[ns] = path
-            if not include_tombstone and ns in RESERVED_NAMESPACES:
-                continue
-            if namespace_filter and ns not in namespace_filter:
-                continue
-            schema = overlay_schema(path)
-            if ns not in RESERVED_NAMESPACES:
-                validate_overlay_schema(ns, schema, registry=registry, key=key)
-            if key not in schema.names:
-                raise SchemaError(f"Overlay missing key column '{key}': {path}")
-            overlay_cols = [c for c in schema.names if c != key]
-            read_path = str(path / "part-*.parquet") if path.is_dir() else str(path)
-            overlays.append(
-                {
-                    "namespace": ns,
-                    "key": key,
-                    "cols": overlay_cols,
-                    "schema": schema,
-                    "path": path,
-                    "read_path": read_path,
-                }
-            )
-        _LOAD_OVERLAYS_CACHE[cache_key] = (path_sig, registry_sig, tuple(dict(overlay) for overlay in overlays))
-        if len(_LOAD_OVERLAYS_CACHE) > _LOAD_OVERLAYS_CACHE_MAX:
-            _LOAD_OVERLAYS_CACHE.clear()
-        return overlays
+        return load_overlay_catalog(
+            self,
+            include_tombstone=include_tombstone,
+            namespaces=namespaces,
+            reserved_namespaces=RESERVED_NAMESPACES,
+        )
 
     @staticmethod
     def _sql_ident(name: str) -> str:
@@ -639,6 +475,7 @@ class Dataset:
         actor: Optional[dict] = None,
         return_ids: bool = False,
         prevalidated_new_ids: bool = False,
+        write_lock=dataset_write_lock,
     ) -> int | tuple[int, list[str], list[str]]:
         return write_import_df_dataset(
             self,
@@ -648,7 +485,7 @@ class Dataset:
             actor=actor,
             return_ids=return_ids,
             prevalidated_new_ids=prevalidated_new_ids,
-            write_lock=dataset_write_lock,
+            write_lock=write_lock,
         )
 
     def import_rows(
@@ -689,6 +526,7 @@ class Dataset:
             strict_id_check=strict_id_check,
             actor=actor,
             prevalidated_new_ids=_prevalidated_new_ids,
+            write_lock=dataset_write_lock,
         )
 
     def add_sequences(
@@ -719,6 +557,7 @@ class Dataset:
             created_at=created_at,
             on_conflict=on_conflict,
             actor=actor,
+            write_lock=dataset_write_lock,
         )
 
     # Legacy file import entry points now route to import_rows (no special logic)
@@ -767,6 +606,7 @@ class Dataset:
         parse_json: bool = True,
         backend: str = "pyarrow",
         note: str = "",
+        actor: Optional[dict] = None,
     ) -> int:
         return attach_dataset(
             dataset=self,
@@ -780,8 +620,10 @@ class Dataset:
             parse_json=parse_json,
             backend=backend,
             note=note,
+            actor=actor,
             namespace_pattern=_NS_RE,
-            reserved_namespaces=RESERVED_NAMESPACES,
+            reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
+            write_lock=dataset_write_lock,
         )
 
     # Friendly alias for didactic API name in README/examples
@@ -798,6 +640,7 @@ class Dataset:
         parse_json: bool = True,
         backend: str = "pyarrow",
         note: str = "",
+        actor: Optional[dict] = None,
     ) -> int:
         return attach_columns_dataset(
             dataset=self,
@@ -811,8 +654,10 @@ class Dataset:
             parse_json=parse_json,
             backend=backend,
             note=note,
+            actor=actor,
             namespace_pattern=_NS_RE,
-            reserved_namespaces=RESERVED_NAMESPACES,
+            reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
+            write_lock=dataset_write_lock,
         )
 
     def write_overlay(
@@ -823,6 +668,7 @@ class Dataset:
         key: str = "id",
         overwrite: bool = False,
         allow_missing: bool = False,
+        actor: Optional[dict] = None,
     ) -> int:
         return write_overlay_dataset(
             dataset=self,
@@ -831,8 +677,10 @@ class Dataset:
             key=key,
             overwrite=overwrite,
             allow_missing=allow_missing,
+            actor=actor,
             namespace_pattern=_NS_RE,
-            reserved_namespaces=RESERVED_NAMESPACES,
+            reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
+            write_lock=dataset_write_lock,
         )
 
     def write_overlay_part(
@@ -853,13 +701,20 @@ class Dataset:
             key_col=key_col,
             allow_missing=allow_missing,
             actor=actor,
+            reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
+            write_lock=dataset_write_lock,
         )
 
     def list_overlays(self) -> List[OverlayInfo]:
         return list_overlay_infos(self)
 
     def remove_overlay(self, namespace: str, *, mode: str = "error") -> dict:
-        return remove_overlay_namespace(self, namespace, mode=mode)
+        return remove_overlay_namespace(
+            self,
+            namespace,
+            mode=mode,
+            reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
+        )
 
     def compact_overlay(self, namespace: str) -> Path:
         return compact_overlay_namespace(self, namespace, reserved_namespaces=RESERVED_NAMESPACES)

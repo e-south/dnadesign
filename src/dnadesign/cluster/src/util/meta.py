@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/util/meta.py
 
 Module Author(s): Eric J. South
@@ -15,7 +15,7 @@ import json
 
 def compact_meta(
     ver: str,
-    algo: str,
+    method_id: str,
     x_col: str | None,
     n: int,
     params: dict,
@@ -26,8 +26,8 @@ def compact_meta(
 ) -> str:
     obj = {
         "ver": ver,
-        "utc": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "algo": algo,
+        "utc": datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "method_id": method_id,
         "x_col": x_col,
         "n": n,
         "p": params or {},

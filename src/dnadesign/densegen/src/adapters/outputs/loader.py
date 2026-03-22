@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any, Iterable, Iterator, Tuple
 if TYPE_CHECKING:
     import pandas as pd
 
-from ...config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
+from ...config import RootConfig, resolve_outputs_scoped_path, resolve_run_root, resolve_usr_root_scoped_path
 from .base import DEFAULT_NAMESPACE
 from .parquet import validate_parquet_schema
 
@@ -129,7 +129,7 @@ def scan_records_from_config(
         usr_cfg = out_cfg.usr
         if usr_cfg is None:
             raise ValueError("output.usr is required when source='usr'")
-        root = resolve_outputs_scoped_path(cfg_path, run_root, usr_cfg.root, label="output.usr.root")
+        root = resolve_usr_root_scoped_path(cfg_path, usr_cfg.root, label="output.usr.root")
         try:
             from dnadesign.usr import Dataset
         except Exception as e:

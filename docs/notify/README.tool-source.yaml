@@ -1,0 +1,13 @@
+schema_version: 1
+catalog_order: 7
+tool: notify
+summary: Tool-owned operator routes for watcher setup, delivery validation, recovery, and scheduler-adjacent notification flows.
+keywords:
+  - usr
+  - watcher
+  - events
+  - scheduler
+routes:
+  - id: usr-events
+    path: usr-events.md
+    summary: Notify-owned operator manual for watcher setup, profile validation, delivery, and recovery.

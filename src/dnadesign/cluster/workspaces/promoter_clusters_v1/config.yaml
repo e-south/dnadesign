@@ -1,0 +1,31 @@
+schema_version: 1
+input:
+  # Resolve this dataset via --usr-root or DNADESIGN_USR_ROOT when running
+  # outside a source checkout.
+  dataset: "60bp_dual_promoter_cpxR_LexA"
+
+fit:
+  name: "promoter_clusters_v1"
+  x_col: "infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean"
+  preset: "method.leiden.fine"
+  write: true
+  allow_overwrite: true
+
+umap:
+  name: "promoter_clusters_v1"
+  x_col: "infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean"
+  preset: "umap.promoter_set1"
+  attach_coords: true
+  write: true
+  allow_overwrite: true
+  plot:
+    dims: [14, 10]
+    alpha: 0.6
+    size: 6.0
+    highlight:
+      overlay: true
+      size: 60.0
+
+analyze:
+  cluster_col: "cluster__promoter_clusters_v1"
+  preset: "analysis.promoter_set1"

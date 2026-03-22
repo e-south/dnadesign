@@ -12,6 +12,7 @@ This section lists dated entries so you can jump to a specific investigation win
 - [2026-02-13](#2026-02-13)
 - [2026-02-15](#2026-02-15)
 - [2026-02-18](#2026-02-18)
+- [2026-03-16](#2026-03-16)
 
 ### 2026-02-04
 - Investigated the reported stall in `test_round_robin_chunk_cap.py::test_stall_detected_with_no_solutions`.
@@ -259,3 +260,316 @@ This section lists dated entries so you can jump to a specific investigation win
   - Added `dnadesign.devtools.quality_score` to generate CI-backed quality score inputs from coverage summary, baseline, and lane outcomes.
   - Added `dnadesign.devtools.quality_entropy` and a scheduled/workflow-dispatch CI job that uploads an entropy report artifact and fails on stale SOR metadata or broken quality evidence links.
   - Updated `QUALITY_SCORE.md` to treat CI evidence links and Codecov status signal as canonical numeric source inputs, keeping narrative guidance separate.
+
+### 2026-03-16
+- Cross-tool promoter/Evo2/active-learning audit kickoff:
+  - Starting point: no high-severity boundary violations were already known; repo gates were green on the previous audit cycle.
+  - Current findings snapshot carried into this cycle:
+    - the core `infer -> OPAL` active-learning path is contract-compatible but not authoritatively routed from root workflow docs
+    - Evo2 intermediate-layer handling in `infer` is an engineering contract (`mid/default -> blocks.20.mlp.l3`), not a promoter-specific scientific policy
+    - OPAL supports USR-backed datasets in code/config, but first-class workflow surfacing still lags the strongest `USR -> infer -> OPAL` user story
+    - `infer validate config` remains schema-oriented while stronger USR dataset/column checks happen in `infer run --dry-run`
+    - the broader multi-source source-of-truth flow is correctly owned by USR operations but remains runbook-first rather than a reusable preset
+- Ownership hypothesis for this audit:
+  - `usr` remains the durable data-plane source of truth
+  - `construct` is optional contextualization/realization over USR-backed inputs
+  - `infer` owns representation generation and writes namespaced outputs back to USR
+  - `opal` owns the label/train/select active-learning loop once X exists
+  - `notify` stays an observer over USR `.events.log`
+  - `ops` owns scheduler/control-plane behavior only and must not absorb the data-plane workflow
+- Statement of intent:
+  - Run a bounded swarm to pressure test wiring, ergonomics, UX, public boundary usage, and documentation authority across `construct`, `usr`, `infer`, `opal`, `densegen`, `notify`, `ops`, and the downstream `cluster` exploratory surface.
+  - Prioritize incoherent user-facing flows over broad implementation churn.
+  - Use findings to decide whether the missing authoritative deep procedure for `USR dataset with infer-derived X -> OPAL active learning` belongs under `opal/docs/workflows`, with root docs routing to it and infer docs linking downstream.
+- Swarm run contract:
+  - `execution_mode=platform_subagent`
+  - `topology=star`
+  - `role=delegator`
+  - `max_workers=3`
+  - `max_depth=1`
+  - planned lanes:
+    - docs/information architecture review
+    - public boundary and contract coherence review
+    - runtime/operator tracer bullets for cross-tool workflows
+- Verification target for this cycle:
+  - reconcile swarm findings against `ARCHITECTURE.md`, `DESIGN.md`, `docs/README.md`, and live CLI/test evidence
+  - keep the cycle findings-first and bounded; if code/docs changes become necessary, rerun `architecture_boundaries`, `docs_checks`, `ruff check`, `ruff format --check`, and `pytest -q`
+- Follow-up planning record for the next pragmatic hardening slice:
+  - Working delivery assumption: `infer` is typically run first as the producer of a large, ready-to-feed OPAL data package in USR; the next increment should improve documentation authority and contract clarity without forcing new runbook automation between `infer` and `opal`.
+  - Scope in:
+    - add one authoritative OPAL-owned workflow for `USR dataset with infer-derived X -> active learning`
+    - route to that workflow from root docs and infer docs without duplicating the full upstream assembly steps
+    - make the infer-first handoff explicit: `infer` produces namespaced X columns in USR, `opal` consumes an explicitly chosen X column and owns the label/train/select loop
+    - harden the two runtime drifts already identified (`notify` fail-late delivery and `ops` infer mode fallback scan)
+  - Scope out:
+    - forcing automatic `infer -> opal` orchestration
+    - changing Evo2 scientific defaults into a hard repo policy
+    - moving multi-source or construct-led source-of-truth ownership out of USR docs
+  - Ordered execution hypothesis:
+    - slice 1: document the infer-first handoff under `src/dnadesign/opal/docs/workflows/` and route root/infer docs to it
+    - slice 2: add docs-contract tests proving the new workflow is discoverable from `docs/README.md`, infer docs, and OPAL docs
+    - slice 3: harden `notify usr-events watch` so failed delivery without spool is fail-fast or explicitly degraded
+    - slice 4: tighten `ops` infer mode probing so it reasons only over the resolved target dataset, or surfaces fallback behavior as an explicit operator-visible contract
+  - Verification target for the planned slice:
+    - targeted docs-contract and runtime regression tests first
+    - then `uv run python -m dnadesign.devtools.docs_checks`
+    - then `uv run python -m dnadesign.devtools.architecture_boundaries --repo-root .`
+    - then `uv run ruff check .`
+    - then `uv run ruff format --check .`
+    - then `uv run pytest -q`
+- Execution emphasis refinement for the next slice:
+  - Treat `infer` as the upstream producer of a USR-backed, OPAL-ready data package rather than trying to automate `infer -> opal` as one coupled runbook.
+  - The primary documentation gap is the missing authoritative OPAL-owned downstream workflow that starts after infer write-back is already complete.
+  - Harness endpoints for the next slice:
+    - `knowledge-integrity`: root docs, infer docs, and OPAL docs must route to one authoritative infer-to-OPAL workflow
+    - `architecture-invariants`: preserve `usr` as the durable boundary and avoid pushing data-plane ownership into `ops` or `notify`
+    - `review-merge`: keep the change small and reversible by separating documentation authority from runtime hardening
+  - Pressure-test expectation:
+    - verify the operator story as `USR dataset -> infer-derived X columns -> OPAL label/train/select`, with explicit X-column choice and no hidden orchestration fallback
+- Scope expansion note:
+  - The next audit/hardening cycle must keep `construct` first-class in the review set, alongside `densegen`, `infer`, `notify`, `ops`, and `usr`, because `construct` is a real producer of downstream USR-backed source-of-truth datasets rather than a side note to the infer-to-OPAL path.
+  - The review target is not just missing OPAL routing; it is any incoherent surface where root docs, tool docs, or runbooks describe the `construct -> usr -> infer -> opal` or `densegen -> usr -> infer/opal` story inconsistently with actual ownership boundaries.
+  - Cross-tool feature-matrix slice:
+    - add one USR-owned workflow doc for `densegen/manual promoters -> optional construct expansion -> infer feature matrix -> downstream cluster/opal`
+    - keep the durable source-of-truth boundary in USR docs because the workflow hinges on explicit dataset merge/carry, construct lineage, and infer write-back onto one canonical dataset
+    - keep the active-learning loop itself owned by OPAL with a separate downstream workflow doc that starts only after infer-derived `X` columns already exist
+    - do not add hidden automation between `infer` and `opal`; the contract remains an explicit handoff where operators choose a concrete `infer__...` column for `cluster` or `opal`
+    - tracer-bullet scope for this slice:
+      - anchor-only promoter rows (for example DenseGen 60 bp outputs or wildtype promoter records)
+      - optional construct-expanded 1 kb contexts in a shared downstream dataset
+      - infer jobs that vary model lane (`evo2_7b`, `evo2_20b`) and output plane (`ll`, pooled logits, `mid` embeddings, `final` embeddings)
+      - downstream consumers limited to `cluster` exploratory analysis and OPAL active learning
+- Cross-tool IA and semantics audit kickoff:
+  - Objective:
+    - pressure test whether the repository information architecture still cleanly separates:
+      - `ops` as cross-tool orchestration control plane
+      - `usr` as durable data-plane and cross-tool source-of-truth runbook owner
+      - tool-local docs as package-scoped command/reference surfaces
+    - identify IA footguns, semantic drift, and ontology gaps that will make new cross-tool runbooks hard to place consistently.
+  - Audit questions:
+    - is `ops` actually a cross-tool runbook registry, or is it only a scheduler/control-plane contract surface with a small preset catalog?
+    - are `usr` operations docs now the effective home for durable cross-tool data-plane runbooks, and if so what naming/placement rules prevent overlap with `docs/operations/`?
+    - what vocabulary needs to be stabilized across the repo (`workflow`, `runbook`, `route`, `demo`, `tutorial`, `control-plane`, `data-plane`, `handoff`, `source-of-truth`, `feature matrix`) to avoid documentation drift?
+  - Harness framing:
+    - selected lane: `knowledge-integrity`
+    - selected endpoints:
+      - `knowledge-integrity`
+      - `architecture-invariants`
+      - `drift-gc`
+    - execution posture:
+      - `execution_mode=platform_subagent`
+      - `topology=star`
+      - `role=delegator`
+      - `max_workers=3`
+      - `max_depth=1`
+  - Working hypothesis:
+    - `ops` should remain a control-plane router and runbook schema home, not the generic registry for every cross-tool scientific workflow.
+    - `usr/docs/operations/` should continue to own durable data-plane cross-tool runbooks whenever the shared contract is a USR-backed dataset plus overlays/events.
+    - root `docs/README.md` should stay the only top-level router and should route by user intent plus ownership plane instead of accumulating long duplicated procedure summaries.
+  - Evidence targets for this cycle:
+    - root docs routing table
+    - `docs/operations/` versus `src/dnadesign/usr/docs/operations/` scope language
+    - `ops` packaged preset semantics and workflow id vocabulary
+    - tool-local readme/index links for `construct`, `densegen`, `infer`, `cluster`, `opal`, and `notify`
+    - any tests that already encode the intended routing/authority model
+- IA and semantics audit findings summary:
+  - The current ownership split is mostly coherent:
+    - `docs/operations/` is a control-plane router and contract surface for deterministic scheduler orchestration
+    - `src/dnadesign/usr/docs/operations/` is now the durable home for cross-tool USR-backed data-plane workflows
+    - root `docs/README.md` correctly routes into those two planes rather than forcing everything through `ops`
+  - Main IA footguns:
+    - the path name `docs/operations/` is broader than its actual scope and can still look like the home for all cross-tool workflows
+    - the adjective `cross-tool` is overloaded across control-plane orchestration and data-plane workflow ownership
+    - ops `workflow_id` naming leaks notifier transport detail (`*_with_notify_slack`) even though notify policy/transport is otherwise modeled as a decoupled contract
+    - `workflow` / `runbook` / `tutorial` / `demo` / `route` are still used as partially overlapping document-type labels across tools
+    - `registry` is overloaded across distinct concepts (`USR namespace registry`, `construct workspace registry`, `OPAL plugin registry`)
+  - Working ontology recommendations:
+    - treat `route` as an index entry only
+    - treat `runbook` as the authoritative operator procedure with ordered commands and verification
+    - treat `tutorial` as pedagogical, non-authoritative, and demo-oriented
+    - treat `demo` as packaged sample assets or tracer-bullet workspace/profile names, not as an authority class
+    - treat `workflow` as an outcome class or branch name, not the primary deep-procedure label unless the tool intentionally uses a `workflows/` subtree like OPAL
+    - require explicit plane language in cross-tool runbooks: `data-plane owner`, `control-plane owner`, `entry artifact`, `handoff artifact`
+    - qualify every use of `registry` by domain owner
+  - Scaling recommendation:
+    - keep new scheduler/preflight/submit material in `docs/operations/`
+    - keep new USR-backed cross-tool assembly/handoff flows in `src/dnadesign/usr/docs/operations/`
+    - add future deep procedures under the boundary-owning tool docs when the durable handoff is not USR, then route to them from root docs instead of duplicating procedures
+    - consider renaming the root concept in prose from “Ops operations” to “Ops orchestration” even if the path stays stable, to reduce directory-scope ambiguity without a disruptive docs move
+- IA semantics implementation intent:
+  - codify the route/runbook/workflow/tutorial/demo ontology in repo-level policy docs so future cross-tool docs inherit one vocabulary instead of ad hoc local prose
+  - keep `docs/operations/` as the control-plane orchestration surface in prose and routing, while keeping `src/dnadesign/usr/docs/operations/` as the durable USR-backed data-plane surface
+  - make cross-tool deep-doc ownership machine-checkable with explicit metadata fields:
+    - `Type`
+    - `Plane`
+    - `Owner-boundary`
+    - `Entry artifact`
+    - `Exit artifact`
+  - remove notifier transport leakage from Ops `workflow_id` values so workflow identity stays about orchestration shape, not delivery provider
+  - tighten Ops terminology from `precedents` toward `presets` where the shipped surface is a reusable starter catalog rather than a historical exemplar catalog
+  - regroup the USR operations index by lifecycle before adding more cross-tool runbooks so routing stays one-hop from the root docs map
+- No-shim IA hardening follow-up:
+  - User constraint raised the bar from "explicit compatibility" to "no compatibility shims" for runbook/documentation semantics.
+  - This follow-up slice should therefore remove, not preserve:
+    - legacy ops CLI aliases such as `runbook precedents`
+    - legacy JSON keys such as `precedents`
+    - legacy transport-specific workflow ids such as `*_with_notify_slack`
+  - Fail-fast contract for deprecated names:
+    - deprecated ops workflow ids must error with an actionable replacement hint instead of normalizing and continuing
+    - authoritative docs must not mention deprecated aliases as supported behavior
+  - Additional semantics tightening for this slice:
+    - reduce `workflow` overload inside Ops prose by preferring `orchestration routes` or `orchestration workflow ids` for the control-plane catalog
+    - keep root docs as the only top-level router
+    - keep `docs/operations/` scoped to orchestration only and avoid any prose that sounds like a universal cross-tool registry
+- 2026-03-16 13:37 EDT: docs IA pressure-test follow-up
+  - Intent:
+    - pressure test whether a naive user or agent can reliably find:
+      - top-level workflow routing,
+      - tool-specific runbooks and demos,
+      - durable cross-tool data-plane flows,
+      - downstream cluster/OPAL branches after infer-derived `X` exists.
+    - keep the repo aligned with the current ownership model:
+      - root `docs/README.md` as the only top-level router,
+      - `docs/operations/` as control-plane orchestration only,
+      - `src/dnadesign/usr/docs/operations/` as the default durable USR-backed cross-tool data-plane surface,
+      - tool-local docs as package-scoped command/reference surfaces,
+      - downstream-tool workflows living with the downstream owner after the handoff.
+  - Pressure-test findings:
+    - root routing is mostly coherent but still too flat for first-pass scanning; the workflow table mixes single-tool starts, USR-backed data-plane flows, and control-plane orchestration without visual grouping.
+    - DenseGen docs had semantic drift: downstream infer/feature-matrix routes were filed under a Notify heading, which hides them from users looking for representation or learning flows.
+    - infer had a doc-type drift: the by-type index grouped shared runbooks and the OPAL downstream workflow under `Tutorials` instead of treating them as cross-tool handoff routes.
+    - cluster remained capability-rich but router-poor; it linked back to the feature-matrix flow without giving first-time readers a small task-first entry section.
+    - OPAL discoverability was good once found, but the docs index still benefited from a short start-here section that names the infer-derived-`X` branch first.
+    - notify package docs still had one mislabeled heading (`cluster workflows`) even though the section actually described cross-tool or scheduler routes.
+  - Implementation targets for this slice:
+    - add plain-language doc taxonomy help to the root docs router
+    - group root workflow routes by ownership plane and user intent
+    - separate DenseGen Notify guidance from downstream infer/feature-matrix guidance
+    - add a short goal-based router to infer and a start-here section to cluster/OPAL
+    - tighten tests so cross-tool routes are not silently reclassified as tutorials or Notify-only flows later
+- 2026-03-16 13:48 EDT: docs coherence and semantic-drift follow-up
+  - Intent:
+    - run one more bounded audit after the recent IA fixes to catch residual semantic drift before it re-hardens into more docs/tests.
+    - keep the existing ownership model unchanged:
+      - root `docs/README.md` remains the only top-level router,
+      - `docs/operations/` remains control-plane orchestration only,
+      - `src/dnadesign/usr/docs/operations/` remains the durable USR-backed cross-tool data-plane surface,
+      - downstream-tool workflows remain tool-owned after handoff.
+  - Pressure-test findings:
+    - `infer/docs/README.md` still mixed shared cross-tool routes into a section labeled `Documentation by type`, which weakens the route/runbook/workflow ontology.
+    - `construct/docs/index.md` and `densegen/docs/index.md` still blended tool-local and shared cross-tool routes without an explicit ownership split, which makes the next deep procedure less obvious for naive readers.
+    - `docs/notify/README.md` said it was a route map only even though it also acted as a compact operator router with command-level guidance.
+    - `cluster/README.md` was clearer than before but still did not state its downstream ownership boundary explicitly enough at the top of the page.
+    - `usr/docs/README.md` remained more read-order-driven than task-driven compared with the other recently hardened tool entry surfaces.
+  - Implementation targets for this slice:
+    - keep `Documentation by type` sections local-only when they claim to be local-only
+    - separate local tool docs from shared cross-tool handoff routes in `construct` and `densegen` indexes
+    - reword Notify's top-level operator page so its stated purpose matches its actual content
+    - add an explicit ownership-boundary note to `cluster`
+    - add task-first routing to `usr/docs/README.md`
+    - encode the new structure with targeted docs-contract tests so drift fails fast
+- 2026-03-16 15:34 EDT: docs IA pressure-test follow-up
+  - Intent:
+    - run another bounded swarm pass over root docs plus `ops`, `densegen`, `infer`, `construct`, `usr`, `notify`, `opal`, and `cluster`
+    - pressure-test whether a naive user or agent can find tool docs, tool-specific runbooks, demos, cross-tool flows, and downstream handoffs without guessing ownership
+    - preserve the current ownership model: root router only at top level, `ops` as control-plane only, `usr` as durable USR-backed data-plane owner, downstream tool state machines owned by the downstream tool
+  - Pressure-test findings:
+    - the remaining issues were mostly entry-surface quality rather than broken routing: cross-plane choice was still implied in a few places, Notify still mixed reference and operator routing, infer still duplicated shared handoffs inside an infer-local pressure-test section, DenseGen's package intro was still too dense for first-pass scanning, and cluster still needed a clearer quick route once `X` already existed
+    - `ops`, `usr`, and `opal` remained directionally coherent; the work in this slice was to make the ownership and next-step language more didactic and less guessy
+  - Implementation targets for this slice:
+    - make plane decisions explicit sooner in root docs and Ops orchestration docs
+    - keep Notify reference-first when the page claims to be a reference index
+    - keep infer shared handoff links in the dedicated handoff section only
+    - sharpen top-level package entry prose for DenseGen and construct
+    - make cluster's first-step routing clearer for users who already arrived after infer write-back
+- 2026-03-16 16:08 EDT: swarm pressure-test and branch cleanup pass
+  - Intent:
+    - run a fresh bounded swarm audit over root docs plus `ops`, `densegen`, `infer`, `construct`, `usr`, `notify`, `opal`, and `cluster`
+    - verify that a naive user or agent can find:
+      - tool entry docs,
+      - tool-specific runbooks and demos,
+      - durable cross-tool flows,
+      - downstream branches such as `cluster` and `OPAL`,
+      - the correct owner for each deep procedure without guessing
+    - close the loop by making any last small IA fixes, verifying them, and then committing the accumulated docs hardening work in sensible slices
+  - Constraints:
+    - keep root `docs/README.md` as the only top-level router
+    - keep `docs/operations/` scoped to control-plane orchestration
+    - keep `src/dnadesign/usr/docs/operations/` as the durable USR-backed cross-tool data-plane surface
+    - keep downstream-tool workflows with the downstream owner after handoff
+    - do not add compatibility shims or duplicate deep procedures
+  - Audit lanes:
+    - root + `ops` + `usr` ownership and routing
+    - tool-local entry surfaces for `densegen`, `infer`, `construct`, and `notify`
+    - downstream consumer surfaces for `opal` and `cluster`
+- 2026-03-16 17:02 EDT: cluster-first-class-surface follow-up
+  - Intent:
+    - run one more bounded docs pressure-test pass with a specific focus on whether `cluster` now reads like a first-class downstream tool rather than a long appendix
+    - keep the same ownership contract intact:
+      - root `docs/README.md` stays the only top-level router
+      - `docs/operations/` stays control-plane only
+      - `src/dnadesign/usr/docs/operations/` stays the durable USR-backed data-plane handoff surface
+      - downstream tool-owned workflows stay with the downstream tool after handoff
+    - fix remaining naive-user footguns surfaced by the swarm without introducing duplicate authority or silent compatibility layers
+  - Swarm findings:
+    - `cluster` routing and downstream ownership were already coherent, but the tool still lagged as a monolithic README with no `docs/` tree, making it the weakest first-pass didactic surface
+    - `notify` still made operators hop between repo-level and package-level docs before they could run the first three commands
+    - `ops` still had one contradictory `--audit-json` example and a hard-coded project slug in docs examples
+    - `usr` workflow-map still used `/tmp` for machine-readable artifacts and lacked one explicit context preamble for summary fragments
+  - Implementation targets for this slice:
+    - refactor `cluster` into a small docs tree:
+      - workflow router
+      - by-type index
+      - exploratory workflow
+      - CLI/reference contract page
+      - ownership-boundary concept page
+    - keep `cluster/README.md` as the concise package entry surface and retarget downstream handoff links to the new workflow doc
+    - add a `Start here in 3 commands` block to Notify package docs without creating a second authoritative runbook
+    - align Ops docs examples with the workspace-scoped audit-path contract and replace `dunlop` placeholders with `<project>`
+    - replace `/tmp` examples in the USR workflow map with a workspace-rooted artifact convention and add a shared context preamble
+- 2026-03-16 18:11 EDT: docs ontology hardening and downstream-branch clarity pass
+  - Intent:
+    - run another bounded swarm audit after the cluster docs refactor to catch residual semantic drift rather than re-open the whole docs tree
+    - keep the same ownership model intact:
+      - root `docs/README.md` remains the only top-level router
+      - `docs/operations/` remains control-plane only
+      - `src/dnadesign/usr/docs/operations/` remains the durable USR-backed cross-tool data-plane surface
+      - downstream exploratory and learning branches remain tool-owned after the infer handoff
+    - remove the remaining ontology footguns instead of documenting around them
+  - Swarm findings:
+    - authoritative USR cross-tool runbooks still carried `demo` in their filenames and one title, which conflicted with the root ontology where demos/tutorials are non-authoritative
+    - infer still made the `cluster` vs `OPAL` branch choice look symmetric even though OPAL requires a USR-backed dataset contract and `data.location.kind: usr`
+    - DenseGen and construct package entry surfaces were still lighter on explicit ownership and verification cues than the recently hardened cluster/opal surfaces
+    - the promoter feature-matrix runbook still duplicated downstream branch commands that properly belong in the downstream owner workflows
+    - `sync.md` still lacked the same metadata contract already enforced on the other major USR router surfaces
+  - Implementation targets for this slice:
+    - rename the two authoritative USR runbooks so their path/title semantics match their `Type: runbook` role
+    - update all root/tool/test references to the new runbook identities with no compatibility shims
+    - make the infer downstream branch decision explicit:
+      - `cluster` accepts a chosen `infer__...` column in file or USR inputs
+      - `OPAL` starts only from a USR-backed dataset and explicit `data.location.kind: usr`
+    - strengthen DenseGen and construct package entry surfaces with clearer `Start here` and boundary language
+    - keep the promoter feature-matrix doc as a routing/handoff artifact instead of a second home for downstream command sequences
+    - add metadata enforcement for `sync.md` and the chained DenseGen/Infer runbook via docs checks
+- 2026-03-16 19:02 EDT: cluster method-contract and runtime-path hardening
+  - Intent:
+    - treat `cluster` as a generic downstream clustering tool with explicit method contracts, not a Leiden-specific tool hiding behind generic command names
+    - remove the two deepest ontology footguns in one bounded slice:
+      - package/runtime state defaulting into the package tree
+      - fit/preset/job semantics that implicitly equate `cluster fit` with Leiden
+    - keep current behavior limited to Leiden while making the source tree and checked-in assets extensible without semantic drift
+  - Audit findings:
+    - `cluster` code, signatures, reuse, presets, and docs still encoded `fit = leiden` in multiple generic surfaces
+    - the default run store still resolved under the package directory instead of an explicit writable project or working directory
+    - checked-in jobs still carried machine-specific absolute paths and a Leiden-shaped example alias (`ldn_v1`)
+    - preset ontology was command-shaped (`fit`) rather than concept-shaped (`method`)
+  - Implementation targets for this slice:
+    - move clustering implementations under a `methods/` surface with an explicit registry
+    - rename signature and metadata surfaces from `algo` to `method`
+    - make preset ontology `method`-first and rename bundled preset ids accordingly
+    - rename the checked-in promoter example from `ldn_v1` to a method-agnostic run alias
+    - resolve results to an explicit writable root:
+      - `DNADESIGN_CLUSTER_RESULTS_DIR`
+      - nearest project `cluster/results/`
+      - `./results`
+    - make checked-in job paths portable by resolving path-like params relative to the job file

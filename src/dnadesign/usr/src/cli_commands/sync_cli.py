@@ -32,7 +32,7 @@ def register_sync_commands(
         primary_only: bool = typer.Option(False, "--primary-only"),
         skip_snapshots: bool = typer.Option(False, "--skip-snapshots"),
         dry_run: bool = typer.Option(False, "--dry-run"),
-        yes: bool = typer.Option(False, "--yes"),
+        yes: bool = typer.Option(False, "-y", "--yes"),
         verify: str = typer.Option("hash", "--verify", help="Verification mode: hash|auto|size|parquet"),
         format: str = typer.Option("auto", "--format", help="Output format: auto|rich|plain|json"),
         audit_json_out: str | None = typer.Option(
@@ -68,7 +68,7 @@ def register_sync_commands(
         primary_only: bool = typer.Option(False, "--primary-only"),
         skip_snapshots: bool = typer.Option(False, "--skip-snapshots"),
         dry_run: bool = typer.Option(False, "--dry-run"),
-        yes: bool = typer.Option(False, "--yes"),
+        yes: bool = typer.Option(False, "-y", "--yes"),
         verify: str = typer.Option("hash", "--verify", help="Verification mode: hash|auto|size|parquet"),
         repo_root: str | None = typer.Option(None, "--repo-root"),
         remote_path: str | None = typer.Option(None, "--remote-path"),
@@ -97,7 +97,7 @@ def register_sync_commands(
         primary_only: bool = typer.Option(False, "--primary-only"),
         skip_snapshots: bool = typer.Option(False, "--skip-snapshots"),
         dry_run: bool = typer.Option(False, "--dry-run"),
-        yes: bool = typer.Option(False, "--yes"),
+        yes: bool = typer.Option(False, "-y", "--yes"),
         verify: str = typer.Option("hash", "--verify", help="Verification mode: hash|auto|size|parquet"),
         verify_sidecars: bool = typer.Option(
             False,
@@ -124,7 +124,7 @@ def register_sync_commands(
         strict_bootstrap_id: bool = typer.Option(
             False,
             "--strict-bootstrap-id",
-            help="Require namespace-qualified dataset ids (<namespace>/<dataset>) for bootstrap pulls.",
+            help="Require an explicit canonical dataset id for bootstrap pulls and disable local name guessing.",
         ),
         audit_json_out: str | None = typer.Option(
             None,
@@ -162,7 +162,7 @@ def register_sync_commands(
         primary_only: bool = typer.Option(False, "--primary-only"),
         skip_snapshots: bool = typer.Option(False, "--skip-snapshots"),
         dry_run: bool = typer.Option(False, "--dry-run"),
-        yes: bool = typer.Option(False, "--yes"),
+        yes: bool = typer.Option(False, "-y", "--yes"),
         verify: str = typer.Option("hash", "--verify", help="Verification mode: hash|auto|size|parquet"),
         verify_sidecars: bool = typer.Option(
             False,

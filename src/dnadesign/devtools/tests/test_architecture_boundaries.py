@@ -69,6 +69,48 @@ def test_find_undeclared_cross_tool_imports_allows_ops_to_usr_default_edge(tmp_p
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_allows_construct_to_usr_default_edge(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "construct" / "runtime.py", "from dnadesign.usr import Dataset\n")
+    _write(tmp_path / "src" / "dnadesign" / "usr" / "__init__.py", "class Dataset:\n    pass\n")
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_allows_ops_to_infer_default_edge(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "ops" / "plan.py",
+        "from dnadesign.infer import validate_runbook_gpu_resources\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "infer" / "__init__.py",
+        "def validate_runbook_gpu_resources(**_kwargs):\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_rejects_internal_src_target_even_for_allowed_edge(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "foo" / "api.py",
+        "from dnadesign.bar.src.runtime import run\n",
+    )
+    _write(tmp_path / "src" / "dnadesign" / "bar" / "src" / "runtime.py", "def run():\n    return 1\n")
+
+    violations = find_undeclared_cross_tool_imports(
+        repo_root=tmp_path,
+        allowed_edges={("foo", "bar")},
+    )
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "foo"
+    assert violations[0].imported_tool == "bar"
+    assert violations[0].import_target == "dnadesign.bar.src.runtime"
+
+
 def test_find_undeclared_cross_tool_imports_reports_relative_cross_tool_edge(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "foo" / "subpkg" / "api.py", "from ...bar.api import run\n")
     _write(tmp_path / "src" / "dnadesign" / "bar" / "api.py", "def run():\n    return 1\n")

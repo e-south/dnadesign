@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/analysis/differential.py
 
 Module Author(s): Eric J. South

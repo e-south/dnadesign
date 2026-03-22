@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/io/write.py
 
 Module Author(s): Eric J. South
@@ -15,12 +15,22 @@ from pathlib import Path
 
 import pandas as pd
 
+from .parquet_attach import write_parquet_with_attached_columns
+
 
 def _backup_file(p: Path, backup_suffix: str = ".bak") -> Path:
     b = p.with_suffix(p.suffix + backup_suffix)
     if not b.exists():
         shutil.copy2(p, b)
     return b
+
+
+def _append_usr_event(event_log: Path, payload: dict[str, object]) -> None:
+    try:
+        with event_log.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(payload) + "\n")
+    except Exception as exc:
+        raise RuntimeError(f"USR mutation completed but event logging failed at '{event_log}': {exc}") from exc
 
 
 def attach_usr(usr_root: Path, dataset: str, cols_df: pd.DataFrame, allow_overwrite: bool = False) -> None:
@@ -33,7 +43,7 @@ def attach_usr(usr_root: Path, dataset: str, cols_df: pd.DataFrame, allow_overwr
         ) from e
     ds = Dataset(usr_root, dataset)
     # We assume 'cols_df' contains 'id' plus one or more *namespaced* columns
-    # (e.g., 'cluster__ldn_v1', 'cluster__ldn_v1__meta', ...).
+    # (e.g., 'cluster__promoter_clusters_v1', 'cluster__promoter_clusters_v1__meta', ...).
     # USR requires an explicit namespace; infer it and *fail fast* if ambiguous.
     non_id = [c for c in cols_df.columns if c != "id"]
     if not non_id:
@@ -60,21 +70,13 @@ def attach_usr(usr_root: Path, dataset: str, cols_df: pd.DataFrame, allow_overwr
     finally:
         if tmp.exists():
             tmp.unlink()
-    # Optionally append to .events.log (best-effort)
-    try:
-        event_log = usr_root / dataset / ".events.log"
-        with event_log.open("a", encoding="utf-8") as f:
-            f.write(
-                json.dumps(
-                    {
-                        "event": "cluster_attach",
-                        "columns": [c for c in cols_df.columns if c != "id"],
-                    }
-                )
-                + "\n"
-            )
-    except Exception:
-        pass
+    _append_usr_event(
+        usr_root / dataset / ".events.log",
+        {
+            "event": "cluster_attach",
+            "columns": [c for c in cols_df.columns if c != "id"],
+        },
+    )
 
 
 def drop_usr_columns(usr_root: Path, dataset: str, columns: list[str]) -> None:
@@ -85,8 +87,8 @@ def drop_usr_columns(usr_root: Path, dataset: str, columns: list[str]) -> None:
     """
     if not columns:
         return
-    # Normalize dotted leaf paths (e.g., 'cluster__ldn_v1__meta.algo') to their
-    # top‑level column ('cluster__ldn_v1__meta') and de‑duplicate.
+    # Normalize dotted leaf paths (e.g., 'cluster__foo__meta.method_id') to their
+    # top‑level column ('cluster__foo__meta') and de‑duplicate.
     columns = list(dict.fromkeys(c.split(".", 1)[0] for c in columns))
     non_cluster = [c for c in columns if not c.startswith("cluster__")]
     if non_cluster:
@@ -132,12 +134,7 @@ def drop_usr_columns(usr_root: Path, dataset: str, columns: list[str]) -> None:
         if tmp_path.exists():
             tmp_path.unlink()
 
-    # Append a concise event
-    try:
-        with events.open("a", encoding="utf-8") as f:
-            f.write(json.dumps({"action": "cluster_delete", "columns": drop_now}) + "\n")
-    except Exception:
-        pass
+    _append_usr_event(events, {"action": "cluster_delete", "columns": drop_now})
 
 
 def write_generic(
@@ -171,3 +168,39 @@ def write_generic(
         else:
             raise ValueError(f"Unsupported out path: {out}")
         return out
+
+
+def write_generic_attached_columns(
+    *,
+    src_file: Path,
+    kind: str,
+    key_col: str,
+    cols_df: pd.DataFrame,
+    allow_overwrite: bool,
+    inplace: bool,
+    out: Path | None,
+    backup_suffix: str,
+    base_df: pd.DataFrame | None = None,
+) -> Path:
+    target = src_file if inplace else Path(out) if out is not None else None
+    if kind == "parquet" and target is not None and target.suffix.lower() == ".parquet":
+        return write_parquet_with_attached_columns(
+            src_file=src_file,
+            cols_df=cols_df,
+            key_col=key_col,
+            allow_overwrite=allow_overwrite,
+            inplace=inplace,
+            out=target,
+            backup_fn=lambda path: _backup_file(path, backup_suffix=backup_suffix),
+            base_df=base_df,
+        )
+    if base_df is not None:
+        materialized_df = base_df
+    elif kind == "parquet":
+        materialized_df = pd.read_parquet(src_file)
+    else:
+        materialized_df = pd.read_csv(src_file)
+    from ..execution_support import attach_columns_schema_preserving
+
+    merged = attach_columns_schema_preserving(materialized_df, cols_df, key_col, allow_overwrite=allow_overwrite)
+    return write_generic(src_file, merged, inplace=inplace, out=out, backup_suffix=backup_suffix)

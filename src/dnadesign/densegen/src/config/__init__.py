@@ -22,6 +22,7 @@ from .base import (
     resolve_relative_path,
     resolve_run_root,
     resolve_run_scoped_path,
+    resolve_usr_root_scoped_path,
 )
 from .generation import (
     FixedElementMatrix,
@@ -156,4 +157,5 @@ __all__ = [
     "resolve_relative_path",
     "resolve_run_root",
     "resolve_run_scoped_path",
+    "resolve_usr_root_scoped_path",
 ]

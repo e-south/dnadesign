@@ -19,6 +19,14 @@ from urllib.parse import parse_qs, urlparse
 
 import yaml
 
+from dnadesign.ops.catalog import (
+    CatalogProcedureEntry,
+    load_runbook_catalog,
+    render_catalog_procedure_section,
+    render_catalog_tool_source_section,
+    resolve_catalog_doc_path,
+    resolve_registry_metadata_path_for_doc_path,
+)
 from dnadesign.ops.runbooks.path_policy import (
     PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
     REPO_TRANSIENT_OPERATIONAL_DIR_NAMES,
@@ -71,6 +79,7 @@ SOR_MARKDOWN_FILES = (
 )
 INDEX_MARKDOWN_FILES = (
     "docs/README.md",
+    "docs/runbooks/README.md",
     "docs/architecture/README.md",
     "docs/architecture/decisions/README.md",
     "docs/security/README.md",
@@ -97,6 +106,15 @@ RUNBOOK_MARKDOWN_FILES = (
 OWNER_PATTERN = re.compile(r"^\*\*Owner:\*\*\s*(.+?)\s*$", re.MULTILINE)
 LAST_VERIFIED_PATTERN = re.compile(r"^\*\*Last verified:\*\*\s*(.+?)\s*$", re.MULTILINE)
 TYPE_PATTERN = re.compile(r"^\*\*Type:\*\*\s*(.+?)\s*$", re.MULTILINE)
+PLANE_PATTERN = re.compile(r"^\*\*Plane:\*\*\s*(.+?)\s*$", re.MULTILINE)
+OWNER_BOUNDARY_PATTERN = re.compile(r"^\*\*Owner-boundary:\*\*\s*(.+?)\s*$", re.MULTILINE)
+ENTRY_ARTIFACT_PATTERN = re.compile(r"^\*\*Entry artifact:\*\*\s*(.+?)\s*$", re.MULTILINE)
+EXIT_ARTIFACT_PATTERN = re.compile(r"^\*\*Exit artifact:\*\*\s*(.+?)\s*$", re.MULTILINE)
+REGISTRY_ID_METADATA_PATTERN = re.compile(r"^\*\*Registry-id:\*\*\s*(.+?)\s*$", re.MULTILINE)
+SUMMARY_METADATA_PATTERN = re.compile(r"^\*\*Summary:\*\*\s*(.+?)\s*$", re.MULTILINE)
+EXECUTION_KIND_METADATA_PATTERN = re.compile(r"^\*\*Execution-kind:\*\*\s*(.+?)\s*$", re.MULTILINE)
+PROGRESS_KIND_METADATA_PATTERN = re.compile(r"^\*\*Progress-kind:\*\*\s*(.+?)\s*$", re.MULTILINE)
+PROGRESS_SURFACE_GLOSSARY_ROW_PATTERN = re.compile(r"^\|\s*`(?P<kind>[^`]+)`\s*\|")
 STATUS_PATTERN = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
 CREATED_PATTERN = re.compile(r"^\*\*Created:\*\*\s*(.+?)\s*$", re.MULTILINE)
 SECTION_HEADING_PATTERN = re.compile(r"^#{2,6}\s+(.+?)\s*$", re.MULTILINE)
@@ -138,10 +156,79 @@ DENSEGEN_DOC_LANGUAGE_PATHS = (
 DENSEGEN_DISALLOWED_TERM_PATTERN = re.compile(r"\bcanonical\b", flags=re.IGNORECASE)
 OPS_OPERATIONAL_WORKFLOW_IDS = {
     "densegen_batch_submit",
-    "densegen_batch_with_notify_slack",
+    "densegen_batch_with_notify",
     "infer_batch_submit",
-    "infer_batch_with_notify_slack",
+    "infer_batch_with_notify",
 }
+CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
+    "docs/operations/README.md": {
+        "type": "route",
+        "plane": "control-plane",
+        "owner_boundary": "ops",
+    },
+    "docs/operations/orchestration-runbooks.md": {
+        "type": "runbook",
+        "plane": "control-plane",
+        "owner_boundary": "ops",
+    },
+    "src/dnadesign/usr/docs/operations/README.md": {
+        "type": "route",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/usr/docs/operations/workflow-map.md": {
+        "type": "route",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/usr/docs/operations/sync.md": {
+        "type": "route",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md": {
+        "type": "runbook",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md": {
+        "type": "runbook",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-runbook.md": {
+        "type": "runbook",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md": {
+        "type": "runbook",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md": {
+        "type": "runbook",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/cluster/docs/workflows/exploratory-clustering.md": {
+        "type": "workflow",
+        "plane": "downstream-tool",
+        "owner_boundary": "cluster",
+    },
+    "src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md": {
+        "type": "workflow",
+        "plane": "downstream-tool",
+        "owner_boundary": "opal",
+    },
+}
+_CROSS_TOOL_DOC_ALLOWED_TYPES = {"route", "runbook", "workflow"}
+_CROSS_TOOL_DOC_ALLOWED_PLANES = {"control-plane", "data-plane", "downstream-tool"}
+_RUNBOOK_CATALOG_METADATA_TYPES = {"runbook", "workflow"}
+_REGISTRY_ID_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$")
+_METADATA_TOKEN_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:-[a-z0-9]+)*$")
+RUNBOOK_CATALOG_DOC_PATH = "docs/runbooks/README.md"
+RUNBOOK_PROGRESS_GLOSSARY_HEADING = "### Progress views"
 OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES = (
     PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
     Path("docs/templates"),
@@ -153,11 +240,39 @@ OVERLAY_GUARD_DOC_PATHS = (
     "docs/bu-scc/jobs/README.md",
     "src/dnadesign/ops/README.md",
 )
+OPS_DEPRECATED_SEMANTICS_DOC_PATHS = (
+    "docs/operations/README.md",
+    "docs/operations/orchestration-runbooks.md",
+    "src/dnadesign/ops/README.md",
+)
 STALE_OVERLAY_GUARD_TERMS = (
     "densegen-overlay-guard",
     "densegen.overlay_guard.namespace",
 )
+OPS_DEPRECATED_SEMANTICS_TERMS = (
+    "precedent",
+    "precedents",
+    "with_notify_slack",
+)
 PACKAGED_RUNBOOK_DURATION_SUFFIX_PATTERN = re.compile(r"_(?:\d+)(?:h|hr|hrs|hour|hours)$", re.IGNORECASE)
+OPERATIONAL_RUNBOOK_SCAN_PRUNE_DIRS = {
+    ".git",
+    ".pytest_cache",
+    ".venv",
+    "__pycache__",
+    "_archive",
+    "_auxiliary",
+    "_derived",
+    "_snapshots",
+    "archived",
+    "batch_results",
+    "build",
+    "dist",
+    "prototype",
+    "prototypes",
+    "runs",
+    "venv",
+}
 
 
 def _collect_markdown_files(repo_root: Path) -> tuple[list[Path], list[Path]]:
@@ -762,6 +877,275 @@ def _find_owner_last_verified_metadata_issues_for_files(
     return issues
 
 
+def _find_cross_tool_doc_metadata_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    registry_ids_by_path: dict[str, str] = {}
+    for relative_path, contract in CROSS_TOOL_DOC_METADATA_CONTRACTS.items():
+        path = repo_root / relative_path
+        if not path.exists():
+            continue
+
+        text = path.read_text(encoding="utf-8")
+
+        doc_type = _extract_metadata_field(text, TYPE_PATTERN)
+        if doc_type is None:
+            issues.append(f"{path}: missing '**Type:**' metadata field.")
+        elif doc_type not in _CROSS_TOOL_DOC_ALLOWED_TYPES:
+            allowed = ", ".join(sorted(_CROSS_TOOL_DOC_ALLOWED_TYPES))
+            issues.append(f"{path}: '**Type:**' must be one of: {allowed}.")
+        elif doc_type != contract["type"]:
+            issues.append(f"{path}: '**Type:**' must be exactly '{contract['type']}'.")
+
+        plane = _extract_metadata_field(text, PLANE_PATTERN)
+        if plane is None:
+            issues.append(f"{path}: missing '**Plane:**' metadata field.")
+        elif plane not in _CROSS_TOOL_DOC_ALLOWED_PLANES:
+            allowed = ", ".join(sorted(_CROSS_TOOL_DOC_ALLOWED_PLANES))
+            issues.append(f"{path}: '**Plane:**' must be one of: {allowed}.")
+        elif plane != contract["plane"]:
+            issues.append(f"{path}: '**Plane:**' must be exactly '{contract['plane']}'.")
+
+        owner_boundary = _extract_metadata_field(text, OWNER_BOUNDARY_PATTERN)
+        if owner_boundary is None:
+            issues.append(f"{path}: missing '**Owner-boundary:**' metadata field.")
+        elif not owner_boundary:
+            issues.append(f"{path}: '**Owner-boundary:**' must not be empty.")
+        elif owner_boundary != contract["owner_boundary"]:
+            issues.append(f"{path}: '**Owner-boundary:**' must be exactly '{contract['owner_boundary']}'.")
+
+        entry_artifact = _extract_metadata_field(text, ENTRY_ARTIFACT_PATTERN)
+        if entry_artifact is None:
+            issues.append(f"{path}: missing '**Entry artifact:**' metadata field.")
+        elif not entry_artifact:
+            issues.append(f"{path}: '**Entry artifact:**' must not be empty.")
+
+        exit_artifact = _extract_metadata_field(text, EXIT_ARTIFACT_PATTERN)
+        if exit_artifact is None:
+            issues.append(f"{path}: missing '**Exit artifact:**' metadata field.")
+        elif not exit_artifact:
+            issues.append(f"{path}: '**Exit artifact:**' must not be empty.")
+
+        if contract["type"] not in _RUNBOOK_CATALOG_METADATA_TYPES:
+            continue
+
+        registry_id = _extract_metadata_field(text, REGISTRY_ID_METADATA_PATTERN)
+        if registry_id is None:
+            issues.append(f"{path}: missing '**Registry-id:**' metadata field.")
+        elif not registry_id:
+            issues.append(f"{path}: '**Registry-id:**' must not be empty.")
+        elif _REGISTRY_ID_VALUE_PATTERN.fullmatch(registry_id) is None:
+            issues.append(f"{path}: '**Registry-id:**' must be dot-qualified lowercase tokens.")
+        else:
+            registry_ids_by_path[relative_path] = registry_id
+
+        summary = _extract_metadata_field(text, SUMMARY_METADATA_PATTERN)
+        if summary is None:
+            issues.append(f"{path}: missing '**Summary:**' metadata field.")
+        elif not summary:
+            issues.append(f"{path}: '**Summary:**' must not be empty.")
+
+        execution_kind = _extract_metadata_field(text, EXECUTION_KIND_METADATA_PATTERN)
+        if execution_kind is None:
+            issues.append(f"{path}: missing '**Execution-kind:**' metadata field.")
+        elif not execution_kind:
+            issues.append(f"{path}: '**Execution-kind:**' must not be empty.")
+        elif _METADATA_TOKEN_VALUE_PATTERN.fullmatch(execution_kind) is None:
+            issues.append(f"{path}: '**Execution-kind:**' must use lowercase slug tokens.")
+
+        progress_kind = _extract_metadata_field(text, PROGRESS_KIND_METADATA_PATTERN)
+        if progress_kind is None:
+            issues.append(f"{path}: missing '**Progress-kind:**' metadata field.")
+        elif not progress_kind:
+            issues.append(f"{path}: '**Progress-kind:**' must not be empty.")
+        elif _METADATA_TOKEN_VALUE_PATTERN.fullmatch(progress_kind) is None:
+            issues.append(f"{path}: '**Progress-kind:**' must use lowercase slug tokens.")
+
+    seen_registry_ids: dict[str, str] = {}
+    for relative_path, registry_id in registry_ids_by_path.items():
+        existing_path = seen_registry_ids.get(registry_id)
+        if existing_path is not None:
+            issues.append(
+                "cross-tool docs must not reuse registry ids: "
+                f"{registry_id} appears in both {existing_path} and {relative_path}."
+            )
+            continue
+        seen_registry_ids[registry_id] = relative_path
+
+    return issues
+
+
+def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    resolved_repo_root = repo_root.resolve()
+    catalog_paths = [
+        repo_root / relative_path
+        for relative_path, contract in CROSS_TOOL_DOC_METADATA_CONTRACTS.items()
+        if contract["type"] in _RUNBOOK_CATALOG_METADATA_TYPES and (repo_root / relative_path).exists()
+    ]
+    if not catalog_paths:
+        return issues
+
+    catalog_path = repo_root / RUNBOOK_CATALOG_DOC_PATH
+    if not catalog_path.exists():
+        return [f"{catalog_path}: missing runbook catalog."]
+
+    catalog_text = catalog_path.read_text(encoding="utf-8")
+    if "## Runbook Catalog" not in catalog_text:
+        issues.append(f"{catalog_path}: missing '## Runbook Catalog' heading.")
+
+    try:
+        catalog = load_runbook_catalog(repo_root=repo_root)
+    except ValueError as exc:
+        issues.append(f"{catalog_path}: {exc}")
+        return issues
+
+    catalog_entries_by_path: dict[str, CatalogProcedureEntry] = {}
+    catalog_progress_kinds = {entry.progress_kind for entry in catalog.procedures}
+    expected_catalog_paths: set[str] = set()
+    for entry in catalog.procedures:
+        resolved_path = resolve_catalog_doc_path(catalog_path=catalog.catalog_path, doc_path=entry.doc_path)
+        try:
+            relative_path = str(resolved_path.relative_to(resolved_repo_root))
+        except ValueError:
+            issues.append(
+                f"{catalog_path}: registry id '{entry.registry_id}' resolves outside the repository: {entry.doc_path}."
+            )
+            continue
+        existing_entry = catalog_entries_by_path.get(relative_path)
+        if existing_entry is not None:
+            issues.append(
+                f"{catalog_path}: duplicate catalog procedure entry for {relative_path} "
+                f"({existing_entry.registry_id}, {entry.registry_id})."
+            )
+            continue
+        catalog_entries_by_path[relative_path] = entry
+
+    procedure_section = _extract_markdown_section(catalog_text, heading="### Cross-tool procedures")
+    if procedure_section is None:
+        issues.append(f"{catalog_path}: missing '### Cross-tool procedures' section.")
+    else:
+        expected_section = render_catalog_procedure_section(catalog)
+        if procedure_section.strip() != expected_section.strip():
+            issues.append(
+                f"{catalog_path}: cross-tool procedures section is stale; "
+                "regenerate it with `uv run python -m dnadesign.devtools.generate_runbook_catalog`."
+            )
+
+    tool_source_section = _extract_markdown_section(catalog_text, heading="### Tool docs")
+    if tool_source_section is None:
+        issues.append(f"{catalog_path}: missing '### Tool docs' section.")
+    else:
+        expected_tool_source_section = render_catalog_tool_source_section(catalog)
+        if tool_source_section.strip() != expected_tool_source_section.strip():
+            issues.append(
+                f"{catalog_path}: tool docs section is stale; "
+                "regenerate it with `uv run python -m dnadesign.devtools.generate_runbook_catalog`."
+            )
+
+    for relative_path, contract in CROSS_TOOL_DOC_METADATA_CONTRACTS.items():
+        if contract["type"] not in _RUNBOOK_CATALOG_METADATA_TYPES:
+            continue
+        path = repo_root / relative_path
+        if not path.exists():
+            continue
+        expected_catalog_paths.add(relative_path)
+        text = path.read_text(encoding="utf-8")
+        registry_id = _extract_metadata_field(text, REGISTRY_ID_METADATA_PATTERN)
+        if not registry_id:
+            continue
+        metadata_relative_path = resolve_registry_metadata_path_for_doc_path(relative_path)
+        metadata_path = repo_root / metadata_relative_path
+        if not metadata_path.exists():
+            issues.append(f"{metadata_path}: missing registry metadata sidecar for {relative_path}.")
+            continue
+        metadata_payload = yaml.safe_load(metadata_path.read_text(encoding="utf-8")) or {}
+        if not isinstance(metadata_payload, dict):
+            issues.append(f"{metadata_path}: registry metadata must be a mapping.")
+            continue
+
+        entry = catalog_entries_by_path.get(relative_path)
+        if entry is None:
+            issues.append(f"{catalog_path}: missing registry id '{registry_id}' for {relative_path}.")
+            continue
+
+        expected_metadata = {
+            "Registry-id": registry_id,
+            "Type": _extract_metadata_field(text, TYPE_PATTERN),
+            "Plane": _extract_metadata_field(text, PLANE_PATTERN),
+            "Owner-boundary": _extract_metadata_field(text, OWNER_BOUNDARY_PATTERN),
+            "Entry artifact": _extract_metadata_field(text, ENTRY_ARTIFACT_PATTERN),
+            "Exit artifact": _extract_metadata_field(text, EXIT_ARTIFACT_PATTERN),
+            "Execution-kind": _extract_metadata_field(text, EXECUTION_KIND_METADATA_PATTERN),
+            "Progress-kind": _extract_metadata_field(text, PROGRESS_KIND_METADATA_PATTERN),
+            "Summary": _extract_metadata_field(text, SUMMARY_METADATA_PATTERN),
+        }
+        metadata_file_values = {
+            "Registry-id": metadata_payload.get("registry_id"),
+            "Type": metadata_payload.get("type"),
+            "Plane": metadata_payload.get("plane"),
+            "Owner-boundary": metadata_payload.get("owner_boundary"),
+            "Entry artifact": metadata_payload.get("entry_artifact"),
+            "Exit artifact": metadata_payload.get("exit_artifact"),
+            "Execution-kind": metadata_payload.get("execution_kind"),
+            "Progress-kind": metadata_payload.get("progress_kind"),
+            "Summary": metadata_payload.get("summary"),
+        }
+        for field_name, expected_value in expected_metadata.items():
+            if not expected_value:
+                continue
+            actual_value = metadata_file_values[field_name]
+            if actual_value != expected_value:
+                issues.append(
+                    f"{metadata_path}: {field_name} for {relative_path} must match owner-local metadata "
+                    f"(metadata={actual_value!r}, doc={expected_value!r})."
+                )
+
+    for relative_path, entry in sorted(catalog_entries_by_path.items()):
+        if relative_path not in expected_catalog_paths:
+            issues.append(
+                f"{catalog_path}: unexpected catalog procedure '{entry.registry_id}' for {relative_path}; "
+                "add a matching cross-tool metadata contract or remove the registry metadata sidecar."
+            )
+
+    glossary_text = _extract_markdown_section(catalog_text, heading=RUNBOOK_PROGRESS_GLOSSARY_HEADING)
+    if glossary_text is None:
+        issues.append(f"{catalog_path}: missing '{RUNBOOK_PROGRESS_GLOSSARY_HEADING}' section.")
+        return issues
+
+    glossary_progress_kinds = {
+        match.group("kind").strip()
+        for line in glossary_text.splitlines()
+        for match in [PROGRESS_SURFACE_GLOSSARY_ROW_PATTERN.match(line.strip())]
+        if match is not None
+    }
+    if not glossary_progress_kinds:
+        issues.append(f"{catalog_path}: progress surface glossary section has no data table.")
+        return issues
+
+    for progress_kind in sorted(catalog_progress_kinds - glossary_progress_kinds):
+        issues.append(f"{catalog_path}: missing progress surface glossary entry for '{progress_kind}'.")
+    for progress_kind in sorted(glossary_progress_kinds - catalog_progress_kinds):
+        issues.append(f"{catalog_path}: unexpected progress surface glossary entry for '{progress_kind}'.")
+
+    return issues
+
+
+def _extract_markdown_section(text: str, *, heading: str) -> str | None:
+    lines = text.splitlines()
+    try:
+        heading_index = next(index for index, line in enumerate(lines) if line.strip() == heading)
+    except StopIteration:
+        return None
+
+    section_lines: list[str] = []
+    for line in lines[heading_index + 1 :]:
+        stripped = line.strip()
+        if stripped.startswith("### "):
+            break
+        section_lines.append(line)
+    return "\n".join(section_lines)
+
+
 def _find_exec_plan_metadata_issues(repo_root: Path) -> list[str]:
     issues: list[str] = []
     exec_root = repo_root / "docs" / "exec-plans"
@@ -1145,20 +1529,59 @@ def _is_allowed_operational_runbook_path(*, relative_path: Path) -> bool:
 
 def _find_operational_runbook_path_issues(repo_root: Path) -> list[str]:
     issues: list[str] = []
-    for suffix in ("*.yaml", "*.yml"):
-        for path in sorted(repo_root.rglob(suffix)):
-            if not path.is_file():
-                continue
-            if not _is_ops_operational_runbook_contract(path):
-                continue
-            relative_path = path.relative_to(repo_root)
-            if _is_allowed_operational_runbook_path(relative_path=relative_path):
-                continue
-            issues.append(
-                f"{path}: operational runbook path is outside allowed locations; "
-                "use workspace outputs/logs/ops/runbooks/ or src/dnadesign/ops/runbooks/presets/."
-            )
+    for path in _iter_operational_runbook_yaml_files(repo_root):
+        if not _is_ops_operational_runbook_contract(path):
+            continue
+        relative_path = path.relative_to(repo_root)
+        if _is_allowed_operational_runbook_path(relative_path=relative_path):
+            continue
+        issues.append(
+            f"{path}: operational runbook path is outside allowed locations; "
+            "use workspace outputs/logs/ops/runbooks/ or src/dnadesign/ops/runbooks/presets/."
+        )
     return issues
+
+
+def _iter_operational_runbook_yaml_files(repo_root: Path):
+    stack = [repo_root]
+    while stack:
+        current = stack.pop()
+        try:
+            entries = sorted(current.iterdir(), key=lambda entry: entry.name)
+        except OSError:
+            continue
+        for entry in reversed(entries):
+            if entry.is_dir():
+                rel_parts = entry.relative_to(repo_root).parts
+                if _should_descend_operational_runbook_dir(rel_parts):
+                    stack.append(entry)
+                continue
+            if entry.suffix.lower() in {".yaml", ".yml"}:
+                yield entry
+
+
+def _should_descend_operational_runbook_dir(relative_parts: tuple[str, ...]) -> bool:
+    if not relative_parts:
+        return True
+    name = relative_parts[-1]
+    if name in OPERATIONAL_RUNBOOK_SCAN_PRUNE_DIRS:
+        return False
+    if "outputs" in relative_parts:
+        outputs_idx = relative_parts.index("outputs")
+        tail = relative_parts[outputs_idx + 1 :]
+        if not tail:
+            return True
+        if tail[0] != "logs":
+            return False
+        if len(tail) == 1:
+            return True
+        if tail[1] != "ops":
+            return False
+        if len(tail) == 2:
+            return True
+        if tail[2] != "runbooks":
+            return False
+    return True
 
 
 def _find_packaged_runbook_variant_issues(repo_root: Path) -> list[str]:
@@ -1222,6 +1645,23 @@ def _find_stale_overlay_guard_term_issues(repo_root: Path) -> list[str]:
     return issues
 
 
+def _find_ops_deprecated_semantics_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    target_files = _collect_markdown_files_from_relative_paths(
+        repo_root,
+        relative_paths=OPS_DEPRECATED_SEMANTICS_DOC_PATHS,
+    )
+    for path in target_files:
+        content = path.read_text(encoding="utf-8")
+        for term in OPS_DEPRECATED_SEMANTICS_TERMS:
+            if term in content:
+                issues.append(
+                    f"{path}: deprecated ops semantics term '{term}' is not allowed; "
+                    "use transport-neutral workflow ids and the presets surface only."
+                )
+    return issues
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check docs markdown naming and local links.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
@@ -1279,6 +1719,20 @@ def main(argv: list[str] | None = None) -> int:
             print(f" - {issue}")
         return 1
 
+    cross_tool_doc_metadata_issues = _find_cross_tool_doc_metadata_issues(repo_root)
+    if cross_tool_doc_metadata_issues:
+        print("Cross-tool doc metadata check failed:")
+        for issue in cross_tool_doc_metadata_issues:
+            print(f" - {issue}")
+        return 1
+
+    runbook_catalog_issues = _find_runbook_catalog_issues(repo_root)
+    if runbook_catalog_issues:
+        print("Runbook catalog check failed:")
+        for issue in runbook_catalog_issues:
+            print(f" - {issue}")
+        return 1
+
     interface_doc_issues = _find_public_interface_doc_contract_issues(repo_root)
     if interface_doc_issues:
         print("Public interface docs contract check failed:")
@@ -1332,6 +1786,13 @@ def main(argv: list[str] | None = None) -> int:
     if stale_overlay_guard_term_issues:
         print("Overlay guard terminology check failed:")
         for issue in stale_overlay_guard_term_issues:
+            print(f" - {issue}")
+        return 1
+
+    ops_deprecated_semantics_issues = _find_ops_deprecated_semantics_issues(repo_root)
+    if ops_deprecated_semantics_issues:
+        print("Ops terminology drift check failed:")
+        for issue in ops_deprecated_semantics_issues:
             print(f" - {issue}")
         return 1
 

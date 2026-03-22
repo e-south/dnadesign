@@ -17,9 +17,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Sequence
 
-from dnadesign._contracts import ResumeReadinessPolicy, resolve_resume_readiness_policy
+from dnadesign._contracts import (
+    ResumeReadinessPolicy,
+    resolve_densegen_usr_output_contract,
+    resolve_resume_readiness_policy,
+)
 
 from ..runbooks.schema import OrchestrationRunbookV1
+from .mode_tools import InferModeProbeError, resolve_mode_tool_adapter
 
 RunMode = Literal["auto", "fresh", "resume"]
 SubmitBehavior = Literal["submit", "hold_jid", "blocked"]
@@ -27,7 +32,11 @@ ResumeState = Literal["none", "resume_ready", "partial"]
 
 
 def _run_probe(argv: Sequence[str]) -> tuple[int, str, str]:
-    result = subprocess.run(list(argv), check=False, capture_output=True, text=True)
+    try:
+        result = subprocess.run(list(argv), check=False, capture_output=True, text=True)
+    except OSError as exc:
+        cmd = str(argv[0]) if argv else "command"
+        return 127, "", f"{cmd} unavailable: {exc}"
     return int(result.returncode), result.stdout, result.stderr
 
 
@@ -65,13 +74,30 @@ def discover_active_job_ids_for_runbook(
     unique_tokens = tuple(dict.fromkeys(token for token in tokens if token))
 
     active_job_ids: list[str] = []
-    for job_id in _parse_job_ids_from_qstat_output(stdout)[:max_jobs]:
+    for job_id in _parse_job_ids_from_qstat_output(stdout):
+        if len(active_job_ids) >= max_jobs:
+            break
         rc, job_stdout, _job_stderr = _run_probe(("qstat", "-j", str(job_id)))
         if rc != 0:
             continue
         if any(token in job_stdout for token in unique_tokens):
             active_job_ids.append(str(job_id))
     return tuple(active_job_ids)
+
+
+def _normalize_hold_jid(active_job_ids: Sequence[str]) -> str | None:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for job_id in active_job_ids:
+        for value in str(job_id).split(","):
+            token = value.strip()
+            if not token or token in seen:
+                continue
+            seen.add(token)
+            normalized.append(token)
+    if not normalized:
+        return None
+    return ",".join(sorted(normalized))
 
 
 @dataclass(frozen=True)
@@ -85,28 +111,18 @@ class ModeDecision:
     reason: str
 
 
-def _has_resume_artifacts(workspace_root: Path) -> bool:
-    markers = (
-        workspace_root / "outputs" / "meta" / "run_manifest.json",
-        workspace_root / "outputs" / "tables" / "records.parquet",
-        workspace_root / "outputs" / "usr_datasets" / "registry.yaml",
-    )
-    if any(path.exists() for path in markers):
-        return True
-    tables_root = workspace_root / "outputs" / "tables"
-    candidate_dirs = [tables_root]
-    nested_tables_root = tables_root / "tables"
-    if nested_tables_root.exists():
-        candidate_dirs.append(nested_tables_root)
-    for directory in candidate_dirs:
-        if any(directory.glob("records__part-*.parquet")):
-            return True
-        if any(directory.glob("attempts_part-*.parquet")):
-            return True
-    return False
+def _densegen_usr_record_candidates(runbook: OrchestrationRunbookV1) -> tuple[Path, ...]:
+    if runbook.densegen is None:
+        return ()
+    if not runbook.densegen.config.exists() or not runbook.densegen.config.is_file():
+        return ()
+    contract = resolve_densegen_usr_output_contract(runbook.densegen.config)
+    dataset_root = contract.usr_root / contract.usr_dataset
+    return (dataset_root / "records.parquet",)
 
 
-def _candidate_record_paths_for_resume(workspace_root: Path) -> tuple[Path, ...]:
+def _candidate_record_paths_for_resume(runbook: OrchestrationRunbookV1) -> tuple[Path, ...]:
+    workspace_root = runbook.workspace_root
     tables_root = workspace_root / "outputs" / "tables"
     candidate_dirs = [tables_root]
     nested_tables_root = tables_root / "tables"
@@ -116,9 +132,7 @@ def _candidate_record_paths_for_resume(workspace_root: Path) -> tuple[Path, ...]
     for directory in candidate_dirs:
         candidates.append(directory / "records.parquet")
         candidates.extend(sorted(directory.glob("records__part-*.parquet")))
-    usr_root = workspace_root / "outputs" / "usr_datasets"
-    if usr_root.exists():
-        candidates.extend(sorted(usr_root.glob("**/records.parquet")))
+    candidates.extend(_densegen_usr_record_candidates(runbook))
     deduped: list[Path] = []
     seen: set[Path] = set()
     for path in candidates:
@@ -190,10 +204,11 @@ def _missing_required_resume_columns(path: Path, *, required_columns: Sequence[s
 
 
 def _classify_resume_state(
-    workspace_root: Path,
+    runbook: OrchestrationRunbookV1,
     *,
     policy: ResumeReadinessPolicy,
 ) -> tuple[ResumeState, str]:
+    workspace_root = runbook.workspace_root
     run_manifest = workspace_root / "outputs" / "meta" / "run_manifest.json"
     if run_manifest.exists():
         return "resume_ready", f"resume-ready via run manifest: {run_manifest}"
@@ -211,7 +226,7 @@ def _classify_resume_state(
         zero_row_attempt_paths.append(path)
 
     zero_row_paths: list[Path] = []
-    for path in _candidate_record_paths_for_resume(workspace_root):
+    for path in _candidate_record_paths_for_resume(runbook):
         if not path.exists():
             continue
         try:
@@ -256,16 +271,29 @@ def resolve_mode_decision(
     allow_fresh_reset: bool = False,
 ) -> ModeDecision:
     selected_requested_mode = requested_mode or runbook.mode_policy.default
-    workflow_tool = "densegen" if runbook.densegen is not None else "infer"
+    tool_adapter = resolve_mode_tool_adapter(runbook)
+    workflow_tool = tool_adapter.tool
     resume_policy = resolve_resume_readiness_policy(workflow_tool)
     has_explicit_resume_policy = resume_policy is not None
-    artifacts_found = _has_resume_artifacts(runbook.workspace_root)
+    try:
+        artifacts_found = tool_adapter.has_resume_artifacts(runbook)
+    except InferModeProbeError as exc:
+        if selected_requested_mode == "auto":
+            raise ValueError(
+                "auto mode blocked: infer resume destination is ambiguous or incomplete "
+                f"({exc}). Choose --mode explicitly before re-running."
+            ) from exc
+        if selected_requested_mode == "resume":
+            raise ValueError(
+                f"resume mode blocked: infer resume destination is ambiguous or incomplete ({exc})."
+            ) from exc
+        artifacts_found = False
     resume_state: ResumeState = "none"
     resume_readiness_reason = "not-evaluated"
     if has_explicit_resume_policy:
         assert resume_policy is not None
         resume_state, resume_readiness_reason = _classify_resume_state(
-            runbook.workspace_root,
+            runbook,
             policy=resume_policy,
         )
         artifacts_found = resume_state != "none"
@@ -298,15 +326,15 @@ def resolve_mode_decision(
             f"({resume_readiness_reason}). "
             "Re-run with --allow-fresh-reset only after confirming outputs should be cleared."
         )
+    if selected_mode == "resume" and not artifacts_found:
+        raise ValueError("resume mode blocked: workspace has no resume artifacts.")
+    if selected_mode == "fresh" and artifacts_found and not allow_fresh_reset:
+        raise ValueError(
+            "fresh mode blocked: workspace already has resume artifacts. "
+            "Re-run with --allow-fresh-reset only after confirming outputs should be cleared."
+        )
 
-    if runbook.densegen is not None:
-        assert runbook.densegen is not None
-        if selected_mode == "fresh":
-            run_args = runbook.densegen.run_args.fresh
-        else:
-            run_args = runbook.densegen.run_args.resume
-    else:
-        run_args = ""
+    run_args = tool_adapter.run_args_for_mode(runbook, selected_mode)
 
     hold_jid: str | None = None
     submit_behavior: SubmitBehavior = "submit"
@@ -316,11 +344,11 @@ def resolve_mode_decision(
         if selected_mode == "fresh":
             reason = f"{reason}; fresh_reset_ack={str(allow_fresh_reset).lower()}"
 
-    if active_job_ids:
-        first_active_job = str(active_job_ids[0]).strip()
+    hold_jid_candidates = _normalize_hold_jid(active_job_ids)
+    if hold_jid_candidates is not None:
         if runbook.mode_policy.on_active_job == "hold_jid":
             submit_behavior = "hold_jid"
-            hold_jid = first_active_job
+            hold_jid = hold_jid_candidates
             reason = f"{reason}; active_jobs_detected; submission_chained_with_hold_jid={hold_jid}"
         else:
             submit_behavior = "blocked"

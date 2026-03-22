@@ -79,6 +79,62 @@ def test_densegen_usr_notify_tutorial_keeps_walkthrough_progression() -> None:
         ],
         label=path.name,
     )
+    assert 'notify setup resolve-events --tool densegen --config "$CONFIG" --json' in text
+    assert (
+        'notify usr-events watch --tool densegen --config "$CONFIG" --provider generic --url "$NOTIFY_WEBHOOK" '
+        "--dry-run --no-advance-cursor-on-dry-run" in text
+    )
+    assert (
+        'notify setup slack --tool densegen --config "$CONFIG" --secret-source env --url-env NOTIFY_WEBHOOK' not in text
+    )
+
+
+def test_densegen_docs_route_to_shared_multi_source_runbook() -> None:
+    text = _read(DOCS_ROOT / "README.md")
+    assert "../../usr/docs/operations/multi-source-shared-dataset-assembly.md" in text
+    assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" in text
+    _assert_token_order(
+        text,
+        [
+            "#### Run with Notify",
+            "tutorials/demo_usr_notify.md",
+            "concepts/observability_and_events.md",
+            "#### Continue into shared downstream data-plane flows",
+            "../../usr/docs/operations/multi-source-shared-dataset-assembly.md",
+            "../../usr/docs/operations/promoter-characterization-feature-matrix.md",
+        ],
+        label="densegen/docs/README.md",
+    )
+
+
+def test_densegen_top_level_readme_routes_to_downstream_shared_flows() -> None:
+    text = _read(ROOT / "README.md")
+    assert "## Start here" in text
+    assert "## Continue after generation" in text
+    assert "## Boundary reminder" in text
+    assert "Want a first local run" in text
+    assert "Want the shared downstream handoff after generation" in text
+    assert "../usr/docs/operations/multi-source-shared-dataset-assembly.md" in text
+    assert "../usr/docs/operations/promoter-characterization-feature-matrix.md" in text
+    assert "downstream USR-backed workflows" in text
+    assert "Use it when you need one design-generation tool" in text
+    assert "DenseGen owns workspace-local generation" in text
+
+
+def test_densegen_docs_index_keeps_cross_tool_handoff_routes_separate_from_tutorials() -> None:
+    text = _read(DOCS_ROOT / "index.md")
+    _assert_token_order(
+        text,
+        [
+            "### Tutorials",
+            "tutorials/demo_usr_notify.md",
+            "### Cross-tool handoff routes",
+            "../../usr/docs/operations/multi-source-shared-dataset-assembly.md",
+            "../../usr/docs/operations/promoter-characterization-feature-matrix.md",
+            "### Workspace docs",
+        ],
+        label="densegen/docs/index.md",
+    )
 
 
 def test_densegen_howto_guides_keep_scope_sentence() -> None:

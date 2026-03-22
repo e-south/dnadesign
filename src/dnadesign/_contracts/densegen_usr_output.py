@@ -46,14 +46,6 @@ def _resolve_path_from_config(config_path: Path, value: object, *, label: str) -
     return (config_path.parent / candidate).resolve()
 
 
-def _is_relative_to(path: Path, parent: Path) -> bool:
-    try:
-        path.resolve().relative_to(parent.resolve())
-        return True
-    except ValueError:
-        return False
-
-
 def load_densegen_config_mapping(config_path: Path) -> tuple[Path, dict[str, object]]:
     resolved_config_path = config_path.expanduser().resolve()
     if not resolved_config_path.exists():
@@ -98,11 +90,6 @@ def resolve_densegen_usr_output_contract(
 
     usr_cfg = _required_mapping(usr_cfg_raw, label="densegen.output.usr")
     usr_root = _resolve_path_from_config(resolved_config_path, usr_cfg.get("root"), label="densegen.output.usr.root")
-    outputs_root = (run_root / "outputs").resolve()
-    if not _is_relative_to(usr_root, outputs_root):
-        raise ValueError(
-            f"output.usr.root must be within outputs/ under densegen.run.root ({outputs_root}), got: {usr_root}"
-        )
 
     dataset_raw = _required_non_empty_string(usr_cfg.get("dataset"), label="densegen.output.usr.dataset")
     dataset_path = Path(dataset_raw.replace("\\", "/"))

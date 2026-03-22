@@ -1,0 +1,9 @@
+schema_version: 1
+catalog_order: 9
+tool: ops
+summary: Ops commands, packaged presets, and runbook lifecycle docs.
+keywords:
+  - control-plane
+  - orchestration
+  - scheduler
+  - runbooks

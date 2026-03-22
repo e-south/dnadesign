@@ -3,13 +3,21 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-03
 
-Use this index to find maintainer workflows, CI parity commands, and planning records.
+Use this index to find maintainer workflows, checks, and planning records.
 
 ### Start here
 
-1. Read [repository docs index](../README.md) for the full docs map.
-2. Review [PLANS](../../PLANS.md) before changing architecture or execution flow.
-3. Use [architecture decisions index](../architecture/decisions/README.md) for approved decisions.
+1. Review [PLANS](../../PLANS.md) before changing architecture or execution flow.
+2. Use [architecture decisions index](../architecture/decisions/README.md) for approved decisions.
+3. Use [CI and quality checks](#ci-and-quality-checks) before merging maintainer changes.
+
+### Quick checks by change type
+
+| If you changed | Run this first |
+| --- | --- |
+| docs, READMEs, or runbooks | `uv run python -m dnadesign.devtools.docs_checks --repo-root .` |
+| cross-tool imports or ownership boundaries | `uv run python -m dnadesign.devtools.architecture_boundaries --repo-root .` |
+| code in one tool | `uv run pytest -q <tool test path>` and then broaden to the repo-level checks when the slice is stable |
 
 ### Day-to-day tasks
 
@@ -20,6 +28,8 @@ Use this index to find maintainer workflows, CI parity commands, and planning re
 `uv run python -m dnadesign.devtools.docs_checks --repo-root .`
 5. Run boundary checks when changing cross-tool imports:
 `uv run python -m dnadesign.devtools.architecture_boundaries --repo-root .`
+6. Run the repo-local BU SCC skill audit when changing `.agents/skills/sge-hpc-ops/`:
+`bash .agents/skills/sge-hpc-ops/scripts/audit-sge-hpc-ops-skill.sh`
 
 ### CI and quality checks
 

@@ -1,0 +1,16 @@
+schema_version: 1
+catalog_order: 10
+registry_id: ops.control-plane.orchestration
+type: runbook
+plane: control-plane
+owner_boundary: ops
+entry_artifact: workspace-scoped ops runbook YAML plus scheduler and optional notify intent
+exit_artifact: audit JSON, rendered command plan, and optional submit or watcher contract
+summary: Deterministic control-plane runbook contract for DenseGen or Infer batch submit flows with optional Notify chaining.
+execution_kind: executable
+progress_kind: ops-audit-json
+related_tools:
+  - densegen
+  - infer
+  - notify
+relations: []

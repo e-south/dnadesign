@@ -14,15 +14,20 @@ from __future__ import annotations
 import datetime as dt
 from pathlib import Path
 
+import yaml
+
 from dnadesign.devtools.docs_checks import (
     _find_broken_links,
+    _find_cross_tool_doc_metadata_issues,
     _find_densegen_disallowed_term_issues,
     _find_deprecated_docs_entrypoint_issues,
     _find_docs_root_heading_style_issues,
     _find_entrypoint_local_path_literal_issues,
     _find_operational_runbook_path_issues,
+    _find_ops_deprecated_semantics_issues,
     _find_packaged_runbook_variant_issues,
     _find_root_docs_entrypoint_issues,
+    _find_runbook_catalog_issues,
     _find_runbook_demo_snippet_issues,
     _find_shared_utils_path_issues,
     _find_stale_overlay_guard_term_issues,
@@ -31,6 +36,11 @@ from dnadesign.devtools.docs_checks import (
     _find_tool_readme_structure_issues,
     _find_transient_operational_artifact_path_issues,
     main,
+)
+from dnadesign.ops.catalog import (
+    load_runbook_catalog,
+    render_catalog_procedure_section,
+    render_catalog_tool_source_section,
 )
 from dnadesign.ops.runbooks.path_policy import (
     PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
@@ -41,6 +51,132 @@ from dnadesign.ops.runbooks.path_policy import (
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def _write_registry_metadata(
+    doc_path: Path,
+    *,
+    catalog_order: int,
+    registry_id: str,
+    entry_type: str,
+    plane: str,
+    owner_boundary: str,
+    entry_artifact: str,
+    exit_artifact: str,
+    summary: str,
+    execution_kind: str,
+    progress_kind: str,
+    relations: list[dict[str, str]] | None = None,
+) -> None:
+    metadata_path = doc_path.with_name(f"{doc_path.stem}.registry.yaml")
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata_path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 1,
+                "catalog_order": catalog_order,
+                "registry_id": registry_id,
+                "type": entry_type,
+                "plane": plane,
+                "owner_boundary": owner_boundary,
+                "entry_artifact": entry_artifact,
+                "exit_artifact": exit_artifact,
+                "summary": summary,
+                "execution_kind": execution_kind,
+                "progress_kind": progress_kind,
+                "relations": relations or [],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_tool_source_metadata(
+    doc_path: Path,
+    *,
+    catalog_order: int,
+    tool: str,
+    summary: str,
+    keywords: list[str] | None = None,
+) -> None:
+    metadata_path = doc_path.with_name(f"{doc_path.stem}.tool-source.yaml")
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata_path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 1,
+                "catalog_order": catalog_order,
+                "tool": tool,
+                "summary": summary,
+                "keywords": keywords or [],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_runbook_catalog_readme(
+    repo_root: Path,
+    *,
+    procedure_section: str,
+    tool_source_section: str,
+    glossary_rows: list[str],
+) -> None:
+    _write(
+        repo_root / "docs" / "runbooks" / "README.md",
+        "\n".join(
+            [
+                "## Runbook Catalog",
+                "",
+                "### Cross-tool procedures",
+                "",
+                procedure_section,
+                "",
+                "### Tool docs",
+                "",
+                tool_source_section,
+                "",
+                "### Progress views",
+                "",
+                "| Progress kind | Meaning | Check next |",
+                "| --- | --- | --- |",
+                *glossary_rows,
+            ]
+        )
+        + "\n",
+    )
+
+
+def _write_generated_runbook_catalog_readme(repo_root: Path, *, glossary_rows: list[str]) -> None:
+    _write_runbook_catalog_readme(
+        repo_root,
+        procedure_section="_placeholder_",
+        tool_source_section="_placeholder_",
+        glossary_rows=glossary_rows,
+    )
+    catalog = load_runbook_catalog(repo_root=repo_root)
+    _write_runbook_catalog_readme(
+        repo_root,
+        procedure_section=render_catalog_procedure_section(catalog),
+        tool_source_section=render_catalog_tool_source_section(catalog),
+        glossary_rows=glossary_rows,
+    )
+
+
+def _empty_tool_source_section() -> str:
+    return "\n".join(
+        [
+            (
+                "This table is generated from owner-local `*.tool-source.yaml` metadata sidecars. "
+                "Edit those files instead of hand-editing rows here."
+            ),
+            "",
+            "| Tool | Docs entrypoint | What you will find |",
+            "| --- | --- | --- |",
+        ]
+    )
 
 
 def test_main_fails_when_docs_directory_is_missing(tmp_path: Path) -> None:
@@ -500,7 +636,7 @@ def test_main_fails_when_operations_runbook_docs_missing_required_metadata(tmp_p
     today = dt.date.today().isoformat()
     _write(
         tmp_path / "docs" / "operations" / "README.md",
-        "## Ops operations index\n\nMissing metadata.\n",
+        "## Ops orchestration index\n\nMissing metadata.\n",
     )
     _write(
         tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
@@ -575,6 +711,50 @@ def test_find_operational_runbook_path_issues_allows_packaged_presets(tmp_path: 
     assert issues == []
 
 
+def test_find_operational_runbook_path_issues_allows_workspace_runbooks_dir(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "workspace" / "outputs" / "logs" / "ops" / "runbooks" / "densegen_demo.yaml",
+        "\n".join(
+            [
+                "runbook:",
+                "  schema_version: 1",
+                "  id: densegen_demo",
+                "  workflow_id: densegen_batch_submit",
+                "  project: dunlop",
+                "  workspace_root: /tmp/workspace",
+                "  logging:",
+                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/densegen_demo",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_operational_runbook_path_issues(tmp_path)
+
+    assert issues == []
+
+
+def test_find_operational_runbook_path_issues_skips_generated_output_yaml_noise(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "workspace" / "outputs" / "usr_datasets" / "registry.yaml",
+        "\n".join(
+            [
+                "runbook:",
+                "  schema_version: 1",
+                "  id: generated_noise",
+                "  workflow_id: densegen_batch_submit",
+                "  project: dunlop",
+                "  workspace_root: /tmp/workspace",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_operational_runbook_path_issues(tmp_path)
+
+    assert issues == []
+
+
 def test_find_packaged_runbook_variant_issues_flags_duration_suffixed_preset(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "ops" / "runbooks" / "presets" / "densegen_demo_with_notify_6h.yaml",
@@ -583,7 +763,7 @@ def test_find_packaged_runbook_variant_issues_flags_duration_suffixed_preset(tmp
                 "runbook:",
                 "  schema_version: 1",
                 "  id: densegen_demo_with_notify_6h",
-                "  workflow_id: densegen_batch_with_notify_slack",
+                "  workflow_id: densegen_batch_with_notify",
                 "  project: dunlop",
                 "  workspace_root: /tmp/workspace",
                 "  logging:",
@@ -613,7 +793,7 @@ def test_find_packaged_runbook_variant_issues_allows_base_preset_name(tmp_path: 
                 "runbook:",
                 "  schema_version: 1",
                 "  id: densegen_demo_with_notify",
-                "  workflow_id: densegen_batch_with_notify_slack",
+                "  workflow_id: densegen_batch_with_notify",
                 "  project: dunlop",
                 "  workspace_root: /tmp/workspace",
                 "  logging:",
@@ -1656,3 +1836,467 @@ def test_tool_docs_metadata_check_accepts_valid_owner_and_last_verified(tmp_path
     issues = _find_tool_docs_metadata_issues(tmp_path, max_age_days=90)
 
     assert issues == []
+
+
+def test_cross_tool_doc_metadata_check_flags_missing_semantic_fields(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "operations" / "README.md",
+        "\n".join(
+            [
+                "## Ops orchestration index",
+                "",
+                "**Type:** route",
+                "**Owner:** maintainers",
+                f"**Last verified:** {dt.date.today().isoformat()}",
+                "",
+                "Missing plane and artifact metadata.",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_cross_tool_doc_metadata_issues(tmp_path)
+
+    assert any("missing '**Plane:**'" in issue for issue in issues)
+    assert any("missing '**Owner-boundary:**'" in issue for issue in issues)
+    assert any("missing '**Entry artifact:**'" in issue for issue in issues)
+    assert any("missing '**Exit artifact:**'" in issue for issue in issues)
+
+
+def test_cross_tool_doc_metadata_check_flags_missing_registry_fields(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
+        "\n".join(
+            [
+                "## Orchestration runbooks",
+                "",
+                "**Type:** runbook",
+                "**Plane:** control-plane",
+                "**Owner-boundary:** ops",
+                "**Entry artifact:** ops runbook intent",
+                "**Exit artifact:** audit output",
+                "**Owner:** maintainers",
+                f"**Last verified:** {dt.date.today().isoformat()}",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_cross_tool_doc_metadata_issues(tmp_path)
+
+    assert any("missing '**Registry-id:**'" in issue for issue in issues)
+    assert any("missing '**Summary:**'" in issue for issue in issues)
+    assert any("missing '**Execution-kind:**'" in issue for issue in issues)
+    assert any("missing '**Progress-kind:**'" in issue for issue in issues)
+
+
+def test_cross_tool_doc_metadata_check_accepts_expected_contract_values(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "operations" / "README.md",
+        "\n".join(
+            [
+                "## Ops orchestration index",
+                "",
+                "**Type:** route",
+                "**Plane:** control-plane",
+                "**Owner-boundary:** ops",
+                "**Entry artifact:** batch orchestration intent",
+                "**Exit artifact:** authoritative ops contract",
+                "**Owner:** maintainers",
+                f"**Last verified:** {dt.date.today().isoformat()}",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_cross_tool_doc_metadata_issues(tmp_path)
+
+    assert issues == []
+
+
+def test_cross_tool_doc_metadata_check_accepts_registry_fields_for_runbook_docs(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
+        "\n".join(
+            [
+                "## Orchestration runbooks",
+                "",
+                "**Type:** runbook",
+                "**Plane:** control-plane",
+                "**Owner-boundary:** ops",
+                "**Entry artifact:** ops runbook intent",
+                "**Exit artifact:** audit output",
+                "**Registry-id:** ops.control-plane.orchestration",
+                "**Summary:** Deterministic batch orchestration contract.",
+                "**Execution-kind:** executable",
+                "**Progress-kind:** ops-audit-json",
+                "**Owner:** maintainers",
+                f"**Last verified:** {dt.date.today().isoformat()}",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_cross_tool_doc_metadata_issues(tmp_path)
+
+    assert issues == []
+
+
+def test_runbook_catalog_check_flags_missing_registered_doc_entries(tmp_path: Path) -> None:
+    today = dt.date.today().isoformat()
+    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration-runbooks.md"
+    _write(
+        orchestration_doc,
+        "\n".join(
+            [
+                "## Orchestration runbooks",
+                "",
+                "**Type:** runbook",
+                "**Plane:** control-plane",
+                "**Owner-boundary:** ops",
+                "**Entry artifact:** ops runbook intent",
+                "**Exit artifact:** audit output",
+                "**Registry-id:** ops.control-plane.orchestration",
+                "**Summary:** Deterministic batch orchestration contract.",
+                "**Execution-kind:** executable",
+                "**Progress-kind:** ops-audit-json",
+                "**Owner:** maintainers",
+                f"**Last verified:** {today}",
+            ]
+        )
+        + "\n",
+    )
+    _write_registry_metadata(
+        orchestration_doc,
+        catalog_order=1,
+        registry_id="ops.control-plane.orchestration",
+        entry_type="runbook",
+        plane="control-plane",
+        owner_boundary="ops",
+        entry_artifact="ops runbook intent",
+        exit_artifact="audit output",
+        summary="Deterministic batch orchestration contract.",
+        execution_kind="executable",
+        progress_kind="ops-audit-json",
+    )
+    hpc_sync_doc = tmp_path / "src" / "dnadesign" / "usr" / "docs" / "operations" / "hpc-agent-sync-flow.md"
+    _write(
+        hpc_sync_doc,
+        "\n".join(
+            [
+                "## USR HPC Sync Flow",
+                "",
+                "**Type:** runbook",
+                "**Plane:** data-plane",
+                "**Owner-boundary:** usr",
+                "**Entry artifact:** sync intent",
+                "**Exit artifact:** synchronized dataset",
+                "**Registry-id:** usr.data-plane.hpc-sync",
+                "**Summary:** HPC and local sync flow.",
+                "**Execution-kind:** iterative",
+                "**Progress-kind:** usr-sync-audit",
+                "**Owner:** maintainers",
+                f"**Last verified:** {today}",
+            ]
+        )
+        + "\n",
+    )
+    _write_generated_runbook_catalog_readme(
+        tmp_path,
+        glossary_rows=["| `ops-audit-json` | Control-plane audit payload. | Inspect the audit JSON. |"],
+    )
+
+    issues = _find_runbook_catalog_issues(tmp_path)
+
+    assert any("missing registry metadata sidecar" in issue for issue in issues)
+    assert any("src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.registry.yaml" in issue for issue in issues)
+
+
+def test_runbook_catalog_check_flags_metadata_drift_against_owner_local_doc(tmp_path: Path) -> None:
+    today = dt.date.today().isoformat()
+    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration-runbooks.md"
+    _write(
+        orchestration_doc,
+        "\n".join(
+            [
+                "## Orchestration runbooks",
+                "",
+                "**Type:** runbook",
+                "**Plane:** control-plane",
+                "**Owner-boundary:** ops",
+                "**Entry artifact:** ops runbook intent",
+                "**Exit artifact:** audit output",
+                "**Registry-id:** ops.control-plane.orchestration",
+                "**Summary:** Deterministic control-plane runbook contract.",
+                "**Execution-kind:** executable",
+                "**Progress-kind:** ops-audit-json",
+                "**Owner:** maintainers",
+                f"**Last verified:** {today}",
+            ]
+        )
+        + "\n",
+    )
+    _write_registry_metadata(
+        orchestration_doc,
+        catalog_order=1,
+        registry_id="ops.control-plane.orchestration",
+        entry_type="runbook",
+        plane="control-plane",
+        owner_boundary="ops",
+        entry_artifact="ops runbook intent",
+        exit_artifact="audit output",
+        summary="Deterministic batch orchestration contract.",
+        execution_kind="executable",
+        progress_kind="ops-audit-json",
+    )
+    _write_generated_runbook_catalog_readme(
+        tmp_path,
+        glossary_rows=["| `ops-audit-json` | Control-plane audit payload. | Inspect the audit JSON. |"],
+    )
+
+    issues = _find_runbook_catalog_issues(tmp_path)
+
+    assert any(
+        "Summary for docs/operations/orchestration-runbooks.md must match owner-local metadata" in issue
+        for issue in issues
+    )
+
+
+def test_runbook_catalog_check_accepts_matching_owner_local_metadata(tmp_path: Path) -> None:
+    today = dt.date.today().isoformat()
+    summary = "Deterministic control-plane runbook contract."
+    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration-runbooks.md"
+    _write(
+        orchestration_doc,
+        "\n".join(
+            [
+                "## Orchestration runbooks",
+                "",
+                "**Type:** runbook",
+                "**Plane:** control-plane",
+                "**Owner-boundary:** ops",
+                "**Entry artifact:** ops runbook intent",
+                "**Exit artifact:** audit output",
+                "**Registry-id:** ops.control-plane.orchestration",
+                f"**Summary:** {summary}",
+                "**Execution-kind:** executable",
+                "**Progress-kind:** ops-audit-json",
+                "**Owner:** maintainers",
+                f"**Last verified:** {today}",
+            ]
+        )
+        + "\n",
+    )
+    _write_registry_metadata(
+        orchestration_doc,
+        catalog_order=1,
+        registry_id="ops.control-plane.orchestration",
+        entry_type="runbook",
+        plane="control-plane",
+        owner_boundary="ops",
+        entry_artifact="ops runbook intent",
+        exit_artifact="audit output",
+        summary=summary,
+        execution_kind="executable",
+        progress_kind="ops-audit-json",
+    )
+    _write_generated_runbook_catalog_readme(
+        tmp_path,
+        glossary_rows=["| `ops-audit-json` | Control-plane audit payload. | Inspect the audit JSON. |"],
+    )
+
+    issues = _find_runbook_catalog_issues(tmp_path)
+
+    assert issues == []
+
+
+def test_runbook_catalog_check_flags_stale_generated_procedure_section(tmp_path: Path) -> None:
+    today = dt.date.today().isoformat()
+    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration-runbooks.md"
+    _write(
+        orchestration_doc,
+        "\n".join(
+            [
+                "## Orchestration runbooks",
+                "",
+                "**Type:** runbook",
+                "**Plane:** control-plane",
+                "**Owner-boundary:** ops",
+                "**Entry artifact:** ops runbook intent",
+                "**Exit artifact:** audit output",
+                "**Registry-id:** ops.control-plane.orchestration",
+                "**Summary:** Deterministic control-plane runbook contract.",
+                "**Execution-kind:** executable",
+                "**Progress-kind:** ops-audit-json",
+                "**Owner:** maintainers",
+                f"**Last verified:** {today}",
+            ]
+        )
+        + "\n",
+    )
+    _write_registry_metadata(
+        orchestration_doc,
+        catalog_order=1,
+        registry_id="ops.control-plane.orchestration",
+        entry_type="runbook",
+        plane="control-plane",
+        owner_boundary="ops",
+        entry_artifact="ops runbook intent",
+        exit_artifact="audit output",
+        summary="Deterministic control-plane runbook contract.",
+        execution_kind="executable",
+        progress_kind="ops-audit-json",
+    )
+    _write_runbook_catalog_readme(
+        tmp_path,
+        procedure_section="stale manually edited procedure section",
+        tool_source_section=_empty_tool_source_section(),
+        glossary_rows=["| `ops-audit-json` | Control-plane audit payload. | Inspect the audit JSON. |"],
+    )
+
+    issues = _find_runbook_catalog_issues(tmp_path)
+
+    assert any("cross-tool procedures section is stale" in issue for issue in issues)
+
+
+def test_runbook_catalog_check_flags_stale_generated_tool_source_section(tmp_path: Path) -> None:
+    today = dt.date.today().isoformat()
+    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration-runbooks.md"
+    ops_docs = tmp_path / "src" / "dnadesign" / "ops" / "docs" / "README.md"
+    _write(
+        orchestration_doc,
+        "\n".join(
+            [
+                "## Orchestration runbooks",
+                "",
+                "**Type:** runbook",
+                "**Plane:** control-plane",
+                "**Owner-boundary:** ops",
+                "**Entry artifact:** ops runbook intent",
+                "**Exit artifact:** audit output",
+                "**Registry-id:** ops.control-plane.orchestration",
+                "**Summary:** Deterministic control-plane runbook contract.",
+                "**Execution-kind:** executable",
+                "**Progress-kind:** ops-audit-json",
+                "**Owner:** maintainers",
+                f"**Last verified:** {today}",
+            ]
+        )
+        + "\n",
+    )
+    _write(
+        ops_docs,
+        "\n".join(
+            [
+                "## ops docs",
+                "",
+                "**Owner:** maintainers",
+                f"**Last verified:** {today}",
+            ]
+        )
+        + "\n",
+    )
+    _write_registry_metadata(
+        orchestration_doc,
+        catalog_order=1,
+        registry_id="ops.control-plane.orchestration",
+        entry_type="runbook",
+        plane="control-plane",
+        owner_boundary="ops",
+        entry_artifact="ops runbook intent",
+        exit_artifact="audit output",
+        summary="Deterministic control-plane runbook contract.",
+        execution_kind="executable",
+        progress_kind="ops-audit-json",
+    )
+    _write_tool_source_metadata(
+        ops_docs,
+        catalog_order=1,
+        tool="ops",
+        summary="Control-plane docs.",
+        keywords=["control-plane", "runbooks"],
+    )
+    _write_runbook_catalog_readme(
+        tmp_path,
+        procedure_section="_placeholder_",
+        tool_source_section="_placeholder_",
+        glossary_rows=["| `ops-audit-json` | Control-plane audit payload. | Inspect the audit JSON. |"],
+    )
+    _write_runbook_catalog_readme(
+        tmp_path,
+        procedure_section=render_catalog_procedure_section(load_runbook_catalog(repo_root=tmp_path)),
+        tool_source_section="stale manually edited tool-source section",
+        glossary_rows=["| `ops-audit-json` | Control-plane audit payload. | Inspect the audit JSON. |"],
+    )
+
+    issues = _find_runbook_catalog_issues(tmp_path)
+
+    assert any("tool docs section is stale" in issue for issue in issues)
+
+
+def test_runbook_catalog_check_flags_missing_progress_surface_glossary_entry(tmp_path: Path) -> None:
+    today = dt.date.today().isoformat()
+    orchestration_doc = tmp_path / "docs" / "operations" / "orchestration-runbooks.md"
+    _write(
+        orchestration_doc,
+        "\n".join(
+            [
+                "## Orchestration runbooks",
+                "",
+                "**Type:** runbook",
+                "**Plane:** control-plane",
+                "**Owner-boundary:** ops",
+                "**Entry artifact:** ops runbook intent",
+                "**Exit artifact:** audit output",
+                "**Registry-id:** ops.control-plane.orchestration",
+                "**Summary:** Deterministic control-plane runbook contract.",
+                "**Execution-kind:** executable",
+                "**Progress-kind:** ops-audit-json",
+                "**Owner:** maintainers",
+                f"**Last verified:** {today}",
+            ]
+        )
+        + "\n",
+    )
+    _write_registry_metadata(
+        orchestration_doc,
+        catalog_order=1,
+        registry_id="ops.control-plane.orchestration",
+        entry_type="runbook",
+        plane="control-plane",
+        owner_boundary="ops",
+        entry_artifact="ops runbook intent",
+        exit_artifact="audit output",
+        summary="Deterministic control-plane runbook contract.",
+        execution_kind="executable",
+        progress_kind="ops-audit-json",
+    )
+    _write_generated_runbook_catalog_readme(
+        tmp_path,
+        glossary_rows=["| `usr-sync-audit` | Sync drift review. | Inspect the sync audit. |"],
+    )
+
+    issues = _find_runbook_catalog_issues(tmp_path)
+
+    assert any("missing progress surface glossary entry for 'ops-audit-json'" in issue for issue in issues)
+
+
+def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "operations" / "orchestration-runbooks.md",
+        "\n".join(
+            [
+                "## Ops runbook",
+                "",
+                "Use `densegen_batch_with_notify_slack`.",
+                "",
+                "The precedents surface remains available.",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_ops_deprecated_semantics_issues(tmp_path)
+
+    assert any("with_notify_slack" in issue for issue in issues)
+    assert any("precedents" in issue for issue in issues)

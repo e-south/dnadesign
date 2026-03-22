@@ -1,0 +1,15 @@
+schema_version: 1
+catalog_order: 3
+tool: usr
+summary: Tool-owned dataset lifecycle docs, dataset handoffs, sync routes, and promoter feature assembly.
+keywords:
+  - promoter
+  - feature matrix
+  - source of truth
+  - active learning
+  - wildtype
+  - evo2
+routes:
+  - id: promoter-evo2-journey
+    path: operations/promoter-evo2-journey.md
+    summary: Route map for DenseGen/manual anchors, optional Construct contexts, Infer Evo2 bundles, Notify watcher validation, and Cluster or OPAL branches.

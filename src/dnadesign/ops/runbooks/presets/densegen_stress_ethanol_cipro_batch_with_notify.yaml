@@ -1,16 +1,16 @@
 runbook:
   schema_version: 1
   id: study_stress_ethanol_cipro_batch_with_notify
-  workflow_id: densegen_batch_with_notify_slack
+  workflow_id: densegen_batch_with_notify
   project: dunlop
   workspace_root: ../../../densegen/workspaces/study_stress_ethanol_cipro
   logging:
     stdout_dir: ../../../densegen/workspaces/study_stress_ethanol_cipro/outputs/logs/ops/sge/study_stress_ethanol_cipro_batch_with_notify
   densegen:
     config: ../../../densegen/workspaces/study_stress_ethanol_cipro/config.yaml
-    qsub_template: ../../../../../docs/bu-scc/jobs/densegen-cpu.qsub
+    qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub
     post_run:
-      qsub_template: ../../../../../docs/bu-scc/jobs/densegen-analysis.qsub
+      qsub_template: docs/bu-scc/jobs/densegen-analysis.qsub
     run_args:
       fresh: --fresh --no-plot
       resume: --resume --no-plot
@@ -31,10 +31,10 @@ runbook:
     cursor: ../../../densegen/workspaces/study_stress_ethanol_cipro/outputs/notify/densegen/cursor
     spool_dir: ../../../densegen/workspaces/study_stress_ethanol_cipro/outputs/notify/densegen/spool
     webhook_env: NOTIFY_WEBHOOK
-    qsub_template: ../../../../../docs/bu-scc/jobs/notify-watch.qsub
+    qsub_template: docs/bu-scc/jobs/notify-watch.qsub
     smoke: dry
   resources:
-    pe_omp: 16
+    pe_omp: 12
     h_rt: 08:00:00
     mem_per_core: 8G
   mode_policy:

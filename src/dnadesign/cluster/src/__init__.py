@@ -1,13 +1,26 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/__init__.py
 
-Cluster — Parquet/CSV-first clustering with run store & presets.
+Cluster runtime package.
 
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-__all__ = ["cli", "io", "algo", "umap", "analysis", "opal", "runs", "presets", "util"]
+__all__ = [
+    "analysis",
+    "cli",
+    "io",
+    "layout",
+    "methods",
+    "opal",
+    "presets",
+    "runs",
+    "runtime_contracts",
+    "umap",
+    "util",
+    "workspaces",
+]

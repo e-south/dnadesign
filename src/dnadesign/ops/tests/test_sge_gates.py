@@ -224,6 +224,34 @@ def test_main_session_counts_emits_record(monkeypatch: pytest.MonkeyPatch, capsy
     assert "eqw_jobs=0" in captured.out
 
 
+def test_main_session_counts_can_degrade_explicitly_when_qstat_is_missing(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    monkeypatch.setattr(gates, "_load_session_counts", lambda: (_ for _ in ()).throw(RuntimeError("qstat unavailable")))
+
+    exit_code = main(["session-counts", "--allow-missing-qstat"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "queue_probe=degraded" in captured.out
+    assert "running_jobs=unknown" in captured.out
+    assert "queue probe degraded:" in captured.err
+
+
+def test_main_operator_brief_can_degrade_explicitly_when_qstat_is_missing(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    monkeypatch.setattr(gates, "_load_session_counts", lambda: (_ for _ in ()).throw(RuntimeError("qstat unavailable")))
+
+    exit_code = main(["operator-brief", "--planned-submits", "2", "--warn-over-running", "3", "--allow-missing-qstat"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "submit_gate=degraded" in captured.out
+    assert "queue_probe=degraded" in captured.out
+    assert "next_action=queue_probe_unavailable" in captured.out
+
+
 def test_main_ensure_dir_writable_creates_directory_and_emits_record(tmp_path: Path, capsys) -> None:
     target = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "runtime"
     exit_code = main(["ensure-dir-writable", "--path", str(target)])
@@ -584,7 +612,7 @@ def test_main_usr_overlay_guard_infer_tool_is_explicitly_skipped(tmp_path: Path,
         [
             "usr-overlay-guard",
             "--tool",
-            "infer_evo2",
+            "infer",
             "--config",
             str(config_path),
             "--workspace-root",
@@ -605,8 +633,81 @@ def test_main_usr_overlay_guard_infer_tool_is_explicitly_skipped(tmp_path: Path,
     assert exit_code == 0
     payload = json.loads(captured.out)
     assert payload["guard_status"] == "skipped"
-    assert payload["tool"] == "infer_evo2"
+    assert payload["tool"] == "infer"
     assert "does not emit overlay parts" in payload["reason"]
+
+
+def test_main_usr_overlay_guard_infer_tool_skips_ambiguous_multi_job_configs(tmp_path: Path, capsys) -> None:
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    config_path = workspace_root / "configs" / "infer_config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        textwrap.dedent(
+            f"""
+            model:
+              id: evo2_7b
+              device: cpu
+              precision: fp32
+              alphabet: dna
+            jobs:
+              - id: job_a
+                operation: extract
+                ingest:
+                  source: usr
+                  root: "{tmp_path / "usr_a"}"
+                  dataset: dataset_a
+                  field: sequence
+                outputs:
+                  - id: ll_mean
+                    fn: evo2.log_likelihood
+                    format: float
+                io:
+                  write_back: true
+              - id: job_b
+                operation: extract
+                ingest:
+                  source: usr
+                  root: "{tmp_path / "usr_b"}"
+                  dataset: dataset_b
+                  field: sequence
+                outputs:
+                  - id: ll_mean
+                    fn: evo2.log_likelihood
+                    format: float
+                io:
+                  write_back: true
+            """
+        ).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "usr-overlay-guard",
+            "--tool",
+            "infer",
+            "--config",
+            str(config_path),
+            "--workspace-root",
+            str(workspace_root),
+            "--mode",
+            "fresh",
+            "--run-args=--overwrite",
+            "--max-projected-overlay-parts",
+            "1000",
+            "--max-existing-overlay-parts",
+            "1000",
+            "--json",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    assert payload["guard_status"] == "skipped"
+    assert payload["tool"] == "infer"
 
 
 def test_main_usr_records_part_guard_infer_tool_is_explicitly_skipped(tmp_path: Path, capsys) -> None:
@@ -619,7 +720,7 @@ def test_main_usr_records_part_guard_infer_tool_is_explicitly_skipped(tmp_path: 
         [
             "usr-records-part-guard",
             "--tool",
-            "infer_evo2",
+            "infer",
             "--config",
             str(config_path),
             "--workspace-root",
@@ -642,7 +743,7 @@ def test_main_usr_records_part_guard_infer_tool_is_explicitly_skipped(tmp_path: 
     assert exit_code == 0
     payload = json.loads(captured.out)
     assert payload["guard_status"] == "skipped"
-    assert payload["tool"] == "infer_evo2"
+    assert payload["tool"] == "infer"
     assert "does not emit records part files" in payload["reason"]
 
 

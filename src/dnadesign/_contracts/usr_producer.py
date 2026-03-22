@@ -11,18 +11,20 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
 import yaml
 
+from dnadesign.usr_roots import resolve_usr_root_from_config
+
+from .construct_usr_output import resolve_construct_usr_output_contract
 from .densegen_usr_output import load_densegen_config_mapping, resolve_densegen_usr_output_contract
 
 
 @dataclass(frozen=True)
-class InferEvo2USROutputContract:
+class InferUSROutputContract:
     config_path: Path
     usr_root: Path
     usr_dataset: str
@@ -162,14 +164,7 @@ def _load_infer_config_mapping(config_path: Path) -> tuple[Path, dict[str, objec
     return resolved_config_path, raw
 
 
-def _infer_usr_root_from_env() -> Path | None:
-    env = str(os.environ.get("DNADESIGN_USR_ROOT", "")).strip()
-    if not env:
-        return None
-    return Path(env).expanduser().resolve()
-
-
-def resolve_infer_evo2_usr_output_contract(config_path: Path) -> InferEvo2USROutputContract:
+def resolve_infer_usr_output_contract(config_path: Path) -> InferUSROutputContract:
     resolved_config_path, root = _load_infer_config_mapping(config_path)
     jobs = root.get("jobs")
     if not isinstance(jobs, list):
@@ -191,46 +186,60 @@ def resolve_infer_evo2_usr_output_contract(config_path: Path) -> InferEvo2USROut
             continue
         dataset = _normalize_relative_dataset_path(
             ingest.get("dataset"),
-            label="infer_evo2 resolver requires ingest.dataset for source='usr' jobs",
+            label="infer resolver requires ingest.dataset for source='usr' jobs",
         )
         root_value = ingest.get("root")
         if root_value is None:
-            usr_root = _infer_usr_root_from_env()
-            if usr_root is None:
-                raise ValueError("infer_evo2 resolver requires ingest.root or DNADESIGN_USR_ROOT for source='usr' jobs")
+            raise ValueError("infer resolver requires ingest.root for source='usr' write-back jobs")
         else:
-            root_text = str(root_value).strip()
-            if not root_text:
-                raise ValueError("infer_evo2 resolver received empty ingest.root")
-            candidate = Path(root_text).expanduser()
-            if candidate.is_absolute():
-                usr_root = candidate.resolve()
-            else:
-                usr_root = (resolved_config_path.parent / candidate).resolve()
+            usr_root = resolve_usr_root_from_config(
+                root_value,
+                config_path=resolved_config_path,
+                label="infer resolver ingest.root",
+            )
+            if usr_root is None:
+                raise ValueError("infer resolver requires ingest.root for source='usr' write-back jobs")
         destinations.add((usr_root, dataset))
 
     if not destinations:
-        raise ValueError(
-            "infer_evo2 resolver requires at least one job with ingest.source='usr' and io.write_back=true"
-        )
+        raise ValueError("infer resolver requires at least one job with ingest.source='usr' and io.write_back=true")
     if len(destinations) > 1:
         rendered = ", ".join(sorted(f"{root_path}/{dataset}" for root_path, dataset in destinations))
         raise ValueError(
-            f"infer_evo2 resolver found multiple USR destinations in config: {rendered}. "
+            f"infer resolver found multiple USR destinations in config: {rendered}. "
             "Pass --events explicitly to select one stream."
         )
     usr_root, dataset = next(iter(destinations))
-    return InferEvo2USROutputContract(
+    return InferUSROutputContract(
         config_path=resolved_config_path,
         usr_root=usr_root,
         usr_dataset=dataset,
     )
 
 
-def _resolve_infer_evo2_usr_producer_contract(config_path: Path) -> USRProducerContract:
-    destination = resolve_infer_evo2_usr_output_contract(config_path)
+def _resolve_infer_usr_producer_contract(config_path: Path) -> USRProducerContract:
+    destination = resolve_infer_usr_output_contract(config_path)
     return USRProducerContract(
-        tool="infer_evo2",
+        tool="infer",
+        config_path=destination.config_path,
+        run_root=None,
+        usr_root=destination.usr_root,
+        usr_dataset=destination.usr_dataset,
+        supports_overlay_parts=False,
+        supports_records_parts=False,
+        usr_chunk_size=None,
+        records_path=None,
+        parquet_chunk_size=None,
+        round_robin=None,
+        max_accepted_per_library=None,
+        generation_total_quota=None,
+    )
+
+
+def _resolve_construct_usr_producer_contract(config_path: Path) -> USRProducerContract:
+    destination = resolve_construct_usr_output_contract(config_path)
+    return USRProducerContract(
+        tool="construct",
         config_path=destination.config_path,
         run_root=None,
         usr_root=destination.usr_root,
@@ -247,10 +256,9 @@ def _resolve_infer_evo2_usr_producer_contract(config_path: Path) -> USRProducerC
 
 
 _USR_PRODUCER_ADAPTERS: dict[str, Callable[[Path], USRProducerContract]] = {
+    "construct": _resolve_construct_usr_producer_contract,
     "densegen": _resolve_densegen_usr_producer_contract,
-    "infer": _resolve_infer_evo2_usr_producer_contract,
-    "infer-evo2": _resolve_infer_evo2_usr_producer_contract,
-    "infer_evo2": _resolve_infer_evo2_usr_producer_contract,
+    "infer": _resolve_infer_usr_producer_contract,
 }
 
 

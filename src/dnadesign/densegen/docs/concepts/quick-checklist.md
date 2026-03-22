@@ -42,8 +42,8 @@ uv run dense notebook generate -c "$CONFIG"
 - Stage-A pools: `outputs/pools/` and `outputs/pools/pool_manifest.json`
 - Stage-B libraries: `outputs/libraries/`
 - Parquet records: `outputs/tables/records.parquet`
-- USR records: `outputs/usr_datasets/<dataset>/records.parquet`
-- USR event stream: `outputs/usr_datasets/<dataset>/.events.log`
+- USR records: `<output.usr.root>/<dataset>/records.parquet`
+- USR event stream: `<output.usr.root>/<dataset>/.events.log`
 
 ### Output mode rules
 

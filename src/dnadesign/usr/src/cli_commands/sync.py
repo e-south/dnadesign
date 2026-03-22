@@ -180,19 +180,19 @@ def _strict_bootstrap_id_enabled(args) -> bool:
     return bool(getattr(args, "strict_bootstrap_id", False)) or _env_flag_true("USR_SYNC_STRICT_BOOTSTRAP_ID")
 
 
-def _enforce_strict_bootstrap_dataset_id(root: Path, dataset: str, *, use_rich: bool) -> None:
-    if "/" in dataset:
-        return
+def _enforce_strict_bootstrap_dataset_id(root: Path, dataset: str, *, use_rich: bool) -> str:
+    del root, use_rich
+    raw = str(dataset or "").strip()
+    if not raw:
+        raise SystemExit("Strict bootstrap mode requires an explicit canonical dataset id.")
     try:
-        resolved = resolve_dataset_name_interactive(root, dataset, use_rich)
-    except SystemExit:
-        resolved = None
-    if resolved:
-        return
-    raise SystemExit(
-        "Strict bootstrap mode requires a namespace-qualified dataset id (<namespace>/<dataset>) "
-        "for pulls when local dataset is missing."
-    )
+        return normalize_dataset_id(raw)
+    except SequencesError as exc:
+        raise SystemExit(
+            "Strict bootstrap mode requires an explicit canonical dataset id "
+            "(flat or namespace-qualified), not a path or inferred shorthand. "
+            f"{exc}"
+        ) from None
 
 
 def cmd_diff(

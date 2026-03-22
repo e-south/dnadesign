@@ -9,11 +9,12 @@ archived so collaborators can discover what exists without committing the data.
 - Notes: `meta.md`
 - Derived overlays: `_derived/<namespace>.parquet` (namespaced columns only)
 - Generated: `.events.log`, `_snapshots/`
-- Namespaces: `namespace/dataset` (preferred)
-- Legacy (allowed): `dataset/`
+- Dataset ids: flat ids such as `mg1655_promoters` are first-class; `namespace/dataset` remains available when it improves disambiguation
 - Registry: `registry.yaml` at the datasets root (required for overlays)
 
 ## Local Datasets (update as needed)
 - `demo/` — demo dataset for CLI examples
 - `60bp_dual_promoter_cpxR_LexA/` — canonical densegen dataset (do not edit without review)
-- `archived/` — generated or historical datasets (do not hand-edit)
+- `mg1655_promoters/` — curated wildtype promoter source dataset currently used by construct and promoter-study assembly flows
+- `plasmids/` — curated plasmid/template source dataset currently used by construct and promoter-study assembly flows
+- `_archive/` — generated or historical datasets (do not hand-edit)

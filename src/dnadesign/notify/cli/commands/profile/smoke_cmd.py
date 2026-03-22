@@ -25,7 +25,7 @@ def register_profile_smoke_command(
     @profile_app.command("smoke")
     def profile_smoke(
         profile: Path = typer.Option(..., "--profile", help="Path to profile JSON file."),
-        tool: str = typer.Option(..., "--tool", help="Source tool name (for example densegen or infer_evo2)."),
+        tool: str = typer.Option(..., "--tool", help="Source tool name (for example densegen or infer)."),
         config: Path = typer.Option(..., "--config", "-c", help="Tool config path used to resolve events path."),
         cursor: Path = typer.Option(..., "--cursor", help="Cursor file path."),
         spool_dir: Path = typer.Option(..., "--spool-dir", help="Spool directory path."),

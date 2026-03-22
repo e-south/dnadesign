@@ -19,6 +19,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable
 
+from .orchestration_notify import build_orchestration_notify_argv
 from .plan import BatchPlan, CommandSpec
 
 CommandRunner = Callable[[CommandSpec], tuple[int, str, str]]
@@ -125,32 +126,22 @@ def _orchestration_notify_command(*, plan: BatchPlan, status: str, message: str)
     notify = plan.orchestration_notify
     if notify is None:
         raise ValueError("orchestration notify command requested without notify contract")
-    command_parts = [
-        "uv",
-        "run",
-        "notify",
-        "send",
-        "--status",
-        status,
-        "--tool",
-        notify.tool,
-        "--run-id",
-        notify.run_id,
-        "--provider",
-        notify.provider,
-    ]
-    if not notify.secret_ref.strip():
-        raise ValueError("orchestration notify secret_ref is required")
-    command_parts.extend(["--secret-ref", notify.secret_ref])
-    command_parts.extend(
-        [
-            "--tls-ca-bundle",
-            notify.tls_ca_bundle,
-            "--message",
-            message,
-        ]
+    return CommandSpec(
+        argv=build_orchestration_notify_argv(
+            notify=notify,
+            status=status,
+            message=message,
+        )
     )
-    return CommandSpec(argv=tuple(command_parts))
+
+
+def _plan_uses_allow_missing_qstat(plan: BatchPlan) -> bool:
+    for command in plan.preflight_commands:
+        if command.argv is not None and "--allow-missing-qstat" in command.argv:
+            return True
+        if command.shell is not None and "--allow-missing-qstat" in command.shell:
+            return True
+    return False
 
 
 def execute_batch_plan(
@@ -177,6 +168,10 @@ def execute_batch_plan(
     for phase, phase_commands in phase_map:
         if phase == "submit" and plan.submit_behavior == "blocked":
             failed_phase = "submit"
+            ok = False
+            break
+        if phase == "submit" and _plan_uses_allow_missing_qstat(plan):
+            failed_phase = "preflight"
             ok = False
             break
         if phase == "submit" and plan.orchestration_notify is not None:

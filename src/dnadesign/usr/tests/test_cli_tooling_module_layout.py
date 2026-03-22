@@ -14,7 +14,7 @@ from __future__ import annotations
 import importlib
 import inspect
 
-import dnadesign.usr.src.cli as usr_cli
+import dnadesign.usr.src.cli_bindings as cli_bindings
 
 
 def test_usr_cli_tooling_module_importable() -> None:
@@ -27,7 +27,7 @@ def test_usr_cli_tooling_module_importable() -> None:
 
 
 def test_usr_cli_tooling_commands_delegate_to_module() -> None:
-    source = inspect.getsource(usr_cli)
+    source = inspect.getsource(cli_bindings)
     assert "tooling_commands.cmd_repair_densegen(" in source
     assert "tooling_commands.cmd_convert_legacy(" in source
     assert "tooling_commands.cmd_make_mock(" in source

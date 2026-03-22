@@ -132,7 +132,7 @@ densegen:
       deduplicate: true
       chunk_size: 64
     usr:
-      root: outputs/usr_datasets
+      root: ../../../usr/datasets
       dataset: densegen/demo_sampling_baseline
       chunk_size: 64
       health_event_interval_seconds: 60

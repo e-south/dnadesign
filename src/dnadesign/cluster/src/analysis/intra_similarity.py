@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/analysis/intra_similarity.py
 
 Module Author(s): Eric J. South
@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -89,6 +88,7 @@ def intra_cluster_similarity(
 
 
 def plot_intra_similarity(df: pd.DataFrame, cluster_col: str, out_path: Path | None = None):
+    import matplotlib.pyplot as plt
     import seaborn as sns
 
     col = f"{cluster_col}__intra_sim" if not cluster_col.endswith("__intra_sim") else cluster_col

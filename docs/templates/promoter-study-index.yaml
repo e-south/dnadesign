@@ -1,0 +1,9 @@
+# Set `active_study` to `null` until one checked-in study record is ready for
+# current-status checks.
+active_study: <study-id-or-null>
+studies:
+  - study_id: <study-id>
+    path: docs/studies/promoter/<study-id>
+    status: active|planned|archived
+    owner: <owner>
+    summary: <one-line-summary>

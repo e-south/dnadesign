@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/analysis/numeric_per_cluster.py
 
 Module Author(s): Eric J. South
@@ -13,11 +13,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable, Iterable, Optional
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
-from matplotlib import rc_context
 
 
 def _coerce_numeric(
@@ -27,20 +24,23 @@ def _coerce_numeric(
     missing_policy: str = "error",
     log_fn: Optional[Callable[[str], None]] = None,
 ) -> pd.DataFrame:
-    out = df.copy()
+    if missing_policy not in {"error", "drop_and_log"}:
+        raise ValueError("missing_policy must be 'error' or 'drop_and_log'.")
+
+    updates: dict[str, pd.Series] = {}
     for c in cols:
-        if c not in out.columns:
+        if c not in df.columns:
             raise KeyError(f"Numeric column '{c}' not found.")
         try:
-            out[c] = pd.to_numeric(out[c], errors="raise")
+            coerced = pd.to_numeric(df[c], errors="raise")
         except Exception as e:
             # Build an offender preview that includes id and sequence when available
-            coerced = pd.to_numeric(out[c], errors="coerce")
-            bad = coerced.isna() & out[c].notna()
+            coerced = pd.to_numeric(df[c], errors="coerce")
+            bad = coerced.isna() & df[c].notna()
             cols_to_take = ["id", c]
-            if "sequence" in out.columns:
+            if "sequence" in df.columns:
                 cols_to_take.insert(1, "sequence")
-            offenders_df = out.loc[bad, cols_to_take].head(15).copy()
+            offenders_df = df.loc[bad, cols_to_take].head(15).copy()
             offenders_df.insert(0, "row", offenders_df.index.astype(int))
             # Normalize into [{'row':…, 'id':…, 'sequence':…, 'value':…}, …]
             offenders = []
@@ -56,7 +56,7 @@ def _coerce_numeric(
             raise TypeError(
                 f"Column '{c}' is not numeric. Non‑numeric values={int(bad.sum())}. First offenders: {offenders}"
             ) from e
-        arr = out[c].to_numpy(dtype="float64", copy=False)
+        arr = coerced.to_numpy(dtype="float64", copy=False)
         nf = ~np.isfinite(arr)
         if nf.any():
             import numpy as _np
@@ -66,9 +66,9 @@ def _coerce_numeric(
             n_ninf = int(_np.isneginf(arr).sum())
             if missing_policy == "error":
                 cols_to_take = ["id", c]
-                if "sequence" in out.columns:
+                if "sequence" in df.columns:
                     cols_to_take.insert(1, "sequence")
-                offenders_df = out.loc[nf, cols_to_take].head(25).copy()
+                offenders_df = df.loc[nf, cols_to_take].head(25).copy()
                 offenders_df.insert(0, "row", offenders_df.index.astype(int))
                 offenders = []
                 for _, r in offenders_df.iterrows():
@@ -87,17 +87,18 @@ def _coerce_numeric(
                 )
             # missing_policy == "drop_and_log": mark non‑finite as NaN; summaries/plots skip them
             if log_fn is not None:
-                sample_ids = out.loc[nf, "id"].astype(str).head(6).tolist() if "id" in out.columns else []
+                sample_ids = df.loc[nf, "id"].astype(str).head(6).tolist() if "id" in df.columns else []
                 msg = (
-                    f"Metric '{c}': dropping {int(nf.sum())}/{len(out)} row(s) with NaN/Inf "
+                    f"Metric '{c}': dropping {int(nf.sum())}/{len(df)} row(s) with NaN/Inf "
                     f"(NaN={n_nan}, +Inf={n_pinf}, -Inf={n_ninf})" + (f"; e.g., ids={sample_ids}" if sample_ids else "")
                 )
                 try:
                     log_fn(msg)
                 except Exception:
                     pass
-            out.loc[nf, c] = np.nan
-    return out
+            coerced = coerced.mask(nf, np.nan)
+        updates[c] = coerced
+    return df.assign(**updates)
 
 
 def summarize_numeric_by_cluster(
@@ -137,6 +138,10 @@ def summarize_numeric_by_cluster(
     summ.to_csv(out_dir / f"numeric_summary__{cluster_col}.csv", index=False)
 
     if plots:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        from matplotlib import rc_context
+
         # Default aesthetic for analysis: colorblind palette, bigger fonts, despined axes
         sns.set_theme(style="ticks", palette="colorblind")
         with rc_context(

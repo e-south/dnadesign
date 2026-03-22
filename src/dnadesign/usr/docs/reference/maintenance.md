@@ -14,13 +14,17 @@ uv run usr maintenance registry-freeze densegen/demo
 
 # Compact overlay parts for one namespace.
 uv run usr maintenance overlay-compact densegen/demo --namespace densegen
+
+# Remove or archive one derived namespace.
+uv run usr maintenance overlay-remove densegen/demo --namespace densegen --mode archive
 ```
 
 Compaction retention contract:
 
 - Compaction rewrites active parts into one compact overlay file.
 - Previous part snapshots are dropped by default (no lingering compact archives).
-- Explicit `remove_overlay(..., mode=\"archive\")` keeps only the latest archived snapshot.
+- Overlay archive retention is bounded: `overlay-remove --mode archive` keeps only the latest archived snapshot.
+- Reserved system namespaces such as `usr_state` are only mutated through dedicated command groups such as `uv run usr state ...`.
 
 ## De-duplication
 
@@ -52,7 +56,15 @@ Merge controls:
 - `--require-same-columns` or `--union-columns`
 - `--if-duplicate {error|skip|prefer-src|prefer-dest}`
 - `--coerce-overlap {to-dest|none}`
+- `--carry-namespace <namespace>` to explicitly carry one compact, `id`-keyed overlay namespace from `src` onto rows that actually survive the merge
 - `--no-avoid-casefold-dups` to disable default case-fold duplicate avoidance
+- plain `merge` still rewrites canonical `records.parquet` only; it does not implicitly copy source overlay namespaces or `_derived` sidecars
+- `--carry-namespace` is fail-fast and narrow by design:
+  - the source namespace must exist
+  - source and destination overlays must be compact files, not overlay-parts directories
+  - only `id`-keyed overlays are supported
+  - only rows that survive the merge are carried
+- if a needed namespace is not `id`-keyed or still lives in overlay parts, compact or reattach it explicitly before the merge
 
 ## Snapshots and export
 

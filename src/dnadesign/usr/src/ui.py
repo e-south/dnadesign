@@ -131,7 +131,7 @@ def render_table_rich(
         table.add_column(
             col_name,
             justify=align,
-            no_wrap=True,
+            no_wrap=col_name in numeric_cols,
             overflow=overflow,
             min_width=min_width,
             style=col_style,

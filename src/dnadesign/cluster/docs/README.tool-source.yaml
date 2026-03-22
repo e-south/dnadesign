@@ -1,0 +1,13 @@
+schema_version: 1
+catalog_order: 5
+tool: cluster
+summary: Tool-owned exploratory analysis workflow plus CLI, results, and artifact contracts.
+keywords:
+  - promoter
+  - feature matrix
+  - clustering
+  - exploratory
+routes:
+  - id: exploratory-clustering
+    path: workflows/exploratory-clustering.md
+    summary: Cluster-owned exploratory workflow for one chosen feature column or exported matrix, UMAP, and downstream summaries.

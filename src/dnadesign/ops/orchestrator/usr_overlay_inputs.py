@@ -15,8 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dnadesign._contracts import (
+    resolve_construct_usr_output_contract,
     resolve_densegen_usr_output_contract,
-    resolve_infer_evo2_usr_output_contract,
     resolve_usr_producer_contract,
 )
 
@@ -36,18 +36,44 @@ class UsrOverlayGuardInputs:
     supports_records_parts: bool
 
 
+_INFER_SKIP_FRAGMENTS = (
+    "at least one job with ingest.source='usr' and io.write_back=true",
+    "multiple USR destinations",
+    "requires ingest.root for source='usr' write-back jobs",
+)
+
+
+def _skipped_infer_guard_inputs(*, config_path: Path) -> UsrOverlayGuardInputs:
+    resolved = Path(config_path).expanduser().resolve()
+    return UsrOverlayGuardInputs(
+        run_root=None,
+        usr_root=resolved.parent,
+        usr_dataset="",
+        usr_chunk_size=None,
+        records_path=None,
+        parquet_chunk_size=None,
+        round_robin=None,
+        max_accepted_per_library=None,
+        generation_total_quota=None,
+        supports_overlay_parts=False,
+        supports_records_parts=False,
+    )
+
+
 def parse_usr_overlay_guard_inputs(*, tool: str, config_path: Path) -> UsrOverlayGuardInputs:
     tool_name = str(tool or "").strip().lower()
     if tool_name == "densegen":
         # Keep densegen events-source contract explicit and shared with notify.
         resolve_densegen_usr_output_contract(config_path)
-    if tool_name in {"infer", "infer-evo2", "infer_evo2"}:
-        # Keep infer events-source contract explicit and shared with notify.
-        resolve_infer_evo2_usr_output_contract(config_path)
+    if tool_name == "construct":
+        # Keep construct events-source contract explicit and shared with notify.
+        resolve_construct_usr_output_contract(config_path)
     try:
         contract = resolve_usr_producer_contract(tool=tool_name, config_path=config_path)
     except ValueError as exc:
         message = str(exc)
+        if tool_name == "infer" and any(fragment in message for fragment in _INFER_SKIP_FRAGMENTS):
+            return _skipped_infer_guard_inputs(config_path=config_path)
         if message.startswith("unsupported usr producer tool:"):
             supported = message.split("(supported:", maxsplit=1)[-1].rstrip(")")
             raise ValueError(f"unsupported usr-overlay-guard tool: {tool_name} (supported: {supported})") from exc

@@ -14,7 +14,7 @@ from __future__ import annotations
 import importlib
 import inspect
 
-import dnadesign.usr.src.cli as usr_cli
+import dnadesign.usr.src.cli_bindings as cli_bindings
 
 
 def test_usr_cli_materialize_module_importable() -> None:
@@ -24,5 +24,5 @@ def test_usr_cli_materialize_module_importable() -> None:
 
 
 def test_usr_cli_materialize_command_delegates_to_materialize_module() -> None:
-    source = inspect.getsource(usr_cli)
+    source = inspect.getsource(cli_bindings)
     assert "materialize_commands.cmd_materialize(" in source

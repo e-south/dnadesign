@@ -80,7 +80,7 @@ def _write_usr_config(path: Path) -> None:
               bio_type: dna
               alphabet: dna_4
             usr:
-              root: outputs/usr_datasets
+              root: ../usr_root
               dataset: densegen/demo_usr
           generation:
             sequence_length: 10
@@ -225,7 +225,7 @@ def test_report_outputs_section_uses_usr_records_path(tmp_path: Path, monkeypatc
 
     loaded = load_config(cfg_path)
     bundle = collect_report_data(loaded.root, cfg_path, include_combinatorics=False)
-    assert bundle.run_report["outputs_path"] == "outputs/usr_datasets/densegen/demo_usr/records.parquet"
+    assert bundle.run_report["outputs_path"] == "../usr_root/densegen/demo_usr/records.parquet"
     assert bundle.run_report["output_source"] == "usr:densegen/demo_usr"
 
 

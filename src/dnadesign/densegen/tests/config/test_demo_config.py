@@ -151,7 +151,7 @@ def test_demo_sampling_baseline_uses_both_outputs_and_cbc_solver() -> None:
     assert output.parquet is not None
     assert output.parquet.path == "outputs/tables/records.parquet"
     assert output.usr is not None
-    assert output.usr.root == "outputs/usr_datasets"
+    assert output.usr.root == "../../../usr/datasets"
     assert output.usr.dataset == "densegen/demo_sampling_baseline"
     assert solver.backend == "CBC"
     assert solver.threads is None
@@ -545,7 +545,7 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     assert output.targets == ["parquet", "usr"]
     assert output.usr is not None
     assert output.usr.dataset == "densegen/study_stress_ethanol_cipro"
-    assert output.usr.root == "outputs/usr_datasets"
+    assert output.usr.root == "../../../usr/datasets"
     assert float(output.usr.health_event_interval_seconds) > 0
     assert solver.backend == "GUROBI"
     assert solver.strategy == "iterate"
@@ -564,18 +564,23 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     pwm_inputs = [inp for inp in cfg.root.densegen.inputs if inp.type == "pwm_artifact"]
     assert len(pwm_inputs) == 3
     for inp in pwm_inputs:
-        assert inp.sampling.n_sites == 1000
+        assert inp.sampling.n_sites == 500
         assert inp.sampling.mining.batch_size == 5000
         assert inp.sampling.mining.budget.mode == "fixed_candidates"
         assert inp.sampling.mining.budget.candidates == 1_000_000
+        assert inp.sampling.selection.policy == "mmr"
+        assert inp.sampling.selection.pool is not None
+        assert inp.sampling.selection.pool.min_score_norm is None
+        assert inp.sampling.selection.pool.max_candidates == 10_000
 
     background = next(inp for inp in cfg.root.densegen.inputs if inp.type == "background_pool")
-    assert background.sampling.n_sites == 1000
+    assert background.sampling.n_sites == 500
     assert background.sampling.mining.batch_size == 20000
     assert background.sampling.mining.budget.mode == "fixed_candidates"
     assert background.sampling.mining.budget.candidates == 1_000_000
     sampling = cfg.root.densegen.generation.sampling
-    assert sampling.library_size == 10
+    assert sampling.library_size == 25
+    assert cfg.root.densegen.runtime.max_accepted_per_library == 100
     assert cfg.root.densegen.generation.expansion.max_plans == 64
     quotas_by_base = {
         "background_only": [

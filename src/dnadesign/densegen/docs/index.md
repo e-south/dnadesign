@@ -1,7 +1,7 @@
 ## DenseGen docs index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-03-16
 
 
 Use **[docs/README.md](README.md)** as the primary docs entry. This page is a compact by-type index for direct browsing.
@@ -12,6 +12,10 @@ Use **[docs/README.md](README.md)** as the primary docs entry. This page is a co
 - **[Constitutive sigma panel study tutorial](tutorials/study_constitutive_sigma_panel.md)**
 - **[Stress ethanol and ciprofloxacin study tutorial](tutorials/study_stress_ethanol_cipro.md)**
 - **[DenseGen to USR to Notify tutorial](tutorials/demo_usr_notify.md)**
+
+### Cross-tool handoff routes
+- **[Multi-source shared dataset assembly](../../usr/docs/operations/multi-source-shared-dataset-assembly.md)**: merge DenseGen outputs with other USR-backed sources before construct and infer share one downstream dataset.
+- **[Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md)**: continue from DenseGen outputs into infer-derived feature columns before clustering or OPAL.
 
 ### Workspace docs
 - **[Workspaces directory guide](../workspaces/README.md)**

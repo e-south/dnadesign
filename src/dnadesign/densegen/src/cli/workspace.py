@@ -21,8 +21,11 @@ from typing import Callable, Optional
 import typer
 import yaml
 
+from dnadesign.usr_roots import normalize_usr_root, resolve_usr_root_from_config, resolve_usr_root_from_env
+
 from ..config import LATEST_SCHEMA_VERSION, resolve_relative_path
 from .context import CliContext
+from .workspace_sources import list_packaged_workspace_inventory
 
 
 def _repo_root_from(start: Path) -> Path | None:
@@ -58,7 +61,49 @@ def _workspace_source_root() -> Path:
     return Path(__file__).resolve().parents[2] / "workspaces"
 
 
-def _apply_output_mode(output: dict, *, run_id: str, output_mode: str) -> dict:
+def _repo_shared_usr_root(repo_root: Path) -> Path:
+    return (repo_root / "src" / "dnadesign" / "usr" / "datasets").resolve()
+
+
+def _default_shared_usr_root(*, workspace_dir: Path) -> Path:
+    env_root = resolve_usr_root_from_env()
+    if env_root is not None:
+        return env_root
+
+    for anchor in (workspace_dir, Path.cwd(), Path(__file__).resolve()):
+        repo_root = _repo_root_from(anchor)
+        if repo_root is None:
+            continue
+        candidate = _repo_shared_usr_root(repo_root)
+        if candidate.parent.exists():
+            return candidate
+
+    raise ValueError(
+        "Shared USR root is ambiguous outside a dnadesign checkout. Pass --usr-root or set DNADESIGN_USR_ROOT."
+    )
+
+
+def _shared_usr_root_for_workspace(workspace_dir: Path, *, usr_root: Path | None = None) -> str:
+    shared_root = (
+        normalize_usr_root(usr_root.expanduser().resolve())
+        if usr_root is not None
+        else _default_shared_usr_root(workspace_dir=workspace_dir)
+    )
+    try:
+        rel = os.path.relpath(shared_root, workspace_dir)
+        return Path(rel).as_posix()
+    except ValueError:
+        return shared_root.as_posix()
+
+
+def _apply_output_mode(
+    output: dict,
+    *,
+    run_id: str,
+    output_mode: str,
+    workspace_dir: Path,
+    usr_root: Path | None = None,
+) -> dict:
     mode = str(output_mode).strip().lower()
     if mode not in {"local", "usr", "both"}:
         raise ValueError("output_mode must be one of: local, usr, both.")
@@ -76,7 +121,7 @@ def _apply_output_mode(output: dict, *, run_id: str, output_mode: str) -> dict:
         out["parquet"] = parquet_cfg
 
     if mode in {"usr", "both"}:
-        usr_cfg["root"] = "outputs/usr_datasets"
+        usr_cfg["root"] = _shared_usr_root_for_workspace(workspace_dir, usr_root=usr_root)
         usr_cfg["dataset"] = run_id
         usr_cfg.setdefault("chunk_size", 128)
         out["usr"] = usr_cfg
@@ -100,7 +145,13 @@ def _seed_usr_registry(*, run_dir: Path, output: dict, console, display_path: Ca
     root_raw = usr_cfg.get("root")
     if not isinstance(root_raw, str) or not root_raw.strip():
         return
-    usr_root = run_dir / Path(root_raw)
+    usr_root = resolve_usr_root_from_config(
+        root_raw,
+        config_path=run_dir / "config.yaml",
+        label="output.usr.root",
+    )
+    if usr_root is None:
+        return
     registry_path = usr_root / "registry.yaml"
     if registry_path.exists():
         return
@@ -110,13 +161,13 @@ def _seed_usr_registry(*, run_dir: Path, output: dict, console, display_path: Ca
         candidate = repo_root / "src" / "dnadesign" / "usr" / "datasets" / "registry.yaml"
         if candidate.exists() and candidate.is_file():
             seed_path = candidate
-    usr_root.mkdir(parents=True, exist_ok=True)
     if seed_path is None:
         console.print(
             "[yellow]USR output selected but no registry seed file was found.[/] "
-            "Create outputs/usr_datasets/registry.yaml before running `uv run dense run`."
+            "Create the configured USR root `registry.yaml` before running `uv run dense run`."
         )
         return
+    usr_root.mkdir(parents=True, exist_ok=True)
     shutil.copy2(seed_path, registry_path)
     console.print(
         f":bookmark_tabs: [bold green]Seeded USR registry[/]: {display_path(registry_path, run_dir, absolute=False)}"
@@ -164,6 +215,43 @@ def register_workspace_commands(
         console.print(f"workspace_source_root: {payload['workspace_source_root']}")
         console.print("Tip: set DENSEGEN_WORKSPACE_ROOT to choose a custom workspace root directory.")
 
+    @app.command("list", help="List packaged workspaces and workspace-local output state.")
+    def workspace_list(
+        fmt: str = typer.Option(
+            "text",
+            "--format",
+            help="Output format: text, json, or ids.",
+        ),
+    ) -> None:
+        try:
+            inventory = list_packaged_workspace_inventory()
+        except RuntimeError as exc:
+            console.print(f"[bold red]{exc}[/]")
+            raise typer.Exit(code=1) from exc
+        fmt_norm = str(fmt).strip().lower()
+        if fmt_norm == "json":
+            typer.echo(json.dumps(inventory, separators=(",", ":")))
+            return
+        if fmt_norm == "ids":
+            for entry in inventory:
+                typer.echo(str(entry["workspace_id"]))
+            return
+        if fmt_norm != "text":
+            console.print("[bold red]format must be one of: text, json, ids.[/]")
+            raise typer.Exit(code=1)
+        for entry in inventory:
+            typer.echo(
+                "\t".join(
+                    [
+                        str(entry["workspace_id"]),
+                        f"workspace_state={entry['workspace_state']}",
+                        f"output_files={entry['output_files']}",
+                        f"latest_output_mtime={entry['latest_output_mtime'] or '-'}",
+                        f"workspace_dir={entry['workspace_dir']}",
+                    ]
+                )
+            )
+
     @app.command(
         "init",
         help=(
@@ -193,6 +281,14 @@ def register_workspace_commands(
             "local",
             "--output-mode",
             help="Output sink mode: local (parquet), usr, or both.",
+        ),
+        usr_root: Optional[Path] = typer.Option(
+            None,
+            "--usr-root",
+            help=(
+                "Shared USR datasets root for --output-mode usr|both. "
+                "Required outside a dnadesign checkout unless DNADESIGN_USR_ROOT is set."
+            ),
         ),
     ):
         workspace_id_clean = sanitize_filename(workspace_id)
@@ -251,7 +347,13 @@ def register_workspace_commands(
                 console.print("[bold red]Template output block must be a mapping.[/]")
                 raise typer.Exit(code=1)
             try:
-                output = _apply_output_mode(output, run_id=workspace_id_clean, output_mode=output_mode)
+                output = _apply_output_mode(
+                    output,
+                    run_id=workspace_id_clean,
+                    output_mode=output_mode,
+                    workspace_dir=workspace_dir,
+                    usr_root=usr_root,
+                )
             except ValueError as exc:
                 console.print(f"[bold red]{exc}[/]")
                 raise typer.Exit(code=1)

@@ -1,0 +1,22 @@
+model:
+  id: evo2_7b
+  device: cpu
+  precision: bf16
+  alphabet: dna
+  batch_size: 8
+
+jobs:
+  - id: workspace_local_records_extract
+    operation: extract
+    ingest:
+      source: records
+      path: inputs/records.jsonl
+      field: sequence
+    outputs:
+      - id: logits_mean
+        fn: evo2.logits
+        params: { pool: { method: mean, dim: 1 } }
+        format: list
+    io:
+      write_back: false
+      overwrite: false

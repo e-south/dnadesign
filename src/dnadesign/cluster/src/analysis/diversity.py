@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/cluster/src/analysis/diversity.py
 
 Module Author(s): Eric J. South
@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import entropy
@@ -34,6 +33,8 @@ def diversity(df: pd.DataFrame, cluster_col: str, group_by: str, out_dir: Path, 
     out = pd.DataFrame(rows).sort_values("shannon", ascending=False)
     out.to_csv(out_dir / "diversity.csv", index=False)
     if plots:
+        import matplotlib.pyplot as plt
+
         fig, ax = plt.subplots(figsize=(10, 6))
         x = np.arange(len(out))
         bw = 0.35

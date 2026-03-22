@@ -1,37 +1,34 @@
 ## Notify documentation index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-01
+**Last verified:** 2026-03-16
 
-Tool-local docs live here. Cross-tool workflows stay in top-level `docs/`.
+Use this page for Notify command contracts and maintainer docs. If you need to set up, run, or recover a watcher, start with [Notify USR events runbook](../../../../docs/notify/usr-events.md).
 
 ### Ownership boundary
 
 - Tool-local (`src/dnadesign/notify/docs/`): command/reference contracts and maintainer internals.
-- Top-level (`docs/notify/`): operator route map and shared workflow runbook.
+- Shared watcher docs (`docs/notify/` and operations docs such as `src/dnadesign/usr/docs/operations/`): setup, recovery, and cross-tool handoffs.
 
 ### Start here
 
-1. Choose one task under **Documentation by workflow** and run its first command.
-2. Confirm mode/schema rules in [command contracts](reference/command-contracts.md).
-3. Open [maintainer architecture map](dev/architecture.md) only when extending internals.
+1. Read [command contracts](reference/command-contracts.md) for flags, schemas, and failure rules.
+2. Read [maintainer architecture map](dev/architecture.md) when changing package internals.
+3. Use [Notify USR events runbook](../../../../docs/notify/usr-events.md) when the task is watcher setup, watching, or recovery.
 
-### Audience and prerequisites
+### Prerequisites
 
-- Operators: start with [Notify USR events runbook](../../../../docs/notify/usr-events.md).
+- Users: start with [Notify USR events runbook](../../../../docs/notify/usr-events.md).
 - Maintainers: start with [maintainer architecture map](dev/architecture.md).
 - Prerequisites: workspace config, USR `.events.log`, and one webhook source (`--url`, `--url-env`, or `--secret-ref`).
 - Verify next: [watch command contract](reference/command-contracts.md#notify-usr-events-watch).
 
-### Documentation by workflow
+### Package docs by task
 
-#### Start or refresh a workspace watcher
-- [Notify USR events runbook](../../../../docs/notify/usr-events.md): setup, watch, and recovery loop.
+#### Validate watcher config and event source
+- [notify profile doctor contract](reference/command-contracts.md#notify-profile-doctor): profile, webhook, and event-source checks.
 - [notify setup slack contract](reference/command-contracts.md#notify-setup-slack): resolver mode versus explicit events mode.
 - [notify usr-events watch contract](reference/command-contracts.md#notify-usr-events-watch): mode families and fail-fast checks.
-
-#### Validate profile and event routing
-- [notify profile doctor contract](reference/command-contracts.md#notify-profile-doctor): profile, webhook, and event-source checks.
 - [Profile schema contract](reference/command-contracts.md#profile-schema-contract): required fields and version invariants.
 - [Observer boundary](reference/command-contracts.md#observer-boundary): USR `.events.log` as Notify input stream.
 
@@ -42,10 +39,9 @@ Tool-local docs live here. Cross-tool workflows stay in top-level `docs/`.
 #### Send one-off notifications
 - [notify send contract](reference/command-contracts.md#notify-send): required flags, webhook source rules, and dry-run behavior.
 
-#### Run cross-tool or cluster workflows
-- [DenseGen -> USR -> Notify tutorial](../../densegen/docs/tutorials/demo_usr_notify.md): local cross-tool path.
-- [Notify operations route map](../../../../docs/notify/README.md): repository-level operator routing.
-- [BU SCC batch + notify runbook](../../../../docs/bu-scc/batch-notify.md): scheduler-oriented workflow.
+#### Shared watcher and scheduler docs
+- [DenseGen -> USR -> Notify tutorial](../../densegen/docs/tutorials/demo_usr_notify.md): shared tutorial for one local cross-tool path.
+- [BU SCC batch + notify runbook](../../../../docs/bu-scc/batch-notify.md): shared scheduler-oriented workflow.
 
 #### Extend and debug internals
 - [Maintainer architecture map](dev/architecture.md): module boundaries and extension seams.
@@ -56,5 +52,4 @@ Tool-local docs live here. Cross-tool workflows stay in top-level `docs/`.
 - [Operator runbook](../../../../docs/notify/usr-events.md): runnable setup/watch/recover paths.
 - [Reference index](reference/README.md): strict command, schema, and boundary contracts.
 - [Maintainer internals](dev/architecture.md): architecture map for package extension work.
-- [Package entrypoint](../README.md): lightweight tool README for repo-level routing.
-- [Repository docs index](../../../../docs/README.md): cross-tool workflow routes.
+- [Package entrypoint](../README.md): package README with the short tool overview.

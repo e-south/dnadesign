@@ -8,6 +8,9 @@
 
 **Purpose**
 - Run the stress campaign workspace with dual-sink outputs, expanded plans, GUROBI solver defaults, and workspace-local plot/notebook generation.
+- Keep DenseGen accumulation in the shared USR root
+  `src/dnadesign/usr/datasets/` so the study record and downstream tools read
+  the same producer dataset directly.
 
 **σ70 promoter context**
 - This workspace keeps a constitutive σ70 promoter core and uses RNAP -35 and -10 hexamer sets from *Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors* (DOI: 10.1038/s41467-017-02473-5; source: https://www.nature.com/articles/s41467-017-02473-5).
@@ -27,7 +30,7 @@ Use `--mode resume` to continue generation without wiping outputs, or `--mode an
     set -euo pipefail
     # Pin the workspace config path for repeated CLI calls.
     CONFIG="$PWD/config.yaml"
-    # dense run auto-seeds outputs/usr_datasets/registry.yaml when missing.
+    # dense run auto-seeds the configured shared USR root registry when missing.
 
     # Verify FIMO is available before PWM-backed sampling and validation.
     pixi run fimo --version
@@ -72,14 +75,14 @@ Use `--mode resume` to continue generation without wiping outputs, or `--mode an
     '
     # Submit generation-only batch run against this workspace config.
     qsub -P <project> \
-      -pe omp 16 \
+      -pe omp 12 \
       -l h_rt=08:00:00 \
       -l mem_per_core=8G \
       -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --no-plot' \
       docs/bu-scc/jobs/densegen-cpu.qsub
     # Submit an extension pass when additional quota is required.
     qsub -P <project> \
-      -pe omp 16 \
+      -pe omp 12 \
       -l h_rt=08:00:00 \
       -l mem_per_core=8G \
       -v DENSEGEN_CONFIG="$CONFIG",DENSEGEN_RUN_ARGS='--resume --extend-quota 50000 --no-plot' \
@@ -88,7 +91,7 @@ Use `--mode resume` to continue generation without wiping outputs, or `--mode an
 Queue contract:
 - If `running_jobs > 3`, confirm before adding more jobs and prefer arrays or `-hold_jid` chains.
 - Do not skip the queue line with bypass-style flags.
-- Keep `densegen.solver.threads` aligned with `-pe omp` slots (this workspace uses `16`).
+- Keep `densegen.solver.threads` aligned with `-pe omp` slots (this workspace uses `12`).
 
 ### Optional analysis mode (existing outputs)
 

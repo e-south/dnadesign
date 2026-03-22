@@ -90,6 +90,72 @@ def _pretty_df(df: pd.DataFrame, opts: PrettyOpts) -> pd.DataFrame:
     return df.applymap(_fmt_cell)
 
 
+def _reorder_head_columns_for_display(df: pd.DataFrame, *, explicit_columns: list[str] | None) -> pd.DataFrame:
+    if explicit_columns is not None or df.empty:
+        return df
+
+    def _rank(name: str) -> tuple[int, str]:
+        if name == "id":
+            return (0, name)
+        if name == "usr_label__primary":
+            return (1, name)
+        if name.endswith("__primary"):
+            return (2, name)
+        if name.endswith("__label"):
+            return (3, name)
+        if name == "sequence":
+            return (4, name)
+        return (5, name)
+
+    ordered = sorted(df.columns, key=_rank)
+    if ordered == list(df.columns):
+        return df
+    return df.loc[:, ordered]
+
+
+def _select_head_columns_for_rich_display(df: pd.DataFrame, *, explicit_columns: list[str] | None) -> pd.DataFrame:
+    if explicit_columns is not None or df.empty or len(df.columns) <= 6:
+        return df
+
+    def _rank(name: str) -> tuple[int, str]:
+        if name == "id":
+            return (0, name)
+        if name == "usr_label__primary":
+            return (1, name)
+        if name == "usr_label__aliases":
+            return (2, name)
+        if name == "sequence":
+            return (3, name)
+        if name.endswith("__primary"):
+            return (4, name)
+        if name.endswith("__aliases"):
+            return (5, name)
+        if name.endswith("__role"):
+            return (6, name)
+        if name.endswith("__topology"):
+            return (7, name)
+        if name.endswith("__label"):
+            return (8, name)
+        if name == "bio_type":
+            return (9, name)
+        if name == "length":
+            return (10, name)
+        if name == "source":
+            return (11, name)
+        if name == "created_at":
+            return (12, name)
+        return (13, name)
+
+    ordered = sorted(df.columns, key=_rank)
+    keep: list[str] = []
+    for name in ordered:
+        if name not in keep:
+            keep.append(name)
+        if len(keep) >= 6:
+            break
+    return df.loc[:, keep]
+
+
 def _log_implicit_pick_if_dataset(
     pq_path: Path | None,
     reason: str,
@@ -153,10 +219,12 @@ def cmd_head(args, *, deps: ReadViewDeps) -> None:
         pf = pq.ParquetFile(str(pq_path))
         tbl = read_parquet_head(pq_path, int(args.n), columns=cols)
         df = tbl.to_pandas()
+        df = _reorder_head_columns_for_display(df, explicit_columns=cols)
         caption = f"{pq_path}  rows={pf.metadata.num_rows:,}  cols={pf.metadata.num_columns}"
         if getattr(args, "rich", False):
             if not args.raw:
                 df = _pretty_df(df, _pretty_opts_from(args))
+            df = _select_head_columns_for_rich_display(df, explicit_columns=cols)
             render_table_rich(
                 df,
                 title=str(pq_path),
@@ -172,11 +240,13 @@ def cmd_head(args, *, deps: ReadViewDeps) -> None:
     ds_name = deps.resolve_existing_dataset_id(args.root, target)
     d = Dataset(args.root, ds_name)
     df = d.head(args.n, columns=cols, include_deleted=bool(getattr(args, "include_deleted", False)))
+    df = _reorder_head_columns_for_display(df, explicit_columns=cols)
     meta = pq.ParquetFile(str(d.records_path)).metadata
     caption = f"{d.records_path}  rows={meta.num_rows:,}  cols={meta.num_columns}"
     if getattr(args, "rich", False):
         if not args.raw:
             df = _pretty_df(df, _pretty_opts_from(args))
+        df = _select_head_columns_for_rich_display(df, explicit_columns=cols)
         render_table_rich(
             df,
             title=f"dataset: {ds_name}",

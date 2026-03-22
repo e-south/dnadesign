@@ -23,6 +23,7 @@ from typing import Callable, Optional
 
 import typer
 
+from ..config import resolve_usr_root_scoped_path
 from ..core.artifacts.pool import pool_status_by_input
 from ..core.pipeline import resolve_plan, run_pipeline
 from ..core.run_lock import RunLockError, acquire_run_lock
@@ -256,12 +257,7 @@ def _capture_usr_registry_snapshots(*, cfg, cfg_path: Path, run_root: Path, cont
     out_cfg = cfg.output
     if "usr" not in out_cfg.targets or out_cfg.usr is None:
         return snapshots
-    usr_root = context.resolve_outputs_path_or_exit(
-        cfg_path,
-        run_root,
-        Path(out_cfg.usr.root),
-        label="output.usr.root",
-    )
+    usr_root = resolve_usr_root_scoped_path(cfg_path, out_cfg.usr.root, label="output.usr.root")
     registry_path = usr_root / "registry.yaml"
     if registry_path.exists() and registry_path.is_file():
         snapshots[registry_path] = registry_path.read_text()
@@ -286,9 +282,122 @@ def _clear_outputs_preserving_notify(*, outputs_root: Path) -> None:
             child.unlink()
 
 
+def _render_os_error(exc: OSError) -> str:
+    detail = exc.strerror or str(exc)
+    filename = getattr(exc, "filename", None)
+    if filename:
+        return f"{detail} ({filename})"
+    return detail
+
+
+def _is_relative_to(path: Path, base: Path) -> bool:
+    try:
+        path.resolve().relative_to(base.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def _has_meaningful_entries(path: Path) -> bool:
+    if not path.exists():
+        return False
+    if path.is_file():
+        return True
+    for entry in path.iterdir():
+        if entry.name == ".DS_Store":
+            continue
+        return True
+    return False
+
+
+def _resolve_usr_output_state(*, cfg, cfg_path: Path, run_root: Path) -> tuple[Path, str, Path] | None:
+    out_cfg = cfg.output
+    if "usr" not in out_cfg.targets or out_cfg.usr is None:
+        return None
+    usr_root = resolve_usr_root_scoped_path(cfg_path, out_cfg.usr.root, label="output.usr.root")
+    dataset = str(out_cfg.usr.dataset or "").strip()
+    if not dataset:
+        raise RuntimeError("output.usr.dataset must be a non-empty string.")
+    return usr_root, dataset, (usr_root / dataset).resolve()
+
+
+def _shared_usr_dataset_state(*, cfg, cfg_path: Path, run_root: Path) -> tuple[Path, str, Path] | None:
+    resolved = _resolve_usr_output_state(cfg=cfg, cfg_path=cfg_path, run_root=run_root)
+    if resolved is None:
+        return None
+    usr_root, dataset, dataset_dir = resolved
+    if _is_relative_to(usr_root, run_outputs_root(run_root)):
+        return None
+    if not _has_meaningful_entries(dataset_dir):
+        return None
+    return usr_root, dataset, dataset_dir
+
+
+def _shared_usr_root_config(*, cfg, cfg_path: Path, run_root: Path) -> tuple[Path, str, Path] | None:
+    resolved = _resolve_usr_output_state(cfg=cfg, cfg_path=cfg_path, run_root=run_root)
+    if resolved is None:
+        return None
+    usr_root, dataset, dataset_dir = resolved
+    if _is_relative_to(usr_root, run_outputs_root(run_root)):
+        return None
+    return usr_root, dataset, dataset_dir
+
+
+def _print_shared_usr_boundary_next_steps(*, usr_root: Path, dataset: str, console) -> None:
+    console.print("[bold]Next steps[/]:")
+    console.print("  - restore workspace outputs and resume if this dataset belongs to the current run")
+    console.print("  - or change output.usr.dataset/output.usr.root before starting a clean run")
+    console.print(f'  - inspect the attached dataset with `uv run usr --root "{usr_root}" info "{dataset}"`')
+
+
+def _reset_outputs(
+    *,
+    cfg,
+    cfg_path: Path,
+    run_root: Path,
+    outputs_root: Path,
+    context: CliContext,
+    preserve_usr_registry: bool,
+    remove_empty_root: bool,
+) -> list[Path]:
+    registry_snapshots: dict[Path, str] = {}
+    if preserve_usr_registry:
+        registry_snapshots = _capture_usr_registry_snapshots(
+            cfg=cfg,
+            cfg_path=cfg_path,
+            run_root=run_root,
+            context=context,
+        )
+    try:
+        _clear_outputs_preserving_notify(outputs_root=outputs_root)
+    except OSError as exc:
+        raise RuntimeError(f"Failed to clear outputs: {_render_os_error(exc)}") from exc
+    except Exception as exc:
+        raise RuntimeError(f"Failed to clear outputs: {exc}") from exc
+
+    if registry_snapshots:
+        try:
+            _restore_usr_registry_snapshots(snapshots=registry_snapshots)
+        except OSError as exc:
+            raise RuntimeError(f"Failed to restore preserved USR registry: {_render_os_error(exc)}") from exc
+        except Exception as exc:
+            raise RuntimeError(f"Failed to restore preserved USR registry: {exc}") from exc
+
+    if remove_empty_root:
+        try:
+            if outputs_root.exists() and not any(outputs_root.iterdir()):
+                outputs_root.rmdir()
+        except OSError as exc:
+            raise RuntimeError(f"Failed to finalize outputs cleanup: {_render_os_error(exc)}") from exc
+
+    return sorted(registry_snapshots)
+
+
 def _print_usr_registry_next_steps(*, console) -> None:
     console.print("[bold]Next steps[/]:")
-    console.print("  - stage your run via `dense workspace init --output-mode usr|both` to seed registry.yaml")
+    console.print(
+        "  - stage your run via `dense workspace init --output-mode usr|both` to seed the configured USR root"
+    )
     console.print("  - or create `<output.usr.root>/registry.yaml` before running `dense run`")
 
 
@@ -304,12 +413,7 @@ def _ensure_usr_registry_ready(
     out_cfg = cfg.output
     if "usr" not in out_cfg.targets or out_cfg.usr is None:
         return
-    usr_root = context.resolve_outputs_path_or_exit(
-        cfg_path,
-        run_root,
-        Path(out_cfg.usr.root),
-        label="output.usr.root",
-    )
+    usr_root = resolve_usr_root_scoped_path(cfg_path, out_cfg.usr.root, label="output.usr.root")
     registry_path = usr_root / "registry.yaml"
     if registry_path.exists() and registry_path.is_file():
         return
@@ -347,25 +451,34 @@ def _resolve_resume_mode(
     context: CliContext,
     console,
 ) -> bool:
+    shared_usr_state = _shared_usr_dataset_state(cfg=cfg, cfg_path=cfg_path, run_root=run_root)
     if fresh and resume:
         console.print("[bold red]Choose either --fresh or --resume, not both.[/]")
         raise typer.Exit(code=1)
 
     if fresh:
-        registry_snapshots = _capture_usr_registry_snapshots(
-            cfg=cfg,
-            cfg_path=cfg_path,
-            run_root=run_root,
-            context=context,
-        )
+        if shared_usr_state is not None:
+            usr_root, dataset, dataset_dir = shared_usr_state
+            console.print(
+                "[bold red]--fresh only clears workspace outputs, but shared USR dataset state already exists at[/] "
+                f"{context.display_path(dataset_dir, run_root, absolute=False)}"
+            )
+            _print_shared_usr_boundary_next_steps(usr_root=usr_root, dataset=dataset, console=console)
+            raise typer.Exit(code=1)
         if outputs_root.exists():
             try:
-                _clear_outputs_preserving_notify(outputs_root=outputs_root)
-            except Exception as exc:
-                console.print(f"[bold red]Failed to clear outputs:[/] {exc}")
+                _reset_outputs(
+                    cfg=cfg,
+                    cfg_path=cfg_path,
+                    run_root=run_root,
+                    outputs_root=outputs_root,
+                    context=context,
+                    preserve_usr_registry=True,
+                    remove_empty_root=False,
+                )
+            except RuntimeError as exc:
+                console.print(f"[bold red]{exc}[/]")
                 raise typer.Exit(code=1) from exc
-            if registry_snapshots:
-                _restore_usr_registry_snapshots(snapshots=registry_snapshots)
             console.print(
                 ":broom: [bold yellow]Cleared outputs[/]: "
                 f"{context.display_path(outputs_root, run_root, absolute=False)}"
@@ -383,6 +496,16 @@ def _resolve_resume_mode(
             )
             raise typer.Exit(code=1)
         return True
+
+    if shared_usr_state is not None and not existing_outputs:
+        usr_root, dataset, dataset_dir = shared_usr_state
+        console.print(
+            "[bold red]Shared USR dataset state already exists, but this workspace has no "
+            "run outputs to resume from:[/] "
+            f"{context.display_path(dataset_dir, run_root, absolute=False)}"
+        )
+        _print_shared_usr_boundary_next_steps(usr_root=usr_root, dataset=dataset, console=console)
+        raise typer.Exit(code=1)
 
     if existing_outputs:
         console.print(
@@ -883,6 +1006,34 @@ def register_run_commands(
             )
             raise typer.Exit(code=1)
 
+        shared_usr_root = _shared_usr_root_config(
+            cfg=loaded.root.densegen,
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        shared_usr_state = _shared_usr_dataset_state(
+            cfg=loaded.root.densegen,
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        if purge_usr_registry and shared_usr_root is not None:
+            usr_root, dataset, _dataset_dir = shared_usr_root
+            console.print(
+                "[bold red]--purge-usr-registry only applies to workspace-local USR roots under outputs/.[/] "
+                f"The configured USR root is shared: {context.display_path(usr_root, run_root, absolute=False)}"
+            )
+            _print_shared_usr_boundary_next_steps(usr_root=usr_root, dataset=dataset, console=console)
+            raise typer.Exit(code=1)
+        if shared_usr_state is not None:
+            usr_root, dataset, dataset_dir = shared_usr_state
+            console.print(
+                "[bold red]campaign-reset only clears workspace outputs, but shared USR dataset "
+                "state already exists at[/] "
+                f"{context.display_path(dataset_dir, run_root, absolute=False)}"
+            )
+            _print_shared_usr_boundary_next_steps(usr_root=usr_root, dataset=dataset, console=console)
+            raise typer.Exit(code=1)
+
         if not yes:
             prompt = (
                 "Danger zone: this will remove run outputs under "
@@ -892,24 +1043,41 @@ def register_run_commands(
                 console.print("[yellow]Reset aborted.[/]")
                 raise typer.Exit(code=1)
 
-        registry_snapshots: dict[Path, str] = {}
-        if not purge_usr_registry:
-            registry_snapshots = _capture_usr_registry_snapshots(
+        try:
+            preserved_registry_paths = _reset_outputs(
                 cfg=loaded.root.densegen,
                 cfg_path=cfg_path,
                 run_root=run_root,
+                outputs_root=outputs_root,
                 context=context,
+                preserve_usr_registry=not purge_usr_registry,
+                remove_empty_root=True,
             )
+        except RuntimeError as exc:
+            console.print(f"[bold red]{exc}[/]")
+            raise typer.Exit(code=1) from exc
 
-        shutil.rmtree(outputs_root)
-        if registry_snapshots:
-            _restore_usr_registry_snapshots(snapshots=registry_snapshots)
+        purged_registry_path: Path | None = None
+        if purge_usr_registry:
+            usr_cfg = loaded.root.densegen.output.usr
+            if usr_cfg is not None:
+                usr_root = resolve_usr_root_scoped_path(cfg_path, usr_cfg.root, label="output.usr.root")
+                registry_path = usr_root / "registry.yaml"
+                if registry_path.exists():
+                    registry_path.unlink()
+                    purged_registry_path = registry_path
+
         console.print(
             ":broom: [bold green]Removed outputs under[/] "
             f"{context.display_path(outputs_root, run_root, absolute=False)}"
         )
-        if registry_snapshots:
+        if purged_registry_path is not None:
+            console.print(
+                ":bookmark_tabs: [bold green]Removed USR registry[/]: "
+                f"{context.display_path(purged_registry_path, run_root, absolute=False)}"
+            )
+        if preserved_registry_paths:
             preserved = ", ".join(
-                context.display_path(path, run_root, absolute=False) for path in sorted(registry_snapshots)
+                context.display_path(path, run_root, absolute=False) for path in preserved_registry_paths
             )
             console.print(f":bookmark_tabs: [bold green]Preserved USR registry[/]: {preserved}")

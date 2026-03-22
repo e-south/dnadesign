@@ -33,7 +33,7 @@ uv run usr head permuter/run42/records.parquet
 uv run usr cols ./some/dir --glob 'events*.parquet'
 ```
 
-When running inside `src/dnadesign/usr/datasets/<namespace>/<dataset>`, commands default to that dataset.
+When running inside `src/dnadesign/usr/datasets/<dataset-id>`, commands default to that dataset.
 
 ## Next steps
 

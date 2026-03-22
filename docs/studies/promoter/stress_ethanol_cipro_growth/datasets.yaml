@@ -1,0 +1,79 @@
+study_id: stress_ethanol_cipro_growth
+usr_remotes_path: src/dnadesign/usr/remotes.yaml
+datasets:
+  - role: densegen_anchor
+    dataset: densegen/study_stress_ethanol_cipro
+    usr_root: src/dnadesign/usr/datasets
+    root_kind: shared
+    status: present
+    lifecycle: source
+    owner_tool: usr
+    onboard_mode: existing_both
+    authority: shared
+    notes: Shared study copy written directly by DenseGen to the shared USR root and used for downstream status, construct, infer, and cluster handoff.
+    sync:
+      enabled: true
+      remote_name: cluster
+      remote_dataset: densegen/study_stress_ethanol_cipro
+      remote_root_kind: shared
+      default_direction: bidirectional
+      audit_json: docs/studies/promoter/stress_ethanol_cipro_growth/audits/densegen_study_stress_ethanol_cipro--cluster-diff.json
+      strict_bootstrap_id: true
+      remote_path: n/a
+  - role: wildtype_manual
+    dataset: mg1655_promoters
+    usr_root: src/dnadesign/usr/datasets
+    root_kind: shared
+    status: present
+    lifecycle: source
+    owner_tool: usr
+    onboard_mode: existing_local
+    authority: local
+    notes: Curated wildtype promoter source set to carry into the promoter study.
+    sync:
+      enabled: false
+      remote_name: n/a
+      remote_dataset: n/a
+      remote_root_kind: n/a
+      default_direction: none
+      audit_json: n/a
+      strict_bootstrap_id: false
+      remote_path: n/a
+  - role: construct_template_seed
+    dataset: plasmids
+    usr_root: src/dnadesign/usr/datasets
+    root_kind: shared
+    status: present
+    lifecycle: source
+    owner_tool: usr
+    onboard_mode: existing_local
+    authority: local
+    notes: Curated plasmid/template source set for construct-context expansion.
+    sync:
+      enabled: false
+      remote_name: n/a
+      remote_dataset: n/a
+      remote_root_kind: n/a
+      default_direction: none
+      audit_json: n/a
+      strict_bootstrap_id: false
+      remote_path: n/a
+  - role: feature_matrix
+    dataset: promoter/stress_ethanol_cipro_feature_matrix
+    usr_root: src/dnadesign/usr/datasets
+    root_kind: shared
+    status: planned
+    lifecycle: shared_handoff
+    owner_tool: usr
+    onboard_mode: create_new
+    authority: shared
+    notes: Planned shared feature dataset after anchor, wildtype, and optional construct-context assembly.
+    sync:
+      enabled: true
+      remote_name: cluster
+      remote_dataset: promoter/stress_ethanol_cipro_feature_matrix
+      remote_root_kind: shared
+      default_direction: bidirectional
+      audit_json: docs/studies/promoter/stress_ethanol_cipro_growth/audits/promoter_stress_ethanol_cipro_feature_matrix--cluster-diff.json
+      strict_bootstrap_id: true
+      remote_path: n/a

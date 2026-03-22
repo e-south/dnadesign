@@ -124,6 +124,7 @@ def test_densegen_top_level_readme_points_to_docs_entry() -> None:
 
 def test_densegen_workspaces_readme_exists_in_workspaces_dir_and_covers_packaged_workspaces() -> None:
     catalog = _read(WORKSPACES / "README.md")
+    assert "uv run dense workspace list" in catalog
     for workspace_id in WORKSPACE_IDS:
         assert workspace_id in catalog
 

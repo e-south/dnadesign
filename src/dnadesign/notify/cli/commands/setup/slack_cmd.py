@@ -49,7 +49,7 @@ def register_setup_slack_command(
         policy: str | None = typer.Option(
             None,
             "--policy",
-            help="Workflow policy defaults: densegen|infer_evo2|generic.",
+            help="Workflow policy defaults: densegen|infer|generic.",
         ),
         cursor: Path | None = typer.Option(None, "--cursor", help="Cursor file storing byte offset."),
         spool_dir: Path | None = typer.Option(None, "--spool-dir", help="Directory for failed payload spool files."),

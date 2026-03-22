@@ -19,6 +19,8 @@ from typing import TYPE_CHECKING, Any, Dict
 import yaml
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from dnadesign.usr_roots import resolve_usr_root_from_config
+
 if TYPE_CHECKING:
     from .root import RootConfig
 
@@ -105,6 +107,16 @@ def resolve_outputs_scoped_path(cfg_path: Path, run_root: Path, value: str | os.
     outputs_root = run_root / "outputs"
     if not _is_relative_to(resolved, outputs_root):
         raise ConfigError(f"{label} must be within outputs/ under densegen.run.root ({outputs_root}), got: {resolved}")
+    return resolved
+
+
+def resolve_usr_root_scoped_path(cfg_path: Path, value: str | os.PathLike, *, label: str) -> Path:
+    try:
+        resolved = resolve_usr_root_from_config(value, config_path=cfg_path, label=label)
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
+    if resolved is None:
+        raise ConfigError(f"{label} must be a non-empty string")
     return resolved
 
 

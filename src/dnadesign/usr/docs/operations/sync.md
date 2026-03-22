@@ -1,11 +1,16 @@
 ## USR Sync over SSH
 
+**Type:** route
+**Plane:** data-plane
+**Owner-boundary:** usr
+**Entry artifact:** sync intent that still needs a task-specific transfer route
+**Exit artifact:** chosen sync runbook for setup, execution, or troubleshooting
+
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-03-16
 
 
-This page is the sync router for USR dataset and file transfers over SSH.
-Use the split runbooks below to follow progressive disclosure by task.
+Use this page to choose setup, daily sync, or troubleshooting for USR dataset and file transfers over SSH.
 
 ### Read this first
 
@@ -24,16 +29,16 @@ Use the split runbooks below to follow progressive disclosure by task.
 
 ```bash
 # Preview local-vs-remote diff.
-uv run usr diff densegen/my_dataset bu-scc
+uv run usr diff my_dataset bu-scc
 # Pull remote state into local dataset path.
-uv run usr pull densegen/my_dataset bu-scc -y
+uv run usr pull my_dataset bu-scc -y
 # Push local state back to remote when needed.
-uv run usr push densegen/my_dataset bu-scc -y
+uv run usr push my_dataset bu-scc -y
 ```
 
 ### Related runbooks
 
 - [sync-audit-loop.md](sync-audit-loop.md)
 - [hpc-agent-sync-flow.md](hpc-agent-sync-flow.md)
-- [chained-densegen-infer-sync-demo.md](chained-densegen-infer-sync-demo.md)
+- [chained-densegen-infer-sync-runbook.md](chained-densegen-infer-sync-runbook.md)
 - [sync-fidelity-drills.md](sync-fidelity-drills.md)

@@ -17,6 +17,45 @@ import numpy as np
 import pandas as pd
 
 
+def _promoter_constraint_motifs(fixed_elements) -> set[str]:
+    motifs: set[str] = set()
+    if fixed_elements is None:
+        return motifs
+    if hasattr(fixed_elements, "promoter_constraints"):
+        constraints = getattr(fixed_elements, "promoter_constraints") or []
+    else:
+        constraints = (fixed_elements or {}).get("promoter_constraints") or []
+    for constraint in constraints:
+        upstream = None
+        downstream = None
+        if hasattr(constraint, "upstream") or hasattr(constraint, "downstream"):
+            upstream = getattr(constraint, "upstream", None)
+            downstream = getattr(constraint, "downstream", None)
+        elif isinstance(constraint, dict):
+            upstream = constraint.get("upstream")
+            downstream = constraint.get("downstream")
+        for motif in (upstream, downstream):
+            if isinstance(motif, str) and motif.strip():
+                motifs.add(motif.strip().upper())
+    return motifs
+
+
+def _countable_variable_motif_indices(*, library_for_opt, fixed_elements, source_by_index=None) -> list[int]:
+    promoter_motifs = _promoter_constraint_motifs(fixed_elements)
+    indices: list[int] = []
+    for idx, motif in enumerate(list(library_for_opt)):
+        motif_norm = str(motif).strip().upper()
+        source = None
+        if source_by_index is not None and idx < len(source_by_index):
+            raw_source = source_by_index[idx]
+            if raw_source is not None:
+                source = str(raw_source).strip().lower()
+        if motif_norm in promoter_motifs and source in {None, "", "fixed_element", "promoter_constraint"}:
+            continue
+        indices.append(int(idx))
+    return indices
+
+
 def _compute_used_tf_info(
     sol,
     library_for_opt,
@@ -41,24 +80,7 @@ def _compute_used_tf_info(
     stage_a_nearest_selected_distance_by_index=None,
     stage_a_nearest_selected_distance_norm_by_index=None,
 ):
-    promoter_motifs = set()
-    if fixed_elements is not None:
-        if hasattr(fixed_elements, "promoter_constraints"):
-            pcs = getattr(fixed_elements, "promoter_constraints") or []
-        else:
-            pcs = (fixed_elements or {}).get("promoter_constraints") or []
-        for pc in pcs:
-            if hasattr(pc, "upstream") or hasattr(pc, "downstream"):
-                up = getattr(pc, "upstream", None)
-                dn = getattr(pc, "downstream", None)
-                for v in (up, dn):
-                    if isinstance(v, str) and v.strip():
-                        promoter_motifs.add(v.strip().upper())
-            elif isinstance(pc, dict):
-                for k in ("upstream", "downstream"):
-                    v = pc.get(k)
-                    if isinstance(v, str) and v.strip():
-                        promoter_motifs.add(v.strip().upper())
+    promoter_motifs = _promoter_constraint_motifs(fixed_elements)
 
     lib = getattr(sol, "library", [])
     orig_n = len(library_for_opt)

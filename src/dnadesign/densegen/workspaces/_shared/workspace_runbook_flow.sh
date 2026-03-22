@@ -102,7 +102,22 @@ densegen_workspace_runbook_flow() {
   fi
 
   if [[ "$ensure_usr_registry" == "true" ]]; then
-    local usr_registry="$PWD/outputs/usr_datasets/registry.yaml"
+    local usr_root
+    usr_root="$(
+      uv run python -c '
+import sys
+from pathlib import Path
+import yaml
+cfg = yaml.safe_load(Path(sys.argv[1]).read_text()) or {}
+usr = (((cfg.get("densegen") or {}).get("output") or {}).get("usr") or {})
+root = str(usr.get("root") or "").strip()
+if not root:
+    raise SystemExit("missing densegen.output.usr.root")
+workspace_dir = Path(sys.argv[2]).resolve()
+print((workspace_dir / Path(root)).resolve())
+' "$config" "$PWD"
+    )"
+    local usr_registry="$usr_root/registry.yaml"
     local root_registry
     root_registry="$(git rev-parse --show-toplevel)/src/dnadesign/usr/datasets/registry.yaml"
     if [[ ! -f "$root_registry" ]]; then
