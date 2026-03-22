@@ -338,8 +338,42 @@ def list_workspace_inventory(root: str | None = None) -> list[dict[str, object]]
     return [inventory_by_id[key] for key in sorted(inventory_by_id)]
 
 
+def _simple_workspace_id(value: str | Path) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    candidate = Path(text).expanduser()
+    if candidate.is_absolute():
+        return None
+    if text.endswith(_WORKSPACE_REGISTRY_NAME):
+        return None
+    if any(sep in text for sep in ("/", "\\")):
+        return None
+    return text
+
+
+def _resolve_workspace_base_path(workspace: str | Path) -> Path:
+    candidate = Path(workspace).expanduser()
+    if candidate.is_absolute():
+        return candidate.resolve()
+    if candidate.exists():
+        return candidate.resolve()
+
+    workspace_id = _simple_workspace_id(workspace)
+    if workspace_id is not None:
+        workspace_root, _source = workspace_root_with_source()
+        local_workspace = (workspace_root / workspace_id).resolve()
+        if (local_workspace / _WORKSPACE_REGISTRY_NAME).is_file():
+            return local_workspace
+        packaged_workspace = (_construct_root() / "workspaces" / workspace_id).resolve()
+        if (packaged_workspace / _WORKSPACE_REGISTRY_NAME).is_file():
+            return packaged_workspace
+
+    return candidate.resolve()
+
+
 def workspace_registry_path(workspace: str | Path) -> Path:
-    base = Path(workspace).expanduser().resolve()
+    base = _resolve_workspace_base_path(workspace)
     return base if base.name == _WORKSPACE_REGISTRY_NAME else base / _WORKSPACE_REGISTRY_NAME
 
 

@@ -419,6 +419,41 @@ def test_workspace_validate_project_runtime_resolves_registry_project(tmp_path: 
     assert "rows_total: 4" in output
 
 
+def test_workspace_show_resolves_local_workspace_id_from_active_root(monkeypatch, tmp_path: Path) -> None:
+    root = tmp_path / "ws_root"
+    init_result = _RUNNER.invoke(
+        app,
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "promoter-swap-demo"],
+    )
+    assert init_result.exit_code == 0, init_result.stdout
+    monkeypatch.setenv("CONSTRUCT_WORKSPACE_ROOT", root.as_posix())
+
+    result = _RUNNER.invoke(app, ["workspace", "show", "--workspace", "demo_construct"])
+
+    assert result.exit_code == 0, result.stdout
+    output = result.stdout or ""
+    assert f"workspace_registry: {root / 'demo_construct' / 'construct.workspace.yaml'}" in output
+    assert "workspace_id: demo_construct" in output
+
+
+def test_workspace_show_resolves_packaged_workspace_id(monkeypatch, tmp_path: Path) -> None:
+    construct_root = tmp_path / "construct_root"
+    packaged_workspace = construct_root / "workspaces" / "demo_promoter_swap_pdual10"
+    packaged_workspace.mkdir(parents=True, exist_ok=True)
+    (packaged_workspace / "construct.workspace.yaml").write_text(
+        "workspace:\n  id: demo_promoter_swap_pdual10\n  profile: promoter-swap-demo\n  projects: []\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("dnadesign.construct.src.workspace._construct_root", lambda: construct_root)
+
+    result = _RUNNER.invoke(app, ["workspace", "show", "--workspace", "demo_promoter_swap_pdual10"])
+
+    assert result.exit_code == 0, result.stdout
+    output = result.stdout or ""
+    assert f"workspace_registry: {packaged_workspace / 'construct.workspace.yaml'}" in output
+    assert "workspace_id: demo_promoter_swap_pdual10" in output
+
+
 def test_workspace_run_project_dry_run_resolves_registry_project(tmp_path: Path) -> None:
     root = tmp_path / "ws_root"
     init_result = _RUNNER.invoke(

@@ -2976,7 +2976,7 @@ def test_cli_runbook_init_supports_densegen_without_notify(tmp_path: Path) -> No
     assert loaded.notify is None
 
 
-def test_cli_runbook_init_generates_infer_notify_scaffold_with_generic_policy(tmp_path: Path) -> None:
+def test_cli_runbook_init_generates_infer_notify_scaffold_with_infer_policy(tmp_path: Path) -> None:
     runbook_path = tmp_path / "contracts" / "infer-runbook.yaml"
     workspace_root = tmp_path / "workspace_infer"
     runner = CliRunner()
@@ -3002,7 +3002,7 @@ def test_cli_runbook_init_generates_infer_notify_scaffold_with_generic_policy(tm
     assert result.exit_code == 0
     raw_payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
     assert raw_payload["runbook"]["notify"]["tool"] == "infer"
-    assert raw_payload["runbook"]["notify"]["policy"] == "generic"
+    assert raw_payload["runbook"]["notify"]["policy"] == "infer"
     assert "Notify contract required before planning" in result.stderr
     assert "NOTIFY_WEBHOOK_FILE" in result.stderr
     assert str(workspace_root / "outputs" / "notify" / "infer" / "profile.json") in result.stderr

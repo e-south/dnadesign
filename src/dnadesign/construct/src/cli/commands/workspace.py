@@ -161,7 +161,11 @@ def init(
 
 @workspace_app.command("show")
 def show(
-    workspace: str = typer.Option(".", "--workspace", help="Workspace directory or construct.workspace.yaml path."),
+    workspace: str = typer.Option(
+        ".",
+        "--workspace",
+        help="Workspace id, workspace directory, or construct.workspace.yaml path.",
+    ),
 ) -> None:
     try:
         registry, registry_path = load_workspace_registry(workspace)
@@ -190,7 +194,11 @@ def show(
 
 @workspace_app.command("doctor")
 def doctor(
-    workspace: str = typer.Option(".", "--workspace", help="Workspace directory or construct.workspace.yaml path."),
+    workspace: str = typer.Option(
+        ".",
+        "--workspace",
+        help="Workspace id, workspace directory, or construct.workspace.yaml path.",
+    ),
 ) -> None:
     try:
         report = doctor_workspace_registry(workspace)
@@ -211,7 +219,11 @@ def doctor(
 
 @workspace_app.command("validate-project")
 def validate_project(
-    workspace: str = typer.Option(".", "--workspace", help="Workspace directory or construct.workspace.yaml path."),
+    workspace: str = typer.Option(
+        ".",
+        "--workspace",
+        help="Workspace id, workspace directory, or construct.workspace.yaml path.",
+    ),
     project: str = typer.Option(..., "--project", help="Workspace project id from construct.workspace.yaml."),
     runtime: bool = typer.Option(
         False,
@@ -235,7 +247,11 @@ def validate_project(
 
 @workspace_app.command("run-project")
 def run_project(
-    workspace: str = typer.Option(".", "--workspace", help="Workspace directory or construct.workspace.yaml path."),
+    workspace: str = typer.Option(
+        ".",
+        "--workspace",
+        help="Workspace id, workspace directory, or construct.workspace.yaml path.",
+    ),
     project: str = typer.Option(..., "--project", help="Workspace project id from construct.workspace.yaml."),
     dry_run: bool = typer.Option(
         False,

@@ -214,9 +214,10 @@ def _build_init_payload(
     }
     if with_notify:
         notify_tool = resolve_workflow_tool(workflow_id)
+        notify_policy = "infer" if notify_tool == "infer" else "generic"
         payload["runbook"]["notify"] = {
             "tool": notify_tool,
-            "policy": "generic",
+            "policy": notify_policy,
             "profile": str(workspace_contract / "outputs" / "notify" / notify_tool / "profile.json"),
             "cursor": str(workspace_contract / "outputs" / "notify" / notify_tool / "cursor"),
             "spool_dir": str(workspace_contract / "outputs" / "notify" / notify_tool / "spool"),
