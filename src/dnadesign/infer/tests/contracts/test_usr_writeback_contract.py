@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -43,6 +44,7 @@ class _AttachCaptureDataset:
         parse_json: bool = True,
         backend: str = "pyarrow",
         note: str = "",
+        actor: dict[str, object] | None = None,
     ) -> int:
         payload = pq.read_table(path)
         self.calls.append(
@@ -58,6 +60,7 @@ class _AttachCaptureDataset:
                 "parse_json": parse_json,
                 "backend": backend,
                 "note": note,
+                "actor": actor,
             }
         )
         return 1
@@ -98,6 +101,60 @@ def test_write_back_usr_respects_overwrite_flag_true() -> None:
     assert len(ds.calls) == 1
     call = ds.calls[0]
     assert call["allow_overwrite"] is True
+
+
+def test_write_back_usr_tags_attach_with_infer_actor(monkeypatch: pytest.MonkeyPatch) -> None:
+    ds = _AttachCaptureDataset()
+    monkeypatch.setenv("USR_ACTOR_RUN_ID", "infer-run-42")
+
+    write_back_usr(
+        ds,
+        ids=["id-1"],
+        model_id="evo2_7b",
+        job_id="job_a",
+        columnar={"ll_mean": [1.25]},
+        overwrite=False,
+    )
+
+    assert ds.calls[0]["actor"] == {
+        "tool": "infer",
+        "run_id": "infer-run-42",
+        "host": ds.calls[0]["actor"]["host"],
+        "pid": ds.calls[0]["actor"]["pid"],
+    }
+
+
+def test_write_back_usr_records_infer_actor_in_usr_events(tmp_path: Path) -> None:
+    root = tmp_path / "usr_root"
+    register_test_namespace(
+        root,
+        namespace="infer",
+        columns_spec="infer__evo2_7b__job_a__ll_mean:float64",
+        overwrite=True,
+    )
+    ds = Dataset(root, "demo")
+    ds.init(source="unit-test")
+    ds.import_rows(
+        [{"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"}],
+        source="unit",
+    )
+    row_id = ds.head(1, columns=["id"])["id"].tolist()
+
+    write_back_usr(
+        ds,
+        ids=row_id,
+        model_id="evo2_7b",
+        job_id="job_a",
+        columnar={"ll_mean": [1.0]},
+        overwrite=False,
+    )
+
+    events = [json.loads(line) for line in ds.events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    attach_events = [event for event in events if event["action"] == "attach"]
+
+    assert len(attach_events) == 1
+    assert attach_events[0]["actor"]["tool"] == "infer"
+    assert attach_events[0]["actor"]["run_id"] == "infer-job_a"
 
 
 def test_write_back_usr_fails_fast_on_existing_values_when_overwrite_false(tmp_path: Path) -> None:

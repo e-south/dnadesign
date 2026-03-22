@@ -40,6 +40,7 @@ class _AttachCaptureDataset:
         parse_json: bool = True,
         backend: str = "pyarrow",
         note: str = "",
+        actor: dict[str, object] | None = None,
     ) -> int:
         payload = pq.read_table(path)
         self.calls.append(
@@ -53,6 +54,7 @@ class _AttachCaptureDataset:
                 "parse_json": parse_json,
                 "backend": backend,
                 "note": note,
+                "actor": actor,
                 "payload_schema_names": list(payload.schema.names),
             }
         )

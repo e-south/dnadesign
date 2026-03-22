@@ -606,6 +606,7 @@ class Dataset:
         parse_json: bool = True,
         backend: str = "pyarrow",
         note: str = "",
+        actor: Optional[dict] = None,
     ) -> int:
         return attach_dataset(
             dataset=self,
@@ -619,6 +620,7 @@ class Dataset:
             parse_json=parse_json,
             backend=backend,
             note=note,
+            actor=actor,
             namespace_pattern=_NS_RE,
             reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
             write_lock=dataset_write_lock,
@@ -638,6 +640,7 @@ class Dataset:
         parse_json: bool = True,
         backend: str = "pyarrow",
         note: str = "",
+        actor: Optional[dict] = None,
     ) -> int:
         return attach_columns_dataset(
             dataset=self,
@@ -651,6 +654,7 @@ class Dataset:
             parse_json=parse_json,
             backend=backend,
             note=note,
+            actor=actor,
             namespace_pattern=_NS_RE,
             reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
             write_lock=dataset_write_lock,

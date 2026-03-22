@@ -10,6 +10,8 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import os
+import socket
 import tempfile
 from pathlib import Path
 from typing import Dict, List
@@ -25,6 +27,16 @@ from ..errors import WriteBackError
 
 _LOG = get_logger(__name__)
 _OVERLAY_GUARD_FILTER_CHUNK_SIZE = 10_000
+
+
+def _infer_actor(job_id: str) -> dict[str, object]:
+    run_id = str(os.getenv("USR_ACTOR_RUN_ID") or "").strip() or f"infer-{job_id}"
+    return {
+        "tool": "infer",
+        "run_id": run_id,
+        "host": socket.gethostname(),
+        "pid": os.getpid(),
+    }
 
 
 def _existing_infer_overlay_path(ds) -> Path | None:
@@ -139,6 +151,7 @@ def write_back_usr(
         p = Path(tmpd) / "infer_attach.parquet"
         tbl = pa.Table.from_pandas(df, preserve_index=False)
         pq.write_table(tbl, p)
+        actor = _infer_actor(job_id)
         _LOG.info(
             "Attaching to USR: rows=%d cols=%s overwrite=%s",
             len(ids),
@@ -153,4 +166,5 @@ def write_back_usr(
             columns=list(out_cols.keys()),
             allow_overwrite=True,
             note=f"dnadesign.infer job={job_id} model={model_id}",
+            actor=actor,
         )
