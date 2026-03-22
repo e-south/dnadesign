@@ -35,6 +35,10 @@ def _repo_root() -> Path:
     raise RuntimeError("repo root not found")
 
 
+def _column_pairs(columns: list[dict[str, str]]) -> list[tuple[str, str]]:
+    return [(str(column["name"]), str(column["type"])) for column in columns]
+
+
 def test_ensure_construct_registry_writes_required_namespaces(tmp_path: Path) -> None:
     root = tmp_path / "usr_root"
 
@@ -44,27 +48,71 @@ def test_ensure_construct_registry_writes_required_namespaces(tmp_path: Path) ->
     namespaces = payload["namespaces"]
 
     assert set(namespaces) >= {"construct", "construct_seed", "usr_label", "usr_state"}
-    construct_columns = {column["name"]: column["type"] for column in namespaces["construct"]["columns"]}
-    assert construct_columns["construct__parts"].startswith("list<struct<")
-    assert construct_columns["construct__context_id"] == "string"
-    assert construct_columns["construct__context_kind"] == "string"
-    assert construct_columns["construct__anchor_id"] == "string"
-    assert construct_columns["construct__anchor_start"] == "int64"
-    assert construct_columns["construct__anchor_end"] == "int64"
-    assert construct_columns["construct__resolved_length"] == "int64"
+    assert _column_pairs(namespaces["construct"]["columns"]) == _column_pairs(_CONSTRUCT_COLUMNS)
+    assert _column_pairs(namespaces["construct_seed"]["columns"]) == _column_pairs(_CONSTRUCT_SEED_COLUMNS)
+    assert _column_pairs(namespaces["usr_label"]["columns"]) == _column_pairs(_USR_LABEL_COLUMNS)
 
 
 def test_checked_in_shared_usr_registry_matches_construct_contract() -> None:
     payload = yaml.safe_load((_repo_root() / "src/dnadesign/usr/datasets/registry.yaml").read_text(encoding="utf-8"))
     namespaces = payload["namespaces"]
 
-    construct_columns = {column["name"]: column["type"] for column in namespaces["construct"]["columns"]}
-    construct_seed_columns = {column["name"]: column["type"] for column in namespaces["construct_seed"]["columns"]}
-    usr_label_columns = {column["name"]: column["type"] for column in namespaces["usr_label"]["columns"]}
+    assert _column_pairs(namespaces["construct"]["columns"]) == _column_pairs(_CONSTRUCT_COLUMNS)
+    assert _column_pairs(namespaces["construct_seed"]["columns"]) == _column_pairs(_CONSTRUCT_SEED_COLUMNS)
+    assert _column_pairs(namespaces["usr_label"]["columns"]) == _column_pairs(_USR_LABEL_COLUMNS)
 
-    assert construct_columns == {column["name"]: column["type"] for column in _CONSTRUCT_COLUMNS}
-    assert construct_seed_columns == {column["name"]: column["type"] for column in _CONSTRUCT_SEED_COLUMNS}
-    assert usr_label_columns == {column["name"]: column["type"] for column in _USR_LABEL_COLUMNS}
+
+def test_ensure_construct_registry_is_idempotent_for_checked_in_shared_registry(tmp_path: Path) -> None:
+    source = _repo_root() / "src/dnadesign/usr/datasets/registry.yaml"
+    root = tmp_path / "usr_root"
+    root.mkdir(parents=True, exist_ok=True)
+    target = root / "registry.yaml"
+    target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    before = target.read_text(encoding="utf-8")
+
+    _ensure_construct_registry(root)
+
+    assert target.read_text(encoding="utf-8") == before
+
+
+def test_ensure_construct_registry_reorders_stale_construct_columns(tmp_path: Path) -> None:
+    root = tmp_path / "usr_root"
+    stale_names = {
+        "construct__context_id",
+        "construct__context_kind",
+        "construct__anchor_id",
+        "construct__anchor_orientation",
+        "construct__anchor_start",
+        "construct__anchor_end",
+        "construct__resolved_length",
+    }
+    base_columns = [dict(column) for column in _CONSTRUCT_COLUMNS if column["name"] not in stale_names]
+    late_columns = [dict(column) for column in _CONSTRUCT_COLUMNS if column["name"] in stale_names]
+    parts_index = next(index for index, column in enumerate(base_columns) if column["name"] == "construct__parts")
+    stale_columns = base_columns[: parts_index + 1] + late_columns + base_columns[parts_index + 1 :]
+    payload = {
+        "namespaces": {
+            "audit": {
+                "owner": "usr",
+                "description": "audit namespace preserved during construct repair",
+                "columns": [{"name": "audit__score", "type": "float64"}],
+            },
+            "construct": {
+                "owner": "construct",
+                "description": "Construct lineage overlays for realized DNA sequences.",
+                "columns": stale_columns,
+            },
+        }
+    }
+    (root / "registry.yaml").parent.mkdir(parents=True, exist_ok=True)
+    (root / "registry.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    _ensure_construct_registry(root)
+
+    repaired = yaml.safe_load((root / "registry.yaml").read_text(encoding="utf-8"))
+    namespaces = repaired["namespaces"]
+    assert _column_pairs(namespaces["construct"]["columns"]) == _column_pairs(_CONSTRUCT_COLUMNS)
+    assert namespaces["audit"]["columns"] == [{"name": "audit__score", "type": "float64"}]
 
 
 def test_existing_output_ids_returns_ids_for_initialized_dataset(tmp_path: Path) -> None:
