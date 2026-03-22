@@ -21,6 +21,9 @@ from dnadesign.infer.src.config import JobConfig, ModelConfig
 from dnadesign.infer.src.engine import run_extract_job
 from dnadesign.infer.src.errors import CapabilityError
 from dnadesign.infer.src.features.execution import (
+    _LOG_LIKELIHOOD_MEAN,
+    _LOG_LIKELIHOOD_TOTAL,
+    _OUTPUT_LAYER_SEQ_MEAN,
     build_feature_bundle_outputs,
     execute_feature_bundle,
     feature_metadata_output_ids,
@@ -51,6 +54,17 @@ class _FeatureAdapter:
         assert fmt == "tensor"
         self.embedding_layers.append(layer)
         return [torch.arange(len(seq) * 3, dtype=torch.float32).reshape(len(seq), 3) for seq in seqs]
+
+
+def _anchor_only_bundle():
+    bundle = JobConfig(
+        id="anchor_only_bundle",
+        operation="extract",
+        ingest={"source": "sequences"},
+        feature_bundle={"context": {"kind": "anchor_only"}},
+    ).feature_bundle
+    assert bundle is not None
+    return bundle
 
 
 def test_run_extract_job_feature_bundle_anchor_only_executes_expected_outputs(monkeypatch) -> None:
@@ -281,13 +295,7 @@ def test_export_evo2_promoter_opal_matrix_skips_seq_mean_when_disabled() -> None
 
 def test_execute_feature_bundle_recomputes_usr_rows_when_digest_mismatches(monkeypatch) -> None:
     adapter = _FeatureAdapter()
-    bundle = JobConfig(
-        id="digest_guard_bundle",
-        operation="extract",
-        ingest={"source": "sequences"},
-        feature_bundle={"context": {"kind": "anchor_only"}},
-    ).feature_bundle
-    assert bundle is not None
+    bundle = _anchor_only_bundle()
 
     monkeypatch.setattr(
         "dnadesign.infer.src.features.execution.read_usr_column_values",
@@ -329,3 +337,167 @@ def test_execute_feature_bundle_recomputes_usr_rows_when_digest_mismatches(monke
     assert columnar["log_likelihood__mean_per_token"] == [0.4]
     _assert_list_close(columnar["output_layer_mean__seq_mean"][0], [3.0, 4.0])
     _assert_list_close(columnar["intermediate_embedding__block26_mlp_out__seq_mean"][0], [4.5, 5.5, 6.5])
+
+
+def test_execute_feature_bundle_resume_writes_only_missing_feature_columns(monkeypatch) -> None:
+    adapter = _FeatureAdapter()
+    bundle = _anchor_only_bundle()
+    feature_out_ids = [payload["id"] for payload in build_feature_bundle_outputs(bundle=bundle)]
+    existing = {out_id: [None] for out_id in feature_out_ids}
+    existing[_LOG_LIKELIHOOD_TOTAL] = [4.0]
+
+    monkeypatch.setattr(
+        "dnadesign.infer.src.features.execution._apply_digest_resume_guard",
+        lambda **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        "dnadesign.infer.src.features.execution._existing_feature_metadata_values",
+        lambda **_kwargs: {out_id: ["present"] for out_id in feature_metadata_output_ids()},
+    )
+
+    output_calls: dict[str, list[tuple[list[int], list[object], bool | None]]] = {
+        out_id: [] for out_id in feature_out_ids
+    }
+
+    def _writer_for(out_id: str):
+        def _writer(idx_chunk, values, *, overwrite_override=None):
+            output_calls[out_id].append((list(idx_chunk), list(values), overwrite_override))
+
+        return _writer
+
+    columnar, _metadata_rows = execute_feature_bundle(
+        seqs=["ACGT"],
+        source="usr",
+        ids=["row-1"],
+        records=None,
+        ds=SimpleNamespace(records_path="unused"),
+        model_id="evo2_7b",
+        job_id="resume_bundle",
+        bundle=bundle,
+        existing=existing,
+        need_idx=[0],
+        adapter=adapter,
+        micro_batch_size=1,
+        default_batch_size=64,
+        auto_derate=True,
+        is_oom=lambda _exc: False,
+        on_progress=lambda _count: None,
+        on_chunk_by_output={out_id: _writer_for(out_id) for out_id in feature_out_ids},
+        on_chunk_by_metadata={out_id: None for out_id in feature_metadata_output_ids()},
+    )
+
+    assert output_calls[_LOG_LIKELIHOOD_TOTAL] == []
+    assert output_calls[_LOG_LIKELIHOOD_MEAN] == [([0], [0.4], None)]
+    assert output_calls[_OUTPUT_LAYER_SEQ_MEAN][0][2] is None
+    assert output_calls["intermediate_embedding__block26_mlp_out__seq_mean"][0][2] is None
+    assert columnar[_LOG_LIKELIHOOD_TOTAL] == [4.0]
+
+
+def test_execute_feature_bundle_stale_digest_rewrites_features_with_overwrite(monkeypatch) -> None:
+    adapter = _FeatureAdapter()
+    bundle = _anchor_only_bundle()
+    feature_out_ids = [payload["id"] for payload in build_feature_bundle_outputs(bundle=bundle)]
+    existing = {out_id: [[999.0, 999.0]] if out_id.endswith("seq_mean") else [999.0] for out_id in feature_out_ids}
+    existing["intermediate_embedding__block26_mlp_out__seq_mean"] = [[999.0, 999.0, 999.0]]
+
+    def _force_stale(*, feature_values, **_kwargs):
+        for values in feature_values.values():
+            values[0] = None
+        return [0]
+
+    monkeypatch.setattr("dnadesign.infer.src.features.execution._apply_digest_resume_guard", _force_stale)
+    monkeypatch.setattr(
+        "dnadesign.infer.src.features.execution._existing_feature_metadata_values",
+        lambda **_kwargs: {out_id: ["present"] for out_id in feature_metadata_output_ids()},
+    )
+
+    output_calls: dict[str, list[tuple[list[int], list[object], bool | None]]] = {
+        out_id: [] for out_id in feature_out_ids
+    }
+
+    def _writer_for(out_id: str):
+        def _writer(idx_chunk, values, *, overwrite_override=None):
+            output_calls[out_id].append((list(idx_chunk), list(values), overwrite_override))
+
+        return _writer
+
+    execute_feature_bundle(
+        seqs=["ACGT"],
+        source="usr",
+        ids=["row-1"],
+        records=None,
+        ds=SimpleNamespace(records_path="unused"),
+        model_id="evo2_7b",
+        job_id="stale_bundle",
+        bundle=bundle,
+        existing=existing,
+        need_idx=[],
+        adapter=adapter,
+        micro_batch_size=1,
+        default_batch_size=64,
+        auto_derate=True,
+        is_oom=lambda _exc: False,
+        on_progress=lambda _count: None,
+        on_chunk_by_output={out_id: _writer_for(out_id) for out_id in feature_out_ids},
+        on_chunk_by_metadata={out_id: None for out_id in feature_metadata_output_ids()},
+    )
+
+    assert all(len(calls) == 1 for calls in output_calls.values())
+    assert all(calls[0][0] == [0] for calls in output_calls.values())
+    assert all(calls[0][2] is True for calls in output_calls.values())
+
+
+def test_execute_feature_bundle_backfills_missing_metadata_without_recomputing(monkeypatch) -> None:
+    bundle = _anchor_only_bundle()
+    feature_out_ids = [payload["id"] for payload in build_feature_bundle_outputs(bundle=bundle)]
+    existing = {out_id: [[3.0, 4.0]] if out_id.endswith("seq_mean") else [4.0] for out_id in feature_out_ids}
+    existing["intermediate_embedding__block26_mlp_out__seq_mean"] = [[4.5, 5.5, 6.5]]
+
+    metadata_existing = {out_id: ["present"] for out_id in feature_metadata_output_ids()}
+    metadata_existing["metadata__provider_version"] = [None]
+    metadata_calls: dict[str, list[tuple[list[int], list[object], bool | None]]] = {
+        out_id: [] for out_id in feature_metadata_output_ids()
+    }
+    progress: list[int] = []
+
+    monkeypatch.setattr(
+        "dnadesign.infer.src.features.execution._apply_digest_resume_guard",
+        lambda **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        "dnadesign.infer.src.features.execution._existing_feature_metadata_values",
+        lambda **_kwargs: metadata_existing,
+    )
+
+    def _writer_for(out_id: str):
+        def _writer(idx_chunk, values, *, overwrite_override=None):
+            metadata_calls[out_id].append((list(idx_chunk), list(values), overwrite_override))
+
+        return _writer
+
+    adapter = _FeatureAdapter()
+    columnar, _metadata_rows = execute_feature_bundle(
+        seqs=["ACGT"],
+        source="usr",
+        ids=["row-1"],
+        records=None,
+        ds=SimpleNamespace(records_path="unused"),
+        model_id="evo2_7b",
+        job_id="metadata_backfill_bundle",
+        bundle=bundle,
+        existing=existing,
+        need_idx=[],
+        adapter=adapter,
+        micro_batch_size=1,
+        default_batch_size=64,
+        auto_derate=True,
+        is_oom=lambda _exc: False,
+        on_progress=progress.append,
+        on_chunk_by_output={out_id: None for out_id in feature_out_ids},
+        on_chunk_by_metadata={out_id: _writer_for(out_id) for out_id in feature_metadata_output_ids()},
+    )
+
+    assert progress == []
+    assert metadata_calls["metadata__provider_version"] == [([0], [None], None)]
+    assert all(not calls for out_id, calls in metadata_calls.items() if out_id != "metadata__provider_version")
+    assert columnar["metadata__provider_version"] == [None]

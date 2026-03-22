@@ -279,6 +279,54 @@ def _apply_digest_resume_guard(
     return stale_idx
 
 
+def _existing_feature_metadata_values(
+    *,
+    ds,
+    ids: Optional[List[str]],
+    model_id: str,
+    job_id: str,
+) -> Dict[str, List[object]]:
+    if ds is None or ids is None:
+        return {out_id: [] for out_id in feature_metadata_output_ids()}
+    return {
+        out_id: read_usr_column_values(
+            ds=ds,
+            ids=ids,
+            column_name=infer_usr_column_name(model_id=model_id, job_id=job_id, out_id=out_id),
+        )
+        for out_id in feature_metadata_output_ids()
+    }
+
+
+def _missing_rows_by_output(columnar: Mapping[str, List[object]]) -> Dict[str, set[int]]:
+    return {
+        out_id: {row_index for row_index, value in enumerate(values) if value is None}
+        for out_id, values in columnar.items()
+    }
+
+
+def _write_chunk_subset(
+    *,
+    writer: Optional[Callable[..., None]],
+    idx_chunk: List[int],
+    values: List[object],
+    row_indexes: set[int],
+    overwrite_override: bool | None = None,
+) -> None:
+    if writer is None or not row_indexes:
+        return
+    subset_pairs = [
+        (row_index, values[position]) for position, row_index in enumerate(idx_chunk) if row_index in row_indexes
+    ]
+    if not subset_pairs:
+        return
+    writer(
+        [row_index for row_index, _value in subset_pairs],
+        [value for _row_index, value in subset_pairs],
+        overwrite_override=overwrite_override,
+    )
+
+
 def execute_feature_bundle(
     *,
     seqs: List[str],
@@ -297,8 +345,8 @@ def execute_feature_bundle(
     auto_derate: bool,
     is_oom: Callable[[BaseException], bool],
     on_progress: Callable[[int], None],
-    on_chunk_by_output: Mapping[str, Optional[Callable[[List[int], List[object]], None]]],
-    on_chunk_by_metadata: Mapping[str, Optional[Callable[[List[int], List[object]], None]]],
+    on_chunk_by_output: Mapping[str, Optional[Callable[..., None]]],
+    on_chunk_by_metadata: Mapping[str, Optional[Callable[..., None]]],
 ) -> tuple[Dict[str, List[object]], list[dict[str, object]]]:
     contexts = resolve_sequence_contexts(
         seqs=seqs,
@@ -321,8 +369,28 @@ def execute_feature_bundle(
         feature_values=all_vals,
         metadata_columnar=metadata_columnar,
     )
-    if stale_idx:
-        need_idx = sorted(set(list(need_idx) + stale_idx))
+    stale_idx_set = set(stale_idx)
+    feature_resume_idx = set(need_idx) | stale_idx_set
+
+    metadata_existing = _existing_feature_metadata_values(
+        ds=ds if source == "usr" else None,
+        ids=ids,
+        model_id=model_id,
+        job_id=job_id,
+    )
+    metadata_missing_by_output = _missing_rows_by_output(metadata_existing)
+    metadata_missing_idx = set().union(*metadata_missing_by_output.values()) if metadata_missing_by_output else set()
+    metadata_only_idx = metadata_missing_idx - feature_resume_idx
+
+    for out_id, values in metadata_columnar.items():
+        _write_chunk_subset(
+            writer=on_chunk_by_metadata.get(out_id),
+            idx_chunk=sorted(metadata_only_idx),
+            values=[values[row_index] for row_index in sorted(metadata_only_idx)],
+            row_indexes=metadata_missing_by_output[out_id],
+        )
+
+    need_idx = sorted(feature_resume_idx)
     if len(need_idx) == 0:
         return {**all_vals, **metadata_columnar}, metadata_rows
 
@@ -396,13 +464,36 @@ def execute_feature_bundle(
             target = all_vals[out_id]
             for value_index, row_index in enumerate(idx_chunk):
                 target[row_index] = values[value_index]
-            writer = on_chunk_by_output.get(out_id)
-            if writer is not None:
-                writer(idx_chunk, values)
+            missing_rows = {row_index for row_index in idx_chunk if existing[out_id][row_index] is None} - stale_idx_set
+            _write_chunk_subset(
+                writer=on_chunk_by_output.get(out_id),
+                idx_chunk=idx_chunk,
+                values=values,
+                row_indexes=missing_rows,
+            )
+            _write_chunk_subset(
+                writer=on_chunk_by_output.get(out_id),
+                idx_chunk=idx_chunk,
+                values=values,
+                row_indexes=stale_idx_set,
+                overwrite_override=True,
+            )
         for out_id, values in metadata_columnar.items():
-            writer = on_chunk_by_metadata.get(out_id)
-            if writer is not None:
-                writer(idx_chunk, [values[row_index] for row_index in idx_chunk])
+            chunk_metadata = [values[row_index] for row_index in idx_chunk]
+            missing_rows = metadata_missing_by_output[out_id] - stale_idx_set
+            _write_chunk_subset(
+                writer=on_chunk_by_metadata.get(out_id),
+                idx_chunk=idx_chunk,
+                values=chunk_metadata,
+                row_indexes=missing_rows,
+            )
+            _write_chunk_subset(
+                writer=on_chunk_by_metadata.get(out_id),
+                idx_chunk=idx_chunk,
+                values=chunk_metadata,
+                row_indexes=stale_idx_set,
+                overwrite_override=True,
+            )
         on_progress(len(idx_chunk))
         start += take
 

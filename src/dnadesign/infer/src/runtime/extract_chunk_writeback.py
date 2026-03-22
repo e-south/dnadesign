@@ -28,13 +28,18 @@ def build_extract_chunk_write_back(
     out_id: str,
     overwrite: bool,
     writer: Callable[..., None] = write_back_usr,
-) -> Optional[Callable[[List[int], List[object]], None]]:
+) -> Optional[Callable[..., None]]:
     if source != "usr" or not write_back:
         return None
     if ids is None or ds is None:
         raise WriteBackError("USR chunk write-back requires ids and dataset handle")
 
-    def _write_back_chunk(idx_chunk: List[int], vals: List[object]) -> None:
+    def _write_back_chunk(
+        idx_chunk: List[int],
+        vals: List[object],
+        *,
+        overwrite_override: bool | None = None,
+    ) -> None:
         chunk_ids = [ids[row_index] for row_index in idx_chunk]
         writer(
             ds,
@@ -42,7 +47,7 @@ def build_extract_chunk_write_back(
             model_id=model_id,
             job_id=job_id,
             columnar={out_id: vals},
-            overwrite=overwrite,
+            overwrite=overwrite if overwrite_override is None else bool(overwrite_override),
         )
 
     return _write_back_chunk
