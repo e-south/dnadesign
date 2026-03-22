@@ -29,6 +29,8 @@ All dataset mutations require a registry at the datasets root (`registry.yaml`).
 - Register every namespace before attach/materialize.
 - Reserved `usr_state` namespace must exist and is only mutated through the dedicated `uv run usr state ...` surface.
 - First successful registration creates `registry.yaml` and includes `usr_state`.
+- For repo-owned shared roots such as `src/dnadesign/usr/datasets`, `registry.yaml` is a tracked cross-tool contract for sibling tools that write or validate namespaced overlays.
+- Keep shared-root registry changes committed and synced across clones before relying on `usr validate --strict`, `usr diff`, `usr pull`, or `usr push`.
 
 Register namespace:
 
