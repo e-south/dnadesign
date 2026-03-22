@@ -175,9 +175,9 @@ class Dataset:
     def maintenance(self, reason: Optional[str] = None, *, actor: Optional[dict] = None):
         return maintenance_context(reason=reason, actor=actor)
 
-    def init(self, source: str = "", notes: str = "") -> None:
+    def init(self, source: str = "", notes: str = "", actor: Optional[dict] = None) -> None:
         """Create a new, empty dataset directory with canonical schema."""
-        init_dataset(self, source=source, notes=notes, write_lock=dataset_write_lock)
+        init_dataset(self, source=source, notes=notes, actor=actor, write_lock=dataset_write_lock)
 
     def write_session(self) -> DatasetWriteSession:
         """Return an explicit single-lock producer write session."""
@@ -664,6 +664,7 @@ class Dataset:
         key: str = "id",
         overwrite: bool = False,
         allow_missing: bool = False,
+        actor: Optional[dict] = None,
     ) -> int:
         return write_overlay_dataset(
             dataset=self,
@@ -672,6 +673,7 @@ class Dataset:
             key=key,
             overwrite=overwrite,
             allow_missing=allow_missing,
+            actor=actor,
             namespace_pattern=_NS_RE,
             reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
             write_lock=dataset_write_lock,

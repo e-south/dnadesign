@@ -40,6 +40,7 @@ def init_dataset(
     *,
     source: str = "",
     notes: str = "",
+    actor: Optional[dict] = None,
     write_lock=dataset_write_lock,
     if_missing: bool = False,
 ) -> bool:
@@ -71,6 +72,7 @@ def init_dataset(
         dataset._record_event(  # noqa: SLF001
             "init",
             args={"source": source},
+            actor=actor,
         )
         return True
 
@@ -107,16 +109,17 @@ class DatasetWriteSession(AbstractContextManager["DatasetWriteSession"]):
         if self._lock_cm is None:
             raise RuntimeError("DatasetWriteSession must be used inside a 'with' block.")
 
-    def init(self, source: str = "", notes: str = "") -> None:
+    def init(self, source: str = "", notes: str = "", actor: Optional[dict] = None) -> None:
         self._require_active()
-        init_dataset(self._dataset, source=source, notes=notes, write_lock=_held_write_lock)
+        init_dataset(self._dataset, source=source, notes=notes, actor=actor, write_lock=_held_write_lock)
 
-    def init_if_missing(self, source: str = "", notes: str = "") -> bool:
+    def init_if_missing(self, source: str = "", notes: str = "", actor: Optional[dict] = None) -> bool:
         self._require_active()
         return init_dataset(
             self._dataset,
             source=source,
             notes=notes,
+            actor=actor,
             write_lock=_held_write_lock,
             if_missing=True,
         )
@@ -178,6 +181,7 @@ class DatasetWriteSession(AbstractContextManager["DatasetWriteSession"]):
         overwrite: bool = False,
         allow_missing: bool = False,
         note: str = "",
+        actor: Optional[dict] = None,
     ) -> int:
         self._require_active()
         namespace_pattern, reserved_namespaces = _namespace_policy()
@@ -189,6 +193,7 @@ class DatasetWriteSession(AbstractContextManager["DatasetWriteSession"]):
             overwrite=overwrite,
             allow_missing=allow_missing,
             note=note,
+            actor=actor,
             namespace_pattern=namespace_pattern,
             reserved_namespaces=reserved_namespaces,
             write_lock=_held_write_lock,

@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pyarrow as pa
@@ -118,6 +119,63 @@ job:
     assert frame.iloc[0]["construct__window_semantics"] == "fixed_total"
     assert [part["name"] for part in frame.iloc[0]["construct__parts"]] == ["tag", "anchor"]
     assert frame.iloc[0]["construct__template_kind"] == "literal"
+
+
+def test_run_construct_tags_usr_events_with_construct_actor(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["ACGT"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: actor_demo
+  input:
+    source: usr
+    dataset: anchors_demo
+    root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    sequence: AAAATTTTCCCCGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        start: 8
+        end: 12
+        orientation: forward
+        expected_template_sequence: CCCC
+  realize:
+    mode: full_construct
+  output:
+    dataset: anchors_constructed
+    root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    run_from_config(config_path)
+
+    output_ds = Dataset(usr_root, "anchors_constructed")
+    events = [
+        json.loads(line) for line in output_ds.events_path.read_text(encoding="utf-8").splitlines() if line.strip()
+    ]
+    relevant_events = [event for event in events if event["action"] in {"init", "import_rows", "attach"}]
+
+    assert [event["action"] for event in relevant_events] == ["init", "import_rows", "attach"]
+    assert all(event["actor"]["tool"] == "construct" for event in relevant_events)
+    assert all(event["actor"]["run_id"] == "construct-actor_demo" for event in relevant_events)
 
 
 def test_run_construct_supports_circular_window_wrap(tmp_path: Path) -> None:

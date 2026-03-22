@@ -66,5 +66,5 @@ def register_builtin_tool_events_sources(register: ToolEventsSourceRegister) -> 
         tool="infer",
         resolver=_resolve_infer_events_from_config,
         default_policy="infer",
-        aliases=("infer_evo2",),
+        aliases=("infer_evo2", "infer-evo2"),
     )

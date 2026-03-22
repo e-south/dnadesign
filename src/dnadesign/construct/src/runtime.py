@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import socket
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -1020,9 +1022,24 @@ def _records_to_write(planned: _PlannedRun) -> List[_BuiltRecord]:
     ]
 
 
+def _construct_actor(job_id: str) -> dict[str, object]:
+    run_id = str(os.getenv("USR_ACTOR_RUN_ID") or "").strip() or f"construct-{job_id}"
+    return {
+        "tool": "construct",
+        "run_id": run_id,
+        "host": socket.gethostname(),
+        "pid": os.getpid(),
+    }
+
+
 def _write_output_records(output_ds: Dataset, *, cfg: JobConfig, records: List[_BuiltRecord]) -> None:
+    actor = _construct_actor(cfg.job.id)
     with output_ds.write_session() as session:
-        session.init_if_missing(source="construct", notes=f"Initialized by construct job {cfg.job.id}.")
+        session.init_if_missing(
+            source="construct",
+            notes=f"Initialized by construct job {cfg.job.id}.",
+            actor=actor,
+        )
         if not records:
             return
         source = cfg.job.output.source or f"construct run {cfg.job.id}"
@@ -1038,6 +1055,7 @@ def _write_output_records(output_ds: Dataset, *, cfg: JobConfig, records: List[_
             ],
             default_bio_type="dna",
             source=source,
+            actor=actor,
         )
         session.write_overlay(
             "construct",
@@ -1045,6 +1063,7 @@ def _write_output_records(output_ds: Dataset, *, cfg: JobConfig, records: List[_
             key="id",
             overwrite=True,
             note="dnadesign.construct lineage attach",
+            actor=actor,
         )
         label_rows = [
             {
@@ -1061,6 +1080,7 @@ def _write_output_records(output_ds: Dataset, *, cfg: JobConfig, records: List[_
                 _usr_label_table(label_rows),
                 overwrite=True,
                 note="dnadesign.construct upstream label carry-through",
+                actor=actor,
             )
 
 

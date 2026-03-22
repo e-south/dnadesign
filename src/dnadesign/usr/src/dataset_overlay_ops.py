@@ -90,6 +90,7 @@ def _attach_frame_dataset(
     allow_missing: bool = False,
     parse_json: bool = True,
     note: str = "",
+    actor: Optional[dict] = None,
     reserved_namespaces: set[str],
     write_lock=dataset_write_lock,
 ) -> int:
@@ -294,6 +295,7 @@ def _attach_frame_dataset(
                 "note": note,
             },
             target_path=out_path,
+            actor=actor,
         )
         return rows_matched
 
@@ -756,6 +758,7 @@ def write_overlay_dataset(
     overwrite: bool = False,
     allow_missing: bool = False,
     note: str = "",
+    actor: Optional[dict] = None,
     namespace_pattern: Any,
     reserved_namespaces: set[str],
     write_lock=dataset_write_lock,
@@ -792,6 +795,7 @@ def write_overlay_dataset(
         allow_missing=allow_missing,
         parse_json=False,
         note=note,
+        actor=actor,
         reserved_namespaces=reserved_namespaces,
         write_lock=write_lock,
     )

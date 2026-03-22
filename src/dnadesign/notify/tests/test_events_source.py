@@ -286,7 +286,8 @@ def test_resolve_tool_events_path_construct_requires_explicit_usr_root(tmp_path:
         resolve_tool_events_path(tool="construct", config=config)
 
 
-def test_resolve_tool_events_path_accepts_legacy_infer_alias(tmp_path: Path) -> None:
+@pytest.mark.parametrize("tool_alias", ["infer_evo2", "infer-evo2"])
+def test_resolve_tool_events_path_accepts_legacy_infer_alias(tool_alias: str, tmp_path: Path) -> None:
     config = tmp_path / "infer.yaml"
     usr_root = tmp_path / "usr_root"
     config.write_text(
@@ -314,7 +315,7 @@ def test_resolve_tool_events_path_accepts_legacy_infer_alias(tmp_path: Path) -> 
         encoding="utf-8",
     )
 
-    events_path, policy = resolve_tool_events_path(tool="infer_evo2", config=config)
+    events_path, policy = resolve_tool_events_path(tool=tool_alias, config=config)
 
     assert events_path == (usr_root / "infer_demo" / ".events.log").resolve()
     assert policy == "infer"
