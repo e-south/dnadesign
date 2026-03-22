@@ -485,6 +485,75 @@ def test_setup_resolve_events_supports_construct_workspace_project_selector(tmp_
     assert payload["policy"] == "generic"
 
 
+def test_setup_slack_namespaces_construct_selector_profile_paths(tmp_path: Path, monkeypatch) -> None:
+    workspace = "demo_construct:slot_a_window"
+    repo_root = tmp_path / "repo"
+    workspace_dir = repo_root / "src" / "dnadesign" / "construct" / "workspaces" / "demo_construct"
+    config_path = workspace_dir / "config.slot_a.window.yaml"
+    events_path = tmp_path / "usr" / "construct_demo" / ".events.log"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    events_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "job:",
+                "  id: promoter_swap_slot_a_window_1kb",
+                "  input:",
+                "    source: usr",
+                "    dataset: mg1655_promoters",
+                "    root: outputs/usr_datasets",
+                "  output:",
+                "    dataset: pdual10_source_of_truth_demo",
+                "    root: outputs/usr_datasets",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (workspace_dir / "construct.workspace.yaml").write_text(
+        "\n".join(
+            [
+                "workspace:",
+                "  id: demo_construct",
+                "  profile: promoter-swap-source-of-truth-demo",
+                "  projects:",
+                "    - id: slot_a_window",
+                "      config: config.slot_a.window.yaml",
+                "      flow: replace-anchor-in-template",
+                "      input_dataset: mg1655_promoters",
+                "      output_dataset: pdual10_source_of_truth_demo",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\n", encoding="utf-8")
+    monkeypatch.chdir(repo_root)
+    monkeypatch.setattr(
+        "dnadesign.notify.cli.bindings._resolve_tool_events_path",
+        lambda *, tool, config: (events_path, "generic"),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "slack",
+            "--tool",
+            "construct",
+            "--workspace",
+            workspace,
+            "--secret-source",
+            "env",
+        ],
+    )
+
+    assert result.exit_code == 0
+    profile = workspace_dir / "outputs" / "notify" / "construct" / "slot_a_window" / "profile.json"
+    assert profile.exists()
+
+
 def test_setup_list_workspaces_emits_names_and_json(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(

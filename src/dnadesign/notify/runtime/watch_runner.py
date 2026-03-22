@@ -166,7 +166,7 @@ def run_usr_events_watch(
         progress_min_seconds=resolved_inputs.progress_min_seconds_value,
         progress_heartbeat_seconds=resolved_inputs.progress_heartbeat_seconds_value,
         tool=mode.tool_value_for_events,
-        run_id=run_id,
+        run_id=run_id or mode.run_id_for_events,
         provider_value=resolved_inputs.provider_value,
         message=message,
         include_args_value=resolved_inputs.include_args_value,

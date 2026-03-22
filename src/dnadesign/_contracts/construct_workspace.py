@@ -81,6 +81,30 @@ def _workspace_registry_payload(registry_path: Path) -> dict[str, object]:
     return _required_mapping(raw, label="construct workspace registry")
 
 
+def _workspace_projects(
+    *, registry_path: Path, payload: dict[str, object], workspace_name: str
+) -> tuple[list[dict[str, object]], list[str], dict[str, dict[str, object]]]:
+    workspace_cfg = _required_mapping(payload.get("workspace"), label="workspace")
+    projects = workspace_cfg.get("projects")
+    if not isinstance(projects, list):
+        raise ValueError(f"construct workspace registry {registry_path} must define workspace.projects as a list")
+    if not projects:
+        raise ValueError(f"construct workspace '{workspace_name}' has no projects in {registry_path}")
+
+    project_by_id: dict[str, dict[str, object]] = {}
+    ordered_project_ids: list[str] = []
+    normalized_projects: list[dict[str, object]] = []
+    for idx, project in enumerate(projects):
+        project_cfg = _required_mapping(project, label=f"workspace.projects[{idx}]")
+        resolved_project_id = _required_non_empty_string(project_cfg.get("id"), label=f"workspace.projects[{idx}].id")
+        if resolved_project_id in project_by_id:
+            raise ValueError(f"construct workspace '{workspace_name}' has duplicate project id '{resolved_project_id}'")
+        project_by_id[resolved_project_id] = project_cfg
+        ordered_project_ids.append(resolved_project_id)
+        normalized_projects.append(project_cfg)
+    return normalized_projects, ordered_project_ids, project_by_id
+
+
 def list_construct_workspaces_from_root(workspaces_root: Path) -> list[str]:
     workspaces_root = Path(workspaces_root).expanduser().resolve()
     if not workspaces_root.exists() or not workspaces_root.is_dir():
@@ -104,23 +128,11 @@ def resolve_construct_workspace_config_path_from_root(*, workspaces_root: Path, 
     workspace_dir = (Path(workspaces_root).expanduser().resolve() / workspace_name).resolve()
     registry_path = workspace_dir / _WORKSPACE_REGISTRY_NAME
     payload = _workspace_registry_payload(registry_path)
-
-    workspace_cfg = _required_mapping(payload.get("workspace"), label="workspace")
-    projects = workspace_cfg.get("projects")
-    if not isinstance(projects, list):
-        raise ValueError(f"construct workspace registry {registry_path} must define workspace.projects as a list")
-    if not projects:
-        raise ValueError(f"construct workspace '{workspace_name}' has no projects in {registry_path}")
-
-    project_by_id: dict[str, dict[str, object]] = {}
-    ordered_project_ids: list[str] = []
-    for idx, project in enumerate(projects):
-        project_cfg = _required_mapping(project, label=f"workspace.projects[{idx}]")
-        resolved_project_id = _required_non_empty_string(project_cfg.get("id"), label=f"workspace.projects[{idx}].id")
-        if resolved_project_id in project_by_id:
-            raise ValueError(f"construct workspace '{workspace_name}' has duplicate project id '{resolved_project_id}'")
-        project_by_id[resolved_project_id] = project_cfg
-        ordered_project_ids.append(resolved_project_id)
+    _projects, ordered_project_ids, project_by_id = _workspace_projects(
+        registry_path=registry_path,
+        payload=payload,
+        workspace_name=workspace_name,
+    )
 
     resolved_project_id = project_id
     if resolved_project_id is None:
@@ -164,3 +176,37 @@ def resolve_construct_workspace_config_path(*, repo_root: Path, workspace_select
         workspaces_root=_construct_workspaces_root(repo_root),
         workspace_selector=workspace_selector,
     )
+
+
+def resolve_construct_workspace_project_id_from_config(config_path: Path) -> str | None:
+    resolved_config_path = Path(config_path).expanduser().resolve()
+    workspace_dir = resolved_config_path.parent
+    registry_path = workspace_dir / _WORKSPACE_REGISTRY_NAME
+    if not registry_path.exists() or not registry_path.is_file():
+        return None
+
+    payload = _workspace_registry_payload(registry_path)
+    projects, _ordered_project_ids, _project_by_id = _workspace_projects(
+        registry_path=registry_path,
+        payload=payload,
+        workspace_name=workspace_dir.name,
+    )
+
+    matching_project_ids: list[str] = []
+    for idx, project_cfg in enumerate(projects):
+        project_id = _required_non_empty_string(project_cfg.get("id"), label=f"workspace.projects[{idx}].id")
+        candidate = _resolve_workspace_relative_path(
+            workspace_dir=workspace_dir,
+            value=project_cfg.get("config"),
+            label=f"workspace.projects[{project_id}].config",
+        )
+        if candidate == resolved_config_path:
+            matching_project_ids.append(project_id)
+    if not matching_project_ids:
+        return None
+    if len(matching_project_ids) > 1:
+        joined = ", ".join(matching_project_ids)
+        raise ValueError(
+            f"construct workspace '{workspace_dir.name}' maps {resolved_config_path} to multiple project ids: {joined}"
+        )
+    return matching_project_ids[0]

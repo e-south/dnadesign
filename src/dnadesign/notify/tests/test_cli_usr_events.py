@@ -1678,3 +1678,90 @@ def test_usr_events_watch_autoload_supports_workspace_shorthand(tmp_path: Path, 
     )
     assert result.exit_code == 0
     assert '"usr_action": "materialize"' in result.stdout
+
+
+def test_usr_events_watch_construct_workspace_selector_uses_selector_profile_and_run_id(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo_root = tmp_path / "repo"
+    workspace = "demo_construct:slot_a_window"
+    workspace_dir = repo_root / "src" / "dnadesign" / "construct" / "workspaces" / "demo_construct"
+    config_path = workspace_dir / "config.slot_a.window.yaml"
+    events = workspace_dir / "outputs" / "usr_datasets" / "pdual10_source_of_truth_demo" / ".events.log"
+    events.parent.mkdir(parents=True, exist_ok=True)
+    slot_b_event = _event(action="attach")
+    slot_b_event["actor"] = {"tool": "construct", "run_id": "construct-promoter_swap_slot_b_window_1kb"}
+    slot_a_event = _event(action="materialize")
+    slot_a_event["actor"] = {"tool": "construct", "run_id": "construct-promoter_swap_slot_a_window_1kb"}
+    _write_events(events, [slot_b_event, slot_a_event])
+
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "job:",
+                "  id: promoter_swap_slot_a_window_1kb",
+                "  input:",
+                "    source: usr",
+                "    dataset: mg1655_promoters",
+                "    root: outputs/usr_datasets",
+                "  output:",
+                "    dataset: pdual10_source_of_truth_demo",
+                "    root: outputs/usr_datasets",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (workspace_dir / "construct.workspace.yaml").write_text(
+        "\n".join(
+            [
+                "workspace:",
+                "  id: demo_construct",
+                "  profile: promoter-swap-source-of-truth-demo",
+                "  projects:",
+                "    - id: slot_a_window",
+                "      config: config.slot_a.window.yaml",
+                "      flow: replace-anchor-in-template",
+                "      input_dataset: mg1655_promoters",
+                "      output_dataset: pdual10_source_of_truth_demo",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\n", encoding="utf-8")
+    profile = workspace_dir / "outputs" / "notify" / "construct" / "slot_a_window" / "profile.json"
+    profile.parent.mkdir(parents=True, exist_ok=True)
+    profile.write_text(
+        json.dumps(
+            {
+                "profile_version": 2,
+                "provider": "generic",
+                "events": str(events.resolve()),
+                "webhook": {"source": "env", "ref": "CONSTRUCT_WEBHOOK"},
+                "events_source": {"tool": "construct", "config": str(config_path.resolve())},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(repo_root)
+    monkeypatch.setenv("CONSTRUCT_WEBHOOK", "http://example.com/webhook")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--tool",
+            "construct",
+            "--workspace",
+            workspace,
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "construct-promoter_swap_slot_a_window_1kb" in result.stdout
+    assert "construct-promoter_swap_slot_b_window_1kb" not in result.stdout

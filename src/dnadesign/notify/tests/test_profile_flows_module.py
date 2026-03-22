@@ -53,6 +53,36 @@ def test_resolve_profile_path_for_setup_anchors_default_to_config_directory(tmp_
     assert resolved == config_path.parent / "outputs" / "notify" / "densegen" / "profile.json"
 
 
+def test_resolve_profile_path_for_setup_namespaces_construct_multi_project_profiles(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "construct_workspace"
+    config_path = workspace_dir / "config.slot_a.window.yaml"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("job:\n  id: slot_a_job\n", encoding="utf-8")
+    (workspace_dir / "construct.workspace.yaml").write_text(
+        "\n".join(
+            [
+                "workspace:",
+                "  id: construct_workspace",
+                "  profile: blank",
+                "  projects:",
+                "    - id: slot_a_window",
+                "      config: config.slot_a.window.yaml",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    resolved = resolve_profile_path_for_setup(
+        profile=Path("outputs/notify/generic/profile.json"),
+        tool_name="construct",
+        policy=None,
+        config=config_path,
+    )
+
+    assert resolved == workspace_dir / "outputs" / "notify" / "construct" / "slot_a_window" / "profile.json"
+
+
 def test_resolve_setup_events_rejects_mixed_events_and_resolver_modes(tmp_path: Path) -> None:
     events = tmp_path / "events.log"
     config = tmp_path / "tool.yaml"
