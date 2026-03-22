@@ -18,10 +18,17 @@ from typing import Any
 
 from .errors import SchemaError
 from .overlays import overlay_metadata, overlay_schema
-from .registry import load_registry, load_registry_file, registry_hash, validate_overlay_schema
+from .registry import (
+    load_registry,
+    load_registry_file,
+    namespace_contract_hash_for_entries,
+    registry_hash_for_entries,
+    validate_overlay_schema,
+)
 
+AllowedHashesResolver = Callable[[Any, dict[str, Any], str], set[str]]
+OverlayMetadataHashResolver = Callable[[dict[str, Any]], str | None]
 OverlayRegistryValidator = Callable[[dict[str, Any]], None]
-AllowedHashesResolver = Callable[[Any], set[str]]
 RegistryValidationRunner = Callable[[Any, OverlayRegistryValidator], None]
 
 
@@ -29,6 +36,8 @@ RegistryValidationRunner = Callable[[Any, OverlayRegistryValidator], None]
 class RegistryModeHandler:
     allowed_hashes: AllowedHashesResolver
     validate_with_registries: RegistryValidationRunner
+    overlay_hash_from_metadata: OverlayMetadataHashResolver
+    overlay_hash_label: str
 
 
 _REGISTRY_MODE_HANDLERS: dict[str, RegistryModeHandler] = {}
@@ -50,6 +59,8 @@ def register_registry_mode(
     mode: str,
     allowed_hashes: AllowedHashesResolver,
     validate_with_registries: RegistryValidationRunner,
+    overlay_hash_from_metadata: OverlayMetadataHashResolver,
+    overlay_hash_label: str,
 ) -> None:
     mode_name = _normalize_mode_name(mode)
     if mode_name in _REGISTRY_MODE_HANDLERS:
@@ -58,9 +69,15 @@ def register_registry_mode(
         raise SchemaError("allowed_hashes must be callable")
     if not callable(validate_with_registries):
         raise SchemaError("validate_with_registries must be callable")
+    if not callable(overlay_hash_from_metadata):
+        raise SchemaError("overlay_hash_from_metadata must be callable")
+    if not str(overlay_hash_label or "").strip():
+        raise SchemaError("overlay_hash_label must be a non-empty string")
     _REGISTRY_MODE_HANDLERS[mode_name] = RegistryModeHandler(
         allowed_hashes=allowed_hashes,
         validate_with_registries=validate_with_registries,
+        overlay_hash_from_metadata=overlay_hash_from_metadata,
+        overlay_hash_label=str(overlay_hash_label),
     )
 
 
@@ -80,7 +97,6 @@ def validate_overlays_for_registry_mode(
 ) -> None:
     mode_name = normalize_registry_mode(mode)
     handler = _REGISTRY_MODE_HANDLERS[mode_name]
-    allowed_hashes = handler.allowed_hashes(dataset)
 
     def _validate_overlays(registry: dict[str, Any]) -> None:
         for path in overlays:
@@ -89,12 +105,15 @@ def validate_overlays_for_registry_mode(
             if not key:
                 raise SchemaError(f"Overlay missing required metadata key: {path}")
             ns = meta.get("namespace") or path.stem
-            reg_hash = meta.get("registry_hash")
+            reg_hash = handler.overlay_hash_from_metadata(meta)
             if reg_hash is None:
-                raise SchemaError(f"Overlay missing registry_hash metadata: {path}")
+                raise SchemaError(f"Overlay missing {handler.overlay_hash_label} metadata: {path}")
+            allowed_hashes = handler.allowed_hashes(dataset, registry, ns)
             if reg_hash not in allowed_hashes:
                 allowed = ", ".join(sorted(allowed_hashes))
-                raise SchemaError(f"Overlay registry_hash mismatch for {path}: {reg_hash} not in [{allowed}].")
+                raise SchemaError(
+                    f"Overlay {handler.overlay_hash_label} mismatch for {path}: {reg_hash} not in [{allowed}]."
+                )
             if ns in reserved_namespaces:
                 continue
             schema = overlay_schema(path)
@@ -103,27 +122,19 @@ def validate_overlays_for_registry_mode(
     handler.validate_with_registries(dataset, _validate_overlays)
 
 
-def _allowed_hashes_current(dataset: Any) -> set[str]:
-    return {registry_hash(dataset.root, required=True)}
+def _allowed_hashes_current(dataset: Any, registry: dict[str, Any], namespace: str) -> set[str]:
+    _ = (dataset, namespace)
+    return {registry_hash_for_entries(registry)}
 
 
-def _allowed_hashes_frozen(dataset: Any) -> set[str]:
-    return {dataset._dataset_registry_hash()}
+def _allowed_hashes_frozen(dataset: Any, registry: dict[str, Any], namespace: str) -> set[str]:
+    _ = (dataset, namespace)
+    return {registry_hash_for_entries(registry)}
 
 
-def _allowed_hashes_either(dataset: Any) -> set[str]:
-    allowed_hashes: set[str] = set()
-    try:
-        allowed_hashes.add(registry_hash(dataset.root, required=True))
-    except SchemaError:
-        pass
-    try:
-        allowed_hashes.add(dataset._dataset_registry_hash())
-    except SchemaError:
-        pass
-    if not allowed_hashes:
-        raise SchemaError("No registry hash available for overlay validation.")
-    return allowed_hashes
+def _allowed_hashes_namespace(dataset: Any, registry: dict[str, Any], namespace: str) -> set[str]:
+    _ = dataset
+    return {namespace_contract_hash_for_entries(registry, namespace)}
 
 
 def _validate_with_current_registry(dataset: Any, validate: OverlayRegistryValidator) -> None:
@@ -143,18 +154,53 @@ def _validate_with_either_registry(dataset: Any, validate: OverlayRegistryValida
         _validate_with_frozen_registry(dataset, validate)
 
 
+def _overlay_registry_hash_from_metadata(meta: dict[str, Any]) -> str | None:
+    return meta.get("registry_hash")
+
+
+def _overlay_namespace_contract_hash_from_metadata(meta: dict[str, Any]) -> str | None:
+    return meta.get("namespace_contract_hash")
+
+
 register_registry_mode(
     mode="current",
     allowed_hashes=_allowed_hashes_current,
     validate_with_registries=_validate_with_current_registry,
+    overlay_hash_from_metadata=_overlay_registry_hash_from_metadata,
+    overlay_hash_label="registry_hash",
 )
 register_registry_mode(
     mode="frozen",
     allowed_hashes=_allowed_hashes_frozen,
     validate_with_registries=_validate_with_frozen_registry,
+    overlay_hash_from_metadata=_overlay_registry_hash_from_metadata,
+    overlay_hash_label="registry_hash",
 )
 register_registry_mode(
     mode="either",
-    allowed_hashes=_allowed_hashes_either,
+    allowed_hashes=_allowed_hashes_current,
     validate_with_registries=_validate_with_either_registry,
+    overlay_hash_from_metadata=_overlay_registry_hash_from_metadata,
+    overlay_hash_label="registry_hash",
+)
+register_registry_mode(
+    mode="namespace-current",
+    allowed_hashes=_allowed_hashes_namespace,
+    validate_with_registries=_validate_with_current_registry,
+    overlay_hash_from_metadata=_overlay_namespace_contract_hash_from_metadata,
+    overlay_hash_label="namespace_contract_hash",
+)
+register_registry_mode(
+    mode="namespace-frozen",
+    allowed_hashes=_allowed_hashes_namespace,
+    validate_with_registries=_validate_with_frozen_registry,
+    overlay_hash_from_metadata=_overlay_namespace_contract_hash_from_metadata,
+    overlay_hash_label="namespace_contract_hash",
+)
+register_registry_mode(
+    mode="namespace-either",
+    allowed_hashes=_allowed_hashes_namespace,
+    validate_with_registries=_validate_with_either_registry,
+    overlay_hash_from_metadata=_overlay_namespace_contract_hash_from_metadata,
+    overlay_hash_label="namespace_contract_hash",
 )

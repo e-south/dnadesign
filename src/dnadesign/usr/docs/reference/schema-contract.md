@@ -60,6 +60,16 @@ Parquet key/value metadata:
 - `usr:id_hash`
 - `usr:registry_hash`
 
+## Overlay metadata
+
+Parquet key/value metadata for derived overlays:
+
+- `usr:overlay_namespace`
+- `usr:overlay_key`
+- `usr:overlay_created_at`
+- `usr:registry_hash`
+- `usr:namespace_contract_hash`
+
 ## Next steps
 
 - Overlay merge and registry behavior: [overlay-and-registry.md](overlay-and-registry.md)

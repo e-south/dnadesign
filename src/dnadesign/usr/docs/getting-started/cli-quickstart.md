@@ -61,6 +61,7 @@ uv run usr head densegen/demo -n 5
 uv run usr schema densegen/demo --tree
 uv run usr events tail densegen/demo --format json --n 5
 uv run usr validate densegen/demo --strict
+uv run usr validate densegen/demo --registry-mode namespace-current
 ```
 
 ## Notes

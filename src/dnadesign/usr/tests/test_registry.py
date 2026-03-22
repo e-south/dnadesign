@@ -28,6 +28,7 @@ from dnadesign.usr.src.registry import (
     arrow_type_str,
     load_registry,
     load_registry_file,
+    namespace_contract_hash_for_entries,
     register_namespace,
 )
 from dnadesign.usr.src.schema import META_REGISTRY_HASH
@@ -145,6 +146,57 @@ def test_overlay_registry_hash_mismatch_is_error(tmp_path: Path) -> None:
         ds.validate(registry_mode="current")
 
 
+def test_namespace_contract_hash_ignores_catalog_fields_but_tracks_column_order(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "tool-a",
+                "description": "first description",
+                "columns": [
+                    {"name": "mock__score", "type": "float64"},
+                    {"name": "mock__rank", "type": "int64"},
+                ],
+            }
+        },
+    )
+    first = namespace_contract_hash_for_entries(load_registry(root, required=True), "mock")
+
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "tool-b",
+                "description": "second description",
+                "columns": [
+                    {"name": "mock__score", "type": "float64"},
+                    {"name": "mock__rank", "type": "int64"},
+                ],
+            }
+        },
+    )
+    second = namespace_contract_hash_for_entries(load_registry(root, required=True), "mock")
+
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "tool-b",
+                "description": "second description",
+                "columns": [
+                    {"name": "mock__rank", "type": "int64"},
+                    {"name": "mock__score", "type": "float64"},
+                ],
+            }
+        },
+    )
+    reordered = namespace_contract_hash_for_entries(load_registry(root, required=True), "mock")
+
+    assert first == second
+    assert reordered != first
+
+
 def test_registry_requires_usr_state(tmp_path: Path) -> None:
     root = tmp_path / "datasets"
     _write_registry(
@@ -252,6 +304,117 @@ def test_validate_registry_modes(tmp_path: Path) -> None:
 
     ds.validate(registry_mode="frozen")
     ds.validate(registry_mode="either")
+
+
+def test_namespace_current_mode_ignores_unrelated_registry_changes(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "unit-test",
+                "description": "test namespace",
+                "columns": [{"name": "mock__score", "type": "float64"}],
+            }
+        },
+    )
+    ds = _make_dataset(root)
+
+    attach_path = tmp_path / "attach.parquet"
+    ids = ds.head(2)["id"].tolist()
+    pq.write_table(pa.table({"id": ids, "score": [0.1, 0.2]}), attach_path)
+    ds.attach(attach_path, namespace="mock", key="id", columns=["score"], parse_json=False)
+
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "unit-test",
+                "description": "test namespace",
+                "columns": [{"name": "mock__score", "type": "float64"}],
+            },
+            "other": {
+                "owner": "unit-test",
+                "description": "unrelated namespace added later",
+                "columns": [{"name": "other__score", "type": "float64"}],
+            },
+        },
+    )
+
+    with pytest.raises(SchemaError, match="registry_hash"):
+        ds.validate(registry_mode="current")
+
+    ds.validate(registry_mode="namespace-current")
+
+
+def test_namespace_registry_modes_require_namespace_contract_hash(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "unit-test",
+                "description": "test namespace",
+                "columns": [{"name": "mock__score", "type": "float64"}],
+            }
+        },
+    )
+    ds = _make_dataset(root)
+
+    out_path = overlay_path(ds.dir, "mock")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    overlay_tbl = pa.table({"id": ds.head(2)["id"].tolist(), "mock__score": [1.0, 2.0]})
+    overlay_tbl = with_overlay_metadata(
+        overlay_tbl,
+        namespace="mock",
+        key="id",
+        created_at="2026-02-06T00:00:00Z",
+        registry_hash="deadbeef",
+    )
+    pq.write_table(overlay_tbl, out_path)
+
+    with pytest.raises(SchemaError, match="namespace_contract_hash"):
+        ds.validate(registry_mode="namespace-current")
+
+
+def test_namespace_frozen_and_either_modes_use_frozen_registry_snapshot(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "unit-test",
+                "description": "test namespace",
+                "columns": [{"name": "mock__score", "type": "float64"}],
+            }
+        },
+    )
+    ds = _make_dataset(root)
+
+    attach_path = tmp_path / "attach.parquet"
+    ids = ds.head(2)["id"].tolist()
+    pq.write_table(pa.table({"id": ids, "score": [0.1, 0.2]}), attach_path)
+    ds.attach(attach_path, namespace="mock", key="id", columns=["score"], parse_json=False)
+
+    with ds.maintenance(reason="registry_freeze"):
+        ds.freeze_registry()
+
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "unit-test",
+                "description": "test namespace",
+                "columns": [{"name": "mock__score", "type": "string"}],
+            }
+        },
+    )
+
+    with pytest.raises(SchemaError, match="namespace_contract_hash"):
+        ds.validate(registry_mode="namespace-current")
+
+    ds.validate(registry_mode="namespace-frozen")
+    ds.validate(registry_mode="namespace-either")
 
 
 def test_registry_type_supports_struct_and_fixed_list() -> None:
