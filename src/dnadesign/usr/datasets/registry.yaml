@@ -11,6 +11,10 @@ namespaces:
       type: string
     - name: construct__spec_id
       type: string
+    - name: construct__context_id
+      type: string
+    - name: construct__context_kind
+      type: string
     - name: construct__template_id
       type: string
     - name: construct__template_kind
@@ -37,6 +41,14 @@ namespaces:
       type: string
     - name: construct__input_length
       type: int64
+    - name: construct__anchor_id
+      type: string
+    - name: construct__anchor_orientation
+      type: string
+    - name: construct__anchor_start
+      type: int64
+    - name: construct__anchor_end
+      type: int64
     - name: construct__mode
       type: string
     - name: construct__focal_part
@@ -61,24 +73,12 @@ namespaces:
       type: int64
     - name: construct__window_end
       type: int64
+    - name: construct__resolved_length
+      type: int64
     - name: construct__full_construct_length
       type: int64
     - name: construct__parts
       type: list<struct<name:string,role:string,sequence_source:string,sequence_field:string,placement_kind:string,orientation:string,template_start:int64,template_end:int64,realized_start:int64,realized_end:int64,length:int64>>
-    - name: construct__context_id
-      type: string
-    - name: construct__context_kind
-      type: string
-    - name: construct__anchor_id
-      type: string
-    - name: construct__anchor_orientation
-      type: string
-    - name: construct__anchor_start
-      type: int64
-    - name: construct__anchor_end
-      type: int64
-    - name: construct__resolved_length
-      type: int64
     description: Construct lineage overlays for realized DNA sequences.
     owner: construct
   construct_seed:

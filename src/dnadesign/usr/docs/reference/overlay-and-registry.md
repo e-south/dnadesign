@@ -31,6 +31,7 @@ All dataset mutations require a registry at the datasets root (`registry.yaml`).
 - First successful registration creates `registry.yaml` and includes `usr_state`.
 - For repo-owned shared roots such as `src/dnadesign/usr/datasets`, `registry.yaml` is a tracked cross-tool contract for sibling tools that write or validate namespaced overlays.
 - Keep shared-root registry changes committed and synced across clones before relying on `usr validate --strict`, `usr diff`, `usr pull`, or `usr push`.
+- `usr:registry_hash` is derived from the serialized `registry.yaml` bytes, so canonical namespace and column ordering is part of the current contract.
 
 Register namespace:
 

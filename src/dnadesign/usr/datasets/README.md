@@ -10,7 +10,7 @@ archived so collaborators can discover what exists without committing the data.
 - Derived overlays: `_derived/<namespace>.parquet` (namespaced columns only)
 - Generated: `.events.log`, `_snapshots/`
 - Dataset ids: flat ids such as `mg1655_promoters` are first-class; `namespace/dataset` remains available when it improves disambiguation
-- Registry: `registry.yaml` at the datasets root (required for overlays and tracked in repo-owned shared roots because it is the cross-tool namespace contract, not generated run state)
+- Registry: `registry.yaml` at the datasets root (required for overlays and tracked in repo-owned shared roots because it is the cross-tool namespace contract, not generated run state; byte-stable ordering matters because `usr:registry_hash` is computed from the serialized YAML)
 
 For the shared repo root `src/dnadesign/usr/datasets`, keep `registry.yaml` committed and synced across clones before relying on `usr validate --strict` or SSH sync verification.
 

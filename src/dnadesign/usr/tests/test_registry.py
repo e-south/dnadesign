@@ -27,6 +27,7 @@ from dnadesign.usr.src.registry import (
     RegistryColumn,
     arrow_type_str,
     load_registry,
+    load_registry_file,
     register_namespace,
 )
 from dnadesign.usr.src.schema import META_REGISTRY_HASH
@@ -264,3 +265,72 @@ def test_registry_type_supports_struct_and_fixed_list() -> None:
         ]
     )
     assert arrow_type_str(struct) == "struct<name:string,values:list<int64>>"
+
+
+@pytest.mark.parametrize(
+    ("payload", "match"),
+    [
+        ({"namespaces": 1}, "must contain a 'namespaces' mapping"),
+        (
+            {"namespaces": {"mock": "bad"}},
+            "Registry entry for 'mock' must be a mapping",
+        ),
+        (
+            {"namespaces": {"mock": {"owner": "unit", "description": "demo", "columns": "bad"}}},
+            "must define 'columns' as a list",
+        ),
+        (
+            {"namespaces": {"mock": {"owner": "unit", "description": "demo", "columns": ["bad"]}}},
+            "Registry column for 'mock' must be a mapping",
+        ),
+        (
+            {"namespaces": {"mock": {"owner": "unit", "description": "demo", "columns": [{"name": "mock__score"}]}}},
+            "requires name and type",
+        ),
+        (
+            {
+                "namespaces": {
+                    "mock": {
+                        "owner": "unit",
+                        "description": "demo",
+                        "columns": [
+                            {"name": "mock__score", "type": "float64"},
+                            {"name": "mock__score", "type": "float64"},
+                        ],
+                    }
+                }
+            },
+            "duplicate column names",
+        ),
+        (
+            {
+                "namespaces": {
+                    "mock": {
+                        "owner": "unit",
+                        "description": "demo",
+                        "columns": [{"name": "score", "type": "float64"}],
+                    }
+                }
+            },
+            "must be namespaced",
+        ),
+        (
+            {
+                "namespaces": {
+                    "mock": {
+                        "owner": "unit",
+                        "description": "demo",
+                        "columns": [{"name": "mock__score", "type": "mystery"}],
+                    }
+                }
+            },
+            "Unsupported registry type",
+        ),
+    ],
+)
+def test_load_registry_file_rejects_malformed_registry_payloads(tmp_path: Path, payload: dict, match: str) -> None:
+    path = tmp_path / "registry.yaml"
+    path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    with pytest.raises(SchemaError, match=match):
+        load_registry_file(path)

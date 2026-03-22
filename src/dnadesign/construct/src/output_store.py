@@ -151,6 +151,8 @@ def _ensure_registry_namespace(
     payload.setdefault("owner", owner)
     payload.setdefault("description", description)
     observed = _validated_registry_columns(namespace_name, payload)
+    expected_names = {column["name"] for column in expected_columns}
+    existing_columns = list(payload.get("columns", []))
     missing = []
     for column in expected_columns:
         observed_type = observed.get(column["name"])
@@ -162,8 +164,14 @@ def _ensure_registry_namespace(
                 f"USR registry namespace '{namespace_name}' column '{column['name']}' has type "
                 f"'{observed_type}', expected '{column['type']}'."
             )
-    if missing:
-        payload["columns"] = list(payload.get("columns", [])) + missing
+    extras = [
+        {"name": str(column["name"]).strip(), "type": str(column["type"]).strip()}
+        for column in existing_columns
+        if str(column.get("name") or "").strip() not in expected_names
+    ]
+    canonical_columns = [dict(column) for column in expected_columns] + extras
+    if missing or payload.get("columns") != canonical_columns:
+        payload["columns"] = canonical_columns
 
 
 def _ensure_construct_registry(root: Path) -> None:
