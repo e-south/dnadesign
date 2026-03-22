@@ -1765,3 +1765,85 @@ def test_usr_events_watch_construct_workspace_selector_uses_selector_profile_and
     assert result.exit_code == 0
     assert "construct-promoter_swap_slot_a_window_1kb" in result.stdout
     assert "construct-promoter_swap_slot_b_window_1kb" not in result.stdout
+
+
+def test_usr_events_watch_profile_infers_construct_run_id_from_events_source(tmp_path: Path, monkeypatch) -> None:
+    workspace_dir = tmp_path / "construct_workspace"
+    config_path = workspace_dir / "configs" / "slot_a" / "config.yaml"
+    events = workspace_dir / "outputs" / "usr_datasets" / "pdual10_source_of_truth_demo" / ".events.log"
+    profile = workspace_dir / "outputs" / "notify" / "construct" / "slot_a_window" / "profile.json"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    profile.parent.mkdir(parents=True, exist_ok=True)
+    events.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "job:",
+                "  id: promoter_swap_slot_a_window_1kb",
+                "  input:",
+                "    source: usr",
+                "    dataset: mg1655_promoters",
+                "    root: ../../outputs/usr_datasets",
+                "  output:",
+                "    dataset: pdual10_source_of_truth_demo",
+                "    root: ../../outputs/usr_datasets",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (workspace_dir / "construct.workspace.yaml").write_text(
+        "\n".join(
+            [
+                "workspace:",
+                "  id: construct_workspace",
+                "  profile: blank",
+                "  projects:",
+                "    - id: slot_a_window",
+                "      config: configs/slot_a/config.yaml",
+                "      flow: replace-anchor-in-template",
+                "      input_dataset: mg1655_promoters",
+                "      output_dataset: pdual10_source_of_truth_demo",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    slot_b_event = _event(action="attach")
+    slot_b_event["actor"] = {"tool": "construct", "run_id": "construct-promoter_swap_slot_b_window_1kb"}
+    slot_a_event = _event(action="materialize")
+    slot_a_event["actor"] = {"tool": "construct", "run_id": "construct-promoter_swap_slot_a_window_1kb"}
+    _write_events(events, [slot_b_event, slot_a_event])
+    profile.write_text(
+        json.dumps(
+            {
+                "profile_version": 2,
+                "provider": "generic",
+                "events": str(events.resolve()),
+                "webhook": {"source": "env", "ref": "CONSTRUCT_WEBHOOK"},
+                "events_source": {"tool": "construct", "config": str(config_path.resolve())},
+                "policy": "construct",
+                "only_actions": "attach,materialize",
+                "only_tools": "construct",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CONSTRUCT_WEBHOOK", "http://example.com/webhook")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--profile",
+            str(profile),
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "construct-promoter_swap_slot_a_window_1kb" in result.stdout
+    assert "construct-promoter_swap_slot_b_window_1kb" not in result.stdout

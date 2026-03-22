@@ -22,6 +22,7 @@ from .construct_workspace import (
     resolve_construct_workspace_config_path,
     resolve_construct_workspace_config_path_from_root,
     resolve_construct_workspace_project_id_from_config,
+    resolve_construct_workspace_root_from_config,
 )
 from .densegen_usr_output import (
     DensegenUSROutputContract,
@@ -62,6 +63,7 @@ __all__ = [
     "parse_notify_profile_webhook",
     "resolve_construct_usr_output_contract",
     "resolve_construct_workspace_project_id_from_config",
+    "resolve_construct_workspace_root_from_config",
     "resolve_construct_workspace_config_path",
     "resolve_construct_workspace_config_path_from_root",
     "resolve_densegen_usr_output_contract",

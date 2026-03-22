@@ -482,7 +482,7 @@ def test_setup_resolve_events_supports_construct_workspace_project_selector(tmp_
     assert payload["events"] == str(
         (workspace_dir / "outputs" / "usr_datasets" / "construct" / "demo_window" / ".events.log").resolve()
     )
-    assert payload["policy"] == "generic"
+    assert payload["policy"] == "construct"
 
 
 def test_setup_slack_namespaces_construct_selector_profile_paths(tmp_path: Path, monkeypatch) -> None:
@@ -531,7 +531,7 @@ def test_setup_slack_namespaces_construct_selector_profile_paths(tmp_path: Path,
     monkeypatch.chdir(repo_root)
     monkeypatch.setattr(
         "dnadesign.notify.cli.bindings._resolve_tool_events_path",
-        lambda *, tool, config: (events_path, "generic"),
+        lambda *, tool, config: (events_path, "construct"),
     )
 
     runner = CliRunner()
@@ -552,6 +552,10 @@ def test_setup_slack_namespaces_construct_selector_profile_paths(tmp_path: Path,
     assert result.exit_code == 0
     profile = workspace_dir / "outputs" / "notify" / "construct" / "slot_a_window" / "profile.json"
     assert profile.exists()
+    payload = json.loads(profile.read_text(encoding="utf-8"))
+    assert payload["policy"] == "construct"
+    assert payload["only_actions"] == "attach,materialize"
+    assert payload["only_tools"] == "construct"
 
 
 def test_setup_list_workspaces_emits_names_and_json(tmp_path: Path, monkeypatch) -> None:

@@ -55,7 +55,7 @@ def register_builtin_tool_events_sources(register: ToolEventsSourceRegister) -> 
     register(
         tool="construct",
         resolver=_resolve_construct_events_from_config,
-        default_policy="generic",
+        default_policy="construct",
     )
     register(
         tool="densegen",

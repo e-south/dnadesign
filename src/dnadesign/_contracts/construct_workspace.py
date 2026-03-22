@@ -178,35 +178,54 @@ def resolve_construct_workspace_config_path(*, repo_root: Path, workspace_select
     )
 
 
-def resolve_construct_workspace_project_id_from_config(config_path: Path) -> str | None:
+def _resolve_construct_workspace_match_from_config(config_path: Path) -> tuple[Path, str] | None:
     resolved_config_path = Path(config_path).expanduser().resolve()
-    workspace_dir = resolved_config_path.parent
-    registry_path = workspace_dir / _WORKSPACE_REGISTRY_NAME
-    if not registry_path.exists() or not registry_path.is_file():
-        return None
+    for workspace_dir in (resolved_config_path.parent, *resolved_config_path.parent.parents):
+        registry_path = workspace_dir / _WORKSPACE_REGISTRY_NAME
+        if not registry_path.exists():
+            continue
+        if not registry_path.is_file():
+            raise ValueError(f"construct workspace registry is not a file: {registry_path}")
 
-    payload = _workspace_registry_payload(registry_path)
-    projects, _ordered_project_ids, _project_by_id = _workspace_projects(
-        registry_path=registry_path,
-        payload=payload,
-        workspace_name=workspace_dir.name,
-    )
+        payload = _workspace_registry_payload(registry_path)
+        projects, _ordered_project_ids, _project_by_id = _workspace_projects(
+            registry_path=registry_path,
+            payload=payload,
+            workspace_name=workspace_dir.name,
+        )
 
-    matching_project_ids: list[str] = []
-    for idx, project_cfg in enumerate(projects):
-        project_id = _required_non_empty_string(project_cfg.get("id"), label=f"workspace.projects[{idx}].id")
-        candidate = _resolve_workspace_relative_path(
-            workspace_dir=workspace_dir,
-            value=project_cfg.get("config"),
-            label=f"workspace.projects[{project_id}].config",
-        )
-        if candidate == resolved_config_path:
-            matching_project_ids.append(project_id)
-    if not matching_project_ids:
+        matching_project_ids: list[str] = []
+        for idx, project_cfg in enumerate(projects):
+            project_id = _required_non_empty_string(project_cfg.get("id"), label=f"workspace.projects[{idx}].id")
+            candidate = _resolve_workspace_relative_path(
+                workspace_dir=workspace_dir,
+                value=project_cfg.get("config"),
+                label=f"workspace.projects[{project_id}].config",
+            )
+            if candidate == resolved_config_path:
+                matching_project_ids.append(project_id)
+        if not matching_project_ids:
+            continue
+        if len(matching_project_ids) > 1:
+            joined = ", ".join(matching_project_ids)
+            raise ValueError(
+                "construct workspace "
+                f"'{workspace_dir.name}' maps {resolved_config_path} "
+                f"to multiple project ids: {joined}"
+            )
+        return workspace_dir, matching_project_ids[0]
+    return None
+
+
+def resolve_construct_workspace_root_from_config(config_path: Path) -> Path | None:
+    match = _resolve_construct_workspace_match_from_config(config_path)
+    if match is None:
         return None
-    if len(matching_project_ids) > 1:
-        joined = ", ".join(matching_project_ids)
-        raise ValueError(
-            f"construct workspace '{workspace_dir.name}' maps {resolved_config_path} to multiple project ids: {joined}"
-        )
-    return matching_project_ids[0]
+    return match[0]
+
+
+def resolve_construct_workspace_project_id_from_config(config_path: Path) -> str | None:
+    match = _resolve_construct_workspace_match_from_config(config_path)
+    if match is None:
+        return None
+    return match[1]

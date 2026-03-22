@@ -18,6 +18,7 @@ from typing import Any, Callable
 from dnadesign._contracts import (
     load_construct_config_mapping,
     resolve_construct_workspace_project_id_from_config,
+    resolve_construct_workspace_root_from_config,
 )
 
 from ..errors import NotifyConfigError
@@ -55,16 +56,35 @@ def _resolve_resolver_mode_profile_path(
     config_path: Path,
     default_profile_path_for_tool: Callable[[str | None], Path],
 ) -> Path:
-    default_path = config_path.parent / default_profile_path_for_tool(tool_name)
+    workspace_root = config_path.parent
     if tool_name != "construct":
-        return default_path
+        return workspace_root / default_profile_path_for_tool(tool_name)
     try:
+        resolved_workspace_root = resolve_construct_workspace_root_from_config(config_path)
         project_id = resolve_construct_workspace_project_id_from_config(config_path)
     except ValueError as exc:
         raise NotifyConfigError(str(exc)) from exc
+    if resolved_workspace_root is not None:
+        workspace_root = resolved_workspace_root
+    default_path = workspace_root / default_profile_path_for_tool(tool_name)
     if project_id is None:
         return default_path
-    return config_path.parent / "outputs" / "notify" / "construct" / project_id / "profile.json"
+    return workspace_root / "outputs" / "notify" / "construct" / project_id / "profile.json"
+
+
+def resolve_profile_run_id(
+    *,
+    mode: WatchResolverMode,
+    profile_data: dict[str, Any],
+    resolve_profile_events_source: Callable[..., tuple[str, Path] | None],
+) -> str | None:
+    if mode.run_id_for_events is not None:
+        return mode.run_id_for_events
+    profile_events_source = resolve_profile_events_source(profile_data=profile_data, profile_path=mode.profile_path)
+    if profile_events_source is None:
+        return None
+    source_tool, source_config = profile_events_source
+    return _resolve_resolver_mode_run_id(tool_name=source_tool, config_path=source_config)
 
 
 def resolve_watch_mode(

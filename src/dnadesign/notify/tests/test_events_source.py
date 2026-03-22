@@ -213,7 +213,7 @@ def test_resolve_tool_events_path_construct_from_explicit_output_root(tmp_path: 
     assert (
         events_path == (workspace / "outputs" / "usr_datasets" / "construct" / "demo_window" / ".events.log").resolve()
     )
-    assert policy == "generic"
+    assert policy == "construct"
 
 
 def test_resolve_tool_events_path_construct_falls_back_to_input_root(tmp_path: Path) -> None:
@@ -239,7 +239,7 @@ def test_resolve_tool_events_path_construct_falls_back_to_input_root(tmp_path: P
     events_path, policy = resolve_tool_events_path(tool="construct", config=config)
 
     assert events_path == (usr_root / "construct" / "demo_window" / ".events.log").resolve()
-    assert policy == "generic"
+    assert policy == "construct"
 
 
 def test_resolve_tool_events_path_construct_requires_job_output_dataset(tmp_path: Path) -> None:

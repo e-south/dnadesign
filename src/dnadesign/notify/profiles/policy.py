@@ -112,6 +112,16 @@ register_workflow_policy(
     },
 )
 register_workflow_policy(
+    policy="construct",
+    defaults={
+        "only_actions": "attach,materialize",
+        "only_tools": "construct",
+        "include_args": False,
+        "include_context": False,
+        "include_raw_event": False,
+    },
+)
+register_workflow_policy(
     policy="generic",
     defaults={},
 )

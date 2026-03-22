@@ -210,13 +210,15 @@ def _construct_workspace_roots(repo_root: Path | None, search_root: Path) -> tup
 
 def _resolve_construct_config_from_known_roots(workspace_name: str, repo_root: Path | None, search_root: Path) -> Path:
     workspace_id, _, _ = workspace_name.partition(":")
-    if search_root.name == workspace_id and (search_root / "construct.workspace.yaml").exists():
+    explicit_root = str(os.environ.get("CONSTRUCT_WORKSPACE_ROOT") or "").strip()
+    if not explicit_root and search_root.name == workspace_id and (search_root / "construct.workspace.yaml").exists():
         return resolve_construct_workspace_config_path_from_root(
             workspaces_root=search_root.parent,
             workspace_selector=workspace_name,
         )
+    roots = _construct_workspace_roots(repo_root, search_root)
     missing_registry_error: str | None = None
-    for root in _construct_workspace_roots(repo_root, search_root):
+    for root in roots:
         try:
             return resolve_construct_workspace_config_path_from_root(
                 workspaces_root=root,
@@ -229,9 +231,11 @@ def _resolve_construct_config_from_known_roots(workspace_name: str, repo_root: P
                     missing_registry_error = message
                 continue
             raise
+    if roots:
+        return (roots[0] / workspace_id / "construct.workspace.yaml").resolve()
     if missing_registry_error is not None:
         raise ValueError(missing_registry_error)
-    return (search_root / workspace_name / "config.yaml").resolve()
+    return (search_root / workspace_id / "construct.workspace.yaml").resolve()
 
 
 def _construct_workspace_selectors(workspace_dir: Path) -> list[str]:
@@ -241,13 +245,13 @@ def _construct_workspace_selectors(workspace_dir: Path) -> list[str]:
     try:
         payload = yaml.safe_load(registry_path.read_text(encoding="utf-8")) or {}
     except Exception:
-        return [workspace_dir.name]
+        return []
     workspace_cfg = payload.get("workspace")
     if not isinstance(workspace_cfg, dict):
-        return [workspace_dir.name]
+        return []
     projects = workspace_cfg.get("projects")
     if not isinstance(projects, list):
-        return [workspace_dir.name]
+        return []
     project_ids = [
         str(project.get("id") or "").strip()
         for project in projects
