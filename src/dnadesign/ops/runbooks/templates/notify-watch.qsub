@@ -90,9 +90,116 @@ cursor_offset_or_zero() {
   fi
 }
 
+policy_default_actions() {
+  local policy_name="$1"
+  case "$policy_name" in
+    densegen) printf '%s\n' "densegen_health,densegen_flush_failed,materialize" ;;
+    infer) printf '%s\n' "attach,materialize" ;;
+    *) printf '%s\n' "" ;;
+  esac
+}
+
+policy_default_tools() {
+  local policy_name="$1"
+  case "$policy_name" in
+    densegen) printf '%s\n' "densegen" ;;
+    infer) printf '%s\n' "infer" ;;
+    *) printf '%s\n' "" ;;
+  esac
+}
+
+first_csv_value() {
+  local raw="$1"
+  raw="${raw%%,*}"
+  raw="${raw#"${raw%%[![:space:]]*}"}"
+  raw="${raw%"${raw##*[![:space:]]}"}"
+  printf '%s\n' "$raw"
+}
+
+resolve_probe_actions() {
+  local profile_path="${1:-}"
+  if [[ -n "$NOTIFY_ACTIONS" ]]; then
+    printf '%s\n' "$NOTIFY_ACTIONS"
+    return 0
+  fi
+  if [[ -n "$profile_path" ]]; then
+    local profile_actions
+    profile_actions="$(profile_json_field "$profile_path" "only_actions")"
+    if [[ -n "$profile_actions" ]]; then
+      printf '%s\n' "$profile_actions"
+      return 0
+    fi
+    local profile_policy
+    profile_policy="$(profile_json_field "$profile_path" "policy")"
+    policy_default_actions "$profile_policy"
+    return 0
+  fi
+  policy_default_actions "$NOTIFY_POLICY"
+}
+
+resolve_probe_tools() {
+  local profile_path="${1:-}"
+  if [[ -n "$NOTIFY_TOOLS" ]]; then
+    printf '%s\n' "$NOTIFY_TOOLS"
+    return 0
+  fi
+  if [[ -n "$profile_path" ]]; then
+    local profile_tools
+    profile_tools="$(profile_json_field "$profile_path" "only_tools")"
+    if [[ -n "$profile_tools" ]]; then
+      printf '%s\n' "$profile_tools"
+      return 0
+    fi
+    local profile_policy
+    profile_policy="$(profile_json_field "$profile_path" "policy")"
+    policy_default_tools "$profile_policy"
+    return 0
+  fi
+  policy_default_tools "$NOTIFY_POLICY"
+}
+
+resolve_timeout_tool() {
+  local profile_path="${1:-}"
+  if [[ -n "$NOTIFY_TOOL" ]]; then
+    printf '%s\n' "$NOTIFY_TOOL"
+    return 0
+  fi
+  if [[ -n "$NOTIFY_NAMESPACE" ]]; then
+    printf '%s\n' "$NOTIFY_NAMESPACE"
+    return 0
+  fi
+  if [[ -n "$profile_path" ]]; then
+    local profile_tools
+    profile_tools="$(resolve_probe_tools "$profile_path")"
+    local first_tool
+    first_tool="$(first_csv_value "$profile_tools")"
+    if [[ -n "$first_tool" ]]; then
+      printf '%s\n' "$first_tool"
+      return 0
+    fi
+    local profile_policy
+    profile_policy="$(profile_json_field "$profile_path" "policy")"
+    local policy_tool
+    policy_tool="$(policy_default_tools "$profile_policy")"
+    if [[ -n "$policy_tool" ]]; then
+      printf '%s\n' "$policy_tool"
+      return 0
+    fi
+  fi
+  local policy_tool
+  policy_tool="$(policy_default_tools "$NOTIFY_POLICY")"
+  if [[ -n "$policy_tool" ]]; then
+    printf '%s\n' "$policy_tool"
+    return 0
+  fi
+  printf '%s\n' "notify"
+}
+
 probe_terminal_status_since_offset() {
   local events_path="$1"
   local offset="$2"
+  local probe_actions="$3"
+  local probe_tools="$4"
   if [[ ! -f "$events_path" ]]; then
     return 1
   fi
@@ -100,18 +207,23 @@ probe_terminal_status_since_offset() {
   probe_cursor="$(mktemp)"
   printf '%s' "$offset" > "$probe_cursor"
   local probe_output
-  probe_output="$(
-    uv run notify usr-events watch \
-      --provider generic \
-      --events "$events_path" \
-      --cursor "$probe_cursor" \
-      --only-actions densegen_health \
-      --only-tools densegen \
-      --dry-run \
-      --no-advance-cursor-on-dry-run \
-      --on-truncate "$NOTIFY_ON_TRUNCATE" \
-      --stop-on-terminal-status 2>/dev/null || true
-  )"
+  local -a probe_args=(
+    uv run notify usr-events watch
+    --provider generic
+    --events "$events_path"
+    --cursor "$probe_cursor"
+    --dry-run
+    --no-advance-cursor-on-dry-run
+    --on-truncate "$NOTIFY_ON_TRUNCATE"
+    --stop-on-terminal-status
+  )
+  if [[ -n "$probe_actions" ]]; then
+    probe_args+=(--only-actions "$probe_actions")
+  fi
+  if [[ -n "$probe_tools" ]]; then
+    probe_args+=(--only-tools "$probe_tools")
+  fi
+  probe_output="$("${probe_args[@]}" 2>/dev/null || true)"
   rm -f "$probe_cursor"
   if grep -Eq '"status":[[:space:]]*"(success|failure)"' <<<"$probe_output"; then
     return 0
@@ -120,9 +232,11 @@ probe_terminal_status_since_offset() {
 }
 
 emit_timeout_notification() {
-  local notify_tool_value="${NOTIFY_TOOL:-${NOTIFY_NAMESPACE:-densegen}}"
+  local profile_path="${1:-}"
+  local notify_tool_value
+  notify_tool_value="$(resolve_timeout_tool "$profile_path")"
   local notify_run_id="${USR_ACTOR_RUN_ID:-notify-watch-${JOB_ID:-manual}}"
-  local notify_message="Notify watcher idle-timeout reached before terminal densegen_health status (idle_timeout=${NOTIFY_IDLE_TIMEOUT_SECONDS}s)."
+  local notify_message="Notify watcher idle-timeout reached before a terminal event matching the active notify filters (idle_timeout=${NOTIFY_IDLE_TIMEOUT_SECONDS}s)."
   local -a SEND_ARGS=(
     --status failure
     --tool "$notify_tool_value"
@@ -141,6 +255,7 @@ enforce_terminal_on_idle_if_enabled() {
   local events_path="$1"
   local cursor_path="$2"
   local pre_watch_offset="$3"
+  local profile_path="${4:-}"
   if [[ "$NOTIFY_ENFORCE_TERMINAL_ON_IDLE" != "1" ]]; then
     return 0
   fi
@@ -159,10 +274,14 @@ enforce_terminal_on_idle_if_enabled() {
       return 0
     fi
   fi
-  if probe_terminal_status_since_offset "$events_path" "$pre_watch_offset"; then
+  local probe_actions
+  probe_actions="$(resolve_probe_actions "$profile_path")"
+  local probe_tools
+  probe_tools="$(resolve_probe_tools "$profile_path")"
+  if probe_terminal_status_since_offset "$events_path" "$pre_watch_offset" "$probe_actions" "$probe_tools"; then
     return 0
   fi
-  emit_timeout_notification
+  emit_timeout_notification "$profile_path"
   return 3
 }
 
@@ -191,7 +310,7 @@ if [[ -n "$NOTIFY_PROFILE" ]]; then
   PROFILE_CURSOR_PATH="$(resolve_profile_path_field "$NOTIFY_PROFILE" "cursor")"
   PRE_WATCH_OFFSET="$(cursor_offset_or_zero "$PROFILE_CURSOR_PATH")"
   uv run notify usr-events watch "${PROFILE_WATCH_ARGS[@]}"
-  enforce_terminal_on_idle_if_enabled "$PROFILE_EVENTS_PATH" "$PROFILE_CURSOR_PATH" "$PRE_WATCH_OFFSET"
+  enforce_terminal_on_idle_if_enabled "$PROFILE_EVENTS_PATH" "$PROFILE_CURSOR_PATH" "$PRE_WATCH_OFFSET" "$NOTIFY_PROFILE"
   exit $?
 fi
 
