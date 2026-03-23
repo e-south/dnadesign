@@ -35,7 +35,7 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     template_contexts = _read("src/dnadesign/construct/docs/reference/template-contexts.md")
     workspaces = _read("src/dnadesign/construct/workspaces/README.md")
     source_of_truth_workspace = _read(
-        "src/dnadesign/construct/workspaces/demo_promoter_swap_pdual10_source_of_truth/README.md"
+        "src/dnadesign/construct/workspaces/demo_anchor_template_shared_dataset/README.md"
     )
 
     token = "../../usr/docs/operations/construct-infer-shared-dataset-runbook.md"
@@ -60,8 +60,8 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     assert "construct__anchor_start" in template_contexts
     assert "### Key docs" in readme
     assert "### Boundary reminders" in readme
-    assert "demo_promoter_swap_pdual10_source_of_truth" in readme
-    assert "demo_promoter_swap_pdual10_source_of_truth" in workspaces
+    assert "demo_anchor_template_shared_dataset" in readme
+    assert "demo_anchor_template_shared_dataset" in workspaces
     assert "uv run construct workspace list" in workspaces
     assert "downstream consumers" in source_of_truth_workspace
     assert "promoter-characterization-feature-matrix.md" in source_of_truth_workspace

@@ -1,0 +1,29 @@
+workspace:
+  id: demo_anchor_template_shared_dataset
+  profile: anchor-template-shared-dataset-demo
+  description: >
+    Construct workspace registry for the packaged shared-dataset demo.
+    Each project entry maps one audited config to the shared output dataset
+    contract used by infer and downstream consumers.
+  roots:
+    shared_usr_root: src/dnadesign/usr/datasets
+    workspace_usr_root: outputs/usr_datasets
+  projects:
+    - id: slot_a_window
+      config: config.slot_a.window.yaml
+      flow: replace-anchor-in-template
+      input_dataset: anchor_parts_demo
+      template_id: template_backbone_dual_slot
+      template_dataset: template_parts_demo
+      template_record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+      output_dataset: anchor_template_shared_dataset_demo
+      notes: 1 kb centered context window around the slot_a incumbent segment.
+    - id: slot_b_window
+      config: config.slot_b.window.yaml
+      flow: replace-anchor-in-template
+      input_dataset: anchor_parts_demo
+      template_id: template_backbone_dual_slot
+      template_dataset: template_parts_demo
+      template_record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+      output_dataset: anchor_template_shared_dataset_demo
+      notes: 1 kb centered context window around the slot_b incumbent segment.

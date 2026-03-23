@@ -19,7 +19,7 @@ import yaml
 from typer.testing import CliRunner
 
 from dnadesign.construct.cli import app
-from dnadesign.construct.src.seed import bootstrap_promoter_swap_demo
+from dnadesign.construct.src.seed import bootstrap_anchor_template_demo
 from dnadesign.construct.src.workspace import project_root
 from dnadesign.usr import Dataset
 
@@ -77,7 +77,7 @@ def test_workspace_init_creates_default_layout_and_config(tmp_path: Path) -> Non
     assert f"Then: {command_prefix} seed import-manifest" in output
     assert "outputs/usr_datasets" in output
     assert "seed_manifest.yaml" not in output
-    assert "--profile promoter-swap-demo" in output
+    assert "--profile anchor-template-demo" in output
     assert "./runbook.sh" not in output
 
 
@@ -99,7 +99,7 @@ def test_workspace_init_copies_packaged_promoter_swap_demo_profile(tmp_path: Pat
 
     result = _RUNNER.invoke(
         app,
-        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "promoter-swap-demo"],
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
     )
 
     workspace_dir = root / "demo_construct"
@@ -117,7 +117,7 @@ def test_workspace_init_copies_packaged_promoter_swap_demo_profile(tmp_path: Pat
         encoding="utf-8"
     )
     output = result.stdout or ""
-    assert "profile: promoter-swap-demo" in output
+    assert "profile: anchor-template-demo" in output
     assert "workspace_registry:" in output
     assert f"{command_prefix} workspace show --workspace" in output
     assert "choose one of the packaged config.*.yaml files" in output
@@ -140,7 +140,7 @@ def test_workspace_init_copies_packaged_source_of_truth_demo_profile(tmp_path: P
             "--root",
             root.as_posix(),
             "--profile",
-            "promoter-swap-source-of-truth-demo",
+            "anchor-template-shared-dataset-demo",
         ],
     )
 
@@ -155,7 +155,7 @@ def test_workspace_init_copies_packaged_source_of_truth_demo_profile(tmp_path: P
     assert not (workspace_dir / "config.slot_a.full.yaml").exists()
     assert not (workspace_dir / "config.slot_b.full.yaml").exists()
     output = result.stdout or ""
-    assert "profile: promoter-swap-source-of-truth-demo" in output
+    assert "profile: anchor-template-shared-dataset-demo" in output
     assert "workspace_registry:" in output
     assert f"{command_prefix} workspace show --workspace" in output
     assert "outputs/usr_datasets" in output
@@ -181,7 +181,7 @@ def test_workspace_init_uses_plain_uv_run_when_repo_checkout_is_unavailable(tmp_
 
     result = _RUNNER.invoke(
         app,
-        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "promoter-swap-demo"],
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
     )
 
     workspace_dir = root / "demo_construct"
@@ -245,7 +245,7 @@ def test_workspace_show_reports_registry_summary(tmp_path: Path) -> None:
 
     init_result = _RUNNER.invoke(
         app,
-        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "promoter-swap-demo"],
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
     )
     assert init_result.exit_code == 0, init_result.stdout
 
@@ -255,7 +255,7 @@ def test_workspace_show_reports_registry_summary(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.stdout
     output = result.stdout or ""
     assert "workspace_id: demo_construct" in output
-    assert "profile: promoter-swap-demo" in output
+    assert "profile: anchor-template-demo" in output
     assert "shared_usr_root: src/dnadesign/usr/datasets (repo-relative hint)" in output
     assert "workspace_usr_root: outputs/usr_datasets (workspace-relative default)" in output
     assert "project: id=slot_a_window" in output
@@ -264,18 +264,18 @@ def test_workspace_show_reports_registry_summary(tmp_path: Path) -> None:
 def test_workspace_list_json_reports_packaged_workspace_state(monkeypatch, tmp_path: Path) -> None:
     construct_root = tmp_path / "construct_root"
     workspaces_root = construct_root / "workspaces"
-    for workspace_id in ("demo_promoter_swap_pdual10", "demo_promoter_swap_pdual10_source_of_truth"):
+    for workspace_id in ("demo_anchor_template_local", "demo_anchor_template_shared_dataset"):
         workspace_dir = workspaces_root / workspace_id
         workspace_dir.mkdir(parents=True, exist_ok=True)
         (workspace_dir / "construct.workspace.yaml").write_text(
             "workspace:\n  id: demo\n  profile: demo\n  projects: []\n",
             encoding="utf-8",
         )
-    (workspaces_root / "demo_promoter_swap_pdual10_source_of_truth" / "outputs" / "logs").mkdir(
+    (workspaces_root / "demo_anchor_template_shared_dataset" / "outputs" / "logs").mkdir(
         parents=True,
         exist_ok=True,
     )
-    (workspaces_root / "demo_promoter_swap_pdual10_source_of_truth" / "outputs" / "logs" / "run.log").write_text(
+    (workspaces_root / "demo_anchor_template_shared_dataset" / "outputs" / "logs" / "run.log").write_text(
         "ok\n",
         encoding="utf-8",
     )
@@ -286,27 +286,27 @@ def test_workspace_list_json_reports_packaged_workspace_state(monkeypatch, tmp_p
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
     by_id = {entry["workspace_id"]: entry for entry in payload}
-    assert by_id["demo_promoter_swap_pdual10"]["workspace_state"] == "clean"
-    assert by_id["demo_promoter_swap_pdual10"]["output_files"] == 0
-    assert by_id["demo_promoter_swap_pdual10"]["workspace_source"] == "packaged"
-    assert by_id["demo_promoter_swap_pdual10_source_of_truth"]["workspace_state"] == "attention"
-    assert by_id["demo_promoter_swap_pdual10_source_of_truth"]["output_files"] == 1
-    assert by_id["demo_promoter_swap_pdual10_source_of_truth"]["workspace_source"] == "packaged"
-    assert by_id["demo_promoter_swap_pdual10_source_of_truth"]["latest_output_mtime"] is not None
+    assert by_id["demo_anchor_template_local"]["workspace_state"] == "clean"
+    assert by_id["demo_anchor_template_local"]["output_files"] == 0
+    assert by_id["demo_anchor_template_local"]["workspace_source"] == "packaged"
+    assert by_id["demo_anchor_template_shared_dataset"]["workspace_state"] == "attention"
+    assert by_id["demo_anchor_template_shared_dataset"]["output_files"] == 1
+    assert by_id["demo_anchor_template_shared_dataset"]["workspace_source"] == "packaged"
+    assert by_id["demo_anchor_template_shared_dataset"]["latest_output_mtime"] is not None
 
 
 def test_workspace_list_json_reports_local_copied_workspace_state(monkeypatch, tmp_path: Path) -> None:
     construct_root = tmp_path / "construct_root"
-    packaged_root = construct_root / "workspaces" / "demo_promoter_swap_pdual10"
+    packaged_root = construct_root / "workspaces" / "demo_anchor_template_local"
     packaged_root.mkdir(parents=True, exist_ok=True)
     (packaged_root / "construct.workspace.yaml").write_text(
-        "workspace:\n  id: demo_promoter_swap_pdual10\n  profile: demo\n  projects: []\n",
+        "workspace:\n  id: demo_anchor_template_local\n  profile: demo\n  projects: []\n",
         encoding="utf-8",
     )
     local_workspace = tmp_path / "demo_construct"
     (local_workspace / "outputs" / "logs").mkdir(parents=True, exist_ok=True)
     (local_workspace / "construct.workspace.yaml").write_text(
-        "workspace:\n  id: demo_construct\n  profile: promoter-swap-demo\n  projects: []\n",
+        "workspace:\n  id: demo_construct\n  profile: anchor-template-demo\n  projects: []\n",
         encoding="utf-8",
     )
     (local_workspace / "outputs" / "logs" / "run.log").write_text("ok\n", encoding="utf-8")
@@ -323,14 +323,14 @@ def test_workspace_list_json_reports_local_copied_workspace_state(monkeypatch, t
     assert by_id["demo_construct"]["output_files"] == 1
     assert by_id["demo_construct"]["workspace_root_source"] == "cwd"
     assert by_id["demo_construct"]["workspace_dir"] == str(local_workspace.resolve())
-    assert by_id["demo_promoter_swap_pdual10"]["workspace_source"] == "packaged"
+    assert by_id["demo_anchor_template_local"]["workspace_source"] == "packaged"
 
 
 def test_workspace_doctor_reports_ok_for_packaged_demo(tmp_path: Path) -> None:
     root = tmp_path / "ws_root"
     init_result = _RUNNER.invoke(
         app,
-        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "promoter-swap-demo"],
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
     )
     assert init_result.exit_code == 0, init_result.stdout
 
@@ -348,7 +348,7 @@ def test_workspace_doctor_reports_registry_drift(tmp_path: Path) -> None:
     root = tmp_path / "ws_root"
     init_result = _RUNNER.invoke(
         app,
-        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "promoter-swap-demo"],
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
     )
     assert init_result.exit_code == 0, init_result.stdout
 
@@ -368,7 +368,7 @@ def test_workspace_doctor_rejects_project_config_path_escape(tmp_path: Path) -> 
     root = tmp_path / "ws_root"
     init_result = _RUNNER.invoke(
         app,
-        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "promoter-swap-demo"],
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
     )
     assert init_result.exit_code == 0, init_result.stdout
 
@@ -388,12 +388,12 @@ def test_workspace_validate_project_runtime_resolves_registry_project(tmp_path: 
     root = tmp_path / "ws_root"
     init_result = _RUNNER.invoke(
         app,
-        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "promoter-swap-demo"],
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
     )
     assert init_result.exit_code == 0, init_result.stdout
 
     workspace_dir = root / "demo_construct"
-    bootstrap_promoter_swap_demo(
+    bootstrap_anchor_template_demo(
         root=workspace_dir / "outputs" / "usr_datasets",
         manifest=workspace_dir / "inputs" / "seed_manifest.yaml",
     )
@@ -413,8 +413,8 @@ def test_workspace_validate_project_runtime_resolves_registry_project(tmp_path: 
 
     assert result.exit_code == 0, result.stdout
     output = result.stdout or ""
-    assert "job_id: promoter_swap_slot_a_window_1kb" in output
-    assert "template_id: pDual-10" in output
+    assert "job_id: anchor_template_slot_a_window_1kb" in output
+    assert "template_id: template_backbone_dual_slot" in output
     assert "placement: part=anchor" in output
     assert "rows_total: 4" in output
 
@@ -423,7 +423,7 @@ def test_workspace_show_resolves_local_workspace_id_from_active_root(monkeypatch
     root = tmp_path / "ws_root"
     init_result = _RUNNER.invoke(
         app,
-        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "promoter-swap-demo"],
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
     )
     assert init_result.exit_code == 0, init_result.stdout
     monkeypatch.setenv("CONSTRUCT_WORKSPACE_ROOT", root.as_posix())
@@ -438,32 +438,32 @@ def test_workspace_show_resolves_local_workspace_id_from_active_root(monkeypatch
 
 def test_workspace_show_resolves_packaged_workspace_id(monkeypatch, tmp_path: Path) -> None:
     construct_root = tmp_path / "construct_root"
-    packaged_workspace = construct_root / "workspaces" / "demo_promoter_swap_pdual10"
+    packaged_workspace = construct_root / "workspaces" / "demo_anchor_template_local"
     packaged_workspace.mkdir(parents=True, exist_ok=True)
     (packaged_workspace / "construct.workspace.yaml").write_text(
-        "workspace:\n  id: demo_promoter_swap_pdual10\n  profile: promoter-swap-demo\n  projects: []\n",
+        "workspace:\n  id: demo_anchor_template_local\n  profile: anchor-template-demo\n  projects: []\n",
         encoding="utf-8",
     )
     monkeypatch.setattr("dnadesign.construct.src.workspace._construct_root", lambda: construct_root)
 
-    result = _RUNNER.invoke(app, ["workspace", "show", "--workspace", "demo_promoter_swap_pdual10"])
+    result = _RUNNER.invoke(app, ["workspace", "show", "--workspace", "demo_anchor_template_local"])
 
     assert result.exit_code == 0, result.stdout
     output = result.stdout or ""
     assert f"workspace_registry: {packaged_workspace / 'construct.workspace.yaml'}" in output
-    assert "workspace_id: demo_promoter_swap_pdual10" in output
+    assert "workspace_id: demo_anchor_template_local" in output
 
 
 def test_workspace_run_project_dry_run_resolves_registry_project(tmp_path: Path) -> None:
     root = tmp_path / "ws_root"
     init_result = _RUNNER.invoke(
         app,
-        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "promoter-swap-demo"],
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
     )
     assert init_result.exit_code == 0, init_result.stdout
 
     workspace_dir = root / "demo_construct"
-    bootstrap_promoter_swap_demo(
+    bootstrap_anchor_template_demo(
         root=workspace_dir / "outputs" / "usr_datasets",
         manifest=workspace_dir / "inputs" / "seed_manifest.yaml",
     )
@@ -483,8 +483,8 @@ def test_workspace_run_project_dry_run_resolves_registry_project(tmp_path: Path)
 
     assert result.exit_code == 0, result.stdout
     output = result.stdout or ""
-    assert "Config validated (dry run): job=promoter_swap_slot_a_window_1kb" in output
-    assert "output_dataset: pdual10_slot_a_window_1kb_demo" in output
+    assert "Config validated (dry run): job=anchor_template_slot_a_window_1kb" in output
+    assert "output_dataset: anchor_template_slot_a_window_1kb_demo" in output
 
 
 def test_workspace_shared_source_of_truth_profile_accumulates_distinct_projects(tmp_path: Path) -> None:
@@ -499,13 +499,13 @@ def test_workspace_shared_source_of_truth_profile_accumulates_distinct_projects(
             "--root",
             root.as_posix(),
             "--profile",
-            "promoter-swap-source-of-truth-demo",
+            "anchor-template-shared-dataset-demo",
         ],
     )
     assert init_result.exit_code == 0, init_result.stdout
 
     workspace_dir = root / "demo_construct"
-    bootstrap_promoter_swap_demo(
+    bootstrap_anchor_template_demo(
         root=workspace_dir / "outputs" / "usr_datasets",
         manifest=workspace_dir / "inputs" / "seed_manifest.yaml",
     )
@@ -538,9 +538,9 @@ def test_workspace_shared_source_of_truth_profile_accumulates_distinct_projects(
         )
         assert run_result.exit_code == 0, run_result.stdout
 
-    output_ds = Dataset(workspace_dir / "outputs" / "usr_datasets", "pdual10_source_of_truth_demo")
+    output_ds = Dataset(workspace_dir / "outputs" / "usr_datasets", "anchor_template_shared_dataset_demo")
     output_ds.validate(strict=True)
     frame = output_ds.head(n=20)
     assert len(frame) == 8
-    assert set(frame["construct__job"]) == {"promoter_swap_slot_a_window_1kb", "promoter_swap_slot_b_window_1kb"}
+    assert set(frame["construct__job"]) == {"anchor_template_slot_a_window_1kb", "anchor_template_slot_b_window_1kb"}
     assert "usr_label__primary" in frame.columns

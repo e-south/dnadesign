@@ -1,15 +1,22 @@
-## demo_promoter_swap_pdual10_source_of_truth workspace
+## demo_anchor_template_shared_dataset workspace
 
-Copy this packaged workspace into a new local workspace id with:
+Use this packaged workspace when you want to show the second Construct pattern:
+multiple audited projects accumulating into one downstream dataset.
+
+Copy it into a new workspace id with:
 
 ```bash
-uv run construct workspace init --id my_shared_dataset_demo --profile promoter-swap-source-of-truth-demo
-cd my_shared_dataset_demo
+uv run construct workspace init --id my_anchor_template_shared_demo --profile anchor-template-shared-dataset-demo
+cd my_anchor_template_shared_demo
 uv run construct workspace show --workspace .
 ./runbook.sh --mode dry-run-all
 ```
 
-This workspace keeps construct IO inside `outputs/usr_datasets` by default and routes both packaged window projects into one semantic dataset, `pdual10_source_of_truth_demo`. Use it when construct should hand one USR-backed shared dataset into infer and downstream consumers without manual config repointing.
+This workspace keeps construct IO inside `outputs/usr_datasets` by default and
+routes both packaged window projects into one semantic dataset,
+`anchor_template_shared_dataset_demo`. Use it when Construct should hand one
+USR-backed dataset to downstream consumers without relying on implicit config
+repointing.
 
 - Workspace registry: [construct.workspace.yaml](construct.workspace.yaml)
 - Runbook: [runbook.md](runbook.md)

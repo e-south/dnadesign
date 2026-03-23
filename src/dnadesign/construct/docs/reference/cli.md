@@ -8,7 +8,7 @@
 - `uv run construct run --config <path> [--dry-run]`
 - `uv run construct validate config --config <path> [--runtime]`
 - `uv run construct seed import-manifest --manifest <path> [--root <usr-root>]`
-- `uv run construct seed promoter-swap-demo [--root <usr-root>] [--manifest <path>]`
+- `uv run construct seed anchor-template-demo [--root <usr-root>] [--manifest <path>]`
 - `uv run construct workspace where [--root <workspace-root>] [--profile <profile>]`
 - `uv run construct workspace init --id <workspace-id> [--root <workspace-root>] [--profile <profile>]`
 - `uv run construct workspace show --workspace <workspace-dir>`
@@ -52,12 +52,12 @@ Run output reports:
 - `output_dataset`
 - `spec_id`
 
-### `seed promoter-swap-demo`
+### `seed anchor-template-demo`
 
-This command bootstraps the packaged promoter-swap demo inputs:
+This command bootstraps the packaged anchor/template demo inputs:
 
-- `mg1655_promoters`
-- `plasmids`
+- `anchor_parts_demo`
+- `template_parts_demo`
 
 It also writes:
 
@@ -93,4 +93,4 @@ Workspace registry contract:
 - the default workspace root is the current working directory; use `--root` or `CONSTRUCT_WORKSPACE_ROOT` to override it
 - each project entry maps one config file to its intended input/template/output contract
 - multi-template studies are represented as multiple project entries, not multiple templates inside one construct job
-- packaged profiles currently include `promoter-swap-demo` and `promoter-swap-source-of-truth-demo`
+- packaged profiles currently include `anchor-template-demo` and `anchor-template-shared-dataset-demo`

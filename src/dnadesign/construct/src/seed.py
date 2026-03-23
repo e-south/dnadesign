@@ -27,7 +27,7 @@ from .errors import ConfigError
 from .output_store import _ensure_construct_registry
 from .workspace import project_root_or_none
 
-_SEED_ASSET = "promoter_swap_demo.yaml"
+_SEED_ASSET = "anchor_template_demo.yaml"
 
 
 @dataclass(frozen=True)
@@ -269,7 +269,7 @@ def _write_manifest(
     slots: List[SeedSlot],
 ) -> None:
     payload = {
-        "demo_id": "promoter_swap_pdual10",
+        "demo_id": "anchor_template_demo",
         "datasets": {
             "anchors": anchor_dataset,
             "templates": template_dataset,
@@ -302,8 +302,11 @@ def _write_manifest(
             for slot in slots
         },
         "notes": [
-            "The full pDual-10 record contains two exact J23105 matches; choose slot_a or slot_b explicitly.",
-            "The earlier scaffold-only interval [405, 440) does not apply to the full pDual-10 record.",
+            (
+                "The full template_backbone_dual_slot record contains two exact "
+                "anchor_part_short_ref matches; choose slot_a or slot_b explicitly."
+            ),
+            "This packaged demo uses the full template record, not an older scaffold-only slice.",
         ],
     }
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -392,11 +395,11 @@ def import_seed_manifest(*, root: str | Path | None, manifest: str | Path) -> Ma
     return ManifestImportResult(root=root_path, manifest_id=manifest_id, datasets=datasets)
 
 
-def bootstrap_promoter_swap_demo(*, root: str | Path | None, manifest: str | Path | None = None) -> SeedResult:
+def bootstrap_anchor_template_demo(*, root: str | Path | None, manifest: str | Path | None = None) -> SeedResult:
     root_path = _resolve_seed_usr_root(root)
     payload = _seed_asset_payload()
     datasets = payload.get("datasets") or {}
-    manifest_id = str(payload.get("demo_id") or "promoter_swap_demo").strip()
+    manifest_id = str(payload.get("demo_id") or "anchor_template_demo").strip()
     anchor_dataset = str(datasets.get("anchors") or "").strip()
     template_dataset = str(datasets.get("templates") or "").strip()
     if not anchor_dataset or not template_dataset:
@@ -413,14 +416,14 @@ def bootstrap_promoter_swap_demo(*, root: str | Path | None, manifest: str | Pat
     _seed_dataset(
         anchor_ds,
         entries=anchor_entries,
-        notes="Curated control anchors for construct tracer bullet.",
-        source="construct seed promoter-swap-demo",
+        notes="Curated anchor parts for the packaged construct demo.",
+        source="construct seed anchor-template-demo",
     )
     _seed_dataset(
         template_ds,
         entries=template_entries,
-        notes="Curated template records for construct tracer bullet.",
-        source="construct seed promoter-swap-demo",
+        notes="Curated template backbones for the packaged construct demo.",
+        source="construct seed anchor-template-demo",
     )
 
     manifest_path = Path(manifest).expanduser().resolve() if manifest is not None else None

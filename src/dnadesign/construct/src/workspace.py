@@ -25,8 +25,8 @@ from .config import JobConfig, load_job_config
 from .errors import ConfigError
 
 _WORKSPACE_PROFILE_DIR = {
-    "promoter-swap-demo": "demo_promoter_swap_pdual10",
-    "promoter-swap-source-of-truth-demo": "demo_promoter_swap_pdual10_source_of_truth",
+    "anchor-template-demo": "demo_anchor_template_local",
+    "anchor-template-shared-dataset-demo": "demo_anchor_template_shared_dataset",
 }
 _WORKSPACE_REGISTRY_NAME = "construct.workspace.yaml"
 
@@ -37,16 +37,19 @@ _INPUTS_README = """# construct workspace inputs
 - Use `uv run construct seed import-manifest --manifest inputs/import_manifest.template.yaml`
   when you want to materialize your own curated inputs and templates into this
   workspace's `outputs/usr_datasets/` root.
-- When you want the packaged `mg1655_promoters` and `plasmids` tracer-bullet datasets,
-  scaffold a packaged promoter-swap workspace with `construct workspace init --profile promoter-swap-demo`
-  or `construct workspace init --profile promoter-swap-source-of-truth-demo`.
+- When you want the packaged `anchor_parts_demo` and `template_parts_demo`
+  tracer-bullet datasets, scaffold a packaged anchor/template workspace with
+  `construct workspace init --profile anchor-template-demo` or
+  `construct workspace init --profile anchor-template-shared-dataset-demo`.
 - Omit `--root` only when you are running inside a dnadesign checkout and deliberately want to seed
   the canonical shared USR root at `src/dnadesign/usr/datasets/`, or when `DNADESIGN_USR_ROOT`
   points at a writable datasets root.
 - Keep human-readable sequence names in `usr_label__primary` / `usr_label__aliases`; keep
   construct-specific seed provenance in `construct_seed__*`.
-- Keep canonical template records in USR; do not fall back to ad hoc FASTA files for ordinary construct runs.
-- Prefer flat semantic output dataset ids such as `pdual10_slot_a_window_1kb_demo`, not tool-owned dataset namespaces.
+- Keep canonical template records in USR; do not fall back to ad hoc FASTA files
+  for ordinary construct runs.
+- Prefer flat semantic output dataset ids such as
+  `anchor_template_slot_a_window_1kb_demo`, not tool-owned dataset namespaces.
 """
 
 _IMPORT_MANIFEST_TEMPLATE = """manifest_id: example_construct_inputs
@@ -518,9 +521,9 @@ def doctor_workspace_registry(workspace: str | Path) -> WorkspaceDoctorReport:
 def _default_workspace_registry_payload(*, workspace_id: str, profile: str) -> dict:
     project_config = "config.yaml" if profile == "blank" else "config.slot_a.window.yaml"
     project_flow = "replace-anchor-in-template"
-    project_output = "REPLACE_WITH_OUTPUT_DATASET" if profile == "blank" else "pdual10_slot_a_window_1kb_demo"
-    project_template_id = "REPLACE_WITH_TEMPLATE_LABEL" if profile == "blank" else "pDual-10"
-    project_template_dataset = "REPLACE_WITH_TEMPLATE_DATASET" if profile == "blank" else "plasmids"
+    project_output = "REPLACE_WITH_OUTPUT_DATASET" if profile == "blank" else "anchor_template_slot_a_window_1kb_demo"
+    project_template_id = "REPLACE_WITH_TEMPLATE_LABEL" if profile == "blank" else "template_backbone_dual_slot"
+    project_template_dataset = "REPLACE_WITH_TEMPLATE_DATASET" if profile == "blank" else "template_parts_demo"
     return {
         "workspace": {
             "id": workspace_id,
@@ -537,7 +540,7 @@ def _default_workspace_registry_payload(*, workspace_id: str, profile: str) -> d
                     "id": workspace_id if profile == "blank" else "slot_a_window",
                     "config": project_config,
                     "flow": project_flow,
-                    "input_dataset": "REPLACE_WITH_ANCHOR_DATASET" if profile == "blank" else "mg1655_promoters",
+                    "input_dataset": "REPLACE_WITH_ANCHOR_DATASET" if profile == "blank" else "anchor_parts_demo",
                     "template_id": project_template_id,
                     "template_dataset": project_template_dataset,
                     "template_record_id": (
@@ -549,7 +552,7 @@ def _default_workspace_registry_payload(*, workspace_id: str, profile: str) -> d
                     "notes": (
                         "Replace placeholders and add more project entries as flows expand."
                         if profile == "blank"
-                        else "Windowed promoter swap against slot_a in pDual-10."
+                        else "Windowed anchor placement against slot_a in the packaged dual-slot template."
                     ),
                 }
             ],

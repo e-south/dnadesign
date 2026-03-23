@@ -9,17 +9,17 @@ One construct job realizes one template against one input dataset selection and 
 
 ```yaml
 job:
-  id: promoter_swap_slot_a_window_1kb
+  id: anchor_template_slot_a_window_1kb
   input:
     source: usr
-    dataset: mg1655_promoters
+    dataset: anchor_parts_demo
     root: outputs/usr_datasets
     field: sequence
     ids: [OPTIONAL_RECORD_ID]
   template:
-    id: pDual-10
+    id: template_backbone_dual_slot
     kind: usr
-    dataset: plasmids
+    dataset: template_parts_demo
     root: outputs/usr_datasets
     record_id: TEMPLATE_RECORD_ID
     field: sequence
@@ -46,7 +46,7 @@ job:
       size_bp: 1000
       offset_bp: 0
   output:
-    dataset: pdual10_slot_a_window_1kb_demo
+    dataset: anchor_template_slot_a_window_1kb_demo
     root: outputs/usr_datasets
     on_conflict: error
     allow_same_as_input: false

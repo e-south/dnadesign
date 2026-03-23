@@ -16,7 +16,7 @@ from pathlib import Path
 import typer
 
 from ...errors import ConstructError
-from ...seed import bootstrap_promoter_swap_demo, import_seed_manifest
+from ...seed import bootstrap_anchor_template_demo, import_seed_manifest
 from ._errors import exit_with_error
 
 seed_app = typer.Typer(
@@ -61,8 +61,8 @@ def import_manifest(
             )
 
 
-@seed_app.command("promoter-swap-demo")
-def promoter_swap_demo(
+@seed_app.command("anchor-template-demo")
+def anchor_template_demo(
     root: Path | None = typer.Option(
         None,
         "--root",
@@ -75,7 +75,7 @@ def promoter_swap_demo(
     ),
 ) -> None:
     try:
-        result = bootstrap_promoter_swap_demo(root=root, manifest=manifest)
+        result = bootstrap_anchor_template_demo(root=root, manifest=manifest)
     except (ConstructError, OSError) as exc:
         exit_with_error(exc, code=1)
 
@@ -110,5 +110,5 @@ def promoter_swap_demo(
     if any(path.exists() for path in legacy_paths):
         typer.echo(
             "warning: legacy demo datasets from older ontology revisions are still present in this root; "
-            "canonical curated inputs are mg1655_promoters and plasmids."
+            "canonical packaged demo inputs are anchor_parts_demo and template_parts_demo."
         )

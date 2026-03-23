@@ -189,13 +189,13 @@ Promote the first real promoter-swap flow from a file-backed placeholder into a 
 
 ### CLI surface additions
 
-- `construct seed promoter-swap-demo [--root <usr-root>] --manifest <path>`
+- `construct seed anchor-template-demo [--root <usr-root>] --manifest <path>`
   - bootstraps curated anchor/template demo datasets
   - defaults to the canonical repo USR datasets root when `--root` is omitted
   - attaches `construct_seed__*` catalog overlays for human-readable labels
   - attaches standardized `usr_label__primary` / `usr_label__aliases` label fields and materializes those into `records.parquet`
   - writes a manifest with deterministic record ids and slot coordinates
-- `construct workspace init --profile promoter-swap-demo`
+- `construct workspace init --profile anchor-template-demo`
   - copies a packaged demo workspace with slot_a/slot_b and window/full configs
 
 ### Validation contract
