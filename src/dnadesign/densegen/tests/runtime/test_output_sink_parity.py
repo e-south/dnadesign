@@ -185,6 +185,54 @@ def test_usr_writer_import_skips_full_existing_id_scan_when_ids_are_prevalidated
     writer.finalize()
 
 
+def test_usr_writer_can_append_after_materialize(tmp_path: Path) -> None:
+    root, writer = _make_usr_writer(tmp_path, deduplicate=True, chunk_size=1)
+    meta_first = output_meta(library_hash="demo_hash", library_index=1)
+    meta_first["run_id"] = "run-1"
+    first = OutputRecord.from_sequence(
+        sequence="ACGTACGTAA",
+        meta=meta_first,
+        source="unit",
+        bio_type="dna",
+        alphabet="dna_4",
+    )
+    assert writer.add(first) is True
+    writer.finalize()
+
+    ds = usr_pkg.Dataset(root, "demo")
+    with ds.maintenance(reason="materialize"):
+        ds.materialize(keep_overlays=False)
+
+    materialized_base = pq.read_table(ds.records_path)
+    assert "densegen__run_id" in materialized_base.column_names
+
+    writer_resumed = USRWriter(
+        dataset="demo",
+        root=root,
+        namespace="densegen",
+        chunk_size=1,
+        deduplicate=True,
+    )
+    meta_second = output_meta(library_hash="demo_hash_2", library_index=2)
+    meta_second["run_id"] = "run-2"
+    second = OutputRecord.from_sequence(
+        sequence="TTTTACGTAA",
+        meta=meta_second,
+        source="unit",
+        bio_type="dna",
+        alphabet="dna_4",
+    )
+    assert writer_resumed.add(second) is True
+    writer_resumed.finalize()
+
+    base_after_resume = pq.read_table(ds.records_path)
+    assert "densegen__run_id" in base_after_resume.column_names
+    assert base_after_resume.num_rows == 2
+
+    merged = ds.head(10)
+    assert sorted(merged["densegen__run_id"].dropna().tolist()) == ["run-1", "run-2"]
+
+
 def test_usr_writer_passes_explicit_actor_to_usr_mutations(tmp_path: Path, monkeypatch) -> None:
     _root, writer = _make_usr_writer(tmp_path)
     meta = output_meta(library_hash="demo_hash", library_index=1)

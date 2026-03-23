@@ -417,6 +417,93 @@ def test_namespace_frozen_and_either_modes_use_frozen_registry_snapshot(tmp_path
     ds.validate(registry_mode="namespace-either")
 
 
+def test_strict_validate_materialized_base_uses_namespace_registry_modes(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "unit-test",
+                "description": "test namespace",
+                "columns": [{"name": "mock__score", "type": "float64"}],
+            }
+        },
+    )
+    ds = _make_dataset(root)
+
+    attach_path = tmp_path / "attach.parquet"
+    ids = ds.head(2)["id"].tolist()
+    pq.write_table(pa.table({"id": ids, "score": [0.1, 0.2]}), attach_path)
+    ds.attach(attach_path, namespace="mock", key="id", columns=["score"], parse_json=False)
+
+    with ds.maintenance(reason="materialize"):
+        ds.materialize(keep_overlays=False)
+
+    ds.import_rows(
+        [{"sequence": "CCCC", "bio_type": "dna", "alphabet": "dna_4", "source": "after-materialize"}],
+        source="after-materialize",
+    )
+    ds.validate(strict=True, registry_mode="namespace-current")
+
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "unit-test",
+                "description": "test namespace",
+                "columns": [{"name": "mock__score", "type": "float64"}],
+            },
+            "other": {
+                "owner": "unit-test",
+                "description": "unrelated namespace added later",
+                "columns": [{"name": "other__score", "type": "float64"}],
+            },
+        },
+    )
+
+    with pytest.raises(SchemaError, match="records.parquet registry_hash mismatch"):
+        ds.validate(strict=True, registry_mode="current")
+
+    ds.validate(strict=True, registry_mode="namespace-current")
+
+
+def test_strict_validate_materialized_base_rejects_namespace_type_drift(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "unit-test",
+                "description": "test namespace",
+                "columns": [{"name": "mock__score", "type": "float64"}],
+            }
+        },
+    )
+    ds = _make_dataset(root)
+
+    attach_path = tmp_path / "attach.parquet"
+    ids = ds.head(2)["id"].tolist()
+    pq.write_table(pa.table({"id": ids, "score": [0.1, 0.2]}), attach_path)
+    ds.attach(attach_path, namespace="mock", key="id", columns=["score"], parse_json=False)
+
+    with ds.maintenance(reason="materialize"):
+        ds.materialize(keep_overlays=False)
+
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "unit-test",
+                "description": "test namespace",
+                "columns": [{"name": "mock__score", "type": "string"}],
+            }
+        },
+    )
+
+    with pytest.raises(SchemaError, match="mock__score"):
+        ds.validate(strict=True, registry_mode="namespace-current")
+
+
 def test_registry_type_supports_struct_and_fixed_list() -> None:
     dtype = pa.list_(pa.float32(), list_size=8)
     assert arrow_type_str(dtype) == "fixed_size_list<float32>[8]"

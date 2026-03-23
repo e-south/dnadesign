@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 import socket
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Dict, List
 
@@ -64,6 +65,41 @@ def _dedupe_ids(ids: List[str]) -> List[str]:
         seen.add(value)
         unique_ids.append(value)
     return unique_ids
+
+
+def _infer_output_event_context(out_id: str) -> dict[str, object]:
+    output_id = str(out_id).strip()
+    family, _, remainder = output_id.partition("__")
+    payload: dict[str, object] = {
+        "id": output_id,
+        "family": family or output_id,
+        "kind": "metadata" if output_id.startswith("metadata__") else "feature",
+    }
+    if family == "log_likelihood" and remainder:
+        payload["reduction"] = remainder
+    elif family == "output_layer_mean" and remainder:
+        payload["pool_scope"] = remainder
+    elif family == "intermediate_embedding" and remainder:
+        selector, _, pool_scope = remainder.partition("__")
+        if selector:
+            payload["intermediate_selector"] = selector
+        if pool_scope:
+            payload["pool_scope"] = pool_scope
+    return {"infer_output": payload}
+
+
+def _merge_infer_event_args(
+    *,
+    columnar: Dict[str, List[object]],
+    event_args: Mapping[str, object] | None,
+) -> dict[str, object] | None:
+    merged: dict[str, object] = {}
+    if len(columnar) == 1:
+        only_out_id = next(iter(columnar))
+        merged.update(_infer_output_event_context(only_out_id))
+    if event_args is not None:
+        merged.update(dict(event_args))
+    return merged or None
 
 
 def _read_overlay_subset(*, overlay_path: Path, read_cols: List[str], ids: List[str]) -> pd.DataFrame:
@@ -129,6 +165,7 @@ def write_back_usr(
     job_id: str,
     columnar: Dict[str, List[object]],
     overwrite: bool,
+    event_args: Mapping[str, object] | None = None,
 ) -> None:
     if not columnar:
         _LOG.info("write_back_usr: nothing to write (empty outputs).")
@@ -158,6 +195,7 @@ def write_back_usr(
             list(out_cols.keys()),
             overwrite,
         )
+        resolved_event_args = _merge_infer_event_args(columnar=columnar, event_args=event_args)
         ds.attach(
             p,
             namespace="infer",
@@ -167,4 +205,5 @@ def write_back_usr(
             allow_overwrite=True,
             note=f"dnadesign.infer job={job_id} model={model_id}",
             actor=actor,
+            event_args=resolved_event_args,
         )

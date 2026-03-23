@@ -1687,12 +1687,12 @@ def test_usr_events_watch_construct_workspace_selector_uses_selector_profile_and
     workspace = "demo_construct:slot_a_window"
     workspace_dir = repo_root / "src" / "dnadesign" / "construct" / "workspaces" / "demo_construct"
     config_path = workspace_dir / "config.slot_a.window.yaml"
-    events = workspace_dir / "outputs" / "usr_datasets" / "pdual10_source_of_truth_demo" / ".events.log"
+    events = workspace_dir / "outputs" / "usr_datasets" / "anchor_template_shared_dataset_demo" / ".events.log"
     events.parent.mkdir(parents=True, exist_ok=True)
     slot_b_event = _event(action="attach")
-    slot_b_event["actor"] = {"tool": "construct", "run_id": "construct-promoter_swap_slot_b_window_1kb"}
+    slot_b_event["actor"] = {"tool": "construct", "run_id": "construct-anchor_template_slot_b_window_1kb"}
     slot_a_event = _event(action="materialize")
-    slot_a_event["actor"] = {"tool": "construct", "run_id": "construct-promoter_swap_slot_a_window_1kb"}
+    slot_a_event["actor"] = {"tool": "construct", "run_id": "construct-anchor_template_slot_a_window_1kb"}
     _write_events(events, [slot_b_event, slot_a_event])
 
     workspace_dir.mkdir(parents=True, exist_ok=True)
@@ -1700,13 +1700,13 @@ def test_usr_events_watch_construct_workspace_selector_uses_selector_profile_and
         "\n".join(
             [
                 "job:",
-                "  id: promoter_swap_slot_a_window_1kb",
+                "  id: anchor_template_slot_a_window_1kb",
                 "  input:",
                 "    source: usr",
-                "    dataset: mg1655_promoters",
+                "    dataset: anchor_parts_demo",
                 "    root: outputs/usr_datasets",
                 "  output:",
-                "    dataset: pdual10_source_of_truth_demo",
+                "    dataset: anchor_template_shared_dataset_demo",
                 "    root: outputs/usr_datasets",
             ]
         )
@@ -1718,13 +1718,13 @@ def test_usr_events_watch_construct_workspace_selector_uses_selector_profile_and
             [
                 "workspace:",
                 "  id: demo_construct",
-                "  profile: promoter-swap-source-of-truth-demo",
+                "  profile: anchor-template-shared-dataset-demo",
                 "  projects:",
                 "    - id: slot_a_window",
                 "      config: config.slot_a.window.yaml",
                 "      flow: replace-anchor-in-template",
-                "      input_dataset: mg1655_promoters",
-                "      output_dataset: pdual10_source_of_truth_demo",
+                "      input_dataset: anchor_parts_demo",
+                "      output_dataset: anchor_template_shared_dataset_demo",
             ]
         )
         + "\n",
@@ -1763,14 +1763,14 @@ def test_usr_events_watch_construct_workspace_selector_uses_selector_profile_and
     )
 
     assert result.exit_code == 0
-    assert "construct-promoter_swap_slot_a_window_1kb" in result.stdout
-    assert "construct-promoter_swap_slot_b_window_1kb" not in result.stdout
+    assert "construct-anchor_template_slot_a_window_1kb" in result.stdout
+    assert "construct-anchor_template_slot_b_window_1kb" not in result.stdout
 
 
 def test_usr_events_watch_profile_infers_construct_run_id_from_events_source(tmp_path: Path, monkeypatch) -> None:
     workspace_dir = tmp_path / "construct_workspace"
     config_path = workspace_dir / "configs" / "slot_a" / "config.yaml"
-    events = workspace_dir / "outputs" / "usr_datasets" / "pdual10_source_of_truth_demo" / ".events.log"
+    events = workspace_dir / "outputs" / "usr_datasets" / "anchor_template_shared_dataset_demo" / ".events.log"
     profile = workspace_dir / "outputs" / "notify" / "construct" / "slot_a_window" / "profile.json"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1780,13 +1780,13 @@ def test_usr_events_watch_profile_infers_construct_run_id_from_events_source(tmp
         "\n".join(
             [
                 "job:",
-                "  id: promoter_swap_slot_a_window_1kb",
+                "  id: anchor_template_slot_a_window_1kb",
                 "  input:",
                 "    source: usr",
-                "    dataset: mg1655_promoters",
+                "    dataset: anchor_parts_demo",
                 "    root: ../../outputs/usr_datasets",
                 "  output:",
-                "    dataset: pdual10_source_of_truth_demo",
+                "    dataset: anchor_template_shared_dataset_demo",
                 "    root: ../../outputs/usr_datasets",
             ]
         )
@@ -1803,17 +1803,17 @@ def test_usr_events_watch_profile_infers_construct_run_id_from_events_source(tmp
                 "    - id: slot_a_window",
                 "      config: configs/slot_a/config.yaml",
                 "      flow: replace-anchor-in-template",
-                "      input_dataset: mg1655_promoters",
-                "      output_dataset: pdual10_source_of_truth_demo",
+                "      input_dataset: anchor_parts_demo",
+                "      output_dataset: anchor_template_shared_dataset_demo",
             ]
         )
         + "\n",
         encoding="utf-8",
     )
     slot_b_event = _event(action="attach")
-    slot_b_event["actor"] = {"tool": "construct", "run_id": "construct-promoter_swap_slot_b_window_1kb"}
+    slot_b_event["actor"] = {"tool": "construct", "run_id": "construct-anchor_template_slot_b_window_1kb"}
     slot_a_event = _event(action="materialize")
-    slot_a_event["actor"] = {"tool": "construct", "run_id": "construct-promoter_swap_slot_a_window_1kb"}
+    slot_a_event["actor"] = {"tool": "construct", "run_id": "construct-anchor_template_slot_a_window_1kb"}
     _write_events(events, [slot_b_event, slot_a_event])
     profile.write_text(
         json.dumps(
@@ -1845,5 +1845,5 @@ def test_usr_events_watch_profile_infers_construct_run_id_from_events_source(tmp
     )
 
     assert result.exit_code == 0
-    assert "construct-promoter_swap_slot_a_window_1kb" in result.stdout
-    assert "construct-promoter_swap_slot_b_window_1kb" not in result.stdout
+    assert "construct-anchor_template_slot_a_window_1kb" in result.stdout
+    assert "construct-anchor_template_slot_b_window_1kb" not in result.stdout

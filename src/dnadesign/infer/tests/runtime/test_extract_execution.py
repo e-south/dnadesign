@@ -19,7 +19,7 @@ from dnadesign.infer.src.runtime.extract_execution import execute_extract_output
 
 def test_execute_extract_output_populates_values_and_calls_hooks() -> None:
     progress_updates: list[int] = []
-    chunk_calls: list[tuple[list[int], list[object]]] = []
+    chunk_calls: list[tuple[list[int], list[object], dict[str, object] | None]] = []
 
     def _fn(chunk, **_kwargs):
         return [f"v:{seq}" for seq in chunk]
@@ -37,12 +37,27 @@ def test_execute_extract_output_populates_values_and_calls_hooks() -> None:
         auto_derate=True,
         is_oom=lambda _exc: False,
         on_progress=progress_updates.append,
-        on_chunk=lambda idx, vals: chunk_calls.append((list(idx), list(vals))),
+        on_chunk=lambda idx, vals, *, progress=None: chunk_calls.append((list(idx), list(vals), progress)),
     )
 
     assert values == ["v:A", "keep", "v:C"]
     assert progress_updates == [2]
-    assert chunk_calls == [([0, 2], ["v:A", "v:C"])]
+    assert chunk_calls == [
+        (
+            [0, 2],
+            ["v:A", "v:C"],
+            {
+                "infer_progress": {
+                    "target_rows": 2,
+                    "completed_rows": 2,
+                    "output_progress_pct": 100.0,
+                    "overall_target_units": 2,
+                    "overall_completed_units": 2,
+                    "overall_progress_pct": 100.0,
+                }
+            },
+        )
+    ]
 
 
 def test_execute_extract_output_derates_after_oom_and_retries() -> None:
