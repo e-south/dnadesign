@@ -446,7 +446,7 @@ def test_setup_resolve_events_supports_construct_workspace_project_selector(tmp_
             [
                 "workspace:",
                 "  id: demo_construct",
-                "  profile: promoter-swap-demo",
+                "  profile: anchor-template-demo",
                 "  projects:",
                 "    - id: slot_a_window",
                 "      config: config.slot_a.window.yaml",
@@ -497,13 +497,13 @@ def test_setup_slack_namespaces_construct_selector_profile_paths(tmp_path: Path,
         "\n".join(
             [
                 "job:",
-                "  id: promoter_swap_slot_a_window_1kb",
+                "  id: anchor_template_slot_a_window_1kb",
                 "  input:",
                 "    source: usr",
-                "    dataset: mg1655_promoters",
+                "    dataset: anchor_parts_demo",
                 "    root: outputs/usr_datasets",
                 "  output:",
-                "    dataset: pdual10_source_of_truth_demo",
+                "    dataset: anchor_template_shared_dataset_demo",
                 "    root: outputs/usr_datasets",
             ]
         )
@@ -515,13 +515,13 @@ def test_setup_slack_namespaces_construct_selector_profile_paths(tmp_path: Path,
             [
                 "workspace:",
                 "  id: demo_construct",
-                "  profile: promoter-swap-source-of-truth-demo",
+                "  profile: anchor-template-shared-dataset-demo",
                 "  projects:",
                 "    - id: slot_a_window",
                 "      config: config.slot_a.window.yaml",
                 "      flow: replace-anchor-in-template",
-                "      input_dataset: mg1655_promoters",
-                "      output_dataset: pdual10_source_of_truth_demo",
+                "      input_dataset: anchor_parts_demo",
+                "      output_dataset: anchor_template_shared_dataset_demo",
             ]
         )
         + "\n",

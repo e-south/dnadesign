@@ -37,6 +37,12 @@ Default promoter bundles collect all three groups:
 - `output_layer_mean`
 - `intermediate_embedding`
 
+Interpret these names as feature families, not persisted tensor shapes:
+
+- `log_likelihood` is scalar by definition
+- `output_layer_mean` refers to the final-layer embedding family
+- `intermediate_embedding` refers to the selected internal-layer embedding family
+
 `output_embedding` is accepted as a config/docs alias for continuity, but stored schema and new docs should prefer `output_layer_mean`.
 
 ### Pooling modes
@@ -51,6 +57,10 @@ Rules:
 - `anchor_only` contexts emit `seq_mean` only
 - templated contexts emit both `seq_mean` and `anchor_mean`
 - tokenwise tensors are pooled in memory and discarded; tokenwise persistence is not part of the v1 repo-aligned contract
+
+When writing to USR, the persisted outputs for `output_layer_mean` and
+`intermediate_embedding` are the pooled summaries. The pooling mode is part of
+the stored semantic id, for example `seq_mean` or `anchor_mean`.
 
 ### Context ownership
 
@@ -79,6 +89,12 @@ Promoter bundles emit stable out ids such as:
 - `output_layer_mean__anchor_mean`
 - `intermediate_embedding__block26_mlp_out__seq_mean`
 - `intermediate_embedding__block26_mlp_out__anchor_mean`
+
+Read these ids literally:
+
+- `output_layer_mean__seq_mean` is the mean-pooled final-layer embedding across sequence positions
+- `intermediate_embedding__block26_mlp_out__seq_mean` is the mean-pooled block-26 representation across sequence positions
+- bare names such as `output_layer_mean` or `intermediate_embedding` are bundle categories, not raw persisted tensors
 
 Structured bundle metadata is persisted as additional infer out ids such as:
 

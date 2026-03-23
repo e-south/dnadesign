@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Union
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Union
 
 import pandas as pd
 import pyarrow as pa
@@ -607,6 +607,7 @@ class Dataset:
         backend: str = "pyarrow",
         note: str = "",
         actor: Optional[dict] = None,
+        event_args: Mapping[str, object] | None = None,
     ) -> int:
         return attach_dataset(
             dataset=self,
@@ -621,6 +622,7 @@ class Dataset:
             backend=backend,
             note=note,
             actor=actor,
+            event_args=event_args,
             namespace_pattern=_NS_RE,
             reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
             write_lock=dataset_write_lock,
@@ -641,6 +643,7 @@ class Dataset:
         backend: str = "pyarrow",
         note: str = "",
         actor: Optional[dict] = None,
+        event_args: Mapping[str, object] | None = None,
     ) -> int:
         return attach_columns_dataset(
             dataset=self,
@@ -655,6 +658,7 @@ class Dataset:
             backend=backend,
             note=note,
             actor=actor,
+            event_args=event_args,
             namespace_pattern=_NS_RE,
             reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
             write_lock=dataset_write_lock,
@@ -724,7 +728,8 @@ class Dataset:
     def validate(self, strict: bool = False, *, registry_mode: str = "current") -> None:
         """
         Validate schema, ID uniqueness, alphabet constraints, and namespacing policy.
-        In strict mode, warnings become errors for alphabet/namespacing issues.
+        Strict mode also checks that materialized derived columns still satisfy the
+        selected registry contract.
         """
         validate_dataset(
             self,

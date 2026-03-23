@@ -111,7 +111,7 @@ def test_resolve_tool_workspace_config_path_supports_construct_tool_with_project
             [
                 "workspace:",
                 "  id: demo_c",
-                "  profile: promoter-swap-demo",
+                "  profile: anchor-template-demo",
                 "  projects:",
                 "    - id: slot_a_window",
                 "      config: config.slot_a.window.yaml",
@@ -145,7 +145,7 @@ def test_resolve_tool_workspace_config_path_supports_local_construct_workspace_r
             [
                 "workspace:",
                 "  id: demo_c",
-                "  profile: promoter-swap-demo",
+                "  profile: anchor-template-demo",
                 "  projects:",
                 "    - id: slot_a_window",
                 "      config: config.slot_a.window.yaml",
@@ -178,7 +178,7 @@ def test_resolve_tool_workspace_config_path_supports_current_construct_workspace
             [
                 "workspace:",
                 "  id: demo_c",
-                "  profile: promoter-swap-demo",
+                "  profile: anchor-template-demo",
                 "  projects:",
                 "    - id: slot_a_window",
                 "      config: config.slot_a.window.yaml",
@@ -247,7 +247,7 @@ def test_resolve_tool_workspace_config_path_construct_rejects_ambiguous_workspac
             [
                 "workspace:",
                 "  id: demo_c",
-                "  profile: promoter-swap-demo",
+                "  profile: anchor-template-demo",
                 "  projects:",
                 "    - id: slot_a_window",
                 "      config: config.slot_a.window.yaml",
@@ -285,7 +285,7 @@ def test_list_tool_workspaces_returns_project_qualified_construct_selectors(tmp_
             [
                 "workspace:",
                 "  id: demo_c",
-                "  profile: promoter-swap-demo",
+                "  profile: anchor-template-demo",
                 "  projects:",
                 "    - id: slot_a_window",
                 "      config: config.slot_a.window.yaml",

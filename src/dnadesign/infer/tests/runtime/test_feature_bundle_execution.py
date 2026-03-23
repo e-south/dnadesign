@@ -360,7 +360,7 @@ def test_execute_feature_bundle_resume_writes_only_missing_feature_columns(monke
     }
 
     def _writer_for(out_id: str):
-        def _writer(idx_chunk, values, *, overwrite_override=None):
+        def _writer(idx_chunk, values, *, overwrite_override=None, progress=None):
             output_calls[out_id].append((list(idx_chunk), list(values), overwrite_override))
 
         return _writer
@@ -416,7 +416,7 @@ def test_execute_feature_bundle_stale_digest_rewrites_features_with_overwrite(mo
     }
 
     def _writer_for(out_id: str):
-        def _writer(idx_chunk, values, *, overwrite_override=None):
+        def _writer(idx_chunk, values, *, overwrite_override=None, progress=None):
             output_calls[out_id].append((list(idx_chunk), list(values), overwrite_override))
 
         return _writer
@@ -470,7 +470,7 @@ def test_execute_feature_bundle_backfills_missing_metadata_without_recomputing(m
     )
 
     def _writer_for(out_id: str):
-        def _writer(idx_chunk, values, *, overwrite_override=None):
+        def _writer(idx_chunk, values, *, overwrite_override=None, progress=None):
             metadata_calls[out_id].append((list(idx_chunk), list(values), overwrite_override))
 
         return _writer

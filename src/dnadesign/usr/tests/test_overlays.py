@@ -127,6 +127,32 @@ def test_head_succeeds_after_materialize_with_kept_overlays(tmp_path: Path) -> N
     assert head["mock__score"].iloc[0] == 4.25
 
 
+def test_import_rows_after_materialize_preserves_materialized_columns(tmp_path: Path) -> None:
+    ds = _make_dataset(tmp_path)
+    base_id = ds.head(1)["id"].iloc[0]
+    attach_path = tmp_path / "attach.csv"
+    pd.DataFrame({"id": [base_id], "score": [7.5]}).to_csv(attach_path, index=False)
+
+    ds.attach(attach_path, namespace="mock", key="id", key_col="id", columns=["score"])
+    with ds.maintenance(reason="materialize"):
+        ds.materialize(keep_overlays=False)
+
+    ds.import_rows(
+        [{"sequence": "TTTT", "bio_type": "dna", "alphabet": "dna_4", "source": "after-materialize"}],
+        source="after-materialize",
+    )
+
+    base_table = pq.read_table(ds.records_path)
+    assert "mock__score" in base_table.column_names
+    assert base_table.num_rows == 3
+
+    rows = base_table.select(["id", "source", "mock__score"]).to_pylist()
+    preserved = next(row for row in rows if row["id"] == base_id)
+    appended = next(row for row in rows if row["source"] == "after-materialize")
+    assert preserved["mock__score"] == pytest.approx(7.5)
+    assert appended["mock__score"] is None
+
+
 def test_info_and_schema_after_materialize_with_kept_overlays(tmp_path: Path) -> None:
     ds = _make_dataset(tmp_path)
     base_id = ds.head(1)["id"].iloc[0]

@@ -16,8 +16,12 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
+from ..errors import NotifyConfigError
 from .types import ToolEventDecision, ToolEventState
 
+_INFER_PROGRESS_STEP_PCT_SMALL_TARGET = 25
+_INFER_PROGRESS_STEP_PCT_LARGE_TARGET = 10
+_INFER_SMALL_TARGET_UNITS_THRESHOLD = 200
 _INFER_ATTACH_MIN_SECONDS_DEFAULT = 60.0
 _INFER_ATTACH_HEARTBEAT_SECONDS_DEFAULT = 1800.0
 
@@ -57,6 +61,89 @@ def _to_float_or_none(value: object) -> float | None:
         return None
 
 
+def _to_int_or_none(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _infer_args(event: dict[str, Any]) -> dict[str, Any]:
+    args_raw = event.get("args")
+    return args_raw if isinstance(args_raw, dict) else {}
+
+
+def _infer_output(event: dict[str, Any]) -> dict[str, Any]:
+    output_raw = _infer_args(event).get("infer_output")
+    return output_raw if isinstance(output_raw, dict) else {}
+
+
+def _infer_progress(event: dict[str, Any]) -> dict[str, Any]:
+    progress_raw = _infer_args(event).get("infer_progress")
+    return progress_raw if isinstance(progress_raw, dict) else {}
+
+
+def _infer_output_id(event: dict[str, Any]) -> str:
+    return str(_infer_output(event).get("id") or "").strip()
+
+
+def _infer_output_kind(event: dict[str, Any]) -> str:
+    return str(_infer_output(event).get("kind") or "").strip().lower()
+
+
+def _infer_notify_suppress(event: dict[str, Any]) -> bool:
+    args = _infer_args(event)
+    if bool(args.get("infer_notify_suppress")):
+        return True
+    return _infer_output_kind(event) == "metadata"
+
+
+def _resolve_progress_step_pct(progress: dict[str, Any], notify_config: dict[str, Any]) -> int:
+    configured = notify_config.get("progress_step_pct")
+    if configured is not None:
+        value = _to_int_or_none(configured)
+        if value is None or value < 1 or value > 100:
+            raise NotifyConfigError("progress_step_pct must be an integer between 1 and 100")
+        return value
+    overall_target_units = _to_int_or_none(progress.get("overall_target_units"))
+    if overall_target_units is not None and overall_target_units <= _INFER_SMALL_TARGET_UNITS_THRESHOLD:
+        return _INFER_PROGRESS_STEP_PCT_SMALL_TARGET
+    return _INFER_PROGRESS_STEP_PCT_LARGE_TARGET
+
+
+def _ordered_family_progress_parts(progress: dict[str, Any]) -> list[str]:
+    progress_map_raw = progress.get("family_progress_pct_map")
+    progress_map = progress_map_raw if isinstance(progress_map_raw, dict) else {}
+    if not progress_map:
+        return []
+    preferred = ("log_likelihood", "output_layer_mean", "intermediate_embedding")
+    parts: list[str] = []
+    seen: set[str] = set()
+    for family in (*preferred, *sorted(progress_map)):
+        if family in seen:
+            continue
+        seen.add(family)
+        pct = _to_float_or_none(progress_map.get(family))
+        if pct is None:
+            continue
+        label = "LL" if family == "log_likelihood" else family
+        parts.append(f"{label} {pct:.1f}%")
+    return parts
+
+
+def _infer_attach_signature(event: dict[str, Any], *, progress_step_pct: int) -> tuple[object, ...]:
+    progress = _infer_progress(event)
+    overall_progress_pct = _to_float_or_none(progress.get("overall_progress_pct")) or 0.0
+    overall_step = int(max(0.0, min(100.0, overall_progress_pct)) // float(progress_step_pct))
+    family_parts = tuple(_ordered_family_progress_parts(progress))
+    output_id = _infer_output_id(event)
+    output_progress_pct = _to_float_or_none(progress.get("output_progress_pct"))
+    rows_matched = _to_int_or_none(_infer_args(event).get("rows_matched"))
+    return (overall_step, output_id, round(output_progress_pct or 0.0, 1), rows_matched, family_parts)
+
+
 def _resolve_progress_min_seconds(notify_config: dict[str, Any]) -> float:
     configured = _to_float_or_none(notify_config.get("progress_min_seconds"))
     if configured is None:
@@ -78,6 +165,8 @@ def _resolve_progress_heartbeat_seconds(notify_config: dict[str, Any]) -> float:
 def _infer_attach_status_override(event: dict[str, Any]) -> str | None:
     if not _is_infer_actor(event):
         return None
+    if _infer_notify_suppress(event):
+        return None
     return "running"
 
 
@@ -96,18 +185,36 @@ def _infer_attach_message(
     del duration_seconds
     if not _is_infer_actor(event):
         return None
+    if _infer_notify_suppress(event):
+        return None
     dataset_raw = event.get("dataset")
     dataset = dataset_raw if isinstance(dataset_raw, dict) else {}
     dataset_name = str(dataset.get("name") or "unknown-dataset")
-    args_raw = event.get("args")
-    args = args_raw if isinstance(args_raw, dict) else {}
+    args = _infer_args(event)
+    progress = _infer_progress(event)
+    output = _infer_output(event)
     rows_incoming = args.get("rows_incoming")
     rows_matched = args.get("rows_matched")
     rows_missing = args.get("rows_missing")
     fingerprint_raw = event.get("fingerprint")
     fingerprint = fingerprint_raw if isinstance(fingerprint_raw, dict) else {}
     workspace_rows = fingerprint.get("rows")
-    lines = [f"Infer write-back progress | run={run_id} | dataset={dataset_name}"]
+    lines = [f"Infer progress | run={run_id} | dataset={dataset_name}"]
+    overall_progress_pct = _to_float_or_none(progress.get("overall_progress_pct"))
+    if overall_progress_pct is not None:
+        lines.append(f"- Overall requested outputs: {overall_progress_pct:.1f}%")
+    family_parts = _ordered_family_progress_parts(progress)
+    if family_parts:
+        lines.append(f"- Families: {' | '.join(family_parts)}")
+    output_id = str(output.get("id") or "").strip()
+    output_progress_pct = _to_float_or_none(progress.get("output_progress_pct"))
+    completed_rows = _to_int_or_none(progress.get("completed_rows"))
+    target_rows = _to_int_or_none(progress.get("target_rows"))
+    if output_id:
+        output_line = f"- Current output: {output_id}"
+        if output_progress_pct is not None and completed_rows is not None and target_rows is not None:
+            output_line += f" {output_progress_pct:.1f}% ({completed_rows}/{target_rows} rows)"
+        lines.append(output_line)
     if rows_incoming is not None or rows_matched is not None or rows_missing is not None:
         lines.append(
             f"- Chunk rows: incoming={rows_incoming if rows_incoming is not None else 0} "
@@ -122,6 +229,8 @@ def _infer_attach_message(
 def _evaluate_infer_attach_event(event: dict[str, Any], run_id: str, state: ToolEventState) -> ToolEventDecision:
     if not _is_infer_actor(event):
         return ToolEventDecision(emit=True, duration_seconds=None)
+    if _infer_notify_suppress(event):
+        return ToolEventDecision(emit=False, duration_seconds=None)
     bucket = state.get_bucket("infer_attach")
     per_run_raw = bucket.setdefault("per_run", {})
     per_run = per_run_raw if isinstance(per_run_raw, dict) else {}
@@ -129,6 +238,8 @@ def _evaluate_infer_attach_event(event: dict[str, Any], run_id: str, state: Tool
     notify_config = notify_config_raw if isinstance(notify_config_raw, dict) else {}
     min_seconds = _resolve_progress_min_seconds(notify_config)
     heartbeat_seconds = _resolve_progress_heartbeat_seconds(notify_config)
+    progress = _infer_progress(event)
+    overall_progress_pct = _to_float_or_none(progress.get("overall_progress_pct"))
     now_seconds = _event_timestamp_seconds(event)
     if now_seconds is None:
         now_seconds = float(time.time())
@@ -138,17 +249,38 @@ def _evaluate_infer_attach_event(event: dict[str, Any], run_id: str, state: Tool
     entry = entry_raw if isinstance(entry_raw, dict) else {}
     last_sent_raw = entry.get("last_sent")
     last_sent = _to_float_or_none(last_sent_raw)
-    if last_sent is None:
+    if overall_progress_pct is None:
+        if last_sent is None:
+            per_run[run_key] = {"last_sent": now_seconds}
+            return ToolEventDecision(emit=True, duration_seconds=None)
+        elapsed = now_seconds - last_sent
+        if elapsed >= heartbeat_seconds:
+            per_run[run_key] = {"last_sent": now_seconds}
+            return ToolEventDecision(emit=True, duration_seconds=None)
+        if elapsed < min_seconds:
+            return ToolEventDecision(emit=False, duration_seconds=None)
         per_run[run_key] = {"last_sent": now_seconds}
         return ToolEventDecision(emit=True, duration_seconds=None)
 
-    elapsed = now_seconds - last_sent
-    if elapsed >= heartbeat_seconds:
-        per_run[run_key] = {"last_sent": now_seconds}
-        return ToolEventDecision(emit=True, duration_seconds=None)
-    if elapsed < min_seconds:
+    progress_step_pct = _resolve_progress_step_pct(progress, notify_config)
+    overall_step = int(max(0.0, min(100.0, overall_progress_pct)) // float(progress_step_pct))
+    last_step_raw = entry.get("last_step")
+    last_step = int(last_step_raw) if last_step_raw is not None else -1
+    elapsed = None if last_sent is None else (now_seconds - last_sent)
+    step_trigger = overall_step > last_step
+    if step_trigger and elapsed is not None and elapsed < min_seconds:
+        step_trigger = False
+    heartbeat_trigger = last_sent is None or (elapsed is not None and elapsed >= heartbeat_seconds)
+    if not step_trigger and not heartbeat_trigger:
         return ToolEventDecision(emit=False, duration_seconds=None)
-    per_run[run_key] = {"last_sent": now_seconds}
+    signature = _infer_attach_signature(event, progress_step_pct=progress_step_pct)
+    if signature == entry.get("last_signature") and not heartbeat_trigger:
+        return ToolEventDecision(emit=False, duration_seconds=None)
+    per_run[run_key] = {
+        "last_sent": now_seconds,
+        "last_step": max(last_step, overall_step),
+        "last_signature": signature,
+    }
     return ToolEventDecision(emit=True, duration_seconds=None)
 
 

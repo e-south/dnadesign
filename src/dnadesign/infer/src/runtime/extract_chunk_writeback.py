@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Callable, List, Optional
 
 from ..errors import WriteBackError
@@ -39,6 +40,7 @@ def build_extract_chunk_write_back(
         vals: List[object],
         *,
         overwrite_override: bool | None = None,
+        progress: Mapping[str, object] | None = None,
     ) -> None:
         chunk_ids = [ids[row_index] for row_index in idx_chunk]
         writer(
@@ -48,6 +50,7 @@ def build_extract_chunk_write_back(
             job_id=job_id,
             columnar={out_id: vals},
             overwrite=overwrite if overwrite_override is None else bool(overwrite_override),
+            event_args=progress,
         )
 
     return _write_back_chunk

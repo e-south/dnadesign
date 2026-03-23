@@ -100,12 +100,38 @@ def test_tool_event_status_override_handles_infer_materialize_as_terminal() -> N
 def test_tool_event_message_override_formats_infer_attach_message() -> None:
     event = _event("attach")
     event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
-    event["args"] = {"rows_incoming": 12, "rows_matched": 11, "rows_missing": 1}
+    event["args"] = {
+        "rows_incoming": 12,
+        "rows_matched": 11,
+        "rows_missing": 1,
+        "infer_output": {
+            "id": "output_layer_mean__seq_mean",
+            "family": "output_layer_mean",
+            "kind": "feature",
+            "pool_scope": "seq_mean",
+        },
+        "infer_progress": {
+            "target_rows": 100,
+            "completed_rows": 24,
+            "output_progress_pct": 24.0,
+            "overall_target_units": 400,
+            "overall_completed_units": 72,
+            "overall_progress_pct": 18.0,
+            "family_progress_pct_map": {
+                "log_likelihood": 50.0,
+                "output_layer_mean": 12.0,
+                "intermediate_embedding": 0.0,
+            },
+        },
+    }
 
     msg = tool_event_message_override("attach", event, run_id="infer-run-1", duration_seconds=None)
 
     assert msg is not None
-    assert "Infer write-back progress | run=infer-run-1 | dataset=demo" in msg
+    assert "Infer progress | run=infer-run-1 | dataset=demo" in msg
+    assert "- Overall requested outputs: 18.0%" in msg
+    assert "- Families: LL 50.0% | output_layer_mean 12.0% | intermediate_embedding 0.0%" in msg
+    assert "- Current output: output_layer_mean__seq_mean 24.0% (24/100 rows)" in msg
     assert "incoming=12 matched=11 missing=1" in msg
     assert "- Workspace rows: 1" in msg
 
@@ -114,13 +140,52 @@ def test_evaluate_tool_event_infer_attach_is_throttled_by_min_seconds() -> None:
     state = ToolEventState()
     first = _event("attach", timestamp="2026-02-06T00:00:00+00:00")
     first["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
-    first["args"] = {"rows_incoming": 20, "rows_matched": 20, "rows_missing": 0}
+    first["args"] = {
+        "rows_incoming": 20,
+        "rows_matched": 20,
+        "rows_missing": 0,
+        "infer_output": {"id": "log_likelihood__total", "family": "log_likelihood", "kind": "feature"},
+        "infer_progress": {
+            "target_rows": 100,
+            "completed_rows": 10,
+            "output_progress_pct": 10.0,
+            "overall_target_units": 100,
+            "overall_completed_units": 10,
+            "overall_progress_pct": 10.0,
+        },
+    }
     second = _event("attach", timestamp="2026-02-06T00:00:10+00:00")
     second["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
-    second["args"] = {"rows_incoming": 20, "rows_matched": 20, "rows_missing": 0}
+    second["args"] = {
+        "rows_incoming": 20,
+        "rows_matched": 20,
+        "rows_missing": 0,
+        "infer_output": {"id": "log_likelihood__total", "family": "log_likelihood", "kind": "feature"},
+        "infer_progress": {
+            "target_rows": 100,
+            "completed_rows": 19,
+            "output_progress_pct": 19.0,
+            "overall_target_units": 100,
+            "overall_completed_units": 19,
+            "overall_progress_pct": 19.0,
+        },
+    }
     third = _event("attach", timestamp="2026-02-06T00:01:10+00:00")
     third["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
-    third["args"] = {"rows_incoming": 20, "rows_matched": 20, "rows_missing": 0}
+    third["args"] = {
+        "rows_incoming": 20,
+        "rows_matched": 20,
+        "rows_missing": 0,
+        "infer_output": {"id": "log_likelihood__total", "family": "log_likelihood", "kind": "feature"},
+        "infer_progress": {
+            "target_rows": 100,
+            "completed_rows": 30,
+            "output_progress_pct": 30.0,
+            "overall_target_units": 100,
+            "overall_completed_units": 30,
+            "overall_progress_pct": 30.0,
+        },
+    }
 
     first_decision = evaluate_tool_event("attach", first, run_id="infer-run-1", state=state)
     second_decision = evaluate_tool_event("attach", second, run_id="infer-run-1", state=state)
@@ -129,6 +194,22 @@ def test_evaluate_tool_event_infer_attach_is_throttled_by_min_seconds() -> None:
     assert first_decision.emit is True
     assert second_decision.emit is False
     assert third_decision.emit is True
+
+
+def test_tool_event_status_override_suppresses_infer_metadata_attach_events() -> None:
+    event = _event("attach")
+    event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    event["args"] = {
+        "rows_incoming": 12,
+        "rows_matched": 12,
+        "rows_missing": 0,
+        "infer_output": {"id": "metadata__sequence_id", "family": "metadata", "kind": "metadata"},
+        "infer_notify_suppress": True,
+    }
+
+    assert tool_event_status_override("attach", event) is None
+    assert tool_event_message_override("attach", event, run_id="infer-run-1", duration_seconds=None) is None
+    assert evaluate_tool_event("attach", event, run_id="infer-run-1", state=ToolEventState()).emit is False
 
 
 def test_evaluate_tool_event_densegen_running_is_gated_by_progress_step() -> None:
