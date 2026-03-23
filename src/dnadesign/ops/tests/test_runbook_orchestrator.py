@@ -3469,6 +3469,38 @@ def test_packaged_runbook_presets_exist_and_load() -> None:
         }
 
 
+def test_infer_runbook_allows_workspace_local_config_variants() -> None:
+    workspace_root = Path("/tmp/infer_layout_alt_config")
+    payload = _infer_runbook_payload(workspace_root)
+    payload["runbook"]["infer"]["config"] = str(workspace_root / "config.anchor_only.evo2_7b.yaml")
+
+    loaded = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+
+    assert loaded.infer is not None
+    assert loaded.infer.config.name == "config.anchor_only.evo2_7b.yaml"
+
+
+def test_infer_runbook_allows_lane_scoped_notify_state() -> None:
+    workspace_root = Path("/tmp/infer_layout_lane_notify")
+    payload = _infer_runbook_payload(workspace_root)
+    payload["runbook"]["workflow_id"] = "infer_batch_with_notify"
+    payload["runbook"]["notify"] = {
+        "tool": "infer",
+        "policy": "infer",
+        "profile": str(workspace_root / "outputs" / "notify" / "infer" / "anchor_only_7b" / "profile.json"),
+        "cursor": str(workspace_root / "outputs" / "notify" / "infer" / "anchor_only_7b" / "cursor"),
+        "spool_dir": str(workspace_root / "outputs" / "notify" / "infer" / "anchor_only_7b" / "spool"),
+        "webhook_env": "NOTIFY_WEBHOOK",
+        "qsub_template": "docs/bu-scc/jobs/notify-watch.qsub",
+        "smoke": "dry",
+    }
+
+    loaded = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+
+    assert loaded.notify is not None
+    assert loaded.notify.profile.parent.name == "anchor_only_7b"
+
+
 def test_densegen_packaged_presets_use_repo_default_qsub_tokens() -> None:
     repo_root = Path(__file__).resolve()
     for parent in repo_root.parents:

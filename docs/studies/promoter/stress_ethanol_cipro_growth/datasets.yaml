@@ -58,6 +58,44 @@ datasets:
       audit_json: n/a
       strict_bootstrap_id: false
       remote_path: n/a
+  - role: merged_anchor_source
+    dataset: promoter/stress_ethanol_cipro_anchor_set
+    usr_root: src/dnadesign/usr/datasets
+    root_kind: shared
+    status: planned
+    lifecycle: shared_handoff
+    owner_tool: usr
+    onboard_mode: create_new
+    authority: shared
+    notes: Study-owned merged anchor set created from mg1655_promoters plus densegen/study_stress_ethanol_cipro before any Construct or anchor-only Infer execution.
+    sync:
+      enabled: false
+      remote_name: n/a
+      remote_dataset: n/a
+      remote_root_kind: n/a
+      default_direction: none
+      audit_json: n/a
+      strict_bootstrap_id: false
+      remote_path: n/a
+  - role: construct_context
+    dataset: promoter/stress_ethanol_cipro_construct_contexts
+    usr_root: src/dnadesign/usr/datasets
+    root_kind: shared
+    status: planned
+    lifecycle: shared_handoff
+    owner_tool: construct
+    onboard_mode: create_new
+    authority: shared
+    notes: Study-owned 1 kb pDual-10 contexts materialized by Construct from the merged anchor set and plasmids template dataset.
+    sync:
+      enabled: false
+      remote_name: n/a
+      remote_dataset: n/a
+      remote_root_kind: n/a
+      default_direction: none
+      audit_json: n/a
+      strict_bootstrap_id: false
+      remote_path: n/a
   - role: feature_matrix
     dataset: promoter/stress_ethanol_cipro_feature_matrix
     usr_root: src/dnadesign/usr/datasets
@@ -67,7 +105,7 @@ datasets:
     owner_tool: usr
     onboard_mode: create_new
     authority: shared
-    notes: Planned shared feature dataset after anchor, wildtype, and optional construct-context assembly.
+    notes: Planned shared downstream feature dataset. The current Infer full-lane configs keep anchor-only and template-backed planes explicit until a later shared consolidation step.
     sync:
       enabled: true
       remote_name: cluster

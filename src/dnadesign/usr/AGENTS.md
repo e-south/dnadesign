@@ -23,7 +23,7 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
 - Checked-in promoter-study records: `docs/studies/README.md`
 - Active promoter-study registry: `docs/studies/promoter/index.yaml`
 - Historical artifacts: `src/dnadesign/usr/archived/` (treat as generated)
-- Dataset naming ontology: prefer the least-coupled semantic dataset ids, usually flat ids such as `mg1655_promoters`, `plasmids`, or `pdual10_slot_a_window_1kb_demo`; use namespace-qualified ids only when they genuinely improve disambiguation. Keep tool provenance in overlay namespaces, not dataset ids.
+- Dataset naming ontology: prefer the least-coupled semantic dataset ids, usually flat ids such as `mg1655_promoters`, `plasmids`, or `anchor_template_slot_a_window_1kb_demo`; use namespace-qualified ids only when they genuinely improve disambiguation. Keep tool provenance in overlay namespaces, not dataset ids.
 - Human-readable record names belong in `usr_label__primary` / `usr_label__aliases`.
 
 ### Generated vs hand-edited

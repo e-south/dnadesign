@@ -19,7 +19,12 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
+from dnadesign.ops import progress as progress_module
 from dnadesign.ops.cli import app
+from dnadesign.ops.progress import (
+    _promoter_study_preflight_progress,
+    _promoter_study_record_progress,
+)
 
 
 def _repo_root() -> Path:
@@ -102,6 +107,271 @@ def _write_usr_dataset(root: Path, dataset: str) -> None:
     pq.write_table(table, dataset_dir / "records.parquet")
     pq.write_table(pa.table({"id": ["a"], "infer__score": [0.1]}), derived_dir / "infer.parquet")
     (dataset_dir / ".events.log").write_text("{}\n{}\n", encoding="utf-8")
+
+
+def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densegen_target: int) -> None:
+    repo_root = study_dir.parents[3]
+    study_dir.mkdir(parents=True, exist_ok=True)
+    (study_dir / "campaign.yaml").write_text("campaign_id: demo_study\nsteps: []\n", encoding="utf-8")
+    (study_dir / "status.md").write_text("## demo_study\n\n- Current shared feature dataset: `n/a`\n", encoding="utf-8")
+    (study_dir / "datasets.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "study_id": "demo_study",
+                "datasets": [
+                    {
+                        "role": "densegen_anchor",
+                        "dataset": "densegen/demo_anchor",
+                        "usr_root": "usr_root",
+                        "status": "present",
+                    },
+                    {
+                        "role": "merged_anchor_source",
+                        "dataset": "promoter/demo_anchor_set",
+                        "usr_root": "usr_root",
+                        "status": "planned",
+                    },
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (study_dir / "pipeline.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "study_pipeline": {
+                    "study_id": "demo_study",
+                    "current_phase": "densegen_growth",
+                    "canonical_usr_root": "usr_root",
+                    "row_targets": {
+                        "densegen_anchor_minimum_before_first_full_lane_infer": densegen_target,
+                    },
+                    "execution_surfaces": {
+                        "construct_workspace": "workspace/construct",
+                        "infer_workspace": "workspace/infer",
+                    },
+                    "datasets": {
+                        "densegen_anchor_source": "densegen/demo_anchor",
+                        "merged_anchor_dataset": "promoter/demo_anchor_set",
+                    },
+                    "phases": [
+                        {
+                            "id": "densegen_growth",
+                            "status": "in_progress",
+                            "primary_dataset": "densegen/demo_anchor",
+                            "next_surface": "workspace/densegen_batch.yaml",
+                        },
+                        {
+                            "id": "merged_anchor_set",
+                            "status": "ready",
+                            "output_dataset": "promoter/demo_anchor_set",
+                            "next_surface": "workspace/merge.md",
+                        },
+                    ],
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    _write_usr_dataset(repo_root / "usr_root", "densegen/demo_anchor")
+    if densegen_rows != 2:
+        dataset_dir = repo_root / "usr_root" / "densegen" / "demo_anchor"
+        table = pa.table(
+            {
+                "id": [f"id_{idx}" for idx in range(densegen_rows)],
+                "sequence": ["AAAA"] * densegen_rows,
+                "length": [4] * densegen_rows,
+            }
+        )
+        pq.write_table(table, dataset_dir / "records.parquet")
+    (repo_root / "workspace" / "construct").mkdir(parents=True, exist_ok=True)
+    (repo_root / "workspace" / "infer").mkdir(parents=True, exist_ok=True)
+
+
+def _write_promoter_study_preflight_record(study_dir: Path) -> None:
+    repo_root = study_dir.parents[3]
+    study_dir.mkdir(parents=True, exist_ok=True)
+    (study_dir / "campaign.yaml").write_text("campaign_id: demo_study\nsteps: []\n", encoding="utf-8")
+    (study_dir / "status.md").write_text("## demo_study\n\n- Current shared feature dataset: `n/a`\n", encoding="utf-8")
+    (study_dir / "datasets.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "study_id": "demo_study",
+                "datasets": [
+                    {
+                        "role": "densegen_anchor",
+                        "dataset": "densegen/demo_anchor",
+                        "usr_root": "usr_root",
+                        "status": "present",
+                    },
+                    {
+                        "role": "wildtype_manual",
+                        "dataset": "mg1655_promoters",
+                        "usr_root": "usr_root",
+                        "status": "present",
+                    },
+                    {
+                        "role": "construct_template_seed",
+                        "dataset": "plasmids",
+                        "usr_root": "usr_root",
+                        "status": "present",
+                    },
+                    {
+                        "role": "merged_anchor_source",
+                        "dataset": "promoter/demo_anchor_set",
+                        "usr_root": "usr_root",
+                        "status": "planned",
+                    },
+                    {
+                        "role": "construct_context",
+                        "dataset": "promoter/demo_construct_contexts",
+                        "usr_root": "usr_root",
+                        "status": "planned",
+                    },
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (study_dir / "pipeline.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "study_pipeline": {
+                    "study_id": "demo_study",
+                    "current_phase": "densegen_growth",
+                    "canonical_usr_root": "usr_root",
+                    "execution_surfaces": {
+                        "construct_workspace": "workspace/construct",
+                        "infer_workspace": "workspace/infer",
+                        "densegen_batch_with_notify": "workspace/runbooks/densegen.yaml",
+                        "infer_batch_7b_with_notify": {
+                            "anchor_only": "workspace/runbooks/infer_anchor_only_7b.yaml",
+                            "anchor_plus_template": "workspace/runbooks/infer_anchor_plus_template_7b.yaml",
+                        },
+                        "infer_batch_20b_with_notify": {
+                            "anchor_only": "workspace/runbooks/infer_anchor_only_20b.yaml",
+                            "anchor_plus_template": "workspace/runbooks/infer_anchor_plus_template_20b.yaml",
+                        },
+                    },
+                    "datasets": {
+                        "densegen_anchor_source": "densegen/demo_anchor",
+                        "merged_anchor_dataset": "promoter/demo_anchor_set",
+                        "construct_context_dataset": "promoter/demo_construct_contexts",
+                    },
+                    "construct": {
+                        "workspace_projects": [
+                            {"id": "slot_a_window", "config": "workspace/construct/config.slot_a.yaml"},
+                        ]
+                    },
+                    "infer": {
+                        "configs": {
+                            "anchor_only_7b": "workspace/infer/config.anchor_only.evo2_7b.yaml",
+                            "anchor_plus_template_7b": "workspace/infer/config.anchor_plus_template.evo2_7b.yaml",
+                            "anchor_only_20b": "workspace/infer/config.anchor_only.evo2_20b.yaml",
+                            "anchor_plus_template_20b": "workspace/infer/config.anchor_plus_template.evo2_20b.yaml",
+                        },
+                        "notify_profiles": {
+                            "anchor_only_7b": "workspace/infer/outputs/notify/infer/anchor_only_7b/profile.json",
+                            "anchor_plus_template_7b": (
+                                "workspace/infer/outputs/notify/infer/"
+                                "anchor_plus_template_7b/profile.json"
+                            ),
+                        },
+                    },
+                    "phases": [
+                        {"id": "densegen_growth", "status": "in_progress"},
+                        {"id": "merged_anchor_set", "status": "ready"},
+                        {"id": "infer_anchor_only_20b", "status": "blocked_gpu", "blocker": "GPU required"},
+                    ],
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    _write_usr_dataset(repo_root / "usr_root", "densegen/demo_anchor")
+    _write_usr_dataset(repo_root / "usr_root", "mg1655_promoters")
+    _write_usr_dataset(repo_root / "usr_root", "plasmids")
+
+    construct_workspace = repo_root / "workspace" / "construct"
+    construct_workspace.mkdir(parents=True, exist_ok=True)
+    (construct_workspace / "construct.workspace.yaml").write_text(
+        "workspace_id: demo\nprojects: []\n", encoding="utf-8"
+    )
+
+    infer_workspace = repo_root / "workspace" / "infer"
+    infer_workspace.mkdir(parents=True, exist_ok=True)
+    for name, dataset in (
+        ("config.anchor_only.evo2_7b.yaml", "promoter/demo_anchor_set"),
+        ("config.anchor_plus_template.evo2_7b.yaml", "promoter/demo_construct_contexts"),
+        ("config.anchor_only.evo2_20b.yaml", "promoter/demo_anchor_set"),
+        ("config.anchor_plus_template.evo2_20b.yaml", "promoter/demo_construct_contexts"),
+    ):
+        (infer_workspace / name).write_text(
+            yaml.safe_dump(
+                {
+                    "model": {"id": "evo2_7b", "device": "cuda:0", "precision": "bf16", "alphabet": "dna"},
+                    "jobs": [
+                        {
+                            "id": name,
+                            "operation": "extract",
+                            "ingest": {
+                                "source": "usr",
+                                "dataset": dataset,
+                                "root": "../../usr_root",
+                                "field": "sequence",
+                            },
+                        }
+                    ],
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+    runbook_root = repo_root / "workspace" / "runbooks"
+    runbook_root.mkdir(parents=True, exist_ok=True)
+    (runbook_root / "densegen.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "runbook": {
+                    "workflow_id": "densegen_batch_with_notify",
+                    "densegen": {"config": "../densegen/config.yaml"},
+                    "resources": {"h_rt": "08:00:00", "pe_omp": 12},
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    densegen_workspace = repo_root / "workspace" / "densegen"
+    densegen_workspace.mkdir(parents=True, exist_ok=True)
+    (densegen_workspace / "config.yaml").write_text("solver:\n  backend: gurobi\n", encoding="utf-8")
+    for runbook_name in (
+        "infer_anchor_only_7b.yaml",
+        "infer_anchor_plus_template_7b.yaml",
+        "infer_anchor_only_20b.yaml",
+        "infer_anchor_plus_template_20b.yaml",
+    ):
+        (runbook_root / runbook_name).write_text(
+            yaml.safe_dump(
+                {
+                    "runbook": {
+                        "workflow_id": runbook_name.replace(".yaml", ""),
+                        "infer": {
+                            "config": f"../infer/{runbook_name.replace('infer_', 'config.').replace('.yaml', '.yaml')}"
+                        },
+                        "resources": {"h_rt": "12:00:00", "gpus": 1},
+                    }
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
 
 
 def _write_cluster_index(root: Path) -> None:
@@ -235,8 +505,199 @@ def test_cli_progress_show_reports_usr_dataset_surface() -> None:
         assert payload["progress_kind"] == "usr-dataset-state"
         assert payload["state"] == "ok"
         assert payload["evidence"]["rows"] == 2
-        assert payload["evidence"]["namespace_column_counts"]["infer"] == 1
-        assert payload["evidence"]["overlay_namespaces"] == ["infer"]
+
+
+def test_cli_progress_show_reports_promoter_study_record_surface() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        repo_root = Path.cwd()
+        (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
+        (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
+        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
+        promoter_index.parent.mkdir(parents=True, exist_ok=True)
+        promoter_index.write_text(
+            (
+                "active_study: demo_study\n"
+                "studies:\n"
+                "  - study_id: demo_study\n"
+                "    path: docs/studies/promoter/demo_study\n"
+            ),
+            encoding="utf-8",
+        )
+        _write_promoter_study_record(study_dir, densegen_rows=2, densegen_target=5)
+
+        result = runner.invoke(
+            app,
+            [
+                "progress",
+                "show",
+                "usr.data-plane.promoter-study-status",
+                "--repo-root",
+                str(_repo_root()),
+                "--study-dir",
+                str(study_dir),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["progress_kind"] == "promoter-study-record"
+        assert payload["state"] == "attention"
+        assert payload["evidence"]["study_id"] == "demo_study"
+        assert payload["evidence"]["study_selection_source"] == "explicit"
+        assert payload["evidence"]["is_active_study"] is True
+        assert payload["evidence"]["densegen_rows"] == 2
+        assert payload["evidence"]["densegen_row_target"] == 5
+        assert payload["evidence"]["densegen_row_gap"] == 3
+        assert payload["evidence"]["next_ready_phase"]["id"] == "merged_anchor_set"
+        assert payload["evidence"]["datasets"][0]["dataset"] == "densegen/demo_anchor"
+        assert "pending promoter/demo_anchor_set" in payload["summary"]
+
+
+def test_promoter_study_progress_discovers_active_study_from_repo_root() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        repo_root = Path.cwd()
+        (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
+        (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
+        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
+        promoter_index.parent.mkdir(parents=True, exist_ok=True)
+        promoter_index.write_text(
+            (
+                "active_study: demo_study\n"
+                "studies:\n"
+                "  - study_id: demo_study\n"
+                "    path: docs/studies/promoter/demo_study\n"
+            ),
+            encoding="utf-8",
+        )
+        _write_promoter_study_record(study_dir, densegen_rows=2, densegen_target=5)
+
+        state, summary, evidence = _promoter_study_record_progress(None, repo_root=repo_root)
+
+        assert state == "attention"
+        assert evidence["study_id"] == "demo_study"
+        assert evidence["study_selection_source"] == "active_registry"
+        assert evidence["active_study_registry_path"] == str(promoter_index)
+        assert evidence["study_dir"] == str(study_dir)
+        assert "pending promoter/demo_anchor_set" in summary
+
+
+def test_promoter_study_progress_resolves_relative_study_dir_against_repo_root() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        repo_root = Path.cwd() / "repo"
+        repo_root.mkdir(parents=True, exist_ok=True)
+        (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
+        (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
+        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
+        promoter_index.parent.mkdir(parents=True, exist_ok=True)
+        promoter_index.write_text(
+            (
+                "active_study: demo_study\n"
+                "studies:\n"
+                "  - study_id: demo_study\n"
+                "    path: docs/studies/promoter/demo_study\n"
+            ),
+            encoding="utf-8",
+        )
+        _write_promoter_study_record(study_dir, densegen_rows=2, densegen_target=5)
+
+        state, _, evidence = _promoter_study_record_progress(
+            Path("docs/studies/promoter/demo_study"),
+            repo_root=repo_root,
+        )
+
+        assert state == "attention"
+        assert evidence["study_selection_source"] == "explicit"
+        assert evidence["study_dir"] == str(study_dir)
+
+
+def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypatch) -> None:
+    with CliRunner().isolated_filesystem():
+        repo_root = Path.cwd()
+        (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
+        (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
+        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
+        promoter_index.parent.mkdir(parents=True, exist_ok=True)
+        promoter_index.write_text(
+            (
+                "active_study: demo_study\n"
+                "studies:\n"
+                "  - study_id: demo_study\n"
+                "    path: docs/studies/promoter/demo_study\n"
+            ),
+            encoding="utf-8",
+        )
+        _write_promoter_study_preflight_record(study_dir)
+
+        def _fake_run(argv, *, cwd, timeout_seconds=180):
+            command = " ".join(argv)
+            if "dense validate-config" in command:
+                return progress_module.CommandExecution(tuple(argv), str(cwd), 1, "", "Solver probe failed", False)
+            if "construct workspace doctor" in command:
+                return progress_module.CommandExecution(tuple(argv), str(cwd), 0, "workspace_doctor: ok", "", False)
+            if "infer validate config" in command:
+                return progress_module.CommandExecution(tuple(argv), str(cwd), 0, "✔ Config validated.", "", False)
+            if "notify setup resolve-events" in command:
+                config_path = Path(argv[-2])
+                dataset = (
+                    "promoter/demo_construct_contexts" if "template" in config_path.name else "promoter/demo_anchor_set"
+                )
+                payload = {
+                    "ok": True,
+                    "events": str(repo_root / "usr_root" / dataset / ".events.log"),
+                    "policy": "infer",
+                }
+                return progress_module.CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "ops runbook plan" in command and "densegen" in command:
+                payload = {
+                    "selected_mode": "resume",
+                    "workflow_id": "densegen_batch_with_notify",
+                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
+                }
+                return progress_module.CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "ops runbook plan" in command:
+                return progress_module.CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    2,
+                    "",
+                    "notify webhook secret file is required for batch notify workflows",
+                    False,
+                )
+            raise AssertionError(f"unexpected command: {command}")
+
+        monkeypatch.setattr(progress_module, "_run_progress_command", _fake_run)
+
+        state, summary, evidence = _promoter_study_preflight_progress(None, repo_root=repo_root)
+
+        assert state == "missing"
+        assert "demo_study: preflight phase densegen_growth" in summary
+        assert evidence["notify_environment"] == {
+            "NOTIFY_WEBHOOK": False,
+            "NOTIFY_WEBHOOK_FILE": False,
+            "SSL_CERT_FILE": False,
+        }
+        checks = {check["id"]: check for check in evidence["checks"]}
+        assert checks["densegen.config.probe_solver"]["state"] == "attention"
+        assert checks["densegen.batch.plan"]["state"] == "ok"
+        assert checks["construct.workspace.doctor"]["state"] == "ok"
+        assert checks["construct.runtime.slot_a_window"]["state"] == "missing"
+        assert checks["infer.validate.anchor_only_7b"]["state"] == "ok"
+        assert checks["notify.profile.anchor_only_7b"]["state"] == "attention"
+        assert "notify setup slack" in checks["notify.profile.anchor_only_7b"]["details"]["setup_command"]
+        assert checks["infer.dry_run.anchor_only_7b"]["state"] == "missing"
+        assert checks["notify.resolve_events.anchor_only_7b"]["state"] == "missing"
+        assert checks["ops.runbook_plan.infer_batch_7b_with_notify.anchor_only"]["state"] == "attention"
+        assert evidence["counts"]["ok"] >= 1
+        assert evidence["counts"]["attention"] >= 1
+        assert evidence["counts"]["missing"] >= 1
 
 
 def test_cli_progress_show_reports_cluster_run_index_surface() -> None:

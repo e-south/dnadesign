@@ -33,6 +33,7 @@ Keep promoter-study records under:
 docs/studies/promoter/<study-id>/
   campaign.yaml
   datasets.yaml
+  pipeline.yaml
   status.md
   audits/
 ```
@@ -43,13 +44,43 @@ should I trust?" rather than "which workflow route applies?"
 `index.yaml` selects the active study, the matching study directory holds the
 record, and this contract explains how to refresh it.
 
-### Keep these three artifacts for every real study
+Fastest read-only summary once the checked-in directory exists:
+
+```bash
+uv run ops progress show usr.data-plane.promoter-study-status
+```
+
+If you need to pin a non-active study or you are invoking the command from
+outside the repo checkout, add:
+
+```bash
+uv run ops progress show usr.data-plane.promoter-study-status \
+  --repo-root <repo-root> \
+  --study-dir docs/studies/promoter/<study-id>
+```
+
+That surface reads the checked-in study directory, validates that the declared
+source datasets and study-owned execution surfaces exist, reports the current
+phase from `pipeline.yaml`, and highlights the next ready phase without
+submitting jobs or mutating USR.
+
+When you need deeper, command-level blockers across the same checked-in study,
+continue to [Promoter Study Preflight](promoter-study-preflight.md):
+
+```bash
+uv run ops progress show usr.data-plane.promoter-study-preflight --json
+```
+
+### Keep these artifacts for every real study
 
 1. A checked-in campaign manifest that names the real artifacts.
 2. A machine-readable dataset registry that names the affiliated USR datasets,
    onboarding mode, root semantics, and sync posture.
 3. A checked-in status note that answers the human questions the manifest and
    dataset registry do not encode.
+4. When the study has real downstream execution surfaces, an optional
+   `pipeline.yaml` that names the canonical Construct, Infer, batch, and Notify
+   paths for the live study.
 
 Recommended bootstrap for the manifest:
 
@@ -64,6 +95,8 @@ uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix
 cp docs/templates/promoter-study-datasets.yaml docs/studies/promoter/<study-id>/datasets.yaml
 # Copy the maintained status-note template into the same study directory.
 cp docs/templates/promoter-study-status.md docs/studies/promoter/<study-id>/status.md
+# Add a study-owned execution map once real Construct or Infer surfaces exist.
+cp docs/templates/promoter-study-pipeline.yaml docs/studies/promoter/<study-id>/pipeline.yaml
 # Create the audit directory referenced by sync-enabled dataset entries.
 mkdir -p docs/studies/promoter/<study-id>/audits
 ```
@@ -71,7 +104,9 @@ mkdir -p docs/studies/promoter/<study-id>/audits
 If the registry already exists, edit it in place instead of replacing it.
 Then replace the placeholders with the real `usr_root`, `dataset`,
 `cluster_results_root`, and `opal_config` values for the current study.
-Delete steps that are not part of the active branch of work.
+Delete steps that are not part of the active branch of work. If the study is
+still only a source-growth effort, omit `pipeline.yaml` until there is a real
+downstream Construct or Infer surface to record.
 
 ### Dataset registry, status template, and discovery rules
 
@@ -117,6 +152,8 @@ Discovery rules:
 - If `active_study` names a study id, that same id must appear under
   `studies:` and the corresponding study directory must contain `campaign.yaml`,
   `datasets.yaml`, and `status.md`.
+- If `pipeline.yaml` exists in the study directory, treat it as the canonical
+  execution-map surface for exact Construct, Infer, batch, and Notify paths.
 - If the registry and study directory contents disagree, fail visibly and fix
   the registry before asking for live status.
 
@@ -211,6 +248,15 @@ From `status.md`:
 - whether construct expansion is required or optional
 - which infer slices are already written versus only preflighted
 - the next concrete batch call to run
+
+From `pipeline.yaml` when present:
+
+- the canonical Construct workspace/config paths for the live study
+- the canonical Infer workspace/config paths for the live study
+- which Notify-backed batch presets belong to the study
+- the expected phase order from source assembly through Infer write-back
+- whether anchor-only and template-backed Infer lanes are modeled as one plane
+  or as explicit separate dataset planes
 
 ### Failure and rollback reminders
 

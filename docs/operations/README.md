@@ -60,14 +60,16 @@ Use these when you still need command lookup before choosing a runbook lifecycle
 1. Use `uv run ops progress explain <registry-id>` to see the required flags and a ready-to-paste `progress show` command before you touch artifacts.
 2. Use `uv run ops progress show ops.control-plane.orchestration --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json` to summarize one control-plane runbook execution from the registered progress contract.
 3. Use `uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <repo-root> --usr-root <usr-root> --dataset <dataset>` to summarize one staged USR-backed data-plane procedure from explicit artifacts.
-4. `ops progress show` and `ops progress campaign` are read-only status commands. Inspect the required flags in `ops progress explain <registry-id>` or `ops catalog show <registry-id>` before you run them if you do not already know the artifact contract.
-5. Use `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` to emit a manifest template with the right required fields. It prints to stdout unless you pass `--out`.
-6. Use `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` when you want the named registered procedure plus its related procedures as a starting point.
-7. Use `uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>` when the work spans multiple runtimes or pauses between steps.
-8. Keep the manifest explicit. Ops reads the files you name there; it does not infer hidden campaign state.
-9. For live promoter-study status, keep the study files under `docs/studies/promoter/<study-id>/`. Use [Study records index](../studies/README.md) for the required layout and selector rules.
-10. For progress-kind meanings and the next checks for each one, see the [runbook catalog progress views](../runbooks/README.md#progress-views).
-11. If the next step is dataset assembly, construct realization, or infer write-back, leave Ops and continue in the shared USR runbooks:
+4. Use `uv run ops progress show usr.data-plane.promoter-study-status` when you want the one-command summary of the active checked-in live study before drilling into tool-local status. Add `--repo-root <repo-root> --study-dir docs/studies/promoter/<study-id>` when you need to pin a different study or invoke it from outside the repo checkout.
+5. Use `uv run ops progress show usr.data-plane.promoter-study-preflight` when you need the deeper read-only command preflight across DenseGen, Construct, Infer, Notify, and batch-plan surfaces for that same study.
+6. `ops progress show` and `ops progress campaign` are read-only status commands. Inspect the required flags in `ops progress explain <registry-id>` or `ops catalog show <registry-id>` before you run them if you do not already know the artifact contract.
+7. Use `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` to emit a manifest template with the right required fields. It prints to stdout unless you pass `--out`.
+8. Use `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` when you want the named registered procedure plus its related procedures as a starting point.
+9. Use `uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>` when the work spans multiple runtimes or pauses between steps.
+10. Keep the manifest explicit. Ops reads the files you name there; it does not infer hidden campaign state.
+11. For live promoter-study status, keep the study files under `docs/studies/promoter/<study-id>/`. Use [Study records index](../studies/README.md) for the required layout and selector rules.
+12. For progress-kind meanings and the next checks for each one, see the [runbook catalog progress views](../runbooks/README.md#progress-views).
+13. If the next step is dataset assembly, construct realization, or infer write-back, leave Ops and continue in the shared USR runbooks:
     [Multi-source shared dataset assembly](../../src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md),
     [Construct -> USR -> Infer shared dataset runbook](../../src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md),
     or [Promoter characterization feature matrix](../../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md).

@@ -111,6 +111,12 @@ After construct materializes the expanded context dataset, set:
 export FEATURE_DATASET="multi_source_construct_truth_demo" # Reuse the construct-backed dataset as the infer target plane.
 ```
 
+For the live `stress_ethanol_cipro_growth` study, keep the study-owned source
+datasets explicit:
+
+- `densegen/study_stress_ethanol_cipro` and `mg1655_promoters` are separate source datasets until the USR merge step is complete
+- if the study needs pDual-backed contexts, merge in USR first, then point Construct at that merged source dataset while keeping `plasmids` as the template dataset
+
 ### 4) Define the infer job matrix explicitly
 
 Use one infer config per model lane. Inside that config, keep the job ids explicit so downstream tools can choose feature columns without ambiguity.
@@ -179,6 +185,7 @@ Notes:
 - keep sequence-window choice outside infer by pointing different jobs at the anchor-only or construct-expanded dataset plane
 - keep `intermediate_block: 26` as the project default unless repo-local benchmarks justify another block
 - the stored schema prefers `output_layer_mean`; `output_embedding` is only a continuity alias in config/docs
+- persisted `output_layer_mean__*` and `intermediate_embedding__*` columns are mean-pooled summaries; the pooling mode is encoded in the suffix such as `seq_mean` or `anchor_mean`
 - copy the config and change `model.id` when you need a second model lane such as `evo2_20b`
 
 ### 5) Validate, register, and dry-run the infer matrix

@@ -1,0 +1,32 @@
+runbook:
+  schema_version: 1
+  id: study_stress_ethanol_cipro_infer_anchor_only_20b_batch_with_notify
+  workflow_id: infer_batch_with_notify
+  project: dunlop
+  workspace_root: ../../../infer/workspaces/study_stress_ethanol_cipro
+  logging:
+    stdout_dir: ../../../infer/workspaces/study_stress_ethanol_cipro/outputs/logs/ops/sge/study_stress_ethanol_cipro_infer_anchor_only_20b_batch_with_notify
+  infer:
+    config: ../../../infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml
+    qsub_template: docs/bu-scc/jobs/evo2-gpu-infer.qsub
+    cuda_module: cuda/12.8
+    gcc_module: gcc/13.2.0
+  notify:
+    tool: infer
+    policy: infer
+    profile: ../../../infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_20b/profile.json
+    cursor: ../../../infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_20b/cursor
+    spool_dir: ../../../infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_20b/spool
+    webhook_env: NOTIFY_WEBHOOK
+    qsub_template: docs/bu-scc/jobs/notify-watch.qsub
+    smoke: dry
+  resources:
+    pe_omp: 4
+    h_rt: "12:00:00"
+    mem_per_core: 8G
+    gpus: 1
+    gpu_capability: "9.0"
+    gpu_memory_gib: 80.0
+  mode_policy:
+    default: auto
+    on_active_job: hold_jid

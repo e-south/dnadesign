@@ -52,8 +52,8 @@ Run `usr diff` / `usr pull` / `usr push` against BU SCC with the dnadesign-speci
 
 ## Repo-Specific Notes
 
-- Curated construct demo inputs now live in flat semantic datasets (`mg1655_promoters`, `plasmids`), not in a tool-owned dataset namespace.
-- Realized construct demo outputs should also use flat semantic dataset ids such as `pdual10_slot_a_window_1kb_demo`, not a tool-owned dataset namespace.
+- Curated construct demo inputs now live in flat semantic datasets (`anchor_parts_demo`, `template_parts_demo`), not in a tool-owned dataset namespace.
+- Realized construct demo outputs should also use flat semantic dataset ids such as `anchor_template_slot_a_window_1kb_demo`, not a tool-owned dataset namespace.
 - Human-readable record names should be carried in `usr_label__primary` / `usr_label__aliases`; tool-specific provenance belongs in tool namespaces such as `construct_seed__*`.
 - Empty SCC directories are not datasets until `records.parquet` exists.
 

@@ -97,6 +97,14 @@ Current presets include:
 
 1. `src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch.yaml`
 2. `src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml`
+3. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml`
+4. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml`
+5. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml`
+6. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml`
+
+Infer auto/resume resolves exactly one USR write-back destination per runbook.
+If a study keeps `anchor_only` and `template_1kb` as separate dataset planes,
+ship one batch preset per lane instead of one multi-destination Infer preset.
 
 Keep `presets/` for reusable starters only. Do not point `ops runbook plan` or `ops runbook execute` at an installed-package preset in place. Materialize a workspace-scoped runbook with `uv run ops runbook init`, or copy the preset content into `<workspace-root>/outputs/logs/ops/runbooks/<runbook-id>.yaml` and rewrite the workspace-relative paths before use. Store run-specific variants under `<workspace-root>/outputs/logs/ops/runbooks/` with a stable runbook id.
 
