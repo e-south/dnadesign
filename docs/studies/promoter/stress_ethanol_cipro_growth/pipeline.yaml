@@ -1,0 +1,152 @@
+study_pipeline:
+  study_id: stress_ethanol_cipro_growth
+  last_verified: 2026-03-22
+  current_phase: densegen_growth
+  canonical_usr_root: src/dnadesign/usr/datasets
+  objective: >
+    Grow DenseGen promoter anchors, merge them with wildtype controls into one
+    auditable anchor set, realize 1 kb pDual-10 contexts with Construct, and
+    run Evo2 feature extraction with Notify-backed batch visibility.
+  row_targets:
+    densegen_anchor_minimum_before_first_full_lane_infer: 100000
+  required_records:
+    campaign_manifest: campaign.yaml
+    dataset_registry: datasets.yaml
+    status_note: status.md
+  execution_surfaces:
+    construct_workspace: src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10
+    infer_workspace: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro
+    densegen_batch_with_notify: src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml
+    infer_batch_7b_with_notify:
+      anchor_only: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml
+      anchor_plus_template: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml
+    infer_batch_20b_with_notify:
+      anchor_only: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml
+      anchor_plus_template: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml
+  datasets:
+    densegen_anchor_source: densegen/study_stress_ethanol_cipro
+    wildtype_anchor_source: mg1655_promoters
+    template_seed_dataset: plasmids
+    merged_anchor_dataset: promoter/stress_ethanol_cipro_anchor_set
+    construct_context_dataset: promoter/stress_ethanol_cipro_construct_contexts
+    canonical_feature_dataset: promoter/stress_ethanol_cipro_feature_matrix
+  construct:
+    template_record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+    merge_contract:
+      init_dataset_first: true
+      init_command: >
+        uv run usr --root src/dnadesign/usr/datasets init
+        promoter/stress_ethanol_cipro_anchor_set
+        --source stress_ethanol_cipro_growth
+        --notes "Merged anchor set for Construct and Infer"
+      merge_commands:
+        - >
+          uv run usr --root src/dnadesign/usr/datasets maintenance merge
+          --dest promoter/stress_ethanol_cipro_anchor_set
+          --src mg1655_promoters
+          --union-columns
+          --if-duplicate error
+          --carry-namespace usr_label
+        - >
+          uv run usr --root src/dnadesign/usr/datasets maintenance merge
+          --dest promoter/stress_ethanol_cipro_anchor_set
+          --src densegen/study_stress_ethanol_cipro
+          --union-columns
+          --if-duplicate error
+          --carry-namespace usr_label
+    workspace_projects:
+      - id: slot_a_window
+        config: src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/config.slot_a.window.yaml
+        output_dataset: promoter/stress_ethanol_cipro_construct_contexts
+      - id: slot_b_window
+        config: src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/config.slot_b.window.yaml
+        output_dataset: promoter/stress_ethanol_cipro_construct_contexts
+  infer:
+    note: >
+      The current Evo2 feature_bundle contract keeps anchor_only and
+      template_1kb as separate jobs. The study's full-lane configs therefore
+      span two explicit dataset planes rather than one mixed-context ingest
+      dataset. Resumable ops runbooks therefore stay lane-specific as well,
+      because ops auto/resume resolves one USR destination per runbook.
+    configs:
+      anchor_only_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml
+      anchor_plus_template_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml
+      anchor_only_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml
+      anchor_plus_template_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml
+      full_lane_set_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_7b.yaml
+      full_lane_set_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_20b.yaml
+    notify_profiles:
+      anchor_only_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_7b/profile.json
+      anchor_plus_template_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_plus_template_7b/profile.json
+      anchor_only_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_20b/profile.json
+      anchor_plus_template_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_plus_template_20b/profile.json
+    notify_watch_contract:
+      anchor_only:
+        setup_command: >
+          export NOTIFY_WEBHOOK_FILE=/abs/path/to/study_stress_ethanol_cipro.webhook &&
+          export SSL_CERT_FILE=/abs/path/to/ca-bundle.pem &&
+          uv run notify setup slack --profile
+          src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_7b/profile.json
+          --tool infer --config
+          src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml
+          --secret-source file --secret-ref "file://$NOTIFY_WEBHOOK_FILE"
+        doctor_command: >
+          uv run notify profile doctor --profile
+          src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_7b/profile.json
+        resolve_command: >
+          uv run notify setup resolve-events --tool infer
+          --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml
+          --json
+        watch_command: >
+          uv run notify usr-events watch --profile
+          src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_7b/profile.json
+          --dry-run --no-advance-cursor-on-dry-run
+      anchor_plus_template:
+        setup_command: >
+          export NOTIFY_WEBHOOK_FILE=/abs/path/to/study_stress_ethanol_cipro.webhook &&
+          export SSL_CERT_FILE=/abs/path/to/ca-bundle.pem &&
+          uv run notify setup slack --profile
+          src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_plus_template_7b/profile.json
+          --tool infer --config
+          src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml
+          --secret-source file --secret-ref "file://$NOTIFY_WEBHOOK_FILE"
+        doctor_command: >
+          uv run notify profile doctor --profile
+          src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_plus_template_7b/profile.json
+        resolve_command: >
+          uv run notify setup resolve-events --tool infer
+          --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml
+          --json
+        watch_command: >
+          uv run notify usr-events watch --profile
+          src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_plus_template_7b/profile.json
+          --dry-run --no-advance-cursor-on-dry-run
+  phases:
+    - id: densegen_growth
+      status: in_progress
+      primary_dataset: densegen/study_stress_ethanol_cipro
+      completion_rule: row_count >= 100000
+      next_surface: src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml
+    - id: merged_anchor_set
+      status: ready
+      output_dataset: promoter/stress_ethanol_cipro_anchor_set
+      runbook: src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md
+      next_surface: src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md
+    - id: construct_context_expansion
+      status: planned
+      output_dataset: promoter/stress_ethanol_cipro_construct_contexts
+      next_surface: src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md
+    - id: infer_anchor_only_7b
+      status: planned
+      next_surface: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml
+    - id: infer_anchor_plus_template_7b
+      status: planned
+      next_surface: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml
+    - id: infer_anchor_only_20b
+      status: blocked_gpu
+      blocker: Hopper or H200 GPU lane required
+      next_surface: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml
+    - id: infer_anchor_plus_template_20b
+      status: blocked_gpu
+      blocker: Hopper or H200 GPU lane required
+      next_surface: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml

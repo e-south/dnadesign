@@ -1,0 +1,32 @@
+schema_version: 1
+catalog_order: 56
+registry_id: usr.data-plane.promoter-study-preflight
+type: contract
+plane: data-plane
+owner_boundary: usr
+entry_artifact: one checked-in promoter-study directory plus study-owned execution surfaces
+exit_artifact: one read-only command-level preflight summary for the active study
+summary: Run the active promoter-study preflight suite across DenseGen, Construct, Infer, Notify, and batch-plan contracts without mutating data or submitting jobs.
+execution_kind: iterative
+progress_kind: promoter-study-preflight
+keywords:
+  - promoter study
+  - preflight
+  - densegen
+  - construct
+  - infer
+  - notify
+  - ops
+related_tools:
+  - densegen
+  - construct
+  - infer
+  - notify
+  - ops
+relations:
+  - type: execution-support
+    target: usr.data-plane.promoter-study-status
+  - type: execution-support
+    target: usr.data-plane.multi-source-source-of-truth
+  - type: execution-support
+    target: usr.data-plane.construct-infer-source-of-truth

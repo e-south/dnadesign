@@ -1,8 +1,8 @@
 ---
 name: promoter-study-status
-description: Answer or refresh the dnadesign promoter-study status across DenseGen, USR, Construct, Infer, Cluster or OPAL, and optional Notify by reading the checked-in study record first, including the affiliated-dataset registry for local and remote sync posture, then running the explicit status commands. Use when the user asks where the promoter study stands, which datasets and row counts are current, which infer slices are done or pending, whether the downstream dataset is ready, how affiliated datasets sync between locations such as BU SCC and local roots, or what batch step should run next. Do not use for generic workflow discovery when no checked-in study record exists, or for tool-local questions that do not need cross-tool study status.
+description: Answer or refresh the dnadesign promoter-study status across DenseGen, USR, Construct, Infer, Cluster or OPAL, and optional Notify by reading the checked-in study record first, including the affiliated-dataset registry and optional pipeline execution map for local, remote, and batch posture, then running the explicit status commands. Use when the user asks where the promoter study stands, which datasets and row counts are current, which infer slices are done or pending, whether the downstream dataset is ready, how affiliated datasets sync between locations such as BU SCC and local roots, or what batch step should run next. Do not use for generic workflow discovery when no checked-in study record exists, or for tool-local questions that do not need cross-tool study status.
 metadata:
-  version: 0.3.0
+  version: 0.3.2
   category: workflow-automation
   tags: [usr, promoter-study, densegen, construct, infer, cluster, notify, status]
 ---
@@ -46,9 +46,10 @@ Out of scope:
   `src/dnadesign/usr/docs/operations/promoter-study-status-contract.md`.
 - Treat `docs/studies/promoter/index.yaml`,
   `docs/studies/promoter/<study-id>/campaign.yaml`,
-  `docs/studies/promoter/<study-id>/datasets.yaml`, and `status.md` as the only
-  valid source for live dataset ids, local-vs-remote sync posture, row targets,
-  completed infer slices, and next actions.
+  `docs/studies/promoter/<study-id>/datasets.yaml`, `status.md`, and optional
+  `pipeline.yaml` as the only valid source for live dataset ids,
+  local-vs-remote sync posture, row targets, completed infer slices, study-owned
+  Construct or Infer surfaces, and next actions.
 - Use `root_kind` and `status` in `datasets.yaml` to tell canonical shared USR
   roots apart from workspace-local export roots and planned-but-not-yet-created
   datasets.
@@ -67,10 +68,28 @@ Out of scope:
 - If `active_study` names a study id, require the same id under `studies:` and
   require `campaign.yaml`, `datasets.yaml`, and `status.md` in the matching
   study directory.
+- If `pipeline.yaml` exists, load it before answering exact Construct, Infer,
+  batch, or Notify next-step questions.
 - If the registry and checked-in study directory disagree, fail visibly instead
   of scanning for a best guess.
 
 2. Refresh the shared status surface
+- Run:
+  `uv run ops progress show usr.data-plane.promoter-study-status --json`
+- Use that output as the one-command summary for current phase, declared datasets,
+  next ready phase, and missing execution surfaces before deeper probes.
+- When the user needs command-level blockers rather than the cheap snapshot,
+  run:
+  `uv run ops progress show usr.data-plane.promoter-study-preflight --json`
+- Use the preflight output when the question is "what fails right now?" across
+  DenseGen, Construct, Infer, Notify, and batch-plan surfaces.
+- This is a repo-local project skill. If Codex was launched outside the
+  `dnadesign` checkout, the skill may not be auto-advertised even though this
+  file exists. In that case, use the `ops progress` commands directly instead
+  of assuming project-scope skill discovery is active.
+- If you are outside the repo checkout or you need a non-active study, rerun with:
+  `uv run ops progress show usr.data-plane.promoter-study-status --repo-root <repo-root> --study-dir docs/studies/promoter/<study-id> --json`
+- Use the same `--repo-root ... --study-dir ...` shape for `promoter-study-preflight`.
 - Run:
   `uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/promoter/<study-id>/campaign.yaml`
 - If `status.md` names a current canonical feature dataset, run:
@@ -115,6 +134,8 @@ Return:
   still source-phase with no canonical feature dataset yet
 - source datasets named in the checked-in study record
 - affiliated dataset registry entries and sync posture
+- study-owned Construct, Infer, batch, and Notify surfaces when `pipeline.yaml`
+  exists
 - completed versus pending infer slices
 - rollback paths (`infer prune`, `usr maintenance overlay-remove`,
   `usr maintenance overlay-compact`)

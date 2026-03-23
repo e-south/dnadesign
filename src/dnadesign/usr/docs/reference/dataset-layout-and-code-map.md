@@ -27,7 +27,7 @@ Dataset ids may be flat (`dataset`) or namespace-qualified (`namespace/dataset`)
 
 Choose the least-coupled semantic id that still keeps the dataset understandable.
 
-- Prefer a flat dataset id when the biological collection is already specific, such as `mg1655_promoters`, `plasmids`, or `pdual10_slot_a_window_1kb_demo`.
+- Prefer a flat dataset id when the biological collection is already specific, such as `mg1655_promoters`, `plasmids`, or `anchor_template_slot_a_window_1kb_demo`.
 - Use namespace-qualified ids only when they genuinely improve disambiguation instead of encoding tool routing.
 - Keep tool provenance in namespaced overlay columns such as `construct__*`, `densegen__*`, or `infer__*`, not in the dataset id itself, unless the dataset is truly tool-private scratch state.
 - Carry human-readable record names in record columns such as `usr_label__primary` / `usr_label__aliases`, not only in local notes or workspace conventions.

@@ -47,7 +47,7 @@ Conventional cross-tool label namespace:
 Dataset id naming convention:
 
 - Prefer the least-coupled semantic id that still makes the dataset obvious to operators.
-- Flat ids are first-class: examples include `mg1655_promoters`, `plasmids`, and `pdual10_slot_a_window_1kb_demo`.
+- Flat ids are first-class: examples include `mg1655_promoters`, `plasmids`, and `anchor_template_slot_a_window_1kb_demo`.
 - Namespace-qualified ids remain valid when they genuinely improve disambiguation.
 - Avoid encoding the producing tool name in the dataset id when the dataset is intended to be consumed across sibling packages.
 

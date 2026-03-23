@@ -244,6 +244,23 @@ def test_usr_docs_index_exposes_getting_started_and_reference_paths() -> None:
     assert "choose cluster or prepare OPAL" in usr_docs
 
 
+def test_promoter_study_index_and_status_are_checked_in_for_stress_ethanol_cipro_growth() -> None:
+    datasets = _read("docs/studies/promoter/stress_ethanol_cipro_growth/datasets.yaml")
+    status = _read("docs/studies/promoter/stress_ethanol_cipro_growth/status.md")
+    pipeline = _read("docs/studies/promoter/stress_ethanol_cipro_growth/pipeline.yaml")
+
+    assert "promoter/stress_ethanol_cipro_anchor_set" in datasets
+    assert "promoter/stress_ethanol_cipro_construct_contexts" in datasets
+    assert "pipeline.yaml" in status
+    assert "construct_workspace:" in pipeline
+    assert "study_stress_ethanol_cipro_pdual10" in pipeline
+    assert "infer_batch_7b_with_notify:" in pipeline
+    assert "anchor_only:" in pipeline
+    assert "anchor_plus_template:" in pipeline
+    assert "promoter/stress_ethanol_cipro_anchor_set" in pipeline
+    assert "promoter/stress_ethanol_cipro_construct_contexts" in pipeline
+
+
 def test_usr_promoter_journey_doc_links_cross_tool_owner_surfaces() -> None:
     journey = _read("src/dnadesign/usr/docs/operations/promoter-evo2-journey.md")
 
@@ -483,7 +500,7 @@ def test_multi_source_runbook_makes_upstream_dataset_mapping_explicit() -> None:
 
     assert "### 1b) Map those ids to real upstream datasets before validation" in runbook
     assert "does not create the extra upstream dataset for you" in runbook
-    assert 'export PRIMARY_INPUT_DATASET="mg1655_promoters"' in runbook
+    assert 'export PRIMARY_INPUT_DATASET="anchor_parts_demo"' in runbook
     assert 'export EXTRA_INPUT_DATASET="<existing_densegen_or_manual_usr_dataset>"' in runbook
 
 
@@ -571,7 +588,7 @@ def test_usr_workflow_map_runbook_is_indexed_with_command_chains() -> None:
     assert (
         'uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_b_window' in workflow_map
     )
-    assert 'DATASET_ID="pdual10_source_of_truth_demo"' in workflow_map
+    assert 'DATASET_ID="anchor_template_shared_dataset_demo"' in workflow_map
     assert (
         'uv run notify usr-events watch --events "$USR_ROOT/$DATASET_ID/.events.log" --provider generic '
         "--dry-run --no-advance-cursor-on-dry-run" in workflow_map
@@ -626,9 +643,9 @@ def test_promoter_feature_matrix_runbook_uses_extract_ops_and_dataset_placeholde
 def test_construct_source_of_truth_runbook_documents_construct_notify_resolver_modes() -> None:
     runbook = _read("src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md")
 
-    assert "promoter-swap-source-of-truth-demo" in runbook
+    assert "anchor-template-shared-dataset-demo" in runbook
     assert 'export CONSTRUCT_CONFIG="$WORKSPACE_ROOT/config.slot_a.window.yaml"' in runbook
-    assert 'export DATASET_ID="pdual10_source_of_truth_demo"' in runbook
+    assert 'export DATASET_ID="anchor_template_shared_dataset_demo"' in runbook
     assert 'config["jobs"][0]["ingest"]["dataset"] = os.environ["DATASET_ID"]' in runbook
     assert "uv run python - <<'PY'" in runbook
     assert "perl -0pi -e" not in runbook

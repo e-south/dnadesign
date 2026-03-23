@@ -23,6 +23,7 @@ docs/studies/promoter/
     campaign.yaml
     datasets.yaml
     status.md
+    pipeline.yaml  # optional execution-map surface once the study owns real configs
     audits/
 ```
 
@@ -34,6 +35,8 @@ docs/studies/promoter/
   sync posture for shared roots and workspace-local export roots.
 - `<study-id>/status.md` records the human-readable current state, row targets,
   infer slices, rollback commands, and next actions.
+- `<study-id>/pipeline.yaml`, when present, records the exact study-owned
+  Construct workspace, Infer configs, ops runbooks, and Notify profile paths.
 
 ### Discovery rules
 
@@ -41,6 +44,8 @@ docs/studies/promoter/
 - If `active_study` names a study id, that entry must exist in `studies:` and
   the corresponding `<study-id>/` directory must contain `campaign.yaml`,
   `datasets.yaml`, and `status.md`.
+- If `<study-id>/pipeline.yaml` exists, use it as the execution-map surface for
+  the next study-owned Construct or Infer action.
 - If `active_study` and `studies:` disagree, fail visibly and fix the registry
   before asking agents for current-study status.
 

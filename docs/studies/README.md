@@ -10,9 +10,10 @@ Study records are checked-in status artifacts for one live effort. They are not
 runbooks, and they are not generated outputs.
 
 Authority chain: `docs/studies/promoter/index.yaml` selects the active study,
-the matching `docs/studies/promoter/<study-id>/` directory holds
-`campaign.yaml`, `datasets.yaml`, and `status.md`, and the promoter-study
-status contract explains how to refresh them.
+the matching `docs/studies/promoter/<study-id>/` directory holds the required
+`campaign.yaml`, `datasets.yaml`, and `status.md`, and may also carry an
+optional `pipeline.yaml` when the study owns checked-in Construct, Infer,
+batch, or Notify execution surfaces.
 
 Keep three complementary artifacts for each real study:
 
@@ -20,6 +21,12 @@ Keep three complementary artifacts for each real study:
 - `datasets.yaml`: machine-readable registry of affiliated USR datasets and
   sync posture across local and remote locations
 - `status.md`: human-readable current state, row targets, and next actions
+
+When a study already owns concrete execution surfaces, add one optional fourth
+artifact:
+
+- `pipeline.yaml`: machine-readable map of the study-owned workspace, config,
+  batch, and Notify surfaces that a naive agent should follow next
 
 Use the study record even when the effort is still in the source-assembly phase.
 An active study does not need to wait until the final feature matrix already
@@ -38,6 +45,7 @@ docs/studies/promoter/<study-id>/
   campaign.yaml
   datasets.yaml
   status.md
+  pipeline.yaml  # optional but recommended once the study owns execution surfaces
   audits/
 ```
 
@@ -56,6 +64,9 @@ docs/studies/promoter/index.yaml
   study-specific workspace-export remote.
 - `status.md` is the human-readable note that records row targets, source
   datasets, infer slice status, rollback paths, and next actions.
+- `pipeline.yaml`, when present, records the exact Construct workspace,
+  Infer configs, batch presets, and Notify profile paths that belong to the
+  real study rather than to a generic demo.
 - `audits/` stores machine-readable sync audit JSON files referenced from
   `datasets.yaml`.
 
@@ -74,7 +85,10 @@ docs/studies/promoter/index.yaml
 6. Create the audit directory:
    `mkdir -p docs/studies/promoter/<study-id>/audits`
 7. Edit the checked-in `index.yaml` plus the new `campaign.yaml`, `datasets.yaml`, and `status.md` so they point at the real study ids, paths, and commands.
-8. Refresh evidence with:
+8. If the study already has concrete Construct, Infer, or batch surfaces,
+   add `docs/studies/promoter/<study-id>/pipeline.yaml` and record those exact
+   paths there.
+9. Refresh evidence with:
    `uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/promoter/<study-id>/campaign.yaml`
 
 ### Dataset registry contract
@@ -121,18 +135,29 @@ for the first pull rather than relying on local name guessing.
 
 ### Status lookup rules
 
+- One-command checked-in status summary:
+  `uv run ops progress show usr.data-plane.promoter-study-status`
+- One-command checked-in command preflight:
+  `uv run ops progress show usr.data-plane.promoter-study-preflight`
+- To pin a non-active study or run from outside the repo checkout, add:
+  `--repo-root <repo-root> --study-dir docs/studies/promoter/<study-id>`
+- The repo-local promoter-study skill lives at `.agents/skills/promoter-study-status/SKILL.md`, but native project-scope skill discovery only picks it up when Codex is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the two `ops progress` commands above directly.
 - Read `docs/studies/promoter/index.yaml` first.
 - If `active_study: null`, say the live study record is missing and route the
   reader to the promoter-study status contract instead of guessing.
 - If `active_study` names a study, that same id must appear under `studies:`
   and its directory must contain `campaign.yaml`, `datasets.yaml`, and
   `status.md`.
+- If `pipeline.yaml` exists, treat it as the study-owned execution map for the
+  next Construct, Infer, batch, or Notify step; do not reconstruct that path
+  from generic workspace docs.
 - If the registry and directory contents disagree, fail visibly and fix the
   registry before asking agents for live study status.
 
 ### Related docs
 
 - [Promoter study status contract](../../src/dnadesign/usr/docs/operations/promoter-study-status-contract.md)
+- [Promoter study preflight contract](../../src/dnadesign/usr/docs/operations/promoter-study-preflight.md)
 - [Promoter study registry](promoter/README.md)
 - [Promoter study index template](../templates/promoter-study-index.yaml)
 - [Promoter study datasets template](../templates/promoter-study-datasets.yaml)

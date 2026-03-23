@@ -38,6 +38,7 @@ Use this index to pick the next dataset, sync, or handoff step.
 | --- | --- |
 | Review the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL path before choosing one branch | [promoter-evo2-journey.md](promoter-evo2-journey.md) |
 | Keep one checked-in promoter-study record for current-status checks | [promoter-study-status-contract.md](promoter-study-status-contract.md) |
+| Run one read-only command preflight across the checked-in promoter-study surfaces | [promoter-study-preflight.md](promoter-study-preflight.md) |
 | Build one infer-annotated promoter-study feature dataset, then continue to cluster or prepare OPAL after choosing one explicit `X` column | [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md) |
 
 ## Validation and drills
@@ -66,6 +67,7 @@ Use this index to pick the next dataset, sync, or handoff step.
 4. Promoter study workflows:
    [promoter-evo2-journey.md](promoter-evo2-journey.md),
    [promoter-study-status-contract.md](promoter-study-status-contract.md),
+   [promoter-study-preflight.md](promoter-study-preflight.md),
    [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md)
 5. Validation drills:
    [sync-fidelity-drills.md](sync-fidelity-drills.md),

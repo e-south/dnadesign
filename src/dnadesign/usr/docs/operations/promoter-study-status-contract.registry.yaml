@@ -1,0 +1,32 @@
+schema_version: 1
+catalog_order: 55
+registry_id: usr.data-plane.promoter-study-status
+type: contract
+plane: data-plane
+owner_boundary: usr
+entry_artifact: one checked-in promoter-study directory selected through docs/studies/promoter/index.yaml
+exit_artifact: one read-only summary of dataset presence, phase posture, and study-owned execution surfaces
+summary: Read one checked-in promoter-study record and summarize dataset, phase, and execution-surface readiness without reconstructing the workflow by hand.
+execution_kind: iterative
+progress_kind: promoter-study-record
+keywords:
+  - promoter study
+  - study record
+  - densegen
+  - construct
+  - infer
+  - notify
+  - status
+related_tools:
+  - densegen
+  - construct
+  - infer
+  - notify
+  - ops
+relations:
+  - type: execution-support
+    target: usr.data-plane.multi-source-source-of-truth
+  - type: execution-support
+    target: usr.data-plane.construct-infer-source-of-truth
+  - type: execution-support
+    target: usr.data-plane.promoter-feature-matrix

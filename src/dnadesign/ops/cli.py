@@ -792,6 +792,14 @@ def _progress_kind_description(progress_kind: str) -> str:
         "ops-audit-json": "Read one workspace-scoped orchestration audit JSON emitted by `ops runbook execute`.",
         "usr-sync-audit": "Read one USR sync audit JSON emitted by `usr diff`, `usr pull`, or `usr push`.",
         "usr-dataset-state": "Read one USR dataset directory, its records.parquet, and related overlay sidecars.",
+        "promoter-study-record": (
+            "Read one checked-in promoter-study directory and summarize dataset, "
+            "phase, and execution-surface readiness."
+        ),
+        "promoter-study-preflight": (
+            "Run one read-only, active-study preflight suite across DenseGen, "
+            "Construct, Infer, Notify, and batch-plan surfaces."
+        ),
         "cluster-run-index": "Read one cluster results root and summarize the run index for that workspace.",
         "opal-campaign-state": "Read one OPAL campaign workdir and summarize state.json plus round ledgers.",
     }
@@ -826,6 +834,20 @@ def _progress_notes(entry: CatalogProcedureEntry) -> tuple[str, ...]:
         notes.append(
             "Prefer `--opal-config` so Ops resolves `campaign.workdir` relative "
             "to the campaign root, matching OPAL's config contract."
+        )
+    if entry.progress_kind == "promoter-study-record":
+        notes.append(
+            "If `docs/studies/promoter/index.yaml` declares `active_study`, you can omit `--study-dir` "
+            "for the active-study summary. Pass `--study-dir` to pin or override the checked-in study directory."
+        )
+    if entry.progress_kind == "promoter-study-preflight":
+        notes.append(
+            "This route composes read-only command preflights. Use it after the cheaper "
+            "`usr.data-plane.promoter-study-status` summary when you need command-level blockers."
+        )
+        notes.append(
+            "If `docs/studies/promoter/index.yaml` declares `active_study`, you can omit `--study-dir` "
+            "for the active-study preflight. Pass `--study-dir` to pin or override the checked-in study directory."
         )
     return tuple(notes)
 
@@ -1666,6 +1688,13 @@ def progress_show(
         str | None,
         typer.Option("--dataset", help="USR dataset id for usr-dataset-state surfaces."),
     ] = None,
+    study_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--study-dir",
+            help="Checked-in promoter-study directory for promoter-study-record and promoter-study-preflight surfaces.",
+        ),
+    ] = None,
     cluster_results_root: Annotated[
         Path | None,
         typer.Option("--cluster-results-root", help="Cluster results root containing index.parquet."),
@@ -1702,10 +1731,12 @@ def progress_show(
             catalog,
             registry_id,
             inputs=ProgressInputs(
+                repo_root=catalog.repo_root,
                 audit_json=audit_json,
                 sync_audit_json=sync_audit_json,
                 usr_root=usr_root,
                 dataset=dataset,
+                study_dir=study_dir,
                 cluster_results_root=cluster_results_root,
                 opal_config=opal_config,
                 opal_workdir=opal_workdir,
