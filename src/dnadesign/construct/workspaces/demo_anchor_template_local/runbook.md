@@ -1,12 +1,12 @@
-## demo_promoter_swap_pdual10 Runbook
+## demo_anchor_template_local Runbook
 
 **Workspace Path**
 - The workspace path printed by `construct workspace init` (default: `<cwd>/<your-workspace-id>/`).
 
 **Purpose**
-- Seed curated promoter and plasmid datasets into the workspace-local USR root at `outputs/usr_datasets/`.
-- Replace one explicit `J23105` interval inside the circular `pDual-10` template record.
-- Emit either a 1 kb centered window or a full realized plasmid into separate USR datasets.
+- Seed curated anchor-part and template datasets into the workspace-local USR root at `outputs/usr_datasets/`.
+- Replace one explicit `anchor_part_short_ref` interval inside the circular `template_backbone_dual_slot` template record.
+- Emit either a 1 kb centered window or a full realized template context into separate USR datasets.
 
 **Registry first**
 - Inspect the project inventory before running anything:
@@ -39,10 +39,10 @@
 The wrapper also carries a project-root hint for `uv run --project ...`; override it with `CONSTRUCT_RUNBOOK_PROJECT_ROOT=/path/to/dnadesign` if needed.
 
 **Important note**
-- The provided full `pDual-10` record contains two exact `J23105` matches:
+- The provided full `template_backbone_dual_slot` record contains two exact `anchor_part_short_ref` matches:
   - `slot_a`: `[2300, 2335)`
   - `slot_b`: `[3621, 3656)`
-- The earlier scaffold-only interval `[405, 440)` does not apply to the full `pDual-10` record used here.
+- The earlier scaffold-only interval `[405, 440)` does not apply to the full `template_backbone_dual_slot` record used here.
 
 ### Step-by-step commands
 
@@ -52,19 +52,19 @@ Run these commands from the workspace root:
 set -euo pipefail # Fail fast on errors, unset variables, and pipe failures.
 
 # Bootstrap the local demo inputs and write a manifest with record ids.
-uv run construct seed promoter-swap-demo \
+uv run construct seed anchor-template-demo \
   --root "$PWD/outputs/usr_datasets" \
   --manifest "$PWD/inputs/seed_manifest.yaml"
 
 # Inspect the workspace registry, verify drift, and inspect seeded labels.
 uv run construct workspace show --workspace . # Print workspace registry entries and resolved paths.
 uv run construct workspace doctor --workspace . # Check workspace registry/config consistency.
-# Inspect seeded promoter records and label fields.
-uv run usr --root "$PWD/outputs/usr_datasets" head mg1655_promoters -n 10 \
-  --columns id,usr_label__primary,usr_label__aliases,sequence # Show seeded promoter labels and aliases.
-# Inspect seeded plasmid records and label fields.
-uv run usr --root "$PWD/outputs/usr_datasets" head plasmids -n 10 \
-  --columns id,usr_label__primary,usr_label__aliases,sequence # Show seeded plasmid labels and aliases.
+# Inspect seeded anchor-part records and label fields.
+uv run usr --root "$PWD/outputs/usr_datasets" head anchor_parts_demo -n 10 \
+  --columns id,usr_label__primary,usr_label__aliases,sequence # Show seeded anchor-part labels and aliases.
+# Inspect seeded template records and label fields.
+uv run usr --root "$PWD/outputs/usr_datasets" head template_parts_demo -n 10 \
+  --columns id,usr_label__primary,usr_label__aliases,sequence # Show seeded template labels and aliases.
 
 # Validate and dry-run a 1 kb context realization around the slot_a incumbent.
 uv run construct validate config --config "$PWD/config.slot_a.window.yaml" --runtime # Validate slot_a window config with runtime paths.
@@ -72,11 +72,11 @@ uv run construct run --config "$PWD/config.slot_a.window.yaml" --dry-run # Previ
 
 # Materialize the slot_a 1 kb outputs into workspace-local USR.
 uv run construct run --config "$PWD/config.slot_a.window.yaml" # Materialize slot_a window outputs.
-uv run usr --root "$PWD/outputs/usr_datasets" validate pdual10_slot_a_window_1kb_demo --strict # Confirm the written output dataset satisfies the active USR registry.
+uv run usr --root "$PWD/outputs/usr_datasets" validate anchor_template_slot_a_window_1kb_demo --strict # Confirm the written output dataset satisfies the active USR registry.
 
-# Validate and dry-run the full-plasmid realization for the same slot.
-uv run construct validate config --config "$PWD/config.slot_a.full.yaml" --runtime # Validate slot_a full-plasmid config with runtime paths.
-uv run construct run --config "$PWD/config.slot_a.full.yaml" --dry-run # Preview the slot_a full-plasmid output without writing records.
+# Validate and dry-run the full-template realization for the same slot.
+uv run construct validate config --config "$PWD/config.slot_a.full.yaml" --runtime # Validate slot_a full-template config with runtime paths.
+uv run construct run --config "$PWD/config.slot_a.full.yaml" --dry-run # Preview the slot_a full-template output without writing records.
 ```
 
 ### Variations

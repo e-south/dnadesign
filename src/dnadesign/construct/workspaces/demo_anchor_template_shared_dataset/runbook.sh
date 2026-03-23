@@ -53,7 +53,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 seed_demo() {
-  construct_cmd seed promoter-swap-demo \
+  construct_cmd seed anchor-template-demo \
     --root "$USR_ROOT" \
     --manifest "$MANIFEST"
 }

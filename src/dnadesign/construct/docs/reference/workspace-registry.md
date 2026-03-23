@@ -11,8 +11,8 @@
 
 ```yaml
 workspace:
-  id: demo_promoter_swap
-  profile: promoter-swap-demo
+  id: demo_anchor_template
+  profile: anchor-template-demo
   description: Construct workspace registry for explicit project inventory.
   roots:
     shared_usr_root: src/dnadesign/usr/datasets
@@ -21,12 +21,12 @@ workspace:
     - id: slot_a_window
       config: config.slot_a.window.yaml
       flow: replace-anchor-in-template
-      input_dataset: mg1655_promoters
-      template_id: pDual-10
-      template_dataset: plasmids
+      input_dataset: anchor_parts_demo
+      template_id: template_backbone_dual_slot
+      template_dataset: template_parts_demo
       template_record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
-      output_dataset: pdual10_slot_a_window_1kb_demo
-      notes: Windowed promoter swap against slot_a in pDual-10.
+      output_dataset: anchor_template_slot_a_window_1kb_demo
+      notes: Windowed anchor placement against slot_a in the packaged dual-slot template.
 ```
 
 ### Contract

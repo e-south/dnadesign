@@ -1,12 +1,12 @@
-## demo_promoter_swap_pdual10_source_of_truth Runbook
+## demo_anchor_template_shared_dataset Runbook
 
 **Workspace Path**
 - The workspace path printed by `construct workspace init` (default: `<cwd>/<your-workspace-id>/`).
 
 **Purpose**
-- Seed curated promoter and plasmid datasets into the workspace-local USR root at `outputs/usr_datasets/`.
-- Replace the explicit `J23105` incumbents in both `slot_a` and `slot_b` with canonical promoter inputs.
-- Materialize both 1 kb window realizations into one semantic dataset, `pdual10_source_of_truth_demo`.
+- Seed curated anchor-part and template datasets into the workspace-local USR root at `outputs/usr_datasets/`.
+- Replace the explicit `anchor_part_short_ref` incumbents in both `slot_a` and `slot_b` with packaged anchor inputs.
+- Materialize both 1 kb window realizations into one semantic dataset, `anchor_template_shared_dataset_demo`.
 - Keep upstream `usr_label__primary` / `usr_label__aliases` visible on derived rows so analyst-facing reads stay human-scannable.
 
 **Registry first**
@@ -42,7 +42,7 @@
 The wrapper also carries a project-root hint for `uv run --project ...`; override it with `CONSTRUCT_RUNBOOK_PROJECT_ROOT=/path/to/dnadesign` if needed.
 
 **Important note**
-- The provided full `pDual-10` record contains two exact `J23105` matches:
+- The provided full `template_backbone_dual_slot` record contains two exact `anchor_part_short_ref` matches:
   - `slot_a`: `[2300, 2335)`
   - `slot_b`: `[3621, 3656)`
 - This packaged shared-dataset demo only uses the two 1 kb window projects because they are the intended infer-ready downstream handoff shape.
@@ -55,7 +55,7 @@ Run these commands from the workspace root:
 set -euo pipefail # Fail fast on errors, unset variables, and pipe failures.
 
 # Bootstrap the local demo inputs and write a manifest with record ids.
-uv run construct seed promoter-swap-demo \
+uv run construct seed anchor-template-demo \
   --root "$PWD/outputs/usr_datasets" \
   --manifest "$PWD/inputs/seed_manifest.yaml"
 
@@ -64,8 +64,8 @@ uv run construct workspace show --workspace . # Print workspace registry entries
 
 # Re-check the packaged registry/config contract before running anything.
 uv run construct workspace doctor --workspace .
-# Show seeded promoter labels and aliases.
-uv run usr --root "$PWD/outputs/usr_datasets" head mg1655_promoters -n 10 --columns id,usr_label__primary,usr_label__aliases,sequence
+# Show seeded anchor-part labels and aliases.
+uv run usr --root "$PWD/outputs/usr_datasets" head anchor_parts_demo -n 10 --columns id,usr_label__primary,usr_label__aliases,sequence
 
 # Validate both packaged projects before any write.
 uv run construct workspace validate-project --workspace . --project slot_a_window --runtime # Validate slot_a runtime roots and template resolution.
@@ -80,9 +80,9 @@ uv run construct workspace run-project --workspace . --project slot_a_window # M
 uv run construct workspace run-project --workspace . --project slot_b_window # Materialize slot_b rows into the shared dataset.
 
 # Verify the shared dataset and inspect carried-through labels plus construct lineage.
-uv run usr --root "$PWD/outputs/usr_datasets" validate pdual10_source_of_truth_demo --strict # Confirm the shared dataset satisfies the active USR registry.
+uv run usr --root "$PWD/outputs/usr_datasets" validate anchor_template_shared_dataset_demo --strict # Confirm the shared dataset satisfies the active USR registry.
 # Inspect the shared dataset with upstream labels plus construct lineage context.
-uv run usr --root "$PWD/outputs/usr_datasets" head pdual10_source_of_truth_demo -n 10 --columns id,usr_label__primary,construct__input_dataset,construct__input_id,construct__template_id,construct__window_semantics
+uv run usr --root "$PWD/outputs/usr_datasets" head anchor_template_shared_dataset_demo -n 10 --columns id,usr_label__primary,construct__input_dataset,construct__input_id,construct__template_id,construct__window_semantics
 ```
 
 ### Variations

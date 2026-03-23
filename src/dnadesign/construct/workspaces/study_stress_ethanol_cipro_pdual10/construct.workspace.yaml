@@ -1,0 +1,29 @@
+workspace:
+  id: study_stress_ethanol_cipro_pdual10
+  profile: study-owned
+  description: >
+    Study-owned Construct workspace for stress_ethanol_cipro_growth.
+    It reads the merged anchor set from the shared USR root and realizes
+    1 kb pDual-10 contexts into one shared downstream dataset.
+  roots:
+    shared_usr_root: ../../../usr/datasets
+    workspace_usr_root: outputs/usr_datasets
+  projects:
+    - id: slot_a_window
+      config: config.slot_a.window.yaml
+      flow: replace-anchor-in-template
+      input_dataset: promoter/stress_ethanol_cipro_anchor_set
+      template_id: pdual10_slot_a
+      template_dataset: plasmids
+      template_record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+      output_dataset: promoter/stress_ethanol_cipro_construct_contexts
+      notes: 1 kb centered pDual-10 context around the slot_a incumbent segment.
+    - id: slot_b_window
+      config: config.slot_b.window.yaml
+      flow: replace-anchor-in-template
+      input_dataset: promoter/stress_ethanol_cipro_anchor_set
+      template_id: pdual10_slot_b
+      template_dataset: plasmids
+      template_record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+      output_dataset: promoter/stress_ethanol_cipro_construct_contexts
+      notes: 1 kb centered pDual-10 context around the slot_b incumbent segment.

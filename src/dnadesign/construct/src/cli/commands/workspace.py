@@ -58,7 +58,7 @@ def where(
     profile: str = typer.Option(
         "blank",
         "--profile",
-        help="Workspace profile: blank | promoter-swap-demo | promoter-swap-source-of-truth-demo.",
+        help="Workspace profile: blank | anchor-template-demo | anchor-template-shared-dataset-demo.",
     ),
 ) -> None:
     try:
@@ -111,7 +111,7 @@ def init(
     profile: str = typer.Option(
         "blank",
         "--profile",
-        help="Workspace profile: blank | promoter-swap-demo | promoter-swap-source-of-truth-demo.",
+        help="Workspace profile: blank | anchor-template-demo | anchor-template-shared-dataset-demo.",
     ),
 ) -> None:
     try:
@@ -137,14 +137,14 @@ def init(
     else:
         typer.echo("config: choose one of the packaged config.*.yaml files in this workspace")
         typer.echo(f"Next: {command_prefix} workspace show --workspace {workspace_arg}")
-    if profile == "promoter-swap-demo":
+    if profile == "anchor-template-demo":
         typer.echo(
-            f"Then: {command_prefix} seed promoter-swap-demo --root {outputs_root_arg} --manifest {demo_manifest_arg}"
+            f"Then: {command_prefix} seed anchor-template-demo --root {outputs_root_arg} --manifest {demo_manifest_arg}"
         )
         typer.echo("Then: run ./runbook.sh --mode dry-run --config <chosen-config>")
-    elif profile == "promoter-swap-source-of-truth-demo":
+    elif profile == "anchor-template-shared-dataset-demo":
         typer.echo(
-            f"Then: {command_prefix} seed promoter-swap-demo --root {outputs_root_arg} --manifest {demo_manifest_arg}"
+            f"Then: {command_prefix} seed anchor-template-demo --root {outputs_root_arg} --manifest {demo_manifest_arg}"
         )
         typer.echo("Then: run ./runbook.sh --mode dry-run-all")
     else:
@@ -155,7 +155,7 @@ def init(
         )
         typer.echo(
             "Then: if you want the curated demo instead, initialize a separate workspace "
-            "with --profile promoter-swap-demo or --profile promoter-swap-source-of-truth-demo."
+            "with --profile anchor-template-demo or --profile anchor-template-shared-dataset-demo."
         )
 
 

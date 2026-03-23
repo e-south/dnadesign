@@ -1,14 +1,14 @@
 job:
-  id: promoter_swap_slot_b_window_1kb
+  id: anchor_template_slot_b_window_1kb
   input:
     source: usr
-    dataset: mg1655_promoters
+    dataset: anchor_parts_demo
     root: outputs/usr_datasets
     field: sequence
   template:
-    id: pDual-10
+    id: template_backbone_dual_slot
     kind: usr
-    dataset: plasmids
+    dataset: template_parts_demo
     root: outputs/usr_datasets
     record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
     field: sequence
@@ -35,5 +35,5 @@ job:
       size_bp: 1000
       offset_bp: 0
   output:
-    dataset: pdual10_source_of_truth_demo
+    dataset: anchor_template_slot_b_window_1kb_demo
     root: outputs/usr_datasets

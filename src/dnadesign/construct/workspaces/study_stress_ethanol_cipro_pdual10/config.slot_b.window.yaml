@@ -1,15 +1,15 @@
 job:
-  id: promoter_swap_slot_a_window_1kb
+  id: stress_ethanol_cipro_slot_b_window_1kb
   input:
     source: usr
-    dataset: mg1655_promoters
-    root: outputs/usr_datasets
+    dataset: promoter/stress_ethanol_cipro_anchor_set
+    root: ../../../usr/datasets
     field: sequence
   template:
-    id: pDual-10
+    id: pdual10_slot_b
     kind: usr
     dataset: plasmids
-    root: outputs/usr_datasets
+    root: ../../../usr/datasets
     record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
     field: sequence
     circular: true
@@ -21,8 +21,8 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 2300
-        end: 2335
+        start: 3621
+        end: 3656
         orientation: forward
         expected_template_sequence: tttacggctagctcagtcctaggtactatgctagc
   realize:
@@ -35,5 +35,5 @@ job:
       size_bp: 1000
       offset_bp: 0
   output:
-    dataset: pdual10_slot_a_window_1kb_demo
-    root: outputs/usr_datasets
+    dataset: promoter/stress_ethanol_cipro_construct_contexts
+    root: ../../../usr/datasets
