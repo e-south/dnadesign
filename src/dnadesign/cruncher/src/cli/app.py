@@ -16,6 +16,7 @@ import typer
 
 from dnadesign.cruncher.cli.commands.analyze import analyze as analyze_cmd
 from dnadesign.cruncher.cli.commands.cache import app as cache_app
+from dnadesign.cruncher.cli.commands.cassette import app as cassette_app
 from dnadesign.cruncher.cli.commands.catalog import app as catalog_app
 from dnadesign.cruncher.cli.commands.config import app as config_app
 from dnadesign.cruncher.cli.commands.discover import app as discover_app
@@ -101,6 +102,12 @@ app.command(
     help="Generate an optional marimo notebook for analysis.",
     short_help="Generate a marimo notebook.",
 )(notebook_cmd)
+app.add_typer(
+    cassette_app,
+    name="cassette",
+    help="Validate and materialize dual-context hairpin cassette specs.",
+    short_help="dual-context hairpin cassette workflow.",
+)
 app.add_typer(
     fetch_app,
     name="fetch",
