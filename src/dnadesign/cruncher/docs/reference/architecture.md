@@ -9,9 +9,11 @@
 ### Contents
 - [Cruncher architecture](#cruncher-architecture)
 - [Run lifecycle](#run-lifecycle)
+- [Cassette lifecycle](#cassette-lifecycle)
 - [Layers and responsibilities](#layers-and-responsibilities)
 - [On-disk layout](#on-disk-layout)
 - [Run artifacts](#run-artifacts)
+- [Cassette artifacts](#cassette-artifacts)
 - [Study artifacts](#study-artifacts)
 - [Portfolio artifacts](#portfolio-artifacts)
 - [Reproducibility boundaries](#reproducibility-boundaries)
@@ -28,6 +30,18 @@ This doc describes the Cruncher run lifecycle, module boundaries, and on-disk ar
 4. **sample** -> run MCMC and write sequences/trace + manifests
 5. **analyze** -> curated `plots/*` and `tables/table__*` artifacts + report from sample artifacts (offline, written into the run directory)
 6. **export** -> sequence-centric contract tables for wrappers/operators (`cruncher export sequences`)
+
+#### Cassette lifecycle
+
+The cassette workflow is additive and separate from `sample`:
+
+1. author `<workspace>/configs/cassettes/<name>.cassette.yaml`
+2. author or select a local nickase catalog (for example `<workspace>/inputs/nickases/*.yaml`)
+3. **cassette validate** -> strict schema + invariant check plus deterministic planning report
+4. **cassette design** -> write cassette-specific manifest, status, report, provenance snapshots, and optional render contract
+5. **cassette show** -> inspect status and artifact paths for one cassette run
+
+This workflow does not currently use `core/evaluator.py`, `gibbs_anneal`, or workspace `run_index.json`.
 
 ---
 
@@ -72,6 +86,13 @@ Core contract:
 - run directory layout + status helpers
 - manifest + artifact bookkeeping utilities
 
+#### `cassette/` (dual-context cassette domain)
+- cassette spec and nickase catalog schemas
+- workspace-relative loading and path validation
+- deterministic nick-site scanning and bounded-segment planning
+- cassette-specific artifact helpers
+- no dependency on legacy `sample` optimizer contracts
+
 #### `viz/` (plotting)
 - matplotlib/logomaker setup
 - PWM logo rendering + visualization helpers
@@ -81,6 +102,7 @@ Core contract:
 
 #### `app/` (orchestration)
 - fetch / lock / parse / sample / analyze coordination
+- cassette workflow coordination in `app/cassette_workflow.py`
 - study coordination (`study run|summarize|show`)
 - portfolio coordination (`portfolio run|show`)
 - translates CLI intent + config into concrete runs and artifacts
@@ -123,6 +145,13 @@ Current Cruncher handoff for `elites_showcase.*` and `chain_trajectory_video.mp4
 
 For `chain_trajectory_video.mp4`, Cruncher first resolves selected-chain trajectory rows and sampled frame indices, then writes temporary record rows and passes a strict sequence-rows video job contract to baserender.
 
+For cassette runs, Cruncher currently writes a strict `analysis/reports/render_contract.json` handoff describing:
+
+* one folded `ssdna_hairpin` view with stem/loop spans and pair map
+* one `linear_duplex` view with left/right nick calls and bounded-segment coordinates
+
+Cassette runs do not call baserender directly yet; they publish the contract for downstream consumers and fail fast on schema violations before write-out.
+
 The showcase/video renderers do not require overlap tables; overlap metrics remain separate analysis artifacts.
 
 This keeps responsibilities decoupled:
@@ -143,8 +172,11 @@ Recommended workspace layout:
 <workspace>/
 configs/
   config.yaml
+  cassettes/             # optional cassette specs
   studies/               # optional study specs
   portfolios/            # optional portfolio specs
+inputs/
+  nickases/              # optional local nickase catalogs
 .cruncher/
 outputs/
 ```
@@ -208,6 +240,12 @@ Within each run directory, Cruncher uses a stable, stage-agnostic subdirectory l
   export/
 ```
 
+Cassette runs use a separate deterministic output root:
+
+```
+<workspace>/outputs/cassettes/<spec.name>/<design_id>/
+```
+
 ---
 
 #### Run artifacts
@@ -225,6 +263,22 @@ A typical **sample** run directory contains:
 - `plots/*` - curated analysis plots and catalog logo renders
 - `plots/chain_trajectory_video.mp4` - optional trajectory-video artifact (`analysis.trajectory_video.enabled=true`)
 - `analysis/tables/table__*` - curated table outputs
+
+#### Cassette artifacts
+
+A typical **cassette** run directory contains:
+
+- `meta/cassette_manifest.json`, `meta/cassette_status.json` - cassette-stage metadata + status
+- `provenance/spec_used.yaml`, `provenance/nickase_catalog.yaml` - frozen input snapshots
+- `analysis/reports/report.json`, `analysis/reports/report.md` - deterministic planning report
+- `analysis/reports/render_contract.json` - optional dual-view render handoff when `output.write_render_contract: true`
+- `export/table__candidates.csv` - candidate table (one row for the satisfied candidate when present)
+
+Cassette runs are intentionally isolated from `sample` runs:
+
+- they do not write `meta/run_manifest.json`
+- they do not append to workspace `run_index.json`
+- they do not share `optimize/`, `plots/`, or `analysis/tables/` sample-stage contracts
 
 ---
 

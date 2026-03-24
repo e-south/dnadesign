@@ -20,6 +20,12 @@
 - [MultiTF Demo](demos/demo_multitf.md): run the multi-TF workflow with full output surfaces.
 - [Project Workspace Demo](demos/project_all_tfs.md): execute workspace-scale runs across all configured TFs.
 
+#### Design Dual-Context Cassettes
+- [Cassette Workflow](guides/cassette_workflow.md): validate and materialize a dual-context hairpin cassette spec.
+- [Cassette Spec Reference](reference/cassette_spec.md): authoritative cassette schema and invariant semantics.
+- [Nickase Catalog Reference](reference/nickase_catalog.md): local nickase catalog schema and cut-offset rules.
+- [Cassette Artifacts](reference/cassette_artifacts.md): deterministic output layout and report files.
+
 #### Ingest and Prepare Inputs
 - [Ingestion](guides/ingestion.md): prepare and validate motif inputs before optimization.
 - [MEME Suite](guides/meme_suite.md): run MEME/FIMO integration flows and expected outputs.
@@ -40,6 +46,9 @@
 - [Config Reference](reference/config.md): authoritative configuration schema and field semantics.
 - [CLI Reference](reference/cli.md): command/flag contracts and invocation patterns.
 - [Architecture](reference/architecture.md): dataflow and module boundaries.
+- [Cassette Spec Reference](reference/cassette_spec.md): cassette schema and coordinate semantics.
+- [Nickase Catalog Reference](reference/nickase_catalog.md): nickase entry schema and validation rules.
+- [Cassette Artifacts](reference/cassette_artifacts.md): cassette output files and manifest semantics.
 - [Glossary](reference/glossary.md): shared vocabulary for models, metrics, and artifacts.
 - [Runbook Step Reference](reference/runbook_steps.md): shared runbook stage names and meanings.
 - [Doc Conventions](reference/doc_conventions.md): documentation structure and writing contracts.

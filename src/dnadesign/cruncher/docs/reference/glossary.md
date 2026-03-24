@@ -8,6 +8,7 @@
 
 ### Contents
 - [Core terms](#core-terms)
+- [Cassette workflow terms](#cassette-workflow-terms)
 - [Source and ingest terms](#source-and-ingest-terms)
 - [Run and analysis terms](#run-and-analysis-terms)
 
@@ -17,6 +18,13 @@
 - **catalog root**: Local cache root (`catalog.root`) with normalized motifs/sites and discovery artifacts.
 - **lockfile**: Frozen mapping from TFs to exact source motif artifacts and hashes.
 - **parse cache**: Workspace-local parse validation output under `.cruncher/parse/`.
+
+### Cassette workflow terms
+- **cassette spec**: A strict YAML document at `configs/cassettes/<name>.cassette.yaml` describing hairpin topology, duplex context, nick windows, catalog path, and output behavior.
+- **nickase catalog**: A strict local YAML document that defines asymmetric recognition sites plus strand and cut-offset metadata for cassette planning.
+- **designated strand**: The duplex strand (`primary_strand` or `complement_strand`) that both intended nicks must hit.
+- **pair map**: The explicit list of stem-position couplings linking the 5' arm to the reverse-complement 3' arm.
+- **bounded segment**: The interval between the two intended nick coordinates on the designated strand. It does not imply downstream removal/excision.
 
 ### Source and ingest terms
 - **source**: Named ingest adapter namespace (for example `regulondb`, `demo_local_meme`).

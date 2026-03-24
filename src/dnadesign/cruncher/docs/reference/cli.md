@@ -11,6 +11,7 @@
 - [Workspace discovery and config resolution](#workspace-discovery-and-config-resolution)
 - [Quick command map](#quick-command-map)
 - [Core lifecycle commands](#core-lifecycle-commands)
+- [Cassette workflows](#cassette-workflows)
 - [Study workflows](#study-workflows)
 - [Portfolio workflows](#portfolio-workflows)
 - [Discovery and inspection](#discovery-and-inspection)
@@ -21,6 +22,8 @@ This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage a
 > **Intent:** Cruncher is an optimization engine for **fixed-length** multi-TF PWM sequence design that returns a **diverse elite set** - not posterior inference.
 >
 > **When to use:** design under tight length constraints; explore motif compatibility tradeoffs; generate a small candidate set for assays; run workspace-scoped studies and summarize aggregate outcomes.
+>
+> **Additive workflow:** `cruncher cassette ...` validates and materializes an explicitly authored dual-context hairpin cassette spec plus nickase catalog. It does **not** currently search over stems, loops, or nickase assignments.
 
 #### Workspace discovery and config resolution
 
@@ -49,6 +52,7 @@ cruncher study list
 * **Render logos** → `catalog logos`
 * **Optimize** → `sample`
 * **Analyze** → `analyze`, `notebook`
+* **Dual-context cassette design** → `cassette validate|design|show`
 * **Study sweeps** → `study list|run|summarize|show|clean`
 * **Cross-workspace handoff aggregation** → `portfolio run|show`
 * **Export sequences** → `export sequences`
@@ -278,6 +282,105 @@ Preconditions:
 * run selection preflight happens before plotting/cache initialization, so missing/incomplete runs fail quickly with no Matplotlib/ArviZ cache setup
 * trace-dependent plots require `optimize/trace.nc`
 * each sample run snapshots the lockfile under `provenance/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
+
+---
+
+#### Cassette workflows
+
+The cassette workflow is separate from `sample`. It expects an explicit spec file at
+`<workspace>/configs/cassettes/<name>.cassette.yaml` plus a local nickase catalog, validates the dual-context invariant set,
+and writes cassette-specific artifacts under `outputs/cassettes/`.
+
+Current scope:
+
+* deterministic validation/materialization of an authored cassette spec
+* strict local nickase catalog loading
+* explicit unsatisfied reports when no valid left/right nick pair exists
+
+Current non-scope:
+
+* no generalized sequence search across candidate stems or loops
+* no automatic nickase selection from broad catalogs
+* no downstream excision/removal semantics after nicking
+
+Deep contracts live in:
+
+* [`reference/cassette_spec.md`](cassette_spec.md)
+* [`reference/nickase_catalog.md`](nickase_catalog.md)
+* [`reference/cassette_artifacts.md`](cassette_artifacts.md)
+* [`../guides/cassette_workflow.md`](../guides/cassette_workflow.md)
+
+#### `cruncher cassette validate`
+
+Validate one cassette spec and print a deterministic planning report.
+
+Inputs:
+
+* `--spec <workspace>/configs/cassettes/<name>.cassette.yaml`
+* local catalog path from `cassette.catalog.path`
+
+Network:
+
+* no
+
+Examples:
+
+* `uv run cruncher cassette validate --spec configs/cassettes/demo_hairpin.cassette.yaml`
+* `uv run cruncher cassette validate --spec configs/cassettes/demo_hairpin.cassette.yaml --json`
+
+Notes:
+
+* `--spec` must point to a `.cassette.yaml` file path under a workspace `configs/` tree.
+* Nick windows are matched against cassette-relative reported `nick_coordinate` values.
+* The report distinguishes `bounded_segment` from downstream removal/excision semantics.
+* `--json` prints machine-readable JSON with no Rich formatting.
+
+#### `cruncher cassette design`
+
+Validate a cassette spec and write deterministic cassette artifacts.
+
+Inputs:
+
+* `--spec <workspace>/configs/cassettes/<name>.cassette.yaml`
+* optional `--force-overwrite` to replace an existing deterministic run directory
+
+Network:
+
+* no
+
+Examples:
+
+* `uv run cruncher cassette design --spec configs/cassettes/demo_hairpin.cassette.yaml`
+* `uv run cruncher cassette design --spec configs/cassettes/demo_hairpin.cassette.yaml --force-overwrite`
+
+Outputs:
+
+* writes under `<workspace>/outputs/cassettes/<spec.name>/<design_id>/`
+* writes `meta/cassette_manifest.json`, `meta/cassette_status.json`, `analysis/reports/report.{json,md}`
+* writes `analysis/reports/render_contract.json` only when `output.write_render_contract: true`
+* writes `export/table__candidates.csv`
+
+Notes:
+
+* cassette runs are additive and do **not** register in workspace `run_index.json`
+* unsatisfied specs still write a cassette run directory with explicit issue codes
+* there is no fallback to `sample`
+
+#### `cruncher cassette show`
+
+Read one cassette run directory and print its key artifact paths.
+
+Inputs:
+
+* `--run <workspace>/outputs/cassettes/<spec.name>/<design_id>`
+
+Network:
+
+* no
+
+Example:
+
+* `uv run cruncher cassette show --run outputs/cassettes/demo_hairpin/<design_id>`
 * if `analysis` is omitted from config, analyze uses schema defaults (including `run_selector=latest`)
 * if `analysis.fimo_compare.enabled=true`, MEME Suite `fimo` must be resolvable via `discover.tool_path`, `MEME_BIN`, or `PATH`
 

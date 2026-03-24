@@ -18,6 +18,7 @@ This index is a browsing map for Cruncher docs. Start with the package-level [Cr
 
 ### Choose your path
 - Run a demo end-to-end: [`demos/demo_pairwise.md`](demos/demo_pairwise.md)
+- Design a dual-context cassette: [`guides/cassette_workflow.md`](guides/cassette_workflow.md)
 - Ingest or discovery changes: [`guides/ingestion.md`](guides/ingestion.md)
 - Analyze outputs and plots: [`guides/sampling_and_analysis.md`](guides/sampling_and_analysis.md)
 - Run sweeps/studies: [`guides/studies.md`](guides/studies.md)
@@ -30,6 +31,12 @@ This index is a browsing map for Cruncher docs. Start with the package-level [Cr
 - [Pairwise Demo](demos/demo_pairwise.md)
 - [MultiTF Demo](demos/demo_multitf.md)
 - [Project Workspace Demo](demos/project_all_tfs.md)
+
+#### Design Dual-Context Cassettes
+- [Cassette Workflow](guides/cassette_workflow.md)
+- [Cassette Spec Reference](reference/cassette_spec.md)
+- [Nickase Catalog Reference](reference/nickase_catalog.md)
+- [Cassette Artifacts](reference/cassette_artifacts.md)
 
 #### Ingest and Prepare Inputs
 - [Ingestion](guides/ingestion.md)
@@ -51,6 +58,9 @@ This index is a browsing map for Cruncher docs. Start with the package-level [Cr
 - [Config Reference](reference/config.md)
 - [CLI Reference](reference/cli.md)
 - [Architecture](reference/architecture.md)
+- [Cassette Spec Reference](reference/cassette_spec.md)
+- [Nickase Catalog Reference](reference/nickase_catalog.md)
+- [Cassette Artifacts](reference/cassette_artifacts.md)
 - [Glossary](reference/glossary.md)
 - [Runbook Step Reference](reference/runbook_steps.md)
 - [Doc Conventions](reference/doc_conventions.md)
@@ -68,6 +78,7 @@ This index is a browsing map for Cruncher docs. Start with the package-level [Cr
 - [`demos/project_all_tfs.md`](demos/project_all_tfs.md)
 
 ### Guides
+- [`guides/cassette_workflow.md`](guides/cassette_workflow.md)
 - [`guides/intent_and_lifecycle.md`](guides/intent_and_lifecycle.md)
 - [`guides/ingestion.md`](guides/ingestion.md)
 - [`guides/meme_suite.md`](guides/meme_suite.md)
@@ -83,6 +94,9 @@ This index is a browsing map for Cruncher docs. Start with the package-level [Cr
 - [`reference/cli.md`](reference/cli.md)
 - [`reference/architecture.md`](reference/architecture.md)
 - [`reference/artifacts.md`](reference/artifacts.md)
+- [`reference/cassette_spec.md`](reference/cassette_spec.md)
+- [`reference/nickase_catalog.md`](reference/nickase_catalog.md)
+- [`reference/cassette_artifacts.md`](reference/cassette_artifacts.md)
 - [`reference/glossary.md`](reference/glossary.md)
 - [`reference/doc_conventions.md`](reference/doc_conventions.md)
 - [`reference/runbook_steps.md`](reference/runbook_steps.md)

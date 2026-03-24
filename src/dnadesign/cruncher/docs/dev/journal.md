@@ -7,6 +7,7 @@
 **Last updated by:** cruncher-maintainers on 2026-02-23
 
 ### Contents
+- [2026-03-24](#2026-03-24)
 - [2026-02-20](#2026-02-20)
 - [2026-02-18](#2026-02-18)
 - [2026-02-15](#2026-02-15)
@@ -14,6 +15,26 @@
 - [2026-02-05](#2026-02-05)
 - [2026-02-06](#2026-02-06)
 - [2026-02-11](#2026-02-11)
+
+### 2026-03-24
+- Planned and began an additive dual-context cassette workflow for Cruncher instead of forcing the feature into the existing PWM-only `sample` surface.
+- Locked boundary decisions:
+  - keep cassette semantics under a new owner-local package boundary (`src/cassette/`) for spec, catalog, planning, artifacts, and reporting
+  - preserve current `sample`, `study`, `portfolio`, fetch/lock/parse, and existing docs routes without compatibility shims or silent fallback
+  - treat nickase metadata as a separate stable contract from the motif/site catalog
+  - keep rendering side effects at the baserender boundary via explicit contracts rather than deep imports or renderer overloading by accident
+- Planned tracer-bullet delivery slices:
+  1. add a first-class `cruncher cassette ...` command group with explicit spec validation and report emission
+  2. define cassette-domain contracts for `HairpinCassetteSpec`, `DuplexNickingPlan`, nickase catalog entries, candidate reports, and unsat reasons
+  3. add local nickase catalog loading with fail-fast validation for malformed recognition sequences, ambiguous strand semantics, and missing cut metadata
+  4. implement a deterministic planner/report path before any deeper search backend work
+  5. add cassette-specific artifact layout and reporting without registering cassette runs as sample runs
+  6. add route-first Cruncher docs IA for cassette workflows (`guide` + `reference` pages) without duplicating deep procedure text
+  7. broaden regression coverage to prove existing Cruncher CLI/docs behavior remains unchanged
+- Pragmatic constraints for implementation:
+  - no silent fallback to `cruncher sample`
+  - impossible specs and unsupported planner states must return explicit unsat reasons or validation errors
+  - if current Gibbs machinery proves to be a poor fit, keep the feature in Cruncher but isolate a separate planner instead of mutating legacy optimizer contracts
 
 ### 2026-02-20
 - Confirmed direction for a strict, breaking workspace/schema modernization focused on decoupling and fail-fast behavior.
