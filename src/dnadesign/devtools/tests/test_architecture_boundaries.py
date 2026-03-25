@@ -13,7 +13,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.devtools.architecture_boundaries import find_undeclared_cross_tool_imports, main
+import pytest
+
+from dnadesign.devtools.architecture_boundaries import (
+    find_legacy_surface_violations,
+    find_undeclared_cross_tool_imports,
+    main,
+)
 
 
 def _write(path: Path, text: str) -> None:
@@ -86,6 +92,36 @@ def test_find_undeclared_cross_tool_imports_allows_ops_to_infer_default_edge(tmp
     _write(
         tmp_path / "src" / "dnadesign" / "infer" / "__init__.py",
         "def validate_runbook_gpu_resources(**_kwargs):\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
+@pytest.mark.parametrize(
+    ("owner_tool", "imported_tool"),
+    (
+        ("notify", "construct"),
+        ("notify", "densegen"),
+        ("notify", "infer"),
+        ("ops", "construct"),
+        ("ops", "densegen"),
+        ("ops", "notify"),
+    ),
+)
+def test_find_undeclared_cross_tool_imports_allows_contract_owner_edges(
+    tmp_path: Path,
+    owner_tool: str,
+    imported_tool: str,
+) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / owner_tool / "api.py",
+        f"from dnadesign.{imported_tool}.contracts import run\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / imported_tool / "contracts.py",
+        "def run():\n    return 1\n",
     )
 
     violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
@@ -195,6 +231,47 @@ def test_find_undeclared_cross_tool_imports_ignores_archived_and_prototypes(tmp_
     )
 
     assert violations == []
+
+
+def test_find_legacy_surface_violations_flags_removed_repo_root_contract_paths(tmp_path: Path) -> None:
+    (tmp_path / "src" / "dnadesign" / "_contracts").mkdir(parents=True, exist_ok=True)
+    legacy_usr_roots = tmp_path / "src" / "dnadesign" / "usr_roots.py"
+    legacy_usr_roots.parent.mkdir(parents=True, exist_ok=True)
+    legacy_usr_roots.write_text("# legacy\n", encoding="utf-8")
+
+    violations = find_legacy_surface_violations(repo_root=tmp_path)
+
+    assert [item.path.relative_to(tmp_path).as_posix() for item in violations] == [
+        "src/dnadesign/_contracts",
+        "src/dnadesign/usr_roots.py",
+    ]
+
+
+def test_find_legacy_surface_violations_flags_removed_ops_study_paths(tmp_path: Path) -> None:
+    legacy_path = tmp_path / "src" / "dnadesign" / "ops" / "promoter_preflight_coordinator.py"
+    legacy_path.parent.mkdir(parents=True, exist_ok=True)
+    legacy_path.write_text("# legacy study-owned surface\n", encoding="utf-8")
+    legacy_cli_path = tmp_path / "src" / "dnadesign" / "ops" / "_cli_legacy.py"
+    legacy_cli_path.write_text("# removed cli bridge\n", encoding="utf-8")
+
+    violations = find_legacy_surface_violations(repo_root=tmp_path)
+
+    assert [item.path.relative_to(tmp_path).as_posix() for item in violations] == [
+        "src/dnadesign/ops/_cli_legacy.py",
+        "src/dnadesign/ops/promoter_preflight_coordinator.py",
+    ]
+
+
+def test_main_fails_when_legacy_contract_surface_paths_exist(tmp_path: Path) -> None:
+    (tmp_path / "src" / "dnadesign" / "foo").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "src" / "dnadesign" / "bar").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "src" / "dnadesign" / "_contracts").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "src" / "dnadesign" / "foo" / "api.py").write_text("def run():\n    return 1\n", encoding="utf-8")
+    (tmp_path / "src" / "dnadesign" / "bar" / "api.py").write_text("def run():\n    return 1\n", encoding="utf-8")
+
+    rc = main(["--repo-root", str(tmp_path)])
+
+    assert rc == 1
 
 
 def test_main_fails_on_syntax_error_in_checked_file(tmp_path: Path) -> None:

@@ -2,6 +2,14 @@
 
 Ops manages batch orchestration across tools. It turns a runbook into preflight, verification, and submit steps with audit output, so scheduler work stays readable instead of turning into ad hoc shell commands.
 If you do not know a route id yet, start with `uv run ops catalog list --simple`.
+Study-family status and preflight implementations do not live in OPS core; the
+active stress-promoter study adapter and its runtime helpers live under
+`src/dnadesign/studies/stress_promoter_ethanol_cipro/`, while OPS keeps the
+neutral CLI, registry loading, path semantics, orchestration, and rendering
+surfaces.
+Treat the command families as three neutral surfaces: `ops catalog` is the
+discovery plane, `ops progress` is the observation plane, and `ops runbook` is
+the control plane for deterministic batch execution.
 
 Use Ops when:
 - you need a shared orchestration layer for scheduler work, packaged runbooks, or read-only status over a registered route

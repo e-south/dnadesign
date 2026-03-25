@@ -1,9 +1,10 @@
 ## Runbook Catalog
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-21
+**Last verified:** 2026-03-25
 
 Use this page when you want a command first. Start with `uv run ops catalog list --simple`, then open the linked runbook or tool doc once you know the route.
+Treat the CLI surfaces explicitly: `ops catalog` is discovery, `ops progress` is observation, and `ops runbook` is the control plane that plans or executes deterministic batch work.
 
 Use the command table first. The generated tables later on are reference.
 
@@ -46,7 +47,7 @@ This table is generated from `*.registry.yaml` sidecars. Edit those files instea
 | `usr.data-plane.multi-source-source-of-truth` | [Multi-Source Shared Dataset Assembly](../../src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md) | `runbook` | `data-plane` | `staged` | `usr-dataset-state` | Merge multiple USR-backed sources, preserve explicit carry, and hand one construct-backed shared dataset to Infer and Notify. |
 | `usr.data-plane.construct-infer-source-of-truth` | [Construct -> USR -> Infer Shared Dataset Runbook](../../src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md) | `runbook` | `data-plane` | `staged` | `usr-dataset-state` | Realize construct outputs into one shared USR dataset and use that dataset as the durable Infer handoff. |
 | `usr.data-plane.promoter-study-status` | [Promoter Study Status Contract](../../src/dnadesign/usr/docs/operations/promoter-study-status-contract.md) | `contract` | `data-plane` | `iterative` | `promoter-study-record` | Read one checked-in promoter-study record and summarize dataset, phase, and execution-surface readiness without reconstructing the workflow by hand. |
-| `usr.data-plane.promoter-study-preflight` | [Promoter Study Preflight](../../src/dnadesign/usr/docs/operations/promoter-study-preflight.md) | `contract` | `data-plane` | `iterative` | `promoter-study-preflight` | Run one read-only preflight suite across DenseGen, Construct, Infer, Notify, and batch-plan contracts for the checked-in active study. |
+| `usr.data-plane.promoter-study-preflight` | [Promoter Study Preflight](../../src/dnadesign/usr/docs/operations/promoter-study-preflight.md) | `contract` | `data-plane` | `iterative` | `promoter-study-preflight` | Run the active promoter-study preflight suite across DenseGen, Construct, Infer, Notify, and batch-plan contracts without mutating data or submitting jobs. |
 | `usr.data-plane.promoter-feature-matrix` | [Promoter Characterization Feature Matrix](../../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md) | `runbook` | `data-plane` | `staged` | `usr-dataset-state` | Build one infer-annotated feature matrix from mixed promoter sources before branching into Cluster or OPAL. |
 | `cluster.downstream.exploratory-clustering` | [Exploratory clustering workflow](../../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) | `workflow` | `downstream-tool` | `exploratory` | `cluster-run-index` | Explore one chosen feature column or exported matrix through clustering, UMAP, and downstream summaries. |
 | `opal.downstream.usr-infer-x-active-learning` | [USR Dataset With Infer-Derived X -> OPAL Active Learning](../../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md) | `workflow` | `downstream-tool` | `round-loop` | `opal-campaign-state` | Start the label, train, and select loop once one explicit infer-derived X column or exported matrix already exists. |
@@ -88,24 +89,32 @@ You only need this section after `uv run ops progress explain <registry-id>` or 
 Use `ops progress scaffold <registry-id> ...` when you want a manifest template with the right placeholder fields. Use `ops progress scaffold --related-to <registry-id>` when you want a starting point that includes linked procedures. Then use `ops progress campaign` when you want one summary across multiple steps. `scaffold` prints to stdout unless you pass `--out`.
 
 ```yaml
+version: 2
+path_base: repo
 campaign_id: demo_cross_tool_campaign
 steps:
   - label: orchestration
     registry_id: ops.control-plane.orchestration
-    audit_json: <workspace-root>/outputs/logs/ops/audit/latest.json
+    inputs:
+      audit_json: repo:<workspace-root>/outputs/logs/ops/audit/latest.json
   - label: feature-matrix
     registry_id: usr.data-plane.promoter-feature-matrix
-    usr_root: <usr-root>
-    dataset: <dataset>
+    inputs:
+      usr_root: repo:<usr-root>
+      dataset: <dataset>
   - label: active-learning
     registry_id: opal.downstream.usr-infer-x-active-learning
-    opal_config: <opal-workdir>/configs/campaign.yaml
+    inputs:
+      opal_config: manifest:./opal/configs/campaign.yaml
 ```
 
 - Generate the same skeleton from registry ids with `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix opal.downstream.usr-infer-x-active-learning`.
 - Expand one registered procedure into a relation-based starting point with `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`.
 - For a real promoter effort, store the manifest under `docs/studies/promoter/<study-id>/campaign.yaml` and keep the paired `datasets.yaml` registry and `status.md` there too. Use [Study records index](../studies/README.md) for the full layout.
-- Relative artifact paths in the manifest resolve from the manifest directory, not from the shell's current working directory.
+- Campaign manifests must declare `version: 2` and `path_base: repo`, `manifest`, or `cwd`.
+- `repo:` references resolve from repository root. `manifest:` plus `./` or `../` resolve from the manifest directory.
+- Bare relative paths resolve from `path_base`.
+- Provider inputs belong under `inputs:`. Ops does not read loose top-level step keys.
 - `--related-to` expands the named procedure first, then related procedures in catalog order. Reorder the manifest when your campaign chronology differs.
 - The manifest is explicit by design. Ops does not infer hidden steps.
 - Smallest working status example: run `uv run ops runbook execute ... --no-submit --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json`. On workstations without `qstat`, add `--allow-missing-qstat` so the queue probe is explicit but non-fatal. Then pass the same audit path to `uv run ops progress show ops.control-plane.orchestration --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json`.

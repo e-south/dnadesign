@@ -62,12 +62,12 @@ datasets:
     dataset: promoter/stress_ethanol_cipro_anchor_set
     usr_root: src/dnadesign/usr/datasets
     root_kind: shared
-    status: planned
+    status: present
     lifecycle: shared_handoff
     owner_tool: usr
-    onboard_mode: create_new
+    onboard_mode: existing_local
     authority: shared
-    notes: Study-owned merged anchor set created from mg1655_promoters plus densegen/study_stress_ethanol_cipro before any Construct or anchor-only Infer execution.
+    notes: Study-owned merged anchor set materialized from mg1655_promoters plus densegen/study_stress_ethanol_cipro and used as the shared anchor-only Infer handoff.
     sync:
       enabled: false
       remote_name: n/a
@@ -81,12 +81,12 @@ datasets:
     dataset: promoter/stress_ethanol_cipro_construct_contexts
     usr_root: src/dnadesign/usr/datasets
     root_kind: shared
-    status: planned
+    status: present
     lifecycle: shared_handoff
     owner_tool: construct
-    onboard_mode: create_new
+    onboard_mode: existing_local
     authority: shared
-    notes: Study-owned 1 kb pDual-10 contexts materialized by Construct from the merged anchor set and plasmids template dataset.
+    notes: Study-owned 1 kb pDual-10 contexts materialized by Construct from the merged anchor set and plasmids template dataset for template-backed Infer lanes.
     sync:
       enabled: false
       remote_name: n/a

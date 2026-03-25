@@ -16,7 +16,7 @@ import ast
 from dataclasses import dataclass
 from pathlib import Path
 
-_NON_TOOL_DIRS = {"devtools", "__pycache__", "archived", "prototypes"}
+_NON_TOOL_DIRS = {"devtools", "__pycache__", "archived", "prototypes", "studies"}
 _SKIPPED_PATH_SEGMENTS = {
     "tests",
     "notebooks",
@@ -41,10 +41,38 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("libshuffle", "aligner"),
     ("libshuffle", "billboard"),
     ("libshuffle", "nmf"),
+    ("notify", "construct"),
+    ("notify", "densegen"),
+    ("notify", "infer"),
+    ("ops", "construct"),
+    ("ops", "densegen"),
     ("ops", "infer"),
+    ("ops", "notify"),
     ("ops", "usr"),
     ("permuter", "infer"),
 }
+_FORBIDDEN_LEGACY_SURFACE_PATHS = (
+    Path("src/dnadesign/_contracts"),
+    Path("src/dnadesign/usr_roots.py"),
+    Path("src/dnadesign/usr/src/roots.py"),
+    Path("src/dnadesign/ops/orchestrator/contracts.py"),
+    Path("src/dnadesign/ops/promoter_study_context.py"),
+    Path("src/dnadesign/ops/promoter_study_infer_runtime.py"),
+    Path("src/dnadesign/ops/promoter_study_status_coordinator.py"),
+    Path("src/dnadesign/ops/promoter_preflight_scope.py"),
+    Path("src/dnadesign/ops/promoter_preflight_orchestration.py"),
+    Path("src/dnadesign/ops/promoter_preflight_upstream.py"),
+    Path("src/dnadesign/ops/promoter_preflight_infer.py"),
+    Path("src/dnadesign/ops/promoter_preflight_coordinator.py"),
+    Path("src/dnadesign/ops/_cli_legacy.py"),
+    Path("src/dnadesign/ops/tests/test_promoter_study_infer_runtime.py"),
+    Path("src/dnadesign/ops/tests/test_promoter_study_status_coordinator.py"),
+    Path("src/dnadesign/ops/tests/test_promoter_preflight_scope.py"),
+    Path("src/dnadesign/ops/tests/test_promoter_preflight_orchestration.py"),
+    Path("src/dnadesign/ops/tests/test_promoter_preflight_upstream.py"),
+    Path("src/dnadesign/ops/tests/test_promoter_preflight_infer.py"),
+    Path("src/dnadesign/ops/tests/test_promoter_preflight_coordinator.py"),
+)
 
 
 @dataclass(frozen=True)
@@ -53,6 +81,11 @@ class ImportViolation:
     imported_tool: str
     file_path: Path
     import_target: str
+
+
+@dataclass(frozen=True)
+class LegacySurfaceViolation:
+    path: Path
 
 
 def _discover_tools(repo_root: Path) -> set[str]:
@@ -173,6 +206,15 @@ def find_undeclared_cross_tool_imports(
     )
 
 
+def find_legacy_surface_violations(*, repo_root: Path) -> list[LegacySurfaceViolation]:
+    violations: list[LegacySurfaceViolation] = []
+    for relative_path in _FORBIDDEN_LEGACY_SURFACE_PATHS:
+        candidate = (repo_root / relative_path).resolve()
+        if candidate.exists():
+            violations.append(LegacySurfaceViolation(path=candidate))
+    return sorted(violations, key=lambda item: str(item.path))
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check dnadesign cross-tool import boundaries.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
@@ -183,17 +225,20 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
         violations = find_undeclared_cross_tool_imports(repo_root=args.repo_root)
+        legacy_surface_violations = find_legacy_surface_violations(repo_root=args.repo_root)
     except (FileNotFoundError, ValueError) as exc:
         print(str(exc))
         return 1
 
-    if not violations:
+    if not violations and not legacy_surface_violations:
         print("Architecture boundary checks passed.")
         return 0
 
-    print("Architecture boundary check failed: undeclared cross-tool imports detected.")
+    print("Architecture boundary check failed.")
     for item in violations:
         print(f" - {item.file_path}: {item.owner_tool} -> {item.imported_tool} via '{item.import_target}'")
+    for item in legacy_surface_violations:
+        print(f" - forbidden legacy surface still exists: {item.path}")
     return 1
 
 

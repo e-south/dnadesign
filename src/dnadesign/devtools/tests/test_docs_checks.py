@@ -23,6 +23,7 @@ from dnadesign.devtools.docs_checks import (
     _find_deprecated_docs_entrypoint_issues,
     _find_docs_root_heading_style_issues,
     _find_entrypoint_local_path_literal_issues,
+    _find_legacy_contract_surface_doc_issues,
     _find_operational_runbook_path_issues,
     _find_ops_deprecated_semantics_issues,
     _find_packaged_runbook_variant_issues,
@@ -2300,3 +2301,12 @@ def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> No
 
     assert any("with_notify_slack" in issue for issue in issues)
     assert any("precedents" in issue for issue in issues)
+
+
+def test_legacy_contract_surface_docs_check_flags_repo_root_contract_references(tmp_path: Path) -> None:
+    _write(tmp_path / "docs" / "README.md", "## Docs\n\nUse `dnadesign._contracts` and `src/dnadesign/usr_roots.py`.\n")
+
+    issues = _find_legacy_contract_surface_doc_issues(tmp_path)
+
+    assert any("dnadesign._contracts" in issue for issue in issues)
+    assert any("src/dnadesign/usr_roots.py" in issue for issue in issues)

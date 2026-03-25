@@ -1,0 +1,30 @@
+version: 1
+study_id: stress_ethanol_cipro_growth
+family: stress_promoter_ethanol_cipro
+
+phase_order:
+  - densegen_growth
+  - merged_anchor_set
+  - construct_context_expansion
+  - infer_batch_preparation
+  - infer_anchor_only_20b
+  - infer_anchor_plus_template_20b
+  - infer_anchor_only_7b
+  - infer_anchor_plus_template_7b
+
+snapshot:
+  summary_scope: repo
+
+preflight:
+  default_scope: next
+  phase_targets:
+    densegen: densegen_growth
+    construct: construct_context_expansion
+    infer_preparation: infer_batch_preparation
+  next_scope:
+    phase_groups:
+      densegen_growth: [densegen]
+      merged_anchor_set: []
+      construct_context_expansion: [construct]
+      infer_batch_preparation: [infer, notify, infer_batch_plan]
+    infer_lane_groups: [infer, notify, infer_batch_plan]

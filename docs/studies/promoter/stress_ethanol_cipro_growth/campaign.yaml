@@ -1,20 +1,27 @@
+version: 2
+path_base: repo
 campaign_id: stress_ethanol_cipro_growth
 steps:
   - label: promoter-feature-matrix
     registry_id: usr.data-plane.promoter-feature-matrix
-    usr_root: src/dnadesign/usr/datasets
-    dataset: promoter/stress_ethanol_cipro_feature_matrix
+    inputs:
+      usr_root: repo:src/dnadesign/usr/datasets
+      dataset: promoter/stress_ethanol_cipro_feature_matrix
   - label: multi-source-source-of-truth
     registry_id: usr.data-plane.multi-source-source-of-truth
-    usr_root: src/dnadesign/usr/datasets
-    dataset: promoter/stress_ethanol_cipro_feature_matrix
+    inputs:
+      usr_root: repo:src/dnadesign/usr/datasets
+      dataset: promoter/stress_ethanol_cipro_feature_matrix
   - label: construct-infer-source-of-truth
     registry_id: usr.data-plane.construct-infer-source-of-truth
-    usr_root: src/dnadesign/usr/datasets
-    dataset: promoter/stress_ethanol_cipro_feature_matrix
+    inputs:
+      usr_root: repo:src/dnadesign/usr/datasets
+      dataset: promoter/stress_ethanol_cipro_feature_matrix
   - label: exploratory-clustering
     registry_id: cluster.downstream.exploratory-clustering
-    cluster_results_root: n/a
+    inputs:
+      cluster_results_root: repo:n/a
   - label: usr-infer-x-active-learning
     registry_id: opal.downstream.usr-infer-x-active-learning
-    opal_config: n/a
+    inputs:
+      opal_config: repo:n/a

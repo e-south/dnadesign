@@ -154,6 +154,31 @@ DENSEGEN_DOC_LANGUAGE_PATHS = (
     "src/dnadesign/densegen/workspaces",
 )
 DENSEGEN_DISALLOWED_TERM_PATTERN = re.compile(r"\bcanonical\b", flags=re.IGNORECASE)
+CONSTRUCT_OPERATOR_DOC_PATHS = (
+    "src/dnadesign/usr/docs/operations",
+    "docs/studies",
+    "src/dnadesign/notify/docs/reference/command-contracts.md",
+)
+CONSTRUCT_LEGACY_OPERATOR_PATTERNS = (
+    re.compile(r'data\["job"\]\["input"\]\["dataset"\]'),
+    re.compile(r'data\["job"\]\["input"\]\["root"\]'),
+    re.compile(r'data\["job"\]\["output"\]\["dataset"\]'),
+    re.compile(r'data\["job"\]\["output"\]\["root"\]'),
+    re.compile(r'project\["input_dataset"\]'),
+    re.compile(r'project\["output_dataset"\]'),
+    re.compile(r"`input\.dataset`"),
+    re.compile(r"`input\.root`"),
+    re.compile(r"`output\.dataset`"),
+    re.compile(r"`output\.root`"),
+)
+LEGACY_CONTRACT_SURFACE_DOC_PATTERNS = (
+    re.compile(r"\bdnadesign\._contracts\b"),
+    re.compile(r"\bdnadesign\.usr_roots\b"),
+    re.compile(r"src/dnadesign/_contracts\b"),
+    re.compile(r"src/dnadesign/usr_roots\.py\b"),
+    re.compile(r"src/dnadesign/usr/src/roots\.py\b"),
+    re.compile(r"src/dnadesign/ops/orchestrator/contracts\.py\b"),
+)
 OPS_OPERATIONAL_WORKFLOW_IDS = {
     "densegen_batch_submit",
     "densegen_batch_with_notify",
@@ -211,6 +236,16 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
+    "src/dnadesign/usr/docs/operations/promoter-study-status-contract.md": {
+        "type": "contract",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/usr/docs/operations/promoter-study-preflight.md": {
+        "type": "contract",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
     "src/dnadesign/cluster/docs/workflows/exploratory-clustering.md": {
         "type": "workflow",
         "plane": "downstream-tool",
@@ -222,9 +257,9 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "owner_boundary": "opal",
     },
 }
-_CROSS_TOOL_DOC_ALLOWED_TYPES = {"route", "runbook", "workflow"}
+_CROSS_TOOL_DOC_ALLOWED_TYPES = {"contract", "route", "runbook", "workflow"}
 _CROSS_TOOL_DOC_ALLOWED_PLANES = {"control-plane", "data-plane", "downstream-tool"}
-_RUNBOOK_CATALOG_METADATA_TYPES = {"runbook", "workflow"}
+_RUNBOOK_CATALOG_METADATA_TYPES = {"contract", "runbook", "workflow"}
 _REGISTRY_ID_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$")
 _METADATA_TOKEN_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:-[a-z0-9]+)*$")
 RUNBOOK_CATALOG_DOC_PATH = "docs/runbooks/README.md"
@@ -633,6 +668,44 @@ def _find_densegen_disallowed_term_issues(repo_root: Path) -> list[str]:
             continue
         line_no = content[: match.start()].count("\n") + 1
         issues.append(f"{path}:{line_no}: term '{match.group(0)}' is not allowed in DenseGen docs.")
+    return issues
+
+
+def _find_construct_legacy_operator_doc_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    targets = _collect_markdown_files_from_relative_paths(repo_root, relative_paths=CONSTRUCT_OPERATOR_DOC_PATHS)
+    for path in targets:
+        content = path.read_text(encoding="utf-8")
+        for pattern in CONSTRUCT_LEGACY_OPERATOR_PATTERNS:
+            match = pattern.search(content)
+            if match is None:
+                continue
+            line_no = content[: match.start()].count("\n") + 1
+            issues.append(
+                f"{path}:{line_no}: deprecated construct flat-key contract "
+                f"'{match.group(0)}' is not allowed in operator docs."
+            )
+    return issues
+
+
+def _find_legacy_contract_surface_doc_issues(repo_root: Path) -> list[str]:
+    try:
+        _docs_md_files, all_md_files = _collect_markdown_files(repo_root)
+    except FileNotFoundError:
+        return []
+
+    issues: list[str] = []
+    for path in all_md_files:
+        content = path.read_text(encoding="utf-8")
+        for pattern in LEGACY_CONTRACT_SURFACE_DOC_PATTERNS:
+            match = pattern.search(content)
+            if match is None:
+                continue
+            line_no = content[: match.start()].count("\n") + 1
+            issues.append(
+                f"{path}:{line_no}: legacy repo-root contract surface reference "
+                f"'{match.group(0)}' is not allowed in docs."
+            )
     return issues
 
 
@@ -1744,6 +1817,20 @@ def main(argv: list[str] | None = None) -> int:
     if densegen_disallowed_term_issues:
         print("DenseGen docs language check failed:")
         for issue in densegen_disallowed_term_issues:
+            print(f" - {issue}")
+        return 1
+
+    construct_legacy_operator_doc_issues = _find_construct_legacy_operator_doc_issues(repo_root)
+    if construct_legacy_operator_doc_issues:
+        print("Construct operator docs contract check failed:")
+        for issue in construct_legacy_operator_doc_issues:
+            print(f" - {issue}")
+        return 1
+
+    legacy_contract_surface_doc_issues = _find_legacy_contract_surface_doc_issues(repo_root)
+    if legacy_contract_surface_doc_issues:
+        print("Legacy contract surface docs check failed:")
+        for issue in legacy_contract_surface_doc_issues:
             print(f" - {issue}")
         return 1
 

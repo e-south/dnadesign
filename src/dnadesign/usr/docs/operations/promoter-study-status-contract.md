@@ -3,15 +3,22 @@
 **Type:** contract
 **Plane:** data-plane
 **Owner-boundary:** usr
-**Entry artifact:** one real promoter-study effort that needs agent-readable status
-**Exit artifact:** one checked-in study record selected through `docs/studies/promoter/index.yaml`
+**Entry artifact:** one checked-in promoter-study directory selected through docs/studies/promoter/index.yaml
+**Exit artifact:** one read-only summary of dataset presence, phase posture, and study-owned execution surfaces
+**Registry-id:** usr.data-plane.promoter-study-status
+**Summary:** Read one checked-in promoter-study record and summarize dataset, phase, and execution-surface readiness without reconstructing the workflow by hand.
+**Execution-kind:** iterative
+**Progress-kind:** promoter-study-record
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-21
+**Last verified:** 2026-03-25
 
 Use this contract when the question is not only "which runbook applies?" but
 "what is the current status of the actual DenseGen/manual/wildtype ->
 optional Construct -> Infer -> Cluster or OPAL study?"
+This is an observation-plane surface: it reads the checked-in study record and
+does not replace the control-plane `ops runbook` routes that plan or execute
+batch work.
 
 The shared runbooks explain procedure. They do not carry your real dataset ids,
 shared-root versus workspace-export semantics, local-vs-remote sync posture,
@@ -33,6 +40,7 @@ Keep promoter-study records under:
 docs/studies/promoter/<study-id>/
   campaign.yaml
   datasets.yaml
+  ops.study.yaml
   pipeline.yaml
   status.md
   audits/
@@ -47,6 +55,7 @@ record, and this contract explains how to refresh it.
 Fastest read-only summary once the checked-in directory exists:
 
 ```bash
+# Read the active checked-in promoter-study status summary.
 uv run ops progress show usr.data-plane.promoter-study-status
 ```
 
@@ -54,20 +63,27 @@ If you need to pin a non-active study or you are invoking the command from
 outside the repo checkout, add:
 
 ```bash
+# Pin a specific checked-in study directory when you are outside the repo root.
 uv run ops progress show usr.data-plane.promoter-study-status \
   --repo-root <repo-root> \
   --study-dir docs/studies/promoter/<study-id>
 ```
 
 That surface reads the checked-in study directory, validates that the declared
-source datasets and study-owned execution surfaces exist, reports the current
-phase from `pipeline.yaml`, and highlights the next ready phase without
-submitting jobs or mutating USR.
+source datasets and study-owned execution surfaces exist, reads phase order and
+repo-summary scope from `ops.study.yaml`, reports the current phase from the
+checked-in record, and highlights the next ready phase without submitting jobs
+or mutating USR. Host-local readiness such as GPU visibility remains advisory
+here and moves into preflight for hard blockers.
+The implementation boundary is explicit: OPS resolves the registered provider,
+and the stress-promoter family code that assembles the snapshot lives under
+`src/dnadesign/studies/stress_promoter_ethanol_cipro/`.
 
 When you need deeper, command-level blockers across the same checked-in study,
 continue to [Promoter Study Preflight](promoter-study-preflight.md):
 
 ```bash
+# Escalate from the cheap snapshot to the command-level preflight surface.
 uv run ops progress show usr.data-plane.promoter-study-preflight --json
 ```
 
@@ -78,9 +94,13 @@ uv run ops progress show usr.data-plane.promoter-study-preflight --json
    onboarding mode, root semantics, and sync posture.
 3. A checked-in status note that answers the human questions the manifest and
    dataset registry do not encode.
-4. When the study has real downstream execution surfaces, an optional
-   `pipeline.yaml` that names the canonical Construct, Infer, batch, and Notify
-   paths for the live study.
+4. A checked-in `ops.study.yaml` that tells OPS the study-family phase order,
+   snapshot scope, and next-scope preflight grouping without hard-coding
+   workflow taxonomy in core code.
+5. When the study has real downstream execution surfaces, an optional
+   `pipeline.yaml` that names the canonical Construct, Infer, and batch paths
+   for the live study. Infer Notify profile paths should derive from the
+   checked-in lane configs instead of being duplicated there.
 
 Recommended bootstrap for the manifest:
 
@@ -95,6 +115,8 @@ uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix
 cp docs/templates/promoter-study-datasets.yaml docs/studies/promoter/<study-id>/datasets.yaml
 # Copy the maintained status-note template into the same study directory.
 cp docs/templates/promoter-study-status.md docs/studies/promoter/<study-id>/status.md
+# Copy the OPS-facing study contract template into the same study directory.
+cp docs/templates/promoter-study-ops.study.yaml docs/studies/promoter/<study-id>/ops.study.yaml
 # Add a study-owned execution map once real Construct or Infer surfaces exist.
 cp docs/templates/promoter-study-pipeline.yaml docs/studies/promoter/<study-id>/pipeline.yaml
 # Create the audit directory referenced by sync-enabled dataset entries.
@@ -151,9 +173,12 @@ Discovery rules:
   of inferring current status from generic runbooks.
 - If `active_study` names a study id, that same id must appear under
   `studies:` and the corresponding study directory must contain `campaign.yaml`,
-  `datasets.yaml`, and `status.md`.
+  `datasets.yaml`, `status.md`, and `ops.study.yaml`.
+- `ops.study.yaml` is the OPS-facing source of phase order, repo snapshot
+  scope, and next-scope routing. Keep it checked in with the study record.
 - If `pipeline.yaml` exists in the study directory, treat it as the canonical
-  execution-map surface for exact Construct, Infer, batch, and Notify paths.
+  execution-map surface for exact Construct, Infer, and batch paths. Infer
+  Notify profile paths derive from the checked-in lane configs.
 - If the registry and study directory contents disagree, fail visibly and fix
   the registry before asking for live status.
 
@@ -248,6 +273,12 @@ From `status.md`:
 - whether construct expansion is required or optional
 - which infer slices are already written versus only preflighted
 - the next concrete batch call to run
+
+From `ops.study.yaml`:
+
+- the study-family phase order that OPS should treat as canonical
+- whether the cheap snapshot is repo-scoped or broader
+- which phase groups belong in `--scope next` preflight rather than `--scope full`
 
 From `pipeline.yaml` when present:
 
