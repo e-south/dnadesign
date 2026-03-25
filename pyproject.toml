@@ -122,6 +122,7 @@ where = ["src"]
   "workspaces/*/inputs/*",
 ]
 "dnadesign.ops" = [
+  "providers/*/status.registry.yaml",
   "runbooks/presets/*.yaml",
   "runbooks/templates/*.qsub",
 ]

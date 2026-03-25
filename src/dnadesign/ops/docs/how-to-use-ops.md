@@ -30,6 +30,7 @@ Once you know the route, use `uv run ops progress explain <registry-id>` to see 
 - `uv run ops progress scaffold <registry-id> ...`: emit an explicit manifest skeleton for one or more registered procedures. It prints YAML to stdout unless you pass `--out`.
 - `uv run ops progress scaffold --related-to <registry-id>`: expand one registered procedure into a manifest starting point. It can include more than one tool when the catalog links the procedures.
 - If you do not know the registry id yet, return to `uv run ops catalog list --simple`; bare `uv run ops progress scaffold` intentionally refuses to guess.
+- Replace scaffold placeholders such as `<usr-root>` and narrative sentinels such as `n/a` before you run `ops progress campaign`; placeholder path values now fail explicitly instead of degrading into fake missing roots.
 - `uv run ops progress campaign --manifest <manifest.yaml>`: read-only multi-step summary driven by the manifest you provide.
 
 ### Continue reading

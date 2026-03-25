@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/ops/progress_usr_provider.py
+src/dnadesign/ops/providers/usr/provider.py
 
 Provider-owned USR status builders.
 
@@ -17,13 +17,15 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
-from .progress_support import (
+from dnadesign.ops.status.artifacts import (
     file_count,
     line_count,
     namespace_column_counts,
     overlay_namespace_names,
+)
+from dnadesign.ops.status.parsing import required_text
+from dnadesign.ops.status.paths import (
     required_path,
-    required_text,
 )
 
 
@@ -33,7 +35,7 @@ def provide_usr_sync_audit_status(
     inputs: Mapping[str, object],
 ) -> tuple[str, str, dict[str, object]]:
     del repo_root
-    return usr_sync_audit_progress(inputs.get("sync_audit_json"))
+    return _usr_sync_audit_status(inputs.get("sync_audit_json"))
 
 
 def provide_usr_dataset_state_status(
@@ -42,15 +44,11 @@ def provide_usr_dataset_state_status(
     inputs: Mapping[str, object],
 ) -> tuple[str, str, dict[str, object]]:
     del repo_root
-    return usr_dataset_state_progress(usr_root=inputs.get("usr_root"), dataset=inputs.get("dataset"))
+    return _usr_dataset_state_status(usr_root=inputs.get("usr_root"), dataset=inputs.get("dataset"))
 
 
-def usr_sync_audit_progress(sync_audit_json: object) -> tuple[str, str, dict[str, object]]:
-    resolved_audit = required_path(
-        sync_audit_json,
-        flag_name="--sync-audit-json",
-        progress_kind="usr-sync-audit",
-    )
+def _usr_sync_audit_status(sync_audit_json: object) -> tuple[str, str, dict[str, object]]:
+    resolved_audit = required_path(sync_audit_json, flag_name="--sync-audit-json", progress_kind="usr-sync-audit")
     if not resolved_audit.exists():
         return (
             "missing",
@@ -86,7 +84,7 @@ def usr_sync_audit_progress(sync_audit_json: object) -> tuple[str, str, dict[str
     )
 
 
-def usr_dataset_state_progress(
+def _usr_dataset_state_status(
     *,
     usr_root: object,
     dataset: object,
@@ -140,9 +138,4 @@ def usr_dataset_state_progress(
     )
 
 
-__all__ = [
-    "provide_usr_dataset_state_status",
-    "provide_usr_sync_audit_status",
-    "usr_dataset_state_progress",
-    "usr_sync_audit_progress",
-]
+__all__ = ["provide_usr_dataset_state_status", "provide_usr_sync_audit_status"]

@@ -16,6 +16,7 @@ from typing import Literal
 
 PathBase = Literal["repo", "manifest", "cwd"]
 _PATH_BASES = frozenset({"repo", "manifest", "cwd"})
+_PLACEHOLDER_PATH_SENTINELS = frozenset({"n/a", "none", "null", "tbd", "todo"})
 
 
 def resolve_path_ref(
@@ -28,6 +29,7 @@ def resolve_path_ref(
     label: str = "path",
 ) -> Path:
     path_text = _coerce_path_text(raw_value, label=label)
+    _reject_placeholder_path_text(path_text, label=label)
     path = Path(path_text).expanduser()
     if path.is_absolute():
         return path.resolve()
@@ -94,6 +96,26 @@ def _coerce_path_text(raw_value: object, *, label: str) -> str:
     if not text:
         raise ValueError(f"{label} must be a non-empty path reference")
     return text
+
+
+def _reject_placeholder_path_text(path_text: str, *, label: str) -> None:
+    normalized = str(path_text or "").strip()
+    if "<" in normalized or ">" in normalized:
+        raise ValueError(
+            f"{label} contains placeholder path text {normalized!r}; "
+            "replace scaffold placeholders with a real path before running this command"
+        )
+
+    candidate = normalized
+    for prefix in ("repo:", "manifest:"):
+        if candidate.startswith(prefix):
+            candidate = candidate.removeprefix(prefix).strip()
+            break
+    if candidate.lower() in _PLACEHOLDER_PATH_SENTINELS:
+        raise ValueError(
+            f"{label} contains placeholder path text {normalized!r}; "
+            "replace narrative placeholders with a real path before running this command"
+        )
 
 
 __all__ = [

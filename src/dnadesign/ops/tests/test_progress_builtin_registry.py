@@ -58,7 +58,7 @@ from dnadesign.ops.status.registry_loader import list_status_kind_specs
 list_status_kind_specs()
 print(json.dumps(sorted(
     name for name in sys.modules
-    if name.startswith('dnadesign.ops.progress_')
+    if name.startswith('dnadesign.ops.providers.')
     or name.startswith('dnadesign.studies.stress_promoter_ethanol_cipro')
 )))
 """
@@ -102,7 +102,7 @@ result = CliRunner().invoke(app, ['catalog', 'list', '--repo-root', '.','--json'
 assert result.exit_code == 0, result.output
 print(json.dumps(sorted(
     name for name in sys.modules
-    if name.startswith('dnadesign.ops.progress_')
+    if name.startswith('dnadesign.ops.providers.')
     or name.startswith('dnadesign.studies.stress_promoter_ethanol_cipro')
 )))
 """
@@ -123,7 +123,7 @@ result = CliRunner().invoke(app, ['progress', 'kinds', '--json'])
 assert result.exit_code == 0, result.output
 print(json.dumps(sorted(
     name for name in sys.modules
-    if name.startswith('dnadesign.ops.progress_')
+    if name.startswith('dnadesign.ops.providers.')
     or name.startswith('dnadesign.studies.stress_promoter_ethanol_cipro')
 )))
 """
@@ -289,10 +289,10 @@ print(json.dumps(sorted(
     if name in {
         'dnadesign.ops.status.campaign',
         'dnadesign.ops.status.service',
-        'dnadesign.ops.progress_ops_provider',
-        'dnadesign.ops.progress_usr_provider',
-        'dnadesign.ops.progress_cluster_provider',
-        'dnadesign.ops.progress_opal_provider',
+        'dnadesign.ops.providers.ops.provider',
+        'dnadesign.ops.providers.usr.provider',
+        'dnadesign.ops.providers.cluster.provider',
+        'dnadesign.ops.providers.opal.provider',
         'dnadesign.studies.stress_promoter_ethanol_cipro.family',
         'dnadesign.studies.stress_promoter_ethanol_cipro.ops_provider',
     }
@@ -319,10 +319,10 @@ assert result.exit_code == 0, result.output
 print(json.dumps(sorted(
     name for name in sys.modules
     if name in {
-        'dnadesign.ops.progress_ops_provider',
-        'dnadesign.ops.progress_usr_provider',
-        'dnadesign.ops.progress_cluster_provider',
-        'dnadesign.ops.progress_opal_provider',
+        'dnadesign.ops.providers.ops.provider',
+        'dnadesign.ops.providers.usr.provider',
+        'dnadesign.ops.providers.cluster.provider',
+        'dnadesign.ops.providers.opal.provider',
         'dnadesign.ops._cli_legacy',
         'dnadesign.studies.stress_promoter_ethanol_cipro.family',
         'dnadesign.studies.stress_promoter_ethanol_cipro.ops_provider',
@@ -331,4 +331,4 @@ print(json.dumps(sorted(
 """
     )
 
-    assert imported_modules == ["dnadesign.ops.progress_ops_provider"]
+    assert imported_modules == ["dnadesign.ops.providers.ops.provider"]

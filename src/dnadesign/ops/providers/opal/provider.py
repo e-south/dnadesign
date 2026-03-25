@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/ops/progress_opal_provider.py
+src/dnadesign/ops/providers/opal/provider.py
 
 Provider-owned OPAL status builders.
 
@@ -15,7 +15,8 @@ import json
 from collections.abc import Mapping
 from pathlib import Path
 
-from .progress_support import load_yaml_mapping, required_path
+from dnadesign.ops.status.artifacts import load_yaml_mapping
+from dnadesign.ops.status.paths import required_path
 
 
 def provide_opal_campaign_state_status(
@@ -24,13 +25,13 @@ def provide_opal_campaign_state_status(
     inputs: Mapping[str, object],
 ) -> tuple[str, str, dict[str, object]]:
     del repo_root
-    return opal_campaign_state_progress(
+    return _opal_campaign_state_status(
         opal_config=inputs.get("opal_config"),
         opal_workdir=inputs.get("opal_workdir"),
     )
 
 
-def opal_campaign_state_progress(
+def _opal_campaign_state_status(
     *,
     opal_config: Path | None,
     opal_workdir: Path | None,
@@ -144,7 +145,4 @@ def _resolve_opal_campaign_root(config_path: Path) -> Path:
     return config_path.parent.resolve()
 
 
-__all__ = [
-    "opal_campaign_state_progress",
-    "provide_opal_campaign_state_status",
-]
+__all__ = ["provide_opal_campaign_state_status"]

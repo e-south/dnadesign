@@ -17,11 +17,3 @@ steps:
     inputs:
       usr_root: repo:src/dnadesign/usr/datasets
       dataset: promoter/stress_ethanol_cipro_feature_matrix
-  - label: exploratory-clustering
-    registry_id: cluster.downstream.exploratory-clustering
-    inputs:
-      cluster_results_root: repo:n/a
-  - label: usr-infer-x-active-learning
-    registry_id: opal.downstream.usr-infer-x-active-learning
-    inputs:
-      opal_config: repo:n/a
