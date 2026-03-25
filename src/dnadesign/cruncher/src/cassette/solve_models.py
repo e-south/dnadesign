@@ -33,6 +33,8 @@ MAX_SOLVE_MAX_HITS = 128
 MAX_SOLVE_MAX_ENUMERATED_CANDIDATES = 250000
 MAX_SOLVE_MAX_SEARCH_NODES = 500000
 MAX_SOLVE_MAX_MATERIALIZE_TOP_K = 32
+DEFAULT_SELECTION_POOL_MIN = 64
+DEFAULT_SELECTION_POOL_MULTIPLIER = 8
 
 
 def _duplicate_values(values: list[str]) -> list[str]:
@@ -212,14 +214,75 @@ class SolveCatalogConfig(StrictCassetteModel):
         return self
 
 
+def _default_selection_pool_size(*, max_hits: int, materialize_top_k: int) -> int:
+    return max(
+        DEFAULT_SELECTION_POOL_MIN,
+        max_hits * DEFAULT_SELECTION_POOL_MULTIPLIER,
+        materialize_top_k * DEFAULT_SELECTION_POOL_MULTIPLIER,
+    )
+
+
+class SearchSelectionSpec(StrictCassetteModel):
+    policy: Literal["score_only", "greedy_hamming", "mmr"] = "greedy_hamming"
+    pool_size: int | None = Field(default=None, ge=1)
+    distance_metric: Literal["hamming"] = "hamming"
+    min_pairwise_distance: int = Field(ge=0, default=0)
+    diversity_weight: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _validate_policy_fields(self) -> "SearchSelectionSpec":
+        if self.policy == "score_only":
+            if self.diversity_weight is not None:
+                raise ValueError("search.selection.diversity_weight must be omitted when policy=score_only.")
+            if self.min_pairwise_distance != 0:
+                raise ValueError("search.selection.min_pairwise_distance must be 0 when policy=score_only.")
+        if self.policy == "greedy_hamming" and self.distance_metric != "hamming":
+            raise ValueError("search.selection.distance_metric must be hamming when policy=greedy_hamming.")
+        if self.policy != "mmr" and self.diversity_weight is not None:
+            raise ValueError("search.selection.diversity_weight must be omitted unless policy=mmr.")
+        if self.policy == "mmr" and self.diversity_weight is None:
+            raise ValueError("search.selection.diversity_weight is required when policy=mmr.")
+        return self
+
+
 class SearchSettingsSpec(StrictCassetteModel):
     max_hits: int = Field(ge=1, default=25)
     max_enumerated_candidates: int = Field(ge=1, default=100000)
     max_search_nodes: int = Field(ge=1, default=250000)
-    min_pairwise_hamming_distance: int = Field(ge=0, default=0)
     bounded_segment_target: int | None = Field(default=None, ge=0)
     gc_target: float | None = Field(default=None, ge=0.0, le=1.0)
     materialize_top_k: int = Field(ge=0, default=5)
+    selection: SearchSelectionSpec = Field(default_factory=SearchSelectionSpec)
+    selection_policy_defaulted: bool = Field(default=False, exclude=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_selection(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        legacy_min_pairwise_distance = normalized.pop("min_pairwise_hamming_distance", None)
+        raw_selection = normalized.get("selection")
+        selection_payload: dict[str, object]
+        if raw_selection is None:
+            selection_payload = {}
+            normalized["selection_policy_defaulted"] = True
+        elif isinstance(raw_selection, dict):
+            selection_payload = dict(raw_selection)
+            normalized["selection_policy_defaulted"] = False
+        else:
+            return value
+        if legacy_min_pairwise_distance is not None:
+            if (
+                "min_pairwise_distance" in selection_payload
+                and selection_payload["min_pairwise_distance"] != legacy_min_pairwise_distance
+            ):
+                raise ValueError(
+                    "search.min_pairwise_hamming_distance conflicts with search.selection.min_pairwise_distance."
+                )
+            selection_payload.setdefault("min_pairwise_distance", legacy_min_pairwise_distance)
+        normalized["selection"] = selection_payload
+        return normalized
 
     @model_validator(mode="after")
     def _validate_bounds(self) -> "SearchSettingsSpec":
@@ -245,6 +308,13 @@ class SearchSettingsSpec(StrictCassetteModel):
                 "search.materialize_top_k exceeds the current first-phase solve safety limit "
                 f"({self.materialize_top_k} > {MAX_SOLVE_MAX_MATERIALIZE_TOP_K})."
             )
+        resolved_pool_size = self.selection.pool_size or _default_selection_pool_size(
+            max_hits=self.max_hits,
+            materialize_top_k=self.materialize_top_k,
+        )
+        if resolved_pool_size < self.max_hits:
+            raise ValueError("search.selection.pool_size must be >= search.max_hits.")
+        self.selection = self.selection.model_copy(update={"pool_size": resolved_pool_size})
         return self
 
 
@@ -313,6 +383,7 @@ class CandidateScoreBreakdown(StrictCassetteModel):
 class CandidateHit(StrictCassetteModel):
     rank: int = Field(ge=1)
     score: list[float | int | str]
+    base_penalty_vector: list[float | int]
     hit_id: str
     cassette_sequence: str
     stem5p_arm: str
@@ -326,6 +397,8 @@ class CandidateHit(StrictCassetteModel):
     extra_site_count: int = Field(ge=0)
     gc_fraction: float = Field(ge=0.0, le=1.0)
     score_breakdown: CandidateScoreBreakdown
+    selection_rank_reason: str | None = None
+    distance_to_previous_selected: float | None = Field(default=None, ge=0.0)
     report_status: Literal["satisfied"] = "satisfied"
     materialized_run_dir: str | None = None
 
@@ -338,12 +411,43 @@ class CandidateHit(StrictCassetteModel):
 class SolveReportMetadata(StrictCassetteModel):
     catalog_variants: list[CatalogNormalizationInfo] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    warning_codes: list[str] = Field(default_factory=list)
     enumerated_candidate_count: int = Field(ge=0, default=0)
     accepted_candidate_count: int = Field(ge=0, default=0)
     considered_variant_pair_count: int = Field(ge=0, default=0)
+    visited_search_node_count: int = Field(ge=0, default=0)
     materialized_hit_count: int = Field(ge=0, default=0)
     catalog_preset: str | None = None
     catalog_additional_paths: list[str] = Field(default_factory=list)
+
+
+class PairwiseDistanceSummary(StrictCassetteModel):
+    min: float | None = None
+    max: float | None = None
+    mean: float | None = None
+
+
+class SolveSelectionSummary(StrictCassetteModel):
+    policy: Literal["score_only", "greedy_hamming", "mmr"]
+    distance_metric: Literal["hamming"]
+    diversity_weight: float | None = Field(default=None, ge=0.0, le=1.0)
+    max_hits: int = Field(ge=0)
+    pool_size: int = Field(ge=0)
+    accepted_candidate_count: int = Field(ge=0)
+    accepted_pool_size: int = Field(ge=0)
+    accepted_pool_admitted_count: int = Field(ge=0)
+    accepted_pool_rejected_count: int = Field(ge=0)
+    accepted_pool_truncated: bool = False
+    accepted_pool_worst_score_at_close: list[float | int | str] | None = None
+    search_truncated: bool = False
+    selected_hit_count: int = Field(ge=0)
+    selected_hit_ids: list[str] = Field(default_factory=list)
+    selection_policy_defaulted: bool = False
+    selection_pool_non_exhaustive_reason: str | None = None
+    policy_limited_hit_count: int = Field(default=0, ge=0)
+    policy_underfilled: bool = False
+    policy_underfilled_reason: str | None = None
+    pairwise_distance_summary: PairwiseDistanceSummary = Field(default_factory=PairwiseDistanceSummary)
 
 
 class SolveReport(StrictCassetteModel):
@@ -357,8 +461,10 @@ class SolveReport(StrictCassetteModel):
     metadata: SolveReportMetadata = Field(default_factory=SolveReportMetadata)
     issues: list[ValidationIssue] = Field(default_factory=list)
     hits: list[CandidateHit] = Field(default_factory=list)
+    selection_summary: SolveSelectionSummary | None = None
     materialized_hit_runs: list[str] = Field(default_factory=list)
     render_contracts_written: bool = False
+    baserender_hits_contract_path: str | None = None
     notes: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")

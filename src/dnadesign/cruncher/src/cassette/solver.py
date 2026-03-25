@@ -36,10 +36,21 @@ from dnadesign.cruncher.cassette.models import (
     reverse_complement_iupac,
 )
 from dnadesign.cruncher.cassette.planner import build_cassette_report
-from dnadesign.cruncher.cassette.scanning import (
-    EvaluatedMatch,
-    display_motif_for_orientation,
-    enumerate_site_instances,
+from dnadesign.cruncher.cassette.scanning import display_motif_for_orientation
+from dnadesign.cruncher.cassette.selection import (
+    CandidateHitRecord,
+    SelectedCandidate,
+    build_accepted_candidate_pool,
+    select_hits,
+)
+from dnadesign.cruncher.cassette.solve_filters import (
+    expanded_blacklist_motifs,
+    extra_site_count,
+    gc_fraction,
+    max_homopolymer_run,
+    sequence_blacklist_issues,
+    sequence_quality_issues,
+    site_blacklist_issues,
 )
 from dnadesign.cruncher.cassette.solve_models import (
     CandidateHit,
@@ -47,11 +58,28 @@ from dnadesign.cruncher.cassette.solve_models import (
     HairpinCassetteSolveSpec,
     SolveReport,
     SolveReportMetadata,
+    SolveSelectionSummary,
 )
 from dnadesign.cruncher.utils.hashing import sha256_bytes
 
 _BASE_ORDER = ("A", "C", "G", "T")
 _COMPLEMENT = {"A": "T", "C": "G", "G": "C", "T": "A"}
+_WARNING_MESSAGES = {
+    "MAX_SEARCH_NODES_REACHED": "search.max_search_nodes reached before exhausting the solve search tree.",
+    "MAX_ENUMERATED_CANDIDATES_REACHED": (
+        "search.max_enumerated_candidates reached before exhausting the solve search space."
+    ),
+    "ACCEPTED_POOL_TRUNCATED": "accepted_pool truncated to keep solve memory bounded.",
+    "SELECTION_RESULTS_POOL_BOUNDED": (
+        "Selected hits are best only among the bounded accepted pool retained under the configured solve caps."
+    ),
+    "SELECTION_RESULTS_SEARCH_BOUNDED": (
+        "Selected hits are search-bounded under the configured solve caps and are not guaranteed globally optimal."
+    ),
+    "SELECTION_POLICY_LIMITED_HITS": (
+        "Selection policy constraints returned fewer hits than the accepted pool could otherwise provide."
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -85,33 +113,17 @@ class ConcreteCandidate:
 
 
 @dataclass
-class CandidateHitRecord:
-    hit_id: str
-    left_variant_id: str
-    right_variant_id: str
-    explicit_spec: HairpinCassetteSpec
-    report: object
-    cassette_sequence: str
-    stem5p_arm: str
-    loop: str
-    gc_fraction: float
-    extra_site_count: int
-    score_breakdown: CandidateScoreBreakdown
-    score_tuple: tuple[float | int | str, ...]
-    left_nick_boundary: int
-    right_nick_boundary: int
-    bounded_segment_length: int
-
-
-@dataclass
 class SolveSearchResult:
     status: Literal["solved", "no_hits", "invalid_spec"]
     issues: list[ValidationIssue]
     warnings: list[str]
-    hits: list[CandidateHitRecord]
+    warning_codes: list[str]
+    hits: list[SelectedCandidate]
+    selection_summary: SolveSelectionSummary | None
     enumerated_candidate_count: int
     accepted_candidate_count: int
     considered_variant_pair_count: int
+    visited_search_node_count: int
 
 
 def _catalog_variants_for_report(catalog: NickaseCatalog) -> list[CatalogNormalizationInfo]:
@@ -129,27 +141,6 @@ def _catalog_variants_for_report(catalog: NickaseCatalog) -> list[CatalogNormali
         )
         for entry in sorted(catalog.entries, key=lambda item: item.id)
     ]
-
-
-def _gc_fraction(sequence: str) -> float:
-    if not sequence:
-        return 0.0
-    gc = sum(1 for base in sequence if base in {"G", "C"})
-    return gc / len(sequence)
-
-
-def _max_homopolymer_run(sequence: str) -> int:
-    if not sequence:
-        return 0
-    best = 1
-    current = 1
-    for index in range(1, len(sequence)):
-        if sequence[index] == sequence[index - 1]:
-            current += 1
-            best = max(best, current)
-        else:
-            current = 1
-    return best
 
 
 def _score_hit(
@@ -195,18 +186,6 @@ def _min_max_gc_from_domains(domains: list[set[str]]) -> tuple[int, int]:
 
 def _build_initial_domains(pattern: str) -> list[set[str]]:
     return [iupac_bases_for_symbol(symbol) for symbol in pattern]
-
-
-def _expanded_blacklist_motifs(
-    *,
-    literals: list[str],
-    iupac_motifs: list[str],
-    include_reverse_complements: bool,
-) -> tuple[str, ...]:
-    motifs = list(literals) + list(iupac_motifs)
-    if include_reverse_complements:
-        motifs.extend(reverse_complement_iupac(motif) for motif in list(motifs))
-    return tuple(sorted(set(motifs)))
 
 
 def _placement_window(
@@ -566,245 +545,6 @@ def _build_candidate(
     )
 
 
-def _scope_filtered_matches(
-    *,
-    matches: list[EvaluatedMatch],
-    solve_spec: HairpinCassetteSolveSpec,
-    scope: Literal["cassette_only", "evaluation_context"],
-) -> list[EvaluatedMatch]:
-    if scope == "evaluation_context":
-        return matches
-    cassette_start = len(solve_spec.construct_context.left_flank)
-    cassette_end = cassette_start + solve_spec.cassette_length_nt
-    return [match for match in matches if cassette_start <= match.site.start and match.site.end <= cassette_end]
-
-
-def _scan_specificity_occurrences(
-    *,
-    candidate: ConcreteCandidate,
-    catalog: NickaseCatalog,
-    solve_spec: HairpinCassetteSolveSpec,
-    specificity_ids: set[str] | None = None,
-    variant_ids: set[str] | None = None,
-) -> list[EvaluatedMatch]:
-    entries_to_scan: list[NickaseCatalogEntry] = []
-    if variant_ids:
-        catalog_by_id = catalog.by_id()
-        entries_to_scan.extend(
-            catalog_by_id[variant_id] for variant_id in sorted(variant_ids) if variant_id in catalog_by_id
-        )
-    if specificity_ids:
-        seen_specificities: set[str] = {entry.specificity_id for entry in entries_to_scan}
-        for entry in sorted(catalog.entries, key=lambda item: (item.specificity_id, item.id)):
-            if entry.specificity_id in specificity_ids and entry.specificity_id not in seen_specificities:
-                entries_to_scan.append(entry)
-                seen_specificities.add(entry.specificity_id)
-    if not entries_to_scan:
-        return []
-    all_matches: list[EvaluatedMatch] = []
-    cassette_offset = len(solve_spec.construct_context.left_flank)
-    for entry in entries_to_scan:
-        all_matches.extend(
-            enumerate_site_instances(
-                candidate.evaluation_primary_sequence,
-                cassette_offset=cassette_offset,
-                entry=entry,
-            )
-        )
-    return all_matches
-
-
-def _intended_site_keys(hit_report: object) -> set[tuple[str, int, int]]:
-    candidate = getattr(hit_report, "candidate", None)
-    if candidate is None:
-        return set()
-    return {
-        (
-            candidate.intended_left_site.specificity_id,
-            candidate.intended_left_site.start,
-            candidate.intended_left_site.end,
-        ),
-        (
-            candidate.intended_right_site.specificity_id,
-            candidate.intended_right_site.start,
-            candidate.intended_right_site.end,
-        ),
-    }
-
-
-def _site_blacklist_issues(
-    *,
-    candidate: ConcreteCandidate,
-    hit_report: object,
-    catalog: NickaseCatalog,
-    solve_spec: HairpinCassetteSolveSpec,
-) -> list[ValidationIssue]:
-    issues: list[ValidationIssue] = []
-    any_specificities = set(solve_spec.site_blacklist.forbidden_any_site_specificity_ids)
-    any_variants = set(solve_spec.site_blacklist.forbidden_any_site_variant_ids)
-    unintended_specificities = set(solve_spec.site_blacklist.forbidden_unintended_site_specificity_ids)
-    scope = solve_spec.site_blacklist.scope
-
-    if any_specificities or any_variants:
-        matches = _scope_filtered_matches(
-            matches=_scan_specificity_occurrences(
-                candidate=candidate,
-                catalog=catalog,
-                solve_spec=solve_spec,
-                specificity_ids=any_specificities,
-                variant_ids=any_variants,
-            ),
-            solve_spec=solve_spec,
-            scope=scope,
-        )
-        if matches:
-            issues.append(
-                ValidationIssue(
-                    code="FORBIDDEN_SITE_OCCURRENCE",
-                    message="A forbidden site specificity or variant occurred in the protected scope.",
-                    details={
-                        "specificity_ids": sorted({match.site.specificity_id for match in matches}),
-                        "variant_ids": sorted({match.variant.id for match in matches}),
-                        "scope": scope,
-                    },
-                )
-            )
-
-    if unintended_specificities:
-        matches = _scope_filtered_matches(
-            matches=_scan_specificity_occurrences(
-                candidate=candidate,
-                catalog=catalog,
-                solve_spec=solve_spec,
-                specificity_ids=unintended_specificities,
-            ),
-            solve_spec=solve_spec,
-            scope=scope,
-        )
-        intended_keys = _intended_site_keys(hit_report)
-        extra_matches = [
-            match
-            for match in matches
-            if (match.site.specificity_id, match.site.start, match.site.end) not in intended_keys
-        ]
-        if extra_matches:
-            issues.append(
-                ValidationIssue(
-                    code="FORBIDDEN_UNINTENDED_SITE_OCCURRENCE",
-                    message="A forbidden unintended site specificity occurred outside the chosen intended hits.",
-                    details={
-                        "specificity_ids": sorted({match.site.specificity_id for match in extra_matches}),
-                        "scope": scope,
-                    },
-                )
-            )
-    return issues
-
-
-def _sequence_blacklist_issues(
-    *,
-    candidate: ConcreteCandidate,
-    solve_spec: HairpinCassetteSolveSpec,
-) -> list[ValidationIssue]:
-    issues: list[ValidationIssue] = []
-    if solve_spec.sequence_blacklist.scope == "cassette_only":
-        sequence = candidate.cassette_sequence
-    else:
-        sequence = candidate.evaluation_primary_sequence
-    motifs = _expanded_blacklist_motifs(
-        literals=solve_spec.sequence_blacklist.forbidden_literals,
-        iupac_motifs=solve_spec.sequence_blacklist.forbidden_iupac_motifs,
-        include_reverse_complements=solve_spec.sequence_blacklist.forbid_reverse_complements,
-    )
-    violations: list[str] = []
-    for motif in motifs:
-        motif_len = len(motif)
-        if any(
-            motif_matches(sequence[start : start + motif_len], motif)
-            for start in range(0, len(sequence) - motif_len + 1)
-        ):
-            violations.append(motif)
-    if violations:
-        issues.append(
-            ValidationIssue(
-                code="FORBIDDEN_SEQUENCE_MOTIF",
-                message="A forbidden literal or IUPAC motif occurred in the protected sequence scope.",
-                details={"motifs": sorted(set(violations)), "scope": solve_spec.sequence_blacklist.scope},
-            )
-        )
-    return issues
-
-
-def _sequence_quality_issues(
-    *,
-    candidate: ConcreteCandidate,
-    solve_spec: HairpinCassetteSolveSpec,
-) -> list[ValidationIssue]:
-    issues: list[ValidationIssue] = []
-    gc_fraction = _gc_fraction(candidate.cassette_sequence)
-    gc_range = solve_spec.sequence_quality.gc_fraction
-    if gc_range is not None and not (gc_range.min <= gc_fraction <= gc_range.max):
-        issues.append(
-            ValidationIssue(
-                code="GC_FRACTION_OUT_OF_RANGE",
-                message="Cassette GC fraction fell outside the requested interval.",
-                details={"gc_fraction": gc_fraction, "min": gc_range.min, "max": gc_range.max},
-            )
-        )
-    homopolymer_run = _max_homopolymer_run(candidate.cassette_sequence)
-    if (
-        solve_spec.sequence_quality.max_homopolymer_run is not None
-        and homopolymer_run > solve_spec.sequence_quality.max_homopolymer_run
-    ):
-        issues.append(
-            ValidationIssue(
-                code="HOMOPOLYMER_RUN_TOO_LONG",
-                message="Cassette contains a homopolymer run longer than the requested maximum.",
-                details={
-                    "observed_max_homopolymer_run": homopolymer_run,
-                    "max_homopolymer_run": solve_spec.sequence_quality.max_homopolymer_run,
-                },
-            )
-        )
-    return issues
-
-
-def _extra_site_count(
-    *,
-    candidate: ConcreteCandidate,
-    hit_report: object,
-    catalog: NickaseCatalog,
-    solve_spec: HairpinCassetteSolveSpec,
-) -> int:
-    seen_specificities: set[str] = set()
-    specificity_entries: list[NickaseCatalogEntry] = []
-    for entry in sorted(catalog.entries, key=lambda item: (item.specificity_id, item.id)):
-        if entry.specificity_id not in seen_specificities:
-            specificity_entries.append(entry)
-            seen_specificities.add(entry.specificity_id)
-    matches: list[EvaluatedMatch] = []
-    cassette_offset = len(solve_spec.construct_context.left_flank)
-    for entry in specificity_entries:
-        matches.extend(
-            enumerate_site_instances(
-                candidate.evaluation_primary_sequence,
-                cassette_offset=cassette_offset,
-                entry=entry,
-            )
-        )
-    matches = _scope_filtered_matches(matches=matches, solve_spec=solve_spec, scope=solve_spec.site_blacklist.scope)
-    intended_keys = _intended_site_keys(hit_report)
-    unique_occurrences = {
-        (match.site.specificity_id, match.site.start, match.site.end, match.site.orientation) for match in matches
-    }
-    intended_occurrences = {
-        occurrence
-        for occurrence in unique_occurrences
-        if (occurrence[0], occurrence[1], occurrence[2]) in intended_keys
-    }
-    return len(unique_occurrences - intended_occurrences)
-
-
 def _make_explicit_spec(
     *,
     solve_spec: HairpinCassetteSolveSpec,
@@ -865,68 +605,15 @@ def _candidate_hit_id(cassette_sequence: str) -> str:
     return sha256_bytes(cassette_sequence.encode("utf-8"))[:10]
 
 
-def _hamming_distance(left: str, right: str) -> int:
-    return sum(1 for a, b in zip(left, right, strict=True) if a != b)
-
-
-def _diversify_hits(
-    hits: list[CandidateHitRecord],
+def _append_warning(
     *,
-    min_pairwise_hamming_distance: int,
-    max_hits: int,
-) -> list[CandidateHitRecord]:
-    if min_pairwise_hamming_distance <= 0:
-        return hits[:max_hits]
-    kept: list[CandidateHitRecord] = []
-    for hit in hits:
-        if all(
-            _hamming_distance(hit.cassette_sequence, existing.cassette_sequence) >= min_pairwise_hamming_distance
-            for existing in kept
-        ):
-            kept.append(hit)
-        if len(kept) >= max_hits:
-            break
-    return kept
-
-
-def _deduplicate_hits(hits: list[CandidateHitRecord]) -> list[CandidateHitRecord]:
-    best_by_sequence: dict[str, CandidateHitRecord] = {}
-    for hit in hits:
-        existing = best_by_sequence.get(hit.cassette_sequence)
-        if existing is None or (hit.score_tuple, hit.left_variant_id, hit.right_variant_id) < (
-            existing.score_tuple,
-            existing.left_variant_id,
-            existing.right_variant_id,
-        ):
-            best_by_sequence[hit.cassette_sequence] = hit
-    return list(best_by_sequence.values())
-
-
-def _recorded_hit_limit(solve_spec: HairpinCassetteSolveSpec) -> int:
-    return max(
-        64,
-        solve_spec.search.max_hits * 8,
-        solve_spec.search.materialize_top_k * 8,
-    )
-
-
-def _trim_hit_buffer(
-    hits: list[CandidateHitRecord],
-    *,
-    solve_spec: HairpinCassetteSolveSpec,
+    code: str,
     warnings: list[str],
-) -> list[CandidateHitRecord]:
-    limit = _recorded_hit_limit(solve_spec)
-    if len(hits) <= limit * 2:
-        return hits
-    trimmed = _deduplicate_hits(hits)
-    trimmed.sort(key=lambda hit: hit.score_tuple)
-    if len(trimmed) > limit:
-        warning = "internal hit buffer truncated to keep solve memory bounded."
-        if warning not in warnings:
-            warnings.append(warning)
-        trimmed = trimmed[:limit]
-    return trimmed
+    warning_codes: list[str],
+) -> None:
+    if code not in warning_codes:
+        warning_codes.append(code)
+        warnings.append(_WARNING_MESSAGES[code])
 
 
 def _variable_order(
@@ -960,27 +647,33 @@ def solve_cassette_search(
             status="invalid_spec",
             issues=issues,
             warnings=[],
+            warning_codes=[],
             hits=[],
+            selection_summary=None,
             enumerated_candidate_count=0,
             accepted_candidate_count=0,
             considered_variant_pair_count=0,
+            visited_search_node_count=0,
         )
 
-    all_hits: list[CandidateHitRecord] = []
     warnings: list[str] = []
+    warning_codes: list[str] = []
     enumerated_candidates = 0
     accepted_candidates = 0
     visited_search_nodes = 0
+    considered_variant_pair_count = 0
     admissible_pair_count = 0
     search_stopped = False
+    accepted_pool = build_accepted_candidate_pool(pool_size=solve_spec.search.selection.pool_size)
     loop_domains = _build_initial_domains(solve_spec.topology.loop_pattern)
-    blacklist_motifs = _expanded_blacklist_motifs(
+    blacklist_motifs = expanded_blacklist_motifs(
         literals=solve_spec.sequence_blacklist.forbidden_literals,
         iupac_motifs=solve_spec.sequence_blacklist.forbidden_iupac_motifs,
         include_reverse_complements=solve_spec.sequence_blacklist.forbid_reverse_complements,
     )
 
     for variant_pair in variant_pairs:
+        considered_variant_pair_count += 1
         left_placements = _enumerate_placements_for_side(side="left", variant=variant_pair.left, solve_spec=solve_spec)
         right_placements = _enumerate_placements_for_side(
             side="right",
@@ -1017,14 +710,18 @@ def solve_cassette_search(
                 )
 
                 def dfs(depth: int) -> None:
-                    nonlocal accepted_candidates, all_hits, enumerated_candidates, search_stopped, visited_search_nodes
+                    nonlocal accepted_candidates, enumerated_candidates, search_stopped, visited_search_nodes
                     if search_stopped:
                         return
-                    visited_search_nodes += 1
-                    if visited_search_nodes > solve_spec.search.max_search_nodes:
-                        warnings.append("search.max_search_nodes reached before exhausting the solve search tree.")
+                    if visited_search_nodes >= solve_spec.search.max_search_nodes:
+                        _append_warning(
+                            code="MAX_SEARCH_NODES_REACHED",
+                            warnings=warnings,
+                            warning_codes=warning_codes,
+                        )
                         search_stopped = True
                         return
+                    visited_search_nodes += 1
                     cassette_chars, evaluation_chars = _build_full_sequences(
                         left_stem_chars=assigned_left,
                         loop_chars=assigned_loop,
@@ -1061,13 +758,15 @@ def solve_cassette_search(
                         )
                         if candidate is None:
                             return
-                        enumerated_candidates += 1
-                        if enumerated_candidates > solve_spec.search.max_enumerated_candidates:
-                            warnings.append(
-                                "search.max_enumerated_candidates reached before exhausting the solve search space."
+                        if enumerated_candidates >= solve_spec.search.max_enumerated_candidates:
+                            _append_warning(
+                                code="MAX_ENUMERATED_CANDIDATES_REACHED",
+                                warnings=warnings,
+                                warning_codes=warning_codes,
                             )
                             search_stopped = True
                             return
+                        enumerated_candidates += 1
                         explicit_spec = _make_explicit_spec(
                             solve_spec=solve_spec,
                             candidate=candidate,
@@ -1087,20 +786,20 @@ def solve_cassette_search(
                             return
                         extra_issues = []
                         extra_issues.extend(
-                            _site_blacklist_issues(
+                            site_blacklist_issues(
                                 candidate=candidate,
                                 hit_report=report,
                                 catalog=catalog,
                                 solve_spec=solve_spec,
                             )
                         )
-                        extra_issues.extend(_sequence_blacklist_issues(candidate=candidate, solve_spec=solve_spec))
-                        extra_issues.extend(_sequence_quality_issues(candidate=candidate, solve_spec=solve_spec))
+                        extra_issues.extend(sequence_blacklist_issues(candidate=candidate, solve_spec=solve_spec))
+                        extra_issues.extend(sequence_quality_issues(candidate=candidate, solve_spec=solve_spec))
                         if extra_issues:
                             return
-                        gc_fraction = _gc_fraction(candidate.cassette_sequence)
-                        homopolymer_run = _max_homopolymer_run(candidate.cassette_sequence)
-                        extra_site_count = _extra_site_count(
+                        observed_gc_fraction = gc_fraction(candidate.cassette_sequence)
+                        observed_homopolymer_run = max_homopolymer_run(candidate.cassette_sequence)
+                        observed_extra_site_count = extra_site_count(
                             candidate=candidate,
                             hit_report=report,
                             catalog=catalog,
@@ -1109,13 +808,13 @@ def solve_cassette_search(
                         breakdown, score_tuple = _score_hit(
                             cassette_sequence=candidate.cassette_sequence,
                             bounded_segment_length=report.candidate.bounded_nicked_segment.length_nt,
-                            extra_site_count=extra_site_count,
-                            gc_fraction=gc_fraction,
-                            homopolymer_run=homopolymer_run,
+                            extra_site_count=observed_extra_site_count,
+                            gc_fraction=observed_gc_fraction,
+                            homopolymer_run=observed_homopolymer_run,
                             solve_spec=solve_spec,
                         )
                         accepted_candidates += 1
-                        all_hits.append(
+                        accepted_pool.consider(
                             CandidateHitRecord(
                                 hit_id=_candidate_hit_id(candidate.cassette_sequence),
                                 left_variant_id=left_placement.variant.id,
@@ -1125,16 +824,16 @@ def solve_cassette_search(
                                 cassette_sequence=candidate.cassette_sequence,
                                 stem5p_arm=candidate.stem5p_arm,
                                 loop=candidate.loop,
-                                gc_fraction=gc_fraction,
-                                extra_site_count=extra_site_count,
+                                gc_fraction=observed_gc_fraction,
+                                extra_site_count=observed_extra_site_count,
                                 score_breakdown=breakdown,
+                                base_penalty_vector=tuple(score_tuple[:-1]),
                                 score_tuple=score_tuple,
                                 left_nick_boundary=report.candidate.intended_left_nick.boundary,
                                 right_nick_boundary=report.candidate.intended_right_nick.boundary,
                                 bounded_segment_length=report.candidate.bounded_nicked_segment.length_nt,
                             )
                         )
-                        all_hits = _trim_hit_buffer(all_hits, solve_spec=solve_spec, warnings=warnings)
                         return
 
                     location, index = variable_order[depth]
@@ -1176,38 +875,74 @@ def solve_cassette_search(
                 )
             ],
             warnings=warnings,
+            warning_codes=warning_codes,
             hits=[],
+            selection_summary=None,
             enumerated_candidate_count=enumerated_candidates,
             accepted_candidate_count=0,
-            considered_variant_pair_count=0,
+            considered_variant_pair_count=considered_variant_pair_count,
+            visited_search_node_count=visited_search_nodes,
         )
 
-    unique_hits = _deduplicate_hits(all_hits)
-    unique_hits.sort(key=lambda hit: hit.score_tuple)
-    ranked_hits = _diversify_hits(
-        unique_hits,
-        min_pairwise_hamming_distance=solve_spec.search.min_pairwise_hamming_distance,
-        max_hits=solve_spec.search.max_hits,
+    search_truncated = any(
+        code in {"MAX_SEARCH_NODES_REACHED", "MAX_ENUMERATED_CANDIDATES_REACHED"} for code in warning_codes
     )
-    if not ranked_hits:
+    selection_outcome = select_hits(
+        accepted_pool=accepted_pool,
+        search_settings=solve_spec.search,
+        accepted_candidate_count=accepted_candidates,
+        search_truncated=search_truncated,
+    )
+    if selection_outcome.pool_summary.truncated:
+        _append_warning(
+            code="ACCEPTED_POOL_TRUNCATED",
+            warnings=warnings,
+            warning_codes=warning_codes,
+        )
+    non_exhaustive_reason = selection_outcome.summary.selection_pool_non_exhaustive_reason
+    if non_exhaustive_reason in {"pool_bounded", "search_bounded_and_pool_bounded"}:
+        _append_warning(
+            code="SELECTION_RESULTS_POOL_BOUNDED",
+            warnings=warnings,
+            warning_codes=warning_codes,
+        )
+    if non_exhaustive_reason in {"search_bounded", "search_bounded_and_pool_bounded"}:
+        _append_warning(
+            code="SELECTION_RESULTS_SEARCH_BOUNDED",
+            warnings=warnings,
+            warning_codes=warning_codes,
+        )
+    if selection_outcome.summary.policy_underfilled:
+        _append_warning(
+            code="SELECTION_POLICY_LIMITED_HITS",
+            warnings=warnings,
+            warning_codes=warning_codes,
+        )
+    if not selection_outcome.selected_hits:
         return SolveSearchResult(
             status="no_hits",
             issues=[],
             warnings=warnings,
+            warning_codes=warning_codes,
             hits=[],
+            selection_summary=selection_outcome.summary,
             enumerated_candidate_count=enumerated_candidates,
             accepted_candidate_count=accepted_candidates,
-            considered_variant_pair_count=admissible_pair_count,
+            considered_variant_pair_count=considered_variant_pair_count,
+            visited_search_node_count=visited_search_nodes,
         )
 
     return SolveSearchResult(
         status="solved",
         issues=[],
         warnings=warnings,
-        hits=ranked_hits,
+        warning_codes=warning_codes,
+        hits=selection_outcome.selected_hits,
+        selection_summary=selection_outcome.summary,
         enumerated_candidate_count=enumerated_candidates,
         accepted_candidate_count=accepted_candidates,
-        considered_variant_pair_count=admissible_pair_count,
+        considered_variant_pair_count=considered_variant_pair_count,
+        visited_search_node_count=visited_search_nodes,
     )
 
 
@@ -1222,22 +957,29 @@ def build_solve_report(
     hits = [
         CandidateHit(
             rank=index,
-            score=list(hit.score_tuple),
-            hit_id=hit.hit_id,
-            cassette_sequence=hit.cassette_sequence,
-            stem5p_arm=hit.stem5p_arm,
-            loop=hit.loop,
-            left_variant_id=hit.left_variant_id,
-            right_variant_id=hit.right_variant_id,
-            left_nick_boundary=hit.left_nick_boundary,
-            right_nick_boundary=hit.right_nick_boundary,
+            score=list(selected_hit.record.score_tuple),
+            base_penalty_vector=list(selected_hit.record.base_penalty_vector),
+            hit_id=selected_hit.record.hit_id,
+            cassette_sequence=selected_hit.record.cassette_sequence,
+            stem5p_arm=selected_hit.record.stem5p_arm,
+            loop=selected_hit.record.loop,
+            left_variant_id=selected_hit.record.left_variant_id,
+            right_variant_id=selected_hit.record.right_variant_id,
+            left_nick_boundary=selected_hit.record.left_nick_boundary,
+            right_nick_boundary=selected_hit.record.right_nick_boundary,
             target_strand=solve_spec.nick_goal.target_strand,
-            bounded_segment_length=hit.bounded_segment_length,
-            extra_site_count=hit.extra_site_count,
-            gc_fraction=hit.gc_fraction,
-            score_breakdown=hit.score_breakdown,
+            bounded_segment_length=selected_hit.record.bounded_segment_length,
+            extra_site_count=selected_hit.record.extra_site_count,
+            gc_fraction=selected_hit.record.gc_fraction,
+            score_breakdown=selected_hit.record.score_breakdown,
+            selection_rank_reason=selected_hit.selection_rank_reason,
+            distance_to_previous_selected=(
+                float(selected_hit.distance_to_previous_selected)
+                if selected_hit.distance_to_previous_selected is not None
+                else None
+            ),
         )
-        for index, hit in enumerate(search_result.hits, start=1)
+        for index, selected_hit in enumerate(search_result.hits, start=1)
     ]
     return SolveReport(
         status=search_result.status,
@@ -1246,12 +988,15 @@ def build_solve_report(
         metadata=SolveReportMetadata(
             catalog_variants=_catalog_variants_for_report(catalog),
             warnings=search_result.warnings,
+            warning_codes=search_result.warning_codes,
             enumerated_candidate_count=search_result.enumerated_candidate_count,
             accepted_candidate_count=search_result.accepted_candidate_count,
             considered_variant_pair_count=search_result.considered_variant_pair_count,
+            visited_search_node_count=search_result.visited_search_node_count,
             catalog_preset=catalog.preset_id,
             catalog_additional_paths=[],
         ),
         issues=search_result.issues,
         hits=hits,
+        selection_summary=search_result.selection_summary,
     )
