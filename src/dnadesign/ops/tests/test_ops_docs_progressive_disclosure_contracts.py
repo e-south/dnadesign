@@ -317,7 +317,10 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "../../src/dnadesign/infer/docs/README.md" in text
     assert "drift is a docs-check failure" not in text
     assert "This command only summarizes the manifest you provide." in text
-    assert "Relative artifact paths in the manifest resolve from the manifest directory" in text
+    assert "Campaign manifests must declare `version: 2` and `path_base: repo`, `manifest`, or `cwd`." in text
+    assert "`repo:` references resolve from repository root." in text
+    assert "`manifest:` plus `./` or `../` resolve from the manifest directory." in text
+    assert "Provider inputs belong under `inputs:`." in text
     assert "`ops-audit-json`" in text
     assert "`opal-campaign-state`" in text
     assert "Ops is not" not in text

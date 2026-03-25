@@ -14,3 +14,8 @@ Templates provide consistent structure for system-of-record docs, runbooks, ADRs
 - [Promoter study index template](promoter-study-index.yaml)
 - [Promoter study datasets template](promoter-study-datasets.yaml)
 - [Promoter study status template](promoter-study-status.md)
+- [Promoter study OPS contract template](promoter-study-ops.study.yaml)
+
+The promoter-study templates define the checked-in record plane. The matching
+study-family adapter code lives under `src/dnadesign/studies/`, not inside OPS
+core.

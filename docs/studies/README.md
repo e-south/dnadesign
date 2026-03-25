@@ -1,28 +1,38 @@
 ## Study Records
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-21
+**Last verified:** 2026-03-25
 
 Use this index when the question is "where is the real study right now?" rather
 than "which generic workflow should I use?"
 
 Study records are checked-in status artifacts for one live effort. They are not
 runbooks, and they are not generated outputs.
+They are the record plane: `ops progress` reads these checked-in artifacts as
+observation surfaces, while `ops runbook` stays in the control plane for
+planning and execution.
 
 Authority chain: `docs/studies/promoter/index.yaml` selects the active study,
 the matching `docs/studies/promoter/<study-id>/` directory holds the required
-`campaign.yaml`, `datasets.yaml`, and `status.md`, and may also carry an
-optional `pipeline.yaml` when the study owns checked-in Construct, Infer,
-batch, or Notify execution surfaces.
+`campaign.yaml`, `datasets.yaml`, `status.md`, and `ops.study.yaml`, and may
+also carry an optional `pipeline.yaml` when the study owns checked-in
+Construct, Infer, batch, or Notify execution surfaces.
 
-Keep three complementary artifacts for each real study:
+Keep four complementary artifacts for each real study:
 
 - `campaign.yaml`: workflow progress and registered procedure evidence
 - `datasets.yaml`: machine-readable registry of affiliated USR datasets and
   sync posture across local and remote locations
 - `status.md`: human-readable current state, row targets, and next actions
+- `ops.study.yaml`: OPS-facing study contract for phase order, snapshot scope,
+  and preflight scope routing
 
-When a study already owns concrete execution surfaces, add one optional fourth
+Keep the code boundary equally explicit: study-family implementation code lives
+under `src/dnadesign/studies/`, not under `src/dnadesign/ops/`. OPS reads the
+checked-in record and dispatches the provider, but the family-owned snapshot
+and preflight logic stays with the family package.
+
+When a study already owns concrete execution surfaces, add one optional fifth
 artifact:
 
 - `pipeline.yaml`: machine-readable map of the study-owned workspace, config,
@@ -45,6 +55,7 @@ docs/studies/promoter/<study-id>/
   campaign.yaml
   datasets.yaml
   status.md
+  ops.study.yaml
   pipeline.yaml  # optional but recommended once the study owns execution surfaces
   audits/
 ```
@@ -57,13 +68,16 @@ docs/studies/promoter/index.yaml
 
 - `campaign.yaml` is the explicit multi-step manifest generated from
   `uv run ops progress scaffold ...` and then filled with the real artifact
-  paths.
+  paths. Use v2 semantics with explicit `version`, `path_base`, and per-step
+  `inputs:` mappings.
 - `datasets.yaml` declares which USR datasets belong to the study, whether each
   location is a shared USR root or a workspace-local export root, how
   it should be onboarded, and how it syncs to remotes such as `cluster` or a
   study-specific workspace-export remote.
 - `status.md` is the human-readable note that records row targets, source
   datasets, infer slice status, rollback paths, and next actions.
+- `ops.study.yaml` is the machine-readable OPS contract for phase ordering,
+  repo-scoped snapshot posture, and next-scope preflight grouping.
 - `pipeline.yaml`, when present, records the exact Construct workspace,
   Infer configs, batch presets, and Notify profile paths that belong to the
   real study rather than to a generic demo.
@@ -82,13 +96,15 @@ docs/studies/promoter/index.yaml
    `cp docs/templates/promoter-study-datasets.yaml docs/studies/promoter/<study-id>/datasets.yaml`
 5. Copy the status-note template:
    `cp docs/templates/promoter-study-status.md docs/studies/promoter/<study-id>/status.md`
-6. Create the audit directory:
+6. Copy the OPS-facing study contract template:
+   `cp docs/templates/promoter-study-ops.study.yaml docs/studies/promoter/<study-id>/ops.study.yaml`
+7. Create the audit directory:
    `mkdir -p docs/studies/promoter/<study-id>/audits`
-7. Edit the checked-in `index.yaml` plus the new `campaign.yaml`, `datasets.yaml`, and `status.md` so they point at the real study ids, paths, and commands.
-8. If the study already has concrete Construct, Infer, or batch surfaces,
+8. Edit the checked-in `index.yaml` plus the new `campaign.yaml`, `datasets.yaml`, `status.md`, and `ops.study.yaml` so they point at the real study ids, paths, and commands.
+9. If the study already has concrete Construct, Infer, or batch surfaces,
    add `docs/studies/promoter/<study-id>/pipeline.yaml` and record those exact
    paths there.
-9. Refresh evidence with:
+10. Refresh evidence with:
    `uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/promoter/<study-id>/campaign.yaml`
 
 ### Dataset registry contract
@@ -146,8 +162,12 @@ for the first pull rather than relying on local name guessing.
 - If `active_study: null`, say the live study record is missing and route the
   reader to the promoter-study status contract instead of guessing.
 - If `active_study` names a study, that same id must appear under `studies:`
-  and its directory must contain `campaign.yaml`, `datasets.yaml`, and
-  `status.md`.
+  and its directory must contain `campaign.yaml`, `datasets.yaml`, `status.md`,
+  and `ops.study.yaml`.
+- `ops.study.yaml` is the OPS-facing source of phase order, repo snapshot
+  summary scope, and preflight next-scope grouping. `pipeline.yaml` remains the
+  exact execution-surface map when the study owns concrete Construct, Infer, or
+  batch assets.
 - If `pipeline.yaml` exists, treat it as the study-owned execution map for the
   next Construct, Infer, batch, or Notify step; do not reconstruct that path
   from generic workspace docs.
@@ -162,4 +182,5 @@ for the first pull rather than relying on local name guessing.
 - [Promoter study index template](../templates/promoter-study-index.yaml)
 - [Promoter study datasets template](../templates/promoter-study-datasets.yaml)
 - [Promoter study status template](../templates/promoter-study-status.md)
+- [Promoter study OPS contract template](../templates/promoter-study-ops.study.yaml)
 - [Documentation index](../README.md)

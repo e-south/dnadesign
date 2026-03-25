@@ -125,6 +125,9 @@ where = ["src"]
   "runbooks/presets/*.yaml",
   "runbooks/templates/*.qsub",
 ]
+"dnadesign.studies" = [
+  "*/status.registry.yaml",
+]
 
 [tool.pytest.ini_options]
 addopts = "-ra -q --strict-markers --import-mode=importlib"

@@ -46,10 +46,13 @@ Out of scope:
   `src/dnadesign/usr/docs/operations/promoter-study-status-contract.md`.
 - Treat `docs/studies/promoter/index.yaml`,
   `docs/studies/promoter/<study-id>/campaign.yaml`,
-  `docs/studies/promoter/<study-id>/datasets.yaml`, `status.md`, and optional
-  `pipeline.yaml` as the only valid source for live dataset ids,
+  `docs/studies/promoter/<study-id>/datasets.yaml`, `status.md`,
+  `ops.study.yaml`, and optional `pipeline.yaml` as the only valid source for live dataset ids,
   local-vs-remote sync posture, row targets, completed infer slices, study-owned
-  Construct or Infer surfaces, and next actions.
+  Construct or Infer surfaces, and next actions. `ops.study.yaml` is the
+  OPS-facing source of phase order and next-scope preflight grouping. Infer
+  Notify profile paths should be derived from the checked-in Infer lane configs
+  rather than stored separately in `pipeline.yaml`.
 - Use `root_kind` and `status` in `datasets.yaml` to tell canonical shared USR
   roots apart from workspace-local export roots and planned-but-not-yet-created
   datasets.
@@ -66,8 +69,8 @@ Out of scope:
 - If `active_study: null`, report that no live promoter study record is checked
   in yet.
 - If `active_study` names a study id, require the same id under `studies:` and
-  require `campaign.yaml`, `datasets.yaml`, and `status.md` in the matching
-  study directory.
+  require `campaign.yaml`, `datasets.yaml`, `status.md`, and `ops.study.yaml`
+  in the matching study directory.
 - If `pipeline.yaml` exists, load it before answering exact Construct, Infer,
   batch, or Notify next-step questions.
 - If the registry and checked-in study directory disagree, fail visibly instead
@@ -76,8 +79,9 @@ Out of scope:
 2. Refresh the shared status surface
 - Run:
   `uv run ops progress show usr.data-plane.promoter-study-status --json`
-- Use that output as the one-command summary for current phase, declared datasets,
-  next ready phase, and missing execution surfaces before deeper probes.
+- Use that output as the repo-scoped one-command summary for current phase,
+  declared datasets, next ready phase, and missing execution surfaces before
+  deeper probes. Treat host-local advisories there as advisory only.
 - When the user needs command-level blockers rather than the cheap snapshot,
   run:
   `uv run ops progress show usr.data-plane.promoter-study-preflight --json`
@@ -134,8 +138,8 @@ Return:
   still source-phase with no canonical feature dataset yet
 - source datasets named in the checked-in study record
 - affiliated dataset registry entries and sync posture
-- study-owned Construct, Infer, batch, and Notify surfaces when `pipeline.yaml`
-  exists
+- study-owned Construct, Infer, and batch surfaces when `pipeline.yaml` exists,
+  plus derived Infer Notify profile paths from the checked-in lane configs
 - completed versus pending infer slices
 - rollback paths (`infer prune`, `usr maintenance overlay-remove`,
   `usr maintenance overlay-compact`)

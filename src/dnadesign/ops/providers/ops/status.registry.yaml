@@ -1,0 +1,23 @@
+version: 1
+provider_id: builtin.ops
+entries:
+  - progress_kind: ops-audit-json
+    provider_ref: dnadesign.ops.progress_ops_provider:provide_ops_audit_status
+    description: Read one workspace-scoped orchestration audit JSON emitted by `ops runbook execute`.
+    surface_type: orchestration_audit
+    cost_class: cheap
+    summary_scope: workspace
+    input_schema:
+      - name: audit_json
+        manifest_key: audit_json
+        cli_flag: --audit-json
+        placeholder: <workspace-root>/outputs/logs/ops/audit/latest.json
+        summary: Workspace-scoped orchestration audit JSON emitted by ops runbook execute.
+        type: path
+    notes:
+      - >-
+        Smallest positive control-plane demo: run `uv run ops runbook execute
+        ... --no-submit --audit-json
+        <workspace-root>/outputs/logs/ops/audit/<file>.json`, then pass the
+        same audit path to `ops progress show`.
+      - On workstations without `qstat`, add `--allow-missing-qstat` so the queue probe stays explicit but non-fatal during a dry-run demo.

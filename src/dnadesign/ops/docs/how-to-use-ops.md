@@ -1,9 +1,10 @@
 ## How to use Ops
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-20
+**Last verified:** 2026-03-25
 
 Use this page when you already know you need Ops and want the next command. Start with `uv run ops catalog list --simple` if you are still choosing a route.
+Treat the shell surfaces explicitly: `ops catalog` discovers routes, `ops progress` reads observation/status surfaces, and `ops runbook` owns control-plane execution.
 
 Once you know the route, use `uv run ops progress explain <registry-id>` to see the required status inputs before you touch artifacts.
 

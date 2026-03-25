@@ -13,17 +13,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.ops import progress as progress_module
 from dnadesign.ops.cli import app
-from dnadesign.ops.progress import (
-    _promoter_study_preflight_progress,
-    _promoter_study_record_progress,
+from dnadesign.ops.progress_command_support import CommandExecution
+from dnadesign.studies.stress_promoter_ethanol_cipro.ops_provider import (
+    provide_stress_promoter_ethanol_cipro_preflight,
+    provide_stress_promoter_ethanol_cipro_status,
 )
 
 
@@ -33,6 +34,27 @@ def _repo_root() -> Path:
         if (parent / "pyproject.toml").exists():
             return parent
     raise RuntimeError("repo root not found")
+
+
+def _promoter_study_status(study_dir: Path | None, *, repo_root: Path | None) -> tuple[str, str, dict[str, object]]:
+    inputs: dict[str, object] = {}
+    if study_dir is not None:
+        inputs["study_dir"] = study_dir
+    return provide_stress_promoter_ethanol_cipro_status(repo_root=repo_root, inputs=inputs)
+
+
+def _promoter_study_preflight(
+    study_dir: Path | None,
+    *,
+    repo_root: Path | None,
+    scope: str | None = None,
+) -> tuple[str, str, dict[str, object]]:
+    inputs: dict[str, object] = {}
+    if study_dir is not None:
+        inputs["study_dir"] = study_dir
+    if scope is not None:
+        inputs["scope"] = scope
+    return provide_stress_promoter_ethanol_cipro_preflight(repo_root=repo_root, inputs=inputs)
 
 
 def _write_ops_audit(path: Path, *, ok: bool, queue_probe: str | None = None) -> None:
@@ -175,6 +197,39 @@ def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densege
         ),
         encoding="utf-8",
     )
+    (study_dir / "ops.study.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "study_id": "demo_study",
+                "family": "stress_promoter_ethanol_cipro",
+                "phase_order": [
+                    "densegen_growth",
+                    "merged_anchor_set",
+                ],
+                "snapshot": {"summary_scope": "repo"},
+                "preflight": {
+                    "default_scope": "next",
+                    "phase_targets": {
+                        "densegen": "densegen_growth",
+                        "construct": "construct_context_expansion",
+                        "infer_preparation": "infer_batch_preparation",
+                    },
+                    "next_scope": {
+                        "phase_groups": {
+                            "densegen_growth": ["densegen"],
+                            "merged_anchor_set": [],
+                            "construct_context_expansion": ["construct"],
+                            "infer_batch_preparation": ["infer", "notify", "infer_batch_plan"],
+                        },
+                        "infer_lane_groups": ["infer", "notify", "infer_batch_plan"],
+                    },
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
     _write_usr_dataset(repo_root / "usr_root", "densegen/demo_anchor")
     if densegen_rows != 2:
         dataset_dir = repo_root / "usr_root" / "densegen" / "demo_anchor"
@@ -241,7 +296,7 @@ def _write_promoter_study_preflight_record(study_dir: Path) -> None:
             {
                 "study_pipeline": {
                     "study_id": "demo_study",
-                    "current_phase": "densegen_growth",
+                    "current_phase": "infer_batch_preparation",
                     "canonical_usr_root": "usr_root",
                     "execution_surfaces": {
                         "construct_workspace": "workspace/construct",
@@ -267,26 +322,80 @@ def _write_promoter_study_preflight_record(study_dir: Path) -> None:
                         ]
                     },
                     "infer": {
+                        "preferred_model_family": "evo2_20b",
+                        "supported_model_families": ["evo2_20b", "evo2_7b"],
                         "configs": {
                             "anchor_only_7b": "workspace/infer/config.anchor_only.evo2_7b.yaml",
                             "anchor_plus_template_7b": "workspace/infer/config.anchor_plus_template.evo2_7b.yaml",
                             "anchor_only_20b": "workspace/infer/config.anchor_only.evo2_20b.yaml",
                             "anchor_plus_template_20b": "workspace/infer/config.anchor_plus_template.evo2_20b.yaml",
                         },
-                        "notify_profiles": {
-                            "anchor_only_7b": "workspace/infer/outputs/notify/infer/anchor_only_7b/profile.json",
-                            "anchor_plus_template_7b": (
-                                "workspace/infer/outputs/notify/infer/"
-                                "anchor_plus_template_7b/profile.json"
-                            ),
-                        },
                     },
                     "phases": [
-                        {"id": "densegen_growth", "status": "in_progress"},
-                        {"id": "merged_anchor_set", "status": "ready"},
-                        {"id": "infer_anchor_only_20b", "status": "blocked_gpu", "blocker": "GPU required"},
+                        {"id": "densegen_growth", "status": "parallel_optional"},
+                        {"id": "merged_anchor_set", "status": "complete"},
+                        {"id": "construct_context_expansion", "status": "complete"},
+                        {"id": "infer_batch_preparation", "status": "in_progress"},
+                        {
+                            "id": "infer_anchor_only_20b",
+                            "status": "planned",
+                            "next_surface": "workspace/runbooks/infer_anchor_only_20b.yaml",
+                        },
+                        {
+                            "id": "infer_anchor_plus_template_20b",
+                            "status": "planned",
+                            "next_surface": "workspace/runbooks/infer_anchor_plus_template_20b.yaml",
+                        },
+                        {
+                            "id": "infer_anchor_only_7b",
+                            "status": "planned",
+                            "next_surface": "workspace/runbooks/infer_anchor_only_7b.yaml",
+                        },
+                        {
+                            "id": "infer_anchor_plus_template_7b",
+                            "status": "planned",
+                            "next_surface": "workspace/runbooks/infer_anchor_plus_template_7b.yaml",
+                        },
                     ],
                 }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (study_dir / "ops.study.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "study_id": "demo_study",
+                "family": "stress_promoter_ethanol_cipro",
+                "phase_order": [
+                    "densegen_growth",
+                    "merged_anchor_set",
+                    "construct_context_expansion",
+                    "infer_batch_preparation",
+                    "infer_anchor_only_20b",
+                    "infer_anchor_plus_template_20b",
+                    "infer_anchor_only_7b",
+                ],
+                "snapshot": {"summary_scope": "repo"},
+                "preflight": {
+                    "default_scope": "next",
+                    "phase_targets": {
+                        "densegen": "densegen_growth",
+                        "construct": "construct_context_expansion",
+                        "infer_preparation": "infer_batch_preparation",
+                    },
+                    "next_scope": {
+                        "phase_groups": {
+                            "densegen_growth": ["densegen"],
+                            "merged_anchor_set": [],
+                            "construct_context_expansion": ["construct"],
+                            "infer_batch_preparation": ["infer", "notify", "infer_batch_plan"],
+                        },
+                        "infer_lane_groups": ["infer", "notify", "infer_batch_plan"],
+                    },
+                },
             },
             sort_keys=False,
         ),
@@ -296,6 +405,8 @@ def _write_promoter_study_preflight_record(study_dir: Path) -> None:
     _write_usr_dataset(repo_root / "usr_root", "densegen/demo_anchor")
     _write_usr_dataset(repo_root / "usr_root", "mg1655_promoters")
     _write_usr_dataset(repo_root / "usr_root", "plasmids")
+    _write_usr_dataset(repo_root / "usr_root", "promoter/demo_anchor_set")
+    _write_usr_dataset(repo_root / "usr_root", "promoter/demo_construct_contexts")
 
     construct_workspace = repo_root / "workspace" / "construct"
     construct_workspace.mkdir(parents=True, exist_ok=True)
@@ -311,10 +422,11 @@ def _write_promoter_study_preflight_record(study_dir: Path) -> None:
         ("config.anchor_only.evo2_20b.yaml", "promoter/demo_anchor_set"),
         ("config.anchor_plus_template.evo2_20b.yaml", "promoter/demo_construct_contexts"),
     ):
+        model_id = "evo2_20b" if "20b" in name else "evo2_7b"
         (infer_workspace / name).write_text(
             yaml.safe_dump(
                 {
-                    "model": {"id": "evo2_7b", "device": "cuda:0", "precision": "bf16", "alphabet": "dna"},
+                    "model": {"id": model_id, "device": "cuda:0", "precision": "bf16", "alphabet": "dna"},
                     "jobs": [
                         {
                             "id": name,
@@ -372,6 +484,27 @@ def _write_promoter_study_preflight_record(study_dir: Path) -> None:
             ),
             encoding="utf-8",
         )
+
+
+def _fake_infer_validation_contract(config_path: Path) -> SimpleNamespace:
+    dataset = "promoter/demo_construct_contexts" if "template" in config_path.name else "promoter/demo_anchor_set"
+    model_id = "evo2_20b" if "20b" in config_path.name else "evo2_7b"
+    return SimpleNamespace(
+        config_path=config_path,
+        model_id=model_id,
+        device="cuda:0",
+        job_ids=(config_path.stem,),
+        usr_datasets=(dataset,),
+    )
+
+
+def _fake_infer_usr_output_contract(repo_root: Path, *, config_path: Path) -> SimpleNamespace:
+    dataset = "promoter/demo_construct_contexts" if "template" in config_path.name else "promoter/demo_anchor_set"
+    return SimpleNamespace(
+        config_path=config_path,
+        usr_root=repo_root / "usr_root",
+        usr_dataset=dataset,
+    )
 
 
 def _write_cluster_index(root: Path) -> None:
@@ -576,13 +709,15 @@ def test_promoter_study_progress_discovers_active_study_from_repo_root() -> None
         )
         _write_promoter_study_record(study_dir, densegen_rows=2, densegen_target=5)
 
-        state, summary, evidence = _promoter_study_record_progress(None, repo_root=repo_root)
+        state, summary, evidence = _promoter_study_status(None, repo_root=repo_root)
 
         assert state == "attention"
         assert evidence["study_id"] == "demo_study"
         assert evidence["study_selection_source"] == "active_registry"
         assert evidence["active_study_registry_path"] == str(promoter_index)
         assert evidence["study_dir"] == str(study_dir)
+        assert evidence["infer_notify_profiles"] == {}
+        assert evidence["infer_notify_profile_errors"] == {}
         assert "pending promoter/demo_anchor_set" in summary
 
 
@@ -607,7 +742,7 @@ def test_promoter_study_progress_resolves_relative_study_dir_against_repo_root()
         )
         _write_promoter_study_record(study_dir, densegen_rows=2, densegen_target=5)
 
-        state, _, evidence = _promoter_study_record_progress(
+        state, _, evidence = _promoter_study_status(
             Path("docs/studies/promoter/demo_study"),
             repo_root=repo_root,
         )
@@ -639,11 +774,29 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
         def _fake_run(argv, *, cwd, timeout_seconds=180):
             command = " ".join(argv)
             if "dense validate-config" in command:
-                return progress_module.CommandExecution(tuple(argv), str(cwd), 1, "", "Solver probe failed", False)
+                return CommandExecution(tuple(argv), str(cwd), 1, "", "Solver probe failed", False)
             if "construct workspace doctor" in command:
-                return progress_module.CommandExecution(tuple(argv), str(cwd), 0, "workspace_doctor: ok", "", False)
+                return CommandExecution(tuple(argv), str(cwd), 0, "workspace_doctor: ok", "", False)
+            if "construct workspace validate-project" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "construct runtime validation completed",
+                    "",
+                    False,
+                )
             if "infer validate config" in command:
-                return progress_module.CommandExecution(tuple(argv), str(cwd), 0, "✔ Config validated.", "", False)
+                return CommandExecution(tuple(argv), str(cwd), 0, "✔ Config validated.", "", False)
+            if "infer run" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "✔ Config validated (dry run).",
+                    "",
+                    False,
+                )
             if "notify setup resolve-events" in command:
                 config_path = Path(argv[-2])
                 dataset = (
@@ -654,16 +807,16 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
                     "events": str(repo_root / "usr_root" / dataset / ".events.log"),
                     "policy": "infer",
                 }
-                return progress_module.CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+                return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
             if "ops runbook plan" in command and "densegen" in command:
                 payload = {
                     "selected_mode": "resume",
                     "workflow_id": "densegen_batch_with_notify",
                     "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
                 }
-                return progress_module.CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+                return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
             if "ops runbook plan" in command:
-                return progress_module.CommandExecution(
+                return CommandExecution(
                     tuple(argv),
                     str(cwd),
                     2,
@@ -673,31 +826,639 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr(progress_module, "_run_progress_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_progress_command", _fake_run)
+        monkeypatch.setattr(
+            "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
+            lambda: {"count": 0, "devices": [], "probe_error": None},
+        )
+        monkeypatch.setattr(
+            "dnadesign.construct.contracts.resolve_construct_workspace_config_path_from_root",
+            lambda **kwargs: repo_root / "workspace" / "construct" / "config.slot_a.yaml",
+        )
+        monkeypatch.setattr(
+            "dnadesign.construct.preflight_from_config",
+            lambda config_path: SimpleNamespace(
+                spec_id="spec-demo",
+                records_total=2,
+                existing_output_collisions=0,
+                output_on_conflict="error",
+            ),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.validate_infer_config_contract",
+            lambda config_path: _fake_infer_validation_contract(config_path),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.validate_infer_dry_run_contract",
+            lambda config_path: _fake_infer_validation_contract(config_path),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.contracts.resolve_infer_usr_output_contract",
+            lambda config_path: _fake_infer_usr_output_contract(repo_root, config_path=config_path),
+        )
 
-        state, summary, evidence = _promoter_study_preflight_progress(None, repo_root=repo_root)
+        state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
 
-        assert state == "missing"
-        assert "demo_study: preflight phase densegen_growth" in summary
+        assert state == "attention"
+        assert "demo_study: preflight phase infer_batch_preparation" in summary
+        assert evidence["preferred_infer_model_family"] == "evo2_20b"
         assert evidence["notify_environment"] == {
             "NOTIFY_WEBHOOK": False,
             "NOTIFY_WEBHOOK_FILE": False,
             "SSL_CERT_FILE": False,
         }
         checks = {check["id"]: check for check in evidence["checks"]}
+        assert checks["notify.environment.webhook"]["state"] == "attention"
+        assert checks["notify.environment.tls"]["state"] == "attention"
         assert checks["densegen.config.probe_solver"]["state"] == "attention"
         assert checks["densegen.batch.plan"]["state"] == "ok"
         assert checks["construct.workspace.doctor"]["state"] == "ok"
-        assert checks["construct.runtime.slot_a_window"]["state"] == "missing"
+        assert checks["construct.runtime.slot_a_window"]["state"] == "ok"
         assert checks["infer.validate.anchor_only_7b"]["state"] == "ok"
+        assert checks["infer.local_runtime.anchor_only_7b"]["state"] == "attention"
+        assert checks["infer.local_runtime.anchor_only_20b"]["state"] == "attention"
         assert checks["notify.profile.anchor_only_7b"]["state"] == "attention"
+        assert checks["notify.profile.anchor_only_20b"]["state"] == "attention"
+        assert checks["notify.profile.anchor_only_20b"]["details"]["profile"].endswith(
+            "workspace/infer/outputs/notify/infer/anchor_only_20b/profile.json"
+        )
         assert "notify setup slack" in checks["notify.profile.anchor_only_7b"]["details"]["setup_command"]
-        assert checks["infer.dry_run.anchor_only_7b"]["state"] == "missing"
-        assert checks["notify.resolve_events.anchor_only_7b"]["state"] == "missing"
+        assert "--profile" not in checks["notify.profile.anchor_only_7b"]["details"]["setup_command"]
+        assert checks["infer.dry_run.anchor_only_7b"]["state"] == "ok"
+        assert checks["infer.dry_run.anchor_only_20b"]["state"] == "ok"
+        assert checks["notify.resolve_events.anchor_only_7b"]["state"] == "ok"
+        assert checks["notify.resolve_events.anchor_only_20b"]["state"] == "ok"
         assert checks["ops.runbook_plan.infer_batch_7b_with_notify.anchor_only"]["state"] == "attention"
         assert evidence["counts"]["ok"] >= 1
         assert evidence["counts"]["attention"] >= 1
-        assert evidence["counts"]["missing"] >= 1
+        assert evidence["counts"]["missing"] == 0
+        assert evidence["scope"] == "full"
+
+
+def test_promoter_study_preflight_skips_construct_runtime_revalidation_once_materialized(monkeypatch) -> None:
+    with CliRunner().isolated_filesystem():
+        repo_root = Path.cwd()
+        (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
+        (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
+        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
+        promoter_index.parent.mkdir(parents=True, exist_ok=True)
+        promoter_index.write_text(
+            (
+                "active_study: demo_study\n"
+                "studies:\n"
+                "  - study_id: demo_study\n"
+                "    path: docs/studies/promoter/demo_study\n"
+            ),
+            encoding="utf-8",
+        )
+        _write_promoter_study_preflight_record(study_dir)
+
+        def _fake_run(argv, *, cwd, timeout_seconds=180):
+            command = " ".join(argv)
+            if "dense validate-config" in command:
+                return CommandExecution(tuple(argv), str(cwd), 0, "solver ok", "", False)
+            if "construct workspace doctor" in command:
+                return CommandExecution(tuple(argv), str(cwd), 0, "workspace_doctor: ok", "", False)
+            if "construct workspace validate-project" in command:
+                payload = {
+                    "status": "error",
+                    "code": 1,
+                    "error": (
+                        "2 planned output id(s) already exist in dataset "
+                        "'promoter/demo_construct_contexts'. Choose a different output dataset."
+                    ),
+                    "error_type": "ValidationError",
+                }
+                return CommandExecution(tuple(argv), str(cwd), 1, json.dumps(payload), "", False)
+            if "infer validate config" in command:
+                return CommandExecution(tuple(argv), str(cwd), 0, "✔ Config validated.", "", False)
+            if "infer run" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "✔ Config validated (dry run).",
+                    "",
+                    False,
+                )
+            if "notify setup resolve-events" in command:
+                config_path = Path(argv[-2])
+                dataset = (
+                    "promoter/demo_construct_contexts" if "template" in config_path.name else "promoter/demo_anchor_set"
+                )
+                payload = {
+                    "ok": True,
+                    "events": str(repo_root / "usr_root" / dataset / ".events.log"),
+                    "policy": "infer",
+                }
+                return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "ops runbook plan" in command and "densegen" in command:
+                payload = {
+                    "selected_mode": "resume",
+                    "workflow_id": "densegen_batch_with_notify",
+                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
+                }
+                return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "ops runbook plan" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    json.dumps({"selected_mode": "fresh"}),
+                    "",
+                    False,
+                )
+            raise AssertionError(f"unexpected command: {command}")
+
+        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_progress_command", _fake_run)
+        monkeypatch.setattr(
+            "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
+            lambda: {"count": 1, "devices": [{"id": 0, "name": "GPU"}], "probe_error": None},
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.validate_infer_config_contract",
+            lambda config_path: _fake_infer_validation_contract(config_path),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.validate_infer_dry_run_contract",
+            lambda config_path: _fake_infer_validation_contract(config_path),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.contracts.resolve_infer_usr_output_contract",
+            lambda config_path: _fake_infer_usr_output_contract(repo_root, config_path=config_path),
+        )
+        state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
+
+        assert state == "attention"
+        checks = {check["id"]: check for check in evidence["checks"]}
+        assert checks["construct.runtime.slot_a_window"]["state"] == "ok"
+        assert checks["construct.runtime.slot_a_window"]["details"]["skipped_runtime_revalidation"] is True
+        assert "skipping rerun runtime preflight" in checks["construct.runtime.slot_a_window"]["summary"]
+        assert "construct.runtime.slot_a_window" not in evidence["blocked_by"]
+
+
+def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypatch) -> None:
+    with CliRunner().isolated_filesystem():
+        repo_root = Path.cwd()
+        (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
+        (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
+        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
+        promoter_index.parent.mkdir(parents=True, exist_ok=True)
+        promoter_index.write_text(
+            (
+                "active_study: demo_study\n"
+                "studies:\n"
+                "  - study_id: demo_study\n"
+                "    path: docs/studies/promoter/demo_study\n"
+            ),
+            encoding="utf-8",
+        )
+        _write_promoter_study_preflight_record(study_dir)
+
+        def _fake_run(argv, *, cwd, timeout_seconds=180):
+            command = " ".join(argv)
+            if "dense validate-config" in command:
+                return CommandExecution(tuple(argv), str(cwd), 1, "", "Solver probe failed", False)
+            if "construct workspace doctor" in command:
+                return CommandExecution(tuple(argv), str(cwd), 0, "workspace_doctor: ok", "", False)
+            if "construct workspace validate-project" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "construct runtime validation completed",
+                    "",
+                    False,
+                )
+            if "infer validate config" in command:
+                return CommandExecution(tuple(argv), str(cwd), 0, "✔ Config validated.", "", False)
+            if "infer run" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "✔ Config validated (dry run).",
+                    "",
+                    False,
+                )
+            if "notify setup resolve-events" in command:
+                config_path = Path(argv[-2])
+                dataset = (
+                    "promoter/demo_construct_contexts" if "template" in config_path.name else "promoter/demo_anchor_set"
+                )
+                payload = {
+                    "ok": True,
+                    "events": str(repo_root / "usr_root" / dataset / ".events.log"),
+                    "policy": "infer",
+                }
+                return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "ops runbook plan" in command and "densegen" in command:
+                payload = {
+                    "selected_mode": "resume",
+                    "workflow_id": "densegen_batch_with_notify",
+                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
+                }
+                return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "ops runbook plan" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    2,
+                    "",
+                    "notify webhook secret file is required for batch notify workflows",
+                    False,
+                )
+            raise AssertionError(f"unexpected command: {command}")
+
+        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_progress_command", _fake_run)
+        monkeypatch.setattr(
+            "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
+            lambda: {"count": 0, "devices": [], "probe_error": None},
+        )
+        monkeypatch.setattr(
+            "dnadesign.construct.contracts.resolve_construct_workspace_config_path_from_root",
+            lambda **kwargs: repo_root / "workspace" / "construct" / "config.slot_a.yaml",
+        )
+        monkeypatch.setattr(
+            "dnadesign.construct.preflight_from_config",
+            lambda config_path: SimpleNamespace(
+                spec_id="spec-demo",
+                records_total=2,
+                existing_output_collisions=0,
+                output_on_conflict="error",
+            ),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.validate_infer_config_contract",
+            lambda config_path: _fake_infer_validation_contract(config_path),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.validate_infer_dry_run_contract",
+            lambda config_path: _fake_infer_validation_contract(config_path),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.contracts.resolve_infer_usr_output_contract",
+            lambda config_path: _fake_infer_usr_output_contract(repo_root, config_path=config_path),
+        )
+
+        state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="next")
+
+        assert state == "attention"
+        assert "focus phase infer_batch_preparation" in summary
+        assert "blocked by:" in summary
+        assert evidence["scope"] == "next"
+        assert evidence["target_phase"] == "infer_batch_preparation"
+        assert "infer.local_runtime.anchor_only_20b" in evidence["blocked_by"]
+        assert "notify.environment.webhook" in evidence["blocked_by"]
+        assert evidence["deferred_check_ids"] == []
+
+
+def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(monkeypatch) -> None:
+    with CliRunner().isolated_filesystem():
+        repo_root = Path.cwd()
+        (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
+        (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
+        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
+        promoter_index.parent.mkdir(parents=True, exist_ok=True)
+        promoter_index.write_text(
+            (
+                "active_study: demo_study\n"
+                "studies:\n"
+                "  - study_id: demo_study\n"
+                "    path: docs/studies/promoter/demo_study\n"
+            ),
+            encoding="utf-8",
+        )
+        _write_promoter_study_preflight_record(study_dir)
+
+        pipeline_path = study_dir / "pipeline.yaml"
+        pipeline_payload = yaml.safe_load(pipeline_path.read_text(encoding="utf-8"))
+        study_pipeline = pipeline_payload["study_pipeline"]
+        study_pipeline["current_phase"] = "infer_anchor_only_20b"
+        for phase in study_pipeline["phases"]:
+            if phase["id"] == "infer_batch_preparation":
+                phase["status"] = "complete"
+            elif phase["id"] == "infer_anchor_only_20b":
+                phase["status"] = "in_progress"
+        pipeline_path.write_text(yaml.safe_dump(pipeline_payload, sort_keys=False), encoding="utf-8")
+
+        def _fake_run(argv, *, cwd, timeout_seconds=180):
+            command = " ".join(argv)
+            if "dense validate-config" in command:
+                return CommandExecution(tuple(argv), str(cwd), 0, "solver ok", "", False)
+            if "construct workspace doctor" in command:
+                return CommandExecution(tuple(argv), str(cwd), 0, "workspace_doctor: ok", "", False)
+            if "construct workspace validate-project" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "construct runtime validation completed",
+                    "",
+                    False,
+                )
+            if "infer validate config" in command:
+                return CommandExecution(tuple(argv), str(cwd), 0, "✔ Config validated.", "", False)
+            if "infer run" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "✔ Config validated (dry run).",
+                    "",
+                    False,
+                )
+            if "notify setup resolve-events" in command:
+                config_path = Path(argv[-2])
+                dataset = (
+                    "promoter/demo_construct_contexts" if "template" in config_path.name else "promoter/demo_anchor_set"
+                )
+                payload = {
+                    "ok": True,
+                    "events": str(repo_root / "usr_root" / dataset / ".events.log"),
+                    "policy": "infer",
+                }
+                return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "ops runbook plan" in command and "densegen" in command:
+                payload = {
+                    "selected_mode": "resume",
+                    "workflow_id": "densegen_batch_with_notify",
+                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
+                }
+                return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "ops runbook plan" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    2,
+                    "",
+                    "notify webhook secret file is required for batch notify workflows",
+                    False,
+                )
+            raise AssertionError(f"unexpected command: {command}")
+
+        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_progress_command", _fake_run)
+        monkeypatch.setattr(
+            "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
+            lambda: {"count": 0, "devices": [], "probe_error": None},
+        )
+        monkeypatch.setattr(
+            "dnadesign.construct.contracts.resolve_construct_workspace_config_path_from_root",
+            lambda **kwargs: repo_root / "workspace" / "construct" / "config.slot_a.yaml",
+        )
+        monkeypatch.setattr(
+            "dnadesign.construct.preflight_from_config",
+            lambda config_path: SimpleNamespace(
+                spec_id="spec-demo",
+                records_total=2,
+                existing_output_collisions=0,
+                output_on_conflict="error",
+            ),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.validate_infer_config_contract",
+            lambda config_path: _fake_infer_validation_contract(config_path),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.validate_infer_dry_run_contract",
+            lambda config_path: _fake_infer_validation_contract(config_path),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.contracts.resolve_infer_usr_output_contract",
+            lambda config_path: _fake_infer_usr_output_contract(repo_root, config_path=config_path),
+        )
+
+        state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="next")
+
+        assert state == "attention"
+        assert "focus phase infer_anchor_only_20b" in summary
+        assert evidence["target_phase"] == "infer_anchor_only_20b"
+        assert "notify.environment.webhook" in evidence["blocked_by"]
+        assert "notify.environment.tls" in evidence["blocked_by"]
+        assert "infer.local_runtime.anchor_only_20b" in evidence["blocked_by"]
+        assert "ops.runbook_plan.infer_batch_20b_with_notify.anchor_only" in evidence["blocked_by"]
+        assert "infer.local_runtime.anchor_only_7b" not in evidence["blocked_by"]
+        assert "notify.profile.anchor_plus_template_20b" not in evidence["blocked_by"]
+        assert "infer.local_runtime.anchor_only_7b" in evidence["deferred_check_ids"]
+
+
+def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attention(monkeypatch) -> None:
+    with CliRunner().isolated_filesystem():
+        repo_root = Path.cwd()
+        (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
+        (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
+        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
+        promoter_index.parent.mkdir(parents=True, exist_ok=True)
+        promoter_index.write_text(
+            (
+                "active_study: demo_study\n"
+                "studies:\n"
+                "  - study_id: demo_study\n"
+                "    path: docs/studies/promoter/demo_study\n"
+            ),
+            encoding="utf-8",
+        )
+        _write_promoter_study_preflight_record(study_dir)
+
+        pipeline_path = study_dir / "pipeline.yaml"
+        pipeline_payload = yaml.safe_load(pipeline_path.read_text(encoding="utf-8"))
+        study_pipeline = pipeline_payload["study_pipeline"]
+        for phase in study_pipeline["phases"]:
+            if phase["id"] == "infer_anchor_only_20b":
+                phase["status"] = "complete"
+        pipeline_path.write_text(yaml.safe_dump(pipeline_payload, sort_keys=False), encoding="utf-8")
+
+        def _fake_run(argv, *, cwd, timeout_seconds=180):
+            command = " ".join(argv)
+            if "dense validate-config" in command:
+                return CommandExecution(tuple(argv), str(cwd), 0, "solver ok", "", False)
+            if "construct workspace doctor" in command:
+                return CommandExecution(tuple(argv), str(cwd), 0, "workspace_doctor: ok", "", False)
+            if "construct workspace validate-project" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "construct runtime validation completed",
+                    "",
+                    False,
+                )
+            if "infer validate config" in command:
+                return CommandExecution(tuple(argv), str(cwd), 0, "✔ Config validated.", "", False)
+            if "infer run" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "✔ Config validated (dry run).",
+                    "",
+                    False,
+                )
+            if "notify setup resolve-events" in command:
+                config_path = Path(argv[-2])
+                dataset = (
+                    "promoter/demo_construct_contexts" if "template" in config_path.name else "promoter/demo_anchor_set"
+                )
+                payload = {
+                    "ok": True,
+                    "events": str(repo_root / "usr_root" / dataset / ".events.log"),
+                    "policy": "infer",
+                }
+                return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "ops runbook plan" in command and "densegen" in command:
+                payload = {
+                    "selected_mode": "resume",
+                    "workflow_id": "densegen_batch_with_notify",
+                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
+                }
+                return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "ops runbook plan" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    2,
+                    "",
+                    "notify webhook secret file is required for batch notify workflows",
+                    False,
+                )
+            raise AssertionError(f"unexpected command: {command}")
+
+        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_progress_command", _fake_run)
+        monkeypatch.setattr(
+            "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
+            lambda: {"count": 0, "devices": [], "probe_error": None},
+        )
+        monkeypatch.setattr(
+            "dnadesign.construct.contracts.resolve_construct_workspace_config_path_from_root",
+            lambda **kwargs: repo_root / "workspace" / "construct" / "config.slot_a.yaml",
+        )
+        monkeypatch.setattr(
+            "dnadesign.construct.preflight_from_config",
+            lambda config_path: SimpleNamespace(
+                spec_id="spec-demo",
+                records_total=2,
+                existing_output_collisions=0,
+                output_on_conflict="error",
+            ),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.validate_infer_config_contract",
+            lambda config_path: _fake_infer_validation_contract(config_path),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.validate_infer_dry_run_contract",
+            lambda config_path: _fake_infer_validation_contract(config_path),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.contracts.resolve_infer_usr_output_contract",
+            lambda config_path: _fake_infer_usr_output_contract(repo_root, config_path=config_path),
+        )
+
+        state, _summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
+
+        assert state == "attention"
+        assert "infer.local_runtime.anchor_only_20b" not in evidence["blocked_by"]
+        assert "notify.profile.anchor_only_20b" not in evidence["blocked_by"]
+        assert "ops.runbook_plan.infer_batch_20b_with_notify.anchor_only" not in evidence["blocked_by"]
+        assert "infer.local_runtime.anchor_only_20b" in evidence["nonblocking_attention_ids"]
+        assert "notify.profile.anchor_only_20b" in evidence["nonblocking_attention_ids"]
+        assert "ops.runbook_plan.infer_batch_20b_with_notify.anchor_only" in evidence["nonblocking_attention_ids"]
+        assert "infer.local_runtime.anchor_plus_template_20b" in evidence["blocked_by"]
+
+
+def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_attention(monkeypatch) -> None:
+    with CliRunner().isolated_filesystem():
+        repo_root = Path.cwd()
+        (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
+        (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
+        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
+        promoter_index.parent.mkdir(parents=True, exist_ok=True)
+        promoter_index.write_text(
+            (
+                "active_study: demo_study\n"
+                "studies:\n"
+                "  - study_id: demo_study\n"
+                "    path: docs/studies/promoter/demo_study\n"
+            ),
+            encoding="utf-8",
+        )
+        _write_promoter_study_preflight_record(study_dir)
+
+        def _fake_run(argv, *, cwd, timeout_seconds=180):
+            command = " ".join(argv)
+            if "dense validate-config" in command:
+                return CommandExecution(tuple(argv), str(cwd), 1, "", "Solver probe failed", False)
+            if "construct workspace doctor" in command:
+                return CommandExecution(tuple(argv), str(cwd), 0, "workspace_doctor: ok", "", False)
+            if "construct workspace validate-project" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "construct runtime validation completed",
+                    "",
+                    False,
+                )
+            if "ops runbook plan" in command and "densegen" in command:
+                payload = {
+                    "selected_mode": "resume",
+                    "workflow_id": "densegen_batch_with_notify",
+                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
+                }
+                return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "ops runbook plan" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    2,
+                    "",
+                    "notify webhook secret file is required for batch notify workflows",
+                    False,
+                )
+            raise AssertionError(f"unexpected command: {command}")
+
+        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_progress_command", _fake_run)
+        monkeypatch.setattr(
+            "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
+            lambda: {"count": 0, "devices": [], "probe_error": None},
+        )
+        monkeypatch.setattr(
+            "dnadesign.construct.contracts.resolve_construct_workspace_config_path_from_root",
+            lambda **kwargs: repo_root / "workspace" / "construct" / "config.slot_a.yaml",
+        )
+        monkeypatch.setattr(
+            "dnadesign.construct.preflight_from_config",
+            lambda config_path: SimpleNamespace(
+                spec_id="spec-demo",
+                records_total=2,
+                existing_output_collisions=0,
+                output_on_conflict="error",
+            ),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.validate_infer_config_contract",
+            lambda config_path: _fake_infer_validation_contract(config_path),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.validate_infer_dry_run_contract",
+            lambda config_path: _fake_infer_validation_contract(config_path),
+        )
+        monkeypatch.setattr(
+            "dnadesign.infer.contracts.resolve_infer_usr_output_contract",
+            lambda config_path: _fake_infer_usr_output_contract(repo_root, config_path=config_path),
+        )
+
+        state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
+
+        assert state == "attention"
+        assert "densegen.config.probe_solver" not in evidence["blocked_by"]
+        assert "densegen.config.probe_solver" in evidence["nonblocking_attention_ids"]
+        assert "infer.local_runtime.anchor_only_20b" in evidence["blocked_by"]
 
 
 def test_cli_progress_show_reports_cluster_run_index_surface() -> None:
@@ -858,23 +1619,27 @@ def test_cli_progress_campaign_aggregates_explicit_steps() -> None:
         manifest_path.write_text(
             yaml.safe_dump(
                 {
+                    "version": 2,
+                    "path_base": "manifest",
                     "campaign_id": "demo_cross_tool_campaign",
                     "steps": [
                         {
                             "label": "orchestration",
                             "registry_id": "ops.control-plane.orchestration",
-                            "audit_json": "../artifacts/latest.json",
+                            "inputs": {"audit_json": "../artifacts/latest.json"},
                         },
                         {
                             "label": "feature-matrix",
                             "registry_id": "usr.data-plane.promoter-feature-matrix",
-                            "usr_root": "../usr_root",
-                            "dataset": "demo_dataset",
+                            "inputs": {
+                                "usr_root": "../usr_root",
+                                "dataset": "demo_dataset",
+                            },
                         },
                         {
                             "label": "active-learning",
                             "registry_id": "opal.downstream.usr-infer-x-active-learning",
-                            "opal_config": "../configs/campaign.yaml",
+                            "inputs": {"opal_config": "../configs/campaign.yaml"},
                         },
                     ],
                 },
@@ -918,12 +1683,14 @@ def test_cli_progress_campaign_resolves_manifest_relative_artifact_paths() -> No
         manifest_path.write_text(
             yaml.safe_dump(
                 {
+                    "version": 2,
+                    "path_base": "manifest",
                     "campaign_id": "manifest_relative_paths",
                     "steps": [
                         {
                             "label": "orchestration",
                             "registry_id": "ops.control-plane.orchestration",
-                            "audit_json": "../artifacts/latest.json",
+                            "inputs": {"audit_json": "../artifacts/latest.json"},
                         }
                     ],
                 },
@@ -989,12 +1756,14 @@ def test_cli_progress_campaign_reports_missing_step_for_scaffold_placeholder_pat
         manifest_path.write_text(
             yaml.safe_dump(
                 {
+                    "version": 2,
+                    "path_base": "manifest",
                     "campaign_id": "placeholder_manifest",
                     "steps": [
                         {
                             "label": "active-learning",
                             "registry_id": "opal.downstream.usr-infer-x-active-learning",
-                            "opal_config": "<opal-workdir>/configs/campaign.yaml",
+                            "inputs": {"opal_config": "<opal-workdir>/configs/campaign.yaml"},
                         }
                     ],
                 },
@@ -1043,17 +1812,21 @@ def test_cli_progress_scaffold_emits_yaml_manifest() -> None:
     assert result.exit_code == 0
     payload = yaml.safe_load(result.output)
     assert payload["campaign_id"] == "progress_campaign"
+    assert payload["version"] == 2
+    assert payload["path_base"] == "repo"
     assert payload["steps"] == [
         {
             "label": "orchestration",
             "registry_id": "ops.control-plane.orchestration",
-            "audit_json": "<workspace-root>/outputs/logs/ops/audit/latest.json",
+            "inputs": {"audit_json": "<workspace-root>/outputs/logs/ops/audit/latest.json"},
         },
         {
             "label": "promoter-feature-matrix",
             "registry_id": "usr.data-plane.promoter-feature-matrix",
-            "usr_root": "<usr-root>",
-            "dataset": "<dataset>",
+            "inputs": {
+                "usr_root": "<usr-root>",
+                "dataset": "<dataset>",
+            },
         },
     ]
 
@@ -1082,7 +1855,7 @@ def test_cli_progress_scaffold_emits_json_metadata() -> None:
         {
             "label": "usr-infer-x-active-learning",
             "registry_id": "opal.downstream.usr-infer-x-active-learning",
-            "opal_config": "<opal-workdir>/configs/campaign.yaml",
+            "inputs": {"opal_config": "<opal-workdir>/configs/campaign.yaml"},
         }
     ]
     assert payload["steps"][0]["progress_kind"] == "opal-campaign-state"
@@ -1122,7 +1895,7 @@ def test_cli_progress_scaffold_supports_related_to_expansion() -> None:
         "opal.downstream.usr-infer-x-active-learning",
     ]
     assert payload["manifest"]["steps"][0]["label"] == "promoter-feature-matrix"
-    assert payload["manifest"]["steps"][0]["dataset"] == "<dataset>"
+    assert payload["manifest"]["steps"][0]["inputs"]["dataset"] == "<dataset>"
 
 
 def test_cli_progress_scaffold_dedupes_related_to_expansion_and_explicit_ids() -> None:
@@ -1211,7 +1984,7 @@ def test_cli_progress_scaffold_writes_manifest_file_and_requires_force() -> None
         assert result.exit_code == 0
         assert out_path.exists()
         payload = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-        assert payload["steps"][0]["audit_json"] == "<workspace-root>/outputs/logs/ops/audit/latest.json"
+        assert payload["steps"][0]["inputs"]["audit_json"] == "<workspace-root>/outputs/logs/ops/audit/latest.json"
 
         second_result = runner.invoke(
             app,
@@ -1331,6 +2104,7 @@ def test_cli_progress_explain_reports_required_inputs_and_next_commands() -> Non
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["progress_kind"] == "opal-campaign-state"
+    assert payload["provider_id"] == "builtin.opal"
     assert payload["required_inputs"] == [
         {
             "cli_flag": "--opal-config",
@@ -1357,6 +2131,49 @@ def test_cli_progress_explain_reports_required_inputs_and_next_commands() -> Non
     assert payload["notes"] == [
         "Prefer `--opal-config` so Ops resolves `campaign.workdir` relative "
         "to the campaign root, matching OPAL's config contract."
+    ]
+
+
+def test_cli_progress_kinds_reports_provider_owned_inventory() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "progress",
+            "kinds",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    kinds = {entry["progress_kind"]: entry for entry in payload["progress_kinds"]}
+    assert kinds["promoter-study-preflight"]["provider_id"] == "study.stress_promoter_ethanol_cipro"
+    assert kinds["promoter-study-preflight"]["optional_inputs"] == [
+        {
+            "cli_flag": "--study-dir",
+            "summary": (
+                "Checked-in promoter-study directory containing campaign.yaml, "
+                "datasets.yaml, status.md, and ops.study.yaml."
+            ),
+        },
+        {
+            "cli_flag": "--scope",
+            "summary": (
+                "Preflight scope for promoter-study-preflight surfaces: "
+                "`full` runs the whole suite; `next` focuses the next actionable "
+                "phase and defers later-lane blockers."
+            ),
+        },
+    ]
+    assert kinds["ops-audit-json"]["notes"] == [
+        "Smallest positive control-plane demo: run "
+        "`uv run ops runbook execute ... --no-submit "
+        "--audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json`, "
+        "then pass the same audit path to `ops progress show`.",
+        "On workstations without `qstat`, add `--allow-missing-qstat` so the queue probe stays explicit "
+        "but non-fatal during a dry-run demo.",
     ]
 
 
@@ -1402,3 +2219,75 @@ def test_cli_progress_campaign_missing_manifest_suggests_scaffold() -> None:
     assert "Hint: check the manifest path from `pwd` or pass an absolute path." in result.output
     assert "uv run ops progress scaffold <registry-id> ..." in result.output
     assert "uv run ops progress scaffold --related-to <registry-id>" in result.output
+
+
+def test_cli_progress_campaign_requires_versioned_manifest_contract() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        manifest_path = Path("manifests") / "campaign_status.yaml"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(
+            yaml.safe_dump(
+                {
+                    "campaign_id": "missing_version",
+                    "steps": [],
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "progress",
+                "campaign",
+                "--repo-root",
+                str(_repo_root()),
+                "--manifest",
+                str(manifest_path),
+            ],
+        )
+
+        assert result.exit_code == 2
+        assert "Progress contract error: campaign manifest must declare version: 2" in result.output
+
+
+def test_cli_progress_campaign_rejects_top_level_step_inputs() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        manifest_path = Path("manifests") / "campaign_status.yaml"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(
+            yaml.safe_dump(
+                {
+                    "version": 2,
+                    "path_base": "repo",
+                    "campaign_id": "invalid_step_shape",
+                    "steps": [
+                        {
+                            "label": "orchestration",
+                            "registry_id": "ops.control-plane.orchestration",
+                            "audit_json": "repo:artifacts/latest.json",
+                        }
+                    ],
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "progress",
+                "campaign",
+                "--repo-root",
+                str(_repo_root()),
+                "--manifest",
+                str(manifest_path),
+            ],
+        )
+
+        assert result.exit_code == 2
+        assert "must place provider inputs under 'inputs': audit_json" in result.output
