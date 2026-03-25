@@ -20,13 +20,13 @@ Once you know the route, use `uv run ops progress explain <registry-id>` to see 
 
 ### Inspect one route
 
-- `uv run ops catalog show <registry-id>`: open one registered procedure with owner docs, related procedures, related tool docs, deeper docs when listed, required progress inputs, and next shell commands.
+- `uv run ops catalog show <registry-id>`: open one registered procedure with owner docs, related procedures, related tool docs, deeper docs when listed, required status inputs, and next shell commands.
 
 ### Check status or build a manifest
 
-- `uv run ops progress explain <registry-id>`: print the required progress flags, a ready-to-paste `progress show` command, and any adapter-specific notes before you touch artifacts.
-- `uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>`: summarize one status view once you have the explicit artifact inputs.
-- `uv run ops catalog show <registry-id>`: inspect the required progress flags before you run `progress show` if you do not already know the artifact contract.
+- `uv run ops progress explain <registry-id>`: print the required status flags, a ready-to-paste `progress show` command, and any adapter-specific notes before you touch artifacts.
+- `uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>`: summarize one status surface once you have the explicit artifact inputs.
+- `uv run ops catalog show <registry-id>`: inspect the required status flags before you run `progress show` if you do not already know the artifact contract.
 - `uv run ops progress scaffold <registry-id> ...`: emit an explicit manifest skeleton for one or more registered procedures. It prints YAML to stdout unless you pass `--out`.
 - `uv run ops progress scaffold --related-to <registry-id>`: expand one registered procedure into a manifest starting point. It can include more than one tool when the catalog links the procedures.
 - If you do not know the registry id yet, return to `uv run ops catalog list --simple`; bare `uv run ops progress scaffold` intentionally refuses to guess.

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/tests/test_stress_promoter_ethanol_cipro_preflight_orchestration.py
+src/dnadesign/studies/tests/test_promoter_preflight_orchestration.py
 
 Focused tests for the study-owned orchestration preflight builders.
 
@@ -14,13 +14,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dnadesign.ops.preflight import CommandExecution
-from dnadesign.studies.stress_promoter_ethanol_cipro.preflight_orchestration import (
-    PromoterPreflightNotifyEnvironmentDependencies,
-    PromoterPreflightRunbookPlanDependencies,
-    PromoterPreflightRunbookPlanTarget,
+from dnadesign.ops.preflight import (
+    CommandExecution,
+    RunbookPlanCheckDependencies,
+    RunbookPlanCheckTarget,
+    build_runbook_plan_checks,
+)
+from dnadesign.studies.promoter.preflight_orchestration import (
     build_promoter_preflight_notify_environment_checks,
-    build_promoter_preflight_runbook_plan_checks,
     resolve_notify_environment_state,
 )
 
@@ -49,7 +50,6 @@ def test_build_promoter_preflight_notify_environment_checks_uses_explicit_state_
         notify_env_state=notify_env_state,
         notify_environment_phase_id="infer_batch_preparation",
         enabled_groups={"notify_environment"},
-        dependencies=PromoterPreflightNotifyEnvironmentDependencies(),
     )
 
     by_id = {check.id: check for check in checks}
@@ -84,10 +84,10 @@ def test_build_promoter_preflight_runbook_plan_checks_merges_payload_and_details
             ),
         )
 
-    checks = build_promoter_preflight_runbook_plan_checks(
-        study_repo_root=study_repo_root,
+    checks = build_runbook_plan_checks(
+        repo_root=study_repo_root,
         targets=(
-            PromoterPreflightRunbookPlanTarget(
+            RunbookPlanCheckTarget(
                 check_id="ops.runbook_plan.infer_batch_7b_with_notify.anchor_only",
                 check_group="infer_batch_plan",
                 phase="ops",
@@ -97,7 +97,7 @@ def test_build_promoter_preflight_runbook_plan_checks_merges_payload_and_details
                 details={"notify_env": {"NOTIFY_WEBHOOK": False}},
             ),
         ),
-        dependencies=PromoterPreflightRunbookPlanDependencies(
+        dependencies=RunbookPlanCheckDependencies(
             run_preflight_command=_run_progress_command,
             safe_json_loads=lambda text: json.loads(text or "") if text else None,
             choose_command_summary=lambda *_args, fallback, **_kwargs: fallback,

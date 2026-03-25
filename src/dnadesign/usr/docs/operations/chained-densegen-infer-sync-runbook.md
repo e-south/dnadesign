@@ -8,7 +8,7 @@
 **Registry-id:** usr.data-plane.chained-densegen-infer-sync
 **Summary:** Coordinate DenseGen-on-HPC and Infer-local writes against one USR dataset with explicit sync checkpoints.
 **Execution-kind:** iterative
-**Progress-kind:** usr-sync-audit
+**Status-kind:** usr-sync-audit
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-20

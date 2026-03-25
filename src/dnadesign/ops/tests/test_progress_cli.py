@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/ops/tests/test_progress_cli.py
 
-Contract tests for the read-only ops progress surface.
+Contract tests for the read-only ops status surface.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -22,9 +22,9 @@ from typer.testing import CliRunner
 
 from dnadesign.ops.cli import app
 from dnadesign.ops.preflight import CommandExecution
-from dnadesign.studies.stress_promoter_ethanol_cipro.ops_provider import (
-    provide_stress_promoter_ethanol_cipro_preflight,
-    provide_stress_promoter_ethanol_cipro_status,
+from dnadesign.studies.promoter.ops_provider import (
+    provide_promoter_preflight,
+    provide_promoter_status,
 )
 
 
@@ -40,7 +40,7 @@ def _promoter_study_status(study_dir: Path | None, *, repo_root: Path | None) ->
     inputs: dict[str, object] = {}
     if study_dir is not None:
         inputs["study_dir"] = study_dir
-    return provide_stress_promoter_ethanol_cipro_status(repo_root=repo_root, inputs=inputs)
+    return provide_promoter_status(repo_root=repo_root, inputs=inputs)
 
 
 def _promoter_study_preflight(
@@ -54,7 +54,7 @@ def _promoter_study_preflight(
         inputs["study_dir"] = study_dir
     if scope is not None:
         inputs["scope"] = scope
-    return provide_stress_promoter_ethanol_cipro_preflight(repo_root=repo_root, inputs=inputs)
+    return provide_promoter_preflight(repo_root=repo_root, inputs=inputs)
 
 
 def _write_ops_audit(path: Path, *, ok: bool, queue_probe: str | None = None) -> None:
@@ -131,6 +131,66 @@ def _write_usr_dataset(root: Path, dataset: str) -> None:
     (dataset_dir / ".events.log").write_text("{}\n{}\n", encoding="utf-8")
 
 
+def _write_promoter_ops_contract(
+    path: Path,
+    *,
+    current_phase_id: str,
+    phase_rows: list[dict[str, object]],
+) -> None:
+    phase_ids = {str(phase["id"]) for phase in phase_rows}
+    group_phase_bindings = {
+        group: phase_id
+        for group, phase_id in {
+            "densegen": "densegen_growth",
+            "construct": "construct_context_expansion",
+            "notify_environment": "infer_batch_preparation",
+        }.items()
+        if phase_id in phase_ids
+    }
+    target_phase_groups = {
+        phase_id: groups
+        for phase_id, groups in {
+            "densegen_growth": ["densegen"],
+            "merged_anchor_set": [],
+            "construct_context_expansion": ["construct"],
+            "infer_batch_preparation": [
+                "infer",
+                "notify_environment",
+                "notify",
+                "infer_batch_plan",
+            ],
+        }.items()
+        if phase_id in phase_ids
+    }
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "study_id": "demo_study",
+                "family": "promoter",
+                "current_phase": {
+                    "strategy": "explicit",
+                    "id": current_phase_id,
+                },
+                "phase_order": [str(phase["id"]) for phase in phase_rows],
+                "phases": phase_rows,
+                "snapshot": {"summary_scope": "repo"},
+                "preflight": {
+                    "default_scope": "next",
+                    "group_phase_bindings": group_phase_bindings,
+                    "next_scope": {
+                        "target_phase_groups": target_phase_groups,
+                        "runtime_phase_groups": ["infer", "notify", "infer_batch_plan"],
+                        "runtime_shared_groups": ["notify_environment"],
+                    },
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+
 def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densegen_target: int) -> None:
     repo_root = study_dir.parents[3]
     study_dir.mkdir(parents=True, exist_ok=True)
@@ -164,7 +224,6 @@ def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densege
             {
                 "study_pipeline": {
                     "study_id": "demo_study",
-                    "current_phase": "densegen_growth",
                     "canonical_usr_root": "usr_root",
                     "row_targets": {
                         "densegen_anchor_minimum_before_first_full_lane_infer": densegen_target,
@@ -177,64 +236,29 @@ def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densege
                         "densegen_anchor_source": "densegen/demo_anchor",
                         "merged_anchor_dataset": "promoter/demo_anchor_set",
                     },
-                    "phases": [
-                        {
-                            "id": "densegen_growth",
-                            "status": "in_progress",
-                            "primary_dataset": "densegen/demo_anchor",
-                            "next_surface": "workspace/densegen_batch.yaml",
-                        },
-                        {
-                            "id": "merged_anchor_set",
-                            "status": "ready",
-                            "output_dataset": "promoter/demo_anchor_set",
-                            "next_surface": "workspace/merge.md",
-                        },
-                    ],
                 }
             },
             sort_keys=False,
         ),
         encoding="utf-8",
     )
-    (study_dir / "ops.study.yaml").write_text(
-        yaml.safe_dump(
+    _write_promoter_ops_contract(
+        study_dir / "ops.study.yaml",
+        current_phase_id="densegen_growth",
+        phase_rows=[
             {
-                "version": 1,
-                "study_id": "demo_study",
-                "family": "stress_promoter_ethanol_cipro",
-                "phase_order": [
-                    "densegen_growth",
-                    "merged_anchor_set",
-                ],
-                "snapshot": {"summary_scope": "repo"},
-                "preflight": {
-                    "default_scope": "next",
-                    "group_phase_bindings": {
-                        "densegen": "densegen_growth",
-                        "construct": "construct_context_expansion",
-                        "notify_environment": "infer_batch_preparation",
-                    },
-                    "next_scope": {
-                        "target_phase_groups": {
-                            "densegen_growth": ["densegen"],
-                            "merged_anchor_set": [],
-                            "construct_context_expansion": ["construct"],
-                            "infer_batch_preparation": [
-                                "infer",
-                                "notify_environment",
-                                "notify",
-                                "infer_batch_plan",
-                            ],
-                        },
-                        "runtime_phase_groups": ["infer", "notify", "infer_batch_plan"],
-                        "runtime_shared_groups": ["notify_environment"],
-                    },
-                },
+                "id": "densegen_growth",
+                "status": "in_progress",
+                "primary_dataset": "densegen/demo_anchor",
+                "next_surface": "repo:workspace/densegen_batch.yaml",
             },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
+            {
+                "id": "merged_anchor_set",
+                "status": "ready",
+                "output_dataset": "promoter/demo_anchor_set",
+                "next_surface": "repo:workspace/merge.md",
+            },
+        ],
     )
     _write_usr_dataset(repo_root / "usr_root", "densegen/demo_anchor")
     if densegen_rows != 2:
@@ -302,7 +326,6 @@ def _write_promoter_study_preflight_record(study_dir: Path) -> None:
             {
                 "study_pipeline": {
                     "study_id": "demo_study",
-                    "current_phase": "infer_batch_preparation",
                     "canonical_usr_root": "usr_root",
                     "execution_surfaces": {
                         "construct_workspace": "workspace/construct",
@@ -337,81 +360,41 @@ def _write_promoter_study_preflight_record(study_dir: Path) -> None:
                             "anchor_plus_template_20b": "workspace/infer/config.anchor_plus_template.evo2_20b.yaml",
                         },
                     },
-                    "phases": [
-                        {"id": "densegen_growth", "status": "parallel_optional"},
-                        {"id": "merged_anchor_set", "status": "complete"},
-                        {"id": "construct_context_expansion", "status": "complete"},
-                        {"id": "infer_batch_preparation", "status": "in_progress"},
-                        {
-                            "id": "infer_anchor_only_20b",
-                            "status": "planned",
-                            "next_surface": "workspace/runbooks/infer_anchor_only_20b.yaml",
-                        },
-                        {
-                            "id": "infer_anchor_plus_template_20b",
-                            "status": "planned",
-                            "next_surface": "workspace/runbooks/infer_anchor_plus_template_20b.yaml",
-                        },
-                        {
-                            "id": "infer_anchor_only_7b",
-                            "status": "planned",
-                            "next_surface": "workspace/runbooks/infer_anchor_only_7b.yaml",
-                        },
-                        {
-                            "id": "infer_anchor_plus_template_7b",
-                            "status": "planned",
-                            "next_surface": "workspace/runbooks/infer_anchor_plus_template_7b.yaml",
-                        },
-                    ],
                 }
             },
             sort_keys=False,
         ),
         encoding="utf-8",
     )
-    (study_dir / "ops.study.yaml").write_text(
-        yaml.safe_dump(
+    _write_promoter_ops_contract(
+        study_dir / "ops.study.yaml",
+        current_phase_id="infer_batch_preparation",
+        phase_rows=[
+            {"id": "densegen_growth", "status": "parallel_optional"},
+            {"id": "merged_anchor_set", "status": "complete"},
+            {"id": "construct_context_expansion", "status": "complete"},
+            {"id": "infer_batch_preparation", "status": "in_progress"},
             {
-                "version": 1,
-                "study_id": "demo_study",
-                "family": "stress_promoter_ethanol_cipro",
-                "phase_order": [
-                    "densegen_growth",
-                    "merged_anchor_set",
-                    "construct_context_expansion",
-                    "infer_batch_preparation",
-                    "infer_anchor_only_20b",
-                    "infer_anchor_plus_template_20b",
-                    "infer_anchor_only_7b",
-                ],
-                "snapshot": {"summary_scope": "repo"},
-                "preflight": {
-                    "default_scope": "next",
-                    "group_phase_bindings": {
-                        "densegen": "densegen_growth",
-                        "construct": "construct_context_expansion",
-                        "notify_environment": "infer_batch_preparation",
-                    },
-                    "next_scope": {
-                        "target_phase_groups": {
-                            "densegen_growth": ["densegen"],
-                            "merged_anchor_set": [],
-                            "construct_context_expansion": ["construct"],
-                            "infer_batch_preparation": [
-                                "infer",
-                                "notify_environment",
-                                "notify",
-                                "infer_batch_plan",
-                            ],
-                        },
-                        "runtime_phase_groups": ["infer", "notify", "infer_batch_plan"],
-                        "runtime_shared_groups": ["notify_environment"],
-                    },
-                },
+                "id": "infer_anchor_only_20b",
+                "status": "planned",
+                "next_surface": "repo:workspace/runbooks/infer_anchor_only_20b.yaml",
             },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
+            {
+                "id": "infer_anchor_plus_template_20b",
+                "status": "planned",
+                "next_surface": "repo:workspace/runbooks/infer_anchor_plus_template_20b.yaml",
+            },
+            {
+                "id": "infer_anchor_only_7b",
+                "status": "planned",
+                "next_surface": "repo:workspace/runbooks/infer_anchor_only_7b.yaml",
+            },
+            {
+                "id": "infer_anchor_plus_template_7b",
+                "status": "planned",
+                "next_surface": "repo:workspace/runbooks/infer_anchor_plus_template_7b.yaml",
+            },
+        ],
     )
 
     _write_usr_dataset(repo_root / "usr_root", "densegen/demo_anchor")
@@ -590,7 +573,7 @@ def test_cli_progress_show_reports_ops_audit_surface() -> None:
 
         assert result.exit_code == 0
         payload = json.loads(result.output)
-        assert payload["progress_kind"] == "ops-audit-json"
+        assert payload["status_kind"] == "ops-audit-json"
         assert payload["state"] == "ok"
         assert payload["evidence"]["command_count"] == 2
         assert payload["evidence"]["phase_counts"] == {"preflight": 1, "submit": 1}
@@ -618,7 +601,7 @@ def test_cli_progress_show_reports_usr_sync_audit_surface() -> None:
 
         assert result.exit_code == 0
         payload = json.loads(result.output)
-        assert payload["progress_kind"] == "usr-sync-audit"
+        assert payload["status_kind"] == "usr-sync-audit"
         assert payload["state"] == "attention"
         assert payload["evidence"]["transfer_state"] == "DRY-RUN"
 
@@ -647,7 +630,7 @@ def test_cli_progress_show_reports_usr_dataset_surface() -> None:
 
         assert result.exit_code == 0
         payload = json.loads(result.output)
-        assert payload["progress_kind"] == "usr-dataset-state"
+        assert payload["status_kind"] == "usr-dataset-state"
         assert payload["state"] == "ok"
         assert payload["evidence"]["rows"] == 2
 
@@ -688,7 +671,7 @@ def test_cli_progress_show_reports_promoter_study_record_surface() -> None:
 
         assert result.exit_code == 0
         payload = json.loads(result.output)
-        assert payload["progress_kind"] == "promoter-study-record"
+        assert payload["status_kind"] == "promoter-study-status"
         assert payload["state"] == "attention"
         assert payload["evidence"]["study_id"] == "demo_study"
         assert payload["evidence"]["study_selection_source"] == "explicit"
@@ -838,9 +821,9 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_preflight_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.promoter.family.run_preflight_command", _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.promoter.family.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -983,9 +966,9 @@ def test_promoter_study_preflight_skips_construct_runtime_revalidation_once_mate
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_preflight_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.promoter.family.run_preflight_command", _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.promoter.family.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [{"id": 0, "name": "GPU"}], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -1084,9 +1067,9 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_preflight_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.promoter.family.run_preflight_command", _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.promoter.family.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -1146,16 +1129,15 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
         )
         _write_promoter_study_preflight_record(study_dir)
 
-        pipeline_path = study_dir / "pipeline.yaml"
-        pipeline_payload = yaml.safe_load(pipeline_path.read_text(encoding="utf-8"))
-        study_pipeline = pipeline_payload["study_pipeline"]
-        study_pipeline["current_phase"] = "infer_anchor_only_20b"
-        for phase in study_pipeline["phases"]:
+        contract_path = study_dir / "ops.study.yaml"
+        contract_payload = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
+        contract_payload["current_phase"]["id"] = "infer_anchor_only_20b"
+        for phase in contract_payload["phases"]:
             if phase["id"] == "infer_batch_preparation":
                 phase["status"] = "complete"
             elif phase["id"] == "infer_anchor_only_20b":
                 phase["status"] = "in_progress"
-        pipeline_path.write_text(yaml.safe_dump(pipeline_payload, sort_keys=False), encoding="utf-8")
+        contract_path.write_text(yaml.safe_dump(contract_payload, sort_keys=False), encoding="utf-8")
 
         def _fake_run(argv, *, cwd, timeout_seconds=180):
             command = " ".join(argv)
@@ -1212,9 +1194,9 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_preflight_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.promoter.family.run_preflight_command", _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.promoter.family.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -1276,13 +1258,12 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
         )
         _write_promoter_study_preflight_record(study_dir)
 
-        pipeline_path = study_dir / "pipeline.yaml"
-        pipeline_payload = yaml.safe_load(pipeline_path.read_text(encoding="utf-8"))
-        study_pipeline = pipeline_payload["study_pipeline"]
-        for phase in study_pipeline["phases"]:
+        contract_path = study_dir / "ops.study.yaml"
+        contract_payload = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
+        for phase in contract_payload["phases"]:
             if phase["id"] == "infer_anchor_only_20b":
                 phase["status"] = "complete"
-        pipeline_path.write_text(yaml.safe_dump(pipeline_payload, sort_keys=False), encoding="utf-8")
+        contract_path.write_text(yaml.safe_dump(contract_payload, sort_keys=False), encoding="utf-8")
 
         def _fake_run(argv, *, cwd, timeout_seconds=180):
             command = " ".join(argv)
@@ -1339,9 +1320,9 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_preflight_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.promoter.family.run_preflight_command", _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.promoter.family.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -1434,9 +1415,9 @@ def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_preflight_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.promoter.family.run_preflight_command", _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.promoter.family.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -1495,7 +1476,7 @@ def test_cli_progress_show_reports_cluster_run_index_surface() -> None:
 
         assert result.exit_code == 0
         payload = json.loads(result.output)
-        assert payload["progress_kind"] == "cluster-run-index"
+        assert payload["status_kind"] == "cluster-run-index"
         assert payload["state"] == "ok"
         assert payload["evidence"]["entry_count"] == 2
         assert payload["evidence"]["latest_entry"]["run_slug"] == "umap_001"
@@ -1534,7 +1515,7 @@ def test_cli_progress_show_reports_opal_campaign_surface() -> None:
 
         assert result.exit_code == 0
         payload = json.loads(result.output)
-        assert payload["progress_kind"] == "opal-campaign-state"
+        assert payload["status_kind"] == "opal-campaign-state"
         assert payload["state"] == "ok"
         assert payload["evidence"]["num_rounds"] == 1
         assert payload["evidence"]["latest_round"]["run_id"] == "run_001"
@@ -1585,7 +1566,7 @@ def test_cli_progress_show_reports_missing_artifact_state_without_exiting() -> N
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert payload["progress_kind"] == "ops-audit-json"
+    assert payload["status_kind"] == "ops-audit-json"
     assert payload["state"] == "missing"
     assert payload["summary"] == "audit artifact not found"
 
@@ -1861,7 +1842,7 @@ def test_cli_progress_scaffold_emits_yaml_manifest() -> None:
 
     assert result.exit_code == 0
     payload = yaml.safe_load(result.output)
-    assert payload["campaign_id"] == "progress_campaign"
+    assert payload["campaign_id"] == "status_campaign"
     assert payload["version"] == 2
     assert payload["path_base"] == "repo"
     assert payload["steps"] == [
@@ -1908,7 +1889,7 @@ def test_cli_progress_scaffold_emits_json_metadata() -> None:
             "inputs": {"opal_config": "<opal-workdir>/configs/campaign.yaml"},
         }
     ]
-    assert payload["steps"][0]["progress_kind"] == "opal-campaign-state"
+    assert payload["steps"][0]["status_kind"] == "opal-campaign-state"
     assert payload["steps"][0]["required_inputs"] == [
         {
             "cli_flag": "--opal-config",
@@ -2067,7 +2048,7 @@ def test_cli_progress_scaffold_requires_registry_ids_or_related_to() -> None:
     )
 
     assert result.exit_code == 2
-    assert "progress scaffold requires at least one registry id or --related-to" in result.output
+    assert "campaign scaffold requires at least one registry id or --related-to" in result.output
     assert "uv run ops catalog list --simple" in result.output
     assert "uv run ops progress scaffold --related-to <registry-id>" in result.output
 
@@ -2107,7 +2088,7 @@ def test_cli_progress_show_rejects_missing_required_surface_arguments() -> None:
     )
 
     assert result.exit_code == 2
-    assert "progress kind 'ops-audit-json' requires --audit-json" in result.output
+    assert "status kind 'ops-audit-json' requires --audit-json" in result.output
     assert "Required inputs for ops.control-plane.orchestration:" in result.output
     assert "--audit-json <workspace-root>/outputs/logs/ops/audit/latest.json" in result.output
     assert "Workspace-scoped orchestration audit JSON emitted by ops runbook execute." in result.output
@@ -2130,7 +2111,7 @@ def test_cli_progress_show_surfaces_optional_opal_workdir_hint_when_inputs_are_m
     )
 
     assert result.exit_code == 2
-    assert "progress kind 'opal-campaign-state' requires --opal-config or --opal-workdir" in result.output
+    assert "status kind 'opal-campaign-state' requires --opal-config or --opal-workdir" in result.output
     assert "Required inputs for opal.downstream.usr-infer-x-active-learning:" in result.output
     assert "Also accepted:" in result.output
     assert "--opal-workdir" in result.output
@@ -2153,7 +2134,7 @@ def test_cli_progress_explain_reports_required_inputs_and_next_commands() -> Non
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert payload["progress_kind"] == "opal-campaign-state"
+    assert payload["status_kind"] == "opal-campaign-state"
     assert payload["provider_id"] == "builtin.opal"
     assert payload["required_inputs"] == [
         {
@@ -2184,7 +2165,7 @@ def test_cli_progress_explain_reports_required_inputs_and_next_commands() -> Non
     ]
 
 
-def test_cli_progress_kinds_reports_provider_owned_inventory() -> None:
+def test_cli_status_kinds_reports_provider_owned_inventory() -> None:
     runner = CliRunner()
 
     result = runner.invoke(
@@ -2198,8 +2179,8 @@ def test_cli_progress_kinds_reports_provider_owned_inventory() -> None:
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    kinds = {entry["progress_kind"]: entry for entry in payload["progress_kinds"]}
-    assert kinds["promoter-study-preflight"]["provider_id"] == "study.stress_promoter_ethanol_cipro"
+    kinds = {entry["status_kind"]: entry for entry in payload["status_kinds"]}
+    assert kinds["promoter-study-preflight"]["provider_id"] == "study.promoter"
     assert kinds["promoter-study-preflight"]["optional_inputs"] == [
         {
             "cli_flag": "--study-dir",

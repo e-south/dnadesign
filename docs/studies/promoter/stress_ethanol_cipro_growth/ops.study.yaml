@@ -1,6 +1,10 @@
 version: 1
 study_id: stress_ethanol_cipro_growth
-family: stress_promoter_ethanol_cipro
+family: promoter
+
+current_phase:
+  strategy: explicit
+  id: infer_batch_preparation
 
 phase_order:
   - densegen_growth
@@ -11,6 +15,35 @@ phase_order:
   - infer_anchor_plus_template_20b
   - infer_anchor_only_7b
   - infer_anchor_plus_template_7b
+
+phases:
+  - id: densegen_growth
+    status: parallel_optional
+    primary_dataset: densegen/study_stress_ethanol_cipro
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml
+  - id: merged_anchor_set
+    status: complete
+    output_dataset: promoter/stress_ethanol_cipro_anchor_set
+    next_surface: repo:src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md
+  - id: construct_context_expansion
+    status: complete
+    output_dataset: promoter/stress_ethanol_cipro_construct_contexts
+    next_surface: repo:src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md
+  - id: infer_batch_preparation
+    status: in_progress
+    next_surface: repo:src/dnadesign/usr/docs/operations/promoter-study-preflight.md
+  - id: infer_anchor_only_20b
+    status: planned
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml
+  - id: infer_anchor_plus_template_20b
+    status: planned
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml
+  - id: infer_anchor_only_7b
+    status: planned
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml
+  - id: infer_anchor_plus_template_7b
+    status: planned
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml
 
 snapshot:
   summary_scope: repo

@@ -8,7 +8,7 @@
 **Registry-id:** cluster.downstream.exploratory-clustering
 **Summary:** Explore one chosen feature column or exported matrix through clustering, UMAP, and downstream summaries.
 **Execution-kind:** exploratory
-**Progress-kind:** cluster-run-index
+**Status-kind:** cluster-run-index
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-19

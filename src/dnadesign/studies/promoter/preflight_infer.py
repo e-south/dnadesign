@@ -1,10 +1,10 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/stress_promoter_ethanol_cipro/preflight_infer.py
+src/dnadesign/studies/promoter/preflight_infer.py
 
 Study-owned infer and notify preflight builders for the
-stress_promoter_ethanol_cipro family.
+promoter family.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,7 +16,14 @@ from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from dnadesign.ops.preflight import CommandExecution, PreflightCheck, build_command_check, build_state_check
+from dnadesign.ops.preflight import (
+    CommandCheckDependencies,
+    CommandCheckTarget,
+    CommandExecution,
+    PreflightCheck,
+    build_command_checks,
+    build_state_check,
+)
 
 from .infer_runtime import PromoterStudyInferRuntimeResolvedContext
 
@@ -313,25 +320,27 @@ def _build_notify_runtime_checks(
             )
         )
     else:
-        notify_profile_doctor = run_preflight_command(
-            ("uv", "run", "notify", "profile", "doctor", "--profile", str(profile_path), "--json"),
-            cwd=study_repo_root,
-        )
-        checks.append(
-            build_command_check(
-                check_id=f"notify.profile.{runtime_label}",
-                check_group="notify",
-                phase="notify",
-                phase_id=runtime_phase_id,
-                summary=choose_command_summary(
-                    notify_profile_doctor,
-                    fallback="infer notify profile doctor completed",
+        checks.extend(
+            build_command_checks(
+                targets=(
+                    CommandCheckTarget(
+                        check_id=f"notify.profile.{runtime_label}",
+                        check_group="notify",
+                        phase="notify",
+                        phase_id=runtime_phase_id,
+                        argv=("uv", "run", "notify", "profile", "doctor", "--profile", str(profile_path), "--json"),
+                        cwd=study_repo_root,
+                        fallback_summary="infer notify profile doctor completed",
+                        details={
+                            "config": str(config_path),
+                            "profile": str(profile_path),
+                        },
+                    ),
                 ),
-                execution=notify_profile_doctor,
-                details={
-                    "config": str(config_path),
-                    "profile": str(profile_path),
-                },
+                dependencies=CommandCheckDependencies(
+                    run_preflight_command=run_preflight_command,
+                    choose_command_summary=choose_command_summary,
+                ),
             )
         )
 

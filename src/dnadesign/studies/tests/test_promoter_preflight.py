@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/tests/test_stress_promoter_ethanol_cipro_preflight.py
+src/dnadesign/studies/tests/test_promoter_preflight.py
 
 Focused tests for the study-owned preflight context coordination layer.
 
@@ -14,10 +14,15 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from dnadesign.studies.core.models import StudyOpsContract, StudyPreflightContract, StudyPreflightNextScopeContract
-from dnadesign.studies.stress_promoter_ethanol_cipro.context import PromoterStudyResolvedContext
-from dnadesign.studies.stress_promoter_ethanol_cipro.infer_runtime import PromoterStudyInferRuntimeDependencies
-from dnadesign.studies.stress_promoter_ethanol_cipro.preflight import (
+from dnadesign.studies.core.models import (
+    StudyOpsContract,
+    StudyPhaseContract,
+    StudyPreflightContract,
+    StudyPreflightNextScopeContract,
+)
+from dnadesign.studies.promoter.context import PromoterStudyResolvedContext
+from dnadesign.studies.promoter.infer_runtime import PromoterStudyInferRuntimeDependencies
+from dnadesign.studies.promoter.preflight import (
     PromoterPreflightContextDependencies,
     resolve_promoter_preflight_context,
 )
@@ -110,8 +115,8 @@ def test_resolve_promoter_preflight_context_projects_infer_batch_targets_in_phas
         evidence={},
     )
 
-    def _resolve_named_path_mapping(value, *, repo_root, label, progress_kind):
-        del repo_root, label, progress_kind
+    def _resolve_named_path_mapping(value, *, repo_root, label, status_kind):
+        del repo_root, label, status_kind
         return {name: Path(path) for name, path in dict(value or {}).items()}
 
     def _resolve_infer_runtime_lane_contracts(config_paths, *, preferred_model_family):
@@ -140,10 +145,10 @@ def test_resolve_promoter_preflight_context_projects_infer_batch_targets_in_phas
     resolved = resolve_promoter_preflight_context(
         study_context=study_context,
         scope="full",
-        progress_kind="promoter-study-preflight",
+        status_kind="promoter-study-preflight",
         contract=StudyOpsContract(
             study_id="demo_study",
-            family="stress_promoter_ethanol_cipro",
+            family="promoter",
             phase_order=(
                 "densegen_growth",
                 "construct_context_expansion",
@@ -173,6 +178,27 @@ def test_resolve_promoter_preflight_context_projects_infer_batch_targets_in_phas
                     },
                     runtime_phase_groups=("infer", "notify", "infer_batch_plan"),
                     runtime_shared_groups=("notify_environment",),
+                ),
+            ),
+            current_phase_id="infer_batch_preparation",
+            phases=(
+                StudyPhaseContract(id="densegen_growth", status="parallel_optional"),
+                StudyPhaseContract(id="construct_context_expansion", status="complete"),
+                StudyPhaseContract(id="infer_batch_preparation", status="in_progress"),
+                StudyPhaseContract(
+                    id="infer_anchor_only_20b",
+                    status="planned",
+                    next_surface="runbooks/anchor_only_20b.yaml",
+                ),
+                StudyPhaseContract(
+                    id="infer_anchor_plus_template_20b",
+                    status="planned",
+                    next_surface="runbooks/anchor_plus_template_20b.yaml",
+                ),
+                StudyPhaseContract(
+                    id="infer_anchor_only_7b",
+                    status="planned",
+                    next_surface="runbooks/anchor_only_7b.yaml",
                 ),
             ),
             raw_payload={},

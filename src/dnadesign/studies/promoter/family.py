@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/stress_promoter_ethanol_cipro/family.py
+src/dnadesign/studies/promoter/family.py
 
-Explicit stress_promoter_ethanol_cipro study adapter for OPS status and
-preflight surfaces.
+Promoter study-family adapter for OPS status and preflight surfaces.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -26,10 +25,7 @@ from dnadesign.ops.preflight import (
     run_preflight_command,
     safe_json_loads,
 )
-from dnadesign.ops.status.artifacts import (
-    load_yaml_mapping,
-    parquet_row_count,
-)
+from dnadesign.ops.status.artifacts import load_yaml_mapping, parquet_row_count
 from dnadesign.ops.status.parsing import (
     optional_positive_int,
     required_metadata_text,
@@ -43,7 +39,7 @@ from dnadesign.ops.status.paths import (
     resolve_repo_relative_path,
 )
 from dnadesign.studies.core.models import StudyFamilyAdapter, StudyStatusContext
-from dnadesign.studies.core.record_loader import load_study_ops_contract
+from dnadesign.studies.core.registry import discover_active_study_selection
 
 from .context import PromoterStudyContextDependencies, PromoterStudyResolvedContext
 from .context import resolve_promoter_study_context as resolve_checked_in_promoter_study_context
@@ -57,26 +53,26 @@ from .preflight import (
 from .preflight_orchestration import resolve_notify_environment_state
 from .snapshot import (
     PromoterStudyStatusDependencies,
-    build_promoter_study_record_progress,
+    build_promoter_study_status,
     resolve_promoter_study_status_context,
 )
 
 
 @dataclass(frozen=True)
-class StressPromoterEthanolCiproFamilyContext:
+class PromoterFamilyContext:
     study_context: PromoterStudyResolvedContext
 
 
-class StressPromoterEthanolCiproStudyAdapter(StudyFamilyAdapter):
-    family_id = "stress_promoter_ethanol_cipro"
+class PromoterStudyFamilyAdapter(StudyFamilyAdapter):
+    family_id = "promoter"
 
     def load_context(self, *, repo_root: Path | None, study_root: Path | None) -> StudyStatusContext:
         study_context = resolve_checked_in_promoter_study_context(
             study_root,
             repo_root=repo_root,
-            progress_kind="promoter-study-record",
+            status_kind="promoter-study-status",
             dependencies=PromoterStudyContextDependencies(
-                discover_active_promoter_study_dir=discover_active_study_dir,
+                discover_active_study_dir=discover_active_study_dir,
                 required_path=required_path,
                 discover_repo_root=discover_repo_root,
                 load_yaml_mapping=load_yaml_mapping,
@@ -88,7 +84,11 @@ class StressPromoterEthanolCiproStudyAdapter(StudyFamilyAdapter):
                 parquet_row_count=parquet_row_count,
             ),
         )
-        contract = load_study_ops_contract(study_context.resolved_study_dir)
+        contract = study_context.ops_contract
+        if contract is None:
+            raise ValueError(
+                f"study record missing ops.study.yaml: {study_context.resolved_study_dir / 'ops.study.yaml'}"
+            )
         if contract.family != self.family_id:
             raise ValueError(
                 f"ops.study.yaml family mismatch for {study_context.resolved_study_dir}: "
@@ -105,7 +105,7 @@ class StressPromoterEthanolCiproStudyAdapter(StudyFamilyAdapter):
             repo_root=study_context.study_repo_root,
             study_root=study_context.resolved_study_dir,
             contract=contract,
-            family_context=StressPromoterEthanolCiproFamilyContext(study_context=study_context),
+            family_context=PromoterFamilyContext(study_context=study_context),
         )
 
     def build_snapshot(self, context: StudyStatusContext) -> tuple[str, str, dict[str, object]]:
@@ -118,18 +118,18 @@ class StressPromoterEthanolCiproStudyAdapter(StudyFamilyAdapter):
 
         status_dependencies = PromoterStudyStatusDependencies(
             infer_runtime=build_promoter_study_infer_runtime_dependencies(),
-            inspect_local_gpu_inventory=inspect_local_infer_gpu_inventory,
             phase_matches_infer_model_family=phase_matches_infer_model_family,
         )
         status_context = resolve_promoter_study_status_context(
             study_context=study_context,
-            progress_kind="promoter-study-record",
+            status_kind="promoter-study-status",
             dependencies=status_dependencies,
         )
-        return build_promoter_study_record_progress(
+        return build_promoter_study_status(
             study_context=study_context,
             status_context=status_context,
             dependencies=status_dependencies,
+            summary_scope=context.contract.snapshot_summary_scope,
         )
 
     def build_preflight(
@@ -148,7 +148,7 @@ class StressPromoterEthanolCiproStudyAdapter(StudyFamilyAdapter):
         resolved_context = resolve_promoter_preflight_context(
             study_context=study_context,
             scope=scope,
-            progress_kind="promoter-study-preflight",
+            status_kind="promoter-study-preflight",
             contract=context.contract,
             dependencies=PromoterPreflightContextDependencies(
                 infer_runtime=build_promoter_study_infer_runtime_dependencies(),
@@ -185,57 +185,20 @@ class StressPromoterEthanolCiproStudyAdapter(StudyFamilyAdapter):
         )
 
 
-STRESS_PROMOTER_ETHANOL_CIPRO_STUDY_ADAPTER = StressPromoterEthanolCiproStudyAdapter()
+PROMOTER_STUDY_ADAPTER = PromoterStudyFamilyAdapter()
 
 
 def discover_active_study_dir(
     *,
     repo_root: Path | None,
-    progress_kind: str = "promoter-study-record",
+    status_kind: str = "promoter-study-status",
 ) -> tuple[Path, Path, str]:
-    resolved_repo_root = repo_root
-    if resolved_repo_root is None:
-        resolved_repo_root = discover_repo_root(Path.cwd())
-    if resolved_repo_root is None:
-        raise ValueError(
-            f"progress kind '{progress_kind}' requires --study-dir or a dnadesign repository checkout "
-            "with docs/studies/promoter/index.yaml"
-        )
-
-    study_index_path = resolved_repo_root / "docs" / "studies" / "promoter" / "index.yaml"
-    if not study_index_path.exists():
-        raise ValueError(f"stress_promoter_ethanol_cipro study registry not found: {study_index_path}")
-
-    study_index = load_yaml_mapping(study_index_path, label="stress_promoter_ethanol_cipro index")
-    active_study = string_or_none(study_index.get("active_study"))
-    if active_study is None:
-        raise ValueError(f"stress_promoter_ethanol_cipro registry does not declare active_study: {study_index_path}")
-
-    studies_payload = study_index.get("studies") or []
-    if not isinstance(studies_payload, list):
-        raise ValueError(f"stress_promoter_ethanol_cipro registry must define a 'studies' list: {study_index_path}")
-
-    matching_entries = [
-        entry
-        for entry in studies_payload
-        if isinstance(entry, dict) and string_or_none(entry.get("study_id")) == active_study
-    ]
-    if not matching_entries:
-        raise ValueError(f"active_study '{active_study}' is not declared under 'studies' in {study_index_path}")
-    if len(matching_entries) > 1:
-        raise ValueError(f"active_study '{active_study}' is declared more than once in {study_index_path}")
-
-    raw_path = required_metadata_text(
-        matching_entries[0].get("path"),
-        label="study path",
-        source=study_index_path,
+    selection = discover_active_study_selection(
+        repo_root=repo_root,
+        family_id="promoter",
+        status_kind=status_kind,
     )
-    resolved_study_dir = resolve_repo_relative_path(
-        repo_root=resolved_repo_root,
-        raw_path=raw_path,
-        progress_kind=progress_kind,
-    )
-    return resolved_study_dir, study_index_path, active_study
+    return selection.study_root, selection.index_path, selection.active_study
 
 
 def build_promoter_study_infer_runtime_dependencies() -> PromoterStudyInferRuntimeDependencies:
@@ -328,13 +291,10 @@ def _missing_promoter_study_result(
     return None
 
 
-def _study_family_context(context: StudyStatusContext) -> StressPromoterEthanolCiproFamilyContext:
-    if not isinstance(context.family_context, StressPromoterEthanolCiproFamilyContext):
-        raise ValueError("stress_promoter_ethanol_cipro status context has invalid family_context payload")
+def _study_family_context(context: StudyStatusContext) -> PromoterFamilyContext:
+    if not isinstance(context.family_context, PromoterFamilyContext):
+        raise ValueError("promoter status context has invalid family_context payload")
     return context.family_context
 
 
-__all__ = [
-    "STRESS_PROMOTER_ETHANOL_CIPRO_STUDY_ADAPTER",
-    "StressPromoterEthanolCiproStudyAdapter",
-]
+__all__ = ["PROMOTER_STUDY_ADAPTER", "PromoterStudyFamilyAdapter"]

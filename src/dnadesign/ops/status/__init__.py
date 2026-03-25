@@ -12,11 +12,11 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from .models import (
-    CampaignProgress,
     CampaignScaffold,
     CampaignScaffoldStep,
+    CampaignStatus,
     InputFieldSpec,
-    ProcedureProgress,
+    ProcedureStatus,
     StatusKindSpec,
 )
 
@@ -27,10 +27,10 @@ def build_campaign_scaffold(*args, **kwargs):
     return _build_campaign_scaffold(*args, **kwargs)
 
 
-def build_procedure_progress(*args, **kwargs):
-    from .campaign import build_procedure_progress as _build_procedure_progress
+def build_procedure_status(*args, **kwargs):
+    from .campaign import build_procedure_status as _build_procedure_status
 
-    return _build_procedure_progress(*args, **kwargs)
+    return _build_procedure_status(*args, **kwargs)
 
 
 def build_status_inputs(*args, **kwargs):
@@ -45,10 +45,10 @@ def list_status_kind_specs(*args, **kwargs):
     return _list_status_kind_specs(*args, **kwargs)
 
 
-def load_campaign_progress(*args, **kwargs):
-    from .campaign import load_campaign_progress as _load_campaign_progress
+def load_campaign_status(*args, **kwargs):
+    from .campaign import load_campaign_status as _load_campaign_status
 
-    return _load_campaign_progress(*args, **kwargs)
+    return _load_campaign_status(*args, **kwargs)
 
 
 def load_status_kind_spec(*args, **kwargs):
@@ -64,17 +64,17 @@ def run_status_kind(*args, **kwargs):
 
 
 __all__ = [
-    "CampaignProgress",
     "CampaignScaffold",
     "CampaignScaffoldStep",
+    "CampaignStatus",
     "InputFieldSpec",
-    "ProcedureProgress",
+    "ProcedureStatus",
     "StatusKindSpec",
     "build_campaign_scaffold",
-    "build_procedure_progress",
+    "build_procedure_status",
     "build_status_inputs",
     "list_status_kind_specs",
-    "load_campaign_progress",
+    "load_campaign_status",
     "load_status_kind_spec",
     "run_status_kind",
 ]

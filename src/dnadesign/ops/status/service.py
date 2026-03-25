@@ -35,7 +35,7 @@ def build_status_inputs(
     allowed_names = {field.name for field in spec.input_schema}
     unexpected = sorted(set(provided_inputs) - allowed_names)
     if unexpected:
-        raise ValueError(f"progress kind '{spec.progress_kind}' does not accept inputs: {', '.join(unexpected)}")
+        raise ValueError(f"status kind '{spec.status_kind}' does not accept inputs: {', '.join(unexpected)}")
 
     resolved_inputs: dict[str, object] = {}
     for field in spec.input_schema:
@@ -44,7 +44,7 @@ def build_status_inputs(
                 resolved_inputs[field.name] = field.default
                 continue
             if field.required:
-                raise ValueError(f"progress kind '{spec.progress_kind}' requires {field.cli_flag}")
+                raise ValueError(f"status kind '{spec.status_kind}' requires {field.cli_flag}")
             continue
         resolved_inputs[field.name] = _coerce_input_value(
             field,
@@ -57,14 +57,14 @@ def build_status_inputs(
 
 
 def run_status_kind(
-    progress_kind: str,
+    status_kind: str,
     *,
     repo_root: Path | None,
     raw_inputs: Mapping[str, object] | None,
     manifest_dir: Path | None = None,
     default_path_base: PathBase | None = None,
 ) -> tuple[str, str, dict[str, object]]:
-    spec = load_status_kind_spec(progress_kind)
+    spec = load_status_kind_spec(status_kind)
     resolved_inputs = build_status_inputs(
         spec=spec,
         raw_inputs=raw_inputs,
@@ -75,7 +75,7 @@ def run_status_kind(
     provider = _load_status_provider(spec.provider_ref)
     state, summary, evidence = provider(repo_root=repo_root, inputs=resolved_inputs)
     if state not in _STATUS_STATES:
-        raise ValueError(f"invalid progress state from {spec.provider_ref}: {state}")
+        raise ValueError(f"invalid status state from {spec.provider_ref}: {state}")
     return state, summary, evidence
 
 

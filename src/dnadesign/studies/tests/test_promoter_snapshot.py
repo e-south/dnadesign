@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/tests/test_stress_promoter_ethanol_cipro_snapshot.py
+src/dnadesign/studies/tests/test_promoter_snapshot.py
 
 Focused tests for the study-owned snapshot coordination layer.
 
@@ -14,15 +14,17 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from dnadesign.studies.stress_promoter_ethanol_cipro.context import PromoterStudyResolvedContext
-from dnadesign.studies.stress_promoter_ethanol_cipro.infer_runtime import (
+from dnadesign.studies.core.models import StudyOpsContract, StudyPreflightContract, StudyStatusContext
+from dnadesign.studies.promoter.context import PromoterStudyResolvedContext
+from dnadesign.studies.promoter.family import PROMOTER_STUDY_ADAPTER, PromoterFamilyContext
+from dnadesign.studies.promoter.infer_runtime import (
     PromoterStudyInferRuntimeDependencies,
     PromoterStudyInferRuntimeResolvedContext,
 )
-from dnadesign.studies.stress_promoter_ethanol_cipro.snapshot import (
+from dnadesign.studies.promoter.snapshot import (
     PromoterStudyStatusDependencies,
     PromoterStudyStatusResolvedContext,
-    build_promoter_study_record_progress,
+    build_promoter_study_status,
     resolve_promoter_study_status_context,
 )
 
@@ -123,8 +125,8 @@ def _make_study_context(tmp_path: Path) -> PromoterStudyResolvedContext:
 def test_resolve_promoter_study_status_context_limits_notify_profiles_to_runtime_lanes(tmp_path: Path) -> None:
     study_context = _make_study_context(tmp_path)
 
-    def _resolve_named_path_mapping(value, *, repo_root, label, progress_kind):
-        del repo_root, label, progress_kind
+    def _resolve_named_path_mapping(value, *, repo_root, label, status_kind):
+        del repo_root, label, status_kind
         return {name: Path(path) for name, path in dict(value or {}).items()}
 
     def _resolve_infer_runtime_lane_contracts(config_paths, *, preferred_model_family):
@@ -146,7 +148,7 @@ def test_resolve_promoter_study_status_context_limits_notify_profiles_to_runtime
 
     resolved = resolve_promoter_study_status_context(
         study_context=study_context,
-        progress_kind="promoter-study-record",
+        status_kind="promoter-study-status",
         dependencies=PromoterStudyStatusDependencies(
             infer_runtime=PromoterStudyInferRuntimeDependencies(
                 resolve_named_path_mapping=_resolve_named_path_mapping,
@@ -162,7 +164,6 @@ def test_resolve_promoter_study_status_context_limits_notify_profiles_to_runtime
                 string_or_none=_string_or_none,
                 string_list_or_empty=_string_list_or_empty,
             ),
-            inspect_local_gpu_inventory=lambda: {"count": 1, "devices": [{"name": "GPU"}], "probe_error": None},
             phase_matches_infer_model_family=lambda *, phase_id, model_family: bool(
                 model_family and model_family in phase_id
             ),
@@ -177,7 +178,7 @@ def test_resolve_promoter_study_status_context_limits_notify_profiles_to_runtime
     ]
 
 
-def test_build_promoter_study_record_progress_preserves_summary_and_attention_contract(tmp_path: Path) -> None:
+def test_build_promoter_study_status_preserves_summary_and_attention_contract(tmp_path: Path) -> None:
     study_context = _make_study_context(tmp_path)
     status_context = PromoterStudyStatusResolvedContext(
         infer_runtime=PromoterStudyInferRuntimeResolvedContext(
@@ -206,10 +207,9 @@ def test_build_promoter_study_record_progress_preserves_summary_and_attention_co
             ),
             gpu_required_runtime_labels=("anchor_only_20b",),
         ),
-        local_gpu_inventory={"count": 0, "devices": [], "probe_error": None},
     )
 
-    state, summary, evidence = build_promoter_study_record_progress(
+    state, summary, evidence = build_promoter_study_status(
         study_context=study_context,
         status_context=status_context,
         dependencies=PromoterStudyStatusDependencies(
@@ -221,11 +221,11 @@ def test_build_promoter_study_record_progress_preserves_summary_and_attention_co
                 string_or_none=_string_or_none,
                 string_list_or_empty=_string_list_or_empty,
             ),
-            inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},
             phase_matches_infer_model_family=lambda *, phase_id, model_family: bool(
                 model_family and model_family in phase_id
             ),
         ),
+        summary_scope="repo",
     )
 
     assert state == "attention"
@@ -238,14 +238,70 @@ def test_build_promoter_study_record_progress_preserves_summary_and_attention_co
         "DenseGen anchor target not met",
         "study is not complete",
     ]
-    assert evidence["local_advisories"] == [
-        {
-            "state": "attention",
-            "scope": "host",
-            "summary": "No visible local GPU; relevant only for local execution readiness.",
-            "details": {
-                "runtime_labels": ["anchor_only_20b"],
-                "local_gpu_inventory": {"count": 0, "devices": [], "probe_error": None},
+    assert "local_advisories" not in evidence
+
+
+def test_promoter_snapshot_adapter_never_touches_local_gpu_probe(tmp_path: Path, monkeypatch) -> None:
+    study_context = _make_study_context(tmp_path)
+    contract = StudyOpsContract(
+        study_id="demo_study",
+        family="promoter",
+        phase_order=("infer_batch_preparation", "infer_anchor_only_20b", "infer_anchor_only_7b"),
+        snapshot_summary_scope="repo",
+        preflight=StudyPreflightContract(default_scope="next"),
+        current_phase_id="infer_batch_preparation",
+        phases=(),
+        raw_payload={"study_id": "demo_study", "family": "promoter"},
+    )
+    adapter_context = StudyStatusContext(
+        repo_root=tmp_path,
+        study_root=study_context.resolved_study_dir,
+        contract=contract,
+        family_context=PromoterFamilyContext(study_context=study_context),
+    )
+
+    def _forbidden_probe() -> dict[str, object]:
+        raise AssertionError("cheap snapshot must not probe local GPU inventory")
+
+    monkeypatch.setattr(
+        "dnadesign.studies.promoter.family.inspect_local_infer_gpu_inventory",
+        _forbidden_probe,
+    )
+    monkeypatch.setattr(
+        "dnadesign.studies.promoter.family.build_promoter_study_infer_runtime_dependencies",
+        lambda: PromoterStudyInferRuntimeDependencies(
+            resolve_named_path_mapping=lambda value, *, repo_root, label, status_kind: {
+                name: Path(path) for name, path in dict(value or {}).items()
             },
-        }
-    ]
+            resolve_infer_runtime_lane_contracts=lambda config_paths, *, preferred_model_family: (
+                SimpleNamespace(
+                    phase_id="infer_anchor_only_20b",
+                    config_label="anchor_only_20b",
+                    config_path=config_paths["anchor_only_20b"],
+                    runtime_label="anchor_only_20b",
+                ),
+                SimpleNamespace(
+                    phase_id="infer_anchor_only_7b",
+                    config_label="anchor_only_7b",
+                    config_path=config_paths["anchor_only_7b"],
+                    runtime_label="anchor_only_7b",
+                ),
+            ),
+            derive_infer_notify_profile_paths=lambda config_paths: (
+                {label: path.parent / "notify" / f"{label}.json" for label, path in config_paths.items()},
+                {},
+            ),
+            load_infer_model_summary=lambda config_path: {
+                "model_id": f"model-{Path(config_path).stem}",
+                "device": "cuda:0",
+            },
+            string_or_none=_string_or_none,
+            string_list_or_empty=_string_list_or_empty,
+        ),
+    )
+
+    state, summary, evidence = PROMOTER_STUDY_ADAPTER.build_snapshot(adapter_context)
+
+    assert state == "attention"
+    assert "preferred infer evo2_20b" in summary
+    assert "infer_local_gpu_inventory" not in evidence

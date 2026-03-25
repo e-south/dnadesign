@@ -3,8 +3,8 @@
 dnadesign
 src/dnadesign/ops/contracts.py
 
-Public ops contracts for producer destination resolution, resume-readiness
-policy, and promoter-study phase target typing.
+Public ops contracts for producer destination resolution and resume-readiness
+policy.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -25,14 +25,6 @@ class ResumeReadinessPolicy:
     tool: str
     required_record_columns: tuple[str, ...]
     orphan_artifact_markers: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class InferRuntimePhaseTarget:
-    phase_id: str
-    config_label: str
-    runtime_label: str
-    runbook_surface_label: str
 
 
 @dataclass(frozen=True)
@@ -163,7 +155,6 @@ def resolve_usr_producer_contract(*, tool: str, config_path: Path) -> USRProduce
 
 
 __all__ = [
-    "InferRuntimePhaseTarget",
     "ResumeReadinessPolicy",
     "USRProducerContract",
     "resolve_resume_readiness_policy",

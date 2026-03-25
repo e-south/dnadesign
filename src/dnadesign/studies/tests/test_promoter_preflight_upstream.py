@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/tests/test_stress_promoter_ethanol_cipro_preflight_upstream.py
+src/dnadesign/studies/tests/test_promoter_preflight_upstream.py
 
 Focused tests for the study-owned DenseGen and Construct preflight builders.
 
@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 
 from dnadesign.ops.preflight import CommandExecution
-from dnadesign.studies.stress_promoter_ethanol_cipro.preflight_upstream import (
+from dnadesign.studies.promoter.preflight_upstream import (
     PromoterPreflightUpstreamDependencies,
     build_promoter_preflight_upstream_checks,
 )

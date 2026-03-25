@@ -48,7 +48,7 @@ def provide_usr_dataset_state_status(
 
 
 def _usr_sync_audit_status(sync_audit_json: object) -> tuple[str, str, dict[str, object]]:
-    resolved_audit = required_path(sync_audit_json, flag_name="--sync-audit-json", progress_kind="usr-sync-audit")
+    resolved_audit = required_path(sync_audit_json, flag_name="--sync-audit-json", status_kind="usr-sync-audit")
     if not resolved_audit.exists():
         return (
             "missing",
@@ -89,8 +89,8 @@ def _usr_dataset_state_status(
     usr_root: object,
     dataset: object,
 ) -> tuple[str, str, dict[str, object]]:
-    resolved_root = required_path(usr_root, flag_name="--usr-root", progress_kind="usr-dataset-state")
-    dataset_id = required_text(dataset, flag_name="--dataset", progress_kind="usr-dataset-state")
+    resolved_root = required_path(usr_root, flag_name="--usr-root", status_kind="usr-dataset-state")
+    dataset_id = required_text(dataset, flag_name="--dataset", status_kind="usr-dataset-state")
     dataset_dir = (resolved_root / dataset_id).resolve()
     records_path = dataset_dir / "records.parquet"
     if not records_path.exists():

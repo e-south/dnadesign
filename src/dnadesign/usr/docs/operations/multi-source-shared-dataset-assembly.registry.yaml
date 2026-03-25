@@ -8,7 +8,7 @@ entry_artifact: multiple USR-backed input datasets plus explicit merge, carry, a
 exit_artifact: one construct-backed downstream USR dataset ready for infer and notify handoff
 summary: Merge multiple USR-backed sources, preserve explicit carry, and hand one construct-backed shared dataset to Infer and Notify.
 execution_kind: staged
-progress_kind: usr-dataset-state
+status_kind: usr-dataset-state
 related_tools:
   - densegen
   - construct

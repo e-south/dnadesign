@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/tests/test_stress_promoter_ethanol_cipro_preflight_infer.py
+src/dnadesign/studies/tests/test_promoter_preflight_infer.py
 
 Focused tests for the study-owned infer and notify preflight builders.
 
@@ -17,11 +17,11 @@ from types import SimpleNamespace
 import pytest
 
 from dnadesign.ops.preflight import CommandExecution
-from dnadesign.studies.stress_promoter_ethanol_cipro.infer_runtime import (
+from dnadesign.studies.promoter.infer_runtime import (
     PromoterStudyInferRuntimeModelSummary,
     PromoterStudyInferRuntimeResolvedContext,
 )
-from dnadesign.studies.stress_promoter_ethanol_cipro.preflight_infer import (
+from dnadesign.studies.promoter.preflight_infer import (
     PromoterPreflightInferDependencies,
     build_promoter_preflight_infer_checks,
 )

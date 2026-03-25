@@ -1,10 +1,10 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/stress_promoter_ethanol_cipro/infer_runtime.py
+src/dnadesign/studies/promoter/infer_runtime.py
 
 Study-owned infer-runtime projection for checked-in
-stress_promoter_ethanol_cipro status surfaces.
+promoter status surfaces.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,7 +16,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from dnadesign.ops.contracts import InferRuntimePhaseTarget
+from dnadesign.ops.status.path_ref import resolve_path_ref
 
 from .context import PromoterStudyResolvedContext
 
@@ -29,6 +29,14 @@ class PromoterStudyInferRuntimeDependencies:
     load_infer_model_summary: Callable[[Path], dict[str, object]]
     string_or_none: Callable[[object], str | None]
     string_list_or_empty: Callable[[object], list[str]]
+
+
+@dataclass(frozen=True)
+class PromoterInferPhaseTarget:
+    phase_id: str
+    config_label: str
+    runtime_label: str
+    runbook_surface_label: str
 
 
 @dataclass(frozen=True)
@@ -56,8 +64,8 @@ class PromoterStudyInferRuntimeResolvedContext:
     infer_config_paths: dict[str, Path]
     runtime_lane_contracts: tuple[object, ...]
     runtime_config_paths: dict[str, Path]
-    phase_targets: tuple[InferRuntimePhaseTarget, ...]
-    phase_targets_by_id: dict[str, InferRuntimePhaseTarget]
+    phase_targets: tuple[PromoterInferPhaseTarget, ...]
+    phase_targets_by_id: dict[str, PromoterInferPhaseTarget]
     config_phase_ids: dict[str, str]
     runtime_phase_ids: dict[str, str]
     infer_notify_profile_paths: dict[str, Path]
@@ -69,7 +77,7 @@ class PromoterStudyInferRuntimeResolvedContext:
 def resolve_promoter_study_infer_runtime_context(
     *,
     study_context: PromoterStudyResolvedContext,
-    progress_kind: str,
+    status_kind: str,
     dependencies: PromoterStudyInferRuntimeDependencies,
 ) -> PromoterStudyInferRuntimeResolvedContext:
     study_repo_root = study_context.study_repo_root
@@ -83,7 +91,7 @@ def resolve_promoter_study_infer_runtime_context(
         infer_payload.get("configs"),
         repo_root=study_repo_root,
         label="infer configs",
-        progress_kind=progress_kind,
+        status_kind=status_kind,
     )
     runtime_lane_contracts = tuple(
         dependencies.resolve_infer_runtime_lane_contracts(
@@ -158,7 +166,7 @@ def _resolve_study_infer_runtime_phase_targets(
     runtime_lane_contracts: Sequence[object],
     *,
     study_context: PromoterStudyResolvedContext,
-) -> tuple[InferRuntimePhaseTarget, ...]:
+) -> tuple[PromoterInferPhaseTarget, ...]:
     study_repo_root = study_context.study_repo_root
     if study_repo_root is None:
         raise ValueError("study-owned infer phase targets require a resolved study_repo_root")
@@ -169,7 +177,7 @@ def _resolve_study_infer_runtime_phase_targets(
     execution_surface_labels_by_path = {
         path.expanduser().resolve(): label for label, path in study_context.execution_surface_index.items()
     }
-    targets: list[InferRuntimePhaseTarget] = []
+    targets: list[PromoterInferPhaseTarget] = []
     for runtime_lane in runtime_lane_contracts:
         phase_id = _required_runtime_lane_text(getattr(runtime_lane, "phase_id", None), label="infer phase_id")
         runtime_label = _required_runtime_lane_text(
@@ -195,7 +203,7 @@ def _resolve_study_infer_runtime_phase_targets(
                 f"{phase_id} -> {resolved_next_surface}"
             )
         targets.append(
-            InferRuntimePhaseTarget(
+            PromoterInferPhaseTarget(
                 phase_id=phase_id,
                 config_label=config_label,
                 runtime_label=runtime_label,
@@ -213,14 +221,17 @@ def _required_runtime_lane_text(value: object, *, label: str) -> str:
 
 
 def _resolve_study_surface_path(raw_path: str, *, repo_root: Path) -> Path:
-    candidate = Path(raw_path).expanduser()
-    if candidate.is_absolute():
-        return candidate.resolve()
-    return (repo_root / candidate).resolve()
+    return resolve_path_ref(
+        raw_path,
+        repo_root=repo_root,
+        default_base="repo",
+        label="ops.study.yaml next_surface",
+    )
 
 
 __all__ = [
     "PromoterStudyInferRuntimeDependencies",
+    "PromoterInferPhaseTarget",
     "PromoterStudyInferRuntimeModelSummary",
     "PromoterStudyInferRuntimeResolvedContext",
     "resolve_promoter_study_infer_runtime_context",

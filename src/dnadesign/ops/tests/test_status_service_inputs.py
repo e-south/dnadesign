@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/ops/tests/test_progress_registry.py
+src/dnadesign/ops/tests/test_status_service_inputs.py
 
 Focused tests for metadata-driven status input validation and dispatch.
 
@@ -24,7 +24,7 @@ def test_build_status_inputs_rejects_unexpected_input() -> None:
 
     with pytest.raises(
         ValueError,
-        match="progress kind 'ops-audit-json' does not accept inputs: unexpected",
+        match="status kind 'ops-audit-json' does not accept inputs: unexpected",
     ):
         build_status_inputs(
             spec=spec,
@@ -36,7 +36,7 @@ def test_build_status_inputs_rejects_unexpected_input() -> None:
 def test_build_status_inputs_requires_declared_flag() -> None:
     spec = load_status_kind_spec("ops-audit-json")
 
-    with pytest.raises(ValueError, match="progress kind 'ops-audit-json' requires --audit-json"):
+    with pytest.raises(ValueError, match="status kind 'ops-audit-json' requires --audit-json"):
         build_status_inputs(spec=spec, raw_inputs={}, repo_root=Path("/tmp/repo"))
 
 

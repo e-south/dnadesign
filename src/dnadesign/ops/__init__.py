@@ -12,7 +12,6 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from .contracts import (
-    InferRuntimePhaseTarget,
     ResumeReadinessPolicy,
     USRProducerContract,
     resolve_resume_readiness_policy,
@@ -20,7 +19,6 @@ from .contracts import (
 )
 
 __all__ = [
-    "InferRuntimePhaseTarget",
     "ResumeReadinessPolicy",
     "USRProducerContract",
     "resolve_resume_readiness_policy",

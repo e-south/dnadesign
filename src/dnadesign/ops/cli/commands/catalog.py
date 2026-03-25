@@ -50,14 +50,14 @@ def get_click_command():
     return typer.main.get_command(app)
 
 
-def _load_status_kind_spec(progress_kind: str) -> StatusKindSpec:
+def _load_status_kind_spec(status_kind: str) -> StatusKindSpec:
     from dnadesign.ops.status import load_status_kind_spec
 
-    return load_status_kind_spec(progress_kind)
+    return load_status_kind_spec(status_kind)
 
 
-def _progress_required_inputs(progress_kind: str) -> tuple[InputFieldSpec, ...]:
-    return _load_status_kind_spec(progress_kind).required_inputs
+def _status_required_inputs(status_kind: str) -> tuple[InputFieldSpec, ...]:
+    return _load_status_kind_spec(status_kind).required_inputs
 
 
 def _catalog_counts(
@@ -106,7 +106,7 @@ def _catalog_query_is_broad(filters: CatalogQuery) -> bool:
             filters.entry_type,
             filters.plane,
             filters.execution_kind,
-            filters.progress_kind,
+            filters.status_kind,
             filters.related_to,
             filters.tool,
         )
@@ -233,7 +233,7 @@ def _catalog_next_commands(
     owner_tool_source: CatalogToolSourceEntry | None,
     related_tool_sources: Sequence[CatalogToolSourceEntry],
 ) -> tuple[tuple[str, str], ...]:
-    required_inputs = _progress_required_inputs(entry.progress_kind)
+    required_inputs = _status_required_inputs(entry.status_kind)
     commands: list[tuple[str, str]] = [
         (
             "progress_explain",
@@ -411,7 +411,7 @@ def _emit_catalog_list_text(
     if section in {"all", "procedures"}:
         lines.append("Cross-tool procedures")
         for entry in procedures:
-            status_summary = f"{entry.entry_type} | {entry.plane} | {entry.execution_kind} | {entry.progress_kind}"
+            status_summary = f"{entry.entry_type} | {entry.plane} | {entry.execution_kind} | {entry.status_kind}"
             lines.append(f"- {entry.registry_id} [{status_summary}]")
             lines.append(f"  {entry.summary}")
             lines.append(
@@ -499,7 +499,7 @@ def _emit_catalog_list_json(
                 "type": entry.entry_type,
                 "plane": entry.plane,
                 "execution_kind": entry.execution_kind,
-                "progress_kind": entry.progress_kind,
+                "status_kind": entry.status_kind,
                 "summary": entry.summary,
             }
             for entry in procedures
@@ -530,7 +530,7 @@ def _emit_catalog_show_text(
     catalog: RunbookCatalog,
 ) -> None:
     entry = details.entry
-    progress_inputs = _progress_required_inputs(entry.progress_kind)
+    status_inputs = _status_required_inputs(entry.status_kind)
     owner_tool_source = catalog.find_tool_source(details.owner_boundary)
     related_tool_sources = load_catalog_related_tool_sources(catalog, entry.registry_id)
     related_tool_routes = load_catalog_related_tool_routes(catalog, entry.registry_id)
@@ -555,7 +555,7 @@ def _emit_catalog_show_text(
         f"Entry artifact: {details.entry_artifact}",
         f"Exit artifact: {details.exit_artifact}",
         f"Execution kind: {entry.execution_kind}",
-        f"Progress kind: {entry.progress_kind}",
+        f"Status kind: {entry.status_kind}",
         f"Summary: {entry.summary}",
     ]
     if owner_tool_source is not None:
@@ -602,9 +602,9 @@ def _emit_catalog_show_text(
                     ),
                 ]
             )
-    lines.append("Required progress inputs:")
-    if progress_inputs:
-        for field in progress_inputs:
+    lines.append("Required status inputs:")
+    if status_inputs:
+        for field in status_inputs:
             lines.append(f"- {field.cli_flag} {field.placeholder}: {field.summary}")
     else:
         lines.append("- none")
@@ -616,7 +616,7 @@ def _emit_catalog_show_text(
                 continue
             status_summary = (
                 f"{related_entry.entry_type} | {related_entry.plane} | "
-                f"{related_entry.execution_kind} | {related_entry.progress_kind}"
+                f"{related_entry.execution_kind} | {related_entry.status_kind}"
             )
             lines.append(f"- {relation.relation_type}: {related_entry.registry_id} [{status_summary}]")
             lines.append(f"  {related_entry.summary}")
@@ -634,7 +634,7 @@ def _emit_catalog_show_json(
     catalog: RunbookCatalog,
 ) -> None:
     entry = details.entry
-    progress_inputs = _progress_required_inputs(entry.progress_kind)
+    status_inputs = _status_required_inputs(entry.status_kind)
     owner_tool_source = catalog.find_tool_source(details.owner_boundary)
     related_tool_sources = load_catalog_related_tool_sources(catalog, entry.registry_id)
     related_tool_routes = load_catalog_related_tool_routes(catalog, entry.registry_id)
@@ -660,8 +660,8 @@ def _emit_catalog_show_json(
                 "entry_artifact": details.entry_artifact,
                 "exit_artifact": details.exit_artifact,
                 "execution_kind": entry.execution_kind,
-                "progress_kind": entry.progress_kind,
-                "progress_required_inputs": [field.as_dict() for field in progress_inputs],
+                "status_kind": entry.status_kind,
+                "required_status_inputs": [field.as_dict() for field in status_inputs],
                 "summary": entry.summary,
                 "owner_tool_source": (
                     {
@@ -720,7 +720,7 @@ def _emit_catalog_show_json(
                         "type": related_entry.entry_type,
                         "plane": related_entry.plane,
                         "execution_kind": related_entry.execution_kind,
-                        "progress_kind": related_entry.progress_kind,
+                        "status_kind": related_entry.status_kind,
                         "summary": related_entry.summary,
                     }
                     for relation in details.relations
@@ -762,9 +762,9 @@ def catalog_list(
         str | None,
         typer.Option("--execution-kind", help="Exact Execution-kind filter for cross-tool procedures."),
     ] = None,
-    progress_kind: Annotated[
+    status_kind: Annotated[
         str | None,
-        typer.Option("--progress-kind", help="Exact Progress-kind filter for cross-tool procedures."),
+        typer.Option("--status-kind", help="Exact status-kind filter for cross-tool procedures."),
     ] = None,
     related_to: Annotated[
         str | None,
@@ -813,7 +813,7 @@ def catalog_list(
         entry_type=normalize_optional_filter(entry_type),
         plane=normalize_optional_filter(plane),
         execution_kind=normalize_optional_filter(execution_kind),
-        progress_kind=normalize_optional_filter(progress_kind),
+        status_kind=normalize_optional_filter(status_kind),
         related_to=normalized_related_to,
         tool=normalize_optional_filter(tool),
     )

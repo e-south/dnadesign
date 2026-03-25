@@ -8,7 +8,7 @@
 **Registry-id:** ops.control-plane.orchestration
 **Summary:** Deterministic control-plane runbook contract for DenseGen or Infer batch submit flows with optional Notify chaining.
 **Execution-kind:** executable
-**Progress-kind:** ops-audit-json
+**Status-kind:** ops-audit-json
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-19

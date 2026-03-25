@@ -1,3 +1,11 @@
+from .check_protocols import CommandCheckTarget, EnvironmentCheckTarget, RunbookPlanCheckTarget
+from .checks import (
+    CommandCheckDependencies,
+    RunbookPlanCheckDependencies,
+    build_command_checks,
+    build_environment_checks,
+    build_runbook_plan_checks,
+)
 from .coordinator import PreflightCheckEvaluation, check_matches_scope, evaluate_preflight_checks
 from .models import CommandExecution, PreflightCheck, build_command_check, build_state_check
 from .support import (
@@ -11,11 +19,19 @@ from .support import (
 )
 
 __all__ = [
+    "CommandCheckDependencies",
+    "CommandCheckTarget",
     "CommandExecution",
+    "EnvironmentCheckTarget",
     "PreflightCheck",
     "PreflightCheckEvaluation",
+    "RunbookPlanCheckDependencies",
+    "RunbookPlanCheckTarget",
     "build_command_check",
+    "build_command_checks",
+    "build_environment_checks",
     "build_infer_notify_setup_command",
+    "build_runbook_plan_checks",
     "build_state_check",
     "check_matches_scope",
     "choose_command_summary",

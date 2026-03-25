@@ -8,7 +8,7 @@ entry_artifact: construct workspace plus one shared USR dataset target
 exit_artifact: one infer-ready USR dataset plus downstream event stream
 summary: Realize construct outputs into one shared USR dataset and use that dataset as the durable Infer handoff.
 execution_kind: staged
-progress_kind: usr-dataset-state
+status_kind: usr-dataset-state
 related_tools:
   - construct
   - infer

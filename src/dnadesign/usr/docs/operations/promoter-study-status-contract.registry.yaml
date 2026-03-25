@@ -8,7 +8,7 @@ entry_artifact: one checked-in promoter-study directory selected through docs/st
 exit_artifact: one read-only summary of dataset presence, phase posture, and study-owned execution surfaces
 summary: Read one checked-in promoter-study record and summarize dataset, phase, and execution-surface readiness without reconstructing the workflow by hand.
 execution_kind: iterative
-progress_kind: promoter-study-record
+status_kind: promoter-study-status
 keywords:
   - promoter study
   - study record

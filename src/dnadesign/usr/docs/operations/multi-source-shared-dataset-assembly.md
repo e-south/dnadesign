@@ -8,7 +8,7 @@
 **Registry-id:** usr.data-plane.multi-source-source-of-truth
 **Summary:** Merge multiple USR-backed sources, preserve explicit carry, and hand one construct-backed shared dataset to Infer and Notify.
 **Execution-kind:** staged
-**Progress-kind:** usr-dataset-state
+**Status-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-19

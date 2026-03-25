@@ -68,7 +68,7 @@ Use these when you still need command lookup before choosing a runbook lifecycle
 9. Use `uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>` when the work spans multiple runtimes or pauses between steps.
 10. Keep the manifest explicit. Ops reads the files you name there; it does not infer hidden campaign state.
 11. For live promoter-study status, keep the study files under `docs/studies/promoter/<study-id>/`. Use [Study records index](../studies/README.md) for the required layout and selector rules.
-12. For progress-kind meanings and the next checks for each one, see the [runbook catalog progress views](../runbooks/README.md#progress-views).
+12. For status-kind meanings and the next checks for each one, see the [runbook catalog status views](../runbooks/README.md#status-views).
 13. If the next step is dataset assembly, construct realization, or infer write-back, leave Ops and continue in the shared USR runbooks:
     [Multi-source shared dataset assembly](../../src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md),
     [Construct -> USR -> Infer shared dataset runbook](../../src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md),

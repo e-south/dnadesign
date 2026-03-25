@@ -1,8 +1,8 @@
 version: 1
-provider_id: study.stress_promoter_ethanol_cipro
+provider_id: study.promoter
 entries:
-  - progress_kind: promoter-study-record
-    provider_ref: dnadesign.studies.stress_promoter_ethanol_cipro.ops_provider:provide_stress_promoter_ethanol_cipro_status
+  - status_kind: promoter-study-status
+    provider_ref: dnadesign.studies.promoter.ops_provider:provide_promoter_status
     description: Read one checked-in promoter-study directory and summarize dataset and phase posture from repo-backed evidence.
     surface_type: study_snapshot
     cost_class: cheap
@@ -18,8 +18,8 @@ entries:
         path_base: repo
     notes:
       - If `docs/studies/promoter/index.yaml` declares `active_study`, you can omit `--study-dir` for the active-study summary. Pass `--study-dir` to pin or override the checked-in study directory.
-  - progress_kind: promoter-study-preflight
-    provider_ref: dnadesign.studies.stress_promoter_ethanol_cipro.ops_provider:provide_stress_promoter_ethanol_cipro_preflight
+  - status_kind: promoter-study-preflight
+    provider_ref: dnadesign.studies.promoter.ops_provider:provide_promoter_preflight
     description: Run one read-only active-study preflight suite across DenseGen, Construct, Infer, Notify, and batch-plan surfaces.
     surface_type: study_preflight
     cost_class: deep

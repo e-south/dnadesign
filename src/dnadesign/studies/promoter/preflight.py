@@ -1,10 +1,10 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/stress_promoter_ethanol_cipro/preflight.py
+src/dnadesign/studies/promoter/preflight.py
 
 Study-owned preflight context resolution and orchestration for the
-stress_promoter_ethanol_cipro family.
+promoter family.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,13 +17,20 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from dnadesign.ops.contracts import InferRuntimePhaseTarget
-from dnadesign.ops.preflight import CommandExecution, PreflightCheck, evaluate_preflight_checks
+from dnadesign.ops.preflight import (
+    CommandExecution,
+    PreflightCheck,
+    RunbookPlanCheckDependencies,
+    RunbookPlanCheckTarget,
+    build_runbook_plan_checks,
+    evaluate_preflight_checks,
+)
 from dnadesign.studies.core.models import StudyOpsContract
 from dnadesign.studies.core.preflight_plan import StudyPreflightPlan, build_study_preflight_plan
 
 from .context import PromoterStudyResolvedContext
 from .infer_runtime import (
+    PromoterInferPhaseTarget,
     PromoterStudyInferRuntimeDependencies,
     PromoterStudyInferRuntimeResolvedContext,
     resolve_promoter_study_infer_runtime_context,
@@ -33,11 +40,7 @@ from .preflight_infer import (
     build_promoter_preflight_infer_checks,
 )
 from .preflight_orchestration import (
-    PromoterPreflightNotifyEnvironmentDependencies,
-    PromoterPreflightRunbookPlanDependencies,
-    PromoterPreflightRunbookPlanTarget,
     build_promoter_preflight_notify_environment_checks,
-    build_promoter_preflight_runbook_plan_checks,
 )
 from .preflight_upstream import (
     PromoterPreflightUpstreamDependencies,
@@ -78,8 +81,8 @@ class PromoterPreflightResolvedContext:
     current_phase: str | None
     next_ready_phase: Mapping[str, object] | None
     infer_runtime: PromoterStudyInferRuntimeResolvedContext
-    infer_phase_targets: dict[str, InferRuntimePhaseTarget]
-    infer_batch_targets: tuple[PromoterPreflightRunbookPlanTarget, ...]
+    infer_phase_targets: dict[str, PromoterInferPhaseTarget]
+    infer_batch_targets: tuple[RunbookPlanCheckTarget, ...]
     densegen_phase_id: str
     construct_phase_id: str
     notify_environment_phase_id: str
@@ -91,7 +94,7 @@ def resolve_promoter_preflight_context(
     *,
     study_context: PromoterStudyResolvedContext,
     scope: str | None,
-    progress_kind: str,
+    status_kind: str,
     contract: StudyOpsContract,
     dependencies: PromoterPreflightContextDependencies,
 ) -> PromoterPreflightResolvedContext:
@@ -103,7 +106,7 @@ def resolve_promoter_preflight_context(
     dataset_index = {dataset_id: dict(payload) for dataset_id, payload in study_context.dataset_index.items()}
     infer_runtime = resolve_promoter_study_infer_runtime_context(
         study_context=study_context,
-        progress_kind=progress_kind,
+        status_kind=status_kind,
         dependencies=dependencies.infer_runtime,
     )
     infer_phase_targets = dict(infer_runtime.phase_targets_by_id)
@@ -166,7 +169,6 @@ def build_promoter_preflight_progress(
         notify_env_state=context.notify_env_state,
         notify_environment_phase_id=context.notify_environment_phase_id,
         enabled_groups=enabled_groups,
-        dependencies=PromoterPreflightNotifyEnvironmentDependencies(),
     ):
         add_check(check)
 
@@ -211,10 +213,10 @@ def build_promoter_preflight_progress(
         add_check(check)
 
     if context.scope_plan.includes_group("infer_batch_plan"):
-        for check in build_promoter_preflight_runbook_plan_checks(
-            study_repo_root=context.study_repo_root,
+        for check in build_runbook_plan_checks(
+            repo_root=context.study_repo_root,
             targets=context.infer_batch_targets,
-            dependencies=PromoterPreflightRunbookPlanDependencies(
+            dependencies=RunbookPlanCheckDependencies(
                 run_preflight_command=dependencies.run_preflight_command,
                 safe_json_loads=dependencies.safe_json_loads,
                 choose_command_summary=dependencies.choose_command_summary,
@@ -277,22 +279,22 @@ def build_promoter_preflight_progress(
 def _resolve_infer_batch_targets(
     *,
     execution_surface_index: Mapping[str, Path],
-    infer_phase_targets: Sequence[InferRuntimePhaseTarget],
+    infer_phase_targets: Sequence[PromoterInferPhaseTarget],
     notify_env_state: Mapping[str, bool],
-) -> tuple[PromoterPreflightRunbookPlanTarget, ...]:
-    targets: list[PromoterPreflightRunbookPlanTarget] = []
+) -> tuple[RunbookPlanCheckTarget, ...]:
+    targets: list[RunbookPlanCheckTarget] = []
     for phase_target in infer_phase_targets:
         runbook_path = execution_surface_index.get(phase_target.runbook_surface_label)
         if runbook_path is None:
             continue
         targets.append(
-            PromoterPreflightRunbookPlanTarget(
+            RunbookPlanCheckTarget(
                 check_id=f"ops.runbook_plan.{phase_target.runbook_surface_label}",
                 check_group="infer_batch_plan",
                 phase="ops",
                 phase_id=phase_target.phase_id,
                 runbook_path=runbook_path,
-                fallback_summary="ops runbook plan completed",
+                fallback_summary=f"ops runbook plan validated {phase_target.runbook_surface_label}",
                 details={"notify_env": dict(notify_env_state)},
             )
         )

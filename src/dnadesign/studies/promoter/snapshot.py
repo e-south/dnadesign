@@ -1,10 +1,10 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/stress_promoter_ethanol_cipro/snapshot.py
+src/dnadesign/studies/promoter/snapshot.py
 
 Study-owned snapshot enrichment and summary assembly for the
-stress_promoter_ethanol_cipro family.
+promoter family.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -26,47 +26,41 @@ from .infer_runtime import (
 @dataclass(frozen=True)
 class PromoterStudyStatusDependencies:
     infer_runtime: PromoterStudyInferRuntimeDependencies
-    inspect_local_gpu_inventory: Callable[[], dict[str, object]]
     phase_matches_infer_model_family: Callable[..., bool]
 
 
 @dataclass(frozen=True)
 class PromoterStudyStatusResolvedContext:
     infer_runtime: PromoterStudyInferRuntimeResolvedContext
-    local_gpu_inventory: dict[str, object]
 
 
 def resolve_promoter_study_status_context(
     *,
     study_context: PromoterStudyResolvedContext,
-    progress_kind: str,
+    status_kind: str,
     dependencies: PromoterStudyStatusDependencies,
 ) -> PromoterStudyStatusResolvedContext:
     infer_runtime = resolve_promoter_study_infer_runtime_context(
         study_context=study_context,
-        progress_kind=progress_kind,
+        status_kind=status_kind,
         dependencies=dependencies.infer_runtime,
     )
-    local_gpu_inventory = dependencies.inspect_local_gpu_inventory()
-    return PromoterStudyStatusResolvedContext(
-        infer_runtime=infer_runtime,
-        local_gpu_inventory=local_gpu_inventory,
-    )
+    return PromoterStudyStatusResolvedContext(infer_runtime=infer_runtime)
 
 
-def build_promoter_study_record_progress(
+def build_promoter_study_status(
     *,
     study_context: PromoterStudyResolvedContext,
     status_context: PromoterStudyStatusResolvedContext,
     dependencies: PromoterStudyStatusDependencies,
+    summary_scope: str,
 ) -> tuple[str, str, dict[str, object]]:
     evidence = dict(study_context.evidence)
     evidence.update(
         {
-            "summary_scope": "repo",
+            "summary_scope": summary_scope,
             "preferred_infer_model_family": status_context.infer_runtime.preferred_model_family,
             "supported_infer_model_families": list(status_context.infer_runtime.supported_model_families),
-            "infer_local_gpu_inventory": status_context.local_gpu_inventory,
             "infer_runtime_models": [
                 summary.as_dict() for summary in status_context.infer_runtime.runtime_model_summaries
             ],
@@ -109,28 +103,12 @@ def build_promoter_study_record_progress(
         summary_parts.append(f"next planned {study_context.next_planned_phase['id']}")
 
     attention_reasons: list[str] = []
-    local_advisories: list[dict[str, object]] = []
     if study_context.current_phase is not None and not study_context.current_phase_is_known:
         attention_reasons.append("current_phase does not match any declared phase id")
     if study_context.present_but_planned:
         attention_reasons.append("datasets.yaml is stale for newly materialized outputs")
     if study_context.densegen_row_gap not in (None, 0):
         attention_reasons.append("DenseGen anchor target not met")
-    if (
-        status_context.infer_runtime.gpu_required_runtime_labels
-        and int(status_context.local_gpu_inventory.get("count") or 0) == 0
-    ):
-        local_advisories.append(
-            {
-                "state": "attention",
-                "scope": "host",
-                "summary": "No visible local GPU; relevant only for local execution readiness.",
-                "details": {
-                    "runtime_labels": list(status_context.infer_runtime.gpu_required_runtime_labels),
-                    "local_gpu_inventory": dict(status_context.local_gpu_inventory),
-                },
-            }
-        )
     if status_context.infer_runtime.preferred_model_family is not None and any(
         dependencies.phase_matches_infer_model_family(
             phase_id=str(phase.get("id") or ""),
@@ -151,8 +129,6 @@ def build_promoter_study_record_progress(
         attention_reasons.append("study is not complete")
 
     summary = "; ".join(summary_parts)
-    if local_advisories:
-        evidence["local_advisories"] = local_advisories
     if attention_reasons:
         evidence["attention_reasons"] = attention_reasons
         return ("attention", summary, evidence)
