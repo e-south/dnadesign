@@ -140,6 +140,12 @@ def _baserender_root() -> Path:
     return Path(__file__).resolve().parent.parent.parent
 
 
+def _has_packaged_job_examples(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    return any(path.glob("*.yaml")) or any(path.glob("*.yml"))
+
+
 def _workspace_root_from_job_path(job_path: Path) -> Path | None:
     job_abs = job_path.resolve()
     if job_abs.name != "job.yaml":
@@ -186,6 +192,71 @@ def _allowed_path_roots(job_path: Path, *, caller_scope: Path) -> tuple[Path, ..
     return tuple(roots)
 
 
+def _append_allowed_root(roots: list[Path], path: Path) -> None:
+    resolved = path.resolve()
+    if resolved not in roots:
+        roots.append(resolved)
+
+
+def _inline_mapping_allowed_roots(
+    mapping: Mapping[str, Any], *, caller_scope: Path, job_path: Path
+) -> tuple[Path, ...]:
+    roots = list(_allowed_path_roots(job_path, caller_scope=caller_scope))
+
+    def _append_if_absolute(raw: Any) -> None:
+        if raw is None:
+            return
+        text = str(raw).strip()
+        if text == "":
+            return
+        candidate = Path(text).expanduser()
+        if candidate.is_absolute():
+            _append_allowed_root(roots, candidate)
+
+    _append_if_absolute(mapping.get("results_root"))
+
+    input_data = mapping.get("input")
+    if isinstance(input_data, Mapping):
+        _append_if_absolute(input_data.get("path"))
+        adapter_data = input_data.get("adapter")
+        if isinstance(adapter_data, Mapping):
+            columns_data = adapter_data.get("columns")
+            if isinstance(columns_data, Mapping):
+                for key in ("hits_path", "config_path"):
+                    _append_if_absolute(columns_data.get(key))
+
+    selection_data = mapping.get("selection")
+    if isinstance(selection_data, Mapping):
+        _append_if_absolute(selection_data.get("path"))
+
+    pipeline_data = mapping.get("pipeline")
+    if isinstance(pipeline_data, Mapping):
+        plugins_data = pipeline_data.get("plugins")
+        if isinstance(plugins_data, (list, tuple)):
+            for plugin in plugins_data:
+                if not isinstance(plugin, Mapping) or len(plugin) != 1:
+                    continue
+                _, params = next(iter(plugin.items()))
+                if not isinstance(params, Mapping):
+                    continue
+                for key in ("config_path", "library_path", "run_manifest_path", "lockfile_path", "motif_store_root"):
+                    _append_if_absolute(params.get(key))
+
+    outputs_data = mapping.get("outputs")
+    if isinstance(outputs_data, (list, tuple)):
+        for output in outputs_data:
+            if not isinstance(output, Mapping):
+                continue
+            _append_if_absolute(output.get("dir"))
+            _append_if_absolute(output.get("path"))
+
+    run_data = mapping.get("run")
+    if isinstance(run_data, Mapping):
+        _append_if_absolute(run_data.get("report_path"))
+
+    return tuple(roots)
+
+
 def _ensure_within_allowed_roots(candidate: Path, *, field: str, allowed_roots: tuple[Path, ...]) -> Path:
     resolved = candidate.resolve()
     for root in allowed_roots:
@@ -223,10 +294,17 @@ def resolve_job_path(spec: str | Path) -> Path:
         raise FileNotFoundError(f"Could not resolve job file: {spec}")
 
     root = _baserender_root()
-    for candidate in (root / "jobs" / f"{p}.yaml", root / "docs" / "examples" / f"{p}.yaml"):
+    candidates = [root / "docs" / "examples" / f"{p}.yaml"]
+    jobs_root = root / "jobs"
+    has_packaged_jobs = _has_packaged_job_examples(jobs_root)
+    if has_packaged_jobs:
+        candidates.insert(0, jobs_root / f"{p}.yaml")
+    for candidate in candidates:
         if candidate.exists():
             return candidate
-    raise FileNotFoundError(f"Could not resolve job name '{spec}' in jobs/ or docs/examples/")
+    if has_packaged_jobs:
+        raise FileNotFoundError(f"Could not resolve job name '{spec}' in jobs/ or docs/examples/")
+    raise FileNotFoundError(f"Could not resolve job name '{spec}' in docs/examples/ or as an explicit path")
 
 
 def _resolve_path(job_path: Path, raw: str, *, field: str, allowed_roots: tuple[Path, ...]) -> Path:
@@ -731,8 +809,10 @@ def _parse_sequence_rows_job_mapping(
     *,
     job_path: Path,
     caller_scope: Path,
+    allowed_roots: tuple[Path, ...] | None = None,
 ) -> SequenceRowsJobV3:
-    allowed_roots = _allowed_path_roots(job_path, caller_scope=caller_scope)
+    if allowed_roots is None:
+        allowed_roots = _allowed_path_roots(job_path, caller_scope=caller_scope)
     data = require_mapping(raw_mapping, "top-level")
     reject_unknown_keys(
         data,
@@ -825,7 +905,14 @@ def load_sequence_rows_job_from_mapping(
         )
         job_path = (caller_scope / source_path).resolve()
         mapping_data = require_mapping(mapping, "top-level")
-        return _parse_sequence_rows_job_mapping(dict(mapping_data), job_path=job_path, caller_scope=caller_scope)
+        parsed_mapping = dict(mapping_data)
+        allowed_roots = _inline_mapping_allowed_roots(parsed_mapping, caller_scope=caller_scope, job_path=job_path)
+        return _parse_sequence_rows_job_mapping(
+            parsed_mapping,
+            job_path=job_path,
+            caller_scope=caller_scope,
+            allowed_roots=allowed_roots,
+        )
     except ContractError as exc:
         raise SchemaError(str(exc)) from exc
 

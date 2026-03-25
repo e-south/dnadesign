@@ -335,6 +335,31 @@ def test_inline_job_source_name_rejects_directory_components(tmp_path: Path) -> 
     assert job.input.path == parquet.resolve()
 
 
+def test_inline_job_mapping_accepts_explicit_absolute_input_and_output_paths_outside_caller_root(
+    tmp_path: Path,
+) -> None:
+    caller_root = tmp_path / "caller"
+    caller_root.mkdir()
+    parquet = _make_input_parquet(tmp_path / "input_root")
+    output_path = (tmp_path / "render_root" / "render.png").resolve()
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=caller_root / "results",
+        outputs=[{"kind": "images", "path": str(output_path), "fmt": "png"}],
+    )
+
+    job = load_sequence_rows_job_from_mapping(
+        payload,
+        caller_root=caller_root,
+        source_name="inline_job.yaml",
+    )
+
+    assert job.path == (caller_root / "inline_job.yaml").resolve()
+    assert job.input.path == parquet.resolve()
+    images_output = next(output for output in job.outputs if output.kind == "images")
+    assert images_output.path == output_path
+
+
 def test_cassette_job_rejects_input_path_outside_owner_root(tmp_path: Path) -> None:
     run_dir = tmp_path / "cassette_run"
     outside_input = _make_input_parquet(tmp_path / "outside")

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from dnadesign.baserender.src.config import resolve_job_path, resolve_preset_path, resolve_style
 from dnadesign.baserender.src.config.jobs import sequence_rows_v3
 from dnadesign.baserender.src.workspace import default_workspaces_root
@@ -43,6 +45,11 @@ def test_resolve_job_path_finds_docs_example_by_name() -> None:
         resolve_job_path("densegen_job").resolve()
         == (_baserender_root() / "docs" / "examples" / "densegen_job.yaml").resolve()
     )
+
+
+def test_resolve_job_path_missing_job_message_does_not_point_to_missing_jobs_dir() -> None:
+    with pytest.raises(FileNotFoundError, match="docs/examples/ or as an explicit path"):
+        resolve_job_path("definitely_missing_job_name")
 
 
 def test_sequence_rows_job_namespace_exports_contract() -> None:
