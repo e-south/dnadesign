@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/ops/progress_ops_provider.py
+src/dnadesign/ops/providers/ops/provider.py
 
 Provider-owned OPS status builders.
 
@@ -16,7 +16,7 @@ from collections import Counter
 from collections.abc import Mapping
 from pathlib import Path
 
-from .progress_support import required_path
+from dnadesign.ops.status.paths import required_path
 
 
 def provide_ops_audit_status(
@@ -25,10 +25,10 @@ def provide_ops_audit_status(
     inputs: Mapping[str, object],
 ) -> tuple[str, str, dict[str, object]]:
     del repo_root
-    return ops_audit_progress(inputs.get("audit_json"))
+    return _ops_audit_status(inputs.get("audit_json"))
 
 
-def ops_audit_progress(audit_json: object) -> tuple[str, str, dict[str, object]]:
+def _ops_audit_status(audit_json: object) -> tuple[str, str, dict[str, object]]:
     resolved_audit = required_path(audit_json, flag_name="--audit-json", progress_kind="ops-audit-json")
     if not resolved_audit.exists():
         return (
@@ -111,7 +111,4 @@ def _parse_record_fields(raw_text: object) -> dict[str, str]:
     return fields
 
 
-__all__ = [
-    "ops_audit_progress",
-    "provide_ops_audit_status",
-]
+__all__ = ["provide_ops_audit_status"]

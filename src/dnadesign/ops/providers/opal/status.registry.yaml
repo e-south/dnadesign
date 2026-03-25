@@ -2,7 +2,7 @@ version: 1
 provider_id: builtin.opal
 entries:
   - progress_kind: opal-campaign-state
-    provider_ref: dnadesign.ops.progress_opal_provider:provide_opal_campaign_state_status
+    provider_ref: dnadesign.ops.providers.opal.provider:provide_opal_campaign_state_status
     description: Read one OPAL campaign workdir and summarize state.json plus round ledgers.
     surface_type: campaign_snapshot
     cost_class: cheap

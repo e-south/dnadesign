@@ -2,7 +2,7 @@ version: 1
 provider_id: builtin.ops
 entries:
   - progress_kind: ops-audit-json
-    provider_ref: dnadesign.ops.progress_ops_provider:provide_ops_audit_status
+    provider_ref: dnadesign.ops.providers.ops.provider:provide_ops_audit_status
     description: Read one workspace-scoped orchestration audit JSON emitted by `ops runbook execute`.
     surface_type: orchestration_audit
     cost_class: cheap

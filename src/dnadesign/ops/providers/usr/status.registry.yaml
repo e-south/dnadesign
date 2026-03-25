@@ -2,7 +2,7 @@ version: 1
 provider_id: builtin.usr
 entries:
   - progress_kind: usr-sync-audit
-    provider_ref: dnadesign.ops.progress_usr_provider:provide_usr_sync_audit_status
+    provider_ref: dnadesign.ops.providers.usr.provider:provide_usr_sync_audit_status
     description: Read one USR sync audit JSON emitted by `usr diff`, `usr pull`, or `usr push`.
     surface_type: sync_audit
     cost_class: cheap
@@ -15,7 +15,7 @@ entries:
         summary: Machine-readable USR sync audit JSON from usr diff, pull, or push.
         type: path
   - progress_kind: usr-dataset-state
-    provider_ref: dnadesign.ops.progress_usr_provider:provide_usr_dataset_state_status
+    provider_ref: dnadesign.ops.providers.usr.provider:provide_usr_dataset_state_status
     description: Read one USR dataset directory, its records.parquet, and related overlay sidecars.
     surface_type: dataset_snapshot
     cost_class: cheap

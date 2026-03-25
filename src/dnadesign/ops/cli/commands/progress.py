@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Sequence
 
+import click
 import typer
 import typer.main
 import yaml
@@ -28,8 +29,9 @@ from dnadesign.ops.catalog import (
 )
 from dnadesign.ops.cli.common import append_registry_suggestions, normalize_optional_filter, render_command
 from dnadesign.ops.cli.dynamic_inputs import (
+    build_dynamic_input_options,
+    merge_status_input_values,
     optional_input_lines,
-    parse_status_input_tokens,
     render_progress_show_command,
     required_input_lines,
 )
@@ -49,7 +51,10 @@ app = typer.Typer(
 
 
 def get_click_command():
-    return typer.main.get_command(app)
+    command = typer.main.get_command(app)
+    if isinstance(command, click.Group):
+        command.add_command(_build_progress_show_click_command(), "show")
+    return command
 
 
 def _build_campaign_scaffold(*args, **kwargs) -> CampaignScaffold:
@@ -356,38 +361,71 @@ def _emit_progress_scaffold_json(*, repo_root: Path, catalog_path: Path, result:
     typer.echo(json.dumps(payload, indent=2, sort_keys=True))
 
 
-@app.command("kinds")
-def progress_kinds(
-    as_json: Annotated[
-        bool,
-        typer.Option("--json/--no-json", help="Emit machine-readable JSON instead of plain text."),
-    ] = False,
-) -> None:
-    if as_json:
-        _emit_progress_kinds_json()
-        return
-    _emit_progress_kinds_text()
+class DynamicProgressShowCommand(click.Command):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._dynamic_param_names: tuple[str, ...] = ()
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        self._configure_dynamic_input_options(args)
+        return super().parse_args(ctx, args)
+
+    def _configure_dynamic_input_options(self, args: Sequence[str]) -> None:
+        spec = _resolve_progress_show_spec_from_args(args)
+        next_param_names = tuple(field.name for field in spec.input_schema) if spec is not None else ()
+        if next_param_names == self._dynamic_param_names:
+            return
+
+        if self._dynamic_param_names:
+            self.params = [
+                param for param in self.params if getattr(param, "name", None) not in self._dynamic_param_names
+            ]
+            self._dynamic_param_names = ()
+
+        if spec is None or not spec.input_schema:
+            return
+
+        insert_at = next(
+            (index for index, param in enumerate(self.params) if getattr(param, "name", None) == "input_items"),
+            len(self.params),
+        )
+        dynamic_params = list(build_dynamic_input_options(spec.input_schema))
+        self.params = [*self.params[:insert_at], *dynamic_params, *self.params[insert_at:]]
+        self._dynamic_param_names = next_param_names
 
 
-@app.command("show", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
-def progress_show(
-    ctx: typer.Context,
-    registry_id: Annotated[str, typer.Argument(help="Registered runbook or workflow registry id.")],
-    repo_root: Annotated[
-        Path | None,
-        typer.Option(
-            "--repo-root",
-            help="Repository root containing docs/runbooks/README.md when invoking outside the repository.",
-        ),
-    ] = None,
-    input_items: Annotated[
-        list[str] | None,
-        typer.Option("--input", help="Provider-owned input override as key=value. May be passed more than once."),
-    ] = None,
-    as_json: Annotated[
-        bool,
-        typer.Option("--json/--no-json", help="Emit machine-readable JSON instead of plain text."),
-    ] = False,
+def _build_progress_show_click_command() -> click.Command:
+    return DynamicProgressShowCommand(
+        name="show",
+        help="Show one registered runbook or workflow status surface.",
+        params=[
+            click.Argument(["registry_id"], metavar="REGISTRY_ID", required=True),
+            click.Option(
+                ["repo_root", "--repo-root"],
+                type=click.Path(path_type=Path),
+                help="Repository root containing docs/runbooks/README.md when invoking outside the repository.",
+            ),
+            click.Option(
+                ["input_items", "--input"],
+                multiple=True,
+                help="Provider-owned input override as key=value. May be passed more than once.",
+            ),
+            click.Option(
+                ["as_json", "--json/--no-json"],
+                default=False,
+                help="Emit machine-readable JSON instead of plain text.",
+            ),
+        ],
+        callback=_progress_show_callback,
+    )
+
+
+def _progress_show_callback(
+    registry_id: str,
+    repo_root: Path | None,
+    input_items: tuple[str, ...],
+    as_json: bool,
+    **dynamic_values: object,
 ) -> None:
     try:
         catalog = load_runbook_catalog(repo_root=repo_root)
@@ -404,10 +442,10 @@ def progress_show(
 
     try:
         spec = _load_status_kind_spec(entry.progress_kind)
-        raw_inputs = parse_status_input_tokens(
-            extra_args=ctx.args,
-            input_items=input_items or (),
-            input_schema=spec.required_inputs + spec.optional_inputs,
+        raw_inputs = merge_status_input_values(
+            flag_values=dynamic_values,
+            input_items=input_items,
+            input_schema=spec.input_schema,
         )
         result = _build_procedure_progress(catalog, registry_id, raw_inputs=raw_inputs)
     except ValueError as exc:
@@ -431,6 +469,72 @@ def progress_show(
         _emit_progress_show_json(repo_root=catalog.repo_root, catalog_path=catalog.catalog_path, result=result)
         return
     _emit_progress_show_text(repo_root=catalog.repo_root, catalog_path=catalog.catalog_path, result=result)
+
+
+def _resolve_progress_show_spec_from_args(args: Sequence[str]) -> StatusKindSpec | None:
+    registry_id, repo_root = _scan_progress_show_args(args)
+    if registry_id is None:
+        return None
+    try:
+        catalog = load_runbook_catalog(repo_root=repo_root)
+    except ValueError:
+        return None
+    entry = catalog.find_procedure(registry_id)
+    if entry is None:
+        return None
+    return _load_status_kind_spec(entry.progress_kind)
+
+
+def _scan_progress_show_args(args: Sequence[str]) -> tuple[str | None, Path | None]:
+    registry_id: str | None = None
+    repo_root: Path | None = None
+    index = 0
+    while index < len(args):
+        token = str(args[index]).strip()
+        if not token:
+            index += 1
+            continue
+        if token == "--":
+            break
+        if token == "--repo-root":
+            if index + 1 < len(args):
+                repo_root = Path(args[index + 1])
+            index += 2
+            continue
+        if token.startswith("--repo-root="):
+            _, _, raw_path = token.partition("=")
+            if raw_path.strip():
+                repo_root = Path(raw_path)
+            index += 1
+            continue
+        if token == "--input":
+            index += 2
+            continue
+        if token.startswith("--input=") or token in {"--json", "--no-json", "--help"}:
+            index += 1
+            continue
+        if token.startswith("-"):
+            if registry_id is None:
+                return None, repo_root
+            index += 1
+            continue
+        if registry_id is None:
+            registry_id = token
+        index += 1
+    return registry_id, repo_root
+
+
+@app.command("kinds")
+def progress_kinds(
+    as_json: Annotated[
+        bool,
+        typer.Option("--json/--no-json", help="Emit machine-readable JSON instead of plain text."),
+    ] = False,
+) -> None:
+    if as_json:
+        _emit_progress_kinds_json()
+        return
+    _emit_progress_kinds_text()
 
 
 @app.command("explain")

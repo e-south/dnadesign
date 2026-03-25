@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/ops/progress_cluster_provider.py
+src/dnadesign/ops/providers/cluster/provider.py
 
 Provider-owned cluster status builders.
 
@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
-from .progress_support import required_path
+from dnadesign.ops.status.paths import required_path
 
 
 def provide_cluster_run_index_status(
@@ -26,10 +26,10 @@ def provide_cluster_run_index_status(
     inputs: Mapping[str, object],
 ) -> tuple[str, str, dict[str, object]]:
     del repo_root
-    return cluster_run_index_progress(inputs.get("cluster_results_root"))
+    return _cluster_run_index_status(inputs.get("cluster_results_root"))
 
 
-def cluster_run_index_progress(cluster_results_root: object) -> tuple[str, str, dict[str, object]]:
+def _cluster_run_index_status(cluster_results_root: object) -> tuple[str, str, dict[str, object]]:
     resolved_root = required_path(
         cluster_results_root,
         flag_name="--cluster-results-root",
@@ -91,7 +91,4 @@ def cluster_run_index_progress(cluster_results_root: object) -> tuple[str, str, 
     )
 
 
-__all__ = [
-    "cluster_run_index_progress",
-    "provide_cluster_run_index_status",
-]
+__all__ = ["provide_cluster_run_index_status"]

@@ -61,3 +61,15 @@ def test_campaign_manifest_v2_path_base_repo(tmp_path: Path) -> None:
     )
 
     assert resolved == target.resolve()
+
+
+def test_path_ref_placeholder_rejected(tmp_path: Path) -> None:
+    manifest_dir = tmp_path / "manifests"
+    manifest_dir.mkdir(parents=True)
+
+    with pytest.raises(ValueError, match="placeholder path text"):
+        resolve_path_ref(
+            "<opal-workdir>/configs/campaign.yaml",
+            manifest_dir=manifest_dir,
+            default_base="manifest",
+        )
