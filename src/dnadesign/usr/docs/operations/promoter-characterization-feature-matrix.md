@@ -8,7 +8,7 @@
 **Registry-id:** usr.data-plane.promoter-feature-matrix
 **Summary:** Build one infer-annotated feature matrix from mixed promoter sources before branching into Cluster or OPAL.
 **Execution-kind:** staged
-**Progress-kind:** usr-dataset-state
+**Status-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-19

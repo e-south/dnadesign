@@ -4,7 +4,7 @@ Ops manages batch orchestration across tools. It turns a runbook into preflight,
 If you do not know a route id yet, start with `uv run ops catalog list --simple`.
 Study-family status and preflight implementations do not live in OPS core; the
 active stress-promoter study adapter and its runtime helpers live under
-`src/dnadesign/studies/stress_promoter_ethanol_cipro/`, while OPS keeps the
+`src/dnadesign/studies/promoter/`, while OPS keeps the
 neutral CLI, registry loading, path semantics, orchestration, and rendering
 surfaces.
 Treat the command families as three neutral surfaces: `ops catalog` is the
@@ -26,7 +26,7 @@ Use this README for package scope, the shared command entrypoints below, and lin
 
 - `uv run ops catalog list --simple`: start with a quick inventory from the shell.
 - `uv run ops catalog show <registry-id>`: inspect one registered route, its owner docs, and related procedures.
-- `uv run ops progress explain <registry-id>`: print the required flags before you use a progress surface.
+- `uv run ops progress explain <registry-id>`: print the required flags before you use a status surface.
 - Use [How to use Ops](docs/how-to-use-ops.md) for the expanded command ladder and [Ops orchestration index](../../../docs/operations/README.md) once you are in the runbook lifecycle.
 
 ## Documentation

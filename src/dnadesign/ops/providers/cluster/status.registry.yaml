@@ -1,7 +1,7 @@
 version: 1
 provider_id: builtin.cluster
 entries:
-  - progress_kind: cluster-run-index
+  - status_kind: cluster-run-index
     provider_ref: dnadesign.ops.providers.cluster.provider:provide_cluster_run_index_status
     description: Read one cluster results root and summarize the run index for that workspace.
     surface_type: run_index

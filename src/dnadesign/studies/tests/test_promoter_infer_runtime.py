@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/tests/test_stress_promoter_ethanol_cipro_infer_runtime.py
+src/dnadesign/studies/tests/test_promoter_infer_runtime.py
 
 Focused tests for study-owned infer-runtime projection.
 
@@ -14,8 +14,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from dnadesign.studies.stress_promoter_ethanol_cipro.context import PromoterStudyResolvedContext
-from dnadesign.studies.stress_promoter_ethanol_cipro.infer_runtime import (
+from dnadesign.studies.promoter.context import PromoterStudyResolvedContext
+from dnadesign.studies.promoter.infer_runtime import (
     PromoterStudyInferRuntimeDependencies,
     resolve_promoter_study_infer_runtime_context,
 )
@@ -103,8 +103,8 @@ def _make_study_context(tmp_path: Path) -> PromoterStudyResolvedContext:
 def test_resolve_promoter_study_infer_runtime_context_projects_runtime_lanes_once(tmp_path: Path) -> None:
     study_context = _make_study_context(tmp_path)
 
-    def _resolve_named_path_mapping(value, *, repo_root, label, progress_kind):
-        del repo_root, label, progress_kind
+    def _resolve_named_path_mapping(value, *, repo_root, label, status_kind):
+        del repo_root, label, status_kind
         return {name: Path(path) for name, path in dict(value or {}).items()}
 
     def _resolve_infer_runtime_lane_contracts(config_paths, *, preferred_model_family):
@@ -126,7 +126,7 @@ def test_resolve_promoter_study_infer_runtime_context_projects_runtime_lanes_onc
 
     resolved = resolve_promoter_study_infer_runtime_context(
         study_context=study_context,
-        progress_kind="promoter-study-record",
+        status_kind="promoter-study-status",
         dependencies=PromoterStudyInferRuntimeDependencies(
             resolve_named_path_mapping=_resolve_named_path_mapping,
             resolve_infer_runtime_lane_contracts=_resolve_infer_runtime_lane_contracts,
@@ -182,8 +182,8 @@ def test_resolve_promoter_study_infer_runtime_context_fails_fast_on_missing_stud
         }
     )
 
-    def _resolve_named_path_mapping(value, *, repo_root, label, progress_kind):
-        del repo_root, label, progress_kind
+    def _resolve_named_path_mapping(value, *, repo_root, label, status_kind):
+        del repo_root, label, status_kind
         return {name: Path(path) for name, path in dict(value or {}).items()}
 
     resolved_dependencies = PromoterStudyInferRuntimeDependencies(
@@ -205,7 +205,7 @@ def test_resolve_promoter_study_infer_runtime_context_fails_fast_on_missing_stud
     try:
         resolve_promoter_study_infer_runtime_context(
             study_context=study_context,
-            progress_kind="promoter-study-record",
+            status_kind="promoter-study-status",
             dependencies=resolved_dependencies,
         )
     except ValueError as exc:

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/ops/tests/test_progress_builtin_registry.py
+src/dnadesign/ops/tests/test_status_registry_lazy_loading.py
 
 Focused tests for metadata-only status registry loading and lazy provider import.
 
@@ -39,11 +39,11 @@ def _run_python(code: str) -> list[str]:
 
 
 def test_status_registry_fragments_load_provider_owned_specs() -> None:
-    supported_specs = {spec.progress_kind: spec.provider_id for spec in list_status_kind_specs()}
+    supported_specs = {spec.status_kind: spec.provider_id for spec in list_status_kind_specs()}
 
     assert supported_specs["ops-audit-json"] == "builtin.ops"
     assert supported_specs["usr-dataset-state"] == "builtin.usr"
-    assert supported_specs["promoter-study-preflight"] == "study.stress_promoter_ethanol_cipro"
+    assert supported_specs["promoter-study-preflight"] == "study.promoter"
     assert supported_specs["cluster-run-index"] == "builtin.cluster"
     assert supported_specs["opal-campaign-state"] == "builtin.opal"
 
@@ -59,7 +59,7 @@ list_status_kind_specs()
 print(json.dumps(sorted(
     name for name in sys.modules
     if name.startswith('dnadesign.ops.providers.')
-    or name.startswith('dnadesign.studies.stress_promoter_ethanol_cipro')
+    or name.startswith('dnadesign.studies.promoter')
 )))
 """
     )
@@ -103,7 +103,7 @@ assert result.exit_code == 0, result.output
 print(json.dumps(sorted(
     name for name in sys.modules
     if name.startswith('dnadesign.ops.providers.')
-    or name.startswith('dnadesign.studies.stress_promoter_ethanol_cipro')
+    or name.startswith('dnadesign.studies.promoter')
 )))
 """
     )
@@ -111,7 +111,7 @@ print(json.dumps(sorted(
     assert imported_modules == []
 
 
-def test_progress_kinds_cli_does_not_import_provider_modules() -> None:
+def test_status_kinds_cli_does_not_import_provider_modules() -> None:
     imported_modules = _run_python(
         """
 import json
@@ -124,7 +124,7 @@ assert result.exit_code == 0, result.output
 print(json.dumps(sorted(
     name for name in sys.modules
     if name.startswith('dnadesign.ops.providers.')
-    or name.startswith('dnadesign.studies.stress_promoter_ethanol_cipro')
+    or name.startswith('dnadesign.studies.promoter')
 )))
 """
     )
@@ -132,7 +132,7 @@ print(json.dumps(sorted(
     assert imported_modules == []
 
 
-def test_progress_kinds_cli_does_not_import_legacy_cli_module() -> None:
+def test_status_kinds_cli_does_not_import_legacy_cli_module() -> None:
     imported_modules = _run_python(
         """
 import json
@@ -201,7 +201,7 @@ print(json.dumps(sorted(
     assert imported_modules == []
 
 
-def test_progress_kinds_cli_does_not_import_runbook_execution_modules() -> None:
+def test_status_kinds_cli_does_not_import_runbook_execution_modules() -> None:
     imported_modules = _run_python(
         """
 import json
@@ -226,7 +226,7 @@ print(json.dumps(sorted(
     assert imported_modules == []
 
 
-def test_progress_kinds_cli_loads_registry_metadata_without_campaign_or_service_modules() -> None:
+def test_status_kinds_cli_loads_registry_metadata_without_campaign_or_service_modules() -> None:
     imported_modules = _run_python(
         """
 import json
@@ -293,8 +293,8 @@ print(json.dumps(sorted(
         'dnadesign.ops.providers.usr.provider',
         'dnadesign.ops.providers.cluster.provider',
         'dnadesign.ops.providers.opal.provider',
-        'dnadesign.studies.stress_promoter_ethanol_cipro.family',
-        'dnadesign.studies.stress_promoter_ethanol_cipro.ops_provider',
+        'dnadesign.studies.promoter.family',
+        'dnadesign.studies.promoter.ops_provider',
     }
 )))
 """
@@ -324,8 +324,8 @@ print(json.dumps(sorted(
         'dnadesign.ops.providers.cluster.provider',
         'dnadesign.ops.providers.opal.provider',
         'dnadesign.ops._cli_legacy',
-        'dnadesign.studies.stress_promoter_ethanol_cipro.family',
-        'dnadesign.studies.stress_promoter_ethanol_cipro.ops_provider',
+        'dnadesign.studies.promoter.family',
+        'dnadesign.studies.promoter.ops_provider',
     }
 )))
 """

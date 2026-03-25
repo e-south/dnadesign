@@ -14,9 +14,9 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def required_text(value: str | None, *, flag_name: str, progress_kind: str) -> str:
+def required_text(value: str | None, *, flag_name: str, status_kind: str) -> str:
     if value is None or not str(value).strip():
-        raise ValueError(f"progress kind '{progress_kind}' requires {flag_name}")
+        raise ValueError(f"status kind '{status_kind}' requires {flag_name}")
     return str(value).strip()
 
 

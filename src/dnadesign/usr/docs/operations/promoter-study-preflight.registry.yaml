@@ -8,7 +8,7 @@ entry_artifact: one checked-in promoter-study directory plus study-owned executi
 exit_artifact: one read-only command-level preflight summary for the active study
 summary: Run the active promoter-study preflight suite across DenseGen, Construct, Infer, Notify, and batch-plan contracts without mutating data or submitting jobs.
 execution_kind: iterative
-progress_kind: promoter-study-preflight
+status_kind: promoter-study-preflight
 keywords:
   - promoter study
   - preflight

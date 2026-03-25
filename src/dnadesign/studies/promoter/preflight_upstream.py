@@ -1,10 +1,10 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/stress_promoter_ethanol_cipro/preflight_upstream.py
+src/dnadesign/studies/promoter/preflight_upstream.py
 
 Study-owned DenseGen and Construct preflight builders for the
-stress_promoter_ethanol_cipro family.
+promoter family.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,12 +16,16 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from dnadesign.ops.preflight import CommandExecution, PreflightCheck, build_command_check, build_state_check
-
-from .preflight_orchestration import (
-    PromoterPreflightRunbookPlanDependencies,
-    PromoterPreflightRunbookPlanTarget,
-    build_promoter_preflight_runbook_plan_checks,
+from dnadesign.ops.preflight import (
+    CommandCheckDependencies,
+    CommandCheckTarget,
+    CommandExecution,
+    PreflightCheck,
+    RunbookPlanCheckDependencies,
+    RunbookPlanCheckTarget,
+    build_command_checks,
+    build_runbook_plan_checks,
+    build_state_check,
 )
 
 
@@ -114,30 +118,40 @@ def _build_densegen_checks(
             Path(densegen_config_text),
             densegen_batch_runbook.parent,
         )
-        densegen_probe = dependencies.run_preflight_command(
-            ("uv", "run", "dense", "validate-config", "--probe-solver", "-c", str(densegen_config_path)),
-            cwd=study_repo_root,
-        )
-        checks.append(
-            build_command_check(
-                check_id="densegen.config.probe_solver",
-                check_group="densegen",
-                phase="densegen",
-                phase_id=densegen_phase_id,
-                summary=dependencies.choose_command_summary(
-                    densegen_probe,
-                    fallback="densegen config probe completed",
+        checks.extend(
+            build_command_checks(
+                targets=(
+                    CommandCheckTarget(
+                        check_id="densegen.config.probe_solver",
+                        check_group="densegen",
+                        phase="densegen",
+                        phase_id=densegen_phase_id,
+                        argv=(
+                            "uv",
+                            "run",
+                            "dense",
+                            "validate-config",
+                            "--probe-solver",
+                            "-c",
+                            str(densegen_config_path),
+                        ),
+                        cwd=study_repo_root,
+                        fallback_summary="densegen config probe completed",
+                        details={"config": str(densegen_config_path)},
+                    ),
                 ),
-                execution=densegen_probe,
-                details={"config": str(densegen_config_path)},
+                dependencies=CommandCheckDependencies(
+                    run_preflight_command=dependencies.run_preflight_command,
+                    choose_command_summary=dependencies.choose_command_summary,
+                ),
             )
         )
 
     checks.extend(
-        build_promoter_preflight_runbook_plan_checks(
-            study_repo_root=study_repo_root,
+        build_runbook_plan_checks(
+            repo_root=study_repo_root,
             targets=(
-                PromoterPreflightRunbookPlanTarget(
+                RunbookPlanCheckTarget(
                     check_id="densegen.batch.plan",
                     check_group="densegen",
                     phase="densegen",
@@ -146,7 +160,7 @@ def _build_densegen_checks(
                     fallback_summary="densegen batch plan completed",
                 ),
             ),
-            dependencies=PromoterPreflightRunbookPlanDependencies(
+            dependencies=RunbookPlanCheckDependencies(
                 run_preflight_command=dependencies.run_preflight_command,
                 safe_json_loads=dependencies.safe_json_loads,
                 choose_command_summary=dependencies.choose_command_summary,
@@ -171,22 +185,32 @@ def _build_construct_checks(
         return ()
 
     checks: list[PreflightCheck] = []
-    construct_doctor = dependencies.run_preflight_command(
-        ("uv", "run", "construct", "workspace", "doctor", "--workspace", str(construct_workspace_path)),
-        cwd=study_repo_root,
-    )
-    checks.append(
-        build_command_check(
-            check_id="construct.workspace.doctor",
-            check_group="construct",
-            phase="construct",
-            phase_id=construct_phase_id,
-            summary=dependencies.choose_command_summary(
-                construct_doctor,
-                fallback="construct workspace doctor completed",
+    checks.extend(
+        build_command_checks(
+            targets=(
+                CommandCheckTarget(
+                    check_id="construct.workspace.doctor",
+                    check_group="construct",
+                    phase="construct",
+                    phase_id=construct_phase_id,
+                    argv=(
+                        "uv",
+                        "run",
+                        "construct",
+                        "workspace",
+                        "doctor",
+                        "--workspace",
+                        str(construct_workspace_path),
+                    ),
+                    cwd=study_repo_root,
+                    fallback_summary="construct workspace doctor completed",
+                    details={"workspace": str(construct_workspace_path)},
+                ),
             ),
-            execution=construct_doctor,
-            details={"workspace": str(construct_workspace_path)},
+            dependencies=CommandCheckDependencies(
+                run_preflight_command=dependencies.run_preflight_command,
+                choose_command_summary=dependencies.choose_command_summary,
+            ),
         )
     )
 
@@ -262,33 +286,35 @@ def _build_construct_checks(
             )
             continue
 
-        construct_runtime = dependencies.run_preflight_command(
-            (
-                "uv",
-                "run",
-                "construct",
-                "workspace",
-                "validate-project",
-                "--workspace",
-                str(construct_workspace_path),
-                "--project",
-                project_id,
-                "--runtime",
-            ),
-            cwd=study_repo_root,
-        )
-        checks.append(
-            build_command_check(
-                check_id=check_id,
-                check_group="construct",
-                phase="construct",
-                phase_id=construct_phase_id,
-                summary=dependencies.choose_command_summary(
-                    construct_runtime,
-                    fallback="construct runtime validation completed",
+        checks.extend(
+            build_command_checks(
+                targets=(
+                    CommandCheckTarget(
+                        check_id=check_id,
+                        check_group="construct",
+                        phase="construct",
+                        phase_id=construct_phase_id,
+                        argv=(
+                            "uv",
+                            "run",
+                            "construct",
+                            "workspace",
+                            "validate-project",
+                            "--workspace",
+                            str(construct_workspace_path),
+                            "--project",
+                            project_id,
+                            "--runtime",
+                        ),
+                        cwd=study_repo_root,
+                        fallback_summary="construct runtime validation completed",
+                        details=construct_details,
+                    ),
                 ),
-                execution=construct_runtime,
-                details=construct_details,
+                dependencies=CommandCheckDependencies(
+                    run_preflight_command=dependencies.run_preflight_command,
+                    choose_command_summary=dependencies.choose_command_summary,
+                ),
             )
         )
 

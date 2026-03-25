@@ -24,7 +24,7 @@ _STATUS_REGISTRY_FILENAME = "status.registry.yaml"
 @lru_cache(maxsize=1)
 def list_status_kind_specs() -> tuple[StatusKindSpec, ...]:
     specs: list[StatusKindSpec] = []
-    loaded_progress_kinds: set[str] = set()
+    loaded_status_kinds: set[str] = set()
     loaded_provider_ids: set[str] = set()
     for fragment_path in _iter_status_registry_fragment_paths():
         payload = yaml.safe_load(fragment_path.read_text(encoding="utf-8")) or {}
@@ -47,7 +47,7 @@ def list_status_kind_specs() -> tuple[StatusKindSpec, ...]:
             if not isinstance(entry, dict):
                 raise ValueError(f"status registry entry {index} must be a mapping: {fragment_path}")
             spec = StatusKindSpec(
-                progress_kind=str(entry.get("progress_kind") or "").strip(),
+                status_kind=str(entry.get("status_kind") or "").strip(),
                 provider_id=provider_id,
                 provider_ref=str(entry.get("provider_ref") or "").strip(),
                 description=str(
@@ -59,25 +59,24 @@ def list_status_kind_specs() -> tuple[StatusKindSpec, ...]:
                 cost_class=str(entry.get("cost_class") or "cheap").strip().lower(),  # type: ignore[arg-type]
                 summary_scope=str(entry.get("summary_scope") or "workspace").strip().lower(),  # type: ignore[arg-type]
             )
-            if spec.progress_kind in loaded_progress_kinds:
+            if spec.status_kind in loaded_status_kinds:
                 raise ValueError(
-                    f"status registry fragment entry {index} duplicates progress kind {spec.progress_kind}: "
-                    f"{fragment_path}"
+                    f"status registry fragment entry {index} duplicates status kind {spec.status_kind}: {fragment_path}"
                 )
-            loaded_progress_kinds.add(spec.progress_kind)
+            loaded_status_kinds.add(spec.status_kind)
             specs.append(spec)
-    return tuple(sorted(specs, key=lambda item: item.progress_kind))
+    return tuple(sorted(specs, key=lambda item: item.status_kind))
 
 
-def load_status_kind_spec(progress_kind: str) -> StatusKindSpec:
-    normalized_kind = str(progress_kind or "").strip()
+def load_status_kind_spec(status_kind: str) -> StatusKindSpec:
+    normalized_kind = str(status_kind or "").strip()
     if not normalized_kind:
-        raise ValueError("progress kind must be non-empty")
+        raise ValueError("status kind must be non-empty")
     for spec in list_status_kind_specs():
-        if spec.progress_kind == normalized_kind:
+        if spec.status_kind == normalized_kind:
             return spec
     raise ValueError(
-        f"unsupported progress kind: {normalized_kind}. "
+        f"unsupported status kind: {normalized_kind}. "
         "Add an explicit checked-in status registry fragment before using this surface."
     )
 

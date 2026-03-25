@@ -40,7 +40,7 @@ def _opal_campaign_state_status(
         resolved_config = required_path(
             opal_config,
             flag_name="--opal-config or --opal-workdir",
-            progress_kind="opal-campaign-state",
+            status_kind="opal-campaign-state",
         )
         if not resolved_config.exists():
             inferred_workdir = _resolve_opal_campaign_root(resolved_config)
@@ -117,7 +117,7 @@ def _resolve_opal_workdir(*, opal_config: Path | None, opal_workdir: Path | None
     resolved_config = required_path(
         opal_config,
         flag_name="--opal-config or --opal-workdir",
-        progress_kind="opal-campaign-state",
+        status_kind="opal-campaign-state",
     )
     if not resolved_config.exists():
         raise ValueError(f"OPAL config not found: {resolved_config}")

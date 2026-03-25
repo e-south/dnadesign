@@ -13,7 +13,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
+
+StudyPhaseStatus = Literal["planned", "ready", "in_progress", "complete", "blocked", "blocked_gpu", "parallel_optional"]
+StudySummaryScope = Literal["repo", "workspace", "host", "cluster"]
+StudyPreflightScope = Literal["next", "full"]
+
+STUDY_PHASE_STATUSES = frozenset(
+    {"planned", "ready", "in_progress", "complete", "blocked", "blocked_gpu", "parallel_optional"}
+)
+STUDY_SUMMARY_SCOPES = frozenset({"repo", "workspace", "host", "cluster"})
+STUDY_PREFLIGHT_SCOPES = frozenset({"next", "full"})
 
 
 @dataclass(frozen=True)
@@ -40,7 +50,7 @@ class StudyPreflightNextScopeContract:
 
 @dataclass(frozen=True)
 class StudyPreflightContract:
-    default_scope: str
+    default_scope: StudyPreflightScope
     group_phase_bindings: dict[str, str] = field(default_factory=dict)
     next_scope: StudyPreflightNextScopeContract = field(default_factory=StudyPreflightNextScopeContract)
 
@@ -57,13 +67,43 @@ class StudyPreflightContract:
 
 
 @dataclass(frozen=True)
+class StudyPhaseContract:
+    id: str
+    status: StudyPhaseStatus
+    next_surface: str | None = None
+    blocker: str | None = None
+    output_dataset: str | None = None
+    primary_dataset: str | None = None
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "id": self.id,
+            "status": self.status,
+            "next_surface": self.next_surface,
+            "blocker": self.blocker,
+            "output_dataset": self.output_dataset,
+            "primary_dataset": self.primary_dataset,
+        }
+
+
+@dataclass(frozen=True)
 class StudyOpsContract:
     study_id: str
     family: str
     phase_order: tuple[str, ...]
-    snapshot_summary_scope: str
+    snapshot_summary_scope: StudySummaryScope
     preflight: StudyPreflightContract
+    current_phase_id: str | None = None
+    phases: tuple[StudyPhaseContract, ...] = ()
     raw_payload: dict[str, object] = field(default_factory=dict, repr=False)
+
+    @property
+    def phase_states(self) -> tuple[dict[str, object], ...]:
+        return tuple(phase.as_dict() for phase in self.phases)
+
+    @property
+    def phase_index(self) -> dict[str, StudyPhaseContract]:
+        return {phase.id: phase for phase in self.phases}
 
 
 @dataclass(frozen=True)
@@ -90,9 +130,16 @@ class StudyFamilyAdapter(Protocol):
 
 
 __all__ = [
+    "STUDY_PHASE_STATUSES",
+    "STUDY_PREFLIGHT_SCOPES",
+    "STUDY_SUMMARY_SCOPES",
     "StudyFamilyAdapter",
     "StudyOpsContract",
+    "StudyPhaseContract",
+    "StudyPhaseStatus",
     "StudyPreflightContract",
     "StudyPreflightNextScopeContract",
+    "StudyPreflightScope",
+    "StudySummaryScope",
     "StudyStatusContext",
 ]

@@ -37,7 +37,7 @@ from dnadesign.ops.cli.dynamic_inputs import (
 )
 
 if TYPE_CHECKING:
-    from dnadesign.ops.status import CampaignProgress, CampaignScaffold, InputFieldSpec, ProcedureProgress
+    from dnadesign.ops.status import CampaignScaffold, CampaignStatus, InputFieldSpec, ProcedureStatus
     from dnadesign.ops.status.models import StatusKindSpec
 
 app = typer.Typer(
@@ -63,10 +63,10 @@ def _build_campaign_scaffold(*args, **kwargs) -> CampaignScaffold:
     return build_campaign_scaffold(*args, **kwargs)
 
 
-def _build_procedure_progress(*args, **kwargs) -> ProcedureProgress:
-    from dnadesign.ops.status.campaign import build_procedure_progress
+def _build_procedure_status(*args, **kwargs) -> ProcedureStatus:
+    from dnadesign.ops.status.campaign import build_procedure_status
 
-    return build_procedure_progress(*args, **kwargs)
+    return build_procedure_status(*args, **kwargs)
 
 
 def _list_status_kind_specs() -> tuple[StatusKindSpec, ...]:
@@ -75,29 +75,29 @@ def _list_status_kind_specs() -> tuple[StatusKindSpec, ...]:
     return list_status_kind_specs()
 
 
-def _load_campaign_progress(*args, **kwargs) -> CampaignProgress:
-    from dnadesign.ops.status.campaign import load_campaign_progress
+def _load_campaign_status(*args, **kwargs) -> CampaignStatus:
+    from dnadesign.ops.status.campaign import load_campaign_status
 
-    return load_campaign_progress(*args, **kwargs)
+    return load_campaign_status(*args, **kwargs)
 
 
-def _load_status_kind_spec(progress_kind: str) -> StatusKindSpec:
+def _load_status_kind_spec(status_kind: str) -> StatusKindSpec:
     from dnadesign.ops.status.registry_loader import load_status_kind_spec
 
-    return load_status_kind_spec(progress_kind)
+    return load_status_kind_spec(status_kind)
 
 
-def _progress_required_inputs(progress_kind: str) -> tuple[InputFieldSpec, ...]:
-    return _load_status_kind_spec(progress_kind).required_inputs
+def _status_required_inputs(status_kind: str) -> tuple[InputFieldSpec, ...]:
+    return _load_status_kind_spec(status_kind).required_inputs
 
 
-def _progress_optional_inputs(progress_kind: str) -> tuple[tuple[str, str], ...]:
-    spec = _load_status_kind_spec(progress_kind)
+def _status_optional_inputs(status_kind: str) -> tuple[tuple[str, str], ...]:
+    spec = _load_status_kind_spec(status_kind)
     return tuple((field.cli_flag, field.summary) for field in spec.optional_inputs)
 
 
-def _progress_notes(entry: CatalogProcedureEntry) -> tuple[str, ...]:
-    return _load_status_kind_spec(entry.progress_kind).notes
+def _status_notes(entry: CatalogProcedureEntry) -> tuple[str, ...]:
+    return _load_status_kind_spec(entry.status_kind).notes
 
 
 def _progress_campaign_recovery_hint() -> str:
@@ -114,12 +114,12 @@ def _progress_campaign_path_hint() -> str:
 def _progress_required_input_lines(entry: CatalogProcedureEntry) -> tuple[str, ...]:
     return required_input_lines(
         label=entry.registry_id,
-        required_inputs=_progress_required_inputs(entry.progress_kind),
+        required_inputs=_status_required_inputs(entry.status_kind),
     )
 
 
 def _progress_optional_input_lines(entry: CatalogProcedureEntry) -> tuple[str, ...]:
-    return optional_input_lines(_load_status_kind_spec(entry.progress_kind).optional_inputs)
+    return optional_input_lines(_load_status_kind_spec(entry.status_kind).optional_inputs)
 
 
 def _progress_scaffold_recovery_hint() -> str:
@@ -146,7 +146,7 @@ def _first_unknown_registry_id(
     return None
 
 
-def _emit_progress_show_text(*, repo_root: Path, catalog_path: Path, result: ProcedureProgress) -> None:
+def _emit_progress_show_text(*, repo_root: Path, catalog_path: Path, result: ProcedureStatus) -> None:
     doc_path = repo_relative_catalog_doc_path(
         repo_root=repo_root,
         catalog_path=catalog_path,
@@ -157,7 +157,7 @@ def _emit_progress_show_text(*, repo_root: Path, catalog_path: Path, result: Pro
         f"Procedure: {result.title}",
         f"Doc: {doc_path}",
         f"Owner boundary: {result.owner_boundary}",
-        f"Progress kind: {result.progress_kind}",
+        f"Status kind: {result.status_kind}",
         f"State: {result.state}",
         f"Summary: {result.summary}",
         "Evidence:",
@@ -168,7 +168,7 @@ def _emit_progress_show_text(*, repo_root: Path, catalog_path: Path, result: Pro
     typer.echo("\n".join(lines))
 
 
-def _emit_progress_show_json(*, repo_root: Path, catalog_path: Path, result: ProcedureProgress) -> None:
+def _emit_progress_show_json(*, repo_root: Path, catalog_path: Path, result: ProcedureStatus) -> None:
     payload = result.as_dict()
     payload["doc_path"] = repo_relative_catalog_doc_path(
         repo_root=repo_root,
@@ -186,9 +186,9 @@ def _emit_progress_explain_text(
     owner_boundary: str,
     has_related_routes: bool,
 ) -> None:
-    spec = _load_status_kind_spec(entry.progress_kind)
-    required_inputs = _progress_required_inputs(entry.progress_kind)
-    optional_inputs = _progress_optional_inputs(entry.progress_kind)
+    spec = _load_status_kind_spec(entry.status_kind)
+    required_inputs = _status_required_inputs(entry.status_kind)
+    optional_inputs = _status_optional_inputs(entry.status_kind)
     lines = [
         f"Registry id: {entry.registry_id}",
         f"Procedure: {entry.title}",
@@ -199,7 +199,7 @@ def _emit_progress_explain_text(
             doc_path=entry.doc_path,
         ),
         f"Owner boundary: {owner_boundary}",
-        f"Progress kind: {entry.progress_kind}",
+        f"Status kind: {entry.status_kind}",
         f"Provider: {spec.provider_id}",
         f"What this status reads: {spec.description}",
         "Required inputs:",
@@ -228,7 +228,7 @@ def _emit_progress_explain_text(
             "- progress_scaffold_related: "
             + render_command(["uv", "run", "ops", "progress", "scaffold", "--related-to", entry.registry_id])
         )
-    notes = _progress_notes(entry)
+    notes = _status_notes(entry)
     if notes:
         lines.append("Notes:")
         for note in notes:
@@ -244,9 +244,9 @@ def _emit_progress_explain_json(
     owner_boundary: str,
     has_related_routes: bool,
 ) -> None:
-    spec = _load_status_kind_spec(entry.progress_kind)
-    required_inputs = _progress_required_inputs(entry.progress_kind)
-    optional_inputs = _progress_optional_inputs(entry.progress_kind)
+    spec = _load_status_kind_spec(entry.status_kind)
+    required_inputs = _status_required_inputs(entry.status_kind)
+    optional_inputs = _status_optional_inputs(entry.status_kind)
     payload = {
         "registry_id": entry.registry_id,
         "title": entry.title,
@@ -256,7 +256,7 @@ def _emit_progress_explain_json(
             doc_path=entry.doc_path,
         ),
         "owner_boundary": owner_boundary,
-        "progress_kind": entry.progress_kind,
+        "status_kind": entry.status_kind,
         "provider_id": spec.provider_id,
         "description": spec.description,
         "required_inputs": [field.as_dict() for field in required_inputs],
@@ -269,7 +269,7 @@ def _emit_progress_explain_json(
             ),
             "progress_scaffold": render_command(["uv", "run", "ops", "progress", "scaffold", entry.registry_id]),
         },
-        "notes": list(_progress_notes(entry)),
+        "notes": list(_status_notes(entry)),
     }
     if has_related_routes:
         payload["next_commands"]["progress_scaffold_related"] = render_command(
@@ -278,10 +278,10 @@ def _emit_progress_explain_json(
     typer.echo(json.dumps(payload, indent=2, sort_keys=True))
 
 
-def _emit_progress_kinds_text() -> None:
-    lines = ["Progress kinds"]
+def _emit_status_kinds_text() -> None:
+    lines = ["Status kinds"]
     for spec in _list_status_kind_specs():
-        lines.append(f"- {spec.progress_kind} [{spec.provider_id}]")
+        lines.append(f"- {spec.status_kind} [{spec.provider_id}]")
         lines.append(f"  {spec.description}")
         if spec.required_inputs:
             rendered_required = ", ".join(f"{field.cli_flag} {field.placeholder}" for field in spec.required_inputs)
@@ -294,15 +294,15 @@ def _emit_progress_kinds_text() -> None:
     typer.echo("\n".join(lines))
 
 
-def _emit_progress_kinds_json() -> None:
-    payload = {"progress_kinds": [spec.as_inventory_dict() for spec in _list_status_kind_specs()]}
+def _emit_status_kinds_json() -> None:
+    payload = {"status_kinds": [spec.as_inventory_dict() for spec in _list_status_kind_specs()]}
     typer.echo(json.dumps(payload, indent=2, sort_keys=True))
 
 
-def _emit_campaign_progress_text(*, repo_root: Path, catalog_path: Path, result: CampaignProgress) -> None:
+def _emit_campaign_progress_text(*, repo_root: Path, catalog_path: Path, result: CampaignStatus) -> None:
     counts = result.counts()
     lines = [
-        "Campaign progress",
+        "Campaign status",
         f"Campaign id: {result.campaign_id}",
         f"Manifest: {result.manifest_path}",
         f"Overall state: {result.overall_state()}",
@@ -312,7 +312,7 @@ def _emit_campaign_progress_text(*, repo_root: Path, catalog_path: Path, result:
     ]
     for step in result.steps:
         heading = f"- {step.label}: {step.registry_id}" if step.label else f"- {step.registry_id}"
-        lines.append(f"{heading} [{step.state} | {step.progress_kind}]")
+        lines.append(f"{heading} [{step.state} | {step.status_kind}]")
         lines.append(f"  {step.summary}")
         lines.append(
             "  Doc: "
@@ -325,7 +325,7 @@ def _emit_campaign_progress_text(*, repo_root: Path, catalog_path: Path, result:
     typer.echo("\n".join(lines))
 
 
-def _emit_campaign_progress_json(*, repo_root: Path, catalog_path: Path, result: CampaignProgress) -> None:
+def _emit_campaign_progress_json(*, repo_root: Path, catalog_path: Path, result: CampaignStatus) -> None:
     payload = result.as_dict()
     payload["steps"] = [
         {
@@ -441,13 +441,13 @@ def _progress_show_callback(
         raise typer.Exit(code=2)
 
     try:
-        spec = _load_status_kind_spec(entry.progress_kind)
+        spec = _load_status_kind_spec(entry.status_kind)
         raw_inputs = merge_status_input_values(
             flag_values=dynamic_values,
             input_items=input_items,
             input_schema=spec.input_schema,
         )
-        result = _build_procedure_progress(catalog, registry_id, raw_inputs=raw_inputs)
+        result = _build_procedure_status(catalog, registry_id, raw_inputs=raw_inputs)
     except ValueError as exc:
         message = f"Progress contract error: {exc}"
         if "requires --" in str(exc):
@@ -482,7 +482,7 @@ def _resolve_progress_show_spec_from_args(args: Sequence[str]) -> StatusKindSpec
     entry = catalog.find_procedure(registry_id)
     if entry is None:
         return None
-    return _load_status_kind_spec(entry.progress_kind)
+    return _load_status_kind_spec(entry.status_kind)
 
 
 def _scan_progress_show_args(args: Sequence[str]) -> tuple[str | None, Path | None]:
@@ -525,16 +525,16 @@ def _scan_progress_show_args(args: Sequence[str]) -> tuple[str | None, Path | No
 
 
 @app.command("kinds")
-def progress_kinds(
+def status_kinds(
     as_json: Annotated[
         bool,
         typer.Option("--json/--no-json", help="Emit machine-readable JSON instead of plain text."),
     ] = False,
 ) -> None:
     if as_json:
-        _emit_progress_kinds_json()
+        _emit_status_kinds_json()
         return
-    _emit_progress_kinds_text()
+    _emit_status_kinds_text()
 
 
 @app.command("explain")
@@ -609,7 +609,7 @@ def progress_campaign(
         raise typer.Exit(code=2) from exc
 
     try:
-        result = _load_campaign_progress(catalog, manifest_path=manifest)
+        result = _load_campaign_status(catalog, manifest_path=manifest)
     except (FileNotFoundError, ValueError) as exc:
         error_text = str(exc)
         message = f"Progress contract error: {error_text}"
@@ -707,7 +707,7 @@ def progress_scaffold(
             suggestions = suggest_procedure_registry_ids(catalog, missing_registry_id)
             if suggestions:
                 message += "\nDid you mean:\n" + "\n".join(f"- {candidate}" for candidate in suggestions)
-        if str(exc) == "progress scaffold requires at least one registry id or --related-to":
+        if str(exc) == "campaign scaffold requires at least one registry id or --related-to":
             message += "\n" + _progress_scaffold_recovery_hint()
         typer.echo(message, err=True)
         raise typer.Exit(code=2) from exc

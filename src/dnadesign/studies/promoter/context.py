@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/stress_promoter_ethanol_cipro/context.py
+src/dnadesign/studies/promoter/context.py
 
-Study-owned checked-in record resolution for the stress_promoter_ethanol_cipro
+Study-owned checked-in record resolution for the promoter
 status surfaces.
 
 Module Author(s): Eric J. South
@@ -16,10 +16,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from dnadesign.studies.core.models import StudyOpsContract
+from dnadesign.studies.core.record_loader import load_study_ops_contract
+
 
 @dataclass(frozen=True)
 class PromoterStudyContextDependencies:
-    discover_active_promoter_study_dir: Callable[..., tuple[Path, Path, str]]
+    discover_active_study_dir: Callable[..., tuple[Path, Path, str]]
     required_path: Callable[..., Path]
     discover_repo_root: Callable[[Path], Path | None]
     load_yaml_mapping: Callable[..., dict[str, object]]
@@ -67,29 +70,30 @@ class PromoterStudyResolvedContext:
     densegen_row_target: int | None
     densegen_row_gap: int | None
     evidence: dict[str, object]
+    ops_contract: StudyOpsContract | None = None
 
 
 def resolve_promoter_study_context(
     study_dir: Path | None,
     *,
     repo_root: Path | None = None,
-    progress_kind: str,
+    status_kind: str,
     dependencies: PromoterStudyContextDependencies,
 ) -> PromoterStudyResolvedContext:
     resolved_input_repo_root = repo_root.expanduser().resolve() if repo_root is not None else None
     selection_source = "explicit"
     requested_study_dir = str(study_dir) if study_dir is not None else None
     if study_dir is None:
-        resolved_study_dir, registry_path, active_registry_study = dependencies.discover_active_promoter_study_dir(
+        resolved_study_dir, registry_path, active_registry_study = dependencies.discover_active_study_dir(
             repo_root=resolved_input_repo_root,
-            progress_kind=progress_kind,
+            status_kind=status_kind,
         )
         selection_source = "active_registry"
     else:
         resolved_study_dir = dependencies.required_path(
             study_dir,
             flag_name="--study-dir",
-            progress_kind=progress_kind,
+            status_kind=status_kind,
             base_dir=resolved_input_repo_root,
         )
         registry_path = resolved_study_dir.parent / "index.yaml"
@@ -101,6 +105,7 @@ def resolve_promoter_study_context(
             resolved_study_dir=resolved_study_dir,
             study_repo_root=resolved_input_repo_root,
             study_id=resolved_study_dir.name,
+            ops_contract=None,
             selection_source=selection_source,
             registry_path=registry_path,
             active_study=None,
@@ -145,6 +150,7 @@ def resolve_promoter_study_context(
     required_paths = {
         "campaign.yaml": resolved_study_dir / "campaign.yaml",
         "datasets.yaml": resolved_study_dir / "datasets.yaml",
+        "ops.study.yaml": resolved_study_dir / "ops.study.yaml",
         "status.md": resolved_study_dir / "status.md",
     }
     missing_required_files = tuple(name for name, path in required_paths.items() if not path.exists())
@@ -154,6 +160,7 @@ def resolve_promoter_study_context(
         "study_dir": str(resolved_study_dir),
         "repo_root": str(study_repo_root),
         "study_id": resolved_study_dir.name,
+        "ops_study_contract_path": str(required_paths["ops.study.yaml"]),
         "study_selection_source": selection_source,
         "active_study_registry_path": str(registry_path),
         "required_files": {name: str(path) for name, path in required_paths.items()},
@@ -168,6 +175,7 @@ def resolve_promoter_study_context(
             resolved_study_dir=resolved_study_dir,
             study_repo_root=study_repo_root,
             study_id=resolved_study_dir.name,
+            ops_contract=None,
             selection_source=selection_source,
             registry_path=registry_path,
             active_study=active_registry_study,
@@ -199,6 +207,7 @@ def resolve_promoter_study_context(
             evidence=evidence,
         )
 
+    ops_contract = load_study_ops_contract(resolved_study_dir)
     datasets_payload = dependencies.load_yaml_mapping(required_paths["datasets.yaml"], label="datasets.yaml")
     datasets_entries = datasets_payload.get("datasets") or []
     if not isinstance(datasets_entries, list):
@@ -230,7 +239,7 @@ def resolve_promoter_study_context(
         dependencies.resolve_repo_relative_path(
             repo_root=study_repo_root,
             raw_path=canonical_usr_root_text,
-            progress_kind=progress_kind,
+            status_kind=status_kind,
         )
         if canonical_usr_root_text is not None
         else None
@@ -254,7 +263,7 @@ def resolve_promoter_study_context(
         entry_usr_root = dependencies.resolve_repo_relative_path(
             repo_root=study_repo_root,
             raw_path=entry_usr_root_text,
-            progress_kind=progress_kind,
+            status_kind=status_kind,
         )
         records_path = (entry_usr_root / dataset_id / "records.parquet").resolve()
         exists = records_path.exists()
@@ -279,7 +288,7 @@ def resolve_promoter_study_context(
         study_pipeline.get("execution_surfaces"),
         repo_root=study_repo_root,
         label="execution_surfaces",
-        progress_kind=progress_kind,
+        status_kind=status_kind,
     )
     execution_surface_states: list[dict[str, object]] = []
     missing_execution_surfaces: list[str] = []
@@ -289,27 +298,9 @@ def resolve_promoter_study_context(
         if not exists:
             missing_execution_surfaces.append(label)
 
-    phases_payload = study_pipeline.get("phases") or []
-    if phases_payload and not isinstance(phases_payload, list):
-        raise ValueError(f"phases must be a list: {pipeline_path}")
-    phase_states: list[dict[str, object]] = []
-    phase_index: dict[str, dict[str, object]] = {}
-    for phase in phases_payload:
-        if not isinstance(phase, dict):
-            raise ValueError(f"phase entry must be a mapping: {pipeline_path}")
-        phase_id = dependencies.required_metadata_text(phase.get("id"), label="phase id", source=pipeline_path)
-        phase_state = {
-            "id": phase_id,
-            "status": dependencies.string_or_none(phase.get("status")) or "unknown",
-            "next_surface": dependencies.string_or_none(phase.get("next_surface")),
-            "blocker": dependencies.string_or_none(phase.get("blocker")),
-            "output_dataset": dependencies.string_or_none(phase.get("output_dataset")),
-            "primary_dataset": dependencies.string_or_none(phase.get("primary_dataset")),
-        }
-        phase_states.append(phase_state)
-        phase_index[phase_id] = phase_state
-
-    current_phase = dependencies.string_or_none(study_pipeline.get("current_phase"))
+    phase_states = [phase.as_dict() for phase in ops_contract.phases]
+    phase_index = {phase.id: phase.as_dict() for phase in ops_contract.phases}
+    current_phase = ops_contract.current_phase_id
     current_phase_is_known = current_phase in phase_index if current_phase is not None else False
     next_ready_phase = _first_phase_by_status(phase_states, status="ready")
     next_in_progress_phase = _first_phase_by_status(phase_states, status="in_progress")
@@ -332,6 +323,7 @@ def resolve_promoter_study_context(
         {
             "active_study": active_study,
             "is_active_study": active_study == resolved_study_dir.name if active_study is not None else None,
+            "ops_study_contract": dict(ops_contract.raw_payload),
             "canonical_usr_root": str(canonical_usr_root_path) if canonical_usr_root_path is not None else None,
             "datasets": dataset_states,
             "missing_declared_present": missing_declared_present,
@@ -358,6 +350,7 @@ def resolve_promoter_study_context(
         resolved_study_dir=resolved_study_dir,
         study_repo_root=study_repo_root,
         study_id=resolved_study_dir.name,
+        ops_contract=ops_contract,
         selection_source=selection_source,
         registry_path=registry_path,
         active_study=active_study,

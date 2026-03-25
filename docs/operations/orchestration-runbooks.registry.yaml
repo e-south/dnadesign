@@ -8,7 +8,7 @@ entry_artifact: workspace-scoped ops runbook YAML plus scheduler and optional no
 exit_artifact: audit JSON, rendered command plan, and optional submit or watcher contract
 summary: Deterministic control-plane runbook contract for DenseGen or Infer batch submit flows with optional Notify chaining.
 execution_kind: executable
-progress_kind: ops-audit-json
+status_kind: ops-audit-json
 related_tools:
   - densegen
   - infer

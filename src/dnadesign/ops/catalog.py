@@ -97,7 +97,7 @@ class CatalogProcedureEntry:
     entry_artifact: str
     exit_artifact: str
     execution_kind: str
-    progress_kind: str
+    status_kind: str
     summary: str
     catalog_order: int = field(repr=False)
     keywords: tuple[str, ...] = field(default_factory=tuple, repr=False)
@@ -122,7 +122,7 @@ class CatalogQuery:
     entry_type: str | None = None
     plane: str | None = None
     execution_kind: str | None = None
-    progress_kind: str | None = None
+    status_kind: str | None = None
     related_to: str | None = None
     tool: str | None = None
 
@@ -136,8 +136,8 @@ class CatalogQuery:
             filters["plane"] = self.plane
         if self.execution_kind:
             filters["execution_kind"] = self.execution_kind
-        if self.progress_kind:
-            filters["progress_kind"] = self.progress_kind
+        if self.status_kind:
+            filters["status_kind"] = self.status_kind
         if self.related_to:
             filters["related_to"] = self.related_to
         if self.tool:
@@ -150,7 +150,7 @@ class CatalogQuery:
         return tuple(token for token in self.query.lower().split() if token)
 
     def has_procedure_filters(self) -> bool:
-        return any((self.entry_type, self.plane, self.execution_kind, self.progress_kind))
+        return any((self.entry_type, self.plane, self.execution_kind, self.status_kind))
 
     def has_tool_filters(self) -> bool:
         return self.tool is not None
@@ -303,7 +303,7 @@ def render_catalog_procedure_section(catalog: RunbookCatalog) -> str:
     lines = [
         _PROCEDURES_SECTION_INTRO,
         "",
-        "| Registry id | Procedure | Type | Plane | Execution kind | Progress kind | Summary |",
+        "| Registry id | Procedure | Type | Plane | Execution kind | Status kind | Summary |",
         "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     for entry in catalog.procedures:
@@ -314,7 +314,7 @@ def render_catalog_procedure_section(catalog: RunbookCatalog) -> str:
             f"`{entry.entry_type}` | "
             f"`{entry.plane}` | "
             f"`{entry.execution_kind}` | "
-            f"`{entry.progress_kind}` | "
+            f"`{entry.status_kind}` | "
             f"{entry.summary} |"
         )
     return "\n".join(lines)
@@ -610,7 +610,7 @@ def _load_registry_metadata_file(
         entry_artifact=_required_string(payload, field_name="entry_artifact", metadata_path=metadata_path),
         exit_artifact=_required_string(payload, field_name="exit_artifact", metadata_path=metadata_path),
         execution_kind=_required_string(payload, field_name="execution_kind", metadata_path=metadata_path),
-        progress_kind=_required_string(payload, field_name="progress_kind", metadata_path=metadata_path),
+        status_kind=_required_string(payload, field_name="status_kind", metadata_path=metadata_path),
         summary=_required_string(payload, field_name="summary", metadata_path=metadata_path),
         keywords=_optional_metadata_keywords(payload, metadata_path=metadata_path),
         related_tools=_optional_related_tools(payload, metadata_path=metadata_path),
@@ -712,7 +712,7 @@ def _required_string(payload: dict[str, object], *, field_name: str, metadata_pa
             "plane",
             "owner_boundary",
             "execution_kind",
-            "progress_kind",
+            "status_kind",
         }
         and _METADATA_TOKEN_PATTERN.fullmatch(value) is None
     ):
@@ -1080,7 +1080,7 @@ def _matches_procedure_query(
         return False
     if query.execution_kind is not None and entry.execution_kind != query.execution_kind:
         return False
-    if query.progress_kind is not None and entry.progress_kind != query.progress_kind:
+    if query.status_kind is not None and entry.status_kind != query.status_kind:
         return False
     if related_registry_ids is not None and entry.registry_id not in related_registry_ids:
         return False
@@ -1121,7 +1121,7 @@ def _procedure_haystack(entry: CatalogProcedureEntry) -> str:
             entry.plane,
             entry.owner_boundary,
             entry.execution_kind,
-            entry.progress_kind,
+            entry.status_kind,
             entry.summary,
             entry.entry_artifact,
             entry.exit_artifact,

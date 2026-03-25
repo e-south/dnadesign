@@ -29,7 +29,7 @@ def provide_ops_audit_status(
 
 
 def _ops_audit_status(audit_json: object) -> tuple[str, str, dict[str, object]]:
-    resolved_audit = required_path(audit_json, flag_name="--audit-json", progress_kind="ops-audit-json")
+    resolved_audit = required_path(audit_json, flag_name="--audit-json", status_kind="ops-audit-json")
     if not resolved_audit.exists():
         return (
             "missing",

@@ -95,7 +95,7 @@ class InputFieldSpec:
 
 @dataclass(frozen=True)
 class StatusKindSpec:
-    progress_kind: str
+    status_kind: str
     provider_id: str
     provider_ref: str
     description: str
@@ -106,23 +106,21 @@ class StatusKindSpec:
     summary_scope: Literal["repo", "workspace", "host", "cluster"] = "workspace"
 
     def __post_init__(self) -> None:
-        progress_kind = str(self.progress_kind or "").strip()
+        status_kind = str(self.status_kind or "").strip()
         provider_id = str(self.provider_id or "").strip()
         provider_ref = str(self.provider_ref or "").strip()
-        if not progress_kind:
-            raise ValueError("status kind spec must define a non-empty progress_kind")
+        if not status_kind:
+            raise ValueError("status kind spec must define a non-empty status_kind")
         if not provider_id:
-            raise ValueError(f"status kind spec {progress_kind} must define a non-empty provider_id")
+            raise ValueError(f"status kind spec {status_kind} must define a non-empty provider_id")
         if not provider_ref or ":" not in provider_ref:
             raise ValueError(
-                "status kind spec "
-                f"{progress_kind} must define provider_ref as module:function, "
-                f"received {provider_ref!r}"
+                f"status kind spec {status_kind} must define provider_ref as module:function, received {provider_ref!r}"
             )
         seen_names: set[str] = set()
         for field_spec in self.input_schema:
             if field_spec.name in seen_names:
-                raise ValueError(f"status kind spec {progress_kind} defines duplicate input field: {field_spec.name}")
+                raise ValueError(f"status kind spec {status_kind} defines duplicate input field: {field_spec.name}")
             seen_names.add(field_spec.name)
 
     @property
@@ -135,7 +133,7 @@ class StatusKindSpec:
 
     def as_inventory_dict(self) -> dict[str, object]:
         return {
-            "progress_kind": self.progress_kind,
+            "status_kind": self.status_kind,
             "provider_id": self.provider_id,
             "description": self.description,
             "required_inputs": [field.as_dict() for field in self.required_inputs],
@@ -154,12 +152,12 @@ class StatusKindSpec:
 
 
 @dataclass(frozen=True)
-class ProcedureProgress:
+class ProcedureStatus:
     registry_id: str
     title: str
     doc_path: str
     owner_boundary: str
-    progress_kind: str
+    status_kind: str
     label: str | None
     state: str
     summary: str
@@ -167,7 +165,7 @@ class ProcedureProgress:
 
     def __post_init__(self) -> None:
         if self.state not in _STATUS_STATES:
-            raise ValueError(f"invalid procedure progress state: {self.state}")
+            raise ValueError(f"invalid procedure status state: {self.state}")
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -175,7 +173,7 @@ class ProcedureProgress:
             "title": self.title,
             "doc_path": self.doc_path,
             "owner_boundary": self.owner_boundary,
-            "progress_kind": self.progress_kind,
+            "status_kind": self.status_kind,
             "label": self.label,
             "state": self.state,
             "summary": self.summary,
@@ -189,7 +187,7 @@ class CampaignScaffoldStep:
     title: str
     doc_path: str
     owner_boundary: str
-    progress_kind: str
+    status_kind: str
     label: str
     input_schema: tuple[InputFieldSpec, ...]
 
@@ -208,7 +206,7 @@ class CampaignScaffoldStep:
             "title": self.title,
             "doc_path": self.doc_path,
             "owner_boundary": self.owner_boundary,
-            "progress_kind": self.progress_kind,
+            "status_kind": self.status_kind,
             "label": self.label,
             "required_inputs": [field.as_dict() for field in self.input_schema if field.display_required],
             "optional_inputs": [
@@ -247,10 +245,10 @@ class CampaignScaffold:
 
 
 @dataclass(frozen=True)
-class CampaignProgress:
+class CampaignStatus:
     manifest_path: Path
     campaign_id: str
-    steps: tuple[ProcedureProgress, ...]
+    steps: tuple[ProcedureStatus, ...]
     manifest_version: int = 2
     path_base: str | None = None
 
@@ -280,10 +278,10 @@ class CampaignProgress:
 
 
 __all__ = [
-    "CampaignProgress",
+    "CampaignStatus",
     "CampaignScaffold",
     "CampaignScaffoldStep",
     "InputFieldSpec",
-    "ProcedureProgress",
+    "ProcedureStatus",
     "StatusKindSpec",
 ]

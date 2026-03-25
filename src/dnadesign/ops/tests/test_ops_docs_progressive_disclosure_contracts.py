@@ -117,7 +117,7 @@ def test_ops_how_to_doc_carries_quick_usage_commands() -> None:
         "uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>"
         in text
     )
-    assert "inspect the required progress flags before you run `progress show`" in text
+    assert "inspect the required status flags before you run `progress show`" in text
     assert "uv run ops progress scaffold <registry-id> ..." in text
     assert "prints YAML to stdout unless you pass `--out`" in text
     assert "can include more than one tool" in text
@@ -285,7 +285,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "--section tool-sources" in text
     assert "--related-to usr.data-plane.promoter-feature-matrix" in text
     assert "uv run ops catalog show <registry-id>" in text
-    assert "required progress inputs" in text
+    assert "required status inputs" in text
     assert "linked deeper docs" in text
     assert "next shell commands" in text
     assert "uv run ops progress explain <registry-id>" in text
@@ -297,7 +297,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "### Common examples" in text
     assert "### Cross-tool procedures" in text
     assert "### Tool docs" in text
-    assert "### Progress views" in text
+    assert "### Status views" in text
     assert "### Explicit campaign manifest shape" in text
     assert "### Boundary reminders" not in text
     assert "ops.control-plane.orchestration" in text

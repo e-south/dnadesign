@@ -19,7 +19,7 @@ If you are entering from the shell rather than browsing docs first, start with `
 
 - [Packaged runbook presets](../runbooks/presets): checked-in starter runbooks for common orchestration routes.
 - [`dnadesign.ops`](../README.md): package README with the short tool overview.
-- [Runbook catalog progress views](../../../../docs/runbooks/README.md#progress-views): glossary for registered progress adapters and explicit campaign manifests.
+- [Runbook catalog status views](../../../../docs/runbooks/README.md#status-views): glossary for registered status adapters and explicit campaign manifests.
 
 ### Boundary reminders
 

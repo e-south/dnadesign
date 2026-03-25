@@ -8,7 +8,7 @@ entry_artifact: USR dataset plus one explicit infer-derived X column
 exit_artifact: initialized OPAL campaign state plus round outputs and selection ledgers
 summary: Start the label, train, and select loop once one explicit infer-derived X column or exported matrix already exists.
 execution_kind: round-loop
-progress_kind: opal-campaign-state
+status_kind: opal-campaign-state
 related_tools:
   - usr
   - infer

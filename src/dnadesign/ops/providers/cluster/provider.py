@@ -33,7 +33,7 @@ def _cluster_run_index_status(cluster_results_root: object) -> tuple[str, str, d
     resolved_root = required_path(
         cluster_results_root,
         flag_name="--cluster-results-root",
-        progress_kind="cluster-run-index",
+        status_kind="cluster-run-index",
     )
     index_path = resolved_root / "index.parquet"
     if not index_path.exists():

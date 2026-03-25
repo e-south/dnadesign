@@ -8,7 +8,7 @@ entry_artifact: one chosen feature column or exported matrix in a USR dataset or
 exit_artifact: cluster run records, embeddings, plots, and downstream exploratory summaries
 summary: Explore one chosen feature column or exported matrix through clustering, UMAP, and downstream summaries.
 execution_kind: exploratory
-progress_kind: cluster-run-index
+status_kind: cluster-run-index
 related_tools:
   - usr
   - infer

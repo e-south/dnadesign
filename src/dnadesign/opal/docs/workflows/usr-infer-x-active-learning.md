@@ -8,7 +8,7 @@
 **Registry-id:** opal.downstream.usr-infer-x-active-learning
 **Summary:** Start the label, train, and select loop once one explicit infer-derived X column or exported matrix already exists.
 **Execution-kind:** round-loop
-**Progress-kind:** opal-campaign-state
+**Status-kind:** opal-campaign-state
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-19

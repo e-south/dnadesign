@@ -21,11 +21,11 @@ def required_path(
     path: Path | None,
     *,
     flag_name: str,
-    progress_kind: str,
+    status_kind: str,
     base_dir: Path | None = None,
 ) -> Path:
     if path is None:
-        raise ValueError(f"progress kind '{progress_kind}' requires {flag_name}")
+        raise ValueError(f"status kind '{status_kind}' requires {flag_name}")
     return resolve_input_path(path, base_dir=base_dir)
 
 
@@ -42,9 +42,9 @@ def resolve_repo_relative_path(
     *,
     repo_root: Path,
     raw_path: str | None,
-    progress_kind: str = "promoter-study-record",
+    status_kind: str,
 ) -> Path:
-    normalized = required_text(raw_path, flag_name="<repo-relative-path>", progress_kind=progress_kind)
+    normalized = required_text(raw_path, flag_name="<repo-relative-path>", status_kind=status_kind)
     return resolve_path_ref(
         normalized,
         repo_root=repo_root,
@@ -58,7 +58,7 @@ def resolve_named_path_mapping(
     *,
     repo_root: Path,
     label: str,
-    progress_kind: str,
+    status_kind: str,
 ) -> dict[str, Path]:
     if payload and not isinstance(payload, dict):
         raise ValueError(f"{label} must be a mapping")
@@ -67,7 +67,7 @@ def resolve_named_path_mapping(
         resolved[name] = resolve_repo_relative_path(
             repo_root=repo_root,
             raw_path=raw_path,
-            progress_kind=progress_kind,
+            status_kind=status_kind,
         )
     return resolved
 

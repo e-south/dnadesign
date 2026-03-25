@@ -14,7 +14,7 @@ Do not use this package when:
 - the change only touches checked-in study records under `docs/studies/`
 
 Current families:
-- `stress_promoter_ethanol_cipro`: promoter-study snapshot and preflight adapters
+- `promoter`: promoter-study snapshot and preflight adapters
 
 See also:
 - [Ops README](../ops/README.md)

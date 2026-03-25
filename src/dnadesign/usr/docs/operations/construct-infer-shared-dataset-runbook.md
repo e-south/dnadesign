@@ -8,7 +8,7 @@
 **Registry-id:** usr.data-plane.construct-infer-source-of-truth
 **Summary:** Realize construct outputs into one shared USR dataset and use that dataset as the durable Infer handoff.
 **Execution-kind:** staged
-**Progress-kind:** usr-dataset-state
+**Status-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-20

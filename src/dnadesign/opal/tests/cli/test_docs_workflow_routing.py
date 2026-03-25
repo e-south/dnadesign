@@ -46,7 +46,7 @@ def test_opal_usr_infer_x_workflow_keeps_upstream_preconditions_explicit() -> No
     assert "**Owner-boundary:** opal" in workflow
     assert "**Registry-id:** opal.downstream.usr-infer-x-active-learning" in workflow
     assert "**Execution-kind:** round-loop" in workflow
-    assert "**Progress-kind:** opal-campaign-state" in workflow
+    assert "**Status-kind:** opal-campaign-state" in workflow
     assert "starts after infer write-back is already complete" in workflow
     assert "data.location.kind: usr" in workflow
     assert "x_column_name" in workflow

@@ -24,33 +24,33 @@ from ..catalog import (
     load_catalog_related_registry_ids,
     resolve_catalog_procedure_entry,
 )
-from .models import CampaignProgress, CampaignScaffold, CampaignScaffoldStep, ProcedureProgress
+from .models import CampaignScaffold, CampaignScaffoldStep, CampaignStatus, ProcedureStatus
 from .path_ref import PathBase
 from .service import load_status_kind_spec, run_status_kind
 
 
-def build_procedure_progress(
+def build_procedure_status(
     catalog: RunbookCatalog,
     registry_id: str,
     *,
     raw_inputs: Mapping[str, object] | None,
     manifest_dir: Path | None = None,
     default_path_base: PathBase | None = None,
-) -> ProcedureProgress:
+) -> ProcedureStatus:
     entry = resolve_catalog_procedure_entry(catalog, registry_id)
     state, summary, evidence = run_status_kind(
-        entry.progress_kind,
+        entry.status_kind,
         repo_root=catalog.repo_root,
         raw_inputs=raw_inputs,
         manifest_dir=manifest_dir,
         default_path_base=default_path_base,
     )
-    return ProcedureProgress(
+    return ProcedureStatus(
         registry_id=entry.registry_id,
         title=entry.title,
         doc_path=entry.doc_path,
         owner_boundary=load_catalog_procedure_owner_boundary(catalog, entry),
-        progress_kind=entry.progress_kind,
+        status_kind=entry.status_kind,
         label=None,
         state=state,
         summary=summary,
@@ -58,7 +58,7 @@ def build_procedure_progress(
     )
 
 
-def load_campaign_progress(catalog: RunbookCatalog, *, manifest_path: Path) -> CampaignProgress:
+def load_campaign_status(catalog: RunbookCatalog, *, manifest_path: Path) -> CampaignStatus:
     resolved_manifest = manifest_path.expanduser().resolve()
     manifest_dir = resolved_manifest.parent
     if not resolved_manifest.exists():
@@ -78,7 +78,7 @@ def load_campaign_progress(catalog: RunbookCatalog, *, manifest_path: Path) -> C
 
     manifest_path_base = _resolve_campaign_path_base(payload=payload)
 
-    steps: list[ProcedureProgress] = []
+    steps: list[ProcedureStatus] = []
     for index, step_payload in enumerate(steps_payload, start=1):
         if not isinstance(step_payload, dict):
             raise ValueError(f"campaign manifest step {index} must be a mapping")
@@ -92,7 +92,7 @@ def load_campaign_progress(catalog: RunbookCatalog, *, manifest_path: Path) -> C
             step_index=index,
         )
         try:
-            step = build_procedure_progress(
+            step = build_procedure_status(
                 catalog,
                 registry_id,
                 raw_inputs=raw_inputs,
@@ -109,19 +109,19 @@ def load_campaign_progress(catalog: RunbookCatalog, *, manifest_path: Path) -> C
 
         label = str(step_payload.get("label") or "").strip()
         if label:
-            step = ProcedureProgress(
+            step = ProcedureStatus(
                 registry_id=step.registry_id,
                 title=step.title,
                 doc_path=step.doc_path,
                 owner_boundary=step.owner_boundary,
-                progress_kind=step.progress_kind,
+                status_kind=step.status_kind,
                 label=label,
                 state=step.state,
                 summary=step.summary,
                 evidence=dict(step.evidence),
             )
         steps.append(step)
-    return CampaignProgress(
+    return CampaignStatus(
         manifest_path=resolved_manifest,
         campaign_id=campaign_id or resolved_manifest.stem,
         steps=tuple(steps),
@@ -143,12 +143,12 @@ def build_campaign_scaffold(
         related_to=related_to,
     )
 
-    resolved_campaign_id = str(campaign_id or "progress_campaign").strip() or "progress_campaign"
+    resolved_campaign_id = str(campaign_id or "status_campaign").strip() or "status_campaign"
     used_labels: Counter[str] = Counter()
     steps: list[CampaignScaffoldStep] = []
     for registry_id in normalized_registry_ids:
         entry = resolve_catalog_procedure_entry(catalog, registry_id)
-        spec = load_status_kind_spec(entry.progress_kind)
+        spec = load_status_kind_spec(entry.status_kind)
         label = _suggest_scaffold_label(entry.registry_id, used_labels)
         steps.append(
             CampaignScaffoldStep(
@@ -156,7 +156,7 @@ def build_campaign_scaffold(
                 title=entry.title,
                 doc_path=entry.doc_path,
                 owner_boundary=load_catalog_procedure_owner_boundary(catalog, entry),
-                progress_kind=spec.progress_kind,
+                status_kind=spec.status_kind,
                 label=label,
                 input_schema=spec.input_schema,
             )
@@ -189,7 +189,7 @@ def _resolve_campaign_scaffold_registry_ids(
         seen_registry_ids.add(normalized_registry_id)
 
     if not ordered_registry_ids:
-        raise ValueError("progress scaffold requires at least one registry id or --related-to")
+        raise ValueError("campaign scaffold requires at least one registry id or --related-to")
     return tuple(ordered_registry_ids)
 
 
@@ -234,6 +234,6 @@ def _suggest_scaffold_label(registry_id: str, used_labels: Counter[str]) -> str:
 
 __all__ = [
     "build_campaign_scaffold",
-    "build_procedure_progress",
-    "load_campaign_progress",
+    "build_procedure_status",
+    "load_campaign_status",
 ]
