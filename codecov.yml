@@ -102,6 +102,10 @@ component_management:
       name: baserender
       paths:
         - src/dnadesign/baserender/**
+    - component_id: contracts
+      name: contracts
+      paths:
+        - src/dnadesign/contracts/**
     - component_id: permuter
       name: permuter
       paths:
