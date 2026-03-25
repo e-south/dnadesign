@@ -3,10 +3,10 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** reference
 **Audience:** cassette workflow users and maintainers
-**Updated by:** cruncher-maintainers on 2026-03-24
+**Updated by:** cruncher-maintainers on 2026-03-25
 **Applies to:** `uv run cruncher cassette design|solve`
-**Last verified:** 2026-03-24
-**Primary artifacts:** explicit cassette reports plus solve reports, hit tables, and per-hit bundles
+**Last verified:** 2026-03-25
+**Primary artifacts:** explicit cassette reports plus solve reports, hit tables, baserender handoff bundles, and per-hit bundles
 
 ### Contents
 - [Run directory](#run-directory)
@@ -74,6 +74,7 @@ Solve layout:
   solve_report.json
   solve_report.md
   table__hits.csv
+  baserender_hits_contract.json
   solve_manifest.json
   solve_status.json
   specs/
@@ -91,8 +92,9 @@ Solve layout:
 
 Solve-mode semantics:
 
-- `solve_report.json`: machine-readable solve summary with `solved`, `no_hits`, `invalid_spec`, or `invalid_catalog`.
-- `table__hits.csv`: ranked hit table with score, nick boundaries, bounded segment length, and GC metrics.
+- `solve_report.json`: machine-readable solve summary with `solved`, `no_hits`, `invalid_spec`, or `invalid_catalog`, plus `selection_summary` for accepted-pool and policy telemetry.
+- `table__hits.csv`: ranked hit table with score, `base_penalty_vector`, selection policy, `selection_rank_reason`, nick boundaries, bounded segment length, GC metrics, and distance-to-previous-selected.
+- `baserender_hits_contract.json`: optional data-only `generic_features` bundle for the selected hits, including record-shaped rows plus solve/report pointers for downstream baserender consumption.
 - `specs/resolved_catalog.yaml`: merged preset-plus-overlay catalog snapshot used for the solve when catalog loading succeeds.
 - `hits/<rank>_<hit_id>/resolved_candidate.cassette.yaml`: explicit spec that round-trips through the normal cassette planner.
 - per-hit `report.json` and `report.md`: explicit satisfied report for the materialized candidate.
@@ -104,6 +106,7 @@ Solve-mode semantics:
 - satisfied specs write `status: completed`
 - unsatisfied specs write `status: unsatisfied`
 - unsatisfied runs still preserve manifest, status, provenance snapshots, and reports
-- solve status artifacts preserve `warning_count`, `warnings`, and `search_truncated` so budget-capped searches are machine-visible without reopening the full report
+- solve status artifacts preserve `warning_count`, `warnings`, `warning_codes`, `search_truncated`, `accepted_pool_truncated`, the optional `baserender_hits_contract` path, and lightweight `selection` telemetry so budget-capped or policy-limited searches are machine-visible without reopening the full report
+- warning codes include `MAX_SEARCH_NODES_REACHED`, `MAX_ENUMERATED_CANDIDATES_REACHED`, `ACCEPTED_POOL_TRUNCATED`, `SELECTION_RESULTS_POOL_BOUNDED`, `SELECTION_RESULTS_SEARCH_BOUNDED`, and `SELECTION_POLICY_LIMITED_HITS`
 - cassette runs do not register in workspace `run_index.json`
 - cassette runs do not write legacy sample artifacts such as `meta/run_manifest.json`, `optimize/`, or `plots/`

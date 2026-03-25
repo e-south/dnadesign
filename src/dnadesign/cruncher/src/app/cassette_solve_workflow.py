@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import shutil
+from itertools import zip_longest
 from pathlib import Path
 
 import yaml
@@ -23,6 +24,7 @@ from dnadesign.cruncher.cassette.artifacts import (
     solve_hit_dir,
     solve_id,
     solve_resolved_catalog_path,
+    write_solve_baserender_hits_contract,
     write_solve_hit_bundle,
     write_solve_hits_table,
     write_solve_inputs,
@@ -30,6 +32,7 @@ from dnadesign.cruncher.cassette.artifacts import (
     write_solve_report,
     write_solve_status,
 )
+from dnadesign.cruncher.cassette.baserender_contract import build_solve_baserender_hits_contract
 from dnadesign.cruncher.cassette.catalog import dump_nickase_catalog_yaml, load_merged_nickase_catalog
 from dnadesign.cruncher.cassette.errors import CassetteSpecError, NickaseCatalogError
 from dnadesign.cruncher.cassette.load import load_cassette_solve_spec, resolve_workspace_root_for_solve_spec
@@ -62,6 +65,12 @@ def _build_invalid_report(
     )
 
 
+def _mapping_member(payload: object, key: str) -> object | None:
+    if not isinstance(payload, dict):
+        return None
+    return payload.get(key)
+
+
 def _best_effort_preflight_run_root(spec_path: Path) -> tuple[Path, list[str]]:
     default_run_root = Path("outputs/cassette_solves")
     unresolved_note = (
@@ -77,11 +86,9 @@ def _best_effort_preflight_run_root(spec_path: Path) -> tuple[Path, list[str]]:
         return default_run_root, [unresolved_note]
     if not isinstance(payload, dict):
         return default_run_root, [unresolved_note]
-    raw_run_dir = (
-        payload.get("cassette_solve", {}).get("output", {}).get("run_dir")
-        if isinstance(payload.get("cassette_solve"), dict)
-        else None
-    )
+    cassette_solve = _mapping_member(payload, "cassette_solve")
+    output = _mapping_member(cassette_solve, "output")
+    raw_run_dir = _mapping_member(output, "run_dir") if isinstance(output, dict) else None
     if not isinstance(raw_run_dir, str) or not raw_run_dir.strip():
         return default_run_root, [unresolved_note]
     run_root = Path(raw_run_dir)
@@ -136,6 +143,24 @@ def _persist_preflight_failure(
             "workspace_root": str(workspace_root.resolve()),
         }
     )
+    _write_solve_bundle(
+        run_dir=run_dir,
+        report=report,
+        workspace_root=workspace_root,
+        spec_path=spec_path,
+        status_message=f"cassette solve {report.status} (preflight; hits={len(report.hits)})",
+    )
+    return run_dir, report
+
+
+def _write_solve_bundle(
+    *,
+    run_dir: Path,
+    report: SolveReport,
+    workspace_root: Path,
+    spec_path: Path,
+    status_message: str,
+) -> None:
     write_solve_report(run_dir, report, markdown=render_solve_markdown_report(report))
     write_solve_hits_table(run_dir, report)
     write_solve_manifest(
@@ -150,9 +175,8 @@ def _persist_preflight_failure(
     write_solve_status(
         run_dir,
         report=report,
-        status_message=f"cassette solve {report.status} (preflight; hits={len(report.hits)})",
+        status_message=status_message,
     )
-    return run_dir, report
 
 
 def render_solve_markdown_report(report: SolveReport) -> str:
@@ -166,12 +190,19 @@ def render_solve_markdown_report(report: SolveReport) -> str:
         lines.append(f"- solve_id: {report.solve_id}")
     if report.run_dir:
         lines.append(f"- run_dir: {report.run_dir}")
+    if report.baserender_hits_contract_path:
+        lines.append(f"- baserender_hits_contract_path: {report.baserender_hits_contract_path}")
     if report.metadata.catalog_preset:
         lines.append(f"- catalog_preset: {report.metadata.catalog_preset}")
     for path in report.metadata.catalog_additional_paths:
         lines.append(f"- catalog_overlay: {path}")
-    for warning in report.metadata.warnings:
-        lines.append(f"- warning: {warning}")
+    for code, warning in zip_longest(report.metadata.warning_codes, report.metadata.warnings, fillvalue=None):
+        if code and warning:
+            lines.append(f"- warning[{code}]: {warning}")
+        elif warning:
+            lines.append(f"- warning: {warning}")
+        elif code:
+            lines.append(f"- warning_code: {code}")
     lines.extend(
         [
             f"- enumerated_candidate_count: {report.metadata.enumerated_candidate_count}",
@@ -180,6 +211,19 @@ def render_solve_markdown_report(report: SolveReport) -> str:
             f"- materialized_hit_count: {report.metadata.materialized_hit_count}",
         ]
     )
+    if report.selection_summary is not None:
+        lines.extend(
+            [
+                f"- selection_policy: {report.selection_summary.policy}",
+                f"- selection_pool_size: {report.selection_summary.pool_size}",
+                f"- accepted_pool_size: {report.selection_summary.accepted_pool_size}",
+                f"- accepted_pool_truncated: {report.selection_summary.accepted_pool_truncated}",
+                f"- selection_defaulted: {report.selection_summary.selection_policy_defaulted}",
+                f"- selection_non_exhaustive_reason: {report.selection_summary.selection_pool_non_exhaustive_reason}",
+                f"- selection_policy_underfilled: {report.selection_summary.policy_underfilled}",
+                f"- selection_policy_limited_hit_count: {report.selection_summary.policy_limited_hit_count}",
+            ]
+        )
     if report.issues:
         lines.extend(["", "## Issues"])
         for issue in report.issues:
@@ -328,7 +372,7 @@ def run_cassette_solve(path: str | Path, *, force_overwrite: bool = False) -> tu
 
     materialized_hit_runs: list[str] = []
     ranked_records = search_result.hits
-    hit_records_by_id = {hit.hit_id: hit for hit in ranked_records}
+    hit_records_by_id = {selected_hit.record.hit_id: selected_hit.record for selected_hit in ranked_records}
     hit_updates = []
     materialize_count = min(solve_spec.search.materialize_top_k, len(report.hits))
     for hit in report.hits[:materialize_count]:
@@ -336,10 +380,10 @@ def run_cassette_solve(path: str | Path, *, force_overwrite: bool = False) -> tu
         hit_dir = solve_hit_dir(run_dir, rank=hit.rank, hit_id=hit.hit_id)
         resolved_spec_payload = {"cassette": hit_record.explicit_spec.model_dump(mode="json")}
         resolved_spec_payload["cassette"]["catalog"]["path"] = str(solve_resolved_catalog_path(run_dir).resolve())
-        resolved_spec_path = hit_dir / "resolved_candidate.cassette.yaml"
+        resolved_candidate_spec_path = hit_dir / "resolved_candidate.cassette.yaml"
         resolved_report = hit_record.report.model_copy(
             update={
-                "spec_path": str(resolved_spec_path.resolve()),
+                "spec_path": str(resolved_candidate_spec_path.resolve()),
                 "catalog_path": str(solve_resolved_catalog_path(run_dir).resolve()),
                 "run_dir": str(hit_dir.resolve()),
                 "render_contract": hit_record.report.render_contract
@@ -366,20 +410,23 @@ def run_cassette_solve(path: str | Path, *, force_overwrite: bool = False) -> tu
             "metadata": report.metadata.model_copy(update={"materialized_hit_count": len(materialized_hit_runs)}),
         }
     )
-    write_solve_report(run_dir, report, markdown=render_solve_markdown_report(report))
-    write_solve_hits_table(run_dir, report)
-    write_solve_manifest(
-        run_dir,
-        build_solve_manifest(
-            run_dir=run_dir,
-            workspace_root=workspace_root,
-            spec_path=resolved_spec_path,
+    if solve_spec.output.write_render_contract and report.hits:
+        baserender_contract = build_solve_baserender_hits_contract(
             report=report,
-        ),
-    )
-    write_solve_status(
-        run_dir,
+            selected_hits=ranked_records,
+        )
+        report = report.model_copy(
+            update={
+                "baserender_hits_contract_path": str(
+                    write_solve_baserender_hits_contract(run_dir, baserender_contract).resolve()
+                )
+            }
+        )
+    _write_solve_bundle(
+        run_dir=run_dir,
         report=report,
+        workspace_root=workspace_root,
+        spec_path=resolved_spec_path,
         status_message=(
             f"cassette solve {report.status} (hits={len(report.hits)}, materialized={len(materialized_hit_runs)})"
         ),

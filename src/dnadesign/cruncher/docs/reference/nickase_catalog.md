@@ -3,14 +3,14 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** reference
 **Audience:** cassette workflow users and maintainers
-**Updated by:** cruncher-maintainers on 2026-03-24
+**Updated by:** cruncher-maintainers on 2026-03-25
 **Applies to:** workspace-local and built-in cassette nickase catalogs
-**Last verified:** 2026-03-24
+**Last verified:** 2026-03-25
 **Primary artifacts:** validated catalog entries used by `cassette validate|design`
 
 ### Contents
 - [File shape](#file-shape)
-- [Canonical entry semantics](#canonical-entry-semantics)
+- [Entry semantics](#entry-semantics)
 - [Legacy compatibility](#legacy-compatibility)
 - [Validation rules](#validation-rules)
 
@@ -52,28 +52,27 @@ variants:
 
 product_aliases:
   - alias_id: WarmStart Nt.BstNBI
-    canonical_variant_id: Nt.BstNBI
     alias_kind: formulation
 ```
 
-### Canonical entry semantics
+### Entry semantics
 
 - `schema_version`: must be `1`.
 - `entries`: non-empty list of nickase variant entries with unique `id` values.
 - `id`: stable variant identifier referenced by `cassette.nicking.left.nickase` and `cassette.nicking.right.nickase`.
 - `specificity_id`: recognition-specificity family identifier shared across related variants.
-- `motif_top_5to3`: canonical top-strand recognition motif. IUPAC nucleotide symbols are allowed.
+- `motif_top_5to3`: top-strand recognition motif. IUPAC nucleotide symbols are allowed.
 - `raw_cut_notation`: optional vendor/source notation parsed into normalized offsets.
-- `top_cut_offset`: signed bond-boundary offset from the motif start on the canonical top strand.
-- `bottom_cut_offset`: signed bond-boundary offset from the motif start on the canonical bottom strand.
+- `top_cut_offset`: signed bond-boundary offset from the motif start on the top strand.
+- `bottom_cut_offset`: signed bond-boundary offset from the motif start on the bottom strand.
 - Exactly one of `top_cut_offset` or `bottom_cut_offset` must be defined for a nickase variant.
 - `source`: optional provenance string preserved in the report metadata.
 - `metadata`: optional free-form dictionary preserved as normalized catalog metadata.
-- `product_aliases`: optional non-catalytic product/formulation aliases that point at a canonical catalytic variant.
+- `product_aliases`: optional non-catalytic product/formulation aliases that point at the underlying catalytic variant.
 
-Cruncher scans both the canonical motif and its reverse complement in the evaluated duplex context. It then derives the actual nicked strand and bond boundary from the normalized offset representation.
+Cruncher scans both the recorded motif and its reverse complement in the evaluated duplex context. It then derives the actual nicked strand and bond boundary from the normalized offset representation.
 
-`neb_nicking_v1` is the built-in seed preset used by `cassette solve`. It ships the NEB nicking variants listed in the phase 2/3 cassette solve spec, including a `WarmStart Nt.BstNBI` formulation alias that resolves to the canonical `Nt.BstNBI` catalytic rule.
+`neb_nicking_v1` is the built-in seed preset used by `cassette solve`. It ships the NEB nicking variants listed in the phase 2/3 cassette solve spec, including a `WarmStart Nt.BstNBI` formulation alias that resolves to the `Nt.BstNBI` catalytic rule.
 
 If you want a local copy of the packaged preset for inspection or overlay authoring, export it with:
 
@@ -95,13 +94,13 @@ nickases:
       cut_offset: 2
 ```
 
-The loader converts legacy fields into the canonical form:
+The loader converts legacy fields into the normalized form:
 
 - `recognition_sequence` -> `motif_top_5to3`
 - `nicked_site_strand: forward` -> `top_cut_offset = cut_offset`
 - `nicked_site_strand: reverse` -> `bottom_cut_offset = len(motif) - cut_offset`
 
-Do not mix legacy geometry fields with canonical `top_cut_offset` or `bottom_cut_offset` in the same entry.
+Do not mix legacy geometry fields with normalized `top_cut_offset` or `bottom_cut_offset` in the same entry.
 
 ### Validation rules
 

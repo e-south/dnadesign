@@ -3,14 +3,14 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** reference
 **Audience:** cassette workflow users and maintainers
-**Updated by:** cruncher-maintainers on 2026-03-24
+**Updated by:** cruncher-maintainers on 2026-03-25
 **Applies to:** `configs/cassettes/*.cassette.solve.yaml`
-**Last verified:** 2026-03-24
-**Primary artifacts:** `solve_report.json`, `table__hits.csv`, materialized explicit hit bundles
+**Last verified:** 2026-03-25
+**Primary artifacts:** `solve_report.json`, `table__hits.csv`, `baserender_hits_contract.json`, materialized explicit hit bundles
 
 ### Contents
 - [File location](#file-location)
-- [Canonical shape](#canonical-shape)
+- [Recommended shape](#recommended-shape)
 - [Field semantics](#field-semantics)
 - [Blacklist semantics](#blacklist-semantics)
 - [Search guardrails](#search-guardrails)
@@ -25,7 +25,7 @@ Cassette solve specs must live at:
 
 The loader does not overload explicit `.cassette.yaml` specs with solve semantics.
 
-### Canonical shape
+### Recommended shape
 
 ```yaml
 cassette_solve:
@@ -69,10 +69,15 @@ cassette_solve:
     max_hits: 25
     max_enumerated_candidates: 100000
     max_search_nodes: 250000
-    min_pairwise_hamming_distance: 2
     bounded_segment_target: 14
     gc_target: 0.5
     materialize_top_k: 5
+    selection:
+      policy: greedy_hamming
+      pool_size: 256
+      distance_metric: hamming
+      min_pairwise_distance: 2
+      diversity_weight: 0.35
   output:
     run_dir: outputs/cassette_solves
     write_render_contract: true
@@ -90,8 +95,19 @@ cassette_solve:
 - `sequence_blacklist.*`: literal or IUPAC sequence motifs excluded independently of catalog identities.
 - `catalog.preset`: built-in preset ID such as `neb_nicking_v1`.
 - `catalog.additional_paths`: local overlay catalogs appended after the preset. Duplicate IDs fail fast.
-- `search.max_hits`: number of ranked hits returned after diversity filtering.
+- `search.max_hits`: number of ranked hits returned after selection.
 - `search.materialize_top_k`: number of top hits written as explicit per-hit bundles.
+- `search.selection.policy`: `score_only`, `greedy_hamming`, or `mmr`.
+- `search.selection.pool_size`: bounded accepted-pool size used before final selection.
+- `search.selection.distance_metric`: currently `hamming`.
+- `search.selection.min_pairwise_distance`: hard floor used by `greedy_hamming` and optionally by `mmr`.
+- `search.selection.diversity_weight`: required for `mmr`; omitted for `score_only`.
+- `output.write_render_contract`: writes per-hit `render_contract.json` files and the solve-level `baserender_hits_contract.json` handoff bundle.
+
+Compatibility note:
+
+- legacy `search.min_pairwise_hamming_distance` still loads and normalizes into `search.selection.min_pairwise_distance`
+- omitting `search.selection` preserves the current compatibility default of `greedy_hamming`
 
 ### Blacklist semantics
 
@@ -109,8 +125,11 @@ Site-occurrence blacklists are specificity-first because sequence occurrence is 
 - `assignment_policy.allowed_left_variant_ids x allowed_right_variant_ids` must stay at or below 256 distinct pairings, and duplicate IDs are rejected at load time.
 - `max_enumerated_candidates` is the cap on fully concrete candidates sent through the explicit planner.
 - `max_search_nodes` is the cap on DFS search nodes explored before the tree is exhausted.
+- `search.selection.pool_size` bounds the accepted pool retained for final selection.
 - `max_hits` is capped at 128 and `materialize_top_k` at 32 so result retention and artifact fan-out stay bounded.
 - `max_enumerated_candidates` is capped at 250000 and `max_search_nodes` at 500000; larger values are rejected instead of being silently clamped.
 - When either cap is hit, the solve report emits warnings instead of silently pretending the search was exhaustive.
-- The solver also keeps a bounded internal hit buffer so abundant valid hits do not cause unbounded memory growth.
+- When the accepted pool truncates, the solve report emits `ACCEPTED_POOL_TRUNCATED`, `SELECTION_RESULTS_POOL_BOUNDED`, and/or `SELECTION_RESULTS_SEARCH_BOUNDED` as appropriate.
+- When diversity constraints prevent the selected set from reaching the available accepted-pool bound, the solve report emits `SELECTION_POLICY_LIMITED_HITS`.
+- `mmr` is opt-in and uses score tiers derived from the base penalty vector plus Hamming-sequence diversity over the bounded accepted pool.
 - Solve mode does not expose inert toggles for energetic hairpin validation or multi-intended nick modes.

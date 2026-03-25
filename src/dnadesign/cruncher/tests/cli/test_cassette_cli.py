@@ -160,6 +160,18 @@ def test_root_help_includes_cassette_group() -> None:
     assert "dual-context hairpin cassette" in result.output
 
 
+def test_cassette_help_describes_validate_design_solve_and_catalog_surface() -> None:
+    result = runner.invoke(app, ["cassette", "--help"], color=False)
+
+    assert result.exit_code == 0
+    assert "init-workspace" in result.output
+    assert "validate" in result.output
+    assert "design" in result.output
+    assert "solve" in result.output
+    assert "show" in result.output
+    assert "catalog" in result.output
+
+
 def test_cassette_command_module_defers_workflow_import() -> None:
     command_module = "dnadesign.cruncher.cli.commands.cassette"
     workflow_module = "dnadesign.cruncher.app.cassette_workflow"
@@ -227,12 +239,40 @@ def test_cassette_solve_json_is_machine_readable_and_materializes_hits(tmp_path:
     payload = json.loads(result.output)
     assert payload["status"] == "solved"
     assert len(payload["hits"]) == 3
+    assert payload["selection_summary"]["policy"] == "greedy_hamming"
+    assert payload["selection_summary"]["selection_policy_defaulted"] is True
     run_dir = Path(payload["run_dir"])
     assert run_dir.is_dir()
     assert str(run_dir).startswith(str(workspace / "outputs" / "cassette_solves"))
     assert (run_dir / "solve_report.json").exists()
     assert (run_dir / "table__hits.csv").exists()
     assert len(list((run_dir / "hits").iterdir())) == 2
+
+
+def test_cassette_solve_plaintext_surfaces_selection_policy_and_bounded_warnings(tmp_path: Path) -> None:
+    _workspace, spec_path = _write_solve_workspace(tmp_path)
+    payload = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+    payload["cassette_solve"]["search"]["max_enumerated_candidates"] = 32
+    payload["cassette_solve"]["search"]["materialize_top_k"] = 1
+    payload["cassette_solve"]["search"]["selection"] = {
+        "policy": "mmr",
+        "pool_size": 8,
+        "distance_metric": "hamming",
+        "min_pairwise_distance": 2,
+        "diversity_weight": 0.35,
+    }
+    payload["cassette_solve"]["search"].pop("min_pairwise_hamming_distance", None)
+    spec_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    result = runner.invoke(app, ["cassette", "solve", "--spec", str(spec_path)], color=False)
+
+    assert result.exit_code == 0
+    assert "Selection -> mmr" in result.output
+    assert "Selected ->" in result.output
+    assert "Pool ->" in result.output
+    assert "Selection bounds ->" in result.output
+    assert "ACCEPTED_POOL_TRUNCATED" in result.output
+    assert "SELECTION_RESULTS_SEARCH_BOUNDED" in result.output
 
 
 def test_cassette_solve_no_hits_exits_nonzero_after_writing_artifacts(tmp_path: Path) -> None:
@@ -264,6 +304,135 @@ def test_cassette_solve_invalid_catalog_exits_nonzero_after_writing_artifacts(tm
     run_dir = run_dirs[0]
     report = json.loads((run_dir / "solve_report.json").read_text(encoding="utf-8"))
     assert report["status"] == "invalid_catalog"
+
+
+def test_cassette_init_workspace_scaffolds_isolated_runtime_profiles(tmp_path: Path) -> None:
+    scaffold_root = tmp_path / "cassette_lab"
+    sibling_workspace = tmp_path / "other_workspace"
+    sibling_workspace.mkdir(parents=True, exist_ok=True)
+    sibling_sentinel = sibling_workspace / "sentinel.txt"
+    sibling_sentinel.write_text("keep", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["cassette", "init-workspace", "--output", str(scaffold_root)],
+        color=False,
+    )
+
+    assert result.exit_code == 0
+    assert "Cassette workspace scaffold" in result.output
+    assert (scaffold_root / "README.md").exists()
+    assert (scaffold_root / "cassette_workspace_manifest.json").exists()
+    manifest_payload = json.loads((scaffold_root / "cassette_workspace_manifest.json").read_text(encoding="utf-8"))
+    assert [item["label"] for item in manifest_payload["profiles"]] == ["fast", "balanced", "deep_mmr"]
+    profiles_by_filename = {item["filename"]: item for item in manifest_payload["profiles"]}
+    assert profiles_by_filename["demo_hairpin_fast.cassette.solve.yaml"]["selection"]["policy"] == "greedy_hamming"
+    assert profiles_by_filename["demo_hairpin_balanced.cassette.solve.yaml"]["selection"]["policy"] == "greedy_hamming"
+    assert profiles_by_filename["demo_hairpin_deep_mmr.cassette.solve.yaml"]["selection"]["policy"] == "mmr"
+    assert (
+        profiles_by_filename["demo_hairpin_fast.cassette.solve.yaml"]["search"]["max_search_nodes"]
+        < profiles_by_filename["demo_hairpin_balanced.cassette.solve.yaml"]["search"]["max_search_nodes"]
+        < profiles_by_filename["demo_hairpin_deep_mmr.cassette.solve.yaml"]["search"]["max_search_nodes"]
+    )
+    spec_dir = scaffold_root / "configs" / "cassettes"
+    profile_names = [
+        "demo_hairpin_fast.cassette.solve.yaml",
+        "demo_hairpin_balanced.cassette.solve.yaml",
+        "demo_hairpin_deep_mmr.cassette.solve.yaml",
+    ]
+    for profile_name in profile_names:
+        assert (spec_dir / profile_name).exists()
+
+    for profile_name in profile_names:
+        solve_result = runner.invoke(
+            app,
+            ["cassette", "solve", "--spec", str(spec_dir / profile_name), "--json"],
+            color=False,
+        )
+        assert solve_result.exit_code == 0, profile_name
+        payload = json.loads(solve_result.output)
+        assert payload["status"] == "solved"
+        profile = profiles_by_filename[profile_name]
+        assert payload["selection_summary"]["policy"] == profile["selection"]["policy"]
+        assert payload["selection_summary"]["pool_size"] == profile["selection"]["pool_size"]
+        assert payload["selection_summary"]["selected_hit_count"] <= profile["search"]["max_hits"]
+        assert payload["metadata"]["enumerated_candidate_count"] <= profile["search"]["max_enumerated_candidates"]
+        assert str(payload["run_dir"]).startswith(str(scaffold_root / "outputs" / "cassette_solves"))
+
+    assert sibling_sentinel.read_text(encoding="utf-8") == "keep"
+    assert not (sibling_workspace / "outputs" / "cassette_solves").exists()
+
+
+def test_cassette_solve_plaintext_surfaces_policy_underfill_warning(tmp_path: Path) -> None:
+    _workspace, spec_path = _write_solve_workspace(tmp_path)
+    payload = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+    payload["cassette_solve"]["search"]["max_hits"] = 5
+    payload["cassette_solve"]["search"]["max_enumerated_candidates"] = 20000
+    payload["cassette_solve"]["search"]["max_search_nodes"] = 500000
+    payload["cassette_solve"]["search"]["selection"] = {
+        "policy": "greedy_hamming",
+        "pool_size": 1024,
+        "distance_metric": "hamming",
+        "min_pairwise_distance": 9,
+    }
+    payload["cassette_solve"]["search"].pop("min_pairwise_hamming_distance", None)
+    spec_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    result = runner.invoke(app, ["cassette", "solve", "--spec", str(spec_path)], color=False)
+
+    assert result.exit_code == 0
+    assert "Selection filter -> selection_policy_constraints_filtered_pool" in result.output
+    assert "Warning -> SELECTION_POLICY_LIMITED_HITS" in result.output
+
+
+def test_cassette_init_workspace_refuses_to_overwrite_nonempty_unowned_root(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "cassette_lab"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    (workspace_root / "notes.txt").write_text("user data", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["cassette", "init-workspace", "--output", str(workspace_root), "--force-overwrite"],
+        color=False,
+    )
+
+    assert result.exit_code == 1
+    assert "Refusing to overwrite" in result.output
+    assert (workspace_root / "notes.txt").read_text(encoding="utf-8") == "user data"
+
+
+def test_cassette_init_workspace_rejects_symlink_root(tmp_path: Path) -> None:
+    external_root = tmp_path / "external_root"
+    external_root.mkdir(parents=True, exist_ok=True)
+    symlink_root = tmp_path / "cassette_link"
+    symlink_root.symlink_to(external_root, target_is_directory=True)
+
+    result = runner.invoke(
+        app,
+        ["cassette", "init-workspace", "--output", str(symlink_root)],
+        color=False,
+    )
+
+    assert result.exit_code == 1
+    assert "must not be a symlink" in result.output
+    assert not (external_root / "README.md").exists()
+
+
+def test_cassette_init_workspace_rejects_symlinked_parent_directory(tmp_path: Path) -> None:
+    external_root = tmp_path / "external_root"
+    external_root.mkdir(parents=True, exist_ok=True)
+    symlink_parent = tmp_path / "workspace_alias"
+    symlink_parent.symlink_to(external_root, target_is_directory=True)
+
+    result = runner.invoke(
+        app,
+        ["cassette", "init-workspace", "--output", str(symlink_parent / "cassette_lab")],
+        color=False,
+    )
+
+    assert result.exit_code == 1
+    assert "must not traverse a symlinked directory" in result.output
+    assert not (external_root / "cassette_lab").exists()
 
 
 def test_cassette_catalog_init_neb_writes_builtin_preset(tmp_path: Path) -> None:
@@ -340,6 +509,17 @@ def test_cassette_design_writes_unsatisfied_artifacts_before_exit(tmp_path: Path
     assert report["issues"][0]["code"] == "RIGHT_WINDOW_NO_MATCH"
     assert status["status"] == "unsatisfied"
     assert "legacy_v1" in status["status_message"]
+
+
+def test_cassette_design_writes_only_to_selected_workspace_root(tmp_path: Path) -> None:
+    workspace_a, spec_path_a = _write_workspace(tmp_path / "a")
+    workspace_b, _spec_path_b = _write_workspace(tmp_path / "b")
+
+    result = runner.invoke(app, ["cassette", "design", "--spec", str(spec_path_a)], color=False)
+
+    assert result.exit_code == 0
+    assert (workspace_a / "outputs" / "cassettes" / "demo_hairpin").exists()
+    assert not (workspace_b / "outputs" / "cassettes" / "demo_hairpin").exists()
 
 
 def test_existing_help_commands_still_work() -> None:

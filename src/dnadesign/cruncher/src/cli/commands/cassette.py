@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+from itertools import zip_longest
 from pathlib import Path
 
 import typer
@@ -19,7 +20,7 @@ from rich.console import Console
 
 app = typer.Typer(
     no_args_is_help=True,
-    help="Validate, materialize, and solve dual-context hairpin cassette workflows.",
+    help="Scaffold, validate, design, solve, inspect, and catalog dual-context hairpin cassette workflows.",
 )
 catalog_app = typer.Typer(no_args_is_help=True, help="Inspect or export cassette nickase preset catalogs.")
 console = Console()
@@ -47,6 +48,12 @@ def solve_cassette_spec(*args, **kwargs):
     from dnadesign.cruncher.app.cassette_solve_workflow import solve_cassette_spec as _solve_cassette_spec
 
     return _solve_cassette_spec(*args, **kwargs)
+
+
+def init_cassette_workspace(*args, **kwargs):
+    from dnadesign.cruncher.app.cassette_workspace_service import init_cassette_workspace as _init_cassette_workspace
+
+    return _init_cassette_workspace(*args, **kwargs)
 
 
 def run_cassette_solve(*args, **kwargs):
@@ -95,14 +102,55 @@ def _print_solve_report(report) -> None:
         console.print(f"Solve id -> {report.solve_id}")
     if report.run_dir:
         console.print(f"Outputs -> {report.run_dir}")
+    if report.baserender_hits_contract_path:
+        console.print(f"Baserender contract -> {report.baserender_hits_contract_path}")
     if report.metadata.catalog_preset:
         console.print(f"Preset -> {report.metadata.catalog_preset}")
     for path in report.metadata.catalog_additional_paths:
         console.print(f"Catalog overlay -> {path}")
-    for warning in report.metadata.warnings:
-        console.print(f"Warning -> {warning}")
+    if report.selection_summary is not None:
+        selection = report.selection_summary
+        console.print(
+            "Selection -> "
+            f"{selection.policy} ({selection.distance_metric}, defaulted={selection.selection_policy_defaulted})"
+        )
+        console.print(
+            "Selected -> "
+            f"{selection.selected_hit_count}/{selection.max_hits} "
+            f"ids={', '.join(selection.selected_hit_ids) if selection.selected_hit_ids else 'none'}"
+        )
+        console.print(
+            "Pool -> "
+            f"kept={selection.accepted_pool_size}/{selection.pool_size}, "
+            f"admitted={selection.accepted_pool_admitted_count}, "
+            f"rejected={selection.accepted_pool_rejected_count}, "
+            f"truncated={selection.accepted_pool_truncated}"
+        )
+        if selection.selection_pool_non_exhaustive_reason:
+            console.print(f"Selection bounds -> {selection.selection_pool_non_exhaustive_reason}")
+        if selection.policy_underfilled:
+            console.print(
+                "Selection filter -> "
+                f"{selection.policy_underfilled_reason} "
+                f"(missing={selection.policy_limited_hit_count})"
+            )
+        if selection.pairwise_distance_summary.min is not None:
+            console.print(
+                "Pairwise distance -> "
+                f"min={selection.pairwise_distance_summary.min:.1f}, "
+                f"mean={selection.pairwise_distance_summary.mean:.1f}, "
+                f"max={selection.pairwise_distance_summary.max:.1f}"
+            )
+    for code, warning in zip_longest(report.metadata.warning_codes, report.metadata.warnings, fillvalue=None):
+        if code and warning:
+            console.print(f"Warning -> {code}: {warning}")
+        elif warning:
+            console.print(f"Warning -> {warning}")
+        elif code:
+            console.print(f"Warning -> {code}")
     console.print(
         "Search -> "
+        f"nodes={report.metadata.visited_search_node_count}, "
         f"enumerated={report.metadata.enumerated_candidate_count}, "
         f"accepted={report.metadata.accepted_candidate_count}, "
         f"variant_pairs={report.metadata.considered_variant_pair_count}"
@@ -123,6 +171,31 @@ def _print_solve_report(report) -> None:
         console.print("Issues:")
         for issue in report.issues:
             console.print(f"  - {issue.code}: {issue.message}")
+
+
+@app.command("init-workspace", help="Scaffold an isolated cassette workspace with pressure-test solve profiles.")
+def init_workspace_cmd(
+    output: Path = typer.Option(
+        ...,
+        "--output",
+        help="New cassette workspace root to create. Existing symlink roots are rejected.",
+    ),
+    force_overwrite: bool = typer.Option(
+        False,
+        "--force-overwrite",
+        help="Replace an existing scaffold created by this command.",
+    ),
+) -> None:
+    try:
+        result = init_cassette_workspace(output, force_overwrite=force_overwrite)
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+    console.print(f"Cassette workspace scaffold -> {result.workspace_root}")
+    console.print(f"README -> {result.readme_path}")
+    console.print(f"Manifest -> {result.manifest_path}")
+    for name, path in result.solve_specs.items():
+        console.print(f"Spec -> {name}: {path}")
 
 
 @app.command("validate", help="Validate a cassette spec and emit a deterministic planning report.")

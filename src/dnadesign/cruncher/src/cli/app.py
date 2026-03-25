@@ -40,7 +40,7 @@ from dnadesign.cruncher.utils.logging import configure_logging
 
 app = typer.Typer(
     no_args_is_help=True,
-    help="Design short DNA sequences that score highly across TF motifs.",
+    help="Design TF-scored sequences, scaffold cassette workspaces, and run explicit or solve-mode cassette workflows.",
 )
 app.info.epilog = "Tip: run `cruncher <command> --help` for examples and details."
 
@@ -68,7 +68,7 @@ def main(
         help="Select a workspace by name, index, or path.",
     ),
 ) -> None:
-    """Design short DNA sequences that score highly across multiple TF motifs."""
+    """Design TF-scored sequences, scaffold cassette workspaces, and run explicit or solve-mode cassette workflows."""
     configure_logging(log_level)
     if config:
         os.environ[CONFIG_ENV_VAR] = str(config)
@@ -105,8 +105,8 @@ app.command(
 app.add_typer(
     cassette_app,
     name="cassette",
-    help="Validate and materialize dual-context hairpin cassette specs.",
-    short_help="dual-context hairpin cassette workflow.",
+    help="Scaffold, validate, design, solve, inspect, and catalog dual-context hairpin cassette workflows.",
+    short_help="dual-context hairpin cassette workflows.",
 )
 app.add_typer(
     fetch_app,

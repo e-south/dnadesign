@@ -38,11 +38,16 @@ def test_cli_reference_lists_cassette_commands_and_contracts() -> None:
     assert "cruncher cassette validate" in cli_ref
     assert "cruncher cassette design" in cli_ref
     assert "cruncher cassette solve" in cli_ref
+    assert "cruncher cassette init-workspace" in cli_ref
     assert "cruncher cassette catalog init-neb" in cli_ref
     assert "cruncher cassette show" in cli_ref
     assert ".cassette.yaml" in cli_ref
     assert ".cassette.solve.yaml" in cli_ref
     assert "no fallback to `sample`" in cli_ref
+    assert "score_only" in cli_ref
+    assert "greedy_hamming" in cli_ref
+    assert "ACCEPTED_POOL_TRUNCATED" in cli_ref
+    assert "SELECTION_POLICY_LIMITED_HITS" in cli_ref
 
 
 def test_cassette_guide_states_current_scope_and_outputs() -> None:
@@ -54,8 +59,15 @@ def test_cassette_guide_states_current_scope_and_outputs() -> None:
     assert "render_contract.json" in guide
     assert "RIGHT_WINDOW_NO_MATCH" in guide
     assert "outputs/cassette_solves/<solve_id>/" in solve_guide
+    assert "init-workspace" in solve_guide
+    assert "demo_hairpin_fast.cassette.solve.yaml" in solve_guide
     assert "max_search_nodes" in solve_guide
     assert "per-hit explicit cassette bundles" in solve_guide
+    assert "score_only" in solve_guide
+    assert "greedy_hamming" in solve_guide
+    assert "mmr" in solve_guide
+    assert "accepted pool" in solve_guide.lower()
+    assert "baserender_hits_contract.json" in solve_guide
 
 
 def test_cassette_references_capture_schema_and_artifacts() -> None:
@@ -67,6 +79,8 @@ def test_cassette_references_capture_schema_and_artifacts() -> None:
     assert "boundary_inclusive_v2" in spec_ref
     assert "derived_reverse_complement" in spec_ref
     assert "max_search_nodes" in solve_spec_ref
+    assert "search.selection" in solve_spec_ref
+    assert "diversity_weight" in solve_spec_ref
     assert "forbidden_any_site_specificity_ids" in solve_spec_ref
     assert "neb_nicking_v1" in solve_spec_ref
     assert "motif_top_5to3" in catalog_ref
@@ -78,6 +92,10 @@ def test_cassette_references_capture_schema_and_artifacts() -> None:
     assert "cassette_manifest.json" in artifacts_ref
     assert "solve_report.json" in artifacts_ref
     assert "table__hits.csv" in artifacts_ref
+    assert "baserender_hits_contract.json" in artifacts_ref
+    assert "selection_summary" in artifacts_ref
+    assert "ACCEPTED_POOL_TRUNCATED" in artifacts_ref
+    assert "SELECTION_POLICY_LIMITED_HITS" in artifacts_ref
     assert "do not register in workspace `run_index.json`" in artifacts_ref
 
 

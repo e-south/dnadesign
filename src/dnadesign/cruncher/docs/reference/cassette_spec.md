@@ -3,15 +3,15 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** reference
 **Audience:** cassette workflow users and maintainers
-**Updated by:** cruncher-maintainers on 2026-03-24
+**Updated by:** cruncher-maintainers on 2026-03-25
 **Applies to:** `configs/cassettes/*.cassette.yaml`
-**Last verified:** 2026-03-24
+**Last verified:** 2026-03-25
 **Primary artifacts:** validated `report.json`, `report.md`, optional `render_contract.json`
 
 ### Contents
 - [File location](#file-location)
 - [Schema versions](#schema-versions)
-- [Canonical v2 shape](#canonical-v2-shape)
+- [Preferred v2 shape](#preferred-v2-shape)
 - [Field semantics](#field-semantics)
 - [Coordinate semantics](#coordinate-semantics)
 - [Hard invariants](#hard-invariants)
@@ -32,11 +32,11 @@ Solve-mode search specs use the separate suffix `.cassette.solve.yaml` and are d
 
 ### Schema versions
 
-- `schema_version: 2` is the canonical tracer-bullet schema.
+- `schema_version: 2` is the preferred tracer-bullet schema.
 - `schema_version: 1` is still accepted and preserves legacy window semantics.
 - `schema_version` is required. The loader does not guess.
 
-### Canonical v2 shape
+### Preferred v2 shape
 
 ```yaml
 cassette:

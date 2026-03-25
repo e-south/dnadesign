@@ -40,12 +40,24 @@ def solve_id(*, spec_bytes: bytes, catalog_bytes: bytes) -> str:
     return sha256_bytes(spec_bytes + b"\n" + catalog_bytes)[:12]
 
 
+def _scoped_run_dir(workspace_root: Path, *parts: Path | str) -> Path:
+    resolved_workspace_root = workspace_root.resolve()
+    candidate = resolved_workspace_root.joinpath(*parts).resolve()
+    try:
+        candidate.relative_to(resolved_workspace_root)
+    except ValueError as exc:
+        raise ValueError(
+            f"Cassette run directory must stay inside workspace {resolved_workspace_root}: {candidate}"
+        ) from exc
+    return candidate
+
+
 def build_run_dir(*, workspace_root: Path, run_root: Path, spec_name: str, cassette_design_id: str) -> Path:
-    return workspace_root / run_root / spec_name / cassette_design_id
+    return _scoped_run_dir(workspace_root, run_root, spec_name, cassette_design_id)
 
 
 def build_solve_run_dir(*, workspace_root: Path, run_root: Path, cassette_solve_id: str) -> Path:
-    return workspace_root / run_root / cassette_solve_id
+    return _scoped_run_dir(workspace_root, run_root, cassette_solve_id)
 
 
 def ensure_run_dirs(run_dir: Path) -> None:
@@ -110,6 +122,10 @@ def solve_status_path(run_dir: Path) -> Path:
 
 def solve_hits_table_path(run_dir: Path) -> Path:
     return run_dir / "table__hits.csv"
+
+
+def solve_baserender_hits_contract_path(run_dir: Path) -> Path:
+    return run_dir / "baserender_hits_contract.json"
 
 
 def solve_input_spec_path(run_dir: Path) -> Path:
@@ -262,7 +278,9 @@ def write_solve_report(run_dir: Path, report: SolveReport, *, markdown: str) -> 
 def write_solve_hits_table(run_dir: Path, report: SolveReport) -> None:
     fieldnames = [
         "rank",
+        "selected_rank",
         "score",
+        "base_penalty_vector",
         "hit_id",
         "cassette_sequence",
         "stem5p_arm",
@@ -275,6 +293,9 @@ def write_solve_hits_table(run_dir: Path, report: SolveReport) -> None:
         "bounded_segment_length",
         "extra_site_count",
         "gc_fraction",
+        "selection_policy",
+        "selection_rank_reason",
+        "distance_to_previous_selected",
     ]
     with solve_hits_table_path(run_dir).open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -283,7 +304,9 @@ def write_solve_hits_table(run_dir: Path, report: SolveReport) -> None:
             writer.writerow(
                 {
                     "rank": hit.rank,
+                    "selected_rank": hit.rank,
                     "score": json.dumps(hit.score),
+                    "base_penalty_vector": json.dumps(hit.base_penalty_vector),
                     "hit_id": hit.hit_id,
                     "cassette_sequence": hit.cassette_sequence,
                     "stem5p_arm": hit.stem5p_arm,
@@ -296,8 +319,19 @@ def write_solve_hits_table(run_dir: Path, report: SolveReport) -> None:
                     "bounded_segment_length": hit.bounded_segment_length,
                     "extra_site_count": hit.extra_site_count,
                     "gc_fraction": hit.gc_fraction,
+                    "selection_policy": (
+                        report.selection_summary.policy if report.selection_summary is not None else None
+                    ),
+                    "selection_rank_reason": hit.selection_rank_reason,
+                    "distance_to_previous_selected": hit.distance_to_previous_selected,
                 }
             )
+
+
+def write_solve_baserender_hits_contract(run_dir: Path, contract: dict[str, Any]) -> Path:
+    path = solve_baserender_hits_contract_path(run_dir)
+    atomic_write_json(path, contract)
+    return path
 
 
 def build_solve_manifest(
@@ -319,6 +353,8 @@ def build_solve_manifest(
         artifacts.append({"name": "input_spec", "path": "specs/input_solve_spec.yaml"})
     if solve_resolved_catalog_path(run_dir).exists():
         artifacts.append({"name": "resolved_catalog", "path": "specs/resolved_catalog.yaml"})
+    if solve_baserender_hits_contract_path(run_dir).exists():
+        artifacts.append({"name": "baserender_hits_contract", "path": "baserender_hits_contract.json"})
     return {
         "stage": "cassette_solve",
         "workflow": "cassette_solve",
@@ -341,6 +377,8 @@ def write_solve_manifest(run_dir: Path, manifest: dict[str, Any]) -> Path:
 def write_solve_status(run_dir: Path, *, report: SolveReport, status_message: str) -> Path:
     path = solve_status_path(run_dir)
     warnings = list(report.metadata.warnings)
+    warning_codes = list(report.metadata.warning_codes)
+    selection_summary = report.selection_summary
     payload = {
         "stage": "cassette_solve",
         "status": report.status,
@@ -351,7 +389,42 @@ def write_solve_status(run_dir: Path, *, report: SolveReport, status_message: st
         "issue_count": len(report.issues),
         "warning_count": len(warnings),
         "warnings": warnings,
-        "search_truncated": any(warning.startswith("search.max_") for warning in warnings),
+        "warning_codes": warning_codes,
+        "search_truncated": any(
+            code in {"MAX_SEARCH_NODES_REACHED", "MAX_ENUMERATED_CANDIDATES_REACHED"} for code in warning_codes
+        ),
+        "accepted_pool_truncated": (
+            selection_summary.accepted_pool_truncated if selection_summary is not None else False
+        ),
+        "selection": (
+            {
+                "policy": selection_summary.policy,
+                "distance_metric": selection_summary.distance_metric,
+                "diversity_weight": selection_summary.diversity_weight,
+                "pool_size": selection_summary.pool_size,
+                "accepted_candidate_count": selection_summary.accepted_candidate_count,
+                "accepted_pool_size": selection_summary.accepted_pool_size,
+                "accepted_pool_admitted_count": selection_summary.accepted_pool_admitted_count,
+                "accepted_pool_rejected_count": selection_summary.accepted_pool_rejected_count,
+                "accepted_pool_truncated": selection_summary.accepted_pool_truncated,
+                "accepted_pool_worst_score_at_close": selection_summary.accepted_pool_worst_score_at_close,
+                "selected_hit_count": selection_summary.selected_hit_count,
+                "selected_hit_ids": selection_summary.selected_hit_ids,
+                "selection_policy_defaulted": selection_summary.selection_policy_defaulted,
+                "selection_pool_non_exhaustive_reason": selection_summary.selection_pool_non_exhaustive_reason,
+                "policy_limited_hit_count": selection_summary.policy_limited_hit_count,
+                "policy_underfilled": selection_summary.policy_underfilled,
+                "policy_underfilled_reason": selection_summary.policy_underfilled_reason,
+                "pairwise_distance_summary": selection_summary.pairwise_distance_summary.model_dump(mode="json"),
+            }
+            if selection_summary is not None
+            else None
+        ),
+        "baserender_hits_contract": (
+            str(solve_baserender_hits_contract_path(run_dir).resolve())
+            if solve_baserender_hits_contract_path(run_dir).exists()
+            else None
+        ),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     atomic_write_json(path, payload)
