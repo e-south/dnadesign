@@ -53,7 +53,7 @@ def test_build_promoter_preflight_upstream_checks_reports_densegen_probe_and_bat
                     {
                         "selected_mode": "resume",
                         "workflow_id": "densegen_batch_with_notify",
-                        "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
+                        "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},  # pragma: allowlist secret
                     }
                 ),
             )
@@ -86,9 +86,10 @@ def test_build_promoter_preflight_upstream_checks_reports_densegen_probe_and_bat
     assert checks["densegen.batch.resources"].check_group == "densegen"
     assert checks["densegen.config.probe_solver"].state == "ok"
     assert checks["densegen.config.probe_solver"].details["config"] == str(densegen_config_path.resolve())
+    expected_notify_ref = "file:///tmp/webhook"  # pragma: allowlist secret
     assert checks["densegen.batch.plan"].state == "ok"
     assert checks["densegen.batch.plan"].details["selected_mode"] == "resume"
-    assert checks["densegen.batch.plan"].details["notify_secret_ref"] == "file:///tmp/webhook"
+    assert checks["densegen.batch.plan"].details["notify_secret_ref"] == expected_notify_ref
     assert commands == [
         ("uv", "run", "dense", "validate-config", "--probe-solver", "-c", str(densegen_config_path.resolve())),
         (

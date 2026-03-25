@@ -65,8 +65,6 @@ def enforce_workspace_layout(runbook: "OrchestrationRunbookV1") -> "Orchestratio
         if spool_path.name != "spool":
             raise ValueError("notify.spool_dir directory name must be exactly spool")
         if profile_path.parent != cursor_path.parent or profile_path.parent != spool_path.parent:
-            raise ValueError(
-                "notify.profile, notify.cursor, and notify.spool_dir must share the same lane directory"
-            )
+            raise ValueError("notify.profile, notify.cursor, and notify.spool_dir must share the same lane directory")
 
     return runbook

@@ -205,8 +205,7 @@ def _require_appendable_records_schema(schema: pa.Schema) -> pa.Schema:
         if mismatched:
             problems.append(f"type mismatches: {', '.join(mismatched)}")
         raise SchemaError(
-            "Cannot append rows because records.parquet has an incompatible schema: "
-            + "; ".join(problems)
+            "Cannot append rows because records.parquet has an incompatible schema: " + "; ".join(problems)
         )
     return schema
 
@@ -244,9 +243,7 @@ def write_import_df_dataset(
 
     def _write_dataset() -> int | tuple[int, list[str], list[str]]:
         if dataset.records_path.exists():
-            existing_schema = _require_appendable_records_schema(
-                pq.ParquetFile(str(dataset.records_path)).schema_arrow
-            )
+            existing_schema = _require_appendable_records_schema(pq.ParquetFile(str(dataset.records_path)).schema_arrow)
             if prevalidated_new_ids:
                 if on_conflict != "error":
                     raise SchemaError("prevalidated_new_ids requires on_conflict='error'.")
