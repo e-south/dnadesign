@@ -16,7 +16,8 @@ This workspace keeps construct IO inside `outputs/usr_datasets` by default and
 routes both packaged window projects into one semantic dataset,
 `anchor_template_shared_dataset_demo`. Use it when Construct should hand one
 USR-backed dataset to downstream consumers without relying on implicit config
-repointing.
+repointing. The workspace registry tracks both config artifacts and shared
+dataset assertions, so `workspace doctor` can fail on drift before a run.
 
 - Workspace registry: [construct.workspace.yaml](construct.workspace.yaml)
 - Runbook: [runbook.md](runbook.md)

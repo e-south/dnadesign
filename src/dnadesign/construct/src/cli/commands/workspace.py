@@ -31,6 +31,7 @@ from ...workspace import (
     workspace_template_with_source,
 )
 from ._errors import exit_with_error
+from ._format import echo_json, validate_output_format
 from ._render import echo_run_result, echo_validate_result
 
 workspace_app = typer.Typer(no_args_is_help=True, help="Workspace scaffolding for construct.")
@@ -148,7 +149,10 @@ def init(
         )
         typer.echo("Then: run ./runbook.sh --mode dry-run-all")
     else:
-        typer.echo("Then: update construct.workspace.yaml with your project inventory and USR root choice.")
+        typer.echo(
+            "Then: update construct.workspace.yaml with your tracked config artifacts, "
+            "project contract, and USR root choice."
+        )
         typer.echo(f"Then: edit {workspace_dir / 'inputs' / 'import_manifest.template.yaml'} for your own inputs.")
         typer.echo(
             f"Then: {command_prefix} seed import-manifest --manifest {import_manifest_arg} --root {outputs_root_arg}"
@@ -166,13 +170,25 @@ def show(
         "--workspace",
         help="Workspace id, workspace directory, or construct.workspace.yaml path.",
     ),
+    output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
+    format_requested = str(output_format or "").strip().lower()
     try:
+        format_norm = validate_output_format(output_format)
         registry, registry_path = load_workspace_registry(workspace)
     except (ConstructError, OSError) as exc:
-        exit_with_error(exc, code=2)
+        exit_with_error(exc, code=2, output_format=format_requested)
 
     payload = registry.workspace
+    if format_norm == "json":
+        echo_json(
+            {
+                "status": "ok",
+                "workspace_registry": registry_path,
+                "workspace": registry.model_dump(exclude_none=True)["workspace"],
+            }
+        )
+        return
     typer.echo(f"workspace_registry: {registry_path}")
     typer.echo(f"workspace_id: {payload.id}")
     typer.echo(f"profile: {payload.profile}")
@@ -181,14 +197,16 @@ def show(
     typer.echo(f"workspace_usr_root: {payload.roots.workspace_usr_root} (workspace-relative default)")
     typer.echo(f"projects_total: {len(payload.projects)}")
     for project in payload.projects:
+        template_contract = project.contract.template
         typer.echo(
             "project: "
             f"id={project.id} "
-            f"config={project.config} "
-            f"flow={project.flow} "
-            f"input_dataset={project.input_dataset} "
-            f"template_dataset={project.template_dataset or ''} "
-            f"output_dataset={project.output_dataset}"
+            f"config.path={project.artifacts.config.path} "
+            f"config.job_id={project.artifacts.config.job_id} "
+            f"contract.input_dataset={project.contract.input_dataset} "
+            f"contract.template_id={(template_contract.id if template_contract is not None else '')} "
+            f"contract.template_dataset={(template_contract.dataset if template_contract is not None else '')} "
+            f"contract.output_dataset={project.contract.output_dataset}"
         )
 
 
@@ -199,11 +217,30 @@ def doctor(
         "--workspace",
         help="Workspace id, workspace directory, or construct.workspace.yaml path.",
     ),
+    output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
+    format_requested = str(output_format or "").strip().lower()
     try:
+        format_norm = validate_output_format(output_format)
         report = doctor_workspace_registry(workspace)
     except (ConstructError, OSError) as exc:
-        exit_with_error(exc, code=2)
+        exit_with_error(exc, code=2, output_format=format_requested)
+
+    if format_norm == "json":
+        echo_json(
+            {
+                "status": "ok" if not report.issues else "issues",
+                "workspace_registry": report.registry_path,
+                "workspace_id": report.workspace_id,
+                "profile": report.profile,
+                "projects_checked": report.projects_checked,
+                "issues_total": len(report.issues),
+                "issues": report.issues,
+            }
+        )
+        if report.issues:
+            raise typer.Exit(1)
+        return
 
     typer.echo(f"workspace_registry: {report.registry_path}")
     typer.echo(f"workspace_id: {report.workspace_id}")
@@ -230,19 +267,27 @@ def validate_project(
         "--runtime",
         help="Resolve template and input dataset, then report the planned runtime summary.",
     ),
+    output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
+    format_requested = str(output_format or "").strip().lower()
     try:
+        format_norm = validate_output_format(output_format)
         resolution = resolve_workspace_project(workspace, project_id=project)
     except (ConstructError, OSError) as exc:
-        exit_with_error(exc, code=2)
+        exit_with_error(exc, code=2, output_format=format_requested)
 
     preflight = None
     if runtime:
         try:
             preflight = preflight_from_config(resolution.config_path)
         except (ConstructError, OSError) as exc:
-            exit_with_error(exc, code=1)
-    echo_validate_result(config_path=resolution.config_path, loaded=resolution.config, preflight=preflight)
+            exit_with_error(exc, code=1, output_format=format_norm)
+    echo_validate_result(
+        config_path=resolution.config_path,
+        loaded=resolution.config,
+        preflight=preflight,
+        output_format=format_norm,
+    )
 
 
 @workspace_app.command("run-project")
@@ -258,10 +303,13 @@ def run_project(
         "--dry-run",
         help="Validate inputs and build outputs without writing USR data.",
     ),
+    output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
+    format_requested = str(output_format or "").strip().lower()
     try:
+        format_norm = validate_output_format(output_format)
         resolution = resolve_workspace_project(workspace, project_id=project)
         result = run_from_config(resolution.config_path, dry_run=dry_run)
     except (ConstructError, OSError) as exc:
-        exit_with_error(exc, code=1)
-    echo_run_result(result)
+        exit_with_error(exc, code=1, output_format=format_requested)
+    echo_run_result(result, output_format=format_norm)

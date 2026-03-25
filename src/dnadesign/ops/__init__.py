@@ -11,4 +11,18 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-__all__ = []
+from .contracts import (
+    InferRuntimePhaseTarget,
+    ResumeReadinessPolicy,
+    USRProducerContract,
+    resolve_resume_readiness_policy,
+    resolve_usr_producer_contract,
+)
+
+__all__ = [
+    "InferRuntimePhaseTarget",
+    "ResumeReadinessPolicy",
+    "USRProducerContract",
+    "resolve_resume_readiness_policy",
+    "resolve_usr_producer_contract",
+]

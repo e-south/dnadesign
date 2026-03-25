@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, Dict
 import yaml
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from dnadesign.usr_roots import resolve_usr_root_from_config
+from dnadesign.usr.roots import resolve_usr_root_from_config
 
 if TYPE_CHECKING:
     from .root import RootConfig

@@ -25,7 +25,7 @@ uv run construct workspace doctor --workspace .
 ./runbook.sh --mode dry-run-all
 ```
 
-Use this path when both packaged window projects should accumulate into one semantic USR dataset before infer or Notify pick it up. The profile keeps the shared-dataset contract explicit in `construct.workspace.yaml` instead of relying on manual config repointing.
+Use this path when both packaged window projects should accumulate into one semantic USR dataset before infer or Notify pick it up. The profile keeps the shared-dataset contract explicit in `construct.workspace.yaml` by tracking both config artifacts and routing assertions instead of relying on manual config repointing.
 
 ### Path 3: blank custom workspace
 
@@ -38,7 +38,7 @@ uv run construct seed import-manifest \
   --root outputs/usr_datasets
 ```
 
-Then edit `config.yaml`, update `construct.workspace.yaml`, run `workspace validate-project --runtime`, and finish with `workspace run-project --dry-run`.
+Then edit `config.yaml`, update the matching `project.artifacts.config` and `project.contract` entry in `construct.workspace.yaml`, run `workspace validate-project --runtime`, and finish with `workspace run-project --dry-run`.
 
 The blank scaffold now writes explicit workspace-local `root: outputs/usr_datasets` entries into `config.yaml` so custom studies stay fail-fast and workspace-scoped by default.
 
@@ -48,7 +48,7 @@ The blank scaffold now writes explicit workspace-local `root: outputs/usr_datase
 - Real studies can still use semantic dataset ids such as `mg1655_promoters` or `plasmids`.
 - `anchor`, `template`, and `helper` are construct roles assigned inside the config, not dataset path categories.
 - One construct job uses one template plus one or more placed parts.
-- Multi-template or slot-matrix studies are represented as multiple project configs in `construct.workspace.yaml`.
+- Multi-template or slot-matrix studies are represented as multiple project entries in `construct.workspace.yaml`, each with its own tracked config artifact.
 
 ### Continue reading
 

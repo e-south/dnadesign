@@ -68,6 +68,13 @@ def test_workspace_init_creates_default_layout_and_config(tmp_path: Path) -> Non
     inputs_readme = (workspace_dir / "inputs" / "README.md").read_text(encoding="utf-8")
     assert "workspace's `outputs/usr_datasets/` root" in inputs_readme
     assert "src/dnadesign/usr/datasets/" in inputs_readme
+    registry_payload = yaml.safe_load((workspace_dir / "construct.workspace.yaml").read_text(encoding="utf-8"))
+    project_artifacts = registry_payload["workspace"]["projects"][0]["artifacts"]["config"]
+    project_contract = registry_payload["workspace"]["projects"][0]["contract"]
+    assert project_artifacts["path"] == "config.yaml"
+    assert project_artifacts["job_id"] == "demo_construct"
+    assert project_contract["input_dataset"] == "REPLACE_WITH_ANCHOR_DATASET"
+    assert project_contract["output_dataset"] == "REPLACE_WITH_OUTPUT_DATASET"
     output = result.stdout or ""
     assert "profile: blank" in output
     assert "workspace_registry:" in output
@@ -116,6 +123,12 @@ def test_workspace_init_copies_packaged_promoter_swap_demo_profile(tmp_path: Pat
     assert "workspace-local USR root `outputs/usr_datasets/`" in (workspace_dir / "inputs" / "README.md").read_text(
         encoding="utf-8"
     )
+    registry_payload = yaml.safe_load((workspace_dir / "construct.workspace.yaml").read_text(encoding="utf-8"))
+    assert registry_payload["workspace"]["projects"][0]["artifacts"]["config"]["path"] == "config.slot_a.window.yaml"
+    assert registry_payload["workspace"]["projects"][0]["artifacts"]["config"]["job_id"] == (
+        "anchor_template_slot_a_window_1kb"
+    )
+    assert registry_payload["workspace"]["projects"][0]["contract"]["input_dataset"] == "anchor_parts_demo"
     output = result.stdout or ""
     assert "profile: anchor-template-demo" in output
     assert "workspace_registry:" in output
@@ -259,6 +272,32 @@ def test_workspace_show_reports_registry_summary(tmp_path: Path) -> None:
     assert "shared_usr_root: src/dnadesign/usr/datasets (repo-relative hint)" in output
     assert "workspace_usr_root: outputs/usr_datasets (workspace-relative default)" in output
     assert "project: id=slot_a_window" in output
+    assert "config.path=config.slot_a.window.yaml" in output
+    assert "config.job_id=anchor_template_slot_a_window_1kb" in output
+    assert "contract.input_dataset=anchor_parts_demo" in output
+
+
+def test_workspace_show_json_reports_registry_summary(tmp_path: Path) -> None:
+    root = tmp_path / "ws_root"
+
+    init_result = _RUNNER.invoke(
+        app,
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
+    )
+    assert init_result.exit_code == 0, init_result.stdout
+
+    workspace_dir = root / "demo_construct"
+    result = _RUNNER.invoke(app, ["workspace", "show", "--workspace", workspace_dir.as_posix(), "--format", "json"])
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["workspace"]["id"] == "demo_construct"
+    assert payload["workspace"]["profile"] == "anchor-template-demo"
+    assert payload["workspace_registry"] == str(workspace_dir / "construct.workspace.yaml")
+    assert payload["workspace"]["projects"][0]["artifacts"]["config"]["path"] == "config.slot_a.window.yaml"
+    assert payload["workspace"]["projects"][0]["artifacts"]["config"]["job_id"] == "anchor_template_slot_a_window_1kb"
+    assert payload["workspace"]["projects"][0]["contract"]["template"]["dataset"] == "template_parts_demo"
 
 
 def test_workspace_list_json_reports_packaged_workspace_state(monkeypatch, tmp_path: Path) -> None:
@@ -344,6 +383,25 @@ def test_workspace_doctor_reports_ok_for_packaged_demo(tmp_path: Path) -> None:
     assert "workspace_doctor: ok" in output
 
 
+def test_workspace_doctor_json_reports_ok_for_packaged_demo(tmp_path: Path) -> None:
+    root = tmp_path / "ws_root"
+    init_result = _RUNNER.invoke(
+        app,
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
+    )
+    assert init_result.exit_code == 0, init_result.stdout
+
+    workspace_dir = root / "demo_construct"
+    result = _RUNNER.invoke(app, ["workspace", "doctor", "--workspace", workspace_dir.as_posix(), "--format", "json"])
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["projects_checked"] == 4
+    assert payload["issues_total"] == 0
+    assert payload["issues"] == []
+
+
 def test_workspace_doctor_reports_registry_drift(tmp_path: Path) -> None:
     root = tmp_path / "ws_root"
     init_result = _RUNNER.invoke(
@@ -355,13 +413,33 @@ def test_workspace_doctor_reports_registry_drift(tmp_path: Path) -> None:
     workspace_dir = root / "demo_construct"
     registry_path = workspace_dir / "construct.workspace.yaml"
     payload = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
-    payload["workspace"]["projects"][0]["output_dataset"] = "drifted_output_dataset"
+    payload["workspace"]["projects"][0]["contract"]["output_dataset"] = "drifted_output_dataset"
     registry_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
     result = _RUNNER.invoke(app, ["workspace", "doctor", "--workspace", workspace_dir.as_posix()])
 
     assert result.exit_code == 1, result.stdout
-    assert "does not match config output.dataset" in (result.stdout or "")
+    assert "does not match config output.target.dataset" in (result.stdout or "")
+
+
+def test_workspace_doctor_reports_config_job_id_drift(tmp_path: Path) -> None:
+    root = tmp_path / "ws_root"
+    init_result = _RUNNER.invoke(
+        app,
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
+    )
+    assert init_result.exit_code == 0, init_result.stdout
+
+    workspace_dir = root / "demo_construct"
+    registry_path = workspace_dir / "construct.workspace.yaml"
+    payload = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+    payload["workspace"]["projects"][0]["artifacts"]["config"]["job_id"] = "drifted_job_id"
+    registry_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    result = _RUNNER.invoke(app, ["workspace", "doctor", "--workspace", workspace_dir.as_posix()])
+
+    assert result.exit_code == 1, result.stdout
+    assert "does not match config job.id" in (result.stdout or "")
 
 
 def test_workspace_doctor_rejects_project_config_path_escape(tmp_path: Path) -> None:
@@ -375,7 +453,7 @@ def test_workspace_doctor_rejects_project_config_path_escape(tmp_path: Path) -> 
     workspace_dir = root / "demo_construct"
     registry_path = workspace_dir / "construct.workspace.yaml"
     payload = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
-    payload["workspace"]["projects"][0]["config"] = "../escaped.yaml"
+    payload["workspace"]["projects"][0]["artifacts"]["config"]["path"] = "../escaped.yaml"
     registry_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
     result = _RUNNER.invoke(app, ["workspace", "doctor", "--workspace", workspace_dir.as_posix()])
@@ -417,6 +495,170 @@ def test_workspace_validate_project_runtime_resolves_registry_project(tmp_path: 
     assert "template_id: template_backbone_dual_slot" in output
     assert "placement: part=anchor" in output
     assert "rows_total: 4" in output
+
+
+def test_workspace_validate_project_runtime_json_reports_registry_project(tmp_path: Path) -> None:
+    root = tmp_path / "ws_root"
+    init_result = _RUNNER.invoke(
+        app,
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
+    )
+    assert init_result.exit_code == 0, init_result.stdout
+
+    workspace_dir = root / "demo_construct"
+    bootstrap_anchor_template_demo(
+        root=workspace_dir / "outputs" / "usr_datasets",
+        manifest=workspace_dir / "inputs" / "seed_manifest.yaml",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "workspace",
+            "validate-project",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--project",
+            "slot_a_window",
+            "--runtime",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["job"]["id"] == "anchor_template_slot_a_window_1kb"
+    assert payload["runtime_preflight"]["records_total"] == 4
+    assert payload["runtime_preflight"]["placements"][0]["locator_kind"] == "coordinates"
+
+
+def test_workspace_validate_project_runtime_json_reports_missing_dataset_error(tmp_path: Path) -> None:
+    root = tmp_path / "ws_root"
+    init_result = _RUNNER.invoke(
+        app,
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
+    )
+    assert init_result.exit_code == 0, init_result.stdout
+
+    workspace_dir = root / "demo_construct"
+    result = _RUNNER.invoke(
+        app,
+        [
+            "workspace",
+            "validate-project",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--project",
+            "slot_a_window",
+            "--runtime",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert payload["code"] == 1
+    assert payload["error_type"] == "ValidationError"
+    assert "Input dataset not initialized:" in payload["error"]
+
+
+def test_workspace_show_rejects_legacy_flat_project_contract(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "demo_construct"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    (workspace_dir / "construct.workspace.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "workspace": {
+                    "id": "demo_construct",
+                    "profile": "blank",
+                    "projects": [
+                        {
+                            "id": "demo_construct",
+                            "artifacts": {"config": {"path": "config.yaml", "job_id": "demo_construct"}},
+                            "input_dataset": "anchors_demo",
+                            "output_dataset": "construct_demo",
+                        }
+                    ],
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(app, ["workspace", "show", "--workspace", workspace_dir.as_posix()])
+
+    assert result.exit_code == 2
+    assert "contract" in (result.stdout or "")
+
+
+def test_workspace_show_rejects_legacy_flat_project_config_path(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "demo_construct"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    (workspace_dir / "construct.workspace.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "workspace": {
+                    "id": "demo_construct",
+                    "profile": "blank",
+                    "projects": [
+                        {
+                            "id": "demo_construct",
+                            "config": "config.yaml",
+                            "contract": {
+                                "input_dataset": "anchors_demo",
+                                "output_dataset": "construct_demo",
+                            },
+                        }
+                    ],
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(app, ["workspace", "show", "--workspace", workspace_dir.as_posix()])
+
+    assert result.exit_code == 2
+    assert "artifacts" in (result.stdout or "")
+
+
+def test_workspace_show_rejects_partial_template_contract(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "demo_construct"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    (workspace_dir / "construct.workspace.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "workspace": {
+                    "id": "demo_construct",
+                    "profile": "blank",
+                    "projects": [
+                        {
+                            "id": "demo_construct",
+                            "artifacts": {"config": {"path": "config.yaml", "job_id": "demo_construct"}},
+                            "contract": {
+                                "input_dataset": "anchors_demo",
+                                "template": {"id": "template_demo", "dataset": "templates_demo"},
+                                "output_dataset": "construct_demo",
+                            },
+                        }
+                    ],
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(app, ["workspace", "show", "--workspace", workspace_dir.as_posix()])
+
+    assert result.exit_code == 2
+    assert "id, dataset, and record_id together" in (result.stdout or "")
 
 
 def test_workspace_show_resolves_local_workspace_id_from_active_root(monkeypatch, tmp_path: Path) -> None:
@@ -485,6 +727,74 @@ def test_workspace_run_project_dry_run_resolves_registry_project(tmp_path: Path)
     output = result.stdout or ""
     assert "Config validated (dry run): job=anchor_template_slot_a_window_1kb" in output
     assert "output_dataset: anchor_template_slot_a_window_1kb_demo" in output
+
+
+def test_workspace_run_project_dry_run_json_reports_registry_project(tmp_path: Path) -> None:
+    root = tmp_path / "ws_root"
+    init_result = _RUNNER.invoke(
+        app,
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
+    )
+    assert init_result.exit_code == 0, init_result.stdout
+
+    workspace_dir = root / "demo_construct"
+    bootstrap_anchor_template_demo(
+        root=workspace_dir / "outputs" / "usr_datasets",
+        manifest=workspace_dir / "inputs" / "seed_manifest.yaml",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "workspace",
+            "run-project",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--project",
+            "slot_a_window",
+            "--dry-run",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["run"]["job_id"] == "anchor_template_slot_a_window_1kb"
+    assert payload["run"]["dry_run"] is True
+
+
+def test_workspace_run_project_dry_run_json_reports_missing_dataset_error(tmp_path: Path) -> None:
+    root = tmp_path / "ws_root"
+    init_result = _RUNNER.invoke(
+        app,
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
+    )
+    assert init_result.exit_code == 0, init_result.stdout
+
+    workspace_dir = root / "demo_construct"
+    result = _RUNNER.invoke(
+        app,
+        [
+            "workspace",
+            "run-project",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--project",
+            "slot_a_window",
+            "--dry-run",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert payload["code"] == 1
+    assert payload["error_type"] == "ValidationError"
+    assert "Input dataset not initialized:" in payload["error"]
 
 
 def test_workspace_shared_source_of_truth_profile_accumulates_distinct_projects(tmp_path: Path) -> None:

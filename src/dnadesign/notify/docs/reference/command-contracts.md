@@ -26,7 +26,7 @@ This page is the tool-local source for Notify command invocation contracts and f
 - Built-in resolver policies:
   - `densegen` -> `densegen`
   - `infer` -> `infer`
-  - `construct` -> `generic`
+  - `construct` -> `construct`
 - Workspace shorthand is repo-rooted for all resolver-mode tools. Outside the repo checkout, set `DNADESIGN_REPO_ROOT=<repo-root>` or pass `--config` explicitly.
 - `infer` resolver requires exactly one USR write-back destination and explicit `ingest.root` for every `ingest.source='usr'` + `io.write_back=true` job.
 - Multi-destination infer configs must use explicit `--events <path>` instead of resolver mode.

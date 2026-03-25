@@ -150,11 +150,11 @@ Environment precedence notes:
 | Adapter registration is import side effect and Evo2-only today | `src/dnadesign/infer/__init__.py:17`, `src/dnadesign/infer/adapters/__init__.py:19` |
 | Notify uses shared infer output-contract resolver | `src/dnadesign/notify/events/source_builtin.py:19`, `src/dnadesign/notify/events/source_builtin.py:37` |
 | Ops infer workflows and notify-tool contract enforcement exist | `src/dnadesign/ops/runbooks/schema.py:34`, `src/dnadesign/ops/runbooks/schema.py:35`, `src/dnadesign/ops/runbooks/schema.py:336` |
-| Shared infer producer contract parser exists in `_contracts` | `src/dnadesign/_contracts/usr_producer.py:172` |
+| Shared infer producer contract parsing is now owner-owned across infer and ops | `src/dnadesign/infer/contracts.py:61`, `src/dnadesign/ops/contracts.py:103`, `src/dnadesign/ops/contracts.py:148` |
 
 #### 10) Open Questions and Risk Notes
 
-- `ingest/sources.py` default USR root fallback and `_contracts/usr_producer.py` infer resolver fallback differ in strictness; this should be normalized before deeper tool-chain coupling.
+- `ingest/sources.py` default USR root fallback and the owner-owned infer-to-ops producer contract path should remain aligned in strictness as the tool-chain grows.
 - Preset stem fallback (`load_preset`) may cause ambiguous selection if namespace collisions grow.
 - `src/dnadesign/infer/workspaces` is referenced by notify resolvers but not currently present; ownership and lifecycle rules should be documented in infer docs.
 

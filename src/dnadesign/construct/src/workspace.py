@@ -77,17 +77,19 @@ datasets:
 _CONFIG_TEMPLATE = """job:
   id: {workspace_id}
   input:
-    source: usr
-    dataset: REPLACE_WITH_ANCHOR_DATASET
-    root: outputs/usr_datasets
+    source:
+      kind: usr
+      dataset: REPLACE_WITH_ANCHOR_DATASET
+      root: outputs/usr_datasets
     field: sequence
   template:
     id: REPLACE_WITH_TEMPLATE_LABEL
-    kind: usr
-    dataset: REPLACE_WITH_TEMPLATE_DATASET
-    root: outputs/usr_datasets
-    record_id: REPLACE_WITH_TEMPLATE_RECORD_ID
-    field: sequence
+    source:
+      kind: usr
+      dataset: REPLACE_WITH_TEMPLATE_DATASET
+      root: outputs/usr_datasets
+      record_id: REPLACE_WITH_TEMPLATE_RECORD_ID
+      field: sequence
     circular: true
   parts:
     - name: anchor
@@ -97,10 +99,13 @@ _CONFIG_TEMPLATE = """job:
         field: sequence
       placement:
         kind: replace
-        start: REPLACE_WITH_TEMPLATE_START
-        end: REPLACE_WITH_TEMPLATE_END
         orientation: forward
-        expected_template_sequence: REPLACE_WITH_INCUMBENT_SEQUENCE
+        locator:
+          kind: coordinates
+          start: REPLACE_WITH_TEMPLATE_START
+          end: REPLACE_WITH_TEMPLATE_END
+        guards:
+          replaced_sequence: REPLACE_WITH_INCUMBENT_SEQUENCE
   realize:
     mode: window
     focal_part: anchor
@@ -111,8 +116,10 @@ _CONFIG_TEMPLATE = """job:
       size_bp: 1000
       offset_bp: 0
   output:
-    dataset: REPLACE_WITH_OUTPUT_DATASET
-    root: outputs/usr_datasets
+    target:
+      kind: usr
+      dataset: REPLACE_WITH_OUTPUT_DATASET
+      root: outputs/usr_datasets
 """
 
 
@@ -133,18 +140,67 @@ class WorkspaceRootsConfig(_StrictWorkspaceModel):
         return text
 
 
+class WorkspaceProjectTemplateContractConfig(_StrictWorkspaceModel):
+    id: str | None = None
+    dataset: str | None = None
+    record_id: str | None = None
+
+    @field_validator("id", "dataset", "record_id")
+    @classmethod
+    def _optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("workspace registry contract template fields cannot be empty when provided.")
+        return text
+
+    @model_validator(mode="after")
+    def _complete_usr_identity(self) -> "WorkspaceProjectTemplateContractConfig":
+        if any(value is not None for value in (self.id, self.dataset, self.record_id)):
+            if not all(value is not None for value in (self.id, self.dataset, self.record_id)):
+                raise ValueError("workspace registry contract template requires id, dataset, and record_id together.")
+        return self
+
+
+class WorkspaceProjectContractConfig(_StrictWorkspaceModel):
+    input_dataset: str
+    output_dataset: str
+    template: WorkspaceProjectTemplateContractConfig | None = None
+
+    @field_validator("input_dataset", "output_dataset")
+    @classmethod
+    def _required_text(cls, value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("workspace registry contract dataset fields cannot be empty.")
+        return text
+
+
+class WorkspaceProjectConfigArtifactConfig(_StrictWorkspaceModel):
+    path: str
+    job_id: str
+
+    @field_validator("path", "job_id")
+    @classmethod
+    def _required_text(cls, value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("workspace registry config artifact fields cannot be empty.")
+        return text
+
+
+class WorkspaceProjectArtifactsConfig(_StrictWorkspaceModel):
+    config: WorkspaceProjectConfigArtifactConfig
+
+
 class WorkspaceProjectConfig(_StrictWorkspaceModel):
     id: str
-    config: str
-    flow: str
-    input_dataset: str
-    template_id: str | None = None
-    template_dataset: str | None = None
-    template_record_id: str | None = None
-    output_dataset: str
+    artifacts: WorkspaceProjectArtifactsConfig
+    contract: WorkspaceProjectContractConfig
     notes: str | None = None
 
-    @field_validator("id", "config", "flow", "input_dataset", "output_dataset")
+    @field_validator("id")
     @classmethod
     def _required_text(cls, value: str) -> str:
         text = str(value or "").strip()
@@ -175,10 +231,11 @@ class _WorkspaceRegistryBody(_StrictWorkspaceModel):
         for project in self.projects:
             if project.id in seen_ids:
                 raise ValueError(f"Duplicate workspace project id '{project.id}'.")
-            if project.config in seen_configs:
-                raise ValueError(f"Duplicate workspace project config '{project.config}'.")
+            config_path = project.artifacts.config.path
+            if config_path in seen_configs:
+                raise ValueError(f"Duplicate workspace project config '{config_path}'.")
             seen_ids.add(project.id)
-            seen_configs.add(project.config)
+            seen_configs.add(config_path)
         return self
 
 
@@ -408,40 +465,57 @@ def _resolve_project_config_path(*, workspace_dir: Path, config_value: str) -> P
     return resolved
 
 
+def resolve_workspace_project_config_artifact_path(*, workspace_dir: Path, config_value: str) -> Path:
+    """Resolve one workspace-scoped config artifact path using construct's registry rules."""
+    return _resolve_project_config_path(workspace_dir=workspace_dir, config_value=config_value)
+
+
 def _project_contract_errors(*, project: WorkspaceProjectConfig, config: JobConfig) -> list[str]:
     errors: list[str] = []
-    if config.job.input.dataset != project.input_dataset:
+    if config.job.id != project.artifacts.config.job_id:
+        errors.append(
+            "registry config.job_id="
+            f"'{project.artifacts.config.job_id}' does not match "
+            f"config job.id='{config.job.id}'."
+        )
+    if config.job.input.source.dataset != project.contract.input_dataset:
         errors.append(
             "registry input_dataset="
-            f"'{project.input_dataset}' does not match "
-            f"config input.dataset='{config.job.input.dataset}'."
+            f"'{project.contract.input_dataset}' does not match "
+            f"config input.source.dataset='{config.job.input.source.dataset}'."
         )
-    if config.job.output.dataset != project.output_dataset:
+    if config.job.output.target.dataset != project.contract.output_dataset:
         errors.append(
             "registry output_dataset="
-            f"'{project.output_dataset}' does not match "
-            f"config output.dataset='{config.job.output.dataset}'."
+            f"'{project.contract.output_dataset}' does not match "
+            f"config output.target.dataset='{config.job.output.target.dataset}'."
         )
-    if project.template_id and config.job.template.id != project.template_id:
+    template_contract = project.contract.template
+    if template_contract and template_contract.id and config.job.template.id != template_contract.id:
         errors.append(
             "registry template_id="
-            f"'{project.template_id}' does not match "
+            f"'{template_contract.id}' does not match "
             f"config template.id='{config.job.template.id}'."
         )
-    if project.template_dataset:
-        config_template_dataset = str(config.job.template.dataset or "")
-        if config_template_dataset != project.template_dataset:
+    if template_contract and template_contract.dataset:
+        config_template_dataset = (
+            str(config.job.template.source.dataset) if config.job.template.source.kind == "usr" else ""
+        )
+        if config_template_dataset != template_contract.dataset:
             errors.append(
                 "registry template_dataset="
-                f"'{project.template_dataset}' does not match config template.dataset='{config_template_dataset}'."
+                f"'{template_contract.dataset}' does not match "
+                f"config template.source.dataset='{config_template_dataset}'."
             )
-    if project.template_record_id:
-        config_template_record_id = str(config.job.template.record_id or "")
-        if config_template_record_id != project.template_record_id:
+    if template_contract and template_contract.record_id:
+        config_template_record_id = (
+            str(config.job.template.source.record_id) if config.job.template.source.kind == "usr" else ""
+        )
+        if config_template_record_id != template_contract.record_id:
             errors.append(
                 "registry template_record_id="
-                f"'{project.template_record_id}' does not match "
-                f"config template.record_id='{config_template_record_id}'."
+                f"'{template_contract.record_id}' does not match "
+                f"config template.source.record_id='{config_template_record_id}'."
             )
     return errors
 
@@ -456,7 +530,10 @@ def resolve_workspace_project(workspace: str | Path, *, project_id: str) -> Work
     if project is None:
         choices = ", ".join(project_item.id for project_item in registry.workspace.projects) or "<none>"
         raise ConfigError(f"workspace project '{requested}' not found. Known project ids: {choices}")
-    config_path = _resolve_project_config_path(workspace_dir=workspace_dir, config_value=project.config)
+    config_path = _resolve_project_config_path(
+        workspace_dir=workspace_dir,
+        config_value=project.artifacts.config.path,
+    )
     if not config_path.exists():
         raise ConfigError(f"workspace project '{requested}' config not found: {config_path}")
     config, _ = load_job_config(config_path)
@@ -479,7 +556,10 @@ def doctor_workspace_registry(workspace: str | Path) -> WorkspaceDoctorReport:
     workspace_dir = registry_path.parent
     issues: list[WorkspaceDoctorIssue] = []
     for project in registry.workspace.projects:
-        config_path = _resolve_project_config_path(workspace_dir=workspace_dir, config_value=project.config)
+        config_path = _resolve_project_config_path(
+            workspace_dir=workspace_dir,
+            config_value=project.artifacts.config.path,
+        )
         if not config_path.exists():
             issues.append(
                 WorkspaceDoctorIssue(
@@ -520,16 +600,22 @@ def doctor_workspace_registry(workspace: str | Path) -> WorkspaceDoctorReport:
 
 def _default_workspace_registry_payload(*, workspace_id: str, profile: str) -> dict:
     project_config = "config.yaml" if profile == "blank" else "config.slot_a.window.yaml"
-    project_flow = "replace-anchor-in-template"
+    project_job_id = workspace_id if profile == "blank" else "anchor_template_slot_a_window_1kb"
     project_output = "REPLACE_WITH_OUTPUT_DATASET" if profile == "blank" else "anchor_template_slot_a_window_1kb_demo"
     project_template_id = "REPLACE_WITH_TEMPLATE_LABEL" if profile == "blank" else "template_backbone_dual_slot"
     project_template_dataset = "REPLACE_WITH_TEMPLATE_DATASET" if profile == "blank" else "template_parts_demo"
+    project_template_record_id = (
+        "REPLACE_WITH_TEMPLATE_RECORD_ID"
+        if profile == "blank"
+        else "c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d"  # pragma: allowlist secret
+    )
     return {
         "workspace": {
             "id": workspace_id,
             "profile": profile,
             "description": (
-                "Construct workspace registry for explicit project inventory, config provenance, and USR root hints."
+                "Construct workspace registry for explicit project inventory, "
+                "tracked config artifacts, and USR root hints."
             ),
             "roots": {
                 "shared_usr_root": "src/dnadesign/usr/datasets",
@@ -538,19 +624,23 @@ def _default_workspace_registry_payload(*, workspace_id: str, profile: str) -> d
             "projects": [
                 {
                     "id": workspace_id if profile == "blank" else "slot_a_window",
-                    "config": project_config,
-                    "flow": project_flow,
-                    "input_dataset": "REPLACE_WITH_ANCHOR_DATASET" if profile == "blank" else "anchor_parts_demo",
-                    "template_id": project_template_id,
-                    "template_dataset": project_template_dataset,
-                    "template_record_id": (
-                        "REPLACE_WITH_TEMPLATE_RECORD_ID"
-                        if profile == "blank"
-                        else "c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d"  # pragma: allowlist secret
-                    ),
-                    "output_dataset": project_output,
+                    "artifacts": {
+                        "config": {
+                            "path": project_config,
+                            "job_id": project_job_id,
+                        }
+                    },
+                    "contract": {
+                        "input_dataset": "REPLACE_WITH_ANCHOR_DATASET" if profile == "blank" else "anchor_parts_demo",
+                        "template": {
+                            "id": project_template_id,
+                            "dataset": project_template_dataset,
+                            "record_id": project_template_record_id,
+                        },
+                        "output_dataset": project_output,
+                    },
                     "notes": (
-                        "Replace placeholders and add more project entries as flows expand."
+                        "Replace placeholders and add more project entries as the study surface expands."
                         if profile == "blank"
                         else "Windowed anchor placement against slot_a in the packaged dual-slot template."
                     ),

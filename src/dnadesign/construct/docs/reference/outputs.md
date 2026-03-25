@@ -12,7 +12,7 @@ Two patterns are supported:
 - Best for study-scoped provenance, isolation, and replay
 
 2. Explicit shared USR root
-- Use `output.root` plus matching input/template roots when a shared dataset mirror is intentional
+- Use `output.target.root` plus matching input/template source roots when a shared dataset mirror is intentional
 - Best for curated shared datasets or downstream cross-workspace reuse
 
 Construct does not silently move between these roots. The resolved `input_root` and `output_root` are printed by runtime preflight.
@@ -24,6 +24,7 @@ Construct does not silently move between these roots. The resolved `input_root` 
 - rerunning the same construct into the same dataset with `output.on_conflict=error` fails during preflight
 - `output.on_conflict=ignore` skips already-present output ids and reports the skipped count
 - writing to the same dataset as input is blocked unless `output.allow_same_as_input=true`
+- `output.record_source` is optional provenance text only; it does not control the write target
 
 ### Lineage columns
 

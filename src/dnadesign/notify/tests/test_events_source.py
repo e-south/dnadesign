@@ -21,6 +21,67 @@ from dnadesign.notify.errors import NotifyConfigError
 from dnadesign.notify.events.source import register_tool_events_source, resolve_tool_events_path
 
 
+def _write_construct_config(
+    config_path: Path,
+    *,
+    input_root: str | Path | None,
+    output_root: str | Path | None,
+    output_dataset: str | None = "construct/demo_window",
+) -> None:
+    lines = [
+        "job:",
+        "  id: slot_a_window",
+        "  input:",
+        "    source:",
+        "      kind: usr",
+        "      dataset: anchors_demo",
+    ]
+    if input_root is not None:
+        lines.append(f"      root: {Path(input_root).as_posix() if isinstance(input_root, Path) else input_root}")
+    lines.extend(
+        [
+            "  template:",
+            "    id: template_demo",
+            "    source:",
+            "      kind: literal",
+            "      sequence: AAAATTTTCCCCGGGG",
+            "    circular: true",
+            "  parts:",
+            "    - name: anchor",
+            "      role: anchor",
+            "      sequence:",
+            "        source: input_field",
+            "        field: sequence",
+            "      placement:",
+            "        kind: replace",
+            "        orientation: forward",
+            "        locator:",
+            "          kind: coordinates",
+            "          start: 8",
+            "          end: 12",
+            "        guards:",
+            "          replaced_sequence: CCCC",
+            "  realize:",
+            "    mode: window",
+            "    focal_part: anchor",
+            "    window:",
+            "      semantics: fixed_total",
+            "      reference: center",
+            "      direction: symmetric",
+            "      size_bp: 8",
+            "      offset_bp: 0",
+            "  output:",
+            "    target:",
+            "      kind: usr",
+        ]
+    )
+    if output_dataset is not None:
+        lines.append(f"      dataset: {output_dataset}")
+    if output_root is not None:
+        lines.append(f"      root: {Path(output_root).as_posix() if isinstance(output_root, Path) else output_root}")
+    config_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def test_resolve_tool_events_path_infer_from_single_usr_writeback_job(tmp_path: Path) -> None:
     config = tmp_path / "infer.yaml"
     usr_root = tmp_path / "usr_root"
@@ -190,22 +251,10 @@ def test_resolve_tool_events_path_construct_from_explicit_output_root(tmp_path: 
     workspace = tmp_path / "construct_workspace"
     workspace.mkdir(parents=True, exist_ok=True)
     config = workspace / "config.yaml"
-    config.write_text(
-        "\n".join(
-            [
-                "job:",
-                "  id: slot_a_window",
-                "  input:",
-                "    source: usr",
-                "    dataset: anchors_demo",
-                "    root: shared_inputs",
-                "  output:",
-                "    dataset: construct/demo_window",
-                "    root: outputs/usr_datasets",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
+    _write_construct_config(
+        config,
+        input_root="shared_inputs",
+        output_root="outputs/usr_datasets",
     )
 
     events_path, policy = resolve_tool_events_path(tool="construct", config=config)
@@ -219,21 +268,10 @@ def test_resolve_tool_events_path_construct_from_explicit_output_root(tmp_path: 
 def test_resolve_tool_events_path_construct_falls_back_to_input_root(tmp_path: Path) -> None:
     config = tmp_path / "config.yaml"
     usr_root = tmp_path / "shared_usr"
-    config.write_text(
-        "\n".join(
-            [
-                "job:",
-                "  id: slot_a_window",
-                "  input:",
-                "    source: usr",
-                "    dataset: anchors_demo",
-                f"    root: {usr_root}",
-                "  output:",
-                "    dataset: construct/demo_window",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
+    _write_construct_config(
+        config,
+        input_root=usr_root,
+        output_root=None,
     )
 
     events_path, policy = resolve_tool_events_path(tool="construct", config=config)
@@ -244,45 +282,26 @@ def test_resolve_tool_events_path_construct_falls_back_to_input_root(tmp_path: P
 
 def test_resolve_tool_events_path_construct_requires_job_output_dataset(tmp_path: Path) -> None:
     config = tmp_path / "construct.yaml"
-    config.write_text(
-        "\n".join(
-            [
-                "job:",
-                "  id: slot_a_window",
-                "  input:",
-                "    source: usr",
-                "    dataset: anchors_demo",
-                "  output:",
-                "    root: outputs/usr_datasets",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
+    _write_construct_config(
+        config,
+        input_root="shared_inputs",
+        output_root="outputs/usr_datasets",
+        output_dataset=None,
     )
 
-    with pytest.raises(NotifyConfigError, match="job.output.dataset"):
+    with pytest.raises(NotifyConfigError, match="job.output.target.dataset"):
         resolve_tool_events_path(tool="construct", config=config)
 
 
-def test_resolve_tool_events_path_construct_requires_explicit_usr_root(tmp_path: Path) -> None:
+def test_resolve_tool_events_path_construct_requires_input_root_contract(tmp_path: Path) -> None:
     config = tmp_path / "construct.yaml"
-    config.write_text(
-        "\n".join(
-            [
-                "job:",
-                "  id: slot_a_window",
-                "  input:",
-                "    source: usr",
-                "    dataset: anchors_demo",
-                "  output:",
-                "    dataset: construct/demo_window",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
+    _write_construct_config(
+        config,
+        input_root=None,
+        output_root=None,
     )
 
-    with pytest.raises(NotifyConfigError, match="construct resolver requires job.input.root or job.output.root"):
+    with pytest.raises(NotifyConfigError, match="job.input.source.root is required"):
         resolve_tool_events_path(tool="construct", config=config)
 
 
@@ -434,7 +453,7 @@ def test_events_source_module_is_registry_only() -> None:
     assert "os" not in imported_modules
 
 
-def test_source_builtin_module_does_not_import_densegen() -> None:
+def test_source_builtin_module_uses_public_tool_contracts_only() -> None:
     import dnadesign.notify.events.source_builtin as source_builtin_module
 
     parsed = ast.parse(inspect.getsource(source_builtin_module))
@@ -445,4 +464,10 @@ def test_source_builtin_module_does_not_import_densegen() -> None:
         if isinstance(node, ast.ImportFrom):
             imported_modules.add(str(node.module or ""))
 
-    assert not any(module.startswith("dnadesign.densegen") for module in imported_modules)
+    assert "dnadesign.construct.contracts" in imported_modules
+    assert "dnadesign.densegen.contracts" in imported_modules
+    assert "dnadesign.infer.contracts" in imported_modules
+    assert not any(module.startswith("dnadesign.construct.src") for module in imported_modules)
+    assert not any(module.startswith("dnadesign.densegen.src") for module in imported_modules)
+    assert not any(module.startswith("dnadesign.infer.src") for module in imported_modules)
+    assert not any(module.startswith("dnadesign._contracts") for module in imported_modules)

@@ -21,7 +21,7 @@ import pyarrow as pa
 import yaml
 
 from dnadesign.usr import Dataset, compute_id, default_usr_root, normalize_sequence, normalize_usr_root
-from dnadesign.usr_roots import resolve_usr_root_from_env
+from dnadesign.usr.roots import resolve_usr_root_from_env
 
 from .errors import ConfigError
 from .output_store import _ensure_construct_registry

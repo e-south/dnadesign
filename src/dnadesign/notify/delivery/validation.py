@@ -15,8 +15,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from dnadesign._contracts.tls_ca_bundle import resolve_tls_ca_bundle_path
-
+from ..contracts import resolve_tls_ca_bundle_path
 from ..errors import NotifyConfigError
 from .secrets import resolve_secret_ref
 

@@ -75,7 +75,6 @@ def run_usr_events_watch(
     resolve_tool_workspace_config: Callable[..., Path],
     resolve_usr_events_path: Callable[..., Path],
     resolve_profile_webhook_source: Callable[[dict[str, Any]], tuple[str | None, str | None]],
-    default_profile_path_for_tool: Callable[[str | None], Path],
     resolve_cli_optional_string: Callable[..., str | None],
     resolve_webhook_url: Callable[..., str],
     resolve_tls_ca_bundle: Callable[..., Path | None],
@@ -105,7 +104,6 @@ def run_usr_events_watch(
         normalize_tool_name=normalize_tool_name,
         resolve_tool_events_path=resolve_tool_events_path,
         resolve_tool_workspace_config=resolve_tool_workspace_config,
-        default_profile_path_for_tool=default_profile_path_for_tool,
     )
 
     profile_data = read_profile(mode.profile_path) if mode.profile_path is not None else {}

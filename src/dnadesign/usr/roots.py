@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/usr_roots.py
+src/dnadesign/usr/roots.py
 
-Lightweight shared USR root-resolution helpers used across tool boundaries.
+USR-owned root-resolution helpers for canonical dataset storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,7 +17,7 @@ from pathlib import Path
 
 def pkg_usr_root() -> Path:
     """Return the installed dnadesign/usr package directory."""
-    return (Path(__file__).resolve().parent / "usr").resolve()
+    return Path(__file__).resolve().parent
 
 
 def default_usr_root(*, pkg_root: Path | None = None) -> Path:
@@ -73,3 +73,12 @@ def resolve_usr_root_from_config(
         return normalize_usr_root(candidate.resolve(), pkg_root=pkg_root)
     resolved_config_path = config_path.expanduser().resolve()
     return normalize_usr_root((resolved_config_path.parent / candidate).resolve(), pkg_root=pkg_root)
+
+
+__all__ = [
+    "default_usr_root",
+    "normalize_usr_root",
+    "pkg_usr_root",
+    "resolve_usr_root_from_config",
+    "resolve_usr_root_from_env",
+]

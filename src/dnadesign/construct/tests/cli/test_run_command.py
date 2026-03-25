@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -53,12 +54,15 @@ def _write_valid_config(*, tmp_path: Path, usr_root: Path) -> Path:
 job:
   id: cli_run_demo
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
   template:
     id: template_demo
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: true
   parts:
     - name: anchor
@@ -68,18 +72,27 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    window_bp: 8
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 8
+      offset_bp: 0
   output:
-    dataset: anchors_demo_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -122,6 +135,24 @@ def test_run_command_writes_output_dataset(tmp_path: Path) -> None:
     assert frame.iloc[0]["construct__job"] == "cli_run_demo"
 
 
+def test_run_command_reports_json_dry_run_summary(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    _write_registry(usr_root)
+    dataset = Dataset(usr_root, "anchors_demo")
+    dataset.init(source="test", notes="run cli json")
+    dataset.add_sequences(["ACGT"], bio_type="dna", alphabet="dna_4", source="test")
+    config_path = _write_valid_config(tmp_path=tmp_path, usr_root=usr_root)
+
+    result = _RUNNER.invoke(app, ["run", "--config", config_path.as_posix(), "--dry-run", "--format", "json"])
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["run"]["job_id"] == "cli_run_demo"
+    assert payload["run"]["dry_run"] is True
+    assert payload["run"]["output_dataset"] == "anchors_demo_constructed"
+
+
 def test_run_command_shapes_construct_errors(tmp_path: Path) -> None:
     usr_root = tmp_path / "usr_root"
     _write_registry(usr_root)
@@ -134,12 +165,15 @@ def test_run_command_shapes_construct_errors(tmp_path: Path) -> None:
 job:
   id: cli_run_bad
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
   template:
     id: template_demo
-    path: {tmp_path.as_posix()}
+    source:
+      kind: path
+      path: {tmp_path.as_posix()}
   parts:
     - name: anchor
       role: anchor
@@ -148,15 +182,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 0
-        end: 4
         orientation: forward
-        expected_template_sequence: AAAA
+        locator:
+          kind: coordinates
+          start: 0
+          end: 4
+        guards:
+          replaced_sequence: AAAA
   realize:
     mode: full_construct
   output:
-    dataset: anchors_demo_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -165,6 +204,63 @@ job:
 
     assert result.exit_code == 1
     assert "Error: Template path must resolve to a readable file" in (result.stdout or "")
+
+
+def test_run_command_shapes_construct_errors_as_json(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    _write_registry(usr_root)
+    dataset = Dataset(usr_root, "anchors_demo")
+    dataset.init(source="test", notes="run cli")
+    dataset.add_sequences(["ACGT"], bio_type="dna", alphabet="dna_4", source="test")
+    config_path = tmp_path / "bad_config.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: cli_run_bad
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+  template:
+    id: template_demo
+    source:
+      kind: path
+      path: {tmp_path.as_posix()}
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 0
+          end: 4
+        guards:
+          replaced_sequence: AAAA
+  realize:
+    mode: full_construct
+  output:
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(app, ["run", "--config", config_path.as_posix(), "--format", "json"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert payload["code"] == 1
+    assert payload["error_type"] == "ValidationError"
+    assert "Template path must resolve to a readable file" in payload["error"]
 
 
 def test_run_command_shapes_usr_write_errors(tmp_path: Path, monkeypatch) -> None:

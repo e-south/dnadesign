@@ -19,7 +19,7 @@ uv run construct workspace list
 
 # Blank workspace for a custom construct study.
 uv run construct workspace init --id demo_construct # Create a blank construct workspace scaffold.
-uv run construct workspace show --workspace demo_construct # Review workspace registry/config paths.
+uv run construct workspace show --workspace demo_construct # Review tracked config artifacts and workspace contract.
 uv run construct workspace doctor --workspace demo_construct # Verify workspace registry/config health before editing or running.
 
 # Packaged local anchor/template demo copied into a new workspace id.
@@ -87,6 +87,7 @@ If you initialize a workspace outside the repo tree, reuse the `uv run --project
 - Workspace ids must be directory names, not paths.
 - Existing workspaces are never overwritten.
 - Every workspace carries `construct.workspace.yaml` as the project registry and provenance surface.
+- Each workspace project keeps only identity fields (`id`) at top level, tracks config artifacts under `project.artifacts`, and moves audited routing fields under `project.contract`.
 - `construct workspace doctor` is the contract check for registry/config drift before project execution.
 - Packaged workspaces default construct IO to `outputs/usr_datasets`, consistent with repo workspace-scoping guidance.
 - Blank workspaces also scaffold explicit `root: outputs/usr_datasets` entries so custom studies do not fall back to repo-package datasets implicitly.
@@ -97,4 +98,4 @@ If you initialize a workspace outside the repo tree, reuse the `uv run --project
 - One construct job uses one template; multi-template or slot-matrix studies are represented as multiple project entries and config files in the workspace registry.
 - The packaged local demo exposes `./runbook.sh --mode seed|validate|dry-run|run|validate-all` as the local workspace entrypoint.
 - The packaged shared-dataset demo exposes `./runbook.sh --mode seed|validate-all|dry-run-all|run-all` as the local workspace entrypoint for the shared-dataset flow; the authoritative cross-tool handoff still lives in `../../usr/docs/operations/construct-infer-shared-dataset-runbook.md`.
-- The study-owned pDual-10 surface is a checked-in execution surface, not a demo profile; use its tracked workspace/config paths when the question is about the live promoter study rather than generic Construct behavior.
+- The study-owned pDual-10 surface is a checked-in execution surface, not a demo profile; use its tracked workspace artifact/config contract when the question is about the live promoter study rather than generic Construct behavior.
