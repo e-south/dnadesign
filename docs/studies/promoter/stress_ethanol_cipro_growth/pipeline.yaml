@@ -1,18 +1,8 @@
 study_pipeline:
   study_id: stress_ethanol_cipro_growth
-  last_verified: 2026-03-24
-  current_phase: infer_batch_preparation
-  canonical_usr_root: src/dnadesign/usr/datasets
-  objective: >
-    Grow DenseGen promoter anchors, merge them with wildtype controls into one
-    auditable anchor set, realize 1 kb pDual-10 contexts with Construct, and
-    run Evo2 feature extraction with Notify-backed batch visibility.
+  last_verified: 2026-03-25
   row_targets:
     densegen_anchor_minimum_before_first_full_lane_infer: 100000
-  required_records:
-    campaign_manifest: campaign.yaml
-    dataset_registry: datasets.yaml
-    status_note: status.md
   execution_surfaces:
     construct_workspace: src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10
     infer_workspace: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro
@@ -25,13 +15,9 @@ study_pipeline:
       anchor_plus_template: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml
   datasets:
     densegen_anchor_source: densegen/study_stress_ethanol_cipro
-    wildtype_anchor_source: mg1655_promoters
-    template_seed_dataset: plasmids
     merged_anchor_dataset: promoter/stress_ethanol_cipro_anchor_set
     construct_context_dataset: promoter/stress_ethanol_cipro_construct_contexts
-    canonical_feature_dataset: promoter/stress_ethanol_cipro_feature_matrix
   construct:
-    template_record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
     workspace_projects:
       - id: forward_anchor_window
   infer:
@@ -39,14 +25,6 @@ study_pipeline:
     supported_model_families:
       - evo2_20b
       - evo2_7b
-    note: >
-      The current Evo2 feature_bundle contract keeps anchor_only and
-      template_1kb as separate jobs. The study's full-lane configs therefore
-      span two explicit dataset planes rather than one mixed-context ingest
-      dataset. The 20B family is the preferred default when Hopper/H200-class
-      GPU resources are available; the 7B family remains a first-class
-      alternate path. Resumable ops runbooks therefore stay lane-specific as
-      well, because ops auto/resume resolves one USR destination per runbook.
     configs:
       anchor_only_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml
       anchor_plus_template_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml
@@ -54,33 +32,3 @@ study_pipeline:
       anchor_plus_template_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml
       full_lane_set_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_7b.yaml
       full_lane_set_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_20b.yaml
-  phases:
-    - id: densegen_growth
-      status: parallel_optional
-      primary_dataset: densegen/study_stress_ethanol_cipro
-      completion_rule: row_count >= 100000
-      next_surface: src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml
-    - id: merged_anchor_set
-      status: complete
-      output_dataset: promoter/stress_ethanol_cipro_anchor_set
-      runbook: src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md
-      next_surface: src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md
-    - id: construct_context_expansion
-      status: complete
-      output_dataset: promoter/stress_ethanol_cipro_construct_contexts
-      next_surface: src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md
-    - id: infer_batch_preparation
-      status: in_progress
-      next_surface: src/dnadesign/usr/docs/operations/promoter-study-preflight.md
-    - id: infer_anchor_only_20b
-      status: planned
-      next_surface: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml
-    - id: infer_anchor_plus_template_20b
-      status: planned
-      next_surface: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml
-    - id: infer_anchor_only_7b
-      status: planned
-      next_surface: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml
-    - id: infer_anchor_plus_template_7b
-      status: planned
-      next_surface: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml

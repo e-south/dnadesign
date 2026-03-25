@@ -8,7 +8,7 @@
 **Registry-id:** usr.data-plane.promoter-study-status
 **Summary:** Read one checked-in promoter-study record and summarize dataset, phase, and execution-surface readiness without reconstructing the workflow by hand.
 **Execution-kind:** iterative
-**Progress-kind:** promoter-study-record
+**Status-kind:** promoter-study-status
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-25
@@ -77,7 +77,7 @@ or mutating USR. Host-local readiness such as GPU visibility remains advisory
 here and moves into preflight for hard blockers.
 The implementation boundary is explicit: OPS resolves the registered provider,
 and the stress-promoter family code that assembles the snapshot lives under
-`src/dnadesign/studies/stress_promoter_ethanol_cipro/`.
+`src/dnadesign/studies/promoter/`.
 
 When you need deeper, command-level blockers across the same checked-in study,
 continue to [Promoter Study Preflight](promoter-study-preflight.md):
@@ -98,9 +98,10 @@ uv run ops progress show usr.data-plane.promoter-study-preflight --json
    snapshot scope, and next-scope preflight grouping without hard-coding
    workflow taxonomy in core code.
 5. When the study has real downstream execution surfaces, an optional
-   `pipeline.yaml` that names the canonical Construct, Infer, and batch paths
-   for the live study. Infer Notify profile paths should derive from the
-   checked-in lane configs instead of being duplicated there.
+   `pipeline.yaml` that names the exact Construct, Infer, and batch surfaces
+   plus any minimal runtime mappings the live study still needs. Infer Notify
+   profile paths should derive from the checked-in lane configs instead of
+   being duplicated there.
 
 Recommended bootstrap for the manifest:
 
@@ -117,8 +118,6 @@ cp docs/templates/promoter-study-datasets.yaml docs/studies/promoter/<study-id>/
 cp docs/templates/promoter-study-status.md docs/studies/promoter/<study-id>/status.md
 # Copy the OPS-facing study contract template into the same study directory.
 cp docs/templates/promoter-study-ops.study.yaml docs/studies/promoter/<study-id>/ops.study.yaml
-# Add a study-owned execution map once real Construct or Infer surfaces exist.
-cp docs/templates/promoter-study-pipeline.yaml docs/studies/promoter/<study-id>/pipeline.yaml
 # Create the audit directory referenced by sync-enabled dataset entries.
 mkdir -p docs/studies/promoter/<study-id>/audits
 ```
@@ -177,8 +176,9 @@ Discovery rules:
 - `ops.study.yaml` is the OPS-facing source of phase order, repo snapshot
   scope, and next-scope routing. Keep it checked in with the study record.
 - If `pipeline.yaml` exists in the study directory, treat it as the canonical
-  execution-map surface for exact Construct, Infer, and batch paths. Infer
-  Notify profile paths derive from the checked-in lane configs.
+  execution-map surface for exact Construct, Infer, and batch paths plus any
+  minimal runtime mappings still needed by the live study. Infer Notify profile
+  paths derive from the checked-in lane configs.
 - If the registry and study directory contents disagree, fail visibly and fix
   the registry before asking for live status.
 
@@ -236,7 +236,7 @@ uv run notify usr-events watch --events <usr-root>/<feature-dataset>/.events.log
 uv run usr --root <usr-root> info <dataset-id> --format json
 # Capture local-vs-remote drift for one sync-enabled datasets.yaml entry.
 uv run usr --root <usr-root> diff <dataset-id> <remote-name> --audit-json-out docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
-# Summarize that same sync audit through the registered progress view.
+# Summarize that same sync audit through the registered status view.
 uv run ops progress show usr.data-plane.hpc-sync --sync-audit-json docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
 ```
 

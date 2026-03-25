@@ -307,6 +307,7 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "docs/studies/promoter/<study-id>/campaign.yaml" in skill
     assert "docs/studies/promoter/<study-id>/datasets.yaml" in skill
     assert "docs/studies/promoter/<study-id>/status.md" in skill
+    assert "docs/studies/promoter/<study-id>/ops.study.yaml" in skill
     assert "docs/studies/promoter/index.yaml" in contract
     assert "docs/studies/promoter/<study-id>/" in contract
     assert "docs/studies/README.md" in contract
@@ -327,10 +328,16 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "active_study: <study-id-or-null>" in index_template
     assert "status: active|planned|archived" in index_template
     assert "docs/studies/promoter/<study-id>/datasets.yaml" in studies_index
+    assert "docs/studies/promoter/<study-id>/ops.study.yaml" in studies_index
+    assert "ops.study.yaml" in promoter_registry
     assert "If `docs/studies/promoter/index.yaml` is missing" in studies_index
     assert "cp docs/templates/promoter-study-index.yaml docs/studies/promoter/index.yaml" in studies_index
     assert (
         "cp docs/templates/promoter-study-datasets.yaml docs/studies/promoter/<study-id>/datasets.yaml" in studies_index
+    )
+    assert (
+        "cp docs/templates/promoter-study-ops.study.yaml docs/studies/promoter/<study-id>/ops.study.yaml"
+        in studies_index
     )
     assert "Read `docs/studies/promoter/index.yaml` first." in contract
     assert "If the registry already exists, edit it in place instead of replacing it." in contract
@@ -389,6 +396,7 @@ def test_promoter_study_record_is_checked_in_for_stress_ethanol_cipro_growth() -
     index_yaml = _read("docs/studies/promoter/index.yaml")
     campaign = _read("docs/studies/promoter/stress_ethanol_cipro_growth/campaign.yaml")
     datasets = _read("docs/studies/promoter/stress_ethanol_cipro_growth/datasets.yaml")
+    ops_study = _read("docs/studies/promoter/stress_ethanol_cipro_growth/ops.study.yaml")
     status = _read("docs/studies/promoter/stress_ethanol_cipro_growth/status.md")
 
     assert "active_study: stress_ethanol_cipro_growth" in index_yaml
@@ -400,8 +408,11 @@ def test_promoter_study_record_is_checked_in_for_stress_ethanol_cipro_growth() -
     assert "remote_name: cluster" in datasets
     assert "mg1655_promoters" in datasets
     assert "plasmids" in datasets
+    assert "summary_scope: repo" in ops_study
+    assert "group_phase_bindings:" in ops_study
+    assert "runtime_shared_groups: [notify_environment]" in ops_study
     assert "densegen/study_stress_ethanol_cipro" in status
-    assert "77680" in status
+    assert "130864" in status
     assert "100000" in status
 
 

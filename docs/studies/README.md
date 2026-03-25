@@ -36,7 +36,8 @@ When a study already owns concrete execution surfaces, add one optional fifth
 artifact:
 
 - `pipeline.yaml`: machine-readable map of the study-owned workspace, config,
-  batch, and Notify surfaces that a naive agent should follow next
+  batch, and runtime surfaces that a naive agent should follow next without
+  duplicating study narrative or lifecycle authority
 
 Use the study record even when the effort is still in the source-assembly phase.
 An active study does not need to wait until the final feature matrix already
@@ -79,8 +80,9 @@ docs/studies/promoter/index.yaml
 - `ops.study.yaml` is the machine-readable OPS contract for phase ordering,
   repo-scoped snapshot posture, and explicit preflight group planning.
 - `pipeline.yaml`, when present, records the exact Construct workspace,
-  Infer configs, batch presets, and Notify profile paths that belong to the
-  real study rather than to a generic demo.
+  Infer configs, batch presets, and other runtime surfaces that belong to the
+  real study rather than to a generic demo. Keep study meaning and lifecycle in
+  `status.md` and `ops.study.yaml`.
 - `audits/` stores machine-readable sync audit JSON files referenced from
   `datasets.yaml`.
 
@@ -140,7 +142,7 @@ uv run usr --root <usr-root> info <dataset-id> --format json
 # Capture remote drift against the study's declared remote profile.
 uv run usr --root <usr-root> diff <dataset-id> <remote-name> \
   --audit-json-out docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
-# Summarize the same sync audit through the registered progress view.
+# Summarize the same sync audit through the registered status view.
 uv run ops progress show usr.data-plane.hpc-sync \
   --sync-audit-json docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
 ```
