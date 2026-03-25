@@ -29,6 +29,7 @@ from dnadesign.studies.stress_promoter_ethanol_cipro.preflight_infer import (
 def _state_check(**kwargs) -> dict[str, object]:
     return {
         "id": kwargs["check_id"],
+        "check_group": kwargs.get("check_group"),
         "phase": kwargs["phase"],
         "phase_id": kwargs["phase_id"],
         "state": kwargs["state"],
@@ -41,6 +42,7 @@ def _command_check(**kwargs) -> dict[str, object]:
     execution = kwargs["execution"]
     return {
         "id": kwargs["check_id"],
+        "check_group": kwargs.get("check_group"),
         "phase": kwargs["phase"],
         "phase_id": kwargs["phase_id"],
         "state": kwargs.get("override_state", "ok"),
@@ -90,8 +92,7 @@ def test_build_promoter_preflight_infer_checks_reports_runtime_and_notify_contra
         study_repo_root=tmp_path,
         infer_runtime=infer_runtime,
         infer_preparation_phase_id="infer_batch_preparation",
-        include_infer_checks=True,
-        include_notify_checks=True,
+        enabled_groups={"infer", "notify"},
         dependencies=PromoterPreflightInferDependencies(
             inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},
             infer_usr_dataset_requirements=lambda _: [],
@@ -124,6 +125,7 @@ def test_build_promoter_preflight_infer_checks_reports_runtime_and_notify_contra
 
     assert result.evidence_updates["preferred_infer_model_family"] == "evo2_20b"
     assert result.evidence_updates["supported_model_families"] == ["evo2_20b", "evo2_7b"]
+    assert checks["infer.validate.anchor_only_20b"]["check_group"] == "infer"
     assert checks["infer.validate.anchor_only_20b"]["state"] == "ok"
     assert checks["infer.validate.full_lane_set_20b"]["state"] == "ok"
     assert checks["infer.local_runtime.anchor_only_20b"]["state"] == "attention"
@@ -167,8 +169,7 @@ def test_build_promoter_preflight_infer_checks_requires_notify_resolver_dependen
             study_repo_root=tmp_path,
             infer_runtime=infer_runtime,
             infer_preparation_phase_id="infer_batch_preparation",
-            include_infer_checks=False,
-            include_notify_checks=True,
+            enabled_groups={"notify"},
             dependencies=PromoterPreflightInferDependencies(
                 inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},
                 infer_usr_dataset_requirements=lambda _: [],

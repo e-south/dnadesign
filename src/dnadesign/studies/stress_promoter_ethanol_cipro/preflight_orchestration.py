@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,6 +36,7 @@ class PromoterPreflightRunbookPlanDependencies:
 @dataclass(frozen=True)
 class PromoterPreflightRunbookPlanTarget:
     check_id: str
+    check_group: str
     phase: str
     phase_id: str | None
     runbook_path: Path
@@ -56,18 +57,19 @@ def resolve_notify_environment_state(
 def build_promoter_preflight_notify_environment_checks(
     *,
     notify_env_state: Mapping[str, bool],
-    infer_preparation_phase_id: str,
-    include_notify_checks: bool,
+    notify_environment_phase_id: str,
+    enabled_groups: Collection[str],
     dependencies: PromoterPreflightNotifyEnvironmentDependencies,
 ) -> tuple[dict[str, object], ...]:
-    if not include_notify_checks:
+    if "notify_environment" not in enabled_groups:
         return ()
     webhook_ready = any(bool(notify_env_state.get(env_var)) for env_var in _NOTIFY_WEBHOOK_ENV_KEYS)
     return (
         dependencies.preflight_state_check(
             check_id="notify.environment.webhook",
+            check_group="notify_environment",
             phase="notify",
-            phase_id=infer_preparation_phase_id,
+            phase_id=notify_environment_phase_id,
             state="ok" if webhook_ready else "attention",
             summary=(
                 "batch notify secret is configured in the environment"
@@ -78,8 +80,9 @@ def build_promoter_preflight_notify_environment_checks(
         ),
         dependencies.preflight_state_check(
             check_id="notify.environment.tls",
+            check_group="notify_environment",
             phase="notify",
-            phase_id=infer_preparation_phase_id,
+            phase_id=notify_environment_phase_id,
             state="ok" if bool(notify_env_state.get(_NOTIFY_TLS_ENV_KEY)) else "attention",
             summary=(
                 "SSL_CERT_FILE is configured for notify profile doctor and live delivery"
@@ -133,6 +136,7 @@ def build_promoter_preflight_runbook_plan_checks(
         checks.append(
             dependencies.preflight_command_check(
                 check_id=target.check_id,
+                check_group=target.check_group,
                 phase=target.phase,
                 phase_id=target.phase_id,
                 summary=dependencies.choose_command_summary(

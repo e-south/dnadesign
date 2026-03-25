@@ -92,6 +92,7 @@ def run_progress_command(argv: Sequence[str], *, cwd: Path, timeout_seconds: int
 def preflight_command_check(
     *,
     check_id: str,
+    check_group: str | None,
     phase: str,
     phase_id: str | None,
     summary: str,
@@ -106,6 +107,7 @@ def preflight_command_check(
         summary = f"timed out: {summary}"
     return {
         "id": check_id,
+        "check_group": str(check_group or "").strip() or None,
         "phase": phase,
         "phase_id": phase_id,
         "state": state,
@@ -123,6 +125,7 @@ def preflight_command_check(
 def preflight_state_check(
     *,
     check_id: str,
+    check_group: str | None,
     phase: str,
     phase_id: str | None,
     state: str,
@@ -131,6 +134,7 @@ def preflight_state_check(
 ) -> dict[str, object]:
     return {
         "id": check_id,
+        "check_group": str(check_group or "").strip() or None,
         "phase": phase,
         "phase_id": phase_id,
         "state": state,

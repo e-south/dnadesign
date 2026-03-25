@@ -210,19 +210,25 @@ def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densege
                 "snapshot": {"summary_scope": "repo"},
                 "preflight": {
                     "default_scope": "next",
-                    "phase_targets": {
+                    "group_phase_bindings": {
                         "densegen": "densegen_growth",
                         "construct": "construct_context_expansion",
-                        "infer_preparation": "infer_batch_preparation",
+                        "notify_environment": "infer_batch_preparation",
                     },
                     "next_scope": {
-                        "phase_groups": {
+                        "target_phase_groups": {
                             "densegen_growth": ["densegen"],
                             "merged_anchor_set": [],
                             "construct_context_expansion": ["construct"],
-                            "infer_batch_preparation": ["infer", "notify", "infer_batch_plan"],
+                            "infer_batch_preparation": [
+                                "infer",
+                                "notify_environment",
+                                "notify",
+                                "infer_batch_plan",
+                            ],
                         },
-                        "infer_lane_groups": ["infer", "notify", "infer_batch_plan"],
+                        "runtime_phase_groups": ["infer", "notify", "infer_batch_plan"],
+                        "runtime_shared_groups": ["notify_environment"],
                     },
                 },
             },
@@ -381,19 +387,25 @@ def _write_promoter_study_preflight_record(study_dir: Path) -> None:
                 "snapshot": {"summary_scope": "repo"},
                 "preflight": {
                     "default_scope": "next",
-                    "phase_targets": {
+                    "group_phase_bindings": {
                         "densegen": "densegen_growth",
                         "construct": "construct_context_expansion",
-                        "infer_preparation": "infer_batch_preparation",
+                        "notify_environment": "infer_batch_preparation",
                     },
                     "next_scope": {
-                        "phase_groups": {
+                        "target_phase_groups": {
                             "densegen_growth": ["densegen"],
                             "merged_anchor_set": [],
                             "construct_context_expansion": ["construct"],
-                            "infer_batch_preparation": ["infer", "notify", "infer_batch_plan"],
+                            "infer_batch_preparation": [
+                                "infer",
+                                "notify_environment",
+                                "notify",
+                                "infer_batch_plan",
+                            ],
                         },
-                        "infer_lane_groups": ["infer", "notify", "infer_batch_plan"],
+                        "runtime_phase_groups": ["infer", "notify", "infer_batch_plan"],
+                        "runtime_shared_groups": ["notify_environment"],
                     },
                 },
             },

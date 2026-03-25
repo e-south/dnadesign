@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -48,12 +48,11 @@ def build_promoter_preflight_upstream_checks(
     phase_states: Sequence[Mapping[str, object]],
     densegen_phase_id: str,
     construct_phase_id: str,
-    include_densegen_checks: bool,
-    include_construct_checks: bool,
+    enabled_groups: Collection[str],
     dependencies: PromoterPreflightUpstreamDependencies,
 ) -> PromoterPreflightUpstreamChecksResult:
     checks: list[dict[str, object]] = []
-    if include_densegen_checks:
+    if "densegen" in enabled_groups:
         checks.extend(
             _build_densegen_checks(
                 study_repo_root=study_repo_root,
@@ -62,7 +61,7 @@ def build_promoter_preflight_upstream_checks(
                 dependencies=dependencies,
             )
         )
-    if include_construct_checks:
+    if "construct" in enabled_groups:
         checks.extend(
             _build_construct_checks(
                 study_repo_root=study_repo_root,
@@ -95,6 +94,7 @@ def _build_densegen_checks(
     checks.append(
         dependencies.preflight_state_check(
             check_id="densegen.batch.resources",
+            check_group="densegen",
             phase="densegen",
             phase_id=densegen_phase_id,
             state="ok",
@@ -121,6 +121,7 @@ def _build_densegen_checks(
         checks.append(
             dependencies.preflight_command_check(
                 check_id="densegen.config.probe_solver",
+                check_group="densegen",
                 phase="densegen",
                 phase_id=densegen_phase_id,
                 summary=dependencies.choose_command_summary(
@@ -138,6 +139,7 @@ def _build_densegen_checks(
             targets=(
                 PromoterPreflightRunbookPlanTarget(
                     check_id="densegen.batch.plan",
+                    check_group="densegen",
                     phase="densegen",
                     phase_id=densegen_phase_id,
                     runbook_path=densegen_batch_runbook,
@@ -177,6 +179,7 @@ def _build_construct_checks(
     checks.append(
         dependencies.preflight_command_check(
             check_id="construct.workspace.doctor",
+            check_group="construct",
             phase="construct",
             phase_id=construct_phase_id,
             summary=dependencies.choose_command_summary(
@@ -210,6 +213,7 @@ def _build_construct_checks(
             checks.append(
                 dependencies.preflight_state_check(
                     check_id=check_id,
+                    check_group="construct",
                     phase="construct",
                     phase_id=construct_phase_id,
                     state="missing",
@@ -249,6 +253,7 @@ def _build_construct_checks(
             checks.append(
                 dependencies.preflight_state_check(
                     check_id=check_id,
+                    check_group="construct",
                     phase="construct",
                     phase_id=construct_phase_id,
                     state="ok",
@@ -276,6 +281,7 @@ def _build_construct_checks(
         checks.append(
             dependencies.preflight_command_check(
                 check_id=check_id,
+                check_group="construct",
                 phase="construct",
                 phase_id=construct_phase_id,
                 summary=dependencies.choose_command_summary(

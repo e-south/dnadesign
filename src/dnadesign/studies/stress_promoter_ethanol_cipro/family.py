@@ -158,7 +158,7 @@ class StressPromoterEthanolCiproStudyAdapter(StudyFamilyAdapter):
         validate_infer_config_contract = None
         validate_infer_dry_run_contract = None
         resolve_infer_usr_output_contract = None
-        if resolved_context.scope_plan.include_infer_checks or resolved_context.scope_plan.include_notify_checks:
+        if resolved_context.scope_plan.includes_group("infer") or resolved_context.scope_plan.includes_group("notify"):
             from dnadesign.infer import validate_infer_config_contract, validate_infer_dry_run_contract
             from dnadesign.infer.contracts import resolve_infer_usr_output_contract
 

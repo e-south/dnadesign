@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -44,10 +44,11 @@ def build_promoter_preflight_infer_checks(
     study_repo_root: Path,
     infer_runtime: PromoterStudyInferRuntimeResolvedContext,
     infer_preparation_phase_id: str,
-    include_infer_checks: bool,
-    include_notify_checks: bool,
+    enabled_groups: Collection[str],
     dependencies: PromoterPreflightInferDependencies,
 ) -> PromoterPreflightInferChecksResult:
+    include_infer_checks = "infer" in enabled_groups
+    include_notify_checks = "notify" in enabled_groups
     local_gpu_inventory = (
         dependencies.inspect_local_gpu_inventory()
         if include_infer_checks
@@ -83,6 +84,7 @@ def build_promoter_preflight_infer_checks(
             checks.append(
                 dependencies.preflight_state_check(
                     check_id=f"infer.validate.{config_label}",
+                    check_group="infer",
                     phase="infer",
                     phase_id=infer_runtime.config_phase_ids.get(config_label, infer_preparation_phase_id),
                     state="ok",
@@ -100,6 +102,7 @@ def build_promoter_preflight_infer_checks(
             checks.append(
                 dependencies.preflight_state_check(
                     check_id=f"infer.validate.{config_label}",
+                    check_group="infer",
                     phase="infer",
                     phase_id=infer_runtime.config_phase_ids.get(config_label, infer_preparation_phase_id),
                     state="attention",
@@ -170,6 +173,7 @@ def _build_infer_runtime_checks(
         checks.append(
             preflight_state_check(
                 check_id=f"infer.local_runtime.{runtime_label}",
+                check_group="infer",
                 phase="infer",
                 phase_id=runtime_phase_id,
                 state="attention",
@@ -186,6 +190,7 @@ def _build_infer_runtime_checks(
         checks.append(
             preflight_state_check(
                 check_id=f"infer.local_runtime.{runtime_label}",
+                check_group="infer",
                 phase="infer",
                 phase_id=runtime_phase_id,
                 state="ok",
@@ -209,6 +214,7 @@ def _build_infer_runtime_checks(
         checks.append(
             preflight_state_check(
                 check_id=f"infer.dry_run.{runtime_label}",
+                check_group="infer",
                 phase="infer",
                 phase_id=runtime_phase_id,
                 state="missing",
@@ -226,6 +232,7 @@ def _build_infer_runtime_checks(
         checks.append(
             preflight_state_check(
                 check_id=f"infer.dry_run.{runtime_label}",
+                check_group="infer",
                 phase="infer",
                 phase_id=runtime_phase_id,
                 state="ok",
@@ -242,6 +249,7 @@ def _build_infer_runtime_checks(
         checks.append(
             preflight_state_check(
                 check_id=f"infer.dry_run.{runtime_label}",
+                check_group="infer",
                 phase="infer",
                 phase_id=runtime_phase_id,
                 state="attention",
@@ -273,6 +281,7 @@ def _build_notify_runtime_checks(
         checks.append(
             preflight_state_check(
                 check_id=f"notify.profile.{runtime_label}",
+                check_group="notify",
                 phase="notify",
                 phase_id=runtime_phase_id,
                 state="attention",
@@ -284,6 +293,7 @@ def _build_notify_runtime_checks(
         checks.append(
             preflight_state_check(
                 check_id=f"notify.profile.{runtime_label}",
+                check_group="notify",
                 phase="notify",
                 phase_id=runtime_phase_id,
                 state="attention",
@@ -295,6 +305,7 @@ def _build_notify_runtime_checks(
         checks.append(
             preflight_state_check(
                 check_id=f"notify.profile.{runtime_label}",
+                check_group="notify",
                 phase="notify",
                 phase_id=runtime_phase_id,
                 state="attention",
@@ -315,6 +326,7 @@ def _build_notify_runtime_checks(
         checks.append(
             preflight_command_check(
                 check_id=f"notify.profile.{runtime_label}",
+                check_group="notify",
                 phase="notify",
                 phase_id=runtime_phase_id,
                 summary=choose_command_summary(
@@ -343,6 +355,7 @@ def _build_notify_runtime_checks(
         checks.append(
             preflight_state_check(
                 check_id=f"notify.resolve_events.{runtime_label}",
+                check_group="notify",
                 phase="notify",
                 phase_id=runtime_phase_id,
                 state=resolve_state,
@@ -359,6 +372,7 @@ def _build_notify_runtime_checks(
         checks.append(
             preflight_state_check(
                 check_id=f"notify.resolve_events.{runtime_label}",
+                check_group="notify",
                 phase="notify",
                 phase_id=runtime_phase_id,
                 state="attention",
