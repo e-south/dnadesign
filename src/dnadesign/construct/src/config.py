@@ -161,9 +161,7 @@ class TemplateConfig(StrictConfigModel):
         if not isinstance(data, dict):
             return data
         legacy_fields = [
-            field
-            for field in ("kind", "sequence", "path", "dataset", "root", "record_id", "field")
-            if field in data
+            field for field in ("kind", "sequence", "path", "dataset", "root", "record_id", "field") if field in data
         ]
         if isinstance(data.get("source"), str):
             legacy_fields.append("source")
@@ -261,9 +259,7 @@ class PlacementGuardsConfig(StrictConfigModel):
         if self.require_unique_forward_matches and not any(
             value is not None for value in (self.replaced_sequence, self.upstream_sequence, self.downstream_sequence)
         ):
-            raise ValueError(
-                "placement.guards.require_unique_forward_matches requires at least one guard sequence."
-            )
+            raise ValueError("placement.guards.require_unique_forward_matches requires at least one guard sequence.")
         if not has_guard and not self.require_unique_forward_matches:
             raise ValueError("placement.guards must declare at least one guard.")
         return self

@@ -79,7 +79,7 @@ def test_build_promoter_preflight_runbook_plan_checks_merges_payload_and_details
                 {
                     "selected_mode": "resume",
                     "workflow_id": "infer_batch_with_notify",
-                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
+                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},  # pragma: allowlist secret
                 }
             ),
         )
@@ -112,7 +112,7 @@ def test_build_promoter_preflight_runbook_plan_checks_merges_payload_and_details
     assert check.details["notify_env"] == {"NOTIFY_WEBHOOK": False}
     assert check.details["selected_mode"] == "resume"
     assert check.details["workflow_id"] == "infer_batch_with_notify"
-    assert check.details["notify_secret_ref"] == "file:///tmp/webhook"
+    assert check.details["notify_secret_ref"] == "file:///tmp/webhook"  # pragma: allowlist secret
     assert commands == [
         (
             "uv",

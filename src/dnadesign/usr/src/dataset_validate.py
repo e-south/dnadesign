@@ -101,8 +101,7 @@ def _validate_materialized_base_registry_contract(
                 actual_hash = base_registry_hash_raw.decode("utf-8")
                 if actual_hash != expected_hash:
                     raise SchemaError(
-                        "records.parquet registry_hash mismatch: "
-                        f"expected {expected_hash}, got {actual_hash}."
+                        f"records.parquet registry_hash mismatch: expected {expected_hash}, got {actual_hash}."
                     )
             for namespace, fields in materialized_by_namespace.items():
                 validate_overlay_schema(namespace, pa.schema([id_field, *fields]), registry=registry, key="id")

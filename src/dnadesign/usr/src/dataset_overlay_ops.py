@@ -788,14 +788,14 @@ def attach_columns_dataset(
         columns=columns,
         allow_overwrite=allow_overwrite,
         allow_missing=allow_missing,
-            parse_json=parse_json,
-            backend=backend,
-            note=note,
-            actor=actor,
-            event_args=event_args,
-            namespace_pattern=namespace_pattern,
-            reserved_namespaces=reserved_namespaces,
-            write_lock=write_lock,
+        parse_json=parse_json,
+        backend=backend,
+        note=note,
+        actor=actor,
+        event_args=event_args,
+        namespace_pattern=namespace_pattern,
+        reserved_namespaces=reserved_namespaces,
+        write_lock=write_lock,
     )
 
 

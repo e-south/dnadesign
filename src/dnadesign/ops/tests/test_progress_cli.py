@@ -807,7 +807,7 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
                 payload = {
                     "selected_mode": "resume",
                     "workflow_id": "densegen_batch_with_notify",
-                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
+                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},  # pragma: allowlist secret
                 }
                 return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
             if "ops runbook plan" in command:
@@ -952,7 +952,7 @@ def test_promoter_study_preflight_skips_construct_runtime_revalidation_once_mate
                 payload = {
                     "selected_mode": "resume",
                     "workflow_id": "densegen_batch_with_notify",
-                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
+                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},  # pragma: allowlist secret
                 }
                 return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
             if "ops runbook plan" in command:
@@ -1053,7 +1053,7 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
                 payload = {
                     "selected_mode": "resume",
                     "workflow_id": "densegen_batch_with_notify",
-                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
+                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},  # pragma: allowlist secret
                 }
                 return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
             if "ops runbook plan" in command:
@@ -1180,7 +1180,7 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
                 payload = {
                     "selected_mode": "resume",
                     "workflow_id": "densegen_batch_with_notify",
-                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
+                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},  # pragma: allowlist secret
                 }
                 return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
             if "ops runbook plan" in command:
@@ -1306,7 +1306,7 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
                 payload = {
                     "selected_mode": "resume",
                     "workflow_id": "densegen_batch_with_notify",
-                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
+                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},  # pragma: allowlist secret
                 }
                 return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
             if "ops runbook plan" in command:
@@ -1401,7 +1401,7 @@ def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_
                 payload = {
                     "selected_mode": "resume",
                     "workflow_id": "densegen_batch_with_notify",
-                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},
+                    "orchestration_notify": {"secret_ref": "file:///tmp/webhook"},  # pragma: allowlist secret
                 }
                 return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
             if "ops runbook plan" in command:
