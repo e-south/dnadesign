@@ -216,7 +216,11 @@ class CassetteCatalogRef(StrictCassetteModel):
 
 class CassetteOutputConfig(StrictCassetteModel):
     run_dir: Path = Path("outputs/cassettes")
-    write_render_contract: bool = True
+    emit_visual_contracts: bool = True
+    emit_baserender_jobs: bool = True
+    baserender_profiles: list[Literal["duplex_qa", "hairpin_qa"]] = Field(
+        default_factory=lambda: ["duplex_qa", "hairpin_qa"]
+    )
 
     @field_validator("run_dir")
     @classmethod
@@ -229,6 +233,22 @@ class CassetteOutputConfig(StrictCassetteModel):
         if not str(path).strip():
             raise ValueError("output.run_dir must be non-empty.")
         return path
+
+    @field_validator("baserender_profiles")
+    @classmethod
+    def _validate_profiles(cls, value: list[str]) -> list[str]:
+        normalized = [str(item).strip() for item in value]
+        if any(not item for item in normalized):
+            raise ValueError("output.baserender_profiles must not contain blank values.")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("output.baserender_profiles must not repeat values.")
+        return normalized
+
+    @model_validator(mode="after")
+    def _validate_visual_output_dependencies(self) -> "CassetteOutputConfig":
+        if self.emit_baserender_jobs and not self.emit_visual_contracts:
+            raise ValueError("output.emit_baserender_jobs requires output.emit_visual_contracts=true.")
+        return self
 
 
 class HairpinCassetteSpec(StrictCassetteModel):
@@ -311,7 +331,9 @@ class HairpinCassetteSpec(StrictCassetteModel):
             hairpin_validation=self.hairpin_validation,
             output=NormalizedOutputConfig(
                 run_dir=self.output.run_dir,
-                write_render_contract=self.output.write_render_contract,
+                emit_visual_contracts=self.output.emit_visual_contracts,
+                emit_baserender_jobs=self.output.emit_baserender_jobs,
+                baserender_profiles=self.output.baserender_profiles,
             ),
         )
 
@@ -568,7 +590,6 @@ class CassetteEvaluationReport(StrictCassetteModel):
     metadata: CassetteReportMetadata
     issues: list[ValidationIssue] = Field(default_factory=list)
     candidate: CassetteCandidateDesign | None = None
-    render_contract: Dict[str, Any] | None = None
     run_dir: str | None = None
 
 
@@ -619,7 +640,9 @@ class NormalizedNickingSpec(StrictCassetteModel):
 
 class NormalizedOutputConfig(StrictCassetteModel):
     run_dir: Path
-    write_render_contract: bool
+    emit_visual_contracts: bool
+    emit_baserender_jobs: bool
+    baserender_profiles: list[Literal["duplex_qa", "hairpin_qa"]] = Field(default_factory=list)
 
 
 class NormalizedCassetteSpec(StrictCassetteModel):

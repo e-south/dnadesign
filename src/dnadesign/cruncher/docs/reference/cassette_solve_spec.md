@@ -6,7 +6,7 @@
 **Updated by:** cruncher-maintainers on 2026-03-25
 **Applies to:** `configs/cassettes/*.cassette.solve.yaml`
 **Last verified:** 2026-03-25
-**Primary artifacts:** `solve_report.json`, `table__hits.csv`, `baserender_hits_contract.json`, materialized explicit hit bundles
+**Primary artifacts:** `solve_report.json`, `table__hits.csv`, `views/top_hits.linear_duplex.v1.jsonl`, `views/top_hits.ssdna_hairpin.v1.jsonl`, and materialized explicit hit bundles
 
 ### Contents
 - [File location](#file-location)
@@ -24,6 +24,9 @@ Cassette solve specs must live at:
 ```
 
 The loader does not overload explicit `.cassette.yaml` specs with solve semantics.
+
+If you want a pressure-tested example path and shipped solve profiles, see
+[`../demos/demo_cassette_workspace.md`](../demos/demo_cassette_workspace.md).
 
 ### Recommended shape
 
@@ -80,7 +83,9 @@ cassette_solve:
       diversity_weight: 0.35
   output:
     run_dir: outputs/cassette_solves
-    write_render_contract: true
+    emit_visual_contracts: true
+    emit_baserender_jobs: true
+    baserender_profiles: [duplex_qa, hairpin_qa, top_hits_duplex_qa, top_hits_hairpin_qa]
 ```
 
 ### Field semantics
@@ -102,7 +107,10 @@ cassette_solve:
 - `search.selection.distance_metric`: currently `hamming`.
 - `search.selection.min_pairwise_distance`: hard floor used by `greedy_hamming` and optionally by `mmr`.
 - `search.selection.diversity_weight`: required for `mmr`; omitted for `score_only`.
-- `output.write_render_contract`: writes per-hit `render_contract.json` files and the solve-level `baserender_hits_contract.json` handoff bundle.
+- `output.emit_visual_contracts`: writes per-hit `views/*.json` files plus solve-level `views/*.jsonl` batches.
+- `output.emit_baserender_jobs`: writes per-hit and solve-level baserender job YAML that consume the shared visual contracts by path and render to sibling `renders/` directories when executed with `baserender`.
+- `output.baserender_profiles`: supported solve profiles are `duplex_qa`, `hairpin_qa`, `top_hits_duplex_qa`, and `top_hits_hairpin_qa`.
+- `output.emit_baserender_jobs` requires `output.emit_visual_contracts: true`; solve specs that request jobs without view publication are rejected during load.
 
 Compatibility note:
 

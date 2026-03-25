@@ -320,7 +320,11 @@ class SearchSettingsSpec(StrictCassetteModel):
 
 class SolveOutputConfig(StrictCassetteModel):
     run_dir: Path = Path("outputs/cassette_solves")
-    write_render_contract: bool = True
+    emit_visual_contracts: bool = True
+    emit_baserender_jobs: bool = True
+    baserender_profiles: list[Literal["duplex_qa", "hairpin_qa", "top_hits_duplex_qa", "top_hits_hairpin_qa"]] = Field(
+        default_factory=lambda: ["duplex_qa", "hairpin_qa", "top_hits_duplex_qa", "top_hits_hairpin_qa"]
+    )
 
     @field_validator("run_dir")
     @classmethod
@@ -333,6 +337,22 @@ class SolveOutputConfig(StrictCassetteModel):
         if not str(path).strip():
             raise ValueError("output.run_dir must be non-empty.")
         return path
+
+    @field_validator("baserender_profiles")
+    @classmethod
+    def _validate_profiles(cls, value: list[str]) -> list[str]:
+        normalized = [str(item).strip() for item in value]
+        if any(not item for item in normalized):
+            raise ValueError("output.baserender_profiles must not contain blank values.")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("output.baserender_profiles must not repeat values.")
+        return normalized
+
+    @model_validator(mode="after")
+    def _validate_visual_output_dependencies(self) -> "SolveOutputConfig":
+        if self.emit_baserender_jobs and not self.emit_visual_contracts:
+            raise ValueError("output.emit_baserender_jobs requires output.emit_visual_contracts=true.")
+        return self
 
 
 class HairpinCassetteSolveSpec(StrictCassetteModel):
@@ -382,6 +402,7 @@ class CandidateScoreBreakdown(StrictCassetteModel):
 
 class CandidateHit(StrictCassetteModel):
     rank: int = Field(ge=1)
+    solution_id: str
     score: list[float | int | str]
     base_penalty_vector: list[float | int]
     hit_id: str
@@ -401,6 +422,10 @@ class CandidateHit(StrictCassetteModel):
     distance_to_previous_selected: float | None = Field(default=None, ge=0.0)
     report_status: Literal["satisfied"] = "satisfied"
     materialized_run_dir: str | None = None
+    explicit_design_id: str | None = None
+    views_manifest_path: str | None = None
+    linear_duplex_job_path: str | None = None
+    ssdna_hairpin_job_path: str | None = None
 
     @field_validator("cassette_sequence", "stem5p_arm", "loop")
     @classmethod
@@ -463,8 +488,6 @@ class SolveReport(StrictCassetteModel):
     hits: list[CandidateHit] = Field(default_factory=list)
     selection_summary: SolveSelectionSummary | None = None
     materialized_hit_runs: list[str] = Field(default_factory=list)
-    render_contracts_written: bool = False
-    baserender_hits_contract_path: str | None = None
     notes: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")

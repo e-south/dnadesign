@@ -19,12 +19,19 @@ from pathlib import Path
 import yaml
 from typer.testing import CliRunner
 
+from dnadesign.baserender.cli import app as baserender_app
 from dnadesign.cruncher.cli.app import app
 
 runner = CliRunner()
+baserender_runner = CliRunner()
 
 
-def _write_workspace(tmp_path: Path, *, write_render_contract: bool = True) -> tuple[Path, Path]:
+def _write_workspace(
+    tmp_path: Path,
+    *,
+    emit_visual_contracts: bool = True,
+    emit_baserender_jobs: bool = True,
+) -> tuple[Path, Path]:
     workspace = tmp_path / "workspaces" / "demo_cassette"
     spec_path = workspace / "configs" / "cassettes" / "demo_hairpin.cassette.yaml"
     catalog_path = workspace / "inputs" / "nickases" / "demo.nickases.yaml"
@@ -74,7 +81,9 @@ def _write_workspace(tmp_path: Path, *, write_render_contract: bool = True) -> t
                     "catalog": {"path": "inputs/nickases/demo.nickases.yaml"},
                     "output": {
                         "run_dir": "outputs/cassettes",
-                        "write_render_contract": write_render_contract,
+                        "emit_visual_contracts": emit_visual_contracts,
+                        "emit_baserender_jobs": emit_baserender_jobs,
+                        "baserender_profiles": ["duplex_qa", "hairpin_qa"],
                     },
                 }
             }
@@ -144,7 +153,14 @@ def _write_solve_workspace(tmp_path: Path, *, forbid_literal: str | None = None)
             },
             "output": {
                 "run_dir": "outputs/cassette_solves",
-                "write_render_contract": True,
+                "emit_visual_contracts": True,
+                "emit_baserender_jobs": True,
+                "baserender_profiles": [
+                    "duplex_qa",
+                    "hairpin_qa",
+                    "top_hits_duplex_qa",
+                    "top_hits_hairpin_qa",
+                ],
             },
         }
     }
@@ -210,13 +226,22 @@ def test_cassette_design_writes_artifacts_and_show_reads_them(tmp_path: Path) ->
     assert (run_dir / "meta" / "cassette_status.json").exists()
     assert (run_dir / "analysis" / "reports" / "report.json").exists()
     assert (run_dir / "analysis" / "reports" / "report.md").exists()
-    assert (run_dir / "analysis" / "reports" / "render_contract.json").exists()
     assert (run_dir / "export" / "table__candidates.csv").exists()
+    assert (run_dir / "views" / "linear_duplex.v1.json").exists()
+    assert (run_dir / "views" / "ssdna_hairpin.v1.json").exists()
+    assert (run_dir / "views" / "views_manifest.v1.json").exists()
+    assert (run_dir / "baserender_jobs" / "linear_duplex.job.yaml").exists()
+    assert (run_dir / "baserender_jobs" / "ssdna_hairpin.job.yaml").exists()
 
     show_result = runner.invoke(app, ["cassette", "show", "--run", str(run_dir)], color=False)
     assert show_result.exit_code == 0
     assert "demo_hairpin" in show_result.output
     assert "completed" in show_result.output
+    assert "Manifest ->" in show_result.output
+    assert "Status file ->" in show_result.output
+    assert "Views manifest" in show_result.output
+    assert "Linear duplex job" in show_result.output
+    assert "ssDNA hairpin job" in show_result.output
 
 
 def test_cassette_design_json_is_machine_readable(tmp_path: Path) -> None:
@@ -227,7 +252,8 @@ def test_cassette_design_json_is_machine_readable(tmp_path: Path) -> None:
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["status"] == "satisfied"
-    assert payload["run_dir"].endswith("/demo_hairpin/c8011c470b18")
+    assert "/outputs/cassettes/demo_hairpin/" in payload["run_dir"]
+    assert len(Path(payload["run_dir"]).name) == 12
 
 
 def test_cassette_solve_json_is_machine_readable_and_materializes_hits(tmp_path: Path) -> None:
@@ -246,6 +272,10 @@ def test_cassette_solve_json_is_machine_readable_and_materializes_hits(tmp_path:
     assert str(run_dir).startswith(str(workspace / "outputs" / "cassette_solves"))
     assert (run_dir / "solve_report.json").exists()
     assert (run_dir / "table__hits.csv").exists()
+    assert (run_dir / "views" / "top_hits.linear_duplex.v1.jsonl").exists()
+    assert (run_dir / "views" / "top_hits.ssdna_hairpin.v1.jsonl").exists()
+    assert (run_dir / "baserender_jobs" / "top_hits_duplex.job.yaml").exists()
+    assert (run_dir / "baserender_jobs" / "top_hits_hairpin.job.yaml").exists()
     assert len(list((run_dir / "hits").iterdir())) == 2
 
 
@@ -363,6 +393,65 @@ def test_cassette_init_workspace_scaffolds_isolated_runtime_profiles(tmp_path: P
     assert not (sibling_workspace / "outputs" / "cassette_solves").exists()
 
 
+def test_cassette_init_workspace_solve_and_baserender_cli_render_in_place(tmp_path: Path) -> None:
+    scaffold_root = tmp_path / "cassette_lab"
+
+    init_result = runner.invoke(
+        app,
+        ["cassette", "init-workspace", "--output", str(scaffold_root)],
+        color=False,
+    )
+
+    assert init_result.exit_code == 0
+    solve_spec = scaffold_root / "configs" / "cassettes" / "demo_hairpin_fast.cassette.solve.yaml"
+    solve_result = runner.invoke(
+        app,
+        ["cassette", "solve", "--spec", str(solve_spec), "--json"],
+        color=False,
+    )
+
+    assert solve_result.exit_code == 0
+    payload = json.loads(solve_result.output)
+    run_dir = Path(payload["run_dir"])
+    assert run_dir.is_dir()
+    assert str(run_dir).startswith(str(scaffold_root / "outputs" / "cassette_solves"))
+
+    solve_job = run_dir / "baserender_jobs" / "top_hits_duplex.job.yaml"
+    solve_validate = baserender_runner.invoke(
+        baserender_app,
+        ["job", "validate", str(solve_job)],
+        color=False,
+    )
+    assert solve_validate.exit_code == 0
+    solve_run = baserender_runner.invoke(
+        baserender_app,
+        ["job", "run", str(solve_job)],
+        color=False,
+    )
+    assert solve_run.exit_code == 0
+    solve_render = run_dir / "renders" / "top_hits_duplex_qa_sheet.pdf"
+    assert solve_render.exists()
+    solve_render.resolve().relative_to(scaffold_root.resolve())
+
+    first_hit_dir = Path(payload["hits"][0]["materialized_run_dir"])
+    hairpin_job = first_hit_dir / "baserender_jobs" / "ssdna_hairpin.job.yaml"
+    hairpin_validate = baserender_runner.invoke(
+        baserender_app,
+        ["job", "validate", str(hairpin_job)],
+        color=False,
+    )
+    assert hairpin_validate.exit_code == 0
+    hairpin_run = baserender_runner.invoke(
+        baserender_app,
+        ["job", "run", str(hairpin_job)],
+        color=False,
+    )
+    assert hairpin_run.exit_code == 0
+    hit_render = first_hit_dir / "renders" / "ssdna_hairpin.pdf"
+    assert hit_render.exists()
+    hit_render.resolve().relative_to(scaffold_root.resolve())
+
+
 def test_cassette_solve_plaintext_surfaces_policy_underfill_warning(tmp_path: Path) -> None:
     _workspace, spec_path = _write_solve_workspace(tmp_path)
     payload = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
@@ -447,8 +536,12 @@ def test_cassette_catalog_init_neb_writes_builtin_preset(tmp_path: Path) -> None
     assert "WarmStart Nt.BstNBI" in payload
 
 
-def test_cassette_design_respects_render_contract_toggle(tmp_path: Path) -> None:
-    workspace, spec_path = _write_workspace(tmp_path, write_render_contract=False)
+def test_cassette_design_respects_visual_contract_toggle(tmp_path: Path) -> None:
+    workspace, spec_path = _write_workspace(
+        tmp_path,
+        emit_visual_contracts=False,
+        emit_baserender_jobs=False,
+    )
 
     result = runner.invoke(app, ["cassette", "design", "--spec", str(spec_path)], color=False)
 
@@ -457,11 +550,16 @@ def test_cassette_design_respects_render_contract_toggle(tmp_path: Path) -> None
     run_dirs = list(run_root.iterdir())
     assert len(run_dirs) == 1
     run_dir = run_dirs[0]
-    assert not (run_dir / "analysis" / "reports" / "render_contract.json").exists()
+    assert not (run_dir / "views" / "linear_duplex.v1.json").exists()
+    assert not (run_dir / "views" / "ssdna_hairpin.v1.json").exists()
+    assert not (run_dir / "views" / "views_manifest.v1.json").exists()
+    assert not (run_dir / "baserender_jobs" / "linear_duplex.job.yaml").exists()
+    assert not (run_dir / "baserender_jobs" / "ssdna_hairpin.job.yaml").exists()
 
     show_result = runner.invoke(app, ["cassette", "show", "--run", str(run_dir)], color=False)
     assert show_result.exit_code == 0
-    assert "Render contract" not in show_result.output
+    assert "Views manifest" not in show_result.output
+    assert "Linear duplex job" not in show_result.output
 
 
 def test_cassette_validate_plaintext_reports_structured_issue_codes(tmp_path: Path) -> None:
@@ -509,6 +607,11 @@ def test_cassette_design_writes_unsatisfied_artifacts_before_exit(tmp_path: Path
     assert report["issues"][0]["code"] == "RIGHT_WINDOW_NO_MATCH"
     assert status["status"] == "unsatisfied"
     assert "legacy_v1" in status["status_message"]
+    assert not (run_dir / "views" / "linear_duplex.v1.json").exists()
+    assert not (run_dir / "views" / "ssdna_hairpin.v1.json").exists()
+    assert not (run_dir / "views" / "views_manifest.v1.json").exists()
+    assert not (run_dir / "baserender_jobs" / "linear_duplex.job.yaml").exists()
+    assert not (run_dir / "baserender_jobs" / "ssdna_hairpin.job.yaml").exists()
 
 
 def test_cassette_design_writes_only_to_selected_workspace_root(tmp_path: Path) -> None:

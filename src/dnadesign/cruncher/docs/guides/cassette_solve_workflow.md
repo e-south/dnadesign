@@ -6,7 +6,7 @@
 **Updated by:** cruncher-maintainers on 2026-03-25
 **Applies to:** `uv run cruncher cassette solve`
 **Last verified:** 2026-03-25
-**Primary artifacts:** `solve_report.json`, `table__hits.csv`, `baserender_hits_contract.json`, per-hit explicit cassette bundles
+**Primary artifacts:** `solve_report.json`, `table__hits.csv`, `views/top_hits.linear_duplex.v1.jsonl`, `views/top_hits.ssdna_hairpin.v1.jsonl`, and per-hit explicit cassette bundles
 
 ### Contents
 - [Why solve exists](#why-solve-exists)
@@ -43,7 +43,7 @@ Current non-scope:
 - variable-length stem or loop search
 - remote catalog sync
 - energetic hairpin validation
-- direct rendering beyond the per-hit render contract handoff
+- direct renderer invocation from Cruncher; use the emitted `baserender_jobs/*.job.yaml` files instead
 
 ### Bootstrap an isolated workspace
 
@@ -122,7 +122,9 @@ cassette_solve:
       min_pairwise_distance: 2
   output:
     run_dir: outputs/cassette_solves
-    write_render_contract: true
+    emit_visual_contracts: true
+    emit_baserender_jobs: true
+    baserender_profiles: [duplex_qa, hairpin_qa, top_hits_duplex_qa, top_hits_hairpin_qa]
 ```
 
 ### Selection policies
@@ -140,6 +142,9 @@ Results remain honest about boundedness:
 - `SELECTION_RESULTS_SEARCH_BOUNDED` means search budgets stopped exploration before the full search space was exhausted.
 - `SELECTION_POLICY_LIMITED_HITS` means the selection policy itself returned fewer hits than the accepted pool could otherwise support, typically because diversity constraints filtered the pool.
 
+If you want the shortest scaffolded tutorial that starts from an empty root and ends with rendered PDFs, use
+[`../demos/demo_cassette_workspace.md`](../demos/demo_cassette_workspace.md) first and return here for the full solve contract.
+
 ### Standard command sequence
 
 ```bash
@@ -154,6 +159,10 @@ uv run cruncher cassette solve --spec configs/cassettes/demo_hairpin_balanced.ca
 
 # 2) Search and capture machine-readable JSON.
 uv run cruncher cassette solve --spec configs/cassettes/demo_hairpin_balanced.cassette.solve.yaml --json
+
+# 3) Optional: validate or render the emitted jobs in place with baserender.
+uv run baserender job validate outputs/cassette_solves/<solve_id>/baserender_jobs/top_hits_duplex.job.yaml
+uv run baserender job run outputs/cassette_solves/<solve_id>/baserender_jobs/top_hits_duplex.job.yaml
 ```
 
 Policy examples:
@@ -181,20 +190,39 @@ Primary artifacts:
 - `solve_report.json`
 - `solve_report.md`
 - `table__hits.csv`
-- `baserender_hits_contract.json` when enabled
 - `solve_manifest.json`
 - `solve_status.json`
 - `specs/input_solve_spec.yaml`
 - `specs/resolved_catalog.yaml`
-- `hits/<rank>_<hit_id>/resolved_candidate.cassette.yaml`
-- `hits/<rank>_<hit_id>/report.json`
-- `hits/<rank>_<hit_id>/report.md`
-- `hits/<rank>_<hit_id>/manifest.json`
-- `hits/<rank>_<hit_id>/status.json`
-- `hits/<rank>_<hit_id>/render_contract.json` when enabled
+- `views/top_hits.linear_duplex.v1.jsonl` when `output.emit_visual_contracts: true`
+- `views/top_hits.ssdna_hairpin.v1.jsonl` when `output.emit_visual_contracts: true`
+- `baserender_jobs/top_hits_duplex.job.yaml` when `output.emit_baserender_jobs: true`
+- `baserender_jobs/top_hits_hairpin.job.yaml` when `output.emit_baserender_jobs: true`
+- `renders/top_hits_duplex_qa_sheet.pdf` after you run the solve-level duplex job with `baserender`
+- `renders/top_hits_hairpin_qa_sheet.pdf` after you run the solve-level hairpin job with `baserender`
+- `output.emit_baserender_jobs` requires `output.emit_visual_contracts: true`
+- `hits/hit_<rank>_<solution_id>/explicit/resolved_candidate.cassette.yaml`
+- `hits/hit_<rank>_<solution_id>/explicit/report.json`
+- `hits/hit_<rank>_<solution_id>/explicit/report.md`
+- `hits/hit_<rank>_<solution_id>/explicit/manifest.json`
+- `hits/hit_<rank>_<solution_id>/explicit/status.json`
+- `hits/hit_<rank>_<solution_id>/views/linear_duplex.v1.json` when enabled
+- `hits/hit_<rank>_<solution_id>/views/ssdna_hairpin.v1.json` when enabled
+- `hits/hit_<rank>_<solution_id>/views/views_manifest.v1.json` when enabled
+- `hits/hit_<rank>_<solution_id>/baserender_jobs/linear_duplex.job.yaml` when enabled
+- `hits/hit_<rank>_<solution_id>/baserender_jobs/ssdna_hairpin.job.yaml` when enabled
+- `hits/hit_<rank>_<solution_id>/renders/linear_duplex.pdf` after you run the emitted duplex job with `baserender`
+- `hits/hit_<rank>_<solution_id>/renders/ssdna_hairpin.pdf` after you run the emitted hairpin job with `baserender`
 
-`solve_report.json` now includes `selection_summary`, and `solve_status.json` mirrors lightweight selection telemetry so automation can tell whether a hit set was search-bounded, pool-bounded, or default-policy selected.
-`baserender_hits_contract.json` is a data-only `generic_features` bundle for solve hits, so downstream visualization can consume the run without scraping every per-hit directory or importing baserender internals from Cruncher.
+`solve_report.json` now includes `selection_summary`, and `solve_status.json` mirrors lightweight selection telemetry plus the top-hit JSONL and job paths so automation can tell whether a hit set was search-bounded, pool-bounded, or default-policy selected without reopening every per-hit bundle.
+
+The solve bundle is intentionally self-contained. The emitted jobs consume sibling `views/` contracts and write rendered PDFs to sibling `renders/` directories, so you do not need a separate baserender workspace to inspect results.
+
+That workspace-scoped flow is the stable operator path:
+
+- Cruncher writes solve-level or per-hit `views/`.
+- Cruncher writes sibling `baserender_jobs/` that point at those local view files only.
+- BaseRender writes rendered PDFs back into sibling `renders/` directories under the same solve bundle.
 
 Each materialized hit round-trips through the explicit cassette lane.
 Preflight `invalid_spec` and `invalid_catalog` results still persist the top-level solve bundle when the workspace can be derived, but they stop before writing `specs/resolved_catalog.yaml` or any per-hit artifacts.

@@ -24,12 +24,55 @@ def test_docs_index_routes_to_cassette_guide_and_references() -> None:
     docs_readme = _read("docs/README.md")
     docs_index = _read("docs/index.md")
     for content in (docs_readme, docs_index):
+        assert "demos/demo_cassette_workspace.md" in content
         assert "guides/cassette_workflow.md" in content
         assert "guides/cassette_solve_workflow.md" in content
         assert "reference/cassette_spec.md" in content
         assert "reference/cassette_solve_spec.md" in content
         assert "reference/nickase_catalog.md" in content
         assert "reference/cassette_artifacts.md" in content
+
+
+def test_top_level_docs_route_both_workflow_families() -> None:
+    package_readme = _read("README.md")
+    docs_readme = _read("docs/README.md")
+    docs_index = _read("docs/index.md")
+
+    assert "Gibbs annealing MCMC" in package_readme
+    assert "cassette workspaces" in package_readme
+    assert "docs/demos/demo_pairwise.md" in package_readme
+    assert "docs/demos/demo_multitf.md" in package_readme
+    assert "docs/demos/project_all_tfs.md" in package_readme
+    assert "docs/demos/demo_cassette_workspace.md" in package_readme
+    assert "docs/guides/sampling_and_analysis.md" in package_readme
+    assert "docs/guides/studies.md" in package_readme
+    assert "docs/guides/portfolio_aggregation.md" in package_readme
+
+    for content in (docs_readme, docs_index):
+        assert "Optimize Fixed-Length Sequences" in content
+        assert "Design and Search Cassettes" in content
+        assert "demos/demo_pairwise.md" in content
+        assert "demos/demo_multitf.md" in content
+        assert "demos/project_all_tfs.md" in content
+        assert "demos/demo_cassette_workspace.md" in content
+        assert "guides/sampling_and_analysis.md" in content
+        assert "guides/studies.md" in content
+        assert "guides/portfolio_aggregation.md" in content
+
+
+def test_cassette_demo_defines_scaffolded_workspace_flow() -> None:
+    demo = _read("docs/demos/demo_cassette_workspace.md")
+    assert "DEMO_ROOT=./cassette_lab_demo" in demo
+    assert 'uv run cruncher cassette init-workspace --output "$DEMO_ROOT"' in demo
+    assert "demo_hairpin_fast.cassette.solve.yaml" in demo
+    assert "cassette_workspace_manifest.json" in demo
+    assert "views/" in demo
+    assert "baserender_jobs/" in demo
+    assert "renders/" in demo
+    assert "uv run baserender job validate" in demo
+    assert "uv run baserender job run" in demo
+    assert "../guides/cassette_solve_workflow.md" in demo
+    assert "../reference/cassette_artifacts.md" in demo
 
 
 def test_cli_reference_lists_cassette_commands_and_contracts() -> None:
@@ -54,9 +97,12 @@ def test_cassette_guide_states_current_scope_and_outputs() -> None:
     guide = _read("docs/guides/cassette_workflow.md")
     solve_guide = _read("docs/guides/cassette_solve_workflow.md")
     assert "explicit lane does not search over stems, loops, or nickase assignments" in guide
+    assert "../demos/demo_cassette_workspace.md" in guide
     assert "outputs/cassettes/<spec.name>/<design_id>/" in guide
     assert "bounded_nicked_segment" in guide
-    assert "render_contract.json" in guide
+    assert "views/linear_duplex.v1.json" in guide
+    assert "baserender_jobs/linear_duplex.job.yaml" in guide
+    assert "renders/linear_duplex.pdf" in guide
     assert "RIGHT_WINDOW_NO_MATCH" in guide
     assert "outputs/cassette_solves/<solve_id>/" in solve_guide
     assert "init-workspace" in solve_guide
@@ -67,7 +113,14 @@ def test_cassette_guide_states_current_scope_and_outputs() -> None:
     assert "greedy_hamming" in solve_guide
     assert "mmr" in solve_guide
     assert "accepted pool" in solve_guide.lower()
-    assert "baserender_hits_contract.json" in solve_guide
+    assert "views/top_hits.linear_duplex.v1.jsonl" in solve_guide
+    assert "baserender_jobs/top_hits_duplex.job.yaml" in solve_guide
+    assert "../demos/demo_cassette_workspace.md" in solve_guide
+    assert (
+        "uv run baserender job run "
+        "outputs/cassette_solves/<solve_id>/baserender_jobs/top_hits_duplex.job.yaml" in solve_guide
+    )
+    assert "hits/hit_<rank>_<solution_id>/renders/ssdna_hairpin.pdf" in solve_guide
 
 
 def test_cassette_references_capture_schema_and_artifacts() -> None:
@@ -92,7 +145,11 @@ def test_cassette_references_capture_schema_and_artifacts() -> None:
     assert "cassette_manifest.json" in artifacts_ref
     assert "solve_report.json" in artifacts_ref
     assert "table__hits.csv" in artifacts_ref
-    assert "baserender_hits_contract.json" in artifacts_ref
+    assert "views/views_manifest.v1.json" in artifacts_ref
+    assert "top_hits.linear_duplex.v1.jsonl" in artifacts_ref
+    assert "top_hits_duplex_qa_sheet.pdf" in artifacts_ref
+    assert "The cassette render path is intentionally local to the owning workspace" in artifacts_ref
+    assert "per-hit `renders/*.pdf`" in artifacts_ref
     assert "selection_summary" in artifacts_ref
     assert "ACCEPTED_POOL_TRUNCATED" in artifacts_ref
     assert "SELECTION_POLICY_LIMITED_HITS" in artifacts_ref
@@ -104,7 +161,7 @@ def test_architecture_and_glossary_capture_cassette_boundary() -> None:
     glossary = _read("docs/reference/glossary.md")
     assert "#### Cassette lifecycle" in architecture
     assert "#### `cassette/` (dual-context cassette domain)" in architecture
-    assert "render_contract.json" in architecture
+    assert "views/linear_duplex.v1.json" in architecture
     assert "bounded nicked segment" in glossary.lower()
     assert "pair map" in glossary.lower()
     assert "target strand" in glossary.lower()

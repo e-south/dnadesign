@@ -93,7 +93,14 @@ def _base_solve_payload() -> dict[str, Any]:
         },
         "output": {
             "run_dir": "outputs/cassette_solves",
-            "write_render_contract": True,
+            "emit_visual_contracts": True,
+            "emit_baserender_jobs": True,
+            "baserender_profiles": [
+                "duplex_qa",
+                "hairpin_qa",
+                "top_hits_duplex_qa",
+                "top_hits_hairpin_qa",
+            ],
         },
     }
 
@@ -260,23 +267,25 @@ def test_solve_returns_multiple_hits_and_materializes_top_k(tmp_path: Path) -> N
     assert len(report.hits) == 3
     assert report.metadata.materialized_hit_count == 2
     assert report.hits[0].materialized_run_dir is not None
-    assert report.baserender_hits_contract_path is not None
     assert (run_dir / "solve_report.json").exists()
     assert (run_dir / "solve_manifest.json").exists()
     assert (run_dir / "solve_status.json").exists()
     assert (run_dir / "table__hits.csv").exists()
-    assert (run_dir / "baserender_hits_contract.json").exists()
+    assert (run_dir / "views" / "top_hits.linear_duplex.v1.jsonl").exists()
+    assert (run_dir / "views" / "top_hits.ssdna_hairpin.v1.jsonl").exists()
+    assert (run_dir / "baserender_jobs" / "top_hits_duplex.job.yaml").exists()
+    assert (run_dir / "baserender_jobs" / "top_hits_hairpin.job.yaml").exists()
     assert (run_dir / "specs" / "resolved_catalog.yaml").exists()
-    baserender_contract = json.loads((run_dir / "baserender_hits_contract.json").read_text(encoding="utf-8"))
-    assert baserender_contract["workflow"] == "cassette_solve_baserender"
-    assert baserender_contract["adapter"]["kind"] == "generic_features"
-    assert len(baserender_contract["records"]) == len(report.hits)
     hit_dirs = sorted((run_dir / "hits").iterdir())
     assert len(hit_dirs) == 2
-    first_hit_report = json.loads((hit_dirs[0] / "report.json").read_text(encoding="utf-8"))
+    first_hit_report = json.loads((hit_dirs[0] / "explicit" / "report.json").read_text(encoding="utf-8"))
     assert first_hit_report["status"] == "satisfied"
-    assert (hit_dirs[0] / "resolved_candidate.cassette.yaml").exists()
-    assert (hit_dirs[0] / "render_contract.json").exists()
+    assert (hit_dirs[0] / "explicit" / "resolved_candidate.cassette.yaml").exists()
+    assert (hit_dirs[0] / "views" / "linear_duplex.v1.json").exists()
+    assert (hit_dirs[0] / "views" / "ssdna_hairpin.v1.json").exists()
+    assert (hit_dirs[0] / "views" / "views_manifest.v1.json").exists()
+    assert (hit_dirs[0] / "baserender_jobs" / "linear_duplex.job.yaml").exists()
+    assert (hit_dirs[0] / "baserender_jobs" / "ssdna_hairpin.job.yaml").exists()
 
 
 def test_solve_reports_no_hits_when_blacklist_blocks_required_site(tmp_path: Path) -> None:
@@ -291,7 +300,7 @@ def test_solve_reports_no_hits_when_blacklist_blocks_required_site(tmp_path: Pat
     assert report.hits == []
     assert (run_dir / "solve_report.json").exists()
     hit_table = (run_dir / "table__hits.csv").read_text(encoding="utf-8")
-    assert "rank,selected_rank,score,base_penalty_vector,hit_id" in hit_table
+    assert "rank,solution_id,score,score_tuple,base_penalty_vector,hit_id" in hit_table
 
 
 def test_solve_reports_invalid_spec_when_assignment_policy_eliminates_all_pairs(tmp_path: Path) -> None:
@@ -430,7 +439,10 @@ def test_run_cassette_solve_status_surface_marks_truncated_search(tmp_path: Path
     )
     assert status_payload["selection"]["policy_underfilled"] is False
     assert status_payload["selection"]["policy_limited_hit_count"] == 0
-    assert status_payload["baserender_hits_contract"] == report.baserender_hits_contract_path
+    assert status_payload["top_hits_linear_duplex_jsonl"].endswith("views/top_hits.linear_duplex.v1.jsonl")
+    assert status_payload["top_hits_hairpin_jsonl"].endswith("views/top_hits.ssdna_hairpin.v1.jsonl")
+    assert status_payload["top_hits_duplex_job"].endswith("baserender_jobs/top_hits_duplex.job.yaml")
+    assert status_payload["top_hits_hairpin_job"].endswith("baserender_jobs/top_hits_hairpin.job.yaml")
     solve_report_md = (run_dir / "solve_report.md").read_text(encoding="utf-8")
     assert "warning[MAX_ENUMERATED_CANDIDATES_REACHED]" in solve_report_md
     assert "warning[SELECTION_RESULTS_POOL_BOUNDED]" in solve_report_md

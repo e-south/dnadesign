@@ -17,14 +17,14 @@
 - [Discovery and inspection](#discovery-and-inspection)
 - [Global options](#global-options)
 
-This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage and workflow.
+This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage and workflow family.
 
-> **Intent:** Cruncher is an optimization engine for **fixed-length** multi-TF PWM sequence design that returns a **diverse elite set** - not posterior inference.
+> **Workflow families:** Cruncher currently has two first-class command families.
 >
-> **When to use:** design under tight length constraints; explore motif compatibility tradeoffs; generate a small candidate set for assays; run workspace-scoped studies and summarize aggregate outcomes.
+> - `fetch|lock|parse|sample|analyze|export` plus `study` and `portfolio` cover fixed-length PWM optimization workspaces. This lane uses Gibbs annealing MCMC plus MMR elite selection and is not posterior inference.
+> - `cassette init-workspace|validate|design|solve|show` cover cassette workspaces. This lane uses explicit cassette planning plus bounded solve search and keeps separate artifact contracts.
 >
-> **Additive workflows:** `cruncher cassette validate|design|show` operate on explicit cassette specs, while
-> `cruncher cassette solve` searches over patterned stems/loops and validates each hit through the explicit planner.
+> Choose the command family by the workspace contract you need. `cassette` does not fall back to `sample`, and `sample` runs do not reuse cassette artifacts.
 
 #### Workspace discovery and config resolution
 
@@ -51,9 +51,9 @@ cruncher study list
 * **Pin TFs** → `lock`
 * **Validate motifs** → `parse`
 * **Render logos** → `catalog logos`
-* **Optimize** → `sample`
-* **Analyze** → `analyze`, `notebook`
-* **Dual-context cassette design** → `cassette validate|design|solve|show`
+* **Optimize fixed-length sequences** → `sample`
+* **Analyze optimization runs** → `analyze`, `notebook`
+* **Design and search cassettes** → `cassette init-workspace|validate|design|solve|show`
 * **Study sweeps** → `study list|run|summarize|show|clean`
 * **Cross-workspace handoff aggregation** → `portfolio run|show`
 * **Export sequences** → `export sequences`
@@ -305,6 +305,7 @@ Current non-scope:
 
 Deep contracts live in:
 
+* [`../demos/demo_cassette_workspace.md`](../demos/demo_cassette_workspace.md)
 * [`reference/cassette_spec.md`](cassette_spec.md)
 * [`reference/cassette_solve_spec.md`](cassette_solve_spec.md)
 * [`reference/nickase_catalog.md`](nickase_catalog.md)
@@ -347,7 +348,9 @@ Notes:
 * generated solve specs are pressure-tested profiles for fast, balanced, and deeper MMR-biased search runs
 * `cassette_workspace_manifest.json` records the profile search/selection settings so operators can diff fast vs balanced vs deep MMR without reopening each YAML
 * cassette scaffolds are intentionally not listed by `cruncher workspaces list`; use the explicit `configs/cassettes/*.cassette.solve.yaml` paths in the scaffold root
+* emitted solve jobs keep the `views/` -> `baserender_jobs/` -> `renders/` flow inside the scaffold root
 * use `cruncher cassette catalog init-neb --output inputs/nickases/neb_nicking_v1.yaml` if you want a local editable copy of the built-in preset
+* see [`../demos/demo_cassette_workspace.md`](../demos/demo_cassette_workspace.md) for the shortest end-to-end tutorial
 
 #### `cruncher cassette validate`
 
@@ -397,14 +400,15 @@ Outputs:
 
 * writes under `<workspace>/outputs/cassettes/<spec.name>/<design_id>/`
 * writes `meta/cassette_manifest.json`, `meta/cassette_status.json`, `analysis/reports/report.{json,md}`
-* writes `analysis/reports/render_contract.json` only when `output.write_render_contract: true`
 * writes `export/table__candidates.csv`
+* writes `views/linear_duplex.v1.json`, `views/ssdna_hairpin.v1.json`, and `views/views_manifest.v1.json` when `output.emit_visual_contracts: true` and the explicit planner materializes a concrete candidate
+* writes `baserender_jobs/linear_duplex.job.yaml` and `baserender_jobs/ssdna_hairpin.job.yaml` when `output.emit_baserender_jobs: true` and the corresponding view files were published
 * `--json` prints the machine-readable report only; the run directory is included at `report.run_dir`
 
 Notes:
 
 * cassette runs are additive and do **not** register in workspace `run_index.json`
-* unsatisfied specs still write a cassette run directory with explicit issue codes
+* unsatisfied specs still write a cassette run directory with explicit issue codes, but view/job publication is skipped when no concrete candidate is available
 * there is no fallback to `sample`
 * unsupported tracer-bullet mode flags fail before materialization
 
@@ -432,8 +436,9 @@ Outputs:
 
 * writes under `<workspace>/outputs/cassette_solves/<solve_id>/`
 * writes `solve_report.{json,md}`, `table__hits.csv`, `solve_manifest.json`, `solve_status.json`
-* writes `baserender_hits_contract.json` when `output.write_render_contract: true`
-* writes per-hit explicit bundles under `hits/<rank>_<hit_id>/...`
+* writes `views/top_hits.linear_duplex.v1.jsonl` and `views/top_hits.ssdna_hairpin.v1.jsonl` when `output.emit_visual_contracts: true`
+* writes `baserender_jobs/top_hits_duplex.job.yaml` and `baserender_jobs/top_hits_hairpin.job.yaml` when `output.emit_baserender_jobs: true`
+* writes per-hit explicit bundles, view bundles, and job files under `hits/hit_<rank>_<solution_id>/...`
 * `invalid_spec` and `invalid_catalog` preflight failures still write a top-level solve bundle when a workspace can be derived, but they do not write per-hit bundles
 * `--json` prints the machine-readable solve report only; the run directory is included at `report.run_dir`
 
@@ -446,10 +451,10 @@ Notes:
 * `search.selection.pool_size` bounds the accepted pool retained before final selection
 * plain CLI output now surfaces selected-hit ids, default-vs-explicit policy status, pool/search boundedness, and policy-limited underfill
 * solve warnings are surfaced in plain CLI output and in `solve_report.json`
-* `solve_status.json` also preserves warning details, accepted-pool telemetry, `search_truncated`, policy-underfill flags, and the optional baserender handoff path for lightweight machine consumers
+* `solve_status.json` also preserves warning details, accepted-pool telemetry, `search_truncated`, policy-underfill flags, and the top-hit JSONL/job paths for lightweight machine consumers
 * warning codes include `ACCEPTED_POOL_TRUNCATED`, `SELECTION_RESULTS_POOL_BOUNDED`, `SELECTION_RESULTS_SEARCH_BOUNDED`, and `SELECTION_POLICY_LIMITED_HITS` when the returned hit set is constrained below the available accepted pool
 * each accepted hit round-trips through the explicit cassette planner
-* `baserender_hits_contract.json` is a data-only `generic_features` bundle intended for future or external baserender consumption without importing baserender internals from Cruncher
+* shared view contracts are file-based handoffs for baserender; Cruncher does not import baserender internals
 * there is no fallback from `solve` into `sample`
 
 #### `cruncher cassette catalog init-neb`
@@ -501,7 +506,8 @@ Outputs:
 * prints `meta/cassette_status.json`
 * prints `analysis/reports/report.json`
 * prints `analysis/reports/report.md`
-* prints `analysis/reports/render_contract.json` when present
+* prints `views/views_manifest.v1.json` when present
+* prints `baserender_jobs/linear_duplex.job.yaml` and `baserender_jobs/ssdna_hairpin.job.yaml` when present
 
 Notes:
 

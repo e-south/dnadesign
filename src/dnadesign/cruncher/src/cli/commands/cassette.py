@@ -18,6 +18,11 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from dnadesign.cruncher.cassette.artifacts import (
+    top_hits_duplex_job_path,
+    top_hits_hairpin_job_path,
+)
+
 app = typer.Typer(
     no_args_is_help=True,
     help="Scaffold, validate, design, solve, inspect, and catalog dual-context hairpin cassette workflows.",
@@ -102,8 +107,11 @@ def _print_solve_report(report) -> None:
         console.print(f"Solve id -> {report.solve_id}")
     if report.run_dir:
         console.print(f"Outputs -> {report.run_dir}")
-    if report.baserender_hits_contract_path:
-        console.print(f"Baserender contract -> {report.baserender_hits_contract_path}")
+        run_dir = Path(report.run_dir)
+        if top_hits_duplex_job_path(run_dir).exists():
+            console.print(f"Top-hit duplex job -> {top_hits_duplex_job_path(run_dir)}")
+        if top_hits_hairpin_job_path(run_dir).exists():
+            console.print(f"Top-hit hairpin job -> {top_hits_hairpin_job_path(run_dir)}")
     if report.metadata.catalog_preset:
         console.print(f"Preset -> {report.metadata.catalog_preset}")
     for path in report.metadata.catalog_additional_paths:
@@ -283,11 +291,18 @@ def show_cmd(
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
     console.print(f"Cassette run -> {payload['spec_name']}")
+    console.print(f"Run dir -> {payload['run_dir']}")
     console.print(f"Status -> {payload['status']}: {payload['status_message']}")
+    console.print(f"Manifest -> {payload['manifest_path']}")
+    console.print(f"Status file -> {payload['status_path']}")
     console.print(f"Report JSON -> {payload['report_json']}")
     console.print(f"Report MD -> {payload['report_md']}")
-    if payload.get("render_contract"):
-        console.print(f"Render contract -> {payload['render_contract']}")
+    if payload.get("views_manifest"):
+        console.print(f"Views manifest -> {payload['views_manifest']}")
+    if payload.get("linear_duplex_job"):
+        console.print(f"Linear duplex job -> {payload['linear_duplex_job']}")
+    if payload.get("ssdna_hairpin_job"):
+        console.print(f"ssDNA hairpin job -> {payload['ssdna_hairpin_job']}")
 
 
 @catalog_app.command("init-neb", help="Write the built-in neb_nicking_v1 cassette nickase preset to disk.")

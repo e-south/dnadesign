@@ -1,14 +1,15 @@
 ## Cruncher architecture
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-03-25
 
 
-**Last updated by:** cruncher-maintainers on 2026-02-28
+**Last updated by:** cruncher-maintainers on 2026-03-25
 
 ### Contents
 - [Cruncher architecture](#cruncher-architecture)
-- [Run lifecycle](#run-lifecycle)
+- [Workflow families](#workflow-families)
+- [Fixed-length optimization lifecycle](#fixed-length-optimization-lifecycle)
 - [Cassette lifecycle](#cassette-lifecycle)
 - [Layers and responsibilities](#layers-and-responsibilities)
 - [On-disk layout](#on-disk-layout)
@@ -22,7 +23,16 @@
 
 This doc describes the Cruncher run lifecycle, module boundaries, and on-disk artifacts.
 
-#### Run lifecycle
+#### Workflow families
+
+Cruncher is organized as peer workflow families, not one monolithic run shape:
+
+- **Fixed-length optimization workspaces** use `fetch -> lock -> parse -> sample -> analyze -> export`, then optional `study` and `portfolio` orchestration on top of the resulting run artifacts.
+- **Cassette workspaces** use `cassette init-workspace|validate|design|solve|show` and publish cassette-specific artifacts plus optional baserender job files.
+
+These families deliberately keep separate workspace contracts, output trees, and orchestration seams. New families should add their own lane-specific artifacts rather than overload `sample` or `cassette`.
+
+#### Fixed-length optimization lifecycle
 
 1. **fetch** -> cache motifs/sites and update `catalog.json`
 2. **lock** -> resolve TFs to exact cached artifacts (`<workspace>/.cruncher/locks/<config>.lock.json`)
@@ -33,15 +43,17 @@ This doc describes the Cruncher run lifecycle, module boundaries, and on-disk ar
 
 #### Cassette lifecycle
 
-The cassette workflow is additive and separate from `sample`:
+The cassette workflow is a peer lane, not a variant of `sample`:
 
-1. author `<workspace>/configs/cassettes/<name>.cassette.yaml`
-2. author or select a local nickase catalog (for example `<workspace>/inputs/nickases/*.yaml`)
-3. **cassette validate** -> strict schema + invariant check plus deterministic planning report
-4. **cassette design** -> write cassette-specific manifest, status, report, provenance snapshots, and optional render contract
-5. **cassette show** -> inspect status and artifact paths for one cassette run
+1. optional **cassette init-workspace** -> scaffold an isolated cassette root with shipped solve profiles
+2. author `<workspace>/configs/cassettes/<name>.cassette.yaml` or `<workspace>/configs/cassettes/<name>.cassette.solve.yaml`
+3. author or select a local nickase catalog (for example `<workspace>/inputs/nickases/*.yaml`) or use a built-in solve preset
+4. **cassette validate** -> strict schema + invariant check plus deterministic planning report
+5. **cassette design** -> write cassette-specific manifest, status, report, provenance snapshots, views, and optional baserender jobs
+6. **cassette solve** -> bounded search, selected-hit materialization, shared view publication, and solve-level/per-hit baserender jobs
+7. **cassette show** -> inspect status and artifact paths for one explicit cassette run
 
-This workflow does not currently use `core/evaluator.py`, `gibbs_anneal`, or workspace `run_index.json`.
+This workflow does not currently use `core/evaluator.py`, `gibbs_anneal`, `study`/`portfolio` orchestration, or workspace `run_index.json`.
 
 ---
 
@@ -145,12 +157,14 @@ Current Cruncher handoff for `elites_showcase.*` and `chain_trajectory_video.mp4
 
 For `chain_trajectory_video.mp4`, Cruncher first resolves selected-chain trajectory rows and sampled frame indices, then writes temporary record rows and passes a strict sequence-rows video job contract to baserender.
 
-For cassette runs, Cruncher currently writes a strict `analysis/reports/render_contract.json` handoff describing:
+For cassette runs, Cruncher now publishes shared, file-based visual contracts rather than a Cruncher-owned render payload:
 
-* one folded `ssdna_hairpin` view with stem/loop spans and pair map
-* one `linear_duplex` view with left/right nick calls and bounded-segment coordinates
+* `views/linear_duplex.v1.json` for the duplex interpretation
+* `views/ssdna_hairpin.v1.json` for the folded hairpin interpretation
+* `views/views_manifest.v1.json` for grouping and discovery
+* sibling `baserender_jobs/*.job.yaml` files that reference those contracts by path
 
-Cassette runs do not call baserender directly yet; they publish the contract for downstream consumers and fail fast on schema violations before write-out.
+Cassette runs do not call baserender directly; they publish the contracts and jobs for downstream consumers and fail fast on schema violations before write-out.
 
 The showcase/video renderers do not require overlap tables; overlap metrics remain separate analysis artifacts.
 
@@ -271,8 +285,9 @@ A typical **cassette** run directory contains:
 - `meta/cassette_manifest.json`, `meta/cassette_status.json` - cassette-stage metadata + status
 - `provenance/spec_used.yaml`, `provenance/nickase_catalog.yaml` - frozen input snapshots
 - `analysis/reports/report.json`, `analysis/reports/report.md` - deterministic planning report
-- `analysis/reports/render_contract.json` - optional dual-view render handoff when `output.write_render_contract: true`
 - `export/table__candidates.csv` - candidate table (one row for the satisfied candidate when present)
+- `views/linear_duplex.v1.json`, `views/ssdna_hairpin.v1.json`, `views/views_manifest.v1.json` - shared file-based visual contracts
+- `baserender_jobs/linear_duplex.job.yaml`, `baserender_jobs/ssdna_hairpin.job.yaml` - optional downstream baserender jobs
 
 Cassette runs are intentionally isolated from `sample` runs:
 

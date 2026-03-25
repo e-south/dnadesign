@@ -56,7 +56,11 @@ def test_load_cassette_spec_normalizes_v2_fields(tmp_path: Path) -> None:
                 "require_energetic_hairpin": False,
             },
             "catalog": {"path": "inputs/nickases/demo.nickases.yaml"},
-            "output": {"run_dir": "outputs/cassettes", "write_render_contract": True},
+            "output": {
+                "run_dir": "outputs/cassettes",
+                "emit_visual_contracts": True,
+                "emit_baserender_jobs": True,
+            },
         },
     )
 
@@ -204,3 +208,110 @@ def test_load_cassette_spec_rejects_energetic_hairpin_flag_until_supported(tmp_p
 
     with pytest.raises(CassetteSpecError, match="ENERGETIC_HAIRPIN_VALIDATION_NOT_SUPPORTED"):
         load_cassette_spec(spec_path)
+
+
+def test_load_cassette_spec_rejects_baserender_jobs_without_visual_contracts(tmp_path: Path) -> None:
+    spec_path = _write_spec(
+        tmp_path,
+        {
+            "schema_version": 2,
+            "name": "demo_hairpin",
+            "topology": {
+                "stem5p_arm": "AACGAT",
+                "loop": "TT",
+                "stem3p_arm_mode": "derived_reverse_complement",
+            },
+            "construct_context": {"left_flank": "", "right_flank": ""},
+            "nicking": {
+                "target_strand": "primary",
+                "left": {"nickase": "Nt.demo", "nick_window": {"start": 0, "end": 2}},
+                "right": {"nickase": "Nb.demo", "nick_window": {"start": 12, "end": 14}},
+            },
+            "catalog": {"path": "inputs/nickases/demo.nickases.yaml"},
+            "output": {
+                "emit_visual_contracts": False,
+                "emit_baserender_jobs": True,
+            },
+        },
+    )
+
+    message = "output.emit_baserender_jobs requires output.emit_visual_contracts=true"
+    with pytest.raises(CassetteSpecError, match=message):
+        load_cassette_spec(spec_path)
+
+
+def test_load_cassette_solve_spec_rejects_baserender_jobs_without_visual_contracts(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspaces" / "demo_cassette"
+    spec_path = workspace / "configs" / "cassettes" / "demo_hairpin.cassette.solve.yaml"
+    spec_path.parent.mkdir(parents=True, exist_ok=True)
+    spec_path.write_text(
+        yaml.safe_dump(
+            {
+                "cassette_solve": {
+                    "schema_version": 1,
+                    "topology": {
+                        "stem5p_arm_pattern": "NNNNNCCTCAGC",
+                        "loop_pattern": "TTT",
+                    },
+                    "construct_context": {
+                        "left_flank": "",
+                        "right_flank": "",
+                        "evaluation_scope": "cassette_plus_flanks",
+                    },
+                    "nick_goal": {
+                        "target_strand": "primary",
+                        "left_nick_window": {"start": 0, "end": 0},
+                        "right_nick_window": {"start": 24, "end": 24},
+                        "bounded_segment_length": {"min": 24, "max": 24},
+                    },
+                    "assignment_policy": {
+                        "allowed_left_variant_ids": ["Nt.BbvCI"],
+                        "allowed_right_variant_ids": ["Nb.BbvCI"],
+                        "forbidden_intended_variant_ids": [],
+                        "forbidden_intended_specificity_ids": [],
+                        "allow_same_variant": True,
+                        "allow_same_specificity_opposite_variant": True,
+                    },
+                    "site_blacklist": {
+                        "forbidden_any_site_specificity_ids": [],
+                        "forbidden_unintended_site_specificity_ids": [],
+                        "forbidden_any_site_variant_ids": [],
+                        "scope": "evaluation_context",
+                    },
+                    "sequence_blacklist": {
+                        "forbidden_literals": [],
+                        "forbidden_iupac_motifs": [],
+                        "forbid_reverse_complements": True,
+                        "scope": "evaluation_context",
+                    },
+                    "sequence_quality": {},
+                    "catalog": {"preset": "neb_nicking_v1", "additional_paths": []},
+                    "search": {
+                        "max_hits": 3,
+                        "max_enumerated_candidates": 256,
+                        "selection": {
+                            "policy": "greedy_hamming",
+                            "pool_size": 16,
+                            "distance_metric": "hamming",
+                            "min_pairwise_distance": 2,
+                        },
+                        "bounded_segment_target": 24,
+                        "gc_target": 0.5,
+                        "materialize_top_k": 2,
+                    },
+                    "output": {
+                        "emit_visual_contracts": False,
+                        "emit_baserender_jobs": True,
+                    },
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    from dnadesign.cruncher.cassette.load import load_cassette_solve_spec
+
+    message = "output.emit_baserender_jobs requires output.emit_visual_contracts=true"
+    with pytest.raises(CassetteSpecError, match=message):
+        load_cassette_solve_spec(spec_path)

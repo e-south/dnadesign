@@ -20,25 +20,43 @@ import yaml
 from dnadesign.cruncher.cassette.artifacts import (
     build_solve_manifest,
     build_solve_run_dir,
+    design_id,
     ensure_solve_run_dirs,
+    hairpin_job_path,
+    hairpin_view_path,
+    linear_duplex_job_path,
+    linear_duplex_view_path,
     solve_hit_dir,
     solve_id,
     solve_resolved_catalog_path,
-    write_solve_baserender_hits_contract,
+    top_hits_duplex_job_path,
+    top_hits_hairpin_job_path,
+    top_hits_hairpin_jsonl_path,
+    top_hits_linear_duplex_jsonl_path,
+    views_manifest_path,
+    write_baserender_job,
+    write_jsonl_records,
     write_solve_hit_bundle,
     write_solve_hits_table,
     write_solve_inputs,
     write_solve_manifest,
     write_solve_report,
     write_solve_status,
+    write_view_bundle,
 )
-from dnadesign.cruncher.cassette.baserender_contract import build_solve_baserender_hits_contract
 from dnadesign.cruncher.cassette.catalog import dump_nickase_catalog_yaml, load_merged_nickase_catalog
 from dnadesign.cruncher.cassette.errors import CassetteSpecError, NickaseCatalogError
 from dnadesign.cruncher.cassette.load import load_cassette_solve_spec, resolve_workspace_root_for_solve_spec
 from dnadesign.cruncher.cassette.planner import render_markdown_report
 from dnadesign.cruncher.cassette.solve_models import SolveReport, SolveReportMetadata
 from dnadesign.cruncher.cassette.solver import build_solve_report, solve_cassette_search
+from dnadesign.cruncher.cassette.view_contracts import (
+    build_hairpin_topology_view,
+    build_linear_duplex_view,
+    build_single_view_job,
+    build_top_hits_job,
+    build_views_manifest,
+)
 
 
 def _issue_from_exception(*, code: str, message: str, details: dict[str, object] | None = None) -> dict[str, object]:
@@ -179,6 +197,18 @@ def _write_solve_bundle(
     )
 
 
+def _relative_to_run(run_dir: Path, path: Path | None) -> str | None:
+    if path is None:
+        return None
+    return str(path.resolve().relative_to(run_dir.resolve()))
+
+
+def _relative_to_run_if_exists(run_dir: Path, path: Path | None) -> str | None:
+    if path is None or not path.exists():
+        return None
+    return _relative_to_run(run_dir, path)
+
+
 def render_solve_markdown_report(report: SolveReport) -> str:
     lines = [
         "# Cassette Solve Report",
@@ -190,8 +220,6 @@ def render_solve_markdown_report(report: SolveReport) -> str:
         lines.append(f"- solve_id: {report.solve_id}")
     if report.run_dir:
         lines.append(f"- run_dir: {report.run_dir}")
-    if report.baserender_hits_contract_path:
-        lines.append(f"- baserender_hits_contract_path: {report.baserender_hits_contract_path}")
     if report.metadata.catalog_preset:
         lines.append(f"- catalog_preset: {report.metadata.catalog_preset}")
     for path in report.metadata.catalog_additional_paths:
@@ -375,53 +403,165 @@ def run_cassette_solve(path: str | Path, *, force_overwrite: bool = False) -> tu
     hit_records_by_id = {selected_hit.record.hit_id: selected_hit.record for selected_hit in ranked_records}
     hit_updates = []
     materialize_count = min(solve_spec.search.materialize_top_k, len(report.hits))
+    top_hit_linear_rows: list[dict[str, object]] = []
+    top_hit_hairpin_rows: list[dict[str, object]] = []
+
+    for hit in report.hits:
+        hit_record = hit_records_by_id[hit.hit_id]
+        explicit_design_id = design_id(
+            spec_bytes=yaml.safe_dump(
+                {"cassette": hit_record.explicit_spec.model_dump(mode="json")},
+                sort_keys=False,
+            ).encode("utf-8"),
+            catalog_bytes=resolved_catalog_yaml.encode("utf-8"),
+        )
+        linear_view = build_linear_duplex_view(
+            report=hit_record.report,
+            solution_id=hit.solution_id,
+            title=f"Hit {hit.rank} - Linear duplex",
+            rank=hit.rank,
+            source_solve_id=cassette_solve_id,
+            explicit_design_id=explicit_design_id,
+        )
+        hairpin_view = build_hairpin_topology_view(
+            report=hit_record.report,
+            solution_id=hit.solution_id,
+            title=f"Hit {hit.rank} - ssDNA hairpin",
+            rank=hit.rank,
+            source_solve_id=cassette_solve_id,
+            explicit_design_id=explicit_design_id,
+        )
+        top_hit_linear_rows.append(linear_view.model_dump(mode="json"))
+        top_hit_hairpin_rows.append(hairpin_view.model_dump(mode="json"))
+
     for hit in report.hits[:materialize_count]:
         hit_record = hit_records_by_id[hit.hit_id]
         hit_dir = solve_hit_dir(run_dir, rank=hit.rank, hit_id=hit.hit_id)
         resolved_spec_payload = {"cassette": hit_record.explicit_spec.model_dump(mode="json")}
         resolved_spec_payload["cassette"]["catalog"]["path"] = str(solve_resolved_catalog_path(run_dir).resolve())
-        resolved_candidate_spec_path = hit_dir / "resolved_candidate.cassette.yaml"
+        explicit_dir = hit_dir / "explicit"
+        resolved_candidate_spec_path = explicit_dir / "resolved_candidate.cassette.yaml"
+        explicit_design_id = design_id(
+            spec_bytes=yaml.safe_dump(resolved_spec_payload, sort_keys=False).encode("utf-8"),
+            catalog_bytes=resolved_catalog_yaml.encode("utf-8"),
+        )
         resolved_report = hit_record.report.model_copy(
             update={
                 "spec_path": str(resolved_candidate_spec_path.resolve()),
                 "catalog_path": str(solve_resolved_catalog_path(run_dir).resolve()),
-                "run_dir": str(hit_dir.resolve()),
-                "render_contract": hit_record.report.render_contract
-                if solve_spec.output.write_render_contract
-                else None,
+                "run_dir": str(explicit_dir.resolve()),
             }
         )
         write_solve_hit_bundle(
-            hit_dir=hit_dir,
+            hit_dir=explicit_dir,
             resolved_spec_payload=resolved_spec_payload,
             report=resolved_report,
             markdown=render_markdown_report(resolved_report),
         )
         materialized_hit_runs.append(str(hit_dir.resolve()))
-        hit_updates.append(hit.model_copy(update={"materialized_run_dir": str(hit_dir.resolve())}))
+        if solve_spec.output.emit_visual_contracts:
+            linear_view = build_linear_duplex_view(
+                report=resolved_report,
+                solution_id=hit.solution_id,
+                title=f"Hit {hit.rank} - Linear duplex",
+                rank=hit.rank,
+                source_solve_id=cassette_solve_id,
+                explicit_design_id=explicit_design_id,
+            )
+            hairpin_view = build_hairpin_topology_view(
+                report=resolved_report,
+                solution_id=hit.solution_id,
+                title=f"Hit {hit.rank} - ssDNA hairpin",
+                rank=hit.rank,
+                source_solve_id=cassette_solve_id,
+                explicit_design_id=explicit_design_id,
+            )
+            manifest = build_views_manifest(
+                solution_id=hit.solution_id,
+                rank=hit.rank,
+                include_jobs=solve_spec.output.emit_baserender_jobs,
+            )
+            write_view_bundle(
+                hit_dir,
+                linear_duplex=linear_view.model_dump(mode="json"),
+                hairpin=hairpin_view.model_dump(mode="json"),
+                manifest=manifest.model_dump(mode="json"),
+            )
+        manifest_ref = _relative_to_run_if_exists(run_dir, views_manifest_path(hit_dir))
+        if solve_spec.output.emit_baserender_jobs:
+            if "duplex_qa" in solve_spec.output.baserender_profiles:
+                write_baserender_job(
+                    linear_duplex_job_path(hit_dir),
+                    build_single_view_job(
+                        input_filename=linear_duplex_view_path(hit_dir).name,
+                        adapter_kind="duplex_sequence_v1",
+                        renderer="sequence_rows",
+                        style_preset="cassette_duplex_qa",
+                        output_filename="linear_duplex.pdf",
+                    ),
+                )
+            if "hairpin_qa" in solve_spec.output.baserender_profiles:
+                write_baserender_job(
+                    hairpin_job_path(hit_dir),
+                    build_single_view_job(
+                        input_filename=hairpin_view_path(hit_dir).name,
+                        adapter_kind="hairpin_topology_v1",
+                        renderer="hairpin_cartoon",
+                        style_preset="cassette_hairpin_qa",
+                        output_filename="ssdna_hairpin.pdf",
+                    ),
+                )
+        linear_job_ref = _relative_to_run_if_exists(run_dir, linear_duplex_job_path(hit_dir))
+        hairpin_job_ref = _relative_to_run_if_exists(run_dir, hairpin_job_path(hit_dir))
+        hit_updates.append(
+            hit.model_copy(
+                update={
+                    "materialized_run_dir": str(hit_dir.resolve()),
+                    "explicit_design_id": explicit_design_id,
+                    "views_manifest_path": manifest_ref,
+                    "linear_duplex_job_path": linear_job_ref,
+                    "ssdna_hairpin_job_path": hairpin_job_ref,
+                }
+            )
+        )
     hit_updates.extend(report.hits[materialize_count:])
+
+    if solve_spec.output.emit_visual_contracts:
+        write_jsonl_records(top_hits_linear_duplex_jsonl_path(run_dir), top_hit_linear_rows)
+        write_jsonl_records(top_hits_hairpin_jsonl_path(run_dir), top_hit_hairpin_rows)
+    if solve_spec.output.emit_baserender_jobs:
+        if "top_hits_duplex_qa" in solve_spec.output.baserender_profiles:
+            write_baserender_job(
+                top_hits_duplex_job_path(run_dir),
+                build_top_hits_job(
+                    input_filename=top_hits_linear_duplex_jsonl_path(run_dir).name,
+                    adapter_kind="duplex_sequence_v1",
+                    renderer="sequence_rows",
+                    style_preset="cassette_duplex_contact_sheet",
+                    output_filename="top_hits_duplex_qa_sheet.pdf",
+                ),
+            )
+        if "top_hits_hairpin_qa" in solve_spec.output.baserender_profiles:
+            write_baserender_job(
+                top_hits_hairpin_job_path(run_dir),
+                build_top_hits_job(
+                    input_filename=top_hits_hairpin_jsonl_path(run_dir).name,
+                    adapter_kind="hairpin_topology_v1",
+                    renderer="hairpin_cartoon",
+                    style_preset="cassette_hairpin_qa",
+                    output_filename="top_hits_hairpin_qa_sheet.pdf",
+                ),
+            )
+
     report = report.model_copy(
         update={
             "solve_id": cassette_solve_id,
             "run_dir": str(run_dir.resolve()),
             "hits": hit_updates,
             "materialized_hit_runs": materialized_hit_runs,
-            "render_contracts_written": solve_spec.output.write_render_contract and materialize_count > 0,
             "metadata": report.metadata.model_copy(update={"materialized_hit_count": len(materialized_hit_runs)}),
         }
     )
-    if solve_spec.output.write_render_contract and report.hits:
-        baserender_contract = build_solve_baserender_hits_contract(
-            report=report,
-            selected_hits=ranked_records,
-        )
-        report = report.model_copy(
-            update={
-                "baserender_hits_contract_path": str(
-                    write_solve_baserender_hits_contract(run_dir, baserender_contract).resolve()
-                )
-            }
-        )
     _write_solve_bundle(
         run_dir=run_dir,
         report=report,

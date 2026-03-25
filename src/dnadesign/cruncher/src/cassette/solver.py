@@ -596,7 +596,11 @@ def _make_explicit_spec(
         catalog=CassetteCatalogRef(path=catalog_path),
         output=CassetteOutputConfig(
             run_dir=solve_spec.output.run_dir,
-            write_render_contract=solve_spec.output.write_render_contract,
+            emit_visual_contracts=solve_spec.output.emit_visual_contracts,
+            emit_baserender_jobs=solve_spec.output.emit_baserender_jobs,
+            baserender_profiles=[
+                profile for profile in solve_spec.output.baserender_profiles if profile in {"duplex_qa", "hairpin_qa"}
+            ],
         ),
     )
 
@@ -957,6 +961,7 @@ def build_solve_report(
     hits = [
         CandidateHit(
             rank=index,
+            solution_id=selected_hit.record.hit_id,
             score=list(selected_hit.record.score_tuple),
             base_penalty_vector=list(selected_hit.record.base_penalty_vector),
             hit_id=selected_hit.record.hit_id,

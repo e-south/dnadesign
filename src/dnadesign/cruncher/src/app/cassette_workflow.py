@@ -20,30 +20,34 @@ from dnadesign.cruncher.cassette.artifacts import (
     catalog_snapshot_path,
     design_id,
     ensure_run_dirs,
+    hairpin_job_path,
+    hairpin_view_path,
+    linear_duplex_job_path,
+    linear_duplex_view_path,
     load_manifest,
     load_status,
-    render_contract_path,
     report_json_path,
     report_md_path,
     snapshot_inputs,
     spec_snapshot_path,
+    views_manifest_path,
+    write_baserender_job,
     write_candidate_table,
     write_manifest,
     write_report,
     write_status,
+    write_view_bundle,
 )
 from dnadesign.cruncher.cassette.catalog import load_nickase_catalog, resolve_catalog_path
 from dnadesign.cruncher.cassette.load import load_cassette_spec
 from dnadesign.cruncher.cassette.models import CassetteEvaluationReport
 from dnadesign.cruncher.cassette.planner import build_cassette_report, render_markdown_report
-
-
-def _apply_output_contract(
-    report: CassetteEvaluationReport, *, write_render_contract: bool
-) -> CassetteEvaluationReport:
-    if write_render_contract:
-        return report
-    return report.model_copy(update={"render_contract": None})
+from dnadesign.cruncher.cassette.view_contracts import (
+    build_hairpin_topology_view,
+    build_linear_duplex_view,
+    build_single_view_job,
+    build_views_manifest,
+)
 
 
 def validate_cassette_spec(path: str | Path) -> CassetteEvaluationReport:
@@ -57,7 +61,7 @@ def validate_cassette_spec(path: str | Path) -> CassetteEvaluationReport:
         catalog_path=catalog_path,
         catalog=catalog,
     )
-    return _apply_output_contract(report, write_render_contract=spec.output.write_render_contract)
+    return report
 
 
 def run_cassette_design(path: str | Path, *, force_overwrite: bool = False) -> tuple[Path, CassetteEvaluationReport]:
@@ -71,7 +75,6 @@ def run_cassette_design(path: str | Path, *, force_overwrite: bool = False) -> t
         catalog_path=catalog_path,
         catalog=catalog,
     )
-    report = _apply_output_contract(report, write_render_contract=spec.output.write_render_contract)
     spec_bytes = spec_path.read_bytes()
     catalog_bytes = catalog_path.read_bytes()
     cassette_design_id = design_id(spec_bytes=spec_bytes, catalog_bytes=catalog_bytes)
@@ -90,6 +93,51 @@ def run_cassette_design(path: str | Path, *, force_overwrite: bool = False) -> t
     report = report.model_copy(update={"run_dir": str(run_dir.resolve())})
     write_report(run_dir, report, markdown=render_markdown_report(report))
     write_candidate_table(run_dir, report)
+    if spec.output.emit_visual_contracts and report.candidate is not None:
+        linear_view = build_linear_duplex_view(
+            report=report,
+            solution_id=cassette_design_id,
+            title=f"{report.spec_name} - Linear duplex",
+        )
+        hairpin_view = build_hairpin_topology_view(
+            report=report,
+            solution_id=cassette_design_id,
+            title=f"{report.spec_name} - ssDNA hairpin",
+        )
+        manifest = build_views_manifest(
+            solution_id=cassette_design_id,
+            rank=None,
+            include_jobs=spec.output.emit_baserender_jobs,
+        )
+        write_view_bundle(
+            run_dir,
+            linear_duplex=linear_view.model_dump(mode="json"),
+            hairpin=hairpin_view.model_dump(mode="json"),
+            manifest=manifest.model_dump(mode="json"),
+        )
+        if spec.output.emit_baserender_jobs:
+            if "duplex_qa" in spec.output.baserender_profiles:
+                write_baserender_job(
+                    linear_duplex_job_path(run_dir),
+                    build_single_view_job(
+                        input_filename=linear_duplex_view_path(run_dir).name,
+                        adapter_kind="duplex_sequence_v1",
+                        renderer="sequence_rows",
+                        style_preset="cassette_duplex_qa",
+                        output_filename="linear_duplex.pdf",
+                    ),
+                )
+            if "hairpin_qa" in spec.output.baserender_profiles:
+                write_baserender_job(
+                    hairpin_job_path(run_dir),
+                    build_single_view_job(
+                        input_filename=hairpin_view_path(run_dir).name,
+                        adapter_kind="hairpin_topology_v1",
+                        renderer="hairpin_cartoon",
+                        style_preset="cassette_hairpin_qa",
+                        output_filename="ssdna_hairpin.pdf",
+                    ),
+                )
     manifest = build_manifest(
         run_dir=run_dir,
         workspace_root=workspace_root,
@@ -123,9 +171,21 @@ def cassette_show_payload(run_dir: str | Path) -> dict[str, object]:
         "report_md": str(report_md_path(resolved).resolve()),
         "spec_snapshot": str(spec_snapshot_path(resolved).resolve()),
         "catalog_snapshot": str(catalog_snapshot_path(resolved).resolve()),
-        "render_contract": str(render_contract_path(resolved).resolve())
-        if render_contract_path(resolved).exists()
-        else None,
+        "views_manifest": (
+            str(views_manifest_path(resolved).resolve()) if views_manifest_path(resolved).exists() else None
+        ),
+        "linear_duplex_view": (
+            str(linear_duplex_view_path(resolved).resolve()) if linear_duplex_view_path(resolved).exists() else None
+        ),
+        "ssdna_hairpin_view": (
+            str(hairpin_view_path(resolved).resolve()) if hairpin_view_path(resolved).exists() else None
+        ),
+        "linear_duplex_job": (
+            str(linear_duplex_job_path(resolved).resolve()) if linear_duplex_job_path(resolved).exists() else None
+        ),
+        "ssdna_hairpin_job": (
+            str(hairpin_job_path(resolved).resolve()) if hairpin_job_path(resolved).exists() else None
+        ),
         "artifacts": manifest.get("artifacts", []),
     }
     return payload

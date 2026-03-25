@@ -124,7 +124,14 @@ def _base_solve_spec() -> dict[str, Any]:
             },
             "output": {
                 "run_dir": "outputs/cassette_solves",
-                "write_render_contract": True,
+                "emit_visual_contracts": True,
+                "emit_baserender_jobs": True,
+                "baserender_profiles": [
+                    "duplex_qa",
+                    "hairpin_qa",
+                    "top_hits_duplex_qa",
+                    "top_hits_hairpin_qa",
+                ],
             },
         }
     }
@@ -290,6 +297,12 @@ def _write_readme(workspace_root: Path, *, solve_specs: dict[str, Path]) -> Path
             "",
             "Cassette scaffolds are intentionally not listed by `cruncher workspaces list`.",
             "Use the explicit `configs/cassettes/*.cassette.solve.yaml` paths in this root instead.",
+            "Emitted baserender jobs stay self-contained inside the cassette workspace:",
+            (
+                "- solve-level jobs read `views/` and write PDFs to sibling `renders/` under "
+                "`outputs/cassette_solves/<solve_id>/`"
+            ),
+            "- per-hit jobs do the same inside each `hits/hit_<rank>_<solution_id>/` bundle",
             "",
             "## Optional local catalog export",
             "",

@@ -86,7 +86,11 @@ def _v1_cassette_payload(*, right_window_start: int = 11, right_window_end: int 
             },
         },
         "catalog": {"path": "inputs/nickases/demo.nickases.yaml"},
-        "output": {"run_dir": "outputs/cassettes", "write_render_contract": True},
+        "output": {
+            "run_dir": "outputs/cassettes",
+            "emit_visual_contracts": True,
+            "emit_baserender_jobs": True,
+        },
     }
 
 
@@ -170,7 +174,11 @@ def _v2_cassette_payload() -> dict[str, Any]:
             "require_energetic_hairpin": False,
         },
         "catalog": {"path": "inputs/nickases/demo.nickases.yaml"},
-        "output": {"run_dir": "outputs/cassettes", "write_render_contract": True},
+        "output": {
+            "run_dir": "outputs/cassettes",
+            "emit_visual_contracts": True,
+            "emit_baserender_jobs": True,
+        },
     }
 
 
@@ -192,7 +200,7 @@ def test_validate_cassette_spec_returns_satisfied_candidate_for_v1(tmp_path: Pat
     assert report.candidate.intended_left_nick.boundary == 2
     assert report.candidate.intended_right_nick.boundary == 12
     assert report.candidate.bounded_nicked_segment.length_nt == 10
-    assert report.render_contract is not None
+    assert "render_contract" not in report.model_dump(mode="json")
 
 
 def test_validate_cassette_spec_reports_unsatisfied_window_miss_for_v1(tmp_path: Path) -> None:

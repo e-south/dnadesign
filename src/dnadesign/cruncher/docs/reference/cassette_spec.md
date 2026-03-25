@@ -6,7 +6,7 @@
 **Updated by:** cruncher-maintainers on 2026-03-25
 **Applies to:** `configs/cassettes/*.cassette.yaml`
 **Last verified:** 2026-03-25
-**Primary artifacts:** validated `report.json`, `report.md`, optional `render_contract.json`
+**Primary artifacts:** validated `report.json`, `report.md`, `views/linear_duplex.v1.json`, `views/ssdna_hairpin.v1.json`, and `views/views_manifest.v1.json`
 
 ### Contents
 - [File location](#file-location)
@@ -29,6 +29,8 @@ The CLI rejects directory arguments, files outside the workspace `configs/` tree
 
 Solve-mode search specs use the separate suffix `.cassette.solve.yaml` and are documented in
 [`cassette_solve_spec.md`](cassette_solve_spec.md).
+
+For a scaffolded workspace walkthrough, start with [`../demos/demo_cassette_workspace.md`](../demos/demo_cassette_workspace.md).
 
 ### Schema versions
 
@@ -69,7 +71,9 @@ cassette:
     path: inputs/nickases/demo.nickases.yaml
   output:
     run_dir: outputs/cassettes
-    write_render_contract: true
+    emit_visual_contracts: true
+    emit_baserender_jobs: true
+    baserender_profiles: [duplex_qa, hairpin_qa]
 ```
 
 ### Field semantics
@@ -91,7 +95,10 @@ cassette:
 - `hairpin_validation.require_energetic_hairpin`: reserved for future energetic checks. Setting it to `true` currently fails fast instead of silently skipping thermodynamic validation.
 - `catalog.path`: workspace-relative or absolute path to a local nickase catalog.
 - `output.run_dir`: relative output root inside the workspace. Absolute paths and `..` traversal are rejected.
-- `output.write_render_contract`: when `true`, write and report `analysis/reports/render_contract.json`.
+- `output.emit_visual_contracts`: when `true`, write `views/linear_duplex.v1.json`, `views/ssdna_hairpin.v1.json`, and `views/views_manifest.v1.json` for satisfied runs that materialize a concrete candidate.
+- `output.emit_baserender_jobs`: when `true`, write baserender job YAML next to the published views.
+- `output.emit_baserender_jobs` requires `output.emit_visual_contracts: true`; the job YAML is rejected at load time otherwise because it would point at missing view files.
+- `output.baserender_profiles`: supported explicit-lane profiles are `duplex_qa` and `hairpin_qa`.
 
 ### Coordinate semantics
 

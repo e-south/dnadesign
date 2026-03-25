@@ -30,6 +30,9 @@ RUN_PROVENANCE_DIR = "provenance"
 RUN_ANALYSIS_DIR = "analysis"
 RUN_ANALYSIS_REPORTS_DIR = "reports"
 RUN_EXPORT_DIR = "export"
+RUN_VIEWS_DIR = "views"
+RUN_BASERENDER_JOBS_DIR = "baserender_jobs"
+RUN_RENDERS_DIR = "renders"
 
 
 def design_id(*, spec_bytes: bytes, catalog_bytes: bytes) -> str:
@@ -65,11 +68,17 @@ def ensure_run_dirs(run_dir: Path) -> None:
     (run_dir / RUN_PROVENANCE_DIR).mkdir(parents=True, exist_ok=True)
     (run_dir / RUN_ANALYSIS_DIR / RUN_ANALYSIS_REPORTS_DIR).mkdir(parents=True, exist_ok=True)
     (run_dir / RUN_EXPORT_DIR).mkdir(parents=True, exist_ok=True)
+    (run_dir / RUN_VIEWS_DIR).mkdir(parents=True, exist_ok=True)
+    (run_dir / RUN_BASERENDER_JOBS_DIR).mkdir(parents=True, exist_ok=True)
+    (run_dir / RUN_RENDERS_DIR).mkdir(parents=True, exist_ok=True)
 
 
 def ensure_solve_run_dirs(run_dir: Path) -> None:
     (run_dir / "hits").mkdir(parents=True, exist_ok=True)
     (run_dir / "specs").mkdir(parents=True, exist_ok=True)
+    (run_dir / RUN_VIEWS_DIR).mkdir(parents=True, exist_ok=True)
+    (run_dir / RUN_BASERENDER_JOBS_DIR).mkdir(parents=True, exist_ok=True)
+    (run_dir / RUN_RENDERS_DIR).mkdir(parents=True, exist_ok=True)
 
 
 def cassette_manifest_path(run_dir: Path) -> Path:
@@ -96,8 +105,36 @@ def report_md_path(run_dir: Path) -> Path:
     return run_dir / RUN_ANALYSIS_DIR / RUN_ANALYSIS_REPORTS_DIR / "report.md"
 
 
-def render_contract_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ANALYSIS_DIR / RUN_ANALYSIS_REPORTS_DIR / "render_contract.json"
+def views_dir(run_dir: Path) -> Path:
+    return run_dir / RUN_VIEWS_DIR
+
+
+def baserender_jobs_dir(run_dir: Path) -> Path:
+    return run_dir / RUN_BASERENDER_JOBS_DIR
+
+
+def renders_dir(run_dir: Path) -> Path:
+    return run_dir / RUN_RENDERS_DIR
+
+
+def linear_duplex_view_path(run_dir: Path) -> Path:
+    return views_dir(run_dir) / "linear_duplex.v1.json"
+
+
+def hairpin_view_path(run_dir: Path) -> Path:
+    return views_dir(run_dir) / "ssdna_hairpin.v1.json"
+
+
+def views_manifest_path(run_dir: Path) -> Path:
+    return views_dir(run_dir) / "views_manifest.v1.json"
+
+
+def linear_duplex_job_path(run_dir: Path) -> Path:
+    return baserender_jobs_dir(run_dir) / "linear_duplex.job.yaml"
+
+
+def hairpin_job_path(run_dir: Path) -> Path:
+    return baserender_jobs_dir(run_dir) / "ssdna_hairpin.job.yaml"
 
 
 def candidate_table_path(run_dir: Path) -> Path:
@@ -124,8 +161,20 @@ def solve_hits_table_path(run_dir: Path) -> Path:
     return run_dir / "table__hits.csv"
 
 
-def solve_baserender_hits_contract_path(run_dir: Path) -> Path:
-    return run_dir / "baserender_hits_contract.json"
+def top_hits_linear_duplex_jsonl_path(run_dir: Path) -> Path:
+    return views_dir(run_dir) / "top_hits.linear_duplex.v1.jsonl"
+
+
+def top_hits_hairpin_jsonl_path(run_dir: Path) -> Path:
+    return views_dir(run_dir) / "top_hits.ssdna_hairpin.v1.jsonl"
+
+
+def top_hits_duplex_job_path(run_dir: Path) -> Path:
+    return baserender_jobs_dir(run_dir) / "top_hits_duplex.job.yaml"
+
+
+def top_hits_hairpin_job_path(run_dir: Path) -> Path:
+    return baserender_jobs_dir(run_dir) / "top_hits_hairpin.job.yaml"
 
 
 def solve_input_spec_path(run_dir: Path) -> Path:
@@ -137,7 +186,7 @@ def solve_resolved_catalog_path(run_dir: Path) -> Path:
 
 
 def solve_hit_dir(run_dir: Path, *, rank: int, hit_id: str) -> Path:
-    return run_dir / "hits" / f"{rank:03d}_{hit_id}"
+    return run_dir / "hits" / f"hit_{rank:03d}_{hit_id}"
 
 
 def build_manifest(
@@ -155,8 +204,20 @@ def build_manifest(
         {"name": "spec_snapshot", "path": str(spec_snapshot_path(run_dir).relative_to(run_dir))},
         {"name": "catalog_snapshot", "path": str(catalog_snapshot_path(run_dir).relative_to(run_dir))},
     ]
-    if report.render_contract is not None:
-        artifacts.append({"name": "render_contract", "path": str(render_contract_path(run_dir).relative_to(run_dir))})
+    if views_manifest_path(run_dir).exists():
+        artifacts.extend(
+            [
+                {"name": "linear_duplex_view", "path": str(linear_duplex_view_path(run_dir).relative_to(run_dir))},
+                {"name": "hairpin_view", "path": str(hairpin_view_path(run_dir).relative_to(run_dir))},
+                {"name": "views_manifest", "path": str(views_manifest_path(run_dir).relative_to(run_dir))},
+            ]
+        )
+    if linear_duplex_job_path(run_dir).exists():
+        artifacts.append(
+            {"name": "linear_duplex_job", "path": str(linear_duplex_job_path(run_dir).relative_to(run_dir))}
+        )
+    if hairpin_job_path(run_dir).exists():
+        artifacts.append({"name": "hairpin_job", "path": str(hairpin_job_path(run_dir).relative_to(run_dir))})
     return {
         "stage": "cassette",
         "workflow": "cassette_design",
@@ -206,8 +267,6 @@ def snapshot_inputs(run_dir: Path, *, spec_path: Path, catalog_path: Path) -> No
 def write_report(run_dir: Path, report: CassetteEvaluationReport, *, markdown: str) -> None:
     atomic_write_json(report_json_path(run_dir), report.model_dump(mode="json"))
     report_md_path(run_dir).write_text(markdown, encoding="utf-8")
-    if report.render_contract is not None:
-        atomic_write_json(render_contract_path(run_dir), report.render_contract)
 
 
 def write_candidate_table(run_dir: Path, report: CassetteEvaluationReport) -> None:
@@ -249,6 +308,31 @@ def write_candidate_table(run_dir: Path, report: CassetteEvaluationReport) -> No
         )
 
 
+def write_view_bundle(
+    run_dir: Path,
+    *,
+    linear_duplex: dict[str, Any],
+    hairpin: dict[str, Any],
+    manifest: dict[str, Any],
+) -> None:
+    atomic_write_json(linear_duplex_view_path(run_dir), linear_duplex)
+    atomic_write_json(hairpin_view_path(run_dir), hairpin)
+    atomic_write_json(views_manifest_path(run_dir), manifest)
+
+
+def write_jsonl_records(path: Path, rows: list[dict[str, Any]]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = "\n".join(json.dumps(row, sort_keys=True) for row in rows) + ("\n" if rows else "")
+    path.write_text(payload, encoding="utf-8")
+    return path
+
+
+def write_baserender_job(path: Path, payload: dict[str, Any]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    return path
+
+
 def load_manifest(run_dir: Path) -> dict[str, Any]:
     path = cassette_manifest_path(run_dir)
     if not path.exists():
@@ -278,8 +362,9 @@ def write_solve_report(run_dir: Path, report: SolveReport, *, markdown: str) -> 
 def write_solve_hits_table(run_dir: Path, report: SolveReport) -> None:
     fieldnames = [
         "rank",
-        "selected_rank",
+        "solution_id",
         "score",
+        "score_tuple",
         "base_penalty_vector",
         "hit_id",
         "cassette_sequence",
@@ -296,6 +381,10 @@ def write_solve_hits_table(run_dir: Path, report: SolveReport) -> None:
         "selection_policy",
         "selection_rank_reason",
         "distance_to_previous_selected",
+        "explicit_design_id",
+        "views_manifest_path",
+        "linear_duplex_job_path",
+        "ssdna_hairpin_job_path",
     ]
     with solve_hits_table_path(run_dir).open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -304,8 +393,9 @@ def write_solve_hits_table(run_dir: Path, report: SolveReport) -> None:
             writer.writerow(
                 {
                     "rank": hit.rank,
-                    "selected_rank": hit.rank,
+                    "solution_id": hit.solution_id,
                     "score": json.dumps(hit.score),
+                    "score_tuple": json.dumps(hit.score),
                     "base_penalty_vector": json.dumps(hit.base_penalty_vector),
                     "hit_id": hit.hit_id,
                     "cassette_sequence": hit.cassette_sequence,
@@ -324,14 +414,12 @@ def write_solve_hits_table(run_dir: Path, report: SolveReport) -> None:
                     ),
                     "selection_rank_reason": hit.selection_rank_reason,
                     "distance_to_previous_selected": hit.distance_to_previous_selected,
+                    "explicit_design_id": hit.explicit_design_id,
+                    "views_manifest_path": hit.views_manifest_path,
+                    "linear_duplex_job_path": hit.linear_duplex_job_path,
+                    "ssdna_hairpin_job_path": hit.ssdna_hairpin_job_path,
                 }
             )
-
-
-def write_solve_baserender_hits_contract(run_dir: Path, contract: dict[str, Any]) -> Path:
-    path = solve_baserender_hits_contract_path(run_dir)
-    atomic_write_json(path, contract)
-    return path
 
 
 def build_solve_manifest(
@@ -353,8 +441,14 @@ def build_solve_manifest(
         artifacts.append({"name": "input_spec", "path": "specs/input_solve_spec.yaml"})
     if solve_resolved_catalog_path(run_dir).exists():
         artifacts.append({"name": "resolved_catalog", "path": "specs/resolved_catalog.yaml"})
-    if solve_baserender_hits_contract_path(run_dir).exists():
-        artifacts.append({"name": "baserender_hits_contract", "path": "baserender_hits_contract.json"})
+    if top_hits_linear_duplex_jsonl_path(run_dir).exists():
+        artifacts.append({"name": "top_hits_linear_duplex_jsonl", "path": "views/top_hits.linear_duplex.v1.jsonl"})
+    if top_hits_hairpin_jsonl_path(run_dir).exists():
+        artifacts.append({"name": "top_hits_hairpin_jsonl", "path": "views/top_hits.ssdna_hairpin.v1.jsonl"})
+    if top_hits_duplex_job_path(run_dir).exists():
+        artifacts.append({"name": "top_hits_duplex_job", "path": "baserender_jobs/top_hits_duplex.job.yaml"})
+    if top_hits_hairpin_job_path(run_dir).exists():
+        artifacts.append({"name": "top_hits_hairpin_job", "path": "baserender_jobs/top_hits_hairpin.job.yaml"})
     return {
         "stage": "cassette_solve",
         "workflow": "cassette_solve",
@@ -393,9 +487,13 @@ def write_solve_status(run_dir: Path, *, report: SolveReport, status_message: st
         "search_truncated": any(
             code in {"MAX_SEARCH_NODES_REACHED", "MAX_ENUMERATED_CANDIDATES_REACHED"} for code in warning_codes
         ),
+        "search_bounded": any(
+            code in {"MAX_SEARCH_NODES_REACHED", "MAX_ENUMERATED_CANDIDATES_REACHED"} for code in warning_codes
+        ),
         "accepted_pool_truncated": (
             selection_summary.accepted_pool_truncated if selection_summary is not None else False
         ),
+        "pool_bounded": selection_summary.accepted_pool_truncated if selection_summary is not None else False,
         "selection": (
             {
                 "policy": selection_summary.policy,
@@ -420,10 +518,22 @@ def write_solve_status(run_dir: Path, *, report: SolveReport, status_message: st
             if selection_summary is not None
             else None
         ),
-        "baserender_hits_contract": (
-            str(solve_baserender_hits_contract_path(run_dir).resolve())
-            if solve_baserender_hits_contract_path(run_dir).exists()
+        "top_hit_batch_scope": "selected_hits",
+        "top_hits_linear_duplex_jsonl": (
+            str(top_hits_linear_duplex_jsonl_path(run_dir).resolve())
+            if top_hits_linear_duplex_jsonl_path(run_dir).exists()
             else None
+        ),
+        "top_hits_hairpin_jsonl": (
+            str(top_hits_hairpin_jsonl_path(run_dir).resolve())
+            if top_hits_hairpin_jsonl_path(run_dir).exists()
+            else None
+        ),
+        "top_hits_duplex_job": (
+            str(top_hits_duplex_job_path(run_dir).resolve()) if top_hits_duplex_job_path(run_dir).exists() else None
+        ),
+        "top_hits_hairpin_job": (
+            str(top_hits_hairpin_job_path(run_dir).resolve()) if top_hits_hairpin_job_path(run_dir).exists() else None
         ),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -452,7 +562,6 @@ def write_solve_hit_bundle(
             "spec_name": report.spec_name,
             "report_json": "report.json",
             "report_md": "report.md",
-            "render_contract": "render_contract.json" if report.render_contract is not None else None,
             "resolved_candidate_spec": "resolved_candidate.cassette.yaml",
         },
     )
@@ -465,5 +574,3 @@ def write_solve_hit_bundle(
             "run_dir": str(hit_dir.resolve()),
         },
     )
-    if report.render_contract is not None:
-        atomic_write_json(hit_dir / "render_contract.json", report.render_contract)

@@ -3,10 +3,10 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** guide
 **Audience:** cassette workflow users and maintainers
-**Updated by:** cruncher-maintainers on 2026-03-24
+**Updated by:** cruncher-maintainers on 2026-03-25
 **Applies to:** `uv run cruncher cassette validate|design|show`
-**Last verified:** 2026-03-24
-**Primary artifacts:** `analysis/reports/report.json`, `analysis/reports/report.md`, `analysis/reports/render_contract.json`, `export/table__candidates.csv`
+**Last verified:** 2026-03-25
+**Primary artifacts:** `analysis/reports/report.json`, `analysis/reports/report.md`, `views/linear_duplex.v1.json`, `views/ssdna_hairpin.v1.json`, `views/views_manifest.v1.json`, `export/table__candidates.csv`
 
 ### Contents
 - [Why this exists](#why-this-exists)
@@ -50,6 +50,9 @@ The explicit lane does not search over stems, loops, or nickase assignments.
 
 Use this workflow when you already know the intended cassette topology and nickase assignments and need Cruncher to validate the dual-context contract and publish artifacts.
 
+If you need a fresh cassette workspace root and a concrete solve-to-render tutorial first, start with
+[`../demos/demo_cassette_workspace.md`](../demos/demo_cassette_workspace.md).
+
 If you want Cruncher to search over patterned stems/loops and rank multiple hits, use
 [`cassette_solve_workflow.md`](cassette_solve_workflow.md) instead.
 
@@ -70,6 +73,10 @@ Store the spec and catalog inside the workspace:
 ```
 
 `--spec` must point to the concrete `.cassette.yaml` file. Passing `configs/` or a file outside the workspace `configs/` tree fails fast.
+
+`cassette init-workspace` scaffolds solve profiles only. Authored explicit `.cassette.yaml` specs still live in
+`configs/cassettes/` under a workspace you own, or they are emitted later as per-hit explicit bundles by
+`cassette solve`.
 
 ### Minimal catalog
 
@@ -128,7 +135,9 @@ cassette:
     path: inputs/nickases/demo.nickases.yaml
   output:
     run_dir: outputs/cassettes
-    write_render_contract: true
+    emit_visual_contracts: true
+    emit_baserender_jobs: true
+    baserender_profiles: [duplex_qa, hairpin_qa]
 ```
 
 This example validates to one cassette sequence, `AACGATTTATCGTT`, with intended boundaries `2` and `12`.
@@ -174,13 +183,17 @@ Primary artifacts:
 - `provenance/nickase_catalog.yaml`
 - `analysis/reports/report.json`
 - `analysis/reports/report.md`
-- `analysis/reports/render_contract.json` when `output.write_render_contract: true`
 - `export/table__candidates.csv`
+- `views/linear_duplex.v1.json` when `output.emit_visual_contracts: true` and the planner materializes a concrete candidate
+- `views/ssdna_hairpin.v1.json` when `output.emit_visual_contracts: true` and the planner materializes a concrete candidate
+- `views/views_manifest.v1.json` when `output.emit_visual_contracts: true` and the planner materializes a concrete candidate
+- `baserender_jobs/linear_duplex.job.yaml` when `output.emit_baserender_jobs: true` and the corresponding views were published
+- `baserender_jobs/ssdna_hairpin.job.yaml` when `output.emit_baserender_jobs: true` and the corresponding views were published
+- `renders/linear_duplex.pdf` or `renders/ssdna_hairpin.pdf` after you run the emitted jobs with `baserender`
+- `output.emit_baserender_jobs` requires `output.emit_visual_contracts: true`
 
-The render contract publishes two views:
-
-- `ssdna_hairpin`
-- `linear_duplex`
+The render handoff stays inside the same run directory: Cruncher publishes `views/`, emits sibling
+`baserender_jobs/`, and BaseRender writes PDFs to sibling `renders/`.
 
 See [`../reference/cassette_artifacts.md`](../reference/cassette_artifacts.md) for file-by-file semantics.
 
@@ -200,3 +213,4 @@ Common fail-fast cases:
 When no valid pair exists, Cruncher reports explicit issue codes such as `RIGHT_WINDOW_NO_MATCH`,
 `TARGET_STRAND_MISMATCH`, `RIGHT_SITE_NOT_IN_RIGHT_STEM`, `EXTRA_DESIGNATED_STRAND_NICKS_FOUND`,
 or `UNSAT_BY_MIRROR_SYMMETRY`. There is no fallback to `sample`.
+Unsatisfied runs still publish the report/status/provenance bundle, but they do not fabricate view contracts or baserender jobs when no truthful candidate exists.

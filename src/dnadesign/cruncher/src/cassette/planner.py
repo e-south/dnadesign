@@ -251,38 +251,6 @@ def _catalog_variants_for_report(
     ]
 
 
-def _build_render_contract(candidate: CassetteCandidateDesign, *, spec: NormalizedCassetteSpec) -> dict[str, object]:
-    return {
-        "schema_version": 2,
-        "workflow": "cassette",
-        "coordinate_semantics": spec.coordinate_semantics,
-        "views": {
-            "ssdna_hairpin": {
-                "sequence": candidate.cassette_sequence,
-                "stem5p_span": candidate.stem5p_span.model_dump(mode="json"),
-                "loop_span": candidate.loop_span.model_dump(mode="json"),
-                "stem3p_span": candidate.stem3p_span.model_dump(mode="json"),
-                "pair_map": [pair.model_dump(mode="json") for pair in candidate.pair_map],
-            },
-            "linear_duplex": {
-                "primary_sequence": candidate.evaluation_primary_sequence,
-                "complement_sequence": candidate.evaluation_complement_sequence,
-                "target_strand": candidate.target_strand,
-                "context_offset": candidate.context_offset,
-                "cassette_offsets": {
-                    "cassette_start": candidate.context_offset,
-                    "cassette_end": candidate.context_offset + candidate.cassette_length_nt,
-                },
-                "intended_left_site": candidate.intended_left_site.model_dump(mode="json"),
-                "intended_right_site": candidate.intended_right_site.model_dump(mode="json"),
-                "intended_left_nick": candidate.intended_left_nick.model_dump(mode="json"),
-                "intended_right_nick": candidate.intended_right_nick.model_dump(mode="json"),
-                "bounded_nicked_segment": candidate.bounded_nicked_segment.model_dump(mode="json"),
-            },
-        },
-    }
-
-
 def _markdown_report(report: CassetteEvaluationReport) -> str:
     lines = [
         f"# Cassette Report: {report.spec_name}",
@@ -386,8 +354,6 @@ def build_cassette_report(
         issues.extend(right_issues)
 
     candidate: CassetteCandidateDesign | None = None
-    render_contract: dict[str, object] | None = None
-
     if not issues and left_match is not None and right_match is not None:
         if left_match.nick.boundary >= right_match.nick.boundary:
             issues.append(
@@ -462,7 +428,6 @@ def build_cassette_report(
                     ),
                     pair_map=normalized.topology.pair_map,
                 )
-                render_contract = _build_render_contract(candidate, spec=normalized)
 
     warnings: list[str] = []
     if normalized.schema_version == 1:
@@ -487,7 +452,6 @@ def build_cassette_report(
         ),
         issues=issues,
         candidate=candidate,
-        render_contract=render_contract,
     )
 
 
