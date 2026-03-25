@@ -15,13 +15,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from dnadesign._contracts import (
-    load_construct_config_mapping,
-    resolve_construct_workspace_project_id_from_config,
-    resolve_construct_workspace_root_from_config,
-)
+from dnadesign.construct.contracts import resolve_construct_run_id_from_config
 
 from ..errors import NotifyConfigError
+from ..profiles.profile_paths import resolve_resolver_mode_profile_path
 
 
 @dataclass(frozen=True)
@@ -38,38 +35,9 @@ def _resolve_resolver_mode_run_id(*, tool_name: str, config_path: Path) -> str |
     if tool_name != "construct":
         return None
     try:
-        _resolved_config_path, payload = load_construct_config_mapping(config_path)
+        return resolve_construct_run_id_from_config(config_path)
     except ValueError as exc:
         raise NotifyConfigError(str(exc)) from exc
-    job_raw = payload.get("job")
-    if not isinstance(job_raw, dict):
-        raise NotifyConfigError(f"construct config missing job mapping: {config_path}")
-    job_id = str(job_raw.get("id") or "").strip()
-    if not job_id:
-        raise NotifyConfigError(f"construct config missing job.id: {config_path}")
-    return f"construct-{job_id}"
-
-
-def _resolve_resolver_mode_profile_path(
-    *,
-    tool_name: str,
-    config_path: Path,
-    default_profile_path_for_tool: Callable[[str | None], Path],
-) -> Path:
-    workspace_root = config_path.parent
-    if tool_name != "construct":
-        return workspace_root / default_profile_path_for_tool(tool_name)
-    try:
-        resolved_workspace_root = resolve_construct_workspace_root_from_config(config_path)
-        project_id = resolve_construct_workspace_project_id_from_config(config_path)
-    except ValueError as exc:
-        raise NotifyConfigError(str(exc)) from exc
-    if resolved_workspace_root is not None:
-        workspace_root = resolved_workspace_root
-    default_path = workspace_root / default_profile_path_for_tool(tool_name)
-    if project_id is None:
-        return default_path
-    return workspace_root / "outputs" / "notify" / "construct" / project_id / "profile.json"
 
 
 def resolve_profile_run_id(
@@ -97,7 +65,6 @@ def resolve_watch_mode(
     normalize_tool_name: Callable[[str | None], str | None],
     resolve_tool_events_path: Callable[..., tuple[Path, str | None]],
     resolve_tool_workspace_config: Callable[..., Path],
-    default_profile_path_for_tool: Callable[[str | None], Path],
 ) -> WatchResolverMode:
     tool_value_for_events = tool
     tool_name_for_config_mode: str | None = None
@@ -125,10 +92,9 @@ def resolve_watch_mode(
             config_path = config_path.expanduser().resolve()
             setup_hint = f"uv run notify setup slack --tool {tool_name} --workspace {workspace_name}"
         events_path_from_cli_tool_config, _default_policy = resolve_tool_events_path(tool=tool_name, config=config_path)
-        auto_profile_path = _resolve_resolver_mode_profile_path(
+        auto_profile_path = resolve_resolver_mode_profile_path(
             tool_name=tool_name,
             config_path=config_path,
-            default_profile_path_for_tool=default_profile_path_for_tool,
         ).resolve()
         if not auto_profile_path.exists():
             raise NotifyConfigError(

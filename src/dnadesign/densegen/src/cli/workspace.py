@@ -21,7 +21,7 @@ from typing import Callable, Optional
 import typer
 import yaml
 
-from dnadesign.usr_roots import normalize_usr_root, resolve_usr_root_from_config, resolve_usr_root_from_env
+from dnadesign.usr.roots import normalize_usr_root, resolve_usr_root_from_config, resolve_usr_root_from_env
 
 from ..config import LATEST_SCHEMA_VERSION, resolve_relative_path
 from .context import CliContext

@@ -18,7 +18,7 @@ from typing import Dict, List, Tuple
 
 import torch
 
-from dnadesign.usr_roots import normalize_usr_root, resolve_usr_root_from_env
+from dnadesign.usr.roots import normalize_usr_root, resolve_usr_root_from_env
 
 from .._logging import get_logger
 from ..errors import ValidationError

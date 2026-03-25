@@ -53,6 +53,11 @@ Planning those presets on this node requires the same webhook secret-file
 surface DenseGen already uses. Export `NOTIFY_WEBHOOK_FILE` or materialize a
 profile with `webhook.source=secret_ref` before submit.
 
+For this workspace, use `--config` per lane for Notify setup/watch. Do not use
+`--workspace study_stress_ethanol_cipro` for Notify because the workspace
+default `config.yaml` points at a multi-destination full-lane config, which is
+intentionally ambiguous for a single USR event stream.
+
 Recommended Infer Notify bootstrap for the real study:
 
 ```bash
@@ -60,14 +65,12 @@ export NOTIFY_WEBHOOK_FILE=/abs/path/to/study_stress_ethanol_cipro.webhook
 export SSL_CERT_FILE=/abs/path/to/ca-bundle.pem
 
 uv run notify setup slack \
-  --profile src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_7b/profile.json \
   --tool infer \
   --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml \
   --secret-source file \
   --secret-ref "file://$NOTIFY_WEBHOOK_FILE"
 
 uv run notify setup slack \
-  --profile src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_plus_template_7b/profile.json \
   --tool infer \
   --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml \
   --secret-source file \

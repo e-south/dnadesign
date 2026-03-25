@@ -17,11 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Sequence
 
-from dnadesign._contracts import (
-    ResumeReadinessPolicy,
-    resolve_densegen_usr_output_contract,
-    resolve_resume_readiness_policy,
-)
+from dnadesign.densegen.contracts import resolve_densegen_usr_output_contract
+from dnadesign.ops.contracts import ResumeReadinessPolicy, resolve_resume_readiness_policy
 
 from ..runbooks.schema import OrchestrationRunbookV1
 from .mode_tools import InferModeProbeError, resolve_mode_tool_adapter

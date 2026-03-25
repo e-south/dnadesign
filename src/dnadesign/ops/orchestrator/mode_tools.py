@@ -15,7 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal
 
-from dnadesign._contracts import resolve_densegen_usr_output_contract, resolve_usr_producer_contract
+from dnadesign.densegen.contracts import resolve_densegen_usr_output_contract
+from dnadesign.ops.contracts import resolve_usr_producer_contract
 
 from ..runbooks.schema import OrchestrationRunbookV1
 from .workflow_tools import (

@@ -53,6 +53,41 @@ def test_resolve_profile_path_for_setup_anchors_default_to_config_directory(tmp_
     assert resolved == config_path.parent / "outputs" / "notify" / "densegen" / "profile.json"
 
 
+def test_resolve_profile_path_for_setup_namespaces_infer_lane_configs(tmp_path: Path) -> None:
+    config_path = tmp_path / "workspaces" / "infer_demo" / "config.anchor_only.evo2_7b.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "model:",
+                "  id: evo2_7b",
+                "  device: cuda:0",
+                "jobs:",
+                "  - id: anchor_only_7b_features",
+                "    operation: extract",
+                "    ingest:",
+                "      source: usr",
+                "      dataset: promoter/demo_anchor_set",
+                "      root: ../../../usr/datasets",
+                "      field: sequence",
+                "    io:",
+                "      write_back: true",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    resolved = resolve_profile_path_for_setup(
+        profile=Path("outputs/notify/generic/profile.json"),
+        tool_name="infer",
+        policy=None,
+        config=config_path,
+    )
+
+    assert resolved == config_path.parent / "outputs" / "notify" / "infer" / "anchor_only_7b" / "profile.json"
+
+
 def test_resolve_profile_path_for_setup_namespaces_construct_multi_project_profiles(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "construct_workspace"
     config_path = workspace_dir / "config.slot_a.window.yaml"
@@ -66,7 +101,13 @@ def test_resolve_profile_path_for_setup_namespaces_construct_multi_project_profi
                 "  profile: blank",
                 "  projects:",
                 "    - id: slot_a_window",
-                "      config: config.slot_a.window.yaml",
+                "      artifacts:",
+                "        config:",
+                "          path: config.slot_a.window.yaml",
+                "          job_id: slot_a_job",
+                "      contract:",
+                "        input_dataset: anchors_demo",
+                "        output_dataset: construct_demo",
             ]
         )
         + "\n",
@@ -96,7 +137,13 @@ def test_resolve_profile_path_for_setup_anchors_nested_construct_configs_to_work
                 "  profile: blank",
                 "  projects:",
                 "    - id: slot_a_window",
-                "      config: configs/slot_a/config.yaml",
+                "      artifacts:",
+                "        config:",
+                "          path: configs/slot_a/config.yaml",
+                "          job_id: slot_a_job",
+                "      contract:",
+                "        input_dataset: anchors_demo",
+                "        output_dataset: construct_demo",
             ]
         )
         + "\n",

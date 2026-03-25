@@ -1,17 +1,17 @@
 job:
-  id: anchor_template_slot_a_window_1kb
+  id: stress_ethanol_cipro_pdual10_forward_anchor_window_1kb
   input:
     source:
       kind: usr
-      dataset: anchor_parts_demo
-      root: outputs/usr_datasets
+      dataset: promoter/stress_ethanol_cipro_anchor_set
+      root: ../../../usr/datasets
     field: sequence
   template:
-    id: template_backbone_dual_slot
+    id: pdual10_forward_anchor_window
     source:
       kind: usr
-      dataset: template_parts_demo
-      root: outputs/usr_datasets
+      dataset: plasmids
+      root: ../../../usr/datasets
       record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
       field: sequence
     circular: true
@@ -26,10 +26,13 @@ job:
         orientation: forward
         locator:
           kind: coordinates
-          start: 2300
-          end: 2335
+          start: 3574
+          end: 3666
         guards:
-          replaced_sequence: tttacggctagctcagtcctaggtactatgctagc
+          replaced_sequence: TGGCGCCGGTGATGCCGGCCACGATGCGTCCGGCGTAGAGGATCGAGTTTACGGCTAGCTCAGTCCTAGGTACTATGCTAGCACCTCGAGGG
+          upstream_sequence: CGCCAGCAACCGGGATCC
+          downstream_sequence: GAATTCGCCAGCTGTCACCGGA
+          require_unique_forward_matches: true
   realize:
     mode: window
     focal_part: anchor
@@ -42,5 +45,5 @@ job:
   output:
     target:
       kind: usr
-      dataset: anchor_template_shared_dataset_demo
-      root: outputs/usr_datasets
+      dataset: promoter/stress_ethanol_cipro_construct_contexts
+      root: ../../../usr/datasets

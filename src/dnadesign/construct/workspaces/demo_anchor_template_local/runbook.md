@@ -84,11 +84,11 @@ uv run construct run --config "$PWD/config.slot_a.full.yaml" --dry-run # Preview
 - Target the second incumbent location:
   - swap `slot_a` for `slot_b`
 - Write to a shared USR root instead of the workspace-local one:
-  - edit the config `root:` fields intentionally
+  - edit the config `input.source.root`, `template.source.root`, and `output.target.root` fields intentionally
   - re-run `uv run construct workspace show --workspace .`
   - re-run `validate --runtime` before `run`
 - Accumulate multiple construct jobs into one existing output dataset:
-  - point multiple configs at the same `output.dataset`
+  - point multiple configs at the same `output.target.dataset`
   - keep `output.on_conflict=error` for fail-fast collision detection
   - use `output.on_conflict=ignore` only when idempotent reruns are intentional
 

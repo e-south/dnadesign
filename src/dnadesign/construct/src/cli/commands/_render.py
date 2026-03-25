@@ -17,13 +17,41 @@ import typer
 
 from ...config import JobConfig
 from ...runtime import PreflightResult, RunResult
+from ._format import echo_json
 
 
-def echo_validate_result(*, config_path: Path, loaded: JobConfig, preflight: PreflightResult | None) -> None:
+def validate_result_payload(
+    *,
+    config_path: Path,
+    loaded: JobConfig,
+    preflight: PreflightResult | None,
+) -> dict[str, object]:
+    return {
+        "status": "ok",
+        "config_path": config_path,
+        "job": {
+            "id": loaded.job.id,
+            "input_dataset": loaded.job.input.source.dataset,
+            "output_dataset": loaded.job.output.target.dataset,
+        },
+        "runtime_preflight": preflight,
+    }
+
+
+def echo_validate_result(
+    *,
+    config_path: Path,
+    loaded: JobConfig,
+    preflight: PreflightResult | None,
+    output_format: str = "text",
+) -> None:
+    if output_format == "json":
+        echo_json(validate_result_payload(config_path=config_path, loaded=loaded, preflight=preflight))
+        return
     typer.echo(f"Config OK: {config_path}")
     typer.echo(f"job_id: {loaded.job.id}")
-    typer.echo(f"input_dataset: {loaded.job.input.dataset}")
-    typer.echo(f"output_dataset: {loaded.job.output.dataset}")
+    typer.echo(f"input_dataset: {loaded.job.input.source.dataset}")
+    typer.echo(f"output_dataset: {loaded.job.output.target.dataset}")
     if preflight is None:
         return
     typer.echo(f"input_root: {preflight.input_root}")
@@ -66,8 +94,21 @@ def echo_validate_result(*, config_path: Path, loaded: JobConfig, preflight: Pre
             f"kind={placement.placement_kind} "
             f"template_start={placement.template_start} "
             f"template_end={placement.template_end} "
+            f"template_span_bp={placement.template_span_bp} "
             f"orientation={placement.orientation} "
-            f"expected_template_sequence={placement.expected_template_sequence or ''}"
+            f"locator_kind={placement.locator_kind} "
+            f"locator_upstream_sequence={placement.locator_upstream_sequence or ''} "
+            f"locator_downstream_sequence={placement.locator_downstream_sequence or ''} "
+            f"guard_mode={placement.guard_mode} "
+            f"guard_require_unique_forward_matches={str(placement.guard_require_unique_forward_matches).lower()} "
+            "guard_replaced_span_bp="
+            f"{placement.guard_replaced_span_bp if placement.guard_replaced_span_bp is not None else ''} "
+            f"template_sequence={placement.template_sequence} "
+            f"guard_replaced_sequence={placement.guard_replaced_sequence or ''} "
+            f"guard_upstream_sequence={placement.guard_upstream_sequence or ''} "
+            f"observed_guard_upstream_sequence={placement.observed_guard_upstream_sequence or ''} "
+            f"guard_downstream_sequence={placement.guard_downstream_sequence or ''} "
+            f"observed_guard_downstream_sequence={placement.observed_guard_downstream_sequence or ''}"
         )
     typer.echo(f"rows_total: {preflight.records_total}")
     for row in preflight.planned_rows:
@@ -82,7 +123,17 @@ def echo_validate_result(*, config_path: Path, loaded: JobConfig, preflight: Pre
         )
 
 
-def echo_run_result(result: RunResult) -> None:
+def run_result_payload(result: RunResult) -> dict[str, object]:
+    return {
+        "status": "ok",
+        "run": result,
+    }
+
+
+def echo_run_result(result: RunResult, *, output_format: str = "text") -> None:
+    if output_format == "json":
+        echo_json(run_result_payload(result))
+        return
     if result.dry_run:
         typer.echo(
             "Config validated (dry run): "

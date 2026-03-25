@@ -19,6 +19,8 @@ from types import SimpleNamespace as NS
 
 import typer
 
+from ..roots import default_usr_root as _default_usr_root_impl
+from ..roots import normalize_usr_root as _normalize_usr_root_impl
 from .cli_bindings import build_cli_bindings
 from .cli_commands import datasets as dataset_commands
 from .cli_commands import deps as deps_commands
@@ -65,8 +67,6 @@ from .merge_datasets import (
 )
 from .mock import add_demo_columns, create_mock_dataset
 from .registry import load_registry, parse_columns_spec, register_namespace
-from .roots import default_usr_root as _default_usr_root_impl
-from .roots import normalize_usr_root as _normalize_usr_root_impl
 
 # Compatibility exports kept for existing monkeypatch-based tests.
 shutil = remotes_commands.shutil

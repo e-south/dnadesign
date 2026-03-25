@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign._contracts.notify_webhook_profile import (
+from dnadesign.notify.contracts import (
     parse_notify_profile_webhook,
     resolve_file_secret_ref_path,
 )

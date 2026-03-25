@@ -49,7 +49,7 @@ dataset while keeping `plasmids` as the pDual-backed template dataset.
 - If upstream records live in multiple USR datasets and must be unified before construct, do that explicitly with `uv run usr maintenance merge ...`; do not hide multi-source consolidation inside one construct config.
 - Use `uv run usr maintenance merge ... --carry-namespace <namespace>` when one compact, `id`-keyed overlay namespace such as `usr_label` must survive consolidation onto rows that actually survive the merge.
 - Plain `uv run usr maintenance merge ...` still rewrites canonical base rows only. For namespaces that are not `id`-keyed or not yet compact, materialize or reattach them explicitly instead of expecting implicit carry-through.
-- If multiple construct projects should accumulate into one semantic output dataset, keep each project auditable and point them at the same `output.dataset`.
+- If multiple construct projects should accumulate into one semantic output dataset, keep each project auditable and point them at the same `output.target.dataset`.
 - Start with `output.on_conflict=error` for fail-fast duplicate detection. Use `ignore` only for intentional idempotent reruns.
 
 ## Ordered procedure
@@ -113,7 +113,7 @@ Expected outcome:
 ### 4) Scale the same pattern to more sources or templates
 
 - represent each additional template or slot as another `construct.workspace.yaml` project
-- point multiple projects at the same `output.dataset` only when one semantic shared dataset is intentional
+- point multiple projects at the same `output.target.dataset` only when one semantic shared dataset is intentional
 - the packaged `anchor-template-shared-dataset-demo` profile is the turnkey two-project accumulation preset; use it as the tracer bullet before widening the matrix
 - if multiple upstream USR datasets must be consolidated first, run `uv run usr maintenance merge ... --carry-namespace usr_label` when the upstream label overlay is compact and `id`-keyed; otherwise materialize or reattach the needed namespace explicitly before construct
 - rerun `construct workspace validate-project --runtime` for every project before `run-project`

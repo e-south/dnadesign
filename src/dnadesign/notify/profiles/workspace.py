@@ -16,10 +16,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
-
-from dnadesign._contracts import (
-    list_construct_workspaces_from_root,
+from dnadesign.construct.contracts import (
+    list_construct_workspace_selectors,
+    list_construct_workspace_selectors_from_root,
     resolve_construct_workspace_config_path_from_root,
 )
 
@@ -238,43 +237,12 @@ def _resolve_construct_config_from_known_roots(workspace_name: str, repo_root: P
     return (search_root / workspace_id / "construct.workspace.yaml").resolve()
 
 
-def _construct_workspace_selectors(workspace_dir: Path) -> list[str]:
-    registry_path = workspace_dir / "construct.workspace.yaml"
-    if not registry_path.exists() or not registry_path.is_file():
-        return []
-    try:
-        payload = yaml.safe_load(registry_path.read_text(encoding="utf-8")) or {}
-    except Exception:
-        return []
-    workspace_cfg = payload.get("workspace")
-    if not isinstance(workspace_cfg, dict):
-        return []
-    projects = workspace_cfg.get("projects")
-    if not isinstance(projects, list):
-        return []
-    project_ids = [
-        str(project.get("id") or "").strip()
-        for project in projects
-        if isinstance(project, dict) and str(project.get("id") or "").strip()
-    ]
-    if len(project_ids) <= 1:
-        return [workspace_dir.name]
-    return [f"{workspace_dir.name}:{project_id}" for project_id in project_ids]
-
-
-def _list_construct_workspace_selectors_from_root(root: Path) -> list[str]:
-    selectors: list[str] = []
-    for workspace_name in list_construct_workspaces_from_root(root):
-        selectors.extend(_construct_workspace_selectors(root / workspace_name))
-    return selectors
-
-
 def _list_construct_workspace_names(repo_root: Path | None, search_root: Path) -> list[str]:
     names: list[str] = []
     if (search_root / "construct.workspace.yaml").exists():
-        names.extend(_construct_workspace_selectors(search_root))
+        names.extend(list_construct_workspace_selectors(search_root))
     for root in _construct_workspace_roots(repo_root, search_root):
-        names.extend(_list_construct_workspace_selectors_from_root(root))
+        names.extend(list_construct_workspace_selectors_from_root(root))
     return sorted(dict.fromkeys(names))
 
 

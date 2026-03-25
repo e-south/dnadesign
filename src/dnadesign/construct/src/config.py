@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import Annotated, List, Literal, Optional
 
 import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -25,12 +25,40 @@ class StrictConfigModel(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-class InputConfig(StrictConfigModel):
-    source: Literal["usr"]
+class USRDatasetLocatorConfig(StrictConfigModel):
+    kind: Literal["usr"]
     dataset: str
     root: Optional[str] = None
+
+    @field_validator("dataset")
+    @classmethod
+    def _dataset_not_blank(cls, value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("USR dataset locator dataset cannot be empty.")
+        return text
+
+
+class InputConfig(StrictConfigModel):
+    source: USRDatasetLocatorConfig
     field: str = "sequence"
     ids: Optional[List[str]] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_legacy_shape(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        legacy_fields = [field for field in ("dataset", "root") if field in data]
+        if isinstance(data.get("source"), str):
+            legacy_fields.append("source")
+        if legacy_fields:
+            joined = ", ".join(f"input.{field}" for field in legacy_fields)
+            raise ValueError(
+                f"{joined} is no longer supported. Use input.source.kind, "
+                "input.source.dataset, and input.source.root instead."
+            )
+        return data
 
     @field_validator("field")
     @classmethod
@@ -41,66 +69,119 @@ class InputConfig(StrictConfigModel):
         return text
 
 
-class TemplateConfig(StrictConfigModel):
-    id: str
-    kind: Optional[Literal["literal", "path", "usr"]] = None
-    sequence: Optional[str] = None
-    path: Optional[str] = None
-    dataset: Optional[str] = None
-    root: Optional[str] = None
-    record_id: Optional[str] = None
-    field: str = "sequence"
-    circular: bool = False
-    source: Optional[str] = None
+class TemplateLiteralSourceConfig(StrictConfigModel):
+    kind: Literal["literal"]
+    sequence: str
+    label: Optional[str] = None
 
-    @field_validator("id", "field")
+    @field_validator("sequence")
+    @classmethod
+    def _sequence_not_blank(cls, value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("template.source.sequence cannot be empty when kind='literal'.")
+        return text
+
+    @field_validator("label")
+    @classmethod
+    def _label_not_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("template.source.label cannot be empty when provided.")
+        return text
+
+
+class TemplatePathSourceConfig(StrictConfigModel):
+    kind: Literal["path"]
+    path: str
+    label: Optional[str] = None
+
+    @field_validator("path")
+    @classmethod
+    def _path_not_blank(cls, value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("template.source.path cannot be empty when kind='path'.")
+        return text
+
+    @field_validator("label")
+    @classmethod
+    def _label_not_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("template.source.label cannot be empty when provided.")
+        return text
+
+
+class TemplateUSRSourceConfig(StrictConfigModel):
+    kind: Literal["usr"]
+    dataset: str
+    root: Optional[str] = None
+    record_id: str
+    field: str = "sequence"
+    label: Optional[str] = None
+
+    @field_validator("dataset", "record_id", "field")
     @classmethod
     def _not_blank(cls, value: str) -> str:
         text = str(value or "").strip()
         if not text:
-            raise ValueError("template.id and template.field cannot be empty.")
+            raise ValueError("template.source.dataset, record_id, and field cannot be empty.")
         return text
 
-    @model_validator(mode="after")
-    def _validate_source(self) -> "TemplateConfig":
-        has_sequence = self.sequence is not None
-        has_path = self.path is not None
-        has_usr = bool(str(self.dataset or "").strip()) or bool(str(self.record_id or "").strip())
+    @field_validator("label")
+    @classmethod
+    def _label_not_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("template.source.label cannot be empty when provided.")
+        return text
 
-        if self.kind is None:
-            selected = [has_sequence, has_path, has_usr]
-            if sum(1 for item in selected if item) != 1:
-                raise ValueError(
-                    "template must define exactly one source: template.sequence, template.path, "
-                    "or template.dataset + template.record_id."
-                )
-            if has_sequence:
-                self.kind = "literal"
-            elif has_path:
-                self.kind = "path"
-            else:
-                self.kind = "usr"
 
-        if self.kind == "literal":
-            if not has_sequence or has_path or has_usr:
-                raise ValueError(
-                    "template.kind='literal' requires template.sequence and disallows template.path/template.dataset."
-                )
-        elif self.kind == "path":
-            if not has_path or has_sequence or has_usr:
-                raise ValueError(
-                    "template.kind='path' requires template.path and disallows template.sequence/template.dataset."
-                )
-        elif self.kind == "usr":
-            if has_sequence or has_path:
-                raise ValueError("template.kind='usr' disallows template.sequence and template.path.")
-            if not str(self.dataset or "").strip():
-                raise ValueError("template.dataset is required when template.kind='usr'.")
-            if not str(self.record_id or "").strip():
-                raise ValueError("template.record_id is required when template.kind='usr'.")
-        else:
-            raise ValueError("template.kind must be one of: literal, path, usr.")
-        return self
+TemplateSourceConfig = Annotated[
+    TemplateLiteralSourceConfig | TemplatePathSourceConfig | TemplateUSRSourceConfig,
+    Field(discriminator="kind"),
+]
+
+
+class TemplateConfig(StrictConfigModel):
+    id: str
+    source: TemplateSourceConfig
+    circular: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_legacy_shape(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        legacy_fields = [
+            field
+            for field in ("kind", "sequence", "path", "dataset", "root", "record_id", "field")
+            if field in data
+        ]
+        if isinstance(data.get("source"), str):
+            legacy_fields.append("source")
+        if legacy_fields:
+            joined = ", ".join(f"template.{field}" for field in legacy_fields)
+            raise ValueError(
+                f"{joined} is no longer supported. Move template locator fields under template.source.* "
+                "and keep any human-readable provenance text in template.source.label."
+            )
+        return data
+
+    @field_validator("id")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("template.id cannot be empty.")
+        return text
 
 
 class PartSequenceConfig(StrictConfigModel):
@@ -123,23 +204,100 @@ class PartSequenceConfig(StrictConfigModel):
         return self
 
 
-class PlacementConfig(StrictConfigModel):
-    kind: Literal["insert", "replace"]
+class CoordinatePlacementLocatorConfig(StrictConfigModel):
+    kind: Literal["coordinates"]
     start: int = Field(ge=0)
     end: int = Field(ge=0)
-    orientation: Literal["forward", "reverse_complement"] = "forward"
-    expected_template_sequence: Optional[str] = None
+
+
+class FlankPlacementLocatorConfig(StrictConfigModel):
+    kind: Literal["flanks"]
+    upstream_sequence: str
+    downstream_sequence: str
+
+    @field_validator("upstream_sequence", "downstream_sequence")
+    @classmethod
+    def _sequence_not_blank(cls, value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("placement.locator flank sequences cannot be empty.")
+        return text
+
+
+PlacementLocatorConfig = Annotated[
+    CoordinatePlacementLocatorConfig | FlankPlacementLocatorConfig,
+    Field(discriminator="kind"),
+]
+
+
+class PlacementGuardsConfig(StrictConfigModel):
+    replaced_sequence: Optional[str] = None
+    upstream_sequence: Optional[str] = None
+    downstream_sequence: Optional[str] = None
+    replaced_span_bp: Optional[int] = Field(default=None, ge=0)
+    require_unique_forward_matches: bool = False
+
+    @field_validator("replaced_sequence", "upstream_sequence", "downstream_sequence")
+    @classmethod
+    def _optional_sequence_not_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("placement.guards sequences cannot be empty when provided.")
+        return text
 
     @model_validator(mode="after")
-    def _validate_bounds(self) -> "PlacementConfig":
-        if self.end < self.start:
-            raise ValueError("placement.end must be >= placement.start.")
-        if self.kind == "insert" and self.end != self.start:
-            raise ValueError("insert placement requires placement.end == placement.start.")
-        if self.kind == "replace" and self.end == self.start:
-            raise ValueError("replace placement requires placement.end > placement.start.")
-        if self.kind == "insert" and self.expected_template_sequence is not None:
-            raise ValueError("placement.expected_template_sequence is only allowed when kind='replace'.")
+    def _validate_meaningful_guard(self) -> "PlacementGuardsConfig":
+        has_guard = any(
+            value is not None
+            for value in (
+                self.replaced_sequence,
+                self.upstream_sequence,
+                self.downstream_sequence,
+                self.replaced_span_bp,
+            )
+        )
+        if self.require_unique_forward_matches and not any(
+            value is not None for value in (self.replaced_sequence, self.upstream_sequence, self.downstream_sequence)
+        ):
+            raise ValueError(
+                "placement.guards.require_unique_forward_matches requires at least one guard sequence."
+            )
+        if not has_guard and not self.require_unique_forward_matches:
+            raise ValueError("placement.guards must declare at least one guard.")
+        return self
+
+
+class PlacementConfig(StrictConfigModel):
+    kind: Literal["insert", "replace"]
+    orientation: Literal["forward", "reverse_complement"] = "forward"
+    locator: PlacementLocatorConfig
+    guards: Optional[PlacementGuardsConfig] = None
+
+    @model_validator(mode="after")
+    def _validate_shape(self) -> "PlacementConfig":
+        if isinstance(self.locator, CoordinatePlacementLocatorConfig):
+            if self.locator.end < self.locator.start:
+                raise ValueError("placement.locator.end must be >= placement.locator.start.")
+            if self.kind == "insert" and self.locator.end != self.locator.start:
+                raise ValueError(
+                    "insert placement requires placement.locator.end == placement.locator.start "
+                    "when locator.kind='coordinates'."
+                )
+            if self.kind == "replace" and self.locator.end == self.locator.start:
+                raise ValueError(
+                    "replace placement requires placement.locator.end > placement.locator.start "
+                    "when locator.kind='coordinates'."
+                )
+        if self.kind == "insert" and self.guards is not None and self.guards.replaced_sequence is not None:
+            raise ValueError("placement.guards.replaced_sequence is only allowed when kind='replace'.")
+        if isinstance(self.locator, FlankPlacementLocatorConfig) and self.guards is not None:
+            if self.guards.upstream_sequence is not None or self.guards.downstream_sequence is not None:
+                raise ValueError(
+                    "placement.guards.upstream_sequence/downstream_sequence are not allowed when "
+                    "locator.kind='flanks'. Use placement.locator.upstream_sequence/downstream_sequence instead."
+                )
         return self
 
 
@@ -201,85 +359,68 @@ class WindowConfig(StrictConfigModel):
         return self
 
 
-def _normalized_realize_window(
-    *,
-    mode: Literal["window", "full_construct"],
-    window: WindowConfig | None,
-    focal_point: Literal["start", "center", "end"],
-    anchor_offset_bp: int,
-    window_bp: int | None,
-    explicit_fields: set[str],
-) -> WindowConfig | None:
-    uses_window_block = "window" in explicit_fields
-    uses_legacy_window_fields = bool({"focal_point", "anchor_offset_bp", "window_bp"} & explicit_fields)
-
-    if mode != "window":
-        if window is not None or window_bp is not None:
-            raise ValueError("realize.window and realize.window_bp are only allowed when realize.mode='window'.")
-        return window
-
-    if uses_window_block and uses_legacy_window_fields:
-        raise ValueError(
-            "Use either realize.window or the legacy realize.focal_point/window_bp/anchor_offset_bp fields, "
-            "not both in the same config."
-        )
-    if uses_window_block:
-        if window is None:
-            raise ValueError("realize.window must be a mapping when realize.mode='window'.")
-        return window
-    if window_bp is None:
-        raise ValueError(
-            "realize.window is required when realize.mode='window', or use the legacy "
-            "realize.window_bp compatibility fields."
-        )
-    return WindowConfig(
-        semantics="fixed_total",
-        reference=focal_point,
-        direction="symmetric",
-        size_bp=window_bp,
-        offset_bp=anchor_offset_bp,
-    )
-
-
 class RealizeConfig(StrictConfigModel):
     mode: Literal["window", "full_construct"] = "window"
     focal_part: Optional[str] = None
     window: Optional[WindowConfig] = None
-    focal_point: Literal["start", "center", "end"] = "center"
-    anchor_offset_bp: int = 0
-    window_bp: Optional[int] = Field(default=None, ge=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_legacy_window_fields(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        legacy_fields = [field for field in ("focal_point", "anchor_offset_bp", "window_bp") if field in data]
+        if legacy_fields:
+            joined = ", ".join(f"realize.{field}" for field in legacy_fields)
+            raise ValueError(
+                f"{joined} is no longer supported. Use realize.window.reference, "
+                "realize.window.offset_bp, and realize.window.size_bp instead."
+            )
+        if data.get("mode", "window") == "window" and "window" in data and data["window"] is None:
+            raise ValueError("realize.window must be a mapping when realize.mode='window'.")
+        return data
 
     @model_validator(mode="after")
     def _validate_mode(self) -> "RealizeConfig":
-        explicit_fields = set(self.model_fields_set)
-
         if self.mode == "window":
             if not str(self.focal_part or "").strip():
                 raise ValueError("realize.focal_part is required when realize.mode='window'.")
-        self.window = _normalized_realize_window(
-            mode=self.mode,
-            window=self.window,
-            focal_point=self.focal_point,
-            anchor_offset_bp=self.anchor_offset_bp,
-            window_bp=self.window_bp,
-            explicit_fields=explicit_fields,
-        )
+            if self.window is None:
+                raise ValueError("realize.window is required when realize.mode='window'.")
+            return self
+        if self.window is not None:
+            raise ValueError("realize.window is only allowed when realize.mode='window'.")
         return self
 
 
 class OutputConfig(StrictConfigModel):
-    dataset: str
-    root: Optional[str] = None
-    source: Optional[str] = None
+    target: USRDatasetLocatorConfig
+    record_source: Optional[str] = None
     on_conflict: Literal["error", "ignore"] = "error"
     allow_same_as_input: bool = False
 
-    @field_validator("dataset")
+    @model_validator(mode="before")
     @classmethod
-    def _dataset_not_blank(cls, value: str) -> str:
+    def _reject_legacy_shape(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        legacy_fields = [field for field in ("dataset", "root", "source") if field in data]
+        if legacy_fields:
+            joined = ", ".join(f"output.{field}" for field in legacy_fields)
+            raise ValueError(
+                f"{joined} is no longer supported. Use output.target.kind, output.target.dataset, "
+                "output.target.root, and output.record_source instead."
+            )
+        return data
+
+    @field_validator("record_source")
+    @classmethod
+    def _record_source_not_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         text = str(value or "").strip()
         if not text:
-            raise ValueError("output.dataset cannot be empty.")
+            raise ValueError("output.record_source cannot be empty when provided.")
         return text
 
 
@@ -295,8 +436,8 @@ class InnerJobConfig(StrictConfigModel):
     def _validate_parts(self) -> "InnerJobConfig":
         if not self.parts:
             raise ValueError("job.parts must define at least one part.")
-        if not str(self.input.root or "").strip():
-            raise ValueError("job.input.root is required for construct jobs that read USR datasets.")
+        if not str(self.input.source.root or "").strip():
+            raise ValueError("job.input.source.root is required for construct jobs that read USR datasets.")
         seen: set[str] = set()
         input_driven = 0
         for part in self.parts:

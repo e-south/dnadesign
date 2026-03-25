@@ -13,6 +13,8 @@
 - Inspect the project inventory before running anything:
   - `uv run construct workspace show --workspace .`
   - `uv run construct workspace doctor --workspace .`
+- Each project entry tracks a config artifact path plus expected `job.id`, so
+  registry drift fails before execution.
 - `shared_usr_root` is a repo-relative hint for an intentional shared mirror, not the default runtime root for this packaged workspace.
 - `workspace_usr_root` is the workspace-relative default used by the packaged configs and `runbook.sh`.
 - The workspace registry is [construct.workspace.yaml](construct.workspace.yaml).

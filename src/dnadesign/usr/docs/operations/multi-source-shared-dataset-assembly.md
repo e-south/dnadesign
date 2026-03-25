@@ -142,15 +142,15 @@ output_dataset = os.environ["DOWNSTREAM_DATASET"]
 for name in ("config.slot_a.window.yaml", "config.slot_b.window.yaml"):
     path = workspace_root / name
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    data["job"]["input"]["dataset"] = input_dataset
-    data["job"]["output"]["dataset"] = output_dataset
+    data["job"]["input"]["source"]["dataset"] = input_dataset
+    data["job"]["output"]["target"]["dataset"] = output_dataset
     path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
 
 registry_path = workspace_root / "construct.workspace.yaml"
 registry = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
 for project in registry["workspace"]["projects"]:
-    project["input_dataset"] = input_dataset
-    project["output_dataset"] = output_dataset
+    project["contract"]["input_dataset"] = input_dataset
+    project["contract"]["output_dataset"] = output_dataset
 registry_path.write_text(yaml.safe_dump(registry, sort_keys=False), encoding="utf-8")
 PY
 ```

@@ -14,8 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from dnadesign._contracts.notify_webhook_profile import parse_notify_profile_webhook
-
+from ...contracts import parse_notify_profile_webhook
 from ...errors import NotifyConfigError
 from ...events.source import normalize_tool_name
 from .contract import PROFILE_VERSION, WEBHOOK_SOURCES

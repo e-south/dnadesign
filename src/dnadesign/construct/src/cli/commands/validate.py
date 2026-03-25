@@ -18,6 +18,7 @@ import typer
 from ...api import load_job_config, preflight_from_config
 from ...errors import ConstructError
 from ._errors import exit_with_error
+from ._format import validate_output_format
 from ._render import echo_validate_result
 
 validate_app = typer.Typer(no_args_is_help=True, help="Validation commands for construct.")
@@ -31,15 +32,18 @@ def validate_config(
         "--runtime",
         help="Resolve template and input dataset, then report the planned runtime summary.",
     ),
+    output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
+    format_requested = str(output_format or "").strip().lower()
     try:
+        format_norm = validate_output_format(output_format)
         loaded, config_path = load_job_config(config)
     except (ConstructError, OSError) as exc:
-        exit_with_error(exc, code=1)
+        exit_with_error(exc, code=1, output_format=format_requested)
     preflight = None
     if runtime:
         try:
             preflight = preflight_from_config(config)
         except (ConstructError, OSError) as exc:
-            exit_with_error(exc, code=1)
-    echo_validate_result(config_path=config_path, loaded=loaded, preflight=preflight)
+            exit_with_error(exc, code=1, output_format=format_norm)
+    echo_validate_result(config_path=config_path, loaded=loaded, preflight=preflight, output_format=format_norm)

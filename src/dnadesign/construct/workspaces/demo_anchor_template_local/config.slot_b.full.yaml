@@ -1,17 +1,19 @@
 job:
   id: anchor_template_slot_b_full_context
   input:
-    source: usr
-    dataset: anchor_parts_demo
-    root: outputs/usr_datasets
+    source:
+      kind: usr
+      dataset: anchor_parts_demo
+      root: outputs/usr_datasets
     field: sequence
   template:
     id: template_backbone_dual_slot
-    kind: usr
-    dataset: template_parts_demo
-    root: outputs/usr_datasets
-    record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
-    field: sequence
+    source:
+      kind: usr
+      dataset: template_parts_demo
+      root: outputs/usr_datasets
+      record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+      field: sequence
     circular: true
   parts:
     - name: anchor
@@ -21,12 +23,17 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 3621
-        end: 3656
         orientation: forward
-        expected_template_sequence: tttacggctagctcagtcctaggtactatgctagc
+        locator:
+          kind: coordinates
+          start: 3621
+          end: 3656
+        guards:
+          replaced_sequence: tttacggctagctcagtcctaggtactatgctagc
   realize:
     mode: full_construct
   output:
-    dataset: anchor_template_slot_b_full_context_demo
-    root: outputs/usr_datasets
+    target:
+      kind: usr
+      dataset: anchor_template_slot_b_full_context_demo
+      root: outputs/usr_datasets
