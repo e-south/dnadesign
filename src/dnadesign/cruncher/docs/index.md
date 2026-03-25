@@ -34,7 +34,9 @@ This index is a browsing map for Cruncher docs. Start with the package-level [Cr
 
 #### Design Dual-Context Cassettes
 - [Cassette Workflow](guides/cassette_workflow.md)
+- [Cassette Solve Workflow](guides/cassette_solve_workflow.md)
 - [Cassette Spec Reference](reference/cassette_spec.md)
+- [Cassette Solve Spec Reference](reference/cassette_solve_spec.md)
 - [Nickase Catalog Reference](reference/nickase_catalog.md)
 - [Cassette Artifacts](reference/cassette_artifacts.md)
 
@@ -79,6 +81,7 @@ This index is a browsing map for Cruncher docs. Start with the package-level [Cr
 
 ### Guides
 - [`guides/cassette_workflow.md`](guides/cassette_workflow.md)
+- [`guides/cassette_solve_workflow.md`](guides/cassette_solve_workflow.md)
 - [`guides/intent_and_lifecycle.md`](guides/intent_and_lifecycle.md)
 - [`guides/ingestion.md`](guides/ingestion.md)
 - [`guides/meme_suite.md`](guides/meme_suite.md)
@@ -95,6 +98,7 @@ This index is a browsing map for Cruncher docs. Start with the package-level [Cr
 - [`reference/architecture.md`](reference/architecture.md)
 - [`reference/artifacts.md`](reference/artifacts.md)
 - [`reference/cassette_spec.md`](reference/cassette_spec.md)
+- [`reference/cassette_solve_spec.md`](reference/cassette_solve_spec.md)
 - [`reference/nickase_catalog.md`](reference/nickase_catalog.md)
 - [`reference/cassette_artifacts.md`](reference/cassette_artifacts.md)
 - [`reference/glossary.md`](reference/glossary.md)

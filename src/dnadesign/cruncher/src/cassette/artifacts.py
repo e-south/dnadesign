@@ -18,8 +18,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
 from dnadesign.cruncher.cassette.models import CassetteEvaluationReport
+from dnadesign.cruncher.cassette.solve_models import SolveReport
 from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_path
 
 RUN_META_DIR = "meta"
@@ -33,8 +36,16 @@ def design_id(*, spec_bytes: bytes, catalog_bytes: bytes) -> str:
     return sha256_bytes(spec_bytes + b"\n" + catalog_bytes)[:12]
 
 
+def solve_id(*, spec_bytes: bytes, catalog_bytes: bytes) -> str:
+    return sha256_bytes(spec_bytes + b"\n" + catalog_bytes)[:12]
+
+
 def build_run_dir(*, workspace_root: Path, run_root: Path, spec_name: str, cassette_design_id: str) -> Path:
     return workspace_root / run_root / spec_name / cassette_design_id
+
+
+def build_solve_run_dir(*, workspace_root: Path, run_root: Path, cassette_solve_id: str) -> Path:
+    return workspace_root / run_root / cassette_solve_id
 
 
 def ensure_run_dirs(run_dir: Path) -> None:
@@ -42,6 +53,11 @@ def ensure_run_dirs(run_dir: Path) -> None:
     (run_dir / RUN_PROVENANCE_DIR).mkdir(parents=True, exist_ok=True)
     (run_dir / RUN_ANALYSIS_DIR / RUN_ANALYSIS_REPORTS_DIR).mkdir(parents=True, exist_ok=True)
     (run_dir / RUN_EXPORT_DIR).mkdir(parents=True, exist_ok=True)
+
+
+def ensure_solve_run_dirs(run_dir: Path) -> None:
+    (run_dir / "hits").mkdir(parents=True, exist_ok=True)
+    (run_dir / "specs").mkdir(parents=True, exist_ok=True)
 
 
 def cassette_manifest_path(run_dir: Path) -> Path:
@@ -76,6 +92,38 @@ def candidate_table_path(run_dir: Path) -> Path:
     return run_dir / RUN_EXPORT_DIR / "table__candidates.csv"
 
 
+def solve_report_json_path(run_dir: Path) -> Path:
+    return run_dir / "solve_report.json"
+
+
+def solve_report_md_path(run_dir: Path) -> Path:
+    return run_dir / "solve_report.md"
+
+
+def solve_manifest_path(run_dir: Path) -> Path:
+    return run_dir / "solve_manifest.json"
+
+
+def solve_status_path(run_dir: Path) -> Path:
+    return run_dir / "solve_status.json"
+
+
+def solve_hits_table_path(run_dir: Path) -> Path:
+    return run_dir / "table__hits.csv"
+
+
+def solve_input_spec_path(run_dir: Path) -> Path:
+    return run_dir / "specs" / "input_solve_spec.yaml"
+
+
+def solve_resolved_catalog_path(run_dir: Path) -> Path:
+    return run_dir / "specs" / "resolved_catalog.yaml"
+
+
+def solve_hit_dir(run_dir: Path, *, rank: int, hit_id: str) -> Path:
+    return run_dir / "hits" / f"{rank:03d}_{hit_id}"
+
+
 def build_manifest(
     *,
     run_dir: Path,
@@ -101,6 +149,8 @@ def build_manifest(
         "workspace_root": str(workspace_root.resolve()),
         "spec_name": report.spec_name,
         "status": report.status,
+        "spec_schema_version": report.metadata.spec_schema_version,
+        "coordinate_semantics": report.metadata.coordinate_semantics,
         "spec_path": str(spec_path.resolve()),
         "spec_sha256": sha256_path(spec_path),
         "catalog_path": str(catalog_path.resolve()),
@@ -123,6 +173,8 @@ def write_status(run_dir: Path, *, status: str, status_message: str, report: Cas
         "status_message": status_message,
         "run_dir": str(run_dir.resolve()),
         "spec_name": report.spec_name,
+        "spec_schema_version": report.metadata.spec_schema_version,
+        "coordinate_semantics": report.metadata.coordinate_semantics,
         "issue_count": len(report.issues),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -148,15 +200,15 @@ def write_candidate_table(run_dir: Path, report: CassetteEvaluationReport) -> No
         "spec_name",
         "status",
         "cassette_sequence",
-        "cassette_length",
-        "designated_strand",
-        "left_nickase",
-        "left_nick_coordinate",
-        "right_nickase",
-        "right_nick_coordinate",
-        "bounded_segment_start",
-        "bounded_segment_end",
-        "bounded_segment_length",
+        "cassette_length_nt",
+        "target_strand",
+        "intended_left_variant",
+        "intended_left_boundary",
+        "intended_right_variant",
+        "intended_right_boundary",
+        "bounded_nicked_segment_start",
+        "bounded_nicked_segment_end",
+        "bounded_nicked_segment_length",
     ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -168,15 +220,15 @@ def write_candidate_table(run_dir: Path, report: CassetteEvaluationReport) -> No
                 "spec_name": report.spec_name,
                 "status": report.status,
                 "cassette_sequence": report.candidate.cassette_sequence,
-                "cassette_length": report.candidate.cassette_length,
-                "designated_strand": report.designated_strand,
-                "left_nickase": report.candidate.left_nick.nickase,
-                "left_nick_coordinate": report.candidate.left_nick.nick_coordinate,
-                "right_nickase": report.candidate.right_nick.nickase,
-                "right_nick_coordinate": report.candidate.right_nick.nick_coordinate,
-                "bounded_segment_start": report.candidate.bounded_segment.start,
-                "bounded_segment_end": report.candidate.bounded_segment.end,
-                "bounded_segment_length": report.candidate.bounded_segment.length,
+                "cassette_length_nt": report.candidate.cassette_length_nt,
+                "target_strand": report.target_strand,
+                "intended_left_variant": report.candidate.intended_left_nick.variant_id,
+                "intended_left_boundary": report.candidate.intended_left_nick.boundary,
+                "intended_right_variant": report.candidate.intended_right_nick.variant_id,
+                "intended_right_boundary": report.candidate.intended_right_nick.boundary,
+                "bounded_nicked_segment_start": report.candidate.bounded_nicked_segment.start_boundary,
+                "bounded_nicked_segment_end": report.candidate.bounded_nicked_segment.end_boundary,
+                "bounded_nicked_segment_length": report.candidate.bounded_nicked_segment.length_nt,
             }
         )
 
@@ -193,3 +245,152 @@ def load_status(run_dir: Path) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"Missing cassette status: {path}")
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def write_solve_inputs(run_dir: Path, *, spec_path: Path | None, resolved_catalog_yaml: str | None = None) -> None:
+    if spec_path is not None and spec_path.exists():
+        shutil.copyfile(spec_path, solve_input_spec_path(run_dir))
+    if resolved_catalog_yaml is not None:
+        solve_resolved_catalog_path(run_dir).write_text(resolved_catalog_yaml, encoding="utf-8")
+
+
+def write_solve_report(run_dir: Path, report: SolveReport, *, markdown: str) -> None:
+    atomic_write_json(solve_report_json_path(run_dir), report.model_dump(mode="json"))
+    solve_report_md_path(run_dir).write_text(markdown, encoding="utf-8")
+
+
+def write_solve_hits_table(run_dir: Path, report: SolveReport) -> None:
+    fieldnames = [
+        "rank",
+        "score",
+        "hit_id",
+        "cassette_sequence",
+        "stem5p_arm",
+        "loop",
+        "left_variant_id",
+        "right_variant_id",
+        "left_nick_boundary",
+        "right_nick_boundary",
+        "target_strand",
+        "bounded_segment_length",
+        "extra_site_count",
+        "gc_fraction",
+    ]
+    with solve_hits_table_path(run_dir).open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for hit in report.hits:
+            writer.writerow(
+                {
+                    "rank": hit.rank,
+                    "score": json.dumps(hit.score),
+                    "hit_id": hit.hit_id,
+                    "cassette_sequence": hit.cassette_sequence,
+                    "stem5p_arm": hit.stem5p_arm,
+                    "loop": hit.loop,
+                    "left_variant_id": hit.left_variant_id,
+                    "right_variant_id": hit.right_variant_id,
+                    "left_nick_boundary": hit.left_nick_boundary,
+                    "right_nick_boundary": hit.right_nick_boundary,
+                    "target_strand": hit.target_strand,
+                    "bounded_segment_length": hit.bounded_segment_length,
+                    "extra_site_count": hit.extra_site_count,
+                    "gc_fraction": hit.gc_fraction,
+                }
+            )
+
+
+def build_solve_manifest(
+    *,
+    run_dir: Path,
+    workspace_root: Path,
+    spec_path: Path,
+    report: SolveReport,
+) -> dict[str, Any]:
+    artifacts = [
+        {"name": "solve_report_json", "path": "solve_report.json"},
+        {"name": "solve_report_md", "path": "solve_report.md"},
+        {"name": "solve_manifest", "path": "solve_manifest.json"},
+        {"name": "solve_status", "path": "solve_status.json"},
+    ]
+    if solve_hits_table_path(run_dir).exists():
+        artifacts.append({"name": "hit_table", "path": "table__hits.csv"})
+    if solve_input_spec_path(run_dir).exists():
+        artifacts.append({"name": "input_spec", "path": "specs/input_solve_spec.yaml"})
+    if solve_resolved_catalog_path(run_dir).exists():
+        artifacts.append({"name": "resolved_catalog", "path": "specs/resolved_catalog.yaml"})
+    return {
+        "stage": "cassette_solve",
+        "workflow": "cassette_solve",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "run_dir": str(run_dir.resolve()),
+        "workspace_root": str(workspace_root.resolve()),
+        "spec_path": str(spec_path.resolve()),
+        "spec_sha256": sha256_path(spec_path),
+        "status": report.status,
+        "artifacts": artifacts,
+    }
+
+
+def write_solve_manifest(run_dir: Path, manifest: dict[str, Any]) -> Path:
+    path = solve_manifest_path(run_dir)
+    atomic_write_json(path, manifest)
+    return path
+
+
+def write_solve_status(run_dir: Path, *, report: SolveReport, status_message: str) -> Path:
+    path = solve_status_path(run_dir)
+    warnings = list(report.metadata.warnings)
+    payload = {
+        "stage": "cassette_solve",
+        "status": report.status,
+        "status_message": status_message,
+        "run_dir": str(run_dir.resolve()),
+        "solve_id": report.solve_id,
+        "hit_count": len(report.hits),
+        "issue_count": len(report.issues),
+        "warning_count": len(warnings),
+        "warnings": warnings,
+        "search_truncated": any(warning.startswith("search.max_") for warning in warnings),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    atomic_write_json(path, payload)
+    return path
+
+
+def write_solve_hit_bundle(
+    *,
+    hit_dir: Path,
+    resolved_spec_payload: dict[str, Any],
+    report: CassetteEvaluationReport,
+    markdown: str,
+) -> None:
+    hit_dir.mkdir(parents=True, exist_ok=True)
+    (hit_dir / "resolved_candidate.cassette.yaml").write_text(
+        yaml.safe_dump(resolved_spec_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+    atomic_write_json(hit_dir / "report.json", report.model_dump(mode="json"))
+    (hit_dir / "report.md").write_text(markdown, encoding="utf-8")
+    atomic_write_json(
+        hit_dir / "manifest.json",
+        {
+            "status": report.status,
+            "spec_name": report.spec_name,
+            "report_json": "report.json",
+            "report_md": "report.md",
+            "render_contract": "render_contract.json" if report.render_contract is not None else None,
+            "resolved_candidate_spec": "resolved_candidate.cassette.yaml",
+        },
+    )
+    atomic_write_json(
+        hit_dir / "status.json",
+        {
+            "status": report.status,
+            "issue_count": len(report.issues),
+            "spec_name": report.spec_name,
+            "run_dir": str(hit_dir.resolve()),
+        },
+    )
+    if report.render_contract is not None:
+        atomic_write_json(hit_dir / "render_contract.json", report.render_contract)

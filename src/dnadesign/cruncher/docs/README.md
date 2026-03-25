@@ -22,7 +22,9 @@
 
 #### Design Dual-Context Cassettes
 - [Cassette Workflow](guides/cassette_workflow.md): validate and materialize a dual-context hairpin cassette spec.
+- [Cassette Solve Workflow](guides/cassette_solve_workflow.md): search for ranked cassette hits and materialize top candidates.
 - [Cassette Spec Reference](reference/cassette_spec.md): authoritative cassette schema and invariant semantics.
+- [Cassette Solve Spec Reference](reference/cassette_solve_spec.md): solve-schema and search guardrail contract.
 - [Nickase Catalog Reference](reference/nickase_catalog.md): local nickase catalog schema and cut-offset rules.
 - [Cassette Artifacts](reference/cassette_artifacts.md): deterministic output layout and report files.
 
@@ -47,6 +49,7 @@
 - [CLI Reference](reference/cli.md): command/flag contracts and invocation patterns.
 - [Architecture](reference/architecture.md): dataflow and module boundaries.
 - [Cassette Spec Reference](reference/cassette_spec.md): cassette schema and coordinate semantics.
+- [Cassette Solve Spec Reference](reference/cassette_solve_spec.md): solve schema, preset catalog use, and search limits.
 - [Nickase Catalog Reference](reference/nickase_catalog.md): nickase entry schema and validation rules.
 - [Cassette Artifacts](reference/cassette_artifacts.md): cassette output files and manifest semantics.
 - [Glossary](reference/glossary.md): shared vocabulary for models, metrics, and artifacts.

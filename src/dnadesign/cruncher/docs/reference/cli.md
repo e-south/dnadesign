@@ -23,7 +23,8 @@ This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage a
 >
 > **When to use:** design under tight length constraints; explore motif compatibility tradeoffs; generate a small candidate set for assays; run workspace-scoped studies and summarize aggregate outcomes.
 >
-> **Additive workflow:** `cruncher cassette ...` validates and materializes an explicitly authored dual-context hairpin cassette spec plus nickase catalog. It does **not** currently search over stems, loops, or nickase assignments.
+> **Additive workflows:** `cruncher cassette validate|design|show` operate on explicit cassette specs, while
+> `cruncher cassette solve` searches over patterned stems/loops and validates each hit through the explicit planner.
 
 #### Workspace discovery and config resolution
 
@@ -52,7 +53,7 @@ cruncher study list
 * **Render logos** → `catalog logos`
 * **Optimize** → `sample`
 * **Analyze** → `analyze`, `notebook`
-* **Dual-context cassette design** → `cassette validate|design|show`
+* **Dual-context cassette design** → `cassette validate|design|solve|show`
 * **Study sweeps** → `study list|run|summarize|show|clean`
 * **Cross-workspace handoff aggregation** → `portfolio run|show`
 * **Export sequences** → `export sequences`
@@ -296,19 +297,20 @@ Current scope:
 * deterministic validation/materialization of an authored cassette spec
 * strict local nickase catalog loading
 * explicit unsatisfied reports when no valid left/right nick pair exists
+* separate solve/search entrypoint for patterned stem/loop exploration
 
 Current non-scope:
 
-* no generalized sequence search across candidate stems or loops
-* no automatic nickase selection from broad catalogs
 * no downstream excision/removal semantics after nicking
 
 Deep contracts live in:
 
 * [`reference/cassette_spec.md`](cassette_spec.md)
+* [`reference/cassette_solve_spec.md`](cassette_solve_spec.md)
 * [`reference/nickase_catalog.md`](nickase_catalog.md)
 * [`reference/cassette_artifacts.md`](cassette_artifacts.md)
 * [`../guides/cassette_workflow.md`](../guides/cassette_workflow.md)
+* [`../guides/cassette_solve_workflow.md`](../guides/cassette_solve_workflow.md)
 
 #### `cruncher cassette validate`
 
@@ -331,9 +333,10 @@ Examples:
 Notes:
 
 * `--spec` must point to a `.cassette.yaml` file path under a workspace `configs/` tree.
-* Nick windows are matched against cassette-relative reported `nick_coordinate` values.
+* Nick windows are matched against cassette-relative reported nick boundaries.
 * The report distinguishes `bounded_segment` from downstream removal/excision semantics.
 * `--json` prints machine-readable JSON with no Rich formatting.
+* Unsupported tracer-bullet mode flags fail at load time rather than degrading silently.
 
 #### `cruncher cassette design`
 
@@ -359,12 +362,77 @@ Outputs:
 * writes `meta/cassette_manifest.json`, `meta/cassette_status.json`, `analysis/reports/report.{json,md}`
 * writes `analysis/reports/render_contract.json` only when `output.write_render_contract: true`
 * writes `export/table__candidates.csv`
+* `--json` prints the machine-readable report only; the run directory is included at `report.run_dir`
 
 Notes:
 
 * cassette runs are additive and do **not** register in workspace `run_index.json`
 * unsatisfied specs still write a cassette run directory with explicit issue codes
 * there is no fallback to `sample`
+* unsupported tracer-bullet mode flags fail before materialization
+
+#### `cruncher cassette solve`
+
+Search for ranked cassette hits from a separate `.cassette.solve.yaml` spec and optionally materialize the top hits as
+explicit cassette bundles.
+
+Inputs:
+
+* `--spec <workspace>/configs/cassettes/<name>.cassette.solve.yaml`
+* built-in preset catalog via `catalog.preset`, optional overlays via `catalog.additional_paths`
+* optional `--force-overwrite` to replace an existing deterministic solve directory
+
+Network:
+
+* no
+
+Examples:
+
+* `uv run cruncher cassette solve --spec configs/cassettes/demo_hairpin.cassette.solve.yaml`
+* `uv run cruncher cassette solve --spec configs/cassettes/demo_hairpin.cassette.solve.yaml --json`
+
+Outputs:
+
+* writes under `<workspace>/outputs/cassette_solves/<solve_id>/`
+* writes `solve_report.{json,md}`, `table__hits.csv`, `solve_manifest.json`, `solve_status.json`
+* writes per-hit explicit bundles under `hits/<rank>_<hit_id>/...`
+* `invalid_spec` and `invalid_catalog` preflight failures still write a top-level solve bundle when a workspace can be derived, but they do not write per-hit bundles
+* `--json` prints the machine-readable solve report only; the run directory is included at `report.run_dir`
+
+Notes:
+
+* `nick_goal.target_strand` is required in solve mode; there is no implicit default
+* solve mode is bounded by `search.max_enumerated_candidates` and `search.max_search_nodes`
+* solve warnings are surfaced in plain CLI output and in `solve_report.json`
+* `solve_status.json` also preserves warning details and `search_truncated` for lightweight machine consumers
+* each accepted hit round-trips through the explicit cassette planner
+* there is no fallback from `solve` into `sample`
+
+#### `cruncher cassette catalog init-neb`
+
+Write the built-in `neb_nicking_v1` cassette nickase preset to a local YAML path.
+
+Inputs:
+
+* `--output <path>`
+* optional `--force-overwrite` to replace an existing output file
+
+Network:
+
+* no
+
+Examples:
+
+* `uv run cruncher cassette catalog init-neb --output configs/catalogs/neb_nicking_v1.yaml`
+
+Outputs:
+
+* writes the packaged preset YAML to the requested path
+
+Notes:
+
+* the command exports the built-in packaged preset exactly as shipped
+* this is a convenience helper for local inspection or overlay authoring; `cassette solve` can still reference `catalog.preset: neb_nicking_v1` directly
 
 #### `cruncher cassette show`
 
@@ -381,29 +449,20 @@ Network:
 Example:
 
 * `uv run cruncher cassette show --run outputs/cassettes/demo_hairpin/<design_id>`
-* if `analysis` is omitted from config, analyze uses schema defaults (including `run_selector=latest`)
-* if `analysis.fimo_compare.enabled=true`, MEME Suite `fimo` must be resolvable via `discover.tool_path`, `MEME_BIN`, or `PATH`
 
 Outputs:
 
-* tables: `analysis/tables/table__scores_summary.parquet`, `analysis/tables/table__elites_topk.parquet`,
-  `analysis/tables/table__metrics_joint.parquet`, `analysis/tables/table__chain_trajectory_points.parquet`,
-  `analysis/tables/table__chain_trajectory_lines.parquet`,
-  `analysis/tables/table__diagnostics_summary.json`, `analysis/tables/table__objective_components.json`,
-  `analysis/tables/table__elites_mmr_summary.parquet`, `analysis/tables/table__elites_nn_distance.parquet`,
-  `analysis/tables/table__elites_mmr_sweep.parquet` (when `analysis.mmr_sweep.enabled=true`)
-* plots: `plots/elite_score_space_context.<plot_format>`,
-  `plots/chain_trajectory_sweep.<plot_format>`,
-  `plots/elites_nn_distance.<plot_format>`, `plots/elites_showcase.<plot_format>`,
-  `plots/health_panel.<plot_format>` (trace only), `plots/chain_trajectory_video.mp4` (optional, when `analysis.trajectory_video.enabled=true`)
-* reports: `analysis/reports/report.json`, `analysis/reports/report.md`
-* summaries: `analysis/reports/summary.json`, `analysis/manifests/manifest.json`, `analysis/manifests/plot_manifest.json`, `analysis/manifests/table_manifest.json`
+* prints the explicit cassette run directory
+* prints `meta/cassette_manifest.json`
+* prints `meta/cassette_status.json`
+* prints `analysis/reports/report.json`
+* prints `analysis/reports/report.md`
+* prints `analysis/reports/render_contract.json` when present
 
-Note:
+Notes:
 
-* Analyze rewrites the latest analysis outputs each run; set `analysis.archive=true` to keep prior reports.
-* Analyze uses `<run_dir>/analysis/state/tmp` as a run-local lock. Stale temp locks from interrupted runs are auto-pruned; active locks still fail fast.
-* Use `cruncher analyze --summary` to print the highlights from `report.json`.
+* `show` remains an explicit-lane inspection command; solve runs are inspected via the solve report bundle
+* `show` does not read from the workspace `run_index.json`
 
 ---
 
