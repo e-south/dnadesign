@@ -19,6 +19,11 @@ from pathlib import Path
 
 from dnadesign.ops.contracts import InferRuntimePhaseTarget
 from dnadesign.studies.core.models import StudyOpsContract
+from dnadesign.studies.core.preflight_plan import (
+    StudyPreflightPlan,
+    build_study_preflight_plan,
+    evaluate_study_preflight_checks,
+)
 
 from .context import PromoterStudyResolvedContext
 from .infer_runtime import (
@@ -36,11 +41,6 @@ from .preflight_orchestration import (
     PromoterPreflightRunbookPlanTarget,
     build_promoter_preflight_notify_environment_checks,
     build_promoter_preflight_runbook_plan_checks,
-)
-from .preflight_scope import (
-    PromoterPreflightScopePlan,
-    build_promoter_preflight_scope_plan,
-    evaluate_promoter_preflight_checks,
 )
 from .preflight_upstream import (
     PromoterPreflightUpstreamDependencies,
@@ -87,8 +87,8 @@ class PromoterPreflightResolvedContext:
     infer_batch_targets: tuple[PromoterPreflightRunbookPlanTarget, ...]
     densegen_phase_id: str
     construct_phase_id: str
-    infer_preparation_phase_id: str
-    scope_plan: PromoterPreflightScopePlan
+    notify_environment_phase_id: str
+    scope_plan: StudyPreflightPlan
     notify_env_state: dict[str, bool]
 
 
@@ -112,23 +112,17 @@ def resolve_promoter_preflight_context(
         dependencies=dependencies.infer_runtime,
     )
     infer_phase_targets = dict(infer_runtime.phase_targets_by_id)
-    densegen_phase_id = str(contract.preflight_phase_targets.get("densegen") or "").strip()
-    construct_phase_id = str(contract.preflight_phase_targets.get("construct") or "").strip()
-    infer_preparation_phase_id = str(contract.preflight_phase_targets.get("infer_preparation") or "").strip()
-    if not densegen_phase_id or not construct_phase_id or not infer_preparation_phase_id:
-        raise ValueError(
-            "ops.study.yaml must define preflight.phase_targets for densegen, construct, and infer_preparation"
-        )
+    densegen_phase_id = _required_group_phase_binding(contract, group="densegen")
+    construct_phase_id = _required_group_phase_binding(contract, group="construct")
+    notify_environment_phase_id = _required_group_phase_binding(contract, group="notify_environment")
     current_phase = study_context.current_phase
     next_ready_phase = dict(study_context.next_ready_phase) if study_context.next_ready_phase is not None else None
-    scope_plan = build_promoter_preflight_scope_plan(
+    scope_plan = build_study_preflight_plan(
         current_phase=current_phase,
         next_ready_phase=next_ready_phase,
         scope=scope,
-        default_scope=contract.preflight_default_scope,
-        phase_group_overrides=contract.next_scope_phase_groups,
-        infer_lane_groups=contract.infer_lane_groups,
-        infer_phase_targets=infer_phase_targets,
+        contract=contract.preflight,
+        runtime_phase_ids=tuple(infer_phase_targets),
     )
     notify_env_state = dependencies.resolve_notify_environment_state(environ=dependencies.environ)
     infer_batch_targets = _resolve_infer_batch_targets(
@@ -152,7 +146,7 @@ def resolve_promoter_preflight_context(
         infer_batch_targets=infer_batch_targets,
         densegen_phase_id=densegen_phase_id,
         construct_phase_id=construct_phase_id,
-        infer_preparation_phase_id=infer_preparation_phase_id,
+        notify_environment_phase_id=notify_environment_phase_id,
         scope_plan=scope_plan,
         notify_env_state=notify_env_state,
     )
@@ -167,6 +161,7 @@ def build_promoter_preflight_progress(
     checks: list[dict[str, object]] = []
     counts: Counter[str] = Counter()
     resolved_evidence = dict(evidence)
+    enabled_groups = set(context.scope_plan.included_groups)
 
     def add_check(check: dict[str, object]) -> None:
         checks.append(check)
@@ -174,8 +169,8 @@ def build_promoter_preflight_progress(
 
     for check in build_promoter_preflight_notify_environment_checks(
         notify_env_state=context.notify_env_state,
-        infer_preparation_phase_id=context.infer_preparation_phase_id,
-        include_notify_checks=context.scope_plan.include_notify_checks,
+        notify_environment_phase_id=context.notify_environment_phase_id,
+        enabled_groups=enabled_groups,
         dependencies=PromoterPreflightNotifyEnvironmentDependencies(
             preflight_state_check=dependencies.preflight_state_check,
         ),
@@ -190,8 +185,7 @@ def build_promoter_preflight_progress(
         phase_states=context.phase_states,
         densegen_phase_id=context.densegen_phase_id,
         construct_phase_id=context.construct_phase_id,
-        include_densegen_checks=context.scope_plan.include_densegen_checks,
-        include_construct_checks=context.scope_plan.include_construct_checks,
+        enabled_groups=enabled_groups,
         dependencies=PromoterPreflightUpstreamDependencies(
             load_orchestration_runbook_payload=dependencies.load_orchestration_runbook_payload,
             resolve_input_path=dependencies.resolve_input_path,
@@ -208,9 +202,8 @@ def build_promoter_preflight_progress(
     infer_checks_result = build_promoter_preflight_infer_checks(
         study_repo_root=context.study_repo_root,
         infer_runtime=context.infer_runtime,
-        infer_preparation_phase_id=context.infer_preparation_phase_id,
-        include_infer_checks=context.scope_plan.include_infer_checks,
-        include_notify_checks=context.scope_plan.include_notify_checks,
+        infer_preparation_phase_id=context.notify_environment_phase_id,
+        enabled_groups=enabled_groups,
         dependencies=PromoterPreflightInferDependencies(
             inspect_local_gpu_inventory=dependencies.inspect_local_gpu_inventory,
             infer_usr_dataset_requirements=dependencies.infer_usr_dataset_requirements,
@@ -228,7 +221,7 @@ def build_promoter_preflight_progress(
     for check in infer_checks_result.checks:
         add_check(check)
 
-    if context.scope_plan.include_infer_batch_plan_checks:
+    if context.scope_plan.includes_group("infer_batch_plan"):
         for check in build_promoter_preflight_runbook_plan_checks(
             study_repo_root=context.study_repo_root,
             targets=context.infer_batch_targets,
@@ -250,11 +243,10 @@ def build_promoter_preflight_progress(
         }
     )
 
-    evaluation = evaluate_promoter_preflight_checks(
+    evaluation = evaluate_study_preflight_checks(
         checks,
         phase_states=context.phase_states,
         scope_plan=context.scope_plan,
-        infer_phase_targets=context.infer_phase_targets,
     )
     resolved_evidence.update(
         {
@@ -310,6 +302,7 @@ def _resolve_infer_batch_targets(
         targets.append(
             PromoterPreflightRunbookPlanTarget(
                 check_id=f"ops.runbook_plan.{phase_target.runbook_surface_label}",
+                check_group="infer_batch_plan",
                 phase="ops",
                 phase_id=phase_target.phase_id,
                 runbook_path=runbook_path,
@@ -318,6 +311,13 @@ def _resolve_infer_batch_targets(
             )
         )
     return tuple(targets)
+
+
+def _required_group_phase_binding(contract: StudyOpsContract, *, group: str) -> str:
+    phase_id = str(contract.preflight.group_phase_bindings.get(group) or "").strip()
+    if not phase_id:
+        raise ValueError(f"ops.study.yaml must define preflight.group_phase_bindings.{group}")
+    return phase_id
 
 
 __all__ = [

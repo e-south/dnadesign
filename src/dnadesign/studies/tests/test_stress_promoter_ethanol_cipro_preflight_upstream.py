@@ -24,6 +24,7 @@ from dnadesign.studies.stress_promoter_ethanol_cipro.preflight_upstream import (
 def _state_check(**kwargs) -> dict[str, object]:
     return {
         "id": kwargs["check_id"],
+        "check_group": kwargs.get("check_group"),
         "phase": kwargs["phase"],
         "phase_id": kwargs["phase_id"],
         "state": kwargs["state"],
@@ -36,6 +37,7 @@ def _command_check(**kwargs) -> dict[str, object]:
     execution = kwargs["execution"]
     return {
         "id": kwargs["check_id"],
+        "check_group": kwargs.get("check_group"),
         "phase": kwargs["phase"],
         "phase_id": kwargs["phase_id"],
         "state": "attention" if getattr(execution, "returncode", 1) != 0 else "ok",
@@ -91,8 +93,7 @@ def test_build_promoter_preflight_upstream_checks_reports_densegen_probe_and_bat
         phase_states=[],
         densegen_phase_id="densegen_growth",
         construct_phase_id="construct_context_expansion",
-        include_densegen_checks=True,
-        include_construct_checks=False,
+        enabled_groups={"densegen"},
         dependencies=PromoterPreflightUpstreamDependencies(
             load_orchestration_runbook_payload=lambda _: {
                 "densegen": {"config": "densegen-config.yaml"},
@@ -110,6 +111,7 @@ def test_build_promoter_preflight_upstream_checks_reports_densegen_probe_and_bat
     checks = {check["id"]: check for check in result.checks}
 
     assert checks["densegen.batch.resources"]["state"] == "ok"
+    assert checks["densegen.batch.resources"]["check_group"] == "densegen"
     assert checks["densegen.config.probe_solver"]["state"] == "ok"
     assert checks["densegen.config.probe_solver"]["details"]["config"] == str(densegen_config_path.resolve())
     assert checks["densegen.batch.plan"]["state"] == "ok"
@@ -170,8 +172,7 @@ def test_build_promoter_preflight_upstream_checks_skips_construct_runtime_when_o
         phase_states=[{"id": "construct_context_expansion", "status": "complete"}],
         densegen_phase_id="densegen_growth",
         construct_phase_id="construct_context_expansion",
-        include_densegen_checks=False,
-        include_construct_checks=True,
+        enabled_groups={"construct"},
         dependencies=PromoterPreflightUpstreamDependencies(
             load_orchestration_runbook_payload=lambda _: {},
             resolve_input_path=lambda path, base_dir: (base_dir / path).resolve() if base_dir else path.resolve(),
@@ -186,6 +187,7 @@ def test_build_promoter_preflight_upstream_checks_skips_construct_runtime_when_o
     checks = {check["id"]: check for check in result.checks}
 
     assert checks["construct.workspace.doctor"]["state"] == "ok"
+    assert checks["construct.workspace.doctor"]["check_group"] == "construct"
     assert checks["construct.runtime.slot_a_window"]["state"] == "ok"
     assert checks["construct.runtime.slot_a_window"]["details"]["skipped_runtime_revalidation"] is True
     assert commands == [

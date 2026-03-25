@@ -28,6 +28,7 @@ from dnadesign.studies.stress_promoter_ethanol_cipro.preflight_orchestration imp
 def _state_check(**kwargs) -> dict[str, object]:
     return {
         "id": kwargs["check_id"],
+        "check_group": kwargs.get("check_group"),
         "phase": kwargs["phase"],
         "phase_id": kwargs["phase_id"],
         "state": kwargs["state"],
@@ -40,6 +41,7 @@ def _command_check(**kwargs) -> dict[str, object]:
     execution = kwargs["execution"]
     return {
         "id": kwargs["check_id"],
+        "check_group": kwargs.get("check_group"),
         "phase": kwargs["phase"],
         "phase_id": kwargs["phase_id"],
         "state": "attention" if getattr(execution, "returncode", 1) != 0 else "ok",
@@ -71,8 +73,8 @@ def test_build_promoter_preflight_notify_environment_checks_uses_explicit_state_
 
     checks = build_promoter_preflight_notify_environment_checks(
         notify_env_state=notify_env_state,
-        infer_preparation_phase_id="infer_batch_preparation",
-        include_notify_checks=True,
+        notify_environment_phase_id="infer_batch_preparation",
+        enabled_groups={"notify_environment"},
         dependencies=PromoterPreflightNotifyEnvironmentDependencies(
             preflight_state_check=_state_check,
         ),
@@ -115,6 +117,7 @@ def test_build_promoter_preflight_runbook_plan_checks_merges_payload_and_details
         targets=(
             PromoterPreflightRunbookPlanTarget(
                 check_id="ops.runbook_plan.infer_batch_7b_with_notify.anchor_only",
+                check_group="infer_batch_plan",
                 phase="ops",
                 phase_id="infer_anchor_only_7b",
                 runbook_path=runbook_path,
@@ -133,6 +136,7 @@ def test_build_promoter_preflight_runbook_plan_checks_merges_payload_and_details
     assert len(checks) == 1
     check = checks[0]
     assert check["state"] == "ok"
+    assert check["check_group"] == "infer_batch_plan"
     assert check["details"]["runbook"] == str(runbook_path)
     assert check["details"]["notify_env"] == {"NOTIFY_WEBHOOK": False}
     assert check["details"]["selected_mode"] == "resume"

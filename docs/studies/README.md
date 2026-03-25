@@ -25,7 +25,7 @@ Keep four complementary artifacts for each real study:
   sync posture across local and remote locations
 - `status.md`: human-readable current state, row targets, and next actions
 - `ops.study.yaml`: OPS-facing study contract for phase order, snapshot scope,
-  and preflight scope routing
+  and explicit preflight group planning
 
 Keep the code boundary equally explicit: study-family implementation code lives
 under `src/dnadesign/studies/`, not under `src/dnadesign/ops/`. OPS reads the
@@ -77,7 +77,7 @@ docs/studies/promoter/index.yaml
 - `status.md` is the human-readable note that records row targets, source
   datasets, infer slice status, rollback paths, and next actions.
 - `ops.study.yaml` is the machine-readable OPS contract for phase ordering,
-  repo-scoped snapshot posture, and next-scope preflight grouping.
+  repo-scoped snapshot posture, and explicit preflight group planning.
 - `pipeline.yaml`, when present, records the exact Construct workspace,
   Infer configs, batch presets, and Notify profile paths that belong to the
   real study rather than to a generic demo.
@@ -165,7 +165,8 @@ for the first pull rather than relying on local name guessing.
   and its directory must contain `campaign.yaml`, `datasets.yaml`, `status.md`,
   and `ops.study.yaml`.
 - `ops.study.yaml` is the OPS-facing source of phase order, repo snapshot
-  summary scope, and preflight next-scope grouping. `pipeline.yaml` remains the
+  summary scope, and preflight group bindings plus next-scope planning.
+  `pipeline.yaml` remains the
   exact execution-surface map when the study owns concrete Construct, Infer, or
   batch assets.
 - If `pipeline.yaml` exists, treat it as the study-owned execution map for the

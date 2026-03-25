@@ -17,15 +17,52 @@ from typing import Protocol
 
 
 @dataclass(frozen=True)
+class StudyPreflightNextScopeContract:
+    target_phase_groups: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    runtime_phase_groups: tuple[str, ...] = field(default_factory=tuple)
+    runtime_shared_groups: tuple[str, ...] = field(default_factory=tuple)
+
+    @property
+    def known_groups(self) -> tuple[str, ...]:
+        ordered: list[str] = []
+        seen: set[str] = set()
+        for group in (
+            *(group for groups in self.target_phase_groups.values() for group in groups),
+            *self.runtime_shared_groups,
+            *self.runtime_phase_groups,
+        ):
+            normalized_group = str(group).strip()
+            if normalized_group and normalized_group not in seen:
+                seen.add(normalized_group)
+                ordered.append(normalized_group)
+        return tuple(ordered)
+
+
+@dataclass(frozen=True)
+class StudyPreflightContract:
+    default_scope: str
+    group_phase_bindings: dict[str, str] = field(default_factory=dict)
+    next_scope: StudyPreflightNextScopeContract = field(default_factory=StudyPreflightNextScopeContract)
+
+    @property
+    def known_groups(self) -> tuple[str, ...]:
+        ordered: list[str] = []
+        seen: set[str] = set()
+        for group in (*self.group_phase_bindings, *self.next_scope.known_groups):
+            normalized_group = str(group).strip()
+            if normalized_group and normalized_group not in seen:
+                seen.add(normalized_group)
+                ordered.append(normalized_group)
+        return tuple(ordered)
+
+
+@dataclass(frozen=True)
 class StudyOpsContract:
     study_id: str
     family: str
     phase_order: tuple[str, ...]
     snapshot_summary_scope: str
-    preflight_default_scope: str
-    preflight_phase_targets: dict[str, str]
-    next_scope_phase_groups: dict[str, tuple[str, ...]]
-    infer_lane_groups: tuple[str, ...] = field(default_factory=tuple)
+    preflight: StudyPreflightContract
     raw_payload: dict[str, object] = field(default_factory=dict, repr=False)
 
 
@@ -52,4 +89,10 @@ class StudyFamilyAdapter(Protocol):
     ) -> tuple[str, str, dict[str, object]]: ...
 
 
-__all__ = ["StudyFamilyAdapter", "StudyOpsContract", "StudyStatusContext"]
+__all__ = [
+    "StudyFamilyAdapter",
+    "StudyOpsContract",
+    "StudyPreflightContract",
+    "StudyPreflightNextScopeContract",
+    "StudyStatusContext",
+]

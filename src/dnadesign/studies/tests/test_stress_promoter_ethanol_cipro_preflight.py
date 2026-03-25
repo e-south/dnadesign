@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from dnadesign.studies.core.models import StudyOpsContract
+from dnadesign.studies.core.models import StudyOpsContract, StudyPreflightContract, StudyPreflightNextScopeContract
 from dnadesign.studies.stress_promoter_ethanol_cipro.context import PromoterStudyResolvedContext
 from dnadesign.studies.stress_promoter_ethanol_cipro.infer_runtime import PromoterStudyInferRuntimeDependencies
 from dnadesign.studies.stress_promoter_ethanol_cipro.preflight import (
@@ -143,7 +143,7 @@ def test_resolve_promoter_preflight_context_projects_infer_batch_targets_in_phas
         progress_kind="promoter-study-preflight",
         contract=StudyOpsContract(
             study_id="demo_study",
-            family="promoter",
+            family="stress_promoter_ethanol_cipro",
             phase_order=(
                 "densegen_growth",
                 "construct_context_expansion",
@@ -153,18 +153,28 @@ def test_resolve_promoter_preflight_context_projects_infer_batch_targets_in_phas
                 "infer_anchor_only_7b",
             ),
             snapshot_summary_scope="repo",
-            preflight_default_scope="next",
-            preflight_phase_targets={
-                "densegen": "densegen_growth",
-                "construct": "construct_context_expansion",
-                "infer_preparation": "infer_batch_preparation",
-            },
-            next_scope_phase_groups={
-                "densegen_growth": ("densegen",),
-                "construct_context_expansion": ("construct",),
-                "infer_batch_preparation": ("infer", "notify", "infer_batch_plan"),
-            },
-            infer_lane_groups=("infer", "notify", "infer_batch_plan"),
+            preflight=StudyPreflightContract(
+                default_scope="next",
+                group_phase_bindings={
+                    "densegen": "densegen_growth",
+                    "construct": "construct_context_expansion",
+                    "notify_environment": "infer_batch_preparation",
+                },
+                next_scope=StudyPreflightNextScopeContract(
+                    target_phase_groups={
+                        "densegen_growth": ("densegen",),
+                        "construct_context_expansion": ("construct",),
+                        "infer_batch_preparation": (
+                            "infer",
+                            "notify_environment",
+                            "notify",
+                            "infer_batch_plan",
+                        ),
+                    },
+                    runtime_phase_groups=("infer", "notify", "infer_batch_plan"),
+                    runtime_shared_groups=("notify_environment",),
+                ),
+            ),
             raw_payload={},
         ),
         dependencies=PromoterPreflightContextDependencies(
