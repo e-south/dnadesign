@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Annotated, Sequence
+from typing import TYPE_CHECKING, Annotated, Sequence
 
 import typer
 import typer.main
@@ -27,17 +27,16 @@ from dnadesign.ops.catalog import (
     repo_relative_catalog_doc_path,
 )
 from dnadesign.ops.cli.common import append_registry_suggestions, normalize_optional_filter, render_command
-from dnadesign.ops.status import (
-    CampaignProgress,
-    CampaignScaffold,
-    InputFieldSpec,
-    ProcedureProgress,
-    build_campaign_scaffold,
-    build_procedure_progress,
-    list_status_kind_specs,
-    load_campaign_progress,
-    load_status_kind_spec,
+from dnadesign.ops.cli.dynamic_inputs import (
+    optional_input_lines,
+    parse_status_input_tokens,
+    render_progress_show_command,
+    required_input_lines,
 )
+
+if TYPE_CHECKING:
+    from dnadesign.ops.status import CampaignProgress, CampaignScaffold, InputFieldSpec, ProcedureProgress
+    from dnadesign.ops.status.models import StatusKindSpec
 
 app = typer.Typer(
     help=(
@@ -53,24 +52,47 @@ def get_click_command():
     return typer.main.get_command(app)
 
 
+def _build_campaign_scaffold(*args, **kwargs) -> CampaignScaffold:
+    from dnadesign.ops.status.campaign import build_campaign_scaffold
+
+    return build_campaign_scaffold(*args, **kwargs)
+
+
+def _build_procedure_progress(*args, **kwargs) -> ProcedureProgress:
+    from dnadesign.ops.status.campaign import build_procedure_progress
+
+    return build_procedure_progress(*args, **kwargs)
+
+
+def _list_status_kind_specs() -> tuple[StatusKindSpec, ...]:
+    from dnadesign.ops.status.registry_loader import list_status_kind_specs
+
+    return list_status_kind_specs()
+
+
+def _load_campaign_progress(*args, **kwargs) -> CampaignProgress:
+    from dnadesign.ops.status.campaign import load_campaign_progress
+
+    return load_campaign_progress(*args, **kwargs)
+
+
+def _load_status_kind_spec(progress_kind: str) -> StatusKindSpec:
+    from dnadesign.ops.status.registry_loader import load_status_kind_spec
+
+    return load_status_kind_spec(progress_kind)
+
+
 def _progress_required_inputs(progress_kind: str) -> tuple[InputFieldSpec, ...]:
-    return load_status_kind_spec(progress_kind).required_inputs
+    return _load_status_kind_spec(progress_kind).required_inputs
 
 
 def _progress_optional_inputs(progress_kind: str) -> tuple[tuple[str, str], ...]:
-    spec = load_status_kind_spec(progress_kind)
+    spec = _load_status_kind_spec(progress_kind)
     return tuple((field.cli_flag, field.summary) for field in spec.optional_inputs)
 
 
 def _progress_notes(entry: CatalogProcedureEntry) -> tuple[str, ...]:
-    return load_status_kind_spec(entry.progress_kind).notes
-
-
-def _catalog_progress_show_command(*, registry_id: str, required_inputs: Sequence[InputFieldSpec]) -> str:
-    parts = ["uv", "run", "ops", "progress", "show", registry_id]
-    for field in required_inputs:
-        parts.extend((field.cli_flag, field.placeholder))
-    return render_command(parts)
+    return _load_status_kind_spec(entry.progress_kind).notes
 
 
 def _progress_campaign_recovery_hint() -> str:
@@ -85,76 +107,14 @@ def _progress_campaign_path_hint() -> str:
 
 
 def _progress_required_input_lines(entry: CatalogProcedureEntry) -> tuple[str, ...]:
-    required_inputs = _progress_required_inputs(entry.progress_kind)
-    if not required_inputs:
-        return ()
-    lines = [f"Required inputs for {entry.registry_id}:"]
-    for field in required_inputs:
-        lines.append(f"- {field.cli_flag} {field.placeholder}: {field.summary}")
-    return tuple(lines)
+    return required_input_lines(
+        label=entry.registry_id,
+        required_inputs=_progress_required_inputs(entry.progress_kind),
+    )
 
 
 def _progress_optional_input_lines(entry: CatalogProcedureEntry) -> tuple[str, ...]:
-    optional_inputs = _progress_optional_inputs(entry.progress_kind)
-    if not optional_inputs:
-        return ()
-    lines = ["Also accepted:"]
-    for flag, summary in optional_inputs:
-        lines.append(f"- {flag}: {summary}")
-    return tuple(lines)
-
-
-def _parse_progress_show_inputs(
-    *,
-    extra_args: Sequence[str],
-    input_items: Sequence[str],
-    input_schema: Sequence[InputFieldSpec],
-) -> dict[str, object]:
-    inputs_by_flag = {field.cli_flag: field for field in input_schema}
-    inputs_by_name = {field.name: field for field in input_schema}
-    resolved_inputs: dict[str, object] = {}
-    tokens = list(extra_args)
-    index = 0
-    while index < len(tokens):
-        token = str(tokens[index]).strip()
-        if not token:
-            index += 1
-            continue
-        if not token.startswith("--"):
-            raise ValueError(f"unexpected argument for progress show: {token}")
-        if token == "--":
-            index += 1
-            continue
-        if "=" in token:
-            flag, value = token.split("=", maxsplit=1)
-            index += 1
-        else:
-            flag = token
-            if index + 1 >= len(tokens):
-                raise ValueError(f"{flag} requires a value")
-            value = str(tokens[index + 1])
-            index += 2
-        field = inputs_by_flag.get(flag)
-        if field is None:
-            raise ValueError(f"unknown progress input flag: {flag}")
-        if field.name in resolved_inputs:
-            raise ValueError(f"duplicate progress input: {field.cli_flag}")
-        resolved_inputs[field.name] = value
-
-    for item in input_items:
-        if "=" not in item:
-            raise ValueError("--input expects key=value")
-        name, value = item.split("=", maxsplit=1)
-        normalized_name = name.strip()
-        if not normalized_name:
-            raise ValueError("--input expects a non-empty key")
-        field = inputs_by_name.get(normalized_name)
-        if field is None:
-            raise ValueError(f"unknown progress input key: {normalized_name}")
-        if field.name in resolved_inputs:
-            raise ValueError(f"duplicate progress input: {field.cli_flag}")
-        resolved_inputs[field.name] = value
-    return resolved_inputs
+    return optional_input_lines(_load_status_kind_spec(entry.progress_kind).optional_inputs)
 
 
 def _progress_scaffold_recovery_hint() -> str:
@@ -221,7 +181,7 @@ def _emit_progress_explain_text(
     owner_boundary: str,
     has_related_routes: bool,
 ) -> None:
-    spec = load_status_kind_spec(entry.progress_kind)
+    spec = _load_status_kind_spec(entry.progress_kind)
     required_inputs = _progress_required_inputs(entry.progress_kind)
     optional_inputs = _progress_optional_inputs(entry.progress_kind)
     lines = [
@@ -250,7 +210,7 @@ def _emit_progress_explain_text(
             lines.append(f"- {flag}: {summary}")
     lines.append("Next commands:")
     lines.append(f"- catalog_show: {render_command(['uv', 'run', 'ops', 'catalog', 'show', entry.registry_id])}")
-    progress_show_command = _catalog_progress_show_command(
+    progress_show_command = render_progress_show_command(
         registry_id=entry.registry_id,
         required_inputs=required_inputs,
     )
@@ -279,7 +239,7 @@ def _emit_progress_explain_json(
     owner_boundary: str,
     has_related_routes: bool,
 ) -> None:
-    spec = load_status_kind_spec(entry.progress_kind)
+    spec = _load_status_kind_spec(entry.progress_kind)
     required_inputs = _progress_required_inputs(entry.progress_kind)
     optional_inputs = _progress_optional_inputs(entry.progress_kind)
     payload = {
@@ -298,7 +258,7 @@ def _emit_progress_explain_json(
         "optional_inputs": [{"cli_flag": flag, "summary": summary} for flag, summary in optional_inputs],
         "next_commands": {
             "catalog_show": render_command(["uv", "run", "ops", "catalog", "show", entry.registry_id]),
-            "progress_show": _catalog_progress_show_command(
+            "progress_show": render_progress_show_command(
                 registry_id=entry.registry_id,
                 required_inputs=required_inputs,
             ),
@@ -315,7 +275,7 @@ def _emit_progress_explain_json(
 
 def _emit_progress_kinds_text() -> None:
     lines = ["Progress kinds"]
-    for spec in list_status_kind_specs():
+    for spec in _list_status_kind_specs():
         lines.append(f"- {spec.progress_kind} [{spec.provider_id}]")
         lines.append(f"  {spec.description}")
         if spec.required_inputs:
@@ -330,7 +290,7 @@ def _emit_progress_kinds_text() -> None:
 
 
 def _emit_progress_kinds_json() -> None:
-    payload = {"progress_kinds": [spec.as_inventory_dict() for spec in list_status_kind_specs()]}
+    payload = {"progress_kinds": [spec.as_inventory_dict() for spec in _list_status_kind_specs()]}
     typer.echo(json.dumps(payload, indent=2, sort_keys=True))
 
 
@@ -443,13 +403,13 @@ def progress_show(
         raise typer.Exit(code=2)
 
     try:
-        spec = load_status_kind_spec(entry.progress_kind)
-        raw_inputs = _parse_progress_show_inputs(
+        spec = _load_status_kind_spec(entry.progress_kind)
+        raw_inputs = parse_status_input_tokens(
             extra_args=ctx.args,
             input_items=input_items or (),
             input_schema=spec.required_inputs + spec.optional_inputs,
         )
-        result = build_procedure_progress(catalog, registry_id, raw_inputs=raw_inputs)
+        result = _build_procedure_progress(catalog, registry_id, raw_inputs=raw_inputs)
     except ValueError as exc:
         message = f"Progress contract error: {exc}"
         if "requires --" in str(exc):
@@ -545,7 +505,7 @@ def progress_campaign(
         raise typer.Exit(code=2) from exc
 
     try:
-        result = load_campaign_progress(catalog, manifest_path=manifest)
+        result = _load_campaign_progress(catalog, manifest_path=manifest)
     except (FileNotFoundError, ValueError) as exc:
         error_text = str(exc)
         message = f"Progress contract error: {error_text}"
@@ -624,7 +584,7 @@ def progress_scaffold(
     normalized_related_to = normalize_optional_filter(related_to)
     requested_registry_ids = registry_ids or []
     try:
-        result = build_campaign_scaffold(
+        result = _build_campaign_scaffold(
             catalog,
             registry_ids=requested_registry_ids,
             campaign_id=normalized_campaign_id,

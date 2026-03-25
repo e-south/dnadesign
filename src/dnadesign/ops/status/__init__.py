@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/ops/status/__init__.py
 
-Neutral status/observation services backing the public ops progress CLI.
+Neutral status/observation package surface with lazy execution-module exports.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from .campaign import build_campaign_scaffold, build_procedure_progress, load_campaign_progress
 from .models import (
     CampaignProgress,
     CampaignScaffold,
@@ -20,7 +19,49 @@ from .models import (
     ProcedureProgress,
     StatusKindSpec,
 )
-from .service import build_status_inputs, list_status_kind_specs, load_status_kind_spec, run_status_kind
+
+
+def build_campaign_scaffold(*args, **kwargs):
+    from .campaign import build_campaign_scaffold as _build_campaign_scaffold
+
+    return _build_campaign_scaffold(*args, **kwargs)
+
+
+def build_procedure_progress(*args, **kwargs):
+    from .campaign import build_procedure_progress as _build_procedure_progress
+
+    return _build_procedure_progress(*args, **kwargs)
+
+
+def build_status_inputs(*args, **kwargs):
+    from .service import build_status_inputs as _build_status_inputs
+
+    return _build_status_inputs(*args, **kwargs)
+
+
+def list_status_kind_specs(*args, **kwargs):
+    from .registry_loader import list_status_kind_specs as _list_status_kind_specs
+
+    return _list_status_kind_specs(*args, **kwargs)
+
+
+def load_campaign_progress(*args, **kwargs):
+    from .campaign import load_campaign_progress as _load_campaign_progress
+
+    return _load_campaign_progress(*args, **kwargs)
+
+
+def load_status_kind_spec(*args, **kwargs):
+    from .registry_loader import load_status_kind_spec as _load_status_kind_spec
+
+    return _load_status_kind_spec(*args, **kwargs)
+
+
+def run_status_kind(*args, **kwargs):
+    from .service import run_status_kind as _run_status_kind
+
+    return _run_status_kind(*args, **kwargs)
+
 
 __all__ = [
     "CampaignProgress",

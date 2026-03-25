@@ -226,6 +226,29 @@ print(json.dumps(sorted(
     assert imported_modules == []
 
 
+def test_progress_kinds_cli_loads_registry_metadata_without_campaign_or_service_modules() -> None:
+    imported_modules = _run_python(
+        """
+import json
+import sys
+from typer.testing import CliRunner
+from dnadesign.ops.cli import app
+
+result = CliRunner().invoke(app, ['progress', 'kinds', '--json'])
+assert result.exit_code == 0, result.output
+print(json.dumps(sorted(
+    name for name in sys.modules
+    if name in {
+        'dnadesign.ops.status.campaign',
+        'dnadesign.ops.status.service',
+    }
+)))
+"""
+    )
+
+    assert imported_modules == []
+
+
 def test_runbook_presets_cli_does_not_import_execution_modules() -> None:
     imported_modules = _run_python(
         """
@@ -243,6 +266,35 @@ print(json.dumps(sorted(
         'dnadesign.ops.orchestrator.plan',
         'dnadesign.ops.orchestrator.state',
         'dnadesign.ops.runbooks.schema',
+    }
+)))
+"""
+    )
+
+    assert imported_modules == []
+
+
+def test_progress_explain_cli_reads_metadata_without_campaign_or_provider_modules() -> None:
+    imported_modules = _run_python(
+        """
+import json
+import sys
+from typer.testing import CliRunner
+from dnadesign.ops.cli import app
+
+result = CliRunner().invoke(app, ['progress', 'explain', 'ops.control-plane.orchestration', '--json'])
+assert result.exit_code == 0, result.output
+print(json.dumps(sorted(
+    name for name in sys.modules
+    if name in {
+        'dnadesign.ops.status.campaign',
+        'dnadesign.ops.status.service',
+        'dnadesign.ops.progress_ops_provider',
+        'dnadesign.ops.progress_usr_provider',
+        'dnadesign.ops.progress_cluster_provider',
+        'dnadesign.ops.progress_opal_provider',
+        'dnadesign.studies.stress_promoter_ethanol_cipro.family',
+        'dnadesign.studies.stress_promoter_ethanol_cipro.ops_provider',
     }
 )))
 """

@@ -32,6 +32,7 @@ from dnadesign.ops.catalog import (
     repo_relative_catalog_doc_path,
 )
 from dnadesign.ops.cli.common import append_registry_suggestions, normalize_optional_filter, render_command
+from dnadesign.ops.cli.dynamic_inputs import render_progress_show_command
 
 if TYPE_CHECKING:
     from dnadesign.ops.status import InputFieldSpec, StatusKindSpec
@@ -57,13 +58,6 @@ def _load_status_kind_spec(progress_kind: str) -> StatusKindSpec:
 
 def _progress_required_inputs(progress_kind: str) -> tuple[InputFieldSpec, ...]:
     return _load_status_kind_spec(progress_kind).required_inputs
-
-
-def _catalog_progress_show_command(*, registry_id: str, required_inputs: Sequence[InputFieldSpec]) -> str:
-    parts = ["uv", "run", "ops", "progress", "show", registry_id]
-    for field in required_inputs:
-        parts.extend((field.cli_flag, field.placeholder))
-    return render_command(parts)
 
 
 def _catalog_counts(
@@ -247,7 +241,7 @@ def _catalog_next_commands(
         ),
         (
             "progress_show",
-            _catalog_progress_show_command(registry_id=entry.registry_id, required_inputs=required_inputs),
+            render_progress_show_command(registry_id=entry.registry_id, required_inputs=required_inputs),
         ),
         (
             "progress_scaffold",
