@@ -16,6 +16,7 @@ from typing import Protocol
 
 from ..config import Style
 from ..core import ContractError, Record, RenderingError, validate_record_kinds
+from .hairpin_cartoon import HairpinCartoonRenderer
 from .palette import Palette
 from .sequence_rows import SequenceRowsRenderer
 
@@ -35,7 +36,12 @@ class _RendererRegistry:
         return renderer
 
 
-_REGISTRY = _RendererRegistry(renderers={"sequence_rows": SequenceRowsRenderer()})
+_REGISTRY = _RendererRegistry(
+    renderers={
+        "sequence_rows": SequenceRowsRenderer(),
+        "hairpin_cartoon": HairpinCartoonRenderer(),
+    }
+)
 
 
 def get_renderer(name: str) -> Renderer:

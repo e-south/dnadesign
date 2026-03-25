@@ -116,7 +116,8 @@ def _job_to_mapping(parsed: SequenceRowsJobV3) -> dict[str, Any]:
             (
                 {
                     "kind": "images",
-                    "dir": str(cfg.dir),
+                    "dir": (str(cfg.dir) if cfg.dir is not None else None),
+                    "path": (str(cfg.path) if cfg.path is not None else None),
                     "fmt": cfg.fmt,
                 }
                 if cfg.kind == "images"

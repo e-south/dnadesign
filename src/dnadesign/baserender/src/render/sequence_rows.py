@@ -173,6 +173,9 @@ class SequenceRowsRenderer:
                 row_id="rev",
             )
             _draw_connectors(ax, len(record.sequence), x0, layout.cw, layout, style)
+        _draw_row_labels(ax, record, layout, style)
+        if bool(style.show_coordinate_ticks):
+            _draw_coordinate_ticks(ax, record, layout, style)
 
         feature_boxes = dict(layout.feature_boxes)
         promoter_source = "densegen_promoter"
@@ -197,10 +200,10 @@ class SequenceRowsRenderer:
         # Draw feature boxes first.
         for placement in layout.placements:
             feature = record.features[placement.feature_index]
-            tag = feature.tags[0] if feature.tags else feature.kind
+            tag = str(feature.attrs.get("style_token", "")) or (feature.tags[0] if feature.tags else feature.kind)
             color = palette.color_for(tag)
             label = feature.label or ""
-            if not placement.above:
+            if not placement.above and feature.kind != "interval_annotation":
                 label = label[::-1]
             source = str(feature.attrs.get("source", "")).strip().lower()
             placement_box = (
@@ -1087,6 +1090,63 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
             ln.set_dashes(dash_pattern)
 
 
+def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) -> None:
+    row_labels = record.meta.get("row_labels") if isinstance(record.meta, Mapping) else None
+    if not isinstance(row_labels, Mapping):
+        return
+    x = layout.x_left - max(48.0, style.font_size_label * 3.2)
+    primary = row_labels.get("primary")
+    complement = row_labels.get("complement")
+    if primary:
+        ax.text(
+            x,
+            layout.y_forward,
+            str(primary),
+            ha="right",
+            va="center",
+            fontsize=style.font_size_label,
+            family=style.font_label,
+            color="#374151",
+            zorder=4.0,
+        )
+    if bool(style.show_reverse_complement and record.alphabet == "DNA") and complement:
+        ax.text(
+            x,
+            layout.y_reverse,
+            str(complement),
+            ha="right",
+            va="center",
+            fontsize=style.font_size_label,
+            family=style.font_label,
+            color="#374151",
+            zorder=4.0,
+        )
+
+
+def _draw_coordinate_ticks(ax, record: Record, layout: LayoutContext, style: Style) -> None:
+    tick_every = 5 if len(record.sequence) > 12 else 2
+    show_two = bool(style.show_reverse_complement and record.alphabet == "DNA")
+    y = (
+        layout.y_reverse - max(20.0, style.font_size_label * 1.8)
+        if show_two
+        else layout.y_forward - max(20.0, style.font_size_label * 1.8)
+    )
+    for boundary in range(0, len(record.sequence) + 1, tick_every):
+        x = layout.x_left + boundary * layout.cw
+        ax.plot([x, x], [y + 2.0, y + 8.0], color=style.color_ticks, linewidth=0.8, zorder=1.2)
+        ax.text(
+            x,
+            y,
+            str(boundary),
+            ha="center",
+            va="top",
+            fontsize=max(7, style.font_size_label - 2),
+            family=style.font_label,
+            color=style.color_ticks,
+            zorder=1.3,
+        )
+
+
 def _draw_sequence(
     ax,
     seq: str,
@@ -1188,6 +1248,8 @@ def _draw_feature_box(
 
     y_text_center = y + float(style.kmer.text_y_nudge_cells) * ch
     for idx, char in enumerate(label):
+        if char.isspace():
+            continue
         tp = _mono_text_path(char, style.font_mono, style.font_size_seq)
         gb = tp.get_extents()
         gx = ((gb.x0 + gb.x1) / 2.0) * px_per_pt

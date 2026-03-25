@@ -86,7 +86,8 @@ class RenderCfg:
 @dataclass(frozen=True)
 class ImagesOutputCfg:
     kind: str
-    dir: Path
+    dir: Path | None
+    path: Path | None
     fmt: str
 
 
@@ -153,6 +154,50 @@ def _workspace_root_from_job_path(job_path: Path) -> Path | None:
     return workspace_root
 
 
+def _cassette_run_root_from_job_path(job_path: Path) -> Path | None:
+    job_abs = job_path.resolve()
+    if job_abs.parent.name != "baserender_jobs":
+        return None
+    owner_root = job_abs.parent.parent
+    if not owner_root.is_dir():
+        return None
+    return owner_root
+
+
+def _job_owner_root(job_path: Path, *, caller_scope: Path) -> Path:
+    workspace_root = _workspace_root_from_job_path(job_path)
+    if workspace_root is not None:
+        return workspace_root.resolve()
+    cassette_root = _cassette_run_root_from_job_path(job_path)
+    if cassette_root is not None:
+        return cassette_root.resolve()
+    return caller_scope.resolve()
+
+
+def _allowed_path_roots(job_path: Path, *, caller_scope: Path) -> tuple[Path, ...]:
+    roots: list[Path] = []
+    for root in (
+        _job_owner_root(job_path, caller_scope=caller_scope),
+        job_path.parent.resolve(),
+        caller_scope.resolve(),
+    ):
+        if root not in roots:
+            roots.append(root)
+    return tuple(roots)
+
+
+def _ensure_within_allowed_roots(candidate: Path, *, field: str, allowed_roots: tuple[Path, ...]) -> Path:
+    resolved = candidate.resolve()
+    for root in allowed_roots:
+        try:
+            resolved.relative_to(root)
+        except ValueError:
+            continue
+        return resolved
+    roots = ", ".join(str(root) for root in allowed_roots)
+    raise SchemaError(f"{field} must stay within {roots}: {resolved}")
+
+
 def _default_results_root(job_path: Path, *, caller_root: Path) -> Path:
     workspace_root = _workspace_root_from_job_path(job_path)
     if workspace_root is not None:
@@ -184,13 +229,14 @@ def resolve_job_path(spec: str | Path) -> Path:
     raise FileNotFoundError(f"Could not resolve job name '{spec}' in jobs/ or docs/examples/")
 
 
-def _resolve_path(job_path: Path, raw: str, *, field: str) -> Path:
+def _resolve_path(job_path: Path, raw: str, *, field: str, allowed_roots: tuple[Path, ...]) -> Path:
     p = Path(raw)
     if p.is_absolute():
-        if not p.exists():
-            raise SchemaError(f"{field} does not exist: {p}")
-        return p
-    candidate = (job_path.parent / p).resolve()
+        candidate = _ensure_within_allowed_roots(p, field=field, allowed_roots=allowed_roots)
+        if not candidate.exists():
+            raise SchemaError(f"{field} does not exist: {candidate}")
+        return candidate
+    candidate = _ensure_within_allowed_roots(job_path.parent / p, field=field, allowed_roots=allowed_roots)
     if candidate.exists():
         return candidate
     raise SchemaError(f"{field} does not exist: {candidate}")
@@ -242,7 +288,7 @@ def _parse_sample(raw: Any) -> SampleCfg:
     return SampleCfg(mode=mode, n=n, seed=seed)
 
 
-def _parse_plugin_specs(job_path: Path, raw: Any) -> tuple[PluginSpec, ...]:
+def _parse_plugin_specs(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, ...]) -> tuple[PluginSpec, ...]:
     if raw is None:
         return ()
     if not isinstance(raw, (list, tuple)):
@@ -269,6 +315,7 @@ def _parse_plugin_specs(job_path: Path, raw: Any) -> tuple[PluginSpec, ...]:
                         job_path,
                         str(config_path_raw),
                         field="pipeline.plugins.attach_motifs_from_config.config_path",
+                        allowed_roots=allowed_roots,
                     )
                 )
             if plugin_name == "attach_motifs_from_library":
@@ -280,6 +327,7 @@ def _parse_plugin_specs(job_path: Path, raw: Any) -> tuple[PluginSpec, ...]:
                         job_path,
                         str(library_path_raw),
                         field="pipeline.plugins.attach_motifs_from_library.library_path",
+                        allowed_roots=allowed_roots,
                     )
                 )
             if plugin_name == "attach_motifs_from_cruncher_lockfile":
@@ -291,6 +339,7 @@ def _parse_plugin_specs(job_path: Path, raw: Any) -> tuple[PluginSpec, ...]:
                                 job_path,
                                 str(value),
                                 field=f"pipeline.plugins.attach_motifs_from_cruncher_lockfile.{key}",
+                                allowed_roots=allowed_roots,
                             )
                         )
                 has_manifest = parsed_params.get("run_manifest_path") is not None
@@ -308,7 +357,7 @@ def _parse_plugin_specs(job_path: Path, raw: Any) -> tuple[PluginSpec, ...]:
     return tuple(out)
 
 
-def _parse_adapter(job_path: Path, raw: Any) -> AdapterCfg:
+def _parse_adapter(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, ...]) -> AdapterCfg:
     data = require_mapping(raw, "input.adapter")
     reject_unknown_keys(data, {"kind", "columns", "policies"}, "input.adapter")
 
@@ -331,6 +380,7 @@ def _parse_adapter(job_path: Path, raw: Any) -> AdapterCfg:
                 job_path,
                 str(parsed_columns[key]),
                 field=f"input.adapter.columns.{key}",
+                allowed_roots=allowed_roots,
             )
         )
 
@@ -340,18 +390,18 @@ def _parse_adapter(job_path: Path, raw: Any) -> AdapterCfg:
     return AdapterCfg(kind=kind, columns=parsed_columns, policies=parsed_policies)
 
 
-def _parse_input(job_path: Path, raw: Any) -> InputCfg:
+def _parse_input(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, ...]) -> InputCfg:
     data = require_mapping(raw, "input")
     reject_unknown_keys(data, {"kind", "path", "adapter", "alphabet", "limit", "sample"}, "input")
 
     kind = str(data.get("kind", "")).strip().lower()
-    ensure(kind == "parquet", "input.kind must be 'parquet'", SchemaError)
+    require_one_of(kind, {"parquet", "json", "jsonl"}, "input.kind")
 
     raw_path = str(data.get("path", "")).strip()
     ensure(raw_path != "", "input.path is required", SchemaError)
-    path = _resolve_path(job_path, raw_path, field="input.path")
+    path = _resolve_path(job_path, raw_path, field="input.path", allowed_roots=allowed_roots)
 
-    adapter = _parse_adapter(job_path, data.get("adapter"))
+    adapter = _parse_adapter(job_path, data.get("adapter"), allowed_roots=allowed_roots)
 
     alphabet = str(data.get("alphabet", "DNA")).upper()
     require_one_of(alphabet, {"DNA", "RNA", "PROTEIN"}, "input.alphabet")
@@ -376,7 +426,7 @@ def _parse_input(job_path: Path, raw: Any) -> InputCfg:
     )
 
 
-def _parse_selection(job_path: Path, raw: Any) -> SelectionCfg:
+def _parse_selection(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, ...]) -> SelectionCfg:
     data = require_mapping(raw, "selection")
     reject_unknown_keys(
         data,
@@ -386,7 +436,7 @@ def _parse_selection(job_path: Path, raw: Any) -> SelectionCfg:
 
     raw_path = str(data.get("path", "")).strip()
     ensure(raw_path != "", "selection.path is required", SchemaError)
-    path = _resolve_path(job_path, raw_path, field="selection.path")
+    path = _resolve_path(job_path, raw_path, field="selection.path", allowed_roots=allowed_roots)
 
     match_on = str(data.get("match_on", "id")).strip().lower()
     require_one_of(match_on, {"id", "sequence", "row"}, "selection.match_on")
@@ -420,7 +470,7 @@ def _parse_render(raw: Any) -> RenderCfg:
     reject_unknown_keys(data, {"renderer", "style"}, "render")
 
     renderer = str(data.get("renderer", "")).strip()
-    ensure(renderer == "sequence_rows", "render.renderer must be 'sequence_rows'", SchemaError)
+    require_one_of(renderer, {"sequence_rows", "hairpin_cartoon"}, "render.renderer")
 
     style_raw = require_mapping(data.get("style", {}), "render.style")
     reject_unknown_keys(style_raw, {"preset", "overrides"}, "render.style")
@@ -440,7 +490,14 @@ def _parse_render(raw: Any) -> RenderCfg:
     return RenderCfg(renderer=renderer, style_preset=style_preset, style_overrides=dict(overrides_raw))
 
 
-def _resolve_output_dir(job: Path, results_root: Path, raw_dir: str | None) -> Path:
+def _resolve_output_dir(
+    job: Path,
+    results_root: Path,
+    raw_dir: str | None,
+    *,
+    field: str,
+    allowed_roots: tuple[Path, ...],
+) -> Path:
     root = _job_output_root(job, results_root)
     workspace_root = _workspace_root_from_job_path(job)
     if workspace_root is not None and results_root.resolve() == (workspace_root / "outputs").resolve():
@@ -448,26 +505,39 @@ def _resolve_output_dir(job: Path, results_root: Path, raw_dir: str | None) -> P
     else:
         default = root / "images"
     if raw_dir is None:
-        return default
+        return _ensure_within_allowed_roots(default, field=field, allowed_roots=allowed_roots)
     p = Path(raw_dir)
     if p.is_absolute():
-        return p
-    return (root / p).resolve()
+        return _ensure_within_allowed_roots(p, field=field, allowed_roots=allowed_roots)
+    return _ensure_within_allowed_roots(root / p, field=field, allowed_roots=allowed_roots)
 
 
-def _resolve_output_file(job: Path, results_root: Path, raw_path: str | None) -> Path:
+def _resolve_output_file(
+    job: Path,
+    results_root: Path,
+    raw_path: str | None,
+    *,
+    field: str,
+    allowed_roots: tuple[Path, ...],
+) -> Path:
     job_name = job.stem
     root = _job_output_root(job, results_root)
     default = root / f"{job_name}.mp4"
     if raw_path is None:
-        return default
+        return _ensure_within_allowed_roots(default, field=field, allowed_roots=allowed_roots)
     p = Path(raw_path)
     if p.is_absolute():
-        return p
-    return (root / p).resolve()
+        return _ensure_within_allowed_roots(p, field=field, allowed_roots=allowed_roots)
+    return _ensure_within_allowed_roots(root / p, field=field, allowed_roots=allowed_roots)
 
 
-def _parse_outputs(job_path: Path, results_root: Path, raw: Any) -> tuple[OutputCfg, ...]:
+def _parse_outputs(
+    job_path: Path,
+    results_root: Path,
+    raw: Any,
+    *,
+    allowed_roots: tuple[Path, ...],
+) -> tuple[OutputCfg, ...]:
     if not isinstance(raw, (list, tuple)):
         raise SchemaError("outputs must be a non-empty list")
     if len(raw) == 0:
@@ -485,12 +555,40 @@ def _parse_outputs(job_path: Path, results_root: Path, raw: Any) -> tuple[Output
         seen_kinds.add(kind)
 
         if kind == "images":
-            reject_unknown_keys(data, {"kind", "dir", "fmt"}, f"outputs[{i}]")
+            reject_unknown_keys(data, {"kind", "dir", "path", "fmt"}, f"outputs[{i}]")
             fmt = str(data.get("fmt", "png")).strip().lower()
             require_one_of(fmt, {"png", "svg", "pdf"}, f"outputs[{i}].fmt")
             raw_dir = data.get("dir")
-            out_dir = _resolve_output_dir(job_path, results_root, None if raw_dir is None else str(raw_dir))
-            outputs.append(ImagesOutputCfg(kind="images", dir=out_dir, fmt=fmt))
+            raw_path = data.get("path")
+            if raw_dir is not None and raw_path is not None:
+                raise SchemaError(f"outputs[{i}] must define only one of dir or path for images output")
+            out_dir = None
+            out_path = None
+            if raw_dir is not None:
+                out_dir = _resolve_output_dir(
+                    job_path,
+                    results_root,
+                    str(raw_dir),
+                    field=f"outputs[{i}].dir",
+                    allowed_roots=allowed_roots,
+                )
+            elif raw_path is not None:
+                out_path = _resolve_output_file(
+                    job_path,
+                    results_root,
+                    str(raw_path),
+                    field=f"outputs[{i}].path",
+                    allowed_roots=allowed_roots,
+                )
+            else:
+                out_dir = _resolve_output_dir(
+                    job_path,
+                    results_root,
+                    None,
+                    field=f"outputs[{i}].dir",
+                    allowed_roots=allowed_roots,
+                )
+            outputs.append(ImagesOutputCfg(kind="images", dir=out_dir, path=out_path, fmt=fmt))
             continue
 
         reject_unknown_keys(
@@ -561,7 +659,13 @@ def _parse_outputs(job_path: Path, results_root: Path, raw: Any) -> tuple[Output
         require_one_of(title_align, {"left", "center", "right"}, f"outputs[{i}].title_align")
 
         raw_path = data.get("path")
-        out_path = _resolve_output_file(job_path, results_root, None if raw_path is None else str(raw_path))
+        out_path = _resolve_output_file(
+            job_path,
+            results_root,
+            None if raw_path is None else str(raw_path),
+            field=f"outputs[{i}].path",
+            allowed_roots=allowed_roots,
+        )
 
         outputs.append(
             VideoOutputCfg(
@@ -584,7 +688,7 @@ def _parse_outputs(job_path: Path, results_root: Path, raw: Any) -> tuple[Output
     return tuple(outputs)
 
 
-def _parse_run(job_path: Path, results_root: Path, raw: Any) -> RunCfg:
+def _parse_run(job_path: Path, results_root: Path, raw: Any, *, allowed_roots: tuple[Path, ...]) -> RunCfg:
     if raw is None:
         data = {}
     else:
@@ -597,10 +701,22 @@ def _parse_run(job_path: Path, results_root: Path, raw: Any) -> RunCfg:
 
     raw_report_path = data.get("report_path")
     if raw_report_path is None:
-        report_path = (_job_output_root(job_path, results_root) / "run_report.json") if emit_report else None
+        report_path = (
+            _ensure_within_allowed_roots(
+                _job_output_root(job_path, results_root) / "run_report.json",
+                field="run.report_path",
+                allowed_roots=allowed_roots,
+            )
+            if emit_report
+            else None
+        )
     else:
         rp = Path(str(raw_report_path))
-        report_path = rp if rp.is_absolute() else (_job_output_root(job_path, results_root) / rp).resolve()
+        report_path = _ensure_within_allowed_roots(
+            rp if rp.is_absolute() else (_job_output_root(job_path, results_root) / rp),
+            field="run.report_path",
+            allowed_roots=allowed_roots,
+        )
 
     return RunCfg(
         strict=strict,
@@ -616,6 +732,7 @@ def _parse_sequence_rows_job_mapping(
     job_path: Path,
     caller_scope: Path,
 ) -> SequenceRowsJobV3:
+    allowed_roots = _allowed_path_roots(job_path, caller_scope=caller_scope)
     data = require_mapping(raw_mapping, "top-level")
     reject_unknown_keys(
         data,
@@ -628,23 +745,35 @@ def _parse_sequence_rows_job_mapping(
 
     results_root_raw = data.get("results_root")
     if results_root_raw is None:
-        results_root = _default_results_root(job_path, caller_root=caller_scope)
+        results_root = _ensure_within_allowed_roots(
+            _default_results_root(job_path, caller_root=caller_scope),
+            field="results_root",
+            allowed_roots=allowed_roots,
+        )
     else:
         p = Path(str(results_root_raw))
-        results_root = p if p.is_absolute() else (job_path.parent / p).resolve()
+        results_root = _ensure_within_allowed_roots(
+            p if p.is_absolute() else (job_path.parent / p),
+            field="results_root",
+            allowed_roots=allowed_roots,
+        )
 
-    input_cfg = _parse_input(job_path, data.get("input"))
+    input_cfg = _parse_input(job_path, data.get("input"), allowed_roots=allowed_roots)
 
     selection_raw = data.get("selection")
-    selection_cfg = None if selection_raw is None else _parse_selection(job_path, selection_raw)
+    selection_cfg = (
+        None if selection_raw is None else _parse_selection(job_path, selection_raw, allowed_roots=allowed_roots)
+    )
 
     pipeline_raw = require_mapping(data.get("pipeline", {}), "pipeline")
     reject_unknown_keys(pipeline_raw, {"plugins"}, "pipeline")
-    pipeline_cfg = PipelineCfg(plugins=_parse_plugin_specs(job_path, pipeline_raw.get("plugins")))
+    pipeline_cfg = PipelineCfg(
+        plugins=_parse_plugin_specs(job_path, pipeline_raw.get("plugins"), allowed_roots=allowed_roots)
+    )
 
     render_cfg = _parse_render(data.get("render"))
-    outputs_cfg = _parse_outputs(job_path, results_root, data.get("outputs"))
-    run_cfg = _parse_run(job_path, results_root, data.get("run"))
+    outputs_cfg = _parse_outputs(job_path, results_root, data.get("outputs"), allowed_roots=allowed_roots)
+    run_cfg = _parse_run(job_path, results_root, data.get("run"), allowed_roots=allowed_roots)
 
     return SequenceRowsJobV3(
         version=3,

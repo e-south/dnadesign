@@ -152,6 +152,18 @@ ADAPTER_CONTRACTS: dict[str, AdapterContract] = {
         optional_source_columns=("id", "motifs", "display"),
         normalize_policies=_normalize_policies_passthrough,
     ),
+    "duplex_sequence_v1": AdapterContract(
+        allowed_config_columns=(),
+        required_config_columns=(),
+        required_source_columns=(),
+        normalize_policies=_normalize_policies_passthrough,
+    ),
+    "hairpin_topology_v1": AdapterContract(
+        allowed_config_columns=(),
+        required_config_columns=(),
+        required_source_columns=(),
+        normalize_policies=_normalize_policies_passthrough,
+    ),
 }
 
 

@@ -333,3 +333,31 @@ def test_inline_job_source_name_rejects_directory_components(tmp_path: Path) -> 
     )
     assert job.path == (tmp_path / "inline_job.yaml").resolve()
     assert job.input.path == parquet.resolve()
+
+
+def test_cassette_job_rejects_input_path_outside_owner_root(tmp_path: Path) -> None:
+    run_dir = tmp_path / "cassette_run"
+    outside_input = _make_input_parquet(tmp_path / "outside")
+    payload = densegen_job_payload(
+        parquet_path=outside_input,
+        results_root=run_dir,
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    job_path = write_job(run_dir / "baserender_jobs" / "top_hits_duplex.job.yaml", payload)
+
+    with pytest.raises(SchemaError, match="must stay within"):
+        load_cruncher_showcase_job(job_path)
+
+
+def test_cassette_job_rejects_output_path_outside_owner_root(tmp_path: Path) -> None:
+    run_dir = tmp_path / "cassette_run"
+    input_path = _make_input_parquet(run_dir / "inputs")
+    payload = densegen_job_payload(
+        parquet_path=input_path,
+        results_root=run_dir,
+        outputs=[{"kind": "images", "path": str(tmp_path / "leak.png"), "fmt": "png"}],
+    )
+    job_path = write_job(run_dir / "baserender_jobs" / "top_hits_duplex.job.yaml", payload)
+
+    with pytest.raises(SchemaError, match="must stay within"):
+        load_cruncher_showcase_job(job_path)

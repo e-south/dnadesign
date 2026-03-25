@@ -79,6 +79,28 @@ class _RegulatorWindowFeatureContract:
 
 
 @dataclass(frozen=True)
+class _IntervalAnnotationFeatureContract:
+    kind: str = "interval_annotation"
+
+    def validate_feature(self, feature: Feature, record: Record) -> None:
+        reject_unknown_keys(
+            feature.attrs,
+            {"lane", "shape", "semantic", "intent", "style_token"},
+            "interval_annotation.attrs",
+        )
+        lane = str(feature.attrs.get("lane", "")).strip().lower()
+        ensure(lane != "", "interval_annotation.attrs.lane is required", ContractError)
+        shape = str(feature.attrs.get("shape", "")).strip().lower()
+        ensure(
+            shape in {"rounded_rect", "band", "underline"},
+            "interval_annotation.attrs.shape is invalid",
+            ContractError,
+        )
+        semantic = str(feature.attrs.get("semantic", "")).strip()
+        ensure(semantic != "", "interval_annotation.attrs.semantic is required", ContractError)
+
+
+@dataclass(frozen=True)
 class _SpanLinkEffectContract:
     kind: str = "span_link"
 
@@ -176,6 +198,53 @@ class _MotifLogoEffectContract:
             )
 
 
+@dataclass(frozen=True)
+class _BoundaryMarkerEffectContract:
+    kind: str = "boundary_marker"
+
+    def validate_effect(self, effect: Effect, record: Record) -> None:
+        target = effect.target
+        reject_unknown_keys(target, {"boundary", "lane"}, "boundary_marker.target")
+        ensure("boundary" in target, "boundary_marker target must include boundary", ContractError)
+        ensure("lane" in target, "boundary_marker target must include lane", ContractError)
+        ensure(
+            isinstance(target["boundary"], int),
+            "boundary_marker.target.boundary must be int",
+            ContractError,
+        )
+        ensure(
+            str(target["lane"]).lower() in {"primary", "complement"},
+            "boundary_marker.target.lane is invalid",
+            ContractError,
+        )
+        reject_unknown_keys(effect.params, {"label", "semantic", "intent"}, "boundary_marker.params")
+
+
+@dataclass(frozen=True)
+class _PairMapEffectContract:
+    kind: str = "pair_map"
+
+    def validate_effect(self, effect: Effect, record: Record) -> None:
+        target = effect.target
+        reject_unknown_keys(target, {"pairs"}, "pair_map.target")
+        ensure("pairs" in target, "pair_map target must include pairs", ContractError)
+        pairs = target["pairs"]
+        ensure(
+            isinstance(pairs, list) and len(pairs) > 0,
+            "pair_map.target.pairs must be a non-empty list",
+            ContractError,
+        )
+        for index, pair in enumerate(pairs):
+            ensure(isinstance(pair, Mapping), f"pair_map.target.pairs[{index}] must be a mapping", ContractError)
+            reject_unknown_keys(pair, {"left_index", "right_index"}, f"pair_map.target.pairs[{index}]")
+            ensure(
+                "left_index" in pair and "right_index" in pair,
+                f"pair_map.target.pairs[{index}] must include left_index and right_index",
+                ContractError,
+            )
+        reject_unknown_keys(effect.params, {"semantic"}, "pair_map.params")
+
+
 _FEATURE_CONTRACTS: dict[str, FeatureKindContract] = {}
 _EFFECT_CONTRACTS: dict[str, EffectKindContract] = {}
 
@@ -217,5 +286,8 @@ def validate_record_kinds(record: Record) -> None:
 def register_builtin_contracts() -> None:
     register_feature_contract(_KmerFeatureContract())
     register_feature_contract(_RegulatorWindowFeatureContract())
+    register_feature_contract(_IntervalAnnotationFeatureContract())
     register_effect_contract(_SpanLinkEffectContract())
     register_effect_contract(_MotifLogoEffectContract())
+    register_effect_contract(_BoundaryMarkerEffectContract())
+    register_effect_contract(_PairMapEffectContract())

@@ -19,7 +19,9 @@ from ..config.adapter_contracts import adapter_contract
 from ..core import Record, SchemaError
 from .cruncher_best_window import CruncherBestWindowAdapter
 from .densegen_tfbs import DensegenTfbsAdapter
+from .duplex_sequence_v1 import DuplexSequenceV1Adapter
 from .generic_features import GenericFeaturesAdapter
+from .hairpin_topology_v1 import HairpinTopologyV1Adapter
 from .sequence_windows_v1 import SequenceWindowsV1Adapter
 
 
@@ -51,11 +53,21 @@ def _build_sequence_windows(cfg: AdapterCfg, alphabet: str) -> Adapter:
     return SequenceWindowsV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
 
 
+def _build_duplex_sequence(cfg: AdapterCfg, alphabet: str) -> Adapter:
+    return DuplexSequenceV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_hairpin_topology(cfg: AdapterCfg, alphabet: str) -> Adapter:
+    return HairpinTopologyV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
 ADAPTER_SPECS: dict[str, AdapterSpec] = {
     "densegen_tfbs": AdapterSpec(factory=_build_densegen),
     "generic_features": AdapterSpec(factory=_build_generic),
     "cruncher_best_window": AdapterSpec(factory=_build_cruncher),
     "sequence_windows_v1": AdapterSpec(factory=_build_sequence_windows),
+    "duplex_sequence_v1": AdapterSpec(factory=_build_duplex_sequence),
+    "hairpin_topology_v1": AdapterSpec(factory=_build_hairpin_topology),
 }
 
 

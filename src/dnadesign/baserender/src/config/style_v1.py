@@ -102,6 +102,10 @@ class Style:
     track_spacing: float = 22.0
     baseline_spacing: float = 56.0
     show_reverse_complement: bool = True
+    show_coordinate_ticks: bool = False
+    show_pair_rungs: bool = True
+    show_loop_label: bool = True
+    show_base_text: bool = False
     layout: LayoutStyle = field(default_factory=LayoutStyle)
     sequence: SequenceStyle = field(default_factory=SequenceStyle)
 
