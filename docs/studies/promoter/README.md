@@ -1,7 +1,7 @@
 ## Promoter Study Registry
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-21
+**Last verified:** 2026-03-25
 
 Use this directory when the question is not just "how do promoter-study
 workflows operate?" but "which real promoter study is active right now?"
@@ -22,6 +22,7 @@ docs/studies/promoter/
   <study-id>/
     campaign.yaml
     datasets.yaml
+    ops.study.yaml
     status.md
     pipeline.yaml  # optional execution-map surface once the study owns real configs
     audits/
@@ -33,17 +34,21 @@ docs/studies/promoter/
   paths.
 - `<study-id>/datasets.yaml` keeps the affiliated-dataset registry, including
   sync posture for shared roots and workspace-local export roots.
+- `<study-id>/ops.study.yaml` is the OPS-facing contract for phase order,
+  repo-scoped snapshot posture, and preflight group planning.
 - `<study-id>/status.md` records the human-readable current state, row targets,
   infer slices, rollback commands, and next actions.
 - `<study-id>/pipeline.yaml`, when present, records the exact study-owned
-  Construct workspace, Infer configs, ops runbooks, and Notify profile paths.
+  Construct workspace, Infer configs, and batch/runbook surfaces that belong to
+  the live study. Keep narrative study meaning in `status.md` or
+  `ops.study.yaml`, not here.
 
 ### Discovery rules
 
 - If `active_study` is `null`, there is no live promoter study record yet.
 - If `active_study` names a study id, that entry must exist in `studies:` and
   the corresponding `<study-id>/` directory must contain `campaign.yaml`,
-  `datasets.yaml`, and `status.md`.
+  `datasets.yaml`, `status.md`, and `ops.study.yaml`.
 - If `<study-id>/pipeline.yaml` exists, use it as the execution-map surface for
   the next study-owned Construct or Infer action.
 - If `active_study` and `studies:` disagree, fail visibly and fix the registry

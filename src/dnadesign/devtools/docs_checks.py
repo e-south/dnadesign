@@ -113,7 +113,7 @@ EXIT_ARTIFACT_PATTERN = re.compile(r"^\*\*Exit artifact:\*\*\s*(.+?)\s*$", re.MU
 REGISTRY_ID_METADATA_PATTERN = re.compile(r"^\*\*Registry-id:\*\*\s*(.+?)\s*$", re.MULTILINE)
 SUMMARY_METADATA_PATTERN = re.compile(r"^\*\*Summary:\*\*\s*(.+?)\s*$", re.MULTILINE)
 EXECUTION_KIND_METADATA_PATTERN = re.compile(r"^\*\*Execution-kind:\*\*\s*(.+?)\s*$", re.MULTILINE)
-PROGRESS_KIND_METADATA_PATTERN = re.compile(r"^\*\*Progress-kind:\*\*\s*(.+?)\s*$", re.MULTILINE)
+STATUS_KIND_METADATA_PATTERN = re.compile(r"^\*\*Status-kind:\*\*\s*(.+?)\s*$", re.MULTILINE)
 PROGRESS_SURFACE_GLOSSARY_ROW_PATTERN = re.compile(r"^\|\s*`(?P<kind>[^`]+)`\s*\|")
 STATUS_PATTERN = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
 CREATED_PATTERN = re.compile(r"^\*\*Created:\*\*\s*(.+?)\s*$", re.MULTILINE)
@@ -178,6 +178,16 @@ LEGACY_CONTRACT_SURFACE_DOC_PATTERNS = (
     re.compile(r"src/dnadesign/usr_roots\.py\b"),
     re.compile(r"src/dnadesign/usr/src/roots\.py\b"),
     re.compile(r"src/dnadesign/ops/orchestrator/contracts\.py\b"),
+)
+STUDY_RECORD_REQUIRED_FILES = (
+    "campaign.yaml",
+    "datasets.yaml",
+    "status.md",
+    "ops.study.yaml",
+)
+STUDY_RECORD_REQUIRED_READMES = (
+    "docs/studies/README.md",
+    "docs/studies/promoter/README.md",
 )
 OPS_OPERATIONAL_WORKFLOW_IDS = {
     "densegen_batch_submit",
@@ -263,7 +273,7 @@ _RUNBOOK_CATALOG_METADATA_TYPES = {"contract", "runbook", "workflow"}
 _REGISTRY_ID_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$")
 _METADATA_TOKEN_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:-[a-z0-9]+)*$")
 RUNBOOK_CATALOG_DOC_PATH = "docs/runbooks/README.md"
-RUNBOOK_PROGRESS_GLOSSARY_HEADING = "### Progress views"
+RUNBOOK_STATUS_GLOSSARY_HEADING = "### Status views"
 OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES = (
     PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
     Path("docs/templates"),
@@ -1025,13 +1035,13 @@ def _find_cross_tool_doc_metadata_issues(repo_root: Path) -> list[str]:
         elif _METADATA_TOKEN_VALUE_PATTERN.fullmatch(execution_kind) is None:
             issues.append(f"{path}: '**Execution-kind:**' must use lowercase slug tokens.")
 
-        progress_kind = _extract_metadata_field(text, PROGRESS_KIND_METADATA_PATTERN)
-        if progress_kind is None:
-            issues.append(f"{path}: missing '**Progress-kind:**' metadata field.")
-        elif not progress_kind:
-            issues.append(f"{path}: '**Progress-kind:**' must not be empty.")
-        elif _METADATA_TOKEN_VALUE_PATTERN.fullmatch(progress_kind) is None:
-            issues.append(f"{path}: '**Progress-kind:**' must use lowercase slug tokens.")
+        status_kind = _extract_metadata_field(text, STATUS_KIND_METADATA_PATTERN)
+        if status_kind is None:
+            issues.append(f"{path}: missing '**Status-kind:**' metadata field.")
+        elif not status_kind:
+            issues.append(f"{path}: '**Status-kind:**' must not be empty.")
+        elif _METADATA_TOKEN_VALUE_PATTERN.fullmatch(status_kind) is None:
+            issues.append(f"{path}: '**Status-kind:**' must use lowercase slug tokens.")
 
     seen_registry_ids: dict[str, str] = {}
     for relative_path, registry_id in registry_ids_by_path.items():
@@ -1073,7 +1083,7 @@ def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
         return issues
 
     catalog_entries_by_path: dict[str, CatalogProcedureEntry] = {}
-    catalog_progress_kinds = {entry.progress_kind for entry in catalog.procedures}
+    catalog_status_kinds = {entry.status_kind for entry in catalog.procedures}
     expected_catalog_paths: set[str] = set()
     for entry in catalog.procedures:
         resolved_path = resolve_catalog_doc_path(catalog_path=catalog.catalog_path, doc_path=entry.doc_path)
@@ -1149,7 +1159,7 @@ def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
             "Entry artifact": _extract_metadata_field(text, ENTRY_ARTIFACT_PATTERN),
             "Exit artifact": _extract_metadata_field(text, EXIT_ARTIFACT_PATTERN),
             "Execution-kind": _extract_metadata_field(text, EXECUTION_KIND_METADATA_PATTERN),
-            "Progress-kind": _extract_metadata_field(text, PROGRESS_KIND_METADATA_PATTERN),
+            "Status-kind": _extract_metadata_field(text, STATUS_KIND_METADATA_PATTERN),
             "Summary": _extract_metadata_field(text, SUMMARY_METADATA_PATTERN),
         }
         metadata_file_values = {
@@ -1160,7 +1170,7 @@ def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
             "Entry artifact": metadata_payload.get("entry_artifact"),
             "Exit artifact": metadata_payload.get("exit_artifact"),
             "Execution-kind": metadata_payload.get("execution_kind"),
-            "Progress-kind": metadata_payload.get("progress_kind"),
+            "Status-kind": metadata_payload.get("status_kind"),
             "Summary": metadata_payload.get("summary"),
         }
         for field_name, expected_value in expected_metadata.items():
@@ -1180,25 +1190,25 @@ def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
                 "add a matching cross-tool metadata contract or remove the registry metadata sidecar."
             )
 
-    glossary_text = _extract_markdown_section(catalog_text, heading=RUNBOOK_PROGRESS_GLOSSARY_HEADING)
+    glossary_text = _extract_markdown_section(catalog_text, heading=RUNBOOK_STATUS_GLOSSARY_HEADING)
     if glossary_text is None:
-        issues.append(f"{catalog_path}: missing '{RUNBOOK_PROGRESS_GLOSSARY_HEADING}' section.")
+        issues.append(f"{catalog_path}: missing '{RUNBOOK_STATUS_GLOSSARY_HEADING}' section.")
         return issues
 
-    glossary_progress_kinds = {
+    glossary_status_kinds = {
         match.group("kind").strip()
         for line in glossary_text.splitlines()
         for match in [PROGRESS_SURFACE_GLOSSARY_ROW_PATTERN.match(line.strip())]
         if match is not None
     }
-    if not glossary_progress_kinds:
-        issues.append(f"{catalog_path}: progress surface glossary section has no data table.")
+    if not glossary_status_kinds:
+        issues.append(f"{catalog_path}: status surface glossary section has no data table.")
         return issues
 
-    for progress_kind in sorted(catalog_progress_kinds - glossary_progress_kinds):
-        issues.append(f"{catalog_path}: missing progress surface glossary entry for '{progress_kind}'.")
-    for progress_kind in sorted(glossary_progress_kinds - catalog_progress_kinds):
-        issues.append(f"{catalog_path}: unexpected progress surface glossary entry for '{progress_kind}'.")
+    for status_kind in sorted(catalog_status_kinds - glossary_status_kinds):
+        issues.append(f"{catalog_path}: missing status surface glossary entry for '{status_kind}'.")
+    for status_kind in sorted(glossary_status_kinds - catalog_status_kinds):
+        issues.append(f"{catalog_path}: unexpected status surface glossary entry for '{status_kind}'.")
 
     return issues
 
@@ -1217,6 +1227,88 @@ def _extract_markdown_section(text: str, *, heading: str) -> str | None:
             break
         section_lines.append(line)
     return "\n".join(section_lines)
+
+
+def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    resolved_repo_root = repo_root.resolve()
+
+    for relative_path in STUDY_RECORD_REQUIRED_READMES:
+        path = repo_root / relative_path
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for required_name in STUDY_RECORD_REQUIRED_FILES:
+            if required_name not in text:
+                issues.append(f"{path}: missing study-record contract reference for '{required_name}'.")
+
+    index_path = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
+    if not index_path.exists():
+        return issues
+
+    payload = yaml.safe_load(index_path.read_text(encoding="utf-8")) or {}
+    if not isinstance(payload, dict):
+        return [f"{index_path}: promoter study index must be a mapping."]
+
+    active_study = payload.get("active_study")
+    studies_payload = payload.get("studies") or []
+    if not isinstance(studies_payload, list):
+        issues.append(f"{index_path}: 'studies' must be a list.")
+        return issues
+
+    entries_by_id: dict[str, Path] = {}
+    for index, entry in enumerate(studies_payload, start=1):
+        if not isinstance(entry, dict):
+            issues.append(f"{index_path}: study entry {index} must be a mapping.")
+            continue
+        study_id = str(entry.get("study_id") or "").strip()
+        raw_path = str(entry.get("path") or "").strip()
+        if not study_id:
+            issues.append(f"{index_path}: study entry {index} must define study_id.")
+            continue
+        if not raw_path:
+            issues.append(f"{index_path}: study entry {study_id!r} must define path.")
+            continue
+        resolved_path = (
+            (repo_root / raw_path).resolve() if not Path(raw_path).is_absolute() else Path(raw_path).resolve()
+        )
+        try:
+            resolved_path.relative_to(resolved_repo_root)
+        except ValueError:
+            issues.append(f"{index_path}: study entry {study_id!r} path escapes the repository: {raw_path}")
+            continue
+        if resolved_path.name != study_id:
+            issues.append(
+                f"{index_path}: study entry {study_id!r} path must end with the same study id (path={raw_path!r})."
+            )
+        if study_id in entries_by_id:
+            issues.append(f"{index_path}: duplicate study_id {study_id!r}.")
+            continue
+        entries_by_id[study_id] = resolved_path
+
+    active_study_text = str(active_study or "").strip() or None
+    if active_study is not None and active_study_text is None:
+        issues.append(f"{index_path}: active_study must be null or a non-empty study id.")
+        return issues
+    if active_study_text is None:
+        return issues
+    if active_study_text not in entries_by_id:
+        issues.append(f"{index_path}: active_study {active_study_text!r} is not declared under studies.")
+        return issues
+
+    study_root = entries_by_id[active_study_text]
+    if not study_root.is_dir():
+        issues.append(f"{index_path}: active study path is not a directory: {study_root}")
+        return issues
+    for required_name in STUDY_RECORD_REQUIRED_FILES:
+        required_path = study_root / required_name
+        if not required_path.exists():
+            issues.append(
+                f"{index_path}: active study {active_study_text!r} is missing "
+                f"required file {required_name}: {required_path}"
+            )
+
+    return issues
 
 
 def _find_exec_plan_metadata_issues(repo_root: Path) -> list[str]:
@@ -1803,6 +1895,13 @@ def main(argv: list[str] | None = None) -> int:
     if runbook_catalog_issues:
         print("Runbook catalog check failed:")
         for issue in runbook_catalog_issues:
+            print(f" - {issue}")
+        return 1
+
+    study_record_doc_issues = _find_study_record_doc_issues(repo_root)
+    if study_record_doc_issues:
+        print("Study record docs check failed:")
+        for issue in study_record_doc_issues:
             print(f" - {issue}")
         return 1
 

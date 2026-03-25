@@ -66,7 +66,7 @@ def _write_registry_metadata(
     exit_artifact: str,
     summary: str,
     execution_kind: str,
-    progress_kind: str,
+    status_kind: str,
     relations: list[dict[str, str]] | None = None,
 ) -> None:
     metadata_path = doc_path.with_name(f"{doc_path.stem}.registry.yaml")
@@ -84,7 +84,7 @@ def _write_registry_metadata(
                 "exit_artifact": exit_artifact,
                 "summary": summary,
                 "execution_kind": execution_kind,
-                "progress_kind": progress_kind,
+                "status_kind": status_kind,
                 "relations": relations or [],
             },
             sort_keys=False,
@@ -139,9 +139,9 @@ def _write_runbook_catalog_readme(
                 "",
                 tool_source_section,
                 "",
-                "### Progress views",
+                "### Status views",
                 "",
-                "| Progress kind | Meaning | Check next |",
+                "| Status kind | Meaning | Check next |",
                 "| --- | --- | --- |",
                 *glossary_rows,
             ]
@@ -1888,7 +1888,7 @@ def test_cross_tool_doc_metadata_check_flags_missing_registry_fields(tmp_path: P
     assert any("missing '**Registry-id:**'" in issue for issue in issues)
     assert any("missing '**Summary:**'" in issue for issue in issues)
     assert any("missing '**Execution-kind:**'" in issue for issue in issues)
-    assert any("missing '**Progress-kind:**'" in issue for issue in issues)
+    assert any("missing '**Status-kind:**'" in issue for issue in issues)
 
 
 def test_cross_tool_doc_metadata_check_accepts_expected_contract_values(tmp_path: Path) -> None:
@@ -1930,7 +1930,7 @@ def test_cross_tool_doc_metadata_check_accepts_registry_fields_for_runbook_docs(
                 "**Registry-id:** ops.control-plane.orchestration",
                 "**Summary:** Deterministic batch orchestration contract.",
                 "**Execution-kind:** executable",
-                "**Progress-kind:** ops-audit-json",
+                "**Status-kind:** ops-audit-json",
                 "**Owner:** maintainers",
                 f"**Last verified:** {dt.date.today().isoformat()}",
             ]
@@ -1960,7 +1960,7 @@ def test_runbook_catalog_check_flags_missing_registered_doc_entries(tmp_path: Pa
                 "**Registry-id:** ops.control-plane.orchestration",
                 "**Summary:** Deterministic batch orchestration contract.",
                 "**Execution-kind:** executable",
-                "**Progress-kind:** ops-audit-json",
+                "**Status-kind:** ops-audit-json",
                 "**Owner:** maintainers",
                 f"**Last verified:** {today}",
             ]
@@ -1978,7 +1978,7 @@ def test_runbook_catalog_check_flags_missing_registered_doc_entries(tmp_path: Pa
         exit_artifact="audit output",
         summary="Deterministic batch orchestration contract.",
         execution_kind="executable",
-        progress_kind="ops-audit-json",
+        status_kind="ops-audit-json",
     )
     hpc_sync_doc = tmp_path / "src" / "dnadesign" / "usr" / "docs" / "operations" / "hpc-agent-sync-flow.md"
     _write(
@@ -1995,7 +1995,7 @@ def test_runbook_catalog_check_flags_missing_registered_doc_entries(tmp_path: Pa
                 "**Registry-id:** usr.data-plane.hpc-sync",
                 "**Summary:** HPC and local sync flow.",
                 "**Execution-kind:** iterative",
-                "**Progress-kind:** usr-sync-audit",
+                "**Status-kind:** usr-sync-audit",
                 "**Owner:** maintainers",
                 f"**Last verified:** {today}",
             ]
@@ -2030,7 +2030,7 @@ def test_runbook_catalog_check_flags_metadata_drift_against_owner_local_doc(tmp_
                 "**Registry-id:** ops.control-plane.orchestration",
                 "**Summary:** Deterministic control-plane runbook contract.",
                 "**Execution-kind:** executable",
-                "**Progress-kind:** ops-audit-json",
+                "**Status-kind:** ops-audit-json",
                 "**Owner:** maintainers",
                 f"**Last verified:** {today}",
             ]
@@ -2048,7 +2048,7 @@ def test_runbook_catalog_check_flags_metadata_drift_against_owner_local_doc(tmp_
         exit_artifact="audit output",
         summary="Deterministic batch orchestration contract.",
         execution_kind="executable",
-        progress_kind="ops-audit-json",
+        status_kind="ops-audit-json",
     )
     _write_generated_runbook_catalog_readme(
         tmp_path,
@@ -2081,7 +2081,7 @@ def test_runbook_catalog_check_accepts_matching_owner_local_metadata(tmp_path: P
                 "**Registry-id:** ops.control-plane.orchestration",
                 f"**Summary:** {summary}",
                 "**Execution-kind:** executable",
-                "**Progress-kind:** ops-audit-json",
+                "**Status-kind:** ops-audit-json",
                 "**Owner:** maintainers",
                 f"**Last verified:** {today}",
             ]
@@ -2099,7 +2099,7 @@ def test_runbook_catalog_check_accepts_matching_owner_local_metadata(tmp_path: P
         exit_artifact="audit output",
         summary=summary,
         execution_kind="executable",
-        progress_kind="ops-audit-json",
+        status_kind="ops-audit-json",
     )
     _write_generated_runbook_catalog_readme(
         tmp_path,
@@ -2128,7 +2128,7 @@ def test_runbook_catalog_check_flags_stale_generated_procedure_section(tmp_path:
                 "**Registry-id:** ops.control-plane.orchestration",
                 "**Summary:** Deterministic control-plane runbook contract.",
                 "**Execution-kind:** executable",
-                "**Progress-kind:** ops-audit-json",
+                "**Status-kind:** ops-audit-json",
                 "**Owner:** maintainers",
                 f"**Last verified:** {today}",
             ]
@@ -2146,7 +2146,7 @@ def test_runbook_catalog_check_flags_stale_generated_procedure_section(tmp_path:
         exit_artifact="audit output",
         summary="Deterministic control-plane runbook contract.",
         execution_kind="executable",
-        progress_kind="ops-audit-json",
+        status_kind="ops-audit-json",
     )
     _write_runbook_catalog_readme(
         tmp_path,
@@ -2178,7 +2178,7 @@ def test_runbook_catalog_check_flags_stale_generated_tool_source_section(tmp_pat
                 "**Registry-id:** ops.control-plane.orchestration",
                 "**Summary:** Deterministic control-plane runbook contract.",
                 "**Execution-kind:** executable",
-                "**Progress-kind:** ops-audit-json",
+                "**Status-kind:** ops-audit-json",
                 "**Owner:** maintainers",
                 f"**Last verified:** {today}",
             ]
@@ -2208,7 +2208,7 @@ def test_runbook_catalog_check_flags_stale_generated_tool_source_section(tmp_pat
         exit_artifact="audit output",
         summary="Deterministic control-plane runbook contract.",
         execution_kind="executable",
-        progress_kind="ops-audit-json",
+        status_kind="ops-audit-json",
     )
     _write_tool_source_metadata(
         ops_docs,
@@ -2252,7 +2252,7 @@ def test_runbook_catalog_check_flags_missing_progress_surface_glossary_entry(tmp
                 "**Registry-id:** ops.control-plane.orchestration",
                 "**Summary:** Deterministic control-plane runbook contract.",
                 "**Execution-kind:** executable",
-                "**Progress-kind:** ops-audit-json",
+                "**Status-kind:** ops-audit-json",
                 "**Owner:** maintainers",
                 f"**Last verified:** {today}",
             ]
@@ -2270,7 +2270,7 @@ def test_runbook_catalog_check_flags_missing_progress_surface_glossary_entry(tmp
         exit_artifact="audit output",
         summary="Deterministic control-plane runbook contract.",
         execution_kind="executable",
-        progress_kind="ops-audit-json",
+        status_kind="ops-audit-json",
     )
     _write_generated_runbook_catalog_readme(
         tmp_path,
@@ -2279,7 +2279,7 @@ def test_runbook_catalog_check_flags_missing_progress_surface_glossary_entry(tmp
 
     issues = _find_runbook_catalog_issues(tmp_path)
 
-    assert any("missing progress surface glossary entry for 'ops-audit-json'" in issue for issue in issues)
+    assert any("missing status surface glossary entry for 'ops-audit-json'" in issue for issue in issues)
 
 
 def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> None:

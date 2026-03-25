@@ -46,10 +46,13 @@ Out of scope:
   `src/dnadesign/usr/docs/operations/promoter-study-status-contract.md`.
 - Treat `docs/studies/promoter/index.yaml`,
   `docs/studies/promoter/<study-id>/campaign.yaml`,
-  `docs/studies/promoter/<study-id>/datasets.yaml`, `status.md`,
-  `ops.study.yaml`, and optional `pipeline.yaml` as the only valid source for live dataset ids,
-  local-vs-remote sync posture, row targets, completed infer slices, study-owned
-  Construct or Infer surfaces, and next actions. `ops.study.yaml` is the
+  `docs/studies/promoter/<study-id>/datasets.yaml`,
+  `docs/studies/promoter/<study-id>/status.md`,
+  `docs/studies/promoter/<study-id>/ops.study.yaml`, and optional
+  `docs/studies/promoter/<study-id>/pipeline.yaml` as the only valid source for
+  live dataset ids, local-vs-remote sync posture, row targets, completed infer
+  slices, study-owned Construct or Infer surfaces, and next actions.
+  `ops.study.yaml` is the
   OPS-facing source of phase order and next-scope preflight grouping. Infer
   Notify profile paths should be derived from the checked-in Infer lane configs
   rather than stored separately in `pipeline.yaml`.

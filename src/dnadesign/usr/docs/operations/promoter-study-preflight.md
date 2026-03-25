@@ -8,7 +8,7 @@
 **Registry-id:** usr.data-plane.promoter-study-preflight
 **Summary:** Run the active promoter-study preflight suite across DenseGen, Construct, Infer, Notify, and batch-plan contracts without mutating data or submitting jobs.
 **Execution-kind:** iterative
-**Progress-kind:** promoter-study-preflight
+**Status-kind:** promoter-study-preflight
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-25
@@ -79,7 +79,8 @@ belong to the next actionable scope versus the full study surface:
 - Use `ops.study.yaml` as the OPS-facing source of phase order, snapshot scope,
   and preflight phase-target grouping.
 - Use the existing study-owned `pipeline.yaml` as the only source for real
-  Construct, Infer, and runbook paths.
+  Construct, Infer, and runbook paths plus any minimal runtime mappings the
+  study still needs.
 - Derive Infer Notify profile paths from the checked-in Infer lane configs
   rather than duplicating those profile paths in `pipeline.yaml`.
 
