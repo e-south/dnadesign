@@ -16,20 +16,21 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from dnadesign.ops.preflight import CommandExecution, PreflightCheck, build_command_check, build_state_check
+
 _NOTIFY_WEBHOOK_ENV_KEYS = ("NOTIFY_WEBHOOK", "NOTIFY_WEBHOOK_FILE")
 _NOTIFY_TLS_ENV_KEY = "SSL_CERT_FILE"
 
 
 @dataclass(frozen=True)
 class PromoterPreflightNotifyEnvironmentDependencies:
-    preflight_state_check: Callable[..., dict[str, object]]
+    pass
 
 
 @dataclass(frozen=True)
 class PromoterPreflightRunbookPlanDependencies:
-    run_progress_command: Callable[..., object]
+    run_preflight_command: Callable[..., CommandExecution]
     safe_json_loads: Callable[[str | None], dict[str, object] | None]
-    preflight_command_check: Callable[..., dict[str, object]]
     choose_command_summary: Callable[..., str]
 
 
@@ -60,12 +61,13 @@ def build_promoter_preflight_notify_environment_checks(
     notify_environment_phase_id: str,
     enabled_groups: Collection[str],
     dependencies: PromoterPreflightNotifyEnvironmentDependencies,
-) -> tuple[dict[str, object], ...]:
+) -> tuple[PreflightCheck, ...]:
+    del dependencies
     if "notify_environment" not in enabled_groups:
         return ()
     webhook_ready = any(bool(notify_env_state.get(env_var)) for env_var in _NOTIFY_WEBHOOK_ENV_KEYS)
     return (
-        dependencies.preflight_state_check(
+        build_state_check(
             check_id="notify.environment.webhook",
             check_group="notify_environment",
             phase="notify",
@@ -78,7 +80,7 @@ def build_promoter_preflight_notify_environment_checks(
             ),
             details=dict(notify_env_state),
         ),
-        dependencies.preflight_state_check(
+        build_state_check(
             check_id="notify.environment.tls",
             check_group="notify_environment",
             phase="notify",
@@ -99,10 +101,10 @@ def build_promoter_preflight_runbook_plan_checks(
     study_repo_root: Path,
     targets: Sequence[PromoterPreflightRunbookPlanTarget],
     dependencies: PromoterPreflightRunbookPlanDependencies,
-) -> tuple[dict[str, object], ...]:
-    checks: list[dict[str, object]] = []
+) -> tuple[PreflightCheck, ...]:
+    checks: list[PreflightCheck] = []
     for target in targets:
-        runbook_plan = dependencies.run_progress_command(
+        runbook_plan = dependencies.run_preflight_command(
             (
                 "uv",
                 "run",
@@ -134,7 +136,7 @@ def build_promoter_preflight_runbook_plan_checks(
                 }
             )
         checks.append(
-            dependencies.preflight_command_check(
+            build_command_check(
                 check_id=target.check_id,
                 check_group=target.check_group,
                 phase=target.phase,

@@ -21,7 +21,7 @@ import yaml
 from typer.testing import CliRunner
 
 from dnadesign.ops.cli import app
-from dnadesign.ops.progress_command_support import CommandExecution
+from dnadesign.ops.preflight import CommandExecution
 from dnadesign.studies.stress_promoter_ethanol_cipro.ops_provider import (
     provide_stress_promoter_ethanol_cipro_preflight,
     provide_stress_promoter_ethanol_cipro_status,
@@ -838,7 +838,7 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_progress_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_preflight_command", _fake_run)
         monkeypatch.setattr(
             "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
@@ -983,7 +983,7 @@ def test_promoter_study_preflight_skips_construct_runtime_revalidation_once_mate
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_progress_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_preflight_command", _fake_run)
         monkeypatch.setattr(
             "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [{"id": 0, "name": "GPU"}], "probe_error": None},
@@ -1084,7 +1084,7 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_progress_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_preflight_command", _fake_run)
         monkeypatch.setattr(
             "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
@@ -1212,7 +1212,7 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_progress_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_preflight_command", _fake_run)
         monkeypatch.setattr(
             "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
@@ -1339,7 +1339,7 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_progress_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_preflight_command", _fake_run)
         monkeypatch.setattr(
             "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
@@ -1434,7 +1434,7 @@ def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_progress_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.stress_promoter_ethanol_cipro.family.run_preflight_command", _fake_run)
         monkeypatch.setattr(
             "dnadesign.studies.stress_promoter_ethanol_cipro.family.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
@@ -1760,7 +1760,7 @@ def test_cli_progress_show_reports_missing_opal_config_state_without_exiting() -
         assert payload["evidence"]["opal_workdir"].endswith("demo_campaign")
 
 
-def test_cli_progress_campaign_reports_missing_step_for_scaffold_placeholder_paths() -> None:
+def test_cli_progress_campaign_rejects_scaffold_placeholder_paths() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
         manifest_path = Path("manifests") / "campaign_status.yaml"
@@ -1797,13 +1797,51 @@ def test_cli_progress_campaign_reports_missing_step_for_scaffold_placeholder_pat
             ],
         )
 
-        assert result.exit_code == 0
-        payload = json.loads(result.output)
-        assert payload["overall_state"] == "missing"
-        assert payload["counts"] == {"ok": 0, "attention": 0, "missing": 1}
-        assert payload["steps"][0]["state"] == "missing"
-        assert payload["steps"][0]["summary"] == "OPAL config not found"
-        assert payload["steps"][0]["evidence"]["opal_config"].endswith("<opal-workdir>/configs/campaign.yaml")
+        assert result.exit_code == 2
+        assert "placeholder path text" in result.output
+        assert "<opal-workdir>/configs/campaign.yaml" in result.output
+
+
+def test_cli_progress_campaign_rejects_narrative_placeholder_paths() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        manifest_path = Path("manifests") / "campaign_status.yaml"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(
+            yaml.safe_dump(
+                {
+                    "version": 2,
+                    "path_base": "repo",
+                    "campaign_id": "placeholder_manifest",
+                    "steps": [
+                        {
+                            "label": "clustering",
+                            "registry_id": "cluster.downstream.exploratory-clustering",
+                            "inputs": {"cluster_results_root": "repo:n/a"},
+                        }
+                    ],
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "progress",
+                "campaign",
+                "--repo-root",
+                str(_repo_root()),
+                "--manifest",
+                str(manifest_path),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 2
+        assert "placeholder path text" in result.output
+        assert "repo:n/a" in result.output
 
 
 def test_cli_progress_scaffold_emits_yaml_manifest() -> None:
@@ -2187,6 +2225,44 @@ def test_cli_progress_kinds_reports_provider_owned_inventory() -> None:
         "On workstations without `qstat`, add `--allow-missing-qstat` so the queue probe stays explicit "
         "but non-fatal during a dry-run demo.",
     ]
+
+
+def test_cli_progress_show_help_includes_registry_specific_inputs_for_status_surface() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "progress",
+            "show",
+            "usr.data-plane.promoter-study-status",
+            "--help",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "--study-dir" in result.output
+    assert "Checked-in promoter-study directory containing" in result.output
+    assert "--scope" not in result.output
+
+
+def test_cli_progress_show_help_includes_registry_specific_inputs_for_preflight_surface() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "progress",
+            "show",
+            "usr.data-plane.promoter-study-preflight",
+            "--help",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "--study-dir" in result.output
+    assert "--scope" in result.output
+    assert "Preflight scope for promoter-study-preflight" in result.output
 
 
 def test_cli_progress_explain_includes_related_scaffold_when_route_has_neighbors() -> None:

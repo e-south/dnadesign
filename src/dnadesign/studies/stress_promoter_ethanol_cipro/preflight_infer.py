@@ -16,6 +16,8 @@ from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from dnadesign.ops.preflight import CommandExecution, PreflightCheck, build_command_check, build_state_check
+
 from .infer_runtime import PromoterStudyInferRuntimeResolvedContext
 
 
@@ -24,9 +26,7 @@ class PromoterPreflightInferDependencies:
     inspect_local_gpu_inventory: Callable[[], dict[str, object]]
     infer_usr_dataset_requirements: Callable[[Path], list[dict[str, object]]]
     build_infer_notify_setup_command: Callable[[Path], str]
-    run_progress_command: Callable[..., object]
-    preflight_state_check: Callable[..., dict[str, object]]
-    preflight_command_check: Callable[..., dict[str, object]]
+    run_preflight_command: Callable[..., CommandExecution]
     choose_command_summary: Callable[..., str]
     validate_infer_config_contract: Callable[[Path], object] | None = None
     validate_infer_dry_run_contract: Callable[[Path], object] | None = None
@@ -35,7 +35,7 @@ class PromoterPreflightInferDependencies:
 
 @dataclass(frozen=True)
 class PromoterPreflightInferChecksResult:
-    checks: tuple[dict[str, object], ...]
+    checks: tuple[PreflightCheck, ...]
     evidence_updates: dict[str, object]
 
 
@@ -56,7 +56,7 @@ def build_promoter_preflight_infer_checks(
     )
     runtime_model_summaries = {summary.label: summary for summary in infer_runtime.runtime_model_summaries}
 
-    checks: list[dict[str, object]] = []
+    checks: list[PreflightCheck] = []
     evidence_updates = {
         "preferred_infer_model_family": infer_runtime.preferred_model_family,
         "supported_model_families": list(infer_runtime.supported_model_families),
@@ -82,7 +82,7 @@ def build_promoter_preflight_infer_checks(
         try:
             config_contract = validate_infer_config_contract(config_path)
             checks.append(
-                dependencies.preflight_state_check(
+                build_state_check(
                     check_id=f"infer.validate.{config_label}",
                     check_group="infer",
                     phase="infer",
@@ -100,7 +100,7 @@ def build_promoter_preflight_infer_checks(
             )
         except Exception as exc:
             checks.append(
-                dependencies.preflight_state_check(
+                build_state_check(
                     check_id=f"infer.validate.{config_label}",
                     check_group="infer",
                     phase="infer",
@@ -128,7 +128,6 @@ def build_promoter_preflight_infer_checks(
                     local_gpu_inventory=local_gpu_inventory,
                     validate_infer_dry_run_contract=validate_infer_dry_run_contract,
                     infer_usr_dataset_requirements=dependencies.infer_usr_dataset_requirements,
-                    preflight_state_check=dependencies.preflight_state_check,
                 )
             )
         if include_notify_checks:
@@ -142,9 +141,7 @@ def build_promoter_preflight_infer_checks(
                     runtime_infer_notify_profile_errors=infer_runtime.infer_notify_profile_errors,
                     resolve_infer_usr_output_contract=resolve_infer_usr_output_contract,
                     build_infer_notify_setup_command=dependencies.build_infer_notify_setup_command,
-                    run_progress_command=dependencies.run_progress_command,
-                    preflight_state_check=dependencies.preflight_state_check,
-                    preflight_command_check=dependencies.preflight_command_check,
+                    run_preflight_command=dependencies.run_preflight_command,
                     choose_command_summary=dependencies.choose_command_summary,
                 )
             )
@@ -164,14 +161,13 @@ def _build_infer_runtime_checks(
     local_gpu_inventory: Mapping[str, object],
     validate_infer_dry_run_contract: Callable[[Path], object],
     infer_usr_dataset_requirements: Callable[[Path], list[dict[str, object]]],
-    preflight_state_check: Callable[..., dict[str, object]],
-) -> tuple[dict[str, object], ...]:
-    checks: list[dict[str, object]] = []
+) -> tuple[PreflightCheck, ...]:
+    checks: list[PreflightCheck] = []
     requires_gpu = str(model_summary.get("device") or "").startswith("cuda")
     local_gpu_count = int(local_gpu_inventory.get("count") or 0)
     if requires_gpu and local_gpu_count == 0:
         checks.append(
-            preflight_state_check(
+            build_state_check(
                 check_id=f"infer.local_runtime.{runtime_label}",
                 check_group="infer",
                 phase="infer",
@@ -188,7 +184,7 @@ def _build_infer_runtime_checks(
         )
     else:
         checks.append(
-            preflight_state_check(
+            build_state_check(
                 check_id=f"infer.local_runtime.{runtime_label}",
                 check_group="infer",
                 phase="infer",
@@ -212,7 +208,7 @@ def _build_infer_runtime_checks(
     missing_usr_inputs = [entry for entry in usr_inputs if not bool(entry.get("exists"))]
     if missing_usr_inputs:
         checks.append(
-            preflight_state_check(
+            build_state_check(
                 check_id=f"infer.dry_run.{runtime_label}",
                 check_group="infer",
                 phase="infer",
@@ -230,7 +226,7 @@ def _build_infer_runtime_checks(
     try:
         dry_run_contract = validate_infer_dry_run_contract(config_path)
         checks.append(
-            preflight_state_check(
+            build_state_check(
                 check_id=f"infer.dry_run.{runtime_label}",
                 check_group="infer",
                 phase="infer",
@@ -247,7 +243,7 @@ def _build_infer_runtime_checks(
         )
     except Exception as exc:
         checks.append(
-            preflight_state_check(
+            build_state_check(
                 check_id=f"infer.dry_run.{runtime_label}",
                 check_group="infer",
                 phase="infer",
@@ -270,16 +266,14 @@ def _build_notify_runtime_checks(
     runtime_infer_notify_profile_errors: Mapping[str, str],
     resolve_infer_usr_output_contract: Callable[[Path], object],
     build_infer_notify_setup_command: Callable[[Path], str],
-    run_progress_command: Callable[..., object],
-    preflight_state_check: Callable[..., dict[str, object]],
-    preflight_command_check: Callable[..., dict[str, object]],
+    run_preflight_command: Callable[..., CommandExecution],
     choose_command_summary: Callable[..., str],
-) -> tuple[dict[str, object], ...]:
-    checks: list[dict[str, object]] = []
+) -> tuple[PreflightCheck, ...]:
+    checks: list[PreflightCheck] = []
     profile_path = infer_notify_profile_paths.get(runtime_label)
     if runtime_label in runtime_infer_notify_profile_errors:
         checks.append(
-            preflight_state_check(
+            build_state_check(
                 check_id=f"notify.profile.{runtime_label}",
                 check_group="notify",
                 phase="notify",
@@ -291,7 +285,7 @@ def _build_notify_runtime_checks(
         )
     elif profile_path is None:
         checks.append(
-            preflight_state_check(
+            build_state_check(
                 check_id=f"notify.profile.{runtime_label}",
                 check_group="notify",
                 phase="notify",
@@ -303,7 +297,7 @@ def _build_notify_runtime_checks(
         )
     elif not profile_path.is_file():
         checks.append(
-            preflight_state_check(
+            build_state_check(
                 check_id=f"notify.profile.{runtime_label}",
                 check_group="notify",
                 phase="notify",
@@ -319,12 +313,12 @@ def _build_notify_runtime_checks(
             )
         )
     else:
-        notify_profile_doctor = run_progress_command(
+        notify_profile_doctor = run_preflight_command(
             ("uv", "run", "notify", "profile", "doctor", "--profile", str(profile_path), "--json"),
             cwd=study_repo_root,
         )
         checks.append(
-            preflight_command_check(
+            build_command_check(
                 check_id=f"notify.profile.{runtime_label}",
                 check_group="notify",
                 phase="notify",
@@ -353,7 +347,7 @@ def _build_notify_runtime_checks(
             else f"resolved events path is not materialized yet: {events_path}"
         )
         checks.append(
-            preflight_state_check(
+            build_state_check(
                 check_id=f"notify.resolve_events.{runtime_label}",
                 check_group="notify",
                 phase="notify",
@@ -370,7 +364,7 @@ def _build_notify_runtime_checks(
         )
     except Exception as exc:
         checks.append(
-            preflight_state_check(
+            build_state_check(
                 check_id=f"notify.resolve_events.{runtime_label}",
                 check_group="notify",
                 phase="notify",

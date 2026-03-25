@@ -18,12 +18,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dnadesign.ops.contracts import InferRuntimePhaseTarget
+from dnadesign.ops.preflight import CommandExecution, PreflightCheck, evaluate_preflight_checks
 from dnadesign.studies.core.models import StudyOpsContract
-from dnadesign.studies.core.preflight_plan import (
-    StudyPreflightPlan,
-    build_study_preflight_plan,
-    evaluate_study_preflight_checks,
-)
+from dnadesign.studies.core.preflight_plan import StudyPreflightPlan, build_study_preflight_plan
 
 from .context import PromoterStudyResolvedContext
 from .infer_runtime import (
@@ -59,10 +56,8 @@ class PromoterPreflightContextDependencies:
 class PromoterPreflightCoordinatorDependencies:
     load_orchestration_runbook_payload: Callable[[Path], dict[str, object]]
     resolve_input_path: Callable[[Path, Path | None], Path]
-    run_progress_command: Callable[..., object]
+    run_preflight_command: Callable[..., CommandExecution]
     safe_json_loads: Callable[[str | None], dict[str, object] | None]
-    preflight_state_check: Callable[..., dict[str, object]]
-    preflight_command_check: Callable[..., dict[str, object]]
     choose_command_summary: Callable[..., str]
     inspect_local_gpu_inventory: Callable[[], dict[str, object]]
     infer_usr_dataset_requirements: Callable[[Path], list[dict[str, object]]]
@@ -158,22 +153,20 @@ def build_promoter_preflight_progress(
     evidence: Mapping[str, object],
     dependencies: PromoterPreflightCoordinatorDependencies,
 ) -> tuple[str, str, dict[str, object]]:
-    checks: list[dict[str, object]] = []
+    checks: list[PreflightCheck] = []
     counts: Counter[str] = Counter()
     resolved_evidence = dict(evidence)
     enabled_groups = set(context.scope_plan.included_groups)
 
-    def add_check(check: dict[str, object]) -> None:
+    def add_check(check: PreflightCheck) -> None:
         checks.append(check)
-        counts[str(check.get("state") or "attention")] += 1
+        counts[check.state] += 1
 
     for check in build_promoter_preflight_notify_environment_checks(
         notify_env_state=context.notify_env_state,
         notify_environment_phase_id=context.notify_environment_phase_id,
         enabled_groups=enabled_groups,
-        dependencies=PromoterPreflightNotifyEnvironmentDependencies(
-            preflight_state_check=dependencies.preflight_state_check,
-        ),
+        dependencies=PromoterPreflightNotifyEnvironmentDependencies(),
     ):
         add_check(check)
 
@@ -189,10 +182,8 @@ def build_promoter_preflight_progress(
         dependencies=PromoterPreflightUpstreamDependencies(
             load_orchestration_runbook_payload=dependencies.load_orchestration_runbook_payload,
             resolve_input_path=dependencies.resolve_input_path,
-            run_progress_command=dependencies.run_progress_command,
+            run_preflight_command=dependencies.run_preflight_command,
             safe_json_loads=dependencies.safe_json_loads,
-            preflight_state_check=dependencies.preflight_state_check,
-            preflight_command_check=dependencies.preflight_command_check,
             choose_command_summary=dependencies.choose_command_summary,
         ),
     )
@@ -208,9 +199,7 @@ def build_promoter_preflight_progress(
             inspect_local_gpu_inventory=dependencies.inspect_local_gpu_inventory,
             infer_usr_dataset_requirements=dependencies.infer_usr_dataset_requirements,
             build_infer_notify_setup_command=dependencies.build_infer_notify_setup_command,
-            run_progress_command=dependencies.run_progress_command,
-            preflight_state_check=dependencies.preflight_state_check,
-            preflight_command_check=dependencies.preflight_command_check,
+            run_preflight_command=dependencies.run_preflight_command,
             choose_command_summary=dependencies.choose_command_summary,
             validate_infer_config_contract=dependencies.validate_infer_config_contract,
             validate_infer_dry_run_contract=dependencies.validate_infer_dry_run_contract,
@@ -226,9 +215,8 @@ def build_promoter_preflight_progress(
             study_repo_root=context.study_repo_root,
             targets=context.infer_batch_targets,
             dependencies=PromoterPreflightRunbookPlanDependencies(
-                run_progress_command=dependencies.run_progress_command,
+                run_preflight_command=dependencies.run_preflight_command,
                 safe_json_loads=dependencies.safe_json_loads,
-                preflight_command_check=dependencies.preflight_command_check,
                 choose_command_summary=dependencies.choose_command_summary,
             ),
         ):
@@ -237,13 +225,13 @@ def build_promoter_preflight_progress(
     resolved_evidence.update(
         {
             "notify_environment": context.notify_env_state,
-            "checks": checks,
+            "checks": [check.as_dict() for check in checks],
             "scope": context.scope_plan.scope,
             "counts": {state: int(counts.get(state, 0)) for state in ("ok", "attention", "missing")},
         }
     )
 
-    evaluation = evaluate_study_preflight_checks(
+    evaluation = evaluate_preflight_checks(
         checks,
         phase_states=context.phase_states,
         scope_plan=context.scope_plan,
@@ -271,14 +259,12 @@ def build_promoter_preflight_progress(
         summary_parts.append(f"{effective_counts['missing']} missing")
     if evaluation.blocker_checks:
         blocker_label = "blocked by" if context.scope_plan.scope == "next" else "first blockers"
-        summary_parts.append(
-            f"{blocker_label}: " + ", ".join(str(check["id"]) for check in evaluation.blocker_checks[:3])
-        )
+        summary_parts.append(f"{blocker_label}: " + ", ".join(check.id for check in evaluation.blocker_checks[:3]))
     elif context.scope_plan.scope == "next" and context.scope_plan.target_phase_id is not None:
         summary_parts.append("ready")
     if context.scope_plan.scope == "next" and evaluation.deferred_blockers:
         summary_parts.append(
-            "deferred downstream blockers: " + ", ".join(str(check["id"]) for check in evaluation.deferred_blockers[:3])
+            "deferred downstream blockers: " + ", ".join(check.id for check in evaluation.deferred_blockers[:3])
         )
 
     if effective_counts.get("missing"):

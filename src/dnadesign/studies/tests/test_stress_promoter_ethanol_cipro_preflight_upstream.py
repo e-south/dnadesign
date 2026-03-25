@@ -13,42 +13,16 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from types import SimpleNamespace
 
+from dnadesign.ops.preflight import CommandExecution
 from dnadesign.studies.stress_promoter_ethanol_cipro.preflight_upstream import (
     PromoterPreflightUpstreamDependencies,
     build_promoter_preflight_upstream_checks,
 )
 
 
-def _state_check(**kwargs) -> dict[str, object]:
-    return {
-        "id": kwargs["check_id"],
-        "check_group": kwargs.get("check_group"),
-        "phase": kwargs["phase"],
-        "phase_id": kwargs["phase_id"],
-        "state": kwargs["state"],
-        "summary": kwargs["summary"],
-        "details": kwargs.get("details", {}),
-    }
-
-
-def _command_check(**kwargs) -> dict[str, object]:
-    execution = kwargs["execution"]
-    return {
-        "id": kwargs["check_id"],
-        "check_group": kwargs.get("check_group"),
-        "phase": kwargs["phase"],
-        "phase_id": kwargs["phase_id"],
-        "state": "attention" if getattr(execution, "returncode", 1) != 0 else "ok",
-        "summary": kwargs["summary"],
-        "details": kwargs.get("details", {}),
-        "returncode": getattr(execution, "returncode", None),
-    }
-
-
 def _execution(argv: tuple[str, ...], cwd: Path, *, returncode: int, stdout: str = "", stderr: str = "") -> object:
-    return SimpleNamespace(
+    return CommandExecution(
         argv=argv,
         cwd=str(cwd),
         returncode=returncode,
@@ -100,23 +74,21 @@ def test_build_promoter_preflight_upstream_checks_reports_densegen_probe_and_bat
                 "resources": {"queue": "gpu"},
             },
             resolve_input_path=lambda path, base_dir: (base_dir / path).resolve() if base_dir else path.resolve(),
-            run_progress_command=_run_progress_command,
+            run_preflight_command=_run_progress_command,
             safe_json_loads=lambda text: json.loads(text or "") if text else None,
-            preflight_state_check=_state_check,
-            preflight_command_check=_command_check,
             choose_command_summary=lambda *_args, fallback, **_kwargs: fallback,
         ),
     )
 
-    checks = {check["id"]: check for check in result.checks}
+    checks = {check.id: check for check in result.checks}
 
-    assert checks["densegen.batch.resources"]["state"] == "ok"
-    assert checks["densegen.batch.resources"]["check_group"] == "densegen"
-    assert checks["densegen.config.probe_solver"]["state"] == "ok"
-    assert checks["densegen.config.probe_solver"]["details"]["config"] == str(densegen_config_path.resolve())
-    assert checks["densegen.batch.plan"]["state"] == "ok"
-    assert checks["densegen.batch.plan"]["details"]["selected_mode"] == "resume"
-    assert checks["densegen.batch.plan"]["details"]["notify_secret_ref"] == "file:///tmp/webhook"
+    assert checks["densegen.batch.resources"].state == "ok"
+    assert checks["densegen.batch.resources"].check_group == "densegen"
+    assert checks["densegen.config.probe_solver"].state == "ok"
+    assert checks["densegen.config.probe_solver"].details["config"] == str(densegen_config_path.resolve())
+    assert checks["densegen.batch.plan"].state == "ok"
+    assert checks["densegen.batch.plan"].details["selected_mode"] == "resume"
+    assert checks["densegen.batch.plan"].details["notify_secret_ref"] == "file:///tmp/webhook"
     assert commands == [
         ("uv", "run", "dense", "validate-config", "--probe-solver", "-c", str(densegen_config_path.resolve())),
         (
@@ -176,20 +148,18 @@ def test_build_promoter_preflight_upstream_checks_skips_construct_runtime_when_o
         dependencies=PromoterPreflightUpstreamDependencies(
             load_orchestration_runbook_payload=lambda _: {},
             resolve_input_path=lambda path, base_dir: (base_dir / path).resolve() if base_dir else path.resolve(),
-            run_progress_command=_run_progress_command,
+            run_preflight_command=_run_progress_command,
             safe_json_loads=lambda text: json.loads(text or "") if text else None,
-            preflight_state_check=_state_check,
-            preflight_command_check=_command_check,
             choose_command_summary=lambda *_args, fallback, **_kwargs: fallback,
         ),
     )
 
-    checks = {check["id"]: check for check in result.checks}
+    checks = {check.id: check for check in result.checks}
 
-    assert checks["construct.workspace.doctor"]["state"] == "ok"
-    assert checks["construct.workspace.doctor"]["check_group"] == "construct"
-    assert checks["construct.runtime.slot_a_window"]["state"] == "ok"
-    assert checks["construct.runtime.slot_a_window"]["details"]["skipped_runtime_revalidation"] is True
+    assert checks["construct.workspace.doctor"].state == "ok"
+    assert checks["construct.workspace.doctor"].check_group == "construct"
+    assert checks["construct.runtime.slot_a_window"].state == "ok"
+    assert checks["construct.runtime.slot_a_window"].details["skipped_runtime_revalidation"] is True
     assert commands == [
         ("uv", "run", "construct", "workspace", "doctor", "--workspace", str(workspace_path)),
     ]

@@ -16,6 +16,8 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from dnadesign.ops.preflight import CommandExecution, PreflightCheck, build_command_check, build_state_check
+
 from .preflight_orchestration import (
     PromoterPreflightRunbookPlanDependencies,
     PromoterPreflightRunbookPlanTarget,
@@ -27,16 +29,14 @@ from .preflight_orchestration import (
 class PromoterPreflightUpstreamDependencies:
     load_orchestration_runbook_payload: Callable[[Path], dict[str, object]]
     resolve_input_path: Callable[[Path, Path | None], Path]
-    run_progress_command: Callable[..., object]
+    run_preflight_command: Callable[..., CommandExecution]
     safe_json_loads: Callable[[str | None], dict[str, object] | None]
-    preflight_state_check: Callable[..., dict[str, object]]
-    preflight_command_check: Callable[..., dict[str, object]]
     choose_command_summary: Callable[..., str]
 
 
 @dataclass(frozen=True)
 class PromoterPreflightUpstreamChecksResult:
-    checks: tuple[dict[str, object], ...]
+    checks: tuple[PreflightCheck, ...]
 
 
 def build_promoter_preflight_upstream_checks(
@@ -51,7 +51,7 @@ def build_promoter_preflight_upstream_checks(
     enabled_groups: Collection[str],
     dependencies: PromoterPreflightUpstreamDependencies,
 ) -> PromoterPreflightUpstreamChecksResult:
-    checks: list[dict[str, object]] = []
+    checks: list[PreflightCheck] = []
     if "densegen" in enabled_groups:
         checks.extend(
             _build_densegen_checks(
@@ -82,17 +82,17 @@ def _build_densegen_checks(
     execution_surface_index: Mapping[str, Path],
     densegen_phase_id: str,
     dependencies: PromoterPreflightUpstreamDependencies,
-) -> tuple[dict[str, object], ...]:
+) -> tuple[PreflightCheck, ...]:
     densegen_batch_runbook = execution_surface_index.get("densegen_batch_with_notify")
     if densegen_batch_runbook is None:
         return ()
 
-    checks: list[dict[str, object]] = []
+    checks: list[PreflightCheck] = []
     densegen_runbook = dependencies.load_orchestration_runbook_payload(densegen_batch_runbook)
     densegen_config_text = _string_or_none(((densegen_runbook.get("densegen") or {}).get("config")))
     densegen_resources = dict(densegen_runbook.get("resources") or {})
     checks.append(
-        dependencies.preflight_state_check(
+        build_state_check(
             check_id="densegen.batch.resources",
             check_group="densegen",
             phase="densegen",
@@ -114,12 +114,12 @@ def _build_densegen_checks(
             Path(densegen_config_text),
             densegen_batch_runbook.parent,
         )
-        densegen_probe = dependencies.run_progress_command(
+        densegen_probe = dependencies.run_preflight_command(
             ("uv", "run", "dense", "validate-config", "--probe-solver", "-c", str(densegen_config_path)),
             cwd=study_repo_root,
         )
         checks.append(
-            dependencies.preflight_command_check(
+            build_command_check(
                 check_id="densegen.config.probe_solver",
                 check_group="densegen",
                 phase="densegen",
@@ -147,9 +147,8 @@ def _build_densegen_checks(
                 ),
             ),
             dependencies=PromoterPreflightRunbookPlanDependencies(
-                run_progress_command=dependencies.run_progress_command,
+                run_preflight_command=dependencies.run_preflight_command,
                 safe_json_loads=dependencies.safe_json_loads,
-                preflight_command_check=dependencies.preflight_command_check,
                 choose_command_summary=dependencies.choose_command_summary,
             ),
         )
@@ -166,18 +165,18 @@ def _build_construct_checks(
     phase_states: Sequence[Mapping[str, object]],
     construct_phase_id: str,
     dependencies: PromoterPreflightUpstreamDependencies,
-) -> tuple[dict[str, object], ...]:
+) -> tuple[PreflightCheck, ...]:
     construct_workspace_path = execution_surface_index.get("construct_workspace")
     if construct_workspace_path is None:
         return ()
 
-    checks: list[dict[str, object]] = []
-    construct_doctor = dependencies.run_progress_command(
+    checks: list[PreflightCheck] = []
+    construct_doctor = dependencies.run_preflight_command(
         ("uv", "run", "construct", "workspace", "doctor", "--workspace", str(construct_workspace_path)),
         cwd=study_repo_root,
     )
     checks.append(
-        dependencies.preflight_command_check(
+        build_command_check(
             check_id="construct.workspace.doctor",
             check_group="construct",
             phase="construct",
@@ -211,7 +210,7 @@ def _build_construct_checks(
         check_id = f"construct.runtime.{project_id}"
         if merged_anchor_state is None or not bool(merged_anchor_state.get("exists")):
             checks.append(
-                dependencies.preflight_state_check(
+                build_state_check(
                     check_id=check_id,
                     check_group="construct",
                     phase="construct",
@@ -251,7 +250,7 @@ def _build_construct_checks(
                 }
             )
             checks.append(
-                dependencies.preflight_state_check(
+                build_state_check(
                     check_id=check_id,
                     check_group="construct",
                     phase="construct",
@@ -263,7 +262,7 @@ def _build_construct_checks(
             )
             continue
 
-        construct_runtime = dependencies.run_progress_command(
+        construct_runtime = dependencies.run_preflight_command(
             (
                 "uv",
                 "run",
@@ -279,7 +278,7 @@ def _build_construct_checks(
             cwd=study_repo_root,
         )
         checks.append(
-            dependencies.preflight_command_check(
+            build_command_check(
                 check_id=check_id,
                 check_group="construct",
                 phase="construct",

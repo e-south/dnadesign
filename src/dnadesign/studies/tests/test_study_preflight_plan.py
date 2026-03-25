@@ -11,8 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from dnadesign.ops.preflight import build_state_check, evaluate_preflight_checks
 from dnadesign.studies.core.models import StudyPreflightContract, StudyPreflightNextScopeContract
-from dnadesign.studies.core.preflight_plan import build_study_preflight_plan, evaluate_study_preflight_checks
+from dnadesign.studies.core.preflight_plan import build_study_preflight_plan
 
 
 def _contract() -> StudyPreflightContract:
@@ -52,26 +53,32 @@ def test_build_study_preflight_plan_limits_runtime_groups_for_lane_scope() -> No
 
 def test_evaluate_study_preflight_checks_demotes_completed_phase_attention_in_full_scope() -> None:
     checks = [
-        {
-            "id": "infer.local_runtime.anchor_only_20b",
-            "check_group": "infer",
-            "state": "attention",
-            "phase_id": "infer_anchor_only_20b",
-        },
-        {
-            "id": "notify.profile.anchor_only_20b",
-            "check_group": "notify",
-            "state": "attention",
-            "phase_id": "infer_anchor_only_20b",
-        },
-        {
-            "id": "infer.local_runtime.anchor_plus_template_20b",
-            "check_group": "infer",
-            "state": "attention",
-            "phase_id": "infer_anchor_plus_template_20b",
-        },
+        build_state_check(
+            check_id="infer.local_runtime.anchor_only_20b",
+            check_group="infer",
+            phase="infer",
+            phase_id="infer_anchor_only_20b",
+            state="attention",
+            summary="attention",
+        ),
+        build_state_check(
+            check_id="notify.profile.anchor_only_20b",
+            check_group="notify",
+            phase="notify",
+            phase_id="infer_anchor_only_20b",
+            state="attention",
+            summary="attention",
+        ),
+        build_state_check(
+            check_id="infer.local_runtime.anchor_plus_template_20b",
+            check_group="infer",
+            phase="infer",
+            phase_id="infer_anchor_plus_template_20b",
+            state="attention",
+            summary="attention",
+        ),
     ]
-    evaluation = evaluate_study_preflight_checks(
+    evaluation = evaluate_preflight_checks(
         checks,
         phase_states=[
             {"id": "infer_anchor_only_20b", "status": "complete"},
@@ -95,32 +102,40 @@ def test_evaluate_study_preflight_checks_demotes_completed_phase_attention_in_fu
 
 def test_evaluate_study_preflight_checks_defers_downstream_lane_blockers_in_next_scope() -> None:
     checks = [
-        {
-            "id": "notify.environment.webhook",
-            "check_group": "notify_environment",
-            "state": "attention",
-            "phase_id": "infer_batch_preparation",
-        },
-        {
-            "id": "infer.local_runtime.anchor_only_20b",
-            "check_group": "infer",
-            "state": "attention",
-            "phase_id": "infer_anchor_only_20b",
-        },
-        {
-            "id": "ops.runbook_plan.infer_batch_20b_with_notify.anchor_only",
-            "check_group": "infer_batch_plan",
-            "state": "attention",
-            "phase_id": "infer_anchor_only_20b",
-        },
-        {
-            "id": "infer.local_runtime.anchor_only_7b",
-            "check_group": "infer",
-            "state": "attention",
-            "phase_id": "infer_anchor_only_7b",
-        },
+        build_state_check(
+            check_id="notify.environment.webhook",
+            check_group="notify_environment",
+            phase="notify",
+            phase_id="infer_batch_preparation",
+            state="attention",
+            summary="attention",
+        ),
+        build_state_check(
+            check_id="infer.local_runtime.anchor_only_20b",
+            check_group="infer",
+            phase="infer",
+            phase_id="infer_anchor_only_20b",
+            state="attention",
+            summary="attention",
+        ),
+        build_state_check(
+            check_id="ops.runbook_plan.infer_batch_20b_with_notify.anchor_only",
+            check_group="infer_batch_plan",
+            phase="ops",
+            phase_id="infer_anchor_only_20b",
+            state="attention",
+            summary="attention",
+        ),
+        build_state_check(
+            check_id="infer.local_runtime.anchor_only_7b",
+            check_group="infer",
+            phase="infer",
+            phase_id="infer_anchor_only_7b",
+            state="attention",
+            summary="attention",
+        ),
     ]
-    evaluation = evaluate_study_preflight_checks(
+    evaluation = evaluate_preflight_checks(
         checks,
         phase_states=[
             {"id": "infer_anchor_only_20b", "status": "planned"},
