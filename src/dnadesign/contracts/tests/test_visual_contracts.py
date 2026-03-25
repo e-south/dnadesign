@@ -11,6 +11,8 @@ Module Author(s): OpenAI Codex
 
 from __future__ import annotations
 
+import pytest
+
 from dnadesign.contracts.visual import CassetteViewsManifestV1, HairpinTopologyViewV1, LinearDuplexViewV1
 
 
@@ -172,3 +174,69 @@ def test_views_manifest_validates_relative_view_and_job_paths() -> None:
     assert manifest.kind == "cassette_views_manifest_v1"
     assert manifest.views[0].path == "linear_duplex.v1.json"
     assert manifest.recommended_jobs[1].name == "ssdna_hairpin"
+
+
+def test_hairpin_topology_view_rejects_empty_pair_map() -> None:
+    payload = {
+        "version": 1,
+        "kind": "ssdna_hairpin_v1",
+        "view_id": "hit_001.ssdna_hairpin",
+        "solution_id": "abc123def456",
+        "title": "Hit 1 - ssDNA hairpin",
+        "primary_sequence_5to3": "ACCTCAGCAAAGCTGAGGT",
+        "topology": {
+            "stem5p_span": {"start": 0, "end": 7},
+            "loop_span": {"start": 7, "end": 12},
+            "stem3p_span": {"start": 12, "end": 19},
+        },
+        "pair_map": [],
+    }
+
+    with pytest.raises(ValueError, match="pair_map must be non-empty"):
+        HairpinTopologyViewV1.model_validate(payload)
+
+
+def test_hairpin_topology_view_rejects_overlapping_spans() -> None:
+    payload = {
+        "version": 1,
+        "kind": "ssdna_hairpin_v1",
+        "view_id": "hit_001.ssdna_hairpin",
+        "solution_id": "abc123def456",
+        "title": "Hit 1 - ssDNA hairpin",
+        "primary_sequence_5to3": "ACCTCAGCAAAGCTGAGGT",
+        "topology": {
+            "stem5p_span": {"start": 0, "end": 9},
+            "loop_span": {"start": 7, "end": 12},
+            "stem3p_span": {"start": 12, "end": 19},
+        },
+        "pair_map": [{"left_index": 0, "right_index": 18}],
+    }
+
+    with pytest.raises(ValueError, match="stem5p_span must end at or before loop_span.start"):
+        HairpinTopologyViewV1.model_validate(payload)
+
+
+def test_linear_duplex_view_rejects_overlapping_segments() -> None:
+    payload = {
+        "version": 1,
+        "kind": "linear_duplex_v1",
+        "view_id": "hit_001.linear_duplex",
+        "solution_id": "abc123def456",
+        "title": "Hit 1 - Linear duplex",
+        "coordinate_semantics": "boundary_inclusive_v2",
+        "primary_sequence_5to3": "TTTACCTCAGCAAAGCTGAGGTAAA",
+        "sequence_span": {"start": 0, "end": 25},
+        "cassette_span": {"start": 0, "end": 25},
+        "row_labels": {
+            "primary": "5' -> 3' primary",
+            "complement": "3' -> 5' complement",
+        },
+        "target_strand": "complement",
+        "segments": [
+            {"id": "stem5p_arm", "start": 0, "end": 10, "semantic": "stem5p_arm", "label": "Stem 5' arm"},
+            {"id": "loop", "start": 9, "end": 15, "semantic": "loop", "label": "Loop"},
+        ],
+    }
+
+    with pytest.raises(ValueError, match="segments must be ordered and non-overlapping"):
+        LinearDuplexViewV1.model_validate(payload)

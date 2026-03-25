@@ -213,6 +213,16 @@ class _BoundaryMarkerEffectContract:
             ContractError,
         )
         ensure(
+            int(target["boundary"]) >= 0,
+            "boundary_marker.target.boundary must be >= 0",
+            ContractError,
+        )
+        ensure(
+            int(target["boundary"]) <= len(record.sequence),
+            "boundary_marker.target.boundary must be within sequence boundaries",
+            ContractError,
+        )
+        ensure(
             str(target["lane"]).lower() in {"primary", "complement"},
             "boundary_marker.target.lane is invalid",
             ContractError,

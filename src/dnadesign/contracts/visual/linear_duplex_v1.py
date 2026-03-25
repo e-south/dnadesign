@@ -103,11 +103,17 @@ class LinearDuplexViewV1(VisualContractModel):
         sequence_length = len(self.primary_sequence_5to3)
         if self.sequence_span.end > sequence_length:
             raise ValueError("sequence_span exceeds primary sequence length")
+        if self.cassette_span.start < self.sequence_span.start or self.cassette_span.end > self.sequence_span.end:
+            raise ValueError("cassette_span must stay inside sequence_span")
+        prior_segment_end: int | None = None
         if self.cassette_span.end > sequence_length:
             raise ValueError("cassette_span exceeds primary sequence length")
         for segment in self.segments:
             if segment.end > sequence_length:
                 raise ValueError("segment exceeds primary sequence length")
+            if prior_segment_end is not None and segment.start < prior_segment_end:
+                raise ValueError("segments must be ordered and non-overlapping")
+            prior_segment_end = segment.end
         for site in self.site_instances:
             if site.end > sequence_length:
                 raise ValueError("site instance exceeds primary sequence length")

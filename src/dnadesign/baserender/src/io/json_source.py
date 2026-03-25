@@ -42,14 +42,15 @@ def iter_jsonl_rows(path: str | Path) -> Iterable[dict]:
     p = Path(path)
     if not p.exists():
         raise SchemaError(f"JSONL input does not exist: {p}")
-    for line_number, raw_line in enumerate(p.read_text(encoding="utf-8").splitlines(), start=1):
-        line = raw_line.strip()
-        if not line:
-            continue
-        try:
-            payload = json.loads(line)
-        except Exception as exc:
-            raise SchemaError(f"Could not parse JSONL line {line_number} in {p}") from exc
-        if not isinstance(payload, dict):
-            raise SchemaError(f"JSONL line {line_number} must be an object")
-        yield payload
+    with p.open("r", encoding="utf-8") as handle:
+        for line_number, raw_line in enumerate(handle, start=1):
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except Exception as exc:
+                raise SchemaError(f"Could not parse JSONL line {line_number} in {p}") from exc
+            if not isinstance(payload, dict):
+                raise SchemaError(f"JSONL line {line_number} must be an object")
+            yield payload

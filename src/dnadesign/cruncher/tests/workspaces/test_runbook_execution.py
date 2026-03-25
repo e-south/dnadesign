@@ -53,6 +53,25 @@ def test_runbook_rejects_disallowed_cli_surface() -> None:
         load_workspace_runbook(Path("runbook.yaml"), raw=payload)
 
 
+def test_runbook_accepts_cassette_cli_surface() -> None:
+    payload = {
+        "runbook": {
+            "schema_version": 1,
+            "name": "demo",
+            "steps": [
+                {
+                    "id": "cassette_solve_fast",
+                    "run": ["cassette", "solve", "--spec", "configs/cassettes/demo_hairpin_fast.cassette.solve.yaml"],
+                }
+            ],
+        }
+    }
+
+    runbook = load_workspace_runbook(Path("runbook.yaml"), raw=payload)
+
+    assert runbook.steps[0].run[0] == "cassette"
+
+
 def test_runbook_executes_selected_steps_in_runbook_order(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     workspace = tmp_path / "workspace"
     runbook_path = _write_runbook(

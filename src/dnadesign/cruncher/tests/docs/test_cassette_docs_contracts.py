@@ -62,10 +62,14 @@ def test_top_level_docs_route_both_workflow_families() -> None:
 
 def test_cassette_demo_defines_scaffolded_workspace_flow() -> None:
     demo = _read("docs/demos/demo_cassette_workspace.md")
-    assert "DEMO_ROOT=./cassette_lab_demo" in demo
-    assert 'uv run cruncher cassette init-workspace --output "$DEMO_ROOT"' in demo
+    assert "WORKSPACES_ROOT=src/dnadesign/cruncher/workspaces" in demo  # pragma: allowlist secret
+    assert "DEMO_WORKSPACE=cassette_lab_demo" in demo
+    assert 'uv run cruncher cassette init-workspace "$DEMO_WORKSPACE"' in demo
+    assert 'uv run cruncher workspaces list --root "$WORKSPACES_ROOT"' in demo
     assert "demo_hairpin_fast.cassette.solve.yaml" in demo
     assert "cassette_workspace_manifest.json" in demo
+    assert "configs/runbook.yaml" in demo
+    assert "runbook-only" in demo
     assert "views/" in demo
     assert "baserender_jobs/" in demo
     assert "renders/" in demo
@@ -107,6 +111,8 @@ def test_cassette_guide_states_current_scope_and_outputs() -> None:
     assert "outputs/cassette_solves/<solve_id>/" in solve_guide
     assert "init-workspace" in solve_guide
     assert "demo_hairpin_fast.cassette.solve.yaml" in solve_guide
+    assert "configs/runbook.yaml" in solve_guide
+    assert "runbook-only" in solve_guide
     assert "max_search_nodes" in solve_guide
     assert "per-hit explicit cassette bundles" in solve_guide
     assert "score_only" in solve_guide

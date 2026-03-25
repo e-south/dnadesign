@@ -12,6 +12,8 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import shutil
+from copy import deepcopy
+from dataclasses import dataclass
 from itertools import zip_longest
 from pathlib import Path
 
@@ -61,6 +63,14 @@ from dnadesign.cruncher.cassette.view_contracts import (
 
 def _issue_from_exception(*, code: str, message: str, details: dict[str, object] | None = None) -> dict[str, object]:
     return {"code": code, "message": message, "details": details or {}}
+
+
+@dataclass(frozen=True)
+class _HitPublicationBundle:
+    explicit_design_id: str
+    canonical_spec_payload: dict[str, object]
+    linear_view: dict[str, object] | None
+    hairpin_view: dict[str, object] | None
 
 
 def _build_invalid_report(
@@ -207,6 +217,72 @@ def _relative_to_run_if_exists(run_dir: Path, path: Path | None) -> str | None:
     if path is None or not path.exists():
         return None
     return _relative_to_run(run_dir, path)
+
+
+def _canonical_hit_spec_payload(hit_record: object) -> dict[str, object]:
+    explicit_spec = getattr(hit_record, "explicit_spec")
+    return {"cassette": explicit_spec.model_dump(mode="json")}
+
+
+def _materialized_hit_spec_payload(*, canonical_spec_payload: dict[str, object], run_dir: Path) -> dict[str, object]:
+    payload = deepcopy(canonical_spec_payload)
+    payload["cassette"]["catalog"]["path"] = str(solve_resolved_catalog_path(run_dir).resolve())
+    return payload
+
+
+def _explicit_design_id_for_payload(*, spec_payload: dict[str, object], resolved_catalog_yaml: str) -> str:
+    return design_id(
+        spec_bytes=yaml.safe_dump(spec_payload, sort_keys=False).encode("utf-8"),
+        catalog_bytes=resolved_catalog_yaml.encode("utf-8"),
+    )
+
+
+def _hit_view_title(*, rank: int, solution_id: str, view_label: str) -> str:
+    return f"Hit {rank} [{solution_id}] - {view_label}"
+
+
+def _build_hit_publication_bundle(
+    *,
+    hit: object,
+    hit_record: object,
+    cassette_solve_id: str,
+    resolved_catalog_yaml: str,
+    emit_visual_contracts: bool,
+) -> _HitPublicationBundle:
+    canonical_spec_payload = _canonical_hit_spec_payload(hit_record)
+    explicit_design_id = _explicit_design_id_for_payload(
+        spec_payload=canonical_spec_payload,
+        resolved_catalog_yaml=resolved_catalog_yaml,
+    )
+    if not emit_visual_contracts:
+        return _HitPublicationBundle(
+            explicit_design_id=explicit_design_id,
+            canonical_spec_payload=canonical_spec_payload,
+            linear_view=None,
+            hairpin_view=None,
+        )
+    linear_view = build_linear_duplex_view(
+        report=hit_record.report,
+        solution_id=hit.solution_id,
+        title=_hit_view_title(rank=hit.rank, solution_id=hit.solution_id, view_label="Linear duplex"),
+        rank=hit.rank,
+        source_solve_id=cassette_solve_id,
+        explicit_design_id=explicit_design_id,
+    )
+    hairpin_view = build_hairpin_topology_view(
+        report=hit_record.report,
+        solution_id=hit.solution_id,
+        title=_hit_view_title(rank=hit.rank, solution_id=hit.solution_id, view_label="ssDNA hairpin"),
+        rank=hit.rank,
+        source_solve_id=cassette_solve_id,
+        explicit_design_id=explicit_design_id,
+    )
+    return _HitPublicationBundle(
+        explicit_design_id=explicit_design_id,
+        canonical_spec_payload=canonical_spec_payload,
+        linear_view=linear_view.model_dump(mode="json"),
+        hairpin_view=hairpin_view.model_dump(mode="json"),
+    )
 
 
 def render_solve_markdown_report(report: SolveReport) -> str:
@@ -405,46 +481,32 @@ def run_cassette_solve(path: str | Path, *, force_overwrite: bool = False) -> tu
     materialize_count = min(solve_spec.search.materialize_top_k, len(report.hits))
     top_hit_linear_rows: list[dict[str, object]] = []
     top_hit_hairpin_rows: list[dict[str, object]] = []
+    publication_by_hit_id: dict[str, _HitPublicationBundle] = {}
 
     for hit in report.hits:
         hit_record = hit_records_by_id[hit.hit_id]
-        explicit_design_id = design_id(
-            spec_bytes=yaml.safe_dump(
-                {"cassette": hit_record.explicit_spec.model_dump(mode="json")},
-                sort_keys=False,
-            ).encode("utf-8"),
-            catalog_bytes=resolved_catalog_yaml.encode("utf-8"),
+        publication = _build_hit_publication_bundle(
+            hit=hit,
+            hit_record=hit_record,
+            cassette_solve_id=cassette_solve_id,
+            resolved_catalog_yaml=resolved_catalog_yaml,
+            emit_visual_contracts=solve_spec.output.emit_visual_contracts,
         )
-        linear_view = build_linear_duplex_view(
-            report=hit_record.report,
-            solution_id=hit.solution_id,
-            title=f"Hit {hit.rank} - Linear duplex",
-            rank=hit.rank,
-            source_solve_id=cassette_solve_id,
-            explicit_design_id=explicit_design_id,
-        )
-        hairpin_view = build_hairpin_topology_view(
-            report=hit_record.report,
-            solution_id=hit.solution_id,
-            title=f"Hit {hit.rank} - ssDNA hairpin",
-            rank=hit.rank,
-            source_solve_id=cassette_solve_id,
-            explicit_design_id=explicit_design_id,
-        )
-        top_hit_linear_rows.append(linear_view.model_dump(mode="json"))
-        top_hit_hairpin_rows.append(hairpin_view.model_dump(mode="json"))
+        publication_by_hit_id[hit.hit_id] = publication
+        if publication.linear_view is not None and publication.hairpin_view is not None:
+            top_hit_linear_rows.append(publication.linear_view)
+            top_hit_hairpin_rows.append(publication.hairpin_view)
 
     for hit in report.hits[:materialize_count]:
         hit_record = hit_records_by_id[hit.hit_id]
+        publication = publication_by_hit_id[hit.hit_id]
         hit_dir = solve_hit_dir(run_dir, rank=hit.rank, hit_id=hit.hit_id)
-        resolved_spec_payload = {"cassette": hit_record.explicit_spec.model_dump(mode="json")}
-        resolved_spec_payload["cassette"]["catalog"]["path"] = str(solve_resolved_catalog_path(run_dir).resolve())
+        resolved_spec_payload = _materialized_hit_spec_payload(
+            canonical_spec_payload=publication.canonical_spec_payload,
+            run_dir=run_dir,
+        )
         explicit_dir = hit_dir / "explicit"
         resolved_candidate_spec_path = explicit_dir / "resolved_candidate.cassette.yaml"
-        explicit_design_id = design_id(
-            spec_bytes=yaml.safe_dump(resolved_spec_payload, sort_keys=False).encode("utf-8"),
-            catalog_bytes=resolved_catalog_yaml.encode("utf-8"),
-        )
         resolved_report = hit_record.report.model_copy(
             update={
                 "spec_path": str(resolved_candidate_spec_path.resolve()),
@@ -460,22 +522,6 @@ def run_cassette_solve(path: str | Path, *, force_overwrite: bool = False) -> tu
         )
         materialized_hit_runs.append(str(hit_dir.resolve()))
         if solve_spec.output.emit_visual_contracts:
-            linear_view = build_linear_duplex_view(
-                report=resolved_report,
-                solution_id=hit.solution_id,
-                title=f"Hit {hit.rank} - Linear duplex",
-                rank=hit.rank,
-                source_solve_id=cassette_solve_id,
-                explicit_design_id=explicit_design_id,
-            )
-            hairpin_view = build_hairpin_topology_view(
-                report=resolved_report,
-                solution_id=hit.solution_id,
-                title=f"Hit {hit.rank} - ssDNA hairpin",
-                rank=hit.rank,
-                source_solve_id=cassette_solve_id,
-                explicit_design_id=explicit_design_id,
-            )
             manifest = build_views_manifest(
                 solution_id=hit.solution_id,
                 rank=hit.rank,
@@ -483,8 +529,8 @@ def run_cassette_solve(path: str | Path, *, force_overwrite: bool = False) -> tu
             )
             write_view_bundle(
                 hit_dir,
-                linear_duplex=linear_view.model_dump(mode="json"),
-                hairpin=hairpin_view.model_dump(mode="json"),
+                linear_duplex=publication.linear_view,
+                hairpin=publication.hairpin_view,
                 manifest=manifest.model_dump(mode="json"),
             )
         manifest_ref = _relative_to_run_if_exists(run_dir, views_manifest_path(hit_dir))
@@ -517,7 +563,7 @@ def run_cassette_solve(path: str | Path, *, force_overwrite: bool = False) -> tu
             hit.model_copy(
                 update={
                     "materialized_run_dir": str(hit_dir.resolve()),
-                    "explicit_design_id": explicit_design_id,
+                    "explicit_design_id": publication.explicit_design_id,
                     "views_manifest_path": manifest_ref,
                     "linear_duplex_job_path": linear_job_ref,
                     "ssdna_hairpin_job_path": hairpin_job_ref,

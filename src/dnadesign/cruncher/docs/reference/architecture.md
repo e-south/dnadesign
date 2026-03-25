@@ -45,7 +45,7 @@ These families deliberately keep separate workspace contracts, output trees, and
 
 The cassette workflow is a peer lane, not a variant of `sample`:
 
-1. optional **cassette init-workspace** -> scaffold an isolated cassette root with shipped solve profiles
+1. optional **cassette init-workspace** -> scaffold a runbook-only cassette workspace with shipped solve profiles
 2. author `<workspace>/configs/cassettes/<name>.cassette.yaml` or `<workspace>/configs/cassettes/<name>.cassette.solve.yaml`
 3. author or select a local nickase catalog (for example `<workspace>/inputs/nickases/*.yaml`) or use a built-in solve preset
 4. **cassette validate** -> strict schema + invariant check plus deterministic planning report

@@ -305,6 +305,18 @@ def test_cassette_solve_plaintext_surfaces_selection_policy_and_bounded_warnings
     assert "SELECTION_RESULTS_SEARCH_BOUNDED" in result.output
 
 
+def test_cassette_solve_plaintext_surfaces_top_hit_view_and_job_paths(tmp_path: Path) -> None:
+    _workspace, spec_path = _write_solve_workspace(tmp_path)
+
+    result = runner.invoke(app, ["cassette", "solve", "--spec", str(spec_path)], color=False)
+
+    assert result.exit_code == 0
+    assert "Top-hit duplex views ->" in result.output
+    assert "Top-hit hairpin views ->" in result.output
+    assert "Top-hit duplex job ->" in result.output
+    assert "Top-hit hairpin job ->" in result.output
+
+
 def test_cassette_solve_no_hits_exits_nonzero_after_writing_artifacts(tmp_path: Path) -> None:
     workspace, spec_path = _write_solve_workspace(tmp_path, forbid_literal="CCTCAGC")
 
@@ -336,7 +348,7 @@ def test_cassette_solve_invalid_catalog_exits_nonzero_after_writing_artifacts(tm
     assert report["status"] == "invalid_catalog"
 
 
-def test_cassette_init_workspace_scaffolds_isolated_runtime_profiles(tmp_path: Path) -> None:
+def test_cassette_init_workspace_scaffolds_runtime_profiles_and_runbook_discovery(tmp_path: Path) -> None:
     scaffold_root = tmp_path / "cassette_lab"
     sibling_workspace = tmp_path / "other_workspace"
     sibling_workspace.mkdir(parents=True, exist_ok=True)
@@ -351,8 +363,13 @@ def test_cassette_init_workspace_scaffolds_isolated_runtime_profiles(tmp_path: P
 
     assert result.exit_code == 0
     assert "Cassette workspace scaffold" in result.output
+    assert "runbook-only" in result.output
+    assert "cruncher workspaces" in result.output
+    assert "list" in result.output
     assert (scaffold_root / "README.md").exists()
+    assert (scaffold_root / "runbook.md").exists()
     assert (scaffold_root / "cassette_workspace_manifest.json").exists()
+    assert (scaffold_root / "configs" / "runbook.yaml").exists()
     manifest_payload = json.loads((scaffold_root / "cassette_workspace_manifest.json").read_text(encoding="utf-8"))
     assert [item["label"] for item in manifest_payload["profiles"]] == ["fast", "balanced", "deep_mmr"]
     profiles_by_filename = {item["filename"]: item for item in manifest_payload["profiles"]}
@@ -389,8 +406,44 @@ def test_cassette_init_workspace_scaffolds_isolated_runtime_profiles(tmp_path: P
         assert payload["metadata"]["enumerated_candidate_count"] <= profile["search"]["max_enumerated_candidates"]
         assert str(payload["run_dir"]).startswith(str(scaffold_root / "outputs" / "cassette_solves"))
 
+    list_result = runner.invoke(
+        app,
+        ["workspaces", "list", "--root", str(tmp_path)],
+        env={"CRUNCHER_NONINTERACTIVE": "1", "COLUMNS": "240"},
+        color=False,
+    )
+    assert list_result.exit_code == 0
+    assert "cassette_lab" in list_result.output
+    assert "runbook-only" in list_result.output
+
     assert sibling_sentinel.read_text(encoding="utf-8") == "keep"
     assert not (sibling_workspace / "outputs" / "cassette_solves").exists()
+
+
+def test_cassette_init_workspace_supports_workspace_name_plus_root(tmp_path: Path) -> None:
+    workspaces_root = tmp_path / "workspaces"
+
+    result = runner.invoke(
+        app,
+        ["cassette", "init-workspace", "demo_cassette", "--root", str(workspaces_root)],
+        color=False,
+    )
+
+    scaffold_root = workspaces_root / "demo_cassette"
+    assert result.exit_code == 0
+    assert "demo_cassette" in result.output
+    assert scaffold_root.is_dir()
+    assert (scaffold_root / "configs" / "runbook.yaml").exists()
+
+    list_result = runner.invoke(
+        app,
+        ["workspaces", "list", "--root", str(workspaces_root)],
+        env={"CRUNCHER_NONINTERACTIVE": "1", "COLUMNS": "240"},
+        color=False,
+    )
+    assert list_result.exit_code == 0
+    assert "demo_cassette" in list_result.output
+    assert "runbook-only" in list_result.output
 
 
 def test_cassette_init_workspace_solve_and_baserender_cli_render_in_place(tmp_path: Path) -> None:

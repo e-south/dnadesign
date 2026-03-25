@@ -21,6 +21,8 @@ from rich.console import Console
 from dnadesign.cruncher.cassette.artifacts import (
     top_hits_duplex_job_path,
     top_hits_hairpin_job_path,
+    top_hits_hairpin_jsonl_path,
+    top_hits_linear_duplex_jsonl_path,
 )
 
 app = typer.Typer(
@@ -59,6 +61,12 @@ def init_cassette_workspace(*args, **kwargs):
     from dnadesign.cruncher.app.cassette_workspace_service import init_cassette_workspace as _init_cassette_workspace
 
     return _init_cassette_workspace(*args, **kwargs)
+
+
+def cassette_workspace_path(*args, **kwargs):
+    from dnadesign.cruncher.app.cassette_workspace_service import cassette_workspace_path as _cassette_workspace_path
+
+    return _cassette_workspace_path(*args, **kwargs)
 
 
 def run_cassette_solve(*args, **kwargs):
@@ -108,6 +116,10 @@ def _print_solve_report(report) -> None:
     if report.run_dir:
         console.print(f"Outputs -> {report.run_dir}")
         run_dir = Path(report.run_dir)
+        if top_hits_linear_duplex_jsonl_path(run_dir).exists():
+            console.print(f"Top-hit duplex views -> {top_hits_linear_duplex_jsonl_path(run_dir)}")
+        if top_hits_hairpin_jsonl_path(run_dir).exists():
+            console.print(f"Top-hit hairpin views -> {top_hits_hairpin_jsonl_path(run_dir)}")
         if top_hits_duplex_job_path(run_dir).exists():
             console.print(f"Top-hit duplex job -> {top_hits_duplex_job_path(run_dir)}")
         if top_hits_hairpin_job_path(run_dir).exists():
@@ -181,12 +193,22 @@ def _print_solve_report(report) -> None:
             console.print(f"  - {issue.code}: {issue.message}")
 
 
-@app.command("init-workspace", help="Scaffold an isolated cassette workspace with pressure-test solve profiles.")
+@app.command("init-workspace", help="Scaffold a cassette workspace with pressure-test solve profiles.")
 def init_workspace_cmd(
-    output: Path = typer.Option(
-        ...,
+    workspace: str | None = typer.Argument(
+        None,
+        metavar="WORKSPACE",
+        help="Workspace directory name. Creates <root>/WORKSPACE unless --output is used.",
+    ),
+    root: Path | None = typer.Option(
+        None,
+        "--root",
+        help="Parent Cruncher workspaces directory for WORKSPACE. Defaults to the standard Cruncher workspaces root.",
+    ),
+    output: Path | None = typer.Option(
+        None,
         "--output",
-        help="New cassette workspace root to create. Existing symlink roots are rejected.",
+        help="Explicit cassette workspace root to create. Overrides WORKSPACE/--root.",
     ),
     force_overwrite: bool = typer.Option(
         False,
@@ -195,15 +217,27 @@ def init_workspace_cmd(
     ),
 ) -> None:
     try:
-        result = init_cassette_workspace(output, force_overwrite=force_overwrite)
+        if output is not None and workspace is not None:
+            raise typer.BadParameter("Use either WORKSPACE [--root] or --output, not both.")
+        if output is not None and root is not None:
+            raise typer.BadParameter("Use either --output or --root, not both.")
+        if output is None and workspace is None:
+            raise typer.BadParameter("Provide WORKSPACE or --output.")
+        target_root = output if output is not None else cassette_workspace_path(workspace, root=root)
+        result = init_cassette_workspace(target_root, force_overwrite=force_overwrite)
     except (FileNotFoundError, ValueError) as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
     console.print(f"Cassette workspace scaffold -> {result.workspace_root}")
     console.print(f"README -> {result.readme_path}")
     console.print(f"Manifest -> {result.manifest_path}")
+    console.print(f"Runbook -> {result.runbook_path}")
     for name, path in result.solve_specs.items():
         console.print(f"Spec -> {name}: {path}")
+    console.print(
+        "Note -> includes `configs/runbook.yaml`, so `cruncher workspaces list "
+        f"--root {result.workspace_root.parent}` reports it as `runbook-only`."
+    )
 
 
 @app.command("validate", help="Validate a cassette spec and emit a deterministic planning report.")

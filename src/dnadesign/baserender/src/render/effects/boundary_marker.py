@@ -20,6 +20,8 @@ def draw_boundary_marker(ax, effect: Effect, record, layout, style, palette, fea
     lane = str(effect.target.get("lane", "")).strip().lower()
     if not isinstance(boundary, int):
         raise RenderingError("boundary_marker.target.boundary must be int")
+    if boundary < 0:
+        raise RenderingError("boundary_marker.target.boundary must be >= 0")
     if boundary > len(record.sequence):
         raise RenderingError("boundary_marker.target.boundary must be within sequence boundaries")
     if lane not in {"primary", "complement"}:

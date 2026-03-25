@@ -11,7 +11,7 @@
 ### Contents
 - [Why solve exists](#why-solve-exists)
 - [Current solve scope](#current-solve-scope)
-- [Bootstrap an isolated workspace](#bootstrap-an-isolated-workspace)
+- [Bootstrap a Runbook-Only Workspace](#bootstrap-a-runbook-only-workspace)
 - [Minimal solve spec](#minimal-solve-spec)
 - [Standard command sequence](#standard-command-sequence)
 - [Outputs](#outputs)
@@ -45,13 +45,14 @@ Current non-scope:
 - energetic hairpin validation
 - direct renderer invocation from Cruncher; use the emitted `baserender_jobs/*.job.yaml` files instead
 
-### Bootstrap an isolated workspace
+### Bootstrap a Runbook-Only Workspace
 
 If you do not already have a cassette workspace root, generate one explicitly:
 
 ```bash
-uv run cruncher cassette init-workspace --output /tmp/cassette_lab
-cd /tmp/cassette_lab
+uv run cruncher cassette init-workspace cassette_lab
+uv run cruncher workspaces list --root src/dnadesign/cruncher/workspaces
+cd src/dnadesign/cruncher/workspaces/cassette_lab
 ```
 
 The scaffold writes three pressure-tested solve specs under `configs/cassettes/`:
@@ -63,10 +64,13 @@ The scaffold writes three pressure-tested solve specs under `configs/cassettes/`
 This scaffold is intentionally cassette-specific:
 
 - it creates only the directories cassette workflows need
-- it does not auto-register as a general sampling workspace
+- it ships `configs/runbook.yaml`, so `workspaces list` reports it as `runbook-only`
+- it still omits a generic `configs/config.yaml` because cassette flows do not use the sampling schema
 - it refuses to overwrite a non-empty unowned root, so it will not trample sibling workspaces by accident
 - it rejects symlinked output roots and symlinked ancestor directories, so the scaffold lands exactly where you asked for it
 - `cassette_workspace_manifest.json` records the fast, balanced, and deep MMR profile budgets so you can compare them without reopening each YAML
+
+If you want the same scaffold under a different parent, pass `--root /path/to/workspaces` or `--output /explicit/workspace/path`.
 
 ### Minimal solve spec
 
@@ -150,9 +154,9 @@ If you want the shortest scaffolded tutorial that starts from an empty root and 
 ```bash
 set -euo pipefail
 
-# 0) Optional: bootstrap an isolated cassette workspace first.
-uv run cruncher cassette init-workspace --output /tmp/cassette_lab
-cd /tmp/cassette_lab
+# 0) Optional: bootstrap a runbook-only cassette workspace first.
+uv run cruncher cassette init-workspace cassette_lab
+cd src/dnadesign/cruncher/workspaces/cassette_lab
 
 # 1) Search and print a human summary.
 uv run cruncher cassette solve --spec configs/cassettes/demo_hairpin_balanced.cassette.solve.yaml

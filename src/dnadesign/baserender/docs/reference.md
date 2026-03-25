@@ -79,6 +79,13 @@ Adapters:
 - `generic_features`
 - `cruncher_best_window`
 - `sequence_windows_v1`
+- `duplex_sequence_v1`
+- `hairpin_topology_v1`
+
+Input kinds:
+- `parquet`
+- `json`
+- `jsonl`
 
 ## Record Contract (`Record`)
 

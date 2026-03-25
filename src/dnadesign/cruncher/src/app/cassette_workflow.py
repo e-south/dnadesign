@@ -97,12 +97,12 @@ def run_cassette_design(path: str | Path, *, force_overwrite: bool = False) -> t
         linear_view = build_linear_duplex_view(
             report=report,
             solution_id=cassette_design_id,
-            title=f"{report.spec_name} - Linear duplex",
+            title=f"{report.spec_name} [{cassette_design_id}] - Linear duplex",
         )
         hairpin_view = build_hairpin_topology_view(
             report=report,
             solution_id=cassette_design_id,
-            title=f"{report.spec_name} - ssDNA hairpin",
+            title=f"{report.spec_name} [{cassette_design_id}] - ssDNA hairpin",
         )
         manifest = build_views_manifest(
             solution_id=cassette_design_id,

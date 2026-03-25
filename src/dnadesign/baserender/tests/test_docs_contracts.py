@@ -64,6 +64,9 @@ def test_workspace_demo_guide_matches_output_contract() -> None:
     text = (_pkg_root() / "docs" / "demos" / "workspaces.md").read_text()
     assert "outputs/plots/" in text
     assert "run.emit_report: true" in text
+    assert "workspace init --root /path/to/workspaces demo_run" in text
+    assert "inputs/input.parquet" in text
+    assert "not BaseRender workspaces" in text
 
 
 def test_densegen_integration_doc_declares_strict_tfbs_contract() -> None:
@@ -72,3 +75,16 @@ def test_densegen_integration_doc_declares_strict_tfbs_contract() -> None:
         assert f"`{key}`" in text
     assert "Legacy TFBS keys (`tf`, `tfbs`, `stage_a_*`) are not accepted" in text
     assert "`on_invalid_row=error`" in text
+
+
+def test_reference_and_cruncher_integration_docs_cover_cassette_json_contract_path() -> None:
+    reference = (_pkg_root() / "docs" / "reference.md").read_text()
+    cruncher = (_pkg_root() / "docs" / "integrations" / "cruncher.md").read_text()
+
+    assert "`json`" in reference
+    assert "`jsonl`" in reference
+    assert "duplex_sequence_v1" in reference
+    assert "hairpin_topology_v1" in reference
+    assert "linear_duplex.v1.json" in cruncher
+    assert "top_hits.linear_duplex.v1.jsonl" in cruncher
+    assert "duplex_sequence_v1" in cruncher

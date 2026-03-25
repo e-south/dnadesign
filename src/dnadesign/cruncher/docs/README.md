@@ -40,7 +40,7 @@ Studies and portfolios build on the fixed-length optimization lane. Cassette run
 - [Artifacts Reference](reference/artifacts.md): verify generated sample/analyze files and schema expectations.
 
 #### Design and Search Cassettes
-- [Cassette Workspace Demo](demos/demo_cassette_workspace.md): scaffold a cassette-only workspace, run solve, and render outputs in place.
+- [Cassette Workspace Demo](demos/demo_cassette_workspace.md): scaffold a runbook-only cassette workspace, run solve, and render outputs in place.
 - [Cassette Workflow](guides/cassette_workflow.md): validate and materialize a dual-context hairpin cassette spec.
 - [Cassette Solve Workflow](guides/cassette_solve_workflow.md): search for ranked cassette hits and materialize top candidates.
 - [Cassette Spec Reference](reference/cassette_spec.md): authoritative cassette schema and invariant semantics.

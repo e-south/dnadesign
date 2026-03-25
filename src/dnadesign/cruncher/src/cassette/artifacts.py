@@ -457,6 +457,16 @@ def build_solve_manifest(
         "workspace_root": str(workspace_root.resolve()),
         "spec_path": str(spec_path.resolve()),
         "spec_sha256": sha256_path(spec_path),
+        "resolved_catalog_path": (
+            str(solve_resolved_catalog_path(run_dir).resolve())
+            if solve_resolved_catalog_path(run_dir).exists()
+            else None
+        ),
+        "resolved_catalog_sha256": (
+            sha256_path(solve_resolved_catalog_path(run_dir)) if solve_resolved_catalog_path(run_dir).exists() else None
+        ),
+        "catalog_preset": report.metadata.catalog_preset,
+        "catalog_additional_paths": list(report.metadata.catalog_additional_paths),
         "status": report.status,
         "artifacts": artifacts,
     }

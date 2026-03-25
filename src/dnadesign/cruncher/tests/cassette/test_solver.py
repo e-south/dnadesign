@@ -30,6 +30,7 @@ from dnadesign.cruncher.cassette.selection import (
     select_hits_mmr,
 )
 from dnadesign.cruncher.cassette.solve_models import CandidateScoreBreakdown, SearchSettingsSpec
+from dnadesign.cruncher.cassette.solver import _candidate_hit_id
 
 
 def _write_solve_spec(tmp_path: Path, *, payload: dict[str, Any]) -> Path:
@@ -121,6 +122,31 @@ def _selection_config(
     if diversity_weight is not None:
         selection["diversity_weight"] = diversity_weight
     return selection
+
+
+def test_candidate_hit_id_discriminates_variant_assignments_and_target_strand() -> None:
+    base = {
+        "cassette_sequence": "AAACGCCTCAGCTTTGCTGAGGCGTTT",
+        "left_variant_id": "Nt.BbvCI",
+        "right_variant_id": "Nb.BbvCI",
+        "left_boundary": 0,
+        "right_boundary": 24,
+    }
+
+    primary = _candidate_hit_id(target_strand="primary", **base)
+    complement = _candidate_hit_id(target_strand="complement", **base)
+    alternate_variant = _candidate_hit_id(
+        target_strand="primary",
+        cassette_sequence=base["cassette_sequence"],
+        left_variant_id="Nt.AlwI",
+        right_variant_id=base["right_variant_id"],
+        left_boundary=base["left_boundary"],
+        right_boundary=base["right_boundary"],
+    )
+
+    assert len(primary) == 12
+    assert primary != complement
+    assert primary != alternate_variant
 
 
 def _policy_payload(

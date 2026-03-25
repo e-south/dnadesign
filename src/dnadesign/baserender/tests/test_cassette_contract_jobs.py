@@ -16,11 +16,15 @@ import json
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
 import dnadesign.baserender as baserender
+from dnadesign.baserender.cli import app as baserender_app
 from dnadesign.baserender.src.core import SchemaError
 
 from .conftest import write_job
+
+runner = CliRunner()
 
 
 def _write_json(path: Path, payload: object) -> Path:
@@ -347,3 +351,149 @@ def test_run_job_rejects_out_of_range_nick_boundary_contract(tmp_path: Path) -> 
 
     with pytest.raises(SchemaError, match="nick boundary"):
         baserender.run_job(job_path, caller_root=tmp_path)
+
+
+def test_run_job_rejects_missing_json_contract_input(tmp_path: Path) -> None:
+    job_path = write_job(
+        tmp_path / "jobs" / "missing.job.yaml",
+        {
+            "version": 3,
+            "results_root": "..",
+            "input": {
+                "kind": "json",
+                "path": "../inputs/missing_linear_duplex.v1.json",
+                "adapter": {"kind": "duplex_sequence_v1"},
+                "alphabet": "DNA",
+            },
+            "render": {
+                "renderer": "sequence_rows",
+                "style": {"preset": "cassette_duplex_qa", "overrides": {}},
+            },
+            "outputs": [{"kind": "images", "path": "../renders/linear_duplex.pdf", "fmt": "pdf"}],
+            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+        },
+    )
+
+    with pytest.raises(SchemaError, match="input.path does not exist"):
+        baserender.run_job(job_path, caller_root=tmp_path)
+
+
+def test_run_job_rejects_json_array_with_non_object_row(tmp_path: Path) -> None:
+    _write_json(
+        tmp_path / "inputs" / "linear_duplex_rows.json",
+        [
+            _linear_duplex_payload(
+                view_id="hit_001.linear_duplex",
+                solution_id="abc123def456",
+                title="Hit 1 - Linear duplex",
+            ),
+            "not-an-object",
+        ],
+    )
+    job_path = write_job(
+        tmp_path / "jobs" / "linear_duplex_rows.job.yaml",
+        {
+            "version": 3,
+            "results_root": "..",
+            "input": {
+                "kind": "json",
+                "path": "../inputs/linear_duplex_rows.json",
+                "adapter": {"kind": "duplex_sequence_v1"},
+                "alphabet": "DNA",
+            },
+            "render": {
+                "renderer": "sequence_rows",
+                "style": {"preset": "cassette_duplex_qa", "overrides": {}},
+            },
+            "outputs": [{"kind": "images", "path": "../renders/linear_duplex.pdf", "fmt": "pdf"}],
+            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+        },
+    )
+
+    with pytest.raises(SchemaError, match="JSON array item 1 must be an object"):
+        baserender.run_job(job_path, caller_root=tmp_path)
+
+
+def test_run_job_rejects_malformed_jsonl_contract_input(tmp_path: Path) -> None:
+    path = tmp_path / "inputs" / "top_hits.linear_duplex.v1.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    _linear_duplex_payload(
+                        view_id="hit_001.linear_duplex",
+                        solution_id="abc123def456",
+                        title="Hit 1 - Linear duplex",
+                    )
+                ),
+                "not-json",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    job_path = write_job(
+        tmp_path / "jobs" / "top_hits_duplex.job.yaml",
+        {
+            "version": 3,
+            "results_root": "..",
+            "input": {
+                "kind": "jsonl",
+                "path": "../inputs/top_hits.linear_duplex.v1.jsonl",
+                "adapter": {"kind": "duplex_sequence_v1"},
+                "alphabet": "DNA",
+            },
+            "render": {
+                "renderer": "sequence_rows",
+                "style": {"preset": "cassette_duplex_contact_sheet", "overrides": {}},
+            },
+            "outputs": [{"kind": "images", "path": "../renders/top_hits_duplex_qa_sheet.pdf", "fmt": "pdf"}],
+            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+        },
+    )
+
+    with pytest.raises(SchemaError, match="Could not parse JSONL line 2"):
+        baserender.run_job(job_path, caller_root=tmp_path)
+
+
+def test_cassette_job_normalize_cli_resolves_json_contract_paths(tmp_path: Path) -> None:
+    run_root = tmp_path / "cassette_run"
+    _write_json(
+        run_root / "views" / "linear_duplex.v1.json",
+        _linear_duplex_payload(
+            view_id="hit_001.linear_duplex",
+            solution_id="abc123def456",
+            title="Hit 1 - Linear duplex",
+        ),
+    )
+    job_path = write_job(
+        run_root / "baserender_jobs" / "linear_duplex.job.yaml",
+        {
+            "version": 3,
+            "results_root": "..",
+            "input": {
+                "kind": "json",
+                "path": "../views/linear_duplex.v1.json",
+                "adapter": {"kind": "duplex_sequence_v1"},
+                "alphabet": "DNA",
+            },
+            "render": {
+                "renderer": "sequence_rows",
+                "style": {"preset": "cassette_duplex_qa", "overrides": {}},
+            },
+            "outputs": [{"kind": "images", "path": "../renders/linear_duplex.pdf", "fmt": "pdf"}],
+            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+        },
+    )
+    normalized_path = tmp_path / "normalized" / "linear_duplex.job.yaml"
+
+    result = runner.invoke(
+        baserender_app,
+        ["job", "normalize", str(job_path), "--out", str(normalized_path)],
+        color=False,
+    )
+
+    assert result.exit_code == 0
+    normalized = normalized_path.read_text(encoding="utf-8")
+    assert str((run_root / "views" / "linear_duplex.v1.json").resolve()) in normalized

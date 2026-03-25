@@ -605,8 +605,26 @@ def _make_explicit_spec(
     )
 
 
-def _candidate_hit_id(cassette_sequence: str) -> str:
-    return sha256_bytes(cassette_sequence.encode("utf-8"))[:10]
+def _candidate_hit_id(
+    *,
+    cassette_sequence: str,
+    target_strand: Literal["primary", "complement"],
+    left_variant_id: str,
+    right_variant_id: str,
+    left_boundary: int,
+    right_boundary: int,
+) -> str:
+    payload = "\n".join(
+        [
+            cassette_sequence,
+            target_strand,
+            left_variant_id,
+            right_variant_id,
+            str(left_boundary),
+            str(right_boundary),
+        ]
+    ).encode("utf-8")
+    return sha256_bytes(payload)[:12]
 
 
 def _append_warning(
@@ -771,13 +789,21 @@ def solve_cassette_search(
                             search_stopped = True
                             return
                         enumerated_candidates += 1
+                        hit_id = _candidate_hit_id(
+                            cassette_sequence=candidate.cassette_sequence,
+                            target_strand=solve_spec.nick_goal.target_strand,
+                            left_variant_id=left_placement.variant.id,
+                            right_variant_id=right_placement.variant.id,
+                            left_boundary=left_placement.nick_boundary,
+                            right_boundary=right_placement.nick_boundary,
+                        )
                         explicit_spec = _make_explicit_spec(
                             solve_spec=solve_spec,
                             candidate=candidate,
                             left_placement=left_placement,
                             right_placement=right_placement,
                             catalog_path=catalog_path,
-                            name=f"{spec_path.stem}__{_candidate_hit_id(candidate.cassette_sequence)}",
+                            name=f"{spec_path.stem}__{hit_id}",
                         )
                         report = build_cassette_report(
                             explicit_spec,
@@ -820,7 +846,7 @@ def solve_cassette_search(
                         accepted_candidates += 1
                         accepted_pool.consider(
                             CandidateHitRecord(
-                                hit_id=_candidate_hit_id(candidate.cassette_sequence),
+                                hit_id=hit_id,
                                 left_variant_id=left_placement.variant.id,
                                 right_variant_id=right_placement.variant.id,
                                 explicit_spec=explicit_spec,

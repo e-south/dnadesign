@@ -121,6 +121,7 @@ Solve layout:
 Solve-mode semantics:
 
 - `solve_report.json`: machine-readable solve summary with `solved`, `no_hits`, `invalid_spec`, or `invalid_catalog`, plus `selection_summary` for accepted-pool and policy telemetry.
+- `solve_manifest.json`: solve-level manifest with source spec hash plus resolved catalog path/hash and emitted artifact inventory.
 - `table__hits.csv`: ranked hit table with score, `solution_id`, `explicit_design_id`, `views_manifest_path`, per-hit job paths, nick boundaries, bounded segment length, GC metrics, and selection telemetry.
 - `views/top_hits.linear_duplex.v1.jsonl`: selected-hit duplex QA contracts for multi-hit rendering.
 - `views/top_hits.ssdna_hairpin.v1.jsonl`: selected-hit hairpin QA contracts for multi-hit rendering.

@@ -23,6 +23,14 @@ class HairpinTopologySpans(VisualContractModel):
     loop_span: PositiveLengthSpan
     stem3p_span: PositiveLengthSpan
 
+    @model_validator(mode="after")
+    def _validate_topology_order(self) -> "HairpinTopologySpans":
+        if self.stem5p_span.end > self.loop_span.start:
+            raise ValueError("stem5p_span must end at or before loop_span.start")
+        if self.loop_span.end > self.stem3p_span.start:
+            raise ValueError("loop_span must end at or before stem3p_span.start")
+        return self
+
 
 class PairMapEntry(VisualContractModel):
     left_index: int = Field(ge=0)
@@ -72,6 +80,8 @@ class HairpinTopologyViewV1(VisualContractModel):
         if not self.primary_sequence_5to3:
             raise ValueError("primary_sequence_5to3 must be non-empty")
         sequence_length = len(self.primary_sequence_5to3)
+        if not self.pair_map:
+            raise ValueError("pair_map must be non-empty")
         for span in (
             self.topology.stem5p_span,
             self.topology.loop_span,
@@ -80,6 +90,17 @@ class HairpinTopologyViewV1(VisualContractModel):
             if span.end > sequence_length:
                 raise ValueError("topology span exceeds primary sequence length")
         for pair in self.pair_map:
+            if pair.left_index < self.topology.stem5p_span.start:
+                raise ValueError("pair_map left_index must remain inside stem5p_span")
+            if pair.left_index >= self.topology.stem5p_span.end:
+                raise ValueError("pair_map left_index must remain inside stem5p_span")
+            if pair.right_index >= self.topology.stem3p_span.end:
+                raise ValueError("pair_map right_index must remain inside stem3p_span")
+            if pair.right_index < self.topology.stem3p_span.start:
+                raise ValueError("pair_map right_index must remain inside stem3p_span")
             if pair.right_index >= sequence_length:
                 raise ValueError("pair_map index exceeds primary sequence length")
+        for feature in self.feature_spans:
+            if feature.end > sequence_length:
+                raise ValueError("feature span exceeds primary sequence length")
         return self

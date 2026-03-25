@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 import dnadesign.baserender as baserender
@@ -252,3 +253,74 @@ def test_solve_omits_view_and_job_paths_when_visual_outputs_are_disabled(tmp_pat
     assert rows[0]["views_manifest_path"] == ""
     assert rows[0]["linear_duplex_job_path"] == ""
     assert rows[0]["ssdna_hairpin_job_path"] == ""
+
+
+def test_solve_keeps_explicit_design_id_consistent_across_csv_jsonl_and_hit_views(tmp_path: Path) -> None:
+    spec_path = _write_solve_spec(tmp_path)
+
+    run_dir, report = run_cassette_solve(spec_path)
+
+    assert run_dir is not None
+    first_hit = report.hits[0]
+    assert first_hit.explicit_design_id is not None
+    with (run_dir / "table__hits.csv").open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    csv_row = next(row for row in rows if row["solution_id"] == first_hit.solution_id)
+    top_hit_rows = (run_dir / "views" / "top_hits.linear_duplex.v1.jsonl").read_text(encoding="utf-8").splitlines()
+    top_hit_view = json.loads(top_hit_rows[0])
+    per_hit_view = json.loads(
+        (Path(first_hit.materialized_run_dir) / "views" / "linear_duplex.v1.json").read_text(encoding="utf-8")
+    )
+
+    assert csv_row["explicit_design_id"] == first_hit.explicit_design_id
+    assert top_hit_view["meta"]["explicit_design_id"] == first_hit.explicit_design_id
+    assert per_hit_view["meta"]["explicit_design_id"] == first_hit.explicit_design_id
+
+
+def test_solve_with_visuals_disabled_skips_view_contract_builds(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = _base_solve_payload()
+    payload["output"] = {
+        "run_dir": "outputs/cassette_solves",
+        "emit_visual_contracts": False,
+        "emit_baserender_jobs": False,
+        "baserender_profiles": [],
+    }
+    workspace = tmp_path / "workspaces" / "demo_cassette"
+    spec_path = workspace / "configs" / "cassettes" / "demo_hairpin.cassette.solve.yaml"
+    spec_path.parent.mkdir(parents=True, exist_ok=True)
+    spec_path.write_text(yaml.safe_dump({"cassette_solve": payload}, sort_keys=False), encoding="utf-8")
+
+    def _unexpected(*_args, **_kwargs):
+        raise AssertionError("view publication should be skipped when visuals are disabled")
+
+    monkeypatch.setattr(
+        "dnadesign.cruncher.app.cassette_solve_workflow.build_linear_duplex_view",
+        _unexpected,
+    )
+    monkeypatch.setattr(
+        "dnadesign.cruncher.app.cassette_solve_workflow.build_hairpin_topology_view",
+        _unexpected,
+    )
+
+    run_dir, report = run_cassette_solve(spec_path)
+
+    assert run_dir is not None
+    assert report.status == "solved"
+    assert not (run_dir / "views" / "top_hits.linear_duplex.v1.jsonl").exists()
+
+
+def test_solve_manifest_records_resolved_catalog_provenance(tmp_path: Path) -> None:
+    spec_path = _write_solve_spec(tmp_path)
+
+    run_dir, report = run_cassette_solve(spec_path)
+
+    assert run_dir is not None
+    assert report.status == "solved"
+    manifest = json.loads((run_dir / "solve_manifest.json").read_text(encoding="utf-8"))
+
+    assert manifest["resolved_catalog_path"] == str((run_dir / "specs" / "resolved_catalog.yaml").resolve())
+    assert manifest["resolved_catalog_sha256"]
+    assert manifest["catalog_preset"] == "neb_nicking_v1"

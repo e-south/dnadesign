@@ -22,7 +22,7 @@ This tutorial takes a fresh cassette workspace from scaffold to rendered QA outp
 
 Use it when you need to:
 
-- bootstrap a cassette-only workspace with `init-workspace`
+- bootstrap a cassette workspace in the standard Cruncher `workspaces/` root
 - run one of the shipped solve profiles without authoring YAML first
 - validate that the emitted baserender jobs render in place under the same workspace root
 
@@ -30,24 +30,29 @@ Start here if you do not already have a cassette workspace.
 
 ### What this demo teaches
 
-- why `cruncher cassette init-workspace` creates a cassette-only root instead of a full sampling workspace
+- why `cruncher cassette init-workspace` creates a `runbook-only` workspace instead of a full sampling workspace
 - where the shipped fast, balanced, and deep MMR solve profiles live
 - how solve outputs stay workspace-scoped under `outputs/cassette_solves/<solve_id>/`
 - how the publication flow stays local to the solve bundle: `views/` -> `baserender_jobs/` -> `renders/`
 
 ### Defined demo location
 
-This demo uses one fixed scratch root:
+This demo uses one fixed workspace name under the checked-in Cruncher workspaces root:
 
 ```bash
-# Keep the demo workspace under one named relative root.
-DEMO_ROOT=./cassette_lab_demo
+# Standard checked-in Cruncher workspaces root plus one cassette workspace name.
+# Set the shared Cruncher workspaces root used by this tutorial.
+WORKSPACES_ROOT=src/dnadesign/cruncher/workspaces
+# Pick one cassette workspace name under that root.
+DEMO_WORKSPACE=cassette_lab_demo
+# Derive the full workspace path used for the remaining commands.
+DEMO_ROOT="$WORKSPACES_ROOT/$DEMO_WORKSPACE"
 ```
 
 Why this path works:
 
-- it is easy to recognize and clean up
-- it does not collide with the checked-in `workspaces/` used by the PWM/sample flow if you run it from a scratch parent directory
+- it places the cassette scaffold alongside the other Cruncher workspaces
+- `cruncher workspaces list` reports it as `runbook-only` because the scaffold includes `configs/runbook.yaml`
 - it makes the workspace boundary obvious when you inspect `outputs/cassette_solves/...`
 
 If you re-run this tutorial against the same root, use `--force-overwrite` only when the root was created by `cruncher cassette init-workspace`.
@@ -57,11 +62,18 @@ If you re-run this tutorial against the same root, use `--force-overwrite` only 
 Bootstrap the workspace and run the fast profile:
 
 ```bash
-# Pick one relative root for the entire tutorial.
-DEMO_ROOT=./cassette_lab_demo
+# Pick one cassette workspace name under the standard Cruncher workspaces root.
+# Set the shared Cruncher workspaces root used by this tutorial.
+WORKSPACES_ROOT=src/dnadesign/cruncher/workspaces
+# Pick one cassette workspace name under that root.
+DEMO_WORKSPACE=cassette_lab_demo
+# Derive the full workspace path used for the remaining commands.
+DEMO_ROOT="$WORKSPACES_ROOT/$DEMO_WORKSPACE"
 
-# Scaffold the cassette-only workspace.
-uv run cruncher cassette init-workspace --output "$DEMO_ROOT"
+# Scaffold the runbook-only cassette workspace in the standard root.
+uv run cruncher cassette init-workspace "$DEMO_WORKSPACE"
+# Optional: confirm it is discoverable next to the other workspaces.
+uv run cruncher workspaces list --root "$WORKSPACES_ROOT"
 # Enter the scaffold root so the shipped spec paths resolve directly.
 cd "$DEMO_ROOT"
 
@@ -72,7 +84,9 @@ uv run cruncher cassette solve --spec configs/cassettes/demo_hairpin_fast.casset
 The scaffold writes:
 
 - `README.md`
+- `runbook.md`
 - `cassette_workspace_manifest.json`
+- `configs/runbook.yaml`
 - `configs/cassettes/demo_hairpin_fast.cassette.solve.yaml`
 - `configs/cassettes/demo_hairpin_balanced.cassette.solve.yaml`
 - `configs/cassettes/demo_hairpin_deep_mmr.cassette.solve.yaml`
@@ -102,8 +116,9 @@ Use `solve_report.json`, `solve_status.json`, or `table__hits.csv` to fill in `<
 Everything stays inside the same cassette workspace root:
 
 ```text
-./cassette_lab_demo/
+src/dnadesign/cruncher/workspaces/cassette_lab_demo/
   configs/
+    runbook.yaml
     cassettes/
       demo_hairpin_fast.cassette.solve.yaml
   outputs/
@@ -132,6 +147,7 @@ That scope is intentional:
 
 - Cruncher publishes solve reports, view contracts, and baserender jobs into the cassette workspace.
 - BaseRender reads those local job files and writes PDFs back into sibling `renders/` directories.
+- `workspaces list` can inventory the scaffold because `configs/runbook.yaml` makes it a `runbook-only` workspace.
 - No separate baserender workspace or Cruncher `run_index.json` entry is involved.
 
 ### Related docs
