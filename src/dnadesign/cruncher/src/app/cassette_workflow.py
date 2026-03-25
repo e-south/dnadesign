@@ -99,7 +99,10 @@ def run_cassette_design(path: str | Path, *, force_overwrite: bool = False) -> t
     )
     write_manifest(run_dir, manifest)
     status = "completed" if report.status == "satisfied" else "unsatisfied"
-    message = "cassette design satisfied" if report.status == "satisfied" else "cassette design unsatisfied"
+    message = (
+        f"cassette design {report.status} "
+        f"(schema v{report.metadata.spec_schema_version}, {report.metadata.coordinate_semantics})"
+    )
     write_status(run_dir, status=status, status_message=message, report=report)
     return run_dir, report
 

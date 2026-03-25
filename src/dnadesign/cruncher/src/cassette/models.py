@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/src/cassette/models.py
 
-Schema contracts for the dual-context cassette workflow.
+Schema and normalized planning contracts for the cassette workflow.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -18,6 +18,44 @@ from typing import Any, Dict, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 _DNA_RE = re.compile(r"^[ACGT]+$")
+_IUPAC_RE = re.compile(r"^[ACGTRYSWKMBDHVN]+$")
+_IUPAC_MAP: dict[str, set[str]] = {
+    "A": {"A"},
+    "C": {"C"},
+    "G": {"G"},
+    "T": {"T"},
+    "R": {"A", "G"},
+    "Y": {"C", "T"},
+    "S": {"G", "C"},
+    "W": {"A", "T"},
+    "K": {"G", "T"},
+    "M": {"A", "C"},
+    "B": {"C", "G", "T"},
+    "D": {"A", "G", "T"},
+    "H": {"A", "C", "T"},
+    "V": {"A", "C", "G"},
+    "N": {"A", "C", "G", "T"},
+}
+_DNA_COMPLEMENT = str.maketrans("ACGT", "TGCA")
+_IUPAC_COMPLEMENT = str.maketrans(
+    {
+        "A": "T",
+        "C": "G",
+        "G": "C",
+        "T": "A",
+        "R": "Y",
+        "Y": "R",
+        "S": "S",
+        "W": "W",
+        "K": "M",
+        "M": "K",
+        "B": "V",
+        "D": "H",
+        "H": "D",
+        "V": "B",
+        "N": "N",
+    }
+)
 
 
 class StrictCassetteModel(BaseModel):
@@ -35,8 +73,44 @@ def _normalize_dna(value: str, *, allow_empty: bool = False) -> str:
     return text
 
 
+def _normalize_iupac(value: str) -> str:
+    text = str(value or "").strip().upper()
+    if not text:
+        raise ValueError("DNA motif cannot be empty.")
+    if not _IUPAC_RE.fullmatch(text):
+        raise ValueError(f"DNA motif must contain only IUPAC nucleotide symbols: {value!r}")
+    return text
+
+
+def normalize_dna(value: str, *, allow_empty: bool = False) -> str:
+    return _normalize_dna(value, allow_empty=allow_empty)
+
+
+def normalize_iupac(value: str) -> str:
+    return _normalize_iupac(value)
+
+
 def reverse_complement(sequence: str) -> str:
-    return sequence.upper().translate(str.maketrans("ACGT", "TGCA"))[::-1]
+    return sequence.upper().translate(_DNA_COMPLEMENT)[::-1]
+
+
+def reverse_complement_iupac(sequence: str) -> str:
+    return sequence.upper().translate(_IUPAC_COMPLEMENT)[::-1]
+
+
+def iupac_bases_for_symbol(symbol: str) -> set[str]:
+    text = str(symbol or "").strip().upper()
+    if len(text) != 1 or text not in _IUPAC_MAP:
+        raise ValueError(f"Unknown IUPAC nucleotide symbol: {symbol!r}")
+    return set(_IUPAC_MAP[text])
+
+
+def motif_matches(sequence: str, motif: str) -> bool:
+    sequence_text = _normalize_dna(sequence)
+    motif_text = _normalize_iupac(motif)
+    if len(sequence_text) != len(motif_text):
+        return False
+    return all(base in _IUPAC_MAP[symbol] for base, symbol in zip(sequence_text, motif_text, strict=True))
 
 
 class NickWindow(StrictCassetteModel):
@@ -47,6 +121,17 @@ class NickWindow(StrictCassetteModel):
     def _validate_bounds(self) -> "NickWindow":
         if self.end < self.start:
             raise ValueError("nick_window.end must be >= nick_window.start.")
+        return self
+
+
+class BoundedSegmentLength(StrictCassetteModel):
+    min: int = Field(ge=0)
+    max: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _validate_bounds(self) -> "BoundedSegmentLength":
+        if self.max < self.min:
+            raise ValueError("bounded_segment_length.max must be >= bounded_segment_length.min.")
         return self
 
 
@@ -66,30 +151,63 @@ class FlankNickingRequest(StrictCassetteModel):
 class HairpinTopologySpec(StrictCassetteModel):
     stem5p_arm: str
     loop: str
-    stem3p_arm_mode: Literal["derive_reverse_complement"] = "derive_reverse_complement"
+    stem3p_arm_mode: Literal["derived_reverse_complement"] = "derived_reverse_complement"
 
     @field_validator("stem5p_arm", "loop")
     @classmethod
-    def _validate_dna(cls, value: str, info) -> str:
-        allow_empty = info.field_name == "loop" and False
-        return _normalize_dna(value, allow_empty=allow_empty)
+    def _validate_dna(cls, value: str) -> str:
+        return _normalize_dna(value)
 
 
-class DuplexContextSpec(StrictCassetteModel):
-    upstream: str = ""
-    downstream: str = ""
+class ConstructContextSpec(StrictCassetteModel):
+    left_flank: str = ""
+    right_flank: str = ""
 
-    @field_validator("upstream", "downstream")
+    @field_validator("left_flank", "right_flank")
     @classmethod
     def _validate_dna(cls, value: str) -> str:
         return _normalize_dna(value, allow_empty=True)
 
 
 class DuplexNickingPlanSpec(StrictCassetteModel):
-    designated_strand: Literal["primary_strand", "complement_strand"] = "primary_strand"
+    target_strand: Literal["primary", "complement"] = "primary"
     left: FlankNickingRequest
     right: FlankNickingRequest
+    require_exactly_two_intended_nicks: bool = True
+    bounded_segment_length: BoundedSegmentLength | None = None
+
+    @model_validator(mode="after")
+    def _validate_tracer_bullet_mode(self) -> "DuplexNickingPlanSpec":
+        if not self.require_exactly_two_intended_nicks:
+            raise ValueError(
+                "UNSUPPORTED_INTENDED_NICK_COUNT_MODE: "
+                "nicking.require_exactly_two_intended_nicks must be true in the cassette tracer bullet."
+            )
+        return self
+
+
+class SitePolicySpec(StrictCassetteModel):
     forbid_additional_designated_strand_nicks: bool = False
+    scan_scope: Literal["requested_variants", "catalog"] = "requested_variants"
+
+
+class HairpinValidationSpec(StrictCassetteModel):
+    require_topological_hairpin: bool = True
+    require_energetic_hairpin: bool = False
+
+    @model_validator(mode="after")
+    def _validate_tracer_bullet_mode(self) -> "HairpinValidationSpec":
+        if not self.require_topological_hairpin:
+            raise ValueError(
+                "UNSUPPORTED_TOPOLOGICAL_HAIRPIN_MODE: "
+                "hairpin_validation.require_topological_hairpin must be true in the cassette tracer bullet."
+            )
+        if self.require_energetic_hairpin:
+            raise ValueError(
+                "ENERGETIC_HAIRPIN_VALIDATION_NOT_SUPPORTED: "
+                "hairpin_validation.require_energetic_hairpin=true is not supported in the cassette tracer bullet."
+            )
+        return self
 
 
 class CassetteCatalogRef(StrictCassetteModel):
@@ -114,20 +232,23 @@ class CassetteOutputConfig(StrictCassetteModel):
 
 
 class HairpinCassetteSpec(StrictCassetteModel):
-    schema_version: int = 1
+    schema_version: int
     name: str
     topology: HairpinTopologySpec
-    duplex_context: DuplexContextSpec = Field(default_factory=DuplexContextSpec)
+    construct_context: ConstructContextSpec = Field(default_factory=ConstructContextSpec)
     nicking: DuplexNickingPlanSpec
+    site_policy: SitePolicySpec = Field(default_factory=SitePolicySpec)
+    hairpin_validation: HairpinValidationSpec = Field(default_factory=HairpinValidationSpec)
     catalog: CassetteCatalogRef
     output: CassetteOutputConfig = Field(default_factory=CassetteOutputConfig)
 
     @field_validator("schema_version")
     @classmethod
     def _validate_schema_version(cls, value: int) -> int:
-        if int(value) != 1:
-            raise ValueError("cassette.schema_version must be 1.")
-        return int(value)
+        version = int(value)
+        if version not in {1, 2}:
+            raise ValueError("cassette.schema_version must be 1 or 2.")
+        return version
 
     @field_validator("name")
     @classmethod
@@ -137,6 +258,63 @@ class HairpinCassetteSpec(StrictCassetteModel):
             raise ValueError("cassette.name must be non-empty.")
         return text
 
+    @property
+    def coordinate_semantics(self) -> Literal["legacy_v1", "boundary_inclusive_v2"]:
+        return "legacy_v1" if self.schema_version == 1 else "boundary_inclusive_v2"
+
+    @property
+    def target_strand_legacy(self) -> Literal["primary_strand", "complement_strand"]:
+        return "primary_strand" if self.nicking.target_strand == "primary" else "complement_strand"
+
+    def normalize(self) -> "NormalizedCassetteSpec":
+        stem5p = self.topology.stem5p_arm
+        loop = self.topology.loop
+        stem3p = reverse_complement(stem5p)
+        cassette_sequence = f"{stem5p}{loop}{stem3p}"
+        pair_map = [PairContract(left=index, right=len(cassette_sequence) - 1 - index) for index in range(len(stem5p))]
+        return NormalizedCassetteSpec(
+            schema_version=self.schema_version,
+            coordinate_semantics=self.coordinate_semantics,
+            topology=NormalizedTopology(
+                stem5p_arm=stem5p,
+                loop=loop,
+                stem3p_arm=stem3p,
+                pair_map=pair_map,
+                cassette_sequence=cassette_sequence,
+                cassette_length_nt=len(cassette_sequence),
+                stem_length_nt=len(stem5p),
+                loop_length_nt=len(loop),
+            ),
+            construct_context=NormalizedConstructContext(
+                left_flank=self.construct_context.left_flank,
+                right_flank=self.construct_context.right_flank,
+                evaluation_primary_sequence=(
+                    f"{self.construct_context.left_flank}{cassette_sequence}{self.construct_context.right_flank}"
+                ),
+            ),
+            nicking=NormalizedNickingSpec(
+                target_strand=self.nicking.target_strand,
+                left=NormalizedNickingRequest(
+                    variant_id=self.nicking.left.nickase,
+                    window_start=self.nicking.left.nick_window.start,
+                    window_end=self.nicking.left.nick_window.end,
+                ),
+                right=NormalizedNickingRequest(
+                    variant_id=self.nicking.right.nickase,
+                    window_start=self.nicking.right.nick_window.start,
+                    window_end=self.nicking.right.nick_window.end,
+                ),
+                require_exactly_two_intended_nicks=self.nicking.require_exactly_two_intended_nicks,
+                bounded_segment_length=self.nicking.bounded_segment_length,
+            ),
+            site_policy=self.site_policy,
+            hairpin_validation=self.hairpin_validation,
+            output=NormalizedOutputConfig(
+                run_dir=self.output.run_dir,
+                write_render_contract=self.output.write_render_contract,
+            ),
+        )
+
 
 class HairpinCassetteSpecDocument(StrictCassetteModel):
     cassette: HairpinCassetteSpec
@@ -144,43 +322,66 @@ class HairpinCassetteSpecDocument(StrictCassetteModel):
 
 class NickaseCatalogEntry(StrictCassetteModel):
     id: str
-    recognition_sequence: str
-    nicked_site_strand: Literal["forward", "reverse"]
-    cut_offset: int = Field(ge=0)
+    specificity_id: str
+    motif_top_5to3: str
+    motif_len: int | None = None
+    top_cut_offset: int | None = None
+    bottom_cut_offset: int | None = None
     source: Optional[str] = None
-    vendor: Optional[str] = None
-    notes: Optional[str] = None
-    tags: Dict[str, str] = Field(default_factory=dict)
+    raw_cut_notation: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("id")
+    @field_validator("id", "specificity_id")
     @classmethod
     def _validate_id(cls, value: str) -> str:
         text = str(value or "").strip()
         if not text:
-            raise ValueError("nickase id must be non-empty.")
+            raise ValueError("nickase id and specificity_id must be non-empty.")
         return text
 
-    @field_validator("recognition_sequence")
+    @field_validator("motif_top_5to3")
     @classmethod
-    def _validate_recognition_sequence(cls, value: str) -> str:
-        text = _normalize_dna(value)
-        if reverse_complement(text) == text:
-            raise ValueError(
-                "recognition_sequence must be asymmetric for v1 nickase catalogs; palindromic sites are ambiguous."
-            )
-        return text
+    def _validate_motif(cls, value: str) -> str:
+        return _normalize_iupac(value)
 
     @model_validator(mode="after")
-    def _validate_cut_offset(self) -> "NickaseCatalogEntry":
-        site_len = len(self.recognition_sequence)
-        if self.cut_offset > site_len:
-            raise ValueError("cut_offset must be between 0 and the recognition sequence length.")
+    def _validate_offsets(self) -> "NickaseCatalogEntry":
+        if (self.top_cut_offset is None) == (self.bottom_cut_offset is None):
+            raise ValueError("nickase variants must define exactly one of top_cut_offset or bottom_cut_offset.")
+        expected_len = len(self.motif_top_5to3)
+        if self.motif_len is None:
+            self.motif_len = expected_len
+        elif self.motif_len != expected_len:
+            raise ValueError("motif_len must equal len(motif_top_5to3).")
         return self
+
+
+class NickaseProductAlias(StrictCassetteModel):
+    alias_id: str
+    canonical_variant_id: str
+    vendor: str | None = None
+    vendor_catalog_number: str | None = None
+    alias_kind: str | None = None
+    notes: list[str] = Field(default_factory=list)
+
+    @field_validator("alias_id", "canonical_variant_id")
+    @classmethod
+    def _validate_id(cls, value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("product alias ids must be non-empty.")
+        return text
 
 
 class NickaseCatalog(StrictCassetteModel):
     schema_version: int = 1
     entries: list[NickaseCatalogEntry]
+    preset_id: str | None = None
+    catalog_version: int | None = None
+    generated_from: str | None = None
+    generated_on: str | None = None
+    normalization_policy: str | None = None
+    product_aliases: list[NickaseProductAlias] = Field(default_factory=list)
 
     @field_validator("schema_version")
     @classmethod
@@ -197,7 +398,30 @@ class NickaseCatalog(StrictCassetteModel):
         ids = [entry.id for entry in value]
         if len(set(ids)) != len(ids):
             raise ValueError("nickase catalog ids must be unique.")
+        motifs_by_specificity: dict[str, str] = {}
+        for entry in value:
+            existing = motifs_by_specificity.get(entry.specificity_id)
+            if existing is None:
+                motifs_by_specificity[entry.specificity_id] = entry.motif_top_5to3
+            elif existing != entry.motif_top_5to3:
+                raise ValueError(
+                    "nickase catalog entries that share a specificity_id must use the same motif_top_5to3."
+                )
         return value
+
+    @model_validator(mode="after")
+    def _validate_product_aliases(self) -> "NickaseCatalog":
+        entry_ids = {entry.id for entry in self.entries}
+        alias_ids = [alias.alias_id for alias in self.product_aliases]
+        if len(set(alias_ids)) != len(alias_ids):
+            raise ValueError("nickase product alias ids must be unique.")
+        for alias in self.product_aliases:
+            if alias.canonical_variant_id not in entry_ids:
+                raise ValueError(
+                    f"nickase product alias {alias.alias_id} references unknown canonical_variant_id "
+                    f"{alias.canonical_variant_id!r}."
+                )
+        return self
 
     def by_id(self) -> Dict[str, NickaseCatalogEntry]:
         return {entry.id: entry for entry in self.entries}
@@ -229,68 +453,181 @@ class PairContract(StrictCassetteModel):
         return self
 
 
-class PlannedNick(StrictCassetteModel):
-    nickase: str
-    recognition_sequence: str
-    site_start: int
-    site_end: int
-    site_orientation: Literal["forward", "reverse"]
-    nicked_strand: Literal["primary_strand", "complement_strand"]
-    nick_coordinate: int
-    nick_coordinate_context: int
-
-
-class BoundedSegment(StrictCassetteModel):
+class RecognitionSiteInstance(StrictCassetteModel):
+    variant_id: str
+    specificity_id: str
     start: int = Field(ge=0)
     end: int = Field(ge=0)
-    length: int = Field(ge=0)
+    orientation: Literal["forward", "reverse"]
+    matched_span_sequence: str
+    cassette_start: int | None = None
+    cassette_end: int | None = None
+
+
+class NickEvent(StrictCassetteModel):
+    variant_id: str
+    specificity_id: str
+    strand: Literal["primary", "complement"]
+    boundary: int
+    boundary_context: int = Field(ge=0)
+    source_site_start: int = Field(ge=0)
+    source_site_end: int = Field(ge=0)
+    source_site_orientation: Literal["forward", "reverse"]
+
+
+class BoundedNickedSegment(StrictCassetteModel):
+    strand: Literal["primary", "complement"]
+    start_boundary: int = Field(ge=0)
+    end_boundary: int = Field(ge=0)
+    length_nt: int = Field(ge=0)
 
     @model_validator(mode="after")
-    def _validate_bounds(self) -> "BoundedSegment":
-        if self.end < self.start:
-            raise ValueError("bounded segment end must be >= start.")
-        if self.length != self.end - self.start:
-            raise ValueError("bounded segment length must equal end - start.")
+    def _validate_bounds(self) -> "BoundedNickedSegment":
+        if self.end_boundary < self.start_boundary:
+            raise ValueError("bounded nicked segment end_boundary must be >= start_boundary.")
+        if self.length_nt != self.end_boundary - self.start_boundary:
+            raise ValueError("bounded nicked segment length must equal end_boundary - start_boundary.")
         return self
 
 
-class UnsatReason(StrictCassetteModel):
+class ValidationIssue(StrictCassetteModel):
     code: str
     message: str
     details: Dict[str, Any] = Field(default_factory=dict)
 
 
+UnsatReason = ValidationIssue
+
+
+class CatalogNormalizationInfo(StrictCassetteModel):
+    variant_id: str
+    specificity_id: str
+    motif_top_5to3: str
+    motif_len: int = Field(ge=1)
+    top_cut_offset: int | None = None
+    bottom_cut_offset: int | None = None
+    source: str | None = None
+    raw_cut_notation: str | None = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CassetteReportMetadata(StrictCassetteModel):
+    spec_schema_version: int
+    coordinate_semantics: Literal["legacy_v1", "boundary_inclusive_v2"]
+    left_flank_length: int = Field(ge=0)
+    right_flank_length: int = Field(ge=0)
+    evaluation_primary_length: int = Field(ge=0)
+    catalog_variants: list[CatalogNormalizationInfo] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    bounded_segment_statement: str = "Reports a bounded nicked segment, not excision."
+
+
 class CassetteCandidateDesign(StrictCassetteModel):
     cassette_sequence: str
-    context_sequence: str
-    complement_sequence: str
-    cassette_length: int = Field(ge=1)
+    stem5p_arm: str
+    loop: str
+    stem3p_arm: str
+    target_strand: Literal["primary", "complement"]
+    intended_left_site: RecognitionSiteInstance
+    intended_right_site: RecognitionSiteInstance
+    intended_left_nick: NickEvent
+    intended_right_nick: NickEvent
+    bounded_nicked_segment: BoundedNickedSegment
+    extra_designated_strand_nicks: list[NickEvent] = Field(default_factory=list)
+    evaluation_primary_sequence: str
+    evaluation_complement_sequence: str
+    cassette_length_nt: int = Field(ge=1)
     context_offset: int = Field(ge=0)
     stem5p_span: SpanContract
     loop_span: SpanContract
     stem3p_span: SpanContract
     pair_map: list[PairContract]
-    left_nick: PlannedNick
-    right_nick: PlannedNick
-    bounded_segment: BoundedSegment
-    additional_designated_strand_nicks: list[PlannedNick] = Field(default_factory=list)
 
-    @field_validator("cassette_sequence", "context_sequence", "complement_sequence")
+    @field_validator(
+        "cassette_sequence",
+        "stem5p_arm",
+        "loop",
+        "stem3p_arm",
+        "evaluation_primary_sequence",
+        "evaluation_complement_sequence",
+    )
     @classmethod
     def _validate_sequence(cls, value: str) -> str:
         return _normalize_dna(value)
 
 
 class CassetteEvaluationReport(StrictCassetteModel):
-    schema_version: int = 1
+    schema_version: int = 2
     workflow: Literal["cassette"] = "cassette"
     status: Literal["satisfied", "unsatisfied"]
     spec_name: str
-    designated_strand: Literal["primary_strand", "complement_strand"]
+    target_strand: Literal["primary", "complement"]
     workspace_root: str
     spec_path: str
     catalog_path: str
-    issues: list[UnsatReason] = Field(default_factory=list)
+    metadata: CassetteReportMetadata
+    issues: list[ValidationIssue] = Field(default_factory=list)
     candidate: CassetteCandidateDesign | None = None
     render_contract: Dict[str, Any] | None = None
     run_dir: str | None = None
+
+
+class NormalizedTopology(StrictCassetteModel):
+    stem5p_arm: str
+    loop: str
+    stem3p_arm: str
+    pair_map: list[PairContract]
+    cassette_sequence: str
+    cassette_length_nt: int = Field(ge=1)
+    stem_length_nt: int = Field(ge=1)
+    loop_length_nt: int = Field(ge=1)
+
+
+class NormalizedConstructContext(StrictCassetteModel):
+    left_flank: str
+    right_flank: str
+    evaluation_primary_sequence: str
+
+    @property
+    def evaluation_complement_sequence(self) -> str:
+        return reverse_complement(self.evaluation_primary_sequence)
+
+    @property
+    def cassette_start_offset(self) -> int:
+        return len(self.left_flank)
+
+
+class NormalizedNickingRequest(StrictCassetteModel):
+    variant_id: str
+    window_start: int = Field(ge=0)
+    window_end: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _validate_bounds(self) -> "NormalizedNickingRequest":
+        if self.window_end < self.window_start:
+            raise ValueError("nicking window_end must be >= window_start.")
+        return self
+
+
+class NormalizedNickingSpec(StrictCassetteModel):
+    target_strand: Literal["primary", "complement"]
+    left: NormalizedNickingRequest
+    right: NormalizedNickingRequest
+    require_exactly_two_intended_nicks: bool = True
+    bounded_segment_length: BoundedSegmentLength | None = None
+
+
+class NormalizedOutputConfig(StrictCassetteModel):
+    run_dir: Path
+    write_render_contract: bool
+
+
+class NormalizedCassetteSpec(StrictCassetteModel):
+    schema_version: int
+    coordinate_semantics: Literal["legacy_v1", "boundary_inclusive_v2"]
+    topology: NormalizedTopology
+    construct_context: NormalizedConstructContext
+    nicking: NormalizedNickingSpec
+    site_policy: SitePolicySpec
+    hairpin_validation: HairpinValidationSpec
+    output: NormalizedOutputConfig

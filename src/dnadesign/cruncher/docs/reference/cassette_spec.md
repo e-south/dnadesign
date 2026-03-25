@@ -10,11 +10,12 @@
 
 ### Contents
 - [File location](#file-location)
-- [Top-level shape](#top-level-shape)
+- [Schema versions](#schema-versions)
+- [Canonical v2 shape](#canonical-v2-shape)
 - [Field semantics](#field-semantics)
 - [Coordinate semantics](#coordinate-semantics)
 - [Hard invariants](#hard-invariants)
-- [Example](#example)
+- [Backward-compatible aliases](#backward-compatible-aliases)
 
 ### File location
 
@@ -26,28 +27,44 @@ Cassette specs must live at:
 
 The CLI rejects directory arguments, files outside the workspace `configs/` tree, and paths with `..` traversal.
 
-### Top-level shape
+Solve-mode search specs use the separate suffix `.cassette.solve.yaml` and are documented in
+[`cassette_solve_spec.md`](cassette_solve_spec.md).
+
+### Schema versions
+
+- `schema_version: 2` is the canonical tracer-bullet schema.
+- `schema_version: 1` is still accepted and preserves legacy window semantics.
+- `schema_version` is required. The loader does not guess.
+
+### Canonical v2 shape
 
 ```yaml
 cassette:
-  schema_version: 1
+  schema_version: 2
   name: demo_hairpin
   topology:
     stem5p_arm: AACGAT
     loop: TT
-    stem3p_arm_mode: derive_reverse_complement
-  duplex_context:
-    upstream: ""
-    downstream: ""
+    stem3p_arm_mode: derived_reverse_complement
+  construct_context:
+    left_flank: ""
+    right_flank: ""
   nicking:
-    designated_strand: primary_strand
+    target_strand: primary
     left:
-      nickase: nb_left
-      nick_window: {start: 0, end: 3}
+      nickase: Nt.demo
+      nick_window: {start: 2, end: 2}
     right:
-      nickase: nb_right
-      nick_window: {start: 11, end: 13}
+      nickase: Nb.demo
+      nick_window: {start: 12, end: 12}
+    require_exactly_two_intended_nicks: true
+    bounded_segment_length: {min: 10, max: 10}
+  site_policy:
     forbid_additional_designated_strand_nicks: false
+    scan_scope: requested_variants
+  hairpin_validation:
+    require_topological_hairpin: true
+    require_energetic_hairpin: false
   catalog:
     path: inputs/nickases/demo.nickases.yaml
   output:
@@ -57,65 +74,53 @@ cassette:
 
 ### Field semantics
 
-- `schema_version`: must be `1`.
+- `schema_version`: `1` or `2`.
 - `name`: non-empty run namespace. It becomes part of `outputs/cassettes/<name>/...`.
-- `topology.stem5p_arm`: required DNA sequence (`A/C/G/T` only).
-- `topology.loop`: required DNA sequence (`A/C/G/T` only).
-- `topology.stem3p_arm_mode`: must be `derive_reverse_complement` in v1.
-- `duplex_context.upstream`, `duplex_context.downstream`: optional flanking DNA included when scanning nickase recognition sites.
-- `nicking.designated_strand`: which duplex strand must receive both intended nicks: `primary_strand` or `complement_strand`.
-- `nicking.left.nickase`, `nicking.right.nickase`: nickase IDs that must exist in the referenced catalog.
-- `nicking.left.nick_window`, `nicking.right.nick_window`: cassette-relative windows matched against reported `nick_coordinate` values.
-- `nicking.forbid_additional_designated_strand_nicks`: when `true`, any extra designated-strand nick site causes an unsatisfied report.
+- `topology.stem5p_arm`: required concrete DNA sequence (`A/C/G/T` only).
+- `topology.loop`: required concrete DNA sequence (`A/C/G/T` only).
+- `topology.stem3p_arm_mode`: must resolve to `derived_reverse_complement`. The tracer bullet does not support authoring `stem3p_arm` directly.
+- `construct_context.left_flank`, `construct_context.right_flank`: optional concrete flanks included when evaluating duplex nickase instances.
+- `nicking.target_strand`: duplex strand that must receive both intended nicks: `primary` or `complement`.
+- `nicking.left.nickase`, `nicking.right.nickase`: nickase variant IDs that must exist in the referenced local catalog.
+- `nicking.left.nick_window`, `nicking.right.nick_window`: cassette-local intended nick boundary windows.
+- `nicking.require_exactly_two_intended_nicks`: must be `true` in the current tracer bullet. Multi-intended modes are outside scope and fail fast at load time.
+- `nicking.bounded_segment_length`: optional inclusive length interval for the bounded nicked segment.
+- `site_policy.forbid_additional_designated_strand_nicks`: when `true`, extra designated-strand nick events under the active scan scope produce an unsatisfied report.
+- `site_policy.scan_scope`: `requested_variants` or `catalog`.
+- `hairpin_validation.require_topological_hairpin`: must be `true` in the current tracer bullet. Disabling the topological hairpin contract is not supported.
+- `hairpin_validation.require_energetic_hairpin`: reserved for future energetic checks. Setting it to `true` currently fails fast instead of silently skipping thermodynamic validation.
 - `catalog.path`: workspace-relative or absolute path to a local nickase catalog.
 - `output.run_dir`: relative output root inside the workspace. Absolute paths and `..` traversal are rejected.
 - `output.write_render_contract`: when `true`, write and report `analysis/reports/render_contract.json`.
 
 ### Coordinate semantics
 
-- `nick_window.start` and `nick_window.end` are zero-based inclusive cassette coordinates.
-- `PlannedNick.site_start` and `PlannedNick.site_end` in reports are cassette-relative half-open recognition-site spans.
-- `nick_coordinate_context` in reports is the same nick coordinate projected into the duplex context sequence.
-- `bounded_segment.start` and `bounded_segment.end` come directly from the selected left/right `nick_coordinate` values.
-
-The workflow uses the same reported `nick_coordinate` integers for filtering windows, reports, and the optional render contract.
+- Internal cassette planning uses bond-boundary coordinates.
+- `schema_version: 2` reports `coordinate_semantics: boundary_inclusive_v2`.
+- In `boundary_inclusive_v2`, cassette-local legal nick boundaries are `0..N`, where `0` is before the first cassette base and `N` is after the last cassette base.
+- `nick_window.start` and `nick_window.end` are inclusive boundary windows.
+- `RecognitionSiteInstance.start` and `.end` in reports are positions on the evaluated primary display strand.
+- `NickEvent.boundary` is cassette-local.
+- `NickEvent.boundary_context` is the same nick boundary projected into the evaluated primary sequence.
+- `schema_version: 1` preserves the legacy v1 interpretation and reports `coordinate_semantics: legacy_v1`.
 
 ### Hard invariants
 
-- `stem3p_arm` is always derived as `reverse_complement(stem5p_arm)`.
-- both intended nick calls must land on the requested `designated_strand`.
-- the left nick coordinate must be strictly less than the right nick coordinate.
-- the bounded segment is reported as a nick-bounded interval, not as an excised/removed product.
-- nickase IDs must resolve against the referenced catalog before planning begins.
+- The cassette primary strand is always `stem5p_arm + loop + reverse_complement(stem5p_arm)`.
+- The tracer bullet models exactly one loop, no bulges, and no mismatches.
+- Intended left and right recognition-site instances must each lie wholly inside their respective stem arms.
+- Both intended nick events must land on the requested `target_strand`.
+- The left intended boundary must be strictly less than the right intended boundary.
+- The output reports a **bounded nicked segment**, not excision.
+- Nickase IDs must resolve against the referenced catalog before planning begins.
 
-### Example
+### Backward-compatible aliases
 
-```yaml
-cassette:
-  schema_version: 1
-  name: demo_hairpin
-  topology:
-    stem5p_arm: AACGAT
-    loop: TT
-    stem3p_arm_mode: derive_reverse_complement
-  duplex_context:
-    upstream: ""
-    downstream: ""
-  nicking:
-    designated_strand: primary_strand
-    left:
-      nickase: nb_left
-      nick_window:
-        start: 0
-        end: 3
-    right:
-      nickase: nb_right
-      nick_window:
-        start: 11
-        end: 13
-  catalog:
-    path: inputs/nickases/demo.nickases.yaml
-  output:
-    run_dir: outputs/cassettes
-    write_render_contract: true
-```
+The loader accepts these aliases and normalizes them internally:
+
+- `duplex_context.upstream` -> `construct_context.left_flank`
+- `duplex_context.downstream` -> `construct_context.right_flank`
+- `nicking.designated_strand` -> `nicking.target_strand`
+- `topology.stem3p_arm_mode: derive_reverse_complement` -> `derived_reverse_complement`
+
+If both old and new names are present in the same document, the loader fails with `SCHEMA_ALIAS_CONFLICT`.

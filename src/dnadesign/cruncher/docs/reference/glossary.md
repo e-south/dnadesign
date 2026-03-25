@@ -22,9 +22,9 @@
 ### Cassette workflow terms
 - **cassette spec**: A strict YAML document at `configs/cassettes/<name>.cassette.yaml` describing hairpin topology, duplex context, nick windows, catalog path, and output behavior.
 - **nickase catalog**: A strict local YAML document that defines asymmetric recognition sites plus strand and cut-offset metadata for cassette planning.
-- **designated strand**: The duplex strand (`primary_strand` or `complement_strand`) that both intended nicks must hit.
+- **target strand**: The duplex strand (`primary` or `complement`) that both intended nicks must hit. Legacy specs may still refer to this as the designated strand.
 - **pair map**: The explicit list of stem-position couplings linking the 5' arm to the reverse-complement 3' arm.
-- **bounded segment**: The interval between the two intended nick coordinates on the designated strand. It does not imply downstream removal/excision.
+- **bounded nicked segment**: The interval between the two intended nick boundaries on the target strand. It does not imply downstream removal/excision.
 
 ### Source and ingest terms
 - **source**: Named ingest adapter namespace (for example `regulondb`, `demo_local_meme`).
