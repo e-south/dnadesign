@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from types import SimpleNamespace
 
+from dnadesign.ops.preflight import CommandExecution
 from dnadesign.studies.stress_promoter_ethanol_cipro.preflight_orchestration import (
     PromoterPreflightNotifyEnvironmentDependencies,
     PromoterPreflightRunbookPlanDependencies,
@@ -25,34 +25,8 @@ from dnadesign.studies.stress_promoter_ethanol_cipro.preflight_orchestration imp
 )
 
 
-def _state_check(**kwargs) -> dict[str, object]:
-    return {
-        "id": kwargs["check_id"],
-        "check_group": kwargs.get("check_group"),
-        "phase": kwargs["phase"],
-        "phase_id": kwargs["phase_id"],
-        "state": kwargs["state"],
-        "summary": kwargs["summary"],
-        "details": kwargs.get("details", {}),
-    }
-
-
-def _command_check(**kwargs) -> dict[str, object]:
-    execution = kwargs["execution"]
-    return {
-        "id": kwargs["check_id"],
-        "check_group": kwargs.get("check_group"),
-        "phase": kwargs["phase"],
-        "phase_id": kwargs["phase_id"],
-        "state": "attention" if getattr(execution, "returncode", 1) != 0 else "ok",
-        "summary": kwargs["summary"],
-        "details": kwargs.get("details", {}),
-        "returncode": getattr(execution, "returncode", None),
-    }
-
-
 def _execution(argv: tuple[str, ...], cwd: Path, *, returncode: int, stdout: str = "", stderr: str = "") -> object:
-    return SimpleNamespace(
+    return CommandExecution(
         argv=argv,
         cwd=str(cwd),
         returncode=returncode,
@@ -75,15 +49,13 @@ def test_build_promoter_preflight_notify_environment_checks_uses_explicit_state_
         notify_env_state=notify_env_state,
         notify_environment_phase_id="infer_batch_preparation",
         enabled_groups={"notify_environment"},
-        dependencies=PromoterPreflightNotifyEnvironmentDependencies(
-            preflight_state_check=_state_check,
-        ),
+        dependencies=PromoterPreflightNotifyEnvironmentDependencies(),
     )
 
-    by_id = {check["id"]: check for check in checks}
-    assert by_id["notify.environment.webhook"]["state"] == "ok"
-    assert by_id["notify.environment.tls"]["state"] == "attention"
-    assert by_id["notify.environment.webhook"]["details"] == {
+    by_id = {check.id: check for check in checks}
+    assert by_id["notify.environment.webhook"].state == "ok"
+    assert by_id["notify.environment.tls"].state == "attention"
+    assert by_id["notify.environment.webhook"].details == {
         "NOTIFY_WEBHOOK": False,
         "NOTIFY_WEBHOOK_FILE": True,
         "SSL_CERT_FILE": False,
@@ -126,22 +98,21 @@ def test_build_promoter_preflight_runbook_plan_checks_merges_payload_and_details
             ),
         ),
         dependencies=PromoterPreflightRunbookPlanDependencies(
-            run_progress_command=_run_progress_command,
+            run_preflight_command=_run_progress_command,
             safe_json_loads=lambda text: json.loads(text or "") if text else None,
-            preflight_command_check=_command_check,
             choose_command_summary=lambda *_args, fallback, **_kwargs: fallback,
         ),
     )
 
     assert len(checks) == 1
     check = checks[0]
-    assert check["state"] == "ok"
-    assert check["check_group"] == "infer_batch_plan"
-    assert check["details"]["runbook"] == str(runbook_path)
-    assert check["details"]["notify_env"] == {"NOTIFY_WEBHOOK": False}
-    assert check["details"]["selected_mode"] == "resume"
-    assert check["details"]["workflow_id"] == "infer_batch_with_notify"
-    assert check["details"]["notify_secret_ref"] == "file:///tmp/webhook"
+    assert check.state == "ok"
+    assert check.check_group == "infer_batch_plan"
+    assert check.details["runbook"] == str(runbook_path)
+    assert check.details["notify_env"] == {"NOTIFY_WEBHOOK": False}
+    assert check.details["selected_mode"] == "resume"
+    assert check.details["workflow_id"] == "infer_batch_with_notify"
+    assert check.details["notify_secret_ref"] == "file:///tmp/webhook"
     assert commands == [
         (
             "uv",

@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from dnadesign.ops.preflight import CommandExecution
 from dnadesign.studies.stress_promoter_ethanol_cipro.infer_runtime import (
     PromoterStudyInferRuntimeModelSummary,
     PromoterStudyInferRuntimeResolvedContext,
@@ -24,32 +25,6 @@ from dnadesign.studies.stress_promoter_ethanol_cipro.preflight_infer import (
     PromoterPreflightInferDependencies,
     build_promoter_preflight_infer_checks,
 )
-
-
-def _state_check(**kwargs) -> dict[str, object]:
-    return {
-        "id": kwargs["check_id"],
-        "check_group": kwargs.get("check_group"),
-        "phase": kwargs["phase"],
-        "phase_id": kwargs["phase_id"],
-        "state": kwargs["state"],
-        "summary": kwargs["summary"],
-        "details": kwargs.get("details", {}),
-    }
-
-
-def _command_check(**kwargs) -> dict[str, object]:
-    execution = kwargs["execution"]
-    return {
-        "id": kwargs["check_id"],
-        "check_group": kwargs.get("check_group"),
-        "phase": kwargs["phase"],
-        "phase_id": kwargs["phase_id"],
-        "state": kwargs.get("override_state", "ok"),
-        "summary": kwargs["summary"],
-        "details": kwargs.get("details", {}),
-        "returncode": getattr(execution, "returncode", None),
-    }
 
 
 def test_build_promoter_preflight_infer_checks_reports_runtime_and_notify_contracts(tmp_path: Path) -> None:
@@ -97,11 +72,9 @@ def test_build_promoter_preflight_infer_checks_reports_runtime_and_notify_contra
             inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},
             infer_usr_dataset_requirements=lambda _: [],
             build_infer_notify_setup_command=lambda path: f"setup:{path.name}",
-            run_progress_command=lambda *args, **kwargs: (_ for _ in ()).throw(
+            run_preflight_command=lambda *args, **kwargs: (_ for _ in ()).throw(
                 AssertionError("notify profile doctor should not run for missing profile")
             ),
-            preflight_state_check=_state_check,
-            preflight_command_check=_command_check,
             choose_command_summary=lambda *_args, **_kwargs: "completed",
             validate_infer_config_contract=lambda _: SimpleNamespace(
                 model_id="evo2_20b",
@@ -121,20 +94,18 @@ def test_build_promoter_preflight_infer_checks_reports_runtime_and_notify_contra
         ),
     )
 
-    checks = {check["id"]: check for check in result.checks}
+    checks = {check.id: check for check in result.checks}
 
     assert result.evidence_updates["preferred_infer_model_family"] == "evo2_20b"
     assert result.evidence_updates["supported_model_families"] == ["evo2_20b", "evo2_7b"]
-    assert checks["infer.validate.anchor_only_20b"]["check_group"] == "infer"
-    assert checks["infer.validate.anchor_only_20b"]["state"] == "ok"
-    assert checks["infer.validate.full_lane_set_20b"]["state"] == "ok"
-    assert checks["infer.local_runtime.anchor_only_20b"]["state"] == "attention"
-    assert checks["notify.profile.anchor_only_20b"]["state"] == "attention"
-    assert (
-        checks["notify.profile.anchor_only_20b"]["details"]["setup_command"] == "setup:config.anchor_only.evo2_20b.yaml"
-    )
-    assert checks["infer.dry_run.anchor_only_20b"]["state"] == "ok"
-    assert checks["notify.resolve_events.anchor_only_20b"]["state"] == "ok"
+    assert checks["infer.validate.anchor_only_20b"].check_group == "infer"
+    assert checks["infer.validate.anchor_only_20b"].state == "ok"
+    assert checks["infer.validate.full_lane_set_20b"].state == "ok"
+    assert checks["infer.local_runtime.anchor_only_20b"].state == "attention"
+    assert checks["notify.profile.anchor_only_20b"].state == "attention"
+    assert checks["notify.profile.anchor_only_20b"].details["setup_command"] == "setup:config.anchor_only.evo2_20b.yaml"
+    assert checks["infer.dry_run.anchor_only_20b"].state == "ok"
+    assert checks["notify.resolve_events.anchor_only_20b"].state == "ok"
 
 
 def test_build_promoter_preflight_infer_checks_requires_notify_resolver_dependency(tmp_path: Path) -> None:
@@ -174,9 +145,7 @@ def test_build_promoter_preflight_infer_checks_requires_notify_resolver_dependen
                 inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},
                 infer_usr_dataset_requirements=lambda _: [],
                 build_infer_notify_setup_command=lambda path: f"setup:{path.name}",
-                run_progress_command=lambda *args, **kwargs: None,
-                preflight_state_check=_state_check,
-                preflight_command_check=_command_check,
+                run_preflight_command=lambda *args, **kwargs: CommandExecution((), str(tmp_path), 0, "", "", False),
                 choose_command_summary=lambda *_args, **_kwargs: "completed",
             ),
         )

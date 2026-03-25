@@ -18,27 +18,29 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dnadesign.ops.catalog import discover_repo_root
-from dnadesign.ops.progress_command_support import (
+from dnadesign.ops.preflight import (
     build_infer_notify_setup_command,
     choose_command_summary,
     infer_usr_dataset_requirements,
     load_orchestration_runbook_payload,
-    preflight_command_check,
-    preflight_state_check,
-    run_progress_command,
+    run_preflight_command,
     safe_json_loads,
 )
-from dnadesign.ops.progress_support import (
+from dnadesign.ops.status.artifacts import (
     load_yaml_mapping,
-    optional_positive_int,
     parquet_row_count,
+)
+from dnadesign.ops.status.parsing import (
+    optional_positive_int,
     required_metadata_text,
+    string_list_or_empty,
+    string_or_none,
+)
+from dnadesign.ops.status.paths import (
     required_path,
     resolve_input_path,
     resolve_named_path_mapping,
     resolve_repo_relative_path,
-    string_list_or_empty,
-    string_or_none,
 )
 from dnadesign.studies.core.models import StudyFamilyAdapter, StudyStatusContext
 from dnadesign.studies.core.record_loader import load_study_ops_contract
@@ -168,10 +170,8 @@ class StressPromoterEthanolCiproStudyAdapter(StudyFamilyAdapter):
             dependencies=PromoterPreflightCoordinatorDependencies(
                 load_orchestration_runbook_payload=load_orchestration_runbook_payload,
                 resolve_input_path=lambda path, base_dir: resolve_input_path(path, base_dir=base_dir),
-                run_progress_command=run_progress_command,
+                run_preflight_command=run_preflight_command,
                 safe_json_loads=safe_json_loads,
-                preflight_state_check=preflight_state_check,
-                preflight_command_check=preflight_command_check,
                 choose_command_summary=choose_command_summary,
                 inspect_local_gpu_inventory=inspect_local_infer_gpu_inventory,
                 infer_usr_dataset_requirements=infer_usr_dataset_requirements,

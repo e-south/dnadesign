@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/ops/progress_command_support.py
+src/dnadesign/ops/preflight/support.py
 
-Command execution and preflight helper support for ops progress providers.
+Generic command execution and payload helpers for OPS preflight surfaces.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -12,32 +12,20 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
-import shlex
 import subprocess
 from collections.abc import Sequence
-from dataclasses import dataclass
 from pathlib import Path
 
-from .progress_support import (
-    load_yaml_mapping,
+from dnadesign.ops.status.artifacts import load_yaml_mapping
+from dnadesign.ops.status.parsing import (
     required_metadata_text,
-    resolve_input_path,
     string_or_none,
 )
+from dnadesign.ops.status.paths import (
+    resolve_input_path,
+)
 
-
-@dataclass(frozen=True)
-class CommandExecution:
-    argv: tuple[str, ...]
-    cwd: str
-    returncode: int
-    stdout: str
-    stderr: str
-    timed_out: bool = False
-
-
-def render_argv(argv: Sequence[str]) -> str:
-    return " ".join(shlex.quote(str(token)) for token in argv)
+from .models import CommandExecution, render_argv
 
 
 def build_infer_notify_setup_command(*, config_path: Path) -> str:
@@ -60,7 +48,7 @@ def build_infer_notify_setup_command(*, config_path: Path) -> str:
     )
 
 
-def run_progress_command(argv: Sequence[str], *, cwd: Path, timeout_seconds: int = 180) -> CommandExecution:
+def run_preflight_command(argv: Sequence[str], *, cwd: Path, timeout_seconds: int = 180) -> CommandExecution:
     try:
         completed = subprocess.run(
             list(argv),
@@ -87,66 +75,6 @@ def run_progress_command(argv: Sequence[str], *, cwd: Path, timeout_seconds: int
         stderr=str(completed.stderr or ""),
         timed_out=False,
     )
-
-
-def preflight_command_check(
-    *,
-    check_id: str,
-    check_group: str | None,
-    phase: str,
-    phase_id: str | None,
-    summary: str,
-    execution: CommandExecution,
-    details: dict[str, object] | None = None,
-    override_state: str | None = None,
-) -> dict[str, object]:
-    state = override_state
-    if state is None:
-        state = "attention" if execution.returncode != 0 or execution.timed_out else "ok"
-    if execution.timed_out:
-        summary = f"timed out: {summary}"
-    return {
-        "id": check_id,
-        "check_group": str(check_group or "").strip() or None,
-        "phase": phase,
-        "phase_id": phase_id,
-        "state": state,
-        "summary": summary,
-        "command": render_argv(execution.argv),
-        "cwd": execution.cwd,
-        "returncode": execution.returncode,
-        "timed_out": execution.timed_out,
-        "stdout_tail": _trim_command_output(execution.stdout),
-        "stderr_tail": _trim_command_output(execution.stderr),
-        "details": details or {},
-    }
-
-
-def preflight_state_check(
-    *,
-    check_id: str,
-    check_group: str | None,
-    phase: str,
-    phase_id: str | None,
-    state: str,
-    summary: str,
-    details: dict[str, object] | None = None,
-) -> dict[str, object]:
-    return {
-        "id": check_id,
-        "check_group": str(check_group or "").strip() or None,
-        "phase": phase,
-        "phase_id": phase_id,
-        "state": state,
-        "summary": summary,
-        "command": None,
-        "cwd": None,
-        "returncode": None,
-        "timed_out": False,
-        "stdout_tail": None,
-        "stderr_tail": None,
-        "details": details or {},
-    }
 
 
 def choose_command_summary(execution: CommandExecution, *, fallback: str) -> str:
@@ -215,27 +143,12 @@ def infer_usr_dataset_requirements(config_path: Path) -> list[dict[str, object]]
     return requirements
 
 
-def _trim_command_output(text: str | None, *, max_lines: int = 8, max_chars: int = 1200) -> str | None:
-    raw = str(text or "").strip()
-    if not raw:
-        return None
-    lines = raw.splitlines()
-    if len(lines) > max_lines:
-        raw = "\n".join(lines[-max_lines:])
-    if len(raw) > max_chars:
-        raw = raw[-max_chars:]
-    return raw
-
-
 __all__ = [
-    "CommandExecution",
     "build_infer_notify_setup_command",
     "choose_command_summary",
     "infer_usr_dataset_requirements",
     "load_orchestration_runbook_payload",
-    "preflight_command_check",
-    "preflight_state_check",
     "render_argv",
-    "run_progress_command",
+    "run_preflight_command",
     "safe_json_loads",
 ]
