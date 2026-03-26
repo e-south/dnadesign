@@ -39,7 +39,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `demo_pairwise` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `demo_pairwise` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `demo_pairwise` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `demo_pairwise` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
+| `demo_pairwise` | `analyze_summary` | Analyze run outputs and emit plots/chain_trajectory_video.mp4 from the enabled trajectory_video config. | `cruncher analyze --summary -c configs/config.yaml` |
 | `demo_pairwise` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `demo_pairwise` | `render_logos` |  | `cruncher catalog logos --source demo_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `demo_pairwise` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |

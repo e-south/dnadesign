@@ -1,10 +1,10 @@
 ## Cruncher CLI
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-25
+**Last verified:** 2026-03-26
 
 
-**Last updated by:** cruncher-maintainers on 2026-03-25
+**Last updated by:** cruncher-maintainers on 2026-03-26
 
 ### Contents
 - [Cruncher CLI](#cruncher-cli)
@@ -12,6 +12,7 @@
 - [Quick command map](#quick-command-map)
 - [Core lifecycle commands](#core-lifecycle-commands)
 - [Cassette workflows](#cassette-workflows)
+- [YIU workflows](#yiu-workflows)
 - [Study workflows](#study-workflows)
 - [Portfolio workflows](#portfolio-workflows)
 - [Discovery and inspection](#discovery-and-inspection)
@@ -19,12 +20,13 @@
 
 This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage and workflow family.
 
-> **Workflow families:** Cruncher currently has two first-class command families.
+> **Workflow families:** Cruncher currently has three first-class command families.
 >
 > - `fetch|lock|parse|sample|analyze|export` plus `study` and `portfolio` cover fixed-length PWM optimization workspaces. This lane uses Gibbs annealing MCMC plus MMR elite selection and is not posterior inference.
 > - `cassette init-workspace|validate|design|solve|show` cover cassette workspaces. This lane uses explicit cassette planning plus bounded solve search and keeps separate artifact contracts.
+> - `yiu init-workspace|validate|design|trace|show` cover YIU protocol-state workspaces. This lane uses explicit step-graph validation and deterministic state-bundle publication.
 >
-> Choose the command family by the workspace contract you need. `cassette` does not fall back to `sample`, and `sample` runs do not reuse cassette artifacts.
+> Choose the command family by the workspace contract you need. `cassette` and `yiu` do not fall back to `sample`, and `sample` runs do not reuse cassette or YIU artifacts.
 
 #### Workspace discovery and config resolution
 
@@ -54,6 +56,7 @@ cruncher study list
 * **Optimize fixed-length sequences** → `sample`
 * **Analyze optimization runs** → `analyze`, `notebook`
 * **Design and search cassettes** → `cassette init-workspace|validate|design|solve|show`
+* **Model YIU hairpin oligo processing** → `yiu init-workspace|validate|design|trace|show`
 * **Study sweeps** → `study list|run|summarize|show|clean`
 * **Cross-workspace handoff aggregation** → `portfolio run|show`
 * **Export sequences** → `export sequences`
@@ -518,6 +521,71 @@ Notes:
 
 * `show` remains an explicit-lane inspection command; solve runs are inspected via the solve report bundle
 * `show` does not read from the workspace `run_index.json`
+
+---
+
+#### YIU workflows
+
+The YIU workflow is separate from both `sample` and `cassette`. It expects an explicit spec file at
+`<workspace>/configs/yiu/<name>.yiu.yaml`, validates a protocol-step state graph, and writes YIU-specific artifacts under `outputs/yiu/explicit/`.
+
+Deep contracts live in:
+
+* [`../demos/demo_yiu_workspace.md`](../demos/demo_yiu_workspace.md)
+* [`../guides/yiu_workflow.md`](../guides/yiu_workflow.md)
+* [`reference/yiu_spec.md`](yiu_spec.md)
+* [`reference/yiu_artifacts.md`](yiu_artifacts.md)
+
+#### `cruncher yiu init-workspace`
+
+Scaffold a runbook-only YIU workspace root with one explicit example spec and optional protocol catalogs.
+
+Examples:
+
+* `uv run cruncher yiu init-workspace yiu_lab`
+* `uv run cruncher yiu init-workspace --output ./yiu_lab --force-overwrite`
+
+Outputs:
+
+* writes `configs/runbook.yaml`
+* writes `configs/yiu/example.yiu.yaml`
+* writes `catalogs/restriction_enzymes.yaml`
+* writes `catalogs/nickases.yaml`
+* writes `catalogs/adapters.yaml`
+* creates `outputs/yiu/explicit/` and `published/views/`
+
+#### `cruncher yiu validate`
+
+Validate one protocol-state YIU spec and print a deterministic state-trace report.
+
+Examples:
+
+* `uv run cruncher yiu validate --spec configs/yiu/example.yiu.yaml`
+* `uv run cruncher yiu validate --spec configs/yiu/example.yiu.yaml --json`
+
+#### `cruncher yiu design`
+
+Write explicit YIU artifacts for one `.yiu.yaml` spec, including `yiu_report.json`, `yiu_trace.jsonl`, and published views.
+
+Example:
+
+* `uv run cruncher yiu design --spec configs/yiu/example.yiu.yaml`
+
+#### `cruncher yiu trace`
+
+Materialize the modeled state graph for one `.yiu.yaml` spec without invoking a solve/search lane.
+
+Example:
+
+* `uv run cruncher yiu trace --spec configs/yiu/example.yiu.yaml`
+
+#### `cruncher yiu show`
+
+Show summary paths for one YIU run directory.
+
+Example:
+
+* `uv run cruncher yiu show --run outputs/yiu/explicit/demo_yiu/<design_id>`
 
 ---
 

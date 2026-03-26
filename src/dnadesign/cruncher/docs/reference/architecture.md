@@ -1,20 +1,22 @@
 ## Cruncher architecture
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-25
+**Last verified:** 2026-03-26
 
 
-**Last updated by:** cruncher-maintainers on 2026-03-25
+**Last updated by:** cruncher-maintainers on 2026-03-26
 
 ### Contents
 - [Cruncher architecture](#cruncher-architecture)
 - [Workflow families](#workflow-families)
 - [Fixed-length optimization lifecycle](#fixed-length-optimization-lifecycle)
 - [Cassette lifecycle](#cassette-lifecycle)
+- [YIU lifecycle](#yiu-lifecycle)
 - [Layers and responsibilities](#layers-and-responsibilities)
 - [On-disk layout](#on-disk-layout)
 - [Run artifacts](#run-artifacts)
 - [Cassette artifacts](#cassette-artifacts)
+- [YIU artifacts](#yiu-artifacts)
 - [Study artifacts](#study-artifacts)
 - [Portfolio artifacts](#portfolio-artifacts)
 - [Reproducibility boundaries](#reproducibility-boundaries)
@@ -29,8 +31,9 @@ Cruncher is organized as peer workflow families, not one monolithic run shape:
 
 - **Fixed-length optimization workspaces** use `fetch -> lock -> parse -> sample -> analyze -> export`, then optional `study` and `portfolio` orchestration on top of the resulting run artifacts.
 - **Cassette workspaces** use `cassette init-workspace|validate|design|solve|show` and publish cassette-specific artifacts plus optional baserender job files.
+- **YIU workspaces** use `yiu init-workspace|validate|design|trace|show` and publish protocol-state bundles plus per-step neutral view contracts.
 
-These families deliberately keep separate workspace contracts, output trees, and orchestration seams. New families should add their own lane-specific artifacts rather than overload `sample` or `cassette`.
+These families deliberately keep separate workspace contracts, output trees, and orchestration seams. New families should add their own lane-specific artifacts rather than overload `sample`, `cassette`, or `yiu`.
 
 #### Fixed-length optimization lifecycle
 
@@ -54,6 +57,20 @@ The cassette workflow is a peer lane, not a variant of `sample`:
 7. **cassette show** -> inspect status and artifact paths for one explicit cassette run
 
 This workflow does not currently use `core/evaluator.py`, `gibbs_anneal`, `study`/`portfolio` orchestration, or workspace `run_index.json`.
+
+#### YIU lifecycle
+
+The YIU workflow is a peer lane, not a cassette submode:
+
+1. optional **yiu init-workspace** -> scaffold a runbook-only YIU workspace with one explicit example spec
+2. author `<workspace>/configs/yiu/<name>.yiu.yaml`
+3. author optional protocol catalogs under `<workspace>/catalogs/*.yaml`
+4. **yiu validate** -> strict schema + protocol-step invariant check plus deterministic state-trace report
+5. **yiu design** -> write explicit manifest, status, report, trace, CSV tables, and published state views
+6. **yiu trace** -> materialize the same protocol-state bundle for QA without implying solve-mode search
+7. **yiu show** -> inspect status and artifact paths for one explicit YIU run
+
+This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, or cassette-specific render contracts. It models intended protocol compatibility across changing molecular states.
 
 ---
 
@@ -104,6 +121,13 @@ Core contract:
 - deterministic nick-site scanning and bounded-segment planning
 - cassette-specific artifact helpers
 - no dependency on legacy `sample` optimizer contracts
+
+#### `yiu/` (protocol-state YIU domain)
+- YIU spec schema and ordered step-graph contracts
+- source-state annotation validation across protocol stages
+- restriction/nickase geometry checks plus retained/sacrificial region validation
+- YIU-specific artifact helpers and neutral published step views
+- no dependency on legacy `sample` or cassette-specific planner contracts
 
 #### `viz/` (plotting)
 - matplotlib/logomaker setup
@@ -187,10 +211,12 @@ Recommended workspace layout:
 configs/
   config.yaml
   cassettes/             # optional cassette specs
+  yiu/                   # optional YIU specs
   studies/               # optional study specs
   portfolios/            # optional portfolio specs
 inputs/
   nickases/              # optional local nickase catalogs
+catalogs/                # optional YIU protocol catalogs
 .cruncher/
 outputs/
 ```
@@ -260,6 +286,12 @@ Cassette runs use a separate deterministic output root:
 <workspace>/outputs/cassettes/<spec.name>/<design_id>/
 ```
 
+YIU runs use their own deterministic explicit root:
+
+```
+<workspace>/outputs/yiu/explicit/<spec.name>/<design_id>/
+```
+
 ---
 
 #### Run artifacts
@@ -294,6 +326,23 @@ Cassette runs are intentionally isolated from `sample` runs:
 - they do not write `meta/run_manifest.json`
 - they do not append to workspace `run_index.json`
 - they do not share `optimize/`, `plots/`, or `analysis/tables/` sample-stage contracts
+
+---
+
+#### YIU artifacts
+
+A typical **YIU** run directory contains:
+
+- `yiu_manifest.json`, `yiu_status.json`, `yiu_report.json` - explicit YIU metadata, status, and structured report
+- `yiu_trace.jsonl` - ordered state graph records
+- `yiu_parts.csv`, `yiu_annotations.csv`, `yiu_fragments.csv` - protocol-oriented export tables
+- `published/views/*.json` - per-state neutral view contracts for source, duplex, digest, foldback, and downstream product states
+
+YIU runs are intentionally isolated from both `sample` and `cassette` runs:
+
+- they do not write `meta/run_manifest.json`
+- they do not append to workspace `run_index.json`
+- they do not reuse cassette-specific `views/*.v1.json` render contracts
 
 ---
 

@@ -7,16 +7,16 @@ docs_catalog:
       kind: hub
       audience: [cruncher-maintainers]
       applies_to: schema_v3
-      last_verified: "2026-03-25"
-      next: [index.md, demos/demo_pairwise.md, demos/demo_cassette_workspace.md]
+      last_verified: "2026-03-26"
+      next: [index.md, demos/demo_pairwise.md, demos/demo_cassette_workspace.md, demos/demo_yiu_workspace.md]
     - id: docs_index
       path: index.md
       title: Cruncher docs
       kind: hub
       audience: [cruncher-maintainers]
       applies_to: schema_v3
-      last_verified: "2026-03-25"
-      next: [README.md, demos/demo_pairwise.md, demos/demo_cassette_workspace.md]
+      last_verified: "2026-03-26"
+      next: [README.md, demos/demo_pairwise.md, demos/demo_cassette_workspace.md, demos/demo_yiu_workspace.md]
     - id: demo_pairwise
       path: demos/demo_pairwise.md
       title: Pairwise Demo
@@ -33,6 +33,14 @@ docs_catalog:
       applies_to: schema_v3
       last_verified: "2026-03-25"
       next: [guides/cassette_solve_workflow.md, reference/cassette_artifacts.md]
+    - id: demo_yiu_workspace
+      path: demos/demo_yiu_workspace.md
+      title: YIU Workspace Demo
+      kind: tutorial
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-03-26"
+      next: [guides/yiu_workflow.md, reference/yiu_artifacts.md]
     - id: demo_multitf
       path: demos/demo_multitf.md
       title: MultiTF Demo
@@ -137,6 +145,14 @@ docs_catalog:
       applies_to: schema_v3
       last_verified: "2026-03-25"
       next: [reference/cassette_solve_spec.md, reference/cassette_artifacts.md]
+    - id: guide_yiu
+      path: guides/yiu_workflow.md
+      title: YIU Workflow
+      kind: guide
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-03-26"
+      next: [reference/yiu_spec.md, reference/yiu_artifacts.md]
     - id: ref_cli
       path: reference/cli.md
       title: CLI Reference
@@ -201,6 +217,22 @@ docs_catalog:
       applies_to: schema_v3
       last_verified: "2026-03-25"
       next: [guides/cassette_solve_workflow.md, reference/cli.md]
+    - id: ref_yiu_spec
+      path: reference/yiu_spec.md
+      title: YIU Spec Reference
+      kind: reference
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-03-26"
+      next: [guides/yiu_workflow.md, reference/yiu_artifacts.md]
+    - id: ref_yiu_artifacts
+      path: reference/yiu_artifacts.md
+      title: YIU Artifacts
+      kind: reference
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-03-26"
+      next: [guides/yiu_workflow.md, reference/cli.md]
     - id: ref_glossary
       path: reference/glossary.md
       title: Glossary
