@@ -3,7 +3,7 @@
 **Type:** contract
 **Plane:** data-plane
 **Owner-boundary:** usr
-**Entry artifact:** one checked-in promoter-study directory selected through docs/studies/promoter/index.yaml
+**Entry artifact:** one checked-in promoter-study directory selected through docs/studies/index.yaml
 **Exit artifact:** one read-only summary of dataset presence, phase posture, and study-owned execution surfaces
 **Registry-id:** usr.data-plane.promoter-study-status
 **Summary:** Read one checked-in promoter-study record and summarize dataset, phase, and execution-surface readiness without reconstructing the workflow by hand.
@@ -31,13 +31,13 @@ the live study stands.
 Keep the study selector at:
 
 ```text
-docs/studies/promoter/index.yaml
+docs/studies/index.yaml
 ```
 
 Keep promoter-study records under:
 
 ```text
-docs/studies/promoter/<study-id>/
+docs/studies/<study-id>/
   campaign.yaml
   datasets.yaml
   ops.study.yaml
@@ -47,7 +47,7 @@ docs/studies/promoter/<study-id>/
 ```
 
 Read [Study records](../../../../../docs/studies/README.md) first, then
-`docs/studies/promoter/index.yaml`, when the question is "which study record
+`docs/studies/index.yaml`, when the question is "which study record
 should I trust?" rather than "which workflow route applies?"
 `index.yaml` selects the active study, the matching study directory holds the
 record, and this contract explains how to refresh it.
@@ -66,7 +66,7 @@ outside the repo checkout, add:
 # Pin a specific checked-in study directory when you are outside the repo root.
 uv run ops progress show usr.data-plane.promoter-study-status \
   --repo-root <repo-root> \
-  --study-dir docs/studies/promoter/<study-id>
+  --study-dir docs/studies/<study-id>
 ```
 
 That surface reads the checked-in study directory, validates that the declared
@@ -77,7 +77,7 @@ or mutating USR. Host-local readiness such as GPU visibility remains advisory
 here and moves into preflight for hard blockers.
 The implementation boundary is explicit: OPS resolves the registered provider,
 and the stress-promoter family code that assembles the snapshot lives under
-`src/dnadesign/studies/promoter/`.
+`src/dnadesign/studies/families/promoter/`.
 
 When you need deeper, command-level blockers across the same checked-in study,
 continue to [Promoter Study Preflight](promoter-study-preflight.md):
@@ -94,9 +94,9 @@ uv run ops progress show usr.data-plane.promoter-study-preflight --json
    onboarding mode, root semantics, and sync posture.
 3. A checked-in status note that answers the human questions the manifest and
    dataset registry do not encode.
-4. A checked-in `ops.study.yaml` that tells OPS the study-family phase order,
-   snapshot scope, and next-scope preflight grouping without hard-coding
-   workflow taxonomy in core code.
+4. A checked-in `ops.study.yaml` that tells OPS the study-family lifecycle,
+   record sources, execution surfaces, snapshot scope, and next-scope
+   preflight posture without hard-coding workflow taxonomy in core code.
 5. When the study has real downstream execution surfaces, an optional
    `pipeline.yaml` that names the exact Construct, Infer, and batch surfaces
    plus any minimal runtime mappings the live study still needs. Infer Notify
@@ -107,19 +107,19 @@ Recommended bootstrap for the manifest:
 
 ```bash
 # Bootstrap the promoter-study registry only if it is missing.
-cp docs/templates/promoter-study-index.yaml docs/studies/promoter/index.yaml
+cp docs/templates/promoter-study-index.yaml docs/studies/index.yaml
 # Create the checked-in directory for one real promoter study.
-mkdir -p docs/studies/promoter/<study-id>
+mkdir -p docs/studies/<study-id>
 # Emit a related-procedure campaign skeleton for the checked-in study record.
-uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root> > docs/studies/promoter/<study-id>/campaign.yaml
+uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root> > docs/studies/<study-id>/campaign.yaml
 # Copy the machine-readable affiliated-dataset registry template.
-cp docs/templates/promoter-study-datasets.yaml docs/studies/promoter/<study-id>/datasets.yaml
+cp docs/templates/promoter-study-datasets.yaml docs/studies/<study-id>/datasets.yaml
 # Copy the maintained status-note template into the same study directory.
-cp docs/templates/promoter-study-status.md docs/studies/promoter/<study-id>/status.md
+cp docs/templates/promoter-study-status.md docs/studies/<study-id>/status.md
 # Copy the OPS-facing study contract template into the same study directory.
-cp docs/templates/promoter-study-ops.study.yaml docs/studies/promoter/<study-id>/ops.study.yaml
+cp docs/templates/promoter-study-ops.study.yaml docs/studies/<study-id>/ops.study.yaml
 # Create the audit directory referenced by sync-enabled dataset entries.
-mkdir -p docs/studies/promoter/<study-id>/audits
+mkdir -p docs/studies/<study-id>/audits
 ```
 
 If the registry already exists, edit it in place instead of replacing it.
@@ -167,14 +167,14 @@ is "where are we now?" or "what should run next?" Copy the template from
 
 Discovery rules:
 
-- Read `docs/studies/promoter/index.yaml` first.
-- If `active_study: null`, answer that the live study record is missing instead
-  of inferring current status from generic runbooks.
-- If `active_study` names a study id, that same id must appear under
-  `studies:` and the corresponding study directory must contain `campaign.yaml`,
+- Read `docs/studies/index.yaml` first.
+- `active_study_id` must name a study declared under `studies:`.
+- The selected study entry must declare `family` and `record_root`.
+- The corresponding study directory must contain `campaign.yaml`,
   `datasets.yaml`, `status.md`, and `ops.study.yaml`.
-- `ops.study.yaml` is the OPS-facing source of phase order, repo snapshot
-  scope, and next-scope routing. Keep it checked in with the study record.
+- `ops.study.yaml` is the OPS-facing source of lifecycle phase order, record
+  sources, execution surfaces, repo snapshot scope, and next-scope routing.
+  Keep it checked in with the study record.
 - If `pipeline.yaml` exists in the study directory, treat it as the canonical
   execution-map surface for exact Construct, Infer, and batch paths plus any
   minimal runtime mappings still needed by the live study. Infer Notify profile
@@ -188,7 +188,7 @@ Discovery rules:
 
 ```bash
 # Summarize every tracked step in the checked-in study manifest.
-uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/promoter/<study-id>/campaign.yaml
+uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/campaign.yaml
 ```
 
 2. Refresh the current feature-dataset summary only when a shared feature
@@ -235,9 +235,9 @@ uv run notify usr-events watch --events <usr-root>/<feature-dataset>/.events.log
 # Inspect the local dataset named by one datasets.yaml entry.
 uv run usr --root <usr-root> info <dataset-id> --format json
 # Capture local-vs-remote drift for one sync-enabled datasets.yaml entry.
-uv run usr --root <usr-root> diff <dataset-id> <remote-name> --audit-json-out docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
+uv run usr --root <usr-root> diff <dataset-id> <remote-name> --audit-json-out docs/studies/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
 # Summarize that same sync audit through the registered status view.
-uv run ops progress show usr.data-plane.hpc-sync --sync-audit-json docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
+uv run ops progress show usr.data-plane.hpc-sync --sync-audit-json docs/studies/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
 ```
 
 If a dataset starts remote-only, keep `strict_bootstrap_id: true` and use an
@@ -309,7 +309,7 @@ From `pipeline.yaml` when present:
 ### Related docs
 
 - [Study records](../../../../../docs/studies/README.md)
-- [Promoter study registry](../../../../../docs/studies/promoter/README.md)
+- [Study records index](../../../../../docs/studies/README.md)
 - [Promoter study index template](../../../../../docs/templates/promoter-study-index.yaml)
 - [Promoter study datasets template](../../../../../docs/templates/promoter-study-datasets.yaml)
 - [Promoter study status template](../../../../../docs/templates/promoter-study-status.md)

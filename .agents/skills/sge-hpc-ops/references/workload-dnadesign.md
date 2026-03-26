@@ -45,7 +45,7 @@ rg -n "backend:" src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/co
 Preferred runbook-native Ops path:
 
 ```bash
-uv run ops runbook precedents
+uv run ops runbook presets
 uv run ops runbook init \
   --workflow densegen \
   --runbook <runbook.yaml> \

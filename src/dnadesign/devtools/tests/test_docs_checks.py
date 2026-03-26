@@ -32,6 +32,7 @@ from dnadesign.devtools.docs_checks import (
     _find_runbook_demo_snippet_issues,
     _find_shared_utils_path_issues,
     _find_stale_overlay_guard_term_issues,
+    _find_study_record_doc_issues,
     _find_tool_docs_metadata_issues,
     _find_tool_readme_banner_issues,
     _find_tool_readme_structure_issues,
@@ -197,6 +198,53 @@ def test_main_fails_for_broken_relative_link(tmp_path: Path) -> None:
 
     rc = main(["--repo-root", str(tmp_path)])
     assert rc == 1
+
+
+def test_find_study_record_doc_issues_flags_legacy_router_index_paths(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "studies" / "README.md",
+        "\n".join(
+            [
+                "campaign.yaml",
+                "datasets.yaml",
+                "status.md",
+                "ops.study.yaml",
+            ]
+        )
+        + "\n",
+    )
+    _write(
+        tmp_path / "docs" / "studies" / "index.yaml",
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "active_study_id": "demo_study",
+                "studies": [
+                    {
+                        "study_id": "demo_study",
+                        "family": "promoter",
+                        "record_root": "docs/studies/demo_study",
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+    )
+    for required_name in ("campaign.yaml", "datasets.yaml", "status.md", "ops.study.yaml"):
+        _write(tmp_path / "docs" / "studies" / "demo_study" / required_name, "placeholder\n")
+    _write(tmp_path / "AGENTS.md", "- Promoter study active-study registry: `docs/studies/promoter/index.yaml`\n")
+    _write(
+        tmp_path / "src" / "dnadesign" / "usr" / "AGENTS.md",
+        "- Active promoter-study registry: `docs/studies/promoter/index.yaml`\n",
+    )
+
+    issues = _find_study_record_doc_issues(tmp_path)
+
+    assert any("AGENTS.md" in issue and "docs/studies/promoter/index.yaml" in issue for issue in issues)
+    assert any(
+        "src/dnadesign/usr/AGENTS.md" in issue and "docs/studies/promoter/index.yaml" in issue for issue in issues
+    )
+    assert any("AGENTS.md" in issue and "docs/studies/index.yaml" in issue for issue in issues)
 
 
 def test_main_fails_for_broken_relative_link_in_root_sor_doc(tmp_path: Path) -> None:

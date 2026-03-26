@@ -4,12 +4,16 @@ Ops manages batch orchestration across tools. It turns a runbook into preflight,
 If you do not know a route id yet, start with `uv run ops catalog list --simple`.
 Study-family status and preflight implementations do not live in OPS core; the
 active stress-promoter study adapter and its runtime helpers live under
-`src/dnadesign/studies/promoter/`, while OPS keeps the
-neutral CLI, registry loading, path semantics, orchestration, and rendering
-surfaces.
+`src/dnadesign/studies/families/promoter/`, while OPS keeps the neutral CLI,
+registry loading, path semantics, orchestration, and rendering surfaces.
+Status surfaces are published by boundary-owned `*/ops/status.registry.yaml`
+fragments under `src/dnadesign/`; OPS discovers those fragments recursively and
+imports provider code only for the selected surface.
 Treat the command families as three neutral surfaces: `ops catalog` is the
 discovery plane, `ops progress` is the observation plane, and `ops runbook` is
 the control plane for deterministic batch execution.
+Within `ops progress`, study snapshots observe the record plane and study
+preflight surfaces observe the execution-readiness plane.
 
 Use Ops when:
 - you need a shared orchestration layer for scheduler work, packaged runbooks, or read-only status over a registered route

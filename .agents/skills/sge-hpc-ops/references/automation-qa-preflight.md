@@ -84,7 +84,7 @@ For pipeline workflows, run preflight once per template and include one session-
 ### Required evidence artifacts
 
 - QA preflight output per template (pass or fail with reasons)
-- route and flow class decision (`workflow_id` plus flow class)
+- route and flow class decision (`route_id` plus flow class)
 - session-status report with threshold status
 - shape-advisor output (`advisor`, `reason`, `recommended_action`)
 - operator-brief output (`submit_gate`, `next_action`)

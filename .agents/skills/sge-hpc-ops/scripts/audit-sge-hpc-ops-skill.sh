@@ -106,7 +106,7 @@ require_pattern "Load minimum reference set \(progressive disclosure\)" "progres
 require_pattern "Apply up-to-date handling" "up-to-date handling step present"
 require_pattern "verify-before-submit" "verify-before-submit contract present"
 require_pattern "qa preflight" "qa preflight contract language present"
-require_pattern "workflow_id" "workflow router output key present"
+require_pattern "route_id" "workflow router output key present"
 require_pattern "execution_locus" "execution locus output key present"
 require_pattern "ondemand_session_handoff" "ondemand handoff route present"
 require_pattern "45 days" "freshness threshold in SKILL.md present"
@@ -283,10 +283,10 @@ else
   fail "workflow router missing explicit notify opt-out cues"
 fi
 
-if rg -q "ops runbook precedents" "$ROOT_DIR/SKILL.md"; then
-  pass "skill docs include ops runbook precedents entrypoint"
+if rg -q "ops runbook presets" "$ROOT_DIR/SKILL.md"; then
+  pass "skill docs include ops runbook presets entrypoint"
 else
-  fail "skill docs missing ops runbook precedents entrypoint"
+  fail "skill docs missing ops runbook presets entrypoint"
 fi
 
 if rg -q "DenseGen scaffolds include notify by default|--no-notify" "$ROOT_DIR/references/workload-dnadesign.md"; then
@@ -295,11 +295,11 @@ else
   fail "dnadesign workload reference missing notify default guidance"
 fi
 
-for workflow_id in densegen_batch_submit densegen_batch_with_notify_slack ondemand_session_request ondemand_session_handoff generic_sge_ops; do
-  if rg -q "$workflow_id" "$ROOT_DIR/references/workflow-router.md"; then
-    pass "workflow router includes $workflow_id"
+for route_id in densegen_batch_submit densegen_batch_with_notify ondemand_session_request ondemand_session_handoff generic_sge_ops; do
+  if rg -q "$route_id" "$ROOT_DIR/references/workflow-router.md"; then
+    pass "workflow router includes $route_id"
   else
-    fail "workflow router missing $workflow_id"
+    fail "workflow router missing $route_id"
   fi
 done
 

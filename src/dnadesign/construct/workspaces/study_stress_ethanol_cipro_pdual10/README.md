@@ -16,8 +16,8 @@ It is not a demo. It assumes:
 Use this workspace after the study's merged anchor dataset exists.
 The supporting study record lives under:
 
-- `docs/studies/promoter/stress_ethanol_cipro_growth/pipeline.yaml`
-- `docs/studies/promoter/stress_ethanol_cipro_growth/status.md`
+- `docs/studies/stress_ethanol_cipro_growth/pipeline.yaml`
+- `docs/studies/stress_ethanol_cipro_growth/status.md`
 
 Validate and preview before any write:
 

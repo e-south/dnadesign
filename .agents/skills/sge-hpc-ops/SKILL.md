@@ -49,7 +49,7 @@ Clarification policy:
 
 ## Success Criteria
 
-- exactly one route is emitted (`workflow_id`) before command generation
+- exactly one route is emitted (`route_id`) before command generation
 - capability snapshot includes scheduler facts, `execution_locus`, session status, and active-job snapshot
 - user-facing status card is emitted before additional submissions
 - verify-before-submit and qa preflight checks pass before real `qsub`
@@ -64,9 +64,9 @@ Clarification policy:
 ### Step 1: Route workflow and execution locus
 
 - classify request using `references/workflow-router.md`
-- select exactly one `workflow_id`:
+- select exactly one `route_id`:
   - `densegen_batch_submit`
-  - `densegen_batch_with_notify_slack`
+  - `densegen_batch_with_notify`
   - `ondemand_session_request`
   - `ondemand_session_handoff`
   - `generic_sge_ops`
@@ -94,7 +94,7 @@ Clarification policy:
 - run probes from `references/probe-first-contract.md`
 - run `scripts/sge-session-status.sh --warn-over-running 3`
 - run `scripts/sge-active-jobs.sh --max-jobs 12` when status reporting is requested
-- include: `workflow_id`, `execution_locus`, `session_handoff_state`, unresolved unknowns
+- include: `route_id`, `execution_locus`, `session_handoff_state`, unresolved unknowns
 - include counts: `running_jobs`, `queued_jobs`, `eqw_jobs` and threshold warning state
 
 ### Step 5: Build deterministic execution plan
@@ -111,7 +111,7 @@ Clarification policy:
 ### Step 5a: Use runbook-native orchestration commands when available
 
 - prefer command-first Ops entrypoints from `references/runbook-entrypoints.md`,
-  including `uv run ops runbook precedents`, over path-discovery heuristics
+  including `uv run ops runbook presets`, over path-discovery heuristics
 - DenseGen defaults to notify-enabled runbooks; use `--no-notify` only for explicit batch-only requests, and treat `--no-submit` as the default pressure-test path before any real submit
 
 ### Step 6: Apply verify-before-submit gate
@@ -141,7 +141,7 @@ Clarification policy:
 
 ## Required Deliverables
 
-- route decision (`workflow_id`, `execution_locus`, `session_handoff_state`)
+- route decision (`route_id`, `execution_locus`, `session_handoff_state`)
 - capability snapshot
 - session status summary (`running_jobs`, `queued_jobs`, `eqw_jobs`, threshold state)
 - active-job snapshot (`job_id`, `state`, `queue`, `slots`, `task_id`)

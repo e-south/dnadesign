@@ -63,7 +63,7 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
 - Deep procedures may live in top-level `docs/` or in the boundary-owning tool's docs when that tool owns the durable handoff contract.
 - Root docs must stay abstract and route to one authoritative deep procedure for each cross-tool workflow.
 - `docs/runbooks/README.md` is the centralized inventory surface for authoritative procedures; it must summarize owner-local runbooks and workflows without becoming a duplicate procedure tree.
-- Inventory rows in `docs/runbooks/README.md` must mirror `Registry-id`, `Type`, `Plane`, `Execution-kind`, `Progress-kind`, and `Summary` declared in the linked owner-local procedure; drift is a docs-check failure.
+- Inventory rows in `docs/runbooks/README.md` must mirror `Registry-id`, `Type`, `Plane`, `Execution-kind`, `Status-kind`, and `Summary` declared in the linked owner-local procedure; drift is a docs-check failure.
 - Tool top-level READMEs stay lightweight: one narrative paragraph plus quick links, with the tool-local docs index listed first.
 - Keep indexes short and link outward; avoid duplicating long procedures in multiple places or repeating adjacent links to the same file.
 - Terminology is controlled:

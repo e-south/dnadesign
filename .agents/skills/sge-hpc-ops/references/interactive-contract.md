@@ -37,7 +37,7 @@ qstat -u "$USER"
 
 ### OnDemand handoff contract
 
-- when user states they are already in OnDemand, set `workflow_id=ondemand_session_handoff`
+- when user states they are already in OnDemand, set `route_id=ondemand_session_handoff`
 - do not re-issue session-request instructions in this path
 - run lightweight in-session probes before task actions (`hostname`, `pwd`, `qstat -u "$USER"`)
 - if requested task is long-running, route to batch submit and keep interactive context for diagnostics

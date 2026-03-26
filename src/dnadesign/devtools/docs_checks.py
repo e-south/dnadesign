@@ -185,10 +185,13 @@ STUDY_RECORD_REQUIRED_FILES = (
     "status.md",
     "ops.study.yaml",
 )
-STUDY_RECORD_REQUIRED_READMES = (
-    "docs/studies/README.md",
-    "docs/studies/promoter/README.md",
+STUDY_RECORD_REQUIRED_READMES = ("docs/studies/README.md",)
+STUDY_RECORD_ROUTER_FILES = (
+    "AGENTS.md",
+    "src/dnadesign/usr/AGENTS.md",
 )
+ACTIVE_STUDY_INDEX_PATH = "docs/studies/index.yaml"
+LEGACY_STUDY_INDEX_PATH = "docs/studies/promoter/index.yaml"
 OPS_OPERATIONAL_WORKFLOW_IDS = {
     "densegen_batch_submit",
     "densegen_batch_with_notify",
@@ -1233,6 +1236,10 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
     issues: list[str] = []
     resolved_repo_root = repo_root.resolve()
 
+    legacy_study_root = repo_root / "docs" / "studies" / "promoter"
+    if legacy_study_root.exists():
+        issues.append(f"{legacy_study_root}: legacy family-nested study record path must not exist.")
+
     for relative_path in STUDY_RECORD_REQUIRED_READMES:
         path = repo_root / relative_path
         if not path.exists():
@@ -1242,15 +1249,32 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
             if required_name not in text:
                 issues.append(f"{path}: missing study-record contract reference for '{required_name}'.")
 
-    index_path = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
+    for relative_path in STUDY_RECORD_ROUTER_FILES:
+        path = repo_root / relative_path
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if LEGACY_STUDY_INDEX_PATH in text:
+            issues.append(
+                f"{path}: legacy study index path '{LEGACY_STUDY_INDEX_PATH}' must not appear; "
+                f"use '{ACTIVE_STUDY_INDEX_PATH}'."
+            )
+        if ACTIVE_STUDY_INDEX_PATH not in text:
+            issues.append(f"{path}: study-record router must reference '{ACTIVE_STUDY_INDEX_PATH}'.")
+
+    index_path = repo_root / "docs" / "studies" / "index.yaml"
     if not index_path.exists():
         return issues
 
     payload = yaml.safe_load(index_path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
-        return [f"{index_path}: promoter study index must be a mapping."]
+        return [f"{index_path}: study index must be a mapping."]
 
-    active_study = payload.get("active_study")
+    version = payload.get("version")
+    if version != 1:
+        issues.append(f"{index_path}: study index must declare version: 1.")
+
+    active_study = payload.get("active_study_id")
     studies_payload = payload.get("studies") or []
     if not isinstance(studies_payload, list):
         issues.append(f"{index_path}: 'studies' must be a list.")
@@ -1262,12 +1286,16 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
             issues.append(f"{index_path}: study entry {index} must be a mapping.")
             continue
         study_id = str(entry.get("study_id") or "").strip()
-        raw_path = str(entry.get("path") or "").strip()
+        family = str(entry.get("family") or "").strip()
+        raw_path = str(entry.get("record_root") or "").strip()
         if not study_id:
             issues.append(f"{index_path}: study entry {index} must define study_id.")
             continue
+        if not family:
+            issues.append(f"{index_path}: study entry {study_id!r} must define family.")
+            continue
         if not raw_path:
-            issues.append(f"{index_path}: study entry {study_id!r} must define path.")
+            issues.append(f"{index_path}: study entry {study_id!r} must define record_root.")
             continue
         resolved_path = (
             (repo_root / raw_path).resolve() if not Path(raw_path).is_absolute() else Path(raw_path).resolve()
@@ -1287,13 +1315,11 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
         entries_by_id[study_id] = resolved_path
 
     active_study_text = str(active_study or "").strip() or None
-    if active_study is not None and active_study_text is None:
-        issues.append(f"{index_path}: active_study must be null or a non-empty study id.")
-        return issues
     if active_study_text is None:
+        issues.append(f"{index_path}: active_study_id must be a non-empty study id.")
         return issues
     if active_study_text not in entries_by_id:
-        issues.append(f"{index_path}: active_study {active_study_text!r} is not declared under studies.")
+        issues.append(f"{index_path}: active_study_id {active_study_text!r} is not declared under studies.")
         return issues
 
     study_root = entries_by_id[active_study_text]

@@ -42,18 +42,18 @@ Out of scope:
 
 ## Guardrails
 
-- Start with `docs/studies/README.md`, `docs/studies/promoter/README.md`, and
+- Start with `docs/studies/README.md`, `docs/studies/index.yaml`, and
   `src/dnadesign/usr/docs/operations/promoter-study-status-contract.md`.
-- Treat `docs/studies/promoter/index.yaml`,
-  `docs/studies/promoter/<study-id>/campaign.yaml`,
-  `docs/studies/promoter/<study-id>/datasets.yaml`,
-  `docs/studies/promoter/<study-id>/status.md`,
-  `docs/studies/promoter/<study-id>/ops.study.yaml`, and optional
-  `docs/studies/promoter/<study-id>/pipeline.yaml` as the only valid source for
+- Treat `docs/studies/index.yaml`,
+  `docs/studies/<study-id>/campaign.yaml`,
+  `docs/studies/<study-id>/datasets.yaml`,
+  `docs/studies/<study-id>/status.md`,
+  `docs/studies/<study-id>/ops.study.yaml`, and optional
+  `docs/studies/<study-id>/pipeline.yaml` as the only valid source for
   live dataset ids, local-vs-remote sync posture, row targets, completed infer
   slices, study-owned Construct or Infer surfaces, and next actions.
   `ops.study.yaml` is the
-  OPS-facing source of phase order and next-scope preflight grouping. Infer
+  OPS-facing source of lifecycle order and next-scope preflight grouping. Infer
   Notify profile paths should be derived from the checked-in Infer lane configs
   rather than stored separately in `pipeline.yaml`.
 - Use `root_kind` and `status` in `datasets.yaml` to tell canonical shared USR
@@ -68,11 +68,12 @@ Out of scope:
 ## Workflow
 
 1. Locate the active study record
-- Read `docs/studies/promoter/index.yaml`.
-- If `active_study: null`, report that no live promoter study record is checked
-  in yet.
-- If `active_study` names a study id, require the same id under `studies:` and
-  require `campaign.yaml`, `datasets.yaml`, `status.md`, and `ops.study.yaml`
+- Read `docs/studies/index.yaml`.
+- If `docs/studies/index.yaml` is missing or invalid, report that no live
+  promoter study record is checked in yet.
+- Require `active_study_id`, `family`, and `record_root` for the selected
+  study entry.
+- Require `campaign.yaml`, `datasets.yaml`, `status.md`, and `ops.study.yaml`
   in the matching study directory.
 - If `pipeline.yaml` exists, load it before answering exact Construct, Infer,
   batch, or Notify next-step questions.
@@ -87,18 +88,21 @@ Out of scope:
   deeper probes. Treat host-local advisories there as advisory only.
 - When the user needs command-level blockers rather than the cheap snapshot,
   run:
-  `uv run ops progress show usr.data-plane.promoter-study-preflight --json`
+  `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
 - Use the preflight output when the question is "what fails right now?" across
   DenseGen, Construct, Infer, Notify, and batch-plan surfaces.
+- Use `next_in_progress_phase`, `next_ready_phase`, and the declared lifecycle
+  fields from `ops.study.yaml` when answering "what should run next?" instead
+  of reconstructing that ordering from generic runbooks.
 - This is a repo-local project skill. If Codex was launched outside the
   `dnadesign` checkout, the skill may not be auto-advertised even though this
   file exists. In that case, use the `ops progress` commands directly instead
   of assuming project-scope skill discovery is active.
 - If you are outside the repo checkout or you need a non-active study, rerun with:
-  `uv run ops progress show usr.data-plane.promoter-study-status --repo-root <repo-root> --study-dir docs/studies/promoter/<study-id> --json`
+  `uv run ops progress show usr.data-plane.promoter-study-status --repo-root <repo-root> --study-dir docs/studies/<study-id> --json`
 - Use the same `--repo-root ... --study-dir ...` shape for `promoter-study-preflight`.
 - Run:
-  `uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/promoter/<study-id>/campaign.yaml`
+  `uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/campaign.yaml`
 - If `status.md` names a current canonical feature dataset, run:
   `uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <repo-root> --usr-root <usr-root> --dataset <feature-dataset>`
 - If the study record says the canonical feature dataset is still `n/a`, report
@@ -111,18 +115,18 @@ Out of scope:
   lineage, and one explicit `infer__...` column.
 
 4. Refresh affiliated-dataset sync posture
-- For each sync-enabled entry in `docs/studies/promoter/<study-id>/datasets.yaml`, run:
+- For each sync-enabled entry in `docs/studies/<study-id>/datasets.yaml`, run:
   `uv run usr --root <usr-root> info <dataset-id> --format json` when that
   entry is locally present
 - Then run:
-  `uv run usr --root <usr-root> diff <dataset-id> <remote-name> --audit-json-out docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json`
+  `uv run usr --root <usr-root> diff <dataset-id> <remote-name> --audit-json-out docs/studies/<study-id>/audits/<dataset-id>--<remote-name>-diff.json`
 - Then run:
-  `uv run ops progress show usr.data-plane.hpc-sync --sync-audit-json docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json`
+  `uv run ops progress show usr.data-plane.hpc-sync --sync-audit-json docs/studies/<study-id>/audits/<dataset-id>--<remote-name>-diff.json`
 - If `onboard_mode: existing_remote`, keep `strict_bootstrap_id: true` and
   require an explicit dataset id for the first pull.
 
 5. Refresh pending infer slices
-- For each pending config in `docs/studies/promoter/<study-id>/status.md`, run:
+- For each pending config in `docs/studies/<study-id>/status.md`, run:
   `uv run infer validate config --config <infer-config>`
 - Then run:
   `uv run infer run --config <infer-config> --dry-run`

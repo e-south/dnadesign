@@ -27,11 +27,11 @@ Use the command table first. The generated tables later on are reference.
 - `uv run ops catalog list --simple`: shorter inventory when you are new to the registry and do not need the taxonomy first.
 - `uv run ops catalog show usr.data-plane.promoter-feature-matrix`: one procedure with its owner docs, related tool docs, linked deeper docs, required status inputs, and next commands.
 - `uv run ops progress explain usr.data-plane.promoter-feature-matrix`: required flags, direct `progress show` command, and notes before you read that status view.
-- `uv run ops progress show usr.data-plane.promoter-study-status`: one checked-in active-study summary for current phase, dataset presence, and next ready surface. Add `--repo-root <repo-root> --study-dir docs/studies/promoter/<study-id>` to pin a different study or invoke it from outside the repo checkout.
+- `uv run ops progress show usr.data-plane.promoter-study-status`: one checked-in active-study summary for current phase, dataset presence, and next ready surface. Add `--repo-root <repo-root> --study-dir docs/studies/<study-id>` to pin a different study or invoke it from outside the repo checkout.
 - `uv run ops progress show usr.data-plane.promoter-study-preflight`: deeper read-only preflight across DenseGen, Construct, Infer, Notify, and batch-plan surfaces for the checked-in active study.
 - `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`: expand one registered procedure into a starting manifest with the named procedure first and its related procedures after it.
 - `uv run ops progress campaign --manifest <manifest.yaml>`: read-only summary for the steps listed in the manifest.
-- For one live promoter study, keep the checked-in files under `docs/studies/promoter/<study-id>/`. Use [Study records index](../studies/README.md) for the required layout and selector rules.
+- For one live promoter study, keep the checked-in files under `docs/studies/<study-id>/`. Use [Study records index](../studies/README.md) for the required layout and selector rules.
 
 Start with the summary and linked doc. The extra labels matter only when two routes look similar.
 
@@ -110,7 +110,7 @@ steps:
 
 - Generate the same skeleton from registry ids with `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix opal.downstream.usr-infer-x-active-learning`.
 - Expand one registered procedure into a relation-based starting point with `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`.
-- For a real promoter effort, store the manifest under `docs/studies/promoter/<study-id>/campaign.yaml` and keep the paired `datasets.yaml` registry and `status.md` there too. Use [Study records index](../studies/README.md) for the full layout.
+- For a real promoter effort, store the manifest under `docs/studies/<study-id>/campaign.yaml` and keep the paired `datasets.yaml` registry and `status.md` there too. Use [Study records index](../studies/README.md) for the full layout.
 - Campaign manifests must declare `version: 2` and `path_base: repo`, `manifest`, or `cwd`.
 - `repo:` references resolve from repository root. `manifest:` plus `./` or `../` resolve from the manifest directory.
 - Bare relative paths resolve from `path_base`.

@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-02
+**Last verified:** 2026-03-26
 
 ## At a glance
 This document defines reliability intent for runtime behavior, CI behavior, and operator workflows.
@@ -20,11 +20,25 @@ It summarizes what must fail fast, what should be observable, and where recovery
 - Runtime and CI behavior should avoid hidden fallback paths.
 - Long-running workflows should surface machine-readable state transitions and terminal outcomes.
 - Repeated campaign orchestration state is workspace-scoped (`<workspace-root>/outputs/logs/ops/*`) to avoid root-level runbook/log fan-out.
+- Observation-plane status discovery is metadata-first: checked-in
+  `src/dnadesign/**/ops/status.registry.yaml` fragments must load without
+  importing provider implementations, and provider code should only import when
+  the selected surface executes.
+- Snapshot and preflight surfaces stay distinct:
+  - record-plane snapshots are cheap, repo-scoped, and should not probe local
+    GPUs or scheduler state on the fast path
+  - execution-readiness preflight is the authoritative deeper surface for
+    host/workspace/cluster blockers before actual control-plane execution
 
 ## Operational signals
 - USR event logs (`.events.log`) are the primary integration signal stream for watcher workflows.
 - Cursor/spool state in notifier workflows must be explicit, restart-safe, and scoped to the intended workspace/run.
 - Failures should include actionable context, not generic error wrappers.
+- Checked-in study records under `docs/studies/<study-id>/` plus the active
+  selector `docs/studies/index.yaml` are the authoritative record-plane signal
+  for live-study posture.
+- Status outputs should carry plane and summary-scope metadata so operators can
+  distinguish repo snapshots from host-local readiness evidence.
 
 ## CI reliability lanes
 - Core lane: lint/docs/format + standard-marker test selection + per-tool coverage gate; installs optional system packages only when in-scope tool tests require them.
