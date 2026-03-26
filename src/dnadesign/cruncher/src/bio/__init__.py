@@ -1,0 +1,36 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/bio/__init__.py
+
+Shared biology helpers reused across explicit Cruncher workflow families.
+
+Module Author(s): OpenAI Codex
+--------------------------------------------------------------------------------
+"""
+
+from dnadesign.cruncher.bio.enzymes import CutGeometry, derive_cut_geometry, recognition_matches_at
+from dnadesign.cruncher.bio.iupac import (
+    iupac_symbols_compatible,
+    longest_reverse_complement_overlap,
+    motif_matches,
+    normalize_dna,
+    normalize_iupac,
+    reverse_complement,
+    reverse_complement_iupac,
+    sequence_contains_iupac,
+)
+
+__all__ = [
+    "CutGeometry",
+    "derive_cut_geometry",
+    "iupac_symbols_compatible",
+    "longest_reverse_complement_overlap",
+    "motif_matches",
+    "normalize_dna",
+    "normalize_iupac",
+    "recognition_matches_at",
+    "reverse_complement",
+    "reverse_complement_iupac",
+    "sequence_contains_iupac",
+]

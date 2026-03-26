@@ -72,6 +72,25 @@ def test_runbook_accepts_cassette_cli_surface() -> None:
     assert runbook.steps[0].run[0] == "cassette"
 
 
+def test_runbook_accepts_yiu_cli_surface() -> None:
+    payload = {
+        "runbook": {
+            "schema_version": 1,
+            "name": "demo",
+            "steps": [
+                {
+                    "id": "yiu_design",
+                    "run": ["yiu", "design", "--spec", "configs/yiu/example.yiu.yaml"],
+                }
+            ],
+        }
+    }
+
+    runbook = load_workspace_runbook(Path("runbook.yaml"), raw=payload)
+
+    assert runbook.steps[0].run[0] == "yiu"
+
+
 def test_runbook_executes_selected_steps_in_runbook_order(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     workspace = tmp_path / "workspace"
     runbook_path = _write_runbook(

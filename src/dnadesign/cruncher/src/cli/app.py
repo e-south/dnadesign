@@ -35,12 +35,18 @@ from dnadesign.cruncher.cli.commands.status import status as status_cmd
 from dnadesign.cruncher.cli.commands.study import app as study_app
 from dnadesign.cruncher.cli.commands.targets import app as targets_app
 from dnadesign.cruncher.cli.commands.workspaces import app as workspaces_app
+from dnadesign.cruncher.cli.commands.yiu import app as yiu_app
 from dnadesign.cruncher.cli.config_resolver import CONFIG_ENV_VAR, WORKSPACE_ENV_VAR
 from dnadesign.cruncher.utils.logging import configure_logging
 
+_APP_HELP = (
+    "Design TF-scored sequences, scaffold cassette or YIU workspaces, "
+    "and run explicit workflow families beside the fixed-length sampling lane."
+)
+
 app = typer.Typer(
     no_args_is_help=True,
-    help="Design TF-scored sequences, scaffold cassette workspaces, and run explicit or solve-mode cassette workflows.",
+    help=_APP_HELP,
 )
 app.info.epilog = "Tip: run `cruncher <command> --help` for examples and details."
 
@@ -68,7 +74,7 @@ def main(
         help="Select a workspace by name, index, or path.",
     ),
 ) -> None:
-    """Design TF-scored sequences, scaffold cassette workspaces, and run explicit or solve-mode cassette workflows."""
+    """Design TF-scored sequences, scaffold cassette or YIU workspaces, and run explicit workflow families."""
     configure_logging(log_level)
     if config:
         os.environ[CONFIG_ENV_VAR] = str(config)
@@ -107,6 +113,12 @@ app.add_typer(
     name="cassette",
     help="Scaffold, validate, design, solve, inspect, and catalog dual-context hairpin cassette workflows.",
     short_help="dual-context hairpin cassette workflows.",
+)
+app.add_typer(
+    yiu_app,
+    name="yiu",
+    help="Scaffold, validate, trace, design, and inspect YIU hairpin oligo processing workflows.",
+    short_help="YIU hairpin oligo workflows.",
 )
 app.add_typer(
     fetch_app,
