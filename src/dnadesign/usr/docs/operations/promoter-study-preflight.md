@@ -43,7 +43,7 @@ outside the repo checkout, add:
 # Pin a specific checked-in study directory and emit the same preflight summary.
 uv run ops progress show usr.data-plane.promoter-study-preflight \
   --repo-root <repo-root> \
-  --study-dir docs/studies/promoter/<study-id> \
+  --study-dir docs/studies/<study-id> \
   --json
 ```
 
@@ -67,7 +67,7 @@ belong to the next actionable scope versus the full study surface:
 
 ### Contract rules
 
-- Start with `docs/studies/promoter/index.yaml` or pass `--study-dir`
+- Start with `docs/studies/index.yaml` or pass `--study-dir`
   explicitly. Do not scan the repo for a best guess.
 - Resolve relative study paths against the repo root, not the shell cwd.
 - Fail visibly when `campaign.yaml`, `datasets.yaml`, `status.md`,
@@ -76,8 +76,8 @@ belong to the next actionable scope versus the full study surface:
   - missing datasets => `missing`
   - failed command preflights => `attention`
   - blocked GPU-only lanes remain visible; there is no hidden 20B -> 7B fallback
-- Use `ops.study.yaml` as the OPS-facing source of phase order, snapshot scope,
-  and preflight phase-target grouping.
+- Use `ops.study.yaml` as the OPS-facing source of lifecycle phase order,
+  execution surfaces, snapshot scope, and preflight phase-target grouping.
 - Use the existing study-owned `pipeline.yaml` as the only source for real
   Construct, Infer, and runbook paths plus any minimal runtime mappings the
   study still needs.
@@ -100,10 +100,12 @@ belong to the next actionable scope versus the full study surface:
 ### Typical use
 
 1. Run `usr.data-plane.promoter-study-status` for the cheap study snapshot.
-   That summary is repo-scoped and does not elevate solely because the local
-   host lacks a GPU.
+   That summary is repo-scoped, observes the record plane, and does not
+   elevate solely because the local host lacks a GPU.
 2. Run `usr.data-plane.promoter-study-preflight` when you need command-level
-   blockers before the next DenseGen, Construct, Infer, or Notify step.
+   blockers before the next DenseGen, Construct, Infer, or Notify step. Use
+   `--scope next` when you want the immediate execution-readiness blockers for
+   the next actionable phase rather than the full historical surface.
 3. Use the returned `checks` list to decide whether the next concrete action is:
    - grow DenseGen again
    - materialize the merged anchor set

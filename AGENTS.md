@@ -46,7 +46,7 @@ Treat this file as a navigation map; canonical policy and operational detail liv
 - Repo-local promoter-study status skill: `.agents/skills/promoter-study-status/SKILL.md`
   - Native project-scope skill discovery only applies when the Codex session is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the explicit `uv run ops progress show usr.data-plane.promoter-study-status` entrypoint instead of assuming the skill will appear in the advertised skill list.
 - Checked-in live study records: `docs/studies/README.md`
-- Promoter study active-study registry: `docs/studies/promoter/index.yaml`
+- Promoter study active-study registry: `docs/studies/index.yaml`
 - Maintainer docs and CI/testing notes: `docs/dev/README.md`
 
 ## Repository patterns
