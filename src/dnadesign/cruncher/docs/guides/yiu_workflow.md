@@ -35,10 +35,13 @@ Cruncher validates protocol compatibility, not stochastic wet-lab yield. Each st
 ### What `validate` checks
 
 - source annotations resolve onto the source oligo unambiguously
+- the PCR state records the primer-bounded amplicon and flags authored downstream annotations that fall outside that amplicon
 - restriction sites match the requested sequence/orientation and produce the expected sticky ends
+- referenced catalog entries exist and agree with the authored restriction sites, nickase sites, and adapter settings
 - the `assembled_payload` derived from `payload_goal.left_half_ref` and `payload_goal.right_half_ref` matches the goal sequence
 - nickase sites do not cut retained regions
-- sacrificial fragment lengths satisfy the configured cleanup assumptions
+- sacrificial fragment lengths satisfy the configured cleanup assumptions, including `min_removed_fragment_nt` and `max_retained_sacrificial_fragment_nt`
+- adapter ligation can resolve its sequence from the step, from `adapter_policy.adapter_sequence`, or from `adapter_policy.y_adapter_id` plus `catalogs.adapters`
 - foldback windows expose the configured reverse-complement homology
 - the downstream amplifiable product contains the required primer-binding motifs
 

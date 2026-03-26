@@ -190,7 +190,6 @@ class YiuStepSpec(StrictBaseModel):
             "circularization": ("compatibility",),
             "nickase_digest": ("site_ids", "sacrificial_region_ids", "retained_region_ids"),
             "foldback": ("left_homology_window", "right_homology_window", "min_complementary_bases"),
-            "adapter_ligation": ("adapter_sequence",),
             "amplification": ("forward_primer_requirement", "reverse_primer_requirement"),
         }
         for field_name in required_fields.get(self.kind, ()):
@@ -276,6 +275,72 @@ class CatalogRefs(StrictBaseModel):
     adapters: Path | None = None
 
 
+class YiuEnzymeCatalogEntry(StrictBaseModel):
+    id: str
+    recognition_sequence: str
+    top_cut_offset: int | None = None
+    bottom_cut_offset: int | None = None
+
+    @field_validator("id")
+    @classmethod
+    def _validate_id(cls, value: str) -> str:
+        return _validate_slug(value, label="catalog_entry.id")
+
+    @field_validator("recognition_sequence")
+    @classmethod
+    def _validate_recognition_sequence(cls, value: str) -> str:
+        return normalize_iupac(value)
+
+
+class YiuEnzymeCatalogSpec(StrictBaseModel):
+    entries: list[YiuEnzymeCatalogEntry] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_unique_ids(self) -> "YiuEnzymeCatalogSpec":
+        ids = [entry.id for entry in self.entries]
+        if len(set(ids)) != len(ids):
+            raise ValueError("catalog enzyme ids must be unique")
+        return self
+
+
+class YiuRestrictionCatalogDocument(StrictBaseModel):
+    restriction_enzymes: YiuEnzymeCatalogSpec
+
+
+class YiuNickaseCatalogDocument(StrictBaseModel):
+    nickases: YiuEnzymeCatalogSpec
+
+
+class YiuAdapterCatalogEntry(StrictBaseModel):
+    id: str
+    sequence: str
+
+    @field_validator("id")
+    @classmethod
+    def _validate_id(cls, value: str) -> str:
+        return _validate_slug(value, label="adapter_catalog_entry.id")
+
+    @field_validator("sequence")
+    @classmethod
+    def _validate_sequence(cls, value: str) -> str:
+        return normalize_iupac(value)
+
+
+class YiuAdapterCatalogSpec(StrictBaseModel):
+    entries: list[YiuAdapterCatalogEntry] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_unique_ids(self) -> "YiuAdapterCatalogSpec":
+        ids = [entry.id for entry in self.entries]
+        if len(set(ids)) != len(ids):
+            raise ValueError("catalog adapter ids must be unique")
+        return self
+
+
+class YiuAdapterCatalogDocument(StrictBaseModel):
+    adapters: YiuAdapterCatalogSpec
+
+
 class OutputSpec(StrictBaseModel):
     run_dir: Path = Path("outputs/yiu/explicit")
     emit_view_contracts: bool = True
@@ -314,6 +379,20 @@ class YiuProcessSpec(StrictBaseModel):
     @classmethod
     def _validate_name(cls, value: str) -> str:
         return _validate_slug(value, label="yiu.name")
+
+    @model_validator(mode="after")
+    def _validate_cross_step_contracts(self) -> "YiuProcessSpec":
+        adapter_step = next((step for step in self.step_graph.steps if step.kind == "adapter_ligation"), None)
+        if adapter_step is not None and (
+            adapter_step.adapter_sequence is None
+            and self.adapter_policy.adapter_sequence is None
+            and self.adapter_policy.y_adapter_id is None
+        ):
+            raise ValueError(
+                "adapter_ligation requires an adapter sequence source from "
+                "step.adapter_sequence, adapter_policy.adapter_sequence, or adapter_policy.y_adapter_id"
+            )
+        return self
 
 
 class YiuSpecDocument(StrictBaseModel):

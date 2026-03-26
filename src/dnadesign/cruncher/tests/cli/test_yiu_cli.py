@@ -164,6 +164,11 @@ def _write_yiu_workspace(tmp_path: Path, *, expected_right_overhang: str = "ACGT
     return workspace, spec_path
 
 
+def _write_yaml(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
 def test_root_help_includes_yiu_group() -> None:
     result = runner.invoke(app, ["--help"], color=False)
 
@@ -194,6 +199,11 @@ def test_yiu_validate_json_reports_step_trace(tmp_path: Path) -> None:
     assert payload["protocol"] == "yiu_v1"
     assert payload["states"][0]["state_id"] == "source_oligo_ssdna"
     assert payload["states"][-1]["state_id"] == "downstream_amplifiable_product"
+    pcr_state = next(state for state in payload["states"] if state["state_id"] == "pcr_linear_duplex")
+    assert pcr_state["metadata"]["amplicon_start"] == 0
+    assert pcr_state["metadata"]["amplicon_end"] == 40
+    assert pcr_state["metadata"]["amplicon_length_nt"] == 40
+    assert pcr_state["primary_sequence"] == "AAAAGGTCTCACGTTTAAGGGGCCGGGGTCTCACGTTTTT"
 
 
 def test_yiu_design_writes_bundle_and_show_reads_it(tmp_path: Path) -> None:
@@ -246,6 +256,31 @@ def test_yiu_validate_reports_missing_payload_region_reference(tmp_path: Path) -
     assert "PAYLOAD_REGION_MISSING" in result.output
 
 
+def test_yiu_validate_reports_annotations_outside_pcr_amplicon(tmp_path: Path) -> None:
+    _workspace, spec_path = _write_yiu_workspace(tmp_path)
+    payload = _yiu_payload()
+    payload["yiu"]["source_oligo"]["primer_sites"][1]["start"] = 10
+    payload["yiu"]["source_oligo"]["primer_sites"][1]["end"] = 14
+    spec_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)], color=False)
+
+    assert result.exit_code == 1
+    assert "PCR_AMPLICON_EXCLUDES_ANNOTATION" in result.output
+
+
+def test_yiu_validate_reports_size_selection_removed_fragment_threshold(tmp_path: Path) -> None:
+    _workspace, spec_path = _write_yiu_workspace(tmp_path)
+    payload = _yiu_payload()
+    payload["yiu"]["cleanup_policy"]["size_selection"]["min_removed_fragment_nt"] = 3
+    spec_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)], color=False)
+
+    assert result.exit_code == 1
+    assert "SIZE_SELECTION_FRAGMENT_TOO_SHORT_TO_REMOVE" in result.output
+
+
 def test_yiu_validate_errors_when_catalog_path_is_missing(tmp_path: Path) -> None:
     _workspace, spec_path = _write_yiu_workspace(tmp_path)
     payload = _yiu_payload()
@@ -256,6 +291,90 @@ def test_yiu_validate_errors_when_catalog_path_is_missing(tmp_path: Path) -> Non
 
     assert result.exit_code == 1
     assert "catalogs.restriction_enzymes not found" in result.output
+
+
+def test_yiu_validate_reports_missing_restriction_catalog_entry(tmp_path: Path) -> None:
+    workspace, spec_path = _write_yiu_workspace(tmp_path)
+    _write_yaml(
+        workspace / "catalogs" / "restriction_enzymes.yaml",
+        {"restriction_enzymes": {"entries": [{"id": "BsmBI", "recognition_sequence": "CGTCTC"}]}},
+    )
+    payload = _yiu_payload()
+    payload["yiu"]["catalogs"] = {"restriction_enzymes": "catalogs/restriction_enzymes.yaml"}
+    spec_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)], color=False)
+
+    assert result.exit_code == 1
+    assert "RESTRICTION_CATALOG_ENTRY_MISSING" in result.output
+
+
+def test_yiu_validate_reports_nickase_catalog_mismatch(tmp_path: Path) -> None:
+    workspace, spec_path = _write_yiu_workspace(tmp_path)
+    _write_yaml(
+        workspace / "catalogs" / "nickases.yaml",
+        {"nickases": {"entries": [{"id": "Nt.Mock", "recognition_sequence": "CCCC", "top_cut_offset": 2}]}},
+    )
+    payload = _yiu_payload()
+    payload["yiu"]["catalogs"] = {"nickases": "catalogs/nickases.yaml"}
+    spec_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)], color=False)
+
+    assert result.exit_code == 1
+    assert "NICKASE_CATALOG_MISMATCH" in result.output
+
+
+def test_yiu_validate_reports_missing_adapter_catalog_entry(tmp_path: Path) -> None:
+    workspace, spec_path = _write_yiu_workspace(tmp_path)
+    _write_yaml(
+        workspace / "catalogs" / "adapters.yaml",
+        {"adapters": {"entries": [{"id": "demo_y_adapter", "sequence": "AGATCGGA"}]}},
+    )
+    payload = _yiu_payload()
+    payload["yiu"]["adapter_policy"]["y_adapter_id"] = "missing_adapter"
+    payload["yiu"]["catalogs"] = {"adapters": "catalogs/adapters.yaml"}
+    spec_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)], color=False)
+
+    assert result.exit_code == 1
+    assert "ADAPTER_CATALOG_ENTRY_MISSING" in result.output
+
+
+def test_yiu_validate_accepts_adapter_sequence_from_catalog_only(tmp_path: Path) -> None:
+    workspace, spec_path = _write_yiu_workspace(tmp_path)
+    _write_yaml(
+        workspace / "catalogs" / "adapters.yaml",
+        {"adapters": {"entries": [{"id": "demo_y_adapter", "sequence": "AGATCGGA"}]}},
+    )
+    payload = _yiu_payload()
+    payload["yiu"]["step_graph"]["steps"][7].pop("adapter_sequence")
+    payload["yiu"]["adapter_policy"].pop("adapter_sequence")
+    payload["yiu"]["adapter_policy"]["y_adapter_id"] = "demo_y_adapter"
+    payload["yiu"]["catalogs"] = {"adapters": "catalogs/adapters.yaml"}
+    spec_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path), "--json"], color=False)
+
+    assert result.exit_code == 0
+    report = json.loads(result.output)
+    adapter_state = next(state for state in report["states"] if state["state_id"] == "y_adapter_ligated_product")
+    assert adapter_state["metadata"]["y_adapter_id"] == "demo_y_adapter"
+    assert adapter_state["metadata"]["adapter_sequence"] == "AGATCGGA"
+
+
+def test_yiu_validate_errors_when_catalog_schema_is_invalid(tmp_path: Path) -> None:
+    workspace, spec_path = _write_yiu_workspace(tmp_path)
+    _write_yaml(workspace / "catalogs" / "restriction_enzymes.yaml", {"restriction_enzymes": {"entries": [{}]}})
+    payload = _yiu_payload()
+    payload["yiu"]["catalogs"] = {"restriction_enzymes": "catalogs/restriction_enzymes.yaml"}
+    spec_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)], color=False)
+
+    assert result.exit_code == 1
+    assert "YIU restriction catalog validation failed" in result.output
 
 
 def test_yiu_init_workspace_scaffolds_family_workspace(tmp_path: Path) -> None:
@@ -280,3 +399,21 @@ def test_yiu_init_workspace_scaffolds_family_workspace(tmp_path: Path) -> None:
     assert list_result.exit_code == 0
     assert "demo_yiu_scaffold" in list_result.output
     assert "yiu" in list_result.output
+
+
+def test_yiu_init_workspace_scaffolded_spec_validates(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "workspaces" / "demo_yiu_scaffold"
+
+    result = runner.invoke(app, ["yiu", "init-workspace", "--output", str(workspace_root)], color=False)
+
+    assert result.exit_code == 0
+    validate_result = runner.invoke(
+        app,
+        ["yiu", "validate", "--spec", str(workspace_root / "configs" / "yiu" / "example.yiu.yaml"), "--json"],
+        color=False,
+    )
+
+    assert validate_result.exit_code == 0
+    payload = json.loads(validate_result.output)
+    assert payload["status"] == "satisfied"
+    assert len(payload["metadata"]["catalog_paths"]) == 3

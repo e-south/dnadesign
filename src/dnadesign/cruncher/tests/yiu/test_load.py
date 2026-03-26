@@ -184,3 +184,25 @@ def test_load_yiu_spec_rejects_duplicate_annotation_ids(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="duplicate annotation id"):
         load_yiu_spec(spec_path)
+
+
+def test_load_yiu_spec_accepts_adapter_sequence_from_adapter_policy(tmp_path: Path) -> None:
+    payload = _base_yiu_payload()
+    payload["step_graph"]["steps"][7].pop("adapter_sequence")
+    spec_path = _write_spec(tmp_path, payload)
+
+    spec, _resolved_spec, _workspace_root = load_yiu_spec(spec_path)
+
+    assert spec.step_graph.steps[7].kind == "adapter_ligation"
+    assert spec.step_graph.steps[7].adapter_sequence is None
+    assert spec.adapter_policy.adapter_sequence == "AGATCGGA"
+
+
+def test_load_yiu_spec_rejects_adapter_ligation_without_any_adapter_source(tmp_path: Path) -> None:
+    payload = _base_yiu_payload()
+    payload["step_graph"]["steps"][7].pop("adapter_sequence")
+    payload["adapter_policy"].pop("adapter_sequence")
+    spec_path = _write_spec(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="adapter_ligation requires an adapter sequence source"):
+        load_yiu_spec(spec_path)

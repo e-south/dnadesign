@@ -31,8 +31,11 @@ published/views/
   pcr_linear_duplex.json
   digested_linear_duplex.json
   circularization_candidate.json
+  post_exonuclease_enriched_pool.json
   post_nickase_fragmentation.json
+  post_size_selection.json
   foldback_or_cap_intermediate.json
+  y_adapter_ligated_product.json
   downstream_amplifiable_product.json
 ```
 

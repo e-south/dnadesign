@@ -27,7 +27,7 @@ The scaffold keeps the YIU lane beside other Cruncher families:
 
 - `configs/runbook.yaml` makes the workspace discoverable without adding `configs/config.yaml`
 - `configs/yiu/example.yiu.yaml` is the default explicit spec
-- `catalogs/*.yaml` holds optional protocol catalogs
+- `catalogs/*.yaml` holds optional protocol catalogs; the scaffolded example spec references all three
 - `outputs/yiu/explicit/<spec.name>/<design_id>/` holds deterministic bundles
 - `published/views/` contains per-state neutral JSON contracts
 

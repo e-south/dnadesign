@@ -40,7 +40,8 @@ from dnadesign.cruncher.yiu.artifacts import (
     write_status,
     write_trace,
 )
-from dnadesign.cruncher.yiu.load import load_yiu_spec, resolve_workspace_relative_path
+from dnadesign.cruncher.yiu.catalog import LoadedYiuCatalogs, load_yiu_catalogs
+from dnadesign.cruncher.yiu.load import load_yiu_spec
 from dnadesign.cruncher.yiu.models import (
     EnzymeSiteSpec,
     RegionSpec,
@@ -146,7 +147,112 @@ def _state(
     )
 
 
-def _build_yiu_report(spec: YiuProcessSpec) -> YiuValidationReport:
+def _catalog_site_issue(
+    *,
+    site: EnzymeSiteSpec,
+    catalog_entry: Any | None,
+    missing_code: str,
+    mismatch_code: str,
+    step_id: str,
+    issues: list[YiuValidationIssue],
+) -> None:
+    if catalog_entry is None:
+        issues.append(
+            _issue(
+                missing_code,
+                f"enzyme {site.enzyme!r} for site {site.id} is not present in the referenced catalog",
+                step_id=step_id,
+            )
+        )
+        return
+    if catalog_entry.recognition_sequence != site.recognition_sequence:
+        issues.append(
+            _issue(
+                mismatch_code,
+                f"site {site.id} recognition sequence {site.recognition_sequence!r} does not match catalog value "
+                f"{catalog_entry.recognition_sequence!r} for enzyme {site.enzyme!r}",
+                step_id=step_id,
+            )
+        )
+    for field_name in ("top_cut_offset", "bottom_cut_offset"):
+        catalog_value = getattr(catalog_entry, field_name)
+        site_value = getattr(site, field_name)
+        if catalog_value is not None and site_value is not None and catalog_value != site_value:
+            issues.append(
+                _issue(
+                    mismatch_code,
+                    f"site {site.id} {field_name}={site_value} does not match catalog value {catalog_value} "
+                    f"for enzyme {site.enzyme!r}",
+                    step_id=step_id,
+                )
+            )
+
+
+def _resolve_adapter_sequence(
+    spec: YiuProcessSpec,
+    step_adapter_sequence: str | None,
+    *,
+    step_id: str,
+    catalogs: LoadedYiuCatalogs,
+    issues: list[YiuValidationIssue],
+) -> str:
+    inline_policy_sequence = spec.adapter_policy.adapter_sequence
+    inline_step_sequence = step_adapter_sequence
+    resolved_sequence = str(inline_step_sequence or inline_policy_sequence or "")
+    adapter_id = spec.adapter_policy.y_adapter_id
+
+    if adapter_id is None:
+        if inline_policy_sequence and inline_step_sequence and inline_policy_sequence != inline_step_sequence:
+            issues.append(
+                _issue(
+                    "ADAPTER_SEQUENCE_MISMATCH",
+                    f"step adapter sequence {inline_step_sequence!r} does not match adapter_policy.adapter_sequence "
+                    f"{inline_policy_sequence!r}",
+                    step_id=step_id,
+                )
+            )
+        return resolved_sequence
+
+    if spec.catalogs.adapters is None:
+        issues.append(
+            _issue(
+                "ADAPTER_CATALOG_REQUIRED",
+                f"adapter_policy.y_adapter_id {adapter_id!r} requires catalogs.adapters",
+                step_id=step_id,
+            )
+        )
+        return resolved_sequence
+
+    catalog_entry = catalogs.adapters.get(adapter_id)
+    if catalog_entry is None:
+        issues.append(
+            _issue(
+                "ADAPTER_CATALOG_ENTRY_MISSING",
+                f"adapter id {adapter_id!r} is not present in the referenced adapter catalog",
+                step_id=step_id,
+            )
+        )
+        return resolved_sequence
+
+    catalog_sequence = catalog_entry.sequence
+    for source_label, candidate in (
+        ("adapter_policy.adapter_sequence", inline_policy_sequence),
+        ("step.adapter_sequence", inline_step_sequence),
+    ):
+        if candidate is not None and candidate != catalog_sequence:
+            issues.append(
+                _issue(
+                    "ADAPTER_CATALOG_MISMATCH",
+                    f"{source_label} {candidate!r} does not match adapter catalog sequence {catalog_sequence!r} "
+                    f"for adapter {adapter_id!r}",
+                    step_id=step_id,
+                )
+            )
+    return catalog_sequence
+
+
+def _build_yiu_report(spec: YiuProcessSpec, *, catalogs: LoadedYiuCatalogs | None = None) -> YiuValidationReport:
+    catalogs = catalogs or LoadedYiuCatalogs(restriction_enzymes={}, nickases={}, adapters={}, paths=())
     issues: list[YiuValidationIssue] = []
     states: list[YiuStateRecord] = []
     source_sequence = spec.source_oligo.sequence
@@ -191,6 +297,8 @@ def _build_yiu_report(spec: YiuProcessSpec) -> YiuValidationReport:
 
     current_primary = source_sequence
     current_complement: str | None = None
+    pcr_primary = source_sequence
+    pcr_complement: str | None = None
     assembled_payload = ""
     retained_product = ""
     adapter_sequence = spec.adapter_policy.adapter_sequence or ""
@@ -201,6 +309,8 @@ def _build_yiu_report(spec: YiuProcessSpec) -> YiuValidationReport:
     for step in spec.step_graph.steps:
         step_issues: list[YiuValidationIssue] = []
         metadata: dict[str, Any] = {}
+        state_primary: str | None = None
+        state_complement: str | None = None
         if step.kind == "pcr":
             forward = primers.get(str(step.forward_primer_site))
             reverse = primers.get(str(step.reverse_primer_site))
@@ -213,11 +323,43 @@ def _build_yiu_report(spec: YiuProcessSpec) -> YiuValidationReport:
                     _issue("PCR_BOUNDARY_INVALID", "forward primer must start before reverse primer", step_id=step.id)
                 )
             current_complement = reverse_complement_iupac(current_primary)
+            amplicon_start = forward.start if forward is not None else None
+            amplicon_end = reverse.end if reverse is not None else None
+            if amplicon_start is not None and amplicon_end is not None:
+                pcr_primary = source_sequence[amplicon_start:amplicon_end]
+                pcr_complement = reverse_complement_iupac(pcr_primary)
+                state_primary = pcr_primary
+                state_complement = pcr_complement
+                for category, collection in (
+                    ("restriction_site", spec.source_oligo.restriction_sites),
+                    ("nickase_site", spec.source_oligo.nickase_sites),
+                    ("payload_window", spec.source_oligo.payload_windows),
+                    ("homology_window", spec.source_oligo.homology_windows),
+                    ("retained_region", spec.source_oligo.retained_regions),
+                    ("sacrificial_region", spec.source_oligo.sacrificial_regions),
+                ):
+                    for item in collection:
+                        end = item.end if hasattr(item, "end") else item.start + len(item.recognition_sequence)
+                        if item.start < amplicon_start or end > amplicon_end:
+                            step_issues.append(
+                                _issue(
+                                    "PCR_AMPLICON_EXCLUDES_ANNOTATION",
+                                    f"{category} {item.id} falls outside PCR amplicon {amplicon_start}:{amplicon_end}",
+                                    step_id=step.id,
+                                )
+                            )
             metadata = {
                 "forward_primer_site": step.forward_primer_site,
                 "reverse_primer_site": step.reverse_primer_site,
+                "amplicon_start": amplicon_start,
+                "amplicon_end": amplicon_end,
+                "amplicon_length_nt": (
+                    len(pcr_primary) if amplicon_start is not None and amplicon_end is not None else 0
+                ),
             }
         elif step.kind == "restriction_digest":
+            state_primary = pcr_primary
+            state_complement = pcr_complement
             left_site = restriction_sites.get(str(step.left_site))
             right_site = restriction_sites.get(str(step.right_site))
             if left_site is None or right_site is None:
@@ -226,6 +368,15 @@ def _build_yiu_report(spec: YiuProcessSpec) -> YiuValidationReport:
                 )
             else:
                 for site_id, site in (("left", left_site), ("right", right_site)):
+                    if spec.catalogs.restriction_enzymes is not None:
+                        _catalog_site_issue(
+                            site=site,
+                            catalog_entry=catalogs.restriction_enzymes.get(site.enzyme),
+                            missing_code="RESTRICTION_CATALOG_ENTRY_MISSING",
+                            mismatch_code="RESTRICTION_CATALOG_MISMATCH",
+                            step_id=step.id,
+                            issues=step_issues,
+                        )
                     try:
                         geometry = derive_cut_geometry(
                             current_primary,
@@ -345,6 +496,15 @@ def _build_yiu_report(spec: YiuProcessSpec) -> YiuValidationReport:
                         _issue("NICKASE_SITE_MISSING", f"nickase site {site_id} is missing", step_id=step.id)
                     )
                     continue
+                if spec.catalogs.nickases is not None:
+                    _catalog_site_issue(
+                        site=site,
+                        catalog_entry=catalogs.nickases.get(site.enzyme),
+                        missing_code="NICKASE_CATALOG_ENTRY_MISSING",
+                        mismatch_code="NICKASE_CATALOG_MISMATCH",
+                        step_id=step.id,
+                        issues=step_issues,
+                    )
                 try:
                     geometry = derive_cut_geometry(
                         source_sequence,
@@ -400,6 +560,15 @@ def _build_yiu_report(spec: YiuProcessSpec) -> YiuValidationReport:
             current_complement = reverse_complement_iupac(retained_product)
             metadata = {"fragment_lengths": fragment_lengths, "retained_product": retained_product}
         elif step.kind == "size_selection":
+            min_removed = spec.cleanup_policy.size_selection.min_removed_fragment_nt
+            if min_removed is not None and any(length < min_removed for length in fragment_lengths):
+                step_issues.append(
+                    _issue(
+                        "SIZE_SELECTION_FRAGMENT_TOO_SHORT_TO_REMOVE",
+                        f"sacrificial fragments {fragment_lengths} fall below min removed threshold {min_removed}",
+                        step_id=step.id,
+                    )
+                )
             max_sacrificial = spec.cleanup_policy.size_selection.max_retained_sacrificial_fragment_nt
             if max_sacrificial is not None and any(length > max_sacrificial for length in fragment_lengths):
                 step_issues.append(
@@ -418,7 +587,13 @@ def _build_yiu_report(spec: YiuProcessSpec) -> YiuValidationReport:
                         step_id=step.id,
                     )
                 )
-            metadata = {"fragment_lengths": fragment_lengths, "retained_product_length": len(retained_product)}
+            metadata = {
+                "fragment_lengths": fragment_lengths,
+                "retained_product_length": len(retained_product),
+                "min_removed_fragment_nt": min_removed,
+                "max_retained_sacrificial_fragment_nt": max_sacrificial,
+                "min_retained_product_nt": min_retained,
+            }
         elif step.kind == "foldback":
             left_region = _resolve_region(
                 regions,
@@ -453,10 +628,19 @@ def _build_yiu_report(spec: YiuProcessSpec) -> YiuValidationReport:
                     )
             metadata = {"left_homology": left, "right_homology": right, "complementary_bases": overlap}
         elif step.kind == "adapter_ligation":
-            adapter_sequence = str(step.adapter_sequence or adapter_sequence)
+            adapter_sequence = _resolve_adapter_sequence(
+                spec,
+                step.adapter_sequence,
+                step_id=step.id,
+                catalogs=catalogs,
+                issues=step_issues,
+            )
             current_primary = f"{retained_product}|{adapter_sequence}"
             current_complement = None
-            metadata = {"adapter_sequence": adapter_sequence}
+            metadata = {
+                "adapter_sequence": adapter_sequence,
+                "y_adapter_id": spec.adapter_policy.y_adapter_id,
+            }
         elif step.kind == "amplification":
             current_primary = f"{retained_product}{adapter_sequence}"
             current_complement = reverse_complement_iupac(current_primary)
@@ -484,20 +668,11 @@ def _build_yiu_report(spec: YiuProcessSpec) -> YiuValidationReport:
                 step_id=step.id,
                 kind=step.kind,
                 status=state_status,
-                primary_sequence=current_primary,
-                complement_sequence=current_complement,
+                primary_sequence=current_primary if state_primary is None else state_primary,
+                complement_sequence=current_complement if state_complement is None else state_complement,
                 metadata=metadata,
             )
         )
-
-    catalog_paths: list[str] = []
-    for raw_path in (
-        spec.catalogs.restriction_enzymes,
-        spec.catalogs.nickases,
-        spec.catalogs.adapters,
-    ):
-        if raw_path is not None:
-            catalog_paths.append(str(raw_path))
 
     return YiuValidationReport(
         spec_name=spec.name,
@@ -507,7 +682,7 @@ def _build_yiu_report(spec: YiuProcessSpec) -> YiuValidationReport:
             step_count=len(spec.step_graph.steps),
             state_count=len(states),
             emitted_view_count=len(states) if spec.output.emit_view_contracts else 0,
-            catalog_paths=catalog_paths,
+            catalog_paths=[str(path) for path in catalogs.paths],
         ),
         states=states,
         issues=issues,
@@ -516,24 +691,8 @@ def _build_yiu_report(spec: YiuProcessSpec) -> YiuValidationReport:
 
 def validate_yiu_spec(path: str | Path) -> YiuValidationReport:
     spec, _spec_path, workspace_root = load_yiu_spec(path)
-    _collect_catalog_paths(spec, workspace_root=workspace_root)
-    return _build_yiu_report(spec)
-
-
-def _collect_catalog_paths(spec: YiuProcessSpec, *, workspace_root: Path) -> list[Path]:
-    catalog_paths: list[Path] = []
-    for label, raw_path in (
-        ("catalogs.restriction_enzymes", spec.catalogs.restriction_enzymes),
-        ("catalogs.nickases", spec.catalogs.nickases),
-        ("catalogs.adapters", spec.catalogs.adapters),
-    ):
-        if raw_path is None:
-            continue
-        resolved = resolve_workspace_relative_path(raw_path, workspace_root=workspace_root, label=label)
-        if not resolved.exists():
-            raise FileNotFoundError(f"{label} not found: {resolved}")
-        catalog_paths.append(resolved)
-    return catalog_paths
+    catalogs = load_yiu_catalogs(spec, workspace_root=workspace_root)
+    return _build_yiu_report(spec, catalogs=catalogs)
 
 
 def _catalog_bytes(catalog_paths: list[Path]) -> bytes:
@@ -616,8 +775,9 @@ def _publish_views(run_dir: Path, report: YiuValidationReport) -> None:
 
 def _materialize_yiu_bundle(spec_path: str | Path, *, force_overwrite: bool) -> tuple[Path, YiuValidationReport]:
     spec, resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
-    report = _build_yiu_report(spec)
-    catalog_paths = _collect_catalog_paths(spec, workspace_root=workspace_root)
+    catalogs = load_yiu_catalogs(spec, workspace_root=workspace_root)
+    report = _build_yiu_report(spec, catalogs=catalogs)
+    catalog_paths = list(catalogs.paths)
     run_id = design_id(spec_bytes=resolved_spec_path.read_bytes(), catalog_bytes=_catalog_bytes(catalog_paths))
     run_dir = build_run_dir(
         workspace_root=workspace_root,
