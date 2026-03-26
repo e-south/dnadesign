@@ -27,6 +27,10 @@ from dnadesign.cruncher.cli.config_resolver import (
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.study.discovery import discover_study_runs_for_workspace, discover_study_specs_for_workspace
 from dnadesign.cruncher.utils.paths import resolve_workspace_root
+from dnadesign.cruncher.workspaces.families import (
+    infer_runbook_workflow_families_from_path,
+    workspace_kind_from_presence,
+)
 
 app = typer.Typer(no_args_is_help=True, help="List discoverable cruncher workspaces.")
 console = Console()
@@ -381,6 +385,7 @@ def list_workspaces(
         table.add_column("Index", justify="right")
         table.add_column("Name")
         table.add_column("Kind")
+        table.add_column("Families")
         table.add_column("Config")
         table.add_column("Runbook")
         table.add_column("Root")
@@ -393,12 +398,20 @@ def list_workspaces(
             runbook_path = runbook_by_root.get(workspace_root)
             has_config = config_workspace is not None
             has_runbook = runbook_path is not None
-            if has_config and has_runbook:
+            internal_kind = workspace_kind_from_presence(has_config=has_config, has_runbook=has_runbook)
+            if internal_kind == "hybrid":
                 kind = "config+runbook"
-            elif has_runbook:
+            elif internal_kind == "runbook_family":
                 kind = "runbook-only"
             else:
                 kind = "config-only"
+            families: list[str] = []
+            if has_config:
+                families.append("sample")
+            if runbook_path is not None:
+                for family in infer_runbook_workflow_families_from_path(runbook_path):
+                    if family not in families:
+                        families.append(family)
 
             catalog_path = workspace_root / ".cruncher" / "catalog.json"
             catalog_flag = "yes" if catalog_path.exists() else "no"
@@ -411,6 +424,7 @@ def list_workspaces(
                 str(idx),
                 workspace_root.name,
                 kind,
+                ", ".join(families) if families else "-",
                 render_path(config_workspace.config_path) if config_workspace is not None else "-",
                 render_path(runbook_path) if runbook_path is not None else "-",
                 render_path(workspace_root),

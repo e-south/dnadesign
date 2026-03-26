@@ -23,30 +23,10 @@ import yaml
 from pydantic import field_validator, model_validator
 
 from dnadesign.cruncher.config.schema_v3 import StrictBaseModel
+from dnadesign.cruncher.workspaces.families import allowed_runbook_command_roots
 
 _STEP_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-_ALLOWED_COMMANDS = {
-    "analyze",
-    "cache",
-    "cassette",
-    "catalog",
-    "config",
-    "discover",
-    "doctor",
-    "export",
-    "fetch",
-    "lock",
-    "optimizers",
-    "parse",
-    "portfolio",
-    "runs",
-    "sample",
-    "sources",
-    "status",
-    "study",
-    "targets",
-    "workspaces",
-}
+_ALLOWED_COMMANDS = set(allowed_runbook_command_roots())
 
 
 class WorkspaceRunbookStep(StrictBaseModel):
