@@ -49,6 +49,8 @@ def list_status_kind_specs() -> tuple[StatusKindSpec, ...]:
             spec = StatusKindSpec(
                 status_kind=str(entry.get("status_kind") or "").strip(),
                 provider_id=provider_id,
+                owner_boundary=str(entry.get("owner_boundary") or "").strip(),
+                observes_plane=str(entry.get("observes_plane") or "").strip().lower(),  # type: ignore[arg-type]
                 provider_ref=str(entry.get("provider_ref") or "").strip(),
                 description=str(
                     entry.get("description") or "Read one explicit, artifact-backed status surface."
@@ -82,16 +84,10 @@ def load_status_kind_spec(status_kind: str) -> StatusKindSpec:
 
 
 def _iter_status_registry_fragment_paths() -> tuple[Path, ...]:
-    ops_root = Path(__file__).resolve().parents[1]
     dnadesign_root = Path(__file__).resolve().parents[2]
-    fragment_paths: list[Path] = []
-    for search_root in (
-        ops_root / "providers",
-        dnadesign_root / "studies",
-    ):
-        if not search_root.exists():
-            continue
-        fragment_paths.extend(path for path in search_root.rglob(_STATUS_REGISTRY_FILENAME) if path.is_file())
+    fragment_paths = [
+        path for path in dnadesign_root.rglob(_STATUS_REGISTRY_FILENAME) if path.is_file() and path.parent.name == "ops"
+    ]
     return tuple(sorted(fragment_paths))
 
 

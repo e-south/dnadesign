@@ -14,11 +14,11 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from dnadesign.studies.promoter.context import PromoterStudyResolvedContext
-from dnadesign.studies.promoter.infer_runtime import (
+from dnadesign.studies.families.promoter.infer_runtime import (
     PromoterStudyInferRuntimeDependencies,
     resolve_promoter_study_infer_runtime_context,
 )
+from dnadesign.studies.families.promoter.record_normalizer import PromoterStudyResolvedContext
 
 
 def _string_or_none(value: object) -> str | None:
@@ -41,15 +41,15 @@ def _make_study_context(tmp_path: Path) -> PromoterStudyResolvedContext:
     return PromoterStudyResolvedContext(
         study_dir_exists=True,
         requested_study_dir=None,
-        resolved_study_dir=tmp_path / "docs" / "studies" / "promoter" / "demo_study",
+        resolved_study_dir=tmp_path / "docs" / "studies" / "demo_study",
         study_repo_root=tmp_path,
         study_id="demo_study",
         selection_source="active_registry",
-        registry_path=tmp_path / "docs" / "studies" / "promoter" / "index.yaml",
+        registry_path=tmp_path / "docs" / "studies" / "index.yaml",
         active_study="demo_study",
         required_paths={},
         missing_required_files=(),
-        pipeline_path=tmp_path / "docs" / "studies" / "promoter" / "demo_study" / "pipeline.yaml",
+        pipeline_path=tmp_path / "docs" / "studies" / "demo_study" / "pipeline.yaml",
         pipeline_present=True,
         datasets_entries=(),
         study_pipeline={

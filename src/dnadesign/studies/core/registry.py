@@ -3,15 +3,15 @@
 dnadesign
 src/dnadesign/studies/core/registry.py
 
-Generic checked-in study registry discovery for family-owned study packages.
+Checked-in study index loading for flat study-first record roots.
 
-Module Author(s): Eric J. South
+Module Author(s): Codex
 --------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -21,60 +21,84 @@ from dnadesign.ops.status.path_ref import resolve_path_ref
 
 
 @dataclass(frozen=True)
-class ActiveStudySelection:
+class StudyIndexEntry:
+    study_id: str
+    family: str
+    record_root: Path
+    title: str | None = None
+    raw_payload: dict[str, object] = field(default_factory=dict, repr=False)
+
+
+@dataclass(frozen=True)
+class StudyIndex:
     repo_root: Path
     index_path: Path
-    active_study: str
-    study_root: Path
+    active_study_id: str
+    studies: tuple[StudyIndexEntry, ...]
+
+    @property
+    def study_index(self) -> dict[str, StudyIndexEntry]:
+        return {entry.study_id: entry for entry in self.studies}
 
 
-def discover_active_study_selection(
-    *,
-    repo_root: Path | None,
-    family_id: str,
-    status_kind: str,
-) -> ActiveStudySelection:
+def load_study_index(repo_root: Path | None) -> StudyIndex:
     resolved_repo_root = repo_root.expanduser().resolve() if repo_root is not None else discover_repo_root(Path.cwd())
     if resolved_repo_root is None:
-        raise ValueError(
-            f"status kind '{status_kind}' requires --study-dir or a dnadesign repository checkout "
-            f"with docs/studies/{family_id}/index.yaml"
-        )
+        raise ValueError("checked-in study index requires a dnadesign repository checkout with docs/studies/index.yaml")
 
-    index_path = resolved_repo_root / "docs" / "studies" / family_id / "index.yaml"
+    index_path = resolved_repo_root / "docs" / "studies" / "index.yaml"
     if not index_path.exists():
-        raise ValueError(f"{family_id} study registry not found: {index_path}")
+        raise ValueError(f"checked-in study index not found: {index_path}")
 
     payload = yaml.safe_load(index_path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
-        raise ValueError(f"{family_id} study registry must be a mapping: {index_path}")
-    active_study = _required_text(payload.get("active_study"), label="active_study", source=index_path)
+        raise ValueError(f"checked-in study index must be a mapping: {index_path}")
+    version = int(payload.get("version") or 0)
+    if version != 1:
+        raise ValueError(f"unsupported checked-in study index version {version}: {index_path}")
+
+    active_study_id = _required_text(payload.get("active_study_id"), label="active_study_id", source=index_path)
     studies_payload = payload.get("studies") or []
-    if not isinstance(studies_payload, list):
-        raise ValueError(f"{family_id} study registry must define a 'studies' list: {index_path}")
+    if not isinstance(studies_payload, list) or not studies_payload:
+        raise ValueError(f"checked-in study index must define a non-empty studies list: {index_path}")
 
-    matches = [
-        entry
-        for entry in studies_payload
-        if isinstance(entry, dict) and _string_or_none(entry.get("study_id")) == active_study
-    ]
-    if not matches:
-        raise ValueError(f"active_study '{active_study}' is not declared under 'studies' in {index_path}")
-    if len(matches) > 1:
-        raise ValueError(f"active_study '{active_study}' is declared more than once in {index_path}")
+    studies: list[StudyIndexEntry] = []
+    seen_study_ids: set[str] = set()
+    for index, item in enumerate(studies_payload, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"study index entry {index} must be a mapping: {index_path}")
+        study_id = _required_text(item.get("study_id"), label="study_id", source=index_path)
+        family = _required_text(item.get("family"), label=f"studies.{study_id}.family", source=index_path)
+        if study_id in seen_study_ids:
+            raise ValueError(f"checked-in study index must not duplicate study_id {study_id!r}: {index_path}")
+        seen_study_ids.add(study_id)
+        raw_record_root = _required_text(
+            item.get("record_root"), label=f"studies.{study_id}.record_root", source=index_path
+        )
+        record_root = resolve_path_ref(
+            raw_record_root,
+            repo_root=resolved_repo_root,
+            default_base="repo",
+            label=f"studies.{study_id}.record_root",
+        )
+        studies.append(
+            StudyIndexEntry(
+                study_id=study_id,
+                family=family,
+                title=_string_or_none(item.get("title")),
+                record_root=record_root,
+                raw_payload=dict(item),
+            )
+        )
 
-    raw_path = _required_text(matches[0].get("path"), label="study path", source=index_path)
-    study_root = resolve_path_ref(
-        raw_path,
-        repo_root=resolved_repo_root,
-        default_base="repo",
-        label="study path",
-    )
-    return ActiveStudySelection(
+    if active_study_id not in seen_study_ids:
+        raise ValueError(f"active_study_id '{active_study_id}' is not declared under studies in {index_path}")
+
+    return StudyIndex(
         repo_root=resolved_repo_root,
         index_path=index_path,
-        active_study=active_study,
-        study_root=study_root,
+        active_study_id=active_study_id,
+        studies=tuple(studies),
     )
 
 
@@ -90,4 +114,4 @@ def _string_or_none(value: object) -> str | None:
     return text or None
 
 
-__all__ = ["ActiveStudySelection", "discover_active_study_selection"]
+__all__ = ["StudyIndex", "StudyIndexEntry", "load_study_index"]

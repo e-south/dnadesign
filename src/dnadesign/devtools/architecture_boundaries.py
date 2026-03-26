@@ -31,6 +31,7 @@ _SKIPPED_PATH_SEGMENTS = {
 _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("billboard", "aligner"),
     ("cluster", "aligner"),
+    ("cluster", "ops"),
     ("cluster", "usr"),
     ("construct", "usr"),
     ("cruncher", "baserender"),
@@ -44,17 +45,20 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("notify", "construct"),
     ("notify", "densegen"),
     ("notify", "infer"),
+    ("opal", "ops"),
     ("ops", "construct"),
     ("ops", "densegen"),
     ("ops", "infer"),
     ("ops", "notify"),
     ("ops", "usr"),
     ("permuter", "infer"),
+    ("usr", "ops"),
 }
 _FORBIDDEN_LEGACY_SURFACE_PATHS = (
     Path("src/dnadesign/_contracts"),
     Path("src/dnadesign/usr_roots.py"),
     Path("src/dnadesign/usr/src/roots.py"),
+    Path("src/dnadesign/ops/providers"),
     Path("src/dnadesign/ops/orchestrator/contracts.py"),
     Path("src/dnadesign/ops/promoter_study_context.py"),
     Path("src/dnadesign/ops/promoter_study_infer_runtime.py"),
@@ -72,6 +76,8 @@ _FORBIDDEN_LEGACY_SURFACE_PATHS = (
     Path("src/dnadesign/ops/tests/test_promoter_preflight_upstream.py"),
     Path("src/dnadesign/ops/tests/test_promoter_preflight_infer.py"),
     Path("src/dnadesign/ops/tests/test_promoter_preflight_coordinator.py"),
+    Path("src/dnadesign/studies/promoter"),
+    Path("docs/studies/promoter"),
 )
 
 

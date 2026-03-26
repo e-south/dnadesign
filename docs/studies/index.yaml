@@ -1,0 +1,7 @@
+version: 1
+active_study_id: stress_ethanol_cipro_growth
+studies:
+  - study_id: stress_ethanol_cipro_growth
+    family: promoter
+    title: Stress / ethanol / ciprofloxacin growth study
+    record_root: docs/studies/stress_ethanol_cipro_growth

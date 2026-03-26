@@ -39,13 +39,31 @@ def _run_python(code: str) -> list[str]:
 
 
 def test_status_registry_fragments_load_provider_owned_specs() -> None:
-    supported_specs = {spec.status_kind: spec.provider_id for spec in list_status_kind_specs()}
+    supported_specs = {spec.status_kind: spec for spec in list_status_kind_specs()}
 
-    assert supported_specs["ops-audit-json"] == "builtin.ops"
-    assert supported_specs["usr-dataset-state"] == "builtin.usr"
-    assert supported_specs["promoter-study-preflight"] == "study.promoter"
-    assert supported_specs["cluster-run-index"] == "builtin.cluster"
-    assert supported_specs["opal-campaign-state"] == "builtin.opal"
+    assert supported_specs["ops-audit-json"].provider_ref == "dnadesign.ops.status_providers:provide_ops_audit_status"
+    assert supported_specs["ops-audit-json"].owner_boundary == "ops"
+    assert supported_specs["ops-audit-json"].observes_plane == "control"
+    assert supported_specs["usr-dataset-state"].provider_ref == (
+        "dnadesign.usr.ops.status_providers:provide_usr_dataset_state_status"
+    )
+    assert supported_specs["usr-dataset-state"].owner_boundary == "usr"
+    assert supported_specs["usr-dataset-state"].observes_plane == "data"
+    assert supported_specs["promoter-study-preflight"].provider_ref == (
+        "dnadesign.studies.families.promoter.ops.provider:provide_promoter_preflight"
+    )
+    assert supported_specs["promoter-study-preflight"].owner_boundary == "usr"
+    assert supported_specs["promoter-study-preflight"].observes_plane == "execution_readiness"
+    assert supported_specs["cluster-run-index"].provider_ref == (
+        "dnadesign.cluster.ops.status_providers:provide_cluster_run_index_status"
+    )
+    assert supported_specs["cluster-run-index"].owner_boundary == "cluster"
+    assert supported_specs["cluster-run-index"].observes_plane == "data"
+    assert supported_specs["opal-campaign-state"].provider_ref == (
+        "dnadesign.opal.ops.status_providers:provide_opal_campaign_state_status"
+    )
+    assert supported_specs["opal-campaign-state"].owner_boundary == "opal"
+    assert supported_specs["opal-campaign-state"].observes_plane == "control"
 
 
 def test_status_registry_loader_reads_metadata_without_provider_import() -> None:
@@ -58,8 +76,14 @@ from dnadesign.ops.status.registry_loader import list_status_kind_specs
 list_status_kind_specs()
 print(json.dumps(sorted(
     name for name in sys.modules
-    if name.startswith('dnadesign.ops.providers.')
-    or name.startswith('dnadesign.studies.promoter')
+    if name in {
+        'dnadesign.ops.status_providers',
+        'dnadesign.usr.ops.status_providers',
+        'dnadesign.opal.ops.status_providers',
+        'dnadesign.cluster.ops.status_providers',
+        'dnadesign.studies.families.promoter.adapter',
+        'dnadesign.studies.families.promoter.ops.provider',
+    }
 )))
 """
     )
@@ -102,8 +126,14 @@ result = CliRunner().invoke(app, ['catalog', 'list', '--repo-root', '.','--json'
 assert result.exit_code == 0, result.output
 print(json.dumps(sorted(
     name for name in sys.modules
-    if name.startswith('dnadesign.ops.providers.')
-    or name.startswith('dnadesign.studies.promoter')
+    if name in {
+        'dnadesign.ops.status_providers',
+        'dnadesign.usr.ops.status_providers',
+        'dnadesign.opal.ops.status_providers',
+        'dnadesign.cluster.ops.status_providers',
+        'dnadesign.studies.families.promoter.adapter',
+        'dnadesign.studies.families.promoter.ops.provider',
+    }
 )))
 """
     )
@@ -123,8 +153,14 @@ result = CliRunner().invoke(app, ['progress', 'kinds', '--json'])
 assert result.exit_code == 0, result.output
 print(json.dumps(sorted(
     name for name in sys.modules
-    if name.startswith('dnadesign.ops.providers.')
-    or name.startswith('dnadesign.studies.promoter')
+    if name in {
+        'dnadesign.ops.status_providers',
+        'dnadesign.usr.ops.status_providers',
+        'dnadesign.opal.ops.status_providers',
+        'dnadesign.cluster.ops.status_providers',
+        'dnadesign.studies.families.promoter.adapter',
+        'dnadesign.studies.families.promoter.ops.provider',
+    }
 )))
 """
     )
@@ -289,12 +325,12 @@ print(json.dumps(sorted(
     if name in {
         'dnadesign.ops.status.campaign',
         'dnadesign.ops.status.service',
-        'dnadesign.ops.providers.ops.provider',
-        'dnadesign.ops.providers.usr.provider',
-        'dnadesign.ops.providers.cluster.provider',
-        'dnadesign.ops.providers.opal.provider',
-        'dnadesign.studies.promoter.family',
-        'dnadesign.studies.promoter.ops_provider',
+        'dnadesign.ops.status_providers',
+        'dnadesign.usr.ops.status_providers',
+        'dnadesign.cluster.ops.status_providers',
+        'dnadesign.opal.ops.status_providers',
+        'dnadesign.studies.families.promoter.adapter',
+        'dnadesign.studies.families.promoter.ops.provider',
     }
 )))
 """
@@ -319,16 +355,16 @@ assert result.exit_code == 0, result.output
 print(json.dumps(sorted(
     name for name in sys.modules
     if name in {
-        'dnadesign.ops.providers.ops.provider',
-        'dnadesign.ops.providers.usr.provider',
-        'dnadesign.ops.providers.cluster.provider',
-        'dnadesign.ops.providers.opal.provider',
+        'dnadesign.ops.status_providers',
+        'dnadesign.usr.ops.status_providers',
+        'dnadesign.cluster.ops.status_providers',
+        'dnadesign.opal.ops.status_providers',
         'dnadesign.ops._cli_legacy',
-        'dnadesign.studies.promoter.family',
-        'dnadesign.studies.promoter.ops_provider',
+        'dnadesign.studies.families.promoter.adapter',
+        'dnadesign.studies.families.promoter.ops.provider',
     }
 )))
 """
     )
 
-    assert imported_modules == ["dnadesign.ops.providers.ops.provider"]
+    assert imported_modules == ["dnadesign.ops.status_providers"]

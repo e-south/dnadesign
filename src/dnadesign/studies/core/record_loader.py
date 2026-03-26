@@ -27,6 +27,18 @@ from .models import (
     StudyPreflightNextScopeContract,
 )
 
+_SUPPORTED_PREFLIGHT_CHECK_KINDS = frozenset(
+    {
+        "command",
+        "dataset_snapshot",
+        "environment",
+        "gpu_availability",
+        "path_exists",
+        "runbook_plan",
+        "workspace_layout",
+    }
+)
+
 
 def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     resolved_study_root = study_root.expanduser().resolve()
@@ -38,32 +50,45 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     if not isinstance(payload, dict):
         raise ValueError(f"ops.study.yaml must be a mapping: {contract_path}")
     version = int(payload.get("version") or 0)
-    if version != 1:
+    if version != 2:
         raise ValueError(f"unsupported ops.study.yaml version {version}: {contract_path}")
 
     study_id = str(payload.get("study_id") or "").strip()
     family = str(payload.get("family") or "").strip()
+    title = _string_or_none(payload.get("title"))
     if not study_id:
         raise ValueError(f"ops.study.yaml must define study_id: {contract_path}")
     if not family:
         raise ValueError(f"ops.study.yaml must define family: {contract_path}")
 
-    phase_order_payload = payload.get("phase_order") or []
+    record_sources = _validated_contract_refs_mapping(
+        payload.get("record_sources"),
+        repo_root=repo_root,
+        study_root=resolved_study_root,
+        contract_path=contract_path,
+        label="ops.study.yaml record_sources",
+    )
+
+    lifecycle_payload = payload.get("lifecycle") or {}
+    if not isinstance(lifecycle_payload, dict):
+        raise ValueError(f"ops.study.yaml lifecycle must be a mapping: {contract_path}")
+    phase_order_payload = lifecycle_payload.get("phase_order") or []
     if not isinstance(phase_order_payload, list) or not phase_order_payload:
-        raise ValueError(f"ops.study.yaml must define a non-empty phase_order list: {contract_path}")
+        raise ValueError(f"ops.study.yaml lifecycle.phase_order must define a non-empty list: {contract_path}")
     phase_order = _string_sequence(
         phase_order_payload,
-        label="ops.study.yaml phase_order",
+        label="ops.study.yaml lifecycle.phase_order",
         source=contract_path,
     )
 
-    current_phase_payload = payload.get("current_phase") or {}
+    current_phase_payload = lifecycle_payload.get("current_phase") or {}
     if current_phase_payload and not isinstance(current_phase_payload, dict):
-        raise ValueError(f"ops.study.yaml current_phase must be a mapping: {contract_path}")
+        raise ValueError(f"ops.study.yaml lifecycle.current_phase must be a mapping: {contract_path}")
     current_phase_strategy = str(current_phase_payload.get("strategy") or "explicit").strip().lower()
     if current_phase_strategy not in {"explicit", "derive_from_phase_status"}:
         raise ValueError(
-            f"ops.study.yaml current_phase.strategy must be one of: explicit, derive_from_phase_status: {contract_path}"
+            "ops.study.yaml lifecycle.current_phase.strategy must be one of: "
+            f"explicit, derive_from_phase_status: {contract_path}"
         )
     current_phase_id = str(current_phase_payload.get("id") or "").strip() or None
 
@@ -108,16 +133,36 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
 
     phase_ids = tuple(phase.id for phase in phases)
     if phase_order != phase_ids:
-        raise ValueError(f"ops.study.yaml phase_order must match phases ids in the same order: {contract_path}")
+        raise ValueError(
+            f"ops.study.yaml lifecycle.phase_order must match phases ids in the same order: {contract_path}"
+        )
     if current_phase_strategy == "explicit":
         if current_phase_id is None:
-            raise ValueError(f"ops.study.yaml current_phase.id must be defined for explicit strategy: {contract_path}")
+            raise ValueError(
+                f"ops.study.yaml lifecycle.current_phase.id must be defined for explicit strategy: {contract_path}"
+            )
         if current_phase_id not in seen_phase_ids:
             raise ValueError(
-                f"ops.study.yaml current_phase.id {current_phase_id!r} is not declared under phases: {contract_path}"
+                "ops.study.yaml lifecycle.current_phase.id "
+                f"{current_phase_id!r} is not declared under phases: {contract_path}"
             )
     else:
         current_phase_id = _derive_current_phase_id(phases)
+
+    artifacts = _validated_contract_named_payloads(
+        payload.get("artifacts"),
+        repo_root=repo_root,
+        study_root=resolved_study_root,
+        contract_path=contract_path,
+        label="ops.study.yaml artifacts",
+    )
+    execution_surfaces = _validated_contract_named_payloads(
+        payload.get("execution_surfaces"),
+        repo_root=repo_root,
+        study_root=resolved_study_root,
+        contract_path=contract_path,
+        label="ops.study.yaml execution_surfaces",
+    )
 
     snapshot_payload = payload.get("snapshot") or {}
     if snapshot_payload and not isinstance(snapshot_payload, dict):
@@ -131,10 +176,16 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     if default_scope not in STUDY_PREFLIGHT_SCOPES:
         allowed_scopes = ", ".join(sorted(STUDY_PREFLIGHT_SCOPES))
         raise ValueError(f"ops.study.yaml preflight.default_scope must be one of: {allowed_scopes}: {contract_path}")
+    scopes_payload = preflight_payload.get("scopes") or {}
+    if scopes_payload and not isinstance(scopes_payload, dict):
+        raise ValueError(f"ops.study.yaml preflight.scopes must be a mapping: {contract_path}")
     if "group_phase_bindings" not in preflight_payload:
         raise ValueError(f"ops.study.yaml preflight.group_phase_bindings must be defined: {contract_path}")
     if "next_scope" not in preflight_payload:
         raise ValueError(f"ops.study.yaml preflight.next_scope must be defined: {contract_path}")
+    checks_payload = preflight_payload.get("checks") or {}
+    if checks_payload and not isinstance(checks_payload, dict):
+        raise ValueError(f"ops.study.yaml preflight.checks must be a mapping: {contract_path}")
     next_scope_payload = preflight_payload.get("next_scope") or {}
     if next_scope_payload and not isinstance(next_scope_payload, dict):
         raise ValueError(f"ops.study.yaml preflight.next_scope must be a mapping: {contract_path}")
@@ -199,6 +250,14 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
         source=contract_path,
         allow_empty=True,
     )
+    scope_payloads = _validated_preflight_scopes(scopes_payload, contract_path=contract_path)
+    check_specs = _validated_preflight_checks(
+        checks_payload,
+        phase_ids=seen_phase_ids,
+        artifact_ids=set(artifacts),
+        execution_surface_ids=set(execution_surfaces),
+        contract_path=contract_path,
+    )
     summary_scope = str(snapshot_payload.get("summary_scope") or "repo").strip()
     if not summary_scope:
         raise ValueError(f"ops.study.yaml snapshot.summary_scope must be non-empty: {contract_path}")
@@ -209,6 +268,7 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     return StudyOpsContract(
         study_id=study_id,
         family=family,
+        title=title,
         phase_order=phase_order,
         current_phase_id=current_phase_id,
         phases=tuple(phases),
@@ -221,7 +281,12 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
                 runtime_phase_groups=runtime_phase_groups,
                 runtime_shared_groups=runtime_shared_groups,
             ),
+            scope_payloads=scope_payloads,
+            check_specs=check_specs,
         ),
+        record_sources=record_sources,
+        artifacts=artifacts,
+        execution_surfaces=execution_surfaces,
         raw_payload=dict(payload),
     )
 
@@ -264,6 +329,220 @@ def _string_sequence(
     return tuple(items)
 
 
+def _validated_contract_refs_mapping(
+    value: object,
+    *,
+    repo_root: Path,
+    study_root: Path,
+    contract_path: Path,
+    label: str,
+) -> dict[str, str]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be a mapping: {contract_path}")
+    resolved: dict[str, str] = {}
+    for raw_key, raw_value in value.items():
+        key = str(raw_key or "").strip()
+        if not key:
+            raise ValueError(f"{label} keys must be non-empty: {contract_path}")
+        ref = _string_or_none(raw_value)
+        if ref is None:
+            raise ValueError(f"{label}.{key} must be a non-empty path ref: {contract_path}")
+        _validate_contract_path_ref(
+            ref,
+            repo_root=repo_root,
+            study_root=study_root,
+            label=f"{label}.{key}",
+        )
+        resolved[key] = ref
+    return resolved
+
+
+def _validated_contract_named_payloads(
+    value: object,
+    *,
+    repo_root: Path,
+    study_root: Path,
+    contract_path: Path,
+    label: str,
+) -> dict[str, dict[str, object]]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be a mapping: {contract_path}")
+    resolved: dict[str, dict[str, object]] = {}
+    for raw_key, raw_payload in value.items():
+        key = str(raw_key or "").strip()
+        if not key:
+            raise ValueError(f"{label} keys must be non-empty: {contract_path}")
+        if not isinstance(raw_payload, dict):
+            raise ValueError(f"{label}.{key} must be a mapping: {contract_path}")
+        normalized_payload = dict(raw_payload)
+        for field_name, field_value in normalized_payload.items():
+            normalized_field = str(field_name or "").strip()
+            if normalized_field.endswith("_ref") or normalized_field == "ref":
+                ref = _string_or_none(field_value)
+                if ref is None:
+                    raise ValueError(f"{label}.{key}.{normalized_field} must be a non-empty path ref: {contract_path}")
+                _validate_contract_path_ref(
+                    ref,
+                    repo_root=repo_root,
+                    study_root=study_root,
+                    label=f"{label}.{key}.{normalized_field}",
+                )
+        resolved[key] = normalized_payload
+    return resolved
+
+
+def _validated_preflight_scopes(
+    scopes_payload: object,
+    *,
+    contract_path: Path,
+) -> dict[str, dict[str, object]]:
+    if scopes_payload is None:
+        return {}
+    if not isinstance(scopes_payload, dict):
+        raise ValueError(f"ops.study.yaml preflight.scopes must be a mapping: {contract_path}")
+    normalized: dict[str, dict[str, object]] = {}
+    for raw_scope, raw_payload in scopes_payload.items():
+        scope = str(raw_scope or "").strip()
+        if not scope:
+            raise ValueError(f"ops.study.yaml preflight.scopes keys must be non-empty: {contract_path}")
+        if scope not in STUDY_PREFLIGHT_SCOPES:
+            allowed_scopes = ", ".join(sorted(STUDY_PREFLIGHT_SCOPES))
+            raise ValueError(
+                f"ops.study.yaml preflight.scopes.{scope} must use one of: {allowed_scopes}: {contract_path}"
+            )
+        if not isinstance(raw_payload, dict):
+            raise ValueError(f"ops.study.yaml preflight.scopes.{scope} must be a mapping: {contract_path}")
+        normalized[scope] = dict(raw_payload)
+    return normalized
+
+
+def _validated_preflight_checks(
+    checks_payload: object,
+    *,
+    phase_ids: set[str],
+    artifact_ids: set[str],
+    execution_surface_ids: set[str],
+    contract_path: Path,
+) -> dict[str, tuple[dict[str, object], ...]]:
+    if checks_payload is None:
+        return {}
+    if not isinstance(checks_payload, dict):
+        raise ValueError(f"ops.study.yaml preflight.checks must be a mapping: {contract_path}")
+    resolved: dict[str, tuple[dict[str, object], ...]] = {}
+    seen_check_ids: set[str] = set()
+    for raw_phase_id, raw_specs in checks_payload.items():
+        phase_id = str(raw_phase_id or "").strip()
+        if not phase_id:
+            raise ValueError(f"ops.study.yaml preflight.checks keys must be non-empty: {contract_path}")
+        if phase_id not in phase_ids:
+            raise ValueError(
+                f"ops.study.yaml preflight.checks references undeclared phase {phase_id!r}: {contract_path}"
+            )
+        if not isinstance(raw_specs, list):
+            raise ValueError(f"ops.study.yaml preflight.checks.{phase_id} must be a list: {contract_path}")
+        specs: list[dict[str, object]] = []
+        for index, raw_spec in enumerate(raw_specs, start=1):
+            if not isinstance(raw_spec, dict):
+                raise ValueError(
+                    f"ops.study.yaml preflight.checks.{phase_id} entry {index} must be a mapping: {contract_path}"
+                )
+            spec = dict(raw_spec)
+            kind = _string_or_none(spec.get("kind"))
+            if kind is None:
+                raise ValueError(
+                    f"ops.study.yaml preflight.checks.{phase_id} entry {index} must define kind: {contract_path}"
+                )
+            if kind not in _SUPPORTED_PREFLIGHT_CHECK_KINDS:
+                allowed_kinds = ", ".join(sorted(_SUPPORTED_PREFLIGHT_CHECK_KINDS))
+                raise ValueError(
+                    f"ops.study.yaml preflight.checks.{phase_id} entry {index} has unsupported kind {kind!r}; "
+                    f"expected one of: {allowed_kinds}: {contract_path}"
+                )
+            check_id = _string_or_none(spec.get("check_id"))
+            if check_id is None:
+                raise ValueError(
+                    f"ops.study.yaml preflight.checks.{phase_id} entry {index} must define check_id: {contract_path}"
+                )
+            if check_id in seen_check_ids:
+                raise ValueError(
+                    f"ops.study.yaml preflight.checks must not duplicate check_id {check_id!r}: {contract_path}"
+                )
+            seen_check_ids.add(check_id)
+            summary = _string_or_none(spec.get("summary"))
+            if summary is None:
+                raise ValueError(
+                    f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} must define summary: {contract_path}"
+                )
+            required = spec.get("required")
+            if required is not None and not isinstance(required, bool):
+                raise ValueError(
+                    "ops.study.yaml preflight.checks."
+                    f"{phase_id} entry {check_id} must use boolean required: {contract_path}"
+                )
+
+            if kind in {"path_exists", "dataset_snapshot"}:
+                artifact = _string_or_none(spec.get("artifact"))
+                if artifact is None:
+                    raise ValueError(
+                        "ops.study.yaml preflight.checks."
+                        f"{phase_id} entry {check_id} must define artifact: {contract_path}"
+                    )
+                if artifact not in artifact_ids:
+                    raise ValueError(
+                        f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} references unknown artifact "
+                        f"{artifact!r}: {contract_path}"
+                    )
+            if kind == "dataset_snapshot":
+                target_rows = spec.get("target_rows")
+                if not isinstance(target_rows, int) or target_rows <= 0:
+                    raise ValueError(
+                        f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} must define positive integer "
+                        f"target_rows: {contract_path}"
+                    )
+            if kind in {"runbook_plan", "workspace_layout"}:
+                surface = _string_or_none(spec.get("surface"))
+                if surface is None:
+                    raise ValueError(
+                        "ops.study.yaml preflight.checks."
+                        f"{phase_id} entry {check_id} must define surface: {contract_path}"
+                    )
+                if surface not in execution_surface_ids:
+                    raise ValueError(
+                        f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} references unknown surface "
+                        f"{surface!r}: {contract_path}"
+                    )
+            if kind == "environment":
+                vars_payload = spec.get("vars")
+                vars_list = _string_sequence(
+                    vars_payload,
+                    label=f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} vars",
+                    source=contract_path,
+                )
+                spec["vars"] = list(vars_list)
+            if kind == "gpu_availability":
+                min_visible = spec.get("min_visible")
+                if not isinstance(min_visible, int) or min_visible <= 0:
+                    raise ValueError(
+                        f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} must define positive integer "
+                        f"min_visible: {contract_path}"
+                    )
+            if kind == "command":
+                argv_payload = spec.get("argv")
+                argv = _string_sequence(
+                    argv_payload,
+                    label=f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} argv",
+                    source=contract_path,
+                )
+                spec["argv"] = list(argv)
+            specs.append(spec)
+        resolved[phase_id] = tuple(specs)
+    return resolved
+
+
 def _validated_surface_ref(
     value: object,
     *,
@@ -282,6 +561,22 @@ def _validated_surface_ref(
         label=label,
     )
     return text
+
+
+def _validate_contract_path_ref(
+    value: str,
+    *,
+    repo_root: Path,
+    study_root: Path,
+    label: str,
+) -> None:
+    resolve_path_ref(
+        value,
+        repo_root=repo_root,
+        manifest_dir=study_root,
+        default_base="manifest",
+        label=label,
+    )
 
 
 def _discover_repo_root(study_root: Path) -> Path:

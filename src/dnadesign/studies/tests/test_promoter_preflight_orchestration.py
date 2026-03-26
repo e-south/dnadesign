@@ -20,7 +20,7 @@ from dnadesign.ops.preflight import (
     RunbookPlanCheckTarget,
     build_runbook_plan_checks,
 )
-from dnadesign.studies.promoter.preflight_orchestration import (
+from dnadesign.studies.families.promoter.preflight_orchestration import (
     build_promoter_preflight_notify_environment_checks,
     resolve_notify_environment_state,
 )

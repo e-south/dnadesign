@@ -53,6 +53,8 @@ class StudyPreflightContract:
     default_scope: StudyPreflightScope
     group_phase_bindings: dict[str, str] = field(default_factory=dict)
     next_scope: StudyPreflightNextScopeContract = field(default_factory=StudyPreflightNextScopeContract)
+    scope_payloads: dict[str, dict[str, object]] = field(default_factory=dict)
+    check_specs: dict[str, tuple[dict[str, object], ...]] = field(default_factory=dict)
 
     @property
     def known_groups(self) -> tuple[str, ...]:
@@ -93,6 +95,10 @@ class StudyOpsContract:
     phase_order: tuple[str, ...]
     snapshot_summary_scope: StudySummaryScope
     preflight: StudyPreflightContract
+    title: str | None = None
+    record_sources: dict[str, str] = field(default_factory=dict)
+    artifacts: dict[str, dict[str, object]] = field(default_factory=dict)
+    execution_surfaces: dict[str, dict[str, object]] = field(default_factory=dict)
     current_phase_id: str | None = None
     phases: tuple[StudyPhaseContract, ...] = ()
     raw_payload: dict[str, object] = field(default_factory=dict, repr=False)

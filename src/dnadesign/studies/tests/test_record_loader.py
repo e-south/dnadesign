@@ -21,17 +21,26 @@ from dnadesign.studies.core.record_loader import load_study_ops_contract
 
 def _base_payload() -> dict[str, object]:
     return {
-        "version": 1,
+        "version": 2,
         "study_id": "demo_study",
         "family": "promoter",
-        "current_phase": {
-            "strategy": "explicit",
-            "id": "densegen_growth",
+        "title": "Demo study",
+        "record_sources": {
+            "narrative_ref": "manifest:status.md",
+            "datasets_ref": "manifest:datasets.yaml",
+            "pipeline_ref": "manifest:pipeline.yaml",
+            "campaign_ref": "manifest:campaign.yaml",
         },
-        "phase_order": [
-            "densegen_growth",
-            "infer_batch_preparation",
-        ],
+        "lifecycle": {
+            "current_phase": {
+                "strategy": "explicit",
+                "id": "densegen_growth",
+            },
+            "phase_order": [
+                "densegen_growth",
+                "infer_batch_preparation",
+            ],
+        },
         "phases": [
             {
                 "id": "densegen_growth",
@@ -44,12 +53,42 @@ def _base_payload() -> dict[str, object]:
                 "next_surface": "repo:src/dnadesign/usr/docs/operations/promoter-study-preflight.md",
             },
         ],
+        "execution_surfaces": {
+            "densegen_batch": {
+                "surface_type": "runbook",
+                "runbook_ref": "repo:src/dnadesign/ops/runbooks/presets/demo.yaml",
+            }
+        },
         "snapshot": {"summary_scope": "repo"},
         "preflight": {
             "default_scope": "next",
+            "scopes": {
+                "next": {"include_phases": ["current_phase", "next_in_progress_phase"]},
+                "full": {"include_phases": ["all"]},
+            },
             "group_phase_bindings": {
                 "densegen": "densegen_growth",
                 "notify_environment": "infer_batch_preparation",
+            },
+            "checks": {
+                "densegen_growth": [
+                    {
+                        "kind": "runbook_plan",
+                        "check_id": "densegen.batch.plan",
+                        "summary": "DenseGen batch runbook renders cleanly.",
+                        "required": True,
+                        "surface": "densegen_batch",
+                    }
+                ],
+                "infer_batch_preparation": [
+                    {
+                        "kind": "environment",
+                        "check_id": "notify.environment.contract",
+                        "summary": "Notify environment variables are present.",
+                        "required": False,
+                        "vars": ["SLACK_WEBHOOK_URL", "SLACK_BOT_TOKEN"],
+                    }
+                ],
             },
             "next_scope": {
                 "target_phase_groups": {
@@ -66,7 +105,7 @@ def _base_payload() -> dict[str, object]:
 def _write_contract(tmp_path: Path, payload: dict[str, object]) -> Path:
     repo_root = tmp_path
     (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
-    study_root = repo_root / "docs" / "studies" / "promoter" / "demo_study"
+    study_root = repo_root / "docs" / "studies" / "demo_study"
     study_root.mkdir(parents=True, exist_ok=True)
     (study_root / "ops.study.yaml").write_text(
         yaml.safe_dump(payload, sort_keys=False),
@@ -135,4 +174,31 @@ def test_load_study_ops_contract_rejects_placeholder_next_surface(tmp_path: Path
     study_root = _write_contract(tmp_path, payload)
 
     with pytest.raises(ValueError, match="contains placeholder path text"):
+        load_study_ops_contract(study_root)
+
+
+def test_load_study_ops_contract_rejects_duplicate_preflight_check_ids(tmp_path: Path) -> None:
+    payload = _base_payload()
+    payload["preflight"]["checks"]["infer_batch_preparation"][0]["check_id"] = "densegen.batch.plan"
+    study_root = _write_contract(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="must not duplicate check_id"):
+        load_study_ops_contract(study_root)
+
+
+def test_load_study_ops_contract_rejects_unknown_preflight_surface_reference(tmp_path: Path) -> None:
+    payload = _base_payload()
+    payload["preflight"]["checks"]["densegen_growth"][0]["surface"] = "missing_surface"
+    study_root = _write_contract(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="references unknown surface 'missing_surface'"):
+        load_study_ops_contract(study_root)
+
+
+def test_load_study_ops_contract_rejects_environment_checks_without_vars(tmp_path: Path) -> None:
+    payload = _base_payload()
+    del payload["preflight"]["checks"]["infer_batch_preparation"][0]["vars"]
+    study_root = _write_contract(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="entry notify.environment.contract vars must be a list"):
         load_study_ops_contract(study_root)
