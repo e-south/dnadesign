@@ -17,11 +17,11 @@ from types import SimpleNamespace
 import pytest
 
 from dnadesign.ops.preflight import CommandExecution
-from dnadesign.studies.promoter.infer_runtime import (
+from dnadesign.studies.families.promoter.infer_runtime import (
     PromoterStudyInferRuntimeModelSummary,
     PromoterStudyInferRuntimeResolvedContext,
 )
-from dnadesign.studies.promoter.preflight_infer import (
+from dnadesign.studies.families.promoter.preflight_infer import (
     PromoterPreflightInferDependencies,
     build_promoter_preflight_infer_checks,
 )

@@ -15,13 +15,13 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from dnadesign.studies.core.models import StudyOpsContract, StudyPreflightContract, StudyStatusContext
-from dnadesign.studies.promoter.context import PromoterStudyResolvedContext
-from dnadesign.studies.promoter.family import PROMOTER_STUDY_ADAPTER, PromoterFamilyContext
-from dnadesign.studies.promoter.infer_runtime import (
+from dnadesign.studies.families.promoter.adapter import STUDY_FAMILY_ADAPTER, PromoterFamilyContext
+from dnadesign.studies.families.promoter.infer_runtime import (
     PromoterStudyInferRuntimeDependencies,
     PromoterStudyInferRuntimeResolvedContext,
 )
-from dnadesign.studies.promoter.snapshot import (
+from dnadesign.studies.families.promoter.record_normalizer import PromoterStudyResolvedContext
+from dnadesign.studies.families.promoter.snapshot import (
     PromoterStudyStatusDependencies,
     PromoterStudyStatusResolvedContext,
     build_promoter_study_status,
@@ -49,15 +49,15 @@ def _make_study_context(tmp_path: Path) -> PromoterStudyResolvedContext:
     return PromoterStudyResolvedContext(
         study_dir_exists=True,
         requested_study_dir=None,
-        resolved_study_dir=tmp_path / "docs" / "studies" / "promoter" / "demo_study",
+        resolved_study_dir=tmp_path / "docs" / "studies" / "demo_study",
         study_repo_root=tmp_path,
         study_id="demo_study",
         selection_source="active_registry",
-        registry_path=tmp_path / "docs" / "studies" / "promoter" / "index.yaml",
+        registry_path=tmp_path / "docs" / "studies" / "index.yaml",
         active_study="demo_study",
         required_paths={},
         missing_required_files=(),
-        pipeline_path=tmp_path / "docs" / "studies" / "promoter" / "demo_study" / "pipeline.yaml",
+        pipeline_path=tmp_path / "docs" / "studies" / "demo_study" / "pipeline.yaml",
         pipeline_present=True,
         datasets_entries=(),
         study_pipeline={
@@ -264,11 +264,11 @@ def test_promoter_snapshot_adapter_never_touches_local_gpu_probe(tmp_path: Path,
         raise AssertionError("cheap snapshot must not probe local GPU inventory")
 
     monkeypatch.setattr(
-        "dnadesign.studies.promoter.family.inspect_local_infer_gpu_inventory",
+        "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
         _forbidden_probe,
     )
     monkeypatch.setattr(
-        "dnadesign.studies.promoter.family.build_promoter_study_infer_runtime_dependencies",
+        "dnadesign.studies.families.promoter.adapter.build_promoter_study_infer_runtime_dependencies",
         lambda: PromoterStudyInferRuntimeDependencies(
             resolve_named_path_mapping=lambda value, *, repo_root, label, status_kind: {
                 name: Path(path) for name, path in dict(value or {}).items()
@@ -300,7 +300,7 @@ def test_promoter_snapshot_adapter_never_touches_local_gpu_probe(tmp_path: Path,
         ),
     )
 
-    state, summary, evidence = PROMOTER_STUDY_ADAPTER.build_snapshot(adapter_context)
+    state, summary, evidence = STUDY_FAMILY_ADAPTER.build_snapshot(adapter_context)
 
     assert state == "attention"
     assert "preferred infer evo2_20b" in summary

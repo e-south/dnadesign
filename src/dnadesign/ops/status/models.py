@@ -19,6 +19,9 @@ from typing import Literal
 _FIELD_TYPES = frozenset({"str", "path", "int", "bool", "enum"})
 _PATH_BASES = frozenset({"repo", "manifest", "cwd"})
 _STATUS_STATES = frozenset({"ok", "attention", "missing"})
+_STATUS_COST_CLASSES = frozenset({"cheap", "deep"})
+_STATUS_PLANES = frozenset({"control", "record", "execution_readiness", "data"})
+_STATUS_SUMMARY_SCOPES = frozenset({"repo", "workspace", "host", "cluster"})
 
 
 @dataclass(frozen=True)
@@ -97,6 +100,8 @@ class InputFieldSpec:
 class StatusKindSpec:
     status_kind: str
     provider_id: str
+    owner_boundary: str
+    observes_plane: Literal["control", "record", "execution_readiness", "data"]
     provider_ref: str
     description: str
     input_schema: tuple[InputFieldSpec, ...] = ()
@@ -108,14 +113,32 @@ class StatusKindSpec:
     def __post_init__(self) -> None:
         status_kind = str(self.status_kind or "").strip()
         provider_id = str(self.provider_id or "").strip()
+        owner_boundary = str(self.owner_boundary or "").strip()
         provider_ref = str(self.provider_ref or "").strip()
         if not status_kind:
             raise ValueError("status kind spec must define a non-empty status_kind")
         if not provider_id:
             raise ValueError(f"status kind spec {status_kind} must define a non-empty provider_id")
+        if not owner_boundary:
+            raise ValueError(f"status kind spec {status_kind} must define a non-empty owner_boundary")
         if not provider_ref or ":" not in provider_ref:
             raise ValueError(
                 f"status kind spec {status_kind} must define provider_ref as module:function, received {provider_ref!r}"
+            )
+        if self.observes_plane not in _STATUS_PLANES:
+            raise ValueError(
+                f"status kind spec {status_kind} has unsupported observes_plane {self.observes_plane!r}: "
+                f"{sorted(_STATUS_PLANES)}"
+            )
+        if self.cost_class not in _STATUS_COST_CLASSES:
+            raise ValueError(
+                f"status kind spec {status_kind} has unsupported cost_class {self.cost_class!r}: "
+                f"{sorted(_STATUS_COST_CLASSES)}"
+            )
+        if self.summary_scope not in _STATUS_SUMMARY_SCOPES:
+            raise ValueError(
+                f"status kind spec {status_kind} has unsupported summary_scope {self.summary_scope!r}: "
+                f"{sorted(_STATUS_SUMMARY_SCOPES)}"
             )
         seen_names: set[str] = set()
         for field_spec in self.input_schema:
@@ -135,6 +158,9 @@ class StatusKindSpec:
         return {
             "status_kind": self.status_kind,
             "provider_id": self.provider_id,
+            "owner_boundary": self.owner_boundary,
+            "observes_plane": self.observes_plane,
+            "provider_ref": self.provider_ref,
             "description": self.description,
             "required_inputs": [field.as_dict() for field in self.required_inputs],
             "optional_inputs": [
@@ -158,6 +184,10 @@ class ProcedureStatus:
     doc_path: str
     owner_boundary: str
     status_kind: str
+    observes_plane: str
+    surface_type: str
+    cost_class: str
+    summary_scope: str
     label: str | None
     state: str
     summary: str
@@ -174,6 +204,10 @@ class ProcedureStatus:
             "doc_path": self.doc_path,
             "owner_boundary": self.owner_boundary,
             "status_kind": self.status_kind,
+            "observes_plane": self.observes_plane,
+            "surface_type": self.surface_type,
+            "cost_class": self.cost_class,
+            "summary_scope": self.summary_scope,
             "label": self.label,
             "state": self.state,
             "summary": self.summary,
@@ -188,6 +222,10 @@ class CampaignScaffoldStep:
     doc_path: str
     owner_boundary: str
     status_kind: str
+    observes_plane: str
+    surface_type: str
+    cost_class: str
+    summary_scope: str
     label: str
     input_schema: tuple[InputFieldSpec, ...]
 
@@ -207,6 +245,10 @@ class CampaignScaffoldStep:
             "doc_path": self.doc_path,
             "owner_boundary": self.owner_boundary,
             "status_kind": self.status_kind,
+            "observes_plane": self.observes_plane,
+            "surface_type": self.surface_type,
+            "cost_class": self.cost_class,
+            "summary_scope": self.summary_scope,
             "label": self.label,
             "required_inputs": [field.as_dict() for field in self.input_schema if field.display_required],
             "optional_inputs": [

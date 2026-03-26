@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 
 from dnadesign.ops.preflight import CommandExecution
-from dnadesign.studies.promoter.preflight_upstream import (
+from dnadesign.studies.families.promoter.preflight_upstream import (
     PromoterPreflightUpstreamDependencies,
     build_promoter_preflight_upstream_checks,
 )

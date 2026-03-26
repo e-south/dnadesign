@@ -40,13 +40,13 @@ def test_parse_status_input_tokens_accepts_declared_flag_and_input_forms() -> No
     )
 
     resolved = parse_status_input_tokens(
-        extra_args=("--study-dir", "docs/studies/promoter/current"),
+        extra_args=("--study-dir", "docs/studies/current"),
         input_items=("scope=full",),
         input_schema=input_schema,
     )
 
     assert resolved == {
-        "study_dir": "docs/studies/promoter/current",
+        "study_dir": "docs/studies/current",
         "scope": "full",
     }
 

@@ -38,6 +38,7 @@ def build_procedure_status(
     default_path_base: PathBase | None = None,
 ) -> ProcedureStatus:
     entry = resolve_catalog_procedure_entry(catalog, registry_id)
+    spec = load_status_kind_spec(entry.status_kind)
     state, summary, evidence = run_status_kind(
         entry.status_kind,
         repo_root=catalog.repo_root,
@@ -51,6 +52,10 @@ def build_procedure_status(
         doc_path=entry.doc_path,
         owner_boundary=load_catalog_procedure_owner_boundary(catalog, entry),
         status_kind=entry.status_kind,
+        observes_plane=spec.observes_plane,
+        surface_type=spec.surface_type,
+        cost_class=spec.cost_class,
+        summary_scope=spec.summary_scope,
         label=None,
         state=state,
         summary=summary,
@@ -115,6 +120,10 @@ def load_campaign_status(catalog: RunbookCatalog, *, manifest_path: Path) -> Cam
                 doc_path=step.doc_path,
                 owner_boundary=step.owner_boundary,
                 status_kind=step.status_kind,
+                observes_plane=step.observes_plane,
+                surface_type=step.surface_type,
+                cost_class=step.cost_class,
+                summary_scope=step.summary_scope,
                 label=label,
                 state=step.state,
                 summary=step.summary,
@@ -157,6 +166,10 @@ def build_campaign_scaffold(
                 doc_path=entry.doc_path,
                 owner_boundary=load_catalog_procedure_owner_boundary(catalog, entry),
                 status_kind=spec.status_kind,
+                observes_plane=spec.observes_plane,
+                surface_type=spec.surface_type,
+                cost_class=spec.cost_class,
+                summary_scope=spec.summary_scope,
                 label=label,
                 input_schema=spec.input_schema,
             )

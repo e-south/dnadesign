@@ -22,7 +22,7 @@ from typer.testing import CliRunner
 
 from dnadesign.ops.cli import app
 from dnadesign.ops.preflight import CommandExecution
-from dnadesign.studies.promoter.ops_provider import (
+from dnadesign.studies.families.promoter.ops.provider import (
     provide_promoter_preflight,
     provide_promoter_status,
 )
@@ -55,6 +55,22 @@ def _promoter_study_preflight(
     if scope is not None:
         inputs["scope"] = scope
     return provide_promoter_preflight(repo_root=repo_root, inputs=inputs)
+
+
+def _write_study_index(index_path: Path) -> None:
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text(
+        (
+            "version: 1\n"
+            "active_study_id: demo_study\n"
+            "studies:\n"
+            "  - study_id: demo_study\n"
+            "    family: promoter\n"
+            "    title: Demo study\n"
+            "    record_root: docs/studies/demo_study\n"
+        ),
+        encoding="utf-8",
+    )
 
 
 def _write_ops_audit(path: Path, *, ok: bool, queue_probe: str | None = None) -> None:
@@ -165,19 +181,33 @@ def _write_promoter_ops_contract(
     path.write_text(
         yaml.safe_dump(
             {
-                "version": 1,
+                "version": 2,
                 "study_id": "demo_study",
                 "family": "promoter",
-                "current_phase": {
-                    "strategy": "explicit",
-                    "id": current_phase_id,
+                "title": "Demo study",
+                "record_sources": {
+                    "narrative_ref": "manifest:status.md",
+                    "datasets_ref": "manifest:datasets.yaml",
+                    "pipeline_ref": "manifest:pipeline.yaml",
+                    "campaign_ref": "manifest:campaign.yaml",
                 },
-                "phase_order": [str(phase["id"]) for phase in phase_rows],
+                "lifecycle": {
+                    "current_phase": {
+                        "strategy": "explicit",
+                        "id": current_phase_id,
+                    },
+                    "phase_order": [str(phase["id"]) for phase in phase_rows],
+                },
                 "phases": phase_rows,
                 "snapshot": {"summary_scope": "repo"},
                 "preflight": {
                     "default_scope": "next",
+                    "scopes": {
+                        "next": {"include_phases": ["current_phase", "next_in_progress_phase"]},
+                        "full": {"include_phases": ["all"]},
+                    },
                     "group_phase_bindings": group_phase_bindings,
+                    "checks": {phase_id: [] for phase_id in [str(phase["id"]) for phase in phase_rows]},
                     "next_scope": {
                         "target_phase_groups": target_phase_groups,
                         "runtime_phase_groups": ["infer", "notify", "infer_batch_plan"],
@@ -192,7 +222,7 @@ def _write_promoter_ops_contract(
 
 
 def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densegen_target: int) -> None:
-    repo_root = study_dir.parents[3]
+    repo_root = study_dir.parents[2]
     study_dir.mkdir(parents=True, exist_ok=True)
     (study_dir / "campaign.yaml").write_text("campaign_id: demo_study\nsteps: []\n", encoding="utf-8")
     (study_dir / "status.md").write_text("## demo_study\n\n- Current shared feature dataset: `n/a`\n", encoding="utf-8")
@@ -276,7 +306,7 @@ def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densege
 
 
 def _write_promoter_study_preflight_record(study_dir: Path) -> None:
-    repo_root = study_dir.parents[3]
+    repo_root = study_dir.parents[2]
     study_dir.mkdir(parents=True, exist_ok=True)
     (study_dir / "campaign.yaml").write_text("campaign_id: demo_study\nsteps: []\n", encoding="utf-8")
     (study_dir / "status.md").write_text("## demo_study\n\n- Current shared feature dataset: `n/a`\n", encoding="utf-8")
@@ -641,18 +671,9 @@ def test_cli_progress_show_reports_promoter_study_record_surface() -> None:
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
-        promoter_index.parent.mkdir(parents=True, exist_ok=True)
-        promoter_index.write_text(
-            (
-                "active_study: demo_study\n"
-                "studies:\n"
-                "  - study_id: demo_study\n"
-                "    path: docs/studies/promoter/demo_study\n"
-            ),
-            encoding="utf-8",
-        )
+        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(promoter_index)
         _write_promoter_study_record(study_dir, densegen_rows=2, densegen_target=5)
 
         result = runner.invoke(
@@ -690,18 +711,9 @@ def test_promoter_study_progress_discovers_active_study_from_repo_root() -> None
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
-        promoter_index.parent.mkdir(parents=True, exist_ok=True)
-        promoter_index.write_text(
-            (
-                "active_study: demo_study\n"
-                "studies:\n"
-                "  - study_id: demo_study\n"
-                "    path: docs/studies/promoter/demo_study\n"
-            ),
-            encoding="utf-8",
-        )
+        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(promoter_index)
         _write_promoter_study_record(study_dir, densegen_rows=2, densegen_target=5)
 
         state, summary, evidence = _promoter_study_status(None, repo_root=repo_root)
@@ -723,22 +735,13 @@ def test_promoter_study_progress_resolves_relative_study_dir_against_repo_root()
         repo_root.mkdir(parents=True, exist_ok=True)
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
-        promoter_index.parent.mkdir(parents=True, exist_ok=True)
-        promoter_index.write_text(
-            (
-                "active_study: demo_study\n"
-                "studies:\n"
-                "  - study_id: demo_study\n"
-                "    path: docs/studies/promoter/demo_study\n"
-            ),
-            encoding="utf-8",
-        )
+        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(promoter_index)
         _write_promoter_study_record(study_dir, densegen_rows=2, densegen_target=5)
 
         state, _, evidence = _promoter_study_status(
-            Path("docs/studies/promoter/demo_study"),
+            Path("docs/studies/demo_study"),
             repo_root=repo_root,
         )
 
@@ -752,18 +755,9 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
-        promoter_index.parent.mkdir(parents=True, exist_ok=True)
-        promoter_index.write_text(
-            (
-                "active_study: demo_study\n"
-                "studies:\n"
-                "  - study_id: demo_study\n"
-                "    path: docs/studies/promoter/demo_study\n"
-            ),
-            encoding="utf-8",
-        )
+        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(promoter_index)
         _write_promoter_study_preflight_record(study_dir)
 
         def _fake_run(argv, *, cwd, timeout_seconds=180):
@@ -821,9 +815,9 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.promoter.family.run_preflight_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.promoter.family.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -895,18 +889,9 @@ def test_promoter_study_preflight_skips_construct_runtime_revalidation_once_mate
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
-        promoter_index.parent.mkdir(parents=True, exist_ok=True)
-        promoter_index.write_text(
-            (
-                "active_study: demo_study\n"
-                "studies:\n"
-                "  - study_id: demo_study\n"
-                "    path: docs/studies/promoter/demo_study\n"
-            ),
-            encoding="utf-8",
-        )
+        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(promoter_index)
         _write_promoter_study_preflight_record(study_dir)
 
         def _fake_run(argv, *, cwd, timeout_seconds=180):
@@ -966,9 +951,9 @@ def test_promoter_study_preflight_skips_construct_runtime_revalidation_once_mate
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.promoter.family.run_preflight_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.promoter.family.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [{"id": 0, "name": "GPU"}], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -998,18 +983,9 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
-        promoter_index.parent.mkdir(parents=True, exist_ok=True)
-        promoter_index.write_text(
-            (
-                "active_study: demo_study\n"
-                "studies:\n"
-                "  - study_id: demo_study\n"
-                "    path: docs/studies/promoter/demo_study\n"
-            ),
-            encoding="utf-8",
-        )
+        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(promoter_index)
         _write_promoter_study_preflight_record(study_dir)
 
         def _fake_run(argv, *, cwd, timeout_seconds=180):
@@ -1067,9 +1043,9 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.promoter.family.run_preflight_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.promoter.family.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -1115,23 +1091,14 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
-        promoter_index.parent.mkdir(parents=True, exist_ok=True)
-        promoter_index.write_text(
-            (
-                "active_study: demo_study\n"
-                "studies:\n"
-                "  - study_id: demo_study\n"
-                "    path: docs/studies/promoter/demo_study\n"
-            ),
-            encoding="utf-8",
-        )
+        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(promoter_index)
         _write_promoter_study_preflight_record(study_dir)
 
         contract_path = study_dir / "ops.study.yaml"
         contract_payload = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
-        contract_payload["current_phase"]["id"] = "infer_anchor_only_20b"
+        contract_payload["lifecycle"]["current_phase"]["id"] = "infer_anchor_only_20b"
         for phase in contract_payload["phases"]:
             if phase["id"] == "infer_batch_preparation":
                 phase["status"] = "complete"
@@ -1194,9 +1161,9 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.promoter.family.run_preflight_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.promoter.family.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -1244,18 +1211,9 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
-        promoter_index.parent.mkdir(parents=True, exist_ok=True)
-        promoter_index.write_text(
-            (
-                "active_study: demo_study\n"
-                "studies:\n"
-                "  - study_id: demo_study\n"
-                "    path: docs/studies/promoter/demo_study\n"
-            ),
-            encoding="utf-8",
-        )
+        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(promoter_index)
         _write_promoter_study_preflight_record(study_dir)
 
         contract_path = study_dir / "ops.study.yaml"
@@ -1320,9 +1278,9 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.promoter.family.run_preflight_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.promoter.family.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -1368,18 +1326,9 @@ def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
         (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
-        study_dir = repo_root / "docs" / "studies" / "promoter" / "demo_study"
-        promoter_index = repo_root / "docs" / "studies" / "promoter" / "index.yaml"
-        promoter_index.parent.mkdir(parents=True, exist_ok=True)
-        promoter_index.write_text(
-            (
-                "active_study: demo_study\n"
-                "studies:\n"
-                "  - study_id: demo_study\n"
-                "    path: docs/studies/promoter/demo_study\n"
-            ),
-            encoding="utf-8",
-        )
+        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(promoter_index)
         _write_promoter_study_preflight_record(study_dir)
 
         def _fake_run(argv, *, cwd, timeout_seconds=180):
@@ -1415,9 +1364,9 @@ def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_
                 )
             raise AssertionError(f"unexpected command: {command}")
 
-        monkeypatch.setattr("dnadesign.studies.promoter.family.run_preflight_command", _fake_run)
+        monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.promoter.family.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
