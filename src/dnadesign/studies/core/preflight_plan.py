@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .models import StudyPreflightContract
 
@@ -26,6 +26,23 @@ class StudyPreflightPlan:
 
     def includes_group(self, group: str) -> bool:
         return str(group).strip() in self.included_groups
+
+
+@dataclass(frozen=True)
+class CompiledStudyPreflightCheck:
+    check_id: str
+    kind: str
+    check_group: str
+    phase_id: str
+    phase: str
+    summary: str
+    required: bool
+    payload: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class CompiledStudyPreflightExecutionPlan:
+    checks: tuple[CompiledStudyPreflightCheck, ...]
 
 
 def normalize_study_preflight_scope(scope: str | None, *, default_scope: str = "full") -> str:
@@ -82,6 +99,48 @@ def build_study_preflight_plan(
     raise ValueError(f"ops.study.yaml does not declare next-scope groups for phase {target_phase_id!r}")
 
 
+def compile_study_preflight_execution_plan(
+    *,
+    contract: StudyPreflightContract,
+    enabled_groups: Sequence[str],
+) -> CompiledStudyPreflightExecutionPlan:
+    enabled_group_set = {str(group).strip() for group in enabled_groups if str(group).strip()}
+    compiled_checks: list[CompiledStudyPreflightCheck] = []
+    for declared_phase_id, specs in contract.check_specs.items():
+        for spec in specs:
+            check_group = str(spec.get("check_group") or "").strip()
+            if not check_group or check_group not in enabled_group_set:
+                continue
+            kind = str(spec.get("kind") or "").strip()
+            phase = str(spec.get("phase") or "").strip()
+            if not phase:
+                if kind == "runbook_plan" or check_group.endswith("_plan"):
+                    phase = "ops"
+                elif kind == "scheduler_queue":
+                    phase = "scheduler"
+                elif check_group.startswith("notify"):
+                    phase = "notify"
+                else:
+                    phase = check_group or kind
+            compiled_checks.append(
+                CompiledStudyPreflightCheck(
+                    check_id=str(spec.get("check_id") or "").strip(),
+                    kind=kind,
+                    check_group=check_group,
+                    phase_id=str(spec.get("phase_id") or declared_phase_id).strip() or declared_phase_id,
+                    phase=phase,
+                    summary=str(spec.get("summary") or "").strip(),
+                    required=bool(spec.get("required", True)),
+                    payload={
+                        key: value
+                        for key, value in dict(spec).items()
+                        if key not in {"check_id", "kind", "check_group", "phase_id", "phase", "summary", "required"}
+                    },
+                )
+            )
+    return CompiledStudyPreflightExecutionPlan(checks=tuple(compiled_checks))
+
+
 def _target_phase_id(
     *,
     current_phase: str | None,
@@ -109,7 +168,10 @@ def _ordered_unique(groups: Sequence[str]) -> tuple[str, ...]:
 
 
 __all__ = [
+    "CompiledStudyPreflightCheck",
+    "CompiledStudyPreflightExecutionPlan",
     "StudyPreflightPlan",
     "build_study_preflight_plan",
+    "compile_study_preflight_execution_plan",
     "normalize_study_preflight_scope",
 ]

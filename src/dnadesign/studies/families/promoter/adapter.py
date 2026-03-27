@@ -18,10 +18,7 @@ from pathlib import Path
 
 from dnadesign.ops.catalog import discover_repo_root
 from dnadesign.ops.preflight import (
-    build_infer_notify_setup_command,
     choose_command_summary,
-    infer_usr_dataset_requirements,
-    load_orchestration_runbook_payload,
     run_preflight_command,
     safe_json_loads,
 )
@@ -34,7 +31,6 @@ from dnadesign.ops.status.parsing import (
 )
 from dnadesign.ops.status.paths import (
     required_path,
-    resolve_input_path,
     resolve_named_path_mapping,
     resolve_repo_relative_path,
 )
@@ -48,7 +44,6 @@ from .preflight import (
     build_promoter_preflight_progress,
     resolve_promoter_preflight_context,
 )
-from .preflight_orchestration import resolve_notify_environment_state
 from .record_normalizer import PromoterStudyContextDependencies, PromoterStudyResolvedContext
 from .record_normalizer import resolve_promoter_study_context as resolve_checked_in_promoter_study_context
 from .snapshot import (
@@ -152,35 +147,19 @@ class PromoterStudyFamilyAdapter(StudyFamilyAdapter):
             contract=context.contract,
             dependencies=PromoterPreflightContextDependencies(
                 infer_runtime=build_promoter_study_infer_runtime_dependencies(),
-                resolve_notify_environment_state=resolve_notify_environment_state,
                 environ=os.environ,
             ),
         )
-
-        validate_infer_config_contract = None
-        validate_infer_dry_run_contract = None
-        resolve_infer_usr_output_contract = None
-        if resolved_context.scope_plan.includes_group("infer") or resolved_context.scope_plan.includes_group("notify"):
-            from dnadesign.infer import validate_infer_config_contract, validate_infer_dry_run_contract
-            from dnadesign.infer.contracts import resolve_infer_usr_output_contract
 
         return build_promoter_preflight_progress(
             context=resolved_context,
             evidence=evidence,
             dependencies=PromoterPreflightCoordinatorDependencies(
-                load_orchestration_runbook_payload=load_orchestration_runbook_payload,
-                resolve_input_path=lambda path, base_dir: resolve_input_path(path, base_dir=base_dir),
                 run_preflight_command=run_preflight_command,
                 safe_json_loads=safe_json_loads,
                 choose_command_summary=choose_command_summary,
                 inspect_local_gpu_inventory=inspect_local_infer_gpu_inventory,
-                infer_usr_dataset_requirements=infer_usr_dataset_requirements,
-                build_infer_notify_setup_command=lambda config_path: build_infer_notify_setup_command(
-                    config_path=config_path
-                ),
-                validate_infer_config_contract=validate_infer_config_contract,
-                validate_infer_dry_run_contract=validate_infer_dry_run_contract,
-                resolve_infer_usr_output_contract=resolve_infer_usr_output_contract,
+                environ=os.environ,
             ),
         )
 

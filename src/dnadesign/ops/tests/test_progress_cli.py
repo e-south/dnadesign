@@ -154,6 +154,151 @@ def _write_promoter_ops_contract(
     phase_rows: list[dict[str, object]],
 ) -> None:
     phase_ids = {str(phase["id"]) for phase in phase_rows}
+    artifacts = {
+        "densegen_anchor_source": {
+            "artifact_type": "dataset",
+            "dataset_id": "densegen/demo_anchor",
+            "ref": "repo:usr_root/densegen/demo_anchor",
+        }
+    }
+    if {"merged_anchor_set", "construct_context_expansion", "infer_batch_preparation"} & phase_ids:
+        artifacts["merged_anchor_dataset"] = {
+            "artifact_type": "dataset",
+            "dataset_id": "promoter/demo_anchor_set",
+            "ref": "repo:usr_root/promoter/demo_anchor_set",
+        }
+    if {"construct_context_expansion", "infer_batch_preparation"} & phase_ids:
+        artifacts["construct_context_dataset"] = {
+            "artifact_type": "dataset",
+            "dataset_id": "promoter/demo_construct_contexts",
+            "ref": "repo:usr_root/promoter/demo_construct_contexts",
+        }
+
+    execution_surfaces: dict[str, dict[str, object]] = {}
+    if "construct_context_expansion" in phase_ids:
+        execution_surfaces["construct_workspace"] = {
+            "surface_type": "workspace",
+            "workspace_ref": "repo:workspace/construct",
+        }
+        execution_surfaces["construct_workspace_doctor"] = {
+            "surface_type": "command",
+            "argv": [
+                "uv",
+                "run",
+                "construct",
+                "workspace",
+                "doctor",
+                "--workspace",
+                "workspace/construct",
+            ],
+        }
+        execution_surfaces["construct_runtime_slot_a_window"] = {
+            "surface_type": "command",
+            "argv": [
+                "uv",
+                "run",
+                "construct",
+                "workspace",
+                "validate-project",
+                "--workspace",
+                "workspace/construct",
+                "--project",
+                "slot_a_window",
+                "--runtime",
+            ],
+        }
+    if "densegen_growth" in phase_ids:
+        execution_surfaces["densegen_batch"] = {
+            "surface_type": "runbook",
+            "runbook_ref": "repo:workspace/runbooks/densegen.yaml",
+        }
+        execution_surfaces["densegen_probe_solver"] = {
+            "surface_type": "command",
+            "argv": [
+                "uv",
+                "run",
+                "dense",
+                "validate-config",
+                "--probe-solver",
+                "-c",
+                "workspace/densegen/config.yaml",
+            ],
+        }
+    if {"infer_batch_preparation", "infer_anchor_only_20b", "infer_anchor_plus_template_20b"} & phase_ids:
+        execution_surfaces["infer_batch_20b_anchor_only"] = {
+            "surface_type": "runbook",
+            "runbook_ref": "repo:workspace/runbooks/infer_anchor_only_20b.yaml",
+        }
+        execution_surfaces["infer_batch_20b_anchor_plus_template"] = {
+            "surface_type": "runbook",
+            "runbook_ref": "repo:workspace/runbooks/infer_anchor_plus_template_20b.yaml",
+        }
+    if {"infer_batch_preparation", "infer_anchor_only_7b", "infer_anchor_plus_template_7b"} & phase_ids:
+        execution_surfaces["infer_batch_7b_anchor_only"] = {
+            "surface_type": "runbook",
+            "runbook_ref": "repo:workspace/runbooks/infer_anchor_only_7b.yaml",
+        }
+        execution_surfaces["infer_batch_7b_anchor_plus_template"] = {
+            "surface_type": "runbook",
+            "runbook_ref": "repo:workspace/runbooks/infer_anchor_plus_template_7b.yaml",
+        }
+    if {
+        "infer_batch_preparation",
+        "infer_anchor_only_20b",
+        "infer_anchor_plus_template_20b",
+        "infer_anchor_only_7b",
+        "infer_anchor_plus_template_7b",
+    } & phase_ids:
+        execution_surfaces["infer_workspace"] = {
+            "surface_type": "workspace",
+            "workspace_ref": "repo:workspace/infer",
+        }
+        execution_surfaces["scheduler_default"] = {
+            "surface_type": "scheduler",
+            "backend": "sge",
+        }
+        for config_label, config_path in (
+            ("anchor_only_20b", "workspace/infer/config.anchor_only.evo2_20b.yaml"),
+            ("anchor_plus_template_20b", "workspace/infer/config.anchor_plus_template.evo2_20b.yaml"),
+            ("anchor_only_7b", "workspace/infer/config.anchor_only.evo2_7b.yaml"),
+            ("anchor_plus_template_7b", "workspace/infer/config.anchor_plus_template.evo2_7b.yaml"),
+        ):
+            execution_surfaces[f"infer_validate_{config_label}"] = {
+                "surface_type": "command",
+                "argv": ["uv", "run", "infer", "validate", "config", "--config", config_path],
+            }
+            execution_surfaces[f"infer_dry_run_{config_label}"] = {
+                "surface_type": "command",
+                "argv": ["uv", "run", "infer", "run", "--config", config_path, "--dry-run"],
+            }
+            execution_surfaces[f"notify_profile_doctor_{config_label}"] = {
+                "surface_type": "command",
+                "argv": [
+                    "uv",
+                    "run",
+                    "notify",
+                    "profile",
+                    "doctor",
+                    "--profile",
+                    f"workspace/infer/outputs/notify/infer/{config_label}/profile.json",
+                    "--json",
+                ],
+            }
+            execution_surfaces[f"notify_resolve_events_{config_label}"] = {
+                "surface_type": "command",
+                "argv": [
+                    "uv",
+                    "run",
+                    "notify",
+                    "setup",
+                    "resolve-events",
+                    "--tool",
+                    "infer",
+                    "--config",
+                    config_path,
+                    "--json",
+                ],
+            }
     group_phase_bindings = {
         group: phase_id
         for group, phase_id in {
@@ -178,6 +323,219 @@ def _write_promoter_ops_contract(
         }.items()
         if phase_id in phase_ids
     }
+    checks = {phase_id: [] for phase_id in [str(phase["id"]) for phase in phase_rows]}
+    if "densegen_growth" in phase_ids:
+        checks["densegen_growth"] = [
+            {
+                "kind": "runbook_plan",
+                "check_id": "densegen.batch.plan",
+                "check_group": "densegen",
+                "summary": "DenseGen batch runbook renders cleanly.",
+                "required": True,
+                "surface": "densegen_batch",
+            },
+            {
+                "kind": "dataset_snapshot",
+                "check_id": "densegen.anchor.rows",
+                "check_group": "densegen",
+                "summary": "DenseGen anchor dataset row count is visible.",
+                "required": True,
+                "artifact": "densegen_anchor_source",
+                "target_rows": 2,
+            },
+            {
+                "kind": "command",
+                "check_id": "densegen.config.probe_solver",
+                "check_group": "densegen",
+                "summary": "DenseGen config probe completed.",
+                "required": True,
+                "surface": "densegen_probe_solver",
+            },
+        ]
+    if "construct_context_expansion" in phase_ids:
+        checks["construct_context_expansion"] = [
+            {
+                "kind": "path_exists",
+                "check_id": "construct.anchor.dataset",
+                "check_group": "construct",
+                "summary": "Merged anchor dataset is materialized.",
+                "required": True,
+                "artifact": "merged_anchor_dataset",
+            },
+            {
+                "kind": "workspace_layout",
+                "check_id": "construct.workspace.layout",
+                "check_group": "construct",
+                "summary": "Construct workspace root is present.",
+                "required": True,
+                "surface": "construct_workspace",
+            },
+            {
+                "kind": "command",
+                "check_id": "construct.workspace.doctor",
+                "check_group": "construct",
+                "summary": "Construct workspace doctor completed.",
+                "required": True,
+                "surface": "construct_workspace_doctor",
+            },
+            {
+                "kind": "command",
+                "check_id": "construct.runtime.slot_a_window",
+                "check_group": "construct",
+                "summary": "Construct runtime validation completed.",
+                "required": True,
+                "surface": "construct_runtime_slot_a_window",
+            },
+        ]
+    if "infer_batch_preparation" in phase_ids:
+        infer_checks: list[dict[str, object]] = [
+            {
+                "kind": "path_exists",
+                "check_id": "infer.construct.contexts",
+                "check_group": "infer",
+                "summary": "Construct contexts are present for infer.",
+                "required": True,
+                "artifact": "construct_context_dataset",
+            },
+            {
+                "kind": "workspace_layout",
+                "check_id": "infer.workspace.layout",
+                "check_group": "infer",
+                "summary": "Infer workspace root is present.",
+                "required": True,
+                "surface": "infer_workspace",
+            },
+            {
+                "kind": "environment",
+                "check_id": "notify.environment.webhook",
+                "check_group": "notify_environment",
+                "summary": "Batch notify secret is configured in the environment.",
+                "required": False,
+                "vars": ["NOTIFY_WEBHOOK", "NOTIFY_WEBHOOK_FILE"],
+                "match_mode": "any",
+            },
+            {
+                "kind": "environment",
+                "check_id": "notify.environment.tls",
+                "check_group": "notify_environment",
+                "summary": "SSL_CERT_FILE is configured for notify profile doctor and live delivery.",
+                "required": False,
+                "vars": ["SSL_CERT_FILE"],
+                "match_mode": "all",
+            },
+            {
+                "kind": "gpu_availability",
+                "check_id": "infer.local_gpu.visibility",
+                "check_group": "infer",
+                "summary": "At least one compatible GPU is visible on the current host.",
+                "required": False,
+                "min_visible": 1,
+            },
+        ]
+        for config_label, phase_id in (
+            ("anchor_only_20b", "infer_anchor_only_20b"),
+            ("anchor_plus_template_20b", "infer_anchor_plus_template_20b"),
+            ("anchor_only_7b", "infer_anchor_only_7b"),
+            ("anchor_plus_template_7b", "infer_anchor_plus_template_7b"),
+        ):
+            infer_checks.append(
+                {
+                    "kind": "command",
+                    "check_id": f"infer.validate.{config_label}",
+                    "check_group": "infer",
+                    "summary": "Infer config validation completed.",
+                    "required": True,
+                    "phase_id": phase_id,
+                    "surface": f"infer_validate_{config_label}",
+                }
+            )
+        for runtime_label, phase_id in (
+            ("anchor_only_20b", "infer_anchor_only_20b"),
+            ("anchor_plus_template_20b", "infer_anchor_plus_template_20b"),
+            ("anchor_only_7b", "infer_anchor_only_7b"),
+            ("anchor_plus_template_7b", "infer_anchor_plus_template_7b"),
+        ):
+            infer_checks.extend(
+                [
+                    {
+                        "kind": "command",
+                        "check_id": f"infer.dry_run.{runtime_label}",
+                        "check_group": "infer",
+                        "summary": "Infer dry-run completed.",
+                        "required": True,
+                        "phase_id": phase_id,
+                        "surface": f"infer_dry_run_{runtime_label}",
+                    },
+                    {
+                        "kind": "command",
+                        "check_id": f"notify.profile.{runtime_label}",
+                        "check_group": "notify",
+                        "summary": "Notify profile doctor completed.",
+                        "required": False,
+                        "phase_id": phase_id,
+                        "surface": f"notify_profile_doctor_{runtime_label}",
+                    },
+                    {
+                        "kind": "command",
+                        "check_id": f"notify.resolve_events.{runtime_label}",
+                        "check_group": "notify",
+                        "summary": "Notify events path resolved.",
+                        "required": False,
+                        "phase_id": phase_id,
+                        "surface": f"notify_resolve_events_{runtime_label}",
+                    },
+                ]
+            )
+        infer_checks.extend(
+            [
+                {
+                    "kind": "scheduler_queue",
+                    "check_id": "infer.batch.queue",
+                    "check_group": "infer_batch_plan",
+                    "summary": "Scheduler queue is below the declared submit threshold.",
+                    "required": False,
+                    "surface": "scheduler_default",
+                    "max_running_jobs": 3,
+                },
+                {
+                    "kind": "runbook_plan",
+                    "check_id": "infer.batch.20b.anchor_only.plan",
+                    "check_group": "infer_batch_plan",
+                    "phase_id": "infer_anchor_only_20b",
+                    "summary": "Anchor-only 20B infer runbook renders cleanly.",
+                    "required": False,
+                    "surface": "infer_batch_20b_anchor_only",
+                },
+                {
+                    "kind": "runbook_plan",
+                    "check_id": "infer.batch.20b.anchor_plus_template.plan",
+                    "check_group": "infer_batch_plan",
+                    "phase_id": "infer_anchor_plus_template_20b",
+                    "summary": "Anchor-plus-template 20B infer runbook renders cleanly.",
+                    "required": False,
+                    "surface": "infer_batch_20b_anchor_plus_template",
+                },
+                {
+                    "kind": "runbook_plan",
+                    "check_id": "infer.batch.7b.anchor_only.plan",
+                    "check_group": "infer_batch_plan",
+                    "phase_id": "infer_anchor_only_7b",
+                    "summary": "Anchor-only 7B infer runbook renders cleanly.",
+                    "required": False,
+                    "surface": "infer_batch_7b_anchor_only",
+                },
+                {
+                    "kind": "runbook_plan",
+                    "check_id": "infer.batch.7b.anchor_plus_template.plan",
+                    "check_group": "infer_batch_plan",
+                    "phase_id": "infer_anchor_plus_template_7b",
+                    "summary": "Anchor-plus-template 7B infer runbook renders cleanly.",
+                    "required": False,
+                    "surface": "infer_batch_7b_anchor_plus_template",
+                },
+            ]
+        )
+        checks["infer_batch_preparation"] = infer_checks
     path.write_text(
         yaml.safe_dump(
             {
@@ -191,6 +549,8 @@ def _write_promoter_ops_contract(
                     "pipeline_ref": "manifest:pipeline.yaml",
                     "campaign_ref": "manifest:campaign.yaml",
                 },
+                "artifacts": artifacts,
+                "execution_surfaces": execution_surfaces,
                 "lifecycle": {
                     "current_phase": {
                         "strategy": "explicit",
@@ -207,7 +567,7 @@ def _write_promoter_ops_contract(
                         "full": {"include_phases": ["all"]},
                     },
                     "group_phase_bindings": group_phase_bindings,
-                    "checks": {phase_id: [] for phase_id in [str(phase["id"]) for phase in phase_rows]},
+                    "checks": checks,
                     "next_scope": {
                         "target_phase_groups": target_phase_groups,
                         "runtime_phase_groups": ["infer", "notify", "infer_batch_plan"],
@@ -301,6 +661,24 @@ def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densege
             }
         )
         pq.write_table(table, dataset_dir / "records.parquet")
+    runbook_root = repo_root / "workspace" / "runbooks"
+    runbook_root.mkdir(parents=True, exist_ok=True)
+    (runbook_root / "densegen.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "runbook": {
+                    "workflow_id": "densegen_batch_with_notify",
+                    "densegen": {"config": "../densegen/config.yaml"},
+                    "resources": {"h_rt": "08:00:00", "pe_omp": 12},
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    densegen_workspace = repo_root / "workspace" / "densegen"
+    densegen_workspace.mkdir(parents=True, exist_ok=True)
+    (densegen_workspace / "config.yaml").write_text("solver:\n  backend: gurobi\n", encoding="utf-8")
     (repo_root / "workspace" / "construct").mkdir(parents=True, exist_ok=True)
     (repo_root / "workspace" / "infer").mkdir(parents=True, exist_ok=True)
 
@@ -511,27 +889,6 @@ def _write_promoter_study_preflight_record(study_dir: Path) -> None:
         )
 
 
-def _fake_infer_validation_contract(config_path: Path) -> SimpleNamespace:
-    dataset = "promoter/demo_construct_contexts" if "template" in config_path.name else "promoter/demo_anchor_set"
-    model_id = "evo2_20b" if "20b" in config_path.name else "evo2_7b"
-    return SimpleNamespace(
-        config_path=config_path,
-        model_id=model_id,
-        device="cuda:0",
-        job_ids=(config_path.stem,),
-        usr_datasets=(dataset,),
-    )
-
-
-def _fake_infer_usr_output_contract(repo_root: Path, *, config_path: Path) -> SimpleNamespace:
-    dataset = "promoter/demo_construct_contexts" if "template" in config_path.name else "promoter/demo_anchor_set"
-    return SimpleNamespace(
-        config_path=config_path,
-        usr_root=repo_root / "usr_root",
-        usr_dataset=dataset,
-    )
-
-
 def _write_cluster_index(root: Path) -> None:
     root.mkdir(parents=True, exist_ok=True)
     table = pa.table(
@@ -604,6 +961,10 @@ def test_cli_progress_show_reports_ops_audit_surface() -> None:
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["status_kind"] == "ops-audit-json"
+        assert payload["observes_plane"] == "control"
+        assert payload["surface_type"] == "orchestration_audit"
+        assert payload["cost_class"] == "cheap"
+        assert payload["summary_scope"] == "workspace"
         assert payload["state"] == "ok"
         assert payload["evidence"]["command_count"] == 2
         assert payload["evidence"]["phase_counts"] == {"preflight": 1, "submit": 1}
@@ -786,6 +1147,9 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
                     "",
                     False,
                 )
+            if "notify profile doctor" in command:
+                payload = {"ok": False, "error": "notify profile missing"}
+                return CommandExecution(tuple(argv), str(cwd), 1, json.dumps(payload), "", False)
             if "notify setup resolve-events" in command:
                 config_path = Path(argv[-2])
                 dataset = (
@@ -797,6 +1161,15 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
                     "policy": "infer",
                 }
                 return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "session-counts" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "queue_probe=ok running_jobs=1 queued_jobs=0 eqw_jobs=0",
+                    "",
+                    False,
+                )
             if "ops runbook plan" in command and "densegen" in command:
                 payload = {
                     "selected_mode": "resume",
@@ -833,19 +1206,6 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
                 output_on_conflict="error",
             ),
         )
-        monkeypatch.setattr(
-            "dnadesign.infer.validate_infer_config_contract",
-            lambda config_path: _fake_infer_validation_contract(config_path),
-        )
-        monkeypatch.setattr(
-            "dnadesign.infer.validate_infer_dry_run_contract",
-            lambda config_path: _fake_infer_validation_contract(config_path),
-        )
-        monkeypatch.setattr(
-            "dnadesign.infer.contracts.resolve_infer_usr_output_contract",
-            lambda config_path: _fake_infer_usr_output_contract(repo_root, config_path=config_path),
-        )
-
         state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
 
         assert state == "attention"
@@ -859,32 +1219,49 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
         checks = {check["id"]: check for check in evidence["checks"]}
         assert checks["notify.environment.webhook"]["state"] == "attention"
         assert checks["notify.environment.tls"]["state"] == "attention"
+        assert (
+            checks["notify.environment.webhook"]["summary"]
+            == "None of the accepted environment variables are configured: NOTIFY_WEBHOOK, NOTIFY_WEBHOOK_FILE."
+        )
+        assert (
+            checks["notify.environment.tls"]["summary"]
+            == "Required environment variable is not configured: SSL_CERT_FILE."
+        )
         assert checks["densegen.config.probe_solver"]["state"] == "attention"
         assert checks["densegen.batch.plan"]["state"] == "ok"
+        assert checks["densegen.batch.plan"]["summary"] == "DenseGen batch runbook renders cleanly."
         assert checks["construct.workspace.doctor"]["state"] == "ok"
         assert checks["construct.runtime.slot_a_window"]["state"] == "ok"
         assert checks["infer.validate.anchor_only_7b"]["state"] == "ok"
-        assert checks["infer.local_runtime.anchor_only_7b"]["state"] == "attention"
-        assert checks["infer.local_runtime.anchor_only_20b"]["state"] == "attention"
+        assert checks["infer.validate.anchor_only_7b"]["summary"] == "Infer config validation completed."
+        assert checks["infer.local_gpu.visibility"]["state"] == "attention"
+        assert checks["infer.local_gpu.visibility"]["kind"] == "gpu_availability"
         assert checks["notify.profile.anchor_only_7b"]["state"] == "attention"
         assert checks["notify.profile.anchor_only_20b"]["state"] == "attention"
-        assert checks["notify.profile.anchor_only_20b"]["details"]["profile"].endswith(
-            "workspace/infer/outputs/notify/infer/anchor_only_20b/profile.json"
+        assert checks["notify.profile.anchor_only_20b"]["surface_id"] == "notify_profile_doctor_anchor_only_20b"
+        assert checks["notify.profile.anchor_only_20b"]["summary"] == "notify profile missing"
+        assert checks["notify.profile.anchor_only_20b"]["command"].endswith(
+            "workspace/infer/outputs/notify/infer/anchor_only_20b/profile.json --json"
         )
-        assert "notify setup slack" in checks["notify.profile.anchor_only_7b"]["details"]["setup_command"]
-        assert "--profile" not in checks["notify.profile.anchor_only_7b"]["details"]["setup_command"]
+        assert "notify profile doctor" in checks["notify.profile.anchor_only_7b"]["command"]
         assert checks["infer.dry_run.anchor_only_7b"]["state"] == "ok"
         assert checks["infer.dry_run.anchor_only_20b"]["state"] == "ok"
+        assert checks["infer.dry_run.anchor_only_7b"]["summary"] == "Infer dry-run completed."
         assert checks["notify.resolve_events.anchor_only_7b"]["state"] == "ok"
         assert checks["notify.resolve_events.anchor_only_20b"]["state"] == "ok"
-        assert checks["ops.runbook_plan.infer_batch_7b_with_notify.anchor_only"]["state"] == "attention"
+        assert checks["notify.resolve_events.anchor_only_7b"]["summary"] == "Notify events path resolved."
+        assert checks["infer.batch.7b.anchor_only.plan"]["state"] == "attention"
+        assert (
+            checks["infer.batch.7b.anchor_only.plan"]["summary"]
+            == "notify webhook secret file is required for batch notify workflows"
+        )
         assert evidence["counts"]["ok"] >= 1
         assert evidence["counts"]["attention"] >= 1
         assert evidence["counts"]["missing"] == 0
         assert evidence["scope"] == "full"
 
 
-def test_promoter_study_preflight_skips_construct_runtime_revalidation_once_materialized(monkeypatch) -> None:
+def test_promoter_study_preflight_demotes_construct_runtime_attention_once_materialized(monkeypatch) -> None:
     with CliRunner().isolated_filesystem():
         repo_root = Path.cwd()
         (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
@@ -922,6 +1299,9 @@ def test_promoter_study_preflight_skips_construct_runtime_revalidation_once_mate
                     "",
                     False,
                 )
+            if "notify profile doctor" in command:
+                payload = {"ok": False, "error": "notify profile missing"}
+                return CommandExecution(tuple(argv), str(cwd), 1, json.dumps(payload), "", False)
             if "notify setup resolve-events" in command:
                 config_path = Path(argv[-2])
                 dataset = (
@@ -933,6 +1313,15 @@ def test_promoter_study_preflight_skips_construct_runtime_revalidation_once_mate
                     "policy": "infer",
                 }
                 return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "session-counts" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "queue_probe=ok running_jobs=1 queued_jobs=0 eqw_jobs=0",
+                    "",
+                    False,
+                )
             if "ops runbook plan" in command and "densegen" in command:
                 payload = {
                     "selected_mode": "resume",
@@ -956,26 +1345,14 @@ def test_promoter_study_preflight_skips_construct_runtime_revalidation_once_mate
             "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [{"id": 0, "name": "GPU"}], "probe_error": None},
         )
-        monkeypatch.setattr(
-            "dnadesign.infer.validate_infer_config_contract",
-            lambda config_path: _fake_infer_validation_contract(config_path),
-        )
-        monkeypatch.setattr(
-            "dnadesign.infer.validate_infer_dry_run_contract",
-            lambda config_path: _fake_infer_validation_contract(config_path),
-        )
-        monkeypatch.setattr(
-            "dnadesign.infer.contracts.resolve_infer_usr_output_contract",
-            lambda config_path: _fake_infer_usr_output_contract(repo_root, config_path=config_path),
-        )
         state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
 
         assert state == "attention"
         checks = {check["id"]: check for check in evidence["checks"]}
-        assert checks["construct.runtime.slot_a_window"]["state"] == "ok"
-        assert checks["construct.runtime.slot_a_window"]["details"]["skipped_runtime_revalidation"] is True
-        assert "skipping rerun runtime preflight" in checks["construct.runtime.slot_a_window"]["summary"]
+        assert checks["construct.runtime.slot_a_window"]["state"] == "attention"
+        assert "planned output id(s) already exist" in (checks["construct.runtime.slot_a_window"]["summary"])
         assert "construct.runtime.slot_a_window" not in evidence["blocked_by"]
+        assert "construct.runtime.slot_a_window" in evidence["nonblocking_attention_ids"]
 
 
 def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypatch) -> None:
@@ -1014,6 +1391,9 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
                     "",
                     False,
                 )
+            if "notify profile doctor" in command:
+                payload = {"ok": False, "error": "notify profile missing"}
+                return CommandExecution(tuple(argv), str(cwd), 1, json.dumps(payload), "", False)
             if "notify setup resolve-events" in command:
                 config_path = Path(argv[-2])
                 dataset = (
@@ -1025,6 +1405,15 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
                     "policy": "infer",
                 }
                 return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "session-counts" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "queue_probe=ok running_jobs=1 queued_jobs=0 eqw_jobs=0",
+                    "",
+                    False,
+                )
             if "ops runbook plan" in command and "densegen" in command:
                 payload = {
                     "selected_mode": "resume",
@@ -1061,28 +1450,17 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
                 output_on_conflict="error",
             ),
         )
-        monkeypatch.setattr(
-            "dnadesign.infer.validate_infer_config_contract",
-            lambda config_path: _fake_infer_validation_contract(config_path),
-        )
-        monkeypatch.setattr(
-            "dnadesign.infer.validate_infer_dry_run_contract",
-            lambda config_path: _fake_infer_validation_contract(config_path),
-        )
-        monkeypatch.setattr(
-            "dnadesign.infer.contracts.resolve_infer_usr_output_contract",
-            lambda config_path: _fake_infer_usr_output_contract(repo_root, config_path=config_path),
-        )
-
         state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="next")
 
         assert state == "attention"
         assert "focus phase infer_batch_preparation" in summary
-        assert "blocked by:" in summary
+        assert "ready with advisories:" in summary
         assert evidence["scope"] == "next"
         assert evidence["target_phase"] == "infer_batch_preparation"
-        assert "infer.local_runtime.anchor_only_20b" in evidence["blocked_by"]
-        assert "notify.environment.webhook" in evidence["blocked_by"]
+        assert evidence["blocked_by"] == []
+        assert "infer.local_gpu.visibility" in evidence["nonblocking_attention_ids"]
+        assert "notify.environment.webhook" in evidence["nonblocking_attention_ids"]
+        assert "infer.batch.20b.anchor_only.plan" in evidence["nonblocking_attention_ids"]
         assert evidence["deferred_check_ids"] == []
 
 
@@ -1132,6 +1510,9 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
                     "",
                     False,
                 )
+            if "notify profile doctor" in command:
+                payload = {"ok": False, "error": "notify profile missing"}
+                return CommandExecution(tuple(argv), str(cwd), 1, json.dumps(payload), "", False)
             if "notify setup resolve-events" in command:
                 config_path = Path(argv[-2])
                 dataset = (
@@ -1143,6 +1524,15 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
                     "policy": "infer",
                 }
                 return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "session-counts" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "queue_probe=ok running_jobs=1 queued_jobs=0 eqw_jobs=0",
+                    "",
+                    False,
+                )
             if "ops runbook plan" in command and "densegen" in command:
                 payload = {
                     "selected_mode": "resume",
@@ -1179,31 +1569,20 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
                 output_on_conflict="error",
             ),
         )
-        monkeypatch.setattr(
-            "dnadesign.infer.validate_infer_config_contract",
-            lambda config_path: _fake_infer_validation_contract(config_path),
-        )
-        monkeypatch.setattr(
-            "dnadesign.infer.validate_infer_dry_run_contract",
-            lambda config_path: _fake_infer_validation_contract(config_path),
-        )
-        monkeypatch.setattr(
-            "dnadesign.infer.contracts.resolve_infer_usr_output_contract",
-            lambda config_path: _fake_infer_usr_output_contract(repo_root, config_path=config_path),
-        )
-
         state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="next")
 
         assert state == "attention"
         assert "focus phase infer_anchor_only_20b" in summary
         assert evidence["target_phase"] == "infer_anchor_only_20b"
-        assert "notify.environment.webhook" in evidence["blocked_by"]
-        assert "notify.environment.tls" in evidence["blocked_by"]
-        assert "infer.local_runtime.anchor_only_20b" in evidence["blocked_by"]
-        assert "ops.runbook_plan.infer_batch_20b_with_notify.anchor_only" in evidence["blocked_by"]
-        assert "infer.local_runtime.anchor_only_7b" not in evidence["blocked_by"]
+        assert "ready with advisories:" in summary
+        assert evidence["blocked_by"] == []
+        assert "infer.local_gpu.visibility" not in evidence["blocked_by"]
+        assert "infer.batch.7b.anchor_only.plan" not in evidence["blocked_by"]
         assert "notify.profile.anchor_plus_template_20b" not in evidence["blocked_by"]
-        assert "infer.local_runtime.anchor_only_7b" in evidence["deferred_check_ids"]
+        assert "notify.environment.webhook" in evidence["nonblocking_attention_ids"]
+        assert "notify.environment.tls" in evidence["nonblocking_attention_ids"]
+        assert "infer.batch.20b.anchor_only.plan" in evidence["nonblocking_attention_ids"]
+        assert "notify.profile.anchor_only_20b" in evidence["nonblocking_attention_ids"]
 
 
 def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attention(monkeypatch) -> None:
@@ -1249,6 +1628,9 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
                     "",
                     False,
                 )
+            if "notify profile doctor" in command:
+                payload = {"ok": False, "error": "notify profile missing"}
+                return CommandExecution(tuple(argv), str(cwd), 1, json.dumps(payload), "", False)
             if "notify setup resolve-events" in command:
                 config_path = Path(argv[-2])
                 dataset = (
@@ -1260,6 +1642,15 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
                     "policy": "infer",
                 }
                 return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "session-counts" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "queue_probe=ok running_jobs=1 queued_jobs=0 eqw_jobs=0",
+                    "",
+                    False,
+                )
             if "ops runbook plan" in command and "densegen" in command:
                 payload = {
                     "selected_mode": "resume",
@@ -1296,29 +1687,16 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
                 output_on_conflict="error",
             ),
         )
-        monkeypatch.setattr(
-            "dnadesign.infer.validate_infer_config_contract",
-            lambda config_path: _fake_infer_validation_contract(config_path),
-        )
-        monkeypatch.setattr(
-            "dnadesign.infer.validate_infer_dry_run_contract",
-            lambda config_path: _fake_infer_validation_contract(config_path),
-        )
-        monkeypatch.setattr(
-            "dnadesign.infer.contracts.resolve_infer_usr_output_contract",
-            lambda config_path: _fake_infer_usr_output_contract(repo_root, config_path=config_path),
-        )
-
         state, _summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
 
         assert state == "attention"
-        assert "infer.local_runtime.anchor_only_20b" not in evidence["blocked_by"]
+        assert "infer.local_gpu.visibility" not in evidence["blocked_by"]
         assert "notify.profile.anchor_only_20b" not in evidence["blocked_by"]
-        assert "ops.runbook_plan.infer_batch_20b_with_notify.anchor_only" not in evidence["blocked_by"]
-        assert "infer.local_runtime.anchor_only_20b" in evidence["nonblocking_attention_ids"]
+        assert "infer.batch.20b.anchor_only.plan" not in evidence["blocked_by"]
+        assert "infer.local_gpu.visibility" in evidence["nonblocking_attention_ids"]
         assert "notify.profile.anchor_only_20b" in evidence["nonblocking_attention_ids"]
-        assert "ops.runbook_plan.infer_batch_20b_with_notify.anchor_only" in evidence["nonblocking_attention_ids"]
-        assert "infer.local_runtime.anchor_plus_template_20b" in evidence["blocked_by"]
+        assert "infer.batch.20b.anchor_only.plan" in evidence["nonblocking_attention_ids"]
+        assert evidence["blocked_by"] == []
 
 
 def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_attention(monkeypatch) -> None:
@@ -1346,6 +1724,40 @@ def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_
                     "",
                     False,
                 )
+            if "infer validate config" in command:
+                return CommandExecution(tuple(argv), str(cwd), 0, "✔ Config validated.", "", False)
+            if "infer run" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "✔ Config validated (dry run).",
+                    "",
+                    False,
+                )
+            if "notify profile doctor" in command:
+                payload = {"ok": False, "error": "notify profile missing"}
+                return CommandExecution(tuple(argv), str(cwd), 1, json.dumps(payload), "", False)
+            if "notify setup resolve-events" in command:
+                config_path = Path(argv[-2])
+                dataset = (
+                    "promoter/demo_construct_contexts" if "template" in config_path.name else "promoter/demo_anchor_set"
+                )
+                payload = {
+                    "ok": True,
+                    "events": str(repo_root / "usr_root" / dataset / ".events.log"),
+                    "policy": "infer",
+                }
+                return CommandExecution(tuple(argv), str(cwd), 0, json.dumps(payload), "", False)
+            if "session-counts" in command:
+                return CommandExecution(
+                    tuple(argv),
+                    str(cwd),
+                    0,
+                    "queue_probe=ok running_jobs=1 queued_jobs=0 eqw_jobs=0",
+                    "",
+                    False,
+                )
             if "ops runbook plan" in command and "densegen" in command:
                 payload = {
                     "selected_mode": "resume",
@@ -1382,25 +1794,13 @@ def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_
                 output_on_conflict="error",
             ),
         )
-        monkeypatch.setattr(
-            "dnadesign.infer.validate_infer_config_contract",
-            lambda config_path: _fake_infer_validation_contract(config_path),
-        )
-        monkeypatch.setattr(
-            "dnadesign.infer.validate_infer_dry_run_contract",
-            lambda config_path: _fake_infer_validation_contract(config_path),
-        )
-        monkeypatch.setattr(
-            "dnadesign.infer.contracts.resolve_infer_usr_output_contract",
-            lambda config_path: _fake_infer_usr_output_contract(repo_root, config_path=config_path),
-        )
-
         state, summary, evidence = _promoter_study_preflight(None, repo_root=repo_root, scope="full")
 
         assert state == "attention"
         assert "densegen.config.probe_solver" not in evidence["blocked_by"]
         assert "densegen.config.probe_solver" in evidence["nonblocking_attention_ids"]
-        assert "infer.local_runtime.anchor_only_20b" in evidence["blocked_by"]
+        assert "infer.local_gpu.visibility" in evidence["nonblocking_attention_ids"]
+        assert evidence["blocked_by"] == []
 
 
 def test_cli_progress_show_reports_cluster_run_index_surface() -> None:
@@ -2084,6 +2484,10 @@ def test_cli_progress_explain_reports_required_inputs_and_next_commands() -> Non
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["status_kind"] == "opal-campaign-state"
+    assert payload["observes_plane"] == "control"
+    assert payload["surface_type"] == "campaign_snapshot"
+    assert payload["cost_class"] == "cheap"
+    assert payload["summary_scope"] == "workspace"
     assert payload["provider_id"] == "builtin.opal"
     assert payload["required_inputs"] == [
         {
@@ -2114,6 +2518,27 @@ def test_cli_progress_explain_reports_required_inputs_and_next_commands() -> Non
     ]
 
 
+def test_cli_progress_explain_text_reports_status_ontology() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "progress",
+            "explain",
+            "opal.downstream.usr-infer-x-active-learning",
+            "--repo-root",
+            str(_repo_root()),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Observes plane: control" in result.output
+    assert "Surface type: campaign_snapshot" in result.output
+    assert "Cost class: cheap" in result.output
+    assert "Summary scope: workspace" in result.output
+
+
 def test_cli_status_kinds_reports_provider_owned_inventory() -> None:
     runner = CliRunner()
 
@@ -2129,6 +2554,10 @@ def test_cli_status_kinds_reports_provider_owned_inventory() -> None:
     assert result.exit_code == 0
     payload = json.loads(result.output)
     kinds = {entry["status_kind"]: entry for entry in payload["status_kinds"]}
+    assert kinds["promoter-study-preflight"]["observes_plane"] == "execution_readiness"
+    assert kinds["promoter-study-preflight"]["surface_type"] == "study_preflight"
+    assert kinds["promoter-study-preflight"]["cost_class"] == "deep"
+    assert kinds["promoter-study-preflight"]["summary_scope"] == "host"
     assert kinds["promoter-study-preflight"]["provider_id"] == "study.promoter"
     assert kinds["promoter-study-preflight"]["optional_inputs"] == [
         {

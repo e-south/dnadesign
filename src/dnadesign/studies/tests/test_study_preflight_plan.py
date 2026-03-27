@@ -104,6 +104,7 @@ def test_evaluate_study_preflight_checks_defers_downstream_lane_blockers_in_next
     checks = [
         build_state_check(
             check_id="notify.environment.webhook",
+            required=False,
             check_group="notify_environment",
             phase="notify",
             phase_id="infer_batch_preparation",
@@ -152,7 +153,7 @@ def test_evaluate_study_preflight_checks_defers_downstream_lane_blockers_in_next
 
     assert evaluation.blocked_by_ids == (
         "infer.local_runtime.anchor_only_20b",
-        "notify.environment.webhook",
         "ops.runbook_plan.infer_batch_20b_with_notify.anchor_only",
     )
     assert evaluation.deferred_check_ids == ("infer.local_runtime.anchor_only_7b",)
+    assert evaluation.nonblocking_attention_ids == ("notify.environment.webhook",)

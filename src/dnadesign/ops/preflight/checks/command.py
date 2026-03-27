@@ -36,6 +36,8 @@ def build_command_checks(
         checks.append(
             build_command_check(
                 check_id=target.check_id,
+                kind="command",
+                required=target.required,
                 check_group=target.check_group,
                 phase=target.phase,
                 phase_id=target.phase_id,
@@ -44,6 +46,7 @@ def build_command_checks(
                     fallback=target.fallback_summary,
                 ),
                 execution=execution,
+                surface_id=target.surface_id,
                 details=dict(target.details or {}),
             )
         )

@@ -44,7 +44,9 @@ app = typer.Typer(
     help=(
         "Status inspection, status explanation, and manifest scaffold commands "
         "for registered runbooks and explicit campaigns. "
-        "Start with `ops progress kinds` or `ops progress explain <registry-id>`. "
+        "Start with `ops catalog list --simple` for public routes, then use "
+        "`ops progress explain <registry-id>` or `ops progress kinds` for the "
+        "underlying status-kind inventory. "
         "`show` and `campaign` are read-only; `scaffold` prints YAML unless `--out` is used."
     )
 )
@@ -158,6 +160,10 @@ def _emit_progress_show_text(*, repo_root: Path, catalog_path: Path, result: Pro
         f"Doc: {doc_path}",
         f"Owner boundary: {result.owner_boundary}",
         f"Status kind: {result.status_kind}",
+        f"Observes plane: {result.observes_plane}",
+        f"Surface type: {result.surface_type}",
+        f"Cost class: {result.cost_class}",
+        f"Summary scope: {result.summary_scope}",
         f"State: {result.state}",
         f"Summary: {result.summary}",
         "Evidence:",
@@ -200,6 +206,10 @@ def _emit_progress_explain_text(
         ),
         f"Owner boundary: {owner_boundary}",
         f"Status kind: {entry.status_kind}",
+        f"Observes plane: {spec.observes_plane}",
+        f"Surface type: {spec.surface_type}",
+        f"Cost class: {spec.cost_class}",
+        f"Summary scope: {spec.summary_scope}",
         f"Provider: {spec.provider_id}",
         f"What this status reads: {spec.description}",
         "Required inputs:",
@@ -257,6 +267,10 @@ def _emit_progress_explain_json(
         ),
         "owner_boundary": owner_boundary,
         "status_kind": entry.status_kind,
+        "observes_plane": spec.observes_plane,
+        "surface_type": spec.surface_type,
+        "cost_class": spec.cost_class,
+        "summary_scope": spec.summary_scope,
         "provider_id": spec.provider_id,
         "description": spec.description,
         "required_inputs": [field.as_dict() for field in required_inputs],
@@ -279,10 +293,20 @@ def _emit_progress_explain_json(
 
 
 def _emit_status_kinds_text() -> None:
-    lines = ["Status kinds"]
+    lines = [
+        "Status kinds",
+        "Use `ops catalog list --simple` for the public registry routes that rely on these underlying status kinds.",
+    ]
     for spec in _list_status_kind_specs():
         lines.append(f"- {spec.status_kind} [{spec.provider_id}]")
         lines.append(f"  {spec.description}")
+        lines.append(
+            "  Ontology: "
+            f"plane={spec.observes_plane} "
+            f"surface={spec.surface_type} "
+            f"scope={spec.summary_scope} "
+            f"cost={spec.cost_class}"
+        )
         if spec.required_inputs:
             rendered_required = ", ".join(f"{field.cli_flag} {field.placeholder}" for field in spec.required_inputs)
             lines.append(f"  Required inputs: {rendered_required}")

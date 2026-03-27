@@ -14,6 +14,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+from dnadesign.ops.preflight import CommandExecution
+from dnadesign.ops.preflight.models import supported_preflight_check_kinds
 from dnadesign.studies.core.models import (
     StudyOpsContract,
     StudyPhaseContract,
@@ -23,6 +25,9 @@ from dnadesign.studies.core.models import (
 from dnadesign.studies.families.promoter.infer_runtime import PromoterStudyInferRuntimeDependencies
 from dnadesign.studies.families.promoter.preflight import (
     PromoterPreflightContextDependencies,
+    PromoterPreflightCoordinatorDependencies,
+    PromoterPreflightResolvedContext,
+    build_promoter_preflight_progress,
     resolve_promoter_preflight_context,
 )
 from dnadesign.studies.families.promoter.record_normalizer import PromoterStudyResolvedContext
@@ -44,7 +49,18 @@ def _string_list_or_empty(value: object) -> list[str]:
     return result
 
 
-def test_resolve_promoter_preflight_context_projects_infer_batch_targets_in_phase_order(tmp_path: Path) -> None:
+def _execution(argv: tuple[str, ...], cwd: Path, *, returncode: int, stdout: str = "", stderr: str = "") -> object:
+    return CommandExecution(
+        argv=argv,
+        cwd=str(cwd),
+        returncode=returncode,
+        stdout=stdout,
+        stderr=stderr,
+        timed_out=False,
+    )
+
+
+def test_resolve_promoter_preflight_context_uses_contract_scope_groups_and_runtime_lane_order(tmp_path: Path) -> None:
     study_repo_root = tmp_path
     infer_configs = {
         "anchor_only_20b": tmp_path / "config.anchor_only.evo2_20b.yaml",
@@ -144,7 +160,7 @@ def test_resolve_promoter_preflight_context_projects_infer_batch_targets_in_phas
 
     resolved = resolve_promoter_preflight_context(
         study_context=study_context,
-        scope="full",
+        scope="next",
         status_kind="promoter-study-preflight",
         contract=StudyOpsContract(
             study_id="demo_study",
@@ -218,27 +234,261 @@ def test_resolve_promoter_preflight_context_projects_infer_batch_targets_in_phas
                 string_or_none=_string_or_none,
                 string_list_or_empty=_string_list_or_empty,
             ),
-            resolve_notify_environment_state=lambda *, environ: {
-                "NOTIFY_WEBHOOK": bool(environ.get("NOTIFY_WEBHOOK")),
-                "NOTIFY_WEBHOOK_FILE": bool(environ.get("NOTIFY_WEBHOOK_FILE")),
-                "SSL_CERT_FILE": bool(environ.get("SSL_CERT_FILE")),
-            },
             environ={},
         ),
     )
 
-    assert [target.check_id for target in resolved.infer_batch_targets] == [
-        "ops.runbook_plan.infer_batch_20b_with_notify.anchor_only",
-        "ops.runbook_plan.infer_batch_20b_with_notify.anchor_plus_template",
-        "ops.runbook_plan.infer_batch_7b_with_notify.anchor_only",
-    ]
-    assert [target.phase_id for target in resolved.infer_batch_targets] == [
+    assert resolved.scope_plan.scope == "next"
+    assert resolved.scope_plan.target_phase_id == "infer_batch_preparation"
+    assert resolved.scope_plan.included_groups == (
+        "infer",
+        "notify_environment",
+        "notify",
+        "infer_batch_plan",
+    )
+    assert tuple(resolved.infer_phase_targets) == (
         "infer_anchor_only_20b",
         "infer_anchor_plus_template_20b",
         "infer_anchor_only_7b",
+    )
+
+
+def test_build_promoter_preflight_progress_uses_only_contract_declared_generic_checks(tmp_path: Path) -> None:
+    runbook_path = tmp_path / "runbooks" / "densegen.yaml"
+    commands: list[tuple[str, ...]] = []
+    contract = StudyOpsContract(
+        study_id="demo_study",
+        family="promoter",
+        phase_order=("densegen_growth", "infer_batch_preparation"),
+        snapshot_summary_scope="repo",
+        execution_surfaces={
+            "densegen_batch": {
+                "surface_type": "runbook",
+                "runbook_ref": "repo:runbooks/densegen.yaml",
+            },
+            "scheduler_default": {
+                "surface_type": "scheduler",
+                "backend": "sge",
+            },
+        },
+        preflight=StudyPreflightContract(
+            default_scope="next",
+            group_phase_bindings={
+                "densegen": "densegen_growth",
+                "infer_batch_plan": "infer_batch_preparation",
+            },
+            next_scope=StudyPreflightNextScopeContract(
+                target_phase_groups={"densegen_growth": ("densegen",)},
+                runtime_phase_groups=("infer_batch_plan",),
+                runtime_shared_groups=(),
+            ),
+            check_specs={
+                "densegen_growth": (
+                    {
+                        "kind": "runbook_plan",
+                        "check_id": "densegen.batch.plan",
+                        "check_group": "densegen",
+                        "summary": "DenseGen batch runbook renders cleanly.",
+                        "required": True,
+                        "surface": "densegen_batch",
+                    },
+                    {
+                        "kind": "scheduler_queue",
+                        "check_id": "densegen.batch.queue",
+                        "check_group": "densegen",
+                        "summary": "Scheduler queue is below the DenseGen submit threshold.",
+                        "required": False,
+                        "surface": "scheduler_default",
+                        "max_running_jobs": 3,
+                    },
+                )
+            },
+        ),
+        current_phase_id="densegen_growth",
+        phases=(
+            StudyPhaseContract(id="densegen_growth", status="in_progress"),
+            StudyPhaseContract(id="infer_batch_preparation", status="planned"),
+        ),
+        raw_payload={},
+    )
+
+    def _run_progress_command(argv, *, cwd, timeout_seconds=180):
+        del timeout_seconds
+        commands.append(tuple(argv))
+        if tuple(argv[:5]) == ("uv", "run", "ops", "runbook", "plan"):
+            return _execution(tuple(argv), cwd, returncode=0, stdout='{"selected_mode":"resume"}')
+        if tuple(argv[:7]) == (
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "dnadesign.ops.orchestrator.gates",
+            "session-counts",
+            "--allow-missing-qstat",
+        ):
+            return _execution(
+                tuple(argv),
+                cwd,
+                returncode=0,
+                stdout="queue_probe=ok running_jobs=1 queued_jobs=0 eqw_jobs=0",
+            )
+        raise AssertionError(f"unexpected command: {' '.join(argv)}")
+
+    state, _summary, evidence = build_promoter_preflight_progress(
+        context=PromoterPreflightResolvedContext(
+            contract=contract,
+            study_id="demo_study",
+            study_repo_root=tmp_path,
+            resolved_study_dir=tmp_path / "docs" / "studies" / "demo_study",
+            study_pipeline={},
+            execution_surface_index={"densegen_batch": runbook_path},
+            dataset_index={},
+            phase_states=tuple(phase.as_dict() for phase in contract.phases),
+            current_phase="densegen_growth",
+            next_ready_phase=None,
+            infer_runtime=SimpleNamespace(
+                preferred_model_family=None,
+                supported_model_families=(),
+                infer_notify_profile_paths={},
+                infer_notify_profile_errors={},
+            ),
+            infer_phase_targets={},
+            scope_plan=SimpleNamespace(
+                scope="next",
+                target_phase_id="densegen_growth",
+                included_groups=("densegen",),
+                phase_scoped_groups=(),
+            ),
+        ),
+        evidence={},
+        dependencies=PromoterPreflightCoordinatorDependencies(
+            run_preflight_command=_run_progress_command,
+            safe_json_loads=lambda text: {"selected_mode": "resume"} if text else None,
+            choose_command_summary=lambda *_args, fallback, **_kwargs: fallback,
+            inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},
+            environ={},
+        ),
+    )
+
+    check_ids = [check["id"] for check in evidence["checks"]]
+    check_kinds = {check["kind"] for check in evidence["checks"]}
+
+    assert state == "ok"
+    assert check_ids == ["densegen.batch.plan", "densegen.batch.queue"]
+    assert check_kinds <= set(supported_preflight_check_kinds())
+    assert commands == [
+        (
+            "uv",
+            "run",
+            "ops",
+            "runbook",
+            "plan",
+            "--runbook",
+            str(runbook_path),
+            "--repo-root",
+            str(tmp_path),
+        ),
+        (
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "dnadesign.ops.orchestrator.gates",
+            "session-counts",
+            "--allow-missing-qstat",
+        ),
     ]
-    assert [str(target.runbook_path.name) for target in resolved.infer_batch_targets] == [
-        "anchor_only_20b.yaml",
-        "anchor_plus_template_20b.yaml",
-        "anchor_only_7b.yaml",
+
+
+def test_build_promoter_preflight_progress_resolves_command_cwd_from_resolved_study_dir(tmp_path: Path) -> None:
+    commands: list[tuple[tuple[str, ...], str]] = []
+    resolved_study_dir = tmp_path / "study-records" / "demo_study"
+    (resolved_study_dir / "workspace").mkdir(parents=True, exist_ok=True)
+    contract = StudyOpsContract(
+        study_id="demo_study",
+        family="promoter",
+        phase_order=("infer_batch_preparation",),
+        snapshot_summary_scope="repo",
+        execution_surfaces={
+            "study_scoped_probe": {
+                "surface_type": "command",
+                "argv": ["uv", "run", "python", "-c", "print('ok')"],
+                "cwd_ref": "manifest:workspace",
+            },
+        },
+        preflight=StudyPreflightContract(
+            default_scope="next",
+            group_phase_bindings={"infer": "infer_batch_preparation"},
+            next_scope=StudyPreflightNextScopeContract(
+                target_phase_groups={"infer_batch_preparation": ("infer",)},
+                runtime_phase_groups=(),
+                runtime_shared_groups=(),
+            ),
+            check_specs={
+                "infer_batch_preparation": (
+                    {
+                        "kind": "command",
+                        "check_id": "study.scoped.probe",
+                        "check_group": "infer",
+                        "summary": "Study-scoped probe completed.",
+                        "required": True,
+                        "surface": "study_scoped_probe",
+                    },
+                )
+            },
+        ),
+        current_phase_id="infer_batch_preparation",
+        phases=(StudyPhaseContract(id="infer_batch_preparation", status="in_progress"),),
+        raw_payload={},
+    )
+
+    def _run_progress_command(argv, *, cwd, timeout_seconds=180):
+        del timeout_seconds
+        commands.append((tuple(argv), str(cwd)))
+        return _execution(tuple(argv), cwd, returncode=0, stdout="probe ok")
+
+    state, _summary, evidence = build_promoter_preflight_progress(
+        context=PromoterPreflightResolvedContext(
+            contract=contract,
+            study_id="demo_study",
+            study_repo_root=tmp_path,
+            resolved_study_dir=resolved_study_dir,
+            study_pipeline={},
+            execution_surface_index={},
+            dataset_index={},
+            phase_states=tuple(phase.as_dict() for phase in contract.phases),
+            current_phase="infer_batch_preparation",
+            next_ready_phase=None,
+            infer_runtime=SimpleNamespace(
+                preferred_model_family=None,
+                supported_model_families=(),
+                infer_notify_profile_paths={},
+                infer_notify_profile_errors={},
+            ),
+            infer_phase_targets={},
+            scope_plan=SimpleNamespace(
+                scope="next",
+                target_phase_id="infer_batch_preparation",
+                included_groups=("infer",),
+                phase_scoped_groups=(),
+            ),
+        ),
+        evidence={},
+        dependencies=PromoterPreflightCoordinatorDependencies(
+            run_preflight_command=_run_progress_command,
+            safe_json_loads=lambda text: {"ok": True} if text else None,
+            choose_command_summary=lambda *_args, fallback, **_kwargs: fallback,
+            inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},
+            environ={},
+        ),
+    )
+
+    assert state == "ok"
+    assert commands == [
+        (
+            ("uv", "run", "python", "-c", "print('ok')"),
+            str(resolved_study_dir / "workspace"),
+        )
     ]
+    checks = {check["id"]: check for check in evidence["checks"]}
+    assert checks["study.scoped.probe"]["cwd"] == str(resolved_study_dir / "workspace")

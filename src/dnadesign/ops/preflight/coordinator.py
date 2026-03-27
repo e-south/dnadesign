@@ -57,18 +57,20 @@ def evaluate_preflight_checks(
     scope_plan: PreflightScopePlan,
 ) -> PreflightCheckEvaluation:
     scoped_checks = tuple(check for check in checks if check_matches_scope(check, scope_plan=scope_plan))
+    phase_status_index = _phase_status_index(phase_states)
     scoped_counts = _counts_by_state(scoped_checks)
     all_counts = _counts_by_state(checks)
-    blocker_checks = _ordered_preflight_blockers(scoped_checks, phase_states=phase_states, scope=scope_plan.scope)
+    blocker_checks = _ordered_preflight_blockers(
+        scoped_checks,
+        phase_status_index=phase_status_index,
+    )
     deferred_blockers = _ordered_preflight_blockers(
         [check for check in checks if check not in scoped_checks],
-        phase_states=phase_states,
-        scope=scope_plan.scope,
+        phase_status_index=phase_status_index,
     )
     nonblocking_attention_checks = _ordered_nonblocking_preflight_attention(
         scoped_checks,
-        phase_states=phase_states,
-        scope=scope_plan.scope,
+        phase_status_index=phase_status_index,
     )
     effective_counts = scoped_counts if scope_plan.scope == "next" else all_counts
     return PreflightCheckEvaluation(
@@ -106,15 +108,10 @@ def _counts_by_state(checks: Sequence[PreflightCheck]) -> dict[str, int]:
 def _ordered_preflight_blockers(
     checks: Sequence[PreflightCheck],
     *,
-    phase_states: Sequence[Mapping[str, object]] | None,
-    scope: str,
+    phase_status_index: Mapping[str, str],
 ) -> tuple[PreflightCheck, ...]:
     failing = [check for check in checks if check.state != "ok"]
-    if scope == "full":
-        phase_status_index = _phase_status_index(phase_states)
-        failing = [
-            check for check in failing if _preflight_check_is_blocking(check, phase_status_index=phase_status_index)
-        ]
+    failing = [check for check in failing if _preflight_check_is_blocking(check, phase_status_index=phase_status_index)]
     return tuple(
         sorted(
             failing,
@@ -129,12 +126,8 @@ def _ordered_preflight_blockers(
 def _ordered_nonblocking_preflight_attention(
     checks: Sequence[PreflightCheck],
     *,
-    phase_states: Sequence[Mapping[str, object]] | None,
-    scope: str,
+    phase_status_index: Mapping[str, str],
 ) -> tuple[PreflightCheck, ...]:
-    if scope != "full":
-        return ()
-    phase_status_index = _phase_status_index(phase_states)
     nonblocking = [
         check
         for check in checks
@@ -156,6 +149,8 @@ def _preflight_check_is_blocking(
     *,
     phase_status_index: Mapping[str, str],
 ) -> bool:
+    if not check.required:
+        return False
     phase_id = str(check.phase_id or "").strip()
     if not phase_id:
         return True

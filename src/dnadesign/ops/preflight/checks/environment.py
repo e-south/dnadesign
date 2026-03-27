@@ -38,6 +38,8 @@ def build_environment_checks(
         checks.append(
             build_state_check(
                 check_id=target.check_id,
+                kind="environment",
+                required=target.required,
                 check_group=target.check_group,
                 phase=target.phase,
                 phase_id=target.phase_id,
