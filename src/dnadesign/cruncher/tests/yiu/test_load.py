@@ -65,8 +65,8 @@ def _base_yiu_payload() -> dict[str, object]:
                 {"id": "right_half", "start": 22, "end": 26},
             ],
             "homology_windows": [
-                {"id": "left_fold", "start": 10, "end": 14},
-                {"id": "right_fold", "start": 32, "end": 36},
+                {"id": "left_fold", "start": 14, "end": 18},
+                {"id": "right_fold", "start": 14, "end": 18},
             ],
             "retained_regions": [
                 {"id": "retained_left", "start": 14, "end": 18},
@@ -148,6 +148,104 @@ def _base_yiu_payload() -> dict[str, object]:
     }
 
 
+def _base_yiu_v2_payload() -> dict[str, object]:
+    return {
+        "schema_version": 2,
+        "family": "yiu",
+        "protocol_template": "msd_hop_retron_eco1_v1",
+        "workflow_scope": "core_insert_generation",
+        "name": "demo_yiu_v2",
+        "source_oligo": {
+            "sequence": "AAAAGGTCTCACGTTTAAGGGGCCGGGGTCTCACGTTTTT",
+            "annotations": {
+                "primer_binding_cores": [
+                    {"id": "source_fwd_core", "start": 0, "end": 4, "strand": "primary"},
+                    {"id": "source_rev_core", "start": 36, "end": 40, "strand": "complement"},
+                ],
+                "primer_tails": [
+                    {"id": "source_fwd_tail", "primer_binding_core_id": "source_fwd_core", "sequence": "GG"},
+                    {"id": "source_rev_tail", "primer_binding_core_id": "source_rev_core", "sequence": "CC"},
+                ],
+                "nickase_sites": [
+                    {
+                        "id": "nick_1",
+                        "enzyme": "Nt.Mock",
+                        "recognition_sequence": "GGGG",
+                        "start": 18,
+                        "orientation": "forward",
+                        "top_cut_offset": 2,
+                    }
+                ],
+                "payload_windows": [
+                    {"id": "payload_left", "start": 14, "end": 18, "projection_mode": "compound_required"},
+                    {"id": "payload_right", "start": 22, "end": 26, "projection_mode": "compound_required"},
+                ],
+                "homology_windows": [
+                    {"id": "stem_left", "start": 14, "end": 18, "projection_mode": "compound_allowed"},
+                    {"id": "stem_right", "start": 22, "end": 26, "projection_mode": "compound_allowed"},
+                ],
+                "retained_regions": [
+                    {"id": "retained_left", "start": 14, "end": 18, "projection_mode": "compound_allowed"},
+                    {"id": "retained_right", "start": 22, "end": 26, "projection_mode": "compound_allowed"},
+                ],
+                "sacrificial_regions": [
+                    {"id": "sacrificial_center", "start": 18, "end": 22, "projection_mode": "atomic_required"}
+                ],
+            },
+        },
+        "steps": {
+            "source_pcr": {"forward_primer_id": "oES790", "reverse_primer_id": "oES791"},
+            "double_nicking_digest": {"enzymes": ["Nt.Mock"]},
+            "heat_cleanup": {"enabled": True, "min_retained_nt": 8},
+            "adapter_anneal": {
+                "adapter_id": "oES792",
+                "compatibility_mode": "partial_complement",
+                "partial_complement": {
+                    "min_paired_nt": 4,
+                    "allow_left_tail": True,
+                    "allow_right_tail": True,
+                },
+            },
+            "hairpin_ligation": {
+                "ligase": "T4_DNA_ligase",
+                "require_5p_phosphate": True,
+                "compatibility_mode": "partial_complement",
+                "partial_complement": {
+                    "min_paired_nt": 4,
+                    "allow_left_tail": True,
+                    "allow_right_tail": True,
+                },
+            },
+            "hairpin_pcr": {
+                "forward_primer_id": "oES793",
+                "reverse_primer_id": "oES794",
+                "single_primer_precycles": {"enabled": True, "primer_id": "oES794", "cycles": 6},
+                "x_structure_resolution_cycle": {"enabled": True},
+            },
+            "insert_cleanup": {"enabled": False},
+            "backbone_pcr": {"enabled": False},
+            "golden_gate_assembly": {"enabled": False},
+        },
+        "payload_goal": {
+            "assembled_payload_pattern": "TTAACCGG",
+            "left_half_ref": "payload_left",
+            "right_half_ref": "payload_right",
+            "assembly_space": "post_ligation",
+            "evidence_policy": "require_guaranteed",
+        },
+        "catalogs": {
+            "enzymes": "catalogs/enzymes.yaml",
+            "oligo_parts": "catalogs/oligo_parts.yaml",
+            "backbones": "catalogs/backbones.yaml",
+        },
+        "output": {
+            "run_dir": "outputs/yiu/explicit",
+            "emit_view_contracts": True,
+            "publish_contract_version": 2,
+        },
+    }
+
+
 def _write_spec(tmp_path: Path, payload: dict[str, object]) -> Path:
     workspace = tmp_path / "workspaces" / "demo_yiu"
     spec_path = workspace / "configs" / "yiu" / "example.yiu.yaml"
@@ -175,6 +273,19 @@ def test_load_yiu_spec_returns_workspace_root_and_ordered_steps(tmp_path: Path) 
         "adapter_ligation",
         "amplification",
     ]
+
+
+def test_load_yiu_spec_rejects_paths_outside_configs_yiu_directory(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspaces" / "demo_yiu"
+    spec_path = workspace / "configs" / "other" / "example.yiu.yaml"
+    spec_path.parent.mkdir(parents=True, exist_ok=True)
+    spec_path.write_text(
+        yaml.safe_dump({"yiu": _base_yiu_payload()}, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"<workspace>/configs/yiu/<name>\.yiu\.yaml"):
+        load_yiu_spec(spec_path)
 
 
 def test_load_yiu_spec_rejects_duplicate_annotation_ids(tmp_path: Path) -> None:
@@ -205,4 +316,25 @@ def test_load_yiu_spec_rejects_adapter_ligation_without_any_adapter_source(tmp_p
     spec_path = _write_spec(tmp_path, payload)
 
     with pytest.raises(ValueError, match="adapter_ligation requires an adapter sequence source"):
+        load_yiu_spec(spec_path)
+
+
+def test_load_yiu_v2_spec_accepts_protocol_template_and_publish_contract_version(tmp_path: Path) -> None:
+    spec_path = _write_spec(tmp_path, _base_yiu_v2_payload())
+
+    spec, _resolved_spec, _workspace_root = load_yiu_spec(spec_path)
+
+    assert spec.schema_version == 2
+    assert spec.family == "yiu"
+    assert spec.protocol_template == "msd_hop_retron_eco1_v1"
+    assert spec.workflow_scope == "core_insert_generation"
+    assert spec.output.publish_contract_version == 2
+
+
+def test_load_yiu_v2_spec_rejects_unknown_protocol_template(tmp_path: Path) -> None:
+    payload = _base_yiu_v2_payload()
+    payload["protocol_template"] = "unknown_template"
+    spec_path = _write_spec(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="protocol_template"):
         load_yiu_spec(spec_path)

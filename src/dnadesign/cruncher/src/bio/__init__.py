@@ -11,6 +11,7 @@ Module Author(s): OpenAI Codex
 
 from dnadesign.cruncher.bio.enzymes import CutGeometry, derive_cut_geometry, recognition_matches_at
 from dnadesign.cruncher.bio.iupac import (
+    iupac_bases_for_symbol,
     iupac_symbols_compatible,
     longest_reverse_complement_overlap,
     motif_matches,
@@ -25,6 +26,7 @@ __all__ = [
     "CutGeometry",
     "derive_cut_geometry",
     "iupac_symbols_compatible",
+    "iupac_bases_for_symbol",
     "longest_reverse_complement_overlap",
     "motif_matches",
     "normalize_dna",

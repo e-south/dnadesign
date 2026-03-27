@@ -146,8 +146,8 @@ def init_yiu_workspace(workspace_root: Path, *, force_overwrite: bool = False) -
                     {"id": "right_half", "start": 22, "end": 26},
                 ],
                 "homology_windows": [
-                    {"id": "left_fold", "start": 10, "end": 14},
-                    {"id": "right_fold", "start": 32, "end": 36},
+                    {"id": "left_fold", "start": 14, "end": 18},
+                    {"id": "right_fold", "start": 14, "end": 18},
                 ],
                 "retained_regions": [
                     {"id": "retained_left", "start": 14, "end": 18},

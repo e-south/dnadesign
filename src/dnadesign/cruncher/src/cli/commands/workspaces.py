@@ -28,6 +28,7 @@ from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.study.discovery import discover_study_runs_for_workspace, discover_study_specs_for_workspace
 from dnadesign.cruncher.utils.paths import resolve_workspace_root
 from dnadesign.cruncher.workspaces.families import (
+    discover_spec_workflow_families,
     infer_runbook_workflow_families_from_path,
     workspace_kind_from_presence,
 )
@@ -142,6 +143,16 @@ def _discover_workspace_runbooks(cwd: Path | None = None) -> list[tuple[str, Pat
     return candidates
 
 
+def _discover_family_spec_workspaces(cwd: Path | None = None) -> dict[Path, tuple[str, ...]]:
+    cwd_path = resolve_invocation_cwd(cwd)
+    discovered: dict[Path, tuple[str, ...]] = {}
+    for root in workspace_search_roots(cwd_path):
+        if not root.is_dir():
+            continue
+        discovered.update(_discover_family_spec_workspaces_in_root(root))
+    return discovered
+
+
 def _discover_workspaces_in_root(root: Path) -> list[WorkspaceCandidate]:
     resolved_root = root.expanduser().resolve()
     if not resolved_root.is_dir():
@@ -173,6 +184,22 @@ def _discover_workspaces_in_root(root: Path) -> list[WorkspaceCandidate]:
             )
         )
     candidates.sort(key=lambda item: (item.name, str(item.config_path)))
+    return candidates
+
+
+def _discover_family_spec_workspaces_in_root(root: Path) -> dict[Path, tuple[str, ...]]:
+    resolved_root = root.expanduser().resolve()
+    if not resolved_root.is_dir():
+        return {}
+    candidates: dict[Path, tuple[str, ...]] = {}
+    entries: list[Path] = [resolved_root]
+    entries.extend(sorted(item for item in resolved_root.iterdir() if item.is_dir()))
+    for entry in entries:
+        if not entry.is_dir():
+            continue
+        family_ids = discover_spec_workflow_families(entry)
+        if family_ids:
+            candidates[entry.resolve()] = family_ids
     return candidates
 
 
@@ -249,7 +276,11 @@ def _is_workspace_layout(root: Path) -> bool:
     configs = root / "configs"
     if not configs.is_dir():
         return False
-    return (configs / "config.yaml").is_file() or (configs / "runbook.yaml").is_file()
+    return (
+        (configs / "config.yaml").is_file()
+        or (configs / "runbook.yaml").is_file()
+        or bool(discover_spec_workflow_families(root))
+    )
 
 
 def _discover_reset_paths(root: Path) -> tuple[list[Path], list[Path]]:
@@ -359,6 +390,7 @@ def list_workspaces(
         if root is None:
             config_workspaces = discover_workspaces()
             runbook_workspaces = _discover_workspace_runbooks()
+            family_spec_workspaces = _discover_family_spec_workspaces()
             roots = workspace_search_roots()
             roots_rendered = "\n".join(f"- {root_path}" for root_path in roots) if roots else "- (none)"
         else:
@@ -369,8 +401,9 @@ def list_workspaces(
                 raise ValueError(f"--root must be a directory: {resolved_root}")
             config_workspaces = _discover_workspaces_in_root(resolved_root)
             runbook_workspaces = _discover_workspace_runbooks_in_root(resolved_root)
+            family_spec_workspaces = _discover_family_spec_workspaces_in_root(resolved_root)
             roots_rendered = f"- {resolved_root}"
-        if not config_workspaces and not runbook_workspaces:
+        if not config_workspaces and not runbook_workspaces and not family_spec_workspaces:
             console.print("No workspaces discovered.")
             console.print("Workspace discovery searched:")
             console.print(roots_rendered)
@@ -379,7 +412,10 @@ def list_workspaces(
 
         config_by_root = {item.root.resolve(): item for item in config_workspaces}
         runbook_by_root = {root.resolve(): runbook for _, root, runbook in runbook_workspaces}
-        all_roots = sorted(set(config_by_root) | set(runbook_by_root), key=lambda path: path.name)
+        all_roots = sorted(
+            set(config_by_root) | set(runbook_by_root) | set(family_spec_workspaces),
+            key=lambda path: path.name,
+        )
 
         table = Table(title="Workspaces", header_style="bold")
         table.add_column("Index", justify="right")
@@ -398,15 +434,21 @@ def list_workspaces(
             runbook_path = runbook_by_root.get(workspace_root)
             has_config = config_workspace is not None
             has_runbook = runbook_path is not None
-            internal_kind = workspace_kind_from_presence(has_config=has_config, has_runbook=has_runbook)
-            if internal_kind == "hybrid":
-                kind = "config+runbook"
-            elif internal_kind == "runbook_family":
-                kind = "runbook-only"
+            if not has_config and not has_runbook and workspace_root in family_spec_workspaces:
+                kind = "family-spec"
             else:
-                kind = "config-only"
+                internal_kind = workspace_kind_from_presence(has_config=has_config, has_runbook=has_runbook)
+                if internal_kind == "hybrid":
+                    kind = "config+runbook"
+                elif internal_kind == "runbook_family":
+                    kind = "runbook-only"
+                else:
+                    kind = "config-only"
             families: list[str] = []
-            if has_config:
+            for family in family_spec_workspaces.get(workspace_root, ()):
+                if family not in families:
+                    families.append(family)
+            if has_config and "sample" not in families:
                 families.append("sample")
             if runbook_path is not None:
                 for family in infer_runbook_workflow_families_from_path(runbook_path):
@@ -534,7 +576,8 @@ def reset(
             if not workspace_roots:
                 raise ValueError(
                     f"No workspace roots found under {resolved_root}. "
-                    "Expected child directories containing configs/runbook.yaml or configs/config.yaml."
+                    "Expected child directories containing configs/runbook.yaml, configs/config.yaml, "
+                    "or family specs matched by registry spec_globs."
                 )
             console.print(f"Workspace reset root set: {render_path(resolved_root)}")
             console.print(f"Discovered {len(workspace_roots)} workspace roots to reset.")
@@ -543,7 +586,8 @@ def reset(
         else:
             if not _is_workspace_layout(resolved_root):
                 raise ValueError(
-                    f"Workspace root must contain configs/runbook.yaml or configs/config.yaml: {resolved_root}"
+                    "Workspace root must contain configs/runbook.yaml, configs/config.yaml, "
+                    f"or family specs matched by registry spec_globs: {resolved_root}"
                 )
             workspace_roots = [resolved_root]
             console.print(f"Workspace reset root: {render_path(resolved_root)}")

@@ -64,6 +64,8 @@ def _print_report(report) -> None:
     console.print(f"YIU spec -> {report.spec_name}")
     console.print(f"Status -> {report.status}")
     console.print(f"Protocol -> {report.protocol}")
+    console.print(f"Sequence mode -> {report.sequence_mode}")
+    console.print(f"Validation mode -> {report.validation_mode}")
     console.print(f"States -> {len(report.states)}")
     if report.issues:
         console.print("Issues:")
@@ -184,8 +186,16 @@ def show_cmd(
     console.print(f"YIU run -> {payload['spec_name']}")
     console.print(f"Run dir -> {payload['run_dir']}")
     console.print(f"Status -> {payload['status']}: {payload['status_message']}")
+    if payload.get("protocol_template"):
+        console.print(f"Protocol template -> {payload['protocol_template']}")
+    elif payload.get("protocol"):
+        console.print(f"Protocol -> {payload['protocol']}")
+    if payload.get("view_contract_version") is not None:
+        console.print(f"View contract -> {payload['view_contract_version']}")
     console.print(f"Manifest -> {payload['manifest_path']}")
     console.print(f"Status file -> {payload['status_path']}")
     console.print(f"Report -> {payload['report_path']}")
     console.print(f"Trace -> {payload['trace_path']}")
+    console.print(f"Trace manifest -> {payload['trace_manifest_path']}")
+    console.print(f"Published views manifest -> {payload['published_views_manifest_path']}")
     console.print(f"Published views -> {payload['published_views_dir']}")

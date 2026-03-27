@@ -84,6 +84,13 @@ def reverse_complement_iupac(sequence: str) -> str:
     return normalize_iupac(sequence).translate(_IUPAC_COMPLEMENT)[::-1]
 
 
+def iupac_bases_for_symbol(symbol: str) -> set[str]:
+    text = str(symbol or "").strip().upper()
+    if len(text) != 1 or text not in _IUPAC_MAP:
+        raise ValueError(f"Unknown IUPAC nucleotide symbol: {symbol!r}")
+    return set(_IUPAC_MAP[text])
+
+
 def iupac_symbols_compatible(left: str, right: str) -> bool:
     left_text = normalize_iupac(left)
     right_text = normalize_iupac(right)

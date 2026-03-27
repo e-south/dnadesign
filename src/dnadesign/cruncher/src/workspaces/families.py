@@ -152,3 +152,14 @@ def infer_runbook_workflow_families_from_path(runbook_path: Path) -> tuple[str, 
         return ()
     payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8")) or {}
     return infer_runbook_workflow_families(payload)
+
+
+def discover_spec_workflow_families(workspace_root: Path) -> tuple[str, ...]:
+    resolved_root = workspace_root.resolve()
+    discovered: list[str] = []
+    for descriptor in _WORKFLOW_FAMILIES:
+        for pattern in descriptor.spec_globs:
+            if any(path.is_file() for path in resolved_root.glob(pattern)):
+                discovered.append(descriptor.id)
+                break
+    return tuple(discovered)

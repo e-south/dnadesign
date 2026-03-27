@@ -73,9 +73,34 @@ def test_yiu_docs_capture_workspace_and_artifact_boundaries() -> None:
     assert "source_oligo_ssdna" in guide
     assert "downstream_amplifiable_product" in guide
     assert "assembled_payload" in spec_ref
+    assert "protocol_template" in spec_ref
+    assert "msd_hop_retron_eco1_v1" in spec_ref
+    assert "publish_contract_version" in spec_ref
+    assert "min_paired_nt" in spec_ref
+    assert "max_unpaired_tail_nt" in spec_ref
+    assert "max_bulge_nt" in spec_ref
+    assert "payload_junction_segments" in spec_ref
+    assert "pattern_compatibility" in spec_ref
+    assert "pattern_evidence_summary" in spec_ref
+    assert "RETAINED_SACRIFICIAL_OVERLAP" in spec_ref
+    assert "HOMOLOGY_WINDOW_SPANS_JUNCTION" in spec_ref
     assert "step_graph" in spec_ref
+    assert "hairpin_pcr_linear_insert" in guide
+    assert "protocol_template" in artifacts_ref
+    assert "view_contract_version" in artifacts_ref
     assert "yiu_report.json" in artifacts_ref
     assert "yiu_trace.jsonl" in artifacts_ref
+    assert "yiu_trace_manifest.json" in artifacts_ref
+    assert "yiu_published_views_manifest.json" in artifacts_ref
+    assert "validation_mode" in artifacts_ref
+    assert "branch_junction" in artifacts_ref
+    assert "bulge_nt" in artifacts_ref
+    assert "spans_junction" in artifacts_ref
+    assert "topology_compatibility" in artifacts_ref
+    assert "sequence_mode" in guide
+    assert "partial_complement" in guide
+    assert "bulged" in guide
+    assert "parts[]" in guide
     assert "`yiu/` (protocol-state YIU domain)" in architecture
     assert "retained product" in glossary.lower()
     assert "workflow family" in glossary.lower()
