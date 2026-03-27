@@ -2,7 +2,7 @@
 name: promoter-study-status
 description: Answer or refresh the dnadesign promoter-study status across DenseGen, USR, Construct, Infer, Cluster or OPAL, and optional Notify by reading the checked-in study record first, including the affiliated-dataset registry and optional pipeline execution map for local, remote, and batch posture, then running the explicit status commands. Use when the user asks where the promoter study stands, which datasets and row counts are current, which infer slices are done or pending, whether the downstream dataset is ready, how affiliated datasets sync between locations such as BU SCC and local roots, or what batch step should run next. Do not use for generic workflow discovery when no checked-in study record exists, or for tool-local questions that do not need cross-tool study status.
 metadata:
-  version: 0.3.2
+  version: 0.3.3
   category: workflow-automation
   tags: [usr, promoter-study, densegen, construct, infer, cluster, notify, status]
 ---
@@ -49,19 +49,25 @@ Out of scope:
   `docs/studies/<study-id>/datasets.yaml`,
   `docs/studies/<study-id>/status.md`,
   `docs/studies/<study-id>/ops.study.yaml`, and optional
-  `docs/studies/<study-id>/pipeline.yaml` as the only valid source for
+  `docs/studies/<study-id>/pipeline.yaml` as the checked-in source set for
   live dataset ids, local-vs-remote sync posture, row targets, completed infer
   slices, study-owned Construct or Infer surfaces, and next actions.
-  `ops.study.yaml` is the
-  OPS-facing source of lifecycle order and next-scope preflight grouping. Infer
-  Notify profile paths should be derived from the checked-in Infer lane configs
-  rather than stored separately in `pipeline.yaml`.
+  `ops.study.yaml` is the OPS-facing source of lifecycle order, declared
+  execution surfaces, and next-scope preflight grouping. `pipeline.yaml`
+  remains supplemental study-owned runtime context when the study needs exact
+  Construct, Infer, or Notify mappings beyond that contract. Infer Notify
+  profile paths should be derived from the checked-in Infer lane configs rather
+  than stored separately in `pipeline.yaml`.
 - Use `root_kind` and `status` in `datasets.yaml` to tell canonical shared USR
   roots apart from workspace-local export roots and planned-but-not-yet-created
   datasets.
 - Use `ops progress ...` and `usr ...` commands only to refresh those checked-in
   study records; do not infer live study state from demo workspaces, journal
   notes, or generic runbooks.
+- Treat `promoter-study-status` as the repo-backed snapshot surface and
+  `promoter-study-preflight` as the execution-readiness surface. Do not answer
+  "what should run next?" from snapshot alone when preflight blockers are in
+  scope.
 - If no checked-in study record exists, say so explicitly and route the user to
   the status contract instead of inventing current state.
 
@@ -75,8 +81,9 @@ Out of scope:
   study entry.
 - Require `campaign.yaml`, `datasets.yaml`, `status.md`, and `ops.study.yaml`
   in the matching study directory.
-- If `pipeline.yaml` exists, load it before answering exact Construct, Infer,
-  batch, or Notify next-step questions.
+- If `pipeline.yaml` exists, load it as supplemental runtime context before
+  answering exact Construct, Infer, batch, or Notify next-step questions that
+  need more detail than the declared `ops.study.yaml` surfaces.
 - If the registry and checked-in study directory disagree, fail visibly instead
   of scanning for a best guess.
 
@@ -86,11 +93,21 @@ Out of scope:
 - Use that output as the repo-scoped one-command summary for current phase,
   declared datasets, next ready phase, and missing execution surfaces before
   deeper probes. Treat host-local advisories there as advisory only.
+- Snapshot means repo-backed study posture: declared datasets, row targets,
+  lifecycle state, study-owned execution surfaces, and sync evidence already
+  checked in.
 - When the user needs command-level blockers rather than the cheap snapshot,
   run:
   `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
 - Use the preflight output when the question is "what fails right now?" across
   DenseGen, Construct, Infer, Notify, and batch-plan surfaces.
+- `--scope next` narrows blocker reporting first. It can still run every
+  declared check attached to a broad preparation phase such as
+  `infer_batch_preparation`, so do not describe it as cheap.
+- Preflight means execution-readiness blockers: generic checks, grouped by the
+  declared study contract, with ontology fields such as `observes_plane`,
+  `summary_scope`, `scope`, `phase_id`, `check_group`, `kind`, `surface_id`,
+  and `artifact_id`.
 - Use `next_in_progress_phase`, `next_ready_phase`, and the declared lifecycle
   fields from `ops.study.yaml` when answering "what should run next?" instead
   of reconstructing that ordering from generic runbooks.
@@ -141,16 +158,20 @@ Out of scope:
 
 Return:
 - study id
+- whether each answer came from snapshot posture or preflight readiness
 - live feature dataset and row count, or an explicit statement that the study is
   still source-phase with no canonical feature dataset yet
 - source datasets named in the checked-in study record
 - affiliated dataset registry entries and sync posture
-- study-owned Construct, Infer, and batch surfaces when `pipeline.yaml` exists,
-  plus derived Infer Notify profile paths from the checked-in lane configs
+- study-owned Construct, Infer, and batch surfaces from `ops.study.yaml`, plus
+  any supplemental runtime detail from `pipeline.yaml` and derived Infer Notify
+  profile paths from the checked-in lane configs
 - completed versus pending infer slices
 - rollback paths (`infer prune`, `usr maintenance overlay-remove`,
   `usr maintenance overlay-compact`)
 - batch and notify readiness
+- preflight ontology fields when blockers are reported (`scope`, `phase_id`,
+  `kind`, `surface_id`, `artifact_id`)
 - next actions
 - explicit blockers when the repo lacks the required study record
 

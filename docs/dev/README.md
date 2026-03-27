@@ -10,6 +10,7 @@ Use this index to find maintainer workflows, checks, and planning records.
 1. Review [PLANS](../../PLANS.md) before changing architecture or execution flow.
 2. Use [architecture decisions index](../architecture/decisions/README.md) for approved decisions.
 3. Use [CI and quality checks](#ci-and-quality-checks) before merging maintainer changes.
+4. Use the repo-local gate here rather than `./scripts/agent-verify`. That script belongs to the external agent-hub repo and is not present in `dnadesign`.
 
 ### Quick checks by change type
 
@@ -30,6 +31,18 @@ Use this index to find maintainer workflows, checks, and planning records.
 `uv run python -m dnadesign.devtools.architecture_boundaries --repo-root .`
 6. Run the repo-local BU SCC skill audit when changing `.agents/skills/sge-hpc-ops/`:
 `bash .agents/skills/sge-hpc-ops/scripts/audit-sge-hpc-ops-skill.sh`
+
+### Repo-local maintainer gate
+
+Run this from the repo root for tracked changes in `dnadesign`:
+
+```bash
+uv sync --locked --group dev
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest -q
+uv run python -m dnadesign.devtools.docs_checks --repo-root .
+```
 
 ### CI and quality checks
 

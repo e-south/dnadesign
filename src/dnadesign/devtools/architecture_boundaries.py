@@ -78,6 +78,12 @@ _FORBIDDEN_LEGACY_SURFACE_PATHS = (
     Path("src/dnadesign/ops/tests/test_promoter_preflight_coordinator.py"),
     Path("src/dnadesign/studies/promoter"),
     Path("docs/studies/promoter"),
+    Path("src/dnadesign/studies/families/promoter/preflight_infer.py"),
+    Path("src/dnadesign/studies/families/promoter/preflight_orchestration.py"),
+    Path("src/dnadesign/studies/families/promoter/preflight_upstream.py"),
+    Path("src/dnadesign/studies/tests/test_promoter_preflight_infer.py"),
+    Path("src/dnadesign/studies/tests/test_promoter_preflight_orchestration.py"),
+    Path("src/dnadesign/studies/tests/test_promoter_preflight_upstream.py"),
 )
 
 

@@ -11,7 +11,7 @@
 **Status-kind:** promoter-study-preflight
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-25
+**Last verified:** 2026-03-26
 
 Use this contract after the cheaper
 [Promoter Study Status Contract](promoter-study-status-contract.md) when you
@@ -36,6 +36,11 @@ later-lane blocker noise:
 uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json
 ```
 
+`--scope next` narrows blocker interpretation first. It is not guaranteed to be
+cheap. If the current checked-in phase is a broad preparation phase such as
+`infer_batch_preparation`, OPS will still run every declared Infer, Notify, and
+runbook-plan check attached to that phase.
+
 If you need to pin a non-active study or you are invoking the command from
 outside the repo checkout, add:
 
@@ -52,18 +57,20 @@ advance Notify cursors. It composes explicit command preflights from the
 checked-in study record and uses `ops.study.yaml` to decide which study phases
 belong to the next actionable scope versus the full study surface:
 
-- DenseGen config probe from the study's batch runbook
-- DenseGen batch `ops runbook plan`
-- Construct workspace doctor
-- Construct runtime validation when the merged-anchor dataset exists
-- Infer config validation for the study-owned configs
-- Infer Notify profile readiness, including exact `notify setup slack` commands
-  when the lane profile has not been materialized yet
-- Infer dry-run when the required study-owned USR datasets exist
-- Notify event-path resolution for the same study configs
-- Notify profile doctor for materialized Infer profiles, so missing TLS or
-  webhook contracts fail visibly before live Slack delivery
-- Infer batch `ops runbook plan` for the lane-specific Notify-backed presets
+- `path_exists` and `dataset_snapshot` checks over declared study artifacts
+- `workspace_layout` checks over declared Construct and Infer workspaces
+- `environment` checks for webhook and TLS contracts
+- `gpu_availability` checks for local infer posture when that scope is relevant
+- `command` checks for DenseGen config probing, Construct doctor/runtime
+  validation, Infer config validation, Infer dry-runs, Notify profile doctor,
+  and Notify event-path resolution
+- `scheduler_queue` checks for declared submit-threshold posture
+- `runbook_plan` checks for DenseGen and Infer batch presets
+
+`ops.study.yaml` is now the visible source of readiness shape: it declares the
+phases, groups, artifacts, execution surfaces, and generic checks. The promoter
+family adapter still normalizes family-local paths and derived refs, but it no
+longer hides a second imperative readiness graph behind the contract.
 
 ### Contract rules
 
@@ -78,11 +85,16 @@ belong to the next actionable scope versus the full study surface:
   - blocked GPU-only lanes remain visible; there is no hidden 20B -> 7B fallback
 - Use `ops.study.yaml` as the OPS-facing source of lifecycle phase order,
   execution surfaces, snapshot scope, and preflight phase-target grouping.
-- Use the existing study-owned `pipeline.yaml` as the only source for real
-  Construct, Infer, and runbook paths plus any minimal runtime mappings the
-  study still needs.
+- Use `ops.study.yaml` as the OPS-facing source of declared artifacts,
+  execution surfaces, and preflight scope/check planning.
+- Use `pipeline.yaml`, when present, only as supplemental study-owned runtime
+  context for exact Construct, Infer, or Notify mappings that are not worth
+  duplicating in generic docs.
 - Derive Infer Notify profile paths from the checked-in Infer lane configs
   rather than duplicating those profile paths in `pipeline.yaml`.
+- Read blocker metadata from the returned ontology fields:
+  `observes_plane`, `summary_scope`, `scope`, `phase_id`, `check_group`,
+  `kind`, `surface_id`, and `artifact_id`.
 
 ### What this route is for
 
@@ -105,7 +117,11 @@ belong to the next actionable scope versus the full study surface:
 2. Run `usr.data-plane.promoter-study-preflight` when you need command-level
    blockers before the next DenseGen, Construct, Infer, or Notify step. Use
    `--scope next` when you want the immediate execution-readiness blockers for
-   the next actionable phase rather than the full historical surface.
+   the next actionable phase rather than the full historical surface. For
+   broad preparation phases, that still means every declared check attached to
+   that phase may execute before the summary is returned.
+   The returned `checks` list is generic and traceable back to the checked-in
+   study contract through `kind`, `surface_id`, and `artifact_id`.
 3. Use the returned `checks` list to decide whether the next concrete action is:
    - grow DenseGen again
    - materialize the merged anchor set

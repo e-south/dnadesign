@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import datetime as dt
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -32,6 +33,7 @@ from dnadesign.devtools.docs_checks import (
     _find_runbook_demo_snippet_issues,
     _find_shared_utils_path_issues,
     _find_stale_overlay_guard_term_issues,
+    _find_study_execution_source_drift_issues,
     _find_study_record_doc_issues,
     _find_tool_docs_metadata_issues,
     _find_tool_readme_banner_issues,
@@ -53,6 +55,14 @@ from dnadesign.ops.runbooks.path_policy import (
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def _git_init(repo_root: Path) -> None:
+    subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
+
+
+def _git_add(repo_root: Path, *paths: str) -> None:
+    subprocess.run(["git", "add", *paths], cwd=repo_root, check=True, capture_output=True, text=True)
 
 
 def _write_registry_metadata(
@@ -209,6 +219,7 @@ def test_find_study_record_doc_issues_flags_legacy_router_index_paths(tmp_path: 
                 "datasets.yaml",
                 "status.md",
                 "ops.study.yaml",
+                "legacy path: docs/studies/promoter/demo_study/status.md",
             ]
         )
         + "\n",
@@ -245,6 +256,7 @@ def test_find_study_record_doc_issues_flags_legacy_router_index_paths(tmp_path: 
         "src/dnadesign/usr/AGENTS.md" in issue and "docs/studies/promoter/index.yaml" in issue for issue in issues
     )
     assert any("AGENTS.md" in issue and "docs/studies/index.yaml" in issue for issue in issues)
+    assert any("docs/studies/README.md" in issue and "docs/studies/promoter/" in issue for issue in issues)
 
 
 def test_main_fails_for_broken_relative_link_in_root_sor_doc(tmp_path: Path) -> None:
@@ -724,10 +736,59 @@ def test_find_operational_runbook_path_issues_flags_repo_root_runbook(tmp_path: 
         )
         + "\n",
     )
+    _git_init(tmp_path)
+    _git_add(tmp_path, "stress_ethanol_cipro.yaml")
 
     issues = _find_operational_runbook_path_issues(tmp_path)
 
     assert any("operational runbook path is outside allowed locations" in issue for issue in issues)
+
+
+def test_find_operational_runbook_path_issues_ignores_untracked_yaml_noise_in_git_repo(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "stress_ethanol_cipro.yaml",
+        "\n".join(
+            [
+                "runbook:",
+                "  schema_version: 1",
+                "  id: study_stress_ethanol_cipro",
+                "  workflow_id: densegen_batch_submit",
+                "  project: dunlop",
+                "  workspace_root: /tmp/workspace",
+                "  logging:",
+                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/study_stress_ethanol_cipro",
+                "  densegen:",
+                "    config: /tmp/workspace/config.yaml",
+                "    qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub",
+                "  resources:",
+                "    pe_omp: 16",
+                "    h_rt: 08:00:00",
+                "    mem_per_core: 8G",
+            ]
+        )
+        + "\n",
+    )
+    _write(
+        tmp_path / "scratch" / "nested" / "noise.yaml",
+        "\n".join(
+            [
+                "runbook:",
+                "  schema_version: 1",
+                "  id: generated_noise",
+                "  workflow_id: densegen_batch_submit",
+                "  project: dunlop",
+                "  workspace_root: /tmp/workspace",
+            ]
+        )
+        + "\n",
+    )
+    _git_init(tmp_path)
+    _git_add(tmp_path, "stress_ethanol_cipro.yaml")
+
+    issues = _find_operational_runbook_path_issues(tmp_path)
+
+    assert any("stress_ethanol_cipro.yaml" in issue for issue in issues)
+    assert not any("scratch/nested/noise.yaml" in issue for issue in issues)
 
 
 def test_find_operational_runbook_path_issues_allows_packaged_presets(tmp_path: Path) -> None:
@@ -2344,11 +2405,38 @@ def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> No
         )
         + "\n",
     )
+    _write(
+        tmp_path / "docs" / "studies" / "README.md",
+        "Use infer_local_runtime and notify_profile_doctor in ops.study.yaml.\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "usr" / "docs" / "operations" / "promoter-study-preflight.md",
+        "Read notify.profile.*.details.setup_command after infer_validate_config.\n",
+    )
 
     issues = _find_ops_deprecated_semantics_issues(tmp_path)
 
     assert any("with_notify_slack" in issue for issue in issues)
     assert any("precedents" in issue for issue in issues)
+    assert any("infer_local_runtime" in issue for issue in issues)
+    assert any("notify_profile_doctor" in issue for issue in issues)
+    assert any("details.setup_command" in issue for issue in issues)
+
+
+def test_study_execution_source_drift_check_flags_pipeline_only_claims(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "docs" / "studies" / "README.md",
+        "Use pipeline.yaml as the only source for real Construct, Infer, and runbook paths.\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "usr" / "docs" / "operations" / "promoter-study-preflight.md",
+        "pipeline.yaml remains the only valid source for exact execution surfaces.\n",
+    )
+
+    issues = _find_study_execution_source_drift_issues(tmp_path)
+
+    assert any("docs/studies/README.md" in issue for issue in issues)
+    assert any("promoter-study-preflight.md" in issue for issue in issues)
 
 
 def test_legacy_contract_surface_docs_check_flags_repo_root_contract_references(tmp_path: Path) -> None:

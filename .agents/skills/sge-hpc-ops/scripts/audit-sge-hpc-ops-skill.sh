@@ -120,6 +120,31 @@ require_pattern "Status card|status card" "user-facing status card language pres
 require_pattern "respect the queue|do not skip the line|queue fairness|skip the queue" "queue respect policy language present"
 require_pattern "submission-shape advisor|shape advisor" "submission-shape advisor language present"
 require_pattern "operator brief|sge-operator-brief.sh" "operator brief language present"
+require_pattern "ops catalog list --simple" "ops catalog list command surface present"
+require_pattern "ops runbook presets" "ops runbook presets command surface present"
+require_pattern "ops runbook init" "ops runbook init command surface present"
+require_pattern "ops runbook plan" "ops runbook plan command surface present"
+require_pattern "ops runbook active-jobs" "ops runbook active-jobs command surface present"
+require_pattern "ops runbook execute" "ops runbook execute command surface present"
+require_pattern "ops progress show ops.control-plane.orchestration --audit-json" "read-only audit summary command present"
+
+if rg -q "precedents" "$SKILL_FILE" "$ROOT_DIR/references"; then
+  fail "skill surfaces must not reference removed precedents terminology"
+else
+  pass "skill surfaces avoid removed precedents terminology"
+fi
+
+if rg -q "docs/studies/promoter/" "$SKILL_FILE" "$ROOT_DIR/references"; then
+  fail "skill surfaces must not reference legacy family-nested study paths"
+else
+  pass "skill surfaces avoid legacy family-nested study paths"
+fi
+
+if rg -q "workflow_id" "$SKILL_FILE" "$ROOT_DIR/references"; then
+  fail "skill surfaces must use route_id unless discussing true runbook workflow metadata"
+else
+  pass "skill surfaces avoid workflow_id routing leakage"
+fi
 
 if rg -qi "start a densegen workspace x batch job on bu scc" "$SKILL_FILE"; then
   pass "trigger test includes densegen batch prompt"

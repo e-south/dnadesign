@@ -1,7 +1,7 @@
 ## Study Records
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-25
+**Last verified:** 2026-03-26
 
 Use this index when the question is "where is the real study right now?" rather
 than "which generic workflow should I use?"
@@ -15,8 +15,8 @@ planning and execution.
 Authority chain: `docs/studies/index.yaml` selects the active study,
 the matching `docs/studies/<study-id>/` directory holds the required
 `campaign.yaml`, `datasets.yaml`, `status.md`, and `ops.study.yaml`, and may
-also carry an optional `pipeline.yaml` when the study owns checked-in
-Construct, Infer, batch, or Notify execution surfaces.
+also carry an optional `pipeline.yaml` when the study needs extra study-owned
+runtime context that should not be reconstructed from generic tool docs.
 
 Keep four complementary artifacts for each real study:
 
@@ -26,7 +26,10 @@ Keep four complementary artifacts for each real study:
 - `status.md`: human-readable current state, row targets, and next actions
 - `ops.study.yaml`: OPS-facing study contract for lifecycle order, record
   sources, artifacts, execution surfaces, and explicit preflight scope/check
-  planning
+  planning. Declare generic readiness kinds there, such as `path_exists`,
+  `dataset_snapshot`, `workspace_layout`, `environment`, `gpu_availability`,
+  `command`, `scheduler_queue`, and `runbook_plan`, then bind them to explicit
+  artifact ids and execution-surface ids.
 
 Keep the code boundary equally explicit: study-family implementation code lives
 under `src/dnadesign/studies/`, not under `src/dnadesign/ops/`. OPS reads the
@@ -36,9 +39,9 @@ and preflight logic stays with the family package.
 When a study already owns concrete execution surfaces, add one optional fifth
 artifact:
 
-- `pipeline.yaml`: machine-readable map of the study-owned workspace, config,
-  batch, and runtime surfaces that a naive agent should follow next without
-  duplicating study narrative or lifecycle authority
+- `pipeline.yaml`: optional study-owned runtime context for exact Construct,
+  Infer, batch, or Notify paths that complement `ops.study.yaml` without
+  replacing its lifecycle or preflight authority
 
 Use the study record even when the effort is still in the source-assembly phase.
 An active study does not need to wait until the final feature matrix already
@@ -80,11 +83,12 @@ docs/studies/index.yaml
   datasets, infer slice status, rollback paths, and next actions.
 - `ops.study.yaml` is the machine-readable OPS contract for lifecycle
   ordering, record sources, artifacts, execution surfaces, repo-scoped
-  snapshot posture, and explicit preflight scope/check planning.
-- `pipeline.yaml`, when present, records the exact Construct workspace,
-  Infer configs, batch presets, and other runtime surfaces that belong to the
-  real study rather than to a generic demo. Keep study meaning and lifecycle in
-  `status.md` and `ops.study.yaml`.
+  snapshot posture, and explicit preflight scope/check planning. Snapshot stays
+  repo-backed and cheap; preflight is the execution-readiness surface.
+- `pipeline.yaml`, when present, records study-owned runtime context that is
+  useful outside the OPS preflight contract, such as exact Construct workspace
+  mappings or lane-specific Infer details. Keep OPS-facing lifecycle order,
+  declared execution surfaces, and preflight shape in `ops.study.yaml`.
 - `audits/` stores machine-readable sync audit JSON files referenced from
   `datasets.yaml`.
 
@@ -168,19 +172,19 @@ for the first pull rather than relying on local name guessing.
 - The selected study directory must contain `campaign.yaml`, `datasets.yaml`,
   `status.md`, and `ops.study.yaml`.
 - `ops.study.yaml` is the OPS-facing source of lifecycle phase order, record
-  sources, execution surfaces, repo snapshot summary scope, and preflight
-  scope/check posture.
-  `pipeline.yaml` remains the
-  exact execution-surface map when the study owns concrete Construct, Infer, or
-  batch assets.
-- If `pipeline.yaml` exists, treat it as the study-owned execution map for the
-  next Construct, Infer, batch, or Notify step; do not reconstruct that path
-  from generic workspace docs.
+  sources, declared execution surfaces, repo snapshot summary scope, and
+  preflight scope/check posture.
+- If `pipeline.yaml` exists, treat it as supplemental study-owned runtime
+  context for exact Construct, Infer, batch, or Notify details that are not
+  already declared in `ops.study.yaml`; do not reconstruct those paths from
+  generic workspace docs.
 - Use `ops progress show usr.data-plane.promoter-study-status` for the cheap
   record-plane snapshot, then escalate to
   `ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
   when the question is "what should run next?" or "which execution-readiness
-  blockers remain right now?"
+  blockers remain right now?" Use the returned ontology fields such as
+  `observes_plane`, `summary_scope`, `scope`, `phase_id`, `group_id`, `kind`,
+  `surface_id`, and `artifact_id` when you summarize blockers.
 - If the registry and directory contents disagree, fail visibly and fix the
   registry before asking agents for live study status.
 

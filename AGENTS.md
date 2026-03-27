@@ -27,6 +27,8 @@ Treat this file as a navigation map; canonical policy and operational detail liv
   - `uv sync --locked`
   - `uv sync --locked --group dev`
 - Validate changes:
+  - This repo does not ship `./scripts/agent-verify`.
+    If external router guidance points at that script, use the repo-local checks below instead.
   - `uv run ruff check .`
   - `uv run ruff format --check .`
   - `uv run pytest -q`
