@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import re
+import subprocess
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -192,6 +193,7 @@ STUDY_RECORD_ROUTER_FILES = (
 )
 ACTIVE_STUDY_INDEX_PATH = "docs/studies/index.yaml"
 LEGACY_STUDY_INDEX_PATH = "docs/studies/promoter/index.yaml"
+LEGACY_STUDY_RECORD_PREFIX = "docs/studies/promoter/"
 OPS_OPERATIONAL_WORKFLOW_IDS = {
     "densegen_batch_submit",
     "densegen_batch_with_notify",
@@ -281,6 +283,10 @@ OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES = (
     PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
     Path("docs/templates"),
 )
+OPS_OPERATIONAL_RUNBOOK_FALLBACK_SCAN_ROOTS = (
+    PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
+    Path("docs/templates"),
+)
 TRANSIENT_OPERATIONAL_ROOT_DIR_NAMES = REPO_TRANSIENT_OPERATIONAL_DIR_NAMES
 DISALLOWED_SHARED_UTILS_PATHS = (Path("src/dnadesign/utils"),)
 OVERLAY_GUARD_DOC_PATHS = (
@@ -291,7 +297,14 @@ OVERLAY_GUARD_DOC_PATHS = (
 OPS_DEPRECATED_SEMANTICS_DOC_PATHS = (
     "docs/operations/README.md",
     "docs/operations/orchestration-runbooks.md",
+    "docs/studies/README.md",
+    "docs/studies/stress_ethanol_cipro_growth/status.md",
     "src/dnadesign/ops/README.md",
+    "src/dnadesign/usr/docs/operations/promoter-study-preflight.md",
+)
+STUDY_EXECUTION_SOURCE_DOC_PATHS = (
+    "docs/studies/README.md",
+    "src/dnadesign/usr/docs/operations/promoter-study-preflight.md",
 )
 STALE_OVERLAY_GUARD_TERMS = (
     "densegen-overlay-guard",
@@ -301,6 +314,16 @@ OPS_DEPRECATED_SEMANTICS_TERMS = (
     "precedent",
     "precedents",
     "with_notify_slack",
+    "infer_validate_config",
+    "infer_local_runtime",
+    "infer_dry_run",
+    "notify_profile_doctor",
+    "notify_resolve_events",
+    "details.setup_command",
+)
+PIPELINE_ONLY_EXECUTION_SOURCE_PATTERN = re.compile(
+    r"pipeline\.yaml[\s\S]{0,120}only (?:valid )?source",
+    flags=re.IGNORECASE,
 )
 PACKAGED_RUNBOOK_DURATION_SUFFIX_PATTERN = re.compile(r"_(?:\d+)(?:h|hr|hrs|hour|hours)$", re.IGNORECASE)
 OPERATIONAL_RUNBOOK_SCAN_PRUNE_DIRS = {
@@ -1245,6 +1268,12 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
         if not path.exists():
             continue
         text = path.read_text(encoding="utf-8")
+        if LEGACY_STUDY_RECORD_PREFIX in text:
+            issues.append(
+                f"{path}: legacy family-nested study path "
+                f"'{LEGACY_STUDY_RECORD_PREFIX}<study-id>/...' must not appear; "
+                "use 'docs/studies/<study-id>/...'."
+            )
         for required_name in STUDY_RECORD_REQUIRED_FILES:
             if required_name not in text:
                 issues.append(f"{path}: missing study-record contract reference for '{required_name}'.")
@@ -1258,6 +1287,12 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
             issues.append(
                 f"{path}: legacy study index path '{LEGACY_STUDY_INDEX_PATH}' must not appear; "
                 f"use '{ACTIVE_STUDY_INDEX_PATH}'."
+            )
+        if LEGACY_STUDY_RECORD_PREFIX in text:
+            issues.append(
+                f"{path}: legacy family-nested study path "
+                f"'{LEGACY_STUDY_RECORD_PREFIX}<study-id>/...' must not appear; "
+                "use 'docs/studies/<study-id>/...'."
             )
         if ACTIVE_STUDY_INDEX_PATH not in text:
             issues.append(f"{path}: study-record router must reference '{ACTIVE_STUDY_INDEX_PATH}'.")
@@ -1720,7 +1755,7 @@ def _is_allowed_operational_runbook_path(*, relative_path: Path) -> bool:
 
 def _find_operational_runbook_path_issues(repo_root: Path) -> list[str]:
     issues: list[str] = []
-    for path in _iter_operational_runbook_yaml_files(repo_root):
+    for path in _iter_operational_runbook_candidate_yaml_files(repo_root):
         if not _is_ops_operational_runbook_contract(path):
             continue
         relative_path = path.relative_to(repo_root)
@@ -1733,22 +1768,70 @@ def _find_operational_runbook_path_issues(repo_root: Path) -> list[str]:
     return issues
 
 
-def _iter_operational_runbook_yaml_files(repo_root: Path):
-    stack = [repo_root]
-    while stack:
-        current = stack.pop()
-        try:
-            entries = sorted(current.iterdir(), key=lambda entry: entry.name)
-        except OSError:
+def _iter_operational_runbook_candidate_yaml_files(repo_root: Path):
+    tracked_paths = _list_git_tracked_yaml_files(repo_root)
+    if tracked_paths is not None:
+        yield from tracked_paths
+        return
+    yield from _iter_bounded_operational_runbook_yaml_files(repo_root)
+
+
+def _list_git_tracked_yaml_files(repo_root: Path) -> tuple[Path, ...] | None:
+    try:
+        completed = subprocess.run(
+            ["git", "ls-files", "--", "*.yaml", "*.yml"],
+            cwd=repo_root,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+    except FileNotFoundError:
+        return None
+    except subprocess.CalledProcessError as exc:
+        stderr = str(exc.stderr or "").strip().lower()
+        if "not a git repository" in stderr:
+            return None
+        raise ValueError(f"git ls-files failed while collecting tracked yaml candidates: {stderr or exc}") from exc
+
+    candidates: list[Path] = []
+    seen: set[Path] = set()
+    for raw_line in completed.stdout.splitlines():
+        relative = Path(str(raw_line).strip())
+        if not relative.parts:
             continue
-        for entry in reversed(entries):
-            if entry.is_dir():
-                rel_parts = entry.relative_to(repo_root).parts
-                if _should_descend_operational_runbook_dir(rel_parts):
-                    stack.append(entry)
+        candidate = repo_root / relative
+        if not candidate.exists() or not candidate.is_file():
+            continue
+        if candidate.suffix.lower() not in {".yaml", ".yml"}:
+            continue
+        resolved = candidate.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        candidates.append(candidate)
+    return tuple(candidates)
+
+
+def _iter_bounded_operational_runbook_yaml_files(repo_root: Path):
+    seen: set[Path] = set()
+    for suffix in ("*.yaml", "*.yml"):
+        for path in sorted(repo_root.glob(suffix)):
+            resolved = path.resolve()
+            if resolved in seen:
                 continue
-            if entry.suffix.lower() in {".yaml", ".yml"}:
-                yield entry
+            seen.add(resolved)
+            yield path
+    for relative_root in OPS_OPERATIONAL_RUNBOOK_FALLBACK_SCAN_ROOTS:
+        target = repo_root / relative_root
+        if not target.exists():
+            continue
+        for suffix in ("*.yaml", "*.yml"):
+            for path in sorted(target.rglob(suffix)):
+                resolved = path.resolve()
+                if resolved in seen:
+                    continue
+                seen.add(resolved)
+                yield path
 
 
 def _should_descend_operational_runbook_dir(relative_parts: tuple[str, ...]) -> bool:
@@ -1850,6 +1933,26 @@ def _find_ops_deprecated_semantics_issues(repo_root: Path) -> list[str]:
                     f"{path}: deprecated ops semantics term '{term}' is not allowed; "
                     "use transport-neutral workflow ids and the presets surface only."
                 )
+    return issues
+
+
+def _find_study_execution_source_drift_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    target_files = _collect_markdown_files_from_relative_paths(
+        repo_root,
+        relative_paths=STUDY_EXECUTION_SOURCE_DOC_PATHS,
+    )
+    for path in target_files:
+        content = path.read_text(encoding="utf-8")
+        match = PIPELINE_ONLY_EXECUTION_SOURCE_PATTERN.search(content)
+        if match is None:
+            continue
+        line_no = content[: match.start()].count("\n") + 1
+        issues.append(
+            f"{path}:{line_no}: docs must not claim pipeline.yaml is the only execution-surface source; "
+            "use ops.study.yaml for OPS-facing execution surfaces and pipeline.yaml only for "
+            "supplemental runtime context."
+        )
     return issues
 
 
@@ -2005,6 +2108,13 @@ def main(argv: list[str] | None = None) -> int:
     if ops_deprecated_semantics_issues:
         print("Ops terminology drift check failed:")
         for issue in ops_deprecated_semantics_issues:
+            print(f" - {issue}")
+        return 1
+
+    study_execution_source_drift_issues = _find_study_execution_source_drift_issues(repo_root)
+    if study_execution_source_drift_issues:
+        print("Study execution-source docs check failed:")
+        for issue in study_execution_source_drift_issues:
             print(f" - {issue}")
         return 1
 

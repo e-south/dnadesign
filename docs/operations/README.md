@@ -7,7 +7,7 @@
 **Exit artifact:** Ops schema, plan, execute, or read-only progress docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-21
+**Last verified:** 2026-03-26
 
 Use this page when the next step is batch orchestration or a read-only Ops status check. If the work is dataset assembly, construct realization, or infer write-back, leave this page and continue in the shared USR runbooks. Detailed command behavior and schema rules live in [orchestration runbooks](orchestration-runbooks.md). Use the [runbook catalog](../runbooks/README.md) when you need command lookup across tools.
 
@@ -61,7 +61,7 @@ Use these when you still need command lookup before choosing a runbook lifecycle
 2. Use `uv run ops progress show ops.control-plane.orchestration --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json` to summarize one control-plane runbook execution from the registered progress contract.
 3. Use `uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <repo-root> --usr-root <usr-root> --dataset <dataset>` to summarize one staged USR-backed data-plane procedure from explicit artifacts.
 4. Use `uv run ops progress show usr.data-plane.promoter-study-status` when you want the one-command summary of the active checked-in live study before drilling into tool-local status. Add `--repo-root <repo-root> --study-dir docs/studies/<study-id>` when you need to pin a different study or invoke it from outside the repo checkout.
-5. Use `uv run ops progress show usr.data-plane.promoter-study-preflight` when you need the deeper read-only command preflight across DenseGen, Construct, Infer, Notify, and batch-plan surfaces for that same study.
+5. Use `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json` when you need the deeper execution-readiness blockers for the next actionable study phase. That surface reports generic check kinds declared in the checked-in `ops.study.yaml`, not hidden family-only readiness branches.
 6. `ops progress show` and `ops progress campaign` are read-only status commands. Inspect the required flags in `ops progress explain <registry-id>` or `ops catalog show <registry-id>` before you run them if you do not already know the artifact contract.
 7. Use `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` to emit a manifest template with the right required fields. It prints to stdout unless you pass `--out`.
 8. Use `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` when you want the named registered procedure plus its related procedures as a starting point.

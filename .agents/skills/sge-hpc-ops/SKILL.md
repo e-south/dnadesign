@@ -2,7 +2,7 @@
 name: sge-hpc-ops
 description: Operate SGE or UGE clusters including BU SCC with probe-first capability detection, deterministic interactive or batch execution, verify-before-submit gates, workflow routing for DenseGen plus Notify chains, and freshness checks for volatile SCC policy claims. Use when users ask about qsub, qrsh, qlogin, qstat, qdel, job arrays, resource requests, queue monitoring, BU SCC connectivity, OnDemand sessions, transfer-node usage, Notify Slack wiring, or BU SCC batch workflows. Do not use for non-SGE schedulers or local-only coding tasks.
 metadata:
-  version: 0.7.4
+  version: 0.7.5
   category: workflow-automation
   tags: [hpc, sge, bu-scc, batch, operations]
 ---
@@ -111,7 +111,10 @@ Clarification policy:
 ### Step 5a: Use runbook-native orchestration commands when available
 
 - prefer command-first Ops entrypoints from `references/runbook-entrypoints.md`,
-  including `uv run ops runbook presets`, over path-discovery heuristics
+  including `uv run ops catalog list --simple`, `uv run ops runbook presets`,
+  `uv run ops runbook init`, `uv run ops runbook plan`,
+  `uv run ops runbook active-jobs`, and `uv run ops runbook execute`, over
+  path-discovery heuristics
 - DenseGen defaults to notify-enabled runbooks; use `--no-notify` only for explicit batch-only requests, and treat `--no-submit` as the default pressure-test path before any real submit
 
 ### Step 6: Apply verify-before-submit gate
@@ -138,6 +141,7 @@ Clarification policy:
 
 - report findings, interpretation, action commands, and open risks
 - include capability snapshot, session summary, status card, shape-advisor output, operator brief, run handles, source freshness status
+- when an audit JSON already exists, use `uv run ops progress show ops.control-plane.orchestration --audit-json <audit.json>` as the read-only audit-summary step instead of inventing a second summary path
 
 ## Required Deliverables
 
