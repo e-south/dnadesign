@@ -11,10 +11,12 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 
 import yaml
 
+from dnadesign.ops.preflight.models import supported_preflight_check_kinds
 from dnadesign.ops.status.path_ref import resolve_path_ref
 
 from .models import (
@@ -25,18 +27,6 @@ from .models import (
     StudyPhaseContract,
     StudyPreflightContract,
     StudyPreflightNextScopeContract,
-)
-
-_SUPPORTED_PREFLIGHT_CHECK_KINDS = frozenset(
-    {
-        "command",
-        "dataset_snapshot",
-        "environment",
-        "gpu_availability",
-        "path_exists",
-        "runbook_plan",
-        "workspace_layout",
-    }
 )
 
 
@@ -156,7 +146,7 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
         contract_path=contract_path,
         label="ops.study.yaml artifacts",
     )
-    execution_surfaces = _validated_contract_named_payloads(
+    execution_surfaces = _validated_execution_surfaces(
         payload.get("execution_surfaces"),
         repo_root=repo_root,
         study_root=resolved_study_root,
@@ -250,12 +240,20 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
         source=contract_path,
         allow_empty=True,
     )
+    known_preflight_groups = {
+        *group_phase_bindings,
+        *(group for groups in target_phase_groups.values() for group in groups),
+        *runtime_phase_groups,
+        *runtime_shared_groups,
+    }
     scope_payloads = _validated_preflight_scopes(scopes_payload, contract_path=contract_path)
     check_specs = _validated_preflight_checks(
         checks_payload,
         phase_ids=seen_phase_ids,
+        known_groups=known_preflight_groups,
         artifact_ids=set(artifacts),
         execution_surface_ids=set(execution_surfaces),
+        execution_surfaces=execution_surfaces,
         contract_path=contract_path,
     )
     summary_scope = str(snapshot_payload.get("summary_scope") or "repo").strip()
@@ -311,6 +309,7 @@ def _string_sequence(
     label: str,
     source: Path,
     allow_empty: bool = False,
+    allow_duplicates: bool = False,
 ) -> tuple[str, ...]:
     if not isinstance(values, list):
         raise ValueError(f"{label} must be a list: {source}")
@@ -320,7 +319,7 @@ def _string_sequence(
         text = str(raw_value or "").strip()
         if not text:
             raise ValueError(f"{label} entry {index} must be non-empty: {source}")
-        if text in seen:
+        if text in seen and not allow_duplicates:
             raise ValueError(f"{label} must not duplicate {text!r}: {source}")
         seen.add(text)
         items.append(text)
@@ -395,6 +394,59 @@ def _validated_contract_named_payloads(
     return resolved
 
 
+def _validated_execution_surfaces(
+    value: object,
+    *,
+    repo_root: Path,
+    study_root: Path,
+    contract_path: Path,
+    label: str,
+) -> dict[str, dict[str, object]]:
+    resolved = _validated_contract_named_payloads(
+        value,
+        repo_root=repo_root,
+        study_root=study_root,
+        contract_path=contract_path,
+        label=label,
+    )
+    for surface_id, payload in resolved.items():
+        surface_type = _string_or_none(payload.get("surface_type"))
+        if surface_type is None:
+            raise ValueError(f"{label}.{surface_id} must define surface_type: {contract_path}")
+        if surface_type == "runbook":
+            if _string_or_none(payload.get("runbook_ref")) is None:
+                raise ValueError(f"{label}.{surface_id} must define runbook_ref: {contract_path}")
+        elif surface_type == "workspace":
+            if _string_or_none(payload.get("workspace_ref")) is None:
+                raise ValueError(f"{label}.{surface_id} must define workspace_ref: {contract_path}")
+        elif surface_type == "command":
+            argv = _string_sequence(
+                payload.get("argv"),
+                label=f"{label}.{surface_id} argv",
+                source=contract_path,
+                allow_duplicates=True,
+            )
+            payload["argv"] = list(argv)
+            cwd_ref = payload.get("cwd_ref")
+            if cwd_ref is not None:
+                normalized_cwd_ref = _string_or_none(cwd_ref)
+                if normalized_cwd_ref is None:
+                    raise ValueError(f"{label}.{surface_id}.cwd_ref must be a non-empty path ref: {contract_path}")
+                _validate_contract_path_ref(
+                    normalized_cwd_ref,
+                    repo_root=repo_root,
+                    study_root=study_root,
+                    label=f"{label}.{surface_id}.cwd_ref",
+                )
+        elif surface_type == "scheduler":
+            backend = _string_or_none(payload.get("backend"))
+            if backend is None:
+                raise ValueError(f"{label}.{surface_id} must define backend: {contract_path}")
+        else:
+            raise ValueError(f"{label}.{surface_id} has unsupported surface_type {surface_type!r}: {contract_path}")
+    return resolved
+
+
 def _validated_preflight_scopes(
     scopes_payload: object,
     *,
@@ -424,8 +476,10 @@ def _validated_preflight_checks(
     checks_payload: object,
     *,
     phase_ids: set[str],
+    known_groups: set[str],
     artifact_ids: set[str],
     execution_surface_ids: set[str],
+    execution_surfaces: Mapping[str, Mapping[str, object]],
     contract_path: Path,
 ) -> dict[str, tuple[dict[str, object], ...]]:
     if checks_payload is None:
@@ -456,8 +510,9 @@ def _validated_preflight_checks(
                 raise ValueError(
                     f"ops.study.yaml preflight.checks.{phase_id} entry {index} must define kind: {contract_path}"
                 )
-            if kind not in _SUPPORTED_PREFLIGHT_CHECK_KINDS:
-                allowed_kinds = ", ".join(sorted(_SUPPORTED_PREFLIGHT_CHECK_KINDS))
+            supported_kinds = supported_preflight_check_kinds()
+            if kind not in supported_kinds:
+                allowed_kinds = ", ".join(sorted(supported_kinds))
                 raise ValueError(
                     f"ops.study.yaml preflight.checks.{phase_id} entry {index} has unsupported kind {kind!r}; "
                     f"expected one of: {allowed_kinds}: {contract_path}"
@@ -472,10 +527,27 @@ def _validated_preflight_checks(
                     f"ops.study.yaml preflight.checks must not duplicate check_id {check_id!r}: {contract_path}"
                 )
             seen_check_ids.add(check_id)
+            check_group = _string_or_none(spec.get("check_group"))
+            if check_group is None:
+                raise ValueError(
+                    "ops.study.yaml preflight.checks."
+                    f"{phase_id} entry {check_id} must define check_group: {contract_path}"
+                )
+            if check_group not in known_groups:
+                raise ValueError(
+                    f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} references unknown check_group "
+                    f"{check_group!r}: {contract_path}"
+                )
             summary = _string_or_none(spec.get("summary"))
             if summary is None:
                 raise ValueError(
                     f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} must define summary: {contract_path}"
+                )
+            explicit_phase_id = _string_or_none(spec.get("phase_id"))
+            if explicit_phase_id is not None and explicit_phase_id not in phase_ids:
+                raise ValueError(
+                    f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} references undeclared phase_id "
+                    f"{explicit_phase_id!r}: {contract_path}"
                 )
             required = spec.get("required")
             if required is not None and not isinstance(required, bool):
@@ -503,7 +575,7 @@ def _validated_preflight_checks(
                         f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} must define positive integer "
                         f"target_rows: {contract_path}"
                     )
-            if kind in {"runbook_plan", "workspace_layout"}:
+            if kind in {"runbook_plan", "workspace_layout", "command", "scheduler_queue"}:
                 surface = _string_or_none(spec.get("surface"))
                 if surface is None:
                     raise ValueError(
@@ -515,6 +587,19 @@ def _validated_preflight_checks(
                         f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} references unknown surface "
                         f"{surface!r}: {contract_path}"
                     )
+                surface_type = str((execution_surfaces.get(surface) or {}).get("surface_type") or "").strip()
+                expected_surface_type = {
+                    "runbook_plan": "runbook",
+                    "workspace_layout": "workspace",
+                    "command": "command",
+                    "scheduler_queue": "scheduler",
+                }[kind]
+                if surface_type != expected_surface_type:
+                    raise ValueError(
+                        "ops.study.yaml preflight.checks."
+                        f"{phase_id} entry {check_id} requires surface {surface!r} to use "
+                        f"surface_type {expected_surface_type!r}: {contract_path}"
+                    )
             if kind == "environment":
                 vars_payload = spec.get("vars")
                 vars_list = _string_sequence(
@@ -523,6 +608,13 @@ def _validated_preflight_checks(
                     source=contract_path,
                 )
                 spec["vars"] = list(vars_list)
+                match_mode = _string_or_none(spec.get("match_mode")) or "all"
+                if match_mode not in {"all", "any"}:
+                    raise ValueError(
+                        "ops.study.yaml preflight.checks."
+                        f"{phase_id} entry {check_id} match_mode must be one of: all, any: {contract_path}"
+                    )
+                spec["match_mode"] = match_mode
             if kind == "gpu_availability":
                 min_visible = spec.get("min_visible")
                 if not isinstance(min_visible, int) or min_visible <= 0:
@@ -530,14 +622,20 @@ def _validated_preflight_checks(
                         f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} must define positive integer "
                         f"min_visible: {contract_path}"
                     )
-            if kind == "command":
-                argv_payload = spec.get("argv")
-                argv = _string_sequence(
-                    argv_payload,
-                    label=f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} argv",
-                    source=contract_path,
-                )
-                spec["argv"] = list(argv)
+            if kind == "scheduler_queue":
+                max_running_jobs = spec.get("max_running_jobs")
+                if not isinstance(max_running_jobs, int) or max_running_jobs <= 0:
+                    raise ValueError(
+                        "ops.study.yaml preflight.checks."
+                        f"{phase_id} entry {check_id} must define positive integer max_running_jobs: {contract_path}"
+                    )
+                max_queued_jobs = spec.get("max_queued_jobs")
+                if max_queued_jobs is not None and (not isinstance(max_queued_jobs, int) or max_queued_jobs <= 0):
+                    raise ValueError(
+                        "ops.study.yaml preflight.checks."
+                        f"{phase_id} entry {check_id} max_queued_jobs must be a positive integer when set: "
+                        f"{contract_path}"
+                    )
             specs.append(spec)
         resolved[phase_id] = tuple(specs)
     return resolved

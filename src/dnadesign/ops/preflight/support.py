@@ -78,10 +78,15 @@ def run_preflight_command(argv: Sequence[str], *, cwd: Path, timeout_seconds: in
 
 
 def choose_command_summary(execution: CommandExecution, *, fallback: str) -> str:
+    if execution.returncode == 0 and not execution.timed_out:
+        return fallback
     candidate_texts = (
         (execution.stderr, execution.stdout) if execution.returncode != 0 else (execution.stdout, execution.stderr)
     )
     for text in candidate_texts:
+        structured_summary = _structured_error_summary(text)
+        if structured_summary is not None:
+            return structured_summary
         for line in str(text or "").splitlines():
             stripped = line.strip()
             if not stripped:
@@ -90,8 +95,34 @@ def choose_command_summary(execution: CommandExecution, *, fallback: str) -> str
                 continue
             if stripped.startswith("WARNING:") or stripped.startswith("W0000 "):
                 continue
+            if _looks_like_rich_table_noise(stripped):
+                continue
             return stripped
     return fallback
+
+
+def _looks_like_rich_table_noise(line: str) -> bool:
+    if not line:
+        return False
+    box_drawing = {"│", "─", "╭", "╮", "╰", "╯", "├", "┤", "┬", "┴", "┼"}
+    return any(char in box_drawing for char in line)
+
+
+def _structured_error_summary(text: str | None) -> str | None:
+    payload = str(text or "").strip()
+    if not payload:
+        return None
+    try:
+        loaded = json.loads(payload)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(loaded, dict):
+        return None
+    for key in ("error", "message", "detail"):
+        value = str(loaded.get(key) or "").strip()
+        if value:
+            return value
+    return None
 
 
 def safe_json_loads(text: str | None) -> dict[str, object] | None:

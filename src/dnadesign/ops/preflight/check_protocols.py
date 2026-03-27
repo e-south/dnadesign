@@ -28,6 +28,8 @@ class CommandCheckTarget:
     argv: tuple[str, ...]
     cwd: Path
     fallback_summary: str
+    required: bool = True
+    surface_id: str | None = None
     details: Mapping[str, object] | None = None
 
 
@@ -39,6 +41,8 @@ class RunbookPlanCheckTarget:
     phase_id: str | None
     runbook_path: Path
     fallback_summary: str
+    required: bool = True
+    surface_id: str | None = None
     details: Mapping[str, object] | None = None
 
 
@@ -52,6 +56,21 @@ class EnvironmentCheckTarget:
     match_mode: EnvironmentMatchMode
     ok_summary: str
     missing_summary: str
+    required: bool = True
+    details: Mapping[str, object] | None = None
+
+
+@dataclass(frozen=True)
+class SchedulerQueueCheckTarget:
+    check_id: str
+    check_group: str | None
+    phase: str
+    phase_id: str | None
+    backend: str
+    max_running_jobs: int
+    max_queued_jobs: int | None = None
+    required: bool = True
+    surface_id: str | None = None
     details: Mapping[str, object] | None = None
 
 
@@ -60,4 +79,5 @@ __all__ = [
     "EnvironmentCheckTarget",
     "EnvironmentMatchMode",
     "RunbookPlanCheckTarget",
+    "SchedulerQueueCheckTarget",
 ]

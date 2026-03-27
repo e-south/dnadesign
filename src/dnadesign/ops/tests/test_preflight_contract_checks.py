@@ -1,0 +1,400 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/ops/tests/test_preflight_contract_checks.py
+
+Focused tests for generic OPS execution of contract-declared study preflight
+checks.
+
+Module Author(s): Codex
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from dnadesign.ops.preflight import (
+    CommandExecution,
+    ContractPreflightCheckDependencies,
+    build_command_check,
+    build_contract_preflight_checks,
+    contract_environment_flag_state,
+)
+from dnadesign.ops.preflight.models import supported_preflight_check_kinds
+from dnadesign.studies.core.models import (
+    StudyOpsContract,
+    StudyPhaseContract,
+    StudyPreflightContract,
+    StudyPreflightNextScopeContract,
+)
+
+
+def _execution(argv: tuple[str, ...], cwd: Path, *, returncode: int, stdout: str = "", stderr: str = "") -> object:
+    return CommandExecution(
+        argv=argv,
+        cwd=str(cwd),
+        returncode=returncode,
+        stdout=stdout,
+        stderr=stderr,
+        timed_out=False,
+    )
+
+
+def _contract() -> StudyOpsContract:
+    return StudyOpsContract(
+        study_id="demo_study",
+        family="promoter",
+        title="Demo study",
+        phase_order=("infer_batch_preparation", "infer_anchor_only_20b", "infer_anchor_only_7b"),
+        snapshot_summary_scope="repo",
+        execution_surfaces={
+            "infer_batch_20b_anchor_only": {
+                "surface_type": "runbook",
+                "runbook_ref": "repo:workspace/runbooks/infer_anchor_only_20b.yaml",
+            },
+            "infer_batch_7b_anchor_only": {
+                "surface_type": "runbook",
+                "runbook_ref": "repo:workspace/runbooks/infer_anchor_only_7b.yaml",
+            },
+            "infer_validate_anchor_only_20b": {
+                "surface_type": "command",
+                "argv": [
+                    "uv",
+                    "run",
+                    "infer",
+                    "validate",
+                    "config",
+                    "--config",
+                    "workspace/infer/config.anchor_only.evo2_20b.yaml",
+                ],
+            },
+            "scheduler_default": {
+                "surface_type": "scheduler",
+                "backend": "sge",
+            },
+        },
+        artifacts={
+            "construct_context_dataset": {
+                "artifact_type": "dataset",
+                "dataset_id": "promoter/demo_construct_contexts",
+                "ref": "repo:usr_root/promoter/demo_construct_contexts",
+            }
+        },
+        preflight=StudyPreflightContract(
+            default_scope="next",
+            group_phase_bindings={"notify_environment": "infer_batch_preparation"},
+            next_scope=StudyPreflightNextScopeContract(
+                target_phase_groups={
+                    "infer_batch_preparation": (
+                        "infer",
+                        "notify_environment",
+                        "infer_batch_plan",
+                    ),
+                },
+                runtime_phase_groups=("infer_batch_plan",),
+                runtime_shared_groups=("notify_environment",),
+            ),
+            check_specs={
+                "infer_batch_preparation": (
+                    {
+                        "kind": "environment",
+                        "check_id": "notify.environment.webhook",
+                        "check_group": "notify_environment",
+                        "summary": "Batch notify secret is configured in the environment.",
+                        "required": False,
+                        "vars": ["NOTIFY_WEBHOOK", "NOTIFY_WEBHOOK_FILE"],
+                        "match_mode": "any",
+                    },
+                    {
+                        "kind": "path_exists",
+                        "check_id": "infer.construct.contexts",
+                        "check_group": "infer",
+                        "summary": "Construct contexts are present for infer.",
+                        "required": True,
+                        "artifact": "construct_context_dataset",
+                    },
+                    {
+                        "kind": "command",
+                        "check_id": "infer.validate.anchor_only_20b",
+                        "check_group": "infer",
+                        "phase_id": "infer_anchor_only_20b",
+                        "summary": "Infer config validation completed.",
+                        "required": True,
+                        "surface": "infer_validate_anchor_only_20b",
+                    },
+                    {
+                        "kind": "scheduler_queue",
+                        "check_id": "infer.batch.queue",
+                        "check_group": "infer_batch_plan",
+                        "summary": "Scheduler queue is below the declared submit thresholds.",
+                        "required": False,
+                        "surface": "scheduler_default",
+                        "max_running_jobs": 3,
+                        "max_queued_jobs": 2,
+                    },
+                    {
+                        "kind": "runbook_plan",
+                        "check_id": "infer.batch.20b.anchor_only.plan",
+                        "check_group": "infer_batch_plan",
+                        "phase_id": "infer_anchor_only_20b",
+                        "summary": "Anchor-only 20B infer runbook renders cleanly.",
+                        "required": False,
+                        "surface": "infer_batch_20b_anchor_only",
+                    },
+                    {
+                        "kind": "runbook_plan",
+                        "check_id": "infer.batch.7b.anchor_only.plan",
+                        "check_group": "infer_batch_plan",
+                        "phase_id": "infer_anchor_only_7b",
+                        "summary": "Anchor-only 7B infer runbook renders cleanly.",
+                        "required": False,
+                        "surface": "infer_batch_7b_anchor_only",
+                    },
+                )
+            },
+        ),
+        current_phase_id="infer_batch_preparation",
+        phases=(
+            StudyPhaseContract(id="infer_batch_preparation", status="in_progress"),
+            StudyPhaseContract(id="infer_anchor_only_20b", status="planned"),
+            StudyPhaseContract(id="infer_anchor_only_7b", status="planned"),
+        ),
+        raw_payload={},
+    )
+
+
+def test_supported_preflight_kinds_are_generic_only() -> None:
+    supported = supported_preflight_check_kinds()
+
+    assert "scheduler_queue" in supported
+    assert "command" in supported
+    assert "infer_validate_config" not in supported
+    assert "infer_local_runtime" not in supported
+    assert "infer_dry_run" not in supported
+    assert "notify_profile_doctor" not in supported
+    assert "notify_resolve_events" not in supported
+
+
+def test_build_command_check_omits_success_output_tails() -> None:
+    check = build_command_check(
+        check_id="infer.validate.anchor_only_20b",
+        check_group="infer",
+        phase="infer",
+        phase_id="infer_anchor_only_20b",
+        summary="Infer config validation completed.",
+        execution=CommandExecution(
+            argv=("uv", "run", "infer", "validate", "config"),
+            cwd="/tmp/demo",
+            returncode=0,
+            stdout="rich table noise\n✔ Config validated.",
+            stderr="",
+            timed_out=False,
+        ),
+    )
+
+    assert check.state == "ok"
+    assert check.stdout_tail is None
+    assert check.stderr_tail is None
+
+
+def test_build_command_check_keeps_failure_output_tails() -> None:
+    check = build_command_check(
+        check_id="notify.profile.anchor_only_20b",
+        check_group="notify",
+        phase="notify",
+        phase_id="infer_anchor_only_20b",
+        summary="Notify profile doctor completed.",
+        execution=CommandExecution(
+            argv=("uv", "run", "notify", "profile", "doctor"),
+            cwd="/tmp/demo",
+            returncode=1,
+            stdout='{"ok": false, "error": "profile file not found"}',
+            stderr="",
+            timed_out=False,
+        ),
+    )
+
+    assert check.state == "attention"
+    assert check.stdout_tail == '{"ok": false, "error": "profile file not found"}'
+    assert check.stderr_tail is None
+
+
+def test_build_contract_preflight_checks_skips_non_enabled_groups(tmp_path: Path) -> None:
+    contract = _contract()
+
+    checks = build_contract_preflight_checks(
+        repo_root=tmp_path,
+        study_root=tmp_path / "docs" / "studies" / "demo_study",
+        contract=contract,
+        dataset_index={
+            "promoter/demo_construct_contexts": {
+                "dataset": "promoter/demo_construct_contexts",
+                "exists": True,
+                "records_path": str(tmp_path / "usr_root" / "promoter" / "demo_construct_contexts" / "records.parquet"),
+                "rows": 2,
+            }
+        },
+        execution_surface_index={
+            "infer_batch_20b_anchor_only": tmp_path / "workspace" / "runbooks" / "infer_anchor_only_20b.yaml",
+            "infer_batch_7b_anchor_only": tmp_path / "workspace" / "runbooks" / "infer_anchor_only_7b.yaml",
+        },
+        enabled_groups={"notify_environment"},
+        environ={"NOTIFY_WEBHOOK": "", "NOTIFY_WEBHOOK_FILE": "", "SSL_CERT_FILE": ""},
+        dependencies=ContractPreflightCheckDependencies(
+            run_preflight_command=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("group-gated commands should not execute")
+            ),
+            safe_json_loads=lambda text: json.loads(text or "") if text else None,
+            choose_command_summary=lambda *_args, fallback, **_kwargs: fallback,
+            inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},
+        ),
+    )
+
+    assert [check.id for check in checks] == ["notify.environment.webhook"]
+    assert checks[0].state == "attention"
+    assert checks[0].check_group == "notify_environment"
+    assert checks[0].details["match_mode"] == "any"
+    assert checks[0].required is False
+    assert (
+        checks[0].summary
+        == "None of the accepted environment variables are configured: NOTIFY_WEBHOOK, NOTIFY_WEBHOOK_FILE."
+    )
+
+
+def test_build_contract_preflight_checks_executes_declared_command_and_scheduler_surfaces(tmp_path: Path) -> None:
+    contract = _contract()
+    runbook_root = tmp_path / "workspace" / "runbooks"
+    runbook_root.mkdir(parents=True, exist_ok=True)
+    commands: list[tuple[str, ...]] = []
+
+    def _run_progress_command(argv, *, cwd, timeout_seconds=180):
+        del timeout_seconds
+        commands.append(tuple(argv))
+        if tuple(argv[:5]) == ("uv", "run", "infer", "validate", "config"):
+            return _execution(tuple(argv), cwd, returncode=0, stdout="config ok")
+        if tuple(argv[:7]) == (
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "dnadesign.ops.orchestrator.gates",
+            "session-counts",
+            "--allow-missing-qstat",
+        ):
+            return _execution(
+                tuple(argv),
+                cwd,
+                returncode=0,
+                stdout="queue_probe=ok running_jobs=4 queued_jobs=1 eqw_jobs=0",
+            )
+        if tuple(argv[:5]) == ("uv", "run", "ops", "runbook", "plan"):
+            return _execution(
+                tuple(argv),
+                cwd,
+                returncode=2,
+                stderr="notify webhook secret file is required for batch notify workflows",
+            )
+        raise AssertionError(f"unexpected command: {' '.join(argv)}")
+
+    checks = build_contract_preflight_checks(
+        repo_root=tmp_path,
+        study_root=tmp_path / "docs" / "studies" / "demo_study",
+        contract=contract,
+        dataset_index={
+            "promoter/demo_construct_contexts": {
+                "dataset": "promoter/demo_construct_contexts",
+                "exists": True,
+                "records_path": str(tmp_path / "usr_root" / "promoter" / "demo_construct_contexts" / "records.parquet"),
+                "rows": 2,
+            }
+        },
+        execution_surface_index={
+            "infer_batch_20b_anchor_only": runbook_root / "infer_anchor_only_20b.yaml",
+            "infer_batch_7b_anchor_only": runbook_root / "infer_anchor_only_7b.yaml",
+        },
+        enabled_groups={"infer", "infer_batch_plan"},
+        environ={},
+        dependencies=ContractPreflightCheckDependencies(
+            run_preflight_command=_run_progress_command,
+            safe_json_loads=lambda text: json.loads(text or "") if text else None,
+            choose_command_summary=lambda *_args, fallback, **_kwargs: fallback,
+            inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},
+        ),
+    )
+
+    by_id = {check.id: check for check in checks}
+
+    assert by_id["infer.validate.anchor_only_20b"].kind == "command"
+    assert by_id["infer.validate.anchor_only_20b"].state == "ok"
+    assert by_id["infer.validate.anchor_only_20b"].surface_id == "infer_validate_anchor_only_20b"
+    assert by_id["infer.validate.anchor_only_20b"].summary == "Infer config validation completed."
+    assert by_id["infer.batch.queue"].kind == "scheduler_queue"
+    assert by_id["infer.batch.queue"].state == "attention"
+    assert by_id["infer.batch.queue"].required is False
+    assert by_id["infer.batch.queue"].details["running_jobs"] == 4
+    assert by_id["infer.batch.20b.anchor_only.plan"].phase_id == "infer_anchor_only_20b"
+    assert by_id["infer.batch.7b.anchor_only.plan"].phase_id == "infer_anchor_only_7b"
+    assert by_id["infer.batch.20b.anchor_only.plan"].state == "attention"
+    assert commands == [
+        (
+            "uv",
+            "run",
+            "infer",
+            "validate",
+            "config",
+            "--config",
+            "workspace/infer/config.anchor_only.evo2_20b.yaml",
+        ),
+        (
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "dnadesign.ops.orchestrator.gates",
+            "session-counts",
+            "--allow-missing-qstat",
+        ),
+        (
+            "uv",
+            "run",
+            "ops",
+            "runbook",
+            "plan",
+            "--runbook",
+            str(runbook_root / "infer_anchor_only_20b.yaml"),
+            "--repo-root",
+            str(tmp_path),
+        ),
+        (
+            "uv",
+            "run",
+            "ops",
+            "runbook",
+            "plan",
+            "--runbook",
+            str(runbook_root / "infer_anchor_only_7b.yaml"),
+            "--repo-root",
+            str(tmp_path),
+        ),
+    ]
+
+
+def test_contract_environment_flag_state_reads_declared_environment_checks() -> None:
+    contract = _contract()
+
+    state = contract_environment_flag_state(
+        contract=contract,
+        environ={
+            "NOTIFY_WEBHOOK": "",
+            "NOTIFY_WEBHOOK_FILE": "/tmp/webhook",
+            "SSL_CERT_FILE": "",
+        },
+        check_group="notify_environment",
+    )
+
+    assert state == {
+        "NOTIFY_WEBHOOK": False,
+        "NOTIFY_WEBHOOK_FILE": True,
+    }
