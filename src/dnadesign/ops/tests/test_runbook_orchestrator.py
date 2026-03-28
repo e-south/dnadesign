@@ -15,6 +15,7 @@ import inspect
 import json
 import os
 import shlex
+import subprocess
 from pathlib import Path
 from typing import get_args
 
@@ -91,6 +92,11 @@ print(f"evo2_loaded={'evo2' in sys.modules}")
 
 def _render_block(commands: list[CommandSpec]) -> str:
     return "\n".join(command.render_shell() for command in commands)
+
+
+def _exported_env_names(command: CommandSpec) -> tuple[str, ...]:
+    assert command.argv is not None
+    return tuple(command.argv[command.argv.index("-v") + 1].split(","))
 
 
 def _write_runbook(
@@ -900,10 +906,20 @@ def test_build_batch_plan_forwards_allow_fresh_reset(tmp_path: Path, monkeypatch
     runbook = load_orchestration_runbook(runbook_path)
     captured: dict[str, object] = {}
 
-    def _fake_resolve_mode_decision(*, runbook, requested_mode, active_job_ids, allow_fresh_reset=False):
+    def _fake_resolve_mode_decision(
+        *,
+        runbook,
+        requested_mode,
+        active_job_ids,
+        runtime_visibility=None,
+        allow_fresh_reset=False,
+        allow_unknown_active_jobs=False,
+    ):
         captured["requested_mode"] = requested_mode
         captured["active_job_ids"] = tuple(active_job_ids)
+        captured["runtime_visibility"] = runtime_visibility
         captured["allow_fresh_reset"] = allow_fresh_reset
+        captured["allow_unknown_active_jobs"] = allow_unknown_active_jobs
         return orchestrator_state.ModeDecision(
             requested_mode="fresh",
             selected_mode="fresh",
@@ -930,25 +946,41 @@ def test_build_batch_plan_forwards_allow_fresh_reset(tmp_path: Path, monkeypatch
     assert plan.selected_mode == "fresh"
 
 
-def test_discover_active_job_ids_matches_densegen_config_and_notify_profile(
+def test_discover_active_job_ids_matches_explicit_identity_tags(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     runbook_path = _write_runbook(tmp_path)
     runbook = load_orchestration_runbook(runbook_path)
+    identity = orchestrator_state.resolve_ops_job_identity(runbook)
 
-    assert runbook.densegen is not None
-    assert runbook.notify is not None
     qstat_table = """
 job-ID prior name user state submit/start at queue slots ja-task-ID
 --------------------------------------------------------------------------------
 81001 0.555 a b r 03/01/2026 queueA 16
 81002 0.555 a b qw 03/01/2026 queueA 1
 81003 0.555 a b qw 03/01/2026 queueA 1
+81004 0.555 a b qw 03/01/2026 queueA 1
 """
     job_details = {
-        "81001": f"env_list: DENSEGEN_CONFIG={runbook.densegen.config}",
-        "81002": f"env_list: NOTIFY_PROFILE={runbook.notify.profile}",
-        "81003": "env_list: DENSEGEN_CONFIG=/tmp/other/config.yaml",
+        "81001": (
+            f"job_name: ops.{identity.job_name_slug}.densegen_cpu\n"
+            f"context: ops_job_role=densegen_cpu,ops_run_group_id={identity.run_group_id},"
+            f"ops_workspace_id={identity.workspace_id},ops_workflow_id={identity.workflow_id}\n"
+        ),
+        "81002": (
+            f"job_name: ops.{identity.job_name_slug}.notify\n"
+            f"env_list: OPS_JOB_ROLE=notify,OPS_RUN_GROUP_ID={identity.run_group_id},"
+            f"OPS_WORKSPACE_ID={identity.workspace_id},OPS_WORKFLOW_ID={identity.workflow_id}\n"
+        ),
+        "81003": (
+            f"job_name: ops.{identity.job_name_slug}.densegen_cpu\n"
+            f"context: ops_job_role=densegen_cpu,ops_run_group_id=foreign1234,"
+            f"ops_workspace_id={identity.workspace_id},ops_workflow_id={identity.workflow_id}\n"
+        ),
+        "81004": (
+            "job_name: ops.looks_similar.densegen_cpu\n"
+            "env_list: DENSEGEN_CONFIG=/tmp/other/config.yaml,NOTIFY_PROFILE=/tmp/other/profile.json\n"
+        ),
     }
 
     def _probe(argv: tuple[str, ...]) -> tuple[int, str, str]:
@@ -969,14 +1001,21 @@ def test_discover_active_job_ids_scans_full_qstat_listing_before_capping_matches
 ) -> None:
     runbook_path = _write_runbook(tmp_path)
     runbook = load_orchestration_runbook(runbook_path)
+    identity = orchestrator_state.resolve_ops_job_identity(runbook)
 
-    assert runbook.densegen is not None
     qstat_lines = [
         "job-ID prior name user state submit/start at queue slots ja-task-ID",
         "--------------------------------------------------------------------------------",
     ]
-    job_details = {str(81000 + idx): "env_list: DENSEGEN_CONFIG=/tmp/other/config.yaml" for idx in range(1, 27)}
-    job_details["81025"] = f"env_list: DENSEGEN_CONFIG={runbook.densegen.config}"
+    job_details = {
+        str(81000 + idx): "context: ops_run_group_id=foreign1234,ops_workspace_id=foreign5678,ops_workflow_id=other"
+        for idx in range(1, 27)
+    }
+    job_details["81025"] = (
+        f"job_name: ops.{identity.job_name_slug}.densegen_cpu\n"
+        f"context: ops_job_role=densegen_cpu,ops_run_group_id={identity.run_group_id},"
+        f"ops_workspace_id={identity.workspace_id},ops_workflow_id={identity.workflow_id}\n"
+    )
     for idx in range(1, 27):
         qstat_lines.append(f"{81000 + idx} 0.555 a b qw 03/01/2026 queueA 1")
     qstat_table = "\n".join(qstat_lines)
@@ -997,6 +1036,26 @@ def test_discover_active_job_ids_scans_full_qstat_listing_before_capping_matches
     assert discovered == ("81025",)
     assert seen_job_probes[-1] == "81025"
     assert "81026" not in seen_job_probes
+
+
+def test_batch_plan_submit_commands_include_explicit_job_identity_tags(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
+    submit_block = _render_block(plan.submit_commands)
+    identity = plan.job_identity
+    payload = plan.as_dict()
+
+    assert plan.runbook_id == runbook.id
+    assert plan.workspace_root == str(runbook.workspace_root)
+    assert payload["job_identity"]["run_group_id"] == identity.run_group_id
+    assert payload["job_identity"]["workspace_id"] == identity.workspace_id
+    assert payload["job_identity"]["workflow_id"] == runbook.workflow_id
+    assert f"OPS_RUN_GROUP_ID={identity.run_group_id}" in submit_block
+    assert f"ops_run_group_id={identity.run_group_id}" in submit_block
+    assert f"ops.{identity.job_name_slug}.notify" in submit_block
+    assert f"ops.{identity.job_name_slug}.densegen_cpu" in submit_block
 
 
 def test_discover_active_job_ids_raises_when_qstat_snapshot_fails(
@@ -1023,6 +1082,21 @@ def test_discover_active_job_ids_raises_clean_error_when_qstat_binary_missing(
     monkeypatch.setattr(orchestrator_state.subprocess, "run", _missing_qstat)
 
     with pytest.raises(RuntimeError, match="qstat unavailable"):
+        discover_active_job_ids_for_runbook(runbook, max_jobs=12)
+
+
+def test_discover_active_job_ids_raises_clean_error_when_qstat_times_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    def _timeout_qstat(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=kwargs.get("args", args[0] if args else ["qstat"]), timeout=10.0)
+
+    monkeypatch.setattr(orchestrator_state.subprocess, "run", _timeout_qstat)
+
+    with pytest.raises(RuntimeError, match=r"qstat unavailable: timed out after 10 seconds"):
         discover_active_job_ids_for_runbook(runbook, max_jobs=12)
 
 
@@ -1106,6 +1180,7 @@ def test_densegen_batch_submit_plan_skips_notify_smoke_and_watcher_submit(tmp_pa
 
     plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
     submit_block = _render_block(plan.submit_commands)
+    densegen_job_name = orchestrator_state.render_sge_job_name(plan.job_identity, role="densegen_cpu")
 
     assert plan.workflow_id == "densegen_batch_submit"
     assert plan.notify_smoke_commands == []
@@ -1114,7 +1189,7 @@ def test_densegen_batch_submit_plan_skips_notify_smoke_and_watcher_submit(tmp_pa
     assert "DENSEGEN_RUN_ARGS='--fresh --no-plot'" in submit_block
     assert f"DENSEGEN_TRACE_DIR={runbook.workspace_root}/outputs/logs/ops/runtime" in submit_block
     assert "docs/bu-scc/jobs/densegen-analysis.qsub" in submit_block
-    assert "-hold_jid study_stress_ethanol_cipro_densegen_cpu" in submit_block
+    assert f"-hold_jid {densegen_job_name}" in submit_block
     assert "-v DENSEGEN_CONFIG,DENSEGEN_RUN_ARGS,DENSEGEN_TRACE_DIR" in submit_block
     assert "DENSEGEN_NOTEBOOK_FORCE" not in submit_block
 
@@ -1162,13 +1237,14 @@ def test_densegen_post_run_can_use_dedicated_resources(tmp_path: Path) -> None:
 
     post_run_verify_shell = post_run_verify.render_shell()
     post_run_submit_shell = post_run_submit.render_shell()
+    densegen_job_name = orchestrator_state.render_sge_job_name(plan.job_identity, role="densegen_cpu")
     assert "-pe omp 1" in post_run_verify_shell
     assert "-l h_rt=00:20:00" in post_run_verify_shell
     assert "-l mem_per_core=2G" in post_run_verify_shell
     assert "-pe omp 1" in post_run_submit_shell
     assert "-l h_rt=00:20:00" in post_run_submit_shell
     assert "-l mem_per_core=2G" in post_run_submit_shell
-    assert "-hold_jid study_stress_ethanol_cipro_densegen_cpu" in post_run_submit_shell
+    assert f"-hold_jid {densegen_job_name}" in post_run_submit_shell
 
 
 def test_densegen_post_run_defaults_to_small_analysis_resources(tmp_path: Path) -> None:
@@ -1185,10 +1261,11 @@ def test_densegen_post_run_defaults_to_small_analysis_resources(tmp_path: Path) 
     )
 
     post_run_submit_shell = post_run_submit.render_shell()
+    densegen_job_name = orchestrator_state.render_sge_job_name(plan.job_identity, role="densegen_cpu")
     assert "-pe omp 4" in post_run_submit_shell
     assert "-l h_rt=01:00:00" in post_run_submit_shell
     assert "-l mem_per_core=4G" in post_run_submit_shell
-    assert "-hold_jid study_stress_ethanol_cipro_densegen_cpu" in post_run_submit_shell
+    assert f"-hold_jid {densegen_job_name}" in post_run_submit_shell
 
 
 def test_notify_submit_uses_webhook_file_without_embedding_secret(
@@ -1242,22 +1319,29 @@ def test_densegen_and_notify_qsub_commands_export_comma_bearing_values_via_env(t
     )
 
     assert densegen_submit.argv is not None
-    assert densegen_submit.argv[densegen_submit.argv.index("-v") + 1] == (
-        "DENSEGEN_CONFIG,DENSEGEN_RUN_ARGS,DENSEGEN_TRACE_DIR"
-    )
+    densegen_export_names = _exported_env_names(densegen_submit)
+    assert densegen_export_names == tuple(densegen_submit.env)
+    assert densegen_export_names[:3] == ("DENSEGEN_CONFIG", "DENSEGEN_RUN_ARGS", "DENSEGEN_TRACE_DIR")
+    assert "OPS_RUN_GROUP_ID" in densegen_export_names
+    assert "OPS_WORKSPACE_ID" in densegen_export_names
     assert "," in densegen_submit.env["DENSEGEN_CONFIG"]
-    assert "-v DENSEGEN_CONFIG,DENSEGEN_RUN_ARGS,DENSEGEN_TRACE_DIR" in densegen_submit.render_shell()
+    assert f"-v {','.join(densegen_export_names)}" in densegen_submit.render_shell()
 
     assert notify_submit.argv is not None
-    assert notify_submit.argv[notify_submit.argv.index("-v") + 1] == (
-        "NOTIFY_PROFILE,WEBHOOK_ENV,NOTIFY_IDLE_TIMEOUT_SECONDS,"
-        "NOTIFY_ENFORCE_TERMINAL_ON_IDLE,NOTIFY_TLS_CA_BUNDLE,WEBHOOK_FILE"
+    notify_export_names = _exported_env_names(notify_submit)
+    assert notify_export_names == tuple(notify_submit.env)
+    assert notify_export_names[:6] == (
+        "NOTIFY_PROFILE",
+        "WEBHOOK_ENV",
+        "NOTIFY_IDLE_TIMEOUT_SECONDS",
+        "NOTIFY_ENFORCE_TERMINAL_ON_IDLE",
+        "NOTIFY_TLS_CA_BUNDLE",
+        "WEBHOOK_FILE",
     )
+    assert "OPS_RUN_GROUP_ID" in notify_export_names
+    assert "OPS_WORKSPACE_ID" in notify_export_names
     assert "," in notify_submit.env["NOTIFY_PROFILE"]
-    assert (
-        "-v NOTIFY_PROFILE,WEBHOOK_ENV,NOTIFY_IDLE_TIMEOUT_SECONDS,"
-        "NOTIFY_ENFORCE_TERMINAL_ON_IDLE,NOTIFY_TLS_CA_BUNDLE,WEBHOOK_FILE"
-    ) in notify_submit.render_shell()
+    assert f"-v {','.join(notify_export_names)}" in notify_submit.render_shell()
 
 
 def test_notify_submit_aligns_runtime_and_idle_timeout_with_runbook(
@@ -1287,6 +1371,23 @@ def test_notify_submit_inherits_hold_jid_when_active_jobs_are_detected(tmp_path:
 
     notify_submit = plan.submit_commands[0].render_shell()
     assert "-hold_jid 81234" in notify_submit
+
+
+def test_preflight_operator_brief_inherits_requires_order_when_active_jobs_are_detected(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    plan = build_batch_plan(
+        runbook=runbook,
+        requested_mode=None,
+        requested_smoke=None,
+        active_job_ids=("81234",),
+    )
+
+    preflight_block = _render_block(plan.preflight_commands)
+    assert "ops runbook diagnostics submit-shape-advisor" in preflight_block
+    assert "ops runbook diagnostics operator-brief" in preflight_block
+    assert "--requires-order" in preflight_block
 
 
 def test_notify_submit_includes_tls_ca_bundle_for_watcher(
@@ -1412,8 +1513,8 @@ def test_batch_plan_includes_preflight_gate_commands(tmp_path: Path) -> None:
     preflight_block = _render_block(plan.preflight_commands)
 
     assert "dnadesign.ops.orchestrator.gates qa-submit-preflight" in preflight_block
-    assert "dnadesign.ops.orchestrator.gates submit-shape-advisor" in preflight_block
-    assert "dnadesign.ops.orchestrator.gates operator-brief" in preflight_block
+    assert "ops runbook diagnostics submit-shape-advisor" in preflight_block
+    assert "ops runbook diagnostics operator-brief" in preflight_block
 
 
 def test_batch_plan_includes_log_retention_prune_gate(tmp_path: Path) -> None:
@@ -1458,7 +1559,7 @@ def test_batch_plan_includes_session_counts_gate_instead_of_qstat_shell_awk(tmp_
     plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
     preflight_block = _render_block(plan.preflight_commands)
 
-    assert "dnadesign.ops.orchestrator.gates session-counts" in preflight_block
+    assert "ops runbook diagnostics session-counts" in preflight_block
     assert 'qstat -u "$USER" | awk' not in preflight_block
 
 
@@ -1474,10 +1575,10 @@ def test_batch_plan_can_render_explicit_degraded_queue_probe_flags(tmp_path: Pat
     )
     preflight_block = _render_block(plan.preflight_commands)
 
-    assert "dnadesign.ops.orchestrator.gates session-counts --allow-missing-qstat" in preflight_block
-    assert "dnadesign.ops.orchestrator.gates submit-shape-advisor --planned-submits" in preflight_block
+    assert "ops runbook diagnostics session-counts --allow-missing-qstat" in preflight_block
+    assert "ops runbook diagnostics submit-shape-advisor --planned-submits" in preflight_block
     assert "--allow-missing-qstat" in preflight_block
-    assert "dnadesign.ops.orchestrator.gates operator-brief --planned-submits" in preflight_block
+    assert "ops runbook diagnostics operator-brief --planned-submits" in preflight_block
 
 
 def test_densegen_notify_preflight_requires_usr_events_path_contract(tmp_path: Path) -> None:
@@ -1614,7 +1715,8 @@ def test_batch_plan_enforces_workspace_scoped_stdout_dir_for_verify_and_submit(t
     assert expected_stdout_file in preflight_block
     assert expected_stdout_file in submit_block
     assert "qsub -verify -P dunlop -o" in preflight_block
-    assert "qsub -terse -P dunlop -o" in submit_block
+    assert "qsub -terse -P dunlop " in submit_block
+    assert " -o " in submit_block
 
 
 def test_densegen_qsub_template_requires_explicit_mode_and_failure_messages() -> None:
@@ -1851,9 +1953,18 @@ def test_infer_qsub_commands_export_comma_bearing_values_via_env(tmp_path: Path)
 
     for command in (infer_verify, infer_submit):
         assert command.argv is not None
-        assert command.argv[command.argv.index("-v") + 1] == "INFER_CONFIG,INFER_RUN_ARGS,CUDA_MODULE,GCC_MODULE"
+        export_names = _exported_env_names(command)
+        assert export_names == tuple(command.env)
+        assert export_names[0] == "INFER_CONFIG"
+        assert export_names[-2:] == ("CUDA_MODULE", "GCC_MODULE")
+        if command is infer_submit:
+            assert "OPS_RUN_GROUP_ID" in export_names
+            assert "OPS_WORKSPACE_ID" in export_names
+        else:
+            assert "OPS_RUN_GROUP_ID" not in export_names
+            assert "OPS_WORKSPACE_ID" not in export_names
         assert "," in command.env["INFER_CONFIG"]
-        assert "-v INFER_CONFIG,INFER_RUN_ARGS,CUDA_MODULE,GCC_MODULE" in command.render_shell()
+        assert f"-v {','.join(export_names)}" in command.render_shell()
 
 
 def test_infer_mode_auto_selects_fresh_when_only_usr_registry_exists(tmp_path: Path) -> None:
@@ -2408,6 +2519,10 @@ def test_execute_batch_plan_writes_audit_json(tmp_path: Path) -> None:
     assert audit_path.exists()
     assert seen_commands
     assert all("qsub -terse" not in cmd for cmd in seen_commands)
+    payload = json.loads(audit_path.read_text(encoding="utf-8"))
+    assert payload["plan"]["runbook_id"] == runbook.id
+    assert payload["plan"]["workspace_root"] == str(runbook.workspace_root)
+    assert payload["plan"]["job_identity"]["run_group_id"] == plan.job_identity.run_group_id
 
 
 def test_execute_batch_plan_emits_orchestration_started_and_success_notifications(tmp_path: Path) -> None:
@@ -2558,6 +2673,57 @@ def test_execute_batch_plan_blocks_submit_when_plan_uses_allow_missing_qstat(tmp
     assert all("qsub -terse" not in command for command in seen_commands)
 
 
+def test_execute_batch_plan_captures_gate_stderr_for_nonzero_native_gate_command(tmp_path: Path) -> None:
+    audit_path = tmp_path / "audit" / "gate-stderr.json"
+    plan = BatchPlan(
+        runbook_id="gate-stderr-test",
+        workflow_id="densegen_batch_submit",
+        project="dunlop",
+        workspace_root=str(tmp_path / "workspace"),
+        job_identity=orchestrator_state.OpsJobIdentity(
+            workflow_id="densegen_batch_submit",
+            run_group_id="gatestderr123456",
+            workspace_id="workspace9876",
+            job_name_slug="gate-stderr-test",
+            runbook_id="gate-stderr-test",
+        ),
+        selected_mode="fresh",
+        selected_smoke=None,
+        submit_behavior="submit",
+        hold_jid=None,
+        preflight_commands=[
+            CommandSpec(
+                argv=(
+                    "uv",
+                    "run",
+                    "python",
+                    "-m",
+                    "dnadesign.ops.orchestrator.gates",
+                    "qa-submit-preflight",
+                    "--template",
+                    "/tmp/does-not-exist.qsub",
+                )
+            )
+        ],
+        notify_smoke_commands=[],
+        submit_commands=[],
+        orchestration_notify=None,
+        decision_reason="capture gate stderr",
+    )
+
+    result = execute_batch_plan(
+        plan=plan,
+        audit_json_path=audit_path,
+        submit=False,
+    )
+
+    assert result.ok is False
+    assert result.failed_phase == "preflight"
+    assert result.commands
+    assert result.commands[0].returncode == 2
+    assert "template_missing=/tmp/does-not-exist.qsub" in result.commands[0].stderr
+
+
 def test_cli_plan_invalid_runbook_shows_contract_error_without_traceback(tmp_path: Path) -> None:
     runbook_path = tmp_path / "invalid-runbook.yaml"
     payload = {
@@ -2606,8 +2772,17 @@ def test_cli_plan_invalid_runbook_shows_contract_error_without_traceback(tmp_pat
 
 def test_execute_batch_plan_fails_when_command_times_out(tmp_path: Path) -> None:
     plan = BatchPlan(
+        runbook_id="timeout-test",
         workflow_id="densegen_batch_with_notify",
         project="dunlop",
+        workspace_root=str(tmp_path / "workspace"),
+        job_identity=orchestrator_state.OpsJobIdentity(
+            workflow_id="densegen_batch_with_notify",
+            run_group_id="timeout1234567890",
+            workspace_id="workspace1234",
+            job_name_slug="timeout-test",
+            runbook_id="timeout-test",
+        ),
         selected_mode="fresh",
         selected_smoke="dry",
         submit_behavior="submit",
@@ -2636,8 +2811,17 @@ def test_execute_batch_plan_fails_when_command_times_out(tmp_path: Path) -> None
 
 def test_execute_batch_plan_requires_secret_ref_for_orchestration_notify(tmp_path: Path) -> None:
     plan = BatchPlan(
+        runbook_id="secret-ref-required-test",
         workflow_id="densegen_batch_with_notify",
         project="dunlop",
+        workspace_root=str(tmp_path / "workspace"),
+        job_identity=orchestrator_state.OpsJobIdentity(
+            workflow_id="densegen_batch_with_notify",
+            run_group_id="secretref1234567",
+            workspace_id="workspace5678",
+            job_name_slug="secret-ref-test",
+            runbook_id="secret-ref-required-test",
+        ),
         selected_mode="fresh",
         selected_smoke="dry",
         submit_behavior="submit",
@@ -2770,7 +2954,7 @@ def test_cli_execute_defaults_timeout_to_300_seconds(tmp_path: Path, monkeypatch
         captured["command_timeout_seconds"] = command_timeout_seconds
         return _Result()
 
-    monkeypatch.setattr("dnadesign.ops.cli.execute_batch_plan", _fake_execute_batch_plan)
+    monkeypatch.setattr("dnadesign.ops.api.execute_batch_plan", _fake_execute_batch_plan)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -2817,16 +3001,26 @@ def test_cli_execute_forwards_allow_missing_qstat_to_plan_builder(
             }
 
     def _fake_build_batch_plan(
-        *, runbook, requested_mode, requested_smoke, active_job_ids, allow_fresh_reset=False, allow_missing_qstat=False
+        *,
+        runbook,
+        requested_mode,
+        requested_smoke,
+        active_job_ids,
+        runtime_visibility=None,
+        allow_fresh_reset=False,
+        allow_missing_qstat=False,
+        allow_unknown_active_jobs=False,
     ):
         captured["allow_missing_qstat"] = allow_missing_qstat
+        captured["runtime_visibility"] = runtime_visibility
+        captured["allow_unknown_active_jobs"] = allow_unknown_active_jobs
         return _Plan()
 
     def _fake_execute_batch_plan(*, plan, audit_json_path, submit, command_timeout_seconds):
         return _Result()
 
-    monkeypatch.setattr("dnadesign.ops.cli.build_batch_plan", _fake_build_batch_plan)
-    monkeypatch.setattr("dnadesign.ops.cli.execute_batch_plan", _fake_execute_batch_plan)
+    monkeypatch.setattr("dnadesign.ops.api.build_batch_plan", _fake_build_batch_plan)
+    monkeypatch.setattr("dnadesign.ops.api.execute_batch_plan", _fake_execute_batch_plan)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -2869,7 +3063,87 @@ def test_cli_execute_rejects_submit_with_allow_missing_qstat(tmp_path: Path) -> 
     )
 
     assert result.exit_code == 2
-    assert "--allow-missing-qstat is only allowed with --no-submit" in result.output
+    assert "Runbook contract error:" in result.output
+    assert "--allow-missing-qstat" in result.output
+    assert "--no-submit" in result.output
+
+
+def test_cli_plan_blocks_submit_decision_when_active_job_visibility_is_unknown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    monkeypatch.setattr(
+        "dnadesign.ops.api.resolve_active_job_resolution",
+        lambda **kwargs: orchestrator_state.ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=(),
+            effective_job_ids=(),
+            runtime_visibility=orchestrator_state.RuntimeVisibility(
+                scheduler_probe_state=orchestrator_state.SchedulerProbeState.UNAVAILABLE,
+                active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.UNKNOWN,
+                degraded=True,
+                degraded_reasons=("qstat unavailable",),
+            ),
+        ),
+    )
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["runbook", "plan", "--runbook", str(runbook_path), "--discover-active-jobs"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["submit_behavior"] == "blocked"
+    assert payload["runtime_visibility"]["scheduler_probe_state"] == "unavailable"
+    assert payload["runtime_visibility"]["active_job_resolution_state"] == "unknown"
+    assert payload["runtime_visibility"]["degraded"] is True
+
+
+def test_cli_execute_blocks_submit_when_active_job_visibility_is_unknown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    audit_path = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "audit" / "result.json"
+    execute_called = False
+
+    monkeypatch.setattr(
+        "dnadesign.ops.api.resolve_active_job_resolution",
+        lambda **kwargs: orchestrator_state.ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=(),
+            effective_job_ids=(),
+            runtime_visibility=orchestrator_state.RuntimeVisibility(
+                scheduler_probe_state=orchestrator_state.SchedulerProbeState.UNAVAILABLE,
+                active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.UNKNOWN,
+                degraded=True,
+                degraded_reasons=("qstat unavailable",),
+            ),
+        ),
+    )
+
+    def _fake_execute_batch_plan(*, plan, audit_json_path, submit, command_timeout_seconds):
+        nonlocal execute_called
+        execute_called = True
+        raise AssertionError("execute_batch_plan should not be called when active-job visibility is unknown")
+
+    monkeypatch.setattr("dnadesign.ops.api.execute_batch_plan", _fake_execute_batch_plan)
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "execute",
+            "--runbook",
+            str(runbook_path),
+            "--audit-json",
+            str(audit_path),
+            "--submit",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "active-job visibility is unavailable" in result.output
+    assert execute_called is False
 
 
 def test_cli_execute_rejects_audit_json_outside_workspace_ops_audit(tmp_path: Path) -> None:
@@ -2950,6 +3224,34 @@ def test_cli_runbook_init_creates_valid_densegen_contract(tmp_path: Path) -> Non
     assert str(workspace_root / "outputs" / "notify" / "densegen" / "profile.json") in result.stderr
 
 
+def test_cli_runbook_init_accepts_named_preset_for_project_defaults(tmp_path: Path) -> None:
+    runbook_path = tmp_path / "contracts" / "densegen-runbook.yaml"
+    workspace_root = tmp_path / "workspace_densegen"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "init",
+            "--workflow",
+            "densegen",
+            "--runbook",
+            str(runbook_path),
+            "--workspace-root",
+            str(workspace_root),
+            "--preset",
+            "bu-scc-dunlop",
+            "--id",
+            "densegen_demo",
+        ],
+    )
+
+    assert result.exit_code == 0
+    loaded = load_orchestration_runbook(runbook_path)
+    assert loaded.project == "dunlop"
+
+
 def test_cli_runbook_init_supports_densegen_without_notify(tmp_path: Path) -> None:
     runbook_path = tmp_path / "contracts" / "densegen-runbook.yaml"
     workspace_root = tmp_path / "workspace_densegen"
@@ -2966,6 +3268,8 @@ def test_cli_runbook_init_supports_densegen_without_notify(tmp_path: Path) -> No
             str(runbook_path),
             "--workspace-root",
             str(workspace_root),
+            "--project",
+            "dunlop",
             "--no-notify",
         ],
     )
@@ -3052,6 +3356,8 @@ def test_cli_runbook_init_applies_resource_overrides(tmp_path: Path) -> None:
             str(runbook_path),
             "--workspace-root",
             str(workspace_root),
+            "--project",
+            "dunlop",
             "--h-rt",
             "02:00:00",
             "--pe-omp",
@@ -3090,6 +3396,8 @@ def test_cli_runbook_init_uses_repo_root_for_template_contracts(tmp_path: Path) 
             str(workspace_root),
             "--repo-root",
             str(repo_root),
+            "--project",
+            "dunlop",
         ],
     )
 
@@ -3119,6 +3427,8 @@ def test_cli_runbook_init_resolves_relative_workspace_root_against_repo_root(tmp
             str(workspace_relative),
             "--repo-root",
             str(repo_root),
+            "--project",
+            "dunlop",
         ],
     )
 
@@ -3145,6 +3455,8 @@ def test_cli_runbook_init_rejects_repo_root_runbook_path(tmp_path: Path) -> None
             str(workspace_root),
             "--repo-root",
             str(tmp_path),
+            "--project",
+            "dunlop",
         ],
     )
 
@@ -3170,6 +3482,8 @@ def test_cli_runbook_init_rejects_tmp_ops_runbook_path(tmp_path: Path) -> None:
             str(workspace_root),
             "--repo-root",
             str(tmp_path),
+            "--project",
+            "dunlop",
         ],
     )
 
@@ -3195,6 +3509,8 @@ def test_cli_runbook_init_rejects_tmp_ops_unhidden_runbook_path(tmp_path: Path) 
             str(workspace_root),
             "--repo-root",
             str(tmp_path),
+            "--project",
+            "dunlop",
         ],
     )
 
@@ -3220,6 +3536,8 @@ def test_cli_runbook_init_rejects_codex_tmp_runbook_path(tmp_path: Path) -> None
             str(workspace_root),
             "--repo-root",
             str(tmp_path),
+            "--project",
+            "dunlop",
         ],
     )
 
@@ -3375,8 +3693,17 @@ def test_cli_runbook_execute_repo_root_override_enforces_path_contract(
 def test_cli_plan_uses_discovered_active_job_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     runbook_path = _write_runbook(tmp_path)
     monkeypatch.setattr(
-        "dnadesign.ops.cli.discover_active_job_ids_for_runbook",
-        lambda runbook, max_jobs: ("93331",),
+        "dnadesign.ops.api.resolve_active_job_resolution",
+        lambda **kwargs: orchestrator_state.ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=("93331",),
+            effective_job_ids=("93331",),
+            runtime_visibility=orchestrator_state.RuntimeVisibility(
+                scheduler_probe_state=orchestrator_state.SchedulerProbeState.OK,
+                active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.MATCHED,
+                degraded=False,
+            ),
+        ),
     )
     runner = CliRunner()
 
@@ -3391,8 +3718,17 @@ def test_cli_plan_uses_discovered_active_job_ids(tmp_path: Path, monkeypatch: py
 def test_cli_plan_chains_all_discovered_active_job_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     runbook_path = _write_runbook(tmp_path)
     monkeypatch.setattr(
-        "dnadesign.ops.cli.discover_active_job_ids_for_runbook",
-        lambda runbook, max_jobs: ("93332", "93331", "93332"),
+        "dnadesign.ops.api.resolve_active_job_resolution",
+        lambda **kwargs: orchestrator_state.ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=("93332", "93331", "93332"),
+            effective_job_ids=("93332", "93331", "93332"),
+            runtime_visibility=orchestrator_state.RuntimeVisibility(
+                scheduler_probe_state=orchestrator_state.SchedulerProbeState.OK,
+                active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.MULTIPLE_MATCHES,
+                degraded=False,
+            ),
+        ),
     )
     runner = CliRunner()
 
@@ -3432,8 +3768,17 @@ def test_cli_plan_accepts_comma_delimited_active_job_ids(tmp_path: Path) -> None
 def test_cli_active_jobs_emits_discovered_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     runbook_path = _write_runbook(tmp_path)
     monkeypatch.setattr(
-        "dnadesign.ops.cli.discover_active_job_ids_for_runbook",
-        lambda runbook, max_jobs: ("95001", "95002"),
+        "dnadesign.ops.api.probe_active_jobs_for_runbook",
+        lambda runbook, max_jobs: orchestrator_state.ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=("95001", "95002"),
+            effective_job_ids=("95001", "95002"),
+            runtime_visibility=orchestrator_state.RuntimeVisibility(
+                scheduler_probe_state=orchestrator_state.SchedulerProbeState.OK,
+                active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.MULTIPLE_MATCHES,
+                degraded=False,
+            ),
+        ),
     )
     runner = CliRunner()
 
@@ -3467,6 +3812,38 @@ def test_packaged_runbook_presets_exist_and_load() -> None:
             "infer_batch_submit",
             "infer_batch_with_notify",
         }
+
+
+def test_infer_runbook_allows_workspace_local_config_variants() -> None:
+    workspace_root = Path("/tmp/infer_layout_alt_config")
+    payload = _infer_runbook_payload(workspace_root)
+    payload["runbook"]["infer"]["config"] = str(workspace_root / "config.anchor_only.evo2_7b.yaml")
+
+    loaded = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+
+    assert loaded.infer is not None
+    assert loaded.infer.config.name == "config.anchor_only.evo2_7b.yaml"
+
+
+def test_infer_runbook_allows_lane_scoped_notify_state() -> None:
+    workspace_root = Path("/tmp/infer_layout_lane_notify")
+    payload = _infer_runbook_payload(workspace_root)
+    payload["runbook"]["workflow_id"] = "infer_batch_with_notify"
+    payload["runbook"]["notify"] = {
+        "tool": "infer",
+        "policy": "infer",
+        "profile": str(workspace_root / "outputs" / "notify" / "infer" / "anchor_only_7b" / "profile.json"),
+        "cursor": str(workspace_root / "outputs" / "notify" / "infer" / "anchor_only_7b" / "cursor"),
+        "spool_dir": str(workspace_root / "outputs" / "notify" / "infer" / "anchor_only_7b" / "spool"),
+        "webhook_env": "NOTIFY_WEBHOOK",
+        "qsub_template": "docs/bu-scc/jobs/notify-watch.qsub",
+        "smoke": "dry",
+    }
+
+    loaded = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+
+    assert loaded.notify is not None
+    assert loaded.notify.profile.parent.name == "anchor_only_7b"
 
 
 def test_densegen_packaged_presets_use_repo_default_qsub_tokens() -> None:

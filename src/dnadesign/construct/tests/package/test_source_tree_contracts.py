@@ -42,6 +42,7 @@ def test_construct_root_keeps_minimal_top_level_surface() -> None:
         "__init__.py",
         "__main__.py",
         "cli.py",
+        "contracts.py",
         "docs",
         "src",
         "tests",
@@ -58,11 +59,9 @@ def test_construct_internal_cli_is_nested_under_src() -> None:
     assert (cli_dir / "commands").is_dir()
 
 
-def test_construct_package_data_includes_both_packaged_workspace_profiles() -> None:
+def test_construct_package_data_uses_workspace_shape_globs() -> None:
     repo_root = _construct_root().parents[2]
     pyproject = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
-    assert "workspaces/demo_promoter_swap_pdual10/*.yaml" in pyproject
-    assert "workspaces/demo_promoter_swap_pdual10/inputs/*.yaml" in pyproject
-    assert "workspaces/demo_promoter_swap_pdual10_source_of_truth/*.yaml" in pyproject
-    assert "workspaces/demo_promoter_swap_pdual10_source_of_truth/inputs/*.md" in pyproject
-    assert "workspaces/demo_promoter_swap_pdual10_source_of_truth/inputs/*.yaml" in pyproject
+    assert '"workspaces/*.md"' in pyproject
+    assert '"workspaces/*/*"' in pyproject
+    assert '"workspaces/*/inputs/*"' in pyproject

@@ -14,11 +14,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from dnadesign._contracts import (
-    resolve_construct_usr_output_contract,
-    resolve_densegen_usr_output_contract,
-    resolve_infer_usr_output_contract,
-)
+from dnadesign.construct.contracts import resolve_construct_usr_output_contract
+from dnadesign.densegen.contracts import resolve_densegen_usr_output_contract
+from dnadesign.infer.contracts import resolve_infer_usr_output_contract
 
 from ..errors import NotifyConfigError
 

@@ -21,6 +21,7 @@ This creates:
 ### Packaged feature-bundle smoke path
 
 - [evo2_feature_bundle_smoke](evo2_feature_bundle_smoke/README.md): small anchor-only plus templated records for the Evo2 feature-bundle contract.
+- [study_stress_ethanol_cipro](study_stress_ethanol_cipro/README.md): the real promoter-study Infer surface, pointing at shared-root anchor-only and template-backed datasets plus Notify-backed batch presets.
 
 ### Contract
 
@@ -37,6 +38,10 @@ This creates:
 root. Use it for self-contained pressure tests or local ownership. Point infer
 at an explicit shared USR root when the dataset is the cross-tool study source
 of truth.
+
+The `study_stress_ethanol_cipro` workspace is not a workspace-local smoke path.
+It is a checked-in shared-root study surface whose configs point at the shared
+USR datasets recorded in the promoter-study docs.
 
 ### Local data path option (non-USR)
 

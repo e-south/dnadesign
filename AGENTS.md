@@ -27,6 +27,8 @@ Treat this file as a navigation map; canonical policy and operational detail liv
   - `uv sync --locked`
   - `uv sync --locked --group dev`
 - Validate changes:
+  - This repo does not ship `./scripts/agent-verify`.
+    If external router guidance points at that script, use the repo-local checks below instead.
   - `uv run ruff check .`
   - `uv run ruff format --check .`
   - `uv run pytest -q`
@@ -44,8 +46,9 @@ Treat this file as a navigation map; canonical policy and operational detail liv
 - Notify operator docs: `docs/notify/README.md`
 - Notify event contract: `docs/notify/usr-events.md`
 - Repo-local promoter-study status skill: `.agents/skills/promoter-study-status/SKILL.md`
+  - Native project-scope skill discovery only applies when the Codex session is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the explicit `uv run ops progress show usr.data-plane.promoter-study-status` entrypoint instead of assuming the skill will appear in the advertised skill list.
 - Checked-in live study records: `docs/studies/README.md`
-- Promoter study active-study registry: `docs/studies/promoter/index.yaml`
+- Promoter study active-study registry: `docs/studies/index.yaml`
 - Maintainer docs and CI/testing notes: `docs/dev/README.md`
 
 ## Repository patterns

@@ -16,7 +16,7 @@ import os
 import uuid
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Mapping, Optional
 
 import pandas as pd
 import pyarrow as pa
@@ -79,6 +79,35 @@ def _read_attach_input(path: Path) -> pd.DataFrame:
     raise SchemaError("Unsupported input format. Use parquet|csv|jsonl.")
 
 
+def _merge_attach_event_args(
+    *,
+    namespace: str,
+    key: str,
+    rows_incoming: int,
+    rows_matched: int,
+    rows_missing: int,
+    allow_overwrite: bool,
+    note: str,
+    event_args: Mapping[str, object] | None,
+) -> dict[str, object]:
+    args: dict[str, object] = {
+        "namespace": namespace,
+        "key": key,
+        "rows_incoming": rows_incoming,
+        "rows_matched": rows_matched,
+        "rows_missing": rows_missing,
+        "allow_overwrite": allow_overwrite,
+        "note": note,
+    }
+    if event_args is None:
+        return args
+    for event_key, event_value in event_args.items():
+        if event_key in args:
+            raise SchemaError(f"Attach event_args cannot override reserved key '{event_key}'.")
+        args[event_key] = event_value
+    return args
+
+
 def _attach_frame_dataset(
     *,
     dataset: Any,
@@ -92,6 +121,7 @@ def _attach_frame_dataset(
     parse_json: bool = True,
     note: str = "",
     actor: Optional[dict] = None,
+    event_args: Mapping[str, object] | None = None,
     reserved_namespaces: set[str],
     write_lock=dataset_write_lock,
 ) -> int:
@@ -289,15 +319,16 @@ def _attach_frame_dataset(
         rows_matched = int(overlay_df.shape[0])
         dataset._record_event(
             "attach",
-            args={
-                "namespace": namespace,
-                "key": key,
-                "rows_incoming": rows_incoming,
-                "rows_matched": rows_matched,
-                "rows_missing": rows_missing_local,
-                "allow_overwrite": allow_overwrite,
-                "note": note,
-            },
+            args=_merge_attach_event_args(
+                namespace=namespace,
+                key=key,
+                rows_incoming=rows_incoming,
+                rows_matched=rows_matched,
+                rows_missing=rows_missing_local,
+                allow_overwrite=allow_overwrite,
+                note=note,
+                event_args=event_args,
+            ),
             target_path=out_path,
             actor=actor,
         )
@@ -321,6 +352,7 @@ def attach_dataset(
     backend: str = "pyarrow",
     note: str = "",
     actor: Optional[dict] = None,
+    event_args: Mapping[str, object] | None = None,
     namespace_pattern: Any,
     reserved_namespaces: set[str],
     write_lock=dataset_write_lock,
@@ -351,6 +383,7 @@ def attach_dataset(
             allow_overwrite=allow_overwrite,
             allow_missing=allow_missing,
             note=note,
+            event_args=event_args,
             write_lock=write_lock,
         )
 
@@ -366,6 +399,7 @@ def attach_dataset(
         parse_json=parse_json,
         note=note,
         actor=actor,
+        event_args=event_args,
         reserved_namespaces=reserved_namespaces,
         write_lock=write_lock,
     )
@@ -487,6 +521,7 @@ def attach_duckdb_dataset(
     allow_overwrite: bool,
     allow_missing: bool,
     note: str,
+    event_args: Mapping[str, object] | None,
     write_lock=dataset_write_lock,
 ) -> int:
     """Attach derived columns using DuckDB for large parquet inputs."""
@@ -705,15 +740,16 @@ def attach_duckdb_dataset(
 
             dataset._record_event(
                 "attach",
-                args={
-                    "namespace": namespace,
-                    "key": key,
-                    "rows_incoming": rows_incoming,
-                    "rows_matched": rows_matched,
-                    "rows_missing": rows_missing if allow_missing else 0,
-                    "allow_overwrite": allow_overwrite,
-                    "note": note,
-                },
+                args=_merge_attach_event_args(
+                    namespace=namespace,
+                    key=key,
+                    rows_incoming=rows_incoming,
+                    rows_matched=rows_matched,
+                    rows_missing=rows_missing if allow_missing else 0,
+                    allow_overwrite=allow_overwrite,
+                    note=note,
+                    event_args=event_args,
+                ),
                 target_path=out_path,
             )
             return rows_matched
@@ -738,6 +774,7 @@ def attach_columns_dataset(
     backend: str = "pyarrow",
     note: str = "",
     actor: Optional[dict] = None,
+    event_args: Mapping[str, object] | None = None,
     namespace_pattern: Any,
     reserved_namespaces: set[str],
     write_lock=dataset_write_lock,
@@ -755,6 +792,7 @@ def attach_columns_dataset(
         backend=backend,
         note=note,
         actor=actor,
+        event_args=event_args,
         namespace_pattern=namespace_pattern,
         reserved_namespaces=reserved_namespaces,
         write_lock=write_lock,

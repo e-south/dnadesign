@@ -9,6 +9,8 @@ Public API:
   - run_generate
   - run_job (YAML-driven)
   - export_evo2_promoter_opal_matrix
+  - inspect_local_gpu_inventory
+  - resolve_infer_runtime_lane_contracts
   - validate_runbook_gpu_resources
 
 Module Author(s): Eric J. South
@@ -20,6 +22,14 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+
+from .contracts import (
+    InferRuntimeLaneContract,
+    infer_model_family_suffix,
+    resolve_infer_runtime_lane_contracts,
+    validate_infer_config_contract,
+    validate_infer_dry_run_contract,
+)
 
 
 def run_extract(*args: Any, **kwargs: Any):
@@ -52,6 +62,24 @@ def export_evo2_promoter_opal_matrix(*args: Any, **kwargs: Any):
     return _export_evo2_promoter_opal_matrix(*args, **kwargs)
 
 
+def inspect_local_gpu_inventory() -> dict[str, object]:
+    from .src.runtime.hardware_probe import probe_gpu_inventory
+
+    inventory = probe_gpu_inventory()
+    return {
+        "count": inventory.count,
+        "devices": [
+            {
+                "index": device.index,
+                "name": device.name,
+                "total_memory_gib": float(device.total_memory_gib),
+                "compute_capability": device.compute_capability,
+            }
+            for device in inventory.devices
+        ],
+    }
+
+
 def validate_runbook_gpu_resources(
     *,
     config_path: Path,
@@ -75,5 +103,11 @@ __all__ = (
     "run_generate",
     "run_job",
     "export_evo2_promoter_opal_matrix",
+    "InferRuntimeLaneContract",
+    "infer_model_family_suffix",
+    "inspect_local_gpu_inventory",
+    "resolve_infer_runtime_lane_contracts",
+    "validate_infer_config_contract",
+    "validate_infer_dry_run_contract",
     "validate_runbook_gpu_resources",
 )

@@ -2,7 +2,7 @@
 name: sge-hpc-ops
 description: Operate SGE or UGE clusters including BU SCC with probe-first capability detection, deterministic interactive or batch execution, verify-before-submit gates, workflow routing for DenseGen plus Notify chains, and freshness checks for volatile SCC policy claims. Use when users ask about qsub, qrsh, qlogin, qstat, qdel, job arrays, resource requests, queue monitoring, BU SCC connectivity, OnDemand sessions, transfer-node usage, Notify Slack wiring, or BU SCC batch workflows. Do not use for non-SGE schedulers or local-only coding tasks.
 metadata:
-  version: 0.7.4
+  version: 0.7.5
   category: workflow-automation
   tags: [hpc, sge, bu-scc, batch, operations]
 ---
@@ -49,7 +49,7 @@ Clarification policy:
 
 ## Success Criteria
 
-- exactly one route is emitted (`workflow_id`) before command generation
+- exactly one route is emitted (`route_id`) before command generation
 - capability snapshot includes scheduler facts, `execution_locus`, session status, and active-job snapshot
 - user-facing status card is emitted before additional submissions
 - verify-before-submit and qa preflight checks pass before real `qsub`
@@ -64,9 +64,9 @@ Clarification policy:
 ### Step 1: Route workflow and execution locus
 
 - classify request using `references/workflow-router.md`
-- select exactly one `workflow_id`:
+- select exactly one `route_id`:
   - `densegen_batch_submit`
-  - `densegen_batch_with_notify_slack`
+  - `densegen_batch_with_notify`
   - `ondemand_session_request`
   - `ondemand_session_handoff`
   - `generic_sge_ops`
@@ -80,6 +80,7 @@ Clarification policy:
 - when reporting HPC status to users, include `references/session-status-reporting.md` and `references/user-status-contract.md`
 - when submit-shape or readiness is in scope, include `references/submission-shape-advisor.md` and `references/operator-brief.md`
 - when command-first Ops runbooks are available, include `references/runbook-entrypoints.md`
+- when OPS CLI failure semantics or machine capture are relevant, include `docs/operations/ops-failure-contract.md`
 - for batch/interactive specifics, load only the matching contract (`references/batch-submit-contract.md` or `references/interactive-contract.md`)
 
 ### Step 3: Apply up-to-date handling
@@ -94,7 +95,7 @@ Clarification policy:
 - run probes from `references/probe-first-contract.md`
 - run `scripts/sge-session-status.sh --warn-over-running 3`
 - run `scripts/sge-active-jobs.sh --max-jobs 12` when status reporting is requested
-- include: `workflow_id`, `execution_locus`, `session_handoff_state`, unresolved unknowns
+- include: `route_id`, `execution_locus`, `session_handoff_state`, unresolved unknowns
 - include counts: `running_jobs`, `queued_jobs`, `eqw_jobs` and threshold warning state
 
 ### Step 5: Build deterministic execution plan
@@ -111,7 +112,16 @@ Clarification policy:
 ### Step 5a: Use runbook-native orchestration commands when available
 
 - prefer command-first Ops entrypoints from `references/runbook-entrypoints.md`,
-  including `uv run ops runbook precedents`, over path-discovery heuristics
+  including `uv run ops catalog list --simple`, `uv run ops runbook presets`,
+  `uv run ops runbook init`, `uv run ops runbook plan`,
+  `uv run ops runbook active-jobs`, and `uv run ops runbook execute`, over
+  path-discovery heuristics
+- treat native OPS gate outputs as canonical for machine-readable scheduler
+  tokens such as `advisor`, `submit_gate`, and `queue_policy`; keep the
+  repo-local shell overlays aligned to those values
+- for automatic active-job discovery, prefer the explicit OPS scheduler
+  identity carried in submitted job metadata and audit JSON; do not infer
+  matches from workspace-path token overlap alone
 - DenseGen defaults to notify-enabled runbooks; use `--no-notify` only for explicit batch-only requests, and treat `--no-submit` as the default pressure-test path before any real submit
 
 ### Step 6: Apply verify-before-submit gate
@@ -138,10 +148,13 @@ Clarification policy:
 
 - report findings, interpretation, action commands, and open risks
 - include capability snapshot, session summary, status card, shape-advisor output, operator brief, run handles, source freshness status
+- when an audit JSON already exists, use `uv run ops progress show ops.control-plane.orchestration --audit-json <audit.json>` as the read-only audit-summary step instead of inventing a second summary path
+- when a runbook or scheduler submission is in scope, keep the same run-group
+  identity across submit metadata, active-job discovery, and audit observation
 
 ## Required Deliverables
 
-- route decision (`workflow_id`, `execution_locus`, `session_handoff_state`)
+- route decision (`route_id`, `execution_locus`, `session_handoff_state`)
 - capability snapshot
 - session status summary (`running_jobs`, `queued_jobs`, `eqw_jobs`, threshold state)
 - active-job snapshot (`job_id`, `state`, `queue`, `slots`, `task_id`)

@@ -61,13 +61,16 @@ def test_run_construct_realizes_multi_part_linear_window(tmp_path: Path) -> None
 job:
   id: demo_linear
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: tag
@@ -77,9 +80,11 @@ job:
         literal: GG
       placement:
         kind: insert
-        start: 4
-        end: 4
         orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 4
     - name: anchor
       role: anchor
       sequence:
@@ -87,18 +92,27 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    window_bp: 8
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 8
+      offset_bp: 0
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -136,13 +150,16 @@ def test_run_construct_tags_usr_events_with_construct_actor(tmp_path: Path) -> N
 job:
   id: actor_demo
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: anchor
@@ -152,15 +169,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: full_construct
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -193,13 +215,16 @@ def test_run_construct_supports_circular_window_wrap(tmp_path: Path) -> None:
 job:
   id: demo_circular
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: circular_template
-    sequence: AAAACCCC
+    source:
+      kind: literal
+      sequence: AAAACCCC
     circular: true
   parts:
     - name: anchor
@@ -209,18 +234,27 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 6
-        end: 8
         orientation: forward
-        expected_template_sequence: CC
+        locator:
+          kind: coordinates
+          start: 6
+          end: 8
+        guards:
+          replaced_sequence: CC
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    window_bp: 6
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 6
+      offset_bp: 0
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -237,7 +271,7 @@ job:
     assert [part["placement_kind"] for part in frame.iloc[0]["construct__parts"]] == ["replace"]
 
 
-def test_run_construct_supports_negative_anchor_offset_on_circular_window(tmp_path: Path) -> None:
+def test_run_construct_supports_negative_window_offset_on_circular_window(tmp_path: Path) -> None:
     usr_root = tmp_path / "usr_root"
     usr_root.mkdir(parents=True, exist_ok=True)
     _write_registry(usr_root)
@@ -252,13 +286,16 @@ def test_run_construct_supports_negative_anchor_offset_on_circular_window(tmp_pa
 job:
   id: demo_negative_offset
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: circular_template
-    sequence: AAAACCCC
+    source:
+      kind: literal
+      sequence: AAAACCCC
     circular: true
   parts:
     - name: anchor
@@ -268,19 +305,27 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 6
-        end: 8
         orientation: forward
-        expected_template_sequence: CC
+        locator:
+          kind: coordinates
+          start: 6
+          end: 8
+        guards:
+          replaced_sequence: CC
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    anchor_offset_bp: -2
-    window_bp: 6
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 6
+      offset_bp: -2
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -310,13 +355,16 @@ def test_run_construct_supports_fixed_total_three_prime_window_semantics(tmp_pat
 job:
   id: demo_three_prime
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: anchor
@@ -326,10 +374,13 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: window
     focal_part: anchor
@@ -340,8 +391,10 @@ job:
       size_bp: 5
       offset_bp: 0
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -372,13 +425,16 @@ def test_preflight_rejects_fixed_total_window_that_clips_anchor_handoff_span(tmp
 job:
   id: demo_clipped_anchor_window
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: anchor
@@ -388,10 +444,13 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: window
     focal_part: anchor
@@ -402,8 +461,10 @@ job:
       size_bp: 5
       offset_bp: 0
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -427,13 +488,16 @@ def test_run_construct_supports_anchor_plus_context_window_semantics(tmp_path: P
 job:
   id: demo_anchor_plus_context
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: anchor
@@ -443,10 +507,13 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: window
     focal_part: anchor
@@ -455,8 +522,10 @@ job:
       upstream_bp: 2
       downstream_bp: 3
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -487,13 +556,16 @@ def test_run_construct_supports_reverse_complement_orientation(tmp_path: Path) -
 job:
   id: demo_reverse_complement
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAACCCC
+    source:
+      kind: literal
+      sequence: AAAACCCC
     circular: false
   parts:
     - name: anchor
@@ -503,15 +575,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 4
-        end: 8
         orientation: reverse_complement
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: full_construct
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -540,13 +617,16 @@ def test_run_construct_rejects_mismatched_expected_template_sequence(tmp_path: P
 job:
   id: demo_mismatch
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAACCCC
+    source:
+      kind: literal
+      sequence: AAAACCCC
     circular: false
   parts:
     - name: anchor
@@ -556,20 +636,258 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 4
-        end: 8
         orientation: forward
-        expected_template_sequence: TTTT
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
   realize:
     mode: full_construct
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
 
     with pytest.raises(ValidationError, match="expected template interval"):
+        run_from_config(config_path)
+
+
+def test_run_construct_accepts_case_insensitive_template_flanks(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["GG"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct_flanks.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: demo_flank_contract
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    source:
+      kind: literal
+      sequence: aaaattttccccgggg
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
+          upstream_sequence: AAAA
+          downstream_sequence: cCcC
+  realize:
+    mode: full_construct
+  output:
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = run_from_config(config_path)
+
+    assert result.records_total == 1
+    frame = Dataset(usr_root, "anchors_constructed").head(n=5)
+    assert str(frame.iloc[0]["sequence"]).upper() == "AAAAGGCCCCGGGG"
+
+
+def test_run_construct_rejects_mismatched_expected_template_upstream_sequence(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["GG"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct_bad_upstream_flank.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: demo_bad_upstream_flank
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
+          upstream_sequence: AAAT
+  realize:
+    mode: full_construct
+  output:
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="forward-strand upstream flank"):
+        run_from_config(config_path)
+
+
+def test_run_construct_rejects_mismatched_expected_template_downstream_sequence(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["GG"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct_bad_downstream_flank.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: demo_bad_downstream_flank
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
+          downstream_sequence: CCCG
+  realize:
+    mode: full_construct
+  output:
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="forward-strand downstream flank"):
+        run_from_config(config_path)
+
+
+def test_run_construct_rejects_non_unique_template_kmer_guards(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["GG"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct_non_unique_flank_guard.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: demo_non_unique_flank_guard
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCAAAAGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
+          upstream_sequence: AAAA
+          require_unique_forward_matches: true
+  realize:
+    mode: full_construct
+  output:
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="requires a unique forward-strand match"):
         run_from_config(config_path)
 
 
@@ -593,17 +911,19 @@ def test_run_construct_supports_usr_backed_template_records(tmp_path: Path) -> N
 job:
   id: demo_usr_template
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: circular_template
-    kind: usr
-    dataset: templates_demo
-    root: {usr_root.as_posix()}
-    record_id: {template_id}
-    field: sequence
+    source:
+      kind: usr
+      dataset: templates_demo
+      root: {usr_root.as_posix()}
+      record_id: {template_id}
+      field: sequence
     circular: true
   parts:
     - name: anchor
@@ -613,15 +933,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 6
-        end: 8
         orientation: forward
-        expected_template_sequence: CC
+        locator:
+          kind: coordinates
+          start: 6
+          end: 8
+        guards:
+          replaced_sequence: CC
   realize:
     mode: full_construct
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -655,14 +980,16 @@ def test_run_construct_rejects_multi_record_fasta_template(tmp_path: Path) -> No
 job:
   id: demo_multi_fasta
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: fasta_template
-    kind: path
-    path: {fasta_path.as_posix()}
+    source:
+      kind: path
+      path: {fasta_path.as_posix()}
     circular: false
   parts:
     - name: anchor
@@ -672,15 +999,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 2
-        end: 4
         orientation: forward
-        expected_template_sequence: AA
+        locator:
+          kind: coordinates
+          start: 2
+          end: 4
+        guards:
+          replaced_sequence: AA
   realize:
     mode: full_construct
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -729,13 +1061,16 @@ namespaces:
 job:
   id: demo_bad_registry
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: template_demo
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: anchor
@@ -745,15 +1080,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: full_construct
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -777,13 +1117,16 @@ def test_run_construct_preserves_equal_coordinate_part_order_in_output_and_metad
 job:
   id: demo_equal_coordinate_order
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAACCCC
+    source:
+      kind: literal
+      sequence: AAAACCCC
     circular: false
   parts:
     - name: z_insert
@@ -793,9 +1136,11 @@ job:
         literal: GG
       placement:
         kind: insert
-        start: 4
-        end: 4
         orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 4
     - name: a_insert
       role: helper
       sequence:
@@ -803,9 +1148,11 @@ job:
         literal: TT
       placement:
         kind: insert
-        start: 4
-        end: 4
         orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 4
     - name: anchor
       role: anchor
       sequence:
@@ -813,15 +1160,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 6
-        end: 8
         orientation: forward
-        expected_template_sequence: CC
+        locator:
+          kind: coordinates
+          start: 6
+          end: 8
+        guards:
+          replaced_sequence: CC
   realize:
     mode: full_construct
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -849,13 +1201,16 @@ def test_preflight_reports_equal_coordinate_insert_order_consistently_with_linea
 job:
   id: demo_equal_coordinate_preflight
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAACCCC
+    source:
+      kind: literal
+      sequence: AAAACCCC
     circular: false
   parts:
     - name: z_insert
@@ -865,9 +1220,11 @@ job:
         literal: GG
       placement:
         kind: insert
-        start: 4
-        end: 4
         orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 4
     - name: a_insert
       role: helper
       sequence:
@@ -875,9 +1232,11 @@ job:
         literal: TT
       placement:
         kind: insert
-        start: 4
-        end: 4
         orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 4
     - name: anchor
       role: anchor
       sequence:
@@ -885,15 +1244,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 6
-        end: 8
         orientation: forward
-        expected_template_sequence: CC
+        locator:
+          kind: coordinates
+          start: 6
+          end: 8
+        guards:
+          replaced_sequence: CC
   realize:
     mode: full_construct
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -921,13 +1285,16 @@ def test_preflight_rejects_same_start_mixed_intervals(tmp_path: Path) -> None:
 job:
   id: demo_same_start_mixed
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: replace_anchor
@@ -937,10 +1304,13 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 4
-        end: 8
         orientation: forward
-        expected_template_sequence: TTTT
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
     - name: insert_tag
       role: helper
       sequence:
@@ -948,14 +1318,18 @@ job:
         literal: GG
       placement:
         kind: insert
-        start: 4
-        end: 4
         orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 4
   realize:
     mode: full_construct
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -979,13 +1353,16 @@ def test_preflight_rejects_partial_overlap(tmp_path: Path) -> None:
 job:
   id: demo_partial_overlap
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: helper
@@ -995,10 +1372,13 @@ job:
         literal: GG
       placement:
         kind: replace
-        start: 4
-        end: 8
         orientation: forward
-        expected_template_sequence: TTTT
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
     - name: anchor
       role: anchor
       sequence:
@@ -1006,15 +1386,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 6
-        end: 10
         orientation: forward
-        expected_template_sequence: TTCC
+        locator:
+          kind: coordinates
+          start: 6
+          end: 10
+        guards:
+          replaced_sequence: TTCC
   realize:
     mode: full_construct
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -1038,13 +1423,16 @@ def test_preflight_rejects_fixed_total_window_shorter_than_focal_part(tmp_path: 
 job:
   id: demo_fixed_total_too_small
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: anchor
@@ -1054,10 +1442,13 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: window
     focal_part: anchor
@@ -1068,8 +1459,10 @@ job:
       size_bp: 5
       offset_bp: 0
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -1098,14 +1491,17 @@ def test_preflight_spec_id_changes_with_selected_input_ids(tmp_path: Path) -> No
 job:
   id: demo_spec_ids
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
     ids: [{selected_id}]
   template:
     id: linear_template
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: anchor
@@ -1115,15 +1511,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: full_construct
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
             encoding="utf-8",
         )
@@ -1146,13 +1547,16 @@ def test_preflight_rejects_same_input_and_output_dataset_without_opt_in(tmp_path
 job:
   id: demo_same_dataset
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: anchor
@@ -1162,15 +1566,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: full_construct
   output:
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -1194,13 +1603,16 @@ def test_preflight_detects_existing_output_collisions_and_ignore_mode_skips_them
 job:
   id: demo_collision
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: anchor
@@ -1210,15 +1622,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: full_construct
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -1231,8 +1648,9 @@ job:
             2,
         )
         .replace(
-            "  output:\n    dataset: anchors_constructed\n    root: " + usr_root.as_posix(),
-            "  output:\n    dataset: anchors_constructed\n    root: "
+            "  output:\n    target:\n      kind: usr\n      dataset: anchors_constructed\n      root: "
+            + usr_root.as_posix(),
+            "  output:\n    target:\n      kind: usr\n      dataset: anchors_constructed\n      root: "
             + usr_root.as_posix()
             + "\n    on_conflict: ignore",
         ),
@@ -1270,14 +1688,17 @@ def test_preflight_rejects_duplicate_planned_output_ids(tmp_path: Path) -> None:
 job:
   id: demo_duplicate_outputs
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
     ids: [{anchor_id}, {anchor_id}]
   template:
     id: linear_template
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: anchor
@@ -1287,15 +1708,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: full_construct
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -1320,13 +1746,16 @@ def test_run_construct_can_append_new_rows_to_existing_output_dataset(tmp_path: 
 job:
   id: demo_append_first
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAACCCC
+    source:
+      kind: literal
+      sequence: AAAACCCC
     circular: false
   parts:
     - name: anchor
@@ -1336,15 +1765,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 6
-        end: 8
         orientation: forward
-        expected_template_sequence: CC
+        locator:
+          kind: coordinates
+          start: 6
+          end: 8
+        guards:
+          replaced_sequence: CC
   realize:
     mode: full_construct
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -1382,13 +1816,16 @@ def test_run_construct_can_append_into_input_dataset_when_allowed(tmp_path: Path
 job:
   id: demo_same_dataset_allowed
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAACCCC
+    source:
+      kind: literal
+      sequence: AAAACCCC
     circular: false
   parts:
     - name: anchor
@@ -1398,15 +1835,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 6
-        end: 8
         orientation: forward
-        expected_template_sequence: CC
+        locator:
+          kind: coordinates
+          start: 6
+          end: 8
+        guards:
+          replaced_sequence: CC
   realize:
     mode: full_construct
   output:
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     allow_same_as_input: true
 """,
         encoding="utf-8",
@@ -1448,13 +1890,16 @@ def test_run_construct_carries_forward_upstream_usr_labels(tmp_path: Path) -> No
 job:
   id: demo_labels
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: linear_template
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: anchor
@@ -1464,18 +1909,27 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    window_bp: 8
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 8
+      offset_bp: 0
   output:
-    dataset: anchors_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -1488,3 +1942,124 @@ job:
     assert frame.iloc[0]["usr_label__primary"] == "J23105"
     assert frame.iloc[0]["usr_label__aliases"] == ["BBa_J23105"]
     assert frame.iloc[0]["construct__input_id"]
+
+
+def test_run_construct_resolves_flank_locator_replace(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["AC"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct_flanks.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: demo_flanks
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    source:
+      kind: literal
+      sequence: AAAACCCCGGGGTTTT
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: flanks
+          upstream_sequence: AAAA
+          downstream_sequence: GGGG
+        guards:
+          replaced_sequence: CCCC
+          replaced_span_bp: 4
+  realize:
+    mode: full_construct
+  output:
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = run_from_config(config_path)
+
+    assert result.records_total == 1
+    frame = Dataset(usr_root, "anchors_constructed").head(n=5)
+    assert frame.iloc[0]["sequence"] == "AAAAACGGGGTTTT"
+    assert frame.iloc[0]["construct__parts"][0]["template_start"] == 4
+    assert frame.iloc[0]["construct__parts"][0]["template_end"] == 8
+
+
+def test_run_construct_rejects_flank_locator_with_repeated_kmer(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["AC"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct_flanks_repeated.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: demo_flanks_repeated
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: linear_template
+    source:
+      kind: literal
+      sequence: AAAACCCCAAAAGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: flanks
+          upstream_sequence: AAAA
+          downstream_sequence: GGGG
+        guards:
+          replaced_span_bp: 4
+  realize:
+    mode: full_construct
+  output:
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="requires exactly one forward-strand match for placement.locator.upstream_sequence",
+    ):
+        run_from_config(config_path)

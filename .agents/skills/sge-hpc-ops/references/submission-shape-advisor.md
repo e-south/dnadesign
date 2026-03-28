@@ -23,6 +23,9 @@ scripts/sge-submit-shape-advisor.sh \
 ```
 
 Add `--requires-order` when jobs must run sequentially.
+The supported `uv run ops runbook diagnostics submit-shape-advisor` command uses
+the same machine-readable `advisor`, `reason`, and `recommended_action`
+contract.
 
 ### Advisor outcomes
 
@@ -32,12 +35,11 @@ Add `--requires-order` when jobs must run sequentially.
 - `advisor=hold_jid`
   - use when jobs must run in order
   - rationale: explicit dependency chain without submit bursts
-- `advisor=single_submit`
-  - use when one submit is planned and pressure is acceptable
-- `advisor=confirm_then_submit`
-  - use when running pressure is high but only one additional submit is requested
-- `advisor=triage_first`
-  - use when `Eqw` jobs are present; fix failures before new submits
+- `advisor=single`
+  - use when one submit is planned; inspect `reason` and `recommended_action`
+    to see whether high running-job pressure still requires confirmation
+- `advisor=hold`
+  - use when `Eqw` jobs are present; stop and triage before new submits
 
 ### Example flows
 

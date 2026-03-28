@@ -104,16 +104,9 @@ where = ["src"]
 ]
 "dnadesign.construct" = [
   "src/seeds/*.yaml",
-  "workspaces/demo_promoter_swap_pdual10/*.md",
-  "workspaces/demo_promoter_swap_pdual10/*.sh",
-  "workspaces/demo_promoter_swap_pdual10/*.yaml",
-  "workspaces/demo_promoter_swap_pdual10/inputs/*.md",
-  "workspaces/demo_promoter_swap_pdual10/inputs/*.yaml",
-  "workspaces/demo_promoter_swap_pdual10_source_of_truth/*.md",
-  "workspaces/demo_promoter_swap_pdual10_source_of_truth/*.sh",
-  "workspaces/demo_promoter_swap_pdual10_source_of_truth/*.yaml",
-  "workspaces/demo_promoter_swap_pdual10_source_of_truth/inputs/*.md",
-  "workspaces/demo_promoter_swap_pdual10_source_of_truth/inputs/*.yaml",
+  "workspaces/*.md",
+  "workspaces/*/*",
+  "workspaces/*/inputs/*",
 ]
 "dnadesign.cruncher.ingest.certs" = ["*.pem"]
 "dnadesign.densegen" = [
@@ -132,8 +125,13 @@ where = ["src"]
   "workspaces/*/inputs/*",
 ]
 "dnadesign.ops" = [
+  "providers/*/status.registry.yaml",
+  "runbooks/init_presets.yaml",
   "runbooks/presets/*.yaml",
   "runbooks/templates/*.qsub",
+]
+"dnadesign.studies" = [
+  "*/status.registry.yaml",
 ]
 
 [tool.pytest.ini_options]

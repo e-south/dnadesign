@@ -8,5 +8,5 @@ entry_artifact: one USR dataset updated asynchronously by DenseGen on HPC and in
 exit_artifact: synchronized USR dataset with transfer-verified infer overlays on both hosts
 summary: Coordinate DenseGen-on-HPC and Infer-local writes against one USR dataset with explicit sync checkpoints.
 execution_kind: iterative
-progress_kind: usr-sync-audit
+status_kind: usr-sync-audit
 relations: []

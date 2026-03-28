@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -53,12 +54,15 @@ def test_validate_config_accepts_minimal_valid_yaml(tmp_path: Path) -> None:
 job:
   id: demo_job
   input:
-    source: usr
-    dataset: anchors_demo
-    root: outputs/usr_datasets
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: outputs/usr_datasets
   template:
     id: template_demo
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: true
   parts:
     - name: anchor
@@ -68,17 +72,26 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 4
-        end: 8
         orientation: forward
-        expected_template_sequence: TTTT
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    window_bp: 8
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 8
+      offset_bp: 0
   output:
-    dataset: anchors_demo_constructed
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
 """,
         encoding="utf-8",
     )
@@ -97,11 +110,14 @@ def test_validate_config_rejects_usr_input_without_explicit_root(tmp_path: Path)
 job:
   id: demo_job
   input:
-    source: usr
-    dataset: anchors_demo
+    source:
+      kind: usr
+      dataset: anchors_demo
   template:
     id: template_demo
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: true
   parts:
     - name: anchor
@@ -111,17 +127,26 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 4
-        end: 8
         orientation: forward
-        expected_template_sequence: TTTT
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    window_bp: 8
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 8
+      offset_bp: 0
   output:
-    dataset: anchors_demo_constructed
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
 """,
         encoding="utf-8",
     )
@@ -129,7 +154,7 @@ job:
     result = _RUNNER.invoke(app, ["validate", "config", "--config", config_path.as_posix()])
 
     assert result.exit_code == 1
-    assert "job.input.root is required for construct jobs that read USR datasets" in (result.stdout or "")
+    assert "job.input.source.root is required for construct jobs that read USR datasets" in (result.stdout or "")
 
 
 def test_validate_config_rejects_missing_input_driven_part(tmp_path: Path) -> None:
@@ -139,12 +164,15 @@ def test_validate_config_rejects_missing_input_driven_part(tmp_path: Path) -> No
 job:
   id: demo_job
   input:
-    source: usr
-    dataset: anchors_demo
-    root: outputs/usr_datasets
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: outputs/usr_datasets
   template:
     id: template_demo
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
   parts:
     - name: literal_only
       role: helper
@@ -153,14 +181,19 @@ job:
         literal: ACGT
       placement:
         kind: replace
-        start: 4
-        end: 8
         orientation: forward
-        expected_template_sequence: TTTT
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
   realize:
     mode: full_construct
   output:
-    dataset: anchors_demo_constructed
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
 """,
         encoding="utf-8",
     )
@@ -178,12 +211,15 @@ def test_validate_config_accepts_explicit_window_block(tmp_path: Path) -> None:
 job:
   id: demo_window_block
   input:
-    source: usr
-    dataset: anchors_demo
-    root: outputs/usr_datasets
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: outputs/usr_datasets
   template:
     id: template_demo
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: true
   parts:
     - name: anchor
@@ -193,10 +229,13 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 4
-        end: 8
         orientation: forward
-        expected_template_sequence: TTTT
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
   realize:
     mode: window
     focal_part: anchor
@@ -207,7 +246,9 @@ job:
       size_bp: 8
       offset_bp: 0
   output:
-    dataset: anchors_demo_constructed
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
 """,
         encoding="utf-8",
     )
@@ -218,19 +259,22 @@ job:
     assert "Config OK:" in (result.stdout or "")
 
 
-def test_validate_config_rejects_mixed_window_and_legacy_fields(tmp_path: Path) -> None:
-    config_path = tmp_path / "config_mixed_window_legacy.yaml"
+def test_validate_config_rejects_legacy_window_fields(tmp_path: Path) -> None:
+    config_path = tmp_path / "config_legacy_window.yaml"
     config_path.write_text(
         """
 job:
-  id: demo_mixed_window
+  id: demo_legacy_window
   input:
-    source: usr
-    dataset: anchors_demo
-    root: outputs/usr_datasets
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: outputs/usr_datasets
   template:
     id: template_demo
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
   parts:
     - name: anchor
       role: anchor
@@ -239,22 +283,27 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 4
-        end: 8
         orientation: forward
-        expected_template_sequence: TTTT
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    window_bp: 8
     window:
       semantics: fixed_total
       reference: center
       direction: symmetric
       size_bp: 8
+      offset_bp: 0
+    window_bp: 8
   output:
-    dataset: anchors_demo_constructed
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
 """,
         encoding="utf-8",
     )
@@ -262,7 +311,7 @@ job:
     result = _RUNNER.invoke(app, ["validate", "config", "--config", config_path.as_posix()])
 
     assert result.exit_code == 1
-    assert "Use either realize.window or the legacy" in (result.stdout or "")
+    assert "realize.window_bp is no longer supported" in (result.stdout or "")
 
 
 def test_validate_config_runtime_reports_preflight_summary(tmp_path: Path) -> None:
@@ -278,12 +327,15 @@ def test_validate_config_runtime_reports_preflight_summary(tmp_path: Path) -> No
 job:
   id: runtime_demo
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
   template:
     id: template_demo
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: true
   parts:
     - name: anchor
@@ -293,18 +345,30 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
+          upstream_sequence: TTTT
+          downstream_sequence: GGGG
+          require_unique_forward_matches: true
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    window_bp: 8
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 8
+      offset_bp: 0
   output:
-    dataset: anchors_demo_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -336,9 +400,158 @@ job:
     assert "placement: part=anchor" in output
     assert "template_start=8" in output
     assert "template_end=12" in output
-    assert "expected_template_sequence=CCCC" in output
+    assert "template_span_bp=4" in output
+    assert "locator_kind=coordinates" in output
+    assert "guard_mode=replaced_sequence_and_context" in output
+    assert "guard_require_unique_forward_matches=true" in output
+    assert "template_sequence=CCCC" in output
+    assert "guard_replaced_sequence=CCCC" in output
+    assert "guard_upstream_sequence=TTTT" in output
+    assert "observed_guard_upstream_sequence=TTTT" in output
+    assert "guard_downstream_sequence=GGGG" in output
+    assert "observed_guard_downstream_sequence=GGGG" in output
     assert "rows_total: 1" in output
     assert "output_id=" in output
+
+
+def test_validate_config_runtime_json_reports_preflight_payload(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    _write_registry(usr_root)
+    dataset = Dataset(usr_root, "anchors_demo")
+    dataset.init(source="test", notes="validate runtime json")
+    dataset.add_sequences(["ACGT"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "config_runtime_json.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: runtime_demo_json
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+  template:
+    id: template_demo
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
+          upstream_sequence: TTTT
+          downstream_sequence: GGGG
+          require_unique_forward_matches: true
+  realize:
+    mode: window
+    focal_part: anchor
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 8
+      offset_bp: 0
+  output:
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        ["validate", "config", "--config", config_path.as_posix(), "--runtime", "--format", "json"],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["job"]["id"] == "runtime_demo_json"
+    assert payload["runtime_preflight"]["template_id"] == "template_demo"
+    placement = payload["runtime_preflight"]["placements"][0]
+    assert placement["template_span_bp"] == 4
+    assert placement["locator_kind"] == "coordinates"
+    assert placement["guard_mode"] == "replaced_sequence_and_context"
+    assert placement["guard_require_unique_forward_matches"] is True
+
+
+def test_validate_config_runtime_json_reports_flank_locator_payload(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    _write_registry(usr_root)
+    dataset = Dataset(usr_root, "anchors_demo")
+    dataset.init(source="test", notes="validate runtime flank json")
+    dataset.add_sequences(["AC"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "config_runtime_flanks.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: runtime_demo_flanks
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+  template:
+    id: template_demo
+    source:
+      kind: literal
+      sequence: AAAACCCCGGGGTTTT
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: flanks
+          upstream_sequence: AAAA
+          downstream_sequence: GGGG
+        guards:
+          replaced_sequence: CCCC
+          replaced_span_bp: 4
+  realize:
+    mode: full_construct
+  output:
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        ["validate", "config", "--config", config_path.as_posix(), "--runtime", "--format", "json"],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    placement = payload["runtime_preflight"]["placements"][0]
+    assert placement["locator_kind"] == "flanks"
+    assert placement["locator_upstream_sequence"] == "AAAA"
+    assert placement["locator_downstream_sequence"] == "GGGG"
+    assert placement["template_start"] == 4
+    assert placement["template_end"] == 8
+    assert placement["guard_replaced_span_bp"] == 4
 
 
 def test_validate_config_runtime_shapes_usr_preflight_errors(tmp_path: Path, monkeypatch) -> None:
@@ -348,12 +561,15 @@ def test_validate_config_runtime_shapes_usr_preflight_errors(tmp_path: Path, mon
 job:
   id: runtime_usr_error
   input:
-    source: usr
-    dataset: anchors_demo
-    root: outputs/usr_datasets
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: outputs/usr_datasets
   template:
     id: template_demo
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
   parts:
     - name: anchor
       role: anchor
@@ -362,17 +578,26 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 4
-        end: 8
         orientation: forward
-        expected_template_sequence: TTTT
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    window_bp: 8
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 8
+      offset_bp: 0
   output:
-    dataset: anchors_demo_constructed
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
 """,
         encoding="utf-8",
     )
@@ -385,6 +610,112 @@ job:
 
     assert result.exit_code == 1
     assert "construct preflight failed while reading USR inputs: registry schema mismatch" in (result.stdout or "")
+
+
+def test_validate_config_runtime_missing_input_dataset_suggests_seed_or_import(tmp_path: Path) -> None:
+    config_path = tmp_path / "config_missing_dataset.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: runtime_missing_dataset
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {(tmp_path / "usr_root").as_posix()}
+  template:
+    id: template_demo
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
+  realize:
+    mode: full_construct
+  output:
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
+      root: {(tmp_path / "usr_root").as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(app, ["validate", "config", "--config", config_path.as_posix(), "--runtime"])
+
+    assert result.exit_code == 1
+    output = result.stdout or ""
+    assert "Input dataset not initialized:" in output
+    assert "Seed or import the required dataset before runtime validation or run." in output
+
+
+def test_validate_config_runtime_missing_input_dataset_reports_json_error(tmp_path: Path) -> None:
+    config_path = tmp_path / "config_missing_dataset.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: runtime_missing_dataset
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {(tmp_path / "usr_root").as_posix()}
+  template:
+    id: template_demo
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
+  realize:
+    mode: full_construct
+  output:
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
+      root: {(tmp_path / "usr_root").as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        ["validate", "config", "--config", config_path.as_posix(), "--runtime", "--format", "json"],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert payload["code"] == 1
+    assert payload["error_type"] == "ValidationError"
+    assert "Input dataset not initialized:" in payload["error"]
+    assert "Seed or import the required dataset before runtime validation or run." in payload["error"]
 
 
 def test_validate_config_runtime_shields_template_path_io_errors(tmp_path: Path) -> None:
@@ -402,13 +733,15 @@ def test_validate_config_runtime_shields_template_path_io_errors(tmp_path: Path)
 job:
   id: runtime_path_template_error
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
   template:
     id: template_demo
-    kind: path
-    path: {template_dir.as_posix()}
+    source:
+      kind: path
+      path: {template_dir.as_posix()}
     circular: false
   parts:
     - name: anchor
@@ -418,15 +751,20 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 0
-        end: 4
         orientation: forward
-        expected_template_sequence: AAAA
+        locator:
+          kind: coordinates
+          start: 0
+          end: 4
+        guards:
+          replaced_sequence: AAAA
   realize:
     mode: full_construct
   output:
-    dataset: anchors_demo_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -450,13 +788,16 @@ def test_validate_config_runtime_rejects_same_start_mixed_intervals(tmp_path: Pa
 job:
   id: runtime_same_start_mixed
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
     field: sequence
   template:
     id: template_demo
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: false
   parts:
     - name: replace_anchor
@@ -466,10 +807,13 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 4
-        end: 8
         orientation: forward
-        expected_template_sequence: TTTT
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: TTTT
     - name: insert_tag
       role: helper
       sequence:
@@ -477,14 +821,18 @@ job:
         literal: GG
       placement:
         kind: insert
-        start: 4
-        end: 4
         orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 4
   realize:
     mode: full_construct
   output:
-    dataset: anchors_demo_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -512,16 +860,18 @@ def test_validate_config_runtime_reports_usr_template_details(tmp_path: Path) ->
 job:
   id: runtime_usr_template
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
   template:
     id: template_demo
-    kind: usr
-    dataset: templates_demo
-    root: {usr_root.as_posix()}
-    record_id: {template_id}
-    field: sequence
+    source:
+      kind: usr
+      dataset: templates_demo
+      root: {usr_root.as_posix()}
+      record_id: {template_id}
+      field: sequence
     circular: true
   parts:
     - name: anchor
@@ -531,18 +881,27 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    window_bp: 8
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 8
+      offset_bp: 0
   output:
-    dataset: anchors_demo_constructed
-    root: {usr_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
+      root: {usr_root.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -577,12 +936,15 @@ def test_validate_config_runtime_normalizes_usr_package_root(tmp_path: Path) -> 
 job:
   id: runtime_pkg_root
   input:
-    source: usr
-    dataset: anchors_demo
-    root: {usr_pkg_root.as_posix()}
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_pkg_root.as_posix()}
   template:
     id: template_demo
-    sequence: AAAATTTTCCCCGGGG
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
     circular: true
   parts:
     - name: anchor
@@ -592,18 +954,27 @@ job:
         field: sequence
       placement:
         kind: replace
-        start: 8
-        end: 12
         orientation: forward
-        expected_template_sequence: CCCC
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+        guards:
+          replaced_sequence: CCCC
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    window_bp: 8
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 8
+      offset_bp: 0
   output:
-    dataset: anchors_demo_constructed
-    root: {usr_pkg_root.as_posix()}
+    target:
+      kind: usr
+      dataset: anchors_demo_constructed
+      root: {usr_pkg_root.as_posix()}
 """,
         encoding="utf-8",
     )

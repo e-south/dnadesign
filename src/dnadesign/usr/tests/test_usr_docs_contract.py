@@ -12,7 +12,11 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 from pathlib import Path
+
+import yaml
 
 
 def _repo_root() -> Path:
@@ -244,6 +248,33 @@ def test_usr_docs_index_exposes_getting_started_and_reference_paths() -> None:
     assert "choose cluster or prepare OPAL" in usr_docs
 
 
+def test_promoter_study_index_and_status_are_checked_in_for_stress_ethanol_cipro_growth() -> None:
+    datasets = _read("docs/studies/stress_ethanol_cipro_growth/datasets.yaml")
+    status = _read("docs/studies/stress_ethanol_cipro_growth/status.md")
+    pipeline = _read("docs/studies/stress_ethanol_cipro_growth/pipeline.yaml")
+
+    assert "promoter/stress_ethanol_cipro_anchor_set" in datasets
+    assert "promoter/stress_ethanol_cipro_construct_contexts" in datasets
+    assert "pipeline.yaml" in status
+    assert "construct_workspace:" in pipeline
+    assert "study_stress_ethanol_cipro_pdual10" in pipeline
+    assert "infer_batch_7b_with_notify:" in pipeline
+    assert "anchor_only:" in pipeline
+
+
+def test_promoter_study_ops_contract_marks_default_notify_submit_path_as_required() -> None:
+    payload = yaml.safe_load(_read("docs/studies/stress_ethanol_cipro_growth/ops.study.yaml"))
+    checks = payload["preflight"]["checks"]["infer_batch_preparation"]
+    by_id = {row["check_id"]: row for row in checks}
+
+    assert by_id["notify.environment.webhook"]["required"] is True
+    assert by_id["notify.environment.tls"]["required"] is True
+    assert by_id["notify.profile.anchor_only_20b"]["required"] is True
+    assert by_id["notify.resolve_events.anchor_only_20b"]["required"] is True
+    assert by_id["infer.batch.20b.anchor_only.plan"]["required"] is True
+    assert by_id["infer.batch.queue"]["required"] is False
+
+
 def test_usr_promoter_journey_doc_links_cross_tool_owner_surfaces() -> None:
     journey = _read("src/dnadesign/usr/docs/operations/promoter-evo2-journey.md")
 
@@ -264,8 +295,7 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     usr_docs = _read("src/dnadesign/usr/docs/README.md")
     ops_index = _read("src/dnadesign/usr/docs/operations/README.md")
     studies_index = _read("docs/studies/README.md")
-    promoter_registry = _read("docs/studies/promoter/README.md")
-    promoter_index = _read("docs/studies/promoter/index.yaml")
+    promoter_index = _read("docs/studies/index.yaml")
     index_template = _read("docs/templates/promoter-study-index.yaml")
     datasets_template = _read("docs/templates/promoter-study-datasets.yaml")
     template = _read("docs/templates/promoter-study-status.md")
@@ -278,48 +308,46 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "promoter-study-status-contract.md" in usr_docs
     assert "promoter-study-status-contract.md" in ops_index
     assert "studies/README.md" in docs_index
-    assert "studies/promoter/README.md" in docs_index
     assert "promoter-study-index.yaml" in templates_index
     assert "promoter-study-datasets.yaml" in templates_index
     assert "promoter-study-status.md" in templates_index
     assert ".agents/skills/promoter-study-status/SKILL.md" in root_agents
     assert ".agents/skills/promoter-study-status/SKILL.md" in usr_agents
+    assert "docs/studies/index.yaml" in root_agents
+    assert "docs/studies/index.yaml" in usr_agents
+    assert "docs/studies/promoter/index.yaml" not in root_agents
+    assert "docs/studies/promoter/index.yaml" not in usr_agents
     assert "docs/studies/README.md" in skill
-    assert "docs/studies/promoter/README.md" in skill
-    assert "docs/studies/promoter/index.yaml" in skill
-    assert "docs/studies/promoter/<study-id>/campaign.yaml" in skill
-    assert "docs/studies/promoter/<study-id>/datasets.yaml" in skill
-    assert "docs/studies/promoter/<study-id>/status.md" in skill
-    assert "docs/studies/promoter/index.yaml" in contract
-    assert "docs/studies/promoter/<study-id>/" in contract
+    assert "docs/studies/index.yaml" in skill
+    assert "docs/studies/<study-id>/campaign.yaml" in skill
+    assert "docs/studies/<study-id>/datasets.yaml" in skill
+    assert "docs/studies/<study-id>/status.md" in skill
+    assert "docs/studies/<study-id>/ops.study.yaml" in skill
+    assert "docs/studies/index.yaml" in contract
+    assert "docs/studies/<study-id>/" in contract
     assert "docs/studies/README.md" in contract
-    assert "docs/studies/promoter/README.md" in contract
     assert "docs/templates/promoter-study-index.yaml" in contract
     assert "docs/templates/promoter-study-datasets.yaml" in contract
     assert "docs/templates/promoter-study-status.md" in contract
     assert "ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix" in contract
-    assert (
-        "ops progress campaign --repo-root <repo-root> --manifest docs/studies/promoter/<study-id>/campaign.yaml"
-        in contract
-    )
+    assert "ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/campaign.yaml" in contract
     assert "ops progress show usr.data-plane.promoter-feature-matrix" in contract
-    assert "docs/studies/promoter/index.yaml" in studies_index
-    assert "docs/studies/promoter/index.yaml" in promoter_registry
-    assert "active_study: stress_ethanol_cipro_growth" in promoter_index
-    assert "status: active" in promoter_index
-    assert "active_study: <study-id-or-null>" in index_template
-    assert "status: active|planned|archived" in index_template
-    assert "docs/studies/promoter/<study-id>/datasets.yaml" in studies_index
-    assert "If `docs/studies/promoter/index.yaml` is missing" in studies_index
-    assert "cp docs/templates/promoter-study-index.yaml docs/studies/promoter/index.yaml" in studies_index
-    assert (
-        "cp docs/templates/promoter-study-datasets.yaml docs/studies/promoter/<study-id>/datasets.yaml" in studies_index
-    )
-    assert "Read `docs/studies/promoter/index.yaml` first." in contract
+    assert "docs/studies/index.yaml" in studies_index
+    assert "active_study_id: stress_ethanol_cipro_growth" in promoter_index
+    assert "record_root: docs/studies/stress_ethanol_cipro_growth" in promoter_index
+    assert "version: 1" in index_template
+    assert "active_study_id: <study-id>" in index_template
+    assert "record_root: docs/studies/<study-id>" in index_template
+    assert "docs/studies/<study-id>/datasets.yaml" in studies_index
+    assert "docs/studies/<study-id>/ops.study.yaml" in studies_index
+    assert "If `docs/studies/index.yaml` is missing" in studies_index
+    assert "cp docs/templates/promoter-study-index.yaml docs/studies/index.yaml" in studies_index
+    assert "cp docs/templates/promoter-study-datasets.yaml docs/studies/<study-id>/datasets.yaml" in studies_index
+    assert "cp docs/templates/promoter-study-ops.study.yaml docs/studies/<study-id>/ops.study.yaml" in studies_index
+    assert "Read `docs/studies/index.yaml` first." in contract
     assert "If the registry already exists, edit it in place instead of replacing it." in contract
-    assert "live study record is missing" in studies_index
-    assert "docs/studies/promoter/<study-id>/" in studies_index
-    assert "cp docs/templates/promoter-study-status.md docs/studies/promoter/<study-id>/status.md" in studies_index
+    assert "docs/studies/<study-id>/" in studies_index
+    assert "cp docs/templates/promoter-study-status.md docs/studies/<study-id>/status.md" in studies_index
     assert "dataset registry" in studies_index
     assert "role: densegen_anchor" in datasets_template
     assert "role: feature_matrix" in datasets_template
@@ -352,14 +380,37 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "workspace_local_export" in contract
     assert "If `status.md` still marks the shared feature dataset as `n/a`, skip this" in contract
     assert "uv run usr --root <usr-root> info <dataset-id> --format json" in contract
-    assert "--audit-json-out docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json" in contract
+    assert "--audit-json-out docs/studies/<study-id>/audits/<dataset-id>--<remote-name>-diff.json" in contract
     assert "ops progress show usr.data-plane.hpc-sync --sync-audit-json" in contract
     assert "strict_bootstrap_id: true" in contract
     assert "onboard_mode: existing_remote" in skill
-    assert "docs/studies/promoter/<study-id>/datasets.yaml" in skill
+    assert "docs/studies/<study-id>/datasets.yaml" in skill
     assert "usr.data-plane.hpc-sync" in skill
     assert "source-assembly mode" in skill
+    assert "promoter-study-preflight --scope next --json" in skill
+    assert not (_repo_root() / "docs" / "studies" / "promoter").exists()
     assert not (_repo_root() / "src/dnadesign/usr/skills/promoter-study-status/SKILL.md").exists()
+
+
+def test_repo_local_promoter_skill_audit_is_documented_and_present() -> None:
+    dev_docs = _read("docs/dev/README.md")
+    skill_root = _repo_root() / ".agents" / "skills" / "promoter-study-status"
+
+    assert ".agents/skills/promoter-study-status/scripts/audit-promoter-study-status-skill.sh" in dev_docs
+    assert (skill_root / "SKILL.md").exists()
+    assert (skill_root / "scripts" / "audit-promoter-study-status-skill.sh").exists()
+
+
+def test_repo_local_promoter_skill_audit_passes() -> None:
+    skill_root = _repo_root() / ".agents" / "skills" / "promoter-study-status"
+    result = subprocess.run(
+        [shutil.which("bash") or "bash", str(skill_root / "scripts" / "audit-promoter-study-status-skill.sh")],
+        cwd=_repo_root(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_usr_docs_index_avoids_anchor_coupling_to_top_readme() -> None:
@@ -369,12 +420,15 @@ def test_usr_docs_index_avoids_anchor_coupling_to_top_readme() -> None:
 
 
 def test_promoter_study_record_is_checked_in_for_stress_ethanol_cipro_growth() -> None:
-    index_yaml = _read("docs/studies/promoter/index.yaml")
-    campaign = _read("docs/studies/promoter/stress_ethanol_cipro_growth/campaign.yaml")
-    datasets = _read("docs/studies/promoter/stress_ethanol_cipro_growth/datasets.yaml")
-    status = _read("docs/studies/promoter/stress_ethanol_cipro_growth/status.md")
+    index_yaml = _read("docs/studies/index.yaml")
+    campaign = _read("docs/studies/stress_ethanol_cipro_growth/campaign.yaml")
+    datasets = _read("docs/studies/stress_ethanol_cipro_growth/datasets.yaml")
+    ops_study = _read("docs/studies/stress_ethanol_cipro_growth/ops.study.yaml")
+    status = _read("docs/studies/stress_ethanol_cipro_growth/status.md")
 
-    assert "active_study: stress_ethanol_cipro_growth" in index_yaml
+    assert "active_study_id: stress_ethanol_cipro_growth" in index_yaml
+    assert "family: promoter" in index_yaml
+    assert "record_root: docs/studies/stress_ethanol_cipro_growth" in index_yaml
     assert "promoter/stress_ethanol_cipro_feature_matrix" in campaign
     assert "role: densegen_anchor" in datasets
     assert "remote_name: cluster" in datasets
@@ -383,8 +437,16 @@ def test_promoter_study_record_is_checked_in_for_stress_ethanol_cipro_growth() -
     assert "remote_name: cluster" in datasets
     assert "mg1655_promoters" in datasets
     assert "plasmids" in datasets
+    assert "version: 2" in ops_study
+    assert "record_sources:" in ops_study
+    assert "lifecycle:" in ops_study
+    assert "execution_surfaces:" in ops_study
+    assert "checks:" in ops_study
+    assert "summary_scope: repo" in ops_study
+    assert "group_phase_bindings:" in ops_study
+    assert "runtime_shared_groups: [notify_environment]" in ops_study
     assert "densegen/study_stress_ethanol_cipro" in status
-    assert "77680" in status
+    assert "130864" in status
     assert "100000" in status
 
 
@@ -483,7 +545,7 @@ def test_multi_source_runbook_makes_upstream_dataset_mapping_explicit() -> None:
 
     assert "### 1b) Map those ids to real upstream datasets before validation" in runbook
     assert "does not create the extra upstream dataset for you" in runbook
-    assert 'export PRIMARY_INPUT_DATASET="mg1655_promoters"' in runbook
+    assert 'export PRIMARY_INPUT_DATASET="anchor_parts_demo"' in runbook
     assert 'export EXTRA_INPUT_DATASET="<existing_densegen_or_manual_usr_dataset>"' in runbook
 
 
@@ -571,7 +633,7 @@ def test_usr_workflow_map_runbook_is_indexed_with_command_chains() -> None:
     assert (
         'uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project slot_b_window' in workflow_map
     )
-    assert 'DATASET_ID="pdual10_source_of_truth_demo"' in workflow_map
+    assert 'DATASET_ID="anchor_template_shared_dataset_demo"' in workflow_map
     assert (
         'uv run notify usr-events watch --events "$USR_ROOT/$DATASET_ID/.events.log" --provider generic '
         "--dry-run --no-advance-cursor-on-dry-run" in workflow_map
@@ -626,9 +688,9 @@ def test_promoter_feature_matrix_runbook_uses_extract_ops_and_dataset_placeholde
 def test_construct_source_of_truth_runbook_documents_construct_notify_resolver_modes() -> None:
     runbook = _read("src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md")
 
-    assert "promoter-swap-source-of-truth-demo" in runbook
+    assert "anchor-template-shared-dataset-demo" in runbook
     assert 'export CONSTRUCT_CONFIG="$WORKSPACE_ROOT/config.slot_a.window.yaml"' in runbook
-    assert 'export DATASET_ID="pdual10_source_of_truth_demo"' in runbook
+    assert 'export DATASET_ID="anchor_template_shared_dataset_demo"' in runbook
     assert 'config["jobs"][0]["ingest"]["dataset"] = os.environ["DATASET_ID"]' in runbook
     assert "uv run python - <<'PY'" in runbook
     assert "perl -0pi -e" not in runbook

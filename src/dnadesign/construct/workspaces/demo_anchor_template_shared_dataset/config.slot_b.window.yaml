@@ -1,0 +1,46 @@
+job:
+  id: anchor_template_slot_b_window_1kb
+  input:
+    source:
+      kind: usr
+      dataset: anchor_parts_demo
+      root: outputs/usr_datasets
+    field: sequence
+  template:
+    id: template_backbone_dual_slot
+    source:
+      kind: usr
+      dataset: template_parts_demo
+      root: outputs/usr_datasets
+      record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+      field: sequence
+    circular: true
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 3621
+          end: 3656
+        guards:
+          replaced_sequence: tttacggctagctcagtcctaggtactatgctagc
+  realize:
+    mode: window
+    focal_part: anchor
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 1000
+      offset_bp: 0
+  output:
+    target:
+      kind: usr
+      dataset: anchor_template_shared_dataset_demo
+      root: outputs/usr_datasets

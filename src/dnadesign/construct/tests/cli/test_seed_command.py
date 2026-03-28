@@ -33,7 +33,7 @@ def test_seed_promoter_swap_demo_creates_curated_usr_datasets(tmp_path: Path) ->
         app,
         [
             "seed",
-            "promoter-swap-demo",
+            "anchor-template-demo",
             "--root",
             usr_root.as_posix(),
             "--manifest",
@@ -42,24 +42,34 @@ def test_seed_promoter_swap_demo_creates_curated_usr_datasets(tmp_path: Path) ->
     )
 
     assert result.exit_code == 0, result.stdout
-    anchors = Dataset(usr_root, "mg1655_promoters")
-    templates = Dataset(usr_root, "plasmids")
+    anchors = Dataset(usr_root, "anchor_parts_demo")
+    templates = Dataset(usr_root, "template_parts_demo")
     anchors_frame = anchors.head(n=10)
     templates_frame = templates.head(n=10)
     assert len(anchors_frame) == 4
     assert len(templates_frame) == 1
     assert "usr_label__primary" in anchors_frame.columns
-    assert set(anchors_frame["usr_label__primary"]) == {"spyP_MG1655", "sulAp", "soxS", "J23105"}
+    assert set(anchors_frame["usr_label__primary"]) == {
+        "anchor_part_alpha",
+        "anchor_part_beta",
+        "anchor_part_gamma",
+        "anchor_part_short_ref",
+    }
     assert "construct_seed__label" in anchors_frame.columns
-    assert set(anchors_frame["construct_seed__label"]) == {"spyP_MG1655", "sulAp", "soxS", "J23105"}
-    assert templates_frame.iloc[0]["construct_seed__label"] == "pDual-10"
+    assert set(anchors_frame["construct_seed__label"]) == {
+        "anchor_part_alpha",
+        "anchor_part_beta",
+        "anchor_part_gamma",
+        "anchor_part_short_ref",
+    }
+    assert templates_frame.iloc[0]["construct_seed__label"] == "template_backbone_dual_slot"
     assert "usr_label__primary" in pq.ParquetFile(str(anchors.records_path)).schema_arrow.names
     assert "usr_label__primary" in pq.ParquetFile(str(templates.records_path)).schema_arrow.names
     assert manifest_path.is_file()
 
     manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    assert manifest["datasets"]["anchors"] == "mg1655_promoters"
-    assert manifest["datasets"]["templates"] == "plasmids"
+    assert manifest["datasets"]["anchors"] == "anchor_parts_demo"
+    assert manifest["datasets"]["templates"] == "template_parts_demo"
     assert manifest["slots"]["slot_a"]["start"] == 2300
     assert manifest["slots"]["slot_b"]["start"] == 3621
 
@@ -73,15 +83,15 @@ def test_seed_promoter_swap_demo_normalizes_usr_package_root(tmp_path: Path) -> 
         app,
         [
             "seed",
-            "promoter-swap-demo",
+            "anchor-template-demo",
             "--root",
             usr_pkg_root.as_posix(),
         ],
     )
 
     assert result.exit_code == 0, result.stdout
-    anchors = Dataset(usr_pkg_root / "datasets", "mg1655_promoters")
-    templates = Dataset(usr_pkg_root / "datasets", "plasmids")
+    anchors = Dataset(usr_pkg_root / "datasets", "anchor_parts_demo")
+    templates = Dataset(usr_pkg_root / "datasets", "template_parts_demo")
     assert len(anchors.head(n=10)) == 4
     assert len(templates.head(n=10)) == 1
 
@@ -97,14 +107,14 @@ def test_seed_promoter_swap_demo_warns_about_legacy_dataset_names(tmp_path: Path
         app,
         [
             "seed",
-            "promoter-swap-demo",
+            "anchor-template-demo",
             "--root",
             usr_root.as_posix(),
         ],
     )
 
     assert result.exit_code == 0, result.stdout
-    assert "canonical curated inputs are mg1655_promoters and plasmids" in (result.stdout or "")
+    assert "canonical packaged demo inputs are anchor_parts_demo and template_parts_demo" in (result.stdout or "")
 
 
 def test_seed_promoter_swap_demo_is_idempotent(tmp_path: Path) -> None:
@@ -114,7 +124,7 @@ def test_seed_promoter_swap_demo_is_idempotent(tmp_path: Path) -> None:
         app,
         [
             "seed",
-            "promoter-swap-demo",
+            "anchor-template-demo",
             "--root",
             usr_root.as_posix(),
         ],
@@ -123,7 +133,7 @@ def test_seed_promoter_swap_demo_is_idempotent(tmp_path: Path) -> None:
         app,
         [
             "seed",
-            "promoter-swap-demo",
+            "anchor-template-demo",
             "--root",
             usr_root.as_posix(),
         ],
@@ -132,15 +142,20 @@ def test_seed_promoter_swap_demo_is_idempotent(tmp_path: Path) -> None:
     assert first.exit_code == 0, first.stdout
     assert second.exit_code == 0, second.stdout
 
-    anchors = Dataset(usr_root, "mg1655_promoters")
-    templates = Dataset(usr_root, "plasmids")
+    anchors = Dataset(usr_root, "anchor_parts_demo")
+    templates = Dataset(usr_root, "template_parts_demo")
     anchors_frame = anchors.head(n=10)
     templates_frame = templates.head(n=10)
 
     assert len(anchors_frame) == 4
     assert len(templates_frame) == 1
-    assert set(anchors_frame["construct_seed__label"]) == {"spyP_MG1655", "sulAp", "soxS", "J23105"}
-    assert list(templates_frame["construct_seed__label"]) == ["pDual-10"]
+    assert set(anchors_frame["construct_seed__label"]) == {
+        "anchor_part_alpha",
+        "anchor_part_beta",
+        "anchor_part_gamma",
+        "anchor_part_short_ref",
+    }
+    assert list(templates_frame["construct_seed__label"]) == ["template_backbone_dual_slot"]
 
 
 def test_seed_import_manifest_creates_generic_usr_datasets(tmp_path: Path) -> None:
@@ -153,7 +168,7 @@ datasets:
   - id: custom_promoters
     notes: Example anchors.
     records:
-      - label: sulAp
+      - label: anchor_part_beta
         topology: linear
         aliases: [sulA]
         source_ref: canonical local note
@@ -162,10 +177,10 @@ datasets:
   - id: custom_templates
     notes: Example templates.
     records:
-      - label: pDual-10
+      - label: template_backbone_dual_slot
         intended_role: template
         topology: circular
-        aliases: [pDual10]
+        aliases: [dual_slot_template]
         source_ref: canonical plasmid
         sequence: tttacggctagctcagtcctaggtactatgctagc
 """,
@@ -189,8 +204,8 @@ datasets:
     templates = Dataset(usr_root, "custom_templates")
     anchors_frame = anchors.head(n=10)
     templates_frame = templates.head(n=10)
-    assert list(anchors_frame["usr_label__primary"]) == ["sulAp"]
-    assert list(templates_frame["usr_label__primary"]) == ["pDual-10"]
+    assert list(anchors_frame["usr_label__primary"]) == ["anchor_part_beta"]
+    assert list(templates_frame["usr_label__primary"]) == ["template_backbone_dual_slot"]
     assert list(anchors_frame["construct_seed__manifest_id"]) == ["custom_construct_inputs"]
     assert list(anchors_frame["construct_seed__role"]) == [""]
     assert list(templates_frame["construct_seed__role"]) == ["template"]
@@ -213,7 +228,7 @@ manifest_id: custom_construct_inputs
 datasets:
   - id: custom_promoters
     records:
-      - label: sulAp
+      - label: anchor_part_beta
         topology: linear
         sequence: ACGT
 """,
@@ -247,7 +262,7 @@ manifest_id: custom_construct_inputs
 datasets:
   - id: custom_promoters
     records:
-      - label: sulAp
+      - label: anchor_part_beta
         topology: linear
         sequence: ACGT
 """,
@@ -271,7 +286,7 @@ def test_seed_import_manifest_requires_manifest_id(tmp_path: Path) -> None:
 datasets:
   - id: custom_promoters
     records:
-      - label: sulAp
+      - label: anchor_part_beta
         role: anchor
         topology: linear
         sequence: ACGT
@@ -320,7 +335,7 @@ def test_seed_promoter_swap_demo_rejects_non_integer_slot_bounds(tmp_path: Path,
         },
     )
 
-    result = _RUNNER.invoke(app, ["seed", "promoter-swap-demo", "--root", (tmp_path / "usr_root").as_posix()])
+    result = _RUNNER.invoke(app, ["seed", "anchor-template-demo", "--root", (tmp_path / "usr_root").as_posix()])
 
     assert result.exit_code == 1
     assert "start/end must be integers" in (result.stdout or "")
@@ -351,7 +366,7 @@ def test_seed_promoter_swap_demo_rejects_reversed_slot_bounds(tmp_path: Path, mo
         },
     )
 
-    result = _RUNNER.invoke(app, ["seed", "promoter-swap-demo", "--root", (tmp_path / "usr_root").as_posix()])
+    result = _RUNNER.invoke(app, ["seed", "anchor-template-demo", "--root", (tmp_path / "usr_root").as_posix()])
 
     assert result.exit_code == 1
     assert "end must be greater than start" in (result.stdout or "")
@@ -367,7 +382,7 @@ datasets:
   - id: custom_promoters
     notes: Example anchors.
     records:
-      - label: sulAp
+      - label: anchor_part_beta
         topology: linear
         aliases: [ok_alias, 42]
         source_ref: canonical local note

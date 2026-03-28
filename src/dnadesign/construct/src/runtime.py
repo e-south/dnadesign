@@ -22,7 +22,14 @@ from typing import Dict, Iterable, List
 
 from dnadesign.usr import Dataset, compute_id, default_usr_root, normalize_sequence, normalize_usr_root
 
-from .config import JobConfig, PartConfig, WindowConfig, load_job_config
+from .config import (
+    CoordinatePlacementLocatorConfig,
+    FlankPlacementLocatorConfig,
+    JobConfig,
+    PartConfig,
+    WindowConfig,
+    load_job_config,
+)
 from .errors import ValidationError
 from .output_store import _construct_metadata_table, _ensure_construct_registry, _existing_output_ids, _usr_label_table
 
@@ -61,8 +68,20 @@ class PlannedPlacement:
     placement_kind: str
     template_start: int
     template_end: int
+    template_span_bp: int
     orientation: str
-    expected_template_sequence: str | None
+    locator_kind: str
+    locator_upstream_sequence: str | None
+    locator_downstream_sequence: str | None
+    guard_mode: str
+    guard_require_unique_forward_matches: bool
+    guard_replaced_span_bp: int | None
+    template_sequence: str
+    guard_replaced_sequence: str | None
+    guard_upstream_sequence: str | None
+    observed_guard_upstream_sequence: str | None
+    guard_downstream_sequence: str | None
+    observed_guard_downstream_sequence: str | None
 
 
 @dataclass(frozen=True)
@@ -136,6 +155,21 @@ class _ResolvedTemplate:
 
 
 @dataclass(frozen=True)
+class _ResolvedPlacementSite:
+    start: int
+    end: int
+    locator_kind: str
+    locator_upstream_sequence: str | None
+    locator_downstream_sequence: str | None
+
+
+@dataclass(frozen=True)
+class _ResolvedPlacementPlan:
+    part: PartConfig
+    site: _ResolvedPlacementSite
+
+
+@dataclass(frozen=True)
 class _WindowGeometry:
     start_raw: int
     end_raw: int
@@ -191,37 +225,88 @@ def _reverse_complement(sequence: str) -> str:
     return sequence.translate(_DNA_COMPLEMENT)[::-1]
 
 
-def _expected_template_sequence(part: PartConfig) -> str | None:
-    expected = part.placement.expected_template_sequence
-    if expected is None:
+def _guard_replaced_sequence(part: PartConfig) -> str | None:
+    guards = part.placement.guards
+    if guards is None or guards.replaced_sequence is None:
         return None
     return _ensure_dna_text(
-        str(expected),
-        label=f"placement.expected_template_sequence for part '{part.name}'",
+        str(guards.replaced_sequence),
+        label=f"placement.guards.replaced_sequence for part '{part.name}'",
+    )
+
+
+def _guard_upstream_sequence(part: PartConfig) -> str | None:
+    guards = part.placement.guards
+    if guards is None or guards.upstream_sequence is None:
+        return None
+    return _ensure_dna_text(
+        str(guards.upstream_sequence),
+        label=f"placement.guards.upstream_sequence for part '{part.name}'",
+    )
+
+
+def _guard_downstream_sequence(part: PartConfig) -> str | None:
+    guards = part.placement.guards
+    if guards is None or guards.downstream_sequence is None:
+        return None
+    return _ensure_dna_text(
+        str(guards.downstream_sequence),
+        label=f"placement.guards.downstream_sequence for part '{part.name}'",
+    )
+
+
+def _guard_replaced_span_bp(part: PartConfig) -> int | None:
+    guards = part.placement.guards
+    if guards is None or guards.replaced_span_bp is None:
+        return None
+    return int(guards.replaced_span_bp)
+
+
+def _guard_requires_unique_forward_matches(part: PartConfig) -> bool:
+    guards = part.placement.guards
+    return bool(guards is not None and guards.require_unique_forward_matches)
+
+
+def _locator_upstream_sequence(part: PartConfig) -> str | None:
+    locator = part.placement.locator
+    if not isinstance(locator, FlankPlacementLocatorConfig):
+        return None
+    return _ensure_dna_text(
+        str(locator.upstream_sequence),
+        label=f"placement.locator.upstream_sequence for part '{part.name}'",
+    )
+
+
+def _locator_downstream_sequence(part: PartConfig) -> str | None:
+    locator = part.placement.locator
+    if not isinstance(locator, FlankPlacementLocatorConfig):
+        return None
+    return _ensure_dna_text(
+        str(locator.downstream_sequence),
+        label=f"placement.locator.downstream_sequence for part '{part.name}'",
     )
 
 
 def _load_template_sequence(base_dir: Path, cfg: JobConfig) -> _ResolvedTemplate:
     template = cfg.job.template
-    if template.kind == "literal":
-        if template.sequence is None:
-            raise ValidationError("template.sequence is required when template.kind='literal'.")
-        seq = _ensure_dna_text(template.sequence, label="template.sequence")
+    template_source = template.source
+    if template_source.kind == "literal":
+        seq = _ensure_dna_text(template_source.sequence, label="template.source.sequence")
         return _ResolvedTemplate(
             id=template.id,
             kind="literal",
             sequence=seq,
-            source=template.source or "template.sequence",
+            source=template_source.label or "template.source.sequence",
             dataset=None,
             field=None,
             record_id=None,
             circular=bool(template.circular),
         )
 
-    if template.kind == "path":
-        path = _resolve_optional_path(base_dir, template.path)
+    if template_source.kind == "path":
+        path = _resolve_optional_path(base_dir, template_source.path)
         if path is None or not path.exists():
-            raise ValidationError(f"Template path not found: {template.path}")
+            raise ValidationError(f"Template path not found: {template_source.path}")
         if not path.is_file():
             raise ValidationError(f"Template path must resolve to a readable file: {path}")
         try:
@@ -244,45 +329,52 @@ def _load_template_sequence(base_dir: Path, cfg: JobConfig) -> _ResolvedTemplate
         return _ResolvedTemplate(
             id=template.id,
             kind="path",
-            sequence=_ensure_dna_text(seq, label=f"template.path ({path})"),
-            source=template.source or str(path),
+            sequence=_ensure_dna_text(seq, label=f"template.source.path ({path})"),
+            source=template_source.label or str(path),
             dataset=None,
             field=None,
             record_id=None,
             circular=bool(template.circular),
         )
 
-    if template.kind != "usr":
-        raise ValidationError(f"Unsupported template.kind '{template.kind}'.")
+    if template_source.kind != "usr":
+        raise ValidationError(f"Unsupported template.source.kind '{template_source.kind}'.")
 
     template_root = _resolve_usr_root(
         base_dir,
-        template.root or cfg.job.input.root,
-        label="template.root or job.input.root",
+        template_source.root or cfg.job.input.source.root,
+        label="template.source.root or job.input.source.root",
     )
-    template_ds = Dataset(template_root, str(template.dataset))
+    template_ds = Dataset(template_root, str(template_source.dataset))
     if not template_ds.records_path.exists():
         raise ValidationError(f"Template dataset not initialized: {template_ds.records_path}")
     rows = _scan_usr_rows(
         template_ds,
-        columns=["id", str(template.field)],
-        ids=[str(template.record_id)],
+        columns=["id", str(template_source.field)],
+        ids=[str(template_source.record_id)],
     )
     if len(rows) != 1:
-        raise ValidationError(f"Template selection must resolve exactly one row in dataset '{template.dataset}'.")
+        raise ValidationError(
+            f"Template selection must resolve exactly one row in dataset '{template_source.dataset}'."
+        )
     row = rows[0]
-    raw = row.get(str(template.field))
+    raw = row.get(str(template_source.field))
     if raw is None:
-        raise ValidationError(f"Template record '{template.record_id}' is missing field '{template.field}'.")
-    seq = _ensure_dna_text(str(raw), label=f"template field '{template.field}' in dataset '{template.dataset}'")
+        raise ValidationError(
+            f"Template record '{template_source.record_id}' is missing field '{template_source.field}'."
+        )
+    seq = _ensure_dna_text(
+        str(raw),
+        label=f"template field '{template_source.field}' in dataset '{template_source.dataset}'",
+    )
     return _ResolvedTemplate(
         id=template.id,
         kind="usr",
         sequence=seq,
-        source=template.source or f"usr:{template.dataset}:{template.record_id}",
-        dataset=str(template.dataset),
-        field=str(template.field),
-        record_id=str(template.record_id),
+        source=template_source.label or f"usr:{template_source.dataset}:{template_source.record_id}",
+        dataset=str(template_source.dataset),
+        field=str(template_source.field),
+        record_id=str(template_source.record_id),
         circular=bool(template.circular),
     )
 
@@ -353,21 +445,86 @@ def _input_usr_labels(row: dict[str, object]) -> tuple[str | None, List[str]]:
     return primary, aliases
 
 
-def _planned_placements(parts: Iterable[PartConfig]) -> List[PlannedPlacement]:
-    return [
-        PlannedPlacement(
-            part_name=part.name,
-            part_role=part.role,
-            sequence_source=part.sequence.source,
-            sequence_field=str(part.sequence.field) if part.sequence.field is not None else None,
-            placement_kind=part.placement.kind,
-            template_start=part.placement.start,
-            template_end=part.placement.end,
-            orientation=part.placement.orientation,
-            expected_template_sequence=_expected_template_sequence(part),
+def _template_context_sequence(
+    template_seq: str,
+    *,
+    anchor: int,
+    length: int,
+    circular: bool,
+    direction: str,
+) -> str:
+    if length < 0:
+        raise ValidationError(f"template context length must be >= 0, got {length}.")
+    if length == 0:
+        return ""
+    template_len = len(template_seq)
+    if not circular:
+        if direction == "upstream":
+            if anchor < length:
+                raise ValidationError(
+                    f"Requested upstream template context length {length} exceeds the available "
+                    f"forward-strand prefix before placement coordinate {anchor}."
+                )
+            return template_seq[anchor - length : anchor]
+        if anchor + length > template_len:
+            raise ValidationError(
+                f"Requested downstream template context length {length} exceeds the available "
+                f"forward-strand suffix after placement coordinate {anchor}."
+            )
+        return template_seq[anchor : anchor + length]
+
+    start = anchor - length if direction == "upstream" else anchor
+    return "".join(template_seq[(start + idx) % template_len] for idx in range(length))
+
+
+def _template_match_offsets(
+    template_seq: str,
+    expected: str,
+    *,
+    circular: bool,
+) -> list[int]:
+    haystack = template_seq.upper()
+    needle = expected.upper()
+    if not needle:
+        return []
+    search_text = haystack if not circular else haystack + haystack[: len(needle) - 1]
+    limit = len(haystack)
+    offsets: list[int] = []
+    start = 0
+    while True:
+        idx = search_text.find(needle, start)
+        if idx < 0:
+            break
+        if idx < limit:
+            offsets.append(idx)
+        start = idx + 1
+    return offsets
+
+
+def _require_unique_template_match(
+    *,
+    template: _ResolvedTemplate,
+    part: PartConfig,
+    field_name: str,
+    expected: str | None,
+    aligned_start: int,
+) -> None:
+    if not _guard_requires_unique_forward_matches(part) or expected is None:
+        return
+    offsets = _template_match_offsets(template.sequence, expected, circular=template.circular)
+    if len(offsets) != 1:
+        raise ValidationError(
+            f"Part '{part.name}' requires a unique forward-strand match for {field_name}, "
+            f"but found {len(offsets)} matches in template '{template.id}'. Use a longer kmer or "
+            "disable placement.guards.require_unique_forward_matches explicitly."
         )
-        for part in parts
-    ]
+    expected_start = aligned_start % len(template.sequence) if template.circular else aligned_start
+    if offsets[0] != expected_start:
+        raise ValidationError(
+            f"Part '{part.name}' requires {field_name} to anchor the configured placement uniquely, "
+            f"but the only forward-strand match starts at template offset {offsets[0]} instead of "
+            f"{expected_start}."
+        )
 
 
 def _part_sequence(part: PartConfig, row: dict[str, object]) -> str:
@@ -385,62 +542,288 @@ def _part_sequence(part: PartConfig, row: dict[str, object]) -> str:
     return seq
 
 
-def _validate_placements(template_len: int, parts: Iterable[PartConfig]) -> List[PartConfig]:
+def _resolve_locator_site(
+    *,
+    template: _ResolvedTemplate,
+    part: PartConfig,
+) -> _ResolvedPlacementSite:
+    locator = part.placement.locator
+    if isinstance(locator, CoordinatePlacementLocatorConfig):
+        return _ResolvedPlacementSite(
+            start=locator.start,
+            end=locator.end,
+            locator_kind="coordinates",
+            locator_upstream_sequence=None,
+            locator_downstream_sequence=None,
+        )
+
+    upstream = _locator_upstream_sequence(part)
+    downstream = _locator_downstream_sequence(part)
+    if upstream is None or downstream is None:
+        raise ValidationError(f"Part '{part.name}' flank locator could not be normalized.")
+    upstream_offsets = _template_match_offsets(template.sequence, upstream, circular=template.circular)
+    downstream_offsets = _template_match_offsets(template.sequence, downstream, circular=template.circular)
+    if len(upstream_offsets) != 1:
+        raise ValidationError(
+            f"Part '{part.name}' flank locator requires exactly one forward-strand match for "
+            f"placement.locator.upstream_sequence, but found {len(upstream_offsets)} matches in template "
+            f"'{template.id}'. Use a longer flank or fall back to coordinates."
+        )
+    if len(downstream_offsets) != 1:
+        raise ValidationError(
+            f"Part '{part.name}' flank locator requires exactly one forward-strand match for "
+            f"placement.locator.downstream_sequence, but found {len(downstream_offsets)} matches in template "
+            f"'{template.id}'. Use a longer flank or fall back to coordinates."
+        )
+    start = upstream_offsets[0] + len(upstream)
+    end = downstream_offsets[0]
+    if end < start:
+        raise ValidationError(
+            f"Part '{part.name}' flank locator resolves across the template origin or into overlapping flanks "
+            f"(upstream_end={start}, downstream_start={end}). Explicit wraparound flank placement is not supported; "
+            "provide coordinates instead."
+        )
+    if part.placement.kind == "replace" and end == start:
+        raise ValidationError(
+            f"Part '{part.name}' flank locator resolves to a zero-length interval. Use kind='insert' for a pure "
+            "boundary insertion or widen the flanks to bracket a replace span."
+        )
+    if part.placement.kind == "insert" and end != start:
+        raise ValidationError(
+            f"Part '{part.name}' kind='insert' requires adjacent flanks, but the flank locator resolves to "
+            f"{end - start} bp between the matches. Use kind='replace' or provide adjacent flanks."
+        )
+    return _ResolvedPlacementSite(
+        start=start,
+        end=end,
+        locator_kind="flanks",
+        locator_upstream_sequence=upstream,
+        locator_downstream_sequence=downstream,
+    )
+
+
+def _resolved_placement_sites(
+    template: _ResolvedTemplate,
+    parts: Iterable[PartConfig],
+) -> dict[str, _ResolvedPlacementSite]:
+    return {part.name: _resolve_locator_site(template=template, part=part) for part in parts}
+
+
+def _observed_guard_upstream_sequence(
+    *,
+    template: _ResolvedTemplate,
+    part: PartConfig,
+    site: _ResolvedPlacementSite,
+) -> str | None:
+    expected = _guard_upstream_sequence(part)
+    if expected is None:
+        return None
+    return _template_context_sequence(
+        template.sequence,
+        anchor=site.start,
+        length=len(expected),
+        circular=template.circular,
+        direction="upstream",
+    )
+
+
+def _observed_guard_downstream_sequence(
+    *,
+    template: _ResolvedTemplate,
+    part: PartConfig,
+    site: _ResolvedPlacementSite,
+) -> str | None:
+    expected = _guard_downstream_sequence(part)
+    if expected is None:
+        return None
+    return _template_context_sequence(
+        template.sequence,
+        anchor=site.end,
+        length=len(expected),
+        circular=template.circular,
+        direction="downstream",
+    )
+
+
+def _placement_guard_mode(part: PartConfig) -> str:
+    has_replaced_sequence = _guard_replaced_sequence(part) is not None
+    has_upstream = _guard_upstream_sequence(part) is not None
+    has_downstream = _guard_downstream_sequence(part) is not None
+    has_span = _guard_replaced_span_bp(part) is not None
+    if has_replaced_sequence and (has_upstream or has_downstream or has_span):
+        return "replaced_sequence_and_context"
+    if has_replaced_sequence:
+        return "replaced_sequence"
+    if has_upstream or has_downstream:
+        return "context"
+    if has_span:
+        return "span"
+    return "none"
+
+
+def _planned_placements(
+    parts: Iterable[PartConfig],
+    *,
+    template: _ResolvedTemplate,
+    resolved_sites: dict[str, _ResolvedPlacementSite],
+) -> List[PlannedPlacement]:
+    return [
+        PlannedPlacement(
+            part_name=part.name,
+            part_role=part.role,
+            sequence_source=part.sequence.source,
+            sequence_field=str(part.sequence.field) if part.sequence.field is not None else None,
+            placement_kind=part.placement.kind,
+            template_start=resolved_sites[part.name].start,
+            template_end=resolved_sites[part.name].end,
+            template_span_bp=resolved_sites[part.name].end - resolved_sites[part.name].start,
+            orientation=part.placement.orientation,
+            locator_kind=resolved_sites[part.name].locator_kind,
+            locator_upstream_sequence=resolved_sites[part.name].locator_upstream_sequence,
+            locator_downstream_sequence=resolved_sites[part.name].locator_downstream_sequence,
+            guard_mode=_placement_guard_mode(part),
+            guard_require_unique_forward_matches=_guard_requires_unique_forward_matches(part),
+            guard_replaced_span_bp=_guard_replaced_span_bp(part),
+            template_sequence=template.sequence[resolved_sites[part.name].start : resolved_sites[part.name].end],
+            guard_replaced_sequence=_guard_replaced_sequence(part),
+            guard_upstream_sequence=_guard_upstream_sequence(part),
+            observed_guard_upstream_sequence=_observed_guard_upstream_sequence(
+                template=template,
+                part=part,
+                site=resolved_sites[part.name],
+            ),
+            guard_downstream_sequence=_guard_downstream_sequence(part),
+            observed_guard_downstream_sequence=_observed_guard_downstream_sequence(
+                template=template,
+                part=part,
+                site=resolved_sites[part.name],
+            ),
+        )
+        for part in parts
+    ]
+
+
+def _validate_placements(
+    template_len: int,
+    parts: Iterable[PartConfig],
+    *,
+    resolved_sites: dict[str, _ResolvedPlacementSite],
+) -> List[_ResolvedPlacementPlan]:
     indexed_parts = list(enumerate(parts))
     ordered = [
-        part
+        _ResolvedPlacementPlan(part=part, site=resolved_sites[part.name])
         for _, part in sorted(
             indexed_parts,
-            key=lambda item: (item[1].placement.start, item[0]),
+            key=lambda item: (resolved_sites[item[1].name].start, item[0]),
         )
     ]
     prior_end = -1
     prior_name = None
     prior_start = None
     prior_template_end = None
-    for part in ordered:
-        start = part.placement.start
-        end = part.placement.end
+    for resolved in ordered:
+        start = resolved.site.start
+        end = resolved.site.end
         if end > template_len:
-            raise ValidationError(f"Part '{part.name}' placement end {end} exceeds template length {template_len}.")
+            raise ValidationError(
+                f"Part '{resolved.part.name}' placement end {end} exceeds template length {template_len}."
+            )
         if prior_start is not None and start == prior_start and end != prior_template_end:
             raise ValidationError(
-                f"Part '{part.name}' shares template start {start} with part '{prior_name}' but uses a different "
+                f"Part '{resolved.part.name}' shares template start {start} with part '{prior_name}' "
+                "but uses a different "
                 "template end. Same-start placements with different intervals are ambiguous; use distinct start "
                 "coordinates or split them into separate construct jobs."
             )
         if start < prior_end:
             raise ValidationError(
-                f"Part '{part.name}' overlaps prior placement '{prior_name}'. Placements must not overlap."
+                f"Part '{resolved.part.name}' overlaps prior placement '{prior_name}'. Placements must not overlap."
             )
         prior_end = end
-        prior_name = part.name
+        prior_name = resolved.part.name
         prior_start = start
         prior_template_end = end
     return ordered
 
 
 def _assemble_full_construct(
-    template_seq: str,
-    parts: List[PartConfig],
+    template: _ResolvedTemplate,
+    placements: List[_ResolvedPlacementPlan],
     row: dict[str, object],
 ) -> tuple[str, List[_ResolvedPart], Dict[str, _ResolvedPart]]:
-    ordered = _validate_placements(len(template_seq), parts)
+    template_seq = template.sequence
     cursor = 0
     out: list[str] = []
     out_len = 0
     realized: Dict[str, _ResolvedPart] = {}
     realized_ordered: list[_ResolvedPart] = []
 
-    for part in ordered:
-        expected_template = _expected_template_sequence(part)
-        template_interval = template_seq[part.placement.start : part.placement.end]
-        if expected_template is not None and template_interval.upper() != expected_template.upper():
+    for resolved in placements:
+        part = resolved.part
+        site = resolved.site
+        replaced_sequence = _guard_replaced_sequence(part)
+        template_interval = template_seq[site.start : site.end]
+        if replaced_sequence is not None and template_interval.upper() != replaced_sequence.upper():
             raise ValidationError(
-                f"Part '{part.name}' expected template interval "
-                f"[{part.placement.start}, {part.placement.end}) to match the configured incumbent sequence."
+                f"Part '{part.name}' expected template interval [{site.start}, {site.end}) to match "
+                "placement.guards.replaced_sequence."
             )
-        prefix = template_seq[cursor : part.placement.start]
+        _require_unique_template_match(
+            template=template,
+            part=part,
+            field_name="placement.guards.replaced_sequence",
+            expected=replaced_sequence,
+            aligned_start=site.start,
+        )
+        replaced_span_bp = _guard_replaced_span_bp(part)
+        if replaced_span_bp is not None and (site.end - site.start) != replaced_span_bp:
+            raise ValidationError(
+                f"Part '{part.name}' expected resolved replacement span {replaced_span_bp} bp, "
+                f"but locator resolved {site.end - site.start} bp."
+            )
+        expected_upstream = _guard_upstream_sequence(part)
+        if expected_upstream is not None:
+            observed_upstream = _template_context_sequence(
+                template_seq,
+                anchor=site.start,
+                length=len(expected_upstream),
+                circular=template.circular,
+                direction="upstream",
+            )
+            if observed_upstream.upper() != expected_upstream.upper():
+                raise ValidationError(
+                    f"Part '{part.name}' expected the forward-strand upstream flank ending at "
+                    f"{site.start} to match placement.guards.upstream_sequence."
+                )
+            _require_unique_template_match(
+                template=template,
+                part=part,
+                field_name="placement.guards.upstream_sequence",
+                expected=expected_upstream,
+                aligned_start=site.start - len(expected_upstream),
+            )
+        expected_downstream = _guard_downstream_sequence(part)
+        if expected_downstream is not None:
+            observed_downstream = _template_context_sequence(
+                template_seq,
+                anchor=site.end,
+                length=len(expected_downstream),
+                circular=template.circular,
+                direction="downstream",
+            )
+            if observed_downstream.upper() != expected_downstream.upper():
+                raise ValidationError(
+                    f"Part '{part.name}' expected the forward-strand downstream flank starting at "
+                    f"{site.end} to match placement.guards.downstream_sequence."
+                )
+            _require_unique_template_match(
+                template=template,
+                part=part,
+                field_name="placement.guards.downstream_sequence",
+                expected=expected_downstream,
+                aligned_start=site.end,
+            )
+        prefix = template_seq[cursor : site.start]
         out.append(prefix)
         out_len += len(prefix)
 
@@ -457,15 +840,15 @@ def _assemble_full_construct(
             sequence_source=part.sequence.source,
             sequence_field=str(part.sequence.field) if part.sequence.field is not None else None,
             orientation=part.placement.orientation,
-            start=part.placement.start,
-            end=part.placement.end,
+            start=site.start,
+            end=site.end,
             sequence=seq,
             realized_start=realized_start,
             realized_end=realized_end,
         )
         realized[part.name] = resolved_part
         realized_ordered.append(resolved_part)
-        cursor = part.placement.end
+        cursor = site.end
 
     out.append(template_seq[cursor:])
     return "".join(out), realized_ordered, realized
@@ -678,20 +1061,25 @@ def _spec_id(
     payload = {
         "job_id": cfg.job.id,
         "input": {
-            "dataset": cfg.job.input.dataset,
+            "source": {
+                "kind": cfg.job.input.source.kind,
+                "dataset": cfg.job.input.source.dataset,
+                "root": str(input_root),
+            },
             "field": cfg.job.input.field,
             "ids": list(cfg.job.input.ids or []),
-            "root": str(input_root),
         },
         "template": {
             "id": cfg.job.template.id,
-            "kind": template.kind,
             "circular": template.circular,
-            "source": template.source,
-            "dataset": template.dataset,
-            "field": template.field,
-            "record_id": template.record_id,
-            "sha256": template_sha256,
+            "source": {
+                "kind": template.kind,
+                "label": template.source,
+                "dataset": template.dataset,
+                "field": template.field,
+                "record_id": template.record_id,
+                "sha256": template_sha256,
+            },
         },
         "parts": [
             {
@@ -704,10 +1092,13 @@ def _spec_id(
                 },
                 "placement": {
                     "kind": part.placement.kind,
-                    "start": part.placement.start,
-                    "end": part.placement.end,
                     "orientation": part.placement.orientation,
-                    "expected_template_sequence": part.placement.expected_template_sequence,
+                    "locator": part.placement.locator.model_dump(exclude_none=True),
+                    "guards": (
+                        part.placement.guards.model_dump(exclude_none=True)
+                        if part.placement.guards is not None
+                        else None
+                    ),
                 },
             }
             for part in cfg.job.parts
@@ -730,9 +1121,12 @@ def _spec_id(
             ),
         },
         "output": {
-            "dataset": cfg.job.output.dataset,
-            "root": str(output_root),
-            "source": cfg.job.output.source,
+            "target": {
+                "kind": cfg.job.output.target.kind,
+                "dataset": cfg.job.output.target.dataset,
+                "root": str(output_root),
+            },
+            "record_source": cfg.job.output.record_source,
             "on_conflict": cfg.job.output.on_conflict,
             "allow_same_as_input": cfg.job.output.allow_same_as_input,
         },
@@ -748,11 +1142,11 @@ def _build_record(
     template: _ResolvedTemplate,
     template_sha256: str,
     spec_id: str,
-    ordered_parts: List[PartConfig],
+    ordered_placements: List[_ResolvedPlacementPlan],
 ) -> _BuiltRecord:
     full_construct, ordered_realized_parts, realized_parts = _assemble_full_construct(
-        template.sequence,
-        ordered_parts,
+        template,
+        ordered_placements,
         row,
     )
     window = cfg.job.realize.window
@@ -802,7 +1196,7 @@ def _build_record(
         "construct__template_sha256": template_sha256,
         "construct__template_length": len(template.sequence),
         "construct__template_circular": bool(template.circular),
-        "construct__input_dataset": cfg.job.input.dataset,
+        "construct__input_dataset": cfg.job.input.source.dataset,
         "construct__input_fields": input_fields,
         "construct__input_id": str(row["id"]),
         "construct__input_length": len(str(row[cfg.job.input.field]).strip()),
@@ -863,19 +1257,19 @@ def _plan_loaded_config(
     config_path: Path,
 ) -> tuple[PreflightResult, List[_BuiltRecord]]:
     base_dir = config_path.parent
-    input_root = _resolve_usr_root(base_dir, cfg.job.input.root, label="job.input.root")
+    input_root = _resolve_usr_root(base_dir, cfg.job.input.source.root, label="job.input.source.root")
     output_root = _resolve_usr_root(
         base_dir,
-        cfg.job.output.root or cfg.job.input.root,
-        label="job.output.root or job.input.root",
+        cfg.job.output.target.root or cfg.job.input.source.root,
+        label="job.output.target.root or job.input.source.root",
     )
 
-    input_ds = Dataset(input_root, cfg.job.input.dataset)
+    input_ds = Dataset(input_root, cfg.job.input.source.dataset)
     if not input_ds.records_path.exists():
         raise ValidationError(f"Input dataset not initialized: {input_ds.records_path}")
     if (
         input_root == output_root
-        and cfg.job.input.dataset == cfg.job.output.dataset
+        and cfg.job.input.source.dataset == cfg.job.output.target.dataset
         and not cfg.job.output.allow_same_as_input
     ):
         raise ValidationError(
@@ -884,7 +1278,8 @@ def _plan_loaded_config(
         )
 
     template = _load_template_sequence(base_dir, cfg)
-    ordered_parts = _validate_placements(len(template.sequence), cfg.job.parts)
+    resolved_sites = _resolved_placement_sites(template, cfg.job.parts)
+    ordered_placements = _validate_placements(len(template.sequence), cfg.job.parts, resolved_sites=resolved_sites)
     template_sha256 = hashlib.sha256(template.sequence.encode("utf-8")).hexdigest()
     spec_id = _spec_id(
         cfg,
@@ -905,7 +1300,7 @@ def _plan_loaded_config(
             template=template,
             template_sha256=template_sha256,
             spec_id=spec_id,
-            ordered_parts=ordered_parts,
+            ordered_placements=ordered_placements,
         )
         for row in rows
     ]
@@ -918,11 +1313,11 @@ def _plan_loaded_config(
             f"{len(duplicate_output_ids)} duplicate planned output id(s) were generated within this construct run. "
             f"Sample: {preview}. Deduplicate input.ids or route the colliding outputs into separate construct jobs."
         )
-    existing_ids = _existing_output_ids(output_root, cfg.job.output.dataset)
+    existing_ids = _existing_output_ids(output_root, cfg.job.output.target.dataset)
     collision_count = sum(1 for record in built if record.output_id in existing_ids)
     if collision_count and cfg.job.output.on_conflict == "error":
         raise ValidationError(
-            f"{collision_count} planned output id(s) already exist in dataset '{cfg.job.output.dataset}'. "
+            f"{collision_count} planned output id(s) already exist in dataset '{cfg.job.output.target.dataset}'. "
             "Choose a different output dataset, change the construct spec, or set output.on_conflict='ignore'."
         )
     planned_rows = [
@@ -943,8 +1338,8 @@ def _plan_loaded_config(
     window = cfg.job.realize.window
     preflight = PreflightResult(
         job_id=cfg.job.id,
-        input_dataset=cfg.job.input.dataset,
-        output_dataset=cfg.job.output.dataset,
+        input_dataset=cfg.job.input.source.dataset,
+        output_dataset=cfg.job.output.target.dataset,
         input_root=input_root,
         output_root=output_root,
         template_id=template.id,
@@ -971,7 +1366,11 @@ def _plan_loaded_config(
         records_total=len(built),
         existing_output_collisions=collision_count,
         output_on_conflict=cfg.job.output.on_conflict,
-        placements=_planned_placements(ordered_parts),
+        placements=_planned_placements(
+            [resolved.part for resolved in ordered_placements],
+            template=template,
+            resolved_sites=resolved_sites,
+        ),
         planned_rows=planned_rows,
     )
     return preflight, built
@@ -993,8 +1392,8 @@ def _dry_run_result(planned: _PlannedRun) -> RunResult:
     preflight = planned.preflight
     return RunResult(
         job_id=cfg.job.id,
-        input_dataset=cfg.job.input.dataset,
-        output_dataset=cfg.job.output.dataset,
+        input_dataset=cfg.job.input.source.dataset,
+        output_dataset=cfg.job.output.target.dataset,
         output_root=preflight.output_root,
         records_total=preflight.records_total,
         records_written=0,
@@ -1008,13 +1407,13 @@ def _ensure_output_dataset(planned: _PlannedRun) -> Dataset:
     cfg = planned.cfg
     preflight = planned.preflight
     _ensure_construct_registry(preflight.output_root)
-    return Dataset(preflight.output_root, cfg.job.output.dataset)
+    return Dataset(preflight.output_root, cfg.job.output.target.dataset)
 
 
 def _records_to_write(planned: _PlannedRun) -> List[_BuiltRecord]:
     cfg = planned.cfg
     preflight = planned.preflight
-    existing_ids = _existing_output_ids(preflight.output_root, cfg.job.output.dataset)
+    existing_ids = _existing_output_ids(preflight.output_root, cfg.job.output.target.dataset)
     return [
         record
         for record in planned.built
@@ -1042,7 +1441,7 @@ def _write_output_records(output_ds: Dataset, *, cfg: JobConfig, records: List[_
         )
         if not records:
             return
-        source = cfg.job.output.source or f"construct run {cfg.job.id}"
+        source = cfg.job.output.record_source or f"construct run {cfg.job.id}"
         session.import_rows(
             [
                 {
@@ -1092,8 +1491,8 @@ def _persist_construct_run(planned: _PlannedRun) -> RunResult:
     _write_output_records(output_ds, cfg=cfg, records=built_to_write)
     return RunResult(
         job_id=cfg.job.id,
-        input_dataset=cfg.job.input.dataset,
-        output_dataset=cfg.job.output.dataset,
+        input_dataset=cfg.job.input.source.dataset,
+        output_dataset=cfg.job.output.target.dataset,
         output_root=preflight.output_root,
         records_total=preflight.records_total,
         records_written=len(built_to_write),

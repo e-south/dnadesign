@@ -28,6 +28,7 @@ def test_infer_public_api_exports_callable_wrappers() -> None:
     assert callable(infer.run_generate)
     assert callable(infer.run_job)
     assert callable(infer.export_evo2_promoter_opal_matrix)
+    assert callable(infer.resolve_infer_runtime_lane_contracts)
 
 
 def test_infer_cli_wrapper_exposes_main_callable() -> None:

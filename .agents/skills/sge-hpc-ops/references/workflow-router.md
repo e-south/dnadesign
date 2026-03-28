@@ -4,13 +4,13 @@ Use this router before emitting any scheduler commands.
 
 ### Route keys
 
-- `workflow_id`: one path from the list below
+- `route_id`: one path from the list below
 - `execution_locus`: `local_shell`, `scc_login_shell`, `ondemand_shell`, `ondemand_app_shell`, or `unknown`
 - `session_handoff_state`: `none`, `session_request_pending`, or `session_ready`
 
 ### DenseGen notify policy
 
-- For runbook-native Ops execution, DenseGen uses notify by default and routes to `densegen_batch_with_notify_slack`.
+- For runbook-native Ops execution, DenseGen uses notify by default and routes to `densegen_batch_with_notify`.
 - Use `densegen_batch_submit` only when the request explicitly opts out (`--no-notify`, "without notify", "notify off").
 
 ### Routes
@@ -42,7 +42,7 @@ Required evidence:
 - operator-brief output
 - densegen job handle
 
-#### `densegen_batch_with_notify_slack`
+#### `densegen_batch_with_notify`
 
 Trigger cues:
 - "start a densegen workspace ... batch job ..."
@@ -50,7 +50,7 @@ Trigger cues:
 - "run a densegen workflow stress ethanol and cipro workspace for two hours"
 
 Execution contract:
-1. Scaffold or select runbook via Ops (`uv run ops runbook precedents` or `uv run ops runbook init --workflow densegen ...`).
+1. Scaffold or select runbook via Ops (`uv run ops runbook presets` or `uv run ops runbook init --workflow densegen ... --project <project>|--preset <preset>`).
 2. Set up notify profile via `uv run notify setup slack ...`.
 3. Run submit QA preflight for watcher and densegen templates.
 4. Run session-status check and apply warning when running_jobs > 3.

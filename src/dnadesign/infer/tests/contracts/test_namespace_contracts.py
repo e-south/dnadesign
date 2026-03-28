@@ -41,6 +41,7 @@ class _AttachCaptureDataset:
         backend: str = "pyarrow",
         note: str = "",
         actor: dict[str, object] | None = None,
+        event_args: dict[str, object] | None = None,
     ) -> int:
         payload = pq.read_table(path)
         self.calls.append(
@@ -55,6 +56,7 @@ class _AttachCaptureDataset:
                 "backend": backend,
                 "note": note,
                 "actor": actor,
+                "event_args": event_args,
                 "payload_schema_names": list(payload.schema.names),
             }
         )

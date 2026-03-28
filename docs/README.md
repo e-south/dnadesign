@@ -1,7 +1,7 @@
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-21
+**Last verified:** 2026-03-27
 
 Use this page to find the next task, command, or reference doc.
 
@@ -50,8 +50,9 @@ Use these when data moves through more than one tool and the shared record lives
 | Assemble multiple producer datasets before construct and infer share one downstream dataset | [Multi-source shared dataset assembly](../src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md) | Verify carried overlays, construct lineage, and infer write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
 | Hand one construct-backed dataset to infer and downstream watchers | [Construct -> USR -> Infer shared dataset runbook](../src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md) | Verify lineage plus downstream write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
 | Review the promoter-study Evo2 route before choosing the next step | [Promoter study Evo2 workflow journey](../src/dnadesign/usr/docs/operations/promoter-evo2-journey.md) | Continue to [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md) for the shared handoff. |
-| Check the current promoter-study record | [Promoter study status contract](../src/dnadesign/usr/docs/operations/promoter-study-status-contract.md) | Read the active selector in [Promoter study index](studies/promoter/index.yaml), then open the matching study directory from [Study records](studies/README.md). Use `ops progress campaign` and `ops progress show usr.data-plane.promoter-feature-matrix` after the record points at real artifacts. |
-| Check study dataset-root semantics and affiliated-dataset registry terms | [Study records index](studies/README.md) | Verify the active promoter-study selector in [Promoter study index](studies/promoter/index.yaml). |
+| Check the current promoter-study record | [Promoter study status contract](../src/dnadesign/usr/docs/operations/promoter-study-status-contract.md) | Read the active selector in [Promoter study index](studies/index.yaml), then open the matching study directory from [Study records](studies/README.md). Use `ops progress campaign` and `ops progress show usr.data-plane.promoter-feature-matrix` after the record points at real artifacts. |
+| Run the deeper promoter-study command preflight | [Promoter study preflight contract](../src/dnadesign/usr/docs/operations/promoter-study-preflight.md) | Start from [Study index](studies/index.yaml), use `ops.study.yaml` for lifecycle and scope posture, and use `pipeline.yaml` when present for the exact Construct, Infer, Notify, and runbook paths. |
+| Check study dataset-root semantics and affiliated-dataset registry terms | [Study records index](studies/README.md) | Verify the active study selector, `family`, and `record_root` in [Study index](studies/index.yaml). |
 | Build a promoter-study feature dataset from anchors, wildtype/manual promoters, optional construct contexts, and infer outputs | [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md) | Verify one explicit `infer__...` column is chosen as `X` or export a flattened matrix before continuing to the exploratory [cluster workflow](../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) or the downstream [USR dataset with infer-derived X -> OPAL active learning](../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md) workflow. |
 | Sync iterative HPC outputs to local analysis safely | [USR workflow map](../src/dnadesign/usr/docs/operations/workflow-map.md) -> [USR HPC sync flow](../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md) | Verify transfer parity with [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync-audit-loop.md). |
 | Run cross-machine sync with stricter failure checks | [USR sync command contract](../src/dnadesign/usr/docs/operations/sync.md) | Verify sidecar and overlay fidelity with [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync-fidelity-drills.md). |
@@ -104,6 +105,8 @@ Use these when the next step is orchestration, environment setup, or audit outpu
 - [Installation](installation.md): environment setup and verification baseline.
 - [Runbook catalog](runbooks/README.md): shell command index for cross-tool procedures and tool entrypoints.
 - [Ops orchestration index](operations/README.md): orchestration docs for init, plan, execute, and status checks.
+- [OPS mental model](operations/ops-mental-model.md): plane model, shared state semantics, and snapshot versus preflight guidance.
+- [OPS failure contract](operations/ops-failure-contract.md): CLI exit-code and stderr contract for automation and maintainers.
 - [BU SCC docs index](bu-scc/README.md): cluster setup, submission, and operator runbooks.
 - [Notify docs index](notify/README.md): notifier setup, runtime behavior, and recovery routes.
 - [USR operations index](../src/dnadesign/usr/docs/operations/README.md): sync, transfer, dataset assembly, and downstream handoff runbooks.
@@ -113,7 +116,6 @@ Use these when the next step is orchestration, environment setup, or audit outpu
 - [Developer docs](dev/README.md): CI/testing contracts and maintainer operations.
 - [Execution plans index](exec-plans/README.md): active and completed execution-plan records.
 - [Study records index](studies/README.md): checked-in live study manifests, affiliated-dataset registries, and status notes for real cross-tool efforts.
-- [Promoter study registry](studies/promoter/README.md): explicit active-study selector for promoter-study records.
 - [Templates index](templates/README.md): reusable templates for runbooks, plans, and records.
 - [Architecture decisions index](architecture/decisions/README.md): ADR catalog and decision history.
 - [Quality docs index](quality/README.md): quality gates, audits, and measurement references.

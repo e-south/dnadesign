@@ -1,0 +1,49 @@
+job:
+  id: stress_ethanol_cipro_pdual10_forward_anchor_window_1kb
+  input:
+    source:
+      kind: usr
+      dataset: promoter/stress_ethanol_cipro_anchor_set
+      root: ../../../usr/datasets
+    field: sequence
+  template:
+    id: pdual10_forward_anchor_window
+    source:
+      kind: usr
+      dataset: plasmids
+      root: ../../../usr/datasets
+      record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+      field: sequence
+    circular: true
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 3574
+          end: 3666
+        guards:
+          replaced_sequence: TGGCGCCGGTGATGCCGGCCACGATGCGTCCGGCGTAGAGGATCGAGTTTACGGCTAGCTCAGTCCTAGGTACTATGCTAGCACCTCGAGGG
+          upstream_sequence: CGCCAGCAACCGGGATCC
+          downstream_sequence: GAATTCGCCAGCTGTCACCGGA
+          require_unique_forward_matches: true
+  realize:
+    mode: window
+    focal_part: anchor
+    window:
+      semantics: fixed_total
+      reference: center
+      direction: symmetric
+      size_bp: 1000
+      offset_bp: 0
+  output:
+    target:
+      kind: usr
+      dataset: promoter/stress_ethanol_cipro_construct_contexts
+      root: ../../../usr/datasets

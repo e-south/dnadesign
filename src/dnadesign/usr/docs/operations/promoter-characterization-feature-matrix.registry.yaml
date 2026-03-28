@@ -8,7 +8,7 @@ entry_artifact: one or more USR-backed promoter datasets plus optional construct
 exit_artifact: infer-annotated USR feature matrix ready for cluster or OPAL
 summary: Build one infer-annotated feature matrix from mixed promoter sources before branching into Cluster or OPAL.
 execution_kind: staged
-progress_kind: usr-dataset-state
+status_kind: usr-dataset-state
 keywords:
   - evo2
   - wildtype

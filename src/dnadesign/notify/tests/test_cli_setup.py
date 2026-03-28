@@ -431,11 +431,45 @@ def test_setup_resolve_events_supports_construct_workspace_project_selector(tmp_
                 "job:",
                 "  id: slot_a_window",
                 "  input:",
-                "    source: usr",
-                "    dataset: anchors_demo",
+                "    source:",
+                "      kind: usr",
+                "      dataset: anchors_demo",
+                "      root: outputs/usr_datasets",
+                "  template:",
+                "    id: template_demo",
+                "    source:",
+                "      kind: literal",
+                "      sequence: AAAATTTTCCCCGGGG",
+                "    circular: true",
+                "  parts:",
+                "    - name: anchor",
+                "      role: anchor",
+                "      sequence:",
+                "        source: input_field",
+                "        field: sequence",
+                "      placement:",
+                "        kind: replace",
+                "        orientation: forward",
+                "        locator:",
+                "          kind: coordinates",
+                "          start: 8",
+                "          end: 12",
+                "        guards:",
+                "          replaced_sequence: CCCC",
+                "  realize:",
+                "    mode: window",
+                "    focal_part: anchor",
+                "    window:",
+                "      semantics: fixed_total",
+                "      reference: center",
+                "      direction: symmetric",
+                "      size_bp: 8",
+                "      offset_bp: 0",
                 "  output:",
-                "    dataset: construct/demo_window",
-                "    root: outputs/usr_datasets",
+                "    target:",
+                "      kind: usr",
+                "      dataset: construct/demo_window",
+                "      root: outputs/usr_datasets",
             ]
         )
         + "\n",
@@ -446,13 +480,16 @@ def test_setup_resolve_events_supports_construct_workspace_project_selector(tmp_
             [
                 "workspace:",
                 "  id: demo_construct",
-                "  profile: promoter-swap-demo",
+                "  profile: anchor-template-demo",
                 "  projects:",
                 "    - id: slot_a_window",
-                "      config: config.slot_a.window.yaml",
-                "      flow: replace-anchor-in-template",
-                "      input_dataset: anchors_demo",
-                "      output_dataset: construct/demo_window",
+                "      artifacts:",
+                "        config:",
+                "          path: config.slot_a.window.yaml",
+                "          job_id: slot_a_window",
+                "      contract:",
+                "        input_dataset: anchors_demo",
+                "        output_dataset: construct/demo_window",
             ]
         )
         + "\n",
@@ -497,14 +534,47 @@ def test_setup_slack_namespaces_construct_selector_profile_paths(tmp_path: Path,
         "\n".join(
             [
                 "job:",
-                "  id: promoter_swap_slot_a_window_1kb",
+                "  id: anchor_template_slot_a_window_1kb",
                 "  input:",
-                "    source: usr",
-                "    dataset: mg1655_promoters",
-                "    root: outputs/usr_datasets",
+                "    source:",
+                "      kind: usr",
+                "      dataset: anchor_parts_demo",
+                "      root: outputs/usr_datasets",
+                "  template:",
+                "    id: template_demo",
+                "    source:",
+                "      kind: literal",
+                "      sequence: AAAATTTTCCCCGGGG",
+                "    circular: true",
+                "  parts:",
+                "    - name: anchor",
+                "      role: anchor",
+                "      sequence:",
+                "        source: input_field",
+                "        field: sequence",
+                "      placement:",
+                "        kind: replace",
+                "        orientation: forward",
+                "        locator:",
+                "          kind: coordinates",
+                "          start: 8",
+                "          end: 12",
+                "        guards:",
+                "          replaced_sequence: CCCC",
+                "  realize:",
+                "    mode: window",
+                "    focal_part: anchor",
+                "    window:",
+                "      semantics: fixed_total",
+                "      reference: center",
+                "      direction: symmetric",
+                "      size_bp: 8",
+                "      offset_bp: 0",
                 "  output:",
-                "    dataset: pdual10_source_of_truth_demo",
-                "    root: outputs/usr_datasets",
+                "    target:",
+                "      kind: usr",
+                "      dataset: anchor_template_shared_dataset_demo",
+                "      root: outputs/usr_datasets",
             ]
         )
         + "\n",
@@ -515,13 +585,16 @@ def test_setup_slack_namespaces_construct_selector_profile_paths(tmp_path: Path,
             [
                 "workspace:",
                 "  id: demo_construct",
-                "  profile: promoter-swap-source-of-truth-demo",
+                "  profile: anchor-template-shared-dataset-demo",
                 "  projects:",
                 "    - id: slot_a_window",
-                "      config: config.slot_a.window.yaml",
-                "      flow: replace-anchor-in-template",
-                "      input_dataset: mg1655_promoters",
-                "      output_dataset: pdual10_source_of_truth_demo",
+                "      artifacts:",
+                "        config:",
+                "          path: config.slot_a.window.yaml",
+                "          job_id: anchor_template_slot_a_window_1kb",
+                "      contract:",
+                "        input_dataset: anchor_parts_demo",
+                "        output_dataset: anchor_template_shared_dataset_demo",
             ]
         )
         + "\n",
@@ -1030,3 +1103,62 @@ def test_setup_slack_can_resolve_infer_events_from_config(tmp_path: Path, monkey
     assert data["events"] == str((usr_root / "infer_demo" / ".events.log").resolve())
     assert data["policy"] == "infer"
     assert data["events_source"] == {"tool": "infer", "config": str(config_path.resolve())}
+
+
+def test_setup_slack_defaults_infer_profile_to_lane_namespace(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "workspaces" / "infer_demo" / "config.anchor_only.evo2_7b.yaml"
+    usr_root = tmp_path / "usr_root"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "model:",
+                "  id: evo2_7b",
+                "  device: cuda:0",
+                "  precision: bf16",
+                "  alphabet: dna",
+                "jobs:",
+                "  - id: anchor_only_7b_features",
+                "    operation: extract",
+                "    ingest:",
+                "      source: usr",
+                "      dataset: promoter/demo_anchor_set",
+                f"      root: {usr_root}",
+                "      field: sequence",
+                "    io:",
+                "      write_back: true",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    outside_cwd = tmp_path / "outside"
+    outside_cwd.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(outside_cwd)
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "slack",
+            "--tool",
+            "infer",
+            "--config",
+            str(config_path),
+            "--secret-source",
+            "env",
+        ],
+    )
+
+    assert result.exit_code == 0
+    profile = config_path.parent / "outputs" / "notify" / "infer" / "anchor_only_7b" / "profile.json"
+    assert profile.exists()
+    data = json.loads(profile.read_text(encoding="utf-8"))
+    assert data["events"] == str((usr_root / "promoter" / "demo_anchor_set" / ".events.log").resolve())
+    assert data["policy"] == "infer"
+    assert data["cursor"] == str((profile.parent / "cursor").resolve())
+    assert data["spool_dir"] == str((profile.parent / "spool").resolve())
+    assert data["events_source"] == {"tool": "infer", "config": str(config_path.resolve())}
+    assert not (outside_cwd / "outputs" / "notify" / "infer" / "anchor_only_7b" / "profile.json").exists()

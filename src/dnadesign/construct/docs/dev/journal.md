@@ -51,14 +51,17 @@ Ship a real first implementation of `construct` as a sibling tool with a layout 
 job:
   id: promoter_context_1kb
   input:
-    source: usr
-    dataset: densegen_anchor_set
+    source:
+      kind: usr
+      dataset: densegen_anchor_set
     field: sequence
   template:
     id: plasmid_demo
-    path: inputs/template.fa
+    source:
+      kind: path
+      path: inputs/template.fa
+      label: inputs/template.fa
     circular: true
-    source: inputs/template.fa
   parts:
     - name: anchor
       role: anchor
@@ -74,9 +77,12 @@ job:
   realize:
     mode: window
     focal_part: anchor
-    focal_point: center
-    anchor_offset_bp: 0
-    window_bp: 1000
+    window:
+    semantics: fixed_total
+    reference: center
+    direction: symmetric
+    size_bp: 1000
+    offset_bp: 0
   output:
     dataset: densegen_anchor_set_construct_1kb
 ```
@@ -189,13 +195,13 @@ Promote the first real promoter-swap flow from a file-backed placeholder into a 
 
 ### CLI surface additions
 
-- `construct seed promoter-swap-demo [--root <usr-root>] --manifest <path>`
+- `construct seed anchor-template-demo [--root <usr-root>] --manifest <path>`
   - bootstraps curated anchor/template demo datasets
   - defaults to the canonical repo USR datasets root when `--root` is omitted
   - attaches `construct_seed__*` catalog overlays for human-readable labels
   - attaches standardized `usr_label__primary` / `usr_label__aliases` label fields and materializes those into `records.parquet`
   - writes a manifest with deterministic record ids and slot coordinates
-- `construct workspace init --profile promoter-swap-demo`
+- `construct workspace init --profile anchor-template-demo`
   - copies a packaged demo workspace with slot_a/slot_b and window/full configs
 
 ### Validation contract
@@ -237,13 +243,14 @@ Pressure testing against real demo flows and a bounded review swarm surfaced thr
   - selected `input.ids`
   - resolved input/output roots
   - output dataset and collision policy
-- `template.kind=path` now rejects multi-record FASTA input instead of concatenating records silently.
+- `template.source.kind=path` now rejects multi-record FASTA input instead of concatenating records silently.
 - Equal-coordinate part execution now preserves config order in both realization and recorded lineage order.
 - Construct output datasets now support explicit collision policy:
   - `output.on_conflict=error` remains the fail-fast default
   - `output.on_conflict=ignore` supports idempotent reruns or selective append flows
 - Writing output to the same dataset/root as input is blocked unless `output.allow_same_as_input=true`.
 - Every workspace now carries `construct.workspace.yaml` as a project registry so multi-template or multi-slot studies stay auditable as multiple explicit config entries.
+- Workspace projects now track config artifacts explicitly, including expected `job.id`, so registry drift is caught before a run instead of after outputs are written.
 
 ### Workspace stance refinement
 
@@ -270,7 +277,7 @@ Pressure testing against real demo flows and a bounded review swarm surfaced thr
 
 The next maintainer audit pass still exposed three pragmatic gaps:
 
-- `template.kind=path` could leak raw filesystem exceptions instead of a shaped construct error
+- `template.source.kind=path` could leak raw filesystem exceptions instead of a shaped construct error
 - `construct.workspace.yaml` described projects but did not enforce registry/config alignment
 - construct-owned onboarding still stopped at the packaged demo instead of supporting generic user-provided inputs
 
@@ -318,7 +325,7 @@ described a different order than the one later persisted in construct lineage.
 ### Validation additions
 
 - Runtime tests now cover:
-  - negative circular `anchor_offset_bp`
+  - negative circular `realize.window.offset_bp`
   - equal-coordinate preflight/lineage order consistency
   - same-start mixed-interval rejection
 - CLI validation tests now cover the shaped same-start ambiguity error.

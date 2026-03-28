@@ -327,7 +327,7 @@ def test_cli_catalog_show_emits_registered_entry() -> None:
     assert "Owner boundary: usr" in result.output
     assert "Entry artifact: one or more USR-backed promoter datasets" in result.output
     assert "Exit artifact: infer-annotated USR feature matrix ready for cluster or OPAL" in result.output
-    assert "Progress kind: usr-dataset-state" in result.output
+    assert "Status kind: usr-dataset-state" in result.output
     assert "Owner docs:" in result.output
     assert "- usr: USR docs" in result.output
     assert "Related tool docs:" in result.output
@@ -345,7 +345,7 @@ def test_cli_catalog_show_emits_registered_entry() -> None:
     assert "- opal/usr-infer-x-active-learning: USR Dataset With Infer-Derived X -> OPAL Active Learning" in (
         result.output
     )
-    assert "Required progress inputs:" in result.output
+    assert "Required status inputs:" in result.output
     assert "--usr-root <usr-root>" in result.output
     assert "--dataset <dataset>" in result.output
     assert "Related procedures:" in result.output
@@ -410,7 +410,7 @@ def test_cli_catalog_show_json_includes_related_procedures() -> None:
         "src/dnadesign/construct/docs/reference/template-contexts.md"
     )
     assert payload["related_tool_routes"][1]["doc_path"] == "src/dnadesign/infer/docs/architecture/README.md"
-    assert payload["progress_required_inputs"] == [
+    assert payload["required_status_inputs"] == [
         {
             "cli_flag": "--usr-root",
             "manifest_key": "usr_root",
@@ -506,7 +506,8 @@ def test_cli_catalog_list_rejects_unknown_related_to_registry_id() -> None:
     )
 
     assert result.exit_code == 2
-    assert "unknown --related-to registry id: usr.data-plane.promoter-feature" in result.output
+    assert "Catalog contract error: unknown --related-to registry id:" in result.output
+    assert "usr.data-plane.promoter-feature" in result.output
     assert "usr.data-plane.promoter-feature-matrix" in result.output
 
 

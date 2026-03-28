@@ -1,0 +1,54 @@
+version: 1
+provider_id: study.promoter
+entries:
+  - status_kind: promoter-study-status
+    owner_boundary: usr
+    observes_plane: record
+    provider_ref: dnadesign.studies.families.promoter.ops.provider:provide_promoter_status
+    description: Read one checked-in promoter-study directory and summarize dataset and phase posture from repo-backed evidence.
+    surface_type: study_snapshot
+    cost_class: cheap
+    summary_scope: repo
+    input_schema:
+      - name: study_dir
+        manifest_key: study_dir
+        cli_flag: --study-dir
+        placeholder: docs/studies/<study-id>
+        summary: Checked-in promoter-study directory containing campaign.yaml, datasets.yaml, status.md, and ops.study.yaml.
+        type: path
+        required: false
+        path_base: repo
+    notes:
+      - If `docs/studies/index.yaml` declares `active_study_id`, you can omit `--study-dir` for the active-study summary. Pass `--study-dir` to pin or override the checked-in study directory.
+  - status_kind: promoter-study-preflight
+    owner_boundary: usr
+    observes_plane: execution_readiness
+    provider_ref: dnadesign.studies.families.promoter.ops.provider:provide_promoter_preflight
+    description: Run one read-only active-study preflight suite across DenseGen, Construct, Infer, Notify, and batch-plan surfaces.
+    surface_type: study_preflight
+    cost_class: deep
+    summary_scope: host
+    input_schema:
+      - name: study_dir
+        manifest_key: study_dir
+        cli_flag: --study-dir
+        placeholder: docs/studies/<study-id>
+        summary: Checked-in promoter-study directory containing campaign.yaml, datasets.yaml, status.md, and ops.study.yaml.
+        type: path
+        required: false
+        path_base: repo
+      - name: scope
+        manifest_key: scope
+        cli_flag: --scope
+        placeholder: next
+        summary: >-
+          Preflight scope for promoter-study-preflight surfaces: `full` runs
+          the whole suite; `next` focuses the next actionable phase and
+          defers later-lane blockers.
+        type: enum
+        required: false
+        default: next
+        choices: [next, full]
+    notes:
+      - This route composes read-only command preflights. Use it after the cheaper `usr.data-plane.promoter-study-status` snapshot when you need command-level blockers.
+      - If `docs/studies/index.yaml` declares `active_study_id`, you can omit `--study-dir` for the active-study preflight. Pass `--study-dir` to pin or override the checked-in study directory.

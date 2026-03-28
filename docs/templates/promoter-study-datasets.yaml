@@ -17,7 +17,7 @@ datasets:
       remote_dataset: <dataset-id>
       remote_root_kind: shared|workspace_local_export|external_usr
       default_direction: pull|push|bidirectional|none
-      audit_json: docs/studies/promoter/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
+      audit_json: docs/studies/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
       strict_bootstrap_id: true
       remote_path: n/a
   - role: wildtype_manual
@@ -55,6 +55,6 @@ datasets:
       remote_dataset: <feature-dataset-id>
       remote_root_kind: shared|workspace_local_export|external_usr
       default_direction: bidirectional
-      audit_json: docs/studies/promoter/<study-id>/audits/<feature-dataset-id>--<remote-name>-diff.json
+      audit_json: docs/studies/<study-id>/audits/<feature-dataset-id>--<remote-name>-diff.json
       strict_bootstrap_id: true
       remote_path: n/a

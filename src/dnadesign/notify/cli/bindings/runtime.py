@@ -106,7 +106,6 @@ def run_usr_events_watch_impl(
         resolve_tool_workspace_config_fn=deps._resolve_tool_workspace_config_path,
         resolve_usr_events_path_fn=deps._resolve_usr_events_path,
         resolve_profile_webhook_source_fn=deps._resolve_profile_webhook_source,
-        default_profile_path_for_tool_fn=deps._default_profile_path_for_tool,
         resolve_cli_optional_string_fn=deps._resolve_cli_optional_string,
         resolve_webhook_url_fn=deps.resolve_webhook_url,
         resolve_tls_ca_bundle_fn=deps.resolve_tls_ca_bundle,

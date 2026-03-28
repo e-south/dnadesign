@@ -1,0 +1,154 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/ops/status_providers.py
+
+Provider-owned OPS status builders.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import json
+from collections import Counter
+from collections.abc import Mapping
+from pathlib import Path
+
+from dnadesign.ops.status.paths import required_path
+
+
+def provide_ops_audit_status(
+    *,
+    repo_root: Path | None,
+    inputs: Mapping[str, object],
+) -> tuple[str, str, dict[str, object]]:
+    del repo_root
+    return _ops_audit_status(inputs.get("audit_json"))
+
+
+def _ops_audit_status(audit_json: object) -> tuple[str, str, dict[str, object]]:
+    resolved_audit = required_path(audit_json, flag_name="--audit-json", status_kind="ops-audit-json")
+    if not resolved_audit.exists():
+        return (
+            "missing",
+            "audit artifact not found",
+            {"audit_json": str(resolved_audit)},
+        )
+    payload = json.loads(resolved_audit.read_text(encoding="utf-8"))
+    execution = dict(payload.get("execution") or {})
+    plan = dict(payload.get("plan") or {})
+    commands = list(execution.get("commands") or [])
+    phase_counts = Counter(str(command.get("phase") or "unknown") for command in commands)
+    ok = bool(execution.get("ok", False))
+    failed_phase = execution.get("failed_phase")
+    queue_probe = _extract_queue_probe_evidence(commands)
+    runtime_visibility = _extract_runtime_visibility(plan)
+    if (
+        ok
+        and runtime_visibility is not None
+        and runtime_visibility.get("degraded")
+        and queue_probe is not None
+        and queue_probe["status"] == "degraded"
+    ):
+        summary = "latest orchestration audit passed with degraded runtime visibility and degraded queue probe"
+    elif ok and runtime_visibility is not None and runtime_visibility.get("degraded"):
+        summary = "latest orchestration audit passed with degraded runtime visibility"
+    elif ok and queue_probe is not None and queue_probe["status"] == "degraded":
+        summary = "latest orchestration audit passed with degraded queue probe"
+    elif ok:
+        summary = "latest orchestration audit passed"
+    else:
+        summary = f"latest orchestration audit failed at {failed_phase or 'unknown'}"
+    return (
+        (
+            "attention"
+            if (
+                not ok
+                or (queue_probe is not None and queue_probe["status"] == "degraded")
+                or (runtime_visibility is not None and runtime_visibility.get("degraded"))
+            )
+            else "ok"
+        ),
+        summary,
+        {
+            "audit_json": str(resolved_audit),
+            "workflow_id": plan.get("workflow_id"),
+            "project": plan.get("project"),
+            "runbook_id": plan.get("runbook_id"),
+            "workspace_root": plan.get("workspace_root"),
+            "execution_ok": ok,
+            "failed_phase": failed_phase,
+            "command_count": len(commands),
+            "phase_counts": dict(sorted(phase_counts.items())),
+            "queue_probe": queue_probe,
+            "runtime_visibility": runtime_visibility,
+        },
+    )
+
+
+def _extract_queue_probe_evidence(commands: list[object]) -> dict[str, object] | None:
+    queue_probe_commands: list[dict[str, object]] = []
+    status = "ok"
+    for command in commands:
+        if not isinstance(command, dict):
+            continue
+        fields = _parse_record_fields(command.get("stdout"))
+        queue_probe = fields.get("queue_probe")
+        if queue_probe is None:
+            continue
+        if queue_probe != "ok":
+            status = "degraded"
+        queue_probe_commands.append(
+            {
+                "phase": command.get("phase"),
+                "command": command.get("command"),
+                "queue_probe": queue_probe,
+                "next_action": fields.get("next_action"),
+                "submit_gate": fields.get("submit_gate"),
+                "advisor": fields.get("advisor"),
+                "stderr": str(command.get("stderr") or "").strip() or None,
+            }
+        )
+    if not queue_probe_commands:
+        return None
+    return {
+        "status": status,
+        "commands": queue_probe_commands,
+    }
+
+
+def _extract_runtime_visibility(plan: Mapping[str, object]) -> dict[str, object] | None:
+    payload = plan.get("runtime_visibility")
+    if not isinstance(payload, Mapping):
+        return None
+    scheduler_probe_state = str(payload.get("scheduler_probe_state") or "").strip()
+    active_job_resolution_state = str(payload.get("active_job_resolution_state") or "").strip()
+    degraded = bool(payload.get("degraded", False))
+    degraded_reasons = [
+        str(reason).strip() for reason in list(payload.get("degraded_reasons") or []) if str(reason).strip()
+    ]
+    if not scheduler_probe_state and not active_job_resolution_state and not degraded and not degraded_reasons:
+        return None
+    return {
+        "scheduler_probe_state": scheduler_probe_state or None,
+        "active_job_resolution_state": active_job_resolution_state or None,
+        "degraded": degraded,
+        "degraded_reasons": degraded_reasons,
+    }
+
+
+def _parse_record_fields(raw_text: object) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for line in str(raw_text or "").splitlines():
+        for token in line.split():
+            if "=" not in token:
+                continue
+            key, value = token.split("=", maxsplit=1)
+            if key:
+                fields[key] = value
+    return fields
+
+
+__all__ = ["provide_ops_audit_status"]

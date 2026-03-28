@@ -164,19 +164,19 @@ main() {
   [[ -n "$threshold" ]] || threshold="$warn_over_running"
 
   local submit_gate next_action
-  if [[ "$health" == "red" || "$advisor" == "triage_first" ]]; then
-    submit_gate="block"
-    next_action="Triage Eqw and failed jobs before any new submission."
-  elif [[ "$health" == "yellow" || "$advisor" == "confirm_then_submit" ]]; then
-    submit_gate="confirm"
-    next_action="Ask for explicit user confirmation, then use advisor-compliant submission shape."
+  if [[ "$health" == "red" || "$advisor" == "hold" ]]; then
+    submit_gate="blocked"
+    next_action="triage_eqw"
+  elif [[ "$health" == "yellow" ]]; then
+    submit_gate="confirmation_required"
+    next_action="explicit_confirmation_required"
   else
     submit_gate="ready"
-    next_action="Proceed with verify-before-submit and template QA preflight."
+    next_action="submit"
   fi
 
   if [[ "$json_output" -eq 1 ]]; then
-    printf '{"submit_gate":"%s","health":"%s","execution_locus":"%s","running_jobs":%d,"threshold":%d,"queued_jobs":%d,"eqw_jobs":%d,"planned_submits":%d,"requires_order":%s,"advisor":"%s","status_reason":"%s","advisor_reason":"%s","advisor_recommendation":"%s","next_action":"%s","queue_policy":"respect-queue-no-line-skipping"}\n' \
+    printf '{"submit_gate":"%s","health":"%s","execution_locus":"%s","running_jobs":%d,"threshold":%d,"queued_jobs":%d,"eqw_jobs":%d,"planned_submits":%d,"requires_order":%s,"advisor":"%s","status_reason":"%s","advisor_reason":"%s","advisor_recommendation":"%s","next_action":"%s","queue_policy":"respect_queue"}\n' \
       "$submit_gate" "$health" "$execution_locus" "$running_jobs" "$threshold" "$queued_jobs" "$eqw_jobs" "$planned_submits" "$([[ "$requires_order" -eq 1 ]] && echo true || echo false)" "$advisor" "$reason" "$advisor_reason" "$advisor_recommendation" "$next_action"
   else
     printf 'HPC Operator Brief\n'
@@ -189,7 +189,20 @@ main() {
     printf -- '- Advisor: %s\n' "$advisor"
     printf -- '- Reason: %s\n' "$advisor_reason"
     printf -- '- Recommendation: %s\n' "$advisor_recommendation"
-    printf -- '- Next Action: %s\n' "$next_action"
+    case "$next_action" in
+      triage_eqw)
+        printf -- '- Next Action: Triage Eqw and failed jobs before any new submission.\n'
+        ;;
+      explicit_confirmation_required)
+        printf -- '- Next Action: Ask for explicit user confirmation, then use advisor-compliant submission shape.\n'
+        ;;
+      submit)
+        printf -- '- Next Action: Proceed with verify-before-submit and template QA preflight.\n'
+        ;;
+      *)
+        printf -- '- Next Action: %s\n' "$next_action"
+        ;;
+    esac
     printf -- '- Queue Policy: respect queue, do not skip the line\n'
   fi
 }

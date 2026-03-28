@@ -17,9 +17,10 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from dnadesign._contracts.notify_webhook_profile import parse_notify_profile_webhook, resolve_file_secret_ref_path
-from dnadesign._contracts.tls_ca_bundle import (
+from dnadesign.notify.contracts import (
     DEFAULT_SYSTEM_TLS_CA_BUNDLE_CANDIDATES,
+    parse_notify_profile_webhook,
+    resolve_file_secret_ref_path,
     resolve_tls_ca_bundle_path,
 )
 

@@ -8,7 +8,7 @@
 **Registry-id:** usr.data-plane.construct-infer-source-of-truth
 **Summary:** Realize construct outputs into one shared USR dataset and use that dataset as the durable Infer handoff.
 **Execution-kind:** staged
-**Progress-kind:** usr-dataset-state
+**Status-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-20
@@ -22,6 +22,11 @@ Its early commands intentionally write into that packaged workspace-local USR
 root. For live promoter-study status and continuation, keep the study record's
 declared shared USR root authoritative and repoint construct configs
 deliberately before treating the dataset as the cross-tool source of truth.
+
+For the live `stress_ethanol_cipro_growth` study, the real source datasets are
+not the packaged demo inputs. Merge `densegen/study_stress_ethanol_cipro` and
+`mg1655_promoters` in USR first, then point Construct at that merged source
+dataset while keeping `plasmids` as the pDual-backed template dataset.
 
 ### Boundary decisions
 
@@ -44,7 +49,7 @@ deliberately before treating the dataset as the cross-tool source of truth.
 - If upstream records live in multiple USR datasets and must be unified before construct, do that explicitly with `uv run usr maintenance merge ...`; do not hide multi-source consolidation inside one construct config.
 - Use `uv run usr maintenance merge ... --carry-namespace <namespace>` when one compact, `id`-keyed overlay namespace such as `usr_label` must survive consolidation onto rows that actually survive the merge.
 - Plain `uv run usr maintenance merge ...` still rewrites canonical base rows only. For namespaces that are not `id`-keyed or not yet compact, materialize or reattach them explicitly instead of expecting implicit carry-through.
-- If multiple construct projects should accumulate into one semantic output dataset, keep each project auditable and point them at the same `output.dataset`.
+- If multiple construct projects should accumulate into one semantic output dataset, keep each project auditable and point them at the same `output.target.dataset`.
 - Start with `output.on_conflict=error` for fail-fast duplicate detection. Use `ignore` only for intentional idempotent reruns.
 
 ## Ordered procedure
@@ -57,11 +62,11 @@ export WORK_ROOT="$(mktemp -d /tmp/construct-usr-infer-XXXXXX)"
 # Pin the repo checkout so later file copies do not depend on the current shell directory.
 export DNADESIGN_REPO_ROOT="$(git rev-parse --show-toplevel)"
 # Scaffold the packaged shared-dataset construct workspace under that root.
-uv run construct workspace init --id shared_dataset_demo --root "$WORK_ROOT" --profile promoter-swap-source-of-truth-demo
+uv run construct workspace init --id shared_dataset_demo --root "$WORK_ROOT" --profile anchor-template-shared-dataset-demo
 # Reuse one workspace path across the remaining commands.
 export WORKSPACE_ROOT="$WORK_ROOT/shared_dataset_demo"
-# Seed canonical promoter and template records into the local tracer-bullet USR root.
-uv run construct seed promoter-swap-demo \
+# Seed packaged anchor and template records into the local tracer-bullet USR root.
+uv run construct seed anchor-template-demo \
   --root "$WORKSPACE_ROOT/outputs/usr_datasets" \
   --manifest "$WORKSPACE_ROOT/inputs/seed_manifest.yaml"
 ```
@@ -90,7 +95,7 @@ uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project s
 # Reuse the local tracer-bullet USR root and one semantic dataset id.
 export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets"
 # Reuse the packaged construct output dataset id across verification and downstream tools.
-export DATASET_ID="pdual10_source_of_truth_demo"
+export DATASET_ID="anchor_template_shared_dataset_demo"
 # Confirm the written dataset satisfies the active USR registry.
 uv run usr --root "$USR_ROOT" validate "$DATASET_ID" --strict
 # Inspect human-readable source labels plus construct lineage needed by downstream tools.
@@ -108,8 +113,8 @@ Expected outcome:
 ### 4) Scale the same pattern to more sources or templates
 
 - represent each additional template or slot as another `construct.workspace.yaml` project
-- point multiple projects at the same `output.dataset` only when one semantic shared dataset is intentional
-- the packaged `promoter-swap-source-of-truth-demo` profile is the turnkey two-project accumulation preset; use it as the tracer bullet before widening the matrix
+- point multiple projects at the same `output.target.dataset` only when one semantic shared dataset is intentional
+- the packaged `anchor-template-shared-dataset-demo` profile is the turnkey two-project accumulation preset; use it as the tracer bullet before widening the matrix
 - if multiple upstream USR datasets must be consolidated first, run `uv run usr maintenance merge ... --carry-namespace usr_label` when the upstream label overlay is compact and `id`-keyed; otherwise materialize or reattach the needed namespace explicitly before construct
 - rerun `construct workspace validate-project --runtime` for every project before `run-project`
 

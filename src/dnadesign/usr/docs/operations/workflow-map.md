@@ -146,7 +146,7 @@ Use this when construct should consolidate explicit source/template pairs into o
 
 ```bash
 # Create or reuse one semantic downstream dataset id.
-DATASET_ID="pdual10_source_of_truth_demo"
+DATASET_ID="anchor_template_shared_dataset_demo"
 # Validate both construct projects that feed the shared dataset.
 uv run construct workspace validate-project --workspace "$WORKSPACE_ROOT" --project slot_a_window --runtime # Validate slot_a runtime roots and output contract.
 uv run construct workspace validate-project --workspace "$WORKSPACE_ROOT" --project slot_b_window --runtime # Validate slot_b runtime roots and output contract.

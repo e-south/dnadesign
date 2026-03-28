@@ -40,19 +40,31 @@ def enforce_workspace_layout(runbook: "OrchestrationRunbookV1") -> "Orchestratio
         if runbook.densegen.config.resolve() != expected_config:
             raise ValueError(f"densegen.config must be {expected_config}")
     if runbook.infer is not None:
-        expected_config = (workspace_root / "config.yaml").resolve()
-        if runbook.infer.config.resolve() != expected_config:
-            raise ValueError(f"infer.config must be {expected_config}")
+        infer_config = runbook.infer.config.resolve()
+        if not _is_path_within(path=infer_config, parent=workspace_root):
+            raise ValueError(f"infer.config must be within {workspace_root}")
+        if infer_config.suffix.lower() not in {".yaml", ".yml"} or not infer_config.name.startswith("config"):
+            raise ValueError(
+                "infer.config must point to a workspace-local YAML config whose filename starts with 'config'"
+            )
     if runbook.notify is not None:
         notify_root = (workspace_root / "outputs" / "notify" / runbook.notify.tool).resolve()
-        expected_profile = (notify_root / "profile.json").resolve()
-        expected_cursor = (notify_root / "cursor").resolve()
-        expected_spool = (notify_root / "spool").resolve()
-        if runbook.notify.profile.resolve() != expected_profile:
-            raise ValueError(f"notify.profile must be {expected_profile}")
-        if runbook.notify.cursor.resolve() != expected_cursor:
-            raise ValueError(f"notify.cursor must be {expected_cursor}")
-        if runbook.notify.spool_dir.resolve() != expected_spool:
-            raise ValueError(f"notify.spool_dir must be {expected_spool}")
+        profile_path = runbook.notify.profile.resolve()
+        cursor_path = runbook.notify.cursor.resolve()
+        spool_path = runbook.notify.spool_dir.resolve()
+        if not _is_path_within(path=profile_path, parent=notify_root):
+            raise ValueError(f"notify.profile must be within {notify_root}")
+        if not _is_path_within(path=cursor_path, parent=notify_root):
+            raise ValueError(f"notify.cursor must be within {notify_root}")
+        if not _is_path_within(path=spool_path, parent=notify_root):
+            raise ValueError(f"notify.spool_dir must be within {notify_root}")
+        if profile_path.name != "profile.json":
+            raise ValueError("notify.profile filename must be exactly profile.json")
+        if cursor_path.name != "cursor":
+            raise ValueError("notify.cursor filename must be exactly cursor")
+        if spool_path.name != "spool":
+            raise ValueError("notify.spool_dir directory name must be exactly spool")
+        if profile_path.parent != cursor_path.parent or profile_path.parent != spool_path.parent:
+            raise ValueError("notify.profile, notify.cursor, and notify.spool_dir must share the same lane directory")
 
     return runbook

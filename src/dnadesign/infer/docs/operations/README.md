@@ -26,7 +26,7 @@
   - `infer_batch_submit`
   - `infer_batch_with_notify`
 - Shared producer contract path:
-  - `src/dnadesign/_contracts/usr_producer.py`
+  - `src/dnadesign/ops/contracts.py`
 
 ### Related docs
 

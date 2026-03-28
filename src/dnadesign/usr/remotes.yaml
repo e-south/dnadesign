@@ -18,12 +18,13 @@ remotes:
     user: esouth
     base_dir: /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets
 
-  # Study-specific producer export root on SCC for DenseGen accumulation.
+  # Study-specific DenseGen producer alias on SCC.
+  # This study now writes directly to the shared USR datasets root.
   cluster_workspace_export:
     type: ssh
     host: scc1.bu.edu
     user: esouth
-    base_dir: /project/dunlop/esouth/dnadesign/src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/outputs/usr_datasets
+    base_dir: /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets
 
   # (Usually NOT needed)
   # Drive sync from the cluster back to your laptop, only works if

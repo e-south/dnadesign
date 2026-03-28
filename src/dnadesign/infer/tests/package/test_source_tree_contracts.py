@@ -39,7 +39,7 @@ def test_infer_runtime_modules_live_under_src_directory() -> None:
     assert (infer_root / "src").is_dir()
 
     top_level_py = sorted(path.name for path in infer_root.glob("*.py"))
-    assert top_level_py == ["__init__.py", "__main__.py", "cli.py"]
+    assert top_level_py == ["__init__.py", "__main__.py", "cli.py", "contracts.py"]
 
 
 def test_infer_root_keeps_progressive_disclosure_directories() -> None:
@@ -67,6 +67,7 @@ def test_infer_root_keeps_minimal_top_level_surface() -> None:
         "__main__.py",
         "assets",
         "cli.py",
+        "contracts.py",
         "docs",
         "src",
         "tests",
@@ -87,6 +88,11 @@ def test_infer_packaged_workspace_examples_exist() -> None:
     assert (workspaces_root / "evo2_feature_bundle_smoke" / "inputs" / "anchor_only_records.jsonl").is_file()
     assert (workspaces_root / "evo2_feature_bundle_smoke" / "inputs" / "template_1kb_records.jsonl").is_file()
     assert (workspaces_root / "demo_usr_pressure" / "config.yaml").is_file()
+    assert (workspaces_root / "study_stress_ethanol_cipro" / "README.md").is_file()
+    assert (workspaces_root / "study_stress_ethanol_cipro" / "config.yaml").is_file()
+    assert (workspaces_root / "study_stress_ethanol_cipro" / "config.anchor_only.evo2_20b.yaml").is_file()
+    assert (workspaces_root / "study_stress_ethanol_cipro" / "config.anchor_plus_template.evo2_20b.yaml").is_file()
+    assert (workspaces_root / "study_stress_ethanol_cipro" / "config.full_lane_set.evo2_20b.yaml").is_file()
 
 
 def test_infer_internal_cli_is_packaged_and_not_flat() -> None:

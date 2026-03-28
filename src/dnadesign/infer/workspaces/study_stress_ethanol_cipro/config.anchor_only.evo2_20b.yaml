@@ -1,0 +1,25 @@
+model:
+  id: evo2_20b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+  batch_size: 8
+
+jobs:
+  - id: anchor_only_20b_features
+    operation: extract
+    ingest:
+      source: usr
+      dataset: promoter/stress_ethanol_cipro_anchor_set
+      root: ../../../usr/datasets
+      field: sequence
+    feature_bundle:
+      intermediate_block: 26
+      context:
+        kind: anchor_only
+      pooling:
+        seq_mean: true
+        anchor_mean_for_templated: true
+    io:
+      write_back: true
+      overwrite: false

@@ -28,7 +28,7 @@ Load when needed by task scope:
 - `automation-qa-preflight.md`
 - `workload-dnadesign.md`
 
-`densegen_batch_with_notify_slack`
+`densegen_batch_with_notify`
 - `batch-submit-contract.md`
 - `automation-qa-preflight.md`
 - `workload-dnadesign.md`
@@ -61,7 +61,7 @@ submit artifact checks:
 
 DenseGen batch with Notify:
 1. base pack
-2. route pack: `densegen_batch_with_notify_slack`
+2. route pack: `densegen_batch_with_notify`
 3. cross-cutting: status + submit-shape + BU SCC policy (if BU context)
 
 OnDemand handoff (already in session):

@@ -1433,25 +1433,24 @@ def test_usr_events_watch_can_autoload_profile_from_infer_tool_config(tmp_path: 
     infer_event = _event(action="materialize")
     infer_event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
     _write_events(events, [infer_event])
-    config_path = tmp_path / "workspaces" / "infer_demo" / "infer.yaml"
+    config_path = tmp_path / "workspaces" / "infer_demo" / "config.anchor_only.evo2_7b.yaml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
         "\n".join(
             [
                 "model:",
-                "  id: evo2",
-                "  device: cpu",
-                "  precision: fp32",
+                "  id: evo2_7b",
+                "  device: cuda:0",
+                "  precision: bf16",
                 "  alphabet: dna",
                 "jobs:",
-                "  - id: j1",
-                "    operation: generate",
+                "  - id: anchor_only_7b_features",
+                "    operation: extract",
                 "    ingest:",
                 "      source: usr",
                 "      dataset: infer_demo",
                 f"      root: {tmp_path / 'usr'}",
-                "    params:",
-                "      max_new_tokens: 8",
+                "      field: sequence",
                 "    io:",
                 "      write_back: true",
             ]
@@ -1459,7 +1458,7 @@ def test_usr_events_watch_can_autoload_profile_from_infer_tool_config(tmp_path: 
         + "\n",
         encoding="utf-8",
     )
-    profile = config_path.parent / "outputs" / "notify" / "infer" / "profile.json"
+    profile = config_path.parent / "outputs" / "notify" / "infer" / "anchor_only_7b" / "profile.json"
     profile.parent.mkdir(parents=True, exist_ok=True)
     profile.write_text(
         json.dumps(
@@ -1687,12 +1686,12 @@ def test_usr_events_watch_construct_workspace_selector_uses_selector_profile_and
     workspace = "demo_construct:slot_a_window"
     workspace_dir = repo_root / "src" / "dnadesign" / "construct" / "workspaces" / "demo_construct"
     config_path = workspace_dir / "config.slot_a.window.yaml"
-    events = workspace_dir / "outputs" / "usr_datasets" / "pdual10_source_of_truth_demo" / ".events.log"
+    events = workspace_dir / "outputs" / "usr_datasets" / "anchor_template_shared_dataset_demo" / ".events.log"
     events.parent.mkdir(parents=True, exist_ok=True)
     slot_b_event = _event(action="attach")
-    slot_b_event["actor"] = {"tool": "construct", "run_id": "construct-promoter_swap_slot_b_window_1kb"}
+    slot_b_event["actor"] = {"tool": "construct", "run_id": "construct-anchor_template_slot_b_window_1kb"}
     slot_a_event = _event(action="materialize")
-    slot_a_event["actor"] = {"tool": "construct", "run_id": "construct-promoter_swap_slot_a_window_1kb"}
+    slot_a_event["actor"] = {"tool": "construct", "run_id": "construct-anchor_template_slot_a_window_1kb"}
     _write_events(events, [slot_b_event, slot_a_event])
 
     workspace_dir.mkdir(parents=True, exist_ok=True)
@@ -1700,14 +1699,47 @@ def test_usr_events_watch_construct_workspace_selector_uses_selector_profile_and
         "\n".join(
             [
                 "job:",
-                "  id: promoter_swap_slot_a_window_1kb",
+                "  id: anchor_template_slot_a_window_1kb",
                 "  input:",
-                "    source: usr",
-                "    dataset: mg1655_promoters",
-                "    root: outputs/usr_datasets",
+                "    source:",
+                "      kind: usr",
+                "      dataset: anchor_parts_demo",
+                "      root: outputs/usr_datasets",
+                "  template:",
+                "    id: template_demo",
+                "    source:",
+                "      kind: literal",
+                "      sequence: AAAATTTTCCCCGGGG",
+                "    circular: true",
+                "  parts:",
+                "    - name: anchor",
+                "      role: anchor",
+                "      sequence:",
+                "        source: input_field",
+                "        field: sequence",
+                "      placement:",
+                "        kind: replace",
+                "        orientation: forward",
+                "        locator:",
+                "          kind: coordinates",
+                "          start: 8",
+                "          end: 12",
+                "        guards:",
+                "          replaced_sequence: CCCC",
+                "  realize:",
+                "    mode: window",
+                "    focal_part: anchor",
+                "    window:",
+                "      semantics: fixed_total",
+                "      reference: center",
+                "      direction: symmetric",
+                "      size_bp: 8",
+                "      offset_bp: 0",
                 "  output:",
-                "    dataset: pdual10_source_of_truth_demo",
-                "    root: outputs/usr_datasets",
+                "    target:",
+                "      kind: usr",
+                "      dataset: anchor_template_shared_dataset_demo",
+                "      root: outputs/usr_datasets",
             ]
         )
         + "\n",
@@ -1718,13 +1750,16 @@ def test_usr_events_watch_construct_workspace_selector_uses_selector_profile_and
             [
                 "workspace:",
                 "  id: demo_construct",
-                "  profile: promoter-swap-source-of-truth-demo",
+                "  profile: anchor-template-shared-dataset-demo",
                 "  projects:",
                 "    - id: slot_a_window",
-                "      config: config.slot_a.window.yaml",
-                "      flow: replace-anchor-in-template",
-                "      input_dataset: mg1655_promoters",
-                "      output_dataset: pdual10_source_of_truth_demo",
+                "      artifacts:",
+                "        config:",
+                "          path: config.slot_a.window.yaml",
+                "          job_id: anchor_template_slot_a_window_1kb",
+                "      contract:",
+                "        input_dataset: anchor_parts_demo",
+                "        output_dataset: anchor_template_shared_dataset_demo",
             ]
         )
         + "\n",
@@ -1763,14 +1798,14 @@ def test_usr_events_watch_construct_workspace_selector_uses_selector_profile_and
     )
 
     assert result.exit_code == 0
-    assert "construct-promoter_swap_slot_a_window_1kb" in result.stdout
-    assert "construct-promoter_swap_slot_b_window_1kb" not in result.stdout
+    assert "construct-anchor_template_slot_a_window_1kb" in result.stdout
+    assert "construct-anchor_template_slot_b_window_1kb" not in result.stdout
 
 
 def test_usr_events_watch_profile_infers_construct_run_id_from_events_source(tmp_path: Path, monkeypatch) -> None:
     workspace_dir = tmp_path / "construct_workspace"
     config_path = workspace_dir / "configs" / "slot_a" / "config.yaml"
-    events = workspace_dir / "outputs" / "usr_datasets" / "pdual10_source_of_truth_demo" / ".events.log"
+    events = workspace_dir / "outputs" / "usr_datasets" / "anchor_template_shared_dataset_demo" / ".events.log"
     profile = workspace_dir / "outputs" / "notify" / "construct" / "slot_a_window" / "profile.json"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1780,14 +1815,47 @@ def test_usr_events_watch_profile_infers_construct_run_id_from_events_source(tmp
         "\n".join(
             [
                 "job:",
-                "  id: promoter_swap_slot_a_window_1kb",
+                "  id: anchor_template_slot_a_window_1kb",
                 "  input:",
-                "    source: usr",
-                "    dataset: mg1655_promoters",
-                "    root: ../../outputs/usr_datasets",
+                "    source:",
+                "      kind: usr",
+                "      dataset: anchor_parts_demo",
+                "      root: ../../outputs/usr_datasets",
+                "  template:",
+                "    id: template_demo",
+                "    source:",
+                "      kind: literal",
+                "      sequence: AAAATTTTCCCCGGGG",
+                "    circular: true",
+                "  parts:",
+                "    - name: anchor",
+                "      role: anchor",
+                "      sequence:",
+                "        source: input_field",
+                "        field: sequence",
+                "      placement:",
+                "        kind: replace",
+                "        orientation: forward",
+                "        locator:",
+                "          kind: coordinates",
+                "          start: 8",
+                "          end: 12",
+                "        guards:",
+                "          replaced_sequence: CCCC",
+                "  realize:",
+                "    mode: window",
+                "    focal_part: anchor",
+                "    window:",
+                "      semantics: fixed_total",
+                "      reference: center",
+                "      direction: symmetric",
+                "      size_bp: 8",
+                "      offset_bp: 0",
                 "  output:",
-                "    dataset: pdual10_source_of_truth_demo",
-                "    root: ../../outputs/usr_datasets",
+                "    target:",
+                "      kind: usr",
+                "      dataset: anchor_template_shared_dataset_demo",
+                "      root: ../../outputs/usr_datasets",
             ]
         )
         + "\n",
@@ -1801,19 +1869,22 @@ def test_usr_events_watch_profile_infers_construct_run_id_from_events_source(tmp
                 "  profile: blank",
                 "  projects:",
                 "    - id: slot_a_window",
-                "      config: configs/slot_a/config.yaml",
-                "      flow: replace-anchor-in-template",
-                "      input_dataset: mg1655_promoters",
-                "      output_dataset: pdual10_source_of_truth_demo",
+                "      artifacts:",
+                "        config:",
+                "          path: configs/slot_a/config.yaml",
+                "          job_id: anchor_template_slot_a_window_1kb",
+                "      contract:",
+                "        input_dataset: anchor_parts_demo",
+                "        output_dataset: anchor_template_shared_dataset_demo",
             ]
         )
         + "\n",
         encoding="utf-8",
     )
     slot_b_event = _event(action="attach")
-    slot_b_event["actor"] = {"tool": "construct", "run_id": "construct-promoter_swap_slot_b_window_1kb"}
+    slot_b_event["actor"] = {"tool": "construct", "run_id": "construct-anchor_template_slot_b_window_1kb"}
     slot_a_event = _event(action="materialize")
-    slot_a_event["actor"] = {"tool": "construct", "run_id": "construct-promoter_swap_slot_a_window_1kb"}
+    slot_a_event["actor"] = {"tool": "construct", "run_id": "construct-anchor_template_slot_a_window_1kb"}
     _write_events(events, [slot_b_event, slot_a_event])
     profile.write_text(
         json.dumps(
@@ -1845,5 +1916,5 @@ def test_usr_events_watch_profile_infers_construct_run_id_from_events_source(tmp
     )
 
     assert result.exit_code == 0
-    assert "construct-promoter_swap_slot_a_window_1kb" in result.stdout
-    assert "construct-promoter_swap_slot_b_window_1kb" not in result.stdout
+    assert "construct-anchor_template_slot_a_window_1kb" in result.stdout
+    assert "construct-anchor_template_slot_b_window_1kb" not in result.stdout

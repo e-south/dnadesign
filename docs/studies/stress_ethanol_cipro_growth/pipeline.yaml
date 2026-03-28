@@ -1,0 +1,34 @@
+study_pipeline:
+  study_id: stress_ethanol_cipro_growth
+  last_verified: 2026-03-25
+  row_targets:
+    densegen_anchor_minimum_before_first_full_lane_infer: 100000
+  execution_surfaces:
+    construct_workspace: src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10
+    infer_workspace: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro
+    densegen_batch_with_notify: src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml
+    infer_batch_7b_with_notify:
+      anchor_only: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml
+      anchor_plus_template: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml
+    infer_batch_20b_with_notify:
+      anchor_only: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml
+      anchor_plus_template: src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml
+  datasets:
+    densegen_anchor_source: densegen/study_stress_ethanol_cipro
+    merged_anchor_dataset: promoter/stress_ethanol_cipro_anchor_set
+    construct_context_dataset: promoter/stress_ethanol_cipro_construct_contexts
+  construct:
+    workspace_projects:
+      - id: forward_anchor_window
+  infer:
+    preferred_model_family: evo2_20b
+    supported_model_families:
+      - evo2_20b
+      - evo2_7b
+    configs:
+      anchor_only_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml
+      anchor_plus_template_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml
+      anchor_only_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml
+      anchor_plus_template_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml
+      full_lane_set_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_7b.yaml
+      full_lane_set_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_20b.yaml

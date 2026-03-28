@@ -18,7 +18,7 @@ from typing import Callable, Protocol
 
 
 class ProgressTracker(Protocol):
-    """Minimal progress surface used by runtime code."""
+    """Minimal status surface used by runtime code."""
 
     def advance(self, n: int = 1) -> None:  # pragma: no cover - interface
         ...

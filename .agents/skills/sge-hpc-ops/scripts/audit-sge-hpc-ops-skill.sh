@@ -106,7 +106,7 @@ require_pattern "Load minimum reference set \(progressive disclosure\)" "progres
 require_pattern "Apply up-to-date handling" "up-to-date handling step present"
 require_pattern "verify-before-submit" "verify-before-submit contract present"
 require_pattern "qa preflight" "qa preflight contract language present"
-require_pattern "workflow_id" "workflow router output key present"
+require_pattern "route_id" "workflow router output key present"
 require_pattern "execution_locus" "execution locus output key present"
 require_pattern "ondemand_session_handoff" "ondemand handoff route present"
 require_pattern "45 days" "freshness threshold in SKILL.md present"
@@ -120,6 +120,31 @@ require_pattern "Status card|status card" "user-facing status card language pres
 require_pattern "respect the queue|do not skip the line|queue fairness|skip the queue" "queue respect policy language present"
 require_pattern "submission-shape advisor|shape advisor" "submission-shape advisor language present"
 require_pattern "operator brief|sge-operator-brief.sh" "operator brief language present"
+require_pattern "ops catalog list --simple" "ops catalog list command surface present"
+require_pattern "ops runbook presets" "ops runbook presets command surface present"
+require_pattern "ops runbook init" "ops runbook init command surface present"
+require_pattern "ops runbook plan" "ops runbook plan command surface present"
+require_pattern "ops runbook active-jobs" "ops runbook active-jobs command surface present"
+require_pattern "ops runbook execute" "ops runbook execute command surface present"
+require_pattern "ops progress show ops.control-plane.orchestration --audit-json" "read-only audit summary command present"
+
+if rg -q "precedents" "$SKILL_FILE" "$ROOT_DIR/references"; then
+  fail "skill surfaces must not reference removed precedents terminology"
+else
+  pass "skill surfaces avoid removed precedents terminology"
+fi
+
+if rg -q "docs/studies/promoter/" "$SKILL_FILE" "$ROOT_DIR/references"; then
+  fail "skill surfaces must not reference legacy family-nested study paths"
+else
+  pass "skill surfaces avoid legacy family-nested study paths"
+fi
+
+if rg -q "workflow_id" "$SKILL_FILE" "$ROOT_DIR/references"; then
+  fail "skill surfaces must use route_id unless discussing true runbook workflow metadata"
+else
+  pass "skill surfaces avoid workflow_id routing leakage"
+fi
 
 if rg -qi "start a densegen workspace x batch job on bu scc" "$SKILL_FILE"; then
   pass "trigger test includes densegen batch prompt"
@@ -283,10 +308,10 @@ else
   fail "workflow router missing explicit notify opt-out cues"
 fi
 
-if rg -q "ops runbook precedents" "$ROOT_DIR/SKILL.md"; then
-  pass "skill docs include ops runbook precedents entrypoint"
+if rg -q "ops runbook presets" "$ROOT_DIR/SKILL.md"; then
+  pass "skill docs include ops runbook presets entrypoint"
 else
-  fail "skill docs missing ops runbook precedents entrypoint"
+  fail "skill docs missing ops runbook presets entrypoint"
 fi
 
 if rg -q "DenseGen scaffolds include notify by default|--no-notify" "$ROOT_DIR/references/workload-dnadesign.md"; then
@@ -295,11 +320,11 @@ else
   fail "dnadesign workload reference missing notify default guidance"
 fi
 
-for workflow_id in densegen_batch_submit densegen_batch_with_notify_slack ondemand_session_request ondemand_session_handoff generic_sge_ops; do
-  if rg -q "$workflow_id" "$ROOT_DIR/references/workflow-router.md"; then
-    pass "workflow router includes $workflow_id"
+for route_id in densegen_batch_submit densegen_batch_with_notify ondemand_session_request ondemand_session_handoff generic_sge_ops; do
+  if rg -q "$route_id" "$ROOT_DIR/references/workflow-router.md"; then
+    pass "workflow router includes $route_id"
   else
-    fail "workflow router missing $workflow_id"
+    fail "workflow router missing $route_id"
   fi
 done
 
@@ -531,7 +556,7 @@ fi
 
 brief_high_output=""
 if brief_high_output="$("$ROOT_DIR"/scripts/sge-operator-brief.sh --qstat-file "$tmp_qstat" --planned-submits 8 --warn-over-running 3 2>/dev/null)"; then
-  if printf '%s\n' "$brief_high_output" | rg -q "Submit Gate: confirm"; then
+  if printf '%s\n' "$brief_high_output" | rg -q "Submit Gate: confirmation_required"; then
     pass "operator brief reports confirmation gate under high pressure"
   else
     fail "operator brief missing confirmation gate under high pressure"
@@ -547,7 +572,7 @@ fi
 
 brief_high_json=""
 if brief_high_json="$("$ROOT_DIR"/scripts/sge-operator-brief.sh --qstat-file "$tmp_qstat" --planned-submits 8 --warn-over-running 3 --json 2>/dev/null)"; then
-  if printf '%s\n' "$brief_high_json" | rg -q '"submit_gate":"confirm"'; then
+  if printf '%s\n' "$brief_high_json" | rg -q '"submit_gate":"confirmation_required"'; then
     pass "operator brief json reports confirmation gate under high pressure"
   else
     fail "operator brief json missing confirmation gate under high pressure"
@@ -563,13 +588,40 @@ fi
 
 brief_eqw_output=""
 if brief_eqw_output="$("$ROOT_DIR"/scripts/sge-operator-brief.sh --qstat-file "$tmp_qstat_eqw" --planned-submits 2 --warn-over-running 3 2>/dev/null)"; then
-  if printf '%s\n' "$brief_eqw_output" | rg -q "Submit Gate: block"; then
+  if printf '%s\n' "$brief_eqw_output" | rg -q "Submit Gate: blocked"; then
     pass "operator brief reports block gate for Eqw"
   else
     fail "operator brief missing block gate for Eqw"
   fi
 else
   fail "operator brief failed Eqw fixture run"
+fi
+
+native_advisor_output=""
+if native_advisor_output="$(uv run ops runbook diagnostics submit-shape-advisor --qstat-file "$tmp_qstat" --planned-submits 8 --warn-over-running 3 2>/dev/null)"; then
+  if printf '%s\n' "$native_advisor_output" | rg -q "advisor=array"; then
+    pass "native ops shape advisor supports fixture mode"
+  else
+    fail "native ops shape advisor fixture mode missing array recommendation"
+  fi
+  if printf '%s\n' "$native_advisor_output" | rg -q "queue_policy=respect_queue"; then
+    pass "native ops shape advisor uses canonical queue policy token"
+  else
+    fail "native ops shape advisor missing canonical queue policy token"
+  fi
+else
+  fail "native ops shape advisor fixture-mode run failed"
+fi
+
+native_brief_output=""
+if native_brief_output="$(uv run ops runbook diagnostics operator-brief --qstat-file "$tmp_qstat" --planned-submits 8 --warn-over-running 3 2>/dev/null)"; then
+  if printf '%s\n' "$native_brief_output" | rg -q "submit_gate=confirmation_required"; then
+    pass "native ops operator brief supports fixture mode"
+  else
+    fail "native ops operator brief fixture mode missing confirmation gate"
+  fi
+else
+  fail "native ops operator brief fixture-mode run failed"
 fi
 
 if [ "$READ_ONLY_AUDIT" = "1" ]; then

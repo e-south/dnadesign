@@ -45,16 +45,19 @@ rg -n "backend:" src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/co
 Preferred runbook-native Ops path:
 
 ```bash
-uv run ops runbook precedents
+uv run ops runbook presets
 uv run ops runbook init \
   --workflow densegen \
   --runbook <runbook.yaml> \
   --workspace-root src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro \
   --repo-root <repo> \
-  --project <project> \
+  --preset bu-scc-dunlop \
   --id <runbook-id> \
   --h-rt 02:00:00 --pe-omp 16 --mem-per-core 8G
 ```
+
+If you are not using the repo-owned BU SCC shortcut, replace `--preset bu-scc-dunlop`
+with an explicit `--project <project>`.
 
 DenseGen scaffolds include notify by default. Add `--no-notify` only when the request explicitly asks for batch-only submit.
 

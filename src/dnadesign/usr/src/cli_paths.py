@@ -14,9 +14,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
+from ..roots import normalize_usr_root, pkg_usr_root
 from .dataset import LEGACY_DATASET_PREFIX, RECORDS, Dataset
 from .errors import SequencesError
-from .roots import normalize_usr_root, pkg_usr_root
 
 LEGACY_DATASET_PATH_ERROR = (
     "Legacy dataset paths under 'archived/' are not supported. "

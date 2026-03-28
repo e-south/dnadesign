@@ -65,6 +65,31 @@ def _pooling_modes(bundle: PromoterFeatureBundleConfig) -> list[str]:
     return modes
 
 
+def infer_output_family(out_id: str) -> str:
+    output_id = str(out_id).strip()
+    if output_id.startswith("log_likelihood__"):
+        return "log_likelihood"
+    if output_id.startswith("output_layer_mean__"):
+        return "output_layer_mean"
+    if output_id.startswith("intermediate_embedding__"):
+        return "intermediate_embedding"
+    if output_id.startswith("metadata__"):
+        return "metadata"
+    family, _, _ = output_id.partition("__")
+    return family or output_id
+
+
+def infer_output_kind(out_id: str) -> str:
+    return "metadata" if infer_output_family(out_id) == "metadata" else "feature"
+
+
+def _progress_pct(*, completed: int, target: int) -> float:
+    if target <= 0:
+        return 100.0
+    ratio = float(completed) * 100.0 / float(target)
+    return max(0.0, min(100.0, ratio))
+
+
 def build_feature_bundle_outputs(*, bundle: PromoterFeatureBundleConfig) -> list[dict[str, object]]:
     selector = canonical_selector_for_block(bundle.intermediate_block)
     outputs: list[dict[str, object]] = []
@@ -312,6 +337,7 @@ def _write_chunk_subset(
     values: List[object],
     row_indexes: set[int],
     overwrite_override: bool | None = None,
+    progress: Mapping[str, object] | None = None,
 ) -> None:
     if writer is None or not row_indexes:
         return
@@ -324,6 +350,7 @@ def _write_chunk_subset(
         [row_index for row_index, _value in subset_pairs],
         [value for _row_index, value in subset_pairs],
         overwrite_override=overwrite_override,
+        progress=progress,
     )
 
 
@@ -381,13 +408,101 @@ def execute_feature_bundle(
     metadata_missing_by_output = _missing_rows_by_output(metadata_existing)
     metadata_missing_idx = set().union(*metadata_missing_by_output.values()) if metadata_missing_by_output else set()
     metadata_only_idx = metadata_missing_idx - feature_resume_idx
+    feature_target_rows_by_output = {
+        out_id: len({row_index for row_index, value in enumerate(values) if value is None} | stale_idx_set)
+        for out_id, values in existing.items()
+    }
+    feature_target_units_by_family: Dict[str, int] = {}
+    for out_id, target_rows in feature_target_rows_by_output.items():
+        family = infer_output_family(out_id)
+        if infer_output_kind(out_id) != "feature":
+            continue
+        feature_target_units_by_family[family] = feature_target_units_by_family.get(family, 0) + int(target_rows)
+    total_feature_units = sum(feature_target_units_by_family.values())
+    feature_written_rows_by_output = {out_id: 0 for out_id in feature_target_rows_by_output}
+    feature_written_units_by_family = {family: 0 for family in feature_target_units_by_family}
+    metadata_target_rows_by_output = {
+        out_id: len(set(row_indexes) | stale_idx_set) for out_id, row_indexes in metadata_missing_by_output.items()
+    }
+    metadata_written_rows_by_output = {out_id: 0 for out_id in metadata_target_rows_by_output}
+
+    def _feature_progress(out_id: str, *, rows_written_now: int) -> dict[str, object]:
+        if rows_written_now <= 0:
+            return {}
+        family = infer_output_family(out_id)
+        target_rows = feature_target_rows_by_output.get(out_id, 0)
+        feature_written_rows_by_output[out_id] = min(
+            target_rows,
+            feature_written_rows_by_output.get(out_id, 0) + int(rows_written_now),
+        )
+        if infer_output_kind(out_id) != "feature":
+            return {"infer_notify_suppress": True}
+        family_target_units = feature_target_units_by_family.get(family, 0)
+        feature_written_units_by_family[family] = min(
+            family_target_units,
+            feature_written_units_by_family.get(family, 0) + int(rows_written_now),
+        )
+        overall_completed_units = sum(feature_written_units_by_family.values())
+        family_progress_pct_map = {
+            family_name: round(
+                _progress_pct(completed=completed_units, target=feature_target_units_by_family[family_name]),
+                1,
+            )
+            for family_name, completed_units in feature_written_units_by_family.items()
+        }
+        return {
+            "infer_progress": {
+                "target_rows": target_rows,
+                "completed_rows": feature_written_rows_by_output[out_id],
+                "output_progress_pct": _progress_pct(
+                    completed=feature_written_rows_by_output[out_id],
+                    target=target_rows,
+                ),
+                "family_target_units": family_target_units,
+                "family_completed_units": feature_written_units_by_family[family],
+                "family_progress_pct": _progress_pct(
+                    completed=feature_written_units_by_family[family],
+                    target=family_target_units,
+                ),
+                "family_progress_pct_map": family_progress_pct_map,
+                "overall_target_units": total_feature_units,
+                "overall_completed_units": overall_completed_units,
+                "overall_progress_pct": _progress_pct(
+                    completed=overall_completed_units,
+                    target=total_feature_units,
+                ),
+            }
+        }
+
+    def _metadata_progress(out_id: str, *, rows_written_now: int) -> dict[str, object]:
+        if rows_written_now > 0:
+            target_rows = metadata_target_rows_by_output.get(out_id, 0)
+            metadata_written_rows_by_output[out_id] = min(
+                target_rows,
+                metadata_written_rows_by_output.get(out_id, 0) + int(rows_written_now),
+            )
+        else:
+            target_rows = metadata_target_rows_by_output.get(out_id, 0)
+        return {
+            "infer_notify_suppress": True,
+            "infer_progress": {
+                "target_rows": target_rows,
+                "completed_rows": metadata_written_rows_by_output.get(out_id, 0),
+                "output_progress_pct": _progress_pct(
+                    completed=metadata_written_rows_by_output.get(out_id, 0),
+                    target=target_rows,
+                ),
+            },
+        }
 
     for out_id, values in metadata_columnar.items():
+        metadata_row_indexes = sorted(metadata_missing_by_output[out_id].intersection(metadata_only_idx))
         _write_chunk_subset(
             writer=on_chunk_by_metadata.get(out_id),
-            idx_chunk=sorted(metadata_only_idx),
-            values=[values[row_index] for row_index in sorted(metadata_only_idx)],
+            idx_chunk=metadata_row_indexes,
+            values=[values[row_index] for row_index in metadata_row_indexes],
             row_indexes=metadata_missing_by_output[out_id],
+            progress=_metadata_progress(out_id, rows_written_now=len(metadata_row_indexes)),
         )
 
     need_idx = sorted(feature_resume_idx)
@@ -465,34 +580,42 @@ def execute_feature_bundle(
             for value_index, row_index in enumerate(idx_chunk):
                 target[row_index] = values[value_index]
             missing_rows = {row_index for row_index in idx_chunk if existing[out_id][row_index] is None} - stale_idx_set
+            missing_rows_in_chunk = len(missing_rows)
             _write_chunk_subset(
                 writer=on_chunk_by_output.get(out_id),
                 idx_chunk=idx_chunk,
                 values=values,
                 row_indexes=missing_rows,
+                progress=_feature_progress(out_id, rows_written_now=missing_rows_in_chunk),
             )
+            stale_rows_in_chunk = len(stale_idx_set.intersection(idx_chunk))
             _write_chunk_subset(
                 writer=on_chunk_by_output.get(out_id),
                 idx_chunk=idx_chunk,
                 values=values,
                 row_indexes=stale_idx_set,
                 overwrite_override=True,
+                progress=_feature_progress(out_id, rows_written_now=stale_rows_in_chunk),
             )
         for out_id, values in metadata_columnar.items():
             chunk_metadata = [values[row_index] for row_index in idx_chunk]
             missing_rows = metadata_missing_by_output[out_id] - stale_idx_set
+            metadata_missing_rows_in_chunk = len(missing_rows.intersection(idx_chunk))
             _write_chunk_subset(
                 writer=on_chunk_by_metadata.get(out_id),
                 idx_chunk=idx_chunk,
                 values=chunk_metadata,
                 row_indexes=missing_rows,
+                progress=_metadata_progress(out_id, rows_written_now=metadata_missing_rows_in_chunk),
             )
+            metadata_stale_rows_in_chunk = len(stale_idx_set.intersection(idx_chunk))
             _write_chunk_subset(
                 writer=on_chunk_by_metadata.get(out_id),
                 idx_chunk=idx_chunk,
                 values=chunk_metadata,
                 row_indexes=stale_idx_set,
                 overwrite_override=True,
+                progress=_metadata_progress(out_id, rows_written_now=metadata_stale_rows_in_chunk),
             )
         on_progress(len(idx_chunk))
         start += take

@@ -8,7 +8,7 @@
 **Registry-id:** usr.data-plane.hpc-sync
 **Summary:** Keep one USR dataset synchronized between HPC and local analysis with explicit diff, pull, and push verification.
 **Execution-kind:** iterative
-**Progress-kind:** usr-sync-audit
+**Status-kind:** usr-sync-audit
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-19

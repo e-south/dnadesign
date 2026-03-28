@@ -1,0 +1,574 @@
+version: 2
+study_id: stress_ethanol_cipro_growth
+family: promoter
+title: Stress / ethanol / ciprofloxacin growth study
+
+record_sources:
+  narrative_ref: manifest:status.md
+  datasets_ref: manifest:datasets.yaml
+  pipeline_ref: manifest:pipeline.yaml
+  campaign_ref: manifest:campaign.yaml
+
+lifecycle:
+  phase_order:
+    - densegen_growth
+    - merged_anchor_set
+    - construct_context_expansion
+    - infer_batch_preparation
+    - infer_anchor_only_20b
+    - infer_anchor_plus_template_20b
+    - infer_anchor_only_7b
+    - infer_anchor_plus_template_7b
+  current_phase:
+    strategy: explicit
+    id: infer_batch_preparation
+
+phases:
+  - id: densegen_growth
+    status: parallel_optional
+    primary_dataset: densegen/study_stress_ethanol_cipro
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml
+  - id: merged_anchor_set
+    status: complete
+    output_dataset: promoter/stress_ethanol_cipro_anchor_set
+    next_surface: repo:src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md
+  - id: construct_context_expansion
+    status: complete
+    output_dataset: promoter/stress_ethanol_cipro_construct_contexts
+    next_surface: repo:src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10/runbook.md
+  - id: infer_batch_preparation
+    status: in_progress
+    next_surface: repo:src/dnadesign/usr/docs/operations/promoter-study-preflight.md
+  - id: infer_anchor_only_20b
+    status: planned
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml
+  - id: infer_anchor_plus_template_20b
+    status: planned
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml
+  - id: infer_anchor_only_7b
+    status: planned
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml
+  - id: infer_anchor_plus_template_7b
+    status: planned
+    next_surface: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml
+
+artifacts:
+  densegen_anchor_source:
+    artifact_type: dataset
+    dataset_id: densegen/study_stress_ethanol_cipro
+    ref: repo:src/dnadesign/usr/datasets/densegen/study_stress_ethanol_cipro
+  densegen_config:
+    artifact_type: file
+    ref: repo:src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/config.yaml
+  merged_anchor_dataset:
+    artifact_type: dataset
+    dataset_id: promoter/stress_ethanol_cipro_anchor_set
+    ref: repo:src/dnadesign/usr/datasets/promoter/stress_ethanol_cipro_anchor_set
+  construct_context_dataset:
+    artifact_type: dataset
+    dataset_id: promoter/stress_ethanol_cipro_construct_contexts
+    ref: repo:src/dnadesign/usr/datasets/promoter/stress_ethanol_cipro_construct_contexts
+  feature_matrix_dataset:
+    artifact_type: dataset
+    dataset_id: promoter/stress_ethanol_cipro_feature_matrix
+    ref: repo:src/dnadesign/usr/datasets/promoter/stress_ethanol_cipro_feature_matrix
+  infer_config_anchor_only_20b:
+    artifact_type: file
+    ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml
+  infer_config_anchor_plus_template_20b:
+    artifact_type: file
+    ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml
+  infer_config_anchor_only_7b:
+    artifact_type: file
+    ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml
+  infer_config_anchor_plus_template_7b:
+    artifact_type: file
+    ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml
+
+execution_surfaces:
+  construct_workspace:
+    surface_type: workspace
+    workspace_ref: repo:src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10
+  infer_workspace:
+    surface_type: workspace
+    workspace_ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro
+  densegen_batch:
+    surface_type: runbook
+    runbook_ref: repo:src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml
+  infer_batch_20b_anchor_only:
+    surface_type: runbook
+    runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml
+  infer_batch_20b_anchor_plus_template:
+    surface_type: runbook
+    runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml
+  infer_batch_7b_anchor_only:
+    surface_type: runbook
+    runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml
+  infer_batch_7b_anchor_plus_template:
+    surface_type: runbook
+    runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml
+  scheduler_default:
+    surface_type: scheduler
+    backend: sge
+  densegen_probe_solver:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - dense
+      - validate-config
+      - --probe-solver
+      - -c
+      - src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/config.yaml
+  construct_workspace_doctor:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - construct
+      - workspace
+      - doctor
+      - --workspace
+      - src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10
+  construct_runtime_forward_anchor_window:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - construct
+      - workspace
+      - validate-project
+      - --workspace
+      - src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10
+      - --project
+      - forward_anchor_window
+      - --runtime
+  infer_validate_anchor_only_20b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - infer
+      - validate
+      - config
+      - --config
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml
+  infer_validate_anchor_plus_template_20b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - infer
+      - validate
+      - config
+      - --config
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml
+  infer_validate_anchor_only_7b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - infer
+      - validate
+      - config
+      - --config
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml
+  infer_validate_anchor_plus_template_7b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - infer
+      - validate
+      - config
+      - --config
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml
+  infer_dry_run_anchor_only_20b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - infer
+      - run
+      - --config
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml
+      - --dry-run
+  infer_dry_run_anchor_plus_template_20b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - infer
+      - run
+      - --config
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml
+      - --dry-run
+  infer_dry_run_anchor_only_7b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - infer
+      - run
+      - --config
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml
+      - --dry-run
+  infer_dry_run_anchor_plus_template_7b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - infer
+      - run
+      - --config
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml
+      - --dry-run
+  notify_profile_doctor_anchor_only_20b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - notify
+      - profile
+      - doctor
+      - --profile
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_20b/profile.json
+      - --json
+  notify_profile_doctor_anchor_plus_template_20b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - notify
+      - profile
+      - doctor
+      - --profile
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_plus_template_20b/profile.json
+      - --json
+  notify_profile_doctor_anchor_only_7b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - notify
+      - profile
+      - doctor
+      - --profile
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_7b/profile.json
+      - --json
+  notify_profile_doctor_anchor_plus_template_7b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - notify
+      - profile
+      - doctor
+      - --profile
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_plus_template_7b/profile.json
+      - --json
+  notify_resolve_events_anchor_only_20b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - notify
+      - setup
+      - resolve-events
+      - --tool
+      - infer
+      - --config
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml
+      - --json
+  notify_resolve_events_anchor_plus_template_20b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - notify
+      - setup
+      - resolve-events
+      - --tool
+      - infer
+      - --config
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml
+      - --json
+  notify_resolve_events_anchor_only_7b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - notify
+      - setup
+      - resolve-events
+      - --tool
+      - infer
+      - --config
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml
+      - --json
+  notify_resolve_events_anchor_plus_template_7b:
+    surface_type: command
+    argv:
+      - uv
+      - run
+      - notify
+      - setup
+      - resolve-events
+      - --tool
+      - infer
+      - --config
+      - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml
+      - --json
+
+snapshot:
+  summary_scope: repo
+  summary_inputs:
+    - kind: dataset_rows
+      artifact: densegen_anchor_source
+      target_rows: 100000
+
+preflight:
+  default_scope: next
+  scopes:
+    next:
+      include_phases: [current_phase, next_in_progress_phase]
+    full:
+      include_phases: [all]
+  group_phase_bindings:
+    densegen: densegen_growth
+    construct: construct_context_expansion
+    notify_environment: infer_batch_preparation
+  checks:
+    densegen_growth:
+      - kind: runbook_plan
+        check_id: densegen.batch.plan
+        check_group: densegen
+        summary: DenseGen batch runbook renders cleanly.
+        required: true
+        surface: densegen_batch
+      - kind: dataset_snapshot
+        check_id: densegen.anchor.rows
+        check_group: densegen
+        summary: DenseGen anchor dataset row count is visible.
+        required: true
+        artifact: densegen_anchor_source
+        target_rows: 100000
+      - kind: command
+        check_id: densegen.config.probe_solver
+        check_group: densegen
+        summary: DenseGen config probe completed.
+        required: true
+        surface: densegen_probe_solver
+    construct_context_expansion:
+      - kind: path_exists
+        check_id: construct.anchor.dataset
+        check_group: construct
+        summary: Merged anchor dataset is materialized.
+        required: true
+        artifact: merged_anchor_dataset
+      - kind: workspace_layout
+        check_id: construct.workspace.layout
+        check_group: construct
+        summary: Construct workspace root is present.
+        required: true
+        surface: construct_workspace
+      - kind: command
+        check_id: construct.workspace.doctor
+        check_group: construct
+        summary: Construct workspace doctor completed.
+        required: true
+        surface: construct_workspace_doctor
+      - kind: command
+        check_id: construct.runtime.forward_anchor_window
+        check_group: construct
+        summary: Construct runtime validation completed.
+        required: true
+        surface: construct_runtime_forward_anchor_window
+    infer_batch_preparation:
+      - kind: path_exists
+        check_id: infer.construct.contexts
+        check_group: infer
+        summary: Construct contexts are present for infer.
+        required: true
+        artifact: construct_context_dataset
+      - kind: workspace_layout
+        check_id: infer.workspace.layout
+        check_group: infer
+        summary: Infer workspace root is present.
+        required: true
+        surface: infer_workspace
+      - kind: environment
+        check_id: notify.environment.webhook
+        check_group: notify_environment
+        summary: Batch notify secret is configured in the environment.
+        required: true
+        vars: [NOTIFY_WEBHOOK, NOTIFY_WEBHOOK_FILE]
+        match_mode: any
+      - kind: environment
+        check_id: notify.environment.tls
+        check_group: notify_environment
+        summary: SSL_CERT_FILE is configured for notify profile doctor and live delivery.
+        required: true
+        vars: [SSL_CERT_FILE]
+        match_mode: all
+      - kind: gpu_availability
+        check_id: infer.local_gpu.visibility
+        check_group: infer
+        summary: At least one compatible GPU is visible on the current host.
+        required: false
+        min_visible: 1
+      - kind: command
+        check_id: infer.validate.anchor_only_20b
+        check_group: infer
+        summary: Infer config validation completed.
+        required: true
+        phase_id: infer_anchor_only_20b
+        surface: infer_validate_anchor_only_20b
+      - kind: command
+        check_id: infer.validate.anchor_plus_template_20b
+        check_group: infer
+        summary: Infer config validation completed.
+        required: true
+        phase_id: infer_anchor_plus_template_20b
+        surface: infer_validate_anchor_plus_template_20b
+      - kind: command
+        check_id: infer.validate.anchor_only_7b
+        check_group: infer
+        summary: Infer config validation completed.
+        required: true
+        phase_id: infer_anchor_only_7b
+        surface: infer_validate_anchor_only_7b
+      - kind: command
+        check_id: infer.validate.anchor_plus_template_7b
+        check_group: infer
+        summary: Infer config validation completed.
+        required: true
+        phase_id: infer_anchor_plus_template_7b
+        surface: infer_validate_anchor_plus_template_7b
+      - kind: command
+        check_id: infer.dry_run.anchor_only_20b
+        check_group: infer
+        summary: Infer dry-run completed.
+        required: true
+        phase_id: infer_anchor_only_20b
+        surface: infer_dry_run_anchor_only_20b
+      - kind: command
+        check_id: infer.dry_run.anchor_plus_template_20b
+        check_group: infer
+        summary: Infer dry-run completed.
+        required: true
+        phase_id: infer_anchor_plus_template_20b
+        surface: infer_dry_run_anchor_plus_template_20b
+      - kind: command
+        check_id: infer.dry_run.anchor_only_7b
+        check_group: infer
+        summary: Infer dry-run completed.
+        required: true
+        phase_id: infer_anchor_only_7b
+        surface: infer_dry_run_anchor_only_7b
+      - kind: command
+        check_id: infer.dry_run.anchor_plus_template_7b
+        check_group: infer
+        summary: Infer dry-run completed.
+        required: true
+        phase_id: infer_anchor_plus_template_7b
+        surface: infer_dry_run_anchor_plus_template_7b
+      - kind: command
+        check_id: notify.profile.anchor_only_20b
+        check_group: notify
+        summary: Notify profile doctor completed.
+        required: true
+        phase_id: infer_anchor_only_20b
+        surface: notify_profile_doctor_anchor_only_20b
+      - kind: command
+        check_id: notify.profile.anchor_plus_template_20b
+        check_group: notify
+        summary: Notify profile doctor completed.
+        required: true
+        phase_id: infer_anchor_plus_template_20b
+        surface: notify_profile_doctor_anchor_plus_template_20b
+      - kind: command
+        check_id: notify.profile.anchor_only_7b
+        check_group: notify
+        summary: Notify profile doctor completed.
+        required: true
+        phase_id: infer_anchor_only_7b
+        surface: notify_profile_doctor_anchor_only_7b
+      - kind: command
+        check_id: notify.profile.anchor_plus_template_7b
+        check_group: notify
+        summary: Notify profile doctor completed.
+        required: true
+        phase_id: infer_anchor_plus_template_7b
+        surface: notify_profile_doctor_anchor_plus_template_7b
+      - kind: command
+        check_id: notify.resolve_events.anchor_only_20b
+        check_group: notify
+        summary: Notify events path resolved.
+        required: true
+        phase_id: infer_anchor_only_20b
+        surface: notify_resolve_events_anchor_only_20b
+      - kind: command
+        check_id: notify.resolve_events.anchor_plus_template_20b
+        check_group: notify
+        summary: Notify events path resolved.
+        required: true
+        phase_id: infer_anchor_plus_template_20b
+        surface: notify_resolve_events_anchor_plus_template_20b
+      - kind: command
+        check_id: notify.resolve_events.anchor_only_7b
+        check_group: notify
+        summary: Notify events path resolved.
+        required: true
+        phase_id: infer_anchor_only_7b
+        surface: notify_resolve_events_anchor_only_7b
+      - kind: command
+        check_id: notify.resolve_events.anchor_plus_template_7b
+        check_group: notify
+        summary: Notify events path resolved.
+        required: true
+        phase_id: infer_anchor_plus_template_7b
+        surface: notify_resolve_events_anchor_plus_template_7b
+      - kind: scheduler_queue
+        check_id: infer.batch.queue
+        check_group: infer_batch_plan
+        summary: Scheduler queue is below the declared submit threshold.
+        required: false
+        surface: scheduler_default
+        max_running_jobs: 3
+      - kind: runbook_plan
+        check_id: infer.batch.20b.anchor_only.plan
+        check_group: infer_batch_plan
+        phase_id: infer_anchor_only_20b
+        summary: Anchor-only 20B infer runbook renders cleanly.
+        required: true
+        surface: infer_batch_20b_anchor_only
+      - kind: runbook_plan
+        check_id: infer.batch.20b.anchor_plus_template.plan
+        check_group: infer_batch_plan
+        phase_id: infer_anchor_plus_template_20b
+        summary: Anchor-plus-template 20B infer runbook renders cleanly.
+        required: true
+        surface: infer_batch_20b_anchor_plus_template
+      - kind: runbook_plan
+        check_id: infer.batch.7b.anchor_only.plan
+        check_group: infer_batch_plan
+        phase_id: infer_anchor_only_7b
+        summary: Anchor-only 7B infer runbook renders cleanly.
+        required: true
+        surface: infer_batch_7b_anchor_only
+      - kind: runbook_plan
+        check_id: infer.batch.7b.anchor_plus_template.plan
+        check_group: infer_batch_plan
+        phase_id: infer_anchor_plus_template_7b
+        summary: Anchor-plus-template 7B infer runbook renders cleanly.
+        required: true
+        surface: infer_batch_7b_anchor_plus_template
+  next_scope:
+    target_phase_groups:
+      densegen_growth: [densegen]
+      merged_anchor_set: []
+      construct_context_expansion: [construct]
+      infer_batch_preparation: [infer, notify_environment, notify, infer_batch_plan]
+    runtime_phase_groups: [infer, notify, infer_batch_plan]
+    runtime_shared_groups: [notify_environment]

@@ -34,7 +34,7 @@ def execute_extract_output(
     auto_derate: bool,
     is_oom: Callable[[BaseException], bool],
     on_progress: Callable[[int], None],
-    on_chunk: Optional[Callable[[List[int], List[object]], None]],
+    on_chunk: Optional[Callable[..., None]],
 ) -> List[object]:
     if len(need_idx) == 0:
         return list(existing)
@@ -43,6 +43,7 @@ def execute_extract_output(
     start_bs = micro_batch_size if micro_batch_size > 0 else min(len(need_idx), default_batch_size)
     bs = start_bs
     start = 0
+    rows_completed = 0
 
     while start < len(need_idx):
         take = min(bs, len(need_idx) - start)
@@ -71,8 +72,23 @@ def execute_extract_output(
         for k, j in enumerate(idx_chunk):
             all_vals[j] = vals[k]
 
+        rows_completed += len(idx_chunk)
         if on_chunk is not None:
-            on_chunk(idx_chunk, vals)
+            progress_pct = min(100.0, float(rows_completed) * 100.0 / float(len(need_idx)))
+            on_chunk(
+                idx_chunk,
+                vals,
+                progress={
+                    "infer_progress": {
+                        "target_rows": len(need_idx),
+                        "completed_rows": rows_completed,
+                        "output_progress_pct": progress_pct,
+                        "overall_target_units": len(need_idx),
+                        "overall_completed_units": rows_completed,
+                        "overall_progress_pct": progress_pct,
+                    }
+                },
+            )
         on_progress(len(idx_chunk))
         start += take
 

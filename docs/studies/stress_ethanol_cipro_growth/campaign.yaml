@@ -1,0 +1,19 @@
+version: 2
+path_base: repo
+campaign_id: stress_ethanol_cipro_growth
+steps:
+  - label: promoter-feature-matrix
+    registry_id: usr.data-plane.promoter-feature-matrix
+    inputs:
+      usr_root: repo:src/dnadesign/usr/datasets
+      dataset: promoter/stress_ethanol_cipro_feature_matrix
+  - label: multi-source-source-of-truth
+    registry_id: usr.data-plane.multi-source-source-of-truth
+    inputs:
+      usr_root: repo:src/dnadesign/usr/datasets
+      dataset: promoter/stress_ethanol_cipro_feature_matrix
+  - label: construct-infer-source-of-truth
+    registry_id: usr.data-plane.construct-infer-source-of-truth
+    inputs:
+      usr_root: repo:src/dnadesign/usr/datasets
+      dataset: promoter/stress_ethanol_cipro_feature_matrix

@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-19
+**Last verified:** 2026-03-26
 
 ## At a glance
 `dnadesign` is a uv-managed monorepo of modular bioinformatics tools under `src/dnadesign/`, with shared CI/devtools and operator runbooks in `docs/`.
@@ -25,6 +25,9 @@ This file is the architecture map: it names system boundaries, major flows, and 
 
 ## System boundaries
 - Tool packages: each top-level tool under `src/dnadesign/<tool>/` owns its CLI behavior, configs, and tests.
+- OPS core is a neutral shell around discovery, observation/status, orchestration,
+  and generic readiness evaluation; it must not own sibling-specific provider
+  implementations or study-family policy.
 - Shared operational plane: Notify (`src/dnadesign/notify/`) consumes USR events as integration signals without controlling producer tools.
 - Shared storage semantics: USR overlay/compaction/file-shape contracts use USR domain terms and stay tool-agnostic so DenseGen, Infer, and future producers can share one records store.
 - Shared developer infrastructure: devtools modules provide CI scope detection, docs checks, coverage gates, and quality entropy reporting.
@@ -42,10 +45,26 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - `src/dnadesign/usr/docs/operations/` is the default home for durable cross-tool data-plane procedures when the shared handoff artifact is a USR dataset, overlay set, or `.events.log`.
 
 ## Cross-tool information architecture
+- Plane semantics are explicit and non-interchangeable:
+  - discovery plane: `ops catalog`
+  - observation plane: `ops progress`
+  - control plane: `ops runbook`
+  - record plane: checked-in study records and other checked-in state
+  - execution-readiness plane: deeper preflight blockers on the current host,
+    workspace, or cluster
+  - data plane: dataset and artifact posture
 - Workspace-rooted accumulation is the contract for repeated campaigns; orchestration state must not fan out into repository-root ad-hoc files.
 - Root `docs/README.md` is the only top-level router. It routes by user intent and ownership plane, then hands off to exactly one authoritative deep procedure for each cross-tool workflow.
 - `docs/runbooks/README.md` is the concise inventory surface for authoritative procedures; it links to owner-local runbooks and workflows without relocating them.
 - Control-plane orchestration artifacts stay under workspace-scoped logging roots; tool-local docs define exact subpaths and artifact names.
+- Boundary-owned observation surfaces publish checked-in metadata under
+  `src/dnadesign/**/ops/status.registry.yaml`. OPS recursively discovers those
+  fragments, renders help from metadata alone, and imports provider code only
+  for the selected surface.
+- Checked-in study records are study-first rather than family-nested:
+  `docs/studies/index.yaml` selects the active study, each live study record
+  lives under `docs/studies/<study-id>/`, and family routing resolves through
+  `src/dnadesign/studies/families/<family>/`.
 - Tool packages own their workload configs, runtime outputs, and package-local workspace templates.
 - USR owns durable dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
 - Cross-dataset USR overlay transfer is explicit-only: maintenance merge defaults to base-row merge, while any overlay carry must be opt-in, namespace-scoped, schema-compatible, and auditable in events.
@@ -56,6 +75,9 @@ This file is the architecture map: it names system boundaries, major flows, and 
   record or runbook.
 - Cross-tool coupling is file/event contract based; packages must not depend on internal `src.*` modules across tool boundaries.
 - Utility modules must stay tool-local (`src/dnadesign/<tool>/...`); top-level shared `src/dnadesign/utils` is not an allowed boundary.
+- Study-family adapters are explicit seams. OPS loads them through metadata and
+  sanctioned loader boundaries; family-specific execution taxonomy does not
+  belong under `src/dnadesign/ops/`.
 - Document-type semantics are explicit:
   - `route`: index entry or decision surface only
   - `runbook`: authoritative operator procedure with ordered commands and verification

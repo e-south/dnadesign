@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import re
+import subprocess
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -113,7 +114,7 @@ EXIT_ARTIFACT_PATTERN = re.compile(r"^\*\*Exit artifact:\*\*\s*(.+?)\s*$", re.MU
 REGISTRY_ID_METADATA_PATTERN = re.compile(r"^\*\*Registry-id:\*\*\s*(.+?)\s*$", re.MULTILINE)
 SUMMARY_METADATA_PATTERN = re.compile(r"^\*\*Summary:\*\*\s*(.+?)\s*$", re.MULTILINE)
 EXECUTION_KIND_METADATA_PATTERN = re.compile(r"^\*\*Execution-kind:\*\*\s*(.+?)\s*$", re.MULTILINE)
-PROGRESS_KIND_METADATA_PATTERN = re.compile(r"^\*\*Progress-kind:\*\*\s*(.+?)\s*$", re.MULTILINE)
+STATUS_KIND_METADATA_PATTERN = re.compile(r"^\*\*Status-kind:\*\*\s*(.+?)\s*$", re.MULTILINE)
 PROGRESS_SURFACE_GLOSSARY_ROW_PATTERN = re.compile(r"^\|\s*`(?P<kind>[^`]+)`\s*\|")
 STATUS_PATTERN = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
 CREATED_PATTERN = re.compile(r"^\*\*Created:\*\*\s*(.+?)\s*$", re.MULTILINE)
@@ -154,6 +155,45 @@ DENSEGEN_DOC_LANGUAGE_PATHS = (
     "src/dnadesign/densegen/workspaces",
 )
 DENSEGEN_DISALLOWED_TERM_PATTERN = re.compile(r"\bcanonical\b", flags=re.IGNORECASE)
+CONSTRUCT_OPERATOR_DOC_PATHS = (
+    "src/dnadesign/usr/docs/operations",
+    "docs/studies",
+    "src/dnadesign/notify/docs/reference/command-contracts.md",
+)
+CONSTRUCT_LEGACY_OPERATOR_PATTERNS = (
+    re.compile(r'data\["job"\]\["input"\]\["dataset"\]'),
+    re.compile(r'data\["job"\]\["input"\]\["root"\]'),
+    re.compile(r'data\["job"\]\["output"\]\["dataset"\]'),
+    re.compile(r'data\["job"\]\["output"\]\["root"\]'),
+    re.compile(r'project\["input_dataset"\]'),
+    re.compile(r'project\["output_dataset"\]'),
+    re.compile(r"`input\.dataset`"),
+    re.compile(r"`input\.root`"),
+    re.compile(r"`output\.dataset`"),
+    re.compile(r"`output\.root`"),
+)
+LEGACY_CONTRACT_SURFACE_DOC_PATTERNS = (
+    re.compile(r"\bdnadesign\._contracts\b"),
+    re.compile(r"\bdnadesign\.usr_roots\b"),
+    re.compile(r"src/dnadesign/_contracts\b"),
+    re.compile(r"src/dnadesign/usr_roots\.py\b"),
+    re.compile(r"src/dnadesign/usr/src/roots\.py\b"),
+    re.compile(r"src/dnadesign/ops/orchestrator/contracts\.py\b"),
+)
+STUDY_RECORD_REQUIRED_FILES = (
+    "campaign.yaml",
+    "datasets.yaml",
+    "status.md",
+    "ops.study.yaml",
+)
+STUDY_RECORD_REQUIRED_READMES = ("docs/studies/README.md",)
+STUDY_RECORD_ROUTER_FILES = (
+    "AGENTS.md",
+    "src/dnadesign/usr/AGENTS.md",
+)
+ACTIVE_STUDY_INDEX_PATH = "docs/studies/index.yaml"
+LEGACY_STUDY_INDEX_PATH = "docs/studies/promoter/index.yaml"
+LEGACY_STUDY_RECORD_PREFIX = "docs/studies/promoter/"
 OPS_OPERATIONAL_WORKFLOW_IDS = {
     "densegen_batch_submit",
     "densegen_batch_with_notify",
@@ -211,6 +251,16 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
+    "src/dnadesign/usr/docs/operations/promoter-study-status-contract.md": {
+        "type": "contract",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "src/dnadesign/usr/docs/operations/promoter-study-preflight.md": {
+        "type": "contract",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
     "src/dnadesign/cluster/docs/workflows/exploratory-clustering.md": {
         "type": "workflow",
         "plane": "downstream-tool",
@@ -222,14 +272,18 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "owner_boundary": "opal",
     },
 }
-_CROSS_TOOL_DOC_ALLOWED_TYPES = {"route", "runbook", "workflow"}
+_CROSS_TOOL_DOC_ALLOWED_TYPES = {"contract", "route", "runbook", "workflow"}
 _CROSS_TOOL_DOC_ALLOWED_PLANES = {"control-plane", "data-plane", "downstream-tool"}
-_RUNBOOK_CATALOG_METADATA_TYPES = {"runbook", "workflow"}
+_RUNBOOK_CATALOG_METADATA_TYPES = {"contract", "runbook", "workflow"}
 _REGISTRY_ID_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$")
 _METADATA_TOKEN_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:-[a-z0-9]+)*$")
 RUNBOOK_CATALOG_DOC_PATH = "docs/runbooks/README.md"
-RUNBOOK_PROGRESS_GLOSSARY_HEADING = "### Progress views"
+RUNBOOK_STATUS_GLOSSARY_HEADING = "### Status views"
 OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES = (
+    PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
+    Path("docs/templates"),
+)
+OPS_OPERATIONAL_RUNBOOK_FALLBACK_SCAN_ROOTS = (
     PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
     Path("docs/templates"),
 )
@@ -243,7 +297,14 @@ OVERLAY_GUARD_DOC_PATHS = (
 OPS_DEPRECATED_SEMANTICS_DOC_PATHS = (
     "docs/operations/README.md",
     "docs/operations/orchestration-runbooks.md",
+    "docs/studies/README.md",
+    "docs/studies/stress_ethanol_cipro_growth/status.md",
     "src/dnadesign/ops/README.md",
+    "src/dnadesign/usr/docs/operations/promoter-study-preflight.md",
+)
+STUDY_EXECUTION_SOURCE_DOC_PATHS = (
+    "docs/studies/README.md",
+    "src/dnadesign/usr/docs/operations/promoter-study-preflight.md",
 )
 STALE_OVERLAY_GUARD_TERMS = (
     "densegen-overlay-guard",
@@ -253,6 +314,16 @@ OPS_DEPRECATED_SEMANTICS_TERMS = (
     "precedent",
     "precedents",
     "with_notify_slack",
+    "infer_validate_config",
+    "infer_local_runtime",
+    "infer_dry_run",
+    "notify_profile_doctor",
+    "notify_resolve_events",
+    "details.setup_command",
+)
+PIPELINE_ONLY_EXECUTION_SOURCE_PATTERN = re.compile(
+    r"pipeline\.yaml[\s\S]{0,120}only (?:valid )?source",
+    flags=re.IGNORECASE,
 )
 PACKAGED_RUNBOOK_DURATION_SUFFIX_PATTERN = re.compile(r"_(?:\d+)(?:h|hr|hrs|hour|hours)$", re.IGNORECASE)
 OPERATIONAL_RUNBOOK_SCAN_PRUNE_DIRS = {
@@ -636,6 +707,44 @@ def _find_densegen_disallowed_term_issues(repo_root: Path) -> list[str]:
     return issues
 
 
+def _find_construct_legacy_operator_doc_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    targets = _collect_markdown_files_from_relative_paths(repo_root, relative_paths=CONSTRUCT_OPERATOR_DOC_PATHS)
+    for path in targets:
+        content = path.read_text(encoding="utf-8")
+        for pattern in CONSTRUCT_LEGACY_OPERATOR_PATTERNS:
+            match = pattern.search(content)
+            if match is None:
+                continue
+            line_no = content[: match.start()].count("\n") + 1
+            issues.append(
+                f"{path}:{line_no}: deprecated construct flat-key contract "
+                f"'{match.group(0)}' is not allowed in operator docs."
+            )
+    return issues
+
+
+def _find_legacy_contract_surface_doc_issues(repo_root: Path) -> list[str]:
+    try:
+        _docs_md_files, all_md_files = _collect_markdown_files(repo_root)
+    except FileNotFoundError:
+        return []
+
+    issues: list[str] = []
+    for path in all_md_files:
+        content = path.read_text(encoding="utf-8")
+        for pattern in LEGACY_CONTRACT_SURFACE_DOC_PATTERNS:
+            match = pattern.search(content)
+            if match is None:
+                continue
+            line_no = content[: match.start()].count("\n") + 1
+            issues.append(
+                f"{path}:{line_no}: legacy repo-root contract surface reference "
+                f"'{match.group(0)}' is not allowed in docs."
+            )
+    return issues
+
+
 def _find_codecov_component_issues(repo_root: Path) -> list[str]:
     src_root = repo_root / "src" / "dnadesign"
     if not src_root.exists():
@@ -952,13 +1061,13 @@ def _find_cross_tool_doc_metadata_issues(repo_root: Path) -> list[str]:
         elif _METADATA_TOKEN_VALUE_PATTERN.fullmatch(execution_kind) is None:
             issues.append(f"{path}: '**Execution-kind:**' must use lowercase slug tokens.")
 
-        progress_kind = _extract_metadata_field(text, PROGRESS_KIND_METADATA_PATTERN)
-        if progress_kind is None:
-            issues.append(f"{path}: missing '**Progress-kind:**' metadata field.")
-        elif not progress_kind:
-            issues.append(f"{path}: '**Progress-kind:**' must not be empty.")
-        elif _METADATA_TOKEN_VALUE_PATTERN.fullmatch(progress_kind) is None:
-            issues.append(f"{path}: '**Progress-kind:**' must use lowercase slug tokens.")
+        status_kind = _extract_metadata_field(text, STATUS_KIND_METADATA_PATTERN)
+        if status_kind is None:
+            issues.append(f"{path}: missing '**Status-kind:**' metadata field.")
+        elif not status_kind:
+            issues.append(f"{path}: '**Status-kind:**' must not be empty.")
+        elif _METADATA_TOKEN_VALUE_PATTERN.fullmatch(status_kind) is None:
+            issues.append(f"{path}: '**Status-kind:**' must use lowercase slug tokens.")
 
     seen_registry_ids: dict[str, str] = {}
     for relative_path, registry_id in registry_ids_by_path.items():
@@ -1000,7 +1109,7 @@ def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
         return issues
 
     catalog_entries_by_path: dict[str, CatalogProcedureEntry] = {}
-    catalog_progress_kinds = {entry.progress_kind for entry in catalog.procedures}
+    catalog_status_kinds = {entry.status_kind for entry in catalog.procedures}
     expected_catalog_paths: set[str] = set()
     for entry in catalog.procedures:
         resolved_path = resolve_catalog_doc_path(catalog_path=catalog.catalog_path, doc_path=entry.doc_path)
@@ -1076,7 +1185,7 @@ def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
             "Entry artifact": _extract_metadata_field(text, ENTRY_ARTIFACT_PATTERN),
             "Exit artifact": _extract_metadata_field(text, EXIT_ARTIFACT_PATTERN),
             "Execution-kind": _extract_metadata_field(text, EXECUTION_KIND_METADATA_PATTERN),
-            "Progress-kind": _extract_metadata_field(text, PROGRESS_KIND_METADATA_PATTERN),
+            "Status-kind": _extract_metadata_field(text, STATUS_KIND_METADATA_PATTERN),
             "Summary": _extract_metadata_field(text, SUMMARY_METADATA_PATTERN),
         }
         metadata_file_values = {
@@ -1087,7 +1196,7 @@ def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
             "Entry artifact": metadata_payload.get("entry_artifact"),
             "Exit artifact": metadata_payload.get("exit_artifact"),
             "Execution-kind": metadata_payload.get("execution_kind"),
-            "Progress-kind": metadata_payload.get("progress_kind"),
+            "Status-kind": metadata_payload.get("status_kind"),
             "Summary": metadata_payload.get("summary"),
         }
         for field_name, expected_value in expected_metadata.items():
@@ -1107,25 +1216,25 @@ def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
                 "add a matching cross-tool metadata contract or remove the registry metadata sidecar."
             )
 
-    glossary_text = _extract_markdown_section(catalog_text, heading=RUNBOOK_PROGRESS_GLOSSARY_HEADING)
+    glossary_text = _extract_markdown_section(catalog_text, heading=RUNBOOK_STATUS_GLOSSARY_HEADING)
     if glossary_text is None:
-        issues.append(f"{catalog_path}: missing '{RUNBOOK_PROGRESS_GLOSSARY_HEADING}' section.")
+        issues.append(f"{catalog_path}: missing '{RUNBOOK_STATUS_GLOSSARY_HEADING}' section.")
         return issues
 
-    glossary_progress_kinds = {
+    glossary_status_kinds = {
         match.group("kind").strip()
         for line in glossary_text.splitlines()
         for match in [PROGRESS_SURFACE_GLOSSARY_ROW_PATTERN.match(line.strip())]
         if match is not None
     }
-    if not glossary_progress_kinds:
-        issues.append(f"{catalog_path}: progress surface glossary section has no data table.")
+    if not glossary_status_kinds:
+        issues.append(f"{catalog_path}: status surface glossary section has no data table.")
         return issues
 
-    for progress_kind in sorted(catalog_progress_kinds - glossary_progress_kinds):
-        issues.append(f"{catalog_path}: missing progress surface glossary entry for '{progress_kind}'.")
-    for progress_kind in sorted(glossary_progress_kinds - catalog_progress_kinds):
-        issues.append(f"{catalog_path}: unexpected progress surface glossary entry for '{progress_kind}'.")
+    for status_kind in sorted(catalog_status_kinds - glossary_status_kinds):
+        issues.append(f"{catalog_path}: missing status surface glossary entry for '{status_kind}'.")
+    for status_kind in sorted(glossary_status_kinds - catalog_status_kinds):
+        issues.append(f"{catalog_path}: unexpected status surface glossary entry for '{status_kind}'.")
 
     return issues
 
@@ -1144,6 +1253,123 @@ def _extract_markdown_section(text: str, *, heading: str) -> str | None:
             break
         section_lines.append(line)
     return "\n".join(section_lines)
+
+
+def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    resolved_repo_root = repo_root.resolve()
+
+    legacy_study_root = repo_root / "docs" / "studies" / "promoter"
+    if legacy_study_root.exists():
+        issues.append(f"{legacy_study_root}: legacy family-nested study record path must not exist.")
+
+    for relative_path in STUDY_RECORD_REQUIRED_READMES:
+        path = repo_root / relative_path
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if LEGACY_STUDY_RECORD_PREFIX in text:
+            issues.append(
+                f"{path}: legacy family-nested study path "
+                f"'{LEGACY_STUDY_RECORD_PREFIX}<study-id>/...' must not appear; "
+                "use 'docs/studies/<study-id>/...'."
+            )
+        for required_name in STUDY_RECORD_REQUIRED_FILES:
+            if required_name not in text:
+                issues.append(f"{path}: missing study-record contract reference for '{required_name}'.")
+
+    for relative_path in STUDY_RECORD_ROUTER_FILES:
+        path = repo_root / relative_path
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if LEGACY_STUDY_INDEX_PATH in text:
+            issues.append(
+                f"{path}: legacy study index path '{LEGACY_STUDY_INDEX_PATH}' must not appear; "
+                f"use '{ACTIVE_STUDY_INDEX_PATH}'."
+            )
+        if LEGACY_STUDY_RECORD_PREFIX in text:
+            issues.append(
+                f"{path}: legacy family-nested study path "
+                f"'{LEGACY_STUDY_RECORD_PREFIX}<study-id>/...' must not appear; "
+                "use 'docs/studies/<study-id>/...'."
+            )
+        if ACTIVE_STUDY_INDEX_PATH not in text:
+            issues.append(f"{path}: study-record router must reference '{ACTIVE_STUDY_INDEX_PATH}'.")
+
+    index_path = repo_root / "docs" / "studies" / "index.yaml"
+    if not index_path.exists():
+        return issues
+
+    payload = yaml.safe_load(index_path.read_text(encoding="utf-8")) or {}
+    if not isinstance(payload, dict):
+        return [f"{index_path}: study index must be a mapping."]
+
+    version = payload.get("version")
+    if version != 1:
+        issues.append(f"{index_path}: study index must declare version: 1.")
+
+    active_study = payload.get("active_study_id")
+    studies_payload = payload.get("studies") or []
+    if not isinstance(studies_payload, list):
+        issues.append(f"{index_path}: 'studies' must be a list.")
+        return issues
+
+    entries_by_id: dict[str, Path] = {}
+    for index, entry in enumerate(studies_payload, start=1):
+        if not isinstance(entry, dict):
+            issues.append(f"{index_path}: study entry {index} must be a mapping.")
+            continue
+        study_id = str(entry.get("study_id") or "").strip()
+        family = str(entry.get("family") or "").strip()
+        raw_path = str(entry.get("record_root") or "").strip()
+        if not study_id:
+            issues.append(f"{index_path}: study entry {index} must define study_id.")
+            continue
+        if not family:
+            issues.append(f"{index_path}: study entry {study_id!r} must define family.")
+            continue
+        if not raw_path:
+            issues.append(f"{index_path}: study entry {study_id!r} must define record_root.")
+            continue
+        resolved_path = (
+            (repo_root / raw_path).resolve() if not Path(raw_path).is_absolute() else Path(raw_path).resolve()
+        )
+        try:
+            resolved_path.relative_to(resolved_repo_root)
+        except ValueError:
+            issues.append(f"{index_path}: study entry {study_id!r} path escapes the repository: {raw_path}")
+            continue
+        if resolved_path.name != study_id:
+            issues.append(
+                f"{index_path}: study entry {study_id!r} path must end with the same study id (path={raw_path!r})."
+            )
+        if study_id in entries_by_id:
+            issues.append(f"{index_path}: duplicate study_id {study_id!r}.")
+            continue
+        entries_by_id[study_id] = resolved_path
+
+    active_study_text = str(active_study or "").strip() or None
+    if active_study_text is None:
+        issues.append(f"{index_path}: active_study_id must be a non-empty study id.")
+        return issues
+    if active_study_text not in entries_by_id:
+        issues.append(f"{index_path}: active_study_id {active_study_text!r} is not declared under studies.")
+        return issues
+
+    study_root = entries_by_id[active_study_text]
+    if not study_root.is_dir():
+        issues.append(f"{index_path}: active study path is not a directory: {study_root}")
+        return issues
+    for required_name in STUDY_RECORD_REQUIRED_FILES:
+        required_path = study_root / required_name
+        if not required_path.exists():
+            issues.append(
+                f"{index_path}: active study {active_study_text!r} is missing "
+                f"required file {required_name}: {required_path}"
+            )
+
+    return issues
 
 
 def _find_exec_plan_metadata_issues(repo_root: Path) -> list[str]:
@@ -1529,7 +1755,7 @@ def _is_allowed_operational_runbook_path(*, relative_path: Path) -> bool:
 
 def _find_operational_runbook_path_issues(repo_root: Path) -> list[str]:
     issues: list[str] = []
-    for path in _iter_operational_runbook_yaml_files(repo_root):
+    for path in _iter_operational_runbook_candidate_yaml_files(repo_root):
         if not _is_ops_operational_runbook_contract(path):
             continue
         relative_path = path.relative_to(repo_root)
@@ -1542,22 +1768,70 @@ def _find_operational_runbook_path_issues(repo_root: Path) -> list[str]:
     return issues
 
 
-def _iter_operational_runbook_yaml_files(repo_root: Path):
-    stack = [repo_root]
-    while stack:
-        current = stack.pop()
-        try:
-            entries = sorted(current.iterdir(), key=lambda entry: entry.name)
-        except OSError:
+def _iter_operational_runbook_candidate_yaml_files(repo_root: Path):
+    tracked_paths = _list_git_tracked_yaml_files(repo_root)
+    if tracked_paths is not None:
+        yield from tracked_paths
+        return
+    yield from _iter_bounded_operational_runbook_yaml_files(repo_root)
+
+
+def _list_git_tracked_yaml_files(repo_root: Path) -> tuple[Path, ...] | None:
+    try:
+        completed = subprocess.run(
+            ["git", "ls-files", "--", "*.yaml", "*.yml"],
+            cwd=repo_root,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+    except FileNotFoundError:
+        return None
+    except subprocess.CalledProcessError as exc:
+        stderr = str(exc.stderr or "").strip().lower()
+        if "not a git repository" in stderr:
+            return None
+        raise ValueError(f"git ls-files failed while collecting tracked yaml candidates: {stderr or exc}") from exc
+
+    candidates: list[Path] = []
+    seen: set[Path] = set()
+    for raw_line in completed.stdout.splitlines():
+        relative = Path(str(raw_line).strip())
+        if not relative.parts:
             continue
-        for entry in reversed(entries):
-            if entry.is_dir():
-                rel_parts = entry.relative_to(repo_root).parts
-                if _should_descend_operational_runbook_dir(rel_parts):
-                    stack.append(entry)
+        candidate = repo_root / relative
+        if not candidate.exists() or not candidate.is_file():
+            continue
+        if candidate.suffix.lower() not in {".yaml", ".yml"}:
+            continue
+        resolved = candidate.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        candidates.append(candidate)
+    return tuple(candidates)
+
+
+def _iter_bounded_operational_runbook_yaml_files(repo_root: Path):
+    seen: set[Path] = set()
+    for suffix in ("*.yaml", "*.yml"):
+        for path in sorted(repo_root.glob(suffix)):
+            resolved = path.resolve()
+            if resolved in seen:
                 continue
-            if entry.suffix.lower() in {".yaml", ".yml"}:
-                yield entry
+            seen.add(resolved)
+            yield path
+    for relative_root in OPS_OPERATIONAL_RUNBOOK_FALLBACK_SCAN_ROOTS:
+        target = repo_root / relative_root
+        if not target.exists():
+            continue
+        for suffix in ("*.yaml", "*.yml"):
+            for path in sorted(target.rglob(suffix)):
+                resolved = path.resolve()
+                if resolved in seen:
+                    continue
+                seen.add(resolved)
+                yield path
 
 
 def _should_descend_operational_runbook_dir(relative_parts: tuple[str, ...]) -> bool:
@@ -1662,6 +1936,26 @@ def _find_ops_deprecated_semantics_issues(repo_root: Path) -> list[str]:
     return issues
 
 
+def _find_study_execution_source_drift_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    target_files = _collect_markdown_files_from_relative_paths(
+        repo_root,
+        relative_paths=STUDY_EXECUTION_SOURCE_DOC_PATHS,
+    )
+    for path in target_files:
+        content = path.read_text(encoding="utf-8")
+        match = PIPELINE_ONLY_EXECUTION_SOURCE_PATTERN.search(content)
+        if match is None:
+            continue
+        line_no = content[: match.start()].count("\n") + 1
+        issues.append(
+            f"{path}:{line_no}: docs must not claim pipeline.yaml is the only execution-surface source; "
+            "use ops.study.yaml for OPS-facing execution surfaces and pipeline.yaml only for "
+            "supplemental runtime context."
+        )
+    return issues
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check docs markdown naming and local links.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
@@ -1733,6 +2027,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f" - {issue}")
         return 1
 
+    study_record_doc_issues = _find_study_record_doc_issues(repo_root)
+    if study_record_doc_issues:
+        print("Study record docs check failed:")
+        for issue in study_record_doc_issues:
+            print(f" - {issue}")
+        return 1
+
     interface_doc_issues = _find_public_interface_doc_contract_issues(repo_root)
     if interface_doc_issues:
         print("Public interface docs contract check failed:")
@@ -1744,6 +2045,20 @@ def main(argv: list[str] | None = None) -> int:
     if densegen_disallowed_term_issues:
         print("DenseGen docs language check failed:")
         for issue in densegen_disallowed_term_issues:
+            print(f" - {issue}")
+        return 1
+
+    construct_legacy_operator_doc_issues = _find_construct_legacy_operator_doc_issues(repo_root)
+    if construct_legacy_operator_doc_issues:
+        print("Construct operator docs contract check failed:")
+        for issue in construct_legacy_operator_doc_issues:
+            print(f" - {issue}")
+        return 1
+
+    legacy_contract_surface_doc_issues = _find_legacy_contract_surface_doc_issues(repo_root)
+    if legacy_contract_surface_doc_issues:
+        print("Legacy contract surface docs check failed:")
+        for issue in legacy_contract_surface_doc_issues:
             print(f" - {issue}")
         return 1
 
@@ -1793,6 +2108,13 @@ def main(argv: list[str] | None = None) -> int:
     if ops_deprecated_semantics_issues:
         print("Ops terminology drift check failed:")
         for issue in ops_deprecated_semantics_issues:
+            print(f" - {issue}")
+        return 1
+
+    study_execution_source_drift_issues = _find_study_execution_source_drift_issues(repo_root)
+    if study_execution_source_drift_issues:
+        print("Study execution-source docs check failed:")
+        for issue in study_execution_source_drift_issues:
             print(f" - {issue}")
         return 1
 

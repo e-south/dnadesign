@@ -15,11 +15,11 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign import usr_roots
+from dnadesign.usr import roots as usr_roots
 
 
 def test_default_usr_root_matches_packaged_usr_datasets_dir() -> None:
-    expected = (Path(usr_roots.__file__).resolve().parent / "usr" / "datasets").resolve()
+    expected = (Path(usr_roots.__file__).resolve().parent / "datasets").resolve()
     assert usr_roots.default_usr_root() == expected
 
 

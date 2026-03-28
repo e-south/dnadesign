@@ -8,7 +8,7 @@
 **Registry-id:** usr.data-plane.multi-source-source-of-truth
 **Summary:** Merge multiple USR-backed sources, preserve explicit carry, and hand one construct-backed shared dataset to Infer and Notify.
 **Execution-kind:** staged
-**Progress-kind:** usr-dataset-state
+**Status-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-19
@@ -57,17 +57,17 @@ deliberately before treating the dataset as the cross-tool source of truth.
 ```bash
 # Create one disposable workspace root for the tracer-bullet flow.
 export WORK_ROOT="$(mktemp -d /tmp/dnadesign-multisource-XXXXXX)" # Allocate a disposable root for the shared workspace and USR datasets.
-uv run construct workspace init --id shared_dataset_demo --root "$WORK_ROOT" --profile promoter-swap-source-of-truth-demo # Scaffold the packaged construct workspace that will read merged USR inputs.
+uv run construct workspace init --id shared_dataset_demo --root "$WORK_ROOT" --profile anchor-template-shared-dataset-demo # Scaffold the packaged construct workspace that will read merged USR inputs.
 export WORKSPACE_ROOT="$WORK_ROOT/shared_dataset_demo" # Reuse one workspace path across construct, infer, and notify commands.
 export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Keep this tracer-bullet flow inside the packaged workspace-local datasets root.
 
 # Seed packaged control/template inputs used by the tracer bullet.
-uv run construct seed promoter-swap-demo \
+uv run construct seed anchor-template-demo \
   --root "$USR_ROOT" \
-  --manifest "$WORKSPACE_ROOT/inputs/seed_manifest.yaml" # Materialize packaged promoter and plasmid inputs under the workspace-local USR root.
+  --manifest "$WORKSPACE_ROOT/inputs/seed_manifest.yaml" # Materialize packaged anchor and template inputs under the workspace-local USR root.
 
 # Reuse explicit dataset ids across merge, construct, infer, and notify.
-export PRIMARY_INPUT_DATASET="mg1655_promoters" # Use the seeded promoter controls as the primary dataset for the tracer bullet.
+export PRIMARY_INPUT_DATASET="anchor_parts_demo" # Use the seeded anchor controls as the primary dataset for the tracer bullet.
 export EXTRA_INPUT_DATASET="<existing_densegen_or_manual_usr_dataset>" # Replace this with a real upstream dataset that already exists under "$USR_ROOT".
 export DOWNSTREAM_DATASET="multi_source_construct_truth_demo" # Reuse one downstream dataset id across construct, infer, and notify.
 ```
@@ -76,11 +76,11 @@ This runbook assumes the upstream datasets already exist in `"$USR_ROOT"`. Their
 
 ### 1b) Map those ids to real upstream datasets before validation
 
-The packaged seed step above creates control/template datasets such as `mg1655_promoters` and `plasmids`; it does not create the extra upstream dataset for you.
+The packaged seed step above creates demo datasets such as `anchor_parts_demo` and `template_parts_demo`; it does not create the extra upstream dataset for you.
 
 Before step 2, do one of the following explicitly:
 
-- keep `PRIMARY_INPUT_DATASET="mg1655_promoters"` and replace `EXTRA_INPUT_DATASET` with a real upstream dataset that already exists under `"$USR_ROOT"`; or
+- keep `PRIMARY_INPUT_DATASET="anchor_parts_demo"` and replace `EXTRA_INPUT_DATASET` with a real upstream dataset that already exists under `"$USR_ROOT"`; or
 - point both ids at real upstream datasets that already exist under `"$USR_ROOT"`; or
 - create/import the missing dataset through your own upstream DenseGen/manual USR flow first, then return here.
 
@@ -89,6 +89,13 @@ Tracer-bullet example when the seeded control dataset should act as the primary 
 ```bash
 export EXTRA_INPUT_DATASET="<existing_densegen_or_manual_usr_dataset>" # Replace with the real upstream dataset that should be folded into the primary input dataset.
 ```
+
+For the live `stress_ethanol_cipro_growth` study, replace the packaged demo
+inputs with the real shared datasets explicitly:
+
+- `PRIMARY_INPUT_DATASET="mg1655_promoters"`
+- `EXTRA_INPUT_DATASET="densegen/study_stress_ethanol_cipro"`
+- keep `plasmids` as the pDual-backed template dataset when you repoint the Construct configs in step 3
 
 ### 2) Validate and consolidate the upstream USR datasets
 
@@ -119,7 +126,7 @@ Expected outcome:
 
 ### 3) Point the construct workspace at the merged input dataset
 
-The packaged `promoter-swap-source-of-truth-demo` workspace is the tracer bullet here. Rewrite both packaged project configs so they read from the merged input dataset and write to one downstream dataset id.
+The packaged `anchor-template-shared-dataset-demo` workspace is the tracer bullet here. Rewrite both packaged project configs so they read from the merged input dataset and write to one downstream dataset id.
 
 ```bash
 uv run python - <<'PY' # Rewrite both packaged construct configs so they read the merged input dataset and share one downstream dataset id.
@@ -135,15 +142,15 @@ output_dataset = os.environ["DOWNSTREAM_DATASET"]
 for name in ("config.slot_a.window.yaml", "config.slot_b.window.yaml"):
     path = workspace_root / name
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    data["job"]["input"]["dataset"] = input_dataset
-    data["job"]["output"]["dataset"] = output_dataset
+    data["job"]["input"]["source"]["dataset"] = input_dataset
+    data["job"]["output"]["target"]["dataset"] = output_dataset
     path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
 
 registry_path = workspace_root / "construct.workspace.yaml"
 registry = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
 for project in registry["workspace"]["projects"]:
-    project["input_dataset"] = input_dataset
-    project["output_dataset"] = output_dataset
+    project["contract"]["input_dataset"] = input_dataset
+    project["contract"]["output_dataset"] = output_dataset
 registry_path.write_text(yaml.safe_dump(registry, sort_keys=False), encoding="utf-8")
 PY
 ```

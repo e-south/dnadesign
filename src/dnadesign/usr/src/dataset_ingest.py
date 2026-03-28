@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Union
 import numpy as np
 import pandas as pd
 import pyarrow as pa
+import pyarrow.parquet as pq
 
 from .errors import AlphabetError, DuplicateGroup, DuplicateIDError, SchemaError
 from .normalize import compute_id, normalize_sequence, validate_alphabet, validate_bio_type
@@ -185,6 +186,47 @@ def prepare_import_rows_dataset(
     return out_df
 
 
+def _require_appendable_records_schema(schema: pa.Schema) -> pa.Schema:
+    """Allow append into base-only or materialized datasets, but require base fields."""
+    missing: list[str] = []
+    mismatched: list[str] = []
+    for field in ARROW_SCHEMA:
+        idx = schema.get_field_index(field.name)
+        if idx < 0:
+            missing.append(field.name)
+            continue
+        existing = schema.field(idx)
+        if not existing.type.equals(field.type):
+            mismatched.append(f"{field.name} ({existing.type} != {field.type})")
+    if missing or mismatched:
+        problems: list[str] = []
+        if missing:
+            problems.append(f"missing required columns: {', '.join(missing)}")
+        if mismatched:
+            problems.append(f"type mismatches: {', '.join(mismatched)}")
+        raise SchemaError(
+            "Cannot append rows because records.parquet has an incompatible schema: " + "; ".join(problems)
+        )
+    return schema
+
+
+def _align_incoming_table_to_schema(table: pa.Table, schema: pa.Schema) -> pa.Table:
+    """Project base rows into an existing materialized schema with null-padding for extras."""
+    if table.schema.equals(schema, check_metadata=False):
+        return table
+    arrays = []
+    for field in schema:
+        idx = table.schema.get_field_index(field.name)
+        if idx >= 0:
+            column = table.column(idx)
+            if not column.type.equals(field.type):
+                column = column.cast(field.type)
+            arrays.append(column)
+        else:
+            arrays.append(pa.nulls(table.num_rows, type=field.type))
+    return pa.Table.from_arrays(arrays, schema=schema)
+
+
 def write_import_df_dataset(
     dataset: Dataset,
     out_df: pd.DataFrame,
@@ -201,11 +243,12 @@ def write_import_df_dataset(
 
     def _write_dataset() -> int | tuple[int, list[str], list[str]]:
         if dataset.records_path.exists():
+            existing_schema = _require_appendable_records_schema(pq.ParquetFile(str(dataset.records_path)).schema_arrow)
             if prevalidated_new_ids:
                 if on_conflict != "error":
                     raise SchemaError("prevalidated_new_ids requires on_conflict='error'.")
                 out_df_local = out_df
-                incoming_local = incoming
+                incoming_local = _align_incoming_table_to_schema(incoming, existing_schema)
                 ids_added = list(ids_all)
                 ids_skipped = []
             else:
@@ -246,14 +289,15 @@ def write_import_df_dataset(
                                     return 0, [], ids_all
                                 return 0
                             out_df_local = out_df.loc[keep_mask].reset_index(drop=True)
-                            incoming_local = pa.Table.from_pandas(
-                                out_df_local, schema=ARROW_SCHEMA, preserve_index=False
+                            incoming_local = _align_incoming_table_to_schema(
+                                pa.Table.from_pandas(out_df_local, schema=ARROW_SCHEMA, preserve_index=False),
+                                existing_schema,
                             )
                             ids_added = [rid for rid, keep in zip(ids_all, keep_mask) if keep]
                             ids_skipped = [rid for rid, keep in zip(ids_all, keep_mask) if not keep]
                         else:
                             out_df_local = out_df
-                            incoming_local = incoming
+                            incoming_local = _align_incoming_table_to_schema(incoming, existing_schema)
                             ids_added = list(ids_all)
                             ids_skipped = []
                     finally:
@@ -268,7 +312,7 @@ def write_import_df_dataset(
             metadata = dataset._base_metadata(created_at=now_utc())  # noqa: SLF001
             write_parquet_atomic_batches(
                 _batch_iter(),
-                ARROW_SCHEMA,
+                existing_schema,
                 dataset.records_path,
                 dataset.snapshot_dir,
                 metadata=metadata,

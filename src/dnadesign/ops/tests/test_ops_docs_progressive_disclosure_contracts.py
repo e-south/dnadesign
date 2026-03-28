@@ -117,7 +117,7 @@ def test_ops_how_to_doc_carries_quick_usage_commands() -> None:
         "uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>"
         in text
     )
-    assert "inspect the required progress flags before you run `progress show`" in text
+    assert "inspect the required status flags before you run `progress show`" in text
     assert "uv run ops progress scaffold <registry-id> ..." in text
     assert "prints YAML to stdout unless you pass `--out`" in text
     assert "can include more than one tool" in text
@@ -178,6 +178,8 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
     assert related_scaffold_example in text
     assert "uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>" in text
     assert "--project <project>" in text
+    assert "--preset bu-scc-dunlop" in text
+    assert "ops-runtime-visibility.md" in text
     assert "project dunlop" not in text
     assert "orchestration-runbooks.md" in text
     assert "../runbooks/README.md" in text
@@ -202,8 +204,11 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     )
     assert "uv run ops runbook init" in text
     assert "--project <project>" in text
+    assert "--preset bu-scc-dunlop" in text
     assert "uv run ops runbook presets" in text
     assert "uv run ops runbook active-jobs" in text
+    assert "ops runbook diagnostics session-counts" in text
+    assert "--allow-unknown-active-jobs" in text
     assert "Infer scaffolds also include notify by default" in text
     assert "**Type:** runbook" in text
     assert "**Plane:** control-plane" in text
@@ -238,6 +243,7 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     assert "including overlays that arrived through explicit USR merge carry" in text
     assert "passes `--overwrite` to `infer run`" in text
     assert "without implicitly pruning the namespace" in text
+    assert "python -m dnadesign.ops.orchestrator.gates" not in text
     assert "--mode fresh --allow-fresh-reset" in text
     assert "--no-discover-active-jobs" in text
     assert "operator-visible warning" in text
@@ -285,7 +291,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "--section tool-sources" in text
     assert "--related-to usr.data-plane.promoter-feature-matrix" in text
     assert "uv run ops catalog show <registry-id>" in text
-    assert "required progress inputs" in text
+    assert "required status inputs" in text
     assert "linked deeper docs" in text
     assert "next shell commands" in text
     assert "uv run ops progress explain <registry-id>" in text
@@ -297,7 +303,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "### Common examples" in text
     assert "### Cross-tool procedures" in text
     assert "### Tool docs" in text
-    assert "### Progress views" in text
+    assert "### Status views" in text
     assert "### Explicit campaign manifest shape" in text
     assert "### Boundary reminders" not in text
     assert "ops.control-plane.orchestration" in text
@@ -317,7 +323,10 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "../../src/dnadesign/infer/docs/README.md" in text
     assert "drift is a docs-check failure" not in text
     assert "This command only summarizes the manifest you provide." in text
-    assert "Relative artifact paths in the manifest resolve from the manifest directory" in text
+    assert "Campaign manifests must declare `version: 2` and `path_base: repo`, `manifest`, or `cwd`." in text
+    assert "`repo:` references resolve from repository root." in text
+    assert "`manifest:` plus `./` or `../` resolve from the manifest directory." in text
+    assert "Provider inputs belong under `inputs:`." in text
     assert "`ops-audit-json`" in text
     assert "`opal-campaign-state`" in text
     assert "Ops is not" not in text

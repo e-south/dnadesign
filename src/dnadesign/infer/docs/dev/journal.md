@@ -150,11 +150,11 @@ Environment precedence notes:
 | Adapter registration is import side effect and Evo2-only today | `src/dnadesign/infer/__init__.py:17`, `src/dnadesign/infer/adapters/__init__.py:19` |
 | Notify uses shared infer output-contract resolver | `src/dnadesign/notify/events/source_builtin.py:19`, `src/dnadesign/notify/events/source_builtin.py:37` |
 | Ops infer workflows and notify-tool contract enforcement exist | `src/dnadesign/ops/runbooks/schema.py:34`, `src/dnadesign/ops/runbooks/schema.py:35`, `src/dnadesign/ops/runbooks/schema.py:336` |
-| Shared infer producer contract parser exists in `_contracts` | `src/dnadesign/_contracts/usr_producer.py:172` |
+| Shared infer producer contract parsing is now owner-owned across infer and ops | `src/dnadesign/infer/contracts.py:61`, `src/dnadesign/ops/contracts.py:103`, `src/dnadesign/ops/contracts.py:148` |
 
 #### 10) Open Questions and Risk Notes
 
-- `ingest/sources.py` default USR root fallback and `_contracts/usr_producer.py` infer resolver fallback differ in strictness; this should be normalized before deeper tool-chain coupling.
+- `ingest/sources.py` default USR root fallback and the owner-owned infer-to-ops producer contract path should remain aligned in strictness as the tool-chain grows.
 - Preset stem fallback (`load_preset`) may cause ambiguous selection if namespace collisions grow.
 - `src/dnadesign/infer/workspaces` is referenced by notify resolvers but not currently present; ownership and lifecycle rules should be documented in infer docs.
 
@@ -1946,7 +1946,7 @@ Record concrete SCC findings for current infer behavior (7B baseline and desired
 
 ### Read-only scheduler and storage snapshot
 
-- Scheduler snapshot (`qstat -u "$USER"` and `uv run python -m dnadesign.ops.orchestrator.gates session-counts`):
+- Scheduler snapshot (`qstat -u "$USER"` and `uv run ops runbook diagnostics session-counts`):
   - running jobs: `2`
   - queued jobs: `1`
   - Eqw jobs: `0`
@@ -2077,7 +2077,7 @@ while preserving 7B support and allowing 40B pressure tests.
 ### Evidence commands executed
 
 - `qstat -u "$USER"`
-- `uv run python -m dnadesign.ops.orchestrator.gates session-counts`
+- `uv run ops runbook diagnostics session-counts`
 - `df -h /projectnb/dunlop/esouth /project/dunlop/esouth /scratch/$USER`
 - `du -sh /projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b`
 - `ls -lah /projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b/snapshots/*`
@@ -2222,9 +2222,9 @@ Build the infer GPU environment deterministically, then run one bounded pressure
 - `skills-preflight --json --strict --ensure-fresh --require-hooks`
 - `hostname`
 - `qstat -u "$USER"`
-- `uv run python -m dnadesign.ops.orchestrator.gates session-counts`
-- `uv run python -m dnadesign.ops.orchestrator.gates submit-shape-advisor --planned-submits 1 --warn-over-running 3`
-- `uv run python -m dnadesign.ops.orchestrator.gates operator-brief --planned-submits 1 --warn-over-running 3`
+- `uv run ops runbook diagnostics session-counts`
+- `uv run ops runbook diagnostics submit-shape-advisor --planned-submits 1 --warn-over-running 3`
+- `uv run ops runbook diagnostics operator-brief --planned-submits 1 --warn-over-running 3`
 - `sed -n '1,260p' pyproject.toml`
 - `sed -n '1,260p' docs/installation.md`
 - `sed -n '1,340p' docs/bu-scc/install.md`

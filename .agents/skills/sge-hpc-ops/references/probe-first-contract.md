@@ -77,7 +77,7 @@ If `running_jobs > 3` and the user asks for additional submits, emit warning and
 
 ```text
 Capability snapshot
-- workflow_id: <densegen_batch_submit|densegen_batch_with_notify_slack|ondemand_session_request|ondemand_session_handoff|generic_sge_ops>
+- route_id: <densegen_batch_submit|densegen_batch_with_notify|ondemand_session_request|ondemand_session_handoff|generic_sge_ops>
 - execution_locus: <local_shell|scc_login_shell|ondemand_shell|ondemand_app_shell|unknown>
 - session_handoff_state: <none|session_request_pending|session_ready>
 - host: <hostname>

@@ -1,20 +1,20 @@
 ## Construct CLI reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-03-24
 
 ### Command map
 
-- `uv run construct run --config <path> [--dry-run]`
-- `uv run construct validate config --config <path> [--runtime]`
+- `uv run construct run --config <path> [--dry-run] [--format text|json]`
+- `uv run construct validate config --config <path> [--runtime] [--format text|json]`
 - `uv run construct seed import-manifest --manifest <path> [--root <usr-root>]`
-- `uv run construct seed promoter-swap-demo [--root <usr-root>] [--manifest <path>]`
+- `uv run construct seed anchor-template-demo [--root <usr-root>] [--manifest <path>]`
 - `uv run construct workspace where [--root <workspace-root>] [--profile <profile>]`
 - `uv run construct workspace init --id <workspace-id> [--root <workspace-root>] [--profile <profile>]`
-- `uv run construct workspace show --workspace <workspace-dir>`
-- `uv run construct workspace doctor --workspace <workspace-dir>`
-- `uv run construct workspace validate-project --workspace <workspace-dir> --project <id> [--runtime]`
-- `uv run construct workspace run-project --workspace <workspace-dir> --project <id> [--dry-run]`
+- `uv run construct workspace show --workspace <workspace-dir> [--format text|json]`
+- `uv run construct workspace doctor --workspace <workspace-dir> [--format text|json]`
+- `uv run construct workspace validate-project --workspace <workspace-dir> --project <id> [--runtime] [--format text|json]`
+- `uv run construct workspace run-project --workspace <workspace-dir> --project <id> [--dry-run] [--format text|json]`
 
 ### `validate config`
 
@@ -22,10 +22,14 @@ Use `validate config` before `run`. With `--runtime`, the command resolves:
 
 - input dataset/root
 - template source, record id, and SHA-256
-- realization mode, focal settings, and placement contract
+- realization mode, `realize.window` contract, and placement contract
 - spec fingerprint (`spec_id`)
 - projected output ids and lengths
 - existing output collisions according to `output.on_conflict`
+
+`--format json` emits the same preflight contract as machine-readable JSON so
+agents or downstream automation can inspect placement strategy, guard posture,
+planned rows, and template provenance without scraping text output.
 
 Failure posture:
 
@@ -52,12 +56,15 @@ Run output reports:
 - `output_dataset`
 - `spec_id`
 
-### `seed promoter-swap-demo`
+`--format json` emits the run summary as a machine-readable payload, including
+the dry-run flag, output root, and spec id.
 
-This command bootstraps the packaged promoter-swap demo inputs:
+### `seed anchor-template-demo`
 
-- `mg1655_promoters`
-- `plasmids`
+This command bootstraps the packaged anchor/template demo inputs:
+
+- `anchor_parts_demo`
+- `template_parts_demo`
 
 It also writes:
 
@@ -87,10 +94,16 @@ Use this when you have your own anchors or templates and want construct to mater
 - `workspace validate-project`: resolve one project by registry id and run the same validation surface as `validate config`
 - `workspace run-project`: resolve one project by registry id and run the same execution surface as `run`
 
+`workspace show`, `workspace doctor`, `workspace validate-project`, and
+`workspace run-project` all support `--format json` for harness-friendly
+inspection and preflight gating.
+
 Workspace registry contract:
 
 - every construct workspace should carry `construct.workspace.yaml`
 - the default workspace root is the current working directory; use `--root` or `CONSTRUCT_WORKSPACE_ROOT` to override it
-- each project entry maps one config file to its intended input/template/output contract
+- each project entry tracks one config artifact under `project.artifacts.config` and one intended input/template/output contract under `project.contract`
+- `workspace doctor` rejects both config path drift and config job-id drift before execution
+- `workspace show` no longer carries a descriptive `flow` string; the runtime contract lives in the config itself and the audited routing contract lives in `project.contract`
 - multi-template studies are represented as multiple project entries, not multiple templates inside one construct job
-- packaged profiles currently include `promoter-swap-demo` and `promoter-swap-source-of-truth-demo`
+- packaged profiles currently include `anchor-template-demo` and `anchor-template-shared-dataset-demo`

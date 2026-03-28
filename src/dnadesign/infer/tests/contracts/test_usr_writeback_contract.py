@@ -45,6 +45,7 @@ class _AttachCaptureDataset:
         backend: str = "pyarrow",
         note: str = "",
         actor: dict[str, object] | None = None,
+        event_args: dict[str, object] | None = None,
     ) -> int:
         payload = pq.read_table(path)
         self.calls.append(
@@ -61,6 +62,7 @@ class _AttachCaptureDataset:
                 "backend": backend,
                 "note": note,
                 "actor": actor,
+                "event_args": event_args,
             }
         )
         return 1
@@ -336,7 +338,7 @@ def test_run_extract_job_usr_write_back_does_not_duplicate_final_call(monkeypatc
     )
     calls: list[dict[str, object]] = []
 
-    def _capture_write_back(ds_obj, *, ids, model_id, job_id, columnar, overwrite):
+    def _capture_write_back(ds_obj, *, ids, model_id, job_id, columnar, overwrite, event_args=None):
         calls.append(
             {
                 "ds": ds_obj,
@@ -345,6 +347,7 @@ def test_run_extract_job_usr_write_back_does_not_duplicate_final_call(monkeypatc
                 "job_id": job_id,
                 "columnar": dict(columnar),
                 "overwrite": overwrite,
+                "event_args": event_args,
             }
         )
 

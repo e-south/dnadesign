@@ -23,11 +23,14 @@ from .dataset_registry_modes import normalize_registry_mode, validate_overlays_f
 from .errors import AlphabetError, DuplicateIDError, NamespaceError, SchemaError
 from .normalize import compute_id, normalize_sequence, validate_alphabet, validate_bio_type
 from .overlays import list_overlays
+from .registry import load_registry, load_registry_file, registry_hash_for_entries, validate_overlay_schema
+from .schema import META_REGISTRY_HASH
 from .storage.parquet import iter_parquet_batches
 
 
 class DatasetValidateHost(Protocol):
     dir: Path
+    root: Path
     records_path: Path
 
     def _load_overlays(self, *, include_tombstone: bool = False, namespaces=None): ...
@@ -35,6 +38,78 @@ class DatasetValidateHost(Protocol):
     def _require_exists(self) -> None: ...
 
     def _tombstone_path(self) -> Path: ...
+
+    def _frozen_registry_path(self) -> Path: ...
+
+
+def _strict_registry_candidates(dataset: DatasetValidateHost, mode: str) -> list[tuple[str, dict, bool]]:
+    if mode in {"current", "namespace-current"}:
+        return [("current", load_registry(dataset.root, required=True), mode == "current")]
+    if mode in {"frozen", "namespace-frozen"}:
+        return [("frozen", load_registry_file(dataset._frozen_registry_path()), mode == "frozen")]
+
+    candidates: list[tuple[str, dict, bool]] = []
+    current_error: SchemaError | None = None
+    frozen_error: SchemaError | None = None
+    try:
+        candidates.append(("current", load_registry(dataset.root, required=True), mode == "either"))
+    except SchemaError as exc:
+        current_error = exc
+    try:
+        candidates.append(("frozen", load_registry_file(dataset._frozen_registry_path()), mode == "either"))
+    except SchemaError as exc:
+        frozen_error = exc
+    if candidates:
+        return candidates
+    if current_error is not None:
+        raise current_error
+    if frozen_error is not None:
+        raise frozen_error
+    raise SchemaError(f"Unsupported registry_mode '{mode}'.")
+
+
+def _validate_materialized_base_registry_contract(
+    *,
+    dataset: DatasetValidateHost,
+    schema: pa.Schema,
+    mode: str,
+    essential: set[str],
+    reserved_namespaces: set[str],
+) -> None:
+    materialized_by_namespace: dict[str, list[pa.Field]] = {}
+    id_field = schema.field("id")
+    for field in schema:
+        if field.name in essential or "__" not in field.name:
+            continue
+        namespace = field.name.split("__", 1)[0]
+        if namespace in reserved_namespaces:
+            continue
+        materialized_by_namespace.setdefault(namespace, []).append(field)
+
+    if not materialized_by_namespace:
+        return
+
+    metadata = schema.metadata or {}
+    base_registry_hash_raw = metadata.get(META_REGISTRY_HASH.encode("utf-8"))
+    errors: list[str] = []
+    for label, registry, check_full_registry_hash in _strict_registry_candidates(dataset, mode):
+        try:
+            if check_full_registry_hash:
+                if base_registry_hash_raw is None:
+                    raise SchemaError("records.parquet missing registry_hash metadata.")
+                expected_hash = registry_hash_for_entries(registry)
+                actual_hash = base_registry_hash_raw.decode("utf-8")
+                if actual_hash != expected_hash:
+                    raise SchemaError(
+                        f"records.parquet registry_hash mismatch: expected {expected_hash}, got {actual_hash}."
+                    )
+            for namespace, fields in materialized_by_namespace.items():
+                validate_overlay_schema(namespace, pa.schema([id_field, *fields]), registry=registry, key="id")
+            return
+        except SchemaError as exc:
+            errors.append(f"{label}: {exc}")
+    joined = " | ".join(errors)
+    raise SchemaError(f"Materialized base columns failed strict registry validation. {joined}")
 
 
 def validate_dataset(
@@ -48,7 +123,6 @@ def validate_dataset(
     """
     Validate schema, IDs, alphabet constraints, and namespacing policy.
     """
-    del strict
     dataset._require_exists()
     mode = normalize_registry_mode(registry_mode)
     pf = pq.ParquetFile(str(dataset.records_path))
@@ -95,6 +169,15 @@ def validate_dataset(
             dataset=dataset,
             overlays=overlays,
             mode=mode,
+            reserved_namespaces=reserved_namespaces,
+        )
+
+    if strict:
+        _validate_materialized_base_registry_contract(
+            dataset=dataset,
+            schema=schema,
+            mode=mode,
+            essential=essential,
             reserved_namespaces=reserved_namespaces,
         )
 
