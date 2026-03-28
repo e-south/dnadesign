@@ -39,7 +39,7 @@ def test_infer_runtime_modules_live_under_src_directory() -> None:
     assert (infer_root / "src").is_dir()
 
     top_level_py = sorted(path.name for path in infer_root.glob("*.py"))
-    assert top_level_py == ["__init__.py", "__main__.py", "cli.py"]
+    assert top_level_py == ["__init__.py", "__main__.py", "cli.py", "contracts.py"]
 
 
 def test_infer_root_keeps_progressive_disclosure_directories() -> None:
@@ -67,6 +67,7 @@ def test_infer_root_keeps_minimal_top_level_surface() -> None:
         "__main__.py",
         "assets",
         "cli.py",
+        "contracts.py",
         "docs",
         "src",
         "tests",

@@ -9,34 +9,39 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-# re-exported API
-from .src.api import (  # noqa: F401
-    ARROW_SCHEMA,
-    ID_HASH_SPEC,
-    REQUIRED_COLUMNS,
-    SCHEMA_VERSION,
-    USR_EVENT_VERSION,
-    AddSequencesResult,
-    AlphabetError,
-    Dataset,
-    DatasetInfo,
-    DuplicateIDError,
-    EmbeddingDimensionError,
-    Fingerprint,
-    Manifest,
-    NamespaceError,
-    OverlayInfo,
-    SchemaError,
-    SequencesError,
-    ValidationError,
-    __version__,
-    compute_id,
-    default_usr_root,
-    normalize_sequence,
-    normalize_usr_root,
-    validate_alphabet,
-    validate_bio_type,
-)
+from __future__ import annotations
+
+from importlib import import_module
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .src.api import (
+        ARROW_SCHEMA,
+        ID_HASH_SPEC,
+        REQUIRED_COLUMNS,
+        SCHEMA_VERSION,
+        USR_EVENT_VERSION,
+        AddSequencesResult,
+        AlphabetError,
+        Dataset,
+        DatasetInfo,
+        DuplicateIDError,
+        EmbeddingDimensionError,
+        Fingerprint,
+        Manifest,
+        NamespaceError,
+        OverlayInfo,
+        SchemaError,
+        SequencesError,
+        ValidationError,
+        __version__,
+        compute_id,
+        default_usr_root,
+        normalize_sequence,
+        normalize_usr_root,
+        validate_alphabet,
+        validate_bio_type,
+    )
 
 __all__ = [
     "Dataset",
@@ -65,3 +70,17 @@ __all__ = [
     "AddSequencesResult",
     "__version__",
 ]
+
+_API_EXPORTS = frozenset(__all__)
+
+
+def __getattr__(name: str):
+    if name not in _API_EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(".src.api", __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()).union(__all__))

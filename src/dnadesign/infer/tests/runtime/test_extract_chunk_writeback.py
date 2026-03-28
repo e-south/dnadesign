@@ -62,7 +62,7 @@ def test_build_extract_chunk_write_back_fails_fast_for_missing_usr_contracts() -
 def test_build_extract_chunk_write_back_writes_chunk_values() -> None:
     calls: list[dict[str, object]] = []
 
-    def _writer(ds, *, ids, model_id, job_id, columnar, overwrite):
+    def _writer(ds, *, ids, model_id, job_id, columnar, overwrite, event_args=None):
         calls.append(
             {
                 "ds": ds,
@@ -71,6 +71,7 @@ def test_build_extract_chunk_write_back_writes_chunk_values() -> None:
                 "job_id": job_id,
                 "columnar": dict(columnar),
                 "overwrite": overwrite,
+                "event_args": event_args,
             }
         )
 
@@ -97,5 +98,6 @@ def test_build_extract_chunk_write_back_writes_chunk_values() -> None:
             "job_id": "job_a",
             "columnar": {"ll_mean": [1.0, 3.0]},
             "overwrite": True,
+            "event_args": None,
         }
     ]

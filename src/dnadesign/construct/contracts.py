@@ -15,14 +15,17 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import ValidationError as PydanticValidationError
 
 from dnadesign.usr.roots import resolve_usr_root_from_config
 
-from .src.api import JobConfig, load_job_config
 from .src.errors import ConfigError, ConstructError
 from .src.workspace import load_workspace_registry, resolve_workspace_project_config_artifact_path
+
+if TYPE_CHECKING:
+    from .src.api import JobConfig
 
 _WORKSPACES_ROOT = Path("src/dnadesign/construct/workspaces")
 _WORKSPACE_REGISTRY_NAME = "construct.workspace.yaml"
@@ -59,6 +62,8 @@ def _normalize_relative_dataset_path(dataset_value: object, *, label: str) -> st
 
 
 def _validate_construct_config_root(root: dict[str, object], *, config_path: Path) -> JobConfig:
+    from .src.api import JobConfig
+
     try:
         return JobConfig.model_validate(root)
     except PydanticValidationError as exc:
@@ -66,6 +71,8 @@ def _validate_construct_config_root(root: dict[str, object], *, config_path: Pat
 
 
 def _load_construct_config(config_path: Path) -> tuple[Path, JobConfig]:
+    from .src.api import load_job_config
+
     try:
         loaded, resolved_config_path = load_job_config(config_path)
     except (ConstructError, OSError) as exc:
