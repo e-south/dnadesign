@@ -29,11 +29,13 @@ _SKIPPED_PATH_SEGMENTS = {
     "__pycache__",
 }
 _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
+    ("baserender", "contracts"),
     ("billboard", "aligner"),
     ("cluster", "aligner"),
     ("cluster", "ops"),
     ("cluster", "usr"),
     ("construct", "usr"),
+    ("cruncher", "contracts"),
     ("cruncher", "baserender"),
     ("densegen", "baserender"),
     ("densegen", "cruncher"),
@@ -87,6 +89,7 @@ _FORBIDDEN_LEGACY_SURFACE_PATHS = (
 _ALLOWED_OPS_ROOT_CLI_PATHS = {
     Path("src/dnadesign/ops/cli"),
 }
+_ALLOWED_CACHE_FILE_SUFFIXES = {".pyc", ".pyo"}
 
 
 @dataclass(frozen=True)
@@ -225,7 +228,7 @@ def find_legacy_surface_violations(*, repo_root: Path) -> list[LegacySurfaceViol
     violations: list[LegacySurfaceViolation] = []
     for relative_path in _FORBIDDEN_LEGACY_SURFACE_PATHS:
         candidate = (resolved_repo_root / relative_path).resolve()
-        if candidate.exists():
+        if candidate.exists() and not _is_cache_only_legacy_path(candidate):
             violations.append(LegacySurfaceViolation(path=candidate))
     ops_root = (resolved_repo_root / "src" / "dnadesign" / "ops").resolve()
     if ops_root.exists():
@@ -236,6 +239,26 @@ def find_legacy_surface_violations(*, repo_root: Path) -> list[LegacySurfaceViol
             if candidate.is_file() and "cli" in candidate.stem:
                 violations.append(LegacySurfaceViolation(path=candidate.resolve()))
     return sorted(violations, key=lambda item: str(item.path))
+
+
+def _is_cache_only_legacy_path(path: Path) -> bool:
+    if path.is_file():
+        return path.suffix in _ALLOWED_CACHE_FILE_SUFFIXES
+    if not path.is_dir():
+        return False
+
+    descendants = list(path.rglob("*"))
+    if not descendants:
+        return False
+
+    for descendant in descendants:
+        if descendant.is_dir():
+            if descendant.name != "__pycache__":
+                return False
+            continue
+        if descendant.suffix not in _ALLOWED_CACHE_FILE_SUFFIXES:
+            return False
+    return True
 
 
 def _build_parser() -> argparse.ArgumentParser:
