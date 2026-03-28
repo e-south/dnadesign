@@ -1,6 +1,6 @@
 ## OPS preflight checks
 
-**Owner:** dnadesign-maintainers  
+**Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
 This index summarizes the generic readiness check vocabulary that study contracts can declare in `ops.study.yaml`.

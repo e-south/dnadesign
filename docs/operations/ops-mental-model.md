@@ -1,6 +1,6 @@
 ## OPS mental model
 
-**Owner:** dnadesign-maintainers  
+**Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
 Use this page when you need the shortest correct model for what OPS owns, what each command family does, and when to escalate from cheap record-backed status to deeper readiness checks.
