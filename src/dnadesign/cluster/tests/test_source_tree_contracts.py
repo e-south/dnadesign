@@ -71,9 +71,7 @@ def test_cluster_root_keeps_minimal_top_level_surface() -> None:
 def test_cluster_ops_surface_is_limited_to_status_registry_files() -> None:
     ops_root = _cluster_root() / "ops"
     observed = {
-        path.name
-        for path in ops_root.iterdir()
-        if path.name != "__pycache__" and not path.name.startswith(".")
+        path.name for path in ops_root.iterdir() if path.name != "__pycache__" and not path.name.startswith(".")
     }
     assert observed == {"__init__.py", "status.registry.yaml", "status_providers.py"}
 
