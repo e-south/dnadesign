@@ -315,8 +315,6 @@ def test_build_promoter_preflight_progress_uses_only_contract_declared_generic_c
     def _run_progress_command(argv, *, cwd, timeout_seconds=180):
         del timeout_seconds
         commands.append(tuple(argv))
-        if tuple(argv[:5]) == ("uv", "run", "ops", "runbook", "plan"):
-            return _execution(tuple(argv), cwd, returncode=0, stdout='{"selected_mode":"resume"}')
         if tuple(argv[:7]) == (
             "uv",
             "run",
@@ -333,6 +331,37 @@ def test_build_promoter_preflight_progress_uses_only_contract_declared_generic_c
                 stdout="queue_probe=ok running_jobs=1 queued_jobs=0 eqw_jobs=0",
             )
         raise AssertionError(f"unexpected command: {' '.join(argv)}")
+
+    def _execute_runbook_plan(*, runbook_path: Path, repo_root: Path) -> CommandExecution:
+        commands.append(
+            (
+                "uv",
+                "run",
+                "ops",
+                "runbook",
+                "plan",
+                "--runbook",
+                str(runbook_path),
+                "--repo-root",
+                str(repo_root),
+            )
+        )
+        return _execution(
+            (
+                "uv",
+                "run",
+                "ops",
+                "runbook",
+                "plan",
+                "--runbook",
+                str(runbook_path),
+                "--repo-root",
+                str(repo_root),
+            ),
+            repo_root,
+            returncode=0,
+            stdout='{"selected_mode":"resume"}',
+        )
 
     state, _summary, evidence = build_promoter_preflight_progress(
         context=PromoterPreflightResolvedContext(
@@ -363,6 +392,7 @@ def test_build_promoter_preflight_progress_uses_only_contract_declared_generic_c
         evidence={},
         dependencies=PromoterPreflightCoordinatorDependencies(
             run_preflight_command=_run_progress_command,
+            execute_runbook_plan=_execute_runbook_plan,
             safe_json_loads=lambda text: {"selected_mode": "resume"} if text else None,
             choose_command_summary=lambda *_args, fallback, **_kwargs: fallback,
             inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},

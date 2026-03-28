@@ -25,7 +25,19 @@ from .orchestration_notify import (
     resolve_notify_runtime_contract,
 )
 from .plan_tools import ToolCommandSpec, resolve_plan_tool_adapter
-from .state import ModeDecision, resolve_mode_decision
+from .state import (
+    ModeDecision,
+    OpsJobIdentity,
+    RuntimeVisibility,
+    build_ops_job_context,
+    build_ops_job_env,
+    default_runtime_visibility,
+    default_runtime_visibility_for_job_ids,
+    render_sge_context_value,
+    render_sge_job_name,
+    resolve_mode_decision,
+    resolve_ops_job_identity,
+)
 
 SmokeMode = Literal["dry", "live"]
 
@@ -69,7 +81,10 @@ def _shell_command(command_text: str, *, env: dict[str, str] | None = None) -> C
 
 
 def _ops_gate_command(*parts: object) -> CommandSpec:
-    return _argv_command("uv", "run", "python", "-m", "dnadesign.ops.orchestrator.gates", *parts)
+    command_parts = tuple(str(part) for part in parts)
+    if command_parts and command_parts[0] in {"session-counts", "submit-shape-advisor", "operator-brief"}:
+        return _argv_command("uv", "run", "ops", "runbook", "diagnostics", *command_parts)
+    return _argv_command("uv", "run", "python", "-m", "dnadesign.ops.orchestrator.gates", *command_parts)
 
 
 def _qsub_export_names(env_vars: dict[str, str]) -> str:
@@ -87,8 +102,11 @@ def _render_tool_command(command: ToolCommandSpec) -> CommandSpec:
 
 @dataclass(frozen=True)
 class BatchPlan:
+    runbook_id: str
     workflow_id: str
     project: str
+    workspace_root: str
+    job_identity: OpsJobIdentity
     selected_mode: str
     selected_smoke: SmokeMode | None
     submit_behavior: str
@@ -98,11 +116,17 @@ class BatchPlan:
     submit_commands: list[CommandSpec]
     orchestration_notify: OrchestrationNotifySpec | None
     decision_reason: str
+    runtime_visibility: RuntimeVisibility = field(default_factory=default_runtime_visibility)
+    warnings: tuple[str, ...] = ()
+    allow_unknown_active_jobs: bool = False
 
     def as_dict(self) -> dict[str, object]:
         return {
+            "runbook_id": self.runbook_id,
             "workflow_id": self.workflow_id,
             "project": self.project,
+            "workspace_root": self.workspace_root,
+            "job_identity": self.job_identity.as_dict(),
             "selected_mode": self.selected_mode,
             "selected_smoke": self.selected_smoke,
             "submit_behavior": self.submit_behavior,
@@ -113,6 +137,9 @@ class BatchPlan:
             "orchestration_notify": (
                 self.orchestration_notify.as_dict() if self.orchestration_notify is not None else None
             ),
+            "runtime_visibility": self.runtime_visibility.as_dict(),
+            "warnings": list(self.warnings),
+            "allow_unknown_active_jobs": self.allow_unknown_active_jobs,
             "decision_reason": self.decision_reason,
         }
 
@@ -232,6 +259,7 @@ def _preflight_commands(
             str(planned_submits),
             "--warn-over-running",
             "3",
+            *(("--requires-order",) if requires_order else ()),
             *(("--allow-missing-qstat",) if allow_missing_qstat else ()),
         ),
     ]
@@ -301,7 +329,12 @@ def _notify_smoke_commands(
     return commands
 
 
-def _submit_commands(runbook: OrchestrationRunbookV1, *, mode_decision: ModeDecision) -> list[CommandSpec]:
+def _submit_commands(
+    runbook: OrchestrationRunbookV1,
+    *,
+    mode_decision: ModeDecision,
+    job_identity: OpsJobIdentity,
+) -> list[CommandSpec]:
     if mode_decision.submit_behavior == "blocked":
         return []
 
@@ -325,18 +358,24 @@ def _submit_commands(runbook: OrchestrationRunbookV1, *, mode_decision: ModeDeci
             ("NOTIFY_TLS_CA_BUNDLE", notify_runtime.tls_ca_bundle),
             ("WEBHOOK_FILE", notify_runtime.webhook_file),
         ]
-        notify_submit_env = {name: value for name, value in notify_submit_parts}
+        notify_submit_env = {name: value for name, value in notify_submit_parts} | build_ops_job_env(
+            job_identity, role="notify"
+        )
         submit_commands.append(
             _argv_command(
                 "qsub",
                 "-terse",
                 "-P",
                 runbook.project,
+                "-N",
+                render_sge_job_name(job_identity, role="notify"),
                 "-o",
                 stdout_file,
                 *hold_fragment,
                 "-l",
                 f"h_rt={runbook.resources.h_rt}",
+                "-ac",
+                render_sge_context_value(build_ops_job_context(job_identity, role="notify")),
                 "-v",
                 _qsub_export_names(notify_submit_env),
                 str(runbook.notify.qsub_template),
@@ -350,6 +389,7 @@ def _submit_commands(runbook: OrchestrationRunbookV1, *, mode_decision: ModeDeci
         for command in tool_adapter.build_submit_commands(
             runbook,
             mode_decision,
+            job_identity,
             stdout_file,
             tuple(hold_fragment),
         )
@@ -363,20 +403,26 @@ def build_batch_plan(
     requested_mode: Literal["auto", "fresh", "resume"] | None,
     requested_smoke: SmokeMode | None,
     active_job_ids: Sequence[str],
+    runtime_visibility: RuntimeVisibility | None = None,
     allow_fresh_reset: bool = False,
     allow_missing_qstat: bool = False,
+    allow_unknown_active_jobs: bool = False,
 ) -> BatchPlan:
     if runbook.notify is None and requested_smoke is not None:
         raise ValueError("notify smoke override is not valid when runbook.notify is absent")
     resolve_plan_tool_adapter(runbook).validate_resources(runbook)
     selected_smoke: SmokeMode | None = requested_smoke or (runbook.notify.smoke if runbook.notify is not None else None)
+    job_identity = resolve_ops_job_identity(runbook)
+    selected_runtime_visibility = runtime_visibility or default_runtime_visibility_for_job_ids(active_job_ids)
     mode_decision = resolve_mode_decision(
         runbook=runbook,
         requested_mode=requested_mode,
         active_job_ids=active_job_ids,
+        runtime_visibility=selected_runtime_visibility,
         allow_fresh_reset=allow_fresh_reset,
+        allow_unknown_active_jobs=allow_unknown_active_jobs,
     )
-    submit_commands = _submit_commands(runbook, mode_decision=mode_decision)
+    submit_commands = _submit_commands(runbook, mode_decision=mode_decision, job_identity=job_identity)
     fallback_submits = 2 if runbook.notify is not None else 1
     planned_submits = len(submit_commands) or fallback_submits
     requires_order = mode_decision.submit_behavior == "hold_jid"
@@ -389,9 +435,19 @@ def build_batch_plan(
             run_id=runbook.id,
             profile_path=runbook.notify.profile,
         )
+    warnings: list[str] = []
+    if selected_runtime_visibility.degraded:
+        warnings.extend(selected_runtime_visibility.degraded_reasons)
+    if selected_runtime_visibility.active_job_resolution_state.value == "unknown" and not allow_unknown_active_jobs:
+        warnings.append("Active-job visibility unavailable; submit posture is blocked by default.")
+    if allow_unknown_active_jobs:
+        warnings.append("Proceeding with explicit --allow-unknown-active-jobs override.")
     return BatchPlan(
+        runbook_id=runbook.id,
         workflow_id=runbook.workflow_id,
         project=runbook.project,
+        workspace_root=str(runbook.workspace_root),
+        job_identity=job_identity,
         selected_mode=mode_decision.selected_mode,
         selected_smoke=selected_smoke,
         submit_behavior=mode_decision.submit_behavior,
@@ -406,5 +462,8 @@ def build_batch_plan(
         notify_smoke_commands=_notify_smoke_commands(runbook, smoke_mode=selected_smoke),
         submit_commands=submit_commands,
         orchestration_notify=orchestration_notify,
+        runtime_visibility=selected_runtime_visibility,
+        warnings=tuple(dict.fromkeys(warnings)),
+        allow_unknown_active_jobs=allow_unknown_active_jobs,
         decision_reason=mode_decision.reason,
     )

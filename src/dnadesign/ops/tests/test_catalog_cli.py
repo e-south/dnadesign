@@ -506,7 +506,8 @@ def test_cli_catalog_list_rejects_unknown_related_to_registry_id() -> None:
     )
 
     assert result.exit_code == 2
-    assert "unknown --related-to registry id: usr.data-plane.promoter-feature" in result.output
+    assert "Catalog contract error: unknown --related-to registry id:" in result.output
+    assert "usr.data-plane.promoter-feature" in result.output
     assert "usr.data-plane.promoter-feature-matrix" in result.output
 
 

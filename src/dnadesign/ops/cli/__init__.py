@@ -1,30 +1,44 @@
-from .app import app, main
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/ops/cli/__init__.py
+
+Intentional public CLI entrypoint shim for the installed OPS console script.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import os
+from collections.abc import Sequence
 
 
-def build_batch_plan(*args, **kwargs):
-    from dnadesign.ops.orchestrator.plan import build_batch_plan as _build_batch_plan
+class _AppProxy:
+    def _load(self):
+        from .app import app as real_app
 
-    return _build_batch_plan(*args, **kwargs)
+        return real_app
 
+    def __call__(self, *args, **kwargs):
+        return self._load()(*args, **kwargs)
 
-def discover_active_job_ids_for_runbook(*args, **kwargs):
-    from dnadesign.ops.orchestrator.state import (
-        discover_active_job_ids_for_runbook as _discover_active_job_ids_for_runbook,
-    )
-
-    return _discover_active_job_ids_for_runbook(*args, **kwargs)
-
-
-def execute_batch_plan(*args, **kwargs):
-    from dnadesign.ops.orchestrator.execute import execute_batch_plan as _execute_batch_plan
-
-    return _execute_batch_plan(*args, **kwargs)
+    def __getattr__(self, name: str):
+        return getattr(self._load(), name)
 
 
-__all__ = [
-    "app",
-    "build_batch_plan",
-    "discover_active_job_ids_for_runbook",
-    "execute_batch_plan",
-    "main",
-]
+app = _AppProxy()
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    from .app import main as _main
+
+    stderr_fd = os.dup(2)
+    try:
+        return _main(argv, stderr_fd=stderr_fd)
+    finally:
+        os.close(stderr_fd)
+
+
+__all__ = ["app", "main"]

@@ -6,7 +6,7 @@ src/dnadesign/studies/tests/test_record_locator.py
 Focused tests for flat checked-in study index loading and active-study
 resolution.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

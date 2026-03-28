@@ -19,6 +19,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable
 
+from . import gates as gates_module
 from .orchestration_notify import build_orchestration_notify_argv
 from .plan import BatchPlan, CommandSpec
 
@@ -56,6 +57,8 @@ def _default_command_runner(command: CommandSpec, *, timeout_seconds: float | No
     env.update(command.env)
     try:
         if command.argv is not None:
+            if gates_module.is_native_gate_command(command.argv):
+                return gates_module.run_native_gate_command(command.argv, env=command.env)
             result = subprocess.run(
                 list(command.argv),
                 check=False,

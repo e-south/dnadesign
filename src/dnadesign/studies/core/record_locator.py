@@ -5,7 +5,7 @@ src/dnadesign/studies/core/record_locator.py
 
 Active-study selection helpers for the flat checked-in study registry.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

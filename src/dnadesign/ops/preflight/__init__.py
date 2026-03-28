@@ -29,6 +29,7 @@ from .models import (
 from .support import (
     build_infer_notify_setup_command,
     choose_command_summary,
+    execute_runbook_plan,
     infer_usr_dataset_requirements,
     load_orchestration_runbook_payload,
     render_argv,
@@ -59,6 +60,7 @@ __all__ = [
     "check_matches_scope",
     "choose_command_summary",
     "contract_environment_flag_state",
+    "execute_runbook_plan",
     "evaluate_preflight_checks",
     "infer_usr_dataset_requirements",
     "load_orchestration_runbook_payload",

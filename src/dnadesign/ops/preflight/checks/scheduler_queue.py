@@ -5,7 +5,7 @@ src/dnadesign/ops/preflight/checks/scheduler_queue.py
 
 Generic scheduler-queue preflight check executors.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

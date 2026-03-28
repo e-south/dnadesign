@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from dnadesign.studies.core.models import StudyOpsContract
@@ -69,6 +69,9 @@ class PromoterStudyResolvedContext:
     densegen_row_target: int | None
     densegen_row_gap: int | None
     evidence: dict[str, object]
+    derived_execution_surface_states: tuple[dict[str, object], ...] = ()
+    derived_execution_surface_index: dict[str, Path] = field(default_factory=dict)
+    missing_derived_execution_surfaces: tuple[str, ...] = ()
     ops_contract: StudyOpsContract | None = None
 
 
@@ -122,6 +125,9 @@ def resolve_promoter_study_context(
             execution_surface_states=(),
             execution_surface_index={},
             missing_execution_surfaces=(),
+            derived_execution_surface_states=(),
+            derived_execution_surface_index={},
+            missing_derived_execution_surfaces=(),
             phase_states=(),
             current_phase=None,
             current_phase_is_known=False,
@@ -194,6 +200,9 @@ def resolve_promoter_study_context(
             execution_surface_states=(),
             execution_surface_index={},
             missing_execution_surfaces=(),
+            derived_execution_surface_states=(),
+            derived_execution_surface_index={},
+            missing_derived_execution_surfaces=(),
             phase_states=(),
             current_phase=None,
             current_phase_is_known=False,
@@ -285,8 +294,7 @@ def resolve_promoter_study_context(
         if declared_status == "planned" and exists:
             present_but_planned.append(dataset_id)
 
-    execution_surface_payload = _merged_execution_surface_payload(
-        pipeline_payload=study_pipeline.get("execution_surfaces"),
+    execution_surface_payload = _declared_execution_surface_payload(
         contract_payload=ops_contract.execution_surfaces,
     )
     execution_surface_index = dependencies.resolve_named_path_mapping(
@@ -295,13 +303,17 @@ def resolve_promoter_study_context(
         label="execution_surfaces",
         status_kind=status_kind,
     )
-    execution_surface_states: list[dict[str, object]] = []
-    missing_execution_surfaces: list[str] = []
-    for label, resolved_path in execution_surface_index.items():
-        exists = resolved_path.exists()
-        execution_surface_states.append({"label": label, "path": str(resolved_path), "exists": exists})
-        if not exists:
-            missing_execution_surfaces.append(label)
+    derived_execution_surface_index = _derived_execution_surface_index(
+        pipeline_payload=study_pipeline.get("execution_surfaces"),
+        execution_surface_index=execution_surface_index,
+        dependencies=dependencies,
+        repo_root=study_repo_root,
+        status_kind=status_kind,
+    )
+    execution_surface_states, missing_execution_surfaces = _build_execution_surface_states(execution_surface_index)
+    derived_execution_surface_states, missing_derived_execution_surfaces = _build_execution_surface_states(
+        derived_execution_surface_index
+    )
 
     phase_states = [phase.as_dict() for phase in ops_contract.phases]
     phase_index = {phase.id: phase.as_dict() for phase in ops_contract.phases}
@@ -336,6 +348,8 @@ def resolve_promoter_study_context(
             "present_but_planned": present_but_planned,
             "execution_surfaces": execution_surface_states,
             "missing_execution_surfaces": missing_execution_surfaces,
+            "derived_execution_surfaces": derived_execution_surface_states,
+            "missing_derived_execution_surfaces": missing_derived_execution_surfaces,
             "current_phase": current_phase,
             "current_phase_is_known": current_phase_is_known,
             "phase_states": phase_states,
@@ -374,6 +388,9 @@ def resolve_promoter_study_context(
         execution_surface_states=tuple(execution_surface_states),
         execution_surface_index=dict(execution_surface_index),
         missing_execution_surfaces=tuple(missing_execution_surfaces),
+        derived_execution_surface_states=tuple(derived_execution_surface_states),
+        derived_execution_surface_index=dict(derived_execution_surface_index),
+        missing_derived_execution_surfaces=tuple(missing_derived_execution_surfaces),
         phase_states=tuple(phase_states),
         current_phase=current_phase,
         current_phase_is_known=current_phase_is_known,
@@ -389,6 +406,19 @@ def resolve_promoter_study_context(
     )
 
 
+def _build_execution_surface_states(
+    execution_surface_index: dict[str, Path],
+) -> tuple[list[dict[str, object]], list[str]]:
+    execution_surface_states: list[dict[str, object]] = []
+    missing_execution_surfaces: list[str] = []
+    for label, resolved_path in execution_surface_index.items():
+        exists = resolved_path.exists()
+        execution_surface_states.append({"label": label, "path": str(resolved_path), "exists": exists})
+        if not exists:
+            missing_execution_surfaces.append(label)
+    return execution_surface_states, missing_execution_surfaces
+
+
 def _first_phase_by_status(phases: list[dict[str, object]], *, status: str) -> dict[str, object] | None:
     for phase in phases:
         if str(phase.get("status") or "").strip() == status:
@@ -396,12 +426,8 @@ def _first_phase_by_status(phases: list[dict[str, object]], *, status: str) -> d
     return None
 
 
-def _merged_execution_surface_payload(
-    *,
-    pipeline_payload: object,
-    contract_payload: dict[str, dict[str, object]],
-) -> dict[str, object]:
-    merged: dict[str, object] = {}
+def _declared_execution_surface_payload(*, contract_payload: dict[str, dict[str, object]]) -> dict[str, object]:
+    declared: dict[str, object] = {}
     for label, surface_payload in contract_payload.items():
         if not isinstance(surface_payload, dict):
             continue
@@ -412,10 +438,27 @@ def _merged_execution_surface_payload(
             or ""
         ).strip()
         if path_ref:
-            merged[label] = path_ref
-    if isinstance(pipeline_payload, dict):
-        merged.update(pipeline_payload)
-    return merged
+            declared[label] = path_ref
+    return declared
+
+
+def _derived_execution_surface_index(
+    *,
+    pipeline_payload: object,
+    execution_surface_index: dict[str, Path],
+    dependencies: PromoterStudyContextDependencies,
+    repo_root: Path,
+    status_kind: str,
+) -> dict[str, Path]:
+    pipeline_index = dependencies.resolve_named_path_mapping(
+        pipeline_payload,
+        repo_root=repo_root,
+        label="execution_surfaces",
+        status_kind=status_kind,
+    )
+    return {
+        label: resolved_path for label, resolved_path in pipeline_index.items() if label not in execution_surface_index
+    }
 
 
 def _snapshot_target_rows(*, ops_contract: StudyOpsContract, artifact_id: str) -> int | None:

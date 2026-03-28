@@ -24,7 +24,9 @@ from dnadesign.ops.preflight import (
     build_contract_preflight_checks,
     contract_environment_flag_state,
     evaluate_preflight_checks,
+    execute_runbook_plan,
 )
+from dnadesign.ops.status.models import combine_states
 from dnadesign.studies.core.models import StudyOpsContract
 from dnadesign.studies.core.preflight_plan import StudyPreflightPlan, build_study_preflight_plan
 
@@ -50,6 +52,7 @@ class PromoterPreflightCoordinatorDependencies:
     choose_command_summary: Callable[..., str]
     inspect_local_gpu_inventory: Callable[[], dict[str, object]]
     environ: Mapping[str, object | None]
+    execute_runbook_plan: Callable[..., CommandExecution] | None = None
 
 
 @dataclass(frozen=True)
@@ -160,6 +163,7 @@ def build_promoter_preflight_progress(
         gpu_inventory=local_gpu_inventory,
         dependencies=ContractPreflightCheckDependencies(
             run_preflight_command=dependencies.run_preflight_command,
+            execute_runbook_plan=dependencies.execute_runbook_plan or execute_runbook_plan,
             safe_json_loads=dependencies.safe_json_loads,
             choose_command_summary=dependencies.choose_command_summary,
             inspect_local_gpu_inventory=dependencies.inspect_local_gpu_inventory,
@@ -220,11 +224,10 @@ def build_promoter_preflight_progress(
             "deferred downstream blockers: " + ", ".join(check.id for check in evaluation.deferred_blockers[:3])
         )
 
-    if effective_counts.get("missing"):
-        return ("missing", "; ".join(summary_parts), resolved_evidence)
-    if effective_counts.get("attention") or effective_counts.get("missing"):
-        return ("attention", "; ".join(summary_parts), resolved_evidence)
-    return ("ok", "; ".join(summary_parts), resolved_evidence)
+    effective_state = combine_states(
+        check.state for check in (evaluation.scoped_checks if context.scope_plan.scope == "next" else checks)
+    )
+    return (effective_state, "; ".join(summary_parts), resolved_evidence)
 
 
 __all__ = [

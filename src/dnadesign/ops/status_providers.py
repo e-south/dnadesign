@@ -44,14 +44,33 @@ def _ops_audit_status(audit_json: object) -> tuple[str, str, dict[str, object]]:
     ok = bool(execution.get("ok", False))
     failed_phase = execution.get("failed_phase")
     queue_probe = _extract_queue_probe_evidence(commands)
-    if ok and queue_probe is not None and queue_probe["status"] == "degraded":
+    runtime_visibility = _extract_runtime_visibility(plan)
+    if (
+        ok
+        and runtime_visibility is not None
+        and runtime_visibility.get("degraded")
+        and queue_probe is not None
+        and queue_probe["status"] == "degraded"
+    ):
+        summary = "latest orchestration audit passed with degraded runtime visibility and degraded queue probe"
+    elif ok and runtime_visibility is not None and runtime_visibility.get("degraded"):
+        summary = "latest orchestration audit passed with degraded runtime visibility"
+    elif ok and queue_probe is not None and queue_probe["status"] == "degraded":
         summary = "latest orchestration audit passed with degraded queue probe"
     elif ok:
         summary = "latest orchestration audit passed"
     else:
         summary = f"latest orchestration audit failed at {failed_phase or 'unknown'}"
     return (
-        "attention" if (not ok or (queue_probe is not None and queue_probe["status"] == "degraded")) else "ok",
+        (
+            "attention"
+            if (
+                not ok
+                or (queue_probe is not None and queue_probe["status"] == "degraded")
+                or (runtime_visibility is not None and runtime_visibility.get("degraded"))
+            )
+            else "ok"
+        ),
         summary,
         {
             "audit_json": str(resolved_audit),
@@ -64,6 +83,7 @@ def _ops_audit_status(audit_json: object) -> tuple[str, str, dict[str, object]]:
             "command_count": len(commands),
             "phase_counts": dict(sorted(phase_counts.items())),
             "queue_probe": queue_probe,
+            "runtime_visibility": runtime_visibility,
         },
     )
 
@@ -96,6 +116,26 @@ def _extract_queue_probe_evidence(commands: list[object]) -> dict[str, object] |
     return {
         "status": status,
         "commands": queue_probe_commands,
+    }
+
+
+def _extract_runtime_visibility(plan: Mapping[str, object]) -> dict[str, object] | None:
+    payload = plan.get("runtime_visibility")
+    if not isinstance(payload, Mapping):
+        return None
+    scheduler_probe_state = str(payload.get("scheduler_probe_state") or "").strip()
+    active_job_resolution_state = str(payload.get("active_job_resolution_state") or "").strip()
+    degraded = bool(payload.get("degraded", False))
+    degraded_reasons = [
+        str(reason).strip() for reason in list(payload.get("degraded_reasons") or []) if str(reason).strip()
+    ]
+    if not scheduler_probe_state and not active_job_resolution_state and not degraded and not degraded_reasons:
+        return None
+    return {
+        "scheduler_probe_state": scheduler_probe_state or None,
+        "active_job_resolution_state": active_job_resolution_state or None,
+        "degraded": degraded,
+        "degraded_reasons": degraded_reasons,
     }
 
 

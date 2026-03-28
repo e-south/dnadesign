@@ -5,7 +5,7 @@ src/dnadesign/studies/core/registry.py
 
 Checked-in study index loading for flat study-first record roots.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

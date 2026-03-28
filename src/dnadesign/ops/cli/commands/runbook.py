@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import shlex
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal, Sequence
 
@@ -20,7 +21,11 @@ import typer
 import yaml
 from typer.main import get_command
 
+from dnadesign.ops.cli.common import emit_stderr, raise_contract_error
+
 app = typer.Typer(help="Control-plane runbook contract commands.")
+diagnostics_app = typer.Typer(help="Supported scheduler diagnostics under the main ops CLI surface.")
+app.add_typer(diagnostics_app, name="diagnostics")
 
 
 def get_click_command():
@@ -35,8 +40,7 @@ def _load_runbook_or_exit(runbook_path: Path):
     try:
         return load_orchestration_runbook(runbook_path.expanduser())
     except (FileNotFoundError, ValueError, ValidationError) as exc:
-        typer.echo(f"Runbook contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(f"Runbook contract error: {exc}")
 
 
 def _workspace_runbook_path_hint() -> str:
@@ -242,29 +246,21 @@ def _split_active_job_id_tokens(values: Sequence[str]) -> list[str]:
     return tokens
 
 
-def _resolve_active_job_ids(
+def _resolve_active_job_resolution(
     *,
     runbook,
     active_job_ids: list[str],
     discover_active_jobs: bool,
     max_discovery_jobs: int,
-) -> tuple[str, ...]:
-    from dnadesign.ops import cli as ops_cli
+) -> object:
+    from dnadesign.ops import api as ops_api
 
-    resolved_job_ids = _split_active_job_id_tokens(active_job_ids)
-    if not discover_active_jobs:
-        return tuple(dict.fromkeys(resolved_job_ids))
-
-    try:
-        discovered_job_ids = ops_cli.discover_active_job_ids_for_runbook(runbook, max_jobs=max_discovery_jobs)
-    except RuntimeError as exc:
-        typer.echo(f"Active-job discovery warning: {exc}", err=True)
-        discovered_job_ids = ()
-
-    for discovered in discovered_job_ids:
-        if discovered not in resolved_job_ids:
-            resolved_job_ids.append(discovered)
-    return tuple(dict.fromkeys(resolved_job_ids))
+    return ops_api.resolve_active_job_resolution(
+        runbook=runbook,
+        explicit_job_ids=_split_active_job_id_tokens(active_job_ids),
+        discover_active_jobs=discover_active_jobs,
+        max_jobs=max_discovery_jobs,
+    )
 
 
 def _render_active_job_hints(*, runbook_path: Path, active_job_ids: Sequence[str]) -> dict[str, object]:
@@ -284,6 +280,63 @@ def _render_active_job_hints(*, runbook_path: Path, active_job_ids: Sequence[str
     }
 
 
+@dataclass(frozen=True)
+class RunbookInitPreset:
+    name: str
+    description: str
+    project: str
+    templates: dict[str, str]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "project": self.project,
+            "templates": dict(sorted(self.templates.items())),
+        }
+
+
+def _runbook_init_preset_manifest_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "runbooks" / "init_presets.yaml"
+
+
+def _load_runbook_init_presets() -> list[RunbookInitPreset]:
+    manifest_path = _runbook_init_preset_manifest_path()
+    if not manifest_path.exists():
+        return []
+    payload = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+    presets: list[RunbookInitPreset] = []
+    for entry in payload.get("presets") or []:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name") or "").strip()
+        project = str(entry.get("project") or "").strip()
+        if not name or not project:
+            continue
+        templates_payload = entry.get("templates") or {}
+        presets.append(
+            RunbookInitPreset(
+                name=name,
+                description=str(entry.get("description") or "").strip(),
+                project=project,
+                templates={
+                    str(key).strip(): str(value).strip()
+                    for key, value in dict(templates_payload).items()
+                    if str(key).strip() and str(value).strip()
+                },
+            )
+        )
+    return presets
+
+
+def _resolve_runbook_init_preset(name: str) -> RunbookInitPreset:
+    normalized_name = str(name or "").strip()
+    for preset in _load_runbook_init_presets():
+        if preset.name == normalized_name:
+            return preset
+    raise ValueError(f"unknown init preset: {normalized_name}")
+
+
 def _packaged_preset_paths() -> list[Path]:
     preset_dir = Path(__file__).resolve().parents[2] / "runbooks" / "presets"
     if not preset_dir.exists():
@@ -293,7 +346,124 @@ def _packaged_preset_paths() -> list[Path]:
 
 def _emit_packaged_runbook_presets() -> None:
     presets = [{"name": path.stem, "path": str(path)} for path in _packaged_preset_paths()]
-    typer.echo(json.dumps({"presets": presets}, indent=2, sort_keys=True))
+    typer.echo(
+        json.dumps(
+            {
+                "init_presets": [preset.as_dict() for preset in _load_runbook_init_presets()],
+                "presets": presets,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+def _run_supported_gate_command(args: list[str]) -> None:
+    from dnadesign.ops.orchestrator import gates as gates_module
+
+    exit_code = gates_module.main(args)
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+@diagnostics_app.command("session-counts")
+def runbook_diagnostics_session_counts(
+    qstat_file: Annotated[
+        Path | None,
+        typer.Option("--qstat-file", help="Read qstat-like output from file for deterministic fixture mode."),
+    ] = None,
+    allow_missing_qstat: Annotated[
+        bool,
+        typer.Option(
+            "--allow-missing-qstat/--no-allow-missing-qstat",
+            help="Emit an explicit degraded queue-probe record instead of failing when qstat is unavailable.",
+        ),
+    ] = False,
+) -> None:
+    args = ["session-counts"]
+    if qstat_file is not None:
+        args.extend(["--qstat-file", str(qstat_file)])
+    if allow_missing_qstat:
+        args.append("--allow-missing-qstat")
+    _run_supported_gate_command(args)
+
+
+@diagnostics_app.command("submit-shape-advisor")
+def runbook_diagnostics_submit_shape_advisor(
+    planned_submits: Annotated[int, typer.Option("--planned-submits", help="Number of planned submit commands.")],
+    warn_over_running: Annotated[
+        int,
+        typer.Option("--warn-over-running", help="Warn when running job count exceeds this threshold."),
+    ] = 3,
+    requires_order: Annotated[
+        bool,
+        typer.Option("--requires-order/--no-requires-order", help="Mark the plan as an ordered pipeline."),
+    ] = False,
+    qstat_file: Annotated[
+        Path | None,
+        typer.Option("--qstat-file", help="Read qstat-like output from file for deterministic fixture mode."),
+    ] = None,
+    allow_missing_qstat: Annotated[
+        bool,
+        typer.Option(
+            "--allow-missing-qstat/--no-allow-missing-qstat",
+            help="Emit an explicit degraded advisory record instead of failing when qstat is unavailable.",
+        ),
+    ] = False,
+) -> None:
+    args = [
+        "submit-shape-advisor",
+        "--planned-submits",
+        str(planned_submits),
+        "--warn-over-running",
+        str(warn_over_running),
+    ]
+    if requires_order:
+        args.append("--requires-order")
+    if qstat_file is not None:
+        args.extend(["--qstat-file", str(qstat_file)])
+    if allow_missing_qstat:
+        args.append("--allow-missing-qstat")
+    _run_supported_gate_command(args)
+
+
+@diagnostics_app.command("operator-brief")
+def runbook_diagnostics_operator_brief(
+    planned_submits: Annotated[int, typer.Option("--planned-submits", help="Number of planned submit commands.")],
+    warn_over_running: Annotated[
+        int,
+        typer.Option("--warn-over-running", help="Warn when running job count exceeds this threshold."),
+    ] = 3,
+    requires_order: Annotated[
+        bool,
+        typer.Option("--requires-order/--no-requires-order", help="Mark the plan as an ordered pipeline."),
+    ] = False,
+    qstat_file: Annotated[
+        Path | None,
+        typer.Option("--qstat-file", help="Read qstat-like output from file for deterministic fixture mode."),
+    ] = None,
+    allow_missing_qstat: Annotated[
+        bool,
+        typer.Option(
+            "--allow-missing-qstat/--no-allow-missing-qstat",
+            help="Emit an explicit degraded readiness record instead of failing when qstat is unavailable.",
+        ),
+    ] = False,
+) -> None:
+    args = [
+        "operator-brief",
+        "--planned-submits",
+        str(planned_submits),
+        "--warn-over-running",
+        str(warn_over_running),
+    ]
+    if requires_order:
+        args.append("--requires-order")
+    if qstat_file is not None:
+        args.extend(["--qstat-file", str(qstat_file)])
+    if allow_missing_qstat:
+        args.append("--allow-missing-qstat")
+    _run_supported_gate_command(args)
 
 
 @app.command("init")
@@ -307,7 +477,20 @@ def runbook_init(
         Path,
         typer.Option("--workspace-root", help="Workspace root path used to derive config and notify paths."),
     ],
-    project: Annotated[str, typer.Option("--project", help="Scheduler project/account id.")] = "dunlop",
+    project: Annotated[
+        str | None,
+        typer.Option("--project", help="Explicit scheduler project/account id."),
+    ] = None,
+    preset: Annotated[
+        str | None,
+        typer.Option(
+            "--preset",
+            help=(
+                "Explicit init preset that supplies site-local project/template defaults; "
+                "use `ops runbook presets` to list presets."
+            ),
+        ),
+    ] = None,
     runbook_id: Annotated[str, typer.Option("--id", help="Runbook id slug.")] = "batch_demo",
     cuda_module: Annotated[
         str,
@@ -347,17 +530,24 @@ def runbook_init(
 ) -> None:
     runbook_path = runbook.expanduser()
     repo_base = _resolve_repo_base(repo_root)
+    try:
+        resolved_preset = _resolve_runbook_init_preset(preset) if preset is not None else None
+    except ValueError as exc:
+        raise_contract_error(f"Runbook contract error: {exc}")
+    if (project is None) == (resolved_preset is None):
+        raise_contract_error("Runbook contract error: provide exactly one of --project or --preset")
+    selected_project = resolved_preset.project if resolved_preset is not None else str(project or "").strip()
+    if not selected_project:
+        raise_contract_error("Runbook contract error: project must be non-empty")
+    preset_templates = resolved_preset.templates if resolved_preset is not None else {}
     if pe_omp is not None and pe_omp <= 0:
-        typer.echo("Runbook contract error: --pe-omp must be > 0", err=True)
-        raise typer.Exit(code=2)
+        raise_contract_error("Runbook contract error: --pe-omp must be > 0")
     try:
         _validate_runbook_output_path_for_init(runbook_path=runbook_path, repo_base=repo_base)
     except ValueError as exc:
-        typer.echo(f"Runbook contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(f"Runbook contract error: {exc}")
     if runbook_path.exists() and not force:
-        typer.echo(f"Runbook contract error: file exists: {runbook_path}", err=True)
-        raise typer.Exit(code=2)
+        raise_contract_error(f"Runbook contract error: file exists: {runbook_path}")
 
     def _template_or_default(relative_path: str) -> Path:
         candidate = repo_base / relative_path
@@ -365,16 +555,18 @@ def runbook_init(
             return candidate
         return Path(relative_path)
 
-    notify_template = _template_or_default("docs/bu-scc/jobs/notify-watch.qsub")
-    densegen_template = _template_or_default("docs/bu-scc/jobs/densegen-cpu.qsub")
-    densegen_post_run_template = _template_or_default("docs/bu-scc/jobs/densegen-analysis.qsub")
-    infer_template = _template_or_default("docs/bu-scc/jobs/evo2-gpu-infer.qsub")
+    notify_template = _template_or_default(preset_templates.get("notify", "docs/bu-scc/jobs/notify-watch.qsub"))
+    densegen_template = _template_or_default(preset_templates.get("densegen", "docs/bu-scc/jobs/densegen-cpu.qsub"))
+    densegen_post_run_template = _template_or_default(
+        preset_templates.get("densegen_post_run", "docs/bu-scc/jobs/densegen-analysis.qsub")
+    )
+    infer_template = _template_or_default(preset_templates.get("infer", "docs/bu-scc/jobs/evo2-gpu-infer.qsub"))
     resolved_workspace_root = _resolve_workspace_root_for_init(workspace_root, repo_base=repo_base)
     payload = _build_init_payload(
         workflow=workflow,
         with_notify=with_notify,
         runbook_id=runbook_id,
-        project=project,
+        project=selected_project,
         workspace_root=resolved_workspace_root,
         runbook_parent=runbook_path.parent,
         cuda_module=cuda_module,
@@ -396,12 +588,11 @@ def runbook_init(
     if with_notify:
         from dnadesign.ops.runbooks.workflow_metadata import resolve_workflow_tool
 
-        typer.echo(
+        emit_stderr(
             _render_notify_contract_warning(
                 workspace_root=resolved_workspace_root,
                 notify_tool=resolve_workflow_tool(workflow_id=payload["runbook"]["workflow_id"]),
-            ),
-            err=True,
+            )
         )
 
 
@@ -466,36 +657,34 @@ def runbook_plan(
         ),
     ] = False,
 ) -> None:
-    from dnadesign.ops import cli as ops_cli
+    from dnadesign.ops import api as ops_api
 
     if max_discovery_jobs <= 0:
-        typer.echo("Runbook contract error: --max-discovery-jobs must be > 0", err=True)
-        raise typer.Exit(code=2)
+        raise_contract_error("Runbook contract error: --max-discovery-jobs must be > 0")
     repo_base = _resolve_repo_base(repo_root)
     try:
         _validate_runbook_input_path_for_runtime(runbook_path=runbook.expanduser(), repo_base=repo_base)
     except ValueError as exc:
-        typer.echo(f"Runbook contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(f"Runbook contract error: {exc}")
     loaded = _load_runbook_or_exit(runbook)
-    resolved_active_job_ids = _resolve_active_job_ids(
+    active_job_resolution = _resolve_active_job_resolution(
         runbook=loaded,
         active_job_ids=list(active_job_id or ()),
         discover_active_jobs=discover_active_jobs,
         max_discovery_jobs=max_discovery_jobs,
     )
     try:
-        plan = ops_cli.build_batch_plan(
+        plan = ops_api.build_batch_plan(
             runbook=loaded,
             requested_mode=mode,
             requested_smoke=smoke,
-            active_job_ids=resolved_active_job_ids,
+            active_job_ids=active_job_resolution.effective_job_ids,
+            runtime_visibility=active_job_resolution.runtime_visibility,
             allow_fresh_reset=allow_fresh_reset,
             allow_missing_qstat=allow_missing_qstat,
         )
     except ValueError as exc:
-        typer.echo(f"Runbook contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(f"Runbook contract error: {exc}")
     typer.echo(json.dumps(plan.as_dict(), indent=2, sort_keys=True))
 
 
@@ -514,28 +703,32 @@ def runbook_active_jobs(
         typer.Option("--max-discovery-jobs", help="Maximum qstat jobs inspected during active-job discovery."),
     ] = 24,
 ) -> None:
-    from dnadesign.ops import cli as ops_cli
+    from dnadesign.ops import api as ops_api
+    from dnadesign.ops.orchestrator.state import ActiveJobResolutionState, SchedulerProbeState
 
     if max_discovery_jobs <= 0:
-        typer.echo("Runbook contract error: --max-discovery-jobs must be > 0", err=True)
-        raise typer.Exit(code=2)
+        raise_contract_error("Runbook contract error: --max-discovery-jobs must be > 0")
     repo_base = _resolve_repo_base(repo_root)
     try:
         _validate_runbook_input_path_for_runtime(runbook_path=runbook.expanduser(), repo_base=repo_base)
     except ValueError as exc:
-        typer.echo(f"Runbook contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(f"Runbook contract error: {exc}")
     loaded = _load_runbook_or_exit(runbook)
-    try:
-        active_job_ids = ops_cli.discover_active_job_ids_for_runbook(loaded, max_jobs=max_discovery_jobs)
-    except RuntimeError as exc:
-        typer.echo(f"Runbook contract error: active-job discovery failed: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
+    resolution = ops_api.probe_active_jobs_for_runbook(loaded, max_jobs=max_discovery_jobs)
+    runtime_visibility = resolution.runtime_visibility
+    if (
+        runtime_visibility.scheduler_probe_state != SchedulerProbeState.OK
+        or runtime_visibility.active_job_resolution_state == ActiveJobResolutionState.UNKNOWN
+    ):
+        reasons = "; ".join(runtime_visibility.degraded_reasons) or "active-job visibility is unavailable"
+        raise_contract_error(f"Runbook contract error: active-job discovery failed: {reasons}")
+    active_job_ids = resolution.discovered_job_ids
     hints = _render_active_job_hints(runbook_path=runbook, active_job_ids=active_job_ids)
     payload = {
         "runbook_id": loaded.id,
         "workflow_id": loaded.workflow_id,
         "active_job_ids": list(active_job_ids),
+        "runtime_visibility": runtime_visibility.as_dict(),
         **hints,
     }
     typer.echo(json.dumps(payload, indent=2, sort_keys=True))
@@ -601,6 +794,13 @@ def runbook_execute(
             help="Allow --mode fresh when resume artifacts already exist in the workspace.",
         ),
     ] = False,
+    allow_unknown_active_jobs: Annotated[
+        bool,
+        typer.Option(
+            "--allow-unknown-active-jobs/--no-allow-unknown-active-jobs",
+            help="Allow submit despite degraded active-job visibility; audit JSON records the override.",
+        ),
+    ] = False,
     allow_missing_qstat: Annotated[
         bool,
         typer.Option(
@@ -612,26 +812,21 @@ def runbook_execute(
         ),
     ] = False,
 ) -> None:
-    from dnadesign.ops import cli as ops_cli
+    from dnadesign.ops import api as ops_api
 
     if command_timeout_seconds is not None and command_timeout_seconds <= 0:
-        typer.echo("Runbook contract error: --command-timeout-seconds must be > 0", err=True)
-        raise typer.Exit(code=2)
+        raise_contract_error("Runbook contract error: --command-timeout-seconds must be > 0")
     if max_discovery_jobs <= 0:
-        typer.echo("Runbook contract error: --max-discovery-jobs must be > 0", err=True)
-        raise typer.Exit(code=2)
+        raise_contract_error("Runbook contract error: --max-discovery-jobs must be > 0")
     if submit and allow_missing_qstat:
-        typer.echo(
-            "Runbook contract error: --allow-missing-qstat is only allowed with --no-submit dry-run demos.",
-            err=True,
+        raise_contract_error(
+            "Runbook contract error: --allow-missing-qstat is only allowed with --no-submit dry-run demos."
         )
-        raise typer.Exit(code=2)
     repo_base = _resolve_repo_base(repo_root)
     try:
         _validate_runbook_input_path_for_runtime(runbook_path=runbook.expanduser(), repo_base=repo_base)
     except ValueError as exc:
-        typer.echo(f"Runbook contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(f"Runbook contract error: {exc}")
     loaded = _load_runbook_or_exit(runbook)
     try:
         resolved_audit_json = _validate_audit_json_path_for_execute(
@@ -639,27 +834,32 @@ def runbook_execute(
             workspace_root=loaded.workspace_root,
         )
     except ValueError as exc:
-        typer.echo(f"Runbook contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
-    resolved_active_job_ids = _resolve_active_job_ids(
+        raise_contract_error(f"Runbook contract error: {exc}")
+    active_job_resolution = _resolve_active_job_resolution(
         runbook=loaded,
         active_job_ids=list(active_job_id or ()),
         discover_active_jobs=discover_active_jobs,
         max_discovery_jobs=max_discovery_jobs,
     )
     try:
-        plan = ops_cli.build_batch_plan(
+        plan = ops_api.build_batch_plan(
             runbook=loaded,
             requested_mode=mode,
             requested_smoke=smoke,
-            active_job_ids=resolved_active_job_ids,
+            active_job_ids=active_job_resolution.effective_job_ids,
+            runtime_visibility=active_job_resolution.runtime_visibility,
             allow_fresh_reset=allow_fresh_reset,
             allow_missing_qstat=allow_missing_qstat,
+            allow_unknown_active_jobs=allow_unknown_active_jobs,
         )
     except ValueError as exc:
-        typer.echo(f"Runbook contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
-    result = ops_cli.execute_batch_plan(
+        raise_contract_error(f"Runbook contract error: {exc}")
+    if submit and not allow_unknown_active_jobs and plan.runtime_visibility.active_job_resolution_state == "unknown":
+        raise_contract_error(
+            "Runbook contract error: active-job visibility is unavailable; "
+            "re-run with --allow-unknown-active-jobs only if degraded submit is intentional."
+        )
+    result = ops_api.execute_batch_plan(
         plan=plan,
         audit_json_path=resolved_audit_json,
         submit=submit,

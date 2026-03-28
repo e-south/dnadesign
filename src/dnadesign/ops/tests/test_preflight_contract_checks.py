@@ -6,7 +6,7 @@ src/dnadesign/ops/tests/test_preflight_contract_checks.py
 Focused tests for generic OPS execution of contract-declared study preflight
 checks.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -20,7 +20,9 @@ from dnadesign.ops.preflight import (
     ContractPreflightCheckDependencies,
     build_command_check,
     build_contract_preflight_checks,
+    choose_command_summary,
     contract_environment_flag_state,
+    run_preflight_command,
 )
 from dnadesign.ops.preflight.models import supported_preflight_check_kinds
 from dnadesign.studies.core.models import (
@@ -165,6 +167,26 @@ def _contract() -> StudyOpsContract:
     )
 
 
+def test_run_preflight_command_captures_native_gate_failure_text(tmp_path: Path) -> None:
+    execution = run_preflight_command(
+        (
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "dnadesign.ops.orchestrator.gates",
+            "qa-submit-preflight",
+            "--template",
+            "/tmp/does-not-exist.qsub",
+        ),
+        cwd=tmp_path,
+    )
+
+    assert execution.returncode == 2
+    assert execution.stdout == ""
+    assert "template_missing=/tmp/does-not-exist.qsub" in execution.stderr
+
+
 def test_supported_preflight_kinds_are_generic_only() -> None:
     supported = supported_preflight_check_kinds()
 
@@ -246,6 +268,9 @@ def test_build_contract_preflight_checks_skips_non_enabled_groups(tmp_path: Path
             run_preflight_command=lambda *args, **kwargs: (_ for _ in ()).throw(
                 AssertionError("group-gated commands should not execute")
             ),
+            execute_runbook_plan=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("group-gated runbook planning should not execute")
+            ),
             safe_json_loads=lambda text: json.loads(text or "") if text else None,
             choose_command_summary=lambda *_args, fallback, **_kwargs: fallback,
             inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},
@@ -268,6 +293,7 @@ def test_build_contract_preflight_checks_executes_declared_command_and_scheduler
     runbook_root = tmp_path / "workspace" / "runbooks"
     runbook_root.mkdir(parents=True, exist_ok=True)
     commands: list[tuple[str, ...]] = []
+    planned_runbooks: list[Path] = []
 
     def _run_progress_command(argv, *, cwd, timeout_seconds=180):
         del timeout_seconds
@@ -289,14 +315,26 @@ def test_build_contract_preflight_checks_executes_declared_command_and_scheduler
                 returncode=0,
                 stdout="queue_probe=ok running_jobs=4 queued_jobs=1 eqw_jobs=0",
             )
-        if tuple(argv[:5]) == ("uv", "run", "ops", "runbook", "plan"):
-            return _execution(
-                tuple(argv),
-                cwd,
-                returncode=2,
-                stderr="notify webhook secret file is required for batch notify workflows",
-            )
         raise AssertionError(f"unexpected command: {' '.join(argv)}")
+
+    def _execute_runbook_plan(*, runbook_path: Path, repo_root: Path) -> CommandExecution:
+        planned_runbooks.append(runbook_path)
+        return _execution(
+            (
+                "uv",
+                "run",
+                "ops",
+                "runbook",
+                "plan",
+                "--runbook",
+                str(runbook_path),
+                "--repo-root",
+                str(repo_root),
+            ),
+            repo_root,
+            returncode=2,
+            stderr="Runbook contract error: notify webhook secret file is required for batch notify workflows",
+        )
 
     checks = build_contract_preflight_checks(
         repo_root=tmp_path,
@@ -318,8 +356,9 @@ def test_build_contract_preflight_checks_executes_declared_command_and_scheduler
         environ={},
         dependencies=ContractPreflightCheckDependencies(
             run_preflight_command=_run_progress_command,
+            execute_runbook_plan=_execute_runbook_plan,
             safe_json_loads=lambda text: json.loads(text or "") if text else None,
-            choose_command_summary=lambda *_args, fallback, **_kwargs: fallback,
+            choose_command_summary=choose_command_summary,
             inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},
         ),
     )
@@ -337,6 +376,10 @@ def test_build_contract_preflight_checks_executes_declared_command_and_scheduler
     assert by_id["infer.batch.20b.anchor_only.plan"].phase_id == "infer_anchor_only_20b"
     assert by_id["infer.batch.7b.anchor_only.plan"].phase_id == "infer_anchor_only_7b"
     assert by_id["infer.batch.20b.anchor_only.plan"].state == "attention"
+    assert (
+        by_id["infer.batch.20b.anchor_only.plan"].summary
+        == "Runbook contract error: notify webhook secret file is required for batch notify workflows"
+    )
     assert commands == [
         (
             "uv",
@@ -356,28 +399,10 @@ def test_build_contract_preflight_checks_executes_declared_command_and_scheduler
             "session-counts",
             "--allow-missing-qstat",
         ),
-        (
-            "uv",
-            "run",
-            "ops",
-            "runbook",
-            "plan",
-            "--runbook",
-            str(runbook_root / "infer_anchor_only_20b.yaml"),
-            "--repo-root",
-            str(tmp_path),
-        ),
-        (
-            "uv",
-            "run",
-            "ops",
-            "runbook",
-            "plan",
-            "--runbook",
-            str(runbook_root / "infer_anchor_only_7b.yaml"),
-            "--repo-root",
-            str(tmp_path),
-        ),
+    ]
+    assert planned_runbooks == [
+        runbook_root / "infer_anchor_only_20b.yaml",
+        runbook_root / "infer_anchor_only_7b.yaml",
     ]
 
 
