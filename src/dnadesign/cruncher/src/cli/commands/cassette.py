@@ -193,6 +193,11 @@ def _print_solve_report(report) -> None:
             console.print(f"  - {issue.code}: {issue.message}")
 
 
+def _echo_scaffold_line(label: str, value: str | Path) -> None:
+    # Keep scaffold paths copy/paste-safe in captured output and narrow terminals.
+    typer.echo(f"{label} -> {value}")
+
+
 @app.command("init-workspace", help="Scaffold a cassette workspace with pressure-test solve profiles.")
 def init_workspace_cmd(
     workspace: str | None = typer.Argument(
@@ -228,13 +233,13 @@ def init_workspace_cmd(
     except (FileNotFoundError, ValueError) as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
-    console.print(f"Cassette workspace scaffold -> {result.workspace_root}")
-    console.print(f"README -> {result.readme_path}")
-    console.print(f"Manifest -> {result.manifest_path}")
-    console.print(f"Runbook -> {result.runbook_path}")
+    _echo_scaffold_line("Cassette workspace scaffold", result.workspace_root)
+    _echo_scaffold_line("README", result.readme_path)
+    _echo_scaffold_line("Manifest", result.manifest_path)
+    _echo_scaffold_line("Runbook", result.runbook_path)
     for name, path in result.solve_specs.items():
-        console.print(f"Spec -> {name}: {path}")
-    console.print(
+        typer.echo(f"Spec -> {name}: {path}")
+    typer.echo(
         "Note -> includes `configs/runbook.yaml`, so `cruncher workspaces list "
         f"--root {result.workspace_root.parent}` reports it as `runbook-only`."
     )

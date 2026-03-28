@@ -426,6 +426,7 @@ def test_cassette_init_workspace_supports_workspace_name_plus_root(tmp_path: Pat
     result = runner.invoke(
         app,
         ["cassette", "init-workspace", "demo_cassette", "--root", str(workspaces_root)],
+        env={"COLUMNS": "60"},
         color=False,
     )
 
