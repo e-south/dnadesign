@@ -178,6 +178,8 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
     assert related_scaffold_example in text
     assert "uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>" in text
     assert "--project <project>" in text
+    assert "--preset bu-scc-dunlop" in text
+    assert "ops-runtime-visibility.md" in text
     assert "project dunlop" not in text
     assert "orchestration-runbooks.md" in text
     assert "../runbooks/README.md" in text
@@ -202,8 +204,11 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     )
     assert "uv run ops runbook init" in text
     assert "--project <project>" in text
+    assert "--preset bu-scc-dunlop" in text
     assert "uv run ops runbook presets" in text
     assert "uv run ops runbook active-jobs" in text
+    assert "ops runbook diagnostics session-counts" in text
+    assert "--allow-unknown-active-jobs" in text
     assert "Infer scaffolds also include notify by default" in text
     assert "**Type:** runbook" in text
     assert "**Plane:** control-plane" in text
@@ -238,6 +243,7 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     assert "including overlays that arrived through explicit USR merge carry" in text
     assert "passes `--overwrite` to `infer run`" in text
     assert "without implicitly pruning the namespace" in text
+    assert "python -m dnadesign.ops.orchestrator.gates" not in text
     assert "--mode fresh --allow-fresh-reset" in text
     assert "--no-discover-active-jobs" in text
     assert "operator-visible warning" in text

@@ -1,7 +1,7 @@
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-21
+**Last verified:** 2026-03-27
 
 Use this page to find the next task, command, or reference doc.
 
@@ -105,6 +105,8 @@ Use these when the next step is orchestration, environment setup, or audit outpu
 - [Installation](installation.md): environment setup and verification baseline.
 - [Runbook catalog](runbooks/README.md): shell command index for cross-tool procedures and tool entrypoints.
 - [Ops orchestration index](operations/README.md): orchestration docs for init, plan, execute, and status checks.
+- [OPS mental model](operations/ops-mental-model.md): plane model, shared state semantics, and snapshot versus preflight guidance.
+- [OPS failure contract](operations/ops-failure-contract.md): CLI exit-code and stderr contract for automation and maintainers.
 - [BU SCC docs index](bu-scc/README.md): cluster setup, submission, and operator runbooks.
 - [Notify docs index](notify/README.md): notifier setup, runtime behavior, and recovery routes.
 - [USR operations index](../src/dnadesign/usr/docs/operations/README.md): sync, transfer, dataset assembly, and downstream handoff runbooks.

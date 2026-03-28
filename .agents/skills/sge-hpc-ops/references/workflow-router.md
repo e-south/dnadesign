@@ -50,7 +50,7 @@ Trigger cues:
 - "run a densegen workflow stress ethanol and cipro workspace for two hours"
 
 Execution contract:
-1. Scaffold or select runbook via Ops (`uv run ops runbook presets` or `uv run ops runbook init --workflow densegen ...`).
+1. Scaffold or select runbook via Ops (`uv run ops runbook presets` or `uv run ops runbook init --workflow densegen ... --project <project>|--preset <preset>`).
 2. Set up notify profile via `uv run notify setup slack ...`.
 3. Run submit QA preflight for watcher and densegen templates.
 4. Run session-status check and apply warning when running_jobs > 3.

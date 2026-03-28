@@ -556,7 +556,7 @@ fi
 
 brief_high_output=""
 if brief_high_output="$("$ROOT_DIR"/scripts/sge-operator-brief.sh --qstat-file "$tmp_qstat" --planned-submits 8 --warn-over-running 3 2>/dev/null)"; then
-  if printf '%s\n' "$brief_high_output" | rg -q "Submit Gate: confirm"; then
+  if printf '%s\n' "$brief_high_output" | rg -q "Submit Gate: confirmation_required"; then
     pass "operator brief reports confirmation gate under high pressure"
   else
     fail "operator brief missing confirmation gate under high pressure"
@@ -572,7 +572,7 @@ fi
 
 brief_high_json=""
 if brief_high_json="$("$ROOT_DIR"/scripts/sge-operator-brief.sh --qstat-file "$tmp_qstat" --planned-submits 8 --warn-over-running 3 --json 2>/dev/null)"; then
-  if printf '%s\n' "$brief_high_json" | rg -q '"submit_gate":"confirm"'; then
+  if printf '%s\n' "$brief_high_json" | rg -q '"submit_gate":"confirmation_required"'; then
     pass "operator brief json reports confirmation gate under high pressure"
   else
     fail "operator brief json missing confirmation gate under high pressure"
@@ -588,13 +588,40 @@ fi
 
 brief_eqw_output=""
 if brief_eqw_output="$("$ROOT_DIR"/scripts/sge-operator-brief.sh --qstat-file "$tmp_qstat_eqw" --planned-submits 2 --warn-over-running 3 2>/dev/null)"; then
-  if printf '%s\n' "$brief_eqw_output" | rg -q "Submit Gate: block"; then
+  if printf '%s\n' "$brief_eqw_output" | rg -q "Submit Gate: blocked"; then
     pass "operator brief reports block gate for Eqw"
   else
     fail "operator brief missing block gate for Eqw"
   fi
 else
   fail "operator brief failed Eqw fixture run"
+fi
+
+native_advisor_output=""
+if native_advisor_output="$(uv run ops runbook diagnostics submit-shape-advisor --qstat-file "$tmp_qstat" --planned-submits 8 --warn-over-running 3 2>/dev/null)"; then
+  if printf '%s\n' "$native_advisor_output" | rg -q "advisor=array"; then
+    pass "native ops shape advisor supports fixture mode"
+  else
+    fail "native ops shape advisor fixture mode missing array recommendation"
+  fi
+  if printf '%s\n' "$native_advisor_output" | rg -q "queue_policy=respect_queue"; then
+    pass "native ops shape advisor uses canonical queue policy token"
+  else
+    fail "native ops shape advisor missing canonical queue policy token"
+  fi
+else
+  fail "native ops shape advisor fixture-mode run failed"
+fi
+
+native_brief_output=""
+if native_brief_output="$(uv run ops runbook diagnostics operator-brief --qstat-file "$tmp_qstat" --planned-submits 8 --warn-over-running 3 2>/dev/null)"; then
+  if printf '%s\n' "$native_brief_output" | rg -q "submit_gate=confirmation_required"; then
+    pass "native ops operator brief supports fixture mode"
+  else
+    fail "native ops operator brief fixture mode missing confirmation gate"
+  fi
+else
+  fail "native ops operator brief fixture-mode run failed"
 fi
 
 if [ "$READ_ONLY_AUDIT" = "1" ]; then

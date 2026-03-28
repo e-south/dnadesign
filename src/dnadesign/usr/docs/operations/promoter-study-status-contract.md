@@ -179,6 +179,10 @@ Discovery rules:
   execution-map surface for exact Construct, Infer, and batch paths plus any
   minimal runtime mappings still needed by the live study. Infer Notify profile
   paths derive from the checked-in lane configs.
+- Snapshot output keeps `ops.study.yaml` labels authoritative under
+  `execution_surfaces`. If `pipeline.yaml` expands convenience aliases beyond
+  that contract, OPS reports those under `derived_execution_surfaces` instead
+  of mixing them into the canonical surface list.
 - If the registry and study directory contents disagree, fail visibly and fix
   the registry before asking for live status.
 

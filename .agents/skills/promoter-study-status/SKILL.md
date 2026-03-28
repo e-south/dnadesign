@@ -44,6 +44,16 @@ Out of scope:
 
 - Start with `docs/studies/README.md`, `docs/studies/index.yaml`, and
   `src/dnadesign/usr/docs/operations/promoter-study-status-contract.md`.
+- Keep the OPS mental model in `docs/operations/ops-mental-model.md` in sync
+  with this skill: snapshot is the record-plane summary, preflight is the
+  execution-readiness summary, and `missing > attention > ok` is the global
+  severity order.
+- For the active `stress_ethanol_cipro_growth` study, treat
+  `promoter-study-preflight` as strict submit-readiness for the default
+  notify-enabled Infer presets: missing notify env/TLS wiring, failed notify
+  profile or event-path checks, and failed notify-enabled runbook plans are
+  blockers, not advisories. Use batch-only routes only when the user explicitly
+  opts out of notify.
 - Treat `docs/studies/index.yaml`,
   `docs/studies/<study-id>/campaign.yaml`,
   `docs/studies/<study-id>/datasets.yaml`,
@@ -68,6 +78,8 @@ Out of scope:
   `promoter-study-preflight` as the execution-readiness surface. Do not answer
   "what should run next?" from snapshot alone when preflight blockers are in
   scope.
+- When this skill changes, run the deterministic repo-local audit:
+  `bash .agents/skills/promoter-study-status/scripts/audit-promoter-study-status-skill.sh`
 - If no checked-in study record exists, say so explicitly and route the user to
   the status contract instead of inventing current state.
 
@@ -96,6 +108,8 @@ Out of scope:
 - Snapshot means repo-backed study posture: declared datasets, row targets,
   lifecycle state, study-owned execution surfaces, and sync evidence already
   checked in.
+- Preflight is the escalation path when a user asks for blockers, failed
+  commands, missing artifacts, or scheduler/readiness posture right now.
 - When the user needs command-level blockers rather than the cheap snapshot,
   run:
   `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
