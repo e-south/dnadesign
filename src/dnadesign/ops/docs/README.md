@@ -1,7 +1,7 @@
 ## Ops docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-20
+**Last verified:** 2026-03-27
 
 Use this page for Ops package docs, packaged presets, and command reference. If you want the full command list, use `docs/runbooks/README.md`.
 
@@ -10,6 +10,10 @@ Use this page for Ops package docs, packaged presets, and command reference. If 
 - [Runbook catalog](../../../../docs/runbooks/README.md): repo-level command index when you want the procedure list first.
 - [How to use Ops](how-to-use-ops.md): command guide for catalog discovery, procedure inspection, status checks, and manifest scaffolds.
 - [Ops orchestration index](../../../../docs/operations/README.md): docs for init, plan, execute, and verification.
+- [OPS mental model](../../../../docs/operations/ops-mental-model.md): shortest correct model for planes, state semantics, and snapshot versus preflight.
+- [OPS failure contract](../../../../docs/operations/ops-failure-contract.md): exit-code and stderr contract for CLI and automation consumers.
+- [OPS status kinds](../../../../docs/operations/ops-status-kinds.md): registry ids, status kinds, owners, scope, and required inputs.
+- [OPS preflight checks](../../../../docs/operations/ops-preflight-checks.md): generic readiness-check vocabulary used by `ops.study.yaml`.
 - [Orchestration runbooks](../../../../docs/operations/orchestration-runbooks.md): runbook schema, command order, and execution contracts.
 - [Repository docs index](../../../../docs/README.md): docs index when the next step is outside Ops.
 

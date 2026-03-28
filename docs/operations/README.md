@@ -11,6 +11,15 @@
 
 Use this page when the next step is batch orchestration or a read-only Ops status check. If the work is dataset assembly, construct realization, or infer write-back, leave this page and continue in the shared USR runbooks. Detailed command behavior and schema rules live in [orchestration runbooks](orchestration-runbooks.md). Use the [runbook catalog](../runbooks/README.md) when you need command lookup across tools.
 
+### OPS docs
+
+- [OPS mental model](ops-mental-model.md): one-page plane model, state semantics, snapshot vs preflight, and source-of-truth map.
+- [OPS failure contract](ops-failure-contract.md): exit codes, stderr rules, and maintainer-facing failure expectations.
+- [OPS runtime visibility](ops-runtime-visibility.md): scheduler probe states, active-job resolution states, and degraded submit rules.
+- [OPS status kinds](ops-status-kinds.md): public routes, status kinds, owners, scope, and required inputs.
+- [OPS preflight checks](ops-preflight-checks.md): generic readiness check vocabulary used by `ops.study.yaml`.
+- [Orchestration runbooks](orchestration-runbooks.md): runbook schema, planner, executor, and scheduler-facing contracts.
+
 ### What Ops is for
 
 - Turn runbook intent into deterministic preflight, verification, and submit phases.
@@ -22,11 +31,12 @@ Use this page when the next step is batch orchestration or a read-only Ops statu
 ### Start here
 
 1. Use [Command lookup](#command-lookup) when you need the catalog or status commands first.
-2. Use [Orchestration routes](#orchestration-routes) when you are starting, dry-running, or submitting a runbook.
-3. Use [Contracts](#contracts) when you need the exact schema or command rules.
-4. Use [Status and manifest routes](#status-and-manifest-routes) when you need a read-only summary or an explicit manifest.
-5. Run the [Verification loop](#verification-loop) before any submit.
-6. Leave Ops for the shared USR runbooks when the next step changes datasets rather than scheduler state.
+2. Read the [OPS mental model](ops-mental-model.md) if you need the plane model or state lattice first.
+3. Use [Orchestration routes](#orchestration-routes) when you are starting, dry-running, or submitting a runbook.
+4. Use [Contracts](#contracts) when you need the exact schema or command rules.
+5. Use [Status and manifest routes](#status-and-manifest-routes) when you need a read-only summary or an explicit manifest.
+6. Run the [Verification loop](#verification-loop) before any submit.
+7. Leave Ops for the shared USR runbooks when the next step changes datasets rather than scheduler state.
 
 ### Command lookup
 
@@ -61,7 +71,7 @@ Use these when you still need command lookup before choosing a runbook lifecycle
 2. Use `uv run ops progress show ops.control-plane.orchestration --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json` to summarize one control-plane runbook execution from the registered progress contract.
 3. Use `uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <repo-root> --usr-root <usr-root> --dataset <dataset>` to summarize one staged USR-backed data-plane procedure from explicit artifacts.
 4. Use `uv run ops progress show usr.data-plane.promoter-study-status` when you want the one-command summary of the active checked-in live study before drilling into tool-local status. Add `--repo-root <repo-root> --study-dir docs/studies/<study-id>` when you need to pin a different study or invoke it from outside the repo checkout.
-5. Use `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json` when you need the deeper execution-readiness blockers for the next actionable study phase. That surface reports generic check kinds declared in the checked-in `ops.study.yaml`, not hidden family-only readiness branches.
+5. Use `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json` when you need the deeper execution-readiness blockers for the next actionable study phase. That surface reports generic check kinds declared in the checked-in `ops.study.yaml`, not hidden family-only readiness branches. For the active stress-promoter study, the default notify-enabled Infer presets treat notify env/profile/event-path and notify-backed runbook-plan failures as real blockers rather than advisories.
 6. `ops progress show` and `ops progress campaign` are read-only status commands. Inspect the required flags in `ops progress explain <registry-id>` or `ops catalog show <registry-id>` before you run them if you do not already know the artifact contract.
 7. Use `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` to emit a manifest template with the right required fields. It prints to stdout unless you pass `--out`.
 8. Use `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` when you want the named registered procedure plus its related procedures as a starting point.
@@ -76,21 +86,25 @@ Use these when you still need command lookup before choosing a runbook lifecycle
 
 ### Verification loop
 
-1. Create or validate runbook shape with `uv run ops runbook init --workflow <workflow> ...`.
+1. Create or validate runbook shape with `uv run ops runbook init --workflow <workflow> ... --project <project>` or an explicit preset such as `--preset bu-scc-dunlop`.
 2. Render deterministic commands with `uv run ops runbook plan --runbook <runbook.yaml> --repo-root <repo-root>`.
 3. Execute dry gates with `uv run ops runbook execute --runbook <runbook.yaml> --repo-root <repo-root> --audit-json <audit.json> --no-submit`.
    On workstations without `qstat`, add `--allow-missing-qstat`; the queue probe remains explicit and the resulting audit will summarize as attention rather than hiding the degraded state.
-4. Review audit JSON fields (`execution.ok`, `execution.failed_phase`, ordered command records).
+4. Review audit JSON fields (`plan.runtime_visibility`, `plan.warnings`, `execution.ok`, `execution.failed_phase`, ordered command records).
 5. Optionally summarize the latest runbook state with `uv run ops progress show ops.control-plane.orchestration --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json`.
-6. Submit only after dry gates remain green.
+6. Submit only after dry gates remain green. If `runtime_visibility.active_job_resolution_state=unknown`, `ops runbook execute --submit` fails closed unless you pass `--allow-unknown-active-jobs`.
 
 ### Operator quickstart
 
 ```bash
 uv run ops runbook init --workflow <workflow> --runbook <runbook.yaml> --workspace-root <workspace-root> --repo-root <repo-root> --project <project> --id <runbook-id>
+uv run ops runbook init --workflow <workflow> --runbook <runbook.yaml> --workspace-root <workspace-root> --repo-root <repo-root> --preset bu-scc-dunlop --id <runbook-id>
 uv run ops runbook plan --runbook <runbook.yaml> --repo-root <repo-root>
 uv run ops runbook execute --runbook <runbook.yaml> --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json --no-submit
 uv run ops runbook execute --runbook <runbook.yaml> --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json --submit
+uv run ops runbook diagnostics session-counts --qstat-file <fixture>
+uv run ops runbook diagnostics submit-shape-advisor --qstat-file <fixture> --planned-submits <N> --warn-over-running 3
+uv run ops runbook diagnostics operator-brief --qstat-file <fixture> --planned-submits <N> --warn-over-running 3
 uv run ops progress explain ops.control-plane.orchestration
 uv run ops progress show ops.control-plane.orchestration --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json
 uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix --repo-root <repo-root>
@@ -100,9 +114,10 @@ uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>
 
 - Keep runbooks workspace-scoped (for example `<workspace-root>/outputs/logs/ops/runbooks/<runbook-id>.yaml`).
 - The dry run above is the smallest working status example because it emits the audit JSON that `ops progress show ops.control-plane.orchestration` reads. On non-SCC workstations, add `--allow-missing-qstat` so queue readiness degrades explicitly instead of failing opaquely.
-- Keep `<project>` aligned with the scheduler account or project configured for the workspace or study.
+- Keep `<project>` aligned with the scheduler account or project configured for the workspace or study. Presets are explicit shortcuts, not hidden defaults.
 - Do not create transient operational working directories at repo root (`.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`); use `/scratch` for disposable state.
 - For manual chaining, `--active-job-id` accepts repeat flags or a comma-delimited list and normalizes before `-hold_jid` submit wiring.
-- `ops runbook active-jobs` returns `plan_command_hint` and active-job arg hints so you can paste manual chaining arguments directly.
+- `ops runbook active-jobs` returns `runtime_visibility`, `plan_command_hint`, and active-job arg hints so you can paste manual chaining arguments directly.
+- `ops runbook plan` may still return a usable dry-run plan when runtime visibility is degraded, but `ops runbook execute --submit` blocks by default when active-job posture is unknown.
 - Notify-enabled routes require a readable webhook file contract before `ops runbook execute`:
   `NOTIFY_WEBHOOK_FILE` (`<webhook_env>_FILE`) or a profile webhook `secret_ref` that resolves to `file://...`.

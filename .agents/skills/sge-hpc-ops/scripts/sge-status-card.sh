@@ -118,7 +118,7 @@ main() {
   fi
 
   if [[ "$json_output" -eq 1 ]]; then
-    printf '{"health":"%s","execution_locus":"%s","running_jobs":%d,"queued_jobs":%d,"eqw_jobs":%d,"threshold":%d,"reason":"%s","recommendation":"%s","queue_policy":"respect-queue-no-line-skipping"}\n' \
+    printf '{"health":"%s","execution_locus":"%s","running_jobs":%d,"queued_jobs":%d,"eqw_jobs":%d,"threshold":%d,"reason":"%s","recommendation":"%s","queue_policy":"respect_queue"}\n' \
       "$health" "$locus" "$running" "$queued" "$eqw" "$threshold" "$reason" "$recommendation"
   else
     printf 'HPC Status Card\n'

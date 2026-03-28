@@ -41,6 +41,16 @@ cheap. If the current checked-in phase is a broad preparation phase such as
 `infer_batch_preparation`, OPS will still run every declared Infer, Notify, and
 runbook-plan check attached to that phase.
 
+For the active `stress_ethanol_cipro_growth` study, that checked-in contract is
+now strict submit-readiness for the default notify-enabled Infer presets.
+Missing `NOTIFY_WEBHOOK` or `NOTIFY_WEBHOOK_FILE`, missing `SSL_CERT_FILE`,
+failed `notify profile doctor`, failed `notify setup resolve-events`, or failed
+notify-enabled `ops runbook plan` checks are blockers rather than advisories.
+Those shared notify-environment blockers remain blocking even after the study
+advances from `infer_batch_preparation` into a specific Infer lane.
+Use batch-only runbooks only when you are explicitly opting out of notify for
+that route.
+
 If you need to pin a non-active study or you are invoking the command from
 outside the repo checkout, add:
 

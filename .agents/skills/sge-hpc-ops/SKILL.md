@@ -80,6 +80,7 @@ Clarification policy:
 - when reporting HPC status to users, include `references/session-status-reporting.md` and `references/user-status-contract.md`
 - when submit-shape or readiness is in scope, include `references/submission-shape-advisor.md` and `references/operator-brief.md`
 - when command-first Ops runbooks are available, include `references/runbook-entrypoints.md`
+- when OPS CLI failure semantics or machine capture are relevant, include `docs/operations/ops-failure-contract.md`
 - for batch/interactive specifics, load only the matching contract (`references/batch-submit-contract.md` or `references/interactive-contract.md`)
 
 ### Step 3: Apply up-to-date handling
@@ -115,6 +116,12 @@ Clarification policy:
   `uv run ops runbook init`, `uv run ops runbook plan`,
   `uv run ops runbook active-jobs`, and `uv run ops runbook execute`, over
   path-discovery heuristics
+- treat native OPS gate outputs as canonical for machine-readable scheduler
+  tokens such as `advisor`, `submit_gate`, and `queue_policy`; keep the
+  repo-local shell overlays aligned to those values
+- for automatic active-job discovery, prefer the explicit OPS scheduler
+  identity carried in submitted job metadata and audit JSON; do not infer
+  matches from workspace-path token overlap alone
 - DenseGen defaults to notify-enabled runbooks; use `--no-notify` only for explicit batch-only requests, and treat `--no-submit` as the default pressure-test path before any real submit
 
 ### Step 6: Apply verify-before-submit gate
@@ -142,6 +149,8 @@ Clarification policy:
 - report findings, interpretation, action commands, and open risks
 - include capability snapshot, session summary, status card, shape-advisor output, operator brief, run handles, source freshness status
 - when an audit JSON already exists, use `uv run ops progress show ops.control-plane.orchestration --audit-json <audit.json>` as the read-only audit-summary step instead of inventing a second summary path
+- when a runbook or scheduler submission is in scope, keep the same run-group
+  identity across submit metadata, active-job discovery, and audit observation
 
 ## Required Deliverables
 

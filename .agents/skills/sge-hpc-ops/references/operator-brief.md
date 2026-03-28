@@ -17,16 +17,18 @@ scripts/sge-operator-brief.sh \
 ```
 
 Add `--requires-order` for dependency-ordered pipelines.
+The supported `uv run ops runbook diagnostics operator-brief` command uses the
+same `submit_gate`, `advisor`, and `next_action` contract.
 
 ### Output fields
 
-- `Submit Gate`: `ready`, `confirm`, or `block`
+- `Submit Gate`: `ready`, `confirmation_required`, or `blocked`
 - `Health`: `green`, `yellow`, or `red`
 - `Execution Locus`: where commands are running
 - `Running Jobs`, `Queued Jobs`, `Eqw Jobs`
-- `Advisor`: `single_submit`, `array`, `hold_jid`, `confirm_then_submit`, or `triage_first`
+- `Advisor`: `single`, `array`, `hold_jid`, or `hold`
 - `Reason`, `Recommendation`, `Next Action`
-- `Queue Policy`: respect queue, do not skip the line
+- `Queue Policy`: `respect_queue`
 
 Use `--json` for machine-readable fields including numeric `running_jobs`, `threshold`, and `planned_submits`.
 
@@ -39,8 +41,8 @@ scripts/sge-active-jobs.sh --max-jobs 12
 ### Gate semantics
 
 - `ready`: proceed with verify-before-submit and QA preflight
-- `confirm`: obtain explicit user confirmation before additional submits
-- `block`: triage `Eqw` or failed jobs before any new submit
+- `confirmation_required`: obtain explicit user confirmation before additional submits
+- `blocked`: triage `Eqw` or failed jobs before any new submit
 
 ### Deterministic fixture mode
 

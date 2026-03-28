@@ -1,7 +1,7 @@
 ## Developer Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-03
+**Last verified:** 2026-03-27
 
 Use this index to find maintainer workflows, checks, and planning records.
 
@@ -18,6 +18,10 @@ Use this index to find maintainer workflows, checks, and planning records.
 | --- | --- |
 | docs, READMEs, or runbooks | `uv run python -m dnadesign.devtools.docs_checks --repo-root .` |
 | cross-tool imports or ownership boundaries | `uv run python -m dnadesign.devtools.architecture_boundaries --repo-root .` |
+| OPS CLI entrypoints, parsing, or error rendering | `uv run pytest -q src/dnadesign/ops/tests/test_cli_failure_contract.py` |
+| OPS native gate stderr or audit-fidelity behavior | `uv run pytest -q src/dnadesign/ops/tests/test_sge_gates.py -k run_native_gate_command_surfaces_failure_text_to_stderr` |
+| OPS orchestration state or active-job discovery | `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "explicit_job_identity or discover_active_job_ids"` |
+| OPS status aggregation semantics | `uv run pytest -q src/dnadesign/ops/tests/test_state_semantics.py` |
 | code in one tool | `uv run pytest -q <tool test path>` and then broaden to the repo-level checks when the slice is stable |
 
 ### Day-to-day tasks
@@ -29,8 +33,17 @@ Use this index to find maintainer workflows, checks, and planning records.
 `uv run python -m dnadesign.devtools.docs_checks --repo-root .`
 5. Run boundary checks when changing cross-tool imports:
 `uv run python -m dnadesign.devtools.architecture_boundaries --repo-root .`
-6. Run the repo-local BU SCC skill audit when changing `.agents/skills/sge-hpc-ops/`:
+6. Run the repo-local skill audits when changing `.agents/skills/`:
+`bash .agents/skills/promoter-study-status/scripts/audit-promoter-study-status-skill.sh`
 `bash .agents/skills/sge-hpc-ops/scripts/audit-sge-hpc-ops-skill.sh`
+7. Run the OPS subprocess failure suite when changing console wiring or CLI contract text:
+`uv run pytest -q src/dnadesign/ops/tests/test_cli_failure_contract.py`
+8. Run the native gate stderr regression when changing `dnadesign.ops.orchestrator.gates` or any audit-fidelity path that executes those commands:
+`uv run pytest -q src/dnadesign/ops/tests/test_sge_gates.py -k run_native_gate_command_surfaces_failure_text_to_stderr`
+`uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k captures_gate_stderr_for_nonzero_native_gate_command`
+9. Run focused OPS contract suites when changing state aggregation, preflight, or active-job identity:
+`uv run pytest -q src/dnadesign/ops/tests/test_state_semantics.py`
+`uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "explicit_job_identity or discover_active_job_ids"`
 
 ### Repo-local maintainer gate
 

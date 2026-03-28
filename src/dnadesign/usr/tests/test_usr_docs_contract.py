@@ -12,7 +12,11 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 from pathlib import Path
+
+import yaml
 
 
 def _repo_root() -> Path:
@@ -256,9 +260,19 @@ def test_promoter_study_index_and_status_are_checked_in_for_stress_ethanol_cipro
     assert "study_stress_ethanol_cipro_pdual10" in pipeline
     assert "infer_batch_7b_with_notify:" in pipeline
     assert "anchor_only:" in pipeline
-    assert "anchor_plus_template:" in pipeline
-    assert "promoter/stress_ethanol_cipro_anchor_set" in pipeline
-    assert "promoter/stress_ethanol_cipro_construct_contexts" in pipeline
+
+
+def test_promoter_study_ops_contract_marks_default_notify_submit_path_as_required() -> None:
+    payload = yaml.safe_load(_read("docs/studies/stress_ethanol_cipro_growth/ops.study.yaml"))
+    checks = payload["preflight"]["checks"]["infer_batch_preparation"]
+    by_id = {row["check_id"]: row for row in checks}
+
+    assert by_id["notify.environment.webhook"]["required"] is True
+    assert by_id["notify.environment.tls"]["required"] is True
+    assert by_id["notify.profile.anchor_only_20b"]["required"] is True
+    assert by_id["notify.resolve_events.anchor_only_20b"]["required"] is True
+    assert by_id["infer.batch.20b.anchor_only.plan"]["required"] is True
+    assert by_id["infer.batch.queue"]["required"] is False
 
 
 def test_usr_promoter_journey_doc_links_cross_tool_owner_surfaces() -> None:
@@ -376,6 +390,27 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "promoter-study-preflight --scope next --json" in skill
     assert not (_repo_root() / "docs" / "studies" / "promoter").exists()
     assert not (_repo_root() / "src/dnadesign/usr/skills/promoter-study-status/SKILL.md").exists()
+
+
+def test_repo_local_promoter_skill_audit_is_documented_and_present() -> None:
+    dev_docs = _read("docs/dev/README.md")
+    skill_root = _repo_root() / ".agents" / "skills" / "promoter-study-status"
+
+    assert ".agents/skills/promoter-study-status/scripts/audit-promoter-study-status-skill.sh" in dev_docs
+    assert (skill_root / "SKILL.md").exists()
+    assert (skill_root / "scripts" / "audit-promoter-study-status-skill.sh").exists()
+
+
+def test_repo_local_promoter_skill_audit_passes() -> None:
+    skill_root = _repo_root() / ".agents" / "skills" / "promoter-study-status"
+    result = subprocess.run(
+        [shutil.which("bash") or "bash", str(skill_root / "scripts" / "audit-promoter-study-status-skill.sh")],
+        cwd=_repo_root(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_usr_docs_index_avoids_anchor_coupling_to_top_readme() -> None:

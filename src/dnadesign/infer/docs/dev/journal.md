@@ -1946,7 +1946,7 @@ Record concrete SCC findings for current infer behavior (7B baseline and desired
 
 ### Read-only scheduler and storage snapshot
 
-- Scheduler snapshot (`qstat -u "$USER"` and `uv run python -m dnadesign.ops.orchestrator.gates session-counts`):
+- Scheduler snapshot (`qstat -u "$USER"` and `uv run ops runbook diagnostics session-counts`):
   - running jobs: `2`
   - queued jobs: `1`
   - Eqw jobs: `0`
@@ -2077,7 +2077,7 @@ while preserving 7B support and allowing 40B pressure tests.
 ### Evidence commands executed
 
 - `qstat -u "$USER"`
-- `uv run python -m dnadesign.ops.orchestrator.gates session-counts`
+- `uv run ops runbook diagnostics session-counts`
 - `df -h /projectnb/dunlop/esouth /project/dunlop/esouth /scratch/$USER`
 - `du -sh /projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b`
 - `ls -lah /projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b/snapshots/*`
@@ -2222,9 +2222,9 @@ Build the infer GPU environment deterministically, then run one bounded pressure
 - `skills-preflight --json --strict --ensure-fresh --require-hooks`
 - `hostname`
 - `qstat -u "$USER"`
-- `uv run python -m dnadesign.ops.orchestrator.gates session-counts`
-- `uv run python -m dnadesign.ops.orchestrator.gates submit-shape-advisor --planned-submits 1 --warn-over-running 3`
-- `uv run python -m dnadesign.ops.orchestrator.gates operator-brief --planned-submits 1 --warn-over-running 3`
+- `uv run ops runbook diagnostics session-counts`
+- `uv run ops runbook diagnostics submit-shape-advisor --planned-submits 1 --warn-over-running 3`
+- `uv run ops runbook diagnostics operator-brief --planned-submits 1 --warn-over-running 3`
 - `sed -n '1,260p' pyproject.toml`
 - `sed -n '1,260p' docs/installation.md`
 - `sed -n '1,340p' docs/bu-scc/install.md`
