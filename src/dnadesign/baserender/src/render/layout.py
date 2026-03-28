@@ -22,7 +22,10 @@ from matplotlib.textpath import TextPath
 from ..config import Style
 from ..core import BoundsError, Effect, Feature, Record
 
-_DNA_COMP = str.maketrans("ACGTacgtNn", "TGCAtgcaNn")
+_DNA_COMP = str.maketrans(
+    "ACGTRYSWKMBDHVNacgtryswkmbdhvn",  # pragma: allowlist secret
+    "TGCAYRSWMKVHDBNtgcayrswmkvhdbn",  # pragma: allowlist secret
+)
 
 
 def comp(seq: str) -> str:
@@ -444,7 +447,7 @@ def compute_layout(
     cw, ch = cell.width, cell.height
     n = len(record.sequence) if fixed_n is None else max(len(record.sequence), int(fixed_n))
 
-    show_two = bool(style.show_reverse_complement and record.alphabet == "DNA")
+    show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
     sequence_extent_up, sequence_extent_down = measure_sequence_extents(style.font_mono, style.font_size_seq, style.dpi)
     sequence_half_height = max(sequence_extent_up, sequence_extent_down)
     strand_gap = style.sequence.strand_gap_cells * ch

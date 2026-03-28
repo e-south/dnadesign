@@ -18,7 +18,7 @@ from typing import Iterable, Iterator
 from .adapters import build_adapter, required_source_columns
 from .config import (
     ImagesOutputCfg,
-    SequenceRowsJobV3,
+    RenderJobV3,
     VideoOutputCfg,
     load_sequence_rows_job,
     output_kind,
@@ -31,7 +31,7 @@ from .reporting import RunReport
 from .runtime import initialize_runtime
 
 
-def _iter_records(job: SequenceRowsJobV3, report: RunReport) -> Iterator[Record]:
+def _iter_records(job: RenderJobV3, report: RunReport) -> Iterator[Record]:
     adapter = build_adapter(job.input.adapter, alphabet=job.input.alphabet)
     transforms = load_transforms(job.pipeline.plugins)
     if job.input.kind == "parquet":
@@ -51,7 +51,7 @@ def _iter_records(job: SequenceRowsJobV3, report: RunReport) -> Iterator[Record]
             report.note_skip_row(str(skip) or "skip_record")
 
 
-def _sample_or_limit_unselected(records: Iterable[Record], job: SequenceRowsJobV3) -> Iterable[Record] | list[Record]:
+def _sample_or_limit_unselected(records: Iterable[Record], job: RenderJobV3) -> Iterable[Record] | list[Record]:
     sample = job.input.sample
     if sample is not None:
         if sample.mode == "first_n":
@@ -71,14 +71,14 @@ def _sample_or_limit_unselected(records: Iterable[Record], job: SequenceRowsJobV
 
 
 def run_sequence_rows_job(
-    job_or_path: SequenceRowsJobV3 | str,
+    job_or_path: RenderJobV3 | str,
     *,
     caller_root: str | Path | None = None,
 ) -> RunReport:
     initialize_runtime()
     job = (
         job_or_path
-        if isinstance(job_or_path, SequenceRowsJobV3)
+        if isinstance(job_or_path, RenderJobV3)
         else load_sequence_rows_job(
             job_or_path,
             caller_root=caller_root,
@@ -187,7 +187,7 @@ def run_sequence_rows_job(
 
 
 def run_cruncher_showcase_job(
-    job_or_path: SequenceRowsJobV3 | str,
+    job_or_path: RenderJobV3 | str,
     *,
     caller_root: str | Path | None = None,
 ) -> RunReport:

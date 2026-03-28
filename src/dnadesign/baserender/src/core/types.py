@@ -17,7 +17,7 @@ from typing import Literal
 from .contracts import ensure
 from .errors import AlphabetError, BoundsError
 
-Alphabet = Literal["DNA", "RNA", "PROTEIN"]
+Alphabet = Literal["DNA", "IUPAC_DNA", "RNA", "PROTEIN"]
 Strand = Literal["fwd", "rev"]
 
 
@@ -38,7 +38,7 @@ class Span:
         ensure(self.end <= seq_len, f"Span [{self.start}, {self.end}) exceeds sequence length {seq_len}", BoundsError)
         if self.strand is not None:
             ensure(self.strand in {"fwd", "rev"}, f"Unsupported strand: {self.strand}", BoundsError)
-            if alphabet != "DNA":
+            if alphabet not in {"DNA", "IUPAC_DNA"}:
                 ensure(
                     self.strand != "rev",
                     f"Reverse strand is only supported for DNA records (alphabet={alphabet})",

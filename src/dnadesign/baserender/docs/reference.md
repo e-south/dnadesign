@@ -1,7 +1,7 @@
 # baserender Reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-03-27
 
 
 Single technical reference for operators and integrators.
@@ -41,7 +41,7 @@ Primary commands:
 
 ## Config Schema to Package Architecture
 
-`SequenceRowsJobV3` keys and owner modules:
+`RenderJobV3` keys and owner modules:
 
 | Job key | Purpose | Primary module(s) |
 | --- | --- | --- |
@@ -54,7 +54,7 @@ Primary commands:
 | `outputs` | Explicit artifact declaration | `src/config/cruncher_showcase_job.py`, `src/outputs/` |
 | `run` | Strictness and optional report emission | `src/runner.py`, `src/reporting/` |
 
-## Job Contract (`SequenceRowsJobV3`)
+## Job Contract (`RenderJobV3`)
 
 Required top-level keys:
 - `version`
@@ -73,6 +73,7 @@ Contract behavior:
 - `outputs` must be non-empty and explicit
 - non-workspace default output root is `<job_dir>/results`
 - workspace `job.yaml` with sibling `inputs/` and `outputs/` defaults to `<workspace>/outputs`
+- compatibility aliases `SequenceRowsJobV3` and `CruncherShowcaseJob` still load the same schema, but `RenderJobV3` is the canonical public model name
 
 Adapters:
 - `densegen_tfbs`
@@ -81,11 +82,21 @@ Adapters:
 - `sequence_windows_v1`
 - `duplex_sequence_v1`
 - `hairpin_topology_v1`
+- `yiu_linear_state_v1`
+- `yiu_hairpin_topology_v1`
+- `yiu_topology_cartoon_v1`
 
 Input kinds:
 - `parquet`
 - `json`
 - `jsonl`
+
+Renderer families:
+- `sequence_rows`
+- `hairpin_cartoon`
+- `topology_cartoon`
+
+Shared cross-tool contract models live under `dnadesign.contracts.visual`. Cruncher and other producers publish those contracts; BaseRender parses them and adapts them to `Record`.
 
 ## Record Contract (`Record`)
 
@@ -144,7 +155,10 @@ Default `results_root`:
 
 Stable API surface:
 - `validate_job`, `run_job`, `render`
+- `validate_render_job`, `run_render_job`
 - `validate_sequence_rows_job`, `run_sequence_rows_job`
+- `list_adapters`, `get_adapter_descriptor`
+- `list_renderers`, `get_renderer_descriptor`
 - `load_record_from_parquet`, `load_records_from_parquet`
 - `render_record_figure`, `render_record_grid_figure`, `render_parquet_record_figure`
 - `Record`, `Feature`, `Effect`, `Display`, `Span`
@@ -158,6 +172,8 @@ Stable API surface:
 Compatibility aliases:
 - `validate_cruncher_showcase_job`
 - `run_cruncher_showcase_job`
+- `SequenceRowsJobV3`
+- `CruncherShowcaseJob`
 
 Boundary rule:
 - supported imports: `dnadesign.baserender`
@@ -166,6 +182,7 @@ Boundary rule:
 Tool-specific wiring examples live in:
 - `docs/integrations/densegen.md`
 - `docs/integrations/cruncher.md`
+- `docs/integrations/yiu.md`
 
 ## Runtime Flow
 
@@ -195,15 +212,19 @@ Core package modules and responsibilities:
 
 Add an adapter:
 1. Implement adapter class (`apply(row, row_index) -> Record`).
-2. Register in `src/adapters/registry.py`.
-3. Add adapter schema in `src/config/adapter_contracts.py`.
-4. Add parser acceptance in job config loader.
-5. Add adapter + end-to-end tests.
+2. Register one `AdapterDescriptor` in `src/config/adapter_contracts.py`.
+3. Reuse the descriptor through `src/adapters/registry.py`.
+4. Add adapter + end-to-end tests.
 
 Add a feature/effect kind:
 1. Register strict validation contract in `src/core/registry.py`.
 2. Register renderer drawer in `src/render/effects/registry.py`.
 3. Add validation and render tests.
+
+Add a renderer:
+1. Implement the renderer in `src/render/`.
+2. Register one `RendererDescriptor` in `src/render/renderer.py`.
+3. Add render-path tests and, when relevant, update the integration docs that map upstream contract kinds to the renderer family.
 
 ## Workspace Contract
 

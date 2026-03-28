@@ -39,7 +39,7 @@ from .palette import Palette
 class SequenceRowsRenderer:
     def render(self, record: Record, style: Style, palette: Palette):
         record = record.validate()
-        show_two = bool(style.show_reverse_complement and record.alphabet == "DNA")
+        show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
         fixed_content_top_extent_px: float | None = None
         fixed_content_bottom_extent_px: float | None = None
         fixed_content_radius_px: float | None = None
@@ -693,7 +693,7 @@ def _draw_inline_feature_labels(ax, record: Record, layout: LayoutContext, palet
             float(layout.y_forward + layout.sequence_extent_up),
         )
     )
-    if bool(style.show_reverse_complement and record.alphabet == "DNA"):
+    if bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"}):
         occupied_boxes.append(
             (
                 sequence_x0,
@@ -1109,7 +1109,7 @@ def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) ->
             color="#374151",
             zorder=4.0,
         )
-    if bool(style.show_reverse_complement and record.alphabet == "DNA") and complement:
+    if bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"}) and complement:
         ax.text(
             x,
             layout.y_reverse,
@@ -1125,7 +1125,7 @@ def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) ->
 
 def _draw_coordinate_ticks(ax, record: Record, layout: LayoutContext, style: Style) -> None:
     tick_every = 5 if len(record.sequence) > 12 else 2
-    show_two = bool(style.show_reverse_complement and record.alphabet == "DNA")
+    show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
     y = (
         layout.y_reverse - max(20.0, style.font_size_label * 1.8)
         if show_two

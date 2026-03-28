@@ -13,7 +13,14 @@ from __future__ import annotations
 
 import pytest
 
-from dnadesign.contracts.visual import CassetteViewsManifestV1, HairpinTopologyViewV1, LinearDuplexViewV1
+from dnadesign.contracts.visual import (
+    CassetteViewsManifestV1,
+    HairpinTopologyViewV1,
+    LinearDuplexViewV1,
+    YiuHairpinTopologyV1,
+    YiuLinearStateV1,
+    YiuTopologyCartoonV1,
+)
 
 
 def test_linear_duplex_view_contract_validates_example_payload() -> None:
@@ -240,3 +247,69 @@ def test_linear_duplex_view_rejects_overlapping_segments() -> None:
 
     with pytest.raises(ValueError, match="segments must be ordered and non-overlapping"):
         LinearDuplexViewV1.model_validate(payload)
+
+
+def test_yiu_linear_state_contract_validates_minimal_payload() -> None:
+    payload = {
+        "contract_kind": "yiu_linear_state_v1",
+        "state_id": "hairpin_pcr_linear_insert",
+        "topology_kind": "linear_dsdna",
+        "alphabet": "iupac_dna",
+        "primary_sequence": "CCTCAGCCCGCTGATCCCTATCAGTGATAGAR",
+        "complement_sequence": "YTCTATCACTGATAGGGATCAGCGGGCTGAGG",
+        "segments": [],
+        "annotations": [],
+        "cuts": [],
+        "junctions": [],
+        "fragments": [],
+        "display": {"title": "Split-payload insert"},
+        "meta": {"evidence_mode": "pattern_compatibility"},
+    }
+
+    contract = YiuLinearStateV1.model_validate(payload)
+
+    assert contract.contract_kind == "yiu_linear_state_v1"
+    assert contract.alphabet == "iupac_dna"
+
+
+def test_yiu_hairpin_topology_contract_validates_minimal_payload() -> None:
+    payload = {
+        "contract_kind": "yiu_hairpin_topology_v1",
+        "state_id": "ligated_ssdna_hairpin",
+        "topology_kind": "ssdna_hairpin",
+        "sequence": "CCTCAGCCCGCTGATCAGCGGGCTGAGG",
+        "stem_left_span": {"start": 0, "end": 8},
+        "stem_right_span": {"start": 20, "end": 28},
+        "loop_span": {"start": 8, "end": 20},
+        "pair_map": [{"left_index": 0, "right_index": 27}],
+        "adapter_branches": [],
+        "annotations": [],
+        "display": {"title": "Ligation hairpin"},
+        "meta": {"evidence_mode": "concrete_realization"},
+    }
+
+    contract = YiuHairpinTopologyV1.model_validate(payload)
+
+    assert contract.contract_kind == "yiu_hairpin_topology_v1"
+    assert len(contract.pair_map) == 1
+
+
+def test_yiu_topology_cartoon_contract_validates_minimal_payload() -> None:
+    payload = {
+        "contract_kind": "yiu_topology_cartoon_v1",
+        "state_id": "circularized_payload_candidate",
+        "topology_kind": "circular_duplex",
+        "sequence": "CCGATGTCCCTATCAGTGATAGAGAGGGGGGGGGGGGCCTCAGCCCGCTGA",
+        "segments": [],
+        "annotations": [],
+        "cuts": [],
+        "junctions": [{"id": "junction", "join_index": 15}],
+        "fragments": [],
+        "display": {"title": "Circularized payload"},
+        "meta": {"evidence_mode": "concrete_realization"},
+    }
+
+    contract = YiuTopologyCartoonV1.model_validate(payload)
+
+    assert contract.contract_kind == "yiu_topology_cartoon_v1"
+    assert contract.topology_kind == "circular_duplex"

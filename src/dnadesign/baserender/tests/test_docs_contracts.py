@@ -30,6 +30,7 @@ def test_docs_surface_stays_compact() -> None:
         "docs/integrations/README.md",
         "docs/integrations/cruncher.md",
         "docs/integrations/densegen.md",
+        "docs/integrations/yiu.md",
         "docs/reference.md",
     ]
 

@@ -406,7 +406,7 @@ def _sequence_rows_content_extents_px(record: Record, *, style: Style) -> tuple[
     from .render.layout import compute_layout
 
     layout = compute_layout(record, style)
-    show_two = bool(style.show_reverse_complement and record.alphabet == "DNA")
+    show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
     centerline = (layout.y_forward + layout.y_reverse) / 2.0 if show_two else layout.y_forward
     top_extent = float(layout.content_top) - float(centerline)
     bottom_extent = float(centerline) - float(layout.content_bottom)

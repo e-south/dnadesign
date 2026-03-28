@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/baserender/src/config/cruncher_showcase_job.py
 
-Sequence Rows v3 job schema and loader with strict nested key validation.
+Generic Render Job v3 schema and loader with strict nested key validation.
 This module remains as a compatibility path; the organized namespace is
 `dnadesign.baserender.src.config.jobs.sequence_rows_v3`.
 
@@ -120,7 +120,7 @@ class RunCfg:
 
 
 @dataclass(frozen=True)
-class SequenceRowsJobV3:
+class RenderJobV3:
     version: int
     name: str
     path: Path
@@ -133,7 +133,8 @@ class SequenceRowsJobV3:
     run: RunCfg
 
 
-CruncherShowcaseJob = SequenceRowsJobV3
+SequenceRowsJobV3 = RenderJobV3
+CruncherShowcaseJob = RenderJobV3
 
 
 def _baserender_root() -> Path:
@@ -160,7 +161,7 @@ def _workspace_root_from_job_path(job_path: Path) -> Path | None:
     return workspace_root
 
 
-def _cassette_run_root_from_job_path(job_path: Path) -> Path | None:
+def _published_job_owner_root_from_job_path(job_path: Path) -> Path | None:
     job_abs = job_path.resolve()
     if job_abs.parent.name != "baserender_jobs":
         return None
@@ -170,11 +171,15 @@ def _cassette_run_root_from_job_path(job_path: Path) -> Path | None:
     return owner_root
 
 
+def _cassette_run_root_from_job_path(job_path: Path) -> Path | None:
+    return _published_job_owner_root_from_job_path(job_path)
+
+
 def _job_owner_root(job_path: Path, *, caller_scope: Path) -> Path:
     workspace_root = _workspace_root_from_job_path(job_path)
     if workspace_root is not None:
         return workspace_root.resolve()
-    cassette_root = _cassette_run_root_from_job_path(job_path)
+    cassette_root = _published_job_owner_root_from_job_path(job_path)
     if cassette_root is not None:
         return cassette_root.resolve()
     return caller_scope.resolve()
@@ -482,7 +487,7 @@ def _parse_input(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, ...]) -
     adapter = _parse_adapter(job_path, data.get("adapter"), allowed_roots=allowed_roots)
 
     alphabet = str(data.get("alphabet", "DNA")).upper()
-    require_one_of(alphabet, {"DNA", "RNA", "PROTEIN"}, "input.alphabet")
+    require_one_of(alphabet, {"DNA", "IUPAC_DNA", "RNA", "PROTEIN"}, "input.alphabet")
 
     sample = data.get("sample")
     sample_cfg = None if sample is None else _parse_sample(sample)
@@ -548,7 +553,7 @@ def _parse_render(raw: Any) -> RenderCfg:
     reject_unknown_keys(data, {"renderer", "style"}, "render")
 
     renderer = str(data.get("renderer", "")).strip()
-    require_one_of(renderer, {"sequence_rows", "hairpin_cartoon"}, "render.renderer")
+    require_one_of(renderer, {"sequence_rows", "hairpin_cartoon", "topology_cartoon"}, "render.renderer")
 
     style_raw = require_mapping(data.get("style", {}), "render.style")
     reject_unknown_keys(style_raw, {"preset", "overrides"}, "render.style")
@@ -810,7 +815,7 @@ def _parse_sequence_rows_job_mapping(
     job_path: Path,
     caller_scope: Path,
     allowed_roots: tuple[Path, ...] | None = None,
-) -> SequenceRowsJobV3:
+) -> RenderJobV3:
     if allowed_roots is None:
         allowed_roots = _allowed_path_roots(job_path, caller_scope=caller_scope)
     data = require_mapping(raw_mapping, "top-level")
@@ -855,7 +860,7 @@ def _parse_sequence_rows_job_mapping(
     outputs_cfg = _parse_outputs(job_path, results_root, data.get("outputs"), allowed_roots=allowed_roots)
     run_cfg = _parse_run(job_path, results_root, data.get("run"), allowed_roots=allowed_roots)
 
-    return SequenceRowsJobV3(
+    return RenderJobV3(
         version=3,
         name=job_path.stem,
         path=job_path,
@@ -869,7 +874,7 @@ def _parse_sequence_rows_job_mapping(
     )
 
 
-def load_cruncher_showcase_job(path: str | Path, *, caller_root: str | Path | None = None) -> SequenceRowsJobV3:
+def load_cruncher_showcase_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV3:
     try:
         job_path = resolve_job_path(path)
         if caller_root is None:
@@ -891,7 +896,7 @@ def load_sequence_rows_job_from_mapping(
     *,
     caller_root: str | Path | None = None,
     source_name: str = "inline_job.yaml",
-) -> SequenceRowsJobV3:
+) -> RenderJobV3:
     try:
         caller_scope = Path.cwd().resolve() if caller_root is None else Path(caller_root).expanduser().resolve()
         name = str(source_name).strip()
@@ -928,17 +933,25 @@ def validate_cruncher_showcase_job(path: str | Path, *, caller_root: str | Path 
     return load_cruncher_showcase_job(path, caller_root=caller_root)
 
 
-def load_sequence_rows_job(path: str | Path, *, caller_root: str | Path | None = None) -> SequenceRowsJobV3:
+def load_sequence_rows_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV3:
     return load_cruncher_showcase_job(path, caller_root=caller_root)
 
 
-def validate_sequence_rows_job(path: str | Path, *, caller_root: str | Path | None = None) -> SequenceRowsJobV3:
+def validate_sequence_rows_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV3:
     return load_sequence_rows_job(path, caller_root=caller_root)
 
 
-def load_job(path: str | Path, *, caller_root: str | Path | None = None) -> SequenceRowsJobV3:
+def load_render_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV3:
     return load_sequence_rows_job(path, caller_root=caller_root)
 
 
-def validate_job(path: str | Path, *, caller_root: str | Path | None = None) -> SequenceRowsJobV3:
+def validate_render_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV3:
     return validate_sequence_rows_job(path, caller_root=caller_root)
+
+
+def load_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV3:
+    return load_render_job(path, caller_root=caller_root)
+
+
+def validate_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV3:
+    return validate_render_job(path, caller_root=caller_root)

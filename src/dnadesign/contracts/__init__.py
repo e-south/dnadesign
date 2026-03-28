@@ -9,10 +9,20 @@ Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
 """
 
-from .visual import CassetteViewsManifestV1, HairpinTopologyViewV1, LinearDuplexViewV1
+from .visual import (
+    CassetteViewsManifestV1,
+    HairpinTopologyViewV1,
+    LinearDuplexViewV1,
+    YiuHairpinTopologyV1,
+    YiuLinearStateV1,
+    YiuTopologyCartoonV1,
+)
 
 __all__ = [
     "LinearDuplexViewV1",
     "HairpinTopologyViewV1",
     "CassetteViewsManifestV1",
+    "YiuLinearStateV1",
+    "YiuHairpinTopologyV1",
+    "YiuTopologyCartoonV1",
 ]
