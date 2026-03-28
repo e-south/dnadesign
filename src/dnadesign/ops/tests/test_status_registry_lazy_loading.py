@@ -102,10 +102,32 @@ assert app is not None
 print(json.dumps(sorted(
     name for name in sys.modules
     if name in {
-        'dnadesign.ops._cli_legacy',
         'dnadesign.ops.cli.commands.catalog',
         'dnadesign.ops.cli.commands.progress',
         'dnadesign.ops.cli.commands.runbook',
+    }
+)))
+"""
+    )
+
+    assert imported_modules == []
+
+
+def test_orchestrator_package_import_does_not_preload_gate_or_execution_modules() -> None:
+    imported_modules = _run_python(
+        """
+import json
+import sys
+import dnadesign.ops.orchestrator as orchestrator
+
+assert orchestrator is not None
+print(json.dumps(sorted(
+    name for name in sys.modules
+    if name in {
+        'dnadesign.ops.orchestrator.execute',
+        'dnadesign.ops.orchestrator.gates',
+        'dnadesign.ops.orchestrator.plan',
+        'dnadesign.ops.orchestrator.state',
     }
 )))
 """
@@ -161,26 +183,6 @@ print(json.dumps(sorted(
         'dnadesign.studies.families.promoter.adapter',
         'dnadesign.studies.families.promoter.ops.provider',
     }
-)))
-"""
-    )
-
-    assert imported_modules == []
-
-
-def test_status_kinds_cli_does_not_import_legacy_cli_module() -> None:
-    imported_modules = _run_python(
-        """
-import json
-import sys
-from typer.testing import CliRunner
-from dnadesign.ops.cli import app
-
-result = CliRunner().invoke(app, ['progress', 'kinds', '--json'])
-assert result.exit_code == 0, result.output
-print(json.dumps(sorted(
-    name for name in sys.modules
-    if name == 'dnadesign.ops._cli_legacy'
 )))
 """
     )
@@ -359,7 +361,6 @@ print(json.dumps(sorted(
         'dnadesign.usr.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.opal.ops.status_providers',
-        'dnadesign.ops._cli_legacy',
         'dnadesign.studies.families.promoter.adapter',
         'dnadesign.studies.families.promoter.ops.provider',
     }

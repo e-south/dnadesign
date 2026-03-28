@@ -157,3 +157,61 @@ def test_evaluate_study_preflight_checks_defers_downstream_lane_blockers_in_next
     )
     assert evaluation.deferred_check_ids == ("infer.local_runtime.anchor_only_7b",)
     assert evaluation.nonblocking_attention_ids == ("notify.environment.webhook",)
+
+
+def test_evaluate_study_preflight_checks_prioritizes_shared_blockers_before_lane_failures() -> None:
+    checks = [
+        build_state_check(
+            check_id="infer.batch.anchor_only_20b.plan",
+            check_group="infer_batch_plan",
+            phase="ops",
+            phase_id="infer_anchor_only_20b",
+            state="attention",
+            summary="attention",
+        ),
+        build_state_check(
+            check_id="notify.environment.webhook",
+            check_group="notify_environment",
+            phase="notify",
+            phase_id="infer_batch_preparation",
+            state="attention",
+            summary="attention",
+        ),
+        build_state_check(
+            check_id="notify.environment.tls",
+            check_group="notify_environment",
+            phase="notify",
+            phase_id="infer_batch_preparation",
+            state="attention",
+            summary="attention",
+        ),
+        build_state_check(
+            check_id="notify.profile.anchor_only_20b",
+            check_group="notify",
+            phase="notify",
+            phase_id="infer_anchor_only_20b",
+            state="attention",
+            summary="attention",
+        ),
+    ]
+    evaluation = evaluate_preflight_checks(
+        checks,
+        phase_states=[
+            {"id": "infer_batch_preparation", "status": "in_progress"},
+            {"id": "infer_anchor_only_20b", "status": "planned"},
+        ],
+        scope_plan=build_study_preflight_plan(
+            current_phase="infer_anchor_only_20b",
+            next_ready_phase=None,
+            scope="next",
+            contract=_contract(),
+            runtime_phase_ids=("infer_anchor_only_20b",),
+        ),
+    )
+
+    assert evaluation.blocked_by_ids == (
+        "notify.environment.tls",
+        "notify.environment.webhook",
+        "infer.batch.anchor_only_20b.plan",
+        "notify.profile.anchor_only_20b",
+    )

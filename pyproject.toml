@@ -123,6 +123,7 @@ where = ["src"]
 ]
 "dnadesign.ops" = [
   "providers/*/status.registry.yaml",
+  "runbooks/init_presets.yaml",
   "runbooks/presets/*.yaml",
   "runbooks/templates/*.qsub",
 ]

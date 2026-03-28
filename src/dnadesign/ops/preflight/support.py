@@ -16,6 +16,12 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
+from pydantic import ValidationError
+
+from dnadesign.ops.orchestrator import build_batch_plan
+from dnadesign.ops.orchestrator import gates as gates_module
+from dnadesign.ops.orchestrator.state import resolve_active_job_resolution
+from dnadesign.ops.runbooks.schema import load_orchestration_runbook
 from dnadesign.ops.status.artifacts import load_yaml_mapping
 from dnadesign.ops.status.parsing import (
     required_metadata_text,
@@ -49,6 +55,16 @@ def build_infer_notify_setup_command(*, config_path: Path) -> str:
 
 
 def run_preflight_command(argv: Sequence[str], *, cwd: Path, timeout_seconds: int = 180) -> CommandExecution:
+    if gates_module.is_native_gate_command(tuple(str(token) for token in argv)):
+        returncode, stdout, stderr = gates_module.run_native_gate_command(tuple(str(token) for token in argv))
+        return CommandExecution(
+            argv=tuple(str(token) for token in argv),
+            cwd=str(cwd),
+            returncode=returncode,
+            stdout=stdout,
+            stderr=stderr,
+            timed_out=False,
+        )
     try:
         completed = subprocess.run(
             list(argv),
@@ -73,6 +89,59 @@ def run_preflight_command(argv: Sequence[str], *, cwd: Path, timeout_seconds: in
         returncode=int(completed.returncode),
         stdout=str(completed.stdout or ""),
         stderr=str(completed.stderr or ""),
+        timed_out=False,
+    )
+
+
+def execute_runbook_plan(
+    *,
+    runbook_path: Path,
+    repo_root: Path,
+    max_discovery_jobs: int = 24,
+) -> CommandExecution:
+    argv = (
+        "uv",
+        "run",
+        "ops",
+        "runbook",
+        "plan",
+        "--runbook",
+        str(runbook_path),
+        "--repo-root",
+        str(repo_root),
+    )
+    try:
+        loaded = load_orchestration_runbook(runbook_path.expanduser())
+        active_job_resolution = resolve_active_job_resolution(
+            runbook=loaded,
+            explicit_job_ids=(),
+            discover_active_jobs=True,
+            max_jobs=max_discovery_jobs,
+        )
+        plan = build_batch_plan(
+            runbook=loaded,
+            requested_mode=None,
+            requested_smoke=None,
+            active_job_ids=active_job_resolution.effective_job_ids,
+            runtime_visibility=active_job_resolution.runtime_visibility,
+            allow_fresh_reset=False,
+            allow_missing_qstat=False,
+        )
+    except (FileNotFoundError, ValidationError, ValueError) as exc:
+        return CommandExecution(
+            argv=argv,
+            cwd=str(repo_root),
+            returncode=2,
+            stdout="",
+            stderr=f"Runbook contract error: {exc}",
+            timed_out=False,
+        )
+    return CommandExecution(
+        argv=argv,
+        cwd=str(repo_root),
+        returncode=0,
+        stdout=json.dumps(plan.as_dict(), indent=2, sort_keys=True),
+        stderr="",
         timed_out=False,
     )
 
@@ -177,6 +246,7 @@ def infer_usr_dataset_requirements(config_path: Path) -> list[dict[str, object]]
 __all__ = [
     "build_infer_notify_setup_command",
     "choose_command_summary",
+    "execute_runbook_plan",
     "infer_usr_dataset_requirements",
     "load_orchestration_runbook_payload",
     "render_argv",

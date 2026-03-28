@@ -11,11 +11,14 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import os
 import subprocess
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
-from typing import Literal, Sequence
+from typing import Literal
 
 from dnadesign.densegen.contracts import resolve_densegen_usr_output_contract
 from dnadesign.ops.contracts import ResumeReadinessPolicy, resolve_resume_readiness_policy
@@ -26,14 +29,25 @@ from .mode_tools import InferModeProbeError, resolve_mode_tool_adapter
 RunMode = Literal["auto", "fresh", "resume"]
 SubmitBehavior = Literal["submit", "hold_jid", "blocked"]
 ResumeState = Literal["none", "resume_ready", "partial"]
+_OPS_IDENTITY_KEYS = ("ops_run_group_id", "ops_workspace_id", "ops_workflow_id")
+_SCHEDULER_PROBE_TIMEOUT_SECONDS = 10.0
 
 
 def _run_probe(argv: Sequence[str]) -> tuple[int, str, str]:
     try:
-        result = subprocess.run(list(argv), check=False, capture_output=True, text=True)
+        result = subprocess.run(
+            list(argv),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=_SCHEDULER_PROBE_TIMEOUT_SECONDS,
+        )
     except OSError as exc:
         cmd = str(argv[0]) if argv else "command"
         return 127, "", f"{cmd} unavailable: {exc}"
+    except subprocess.TimeoutExpired:
+        cmd = str(argv[0]) if argv else "command"
+        return 124, "", f"{cmd} unavailable: timed out after {_SCHEDULER_PROBE_TIMEOUT_SECONDS:g} seconds"
     return int(result.returncode), result.stdout, result.stderr
 
 
@@ -47,39 +61,392 @@ def _parse_job_ids_from_qstat_output(text: str) -> tuple[str, ...]:
     return tuple(job_ids)
 
 
+def _slug_token(value: str, *, fallback: str) -> str:
+    token = "".join(ch if ch.isalnum() or ch in "._-" else "-" for ch in str(value or "").strip()).strip("._-")
+    return token or fallback
+
+
+def _short_digest(*parts: object, length: int = 12) -> str:
+    payload = "\n".join(str(part or "").strip() for part in parts)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:length]
+
+
+class SchedulerProbeState(StrEnum):
+    SKIPPED = "skipped"
+    OK = "ok"
+    UNAVAILABLE = "unavailable"
+    UNSUPPORTED = "unsupported"
+    ERROR = "error"
+
+
+class ActiveJobResolutionState(StrEnum):
+    NOT_REQUIRED = "not_required"
+    NO_MATCH = "no_match"
+    MATCHED = "matched"
+    MULTIPLE_MATCHES = "multiple_matches"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True)
+class RuntimeVisibility:
+    scheduler_probe_state: SchedulerProbeState
+    active_job_resolution_state: ActiveJobResolutionState
+    degraded: bool
+    degraded_reasons: tuple[str, ...] = ()
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "scheduler_probe_state": self.scheduler_probe_state.value,
+            "active_job_resolution_state": self.active_job_resolution_state.value,
+            "degraded": self.degraded,
+            "degraded_reasons": list(self.degraded_reasons),
+        }
+
+
+@dataclass(frozen=True)
+class ActiveJobResolution:
+    explicit_job_ids: tuple[str, ...]
+    discovered_job_ids: tuple[str, ...]
+    effective_job_ids: tuple[str, ...]
+    runtime_visibility: RuntimeVisibility
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "explicit_job_ids": list(self.explicit_job_ids),
+            "discovered_job_ids": list(self.discovered_job_ids),
+            "effective_job_ids": list(self.effective_job_ids),
+            "runtime_visibility": self.runtime_visibility.as_dict(),
+        }
+
+
+class ActiveJobProbeError(RuntimeError):
+    def __init__(self, runtime_visibility: RuntimeVisibility):
+        reasons = runtime_visibility.degraded_reasons or ("active-job visibility is unavailable",)
+        super().__init__("; ".join(reasons))
+        self.runtime_visibility = runtime_visibility
+
+
+@dataclass(frozen=True)
+class OpsJobIdentity:
+    workflow_id: str
+    run_group_id: str
+    workspace_id: str
+    job_name_slug: str
+    runbook_id: str
+
+    def as_dict(self) -> dict[str, str]:
+        return {
+            "workflow_id": self.workflow_id,
+            "run_group_id": self.run_group_id,
+            "workspace_id": self.workspace_id,
+            "job_name_slug": self.job_name_slug,
+            "runbook_id": self.runbook_id,
+        }
+
+
+def resolve_ops_job_identity(runbook: OrchestrationRunbookV1) -> OpsJobIdentity:
+    workspace_root = str(runbook.workspace_root.resolve())
+    run_group_id = _short_digest(runbook.workflow_id, runbook.id, workspace_root, length=16)
+    workspace_id = _short_digest(workspace_root, length=12)
+    job_name_slug = _slug_token(f"{runbook.id}.{run_group_id[:8]}", fallback="ops")
+    return OpsJobIdentity(
+        workflow_id=runbook.workflow_id,
+        run_group_id=run_group_id,
+        workspace_id=workspace_id,
+        job_name_slug=job_name_slug,
+        runbook_id=runbook.id,
+    )
+
+
+def build_ops_job_context(identity: OpsJobIdentity, *, role: str | None = None) -> dict[str, str]:
+    context = {
+        "ops_job_name_slug": identity.job_name_slug,
+        "ops_run_group_id": identity.run_group_id,
+        "ops_runbook_id": identity.runbook_id,
+        "ops_workflow_id": identity.workflow_id,
+        "ops_workspace_id": identity.workspace_id,
+    }
+    if role is not None:
+        context["ops_job_role"] = _slug_token(role, fallback="job")
+    return context
+
+
+def build_ops_job_env(identity: OpsJobIdentity, *, role: str | None = None) -> dict[str, str]:
+    context = build_ops_job_context(identity, role=role)
+    return {key.upper(): value for key, value in context.items()}
+
+
+def render_sge_context_value(context: Mapping[str, str]) -> str:
+    return ",".join(f"{key}={value}" for key, value in sorted(context.items()))
+
+
+def render_sge_job_name(identity: OpsJobIdentity, *, role: str) -> str:
+    role_token = _slug_token(role, fallback="job")
+    return f"ops.{identity.job_name_slug}.{role_token}"[:128]
+
+
+def _parse_assignment_list(value: str) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for item in str(value or "").split(","):
+        token = item.strip()
+        if not token or "=" not in token:
+            continue
+        key, raw_value = token.split("=", maxsplit=1)
+        normalized_key = key.strip().lower()
+        normalized_value = raw_value.strip()
+        if normalized_key and normalized_value:
+            result[normalized_key] = normalized_value
+    return result
+
+
+def _parse_qstat_job_metadata(text: str) -> tuple[str | None, dict[str, str]]:
+    job_name: str | None = None
+    tags: dict[str, str] = {}
+    for line in str(text or "").splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", maxsplit=1)
+        normalized_key = key.strip().lower()
+        normalized_value = value.strip()
+        if normalized_key == "job_name":
+            job_name = normalized_value or None
+            continue
+        if normalized_key in {"context", "env_list"}:
+            tags.update(_parse_assignment_list(normalized_value))
+    return job_name, tags
+
+
+def _job_name_matches_identity(identity: OpsJobIdentity, job_name: str | None) -> bool:
+    if not job_name:
+        return False
+    expected_prefix = f"ops.{identity.job_name_slug}."
+    return str(job_name).startswith(expected_prefix)
+
+
+def _job_matches_identity(identity: OpsJobIdentity, tags: Mapping[str, str]) -> bool:
+    expected = {
+        "ops_run_group_id": identity.run_group_id,
+        "ops_workspace_id": identity.workspace_id,
+        "ops_workflow_id": identity.workflow_id,
+    }
+    return all(tags.get(key) == value for key, value in expected.items())
+
+
+def _job_exposes_identity_contract(tags: Mapping[str, str]) -> bool:
+    return all(str(tags.get(key) or "").strip() for key in _OPS_IDENTITY_KEYS)
+
+
+def _active_job_resolution_state_for_job_ids(job_ids: Sequence[str]) -> ActiveJobResolutionState:
+    unique_job_ids = tuple(dict.fromkeys(str(job_id).strip() for job_id in job_ids if str(job_id).strip()))
+    if not unique_job_ids:
+        return ActiveJobResolutionState.NO_MATCH
+    if len(unique_job_ids) == 1:
+        return ActiveJobResolutionState.MATCHED
+    return ActiveJobResolutionState.MULTIPLE_MATCHES
+
+
+def _dedupe_job_ids(job_ids: Sequence[str]) -> tuple[str, ...]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for job_id in job_ids:
+        for token in str(job_id).split(","):
+            normalized = token.strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            deduped.append(normalized)
+    return tuple(deduped)
+
+
+def _default_runtime_visibility_for_job_ids(job_ids: Sequence[str]) -> RuntimeVisibility:
+    deduped = _dedupe_job_ids(job_ids)
+    if not deduped:
+        return RuntimeVisibility(
+            scheduler_probe_state=SchedulerProbeState.SKIPPED,
+            active_job_resolution_state=ActiveJobResolutionState.NOT_REQUIRED,
+            degraded=False,
+        )
+    return RuntimeVisibility(
+        scheduler_probe_state=SchedulerProbeState.SKIPPED,
+        active_job_resolution_state=_active_job_resolution_state_for_job_ids(deduped),
+        degraded=False,
+    )
+
+
+def default_runtime_visibility() -> RuntimeVisibility:
+    return _default_runtime_visibility_for_job_ids(())
+
+
+def default_runtime_visibility_for_job_ids(job_ids: Sequence[str]) -> RuntimeVisibility:
+    return _default_runtime_visibility_for_job_ids(job_ids)
+
+
+def probe_active_jobs_for_runbook(
+    runbook: OrchestrationRunbookV1,
+    *,
+    max_jobs: int = 24,
+) -> ActiveJobResolution:
+    if max_jobs <= 0:
+        return ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=(),
+            effective_job_ids=(),
+            runtime_visibility=RuntimeVisibility(
+                scheduler_probe_state=SchedulerProbeState.SKIPPED,
+                active_job_resolution_state=ActiveJobResolutionState.NOT_REQUIRED,
+                degraded=False,
+            ),
+        )
+
+    identity = resolve_ops_job_identity(runbook)
+    user = os.environ.get("USER", "")
+    return_code, stdout, stderr = _run_probe(("qstat", "-u", user))
+    if return_code != 0:
+        message = stderr.strip() or stdout.strip() or "qstat -u failed"
+        return ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=(),
+            effective_job_ids=(),
+            runtime_visibility=RuntimeVisibility(
+                scheduler_probe_state=SchedulerProbeState.UNAVAILABLE,
+                active_job_resolution_state=ActiveJobResolutionState.UNKNOWN,
+                degraded=True,
+                degraded_reasons=(message,),
+            ),
+        )
+
+    active_job_ids: list[str] = []
+    degraded_reasons: list[str] = []
+    scheduler_probe_state = SchedulerProbeState.OK
+    for job_id in _parse_job_ids_from_qstat_output(stdout):
+        if len(active_job_ids) >= max_jobs:
+            break
+        rc, job_stdout, job_stderr = _run_probe(("qstat", "-j", str(job_id)))
+        if rc != 0:
+            message = job_stderr.strip() or job_stdout.strip() or f"qstat -j {job_id} failed"
+            degraded_reasons.append(f"active-job detail probe failed for job {job_id}: {message}")
+            scheduler_probe_state = SchedulerProbeState.ERROR
+            continue
+        job_name, tags = _parse_qstat_job_metadata(job_stdout)
+        if _job_matches_identity(identity, tags):
+            active_job_ids.append(str(job_id))
+            continue
+        if _job_name_matches_identity(identity, job_name) and not _job_exposes_identity_contract(tags):
+            degraded_reasons.append(
+                "scheduler surfaced candidate job "
+                f"{job_id} without the explicit OPS identity tags required for discovery"
+            )
+            scheduler_probe_state = SchedulerProbeState.UNSUPPORTED
+            continue
+    discovered_job_ids = tuple(active_job_ids)
+    resolution_state = _active_job_resolution_state_for_job_ids(discovered_job_ids)
+    if degraded_reasons:
+        resolution_state = ActiveJobResolutionState.UNKNOWN
+    return ActiveJobResolution(
+        explicit_job_ids=(),
+        discovered_job_ids=discovered_job_ids,
+        effective_job_ids=discovered_job_ids,
+        runtime_visibility=RuntimeVisibility(
+            scheduler_probe_state=scheduler_probe_state,
+            active_job_resolution_state=resolution_state,
+            degraded=bool(degraded_reasons),
+            degraded_reasons=tuple(dict.fromkeys(degraded_reasons)),
+        ),
+    )
+
+
+def resolve_active_job_resolution(
+    *,
+    runbook: OrchestrationRunbookV1,
+    explicit_job_ids: Sequence[str],
+    discover_active_jobs: bool,
+    max_jobs: int = 24,
+) -> ActiveJobResolution:
+    normalized_explicit_job_ids = _dedupe_job_ids(explicit_job_ids)
+    if not discover_active_jobs:
+        if normalized_explicit_job_ids:
+            return ActiveJobResolution(
+                explicit_job_ids=normalized_explicit_job_ids,
+                discovered_job_ids=(),
+                effective_job_ids=normalized_explicit_job_ids,
+                runtime_visibility=RuntimeVisibility(
+                    scheduler_probe_state=SchedulerProbeState.SKIPPED,
+                    active_job_resolution_state=_active_job_resolution_state_for_job_ids(normalized_explicit_job_ids),
+                    degraded=False,
+                ),
+            )
+        return ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=(),
+            effective_job_ids=(),
+            runtime_visibility=RuntimeVisibility(
+                scheduler_probe_state=SchedulerProbeState.SKIPPED,
+                active_job_resolution_state=ActiveJobResolutionState.UNKNOWN,
+                degraded=True,
+                degraded_reasons=(
+                    f"active-job discovery skipped while mode_policy.on_active_job={runbook.mode_policy.on_active_job}",
+                ),
+            ),
+        )
+
+    try:
+        discovered_job_ids = discover_active_job_ids_for_runbook(runbook, max_jobs=max_jobs)
+        auto_resolution = ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=discovered_job_ids,
+            effective_job_ids=discovered_job_ids,
+            runtime_visibility=RuntimeVisibility(
+                scheduler_probe_state=SchedulerProbeState.OK,
+                active_job_resolution_state=_active_job_resolution_state_for_job_ids(discovered_job_ids),
+                degraded=False,
+            ),
+        )
+    except ActiveJobProbeError as exc:
+        auto_resolution = ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=(),
+            effective_job_ids=(),
+            runtime_visibility=exc.runtime_visibility,
+        )
+    except RuntimeError as exc:
+        auto_resolution = ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=(),
+            effective_job_ids=(),
+            runtime_visibility=RuntimeVisibility(
+                scheduler_probe_state=SchedulerProbeState.UNAVAILABLE,
+                active_job_resolution_state=ActiveJobResolutionState.UNKNOWN,
+                degraded=True,
+                degraded_reasons=(str(exc),),
+            ),
+        )
+    effective_job_ids = _dedupe_job_ids((*normalized_explicit_job_ids, *auto_resolution.discovered_job_ids))
+    runtime_visibility = auto_resolution.runtime_visibility
+    if normalized_explicit_job_ids:
+        runtime_visibility = RuntimeVisibility(
+            scheduler_probe_state=auto_resolution.runtime_visibility.scheduler_probe_state,
+            active_job_resolution_state=_active_job_resolution_state_for_job_ids(effective_job_ids),
+            degraded=auto_resolution.runtime_visibility.degraded,
+            degraded_reasons=auto_resolution.runtime_visibility.degraded_reasons,
+        )
+    return ActiveJobResolution(
+        explicit_job_ids=normalized_explicit_job_ids,
+        discovered_job_ids=auto_resolution.discovered_job_ids,
+        effective_job_ids=effective_job_ids,
+        runtime_visibility=runtime_visibility,
+    )
+
+
 def discover_active_job_ids_for_runbook(
     runbook: OrchestrationRunbookV1,
     *,
     max_jobs: int = 24,
 ) -> tuple[str, ...]:
-    if max_jobs <= 0:
-        return ()
-
-    user = os.environ.get("USER", "")
-    return_code, stdout, stderr = _run_probe(("qstat", "-u", user))
-    if return_code != 0:
-        message = stderr.strip() or stdout.strip() or "qstat -u failed"
-        raise RuntimeError(message)
-
-    tokens: list[str] = [str(runbook.workspace_root)]
-    if runbook.densegen is not None:
-        tokens.append(str(runbook.densegen.config))
-    if runbook.infer is not None:
-        tokens.append(str(runbook.infer.config))
-    if runbook.notify is not None:
-        tokens.append(str(runbook.notify.profile))
-    unique_tokens = tuple(dict.fromkeys(token for token in tokens if token))
-
-    active_job_ids: list[str] = []
-    for job_id in _parse_job_ids_from_qstat_output(stdout):
-        if len(active_job_ids) >= max_jobs:
-            break
-        rc, job_stdout, _job_stderr = _run_probe(("qstat", "-j", str(job_id)))
-        if rc != 0:
-            continue
-        if any(token in job_stdout for token in unique_tokens):
-            active_job_ids.append(str(job_id))
-    return tuple(active_job_ids)
+    resolution = probe_active_jobs_for_runbook(runbook, max_jobs=max_jobs)
+    runtime_visibility = resolution.runtime_visibility
+    if runtime_visibility.scheduler_probe_state != SchedulerProbeState.OK or runtime_visibility.degraded:
+        raise ActiveJobProbeError(runtime_visibility)
+    return resolution.discovered_job_ids
 
 
 def _normalize_hold_jid(active_job_ids: Sequence[str]) -> str | None:
@@ -265,7 +632,9 @@ def resolve_mode_decision(
     runbook: OrchestrationRunbookV1,
     requested_mode: RunMode | None,
     active_job_ids: Sequence[str],
+    runtime_visibility: RuntimeVisibility | None = None,
     allow_fresh_reset: bool = False,
+    allow_unknown_active_jobs: bool = False,
 ) -> ModeDecision:
     selected_requested_mode = requested_mode or runbook.mode_policy.default
     tool_adapter = resolve_mode_tool_adapter(runbook)
@@ -341,6 +710,7 @@ def resolve_mode_decision(
         if selected_mode == "fresh":
             reason = f"{reason}; fresh_reset_ack={str(allow_fresh_reset).lower()}"
 
+    selected_runtime_visibility = runtime_visibility or _default_runtime_visibility_for_job_ids(active_job_ids)
     hold_jid_candidates = _normalize_hold_jid(active_job_ids)
     if hold_jid_candidates is not None:
         if runbook.mode_policy.on_active_job == "hold_jid":
@@ -350,6 +720,14 @@ def resolve_mode_decision(
         else:
             submit_behavior = "blocked"
             reason = f"{reason}; active_jobs_detected; submission_blocked_by_policy"
+    elif selected_runtime_visibility.active_job_resolution_state == ActiveJobResolutionState.UNKNOWN:
+        if allow_unknown_active_jobs:
+            reason = f"{reason}; active_job_visibility_unknown; submission_override_allow_unknown_active_jobs=true"
+        else:
+            submit_behavior = "blocked"
+            reason = f"{reason}; active_job_visibility_unknown; submission_blocked_by_runtime_visibility"
+    else:
+        reason = f"{reason}; active_job_visibility={selected_runtime_visibility.active_job_resolution_state.value}"
 
     return ModeDecision(
         requested_mode=selected_requested_mode,

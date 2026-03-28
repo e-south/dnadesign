@@ -93,7 +93,7 @@ def _write_ops_audit(path: Path, *, ok: bool, queue_probe: str | None = None) ->
             "commands": [
                 {
                     "phase": "preflight",
-                    "command": "uv run python -m dnadesign.ops.orchestrator.gates session-counts",
+                    "command": "uv run ops runbook diagnostics session-counts",
                     "returncode": 0,
                     "stdout": preflight_stdout,
                     "stderr": preflight_stderr,
@@ -410,7 +410,7 @@ def _write_promoter_ops_contract(
                 "check_id": "notify.environment.webhook",
                 "check_group": "notify_environment",
                 "summary": "Batch notify secret is configured in the environment.",
-                "required": False,
+                "required": True,
                 "vars": ["NOTIFY_WEBHOOK", "NOTIFY_WEBHOOK_FILE"],
                 "match_mode": "any",
             },
@@ -419,7 +419,7 @@ def _write_promoter_ops_contract(
                 "check_id": "notify.environment.tls",
                 "check_group": "notify_environment",
                 "summary": "SSL_CERT_FILE is configured for notify profile doctor and live delivery.",
-                "required": False,
+                "required": True,
                 "vars": ["SSL_CERT_FILE"],
                 "match_mode": "all",
             },
@@ -471,7 +471,7 @@ def _write_promoter_ops_contract(
                         "check_id": f"notify.profile.{runtime_label}",
                         "check_group": "notify",
                         "summary": "Notify profile doctor completed.",
-                        "required": False,
+                        "required": True,
                         "phase_id": phase_id,
                         "surface": f"notify_profile_doctor_{runtime_label}",
                     },
@@ -480,7 +480,7 @@ def _write_promoter_ops_contract(
                         "check_id": f"notify.resolve_events.{runtime_label}",
                         "check_group": "notify",
                         "summary": "Notify events path resolved.",
-                        "required": False,
+                        "required": True,
                         "phase_id": phase_id,
                         "surface": f"notify_resolve_events_{runtime_label}",
                     },
@@ -503,7 +503,7 @@ def _write_promoter_ops_contract(
                     "check_group": "infer_batch_plan",
                     "phase_id": "infer_anchor_only_20b",
                     "summary": "Anchor-only 20B infer runbook renders cleanly.",
-                    "required": False,
+                    "required": True,
                     "surface": "infer_batch_20b_anchor_only",
                 },
                 {
@@ -512,7 +512,7 @@ def _write_promoter_ops_contract(
                     "check_group": "infer_batch_plan",
                     "phase_id": "infer_anchor_plus_template_20b",
                     "summary": "Anchor-plus-template 20B infer runbook renders cleanly.",
-                    "required": False,
+                    "required": True,
                     "surface": "infer_batch_20b_anchor_plus_template",
                 },
                 {
@@ -521,7 +521,7 @@ def _write_promoter_ops_contract(
                     "check_group": "infer_batch_plan",
                     "phase_id": "infer_anchor_only_7b",
                     "summary": "Anchor-only 7B infer runbook renders cleanly.",
-                    "required": False,
+                    "required": True,
                     "surface": "infer_batch_7b_anchor_only",
                 },
                 {
@@ -530,7 +530,7 @@ def _write_promoter_ops_contract(
                     "check_group": "infer_batch_plan",
                     "phase_id": "infer_anchor_plus_template_7b",
                     "summary": "Anchor-plus-template 7B infer runbook renders cleanly.",
-                    "required": False,
+                    "required": True,
                     "surface": "infer_batch_7b_anchor_plus_template",
                 },
             ]
@@ -1066,6 +1066,46 @@ def test_cli_progress_show_reports_promoter_study_record_surface() -> None:
         assert "pending promoter/demo_anchor_set" in payload["summary"]
 
 
+def test_cli_progress_show_marks_pipeline_only_execution_surfaces_as_derived() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        repo_root = Path.cwd()
+        (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
+        (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
+        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(promoter_index)
+        _write_promoter_study_preflight_record(study_dir)
+
+        result = runner.invoke(
+            app,
+            [
+                "progress",
+                "show",
+                "usr.data-plane.promoter-study-status",
+                "--repo-root",
+                str(_repo_root()),
+                "--study-dir",
+                str(study_dir),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        surface_labels = {item["label"] for item in payload["evidence"]["execution_surfaces"]}
+        derived_labels = {item["label"] for item in payload["evidence"]["derived_execution_surfaces"]}
+
+        assert "densegen_batch" in surface_labels
+        assert "infer_batch_7b_anchor_only" in surface_labels
+        assert "densegen_batch_with_notify" not in surface_labels
+        assert "infer_batch_7b_with_notify.anchor_only" not in surface_labels
+        assert "densegen_batch_with_notify" in derived_labels
+        assert "infer_batch_7b_with_notify.anchor_only" in derived_labels
+        assert payload["evidence"]["missing_execution_surfaces"] == []
+        assert payload["evidence"]["missing_derived_execution_surfaces"] == []
+
+
 def test_promoter_study_progress_discovers_active_study_from_repo_root() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -1189,6 +1229,23 @@ def test_promoter_study_preflight_reports_command_and_dataset_blockers(monkeypat
             raise AssertionError(f"unexpected command: {command}")
 
         monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
+        monkeypatch.setattr(
+            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            lambda *, runbook_path, repo_root: _fake_run(
+                (
+                    "uv",
+                    "run",
+                    "ops",
+                    "runbook",
+                    "plan",
+                    "--runbook",
+                    str(runbook_path),
+                    "--repo-root",
+                    str(repo_root),
+                ),
+                cwd=repo_root,
+            ),
+        )
         monkeypatch.setattr(
             "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
@@ -1342,6 +1399,23 @@ def test_promoter_study_preflight_demotes_construct_runtime_attention_once_mater
 
         monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
         monkeypatch.setattr(
+            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            lambda *, runbook_path, repo_root: _fake_run(
+                (
+                    "uv",
+                    "run",
+                    "ops",
+                    "runbook",
+                    "plan",
+                    "--runbook",
+                    str(runbook_path),
+                    "--repo-root",
+                    str(repo_root),
+                ),
+                cwd=repo_root,
+            ),
+        )
+        monkeypatch.setattr(
             "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [{"id": 0, "name": "GPU"}], "probe_error": None},
         )
@@ -1434,6 +1508,23 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
 
         monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
         monkeypatch.setattr(
+            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            lambda *, runbook_path, repo_root: _fake_run(
+                (
+                    "uv",
+                    "run",
+                    "ops",
+                    "runbook",
+                    "plan",
+                    "--runbook",
+                    str(runbook_path),
+                    "--repo-root",
+                    str(repo_root),
+                ),
+                cwd=repo_root,
+            ),
+        )
+        monkeypatch.setattr(
             "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
@@ -1454,13 +1545,17 @@ def test_promoter_study_preflight_scope_next_defers_later_lane_blockers(monkeypa
 
         assert state == "attention"
         assert "focus phase infer_batch_preparation" in summary
-        assert "ready with advisories:" in summary
+        assert "blocked by:" in summary
         assert evidence["scope"] == "next"
         assert evidence["target_phase"] == "infer_batch_preparation"
-        assert evidence["blocked_by"] == []
+        assert evidence["blocked_by"][:3] == [
+            "notify.environment.tls",
+            "notify.environment.webhook",
+            "infer.batch.20b.anchor_only.plan",
+        ]
         assert "infer.local_gpu.visibility" in evidence["nonblocking_attention_ids"]
-        assert "notify.environment.webhook" in evidence["nonblocking_attention_ids"]
-        assert "infer.batch.20b.anchor_only.plan" in evidence["nonblocking_attention_ids"]
+        assert "notify.environment.webhook" not in evidence["nonblocking_attention_ids"]
+        assert "infer.batch.20b.anchor_only.plan" not in evidence["nonblocking_attention_ids"]
         assert evidence["deferred_check_ids"] == []
 
 
@@ -1553,6 +1648,23 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
 
         monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
         monkeypatch.setattr(
+            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            lambda *, runbook_path, repo_root: _fake_run(
+                (
+                    "uv",
+                    "run",
+                    "ops",
+                    "runbook",
+                    "plan",
+                    "--runbook",
+                    str(runbook_path),
+                    "--repo-root",
+                    str(repo_root),
+                ),
+                cwd=repo_root,
+            ),
+        )
+        monkeypatch.setattr(
             "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
@@ -1574,15 +1686,20 @@ def test_promoter_study_preflight_lane_scope_keeps_notify_env_and_selected_lane(
         assert state == "attention"
         assert "focus phase infer_anchor_only_20b" in summary
         assert evidence["target_phase"] == "infer_anchor_only_20b"
-        assert "ready with advisories:" in summary
-        assert evidence["blocked_by"] == []
+        assert "blocked by:" in summary
         assert "infer.local_gpu.visibility" not in evidence["blocked_by"]
         assert "infer.batch.7b.anchor_only.plan" not in evidence["blocked_by"]
         assert "notify.profile.anchor_plus_template_20b" not in evidence["blocked_by"]
-        assert "notify.environment.webhook" in evidence["nonblocking_attention_ids"]
-        assert "notify.environment.tls" in evidence["nonblocking_attention_ids"]
-        assert "infer.batch.20b.anchor_only.plan" in evidence["nonblocking_attention_ids"]
-        assert "notify.profile.anchor_only_20b" in evidence["nonblocking_attention_ids"]
+        assert evidence["blocked_by"][:4] == [
+            "notify.environment.tls",
+            "notify.environment.webhook",
+            "infer.batch.20b.anchor_only.plan",
+            "notify.profile.anchor_only_20b",
+        ]
+        assert "notify.environment.webhook" not in evidence["nonblocking_attention_ids"]
+        assert "notify.environment.tls" not in evidence["nonblocking_attention_ids"]
+        assert "infer.batch.20b.anchor_only.plan" not in evidence["nonblocking_attention_ids"]
+        assert "notify.profile.anchor_only_20b" not in evidence["nonblocking_attention_ids"]
 
 
 def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attention(monkeypatch) -> None:
@@ -1671,6 +1788,23 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
 
         monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
         monkeypatch.setattr(
+            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            lambda *, runbook_path, repo_root: _fake_run(
+                (
+                    "uv",
+                    "run",
+                    "ops",
+                    "runbook",
+                    "plan",
+                    "--runbook",
+                    str(runbook_path),
+                    "--repo-root",
+                    str(repo_root),
+                ),
+                cwd=repo_root,
+            ),
+        )
+        monkeypatch.setattr(
             "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
@@ -1696,7 +1830,8 @@ def test_promoter_study_preflight_full_scope_demotes_completed_infer_lane_attent
         assert "infer.local_gpu.visibility" in evidence["nonblocking_attention_ids"]
         assert "notify.profile.anchor_only_20b" in evidence["nonblocking_attention_ids"]
         assert "infer.batch.20b.anchor_only.plan" in evidence["nonblocking_attention_ids"]
-        assert evidence["blocked_by"] == []
+        assert "notify.environment.webhook" in evidence["blocked_by"]
+        assert "infer.batch.20b.anchor_plus_template.plan" in evidence["blocked_by"]
 
 
 def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_attention(monkeypatch) -> None:
@@ -1778,6 +1913,23 @@ def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_
 
         monkeypatch.setattr("dnadesign.studies.families.promoter.adapter.run_preflight_command", _fake_run)
         monkeypatch.setattr(
+            "dnadesign.studies.families.promoter.adapter.execute_runbook_plan",
+            lambda *, runbook_path, repo_root: _fake_run(
+                (
+                    "uv",
+                    "run",
+                    "ops",
+                    "runbook",
+                    "plan",
+                    "--runbook",
+                    str(runbook_path),
+                    "--repo-root",
+                    str(repo_root),
+                ),
+                cwd=repo_root,
+            ),
+        )
+        monkeypatch.setattr(
             "dnadesign.studies.families.promoter.adapter.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
@@ -1800,7 +1952,7 @@ def test_promoter_study_preflight_full_scope_demotes_parallel_optional_densegen_
         assert "densegen.config.probe_solver" not in evidence["blocked_by"]
         assert "densegen.config.probe_solver" in evidence["nonblocking_attention_ids"]
         assert "infer.local_gpu.visibility" in evidence["nonblocking_attention_ids"]
-        assert evidence["blocked_by"] == []
+        assert "notify.environment.webhook" in evidence["blocked_by"]
 
 
 def test_cli_progress_show_reports_cluster_run_index_surface() -> None:
@@ -2317,7 +2469,8 @@ def test_cli_progress_scaffold_rejects_unknown_registry_id_with_suggestions() ->
     )
 
     assert result.exit_code == 2
-    assert "Progress contract error: unknown registry id: usr.data-plane.promoter-feature" in result.output
+    assert "Progress contract error: unknown registry id:" in result.output
+    assert "usr.data-plane.promoter-feature" in result.output
     assert "Did you mean:" in result.output
     assert "usr.data-plane.promoter-feature-matrix" in result.output
 
@@ -2338,7 +2491,8 @@ def test_cli_progress_scaffold_rejects_unknown_related_to_registry_id_with_sugge
     )
 
     assert result.exit_code == 2
-    assert "Progress contract error: unknown registry id: usr.data-plane.promoter-feature" in result.output
+    assert "Progress contract error: unknown registry id:" in result.output
+    assert "usr.data-plane.promoter-feature" in result.output
     assert "Did you mean:" in result.output
     assert "usr.data-plane.promoter-feature-matrix" in result.output
 
@@ -2397,7 +2551,8 @@ def test_cli_progress_scaffold_requires_registry_ids_or_related_to() -> None:
     )
 
     assert result.exit_code == 2
-    assert "campaign scaffold requires at least one registry id or --related-to" in result.output
+    assert "campaign scaffold requires at least one registry id" in result.output
+    assert "--related-to" in result.output
     assert "uv run ops catalog list --simple" in result.output
     assert "uv run ops progress scaffold --related-to <registry-id>" in result.output
 
@@ -2417,7 +2572,8 @@ def test_cli_progress_show_suggests_close_registry_ids() -> None:
     )
 
     assert result.exit_code == 2
-    assert "Progress contract error: unknown registry id: usr.data-plane.promoter-feature" in result.output
+    assert "Progress contract error: unknown registry id:" in result.output
+    assert "usr.data-plane.promoter-feature" in result.output
     assert "Did you mean:" in result.output
     assert "usr.data-plane.promoter-feature-matrix" in result.output
 
@@ -2460,7 +2616,9 @@ def test_cli_progress_show_surfaces_optional_opal_workdir_hint_when_inputs_are_m
     )
 
     assert result.exit_code == 2
-    assert "status kind 'opal-campaign-state' requires --opal-config or --opal-workdir" in result.output
+    assert "status kind 'opal-campaign-state' requires" in result.output
+    assert "--opal-config" in result.output
+    assert "--opal-workdir" in result.output
     assert "Required inputs for opal.downstream.usr-infer-x-active-learning:" in result.output
     assert "Also accepted:" in result.output
     assert "--opal-workdir" in result.output
@@ -2583,6 +2741,8 @@ def test_cli_status_kinds_reports_provider_owned_inventory() -> None:
         "then pass the same audit path to `ops progress show`.",
         "On workstations without `qstat`, add `--allow-missing-qstat` so the queue probe stays explicit "
         "but non-fatal during a dry-run demo.",
+        "If `plan.runtime_visibility.active_job_resolution_state=unknown`, submit stays blocked by default "
+        "unless the operator explicitly passes `--allow-unknown-active-jobs`.",
     ]
 
 
@@ -2665,7 +2825,8 @@ def test_cli_progress_campaign_missing_manifest_suggests_scaffold() -> None:
     assert "Progress contract error: campaign manifest not found" in result.output
     assert "Hint: check the manifest path from `pwd` or pass an absolute path." in result.output
     assert "uv run ops progress scaffold <registry-id> ..." in result.output
-    assert "uv run ops progress scaffold --related-to <registry-id>" in result.output
+    assert "uv run ops progress scaffold --related-to" in result.output
+    assert "<registry-id>" in result.output
 
 
 def test_cli_progress_campaign_requires_versioned_manifest_contract() -> None:
@@ -2737,4 +2898,5 @@ def test_cli_progress_campaign_rejects_top_level_step_inputs() -> None:
         )
 
         assert result.exit_code == 2
-        assert "must place provider inputs under 'inputs': audit_json" in result.output
+        assert "must place provider inputs under 'inputs':" in result.output
+        assert "audit_json" in result.output

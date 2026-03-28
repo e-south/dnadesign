@@ -5,7 +5,7 @@ src/dnadesign/ops/preflight/contract_checks.py
 
 Generic execution for checked-in study preflight check specs.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -29,6 +29,7 @@ from .checks import (
     build_scheduler_queue_checks,
 )
 from .models import CommandExecution, PreflightCheck, build_state_check
+from .support import execute_runbook_plan as default_execute_runbook_plan
 
 _ENVIRONMENT_MATCH_MODES = frozenset({"all", "any"})
 
@@ -39,6 +40,7 @@ class ContractPreflightCheckDependencies:
     safe_json_loads: Callable[[str | None], dict[str, object] | None]
     choose_command_summary: Callable[..., str]
     inspect_local_gpu_inventory: Callable[[], dict[str, object]]
+    execute_runbook_plan: Callable[..., CommandExecution] | None = None
 
 
 def build_contract_preflight_checks(
@@ -61,6 +63,7 @@ def build_contract_preflight_checks(
         contract=contract.preflight,
         enabled_groups=tuple(enabled_group_set),
     )
+    execute_runbook_plan = dependencies.execute_runbook_plan or default_execute_runbook_plan
     for compiled in compiled_plan.checks:
         kind = compiled.kind
         check_group = compiled.check_group
@@ -191,7 +194,7 @@ def build_contract_preflight_checks(
                         ),
                     ),
                     dependencies=RunbookPlanCheckDependencies(
-                        run_preflight_command=dependencies.run_preflight_command,
+                        execute_runbook_plan=execute_runbook_plan,
                         safe_json_loads=dependencies.safe_json_loads,
                         choose_command_summary=dependencies.choose_command_summary,
                     ),

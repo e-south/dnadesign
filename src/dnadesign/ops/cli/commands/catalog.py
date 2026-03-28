@@ -31,7 +31,12 @@ from dnadesign.ops.catalog import (
     load_runbook_catalog,
     repo_relative_catalog_doc_path,
 )
-from dnadesign.ops.cli.common import append_registry_suggestions, normalize_optional_filter, render_command
+from dnadesign.ops.cli.common import (
+    append_registry_suggestions,
+    normalize_optional_filter,
+    raise_contract_error,
+    render_command,
+)
 from dnadesign.ops.cli.dynamic_inputs import render_progress_show_command
 
 if TYPE_CHECKING:
@@ -798,15 +803,13 @@ def catalog_list(
     try:
         catalog = load_runbook_catalog(repo_root=repo_root)
     except ValueError as exc:
-        typer.echo(f"Catalog contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(f"Catalog contract error: {exc}")
 
     normalized_related_to = normalize_optional_filter(related_to)
     if normalized_related_to is not None and catalog.find_procedure(normalized_related_to) is None:
         message = f"Catalog contract error: unknown --related-to registry id: {normalized_related_to}"
         message = append_registry_suggestions(message=message, catalog=catalog, registry_id=normalized_related_to)
-        typer.echo(message, err=True)
-        raise typer.Exit(code=2)
+        raise_contract_error(message)
 
     filters = CatalogQuery(
         query=normalize_optional_filter(query),
@@ -868,8 +871,7 @@ def catalog_show(
     try:
         catalog = load_runbook_catalog(repo_root=repo_root)
     except ValueError as exc:
-        typer.echo(f"Catalog contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(f"Catalog contract error: {exc}")
 
     entry = catalog.find_procedure(registry_id)
     if entry is None:
@@ -878,13 +880,11 @@ def catalog_show(
             catalog=catalog,
             registry_id=registry_id,
         )
-        typer.echo(message, err=True)
-        raise typer.Exit(code=2)
+        raise_contract_error(message)
     try:
         details = load_catalog_procedure_details(catalog, entry)
     except ValueError as exc:
-        typer.echo(f"Catalog contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(f"Catalog contract error: {exc}")
 
     if as_json:
         _emit_catalog_show_json(

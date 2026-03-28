@@ -5,7 +5,7 @@ src/dnadesign/studies/tests/test_record_loader.py
 
 Focused tests for fail-fast ops.study.yaml contract loading.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

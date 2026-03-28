@@ -11,14 +11,13 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
-from .models import PreflightCheck
+from dnadesign.ops.status.models import STATE_SEVERITY, state_counts
 
-_STATE_PRIORITY = {"missing": 0, "attention": 1}
+from .models import PreflightCheck
 
 
 class PreflightScopePlan(Protocol):
@@ -63,14 +62,17 @@ def evaluate_preflight_checks(
     blocker_checks = _ordered_preflight_blockers(
         scoped_checks,
         phase_status_index=phase_status_index,
+        scope_plan=scope_plan,
     )
     deferred_blockers = _ordered_preflight_blockers(
         [check for check in checks if check not in scoped_checks],
         phase_status_index=phase_status_index,
+        scope_plan=scope_plan,
     )
     nonblocking_attention_checks = _ordered_nonblocking_preflight_attention(
         scoped_checks,
         phase_status_index=phase_status_index,
+        scope_plan=scope_plan,
     )
     effective_counts = scoped_counts if scope_plan.scope == "next" else all_counts
     return PreflightCheckEvaluation(
@@ -101,24 +103,29 @@ def check_matches_scope(
 
 
 def _counts_by_state(checks: Sequence[PreflightCheck]) -> dict[str, int]:
-    counts: Counter[str] = Counter(check.state for check in checks)
-    return {state: int(counts.get(state, 0)) for state in ("ok", "attention", "missing")}
+    return state_counts(check.state for check in checks)
 
 
 def _ordered_preflight_blockers(
     checks: Sequence[PreflightCheck],
     *,
     phase_status_index: Mapping[str, str],
+    scope_plan: PreflightScopePlan,
 ) -> tuple[PreflightCheck, ...]:
     failing = [check for check in checks if check.state != "ok"]
-    failing = [check for check in failing if _preflight_check_is_blocking(check, phase_status_index=phase_status_index)]
+    failing = [
+        check
+        for check in failing
+        if _preflight_check_is_blocking(
+            check,
+            phase_status_index=phase_status_index,
+            scope_plan=scope_plan,
+        )
+    ]
     return tuple(
         sorted(
             failing,
-            key=lambda check: (
-                _STATE_PRIORITY.get(check.state, 99),
-                check.id,
-            ),
+            key=lambda check: _preflight_order_key(check, scope_plan=scope_plan),
         )
     )
 
@@ -127,33 +134,57 @@ def _ordered_nonblocking_preflight_attention(
     checks: Sequence[PreflightCheck],
     *,
     phase_status_index: Mapping[str, str],
+    scope_plan: PreflightScopePlan,
 ) -> tuple[PreflightCheck, ...]:
     nonblocking = [
         check
         for check in checks
-        if check.state != "ok" and not _preflight_check_is_blocking(check, phase_status_index=phase_status_index)
+        if check.state != "ok"
+        and not _preflight_check_is_blocking(
+            check,
+            phase_status_index=phase_status_index,
+            scope_plan=scope_plan,
+        )
     ]
     return tuple(
         sorted(
             nonblocking,
-            key=lambda check: (
-                _STATE_PRIORITY.get(check.state, 99),
-                check.id,
-            ),
+            key=lambda check: _preflight_order_key(check, scope_plan=scope_plan),
         )
     )
+
+
+def _preflight_order_key(
+    check: PreflightCheck,
+    *,
+    scope_plan: PreflightScopePlan,
+) -> tuple[int, int, int, str]:
+    severity_rank = -STATE_SEVERITY.get(check.state, -1)
+    if scope_plan.scope != "next" or scope_plan.target_phase_id is None:
+        return (severity_rank, 0, 0, check.id)
+
+    check_group = str(check.check_group or "").strip()
+    group_is_shared = check_group not in scope_plan.phase_scoped_groups
+    shared_rank = 0 if group_is_shared else 1
+    phase_rank = 0 if str(check.phase_id or "").strip() == scope_plan.target_phase_id else 1
+    return (severity_rank, shared_rank, phase_rank, check.id)
 
 
 def _preflight_check_is_blocking(
     check: PreflightCheck,
     *,
     phase_status_index: Mapping[str, str],
+    scope_plan: PreflightScopePlan,
 ) -> bool:
     if not check.required:
         return False
     phase_id = str(check.phase_id or "").strip()
     if not phase_id:
         return True
+    if scope_plan.scope == "next" and scope_plan.target_phase_id is not None:
+        check_group = str(check.check_group or "").strip()
+        if check_group and check_group not in scope_plan.phase_scoped_groups:
+            return True
     phase_status = phase_status_index.get(phase_id)
     return phase_status not in {"complete", "parallel_optional"}
 

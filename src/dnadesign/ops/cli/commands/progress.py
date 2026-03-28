@@ -27,7 +27,12 @@ from dnadesign.ops.catalog import (
     load_runbook_catalog,
     repo_relative_catalog_doc_path,
 )
-from dnadesign.ops.cli.common import append_registry_suggestions, normalize_optional_filter, render_command
+from dnadesign.ops.cli.common import (
+    append_registry_suggestions,
+    normalize_optional_filter,
+    raise_contract_error,
+    render_command,
+)
 from dnadesign.ops.cli.dynamic_inputs import (
     build_dynamic_input_options,
     merge_status_input_values,
@@ -454,15 +459,13 @@ def _progress_show_callback(
     try:
         catalog = load_runbook_catalog(repo_root=repo_root)
     except ValueError as exc:
-        typer.echo(f"Progress contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(f"Progress contract error: {exc}")
 
     entry = catalog.find_procedure(registry_id)
     if entry is None:
         message = f"Progress contract error: unknown registry id: {registry_id}"
         message = append_registry_suggestions(message=message, catalog=catalog, registry_id=registry_id)
-        typer.echo(message, err=True)
-        raise typer.Exit(code=2)
+        raise_contract_error(message)
 
     try:
         spec = _load_status_kind_spec(entry.status_kind)
@@ -486,8 +489,7 @@ def _progress_show_callback(
                 f"\nHint: use `uv run ops progress scaffold {registry_id}` to emit a manifest step "
                 "with the required fields."
             )
-        typer.echo(message, err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(message)
 
     if as_json:
         _emit_progress_show_json(repo_root=catalog.repo_root, catalog_path=catalog.catalog_path, result=result)
@@ -579,15 +581,13 @@ def progress_explain(
     try:
         catalog = load_runbook_catalog(repo_root=repo_root)
     except ValueError as exc:
-        typer.echo(f"Progress contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(f"Progress contract error: {exc}")
 
     entry = catalog.find_procedure(registry_id)
     if entry is None:
         message = f"Progress contract error: unknown registry id: {registry_id}"
         message = append_registry_suggestions(message=message, catalog=catalog, registry_id=registry_id)
-        typer.echo(message, err=True)
-        raise typer.Exit(code=2)
+        raise_contract_error(message)
 
     details = load_catalog_procedure_details(catalog, entry)
     if as_json:
@@ -629,8 +629,7 @@ def progress_campaign(
     try:
         catalog = load_runbook_catalog(repo_root=repo_root)
     except ValueError as exc:
-        typer.echo(f"Progress contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(f"Progress contract error: {exc}")
 
     try:
         result = _load_campaign_status(catalog, manifest_path=manifest)
@@ -649,8 +648,7 @@ def progress_campaign(
             or "must define a non-empty 'steps' list" in error_text
         ):
             message += "\n" + _progress_campaign_recovery_hint()
-        typer.echo(message, err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(message)
 
     if as_json:
         _emit_campaign_progress_json(repo_root=catalog.repo_root, catalog_path=catalog.catalog_path, result=result)
@@ -699,14 +697,12 @@ def progress_scaffold(
     ] = False,
 ) -> None:
     if as_json and out is not None:
-        typer.echo("Progress contract error: --json cannot be combined with --out", err=True)
-        raise typer.Exit(code=2)
+        raise_contract_error("Progress contract error: --json cannot be combined with --out")
 
     try:
         catalog = load_runbook_catalog(repo_root=repo_root)
     except ValueError as exc:
-        typer.echo(f"Progress contract error: {exc}", err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(f"Progress contract error: {exc}")
 
     normalized_campaign_id = normalize_optional_filter(campaign_id)
     normalized_related_to = normalize_optional_filter(related_to)
@@ -733,8 +729,7 @@ def progress_scaffold(
                 message += "\nDid you mean:\n" + "\n".join(f"- {candidate}" for candidate in suggestions)
         if str(exc) == "campaign scaffold requires at least one registry id or --related-to":
             message += "\n" + _progress_scaffold_recovery_hint()
-        typer.echo(message, err=True)
-        raise typer.Exit(code=2) from exc
+        raise_contract_error(message)
 
     if as_json:
         _emit_progress_scaffold_json(repo_root=catalog.repo_root, catalog_path=catalog.catalog_path, result=result)
@@ -746,8 +741,7 @@ def progress_scaffold(
         return
     out_path = out.expanduser()
     if out_path.exists() and not force:
-        typer.echo(f"Progress contract error: file exists: {out_path}", err=True)
-        raise typer.Exit(code=2)
+        raise_contract_error(f"Progress contract error: file exists: {out_path}")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(rendered_yaml, encoding="utf-8")
     typer.echo(str(out_path.resolve()))

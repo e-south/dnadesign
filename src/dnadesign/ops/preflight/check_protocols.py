@@ -5,7 +5,7 @@ src/dnadesign/ops/preflight/check_protocols.py
 
 Shared check-target contracts for generic OPS preflight executors.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

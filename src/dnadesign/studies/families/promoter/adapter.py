@@ -19,6 +19,7 @@ from pathlib import Path
 from dnadesign.ops.catalog import discover_repo_root
 from dnadesign.ops.preflight import (
     choose_command_summary,
+    execute_runbook_plan,
     run_preflight_command,
     safe_json_loads,
 )
@@ -156,6 +157,7 @@ class PromoterStudyFamilyAdapter(StudyFamilyAdapter):
             evidence=evidence,
             dependencies=PromoterPreflightCoordinatorDependencies(
                 run_preflight_command=run_preflight_command,
+                execute_runbook_plan=execute_runbook_plan,
                 safe_json_loads=safe_json_loads,
                 choose_command_summary=choose_command_summary,
                 inspect_local_gpu_inventory=inspect_local_infer_gpu_inventory,

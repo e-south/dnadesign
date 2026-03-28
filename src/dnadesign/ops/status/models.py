@@ -12,16 +12,46 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 _FIELD_TYPES = frozenset({"str", "path", "int", "bool", "enum"})
 _PATH_BASES = frozenset({"repo", "manifest", "cwd"})
-_STATUS_STATES = frozenset({"ok", "attention", "missing"})
 _STATUS_COST_CLASSES = frozenset({"cheap", "deep"})
 _STATUS_PLANES = frozenset({"control", "record", "execution_readiness", "data"})
 _STATUS_SUMMARY_SCOPES = frozenset({"repo", "workspace", "host", "cluster"})
+StatusState = Literal["ok", "attention", "missing"]
+STATUS_STATES: tuple[StatusState, ...] = ("ok", "attention", "missing")
+STATE_SEVERITY: dict[StatusState, int] = {"ok": 0, "attention": 1, "missing": 2}
+_STATUS_STATES = frozenset(STATUS_STATES)
+
+
+def state_counts(states: Iterable[str]) -> dict[StatusState, int]:
+    counts: Counter[str] = Counter()
+    for state in states:
+        normalized = str(state or "").strip()
+        if normalized not in _STATUS_STATES:
+            raise ValueError(f"invalid status state: {state!r}")
+        counts[normalized] += 1
+    return {state: int(counts.get(state, 0)) for state in STATUS_STATES}
+
+
+def combine_states(states: Iterable[StatusState], *, empty: StatusState = "ok") -> StatusState:
+    seen_state = False
+    selected_state = empty
+    selected_severity = STATE_SEVERITY[selected_state]
+    for state in states:
+        normalized = str(state or "").strip()
+        if normalized not in _STATUS_STATES:
+            raise ValueError(f"invalid status state: {state!r}")
+        seen_state = True
+        severity = STATE_SEVERITY[normalized]
+        if severity > selected_severity:
+            selected_state = normalized
+            selected_severity = severity
+    return selected_state if seen_state else empty
 
 
 @dataclass(frozen=True)
@@ -189,7 +219,7 @@ class ProcedureStatus:
     cost_class: str
     summary_scope: str
     label: str | None
-    state: str
+    state: StatusState
     summary: str
     evidence: dict[str, object]
 
@@ -295,16 +325,10 @@ class CampaignStatus:
     path_base: str | None = None
 
     def counts(self) -> dict[str, int]:
-        state_counts = Counter(step.state for step in self.steps)
-        return {state: int(state_counts.get(state, 0)) for state in ("ok", "attention", "missing")}
+        return state_counts(step.state for step in self.steps)
 
     def overall_state(self) -> str:
-        counts = self.counts()
-        if counts["attention"] > 0:
-            return "attention"
-        if counts["missing"] > 0:
-            return "missing"
-        return "ok"
+        return combine_states(step.state for step in self.steps)
 
     def as_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -325,5 +349,10 @@ __all__ = [
     "CampaignScaffoldStep",
     "InputFieldSpec",
     "ProcedureStatus",
+    "STATE_SEVERITY",
+    "STATUS_STATES",
     "StatusKindSpec",
+    "StatusState",
+    "combine_states",
+    "state_counts",
 ]

@@ -5,7 +5,7 @@ src/dnadesign/ops/preflight/checks/environment.py
 
 Generic environment-flag preflight check executors.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

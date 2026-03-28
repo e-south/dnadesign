@@ -21,7 +21,14 @@ from dnadesign.infer import validate_runbook_gpu_resources
 
 from ..runbooks.path_policy import WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR
 from ..runbooks.schema import OrchestrationRunbookV1
-from .state import ModeDecision
+from .state import (
+    ModeDecision,
+    OpsJobIdentity,
+    build_ops_job_context,
+    build_ops_job_env,
+    render_sge_context_value,
+    render_sge_job_name,
+)
 from .workflow_tools import (
     build_workflow_tool_registry,
     freeze_workflow_tool_registry,
@@ -48,7 +55,7 @@ class PlanToolAdapter:
     notify_config_path: Callable[[OrchestrationRunbookV1], Path]
     build_preflight_commands: Callable[[OrchestrationRunbookV1, ModeDecision, str], tuple[ToolCommandSpec, ...]]
     build_submit_commands: Callable[
-        [OrchestrationRunbookV1, ModeDecision, str, tuple[str, ...]],
+        [OrchestrationRunbookV1, ModeDecision, OpsJobIdentity, str, tuple[str, ...]],
         tuple[ToolCommandSpec, ...],
     ]
 
@@ -343,6 +350,7 @@ def _infer_preflight_commands(
 def _densegen_submit_commands(
     runbook: OrchestrationRunbookV1,
     mode_decision: ModeDecision,
+    job_identity: OpsJobIdentity,
     stdout_file: str,
     hold_fragment: tuple[str, ...],
 ) -> tuple[ToolCommandSpec, ...]:
@@ -350,14 +358,18 @@ def _densegen_submit_commands(
         raise ValueError("densegen plan adapter requires runbook.densegen")
     post_run_pe_omp, post_run_h_rt, post_run_mem_per_core = _densegen_post_run_resource_values(runbook)
     runtime_trace_dir = (runbook.workspace_root / WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR).resolve()
-    densegen_job_name = _sge_job_name(runbook_id=runbook.id, suffix="densegen_cpu")
-    densegen_post_run_job_name = _sge_job_name(runbook_id=runbook.id, suffix="densegen_postrun")
+    densegen_job_name = render_sge_job_name(job_identity, role="densegen_cpu")
+    densegen_post_run_job_name = render_sge_job_name(job_identity, role="densegen_postrun")
     densegen_env = {
         "DENSEGEN_CONFIG": str(runbook.densegen.config),
         "DENSEGEN_RUN_ARGS": mode_decision.run_args,
         "DENSEGEN_TRACE_DIR": str(runtime_trace_dir),
+        **build_ops_job_env(job_identity, role="densegen_cpu"),
     }
-    densegen_post_run_env = {"DENSEGEN_CONFIG": str(runbook.densegen.config)}
+    densegen_post_run_env = {
+        "DENSEGEN_CONFIG": str(runbook.densegen.config),
+        **build_ops_job_env(job_identity, role="densegen_postrun"),
+    }
     return (
         _tool_argv(
             "qsub",
@@ -367,6 +379,8 @@ def _densegen_submit_commands(
             *hold_fragment,
             "-N",
             densegen_job_name,
+            "-ac",
+            render_sge_context_value(build_ops_job_context(job_identity, role="densegen_cpu")),
             "-o",
             stdout_file,
             "-pe",
@@ -390,6 +404,8 @@ def _densegen_submit_commands(
             densegen_job_name,
             "-N",
             densegen_post_run_job_name,
+            "-ac",
+            render_sge_context_value(build_ops_job_context(job_identity, role="densegen_postrun")),
             "-o",
             stdout_file,
             "-pe",
@@ -410,12 +426,16 @@ def _densegen_submit_commands(
 def _infer_submit_commands(
     runbook: OrchestrationRunbookV1,
     mode_decision: ModeDecision,
+    job_identity: OpsJobIdentity,
     stdout_file: str,
     hold_fragment: tuple[str, ...],
 ) -> tuple[ToolCommandSpec, ...]:
     if runbook.infer is None:
         raise ValueError("infer plan adapter requires runbook.infer")
-    infer_env: dict[str, str] = {"INFER_CONFIG": str(runbook.infer.config)}
+    infer_env: dict[str, str] = {
+        "INFER_CONFIG": str(runbook.infer.config),
+        **build_ops_job_env(job_identity, role="infer_gpu"),
+    }
     if mode_decision.run_args:
         infer_env["INFER_RUN_ARGS"] = mode_decision.run_args
     infer_env["CUDA_MODULE"] = runbook.infer.cuda_module
@@ -427,6 +447,10 @@ def _infer_submit_commands(
             "-P",
             runbook.project,
             *hold_fragment,
+            "-N",
+            render_sge_job_name(job_identity, role="infer_gpu"),
+            "-ac",
+            render_sge_context_value(build_ops_job_context(job_identity, role="infer_gpu")),
             "-o",
             stdout_file,
             "-pe",
@@ -446,16 +470,6 @@ def _infer_submit_commands(
             env=infer_env,
         ),
     )
-
-
-def _sge_job_name(*, runbook_id: str, suffix: str) -> str:
-    token = "".join(ch if ch.isalnum() or ch in "_.-" else "_" for ch in str(runbook_id or "").strip()).strip("_.-")
-    suffix_token = "".join(ch if ch.isalnum() or ch in "_.-" else "_" for ch in str(suffix or "").strip()).strip("_.-")
-    if not token:
-        token = "runbook"
-    if not suffix_token:
-        suffix_token = "job"
-    return f"{token}_{suffix_token}"[:128]
 
 
 _PLAN_TOOL_ADAPTERS = build_workflow_tool_registry(

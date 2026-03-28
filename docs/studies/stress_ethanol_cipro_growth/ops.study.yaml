@@ -401,14 +401,14 @@ preflight:
         check_id: notify.environment.webhook
         check_group: notify_environment
         summary: Batch notify secret is configured in the environment.
-        required: false
+        required: true
         vars: [NOTIFY_WEBHOOK, NOTIFY_WEBHOOK_FILE]
         match_mode: any
       - kind: environment
         check_id: notify.environment.tls
         check_group: notify_environment
         summary: SSL_CERT_FILE is configured for notify profile doctor and live delivery.
-        required: false
+        required: true
         vars: [SSL_CERT_FILE]
         match_mode: all
       - kind: gpu_availability
@@ -477,56 +477,56 @@ preflight:
         check_id: notify.profile.anchor_only_20b
         check_group: notify
         summary: Notify profile doctor completed.
-        required: false
+        required: true
         phase_id: infer_anchor_only_20b
         surface: notify_profile_doctor_anchor_only_20b
       - kind: command
         check_id: notify.profile.anchor_plus_template_20b
         check_group: notify
         summary: Notify profile doctor completed.
-        required: false
+        required: true
         phase_id: infer_anchor_plus_template_20b
         surface: notify_profile_doctor_anchor_plus_template_20b
       - kind: command
         check_id: notify.profile.anchor_only_7b
         check_group: notify
         summary: Notify profile doctor completed.
-        required: false
+        required: true
         phase_id: infer_anchor_only_7b
         surface: notify_profile_doctor_anchor_only_7b
       - kind: command
         check_id: notify.profile.anchor_plus_template_7b
         check_group: notify
         summary: Notify profile doctor completed.
-        required: false
+        required: true
         phase_id: infer_anchor_plus_template_7b
         surface: notify_profile_doctor_anchor_plus_template_7b
       - kind: command
         check_id: notify.resolve_events.anchor_only_20b
         check_group: notify
         summary: Notify events path resolved.
-        required: false
+        required: true
         phase_id: infer_anchor_only_20b
         surface: notify_resolve_events_anchor_only_20b
       - kind: command
         check_id: notify.resolve_events.anchor_plus_template_20b
         check_group: notify
         summary: Notify events path resolved.
-        required: false
+        required: true
         phase_id: infer_anchor_plus_template_20b
         surface: notify_resolve_events_anchor_plus_template_20b
       - kind: command
         check_id: notify.resolve_events.anchor_only_7b
         check_group: notify
         summary: Notify events path resolved.
-        required: false
+        required: true
         phase_id: infer_anchor_only_7b
         surface: notify_resolve_events_anchor_only_7b
       - kind: command
         check_id: notify.resolve_events.anchor_plus_template_7b
         check_group: notify
         summary: Notify events path resolved.
-        required: false
+        required: true
         phase_id: infer_anchor_plus_template_7b
         surface: notify_resolve_events_anchor_plus_template_7b
       - kind: scheduler_queue
@@ -541,28 +541,28 @@ preflight:
         check_group: infer_batch_plan
         phase_id: infer_anchor_only_20b
         summary: Anchor-only 20B infer runbook renders cleanly.
-        required: false
+        required: true
         surface: infer_batch_20b_anchor_only
       - kind: runbook_plan
         check_id: infer.batch.20b.anchor_plus_template.plan
         check_group: infer_batch_plan
         phase_id: infer_anchor_plus_template_20b
         summary: Anchor-plus-template 20B infer runbook renders cleanly.
-        required: false
+        required: true
         surface: infer_batch_20b_anchor_plus_template
       - kind: runbook_plan
         check_id: infer.batch.7b.anchor_only.plan
         check_group: infer_batch_plan
         phase_id: infer_anchor_only_7b
         summary: Anchor-only 7B infer runbook renders cleanly.
-        required: false
+        required: true
         surface: infer_batch_7b_anchor_only
       - kind: runbook_plan
         check_id: infer.batch.7b.anchor_plus_template.plan
         check_group: infer_batch_plan
         phase_id: infer_anchor_plus_template_7b
         summary: Anchor-plus-template 7B infer runbook renders cleanly.
-        required: false
+        required: true
         surface: infer_batch_7b_anchor_plus_template
   next_scope:
     target_phase_groups:

@@ -5,7 +5,7 @@ src/dnadesign/ops/preflight/checks/command.py
 
 Generic command-backed preflight check executors.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

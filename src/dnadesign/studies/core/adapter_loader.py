@@ -5,7 +5,7 @@ src/dnadesign/studies/core/adapter_loader.py
 
 Explicit study-family adapter loading for normalized checked-in study records.
 
-Module Author(s): Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

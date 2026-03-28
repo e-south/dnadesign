@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import math
 import os
@@ -21,6 +22,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 from typing import Literal
 
@@ -30,6 +32,8 @@ from .usr_overlay_inputs import parse_usr_overlay_guard_inputs
 _TEMPLATE_SHEBANG = "#!/bin/bash -l"
 _DISALLOWED_NOW_DIRECTIVE = re.compile(r"^\s*#\$\s+-now\s+y(?:\s|$)")
 _SLUG_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_QSTAT_PROBE_TIMEOUT_SECONDS = 10.0
+_GATES_MODULE_NAME = "dnadesign.ops.orchestrator.gates"
 
 
 @dataclass(frozen=True)
@@ -44,6 +48,10 @@ class SessionCountsProbe:
     counts: SessionCounts | None
     queue_probe: Literal["ok", "degraded"]
     probe_error: str | None = None
+    qstat_source: Literal["live", "fixture", "degraded"] = "live"
+
+
+_QUEUE_POLICY = "respect_queue"
 
 
 def _validate_runbook_id(runbook_id: str) -> str:
@@ -169,6 +177,18 @@ def parse_qstat_output(text: str) -> SessionCounts:
     return SessionCounts(running_jobs=running, queued_jobs=queued, eqw_jobs=eqw)
 
 
+def _read_qstat_fixture(qstat_file: Path) -> str:
+    resolved = qstat_file.expanduser().resolve()
+    if not resolved.exists():
+        raise RuntimeError(f"qstat fixture file does not exist: {resolved}")
+    if not resolved.is_file():
+        raise RuntimeError(f"qstat fixture path is not a file: {resolved}")
+    try:
+        return resolved.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RuntimeError(f"qstat fixture file is not readable: {resolved}: {exc}") from exc
+
+
 def qa_submit_template(template: Path) -> list[str]:
     errors: list[str] = []
     if not template.exists():
@@ -218,11 +238,14 @@ def build_shape_advisor(
     return {
         "advisor": advisor,
         "reason": reason,
-        "queue_policy": "respect_queue",
+        "queue_policy": _QUEUE_POLICY,
         "recommended_action": recommended_action,
         "running_jobs": str(counts.running_jobs),
         "queued_jobs": str(counts.queued_jobs),
         "eqw_jobs": str(counts.eqw_jobs),
+        "planned_submits": str(planned_submits),
+        "requires_order": "yes" if requires_order else "no",
+        "threshold": str(warn_over_running),
     }
 
 
@@ -231,34 +254,51 @@ def build_operator_brief(
     counts: SessionCounts,
     planned_submits: int,
     warn_over_running: int,
+    requires_order: bool = False,
 ) -> tuple[dict[str, str], int]:
+    advisor = build_shape_advisor(
+        counts=counts,
+        planned_submits=planned_submits,
+        warn_over_running=warn_over_running,
+        requires_order=requires_order,
+    )
     if counts.eqw_jobs > 0:
         submit_gate = "blocked"
         next_action = "triage_eqw"
+        health = "red"
         exit_code = 2
     elif counts.running_jobs > warn_over_running and planned_submits > 0:
         submit_gate = "confirmation_required"
         next_action = "explicit_confirmation_required"
+        health = "yellow"
         exit_code = 0
     else:
         submit_gate = "ready"
         next_action = "submit"
+        health = "green"
         exit_code = 0
 
-    advisor = "single" if planned_submits <= 1 else "array_or_hold_jid"
     brief = {
         "submit_gate": submit_gate,
-        "advisor": advisor,
+        "advisor": advisor["advisor"],
+        "health": health,
         "next_action": next_action,
-        "queue_policy": "respect_queue",
+        "reason": advisor["reason"],
+        "recommended_action": advisor["recommended_action"],
+        "queue_policy": _QUEUE_POLICY,
         "running_jobs": str(counts.running_jobs),
         "queued_jobs": str(counts.queued_jobs),
         "eqw_jobs": str(counts.eqw_jobs),
+        "planned_submits": str(planned_submits),
+        "requires_order": "yes" if requires_order else "no",
+        "threshold": str(warn_over_running),
     }
     return brief, exit_code
 
 
-def _load_session_counts() -> SessionCounts:
+def _load_session_counts(*, qstat_file: Path | None = None) -> SessionCounts:
+    if qstat_file is not None:
+        return parse_qstat_output(_read_qstat_fixture(qstat_file))
     user = os.environ.get("USER", "")
     try:
         result = subprocess.run(
@@ -266,22 +306,35 @@ def _load_session_counts() -> SessionCounts:
             check=False,
             capture_output=True,
             text=True,
+            timeout=_QSTAT_PROBE_TIMEOUT_SECONDS,
         )
     except FileNotFoundError as exc:
         raise RuntimeError(f"qstat unavailable: {exc}") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"qstat unavailable: timed out after {_QSTAT_PROBE_TIMEOUT_SECONDS:g} seconds") from exc
     if result.returncode != 0:
         stderr = result.stderr.strip() or result.stdout.strip() or "qstat failed"
         raise RuntimeError(f"qstat unavailable: {stderr}")
     return parse_qstat_output(result.stdout)
 
 
-def _load_session_counts_probe(*, allow_missing_qstat: bool) -> SessionCountsProbe:
+def _load_session_counts_probe(*, allow_missing_qstat: bool, qstat_file: Path | None = None) -> SessionCountsProbe:
     try:
-        return SessionCountsProbe(counts=_load_session_counts(), queue_probe="ok")
+        qstat_source: Literal["live", "fixture", "degraded"] = "fixture" if qstat_file is not None else "live"
+        return SessionCountsProbe(
+            counts=_load_session_counts(qstat_file=qstat_file),
+            queue_probe="ok",
+            qstat_source=qstat_source,
+        )
     except RuntimeError as exc:
-        if not allow_missing_qstat:
+        if qstat_file is not None or not allow_missing_qstat:
             raise
-        return SessionCountsProbe(counts=None, queue_probe="degraded", probe_error=str(exc))
+        return SessionCountsProbe(
+            counts=None,
+            queue_probe="degraded",
+            probe_error=str(exc),
+            qstat_source="degraded",
+        )
 
 
 def _unknown_queue_counts() -> dict[str, str]:
@@ -295,14 +348,95 @@ def _unknown_queue_counts() -> dict[str, str]:
 def _emit_degraded_queue_probe_warning(probe: SessionCountsProbe) -> None:
     if probe.queue_probe != "degraded" or probe.probe_error is None:
         return
-    print(
-        f"queue probe degraded: {probe.probe_error}. Continue only for dry-run/demo use; submit readiness is unknown.",
-        file=sys.stderr,
+    _emit_stderr(
+        f"queue probe degraded: {probe.probe_error}. Continue only for dry-run/demo use; submit readiness is unknown."
     )
 
 
 def _format_record(record: dict[str, str]) -> str:
     return " ".join(f"{key}={value}" for key, value in record.items())
+
+
+def _emit_stderr(message: str) -> None:
+    text = str(message or "")
+    if not text:
+        return
+    if not text.endswith("\n"):
+        text += "\n"
+    stream = getattr(sys, "stderr", None)
+    if stream is not None:
+        try:
+            stream.write(text)
+            stream.flush()
+            return
+        except Exception:
+            pass
+    if sys.stderr is not getattr(sys, "__stderr__", None):
+        sys.stderr.write(text)
+        sys.stderr.flush()
+        return
+    encoded = text.encode("utf-8", errors="replace")
+    try:
+        os.write(2, encoded)
+    except OSError:  # pragma: no cover - defensive stderr fallback
+        sys.stderr.write(text)
+        sys.stderr.flush()
+
+
+def is_native_gate_command(argv: tuple[str, ...] | list[str] | None) -> bool:
+    return native_gate_command_args(argv) is not None
+
+
+def native_gate_command_args(argv: tuple[str, ...] | list[str] | None) -> tuple[str, ...] | None:
+    if not argv:
+        return None
+    parts = tuple(str(part) for part in argv)
+    if len(parts) >= 5 and parts[:4] == ("uv", "run", "python", "-m") and parts[4] == _GATES_MODULE_NAME:
+        return parts[5:]
+    python_name = Path(parts[0]).name.lower()
+    if python_name.startswith("python") and len(parts) >= 3 and parts[1] == "-m" and parts[2] == _GATES_MODULE_NAME:
+        return parts[3:]
+    return None
+
+
+def _normalize_exit_code(code: object) -> int:
+    if code is None:
+        return 0
+    if isinstance(code, int):
+        return code
+    try:
+        return int(code)
+    except (TypeError, ValueError):
+        return 1
+
+
+def run_native_gate_command(
+    argv: tuple[str, ...] | list[str],
+    *,
+    env: dict[str, str] | None = None,
+) -> tuple[int, str, str]:
+    gate_args = native_gate_command_args(argv)
+    if gate_args is None:
+        raise ValueError("argv does not target dnadesign.ops.orchestrator.gates")
+
+    stdout_buffer = StringIO()
+    stderr_buffer = StringIO()
+    previous_env: dict[str, str | None] = {name: os.environ.get(name) for name in (env or {})}
+    if env:
+        os.environ.update(env)
+    try:
+        with contextlib.redirect_stdout(stdout_buffer), contextlib.redirect_stderr(stderr_buffer):
+            try:
+                exit_code = main(list(gate_args))
+            except SystemExit as exc:
+                exit_code = _normalize_exit_code(exc.code)
+    finally:
+        for name, previous in previous_env.items():
+            if previous is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = previous
+    return int(exit_code), stdout_buffer.getvalue(), stderr_buffer.getvalue()
 
 
 def _non_negative_int(value: str) -> int:
@@ -535,6 +669,7 @@ def main(argv: list[str] | None = None) -> int:
     shape_parser.add_argument("--planned-submits", type=_non_negative_int, required=True)
     shape_parser.add_argument("--warn-over-running", type=_positive_int, default=3)
     shape_parser.add_argument("--requires-order", action="store_true")
+    shape_parser.add_argument("--qstat-file", help="Read qstat-like output from file for deterministic fixture mode.")
     shape_parser.add_argument(
         "--allow-missing-qstat",
         action="store_true",
@@ -544,6 +679,8 @@ def main(argv: list[str] | None = None) -> int:
     brief_parser = subparsers.add_parser("operator-brief", help="Emit submit gate readiness brief.")
     brief_parser.add_argument("--planned-submits", type=_non_negative_int, required=True)
     brief_parser.add_argument("--warn-over-running", type=_positive_int, default=3)
+    brief_parser.add_argument("--requires-order", action="store_true")
+    brief_parser.add_argument("--qstat-file", help="Read qstat-like output from file for deterministic fixture mode.")
     brief_parser.add_argument(
         "--allow-missing-qstat",
         action="store_true",
@@ -577,6 +714,9 @@ def main(argv: list[str] | None = None) -> int:
     session_counts_parser = subparsers.add_parser(
         "session-counts",
         help="Emit running/queued/Eqw qstat counts for the current user.",
+    )
+    session_counts_parser.add_argument(
+        "--qstat-file", help="Read qstat-like output from file for deterministic fixture mode."
     )
     session_counts_parser.add_argument(
         "--allow-missing-qstat",
@@ -693,17 +833,21 @@ def main(argv: list[str] | None = None) -> int:
             failures.extend(qa_submit_template(template))
         if failures:
             for failure in failures:
-                print(failure, file=sys.stderr)
+                _emit_stderr(failure)
             return 2
         for raw_template in args.template:
             print(f"qa_preflight=pass template={Path(raw_template).expanduser()}")
         return 0
 
     if args.command == "submit-shape-advisor":
+        qstat_file = Path(args.qstat_file).expanduser() if args.qstat_file else None
         try:
-            probe = _load_session_counts_probe(allow_missing_qstat=bool(args.allow_missing_qstat))
+            probe = _load_session_counts_probe(
+                allow_missing_qstat=bool(args.allow_missing_qstat),
+                qstat_file=qstat_file,
+            )
         except RuntimeError as exc:
-            print(str(exc), file=sys.stderr)
+            _emit_stderr(str(exc))
             return 2
         if probe.queue_probe == "degraded":
             _emit_degraded_queue_probe_warning(probe)
@@ -712,6 +856,10 @@ def main(argv: list[str] | None = None) -> int:
                 "next_action": "queue_probe_unavailable",
                 "queue_policy": "queue_probe_unavailable",
                 "queue_probe": "degraded",
+                "qstat_source": probe.qstat_source,
+                "planned_submits": str(args.planned_submits),
+                "requires_order": "yes" if bool(args.requires_order) else "no",
+                "threshold": str(args.warn_over_running),
                 **_unknown_queue_counts(),
             }
         else:
@@ -723,23 +871,33 @@ def main(argv: list[str] | None = None) -> int:
                 requires_order=bool(args.requires_order),
             )
             advisor["queue_probe"] = "ok"
+            advisor["qstat_source"] = probe.qstat_source
         print(_format_record(advisor))
         return 0
 
     if args.command == "operator-brief":
+        qstat_file = Path(args.qstat_file).expanduser() if args.qstat_file else None
         try:
-            probe = _load_session_counts_probe(allow_missing_qstat=bool(args.allow_missing_qstat))
+            probe = _load_session_counts_probe(
+                allow_missing_qstat=bool(args.allow_missing_qstat),
+                qstat_file=qstat_file,
+            )
         except RuntimeError as exc:
-            print(str(exc), file=sys.stderr)
+            _emit_stderr(str(exc))
             return 2
         if probe.queue_probe == "degraded":
             _emit_degraded_queue_probe_warning(probe)
             brief = {
                 "submit_gate": "degraded",
                 "advisor": "unknown",
+                "health": "unknown",
                 "next_action": "queue_probe_unavailable",
                 "queue_policy": "queue_probe_unavailable",
                 "queue_probe": "degraded",
+                "qstat_source": probe.qstat_source,
+                "planned_submits": str(args.planned_submits),
+                "requires_order": "yes" if bool(args.requires_order) else "no",
+                "threshold": str(args.warn_over_running),
                 **_unknown_queue_counts(),
             }
             exit_code = 0
@@ -749,8 +907,10 @@ def main(argv: list[str] | None = None) -> int:
                 counts=probe.counts,
                 planned_submits=args.planned_submits,
                 warn_over_running=args.warn_over_running,
+                requires_order=bool(args.requires_order),
             )
             brief["queue_probe"] = "ok"
+            brief["qstat_source"] = probe.qstat_source
         print(_format_record(brief))
         return exit_code
 
@@ -767,10 +927,10 @@ def main(argv: list[str] | None = None) -> int:
                 dry_run=bool(args.dry_run),
             )
         except ValueError as exc:
-            print(str(exc), file=sys.stderr)
+            _emit_stderr(str(exc))
             return 2
         except Exception as exc:  # pragma: no cover - defensive guard path
-            print(str(exc), file=sys.stderr)
+            _emit_stderr(str(exc))
             return 2
         if args.json:
             print(json.dumps(summary, sort_keys=True))
@@ -794,26 +954,39 @@ def main(argv: list[str] | None = None) -> int:
         try:
             resolved = ensure_dir_writable(Path(args.path))
         except ValueError as exc:
-            print(str(exc), file=sys.stderr)
+            _emit_stderr(str(exc))
             return 2
         print(_format_record({"dir_gate": "ok", "path": str(resolved)}))
         return 0
 
     if args.command == "session-counts":
+        qstat_file = Path(args.qstat_file).expanduser() if args.qstat_file else None
         try:
-            probe = _load_session_counts_probe(allow_missing_qstat=bool(args.allow_missing_qstat))
+            probe = _load_session_counts_probe(
+                allow_missing_qstat=bool(args.allow_missing_qstat),
+                qstat_file=qstat_file,
+            )
         except RuntimeError as exc:
-            print(str(exc), file=sys.stderr)
+            _emit_stderr(str(exc))
             return 2
         if probe.queue_probe == "degraded":
             _emit_degraded_queue_probe_warning(probe)
-            print(_format_record({"queue_probe": "degraded", **_unknown_queue_counts()}))
+            print(
+                _format_record(
+                    {
+                        "queue_probe": "degraded",
+                        "qstat_source": probe.qstat_source,
+                        **_unknown_queue_counts(),
+                    }
+                )
+            )
             return 0
         assert probe.counts is not None
         print(
             _format_record(
                 {
                     "queue_probe": "ok",
+                    "qstat_source": probe.qstat_source,
                     "running_jobs": str(probe.counts.running_jobs),
                     "queued_jobs": str(probe.counts.queued_jobs),
                     "eqw_jobs": str(probe.counts.eqw_jobs),
@@ -879,14 +1052,13 @@ def main(argv: list[str] | None = None) -> int:
             compacted_path = ""
             if existing_overlay_parts_before > args.max_existing_overlay_parts:
                 if not args.auto_compact_existing_overlay_parts:
-                    print(
+                    _emit_stderr(
                         "existing_overlay_parts exceeds threshold; "
                         "run 'uv run usr --root <usr-root> maintenance overlay-compact "
                         "<dataset> --namespace <namespace>' "
-                        "or set --auto-compact-existing-overlay-parts.",
-                        file=sys.stderr,
+                        "or set --auto-compact-existing-overlay-parts."
                     )
-                    print(
+                    _emit_stderr(
                         _format_record(
                             {
                                 "guard_status": "blocked",
@@ -894,8 +1066,7 @@ def main(argv: list[str] | None = None) -> int:
                                 "existing_overlay_parts": str(existing_overlay_parts_before),
                                 "max_existing_overlay_parts": str(args.max_existing_overlay_parts),
                             }
-                        ),
-                        file=sys.stderr,
+                        )
                     )
                     return 2
                 compacted_path = _compact_overlay_parts(
@@ -911,12 +1082,11 @@ def main(argv: list[str] | None = None) -> int:
             )
             if projected_overlay_parts > args.max_projected_overlay_parts:
                 recommended_max_accepted = max(1, math.ceil(int(planned_rows) / int(args.max_projected_overlay_parts)))
-                print(
+                _emit_stderr(
                     "projected_overlay_parts exceeds threshold; "
-                    "increase runtime.max_accepted_per_library and/or output.usr.chunk_size before submit.",
-                    file=sys.stderr,
+                    "increase runtime.max_accepted_per_library and/or output.usr.chunk_size before submit."
                 )
-                print(
+                _emit_stderr(
                     _format_record(
                         {
                             "guard_status": "blocked",
@@ -929,8 +1099,7 @@ def main(argv: list[str] | None = None) -> int:
                             "usr_chunk_size": str(inputs.usr_chunk_size),
                             "recommended_min_max_accepted_per_library": str(recommended_max_accepted),
                         }
-                    ),
-                    file=sys.stderr,
+                    )
                 )
                 return 2
             summary = {
@@ -955,7 +1124,7 @@ def main(argv: list[str] | None = None) -> int:
                 "usr_chunk_size": int(inputs.usr_chunk_size),
             }
         except ValueError as exc:
-            print(str(exc), file=sys.stderr)
+            _emit_stderr(str(exc))
             return 2
         if args.json:
             print(json.dumps(summary, sort_keys=True))
@@ -1056,12 +1225,11 @@ def main(argv: list[str] | None = None) -> int:
                 maintenance_reasons.append("age_threshold")
             if maintenance_reasons:
                 if not args.auto_compact_existing_records_parts:
-                    print(
+                    _emit_stderr(
                         "existing records parts require maintenance; "
-                        "set --auto-compact-existing-records-parts or compact records__part files before submit.",
-                        file=sys.stderr,
+                        "set --auto-compact-existing-records-parts or compact records__part files before submit."
                     )
-                    print(
+                    _emit_stderr(
                         _format_record(
                             {
                                 "guard_status": "blocked",
@@ -1072,8 +1240,7 @@ def main(argv: list[str] | None = None) -> int:
                                 "max_existing_records_part_age_days": str(args.max_existing_records_part_age_days),
                                 "maintenance_reasons": ",".join(sorted(set(maintenance_reasons))),
                             }
-                        ),
-                        file=sys.stderr,
+                        )
                     )
                     return 2
                 compacted_path = _compact_records_parts(records_path=records_path)
@@ -1082,12 +1249,11 @@ def main(argv: list[str] | None = None) -> int:
             oldest_part_age_days_after = _oldest_records_part_age_days(records_path=records_path)
             if projected_records_parts > args.max_projected_records_parts:
                 recommended_max_accepted = max(1, math.ceil(int(planned_rows) / int(args.max_projected_records_parts)))
-                print(
+                _emit_stderr(
                     "projected_records_parts exceeds threshold; "
-                    "increase runtime.max_accepted_per_library and/or output.parquet.chunk_size before submit.",
-                    file=sys.stderr,
+                    "increase runtime.max_accepted_per_library and/or output.parquet.chunk_size before submit."
                 )
-                print(
+                _emit_stderr(
                     _format_record(
                         {
                             "guard_status": "blocked",
@@ -1100,8 +1266,7 @@ def main(argv: list[str] | None = None) -> int:
                             "parquet_chunk_size": str(inputs.parquet_chunk_size),
                             "recommended_min_max_accepted_per_library": str(recommended_max_accepted),
                         }
-                    ),
-                    file=sys.stderr,
+                    )
                 )
                 return 2
             summary = {
@@ -1127,7 +1292,7 @@ def main(argv: list[str] | None = None) -> int:
                 "parquet_chunk_size": int(inputs.parquet_chunk_size),
             }
         except ValueError as exc:
-            print(str(exc), file=sys.stderr)
+            _emit_stderr(str(exc))
             return 2
         if args.json:
             print(json.dumps(summary, sort_keys=True))
@@ -1173,16 +1338,12 @@ def main(argv: list[str] | None = None) -> int:
             if blocked_reasons:
                 reason_text = ",".join(blocked_reasons)
                 if "archived_entries" in blocked_reasons:
-                    print(
-                        "archived_entries exceeds threshold; compact or prune _derived/_archived before submit.",
-                        file=sys.stderr,
+                    _emit_stderr(
+                        "archived_entries exceeds threshold; compact or prune _derived/_archived before submit."
                     )
                 if "archived_bytes" in blocked_reasons:
-                    print(
-                        "archived_bytes exceeds threshold; compact or prune _derived/_archived before submit.",
-                        file=sys.stderr,
-                    )
-                print(
+                    _emit_stderr("archived_bytes exceeds threshold; compact or prune _derived/_archived before submit.")
+                _emit_stderr(
                     _format_record(
                         {
                             "guard_status": "blocked",
@@ -1194,8 +1355,7 @@ def main(argv: list[str] | None = None) -> int:
                             "archived_bytes": str(archived_bytes),
                             "max_archived_bytes": str(args.max_archived_bytes),
                         }
-                    ),
-                    file=sys.stderr,
+                    )
                 )
                 return 2
 
@@ -1213,7 +1373,7 @@ def main(argv: list[str] | None = None) -> int:
                 "max_archived_bytes": int(args.max_archived_bytes),
             }
         except ValueError as exc:
-            print(str(exc), file=sys.stderr)
+            _emit_stderr(str(exc))
             return 2
         if args.json:
             print(json.dumps(summary, sort_keys=True))
@@ -1233,5 +1393,20 @@ def main(argv: list[str] | None = None) -> int:
     return 2
 
 
+def _flush_standard_streams() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except Exception:  # pragma: no cover - defensive flush path
+            continue
+
+
+def _module_main() -> int:
+    try:
+        return main()
+    finally:
+        _flush_standard_streams()
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(_module_main())

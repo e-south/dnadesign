@@ -68,7 +68,6 @@ _FORBIDDEN_LEGACY_SURFACE_PATHS = (
     Path("src/dnadesign/ops/promoter_preflight_upstream.py"),
     Path("src/dnadesign/ops/promoter_preflight_infer.py"),
     Path("src/dnadesign/ops/promoter_preflight_coordinator.py"),
-    Path("src/dnadesign/ops/_cli_legacy.py"),
     Path("src/dnadesign/ops/tests/test_promoter_study_infer_runtime.py"),
     Path("src/dnadesign/ops/tests/test_promoter_study_status_coordinator.py"),
     Path("src/dnadesign/ops/tests/test_promoter_preflight_scope.py"),
@@ -85,6 +84,9 @@ _FORBIDDEN_LEGACY_SURFACE_PATHS = (
     Path("src/dnadesign/studies/tests/test_promoter_preflight_orchestration.py"),
     Path("src/dnadesign/studies/tests/test_promoter_preflight_upstream.py"),
 )
+_ALLOWED_OPS_ROOT_CLI_PATHS = {
+    Path("src/dnadesign/ops/cli"),
+}
 
 
 @dataclass(frozen=True)
@@ -219,11 +221,20 @@ def find_undeclared_cross_tool_imports(
 
 
 def find_legacy_surface_violations(*, repo_root: Path) -> list[LegacySurfaceViolation]:
+    resolved_repo_root = repo_root.expanduser().resolve()
     violations: list[LegacySurfaceViolation] = []
     for relative_path in _FORBIDDEN_LEGACY_SURFACE_PATHS:
-        candidate = (repo_root / relative_path).resolve()
+        candidate = (resolved_repo_root / relative_path).resolve()
         if candidate.exists():
             violations.append(LegacySurfaceViolation(path=candidate))
+    ops_root = (resolved_repo_root / "src" / "dnadesign" / "ops").resolve()
+    if ops_root.exists():
+        for candidate in sorted(ops_root.iterdir()):
+            relative_candidate = candidate.relative_to(resolved_repo_root)
+            if relative_candidate in _ALLOWED_OPS_ROOT_CLI_PATHS:
+                continue
+            if candidate.is_file() and "cli" in candidate.stem:
+                violations.append(LegacySurfaceViolation(path=candidate.resolve()))
     return sorted(violations, key=lambda item: str(item.path))
 
 
