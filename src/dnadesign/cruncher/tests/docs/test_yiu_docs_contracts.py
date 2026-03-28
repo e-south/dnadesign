@@ -28,6 +28,7 @@ def test_docs_index_routes_to_yiu_guide_and_references() -> None:
         assert "guides/yiu_workflow.md" in content
         assert "reference/yiu_spec.md" in content
         assert "reference/yiu_artifacts.md" in content
+        assert "yiu init-workspace|validate|design|trace|solve|show" in content
 
 
 def test_top_level_docs_route_three_workflow_families() -> None:
@@ -52,9 +53,11 @@ def test_cli_reference_lists_yiu_commands_and_contracts() -> None:
     assert "cruncher yiu validate" in cli_ref
     assert "cruncher yiu design" in cli_ref
     assert "cruncher yiu trace" in cli_ref
+    assert "cruncher yiu solve" in cli_ref
     assert "cruncher yiu init-workspace" in cli_ref
     assert "cruncher yiu show" in cli_ref
     assert ".yiu.yaml" in cli_ref
+    assert ".yiu.solve.yaml" in cli_ref
 
 
 def test_yiu_docs_capture_workspace_and_artifact_boundaries() -> None:
@@ -65,42 +68,62 @@ def test_yiu_docs_capture_workspace_and_artifact_boundaries() -> None:
     architecture = _read("docs/reference/architecture.md")
     glossary = _read("docs/reference/glossary.md")
 
-    assert "uv run cruncher yiu init-workspace" in demo
-    assert "configs/yiu/example.yiu.yaml" in demo
+    assert "src/dnadesign/cruncher/workspaces/demo_yiu_circularized" in demo
+    assert "uv run cruncher workspaces run --workspace demo_yiu_circularized --runbook configs/runbook.yaml" in demo
+    assert "uv run cruncher yiu init-workspace yiu_lab_demo" in demo
+    assert "configs/yiu/example_canonical_circularized.yiu.yaml" in demo
+    assert "configs/yiu/example_canonical_circularized.yiu.solve.yaml" in demo
     assert "outputs/yiu/explicit" in demo
+    assert "outputs/yiu/solve" in demo
     assert "published/views" in demo
+    assert "published/baserender_jobs" in demo
+    assert "uv run cruncher visuals validate" in demo
+    assert "uv run cruncher visuals run" in demo
     assert "state graph" in guide.lower()
     assert "source_oligo_ssdna" in guide
-    assert "downstream_amplifiable_product" in guide
+    assert "hairpin_pcr_linear_insert" in guide
     assert "assembled_payload" in spec_ref
     assert "protocol_template" in spec_ref
-    assert "msd_hop_retron_eco1_v1" in spec_ref
+    assert "yiu_adapter_hairpin_v1" in spec_ref
+    assert "yiu_circularized_payload_v1" in spec_ref
+    assert "yiu_solve" in spec_ref
     assert "publish_contract_version" in spec_ref
-    assert "min_paired_nt" in spec_ref
-    assert "max_unpaired_tail_nt" in spec_ref
-    assert "max_bulge_nt" in spec_ref
-    assert "payload_junction_segments" in spec_ref
-    assert "pattern_compatibility" in spec_ref
-    assert "pattern_evidence_summary" in spec_ref
-    assert "RETAINED_SACRIFICIAL_OVERLAP" in spec_ref
-    assert "HOMOLOGY_WINDOW_SPANS_JUNCTION" in spec_ref
-    assert "step_graph" in spec_ref
-    assert "hairpin_pcr_linear_insert" in guide
+    assert "emit_baserender_jobs" in spec_ref
+    assert "circularized_payload_junction" in spec_ref
+    assert "accepted_hits.jsonl" in artifacts_ref
+    assert "yiu_solve_report.json" in artifacts_ref
+    assert "published/visual_manifest.json" in artifacts_ref
+    assert "materialized hit" in artifacts_ref.lower()
+    assert "design" in guide
+    assert "trace" in guide
+    assert "solve" in guide
     assert "protocol_template" in artifacts_ref
-    assert "view_contract_version" in artifacts_ref
     assert "yiu_report.json" in artifacts_ref
     assert "yiu_trace.jsonl" in artifacts_ref
-    assert "yiu_trace_manifest.json" in artifacts_ref
-    assert "yiu_published_views_manifest.json" in artifacts_ref
-    assert "validation_mode" in artifacts_ref
-    assert "branch_junction" in artifacts_ref
-    assert "bulge_nt" in artifacts_ref
-    assert "spans_junction" in artifacts_ref
-    assert "topology_compatibility" in artifacts_ref
-    assert "sequence_mode" in guide
-    assert "partial_complement" in guide
-    assert "bulged" in guide
-    assert "parts[]" in guide
+    assert "published/views/" in artifacts_ref
+    assert "published/renders/" in artifacts_ref
+    assert "bundle kind" in guide.lower()
     assert "`yiu/` (protocol-state YIU domain)" in architecture
+    assert "yiu init-workspace|validate|design|trace|solve|show" in architecture
+    assert "**yiu solve**" in architecture
     assert "retained product" in glossary.lower()
     assert "workflow family" in glossary.lower()
+
+
+def test_checked_in_canonical_yiu_demo_workspace_exists() -> None:
+    workspace_root = ROOT / "workspaces" / "demo_yiu_circularized"
+
+    assert workspace_root.exists()
+    assert (workspace_root / "runbook.md").exists()
+    assert (workspace_root / "configs" / "runbook.yaml").exists()
+    assert (workspace_root / "configs" / "yiu" / "example_canonical_circularized.yiu.yaml").exists()
+    assert (workspace_root / "configs" / "yiu" / "example_canonical_circularized.yiu.solve.yaml").exists()
+    assert (workspace_root / "catalogs" / "enzymes.yaml").exists()
+    assert (workspace_root / "catalogs" / "oligo_parts.yaml").exists()
+    assert (workspace_root / "catalogs" / "backbones.yaml").exists()
+    runbook_doc = (workspace_root / "runbook.md").read_text(encoding="utf-8")
+    assert "Canonical checked-in YIU demo" in runbook_doc
+    assert (
+        "uv run cruncher workspaces run --workspace demo_yiu_circularized --runbook configs/runbook.yaml" in runbook_doc
+    )
+    assert "uv run cruncher visuals run" in runbook_doc

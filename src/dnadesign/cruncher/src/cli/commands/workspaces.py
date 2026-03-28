@@ -577,7 +577,7 @@ def reset(
                 raise ValueError(
                     f"No workspace roots found under {resolved_root}. "
                     "Expected child directories containing configs/runbook.yaml, configs/config.yaml, "
-                    "or family specs matched by registry spec_globs."
+                    "or family-spec files matched by registry spec_globs."
                 )
             console.print(f"Workspace reset root set: {render_path(resolved_root)}")
             console.print(f"Discovered {len(workspace_roots)} workspace roots to reset.")
@@ -587,7 +587,7 @@ def reset(
             if not _is_workspace_layout(resolved_root):
                 raise ValueError(
                     "Workspace root must contain configs/runbook.yaml, configs/config.yaml, "
-                    f"or family specs matched by registry spec_globs: {resolved_root}"
+                    f"or family-spec files matched by registry spec_globs: {resolved_root}"
                 )
             workspace_roots = [resolved_root]
             console.print(f"Workspace reset root: {render_path(resolved_root)}")

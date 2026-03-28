@@ -25,7 +25,8 @@ def test_workflow_family_descriptor_registers_yiu_as_runbook_family() -> None:
     assert descriptor.id == "yiu"
     assert descriptor.workspace_kind == "runbook_family"
     assert descriptor.runbook_command_roots == ("yiu",)
-    assert descriptor.default_output_root == "outputs/yiu/explicit"
+    assert "configs/yiu/*.yiu.solve.yaml" in descriptor.spec_globs
+    assert descriptor.default_output_root == "outputs/yiu"
 
 
 def test_infer_runbook_workflow_families_reports_yiu() -> None:

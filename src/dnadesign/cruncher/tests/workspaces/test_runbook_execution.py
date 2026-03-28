@@ -11,6 +11,10 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -26,6 +30,11 @@ def _write_runbook(workspace: Path, payload: dict) -> Path:
     runbook_path.parent.mkdir(parents=True, exist_ok=True)
     runbook_path.write_text(yaml.safe_dump(payload))
     return runbook_path
+
+
+def _copytree_without_ds_store(src: Path, dest: Path) -> Path:
+    shutil.copytree(src, dest, ignore=shutil.ignore_patterns(".DS_Store"))
+    return dest
 
 
 def test_runbook_rejects_unknown_keys() -> None:
@@ -256,3 +265,91 @@ def test_runbook_sets_writable_home_for_child_processes_when_home_is_not_writabl
     expected_home = (workspace / ".cruncher" / ".runtime_home").resolve()
     assert Path(str(env["HOME"])).resolve() == expected_home
     assert expected_home.is_dir()
+
+
+def test_runbook_sets_workspace_local_mpl_cache_for_child_processes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    runbook_path = _write_runbook(
+        workspace,
+        {
+            "runbook": {
+                "schema_version": 1,
+                "name": "demo",
+                "steps": [{"id": "sample", "run": ["sample", "-c", "configs/config.yaml"]}],
+            }
+        },
+    )
+
+    call_kwargs: list[dict[str, object]] = []
+
+    def _fake_subprocess_run(cmd, **kwargs):
+        _ = cmd
+        call_kwargs.append(dict(kwargs))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(runbook_module.subprocess, "run", _fake_subprocess_run)
+    monkeypatch.delenv("MPLCONFIGDIR", raising=False)
+
+    run_workspace_runbook(runbook_path)
+
+    assert len(call_kwargs) == 1
+    env = call_kwargs[0].get("env")
+    assert isinstance(env, dict)
+    expected_cache = (workspace / ".cruncher" / ".runtime_mplconfig").resolve()
+    assert Path(str(env["MPLCONFIGDIR"])).resolve() == expected_cache
+    assert expected_cache.is_dir()
+
+
+def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cache_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_workspace = Path("src/dnadesign/cruncher/workspaces/demo_yiu_circularized")
+    workspace = _copytree_without_ds_store(source_workspace, tmp_path / "demo_yiu_circularized")
+    runbook_path = workspace / "configs" / "runbook.yaml"
+    output_log = tmp_path / "demo-runbook.log"
+    runtime_home = tmp_path / "home"
+    runtime_home.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HOME", str(runtime_home))
+    monkeypatch.setenv("CRUNCHER_NONINTERACTIVE", "1")
+    monkeypatch.delenv("MPLCONFIGDIR", raising=False)
+
+    result = run_workspace_runbook(runbook_path, output_log_path=output_log)
+
+    assert result.executed_step_ids == ["yiu_validate", "yiu_design", "yiu_trace", "yiu_solve"]
+    explicit_run_root = workspace / "outputs" / "yiu" / "explicit" / "example_canonical_circularized"
+    solve_run_root = workspace / "outputs" / "yiu" / "solve" / "example_canonical_circularized"
+    explicit_run_dir = next(explicit_run_root.iterdir())
+    solve_run_dir = next(solve_run_root.iterdir())
+    assert (explicit_run_dir / "published" / "visual_manifest.json").exists()
+    assert (solve_run_dir / "published" / "visual_manifest.json").exists()
+
+    log_text = output_log.read_text(encoding="utf-8")
+    assert "Matplotlib is building the font cache" not in log_text
+    assert "MPLCONFIGDIR" not in log_text
+
+    job_path = explicit_run_dir / "published" / "baserender_jobs" / "circularized_payload_candidate.job.yaml"
+    base_env = {**os.environ, "PYTHONPATH": str(Path.cwd() / "src")}
+    validate_proc = subprocess.run(
+        [sys.executable, "-m", "dnadesign.cruncher.cli.app", "visuals", "validate", "--job", str(job_path)],
+        cwd=workspace,
+        env=base_env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    render_proc = subprocess.run(
+        [sys.executable, "-m", "dnadesign.cruncher.cli.app", "visuals", "run", "--job", str(job_path)],
+        cwd=workspace,
+        env=base_env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "Matplotlib" not in validate_proc.stderr
+    assert "MPLCONFIGDIR" not in validate_proc.stderr
+    assert "Matplotlib" not in render_proc.stderr
+    assert "MPLCONFIGDIR" not in render_proc.stderr
+    assert (explicit_run_dir / "published" / "renders" / "circularized_payload_candidate.pdf").exists()

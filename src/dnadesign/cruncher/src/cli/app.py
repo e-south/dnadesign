@@ -34,6 +34,7 @@ from dnadesign.cruncher.cli.commands.sources import app as sources_app
 from dnadesign.cruncher.cli.commands.status import status as status_cmd
 from dnadesign.cruncher.cli.commands.study import app as study_app
 from dnadesign.cruncher.cli.commands.targets import app as targets_app
+from dnadesign.cruncher.cli.commands.visuals import app as visuals_app
 from dnadesign.cruncher.cli.commands.workspaces import app as workspaces_app
 from dnadesign.cruncher.cli.commands.yiu import app as yiu_app
 from dnadesign.cruncher.cli.config_resolver import CONFIG_ENV_VAR, WORKSPACE_ENV_VAR
@@ -119,6 +120,12 @@ app.add_typer(
     name="yiu",
     help="Scaffold, validate, trace, design, and inspect YIU hairpin oligo processing workflows.",
     short_help="YIU hairpin oligo workflows.",
+)
+app.add_typer(
+    visuals_app,
+    name="visuals",
+    help="Validate or run published visual jobs through BaseRender's public API.",
+    short_help="Run published visual jobs.",
 )
 app.add_typer(
     fetch_app,

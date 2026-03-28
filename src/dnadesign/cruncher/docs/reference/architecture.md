@@ -1,10 +1,10 @@
 ## Cruncher architecture
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-26
+**Last verified:** 2026-03-27
 
 
-**Last updated by:** cruncher-maintainers on 2026-03-26
+**Last updated by:** cruncher-maintainers on 2026-03-27
 
 ### Contents
 - [Cruncher architecture](#cruncher-architecture)
@@ -31,7 +31,7 @@ Cruncher is organized as peer workflow families, not one monolithic run shape:
 
 - **Fixed-length optimization workspaces** use `fetch -> lock -> parse -> sample -> analyze -> export`, then optional `study` and `portfolio` orchestration on top of the resulting run artifacts.
 - **Cassette workspaces** use `cassette init-workspace|validate|design|solve|show` and publish cassette-specific artifacts plus optional baserender job files.
-- **YIU workspaces** use `yiu init-workspace|validate|design|trace|show` and publish protocol-state bundles plus per-step neutral view contracts.
+- **YIU workspaces** use `yiu init-workspace|validate|design|trace|solve|show` and publish protocol-state bundles plus per-step neutral view contracts.
 
 These families deliberately keep separate workspace contracts, output trees, and orchestration seams. New families should add their own lane-specific artifacts rather than overload `sample`, `cassette`, or `yiu`.
 
@@ -62,13 +62,14 @@ This workflow does not currently use `core/evaluator.py`, `gibbs_anneal`, `study
 
 The YIU workflow is a peer lane, not a cassette submode:
 
-1. optional **yiu init-workspace** -> scaffold a runbook-only YIU workspace with one explicit example spec
-2. author `<workspace>/configs/yiu/<name>.yiu.yaml`
+1. optional **yiu init-workspace** -> scaffold a runbook-only YIU workspace with one explicit example spec and paired solve spec
+2. author `<workspace>/configs/yiu/<name>.yiu.yaml` and optional `<workspace>/configs/yiu/<name>.yiu.solve.yaml`
 3. author optional protocol catalogs under `<workspace>/catalogs/*.yaml`
 4. **yiu validate** -> strict schema + protocol-step invariant check plus deterministic state-trace report
 5. **yiu design** -> write explicit manifest, status, report, trace, CSV tables, and published state views
 6. **yiu trace** -> materialize the same protocol-state bundle for QA without implying solve-mode search
-7. **yiu show** -> inspect status and artifact paths for one explicit YIU run
+7. **yiu solve** -> bounded search over declared source windows, explicit-validator admission, and solve-level/per-hit YIU artifacts
+8. **yiu show** -> inspect status and artifact paths for one explicit or solve YIU run
 
 This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, or cassette-specific render contracts. It models intended protocol compatibility across changing molecular states.
 
@@ -286,10 +287,11 @@ Cassette runs use a separate deterministic output root:
 <workspace>/outputs/cassettes/<spec.name>/<design_id>/
 ```
 
-YIU runs use their own deterministic explicit root:
+YIU runs use family-rooted deterministic explicit and solve roots:
 
 ```
 <workspace>/outputs/yiu/explicit/<spec.name>/<design_id>/
+<workspace>/outputs/yiu/solve/<solve_name>/<solve_id>/
 ```
 
 ---

@@ -1,0 +1,124 @@
+yiu:
+  schema_version: 1
+  protocol: yiu_v1
+  name: example_legacy_v1
+  source_oligo:
+    sequence: AAAAGGTCTCACGTTTAAGGGGCCGGGGTCTCACGTTTTT
+    primer_sites:
+    - id: fwd_primer
+      start: 0
+      end: 4
+      strand: primary
+    - id: rev_primer
+      start: 36
+      end: 40
+      strand: complement
+    restriction_sites:
+    - id: left_digest
+      enzyme: BsaI
+      recognition_sequence: GGTCTC
+      start: 4
+      orientation: forward
+      top_cut_offset: 6
+      bottom_cut_offset: 10
+    - id: right_digest
+      enzyme: BsaI
+      recognition_sequence: GGTCTC
+      start: 26
+      orientation: forward
+      top_cut_offset: 6
+      bottom_cut_offset: 10
+    nickase_sites:
+    - id: nick_1
+      enzyme: Nt.Mock
+      recognition_sequence: GGGG
+      start: 18
+      orientation: forward
+      top_cut_offset: 2
+    payload_windows:
+    - id: left_half
+      start: 14
+      end: 18
+    - id: right_half
+      start: 22
+      end: 26
+    homology_windows:
+    - id: left_fold
+      start: 14
+      end: 18
+    - id: right_fold
+      start: 14
+      end: 18
+    retained_regions:
+    - id: retained_left
+      start: 14
+      end: 18
+    - id: retained_right
+      start: 22
+      end: 26
+    sacrificial_regions:
+    - id: sacrificial_center
+      start: 18
+      end: 22
+  step_graph:
+    steps:
+    - kind: pcr
+      id: pcr_linear_duplex
+      forward_primer_site: fwd_primer
+      reverse_primer_site: rev_primer
+    - kind: restriction_digest
+      id: digested_linear_duplex
+      left_site: left_digest
+      right_site: right_digest
+      expected_left_overhang: ACGT
+      expected_right_overhang: ACGT
+    - kind: circularization
+      id: circularization_candidate
+      compatibility: exact_complement
+    - kind: exonuclease_selection
+      id: post_exonuclease_enriched_pool
+    - kind: nickase_digest
+      id: post_nickase_fragmentation
+      site_ids:
+      - nick_1
+      sacrificial_region_ids:
+      - sacrificial_center
+      retained_region_ids:
+      - retained_left
+      - retained_right
+    - kind: size_selection
+      id: post_size_selection
+    - kind: foldback
+      id: foldback_or_cap_intermediate
+      left_homology_window: left_fold
+      right_homology_window: right_fold
+      min_complementary_bases: 4
+    - kind: adapter_ligation
+      id: y_adapter_ligated_product
+      adapter_sequence: AGATCGGA
+    - kind: amplification
+      id: downstream_amplifiable_product
+      forward_primer_requirement: AGAT
+      reverse_primer_requirement: CCGG
+  payload_goal:
+    assembled_payload: TTAACCGG
+    left_half_ref: left_half
+    right_half_ref: right_half
+    junction_rule: contiguous_after_ligation
+  cleanup_policy:
+    linear_depletion:
+      enabled: true
+      enzyme: T5 exonuclease
+    size_selection:
+      max_retained_sacrificial_fragment_nt: 4
+      min_retained_product_nt: 8
+  adapter_policy:
+    adapter_sequence: AGATCGGA
+    primer_binding_requirements:
+    - id: amp_fwd
+      sequence: AGAT
+    - id: amp_rev
+      sequence: CCGG
+  output:
+    run_dir: outputs/yiu/explicit
+    emit_view_contracts: true

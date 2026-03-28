@@ -27,7 +27,14 @@ def _workspace_names() -> list[str]:
 
 def _non_portfolio_workspaces() -> list[str]:
     excluded = {"archived", "portfolio", "portfolios"}
-    return [name for name in _workspace_names() if name not in excluded]
+    eligible: list[str] = []
+    for name in _workspace_names():
+        if name in excluded:
+            continue
+        if not (WORKSPACES_ROOT / name / "configs" / "config.yaml").is_file():
+            continue
+        eligible.append(name)
+    return eligible
 
 
 def test_all_non_portfolio_workspaces_have_length_and_diversity_study_specs() -> None:

@@ -23,6 +23,7 @@ import yaml
 from pydantic import field_validator, model_validator
 
 from dnadesign.cruncher.config.schema_v3 import StrictBaseModel
+from dnadesign.cruncher.viz.mpl import ensure_workspace_mpl_cache
 from dnadesign.cruncher.workspaces.families import allowed_runbook_command_roots
 
 _STEP_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -168,6 +169,7 @@ def _runbook_subprocess_env(*, workspace_root: Path) -> dict[str, str]:
         runtime_home = (workspace_root / ".cruncher" / ".runtime_home").resolve()
         runtime_home.mkdir(parents=True, exist_ok=True)
         env["HOME"] = str(runtime_home)
+    ensure_workspace_mpl_cache(workspace_root, environ=env)
     return env
 
 

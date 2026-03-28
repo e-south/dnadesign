@@ -24,7 +24,7 @@ This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage a
 >
 > - `fetch|lock|parse|sample|analyze|export` plus `study` and `portfolio` cover fixed-length PWM optimization workspaces. This lane uses Gibbs annealing MCMC plus MMR elite selection and is not posterior inference.
 > - `cassette init-workspace|validate|design|solve|show` cover cassette workspaces. This lane uses explicit cassette planning plus bounded solve search and keeps separate artifact contracts.
-> - `yiu init-workspace|validate|design|trace|show` cover YIU protocol-state workspaces. This lane uses explicit step-graph validation and deterministic state-bundle publication.
+> - `yiu init-workspace|validate|design|trace|solve|show` cover YIU protocol-state workspaces. This lane uses explicit step-graph validation, deterministic state-bundle publication, and bounded solve search.
 >
 > Choose the command family by the workspace contract you need. `cassette` and `yiu` do not fall back to `sample`, and `sample` runs do not reuse cassette or YIU artifacts.
 
@@ -56,7 +56,7 @@ cruncher study list
 * **Optimize fixed-length sequences** → `sample`
 * **Analyze optimization runs** → `analyze`, `notebook`
 * **Design and search cassettes** → `cassette init-workspace|validate|design|solve|show`
-* **Model YIU hairpin oligo processing** → `yiu init-workspace|validate|design|trace|show`
+* **Model YIU hairpin oligo processing** → `yiu init-workspace|validate|design|trace|solve|show`
 * **Study sweeps** → `study list|run|summarize|show|clean`
 * **Cross-workspace handoff aggregation** → `portfolio run|show`
 * **Export sequences** → `export sequences`
@@ -527,7 +527,8 @@ Notes:
 #### YIU workflows
 
 The YIU workflow is separate from both `sample` and `cassette`. It expects an explicit spec file at
-`<workspace>/configs/yiu/<name>.yiu.yaml`, validates a protocol-step state graph, and writes YIU-specific artifacts under `outputs/yiu/explicit/`.
+`<workspace>/configs/yiu/<name>.yiu.yaml` or a solve spec at
+`<workspace>/configs/yiu/<name>.yiu.solve.yaml`, validates a protocol-step state graph, and writes YIU-specific artifacts under `outputs/yiu/explicit/` and `outputs/yiu/solve/`.
 
 Deep contracts live in:
 
@@ -538,7 +539,7 @@ Deep contracts live in:
 
 #### `cruncher yiu init-workspace`
 
-Scaffold a runbook-only YIU workspace root with one explicit example spec and optional protocol catalogs.
+Scaffold a runbook-only YIU workspace root with the canonical circularized explicit spec, a paired solve spec, and compatibility examples.
 
 Examples:
 
@@ -548,11 +549,14 @@ Examples:
 Outputs:
 
 * writes `configs/runbook.yaml`
-* writes `configs/yiu/example.yiu.yaml`
-* writes `catalogs/restriction_enzymes.yaml`
-* writes `catalogs/nickases.yaml`
-* writes `catalogs/adapters.yaml`
-* creates `outputs/yiu/explicit/` and `published/views/`
+* writes `configs/yiu/example_canonical_circularized.yiu.yaml`
+* writes `configs/yiu/example_canonical_circularized.yiu.solve.yaml`
+* writes `configs/yiu/compat/example_adapter_hairpin.yiu.yaml`
+* writes `configs/yiu/compat/example_legacy_v1.yiu.yaml`
+* writes `catalogs/enzymes.yaml`
+* writes `catalogs/oligo_parts.yaml`
+* writes `catalogs/backbones.yaml`
+* creates `outputs/yiu/explicit/` and `outputs/yiu/solve/`
 
 #### `cruncher yiu validate`
 
@@ -560,32 +564,73 @@ Validate one protocol-state YIU spec and print a deterministic state-trace repor
 
 Examples:
 
-* `uv run cruncher yiu validate --spec configs/yiu/example.yiu.yaml`
-* `uv run cruncher yiu validate --spec configs/yiu/example.yiu.yaml --json`
+* `uv run cruncher yiu validate --spec configs/yiu/example_canonical_circularized.yiu.yaml`
+* `uv run cruncher yiu validate --spec configs/yiu/example_canonical_circularized.yiu.yaml --json`
 
 #### `cruncher yiu design`
 
-Write explicit YIU artifacts for one `.yiu.yaml` spec, including `yiu_report.json`, `yiu_trace.jsonl`, and published views.
+Write explicit YIU artifacts for one `.yiu.yaml` spec, including `yiu_report.json`, `yiu_trace.jsonl`, `published/visual_manifest.json`, and optional BaseRender job files.
 
 Example:
 
-* `uv run cruncher yiu design --spec configs/yiu/example.yiu.yaml`
+* `uv run cruncher yiu design --spec configs/yiu/example_canonical_circularized.yiu.yaml`
 
 #### `cruncher yiu trace`
 
-Materialize the modeled state graph for one `.yiu.yaml` spec without invoking a solve/search lane.
+Materialize the modeled state graph for one `.yiu.yaml` spec. In this tranche it is operationally identical to `design`.
 
 Example:
 
-* `uv run cruncher yiu trace --spec configs/yiu/example.yiu.yaml`
+* `uv run cruncher yiu trace --spec configs/yiu/example_canonical_circularized.yiu.yaml`
+
+#### `cruncher yiu solve`
+
+Search for concrete YIU hits from a separate `.yiu.solve.yaml` spec and materialize the top hits as explicit YIU bundles.
+
+Examples:
+
+* `uv run cruncher yiu solve --spec configs/yiu/example_canonical_circularized.yiu.solve.yaml`
+* `uv run cruncher yiu solve --spec configs/yiu/example_canonical_circularized.yiu.solve.yaml --json`
+
+Outputs:
+
+* writes under `<workspace>/outputs/yiu/solve/<solve_name>/<solve_id>/`
+* writes `yiu_solve_report.json`, `yiu_solve_status.json`, `yiu_solve_manifest.json`, `accepted_hits.jsonl`, and `hits.csv`
+* materializes per-hit explicit bundles under `hits/hit_0001/`
+* publishes solve-level `published/visual_manifest.json`, `published/views/`, `published/baserender_jobs/`, and `published/renders/`
 
 #### `cruncher yiu show`
 
-Show summary paths for one YIU run directory.
+Show the normalized bundle inventory for one explicit or solve YIU run directory.
 
 Example:
 
-* `uv run cruncher yiu show --run outputs/yiu/explicit/demo_yiu/<design_id>`
+* `uv run cruncher yiu show --run outputs/yiu/explicit/example_canonical_circularized/<design_id>`
+* `uv run cruncher yiu show --run outputs/yiu/solve/example_canonical_circularized/<solve_id>`
+* `uv run cruncher yiu show --run outputs/yiu/solve/example_canonical_circularized/<solve_id> --json`
+
+Notes:
+
+* text output surfaces run id, bundle kind, status, artifact paths, and publication counts
+* explicit bundles also show step/state/issue counts and canonical template plus alias metadata when relevant
+* solve bundles also show accepted/materialized hit counts, final-state kind, and top-hit explicit bundle roots
+* `--json` prints the normalized bundle inventory instead of the human summary view
+
+#### `cruncher visuals validate`
+
+Validate a published render job through the public `dnadesign.baserender` API.
+
+Example:
+
+* `uv run cruncher visuals validate --job outputs/yiu/explicit/example_canonical_circularized/<design_id>/published/baserender_jobs/circularized_payload_candidate.job.yaml`
+
+#### `cruncher visuals run`
+
+Run a published render job through the public `dnadesign.baserender` API.
+
+Example:
+
+* `uv run cruncher visuals run --job outputs/yiu/explicit/example_canonical_circularized/<design_id>/published/baserender_jobs/circularized_payload_candidate.job.yaml`
 
 ---
 

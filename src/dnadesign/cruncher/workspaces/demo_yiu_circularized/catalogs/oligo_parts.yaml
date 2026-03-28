@@ -1,0 +1,18 @@
+oligo_parts:
+  entries:
+  - id: oES790
+    part_kind: primer
+    sequence: GGAAAAAA
+  - id: oES791
+    part_kind: primer
+    sequence: TTTTTTCC
+  - id: oES792
+    part_kind: adapter
+    sequence: TCAGCGGGCTGAGG
+    phosphorylated_5p: true
+  - id: oES793
+    part_kind: primer
+    sequence: TCCCTA
+  - id: oES794
+    part_kind: primer
+    sequence: TCAGCG

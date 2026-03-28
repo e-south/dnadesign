@@ -1,0 +1,12 @@
+enzymes:
+  entries:
+  - id: TypeIIS.Mock
+    recognition_sequence: AACGTT
+    top_cut_offset: 1
+    bottom_cut_offset: 5
+  - id: Nb.BssSI
+    recognition_sequence: GGGG
+    bottom_cut_offset: 4
+  - id: Nt.Mock
+    recognition_sequence: GGGG
+    top_cut_offset: 2

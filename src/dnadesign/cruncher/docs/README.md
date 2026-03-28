@@ -1,16 +1,16 @@
 ## Cruncher Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-26
+**Last verified:** 2026-03-27
 
 
-**Last updated by:** cruncher-maintainers on 2026-03-26
+**Last updated by:** cruncher-maintainers on 2026-03-27
 
 Cruncher currently has three first-class workflow families:
 
 - fixed-length PWM optimization workspaces built around `fetch -> lock -> parse -> sample -> analyze`
 - cassette workspaces built around `cassette init-workspace|validate|design|solve|show`
-- YIU protocol-state workspaces built around `yiu init-workspace|validate|design|trace|show`
+- YIU protocol-state workspaces built around `yiu init-workspace|validate|design|trace|solve|show`
 
 Studies and portfolios build on the fixed-length optimization lane. Cassette and YIU runs keep their own workspace and artifact contracts. Future lanes should sit beside these families rather than overload them.
 
