@@ -942,6 +942,7 @@ Example:
 
 Notes:
 
+* `workspaces list` is Cruncher's tool-local workspace and machine-runbook inventory. For repo-wide runbook discovery across tools, start with `docs/runbooks/README.md` or `uv run ops catalog list --section tool-sources`.
 * `workspaces list` includes Study inventory columns: `Study Specs` and `Study Runs`, and reports workspace kind (`config+runbook` or `runbook-only`).
 * `workspaces run` executes typed runbook steps from `configs/runbook.yaml` in fail-fast order.
 * runbook steps are strict CLI-args only (`run: [<cruncher-subcommand>, ...]`); arbitrary shell is not supported.

@@ -33,7 +33,10 @@ from dnadesign.cruncher.workspaces.families import (
     workspace_kind_from_presence,
 )
 
-app = typer.Typer(no_args_is_help=True, help="List discoverable cruncher workspaces.")
+app = typer.Typer(
+    no_args_is_help=True,
+    help="List tool-local Cruncher workspaces and machine runbooks.",
+)
 console = Console()
 
 

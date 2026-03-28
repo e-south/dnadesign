@@ -8,6 +8,11 @@ Cruncher is a workspace-oriented DNA design tool with three first-class workflow
 
 Use Cruncher when you need strict workspace contracts, deterministic artifacts, and a clear separation between workflow families. New families can be added beside these lanes without forcing sample workspaces, study workspaces, cassette workspaces, or YIU workspaces into one artifact model.
 
+`cruncher workspaces list` is the tool-local discovery surface for packaged
+Cruncher workspaces and their machine runbooks. For repo-wide runbook discovery
+across tools, start with [`docs/runbooks/README.md`](../../../docs/runbooks/README.md)
+or `uv run ops catalog list --section tool-sources`.
+
 ### Start here
 
 Use the docs map for the full index, then pick the shortest workflow that matches your job:

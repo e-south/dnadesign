@@ -156,6 +156,10 @@ cruncher workspaces reset --root src/dnadesign/cruncher/workspaces --all-workspa
 
 Tip: `cd` into a fixed-length optimization workspace and run cruncher commands without passing `--config`; Cruncher resolves `configs/config.yaml` automatically for that workspace kind. For runbook-family workspaces, use the family CLI surface or `cruncher workspaces run --runbook configs/runbook.yaml`. You can also run from anywhere with `--workspace <name>` or inspect what is available via `cruncher workspaces list`.
 
+`cruncher workspaces list` is intentionally tool-local. For repo-wide runbook
+discovery across tools, use [`docs/runbooks/README.md`](../../../docs/runbooks/README.md)
+or `uv run ops catalog list --section tool-sources`.
+
 For packaged YIU demo workspaces, treat `outputs/yiu/...` as generated runtime space. The checked-in demo is input-only and should not accumulate explicit bundles, solve bundles, render outputs, or caches in version control.
 
 Packaged workspace configs resolve `discover.tool_path` relative to their `configs/config.yaml`, so keep packaged workspaces under the repository layout (`src/dnadesign/cruncher/workspaces/...`). If you copy a workspace elsewhere, update `discover.tool_path` explicitly before running `discover motifs`.
