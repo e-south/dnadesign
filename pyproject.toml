@@ -131,7 +131,7 @@ where = ["src"]
   "runbooks/templates/*.qsub",
 ]
 "dnadesign.studies" = [
-  "*/status.registry.yaml",
+  "families/*/ops/status.registry.yaml",
 ]
 
 [tool.pytest.ini_options]
