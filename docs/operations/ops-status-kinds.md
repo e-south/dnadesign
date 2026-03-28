@@ -1,6 +1,6 @@
 ## OPS status kinds
 
-**Owner:** dnadesign-maintainers  
+**Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
 This index summarizes the currently registered public OPS routes and the status kinds behind them.

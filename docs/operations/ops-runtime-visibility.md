@@ -1,6 +1,6 @@
 ## OPS runtime visibility
 
-**Owner:** dnadesign-maintainers  
+**Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
 Use this page when you need the exact contract for scheduler probes, active-job
