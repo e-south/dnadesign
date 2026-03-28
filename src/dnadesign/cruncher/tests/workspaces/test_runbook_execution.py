@@ -318,8 +318,8 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
     result = run_workspace_runbook(runbook_path, output_log_path=output_log)
 
     assert result.executed_step_ids == ["yiu_validate", "yiu_design", "yiu_trace", "yiu_solve"]
-    explicit_run_root = workspace / "outputs" / "yiu" / "explicit" / "example_canonical_circularized"
-    solve_run_root = workspace / "outputs" / "yiu" / "solve" / "example_canonical_circularized"
+    explicit_run_root = workspace / "outputs" / "yiu" / "explicit" / "example_split_payload_circularized"
+    solve_run_root = workspace / "outputs" / "yiu" / "solve" / "example_split_payload_circularized"
     explicit_run_dir = next(explicit_run_root.iterdir())
     solve_run_dir = next(solve_run_root.iterdir())
     assert (explicit_run_dir / "published" / "visual_manifest.json").exists()

@@ -16,8 +16,8 @@ YIU now has two strict document roots:
 configs/
   runbook.yaml
   yiu/
-    example_canonical_circularized.yiu.yaml
-    example_canonical_circularized.yiu.solve.yaml
+    example_split_payload_circularized.yiu.yaml
+    example_split_payload_circularized.yiu.solve.yaml
     compat/
       example_adapter_hairpin.yiu.yaml
       example_legacy_v1.yiu.yaml
@@ -47,7 +47,7 @@ yiu:
   family: yiu
   protocol_template: yiu_circularized_payload_v1
   workflow_scope: core_insert_generation
-  name: example_canonical_circularized
+  name: example_split_payload_circularized
   source_oligo:
     authored_sequence: CCGATG...
     annotations:
@@ -114,7 +114,7 @@ Important explicit rules:
 - `publish_contract_version: 2` is compatibility-only for older consumers
 - `output.emit_baserender_jobs` requires `output.emit_view_contracts: true`
 - `template_bindings` is required for `protocol_template: yiu_circularized_payload_v1`
-- canonical sequence fields must be separator-free; composite structure belongs in `segments`, `junctions`, `compound_regions`, and optional display metadata
+- sequence identity fields must be separator-free; composite structure belongs in `segments`, `junctions`, `compound_regions`, and optional display metadata
 - hard invariants are either evaluated or rejected; they are no longer silently accepted
 - `cloning_geometry` is not allowed in `workflow_scope: core_insert_generation`
 
@@ -141,11 +141,11 @@ Every invariant result records:
 - `status`: `guaranteed`, `possible`, or `impossible`
 - observed coordinates, motifs, fragments, or junction evidence
 
-### Canonical support matrix
+### Workflow support matrix
 
 Current shipment language:
 
-> YIU currently ships as a canonical circularized workflow family with bounded solve over declared source windows. Compatibility templates remain supported, but the canonical circularized template is the recommended operator path.
+> YIU currently ships as a split-payload circularized workflow family with bounded solve over declared source windows. Compatibility templates remain supported, but the split-payload circularized template is the recommended operator path.
 
 | Surface | `yiu_circularized_payload_v1` | `yiu_adapter_hairpin_v1` | `yiu_v1` |
 | --- | --- | --- | --- |
@@ -154,9 +154,9 @@ Current shipment language:
 | visual publication | full v3 support | compatibility / reduced guarantees | compatibility / reduced guarantees |
 | BaseRender jobs | supported path | compatibility path | not emitted |
 
-Canonical invariant classes currently supported in the runtime:
+Runtime-supported invariant classes for the split-payload lane:
 
-| Invariant class | Canonical explicit validate | Canonical solve admissibility | Notes |
+| Invariant class | Split-payload explicit validate | Split-payload solve admissibility | Notes |
 | --- | --- | --- | --- |
 | `payload_assembly` | yes | yes | compound-region aware |
 | `sacrificial_fragmentation` | yes | yes | bounded fragment check |
@@ -177,7 +177,7 @@ The solve root is `yiu_solve:` and must live beside the explicit specs under `co
 ```yaml
 yiu_solve:
   schema_version: 1
-  base_spec: configs/yiu/example_canonical_circularized.yiu.yaml
+  base_spec: configs/yiu/example_split_payload_circularized.yiu.yaml
   search:
     max_hits: 32
     materialize_top_k: 8

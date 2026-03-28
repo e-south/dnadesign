@@ -27,7 +27,7 @@ Explicit runs write:
 - `published/baserender_jobs/` when job emission is enabled
 - `published/renders/` as the target directory for emitted BaseRender jobs
 
-Explicit `yiu_status.json`, `yiu_manifest.json`, and `yiu_report.json` preserve canonical `protocol_template` and any deprecated alias metadata when the run uses a `schema_version: 2` template-driven spec.
+Explicit `yiu_status.json`, `yiu_manifest.json`, and `yiu_report.json` preserve the resolved `protocol_template` and any deprecated alias metadata when the run uses a `schema_version: 2` template-driven spec.
 
 `published/visual_manifest.json` is the operator-facing visual inventory. It unifies:
 

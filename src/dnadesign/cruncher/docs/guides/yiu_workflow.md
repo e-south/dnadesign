@@ -7,29 +7,29 @@ YIU is now a real workflow family with two explicit lanes and one bounded solve 
 
 - `schema_version: 1` with `protocol: yiu_v1` remains the compatibility lane.
 - `schema_version: 2` with `protocol_template: yiu_adapter_hairpin_v1` is the typed adapter-hairpin compatibility lane.
-- `schema_version: 2` with `protocol_template: yiu_circularized_payload_v1` is the recommended canonical lane.
+- `schema_version: 2` with `protocol_template: yiu_circularized_payload_v1` is the recommended operator lane.
 - `.yiu.solve.yaml` drives bounded search over declared variable windows and admits hits only after the explicit validator succeeds.
 
 Ship posture for this tranche:
 
-> YIU currently ships as a canonical circularized workflow family with bounded solve over declared source windows. Compatibility templates remain supported, but the canonical circularized template is the recommended operator path.
+> YIU currently ships as a split-payload circularized workflow family with bounded solve over declared source windows. Compatibility templates remain supported, but the split-payload circularized template is the recommended operator path.
 
 ### Command surface
 
 ```bash
 uv run cruncher yiu init-workspace WORKSPACE
-uv run cruncher yiu validate --spec configs/yiu/example_canonical_circularized.yiu.yaml
-uv run cruncher yiu design --spec configs/yiu/example_canonical_circularized.yiu.yaml
-uv run cruncher yiu trace --spec configs/yiu/example_canonical_circularized.yiu.yaml
-uv run cruncher yiu show --run outputs/yiu/explicit/example_canonical_circularized/<design_id>
-uv run cruncher yiu solve --spec configs/yiu/example_canonical_circularized.yiu.solve.yaml
+uv run cruncher yiu validate --spec configs/yiu/example_split_payload_circularized.yiu.yaml
+uv run cruncher yiu design --spec configs/yiu/example_split_payload_circularized.yiu.yaml
+uv run cruncher yiu trace --spec configs/yiu/example_split_payload_circularized.yiu.yaml
+uv run cruncher yiu show --run outputs/yiu/explicit/example_split_payload_circularized/<design_id>
+uv run cruncher yiu solve --spec configs/yiu/example_split_payload_circularized.yiu.solve.yaml
 ```
 
 `design` and `trace` are currently operational aliases. They both materialize the same explicit bundle, but operators use `design` as the default artifact command and `trace` when they want state-graph inspection intent to be explicit.
 
 ### Recommended explicit state graph
 
-The canonical circularized `v2` lane publishes these states:
+The split-payload circularized `v2` lane publishes these states:
 
 1. `source_oligo_ssdna`
 2. `pcr_linear_duplex`
@@ -48,7 +48,7 @@ The adapter-hairpin compatibility lane still publishes `source_oligo_ssdna`, `so
 
 - source annotations resolve onto the authored source oligo
 - overlap legality is enforced before state materialization
-- canonical circularized specs must declare `template_bindings`; runtime no longer depends on hidden favorite IDs
+- split-payload circularized specs must declare `template_bindings`; runtime no longer depends on hidden favorite IDs
 - the explicit validator records `sequence_mode`, `validation_mode`, and per-state `pattern_evidence_summary`
 - hard invariants are no longer silently accepted; supported checks are evaluated and unsupported scope requests fail fast
 - split-template payload assembly is checked in `circularized_payload_junction`

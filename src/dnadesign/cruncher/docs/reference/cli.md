@@ -539,7 +539,7 @@ Deep contracts live in:
 
 #### `cruncher yiu init-workspace`
 
-Scaffold a runbook-only YIU workspace root with the canonical circularized explicit spec, a paired solve spec, and compatibility examples.
+Scaffold a runbook-only YIU workspace root with the split-payload circularized explicit spec, a paired solve spec, and compatibility examples.
 
 Examples:
 
@@ -549,8 +549,8 @@ Examples:
 Outputs:
 
 * writes `configs/runbook.yaml`
-* writes `configs/yiu/example_canonical_circularized.yiu.yaml`
-* writes `configs/yiu/example_canonical_circularized.yiu.solve.yaml`
+* writes `configs/yiu/example_split_payload_circularized.yiu.yaml`
+* writes `configs/yiu/example_split_payload_circularized.yiu.solve.yaml`
 * writes `configs/yiu/compat/example_adapter_hairpin.yiu.yaml`
 * writes `configs/yiu/compat/example_legacy_v1.yiu.yaml`
 * writes `catalogs/enzymes.yaml`
@@ -564,8 +564,8 @@ Validate one protocol-state YIU spec and print a deterministic state-trace repor
 
 Examples:
 
-* `uv run cruncher yiu validate --spec configs/yiu/example_canonical_circularized.yiu.yaml`
-* `uv run cruncher yiu validate --spec configs/yiu/example_canonical_circularized.yiu.yaml --json`
+* `uv run cruncher yiu validate --spec configs/yiu/example_split_payload_circularized.yiu.yaml`
+* `uv run cruncher yiu validate --spec configs/yiu/example_split_payload_circularized.yiu.yaml --json`
 
 #### `cruncher yiu design`
 
@@ -573,7 +573,7 @@ Write explicit YIU artifacts for one `.yiu.yaml` spec, including `yiu_report.jso
 
 Example:
 
-* `uv run cruncher yiu design --spec configs/yiu/example_canonical_circularized.yiu.yaml`
+* `uv run cruncher yiu design --spec configs/yiu/example_split_payload_circularized.yiu.yaml`
 
 #### `cruncher yiu trace`
 
@@ -581,7 +581,7 @@ Materialize the modeled state graph for one `.yiu.yaml` spec. In this tranche it
 
 Example:
 
-* `uv run cruncher yiu trace --spec configs/yiu/example_canonical_circularized.yiu.yaml`
+* `uv run cruncher yiu trace --spec configs/yiu/example_split_payload_circularized.yiu.yaml`
 
 #### `cruncher yiu solve`
 
@@ -589,8 +589,8 @@ Search for concrete YIU hits from a separate `.yiu.solve.yaml` spec and material
 
 Examples:
 
-* `uv run cruncher yiu solve --spec configs/yiu/example_canonical_circularized.yiu.solve.yaml`
-* `uv run cruncher yiu solve --spec configs/yiu/example_canonical_circularized.yiu.solve.yaml --json`
+* `uv run cruncher yiu solve --spec configs/yiu/example_split_payload_circularized.yiu.solve.yaml`
+* `uv run cruncher yiu solve --spec configs/yiu/example_split_payload_circularized.yiu.solve.yaml --json`
 
 Outputs:
 
@@ -605,14 +605,14 @@ Show the normalized bundle inventory for one explicit or solve YIU run directory
 
 Example:
 
-* `uv run cruncher yiu show --run outputs/yiu/explicit/example_canonical_circularized/<design_id>`
-* `uv run cruncher yiu show --run outputs/yiu/solve/example_canonical_circularized/<solve_id>`
-* `uv run cruncher yiu show --run outputs/yiu/solve/example_canonical_circularized/<solve_id> --json`
+* `uv run cruncher yiu show --run outputs/yiu/explicit/example_split_payload_circularized/<design_id>`
+* `uv run cruncher yiu show --run outputs/yiu/solve/example_split_payload_circularized/<solve_id>`
+* `uv run cruncher yiu show --run outputs/yiu/solve/example_split_payload_circularized/<solve_id> --json`
 
 Notes:
 
 * text output surfaces run id, bundle kind, status, artifact paths, and publication counts
-* explicit bundles also show step/state/issue counts and canonical template plus alias metadata when relevant
+* explicit bundles also show step/state/issue counts and resolved template plus alias metadata when relevant
 * solve bundles also show accepted/materialized hit counts, final-state kind, and top-hit explicit bundle roots
 * `--json` prints the normalized bundle inventory instead of the human summary view
 
@@ -622,7 +622,7 @@ Validate a published render job through the public `dnadesign.baserender` API.
 
 Example:
 
-* `uv run cruncher visuals validate --job outputs/yiu/explicit/example_canonical_circularized/<design_id>/published/baserender_jobs/circularized_payload_candidate.job.yaml`
+* `uv run cruncher visuals validate --job outputs/yiu/explicit/example_split_payload_circularized/<design_id>/published/baserender_jobs/circularized_payload_candidate.job.yaml`
 
 #### `cruncher visuals run`
 
@@ -630,7 +630,7 @@ Run a published render job through the public `dnadesign.baserender` API.
 
 Example:
 
-* `uv run cruncher visuals run --job outputs/yiu/explicit/example_canonical_circularized/<design_id>/published/baserender_jobs/circularized_payload_candidate.job.yaml`
+* `uv run cruncher visuals run --job outputs/yiu/explicit/example_split_payload_circularized/<design_id>/published/baserender_jobs/circularized_payload_candidate.job.yaml`
 
 ---
 

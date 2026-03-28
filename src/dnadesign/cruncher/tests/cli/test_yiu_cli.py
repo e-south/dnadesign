@@ -1302,8 +1302,8 @@ def test_yiu_init_workspace_scaffolds_family_workspace(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert (workspace_root / "configs" / "runbook.yaml").exists()
     assert (workspace_root / "runbook.md").exists()
-    assert (workspace_root / "configs" / "yiu" / "example_canonical_circularized.yiu.yaml").exists()
-    assert (workspace_root / "configs" / "yiu" / "example_canonical_circularized.yiu.solve.yaml").exists()
+    assert (workspace_root / "configs" / "yiu" / "example_split_payload_circularized.yiu.yaml").exists()
+    assert (workspace_root / "configs" / "yiu" / "example_split_payload_circularized.yiu.solve.yaml").exists()
     assert (workspace_root / "configs" / "yiu" / "compat" / "example_adapter_hairpin.yiu.yaml").exists()
     assert (workspace_root / "configs" / "yiu" / "compat" / "example_legacy_v1.yiu.yaml").exists()
     assert (workspace_root / "catalogs" / "enzymes.yaml").exists()
@@ -1341,11 +1341,11 @@ def test_yiu_init_workspace_runbook_dry_run_is_rerunnable(tmp_path: Path) -> Non
     assert "yiu_validate, yiu_design, yiu_trace, yiu_solve" in runbook_result.output
     runbook_doc = (workspace_root / "runbook.md").read_text(encoding="utf-8")
     assert (
-        "cruncher yiu design --spec configs/yiu/example_canonical_circularized.yiu.yaml --force-overwrite"
+        "cruncher yiu design --spec configs/yiu/example_split_payload_circularized.yiu.yaml --force-overwrite"
         in runbook_doc
     )
     assert (
-        "cruncher yiu solve --spec configs/yiu/example_canonical_circularized.yiu.solve.yaml --force-overwrite"
+        "cruncher yiu solve --spec configs/yiu/example_split_payload_circularized.yiu.solve.yaml --force-overwrite"
         in runbook_doc
     )
 
@@ -1370,8 +1370,8 @@ def test_yiu_init_workspace_runbook_executes_end_to_end_and_visual_job_renders(t
     assert "Runbook executed:" in runbook_result.output
     assert not (workspace_root / "published").exists()
 
-    explicit_run_root = workspace_root / "outputs" / "yiu" / "explicit" / "example_canonical_circularized"
-    solve_run_root = workspace_root / "outputs" / "yiu" / "solve" / "example_canonical_circularized"
+    explicit_run_root = workspace_root / "outputs" / "yiu" / "explicit" / "example_split_payload_circularized"
+    solve_run_root = workspace_root / "outputs" / "yiu" / "solve" / "example_split_payload_circularized"
     explicit_run_dir = next(explicit_run_root.iterdir())
     solve_run_dir = next(solve_run_root.iterdir())
     assert len(list(explicit_run_root.iterdir())) == 1
@@ -1430,7 +1430,7 @@ def test_yiu_init_workspace_scaffolded_spec_validates(tmp_path: Path) -> None:
             "yiu",
             "validate",
             "--spec",
-            str(workspace_root / "configs" / "yiu" / "example_canonical_circularized.yiu.yaml"),
+            str(workspace_root / "configs" / "yiu" / "example_split_payload_circularized.yiu.yaml"),
             "--json",
         ],
         color=False,
@@ -1454,7 +1454,7 @@ def test_yiu_init_workspace_scaffolded_solve_spec_runs(tmp_path: Path) -> None:
             "yiu",
             "solve",
             "--spec",
-            str(workspace_root / "configs" / "yiu" / "example_canonical_circularized.yiu.solve.yaml"),
+            str(workspace_root / "configs" / "yiu" / "example_split_payload_circularized.yiu.solve.yaml"),
             "--json",
         ],
         color=False,

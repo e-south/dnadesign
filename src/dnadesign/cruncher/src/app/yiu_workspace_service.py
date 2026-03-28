@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/src/app/yiu_workspace_service.py
 
-Scaffold YIU workspaces with the canonical circularized explicit + solve layout.
+Scaffold YIU workspaces with the split-payload circularized explicit + solve layout.
 
 Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
@@ -20,6 +20,13 @@ from pathlib import Path
 import yaml
 
 _WORKSPACE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_DEMO_EXPLICIT_SPEC_NAME = "example_split_payload_circularized"
+_DEMO_EXPLICIT_SPEC_FILENAME = f"{_DEMO_EXPLICIT_SPEC_NAME}.yiu.yaml"
+_DEMO_SOLVE_SPEC_FILENAME = f"{_DEMO_EXPLICIT_SPEC_NAME}.yiu.solve.yaml"
+_DEMO_EXPLICIT_SPEC_RELATIVE_PATH = f"configs/yiu/{_DEMO_EXPLICIT_SPEC_FILENAME}"
+_DEMO_SOLVE_SPEC_RELATIVE_PATH = f"configs/yiu/{_DEMO_SOLVE_SPEC_FILENAME}"
+_DEMO_EXPLICIT_RUN_ROOT = f"outputs/yiu/explicit/{_DEMO_EXPLICIT_SPEC_NAME}"
+_DEMO_SOLVE_RUN_ROOT = f"outputs/yiu/solve/{_DEMO_EXPLICIT_SPEC_NAME}"
 
 
 @dataclass(frozen=True)
@@ -76,7 +83,7 @@ def _split_example_spec_payload() -> dict[str, object]:
             "family": "yiu",
             "protocol_template": "yiu_circularized_payload_v1",
             "workflow_scope": "core_insert_generation",
-            "name": "example_canonical_circularized",
+            "name": _DEMO_EXPLICIT_SPEC_NAME,
             "source_oligo": {
                 "authored_sequence": "ccgatgTCCCTATCAaacgttGTGATAGAGAGGGGGGGGGGGGCCTCAGCCCGCTGA",
                 "annotations": {
@@ -313,7 +320,7 @@ def _split_solve_spec_payload() -> dict[str, object]:
     return {
         "yiu_solve": {
             "schema_version": 1,
-            "base_spec": "configs/yiu/example_canonical_circularized.yiu.yaml",
+            "base_spec": _DEMO_EXPLICIT_SPEC_RELATIVE_PATH,
             "search": {
                 "max_hits": 4,
                 "materialize_top_k": 2,
@@ -603,8 +610,8 @@ def _runbook_steps() -> list[dict[str, object]]:
     return [
         {
             "id": "yiu_validate",
-            "description": "Validate the canonical circularized YIU demo spec.",
-            "run": ["yiu", "validate", "--spec", "configs/yiu/example_canonical_circularized.yiu.yaml"],
+            "description": "Validate the checked-in split-payload circularized YIU demo spec.",
+            "run": ["yiu", "validate", "--spec", _DEMO_EXPLICIT_SPEC_RELATIVE_PATH],
         },
         {
             "id": "yiu_design",
@@ -613,7 +620,7 @@ def _runbook_steps() -> list[dict[str, object]]:
                 "yiu",
                 "design",
                 "--spec",
-                "configs/yiu/example_canonical_circularized.yiu.yaml",
+                _DEMO_EXPLICIT_SPEC_RELATIVE_PATH,
                 "--force-overwrite",
             ],
         },
@@ -624,7 +631,7 @@ def _runbook_steps() -> list[dict[str, object]]:
                 "yiu",
                 "trace",
                 "--spec",
-                "configs/yiu/example_canonical_circularized.yiu.yaml",
+                _DEMO_EXPLICIT_SPEC_RELATIVE_PATH,
                 "--force-overwrite",
             ],
         },
@@ -635,7 +642,7 @@ def _runbook_steps() -> list[dict[str, object]]:
                 "yiu",
                 "solve",
                 "--spec",
-                "configs/yiu/example_canonical_circularized.yiu.solve.yaml",
+                _DEMO_SOLVE_SPEC_RELATIVE_PATH,
                 "--force-overwrite",
             ],
         },
@@ -662,7 +669,7 @@ def _write_runbook_markdown(workspace_root: Path, *, runbook_path: Path) -> Path
         f"- {workspace_display_path}/",
         "",
         "**Purpose**",
-        "- Canonical checked-in YIU demo for the circularized-payload flow.",
+        "- Checked-in YIU demo for the split-payload circularized flow.",
         "- Covers validate, explicit materialization, trace-alias materialization, and solve from one repo workspace.",
         "",
         "**Run This Single Command**",
@@ -676,25 +683,25 @@ def _write_runbook_markdown(workspace_root: Path, *, runbook_path: Path) -> Path
         '    cruncher() { uv run cruncher "$@"; }',
         "",
         "    # Standard machine-runbook sequence (matches configs/runbook.yaml).",
-        "    cruncher yiu validate --spec configs/yiu/example_canonical_circularized.yiu.yaml",
-        "    cruncher yiu design --spec configs/yiu/example_canonical_circularized.yiu.yaml --force-overwrite",
-        "    cruncher yiu trace --spec configs/yiu/example_canonical_circularized.yiu.yaml --force-overwrite",
-        "    cruncher yiu solve --spec configs/yiu/example_canonical_circularized.yiu.solve.yaml --force-overwrite",
+        f"    cruncher yiu validate --spec {_DEMO_EXPLICIT_SPEC_RELATIVE_PATH}",
+        f"    cruncher yiu design --spec {_DEMO_EXPLICIT_SPEC_RELATIVE_PATH} --force-overwrite",
+        f"    cruncher yiu trace --spec {_DEMO_EXPLICIT_SPEC_RELATIVE_PATH} --force-overwrite",
+        f"    cruncher yiu solve --spec {_DEMO_SOLVE_SPEC_RELATIVE_PATH} --force-overwrite",
         "",
         "### Optional follow-up commands",
         "",
-        '    DESIGN_ID="$(ls -1 outputs/yiu/explicit/example_canonical_circularized | tail -n 1)"',
-        '    SOLVE_ID="$(ls -1 outputs/yiu/solve/example_canonical_circularized | tail -n 1)"',
-        '    uv run cruncher yiu show --run "outputs/yiu/explicit/example_canonical_circularized/$DESIGN_ID"',
-        '    uv run cruncher yiu show --run "outputs/yiu/solve/example_canonical_circularized/$SOLVE_ID"',
+        f'    DESIGN_ID="$(ls -1 {_DEMO_EXPLICIT_RUN_ROOT} | tail -n 1)"',
+        f'    SOLVE_ID="$(ls -1 {_DEMO_SOLVE_RUN_ROOT} | tail -n 1)"',
+        f'    uv run cruncher yiu show --run "{_DEMO_EXPLICIT_RUN_ROOT}/$DESIGN_ID"',
+        f'    uv run cruncher yiu show --run "{_DEMO_SOLVE_RUN_ROOT}/$SOLVE_ID"',
         (
-            "    uv run cruncher visuals validate --job "
-            '"outputs/yiu/explicit/example_canonical_circularized/$DESIGN_ID/'
+            f"    uv run cruncher visuals validate --job "
+            f'"{_DEMO_EXPLICIT_RUN_ROOT}/$DESIGN_ID/'
             'published/baserender_jobs/circularized_payload_candidate.job.yaml"'
         ),
         (
-            "    uv run cruncher visuals run --job "
-            '"outputs/yiu/explicit/example_canonical_circularized/$DESIGN_ID/'
+            f"    uv run cruncher visuals run --job "
+            f'"{_DEMO_EXPLICIT_RUN_ROOT}/$DESIGN_ID/'
             'published/baserender_jobs/circularized_payload_candidate.job.yaml"'
         ),
         "",
@@ -727,10 +734,10 @@ def init_yiu_workspace(workspace_root: Path, *, force_overwrite: bool = False) -
     runbook_path.write_text(yaml.safe_dump(runbook_payload, sort_keys=False), encoding="utf-8")
     runbook_doc_path = _write_runbook_markdown(resolved_root, runbook_path=runbook_path)
 
-    spec_path = resolved_root / "configs" / "yiu" / "example_canonical_circularized.yiu.yaml"
+    spec_path = resolved_root / "configs" / "yiu" / _DEMO_EXPLICIT_SPEC_FILENAME
     spec_path.write_text(yaml.safe_dump(_split_example_spec_payload(), sort_keys=False), encoding="utf-8")
 
-    solve_spec_path = resolved_root / "configs" / "yiu" / "example_canonical_circularized.yiu.solve.yaml"
+    solve_spec_path = resolved_root / "configs" / "yiu" / _DEMO_SOLVE_SPEC_FILENAME
     solve_spec_path.write_text(yaml.safe_dump(_split_solve_spec_payload(), sort_keys=False), encoding="utf-8")
 
     compat_v2_path = resolved_root / "configs" / "yiu" / "compat" / "example_adapter_hairpin.yiu.yaml"

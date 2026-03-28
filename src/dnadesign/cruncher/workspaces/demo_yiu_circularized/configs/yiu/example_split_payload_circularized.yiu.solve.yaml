@@ -1,6 +1,6 @@
 yiu_solve:
   schema_version: 1
-  base_spec: configs/yiu/example_canonical_circularized.yiu.yaml
+  base_spec: configs/yiu/example_split_payload_circularized.yiu.yaml
   search:
     max_hits: 4
     materialize_top_k: 2

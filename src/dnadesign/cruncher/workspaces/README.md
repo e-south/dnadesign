@@ -65,8 +65,8 @@ src/dnadesign/cruncher/workspaces/
     configs/
       runbook.yaml            # machine runbook for the YIU family lane
       yiu/
-        example_canonical_circularized.yiu.yaml
-        example_canonical_circularized.yiu.solve.yaml
+        example_split_payload_circularized.yiu.yaml
+        example_split_payload_circularized.yiu.solve.yaml
         compat/
           example_adapter_hairpin.yiu.yaml
           example_legacy_v1.yiu.yaml

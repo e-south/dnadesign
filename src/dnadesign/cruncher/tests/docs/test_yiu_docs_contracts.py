@@ -71,8 +71,8 @@ def test_yiu_docs_capture_workspace_and_artifact_boundaries() -> None:
     assert "src/dnadesign/cruncher/workspaces/demo_yiu_circularized" in demo
     assert "uv run cruncher workspaces run --workspace demo_yiu_circularized --runbook configs/runbook.yaml" in demo
     assert "uv run cruncher yiu init-workspace yiu_lab_demo" in demo
-    assert "configs/yiu/example_canonical_circularized.yiu.yaml" in demo
-    assert "configs/yiu/example_canonical_circularized.yiu.solve.yaml" in demo
+    assert "configs/yiu/example_split_payload_circularized.yiu.yaml" in demo
+    assert "configs/yiu/example_split_payload_circularized.yiu.solve.yaml" in demo
     assert "outputs/yiu/explicit" in demo
     assert "outputs/yiu/solve" in demo
     assert "published/views" in demo
@@ -110,19 +110,19 @@ def test_yiu_docs_capture_workspace_and_artifact_boundaries() -> None:
     assert "workflow family" in glossary.lower()
 
 
-def test_checked_in_canonical_yiu_demo_workspace_exists() -> None:
+def test_checked_in_yiu_demo_workspace_exists() -> None:
     workspace_root = ROOT / "workspaces" / "demo_yiu_circularized"
 
     assert workspace_root.exists()
     assert (workspace_root / "runbook.md").exists()
     assert (workspace_root / "configs" / "runbook.yaml").exists()
-    assert (workspace_root / "configs" / "yiu" / "example_canonical_circularized.yiu.yaml").exists()
-    assert (workspace_root / "configs" / "yiu" / "example_canonical_circularized.yiu.solve.yaml").exists()
+    assert (workspace_root / "configs" / "yiu" / "example_split_payload_circularized.yiu.yaml").exists()
+    assert (workspace_root / "configs" / "yiu" / "example_split_payload_circularized.yiu.solve.yaml").exists()
     assert (workspace_root / "catalogs" / "enzymes.yaml").exists()
     assert (workspace_root / "catalogs" / "oligo_parts.yaml").exists()
     assert (workspace_root / "catalogs" / "backbones.yaml").exists()
     runbook_doc = (workspace_root / "runbook.md").read_text(encoding="utf-8")
-    assert "Canonical checked-in YIU demo" in runbook_doc
+    assert "Checked-in YIU demo" in runbook_doc
     assert (
         "uv run cruncher workspaces run --workspace demo_yiu_circularized --runbook configs/runbook.yaml" in runbook_doc
     )

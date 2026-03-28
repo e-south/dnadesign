@@ -3,7 +3,7 @@ yiu:
   family: yiu
   protocol_template: yiu_circularized_payload_v1
   workflow_scope: core_insert_generation
-  name: example_canonical_circularized
+  name: example_split_payload_circularized
   source_oligo:
     authored_sequence: ccgatgTCCCTATCAaacgttGTGATAGAGAGGGGGGGGGGGGCCTCAGCCCGCTGA
     annotations:
