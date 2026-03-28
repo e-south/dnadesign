@@ -38,6 +38,7 @@ def test_cluster_root_keeps_progressive_disclosure_directories() -> None:
     cluster_root = _cluster_root()
     assert (cluster_root / "README.md").is_file()
     assert (cluster_root / "docs").is_dir()
+    assert (cluster_root / "ops").is_dir()
     assert (cluster_root / "src").is_dir()
     assert (cluster_root / "tests").is_dir()
     assert (cluster_root / "workspaces").is_dir()
@@ -58,12 +59,23 @@ def test_cluster_root_keeps_minimal_top_level_surface() -> None:
         "cli.py",
         "contracts.py",
         "docs",
+        "ops",
         "presets",
         "scripts",
         "src",
         "tests",
         "workspaces",
     }
+
+
+def test_cluster_ops_surface_is_limited_to_status_registry_files() -> None:
+    ops_root = _cluster_root() / "ops"
+    observed = {
+        path.name
+        for path in ops_root.iterdir()
+        if path.name != "__pycache__" and not path.name.startswith(".")
+    }
+    assert observed == {"__init__.py", "status.registry.yaml", "status_providers.py"}
 
 
 def test_cluster_workspaces_scaffold_exists() -> None:

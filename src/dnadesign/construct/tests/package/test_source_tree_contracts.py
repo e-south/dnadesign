@@ -42,6 +42,7 @@ def test_construct_root_keeps_minimal_top_level_surface() -> None:
         "__init__.py",
         "__main__.py",
         "cli.py",
+        "contracts.py",
         "docs",
         "src",
         "tests",
