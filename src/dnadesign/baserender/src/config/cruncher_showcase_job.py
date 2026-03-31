@@ -553,7 +553,11 @@ def _parse_render(raw: Any) -> RenderCfg:
     reject_unknown_keys(data, {"renderer", "style"}, "render")
 
     renderer = str(data.get("renderer", "")).strip()
-    require_one_of(renderer, {"sequence_rows", "hairpin_cartoon", "topology_cartoon"}, "render.renderer")
+    require_one_of(
+        renderer,
+        {"sequence_rows", "nucleotide_evidence_map", "hairpin_cartoon", "topology_cartoon"},
+        "render.renderer",
+    )
 
     style_raw = require_mapping(data.get("style", {}), "render.style")
     reject_unknown_keys(style_raw, {"preset", "overrides"}, "render.style")

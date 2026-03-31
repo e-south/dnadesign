@@ -23,6 +23,7 @@ from .registry import (
     list_adapter_descriptors,
     required_source_columns,
 )
+from .sequence_evidence_map_v1 import SequenceEvidenceMapV1Adapter
 from .sequence_windows_v1 import SequenceWindowsV1Adapter
 from .yiu_hairpin_topology_v1 import YiuHairpinTopologyV1Adapter
 from .yiu_linear_state_v1 import YiuLinearStateV1Adapter
@@ -37,6 +38,7 @@ __all__ = [
     "DensegenTfbsAdapter",
     "GenericFeaturesAdapter",
     "CruncherBestWindowAdapter",
+    "SequenceEvidenceMapV1Adapter",
     "SequenceWindowsV1Adapter",
     "DuplexSequenceV1Adapter",
     "HairpinTopologyV1Adapter",

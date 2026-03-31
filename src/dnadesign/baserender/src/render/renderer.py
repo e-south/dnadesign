@@ -48,6 +48,12 @@ def _build_sequence_rows_renderer() -> Renderer:
     return SequenceRowsRenderer()
 
 
+def _build_nucleotide_evidence_map_renderer() -> Renderer:
+    from .sequence_rows import SequenceRowsRenderer
+
+    return SequenceRowsRenderer()
+
+
 def _build_hairpin_cartoon_renderer() -> Renderer:
     from .hairpin_cartoon import HairpinCartoonRenderer
 
@@ -89,6 +95,24 @@ _REGISTRY = _RendererRegistry(
                 docs_slug="sequence-rows",
             ),
             factory=_build_sequence_rows_renderer,
+        ),
+        "nucleotide_evidence_map": _RegisteredRenderer(
+            descriptor=RendererDescriptor(
+                name="nucleotide_evidence_map",
+                topology_kinds=(
+                    "linear_ssdna",
+                    "linear_dsdna",
+                    "fragment_pool",
+                    "circularized_linearized",
+                    "hairpin_folded",
+                    "branched_adapter",
+                ),
+                accepted_alphabets=("DNA", "IUPAC_DNA"),
+                required_record_features=(),
+                optional_record_features=("interval_annotation", "boundary_marker", "span_link"),
+                docs_slug="nucleotide-evidence-map",
+            ),
+            factory=_build_nucleotide_evidence_map_renderer,
         ),
         "hairpin_cartoon": _RegisteredRenderer(
             descriptor=RendererDescriptor(

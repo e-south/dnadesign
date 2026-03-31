@@ -16,7 +16,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from dnadesign.contracts.visual import YiuHairpinTopologyV1, YiuLinearStateV1, YiuTopologyCartoonV1
+from dnadesign.contracts.visual import (
+    SequenceEvidenceMapV1,
+    YiuHairpinTopologyV1,
+    YiuLinearStateV1,
+    YiuTopologyCartoonV1,
+)
 
 from ..core import SchemaError, ensure, require_one_of
 
@@ -111,6 +116,12 @@ def _build_sequence_windows(cfg: Any, alphabet: str) -> Any:
     from ..adapters.sequence_windows_v1 import SequenceWindowsV1Adapter
 
     return SequenceWindowsV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_sequence_evidence_map(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.sequence_evidence_map_v1 import SequenceEvidenceMapV1Adapter
+
+    return SequenceEvidenceMapV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
 
 
 def _build_duplex_sequence(cfg: Any, alphabet: str) -> Any:
@@ -250,6 +261,19 @@ ADAPTER_DESCRIPTORS: dict[str, AdapterDescriptor] = {
         required_config_columns=("sequence", "regulator_windows"),
         required_source_columns=("sequence", "regulator_windows"),
         optional_source_columns=("id", "motifs", "display"),
+    ),
+    "sequence_evidence_map_v1": AdapterDescriptor(
+        kind="sequence_evidence_map_v1",
+        owner_tool=None,
+        contract_kind="sequence_evidence_map_v1",
+        schema_model=SequenceEvidenceMapV1,
+        supported_renderers=("nucleotide_evidence_map",),
+        supported_alphabets=("DNA", "IUPAC_DNA"),
+        factory=_build_sequence_evidence_map,
+        docs_slug="sequence-evidence-map-v1",
+        allowed_config_columns=(),
+        required_config_columns=(),
+        required_source_columns=(),
     ),
     "duplex_sequence_v1": AdapterDescriptor(
         kind="duplex_sequence_v1",
