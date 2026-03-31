@@ -17,6 +17,7 @@ from dnadesign.contracts.visual import (
     CassetteViewsManifestV1,
     HairpinTopologyViewV1,
     LinearDuplexViewV1,
+    SequenceEvidenceMapV1,
     YiuHairpinTopologyV1,
     YiuLinearStateV1,
     YiuTopologyCartoonV1,
@@ -313,3 +314,252 @@ def test_yiu_topology_cartoon_contract_validates_minimal_payload() -> None:
 
     assert contract.contract_kind == "yiu_topology_cartoon_v1"
     assert contract.topology_kind == "circular_duplex"
+
+
+def test_sequence_evidence_map_contract_validates_minimal_payload() -> None:
+    payload = {
+        "contract_kind": "sequence_evidence_map_v1",
+        "state_id": "hairpin_pcr_linear_insert",
+        "topology_kind": "linear_dsdna",
+        "alphabet": "iupac_dna",
+        "primary_sequence": "ACGTACGT",
+        "complement_sequence": "TGCATGCA",
+        "owners": [
+            {
+                "owner_id": "payload_left_half",
+                "row_id": "primary",
+                "start": 0,
+                "end": 4,
+                "display_label": "Payload",
+                "short_label": "PAY",
+            }
+        ],
+        "effect_tags": [
+            {
+                "tag_id": "overhang",
+                "tag_kind": "payload_overhang_left",
+                "row_id": "primary",
+                "start": 0,
+                "end": 2,
+                "display_label": "Overhang",
+                "short_label": "OVL",
+            }
+        ],
+        "boundaries": [
+            {
+                "boundary_id": "nick-1",
+                "row_id": "primary",
+                "boundary": 4,
+                "boundary_kind": "nick",
+                "display_label": "Nick",
+                "short_label": "NCK",
+            }
+        ],
+        "pairings": [
+            {
+                "pairing_id": "pair-1",
+                "primary_start": 0,
+                "primary_end": 2,
+                "complement_start": 6,
+                "complement_end": 8,
+                "display_label": "Pairing",
+                "short_label": "PR",
+            }
+        ],
+        "display": {"title": "Example"},
+        "meta": {"source": "test"},
+    }
+
+    contract = SequenceEvidenceMapV1.model_validate(payload)
+
+    assert contract.contract_kind == "sequence_evidence_map_v1"
+    assert contract.boundaries[0].boundary_kind == "nick"
+
+
+def test_sequence_evidence_map_contract_rejects_invalid_owner_bounds() -> None:
+    payload = {
+        "contract_kind": "sequence_evidence_map_v1",
+        "state_id": "bad-owner",
+        "topology_kind": "linear_dsdna",
+        "alphabet": "dna",
+        "primary_sequence": "ACGT",
+        "owners": [
+            {
+                "owner_id": "payload_left_half",
+                "row_id": "primary",
+                "start": 1,
+                "end": 1,
+                "display_label": "Payload",
+                "short_label": "PAY",
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError, match="owner span end must be > start"):
+        SequenceEvidenceMapV1.model_validate(payload)
+
+
+def test_sequence_evidence_map_contract_rejects_invalid_effect_bounds() -> None:
+    payload = {
+        "contract_kind": "sequence_evidence_map_v1",
+        "state_id": "bad-effect",
+        "topology_kind": "linear_dsdna",
+        "alphabet": "dna",
+        "primary_sequence": "ACGT",
+        "effect_tags": [
+            {
+                "tag_id": "effect-1",
+                "tag_kind": "payload_overhang_left",
+                "row_id": "primary",
+                "start": 2,
+                "end": 2,
+                "display_label": "Effect",
+                "short_label": "EFF",
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError, match="effect span end must be > start"):
+        SequenceEvidenceMapV1.model_validate(payload)
+
+
+def test_sequence_evidence_map_contract_rejects_boundary_length_overflow() -> None:
+    payload = {
+        "contract_kind": "sequence_evidence_map_v1",
+        "state_id": "bad-pairing",
+        "topology_kind": "linear_dsdna",
+        "alphabet": "dna",
+        "primary_sequence": "ACGT",
+        "complement_sequence": "TGCA",
+        "boundaries": [
+            {
+                "boundary_id": "boundary-1",
+                "row_id": "primary",
+                "boundary": 5,
+                "boundary_kind": "cut",
+                "display_label": "Boundary",
+                "short_label": "BND",
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError, match="boundary exceeds row sequence length"):
+        SequenceEvidenceMapV1.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("pairing_updates", "message"),
+    [
+        (
+            {"primary_start": 2, "primary_end": 2},
+            "pairing primary span end must be > start",
+        ),
+        (
+            {"complement_start": 2, "complement_end": 2},
+            "pairing complement span end must be > start",
+        ),
+    ],
+)
+def test_sequence_evidence_map_contract_rejects_invalid_pairing_bounds(
+    pairing_updates: dict[str, int],
+    message: str,
+) -> None:
+    payload = {
+        "contract_kind": "sequence_evidence_map_v1",
+        "state_id": "bad-pairing",
+        "topology_kind": "linear_dsdna",
+        "alphabet": "dna",
+        "primary_sequence": "ACGT",
+        "complement_sequence": "TGCA",
+        "pairings": [
+            {
+                "pairing_id": "pair-1",
+                "primary_start": 0,
+                "primary_end": 2,
+                "complement_start": 0,
+                "complement_end": 2,
+                "display_label": "Pairing",
+                "short_label": "PR",
+                **pairing_updates,
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError, match=message):
+        SequenceEvidenceMapV1.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("payload_key", "row_id", "message"),
+    [
+        ("owners", "complement", "owner span exceeds row sequence length"),
+        ("effect_tags", "complement", "effect span exceeds row sequence length"),
+    ],
+)
+def test_sequence_evidence_map_contract_rejects_complement_span_overflow(
+    payload_key: str,
+    row_id: str,
+    message: str,
+) -> None:
+    payload = {
+        "contract_kind": "sequence_evidence_map_v1",
+        "state_id": "bad-span",
+        "topology_kind": "linear_dsdna",
+        "alphabet": "dna",
+        "primary_sequence": "ACGT",
+        "complement_sequence": "TGCA",
+        payload_key: [
+            {
+                "owner_id" if payload_key == "owners" else "tag_id": "overflow",
+                "owner_id": "payload_left_half" if payload_key == "owners" else None,
+                "tag_kind": "payload_overhang_left" if payload_key == "effect_tags" else None,
+                "row_id": row_id,
+                "start": 0,
+                "end": 5,
+                "display_label": "Overflow",
+                "short_label": "OVR",
+            }
+        ],
+    }
+    payload[payload_key][0] = {k: v for k, v in payload[payload_key][0].items() if v is not None}
+
+    with pytest.raises(ValueError, match=message):
+        SequenceEvidenceMapV1.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("pairing_updates", "message"),
+    [
+        (
+            {"primary_start": 0, "primary_end": 5, "complement_start": 0, "complement_end": 2},
+            "pairing primary span exceeds primary sequence length",
+        ),
+        (
+            {"primary_start": 0, "primary_end": 2, "complement_start": 0, "complement_end": 5},
+            "pairing complement span exceeds complement sequence length",
+        ),
+    ],
+)
+def test_sequence_evidence_map_contract_rejects_pairing_length_overflow(
+    pairing_updates: dict[str, int],
+    message: str,
+) -> None:
+    payload = {
+        "contract_kind": "sequence_evidence_map_v1",
+        "state_id": "bad-pairing-length",
+        "topology_kind": "linear_dsdna",
+        "alphabet": "dna",
+        "primary_sequence": "ACGT",
+        "complement_sequence": "TGCA",
+        "pairings": [
+            {
+                "pairing_id": "pair-1",
+                "display_label": "Pairing",
+                "short_label": "PR",
+                **pairing_updates,
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError, match=message):
+        SequenceEvidenceMapV1.model_validate(payload)

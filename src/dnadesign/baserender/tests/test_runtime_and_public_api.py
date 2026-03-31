@@ -261,13 +261,31 @@ def test_public_api_exposes_generic_job_entrypoints(tmp_path) -> None:
     adapter_kinds = baserender.list_adapters()
     renderer_names = baserender.list_renderers()
     assert "yiu_topology_cartoon_v1" in adapter_kinds
+    assert "sequence_evidence_map_v1" in adapter_kinds
     assert "topology_cartoon" in renderer_names
+    assert "nucleotide_evidence_map" in renderer_names
     adapter_descriptor = baserender.get_adapter_descriptor("yiu_topology_cartoon_v1")
     renderer_descriptor = baserender.get_renderer_descriptor("topology_cartoon")
     assert adapter_descriptor.owner_tool == "yiu"
     assert "topology_cartoon" in adapter_descriptor.supported_renderers
     assert renderer_descriptor.name == "topology_cartoon"
     assert "DNA" in renderer_descriptor.accepted_alphabets
+    evidence_adapter_descriptor = baserender.get_adapter_descriptor("sequence_evidence_map_v1")
+    evidence_renderer_descriptor = baserender.get_renderer_descriptor("nucleotide_evidence_map")
+    assert evidence_adapter_descriptor.owner_tool is None
+    assert evidence_adapter_descriptor.required_source_columns == ()
+    assert evidence_adapter_descriptor.supported_renderers == ("nucleotide_evidence_map",)
+    assert evidence_renderer_descriptor.name == "nucleotide_evidence_map"
+    assert "span_link" in evidence_renderer_descriptor.optional_record_features
+
+
+def test_public_api_rejects_unknown_renderer_lookup() -> None:
+    from dnadesign.baserender.src.render.renderer import get_renderer
+
+    with pytest.raises(RenderingError, match="Unknown renderer: missing"):
+        get_renderer("missing")
+    with pytest.raises(RenderingError, match="Unknown renderer: missing"):
+        baserender.get_renderer_descriptor("missing")
 
 
 def test_public_api_accepts_in_memory_job_mapping(tmp_path) -> None:
