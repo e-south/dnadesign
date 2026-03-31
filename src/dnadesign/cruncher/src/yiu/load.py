@@ -17,13 +17,10 @@ from typing import Any
 import yaml
 
 from dnadesign.cruncher.yiu.models import (
-    YiuProcessSpec,
-    YiuProcessSpecV2,
+    YiuProcessSpecV4,
     YiuSolveSpec,
     YiuSolveSpecDocument,
-    YiuSpecDocument,
-    YiuSpecDocumentV2,
-    deprecated_yiu_protocol_template_alias,
+    YiuSpecDocumentV4,
 )
 
 
@@ -73,7 +70,7 @@ def _load_yaml_mapping(path: Path) -> dict[str, Any]:
     return payload
 
 
-def load_yiu_spec(path: str | Path) -> tuple[YiuProcessSpec | YiuProcessSpecV2, Path, Path]:
+def load_yiu_spec(path: str | Path) -> tuple[YiuProcessSpecV4, Path, Path]:
     spec_path = Path(path).expanduser().resolve()
     workspace_root = resolve_workspace_root_for_yiu_spec(spec_path)
     payload = _load_yaml_mapping(spec_path)
@@ -89,26 +86,16 @@ def load_yiu_spec(path: str | Path) -> tuple[YiuProcessSpec | YiuProcessSpecV2, 
         raise ValueError(
             f"YIU schema validation failed for {spec_path}: invalid schema_version {raw_schema_version!r}"
         ) from exc
+    if schema_version != 4:
+        raise ValueError(
+            "YIU ship runtime only supports schema_version 4. "
+            "Migrate legacy specs offline before validation, trace, or solve."
+        )
     try:
-        if schema_version == 1:
-            document = YiuSpecDocument.model_validate(payload)
-        elif schema_version == 2:
-            document = YiuSpecDocumentV2.model_validate(payload)
-        else:
-            raise ValueError(f"Unsupported YIU schema_version: {schema_version}")
+        document = YiuSpecDocumentV4.model_validate(payload)
     except Exception as exc:
         raise ValueError(f"YIU schema validation failed for {spec_path}: {exc}") from exc
-    spec = document.yiu
-    if isinstance(spec, YiuProcessSpecV2):
-        alias_used = deprecated_yiu_protocol_template_alias(str(raw_root.get("protocol_template") or ""))
-        if alias_used is not None:
-            spec = spec.model_copy(
-                update={
-                    "template_alias_used": alias_used,
-                    "template_alias_status": "deprecated_alias",
-                }
-            )
-    return spec, spec_path, workspace_root
+    return document.yiu, spec_path, workspace_root
 
 
 def load_yiu_solve_spec(path: str | Path) -> tuple[YiuSolveSpec, Path, Path]:

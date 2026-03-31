@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -88,8 +89,8 @@ def test_runbook_accepts_yiu_cli_surface() -> None:
             "name": "demo",
             "steps": [
                 {
-                    "id": "yiu_design",
-                    "run": ["yiu", "design", "--spec", "configs/yiu/example.yiu.yaml"],
+                    "id": "yiu_trace",
+                    "run": ["yiu", "trace", "--spec", "configs/yiu/example.yiu.yaml"],
                 }
             ],
         }
@@ -317,19 +318,50 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
 
     result = run_workspace_runbook(runbook_path, output_log_path=output_log)
 
-    assert result.executed_step_ids == ["yiu_validate", "yiu_design", "yiu_trace", "yiu_solve"]
-    explicit_run_root = workspace / "outputs" / "yiu" / "explicit" / "example_split_payload_circularized"
-    solve_run_root = workspace / "outputs" / "yiu" / "solve" / "example_split_payload_circularized"
+    assert result.executed_step_ids == ["yiu_validate", "yiu_trace", "yiu_solve"]
+    explicit_run_root = workspace / "outputs" / "yiu" / "explicit" / "example_reference_circularized"
+    solve_run_root = workspace / "outputs" / "yiu" / "solve" / "example_reference_circularized"
     explicit_run_dir = next(explicit_run_root.iterdir())
     solve_run_dir = next(solve_run_root.iterdir())
-    assert (explicit_run_dir / "published" / "visual_manifest.json").exists()
-    assert (solve_run_dir / "published" / "visual_manifest.json").exists()
+    assert (explicit_run_dir / "visual_inventory.json").exists()
+    assert (solve_run_dir / "visual_inventory.json").exists()
+    explicit_inventory = json.loads((explicit_run_dir / "visual_inventory.json").read_text(encoding="utf-8"))
+    solve_inventory = json.loads((solve_run_dir / "visual_inventory.json").read_text(encoding="utf-8"))
+    assert explicit_inventory["render_status"] == "rendered"
+    assert explicit_inventory["render_count"] == 9
+    assert solve_inventory["render_status"] == "rendered"
+    assert solve_inventory["render_count"] == 9
+    assert (explicit_run_dir / "visuals" / "source_oligo_ssdna.pdf").exists()
+    assert (solve_run_dir / "solution" / "visuals" / "source_oligo_ssdna.pdf").exists()
+    assert not (explicit_run_dir / "inline_job").exists()
+    assert not (solve_run_dir / "inline_job").exists()
 
     log_text = output_log.read_text(encoding="utf-8")
     assert "Matplotlib is building the font cache" not in log_text
     assert "MPLCONFIGDIR" not in log_text
 
-    job_path = explicit_run_dir / "published" / "baserender_jobs" / "circularized_payload_candidate.job.yaml"
+    job_path = explicit_run_dir / "circularized_payload_candidate.job.yaml"
+    job_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": 3,
+                "results_root": ".",
+                "input": {
+                    "kind": "json",
+                    "path": "contracts/visuals/circularized_payload_candidate.json",
+                    "adapter": {"kind": "sequence_evidence_map_v1"},
+                    "alphabet": "iupac_dna",
+                },
+                "render": {"renderer": "nucleotide_evidence_map", "style": {"preset": None, "overrides": {}}},
+                "outputs": [
+                    {"kind": "images", "path": "visuals/circularized_payload_candidate_replay.pdf", "fmt": "pdf"}
+                ],
+                "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
     base_env = {**os.environ, "PYTHONPATH": str(Path.cwd() / "src")}
     validate_proc = subprocess.run(
         [sys.executable, "-m", "dnadesign.cruncher.cli.app", "visuals", "validate", "--job", str(job_path)],
@@ -352,4 +384,9 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
     assert "MPLCONFIGDIR" not in validate_proc.stderr
     assert "Matplotlib" not in render_proc.stderr
     assert "MPLCONFIGDIR" not in render_proc.stderr
-    assert (explicit_run_dir / "published" / "renders" / "circularized_payload_candidate.pdf").exists()
+    assert (
+        explicit_run_dir
+        / "circularized_payload_candidate.job"
+        / "visuals"
+        / "circularized_payload_candidate_replay.pdf"
+    ).exists()

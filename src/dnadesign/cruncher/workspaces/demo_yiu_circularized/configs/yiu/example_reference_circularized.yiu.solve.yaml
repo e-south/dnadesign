@@ -1,0 +1,25 @@
+yiu_solve:
+  schema_version: 1
+  base_spec: configs/yiu/example_reference_circularized.yiu.yaml
+  target:
+    payload_pattern: AGGTCTCACACCTATAGAG
+    bulge_mask: []
+  scaffold_windows:
+    - id: sacrificial_spacing_window
+      owner_id: sacrificial_region_long
+      relative_start: 3
+      relative_end: 12
+      allowed_patterns:
+        - AAAAAAAAA
+        - AAAATAAAA
+  search:
+    max_search_nodes: 16
+    max_enumerated_candidates: 16
+  solve:
+    compare_solutions: false
+    max_solutions: 1
+  output:
+    run_dir: outputs/yiu/solve
+    emit_view_contracts: true
+    publish_contract_version: 4
+    persist_render_jobs_debug: false

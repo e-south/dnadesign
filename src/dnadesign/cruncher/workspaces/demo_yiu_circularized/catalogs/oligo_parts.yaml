@@ -2,10 +2,10 @@ oligo_parts:
   entries:
   - id: oES790
     part_kind: primer
-    sequence: GGAAAAAA
+    sequence: GGTCTCAA
   - id: oES791
     part_kind: primer
-    sequence: TTTTTTCC
+    sequence: GGTCTCAA
   - id: oES792
     part_kind: adapter
     sequence: TCAGCGGGCTGAGG
@@ -15,4 +15,4 @@ oligo_parts:
     sequence: TCCCTA
   - id: oES794
     part_kind: primer
-    sequence: TCAGCG
+    sequence: CTCTAT

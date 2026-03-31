@@ -10,10 +10,10 @@ Module Author(s): OpenAI Codex
 """
 
 from dnadesign.cruncher.yiu.load import load_yiu_spec
-from dnadesign.cruncher.yiu.models import YiuProcessSpec, YiuValidationIssue, YiuValidationReport
+from dnadesign.cruncher.yiu.models import YiuProcessSpecV4, YiuValidationIssue, YiuValidationReport
 
 __all__ = [
-    "YiuProcessSpec",
+    "YiuProcessSpecV4",
     "YiuValidationIssue",
     "YiuValidationReport",
     "load_yiu_spec",

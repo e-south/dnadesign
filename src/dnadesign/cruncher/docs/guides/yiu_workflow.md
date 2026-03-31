@@ -1,92 +1,98 @@
 ## YIU Workflow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-03-29
 
-YIU is now a real workflow family with two explicit lanes and one bounded solve lane.
+YIU is a replay/validation engine with bounded scaffold solving.
 
-- `schema_version: 1` with `protocol: yiu_v1` remains the compatibility lane.
-- `schema_version: 2` with `protocol_template: yiu_adapter_hairpin_v1` is the typed adapter-hairpin compatibility lane.
-- `schema_version: 2` with `protocol_template: yiu_circularized_payload_v1` is the recommended operator lane.
-- `.yiu.solve.yaml` drives bounded search over declared variable windows and admits hits only after the explicit validator succeeds.
+It ships one v4 workflow lane:
 
-Ship posture for this tranche:
-
-> YIU currently ships as a split-payload circularized workflow family with bounded solve over declared source windows. Compatibility templates remain supported, but the split-payload circularized template is the recommended operator path.
+- `schema_version: 4`
+- `protocol_template: yiu_circularized_payload_v1`
+- explicit materialization through `cruncher yiu trace`
+- bounded solve through `cruncher yiu solve`
+- bundle-local `visual_inventory.json` as the render source of truth
 
 ### Command surface
 
 ```bash
 uv run cruncher yiu init-workspace WORKSPACE
-uv run cruncher yiu validate --spec configs/yiu/example_split_payload_circularized.yiu.yaml
-uv run cruncher yiu design --spec configs/yiu/example_split_payload_circularized.yiu.yaml
-uv run cruncher yiu trace --spec configs/yiu/example_split_payload_circularized.yiu.yaml
-uv run cruncher yiu show --run outputs/yiu/explicit/example_split_payload_circularized/<design_id>
-uv run cruncher yiu solve --spec configs/yiu/example_split_payload_circularized.yiu.solve.yaml
+uv run cruncher yiu validate --spec configs/yiu/<workflow>.yiu.yaml
+uv run cruncher yiu trace --spec configs/yiu/<workflow>.yiu.yaml
+uv run cruncher yiu trace --spec configs/yiu/<workflow>.yiu.yaml --emit-renders
+uv run cruncher yiu solve --spec configs/yiu/<workflow>.yiu.solve.yaml
+uv run cruncher yiu show --run outputs/yiu/explicit/<workflow>/<trace_id>
+uv run cruncher yiu show --run outputs/yiu/solve/<workflow>/<solve_id>
+uv run cruncher yiu render --run outputs/yiu/explicit/<workflow>/<trace_id>
+uv run cruncher yiu render --run outputs/yiu/solve/<workflow>/<solve_id>
 ```
 
-`design` and `trace` are currently operational aliases. They both materialize the same explicit bundle, but operators use `design` as the default artifact command and `trace` when they want state-graph inspection intent to be explicit.
+`design` is not part of the public YIU surface.
 
-### Recommended explicit state graph
+### State graph
 
-The split-payload circularized `v2` lane publishes these states:
+The `yiu_circularized_payload_v1` workflow emits 9 states:
 
 1. `source_oligo_ssdna`
 2. `pcr_linear_duplex`
-3. `type_iis_digest_linear_duplex`
+3. `type_iis_cut_product_duplex`
 4. `circularized_payload_candidate`
-5. `post_exonuclease_cleanup`
-6. `post_sacrificial_fragmentation`
-7. `post_fragment_cleanup`
-8. `snapback_adapter_complex`
-9. `ligated_ssdna_hairpin`
-10. `hairpin_pcr_linear_insert`
+5. `post_sacrificial_fragmentation`
+6. `post_fragment_cleanup`
+7. `snapback_adapter_complex`
+8. `ligated_ssdna_hairpin`
+9. `hairpin_pcr_linear_insert`
 
-The adapter-hairpin compatibility lane still publishes `source_oligo_ssdna`, `source_amplicon_dsdna`, `post_double_nicking_fragment_pool`, `post_heat_cleanup_fragment_pool`, `adapter_annealed_complex`, `ligated_ssdna_hairpin`, and `hairpin_pcr_linear_insert`, with optional insert-cleanup and cloning states when enabled.
+`post_exonuclease_cleanup` is method metadata only. It is not an emitted state in v4.
 
 ### What `validate` checks
 
-- source annotations resolve onto the authored source oligo
-- overlap legality is enforced before state materialization
-- split-payload circularized specs must declare `template_bindings`; runtime no longer depends on hidden favorite IDs
-- the explicit validator records `sequence_mode`, `validation_mode`, and per-state `pattern_evidence_summary`
-- hard invariants are no longer silently accepted; supported checks are evaluated and unsupported scope requests fail fast
-- split-template payload assembly is checked in `circularized_payload_junction`
-- split-template publication uses `publish_contract_version: 3` by default and emits render-oriented contracts plus file-based BaseRender jobs when requested
-- `output.emit_baserender_jobs: true` requires `output.emit_view_contracts: true`
+- the source primary strand follows the fixed owner order for `yiu_circularized_payload_v1`
+- every emitted nucleotide has exactly one structural owner on each emitted strand
+- effect-tag kinds are closed and unknown operational tags fail at load time
+- owner/tag overlap legality fails closed
+- `type_iis_cut_product_duplex` is a real cut-product state with sticky-end metadata
+- payload assembly remains interpretable where the payload exists
+- the `Nt.Bpu10I` local context, nick boundary, and exposed tether geometry all pass
+- sacrificial fragmentation stays within the declared fragment limit
 
 ### Solve lane
 
-`cruncher yiu solve` reads `<workspace>/configs/yiu/<name>.yiu.solve.yaml`, resolves `base_spec`, enumerates only the declared variable windows, and runs every candidate through the full explicit YIU validator.
+`cruncher yiu solve` resolves one base spec, derives payload halves and payload overhangs from a single target payload, and mutates only:
 
-A candidate becomes a hit only if:
+- the payload target or pattern
+- the payload bulge mask
+- declared windows inside `sacrificial_region_long`
 
-1. every declared window is concrete,
-2. the explicit validator succeeds,
-3. every declared hard invariant is `guaranteed`,
-4. no unsupported invariant class is required,
-5. and no hard explicit-lane issues remain.
+It does not mutate fixed scaffold owners, enzyme identities, tether or snapback owners, or the Y adapter sequence.
 
-Solve artifacts are written under `outputs/yiu/solve/<solve_name>/<solve_id>/`. Each materialized hit under `hits/hit_0001/` is a standard explicit YIU bundle, so `cruncher yiu show` can inspect both solve bundles and per-hit explicit bundles without a different code path.
+Default solve behavior is SAT-first:
 
-### Operator surfaces
+- search all bounded candidates
+- return `solved`, `unsatisfied`, or `incomplete_search`
+- materialize one deterministic solution by default
+- keep comparison solutions behind `compare_solutions: true`
 
-`cruncher yiu show` now surfaces:
+The checked-in demo workspace is exhaustive under its current search bounds. On 2026-03-29 it found 2 satisfying solutions and selected 1 deterministic solution.
 
-- bundle kind (`explicit` or `solve`)
-- run id / solve id
-- step/state/issue counts for explicit bundles
-- accepted/materialized hit counts plus final-state kind for solve bundles
-- `published/views/`
-- `published/visual_manifest.json`
-- `published/baserender_jobs/`
-- `published/renders/`
-- solve-level `accepted_hits.jsonl` and the first materialized hit path when the run is a solve bundle
-- top-hit explicit bundle roots for solve bundles
+### Visuals and inspection
 
-Use `cruncher yiu show --json` when you want the full normalized artifact inventory instead of the human summary.
+Every emitted state publishes `sequence_evidence_map_v1` and renders through BaseRender's `nucleotide_evidence_map` surface.
 
-Start with the scaffolded walk-through in [YIU Workspace Demo](../demos/demo_yiu_workspace.md), then use the references below:
+`cruncher yiu show` surfaces:
+
+- bundle kind
+- protocol template
+- schema version or solve status
+- final-state or solve summary
+- exhaustive-search truth for solve runs
+- hard-invariant summary for the selected final state
+- render summary from `visual_inventory.json`
+- key artifact paths
+
+`cruncher yiu render --run <bundle>` rereads `visual_inventory.json`, regenerates missing PDFs directly into the bundle's published `visuals/` paths, and updates render truth in the same inventory.
+
+Start with [YIU Workspace Demo](../demos/demo_yiu_workspace.md), then use:
 
 - [YIU Spec Reference](../reference/yiu_spec.md)
 - [YIU Artifacts](../reference/yiu_artifacts.md)

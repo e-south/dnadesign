@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 <cruncher project>
-src/dnadesign/cruncher/src/app/yiu_workspace_service.py
+src/dnadesign/cruncher/tests/yiu/test_ship_v3.py
 
-Scaffold the canonical YIU v4 workspace.
+Ship-readiness contracts for the canonical YIU v4 workflow.
 
 Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
@@ -11,97 +11,57 @@ Module Author(s): OpenAI Codex
 
 from __future__ import annotations
 
-import re
-import shlex
-import shutil
-from dataclasses import dataclass
+import csv
+import json
 from pathlib import Path
 
+import pytest
 import yaml
 
-_WORKSPACE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-_DEMO_NAME = "example_reference_circularized"
-_DEMO_EXPLICIT_SPEC_FILENAME = f"{_DEMO_NAME}.yiu.yaml"
-_DEMO_SOLVE_SPEC_FILENAME = f"{_DEMO_NAME}.yiu.solve.yaml"
-_DEMO_EXPLICIT_SPEC_RELATIVE_PATH = f"configs/yiu/{_DEMO_EXPLICIT_SPEC_FILENAME}"
-_DEMO_SOLVE_SPEC_RELATIVE_PATH = f"configs/yiu/{_DEMO_SOLVE_SPEC_FILENAME}"
-_DEMO_EXPLICIT_RUN_ROOT = f"outputs/yiu/explicit/{_DEMO_NAME}"
-_DEMO_SOLVE_RUN_ROOT = f"outputs/yiu/solve/{_DEMO_NAME}"
+from dnadesign.cruncher.app.yiu_solve_workflow import run_yiu_solve
+from dnadesign.cruncher.app.yiu_workflow import run_yiu_trace, yiu_show_payload
+from dnadesign.cruncher.yiu.load import (
+    load_yiu_solve_spec,
+    load_yiu_spec,
+    resolve_base_spec_path_for_yiu_solve_spec,
+)
 
 
-@dataclass(frozen=True)
-class YiuWorkspaceScaffoldResult:
-    workspace_root: Path
-    runbook_path: Path
-    runbook_doc_path: Path
-    spec_path: Path
-    solve_spec_path: Path
-    enzyme_catalog_path: Path
-    oligo_parts_catalog_path: Path
-    backbone_catalog_path: Path
-
-
-def _repo_root_from(start: Path) -> Path | None:
-    cursor = start.resolve()
-    for root in [cursor, *cursor.parents]:
-        if (root / "pyproject.toml").exists() or (root / ".git").exists():
-            return root
-    return None
-
-
-def default_cruncher_workspaces_root() -> Path:
-    repo_root = _repo_root_from(Path(__file__).resolve())
-    if repo_root is None:
-        raise ValueError(
-            "Unable to determine the standard Cruncher workspaces root. Pass --root or --output explicitly."
-        )
-    return (repo_root / "src" / "dnadesign" / "cruncher" / "workspaces").resolve()
-
-
-def _validate_workspace_name(name: str) -> str:
-    raw = str(name).strip()
-    if not raw:
-        raise ValueError("YIU workspace name must be non-empty.")
-    if "/" in raw or "\\" in raw:
-        raise ValueError("YIU workspace name must be a simple directory name or use --output.")
-    if _WORKSPACE_NAME_RE.fullmatch(raw) is None:
-        raise ValueError(f"Invalid YIU workspace name: {raw!r}.")
-    return raw
-
-
-def yiu_workspace_path(name: str, *, root: Path | None = None) -> Path:
-    workspace_name = _validate_workspace_name(name)
-    parent = default_cruncher_workspaces_root() if root is None else Path(root).expanduser().resolve()
-    return parent / workspace_name
+def _write_yaml(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
 
 def _owner_projection(state: str, strand: str, provenance_mode: str) -> dict[str, object]:
-    return {"state": state, "strand": strand, "provenance_mode": provenance_mode}
+    return {
+        "state": state,
+        "strand": strand,
+        "provenance_mode": provenance_mode,
+    }
 
 
 def _owner_lifecycle(
-    owner_id: str,
-    *,
-    projected_to: list[dict[str, object]],
-    disappears_after: str | None,
+    owner_id: str, *, projected_to: list[dict[str, object]], disappears_after: str | None
 ) -> dict[str, object]:
-    late_owner_ids = {
-        "retained_region",
-        "sacrificial_region_short",
-        "y_adapter_complementary_arm",
-        "y_adapter_noncomplementary_arm",
-        "hairpin_pcr_forward_binding_region",
-        "hairpin_pcr_reverse_binding_region",
-    }
     return {
         "owner_id": owner_id,
-        "appears_in": [] if owner_id in late_owner_ids else ["source_oligo_ssdna"],
+        "appears_in": ["source_oligo_ssdna"]
+        if owner_id
+        not in {
+            "y_adapter_complementary_arm",
+            "y_adapter_noncomplementary_arm",
+            "hairpin_pcr_forward_binding_region",
+            "hairpin_pcr_reverse_binding_region",
+            "retained_region",
+            "sacrificial_region_short",
+        }
+        else [],
         "projected_to": projected_to,
         "disappears_after": disappears_after,
     }
 
 
-def _canonical_spec_payload() -> dict[str, object]:
+def _canonical_v4_payload() -> dict[str, object]:
     sequence = "CACGAGAGGTCTCACGAGAAAAAAAAACCTCAGCCCGCTGAACCTATAGAGGAGACC"
     owner_spans = {
         "source_fwd_primer_binding_region": (0, 6),
@@ -306,7 +266,7 @@ def _canonical_spec_payload() -> dict[str, object]:
             "schema_version": 4,
             "family": "yiu",
             "protocol_template": "yiu_circularized_payload_v1",
-            "name": _DEMO_NAME,
+            "name": "example_reference_circularized",
             "source_oligo": {
                 "authored_sequence": sequence,
                 "structural_owners": structural_owners,
@@ -345,11 +305,17 @@ def _canonical_spec_payload() -> dict[str, object]:
     }
 
 
-def _canonical_solve_payload() -> dict[str, object]:
+def _legacy_v3_payload() -> dict[str, object]:
+    payload = _canonical_v4_payload()
+    payload["yiu"]["schema_version"] = 3
+    return payload
+
+
+def _canonical_v4_solve_payload() -> dict[str, object]:
     return {
         "yiu_solve": {
             "schema_version": 1,
-            "base_spec": _DEMO_EXPLICIT_SPEC_RELATIVE_PATH,
+            "base_spec": "configs/yiu/example_reference_circularized.yiu.yaml",
             "target": {
                 "payload_pattern": "AGGTCTCACACCTATAGAG",
                 "bulge_mask": [],
@@ -381,8 +347,9 @@ def _canonical_solve_payload() -> dict[str, object]:
     }
 
 
-def _catalog_payloads() -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
-    return (
+def _write_catalogs(workspace: Path) -> None:
+    _write_yaml(
+        workspace / "catalogs" / "enzymes.yaml",
         {
             "enzymes": {
                 "entries": [
@@ -392,6 +359,9 @@ def _catalog_payloads() -> tuple[dict[str, object], dict[str, object], dict[str,
                 ]
             }
         },
+    )
+    _write_yaml(
+        workspace / "catalogs" / "oligo_parts.yaml",
         {
             "oligo_parts": {
                 "entries": [
@@ -403,132 +373,273 @@ def _catalog_payloads() -> tuple[dict[str, object], dict[str, object], dict[str,
                 ]
             }
         },
-        {"backbones": {"entries": []}},
     )
+    _write_yaml(workspace / "catalogs" / "backbones.yaml", {"backbones": {"entries": []}})
 
 
-def _runbook_steps() -> list[dict[str, object]]:
+def _write_canonical_workspace(tmp_path: Path) -> tuple[Path, Path, Path]:
+    workspace = tmp_path / "workspaces" / "demo_yiu_ship_v4"
+    spec_path = workspace / "configs" / "yiu" / "example_reference_circularized.yiu.yaml"
+    solve_path = workspace / "configs" / "yiu" / "example_reference_circularized.yiu.solve.yaml"
+    _write_yaml(spec_path, _canonical_v4_payload())
+    _write_yaml(solve_path, _canonical_v4_solve_payload())
+    _write_catalogs(workspace)
+    return workspace, spec_path, solve_path
+
+
+def _row_owner_annotations(state, *, row_id: str) -> list[dict[str, object]]:
     return [
-        {
-            "id": "yiu_validate",
-            "description": "Validate the checked-in YIU v4 replay/validation spec.",
-            "run": ["yiu", "validate", "--spec", _DEMO_EXPLICIT_SPEC_RELATIVE_PATH],
-        },
-        {
-            "id": "yiu_trace",
-            "description": "Materialize the explicit YIU state trace and evidence visuals.",
-            "run": ["yiu", "trace", "--spec", _DEMO_EXPLICIT_SPEC_RELATIVE_PATH, "--force-overwrite", "--emit-renders"],
-        },
-        {
-            "id": "yiu_solve",
-            "description": "Search the bounded scaffold window and materialize the selected satisfying solution.",
-            "run": ["yiu", "solve", "--spec", _DEMO_SOLVE_SPEC_RELATIVE_PATH, "--force-overwrite", "--emit-renders"],
-        },
+        annotation
+        for annotation in state.annotations
+        if annotation.get("annotation_layer") == "structural_owner" and annotation.get("row_id") == row_id
     ]
 
 
-def _write_runbook_markdown(workspace_root: Path, *, runbook_path: Path) -> Path:
-    workspace_name = workspace_root.name
-    repo_root = _repo_root_from(workspace_root)
-    if repo_root is not None:
-        try:
-            workspace_display_path = workspace_root.relative_to(repo_root).as_posix()
-        except ValueError:
-            workspace_display_path = workspace_root.as_posix()
-    else:
-        workspace_display_path = workspace_root.as_posix()
-    workspace_root_arg = shlex.quote(workspace_display_path)
-    workspace_name_arg = shlex.quote(workspace_name)
-    runbook_arg = shlex.quote(runbook_path.relative_to(workspace_root).as_posix())
-    lines = [
-        f"## {workspace_name} YIU Runbook",
-        "",
-        "**Workspace Path**",
-        f"- {workspace_display_path}/",
-        "",
-        "**Purpose**",
-        "- Checked-in YIU replay/validation workspace with bounded scaffold solving.",
-        "- Covers validate, trace, solve, show, and render without the deprecated design surface.",
-        "",
-        "**Run This Single Command**",
-        "",
-        f"    uv run cruncher workspaces run --workspace {workspace_name_arg} --runbook {runbook_arg}",
-        "",
-        "### Step-by-Step Commands",
-        "",
-        "    set -euo pipefail",
-        f"    cd {workspace_root_arg}",
-        '    cruncher() { uv run cruncher "$@"; }',
-        "",
-        f"    cruncher yiu validate --spec {_DEMO_EXPLICIT_SPEC_RELATIVE_PATH}",
-        f"    cruncher yiu trace --spec {_DEMO_EXPLICIT_SPEC_RELATIVE_PATH} --force-overwrite --emit-renders",
-        f"    cruncher yiu solve --spec {_DEMO_SOLVE_SPEC_RELATIVE_PATH} --force-overwrite --emit-renders",
-        "",
-        "### Optional follow-up commands",
-        "",
-        f'    WORKFLOW_NAME="{_DEMO_NAME}"',
-        '    TRACE_ID="$(ls -1 "outputs/yiu/explicit/$WORKFLOW_NAME" | tail -n 1)"',
-        '    SOLVE_ID="$(ls -1 "outputs/yiu/solve/$WORKFLOW_NAME" | tail -n 1)"',
-        '    uv run cruncher yiu show --run "outputs/yiu/explicit/$WORKFLOW_NAME/$TRACE_ID"',
-        '    uv run cruncher yiu show --run "outputs/yiu/solve/$WORKFLOW_NAME/$SOLVE_ID"',
-        '    uv run cruncher yiu render --run "outputs/yiu/explicit/$WORKFLOW_NAME/$TRACE_ID"',
-        '    uv run cruncher yiu render --run "outputs/yiu/solve/$WORKFLOW_NAME/$SOLVE_ID"',
-        "",
+def _assert_single_owner_partition(state, *, row_id: str, sequence: str) -> None:
+    annotations = _row_owner_annotations(state, row_id=row_id)
+    assert annotations, f"{state.state_id} is missing structural owners for row {row_id}"
+    coverage = [0] * len(sequence)
+    for annotation in annotations:
+        start = int(annotation["start"])
+        end = int(annotation["end"])
+        for index in range(start, end):
+            coverage[index] += 1
+    assert coverage, f"{state.state_id} row {row_id} has no emitted owner coverage"
+    assert all(value == 1 for value in coverage), f"{state.state_id} row {row_id} owner coverage was {coverage}"
+
+
+def _state_by_id(report, state_id: str):
+    return next(state for state in report.states if state.state_id == state_id)
+
+
+def _hard_invariant_by_id(state, invariant_id: str) -> dict[str, object]:
+    invariants = state.metadata.get("hard_invariants")
+    assert isinstance(invariants, list)
+    for invariant in invariants:
+        if invariant.get("id") == invariant_id:
+            return invariant
+    raise AssertionError(f"missing hard invariant {invariant_id} in {state.state_id}")
+
+
+def test_load_yiu_v4_accepts_canonical_schema_and_rejects_removed_semantic_fields(tmp_path: Path) -> None:
+    _workspace, spec_path, _solve_path = _write_canonical_workspace(tmp_path)
+
+    spec, _resolved_spec_path, _workspace_root = load_yiu_spec(spec_path)
+
+    assert spec.schema_version == 4
+    assert spec.protocol_template == "yiu_circularized_payload_v1"
+
+    payload = _canonical_v4_payload()
+    payload["yiu"]["source_oligo"]["structural_owners"][0]["projection_mode"] = "compound_required"
+    decorated_path = tmp_path / "workspaces" / "decorated" / "configs" / "yiu" / "decorated.yiu.yaml"
+    _write_yaml(decorated_path, payload)
+
+    with pytest.raises(ValueError, match="projection_mode"):
+        load_yiu_spec(decorated_path)
+
+    payload = _canonical_v4_payload()
+    payload["yiu"]["compound_regions"] = [{"id": "legacy_compound", "join_policy": "ordered_concat"}]
+    removed_field_path = tmp_path / "workspaces" / "removed_field" / "configs" / "yiu" / "removed_field.yiu.yaml"
+    _write_yaml(removed_field_path, payload)
+
+    with pytest.raises(ValueError, match="compound_regions"):
+        load_yiu_spec(removed_field_path)
+
+
+def test_load_yiu_v4_rejects_unknown_effect_tags_and_unspecified_overlaps(tmp_path: Path) -> None:
+    payload = _canonical_v4_payload()
+    payload["yiu"]["source_oligo"]["effect_tags"][0]["class"] = "unknown_tag_class"
+    unknown_class_path = tmp_path / "workspaces" / "unknown_tag" / "configs" / "yiu" / "unknown_tag.yiu.yaml"
+    _write_yaml(unknown_class_path, payload)
+
+    with pytest.raises(ValueError, match="effect_tag.class"):
+        load_yiu_spec(unknown_class_path)
+
+    payload = _canonical_v4_payload()
+    payload["yiu"]["source_oligo"]["effect_tags"].append(
+        {
+            "id": "illegal_payload_bulge",
+            "class": "payload_bulge_position",
+            "start": 0,
+            "end": 2,
+        }
+    )
+    overlap_path = tmp_path / "workspaces" / "illegal_overlap" / "configs" / "yiu" / "illegal_overlap.yiu.yaml"
+    _write_yaml(overlap_path, payload)
+
+    with pytest.raises(ValueError, match="overlap"):
+        load_yiu_spec(overlap_path)
+
+
+def test_load_yiu_solve_spec_resolves_workspace_root_and_base_spec(tmp_path: Path) -> None:
+    workspace, spec_path, solve_path = _write_canonical_workspace(tmp_path)
+
+    solve_spec, resolved_solve_path, workspace_root = load_yiu_solve_spec(solve_path)
+
+    assert resolved_solve_path == solve_path.resolve()
+    assert workspace_root == workspace.resolve()
+    assert resolve_base_spec_path_for_yiu_solve_spec(solve_spec, workspace_root=workspace_root) == spec_path.resolve()
+
+
+def test_load_yiu_spec_rejects_legacy_schema_versions(tmp_path: Path) -> None:
+    legacy_v3_path = tmp_path / "workspaces" / "legacy_v3" / "configs" / "yiu" / "legacy_v3.yiu.yaml"
+    _write_yaml(legacy_v3_path, _legacy_v3_payload())
+
+    with pytest.raises(ValueError, match="schema_version 4"):
+        load_yiu_spec(legacy_v3_path)
+
+
+def test_run_yiu_trace_v4_emits_owner_closed_states_real_cut_product_and_clean_bundle_artifacts(tmp_path: Path) -> None:
+    _workspace, spec_path, _solve_path = _write_canonical_workspace(tmp_path)
+
+    run_dir, report = run_yiu_trace(spec_path)
+
+    assert report.metadata.spec_schema_version == 4
+    assert [state.state_id for state in report.states] == [
+        "source_oligo_ssdna",
+        "pcr_linear_duplex",
+        "type_iis_cut_product_duplex",
+        "circularized_payload_candidate",
+        "post_sacrificial_fragmentation",
+        "post_fragment_cleanup",
+        "snapback_adapter_complex",
+        "ligated_ssdna_hairpin",
+        "hairpin_pcr_linear_insert",
     ]
-    runbook_doc_path = workspace_root / "runbook.md"
-    runbook_doc_path.write_text("\n".join(lines), encoding="utf-8")
-    return runbook_doc_path
+
+    assert (run_dir / "report.json").exists()
+    assert (run_dir / "status.json").exists()
+    assert (run_dir / "manifest.json").exists()
+    assert (run_dir / "state_trace.jsonl").exists()
+    assert (run_dir / "tables" / "state_sequences.csv").exists()
+    assert (run_dir / "tables" / "state_owners.csv").exists()
+    assert (run_dir / "tables" / "effect_tags.csv").exists()
+    assert (run_dir / "tables" / "fragment_summary.csv").exists()
+    assert (run_dir / "contracts" / "visuals").exists()
+    assert not (run_dir / "published").exists()
+    assert not (run_dir / "hits").exists()
+
+    inventory_path = run_dir / "visual_inventory.json"
+    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    assert inventory["bundle_kind"] == "explicit"
+    assert inventory["protocol_template"] == "yiu_circularized_payload_v1"
+    assert inventory["view_count"] == 9
+    assert inventory["render_status"] == "not_requested"
+    assert inventory["renderer_kind"] == "nucleotide_evidence_map"
+    assert all(view["contract_kind"] == "sequence_evidence_map_v1" for view in inventory["views"])
+
+    for state in report.states:
+        if state.primary_sequence:
+            _assert_single_owner_partition(state, row_id="primary", sequence=state.primary_sequence)
+        if state.complement_sequence:
+            _assert_single_owner_partition(state, row_id="complement", sequence=state.complement_sequence)
+
+    source_state = _state_by_id(report, "source_oligo_ssdna")
+    cut_state = _state_by_id(report, "type_iis_cut_product_duplex")
+    assert cut_state.primary_sequence != source_state.primary_sequence
+    assert len(cut_state.primary_sequence) < len(source_state.primary_sequence)
+    assert "source_fwd_primer_binding_region" not in {
+        item["id"] for item in _row_owner_annotations(cut_state, row_id="primary")
+    }
+    assert "source_rev_primer_binding_region" not in {
+        item["id"] for item in _row_owner_annotations(cut_state, row_id="primary")
+    }
+
+    ligated_hairpin = _state_by_id(report, "ligated_ssdna_hairpin")
+    ligated_owner_ids = {item["id"] for item in _row_owner_annotations(ligated_hairpin, row_id="primary")}
+    assert "y_adapter_complementary_arm" in ligated_owner_ids
+    assert "y_adapter_noncomplementary_arm" in ligated_owner_ids
+
+    final_insert = _state_by_id(report, "hairpin_pcr_linear_insert")
+    assert final_insert.complement_sequence
+    final_primary_owner_ids = {item["id"] for item in _row_owner_annotations(final_insert, row_id="primary")}
+    final_complement_owner_ids = {item["id"] for item in _row_owner_annotations(final_insert, row_id="complement")}
+    assert "hairpin_pcr_forward_binding_region" in final_primary_owner_ids
+    assert "hairpin_pcr_reverse_binding_region" in final_primary_owner_ids
+    assert "retained_region" in final_complement_owner_ids
+
+    post_fragment_cleanup = _state_by_id(report, "post_fragment_cleanup")
+    nt_bpu10i = _hard_invariant_by_id(post_fragment_cleanup, "nt_bpu10i_snapback_invariant")
+    assert nt_bpu10i["status"] == "guaranteed"
+    assert nt_bpu10i["observed"]["recognized_sequence"] == "CCTCAGC"
+    assert nt_bpu10i["observed"]["nick_boundary"] == 33
+    assert nt_bpu10i["subchecks"]["downstream_exposed_tether_geometry"]["status"] == "guaranteed"
+
+    circularized = _state_by_id(report, "circularized_payload_candidate")
+    payload_assembly = _hard_invariant_by_id(circularized, "payload_assembly_invariant")
+    assert payload_assembly["status"] == "guaranteed"
+    assert payload_assembly["observed"]["assembled_payload_sequence"] == "AGGTCTCACACCTATAGAG"
+
+    with (run_dir / "tables" / "fragment_summary.csv").open(newline="", encoding="utf-8") as handle:
+        fragment_rows = list(csv.DictReader(handle))
+    assert fragment_rows
+    assert any(row["state_id"] == "post_sacrificial_fragmentation" for row in fragment_rows)
+    assert {row["max_fragment_nt"] for row in fragment_rows if row["state_id"] == "post_sacrificial_fragmentation"} == {
+        "12"
+    }
+
+    show_payload = yiu_show_payload(run_dir)
+    assert show_payload["bundle_kind"] == "explicit"
+    assert show_payload["protocol_template"] == "yiu_circularized_payload_v1"
+    assert show_payload["schema_version"] == 4
+    assert show_payload["explicit_final_state"] == "hairpin_pcr_linear_insert"
+    assert show_payload["state_count"] == 9
+    assert show_payload["visual_inventory_path"] == str(inventory_path.resolve())
 
 
-def init_yiu_workspace(workspace_root: Path, *, force_overwrite: bool = False) -> YiuWorkspaceScaffoldResult:
-    resolved_root = workspace_root.expanduser().resolve()
-    if resolved_root.exists() and any(resolved_root.iterdir()) and not force_overwrite:
-        raise ValueError(f"YIU workspace root already exists and is not empty: {resolved_root}")
-    if resolved_root.exists() and force_overwrite:
-        shutil.rmtree(resolved_root)
+def test_run_yiu_solve_v4_returns_single_canonical_solution_and_clean_bundle(tmp_path: Path) -> None:
+    _workspace, _spec_path, solve_path = _write_canonical_workspace(tmp_path)
 
-    (resolved_root / "configs" / "yiu").mkdir(parents=True, exist_ok=True)
-    (resolved_root / "catalogs").mkdir(parents=True, exist_ok=True)
-    (resolved_root / "outputs" / "yiu" / "explicit").mkdir(parents=True, exist_ok=True)
-    (resolved_root / "outputs" / "yiu" / "solve").mkdir(parents=True, exist_ok=True)
+    run_dir, report = run_yiu_solve(solve_path)
 
-    runbook_path = resolved_root / "configs" / "runbook.yaml"
-    runbook_path.write_text(
-        yaml.safe_dump(
-            {
-                "runbook": {
-                    "schema_version": 1,
-                    "name": resolved_root.name,
-                    "steps": _runbook_steps(),
-                }
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    runbook_doc_path = _write_runbook_markdown(resolved_root, runbook_path=runbook_path)
+    assert report.status == "solved"
+    assert report.satisfying_solution_count == 2
+    assert report.selected_solution_path is not None
+    assert report.selected_source_sequence is not None
+    assert "AAAAAAAAA" in report.selected_source_sequence
+    assert (run_dir / "solve_report.json").exists()
+    assert (run_dir / "solve_status.json").exists()
+    assert (run_dir / "solve_manifest.json").exists()
+    assert (run_dir / "solution" / "report.json").exists()
+    assert (run_dir / "visual_inventory.json").exists()
+    assert not (run_dir / "hits").exists()
+    assert not (run_dir / "alternatives").exists()
+    assert not (run_dir / "comparison").exists()
 
-    spec_path = resolved_root / "configs" / "yiu" / _DEMO_EXPLICIT_SPEC_FILENAME
-    spec_path.write_text(yaml.safe_dump(_canonical_spec_payload(), sort_keys=False), encoding="utf-8")
+    inventory = json.loads((run_dir / "visual_inventory.json").read_text(encoding="utf-8"))
+    assert inventory["bundle_kind"] == "solve"
+    assert inventory["render_status"] == "not_requested"
+    assert all(str(view["view_contract_path"]).startswith("solution/") for view in inventory["views"])
 
-    solve_spec_path = resolved_root / "configs" / "yiu" / _DEMO_SOLVE_SPEC_FILENAME
-    solve_spec_path.write_text(yaml.safe_dump(_canonical_solve_payload(), sort_keys=False), encoding="utf-8")
+    show_payload = yiu_show_payload(run_dir)
+    assert show_payload["bundle_kind"] == "solve"
+    assert show_payload["protocol_template"] == "yiu_circularized_payload_v1"
+    assert show_payload["solve_status"] == "solved"
+    assert show_payload["satisfying_solution_count"] == 2
+    assert show_payload["comparison_solution_count"] == 0
+    assert show_payload["selected_canonical_solution_path"].endswith("/solution")
 
-    enzymes_payload, oligo_parts_payload, backbones_payload = _catalog_payloads()
-    enzyme_catalog_path = resolved_root / "catalogs" / "enzymes.yaml"
-    enzyme_catalog_path.write_text(yaml.safe_dump(enzymes_payload, sort_keys=False), encoding="utf-8")
-    oligo_parts_catalog_path = resolved_root / "catalogs" / "oligo_parts.yaml"
-    oligo_parts_catalog_path.write_text(yaml.safe_dump(oligo_parts_payload, sort_keys=False), encoding="utf-8")
-    backbone_catalog_path = resolved_root / "catalogs" / "backbones.yaml"
-    backbone_catalog_path.write_text(yaml.safe_dump(backbones_payload, sort_keys=False), encoding="utf-8")
 
-    return YiuWorkspaceScaffoldResult(
-        workspace_root=resolved_root,
-        runbook_path=runbook_path,
-        runbook_doc_path=runbook_doc_path,
-        spec_path=spec_path,
-        solve_spec_path=solve_spec_path,
-        enzyme_catalog_path=enzyme_catalog_path,
-        oligo_parts_catalog_path=oligo_parts_catalog_path,
-        backbone_catalog_path=backbone_catalog_path,
-    )
+def test_run_yiu_solve_v4_incomplete_search_fails_closed(tmp_path: Path) -> None:
+    _workspace, _spec_path, solve_path = _write_canonical_workspace(tmp_path)
+    payload = _canonical_v4_solve_payload()
+    payload["yiu_solve"]["search"]["max_enumerated_candidates"] = 1
+    _write_yaml(solve_path, payload)
+
+    run_dir, report = run_yiu_solve(solve_path)
+
+    assert report.status == "incomplete_search"
+    assert report.selected_solution_path is None
+    assert report.selected_source_sequence is None
+    assert not (run_dir / "solution").exists()
+    assert not (run_dir / "visual_inventory.json").exists()
+
+
+def test_run_yiu_solve_rejects_forbidden_mutation_window(tmp_path: Path) -> None:
+    _workspace, _spec_path, solve_path = _write_canonical_workspace(tmp_path)
+    payload = _canonical_v4_solve_payload()
+    payload["yiu_solve"]["scaffold_windows"][0]["owner_id"] = "source_fwd_primer_binding_region"
+    _write_yaml(solve_path, payload)
+
+    with pytest.raises(ValueError, match="owner_id"):
+        run_yiu_solve(solve_path)

@@ -4,8 +4,8 @@
 - src/dnadesign/cruncher/workspaces/demo_yiu_circularized/
 
 **Purpose**
-- Checked-in YIU demo for the split-payload circularized flow.
-- Covers validate, explicit materialization, trace-alias materialization, and solve from one repo workspace.
+- Checked-in YIU demo for the circularized payload workflow.
+- Covers validate, trace, solve, show, and render from one repo workspace without the legacy design alias.
 
 **Run This Single Command**
 
@@ -18,16 +18,16 @@
     cruncher() { uv run cruncher "$@"; }
 
     # Standard machine-runbook sequence (matches configs/runbook.yaml).
-    cruncher yiu validate --spec configs/yiu/example_split_payload_circularized.yiu.yaml
-    cruncher yiu design --spec configs/yiu/example_split_payload_circularized.yiu.yaml --force-overwrite
-    cruncher yiu trace --spec configs/yiu/example_split_payload_circularized.yiu.yaml --force-overwrite
-    cruncher yiu solve --spec configs/yiu/example_split_payload_circularized.yiu.solve.yaml --force-overwrite
+    cruncher yiu validate --spec configs/yiu/example_reference_circularized.yiu.yaml
+    cruncher yiu trace --spec configs/yiu/example_reference_circularized.yiu.yaml --force-overwrite --emit-renders
+    cruncher yiu solve --spec configs/yiu/example_reference_circularized.yiu.solve.yaml --force-overwrite --emit-renders
 
 ### Optional follow-up commands
 
-    DESIGN_ID="$(ls -1 outputs/yiu/explicit/example_split_payload_circularized | tail -n 1)"
-    SOLVE_ID="$(ls -1 outputs/yiu/solve/example_split_payload_circularized | tail -n 1)"
-    uv run cruncher yiu show --run "outputs/yiu/explicit/example_split_payload_circularized/$DESIGN_ID"
-    uv run cruncher yiu show --run "outputs/yiu/solve/example_split_payload_circularized/$SOLVE_ID"
-    uv run cruncher visuals validate --job "outputs/yiu/explicit/example_split_payload_circularized/$DESIGN_ID/published/baserender_jobs/circularized_payload_candidate.job.yaml"
-    uv run cruncher visuals run --job "outputs/yiu/explicit/example_split_payload_circularized/$DESIGN_ID/published/baserender_jobs/circularized_payload_candidate.job.yaml"
+    WORKFLOW_NAME="example_reference_circularized"
+    TRACE_ID="$(ls -1 "outputs/yiu/explicit/$WORKFLOW_NAME" | tail -n 1)"
+    SOLVE_ID="$(ls -1 "outputs/yiu/solve/$WORKFLOW_NAME" | tail -n 1)"
+    uv run cruncher yiu show --run "outputs/yiu/explicit/$WORKFLOW_NAME/$TRACE_ID"
+    uv run cruncher yiu show --run "outputs/yiu/solve/$WORKFLOW_NAME/$SOLVE_ID"
+    uv run cruncher yiu render --run "outputs/yiu/explicit/$WORKFLOW_NAME/$TRACE_ID"
+    uv run cruncher yiu render --run "outputs/yiu/solve/$WORKFLOW_NAME/$SOLVE_ID"

@@ -1,0 +1,434 @@
+yiu:
+  schema_version: 4
+  family: yiu
+  protocol_template: yiu_circularized_payload_v1
+  name: example_reference_circularized
+  source_oligo:
+    authored_sequence: CACGAGAGGTCTCACGAGAAAAAAAAACCTCAGCCCGCTGAACCTATAGAGGAGACC
+    structural_owners:
+      - id: source_fwd_primer_binding_region
+        start: 0
+        end: 6
+      - id: payload_left_half
+        start: 6
+        end: 15
+      - id: sacrificial_region_long
+        start: 15
+        end: 27
+      - id: tether_dock_complement
+        start: 27
+        end: 31
+      - id: tether_cap
+        start: 31
+        end: 35
+      - id: tether_dock
+        start: 35
+        end: 39
+      - id: snapback_stem
+        start: 39
+        end: 41
+      - id: payload_right_half
+        start: 41
+        end: 51
+      - id: source_rev_primer_binding_region
+        start: 51
+        end: 57
+    effect_tags:
+      - id: source_forward_primer_bindable
+        class: primer_bindable_by_source_forward
+        start: 0
+        end: 6
+      - id: left_nb_bsssi_member
+        class: nb_bsssi_array_member
+        start: 0
+        end: 6
+      - id: left_bsssi_bsai_overlap_unit
+        class: left_bsssi_bsai_overlap_unit
+        start: 0
+        end: 18
+      - id: payload_overhang_left
+        class: payload_overhang_left
+        start: 6
+        end: 10
+      - id: type_iis_recognition_left
+        class: type_iis_recognition_left
+        start: 7
+        end: 13
+      - id: right_nb_bsssi_member
+        class: nb_bsssi_array_member
+        start: 12
+        end: 18
+      - id: sacrificial_region_long_tag
+        class: sacrificial
+        start: 15
+        end: 27
+      - id: nt_bpu10i_snapback_site
+        class: nt_bpu10i_snapback_site
+        start: 27
+        end: 41
+      - id: payload_overhang_right
+        class: payload_overhang_right
+        start: 41
+        end: 45
+      - id: source_reverse_primer_bindable
+        class: primer_bindable_by_source_reverse
+        start: 51
+        end: 57
+      - id: type_iis_recognition_right
+        class: type_iis_recognition_right
+        start: 51
+        end: 57
+  owner_lifecycle:
+    - owner_id: source_fwd_primer_binding_region
+      appears_in:
+        - source_oligo_ssdna
+      projected_to:
+        - state: pcr_linear_duplex
+          strand: primary
+          provenance_mode: literal_source
+        - state: pcr_linear_duplex
+          strand: complement
+          provenance_mode: amplification_projection
+      disappears_after: pcr_linear_duplex
+    - owner_id: payload_left_half
+      appears_in:
+        - source_oligo_ssdna
+      projected_to:
+        - state: pcr_linear_duplex
+          strand: primary
+          provenance_mode: literal_source
+        - state: pcr_linear_duplex
+          strand: complement
+          provenance_mode: amplification_projection
+        - state: type_iis_cut_product_duplex
+          strand: primary
+          provenance_mode: cut_product_projection
+        - state: type_iis_cut_product_duplex
+          strand: complement
+          provenance_mode: cut_product_projection
+        - state: circularized_payload_candidate
+          strand: primary
+          provenance_mode: ligation_assembly
+        - state: circularized_payload_candidate
+          strand: complement
+          provenance_mode: ligation_assembly
+        - state: post_sacrificial_fragmentation
+          strand: primary
+          provenance_mode: retained_projection
+        - state: post_fragment_cleanup
+          strand: primary
+          provenance_mode: retained_projection
+        - state: snapback_adapter_complex
+          strand: primary
+          provenance_mode: retained_projection
+        - state: ligated_ssdna_hairpin
+          strand: primary
+          provenance_mode: ligated_projection
+        - state: hairpin_pcr_linear_insert
+          strand: primary
+          provenance_mode: amplification_projection
+      disappears_after: null
+    - owner_id: sacrificial_region_long
+      appears_in:
+        - source_oligo_ssdna
+      projected_to:
+        - state: pcr_linear_duplex
+          strand: primary
+          provenance_mode: literal_source
+        - state: pcr_linear_duplex
+          strand: complement
+          provenance_mode: amplification_projection
+        - state: type_iis_cut_product_duplex
+          strand: primary
+          provenance_mode: cut_product_projection
+        - state: type_iis_cut_product_duplex
+          strand: complement
+          provenance_mode: cut_product_projection
+        - state: circularized_payload_candidate
+          strand: primary
+          provenance_mode: ligation_assembly
+        - state: circularized_payload_candidate
+          strand: complement
+          provenance_mode: ligation_assembly
+        - state: post_sacrificial_fragmentation
+          strand: primary
+          provenance_mode: sacrificial_projection
+      disappears_after: post_sacrificial_fragmentation
+    - owner_id: tether_dock_complement
+      appears_in:
+        - source_oligo_ssdna
+      projected_to:
+        - state: pcr_linear_duplex
+          strand: primary
+          provenance_mode: literal_source
+        - state: pcr_linear_duplex
+          strand: complement
+          provenance_mode: amplification_projection
+        - state: type_iis_cut_product_duplex
+          strand: primary
+          provenance_mode: cut_product_projection
+        - state: type_iis_cut_product_duplex
+          strand: complement
+          provenance_mode: cut_product_projection
+        - state: circularized_payload_candidate
+          strand: primary
+          provenance_mode: ligation_assembly
+        - state: circularized_payload_candidate
+          strand: complement
+          provenance_mode: ligation_assembly
+        - state: post_sacrificial_fragmentation
+          strand: primary
+          provenance_mode: retained_projection
+        - state: post_fragment_cleanup
+          strand: primary
+          provenance_mode: retained_projection
+        - state: snapback_adapter_complex
+          strand: primary
+          provenance_mode: retained_projection
+        - state: ligated_ssdna_hairpin
+          strand: primary
+          provenance_mode: ligated_projection
+        - state: hairpin_pcr_linear_insert
+          strand: primary
+          provenance_mode: amplification_projection
+      disappears_after: null
+    - owner_id: tether_cap
+      appears_in:
+        - source_oligo_ssdna
+      projected_to:
+        - state: pcr_linear_duplex
+          strand: primary
+          provenance_mode: literal_source
+        - state: pcr_linear_duplex
+          strand: complement
+          provenance_mode: amplification_projection
+        - state: type_iis_cut_product_duplex
+          strand: primary
+          provenance_mode: cut_product_projection
+        - state: type_iis_cut_product_duplex
+          strand: complement
+          provenance_mode: cut_product_projection
+        - state: circularized_payload_candidate
+          strand: primary
+          provenance_mode: ligation_assembly
+        - state: circularized_payload_candidate
+          strand: complement
+          provenance_mode: ligation_assembly
+        - state: post_sacrificial_fragmentation
+          strand: primary
+          provenance_mode: retained_projection
+        - state: post_fragment_cleanup
+          strand: primary
+          provenance_mode: retained_projection
+        - state: snapback_adapter_complex
+          strand: primary
+          provenance_mode: retained_projection
+        - state: ligated_ssdna_hairpin
+          strand: primary
+          provenance_mode: ligated_projection
+        - state: hairpin_pcr_linear_insert
+          strand: primary
+          provenance_mode: amplification_projection
+      disappears_after: null
+    - owner_id: tether_dock
+      appears_in:
+        - source_oligo_ssdna
+      projected_to:
+        - state: pcr_linear_duplex
+          strand: primary
+          provenance_mode: literal_source
+        - state: pcr_linear_duplex
+          strand: complement
+          provenance_mode: amplification_projection
+        - state: type_iis_cut_product_duplex
+          strand: primary
+          provenance_mode: cut_product_projection
+        - state: type_iis_cut_product_duplex
+          strand: complement
+          provenance_mode: cut_product_projection
+        - state: circularized_payload_candidate
+          strand: primary
+          provenance_mode: ligation_assembly
+        - state: circularized_payload_candidate
+          strand: complement
+          provenance_mode: ligation_assembly
+        - state: post_sacrificial_fragmentation
+          strand: primary
+          provenance_mode: retained_projection
+        - state: post_fragment_cleanup
+          strand: primary
+          provenance_mode: retained_projection
+        - state: snapback_adapter_complex
+          strand: primary
+          provenance_mode: retained_projection
+        - state: ligated_ssdna_hairpin
+          strand: primary
+          provenance_mode: ligated_projection
+        - state: hairpin_pcr_linear_insert
+          strand: primary
+          provenance_mode: amplification_projection
+      disappears_after: null
+    - owner_id: snapback_stem
+      appears_in:
+        - source_oligo_ssdna
+      projected_to:
+        - state: pcr_linear_duplex
+          strand: primary
+          provenance_mode: literal_source
+        - state: pcr_linear_duplex
+          strand: complement
+          provenance_mode: amplification_projection
+        - state: type_iis_cut_product_duplex
+          strand: primary
+          provenance_mode: cut_product_projection
+        - state: type_iis_cut_product_duplex
+          strand: complement
+          provenance_mode: cut_product_projection
+        - state: circularized_payload_candidate
+          strand: primary
+          provenance_mode: ligation_assembly
+        - state: circularized_payload_candidate
+          strand: complement
+          provenance_mode: ligation_assembly
+        - state: post_sacrificial_fragmentation
+          strand: primary
+          provenance_mode: retained_projection
+        - state: post_fragment_cleanup
+          strand: primary
+          provenance_mode: retained_projection
+        - state: snapback_adapter_complex
+          strand: primary
+          provenance_mode: retained_projection
+        - state: ligated_ssdna_hairpin
+          strand: primary
+          provenance_mode: ligated_projection
+        - state: hairpin_pcr_linear_insert
+          strand: primary
+          provenance_mode: amplification_projection
+      disappears_after: null
+    - owner_id: payload_right_half
+      appears_in:
+        - source_oligo_ssdna
+      projected_to:
+        - state: pcr_linear_duplex
+          strand: primary
+          provenance_mode: literal_source
+        - state: pcr_linear_duplex
+          strand: complement
+          provenance_mode: amplification_projection
+        - state: type_iis_cut_product_duplex
+          strand: primary
+          provenance_mode: cut_product_projection
+        - state: type_iis_cut_product_duplex
+          strand: complement
+          provenance_mode: cut_product_projection
+        - state: circularized_payload_candidate
+          strand: primary
+          provenance_mode: ligation_assembly
+        - state: circularized_payload_candidate
+          strand: complement
+          provenance_mode: ligation_assembly
+        - state: post_sacrificial_fragmentation
+          strand: primary
+          provenance_mode: retained_projection
+        - state: post_fragment_cleanup
+          strand: primary
+          provenance_mode: retained_projection
+        - state: snapback_adapter_complex
+          strand: primary
+          provenance_mode: retained_projection
+        - state: ligated_ssdna_hairpin
+          strand: primary
+          provenance_mode: ligated_projection
+        - state: hairpin_pcr_linear_insert
+          strand: primary
+          provenance_mode: amplification_projection
+      disappears_after: null
+    - owner_id: source_rev_primer_binding_region
+      appears_in:
+        - source_oligo_ssdna
+      projected_to:
+        - state: pcr_linear_duplex
+          strand: primary
+          provenance_mode: literal_source
+        - state: pcr_linear_duplex
+          strand: complement
+          provenance_mode: amplification_projection
+      disappears_after: pcr_linear_duplex
+    - owner_id: retained_region
+      appears_in: []
+      projected_to:
+        - state: post_sacrificial_fragmentation
+          strand: primary
+          provenance_mode: retained_projection
+        - state: post_fragment_cleanup
+          strand: primary
+          provenance_mode: retained_projection
+        - state: hairpin_pcr_linear_insert
+          strand: complement
+          provenance_mode: amplification_projection
+      disappears_after: null
+    - owner_id: sacrificial_region_short
+      appears_in: []
+      projected_to:
+        - state: post_sacrificial_fragmentation
+          strand: complement
+          provenance_mode: sacrificial_projection
+      disappears_after: post_sacrificial_fragmentation
+    - owner_id: y_adapter_complementary_arm
+      appears_in: []
+      projected_to:
+        - state: snapback_adapter_complex
+          strand: primary
+          provenance_mode: late_introduction
+        - state: ligated_ssdna_hairpin
+          strand: primary
+          provenance_mode: late_introduction
+      disappears_after: ligated_ssdna_hairpin
+    - owner_id: y_adapter_noncomplementary_arm
+      appears_in: []
+      projected_to:
+        - state: snapback_adapter_complex
+          strand: primary
+          provenance_mode: late_introduction
+        - state: ligated_ssdna_hairpin
+          strand: primary
+          provenance_mode: late_introduction
+      disappears_after: ligated_ssdna_hairpin
+    - owner_id: hairpin_pcr_forward_binding_region
+      appears_in: []
+      projected_to:
+        - state: hairpin_pcr_linear_insert
+          strand: primary
+          provenance_mode: derived_binding_region
+      disappears_after: null
+    - owner_id: hairpin_pcr_reverse_binding_region
+      appears_in: []
+      projected_to:
+        - state: hairpin_pcr_linear_insert
+          strand: primary
+          provenance_mode: derived_binding_region
+      disappears_after: null
+  external_parts:
+    primer_source_forward: oES790
+    primer_source_reverse: oES791
+    hairpin_pcr_forward: oES793
+    hairpin_pcr_reverse: oES794
+    y_adapter: oES792
+  enzymes:
+    left_type_iis: BsmBI
+    right_type_iis: BsmBI
+    snapback_nickase: Nt.Bpu10I
+    sacrificial_nickase: Nb.BssSI
+  payload:
+    target_sequence: AGGTCTCACACCTATAGAG
+    bulge_mask: []
+  catalogs:
+    enzymes: catalogs/enzymes.yaml
+    oligo_parts: catalogs/oligo_parts.yaml
+    backbones: catalogs/backbones.yaml
+  output:
+    run_dir: outputs/yiu/explicit
+    emit_view_contracts: true
+    publish_contract_version: 4
+    persist_render_jobs_debug: false

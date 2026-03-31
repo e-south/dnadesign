@@ -118,7 +118,7 @@ def trace_manifest_path(run_dir: Path) -> Path:
 
 
 def parts_path(run_dir: Path) -> Path:
-    return run_dir / "yiu_parts.csv"
+    return run_dir / "yiu_state_sequences.csv"
 
 
 def annotations_path(run_dir: Path) -> Path:
@@ -142,7 +142,11 @@ def published_views_manifest_path(run_dir: Path) -> Path:
 
 
 def visual_manifest_path(run_dir: Path) -> Path:
-    return run_dir / "published" / "visual_manifest.json"
+    return run_dir / "visual_inventory.json"
+
+
+def visual_inventory_path(run_dir: Path) -> Path:
+    return visual_manifest_path(run_dir)
 
 
 def baserender_jobs_dir(run_dir: Path) -> Path:
@@ -175,7 +179,16 @@ def solve_accepted_hits_path(run_dir: Path) -> Path:
 
 def write_report(run_dir: Path, report: YiuValidationReport) -> Path:
     path = report_path(run_dir)
-    atomic_write_json(path, report.model_dump(mode="json"))
+    atomic_write_json(
+        path,
+        report.model_dump(
+            mode="json",
+            exclude={
+                "template_alias_used",
+                "template_alias_status",
+            },
+        ),
+    )
     return path
 
 
@@ -207,8 +220,6 @@ def write_status(
         "family": "yiu",
         "protocol": report.protocol,
         "protocol_template": report.protocol_template,
-        "template_alias_used": report.template_alias_used,
-        "template_alias_status": report.template_alias_status,
         "status": "completed" if report.status == "satisfied" else "unsatisfied",
         "status_message": f"{report.status} ({report.validation_mode})",
         "spec_name": report.spec_name,
@@ -226,8 +237,6 @@ def write_status(
             "git_sha": code_revision,
             "yiu_contract_version": ENGINE_CONTRACT_VERSION,
             "protocol_template": report.protocol_template or report.protocol,
-            "template_alias_used": report.template_alias_used,
-            "template_alias_status": report.template_alias_status,
             "publish_contract_version": report.metadata.view_contract_version or STATE_VIEW_SCHEMA_VERSION,
         },
         "run_dir": str(run_dir.resolve()),
@@ -255,14 +264,14 @@ def write_manifest(
         ("status", status_path(run_dir).name, status_path(run_dir).exists()),
         ("trace", trace_path(run_dir).name, trace_path(run_dir).exists()),
         ("trace_manifest", trace_manifest_path(run_dir).name, trace_manifest_path(run_dir).exists()),
-        ("parts", parts_path(run_dir).name, parts_path(run_dir).exists()),
+        ("state_sequences", parts_path(run_dir).name, parts_path(run_dir).exists()),
         ("annotations", annotations_path(run_dir).name, annotations_path(run_dir).exists()),
         ("fragments", fragments_path(run_dir).name, fragments_path(run_dir).exists()),
     )
     machine_artifacts = {name: path for name, path, include in machine_artifact_candidates if include}
     published_artifact_candidates = (
         ("views_dir", "published/views", published_views_dir(run_dir).exists()),
-        ("visual_manifest", "published/visual_manifest.json", visual_manifest_path(run_dir).exists()),
+        ("visual_inventory", visual_inventory_path(run_dir).name, visual_inventory_path(run_dir).exists()),
         ("baserender_jobs_dir", "published/baserender_jobs", baserender_jobs_dir(run_dir).exists()),
         ("renders_dir", "published/renders", renders_dir(run_dir).exists()),
     )
@@ -276,8 +285,6 @@ def write_manifest(
         "workflow": "yiu_explicit",
         "protocol": report.protocol,
         "protocol_template": report.protocol_template,
-        "template_alias_used": report.template_alias_used,
-        "template_alias_status": report.template_alias_status,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "run_dir": str(run_dir.resolve()),
         "workspace_root": str(workspace_root.resolve()),
@@ -296,8 +303,6 @@ def write_manifest(
             "git_sha": code_revision,
             "yiu_contract_version": ENGINE_CONTRACT_VERSION,
             "protocol_template": report.protocol_template or report.protocol,
-            "template_alias_used": report.template_alias_used,
-            "template_alias_status": report.template_alias_status,
             "publish_contract_version": report.metadata.view_contract_version or STATE_VIEW_SCHEMA_VERSION,
         },
         "spec_path": str(spec_path.resolve()),
@@ -353,8 +358,6 @@ def write_trace_manifest(run_dir: Path, report: YiuValidationReport) -> Path:
         "family": "yiu",
         "protocol": report.protocol,
         "protocol_template": report.protocol_template,
-        "template_alias_used": report.template_alias_used,
-        "template_alias_status": report.template_alias_status,
         "spec_name": report.spec_name,
         "state_count": len(report.states),
         "sequence_mode": report.sequence_mode,
@@ -375,8 +378,6 @@ def write_published_views_manifest(run_dir: Path, report: YiuValidationReport) -
         "family": "yiu",
         "protocol": report.protocol,
         "protocol_template": report.protocol_template,
-        "template_alias_used": report.template_alias_used,
-        "template_alias_status": report.template_alias_status,
         "spec_name": report.spec_name,
         "view_count": len(report.states),
         "sequence_mode": report.sequence_mode,

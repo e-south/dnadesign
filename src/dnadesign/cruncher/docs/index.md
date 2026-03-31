@@ -20,7 +20,7 @@ Cruncher has three first-class workflow families today:
 
 - fixed-length optimization workspaces built around `fetch -> lock -> parse -> sample -> analyze`
 - cassette workspaces built around `cassette init-workspace|validate|design|solve|show`
-- YIU protocol-state workspaces built around `yiu init-workspace|validate|design|trace|solve|show`
+- YIU protocol-state workspaces built around `yiu init-workspace|validate|trace|solve|show|render`
 
 Studies and portfolios extend the fixed-length optimization lane. Cassette and YIU runs keep separate workspace and artifact contracts. More families can be added beside these lanes without rewriting the existing ones.
 

@@ -1,100 +1,83 @@
 ## YIU Workspace Demo
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-03-29
 
-Use this walkthrough to run the checked-in split-payload circularized YIU demo workspace, inspect the explicit and solve bundles, and render the emitted QA views.
+Use this walkthrough to run the checked-in YIU reference workspace, inspect the explicit and solve bundles, and rerender their published visuals.
+
+The checked-in solve fixture is small but nontrivial. On 2026-03-29 the default run was exhaustive, found 2 satisfying solutions, and selected 1 deterministic solution for publication.
 
 ```bash
 # Use the checked-in YIU demo workspace in the repo.
 DEMO_WORKSPACE=src/dnadesign/cruncher/workspaces/demo_yiu_circularized
 
-# Confirm the checked-in workspace is family-discoverable from the workspace registry.
+# Resolve the checked-in explicit spec without hard-coding the filename.
+EXPLICIT_SPEC="$(find "$DEMO_WORKSPACE/configs/yiu" -maxdepth 1 -name '*.yiu.yaml' ! -name '*.solve.yaml' | head -n 1)"
+
+# Resolve the checked-in solve spec without hard-coding the filename.
+SOLVE_SPEC="$(find "$DEMO_WORKSPACE/configs/yiu" -maxdepth 1 -name '*.yiu.solve.yaml' | head -n 1)"
+
+# Confirm the checked-in workspace is discoverable.
 uv run cruncher workspaces list --root src/dnadesign/cruncher/workspaces
-# Run the standard machine runbook from the checked-in workspace.
+
+# Run the checked-in machine runbook.
 uv run cruncher workspaces run --workspace demo_yiu_circularized --runbook configs/runbook.yaml
 
-# Validate the explicit YIU spec before materializing any artifacts.
-uv run cruncher yiu validate \
-  --spec "$DEMO_WORKSPACE/configs/yiu/example_split_payload_circularized.yiu.yaml"
+# Validate the explicit spec.
+uv run cruncher yiu validate --spec "$EXPLICIT_SPEC"
 
-# Materialize the explicit YIU bundle plus published views and jobs.
-uv run cruncher yiu design \
-  --spec "$DEMO_WORKSPACE/configs/yiu/example_split_payload_circularized.yiu.yaml" \
-  --force-overwrite
+# Materialize and render the explicit bundle.
+uv run cruncher yiu trace --spec "$EXPLICIT_SPEC" --force-overwrite --emit-renders
 
-# Re-materialize the same explicit bundle under trace intent.
-uv run cruncher yiu trace \
-  --spec "$DEMO_WORKSPACE/configs/yiu/example_split_payload_circularized.yiu.yaml" \
-  --force-overwrite
+# Run the paired solve spec and render the selected solution bundle.
+uv run cruncher yiu solve --spec "$SOLVE_SPEC" --force-overwrite --emit-renders
 
-# Run the paired solve spec and materialize the top hit bundles.
-uv run cruncher yiu solve \
-  --spec "$DEMO_WORKSPACE/configs/yiu/example_split_payload_circularized.yiu.solve.yaml" \
-  --force-overwrite
+# Derive the workflow directory name from the explicit spec path.
+WORKFLOW_NAME="$(basename "${EXPLICIT_SPEC%.yiu.yaml}")"
 
-# Validate the emitted render job for the ligated hairpin view.
-uv run cruncher visuals validate \
-  --job "$DEMO_WORKSPACE/outputs/yiu/explicit/example_split_payload_circularized/<design_id>/published/baserender_jobs/ligated_ssdna_hairpin.job.yaml"
+# Resolve the newest explicit run id for that workflow.
+TRACE_ID="$(ls -1 "$DEMO_WORKSPACE/outputs/yiu/explicit/$WORKFLOW_NAME" | tail -n 1)"
 
-# Render the ligated hairpin QA view from the emitted job file.
-uv run cruncher visuals run \
-  --job "$DEMO_WORKSPACE/outputs/yiu/explicit/example_split_payload_circularized/<design_id>/published/baserender_jobs/ligated_ssdna_hairpin.job.yaml"
+# Resolve the newest solve run id for that workflow.
+SOLVE_ID="$(ls -1 "$DEMO_WORKSPACE/outputs/yiu/solve/$WORKFLOW_NAME" | tail -n 1)"
+
+# Show the explicit bundle summary.
+uv run cruncher yiu show --run "$DEMO_WORKSPACE/outputs/yiu/explicit/$WORKFLOW_NAME/$TRACE_ID"
+
+# Show the solve bundle summary.
+uv run cruncher yiu show --run "$DEMO_WORKSPACE/outputs/yiu/solve/$WORKFLOW_NAME/$SOLVE_ID"
+
+# Rerender the explicit bundle from its persisted view contracts.
+uv run cruncher yiu render --run "$DEMO_WORKSPACE/outputs/yiu/explicit/$WORKFLOW_NAME/$TRACE_ID"
+
+# Rerender the solve bundle from its persisted view contracts.
+uv run cruncher yiu render --run "$DEMO_WORKSPACE/outputs/yiu/solve/$WORKFLOW_NAME/$SOLVE_ID"
 ```
 
-The checked-in demo workspace ships input and runbook material only:
+After `trace`, the explicit bundle lives under:
 
-- `runbook.md`
-- `configs/runbook.yaml`
-- `configs/yiu/example_split_payload_circularized.yiu.yaml`
-- `configs/yiu/example_split_payload_circularized.yiu.solve.yaml`
-- `configs/yiu/compat/example_adapter_hairpin.yiu.yaml`
-- `configs/yiu/compat/example_legacy_v1.yiu.yaml`
-- `catalogs/enzymes.yaml`
-- `catalogs/oligo_parts.yaml`
-- `catalogs/backbones.yaml`
+```text
+outputs/yiu/explicit/<workflow>/<trace_id>/
+```
 
-Runtime outputs are generated under `outputs/yiu/...` only after you run the explicit or solve commands above. The checked-in workspace does not version control explicit bundles, rendered outputs, matplotlib caches, or desktop clutter.
+After `solve`, the solve bundle lives under:
 
-If you want a disposable scratch copy instead of the checked-in repo workspace, generate one with:
+```text
+outputs/yiu/solve/<workflow>/<solve_id>/
+```
+
+Key YIU publication paths:
+
+- bundle-root render truth: `visual_inventory.json`
+- persisted view contracts: `contracts/visuals/*.json`
+- explicit rendered PDFs: `visuals/*.pdf`
+- solve rendered PDFs: `solution/visuals/*.pdf`
+
+If you want a disposable scratch copy instead of the checked-in repo workspace:
 
 ```bash
-# Create a scratch YIU workspace outside the checked-in demo.
+# Create a fresh YIU workspace with the same reference inputs and catalogs.
 uv run cruncher yiu init-workspace yiu_lab_demo
-```
-
-After `design`, inspect the explicit bundle with:
-
-```bash
-# Inspect the explicit bundle and published visual surface.
-uv run cruncher yiu show \
-  --run "$DEMO_WORKSPACE/outputs/yiu/explicit/example_split_payload_circularized/<design_id>"
-```
-
-After `solve`, inspect the solve bundle with:
-
-```bash
-# Inspect the solve bundle, solve-level views, and top-hit path.
-uv run cruncher yiu show \
-  --run "$DEMO_WORKSPACE/outputs/yiu/solve/example_split_payload_circularized/<solve_id>"
-```
-
-One emitted BaseRender job from the explicit bundle looks like:
-
-```text
-published/baserender_jobs/ligated_ssdna_hairpin.job.yaml
-```
-
-Published view contracts are written under:
-
-```text
-published/views/
-```
-
-Running the two `cruncher visuals` commands above writes rendered QA output under:
-
-```text
-published/renders/
 ```
 
 Next:

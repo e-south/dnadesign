@@ -3,9 +3,9 @@
 **Audience:** YIU workflow users and maintainers
 **Applies to:** `configs/yiu/*.yiu.yaml` and `configs/yiu/*.yiu.solve.yaml`
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-03-29
 
-YIU now has two strict document roots:
+YIU ships two strict document roots:
 
 - explicit specs rooted at `yiu:`
 - solve specs rooted at `yiu_solve:`
@@ -16,11 +16,8 @@ YIU now has two strict document roots:
 configs/
   runbook.yaml
   yiu/
-    example_split_payload_circularized.yiu.yaml
-    example_split_payload_circularized.yiu.solve.yaml
-    compat/
-      example_adapter_hairpin.yiu.yaml
-      example_legacy_v1.yiu.yaml
+    <workflow>.yiu.yaml
+    <workflow>.yiu.solve.yaml
 catalogs/
   enzymes.yaml
   oligo_parts.yaml
@@ -31,72 +28,110 @@ outputs/
     solve/
 ```
 
-### Explicit spec summary
+### Explicit spec
 
-The explicit root is still `yiu:`. Three shapes matter operationally:
-
-- `schema_version: 1` with `protocol: yiu_v1`
-- `schema_version: 2` with `protocol_template: yiu_adapter_hairpin_v1`
-- `schema_version: 2` with `protocol_template: yiu_circularized_payload_v1`
-
-Recommended split-template explicit spec:
+The explicit root is `yiu:` and the ship-targeted contract is `schema_version: 4`.
 
 ```yaml
 yiu:
-  schema_version: 2
+  schema_version: 4
   family: yiu
   protocol_template: yiu_circularized_payload_v1
-  workflow_scope: core_insert_generation
-  name: example_split_payload_circularized
+  name: <workflow>
   source_oligo:
-    authored_sequence: CCGATG...
-    annotations:
-      primer_binding_cores: [...]
-      restriction_sites: [...]
-      nickase_sites: [...]
-      payload_windows: [...]
-      retained_regions: [...]
-      sacrificial_regions: [...]
-      named_regions: [...]
-  steps:
-    source_pcr: {...}
-    type_iis_digest: {...}
-    circularization: {...}
-    exonuclease_cleanup: {...}
-    sacrificial_digest: {...}
-    fragment_cleanup: {...}
-    snapback_adapter_engagement: {...}
-    hairpin_ligation: {...}
-    hairpin_pcr: {...}
-  payload_goal:
-    assembled_payload_pattern: TCCCTATCAGTGATAGAGA
-    left_half_ref: payload_left
-    right_half_ref: payload_right
-    assembly_space: circularized_payload_junction
-    evidence_policy: require_guaranteed
-  template_bindings:
-    source_forward_primer_core_ref: source_fwd_core
-    source_reverse_primer_core_ref: source_rev_core
-    snapback_seed_region_ref: snapback_seed
-    retained_left_region_ref: retained_payload_left
-    retained_right_region_ref: retained_payload_right
-    primary_sacrificial_region_refs:
-      - sacrificial_tract
-    circularization_left_overhang_ref: split_payload_digest
-    circularization_right_overhang_ref: split_payload_digest
-  compound_regions:
-    - id: assembled_payload
-      join_policy: junction_assemble
-      segments: [...]
-  hard_invariants:
-    - id: payload_assembly
-      class: payload_assembly
-      space_kind: assembly_junction
-      transform_ref: circularization
-      region_ref: assembled_payload
-      evidence_policy: require_guaranteed
-      params:
-        expected_pattern: TCCCTATCAGTGATAGAGA
+    authored_sequence: <iupac_dna_sequence>
+    structural_owners:
+      - id: source_fwd_primer_binding_region
+        start: 0
+        end: 6
+      - id: payload_left_half
+        start: 6
+        end: 15
+      - id: sacrificial_region_long
+        start: 15
+        end: 27
+      - id: tether_dock_complement
+        start: 27
+        end: 31
+      - id: tether_cap
+        start: 31
+        end: 35
+      - id: tether_dock
+        start: 35
+        end: 39
+      - id: snapback_stem
+        start: 39
+        end: 41
+      - id: payload_right_half
+        start: 41
+        end: 51
+      - id: source_rev_primer_binding_region
+        start: 51
+        end: 57
+    effect_tags:
+      - id: source_forward_primer_bindable
+        class: primer_bindable_by_source_forward
+        start: 0
+        end: 6
+      - id: left_bsssi_bsai_overlap_unit
+        class: left_bsssi_bsai_overlap_unit
+        start: 0
+        end: 18
+      - id: payload_overhang_left
+        class: payload_overhang_left
+        start: 6
+        end: 10
+      - id: type_iis_recognition_left
+        class: type_iis_recognition_left
+        start: 7
+        end: 13
+      - id: nt_bpu10i_snapback_site
+        class: nt_bpu10i_snapback_site
+        start: 27
+        end: 41
+      - id: payload_overhang_right
+        class: payload_overhang_right
+        start: 41
+        end: 45
+      - id: type_iis_recognition_right
+        class: type_iis_recognition_right
+        start: 51
+        end: 57
+  owner_lifecycle:
+    - owner_id: payload_left_half
+      appears_in:
+        - source_oligo_ssdna
+      projected_to:
+        - state: pcr_linear_duplex
+          strand: primary
+          provenance_mode: literal_source
+        - state: type_iis_cut_product_duplex
+          strand: primary
+          provenance_mode: cut_product_projection
+        - state: circularized_payload_candidate
+          strand: primary
+          provenance_mode: ligation_assembly
+        - state: post_fragment_cleanup
+          strand: primary
+          provenance_mode: retained_projection
+        - state: hairpin_pcr_linear_insert
+          strand: primary
+          provenance_mode: amplification_projection
+      disappears_after: null
+  external_parts:
+    primer_source_forward: <oligo_id>
+    primer_source_reverse: <oligo_id>
+    hairpin_pcr_forward: <oligo_id>
+    hairpin_pcr_reverse: <oligo_id>
+    y_adapter: <oligo_id>
+  enzymes:
+    left_type_iis: BsmBI
+    right_type_iis: BsmBI
+    snapback_nickase: Nt.Bpu10I
+    sacrificial_nickase: Nb.BssSI
+  payload:
+    target_sequence: <assembled_payload_sequence>
+    bulge_mask: []
   catalogs:
     enzymes: catalogs/enzymes.yaml
     oligo_parts: catalogs/oligo_parts.yaml
@@ -104,112 +139,112 @@ yiu:
   output:
     run_dir: outputs/yiu/explicit
     emit_view_contracts: true
-    emit_baserender_jobs: true
-    publish_contract_version: 3
+    publish_contract_version: 4
+    persist_render_jobs_debug: false
 ```
+
+Required structural-owner ids for `yiu_circularized_payload_v1`:
+
+- `source_fwd_primer_binding_region`
+- `payload_left_half`
+- `sacrificial_region_long`
+- `tether_dock_complement`
+- `tether_cap`
+- `tether_dock`
+- `snapback_stem`
+- `payload_right_half`
+- `source_rev_primer_binding_region`
+- `retained_region`
+- `sacrificial_region_short`
+- `y_adapter_complementary_arm`
+- `y_adapter_noncomplementary_arm`
+- `hairpin_pcr_forward_binding_region`
+- `hairpin_pcr_reverse_binding_region`
+
+Closed effect-tag kinds:
+
+- `type_iis_recognition_left`
+- `type_iis_recognition_right`
+- `payload_overhang_left`
+- `payload_overhang_right`
+- `nt_bpu10i_snapback_site`
+- `nb_bsssi_array_member`
+- `left_bsssi_bsai_overlap_unit`
+- `pairs_with`
+- `primer_bindable_by_source_forward`
+- `primer_bindable_by_source_reverse`
+- `primer_bindable_by_hairpin_pcr_forward`
+- `primer_bindable_by_hairpin_pcr_reverse`
+- `retained`
+- `sacrificial`
+- `introduced_late`
+- `y_adapter_binding`
+- `ligation_junction_member`
+- `cut_boundary_anchor`
+- `nick_boundary_anchor`
+- `payload_bulge_position`
+
+Emitted state ids:
+
+1. `source_oligo_ssdna`
+2. `pcr_linear_duplex`
+3. `type_iis_cut_product_duplex`
+4. `circularized_payload_candidate`
+5. `post_sacrificial_fragmentation`
+6. `post_fragment_cleanup`
+7. `snapback_adapter_complex`
+8. `ligated_ssdna_hairpin`
+9. `hairpin_pcr_linear_insert`
 
 Important explicit rules:
 
-- `publish_contract_version: 3` is the default for `schema_version: 2`
-- `publish_contract_version: 2` is compatibility-only for older consumers
-- `output.emit_baserender_jobs` requires `output.emit_view_contracts: true`
-- `template_bindings` is required for `protocol_template: yiu_circularized_payload_v1`
-- sequence identity fields must be separator-free; composite structure belongs in `segments`, `junctions`, `compound_regions`, and optional display metadata
-- hard invariants are either evaluated or rejected; they are no longer silently accepted
-- `cloning_geometry` is not allowed in `workflow_scope: core_insert_generation`
+- structural owners must cover the entire authored source sequence in the declared source order
+- every emitted nucleotide belongs to exactly one structural owner on each emitted strand
+- unknown effect-tag kinds hard-fail at load time
+- owner and effect-tag overlap legality fails closed
+- runtime state-owner behavior must come from `owner_lifecycle`
+- `projection_mode`, `compound_regions`, `join_policy`, and `space_kind` are not part of the v4 operational schema
 
-### Hard invariants
+### Solve spec
 
-The shipped split-template lane uses `payload_assembly`, `sacrificial_fragmentation`, and `snapback_exposure`, and the schema still recognizes:
-
-- `region_pattern`
-- `enzyme_site`
-- `cut_geometry`
-- `ligation_compatibility`
-- `payload_assembly`
-- `retained_survival`
-- `sacrificial_fragmentation`
-- `snapback_exposure`
-- `adapter_binding`
-- `primer_binding`
-- `cloning_geometry`
-
-Every invariant result records:
-
-- `class`
-- evaluated state or transform
-- `status`: `guaranteed`, `possible`, or `impossible`
-- observed coordinates, motifs, fragments, or junction evidence
-
-### Workflow support matrix
-
-Current shipment language:
-
-> YIU currently ships as a split-payload circularized workflow family with bounded solve over declared source windows. Compatibility templates remain supported, but the split-payload circularized template is the recommended operator path.
-
-| Surface | `yiu_circularized_payload_v1` | `yiu_adapter_hairpin_v1` | `yiu_v1` |
-| --- | --- | --- | --- |
-| `validate/design/trace/show` | full | compatibility-supported | compatibility-supported |
-| `solve` | full bounded support | not supported | not supported |
-| visual publication | full v3 support | compatibility / reduced guarantees | compatibility / reduced guarantees |
-| BaseRender jobs | supported path | compatibility path | not emitted |
-
-Runtime-supported invariant classes for the split-payload lane:
-
-| Invariant class | Split-payload explicit validate | Split-payload solve admissibility | Notes |
-| --- | --- | --- | --- |
-| `payload_assembly` | yes | yes | compound-region aware |
-| `sacrificial_fragmentation` | yes | yes | bounded fragment check |
-| `snapback_exposure` | yes | yes | 5' exposure-aware |
-| `retained_survival` | yes | yes | projected-region aware |
-| `ligation_compatibility` | yes | yes | step-match backed |
-| `enzyme_site` | yes | yes | site projection required |
-| `cut_geometry` | yes | yes | site projection required |
-| `adapter_binding` | yes | yes | engagement/ligation backed |
-| `primer_binding` | yes | yes | binding-core presence check |
-| `region_pattern` | yes | yes | generic region / compound-region check |
-| `cloning_geometry` | rejected | rejected | not implemented in this tranche |
-
-### Solve spec summary
-
-The solve root is `yiu_solve:` and must live beside the explicit specs under `configs/yiu/`.
+The solve root is `yiu_solve:` and lives beside the explicit spec under `configs/yiu/`.
 
 ```yaml
 yiu_solve:
   schema_version: 1
-  base_spec: configs/yiu/example_split_payload_circularized.yiu.yaml
+  base_spec: configs/yiu/<workflow>.yiu.yaml
+  target:
+    payload_sequence: <assembled_payload_sequence>   # or payload_pattern
+    bulge_mask: []
+  scaffold_windows:
+    - id: sacrificial_spacing_window
+      owner_id: sacrificial_region_long
+      relative_start: 3
+      relative_end: 12
+      allowed_patterns:
+        - AAAAAAAAA
+        - AAAATAAAA
   search:
-    max_hits: 32
-    materialize_top_k: 8
-    max_search_nodes: 100000
-    max_enumerated_candidates: 10000
-  variables:
-    source_windows:
-      - id: payload_left
-        span_ref: payload_left
-        alphabet: iupac_dna
-        pattern: NNNNNNNNN
-      - id: payload_right
-        span_ref: payload_right
-        alphabet: iupac_dna
-        allowed_patterns:
-          - GTGATAGAGA
-  candidate_policy:
-    require_guaranteed_hard_invariants: true
-    forbid_possible_hits: true
+    max_search_nodes: 16
+    max_enumerated_candidates: 16
+  solve:
+    compare_solutions: false
+    max_solutions: 1
   output:
     run_dir: outputs/yiu/solve
     emit_view_contracts: true
-    emit_baserender_jobs: true
-    publish_contract_version: 3
+    publish_contract_version: 4
+    persist_render_jobs_debug: false
 ```
 
 Important solve rules:
 
-- `base_spec` is resolved relative to the workspace root
-- solve currently targets `schema_version: 2` base specs
-- variable windows must match the referenced span length exactly
-- solve hits are concrete and bounded; search is capped by both `max_search_nodes` and `max_enumerated_candidates`
-- ranking never weakens admissibility; the explicit validator remains the final oracle
+- `base_spec` is resolved relative to the solve spec path
+- payload halves and payload overhangs are derived from one payload target
+- only declared `scaffold_windows` may mutate fixed scaffold sequence
+- solve windows must map to structural-owner spans
+- default solve returns one deterministic solution, not a ranked hit list
+- `compare_solutions: true` enables additional solutions and `comparison/solutions.csv`
+- public solve statuses are `solved`, `unsatisfied`, and `incomplete_search`
 
 Use [YIU Workflow](../guides/yiu_workflow.md) for execution guidance and [YIU Artifacts](yiu_artifacts.md) for the emitted bundle contracts.

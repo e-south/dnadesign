@@ -25,7 +25,7 @@ _NOISY_FONT_LOGGERS = (
 def _quiet_font_logs() -> None:
     """Reduce noisy font parsing chatter from Matplotlib/fontTools."""
     for logger_name in _NOISY_FONT_LOGGERS:
-        logging.getLogger(logger_name).setLevel(logging.WARNING)
+        logging.getLogger(logger_name).setLevel(logging.ERROR)
 
 
 def _repo_root_from(start: Path) -> Path | None:

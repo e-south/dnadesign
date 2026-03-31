@@ -3,33 +3,29 @@ runbook:
   name: demo_yiu_circularized
   steps:
   - id: yiu_validate
-    description: Validate the checked-in split-payload circularized YIU demo spec.
+    description: Validate the checked-in circularized YIU demo spec.
     run:
     - yiu
     - validate
     - --spec
-    - configs/yiu/example_split_payload_circularized.yiu.yaml
-  - id: yiu_design
-    description: Materialize the explicit YIU bundle and published visual contracts.
-    run:
-    - yiu
-    - design
-    - --spec
-    - configs/yiu/example_split_payload_circularized.yiu.yaml
-    - --force-overwrite
+    - configs/yiu/example_reference_circularized.yiu.yaml
   - id: yiu_trace
-    description: Re-materialize the explicit bundle under trace intent for QA parity.
+    description: Materialize the explicit YIU bundle and render its published BaseRender
+      jobs.
     run:
     - yiu
     - trace
     - --spec
-    - configs/yiu/example_split_payload_circularized.yiu.yaml
+    - configs/yiu/example_reference_circularized.yiu.yaml
     - --force-overwrite
+    - --emit-renders
   - id: yiu_solve
-    description: Run the paired solve spec and materialize the top accepted hit bundles.
+    description: Run the paired solve spec, materialize the selected solution bundle,
+      and render solve-level visuals.
     run:
     - yiu
     - solve
     - --spec
-    - configs/yiu/example_split_payload_circularized.yiu.solve.yaml
+    - configs/yiu/example_reference_circularized.yiu.solve.yaml
     - --force-overwrite
+    - --emit-renders

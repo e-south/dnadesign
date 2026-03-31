@@ -118,7 +118,7 @@ app.add_typer(
 app.add_typer(
     yiu_app,
     name="yiu",
-    help="Scaffold, validate, trace, design, and inspect YIU hairpin oligo processing workflows.",
+    help="Scaffold, validate, trace, solve, render, and inspect YIU hairpin oligo processing workflows.",
     short_help="YIU hairpin oligo workflows.",
 )
 app.add_typer(

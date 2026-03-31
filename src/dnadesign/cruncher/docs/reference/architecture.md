@@ -31,7 +31,7 @@ Cruncher is organized as peer workflow families, not one monolithic run shape:
 
 - **Fixed-length optimization workspaces** use `fetch -> lock -> parse -> sample -> analyze -> export`, then optional `study` and `portfolio` orchestration on top of the resulting run artifacts.
 - **Cassette workspaces** use `cassette init-workspace|validate|design|solve|show` and publish cassette-specific artifacts plus optional baserender job files.
-- **YIU workspaces** use `yiu init-workspace|validate|design|trace|solve|show` and publish protocol-state bundles plus per-step neutral view contracts.
+- **YIU workspaces** use `yiu init-workspace|validate|trace|solve|show|render` and publish protocol-state bundles plus per-step neutral view contracts.
 
 These families deliberately keep separate workspace contracts, output trees, and orchestration seams. New families should add their own lane-specific artifacts rather than overload `sample`, `cassette`, or `yiu`.
 
@@ -66,10 +66,10 @@ The YIU workflow is a peer lane, not a cassette submode:
 2. author `<workspace>/configs/yiu/<name>.yiu.yaml` and optional `<workspace>/configs/yiu/<name>.yiu.solve.yaml`
 3. author optional protocol catalogs under `<workspace>/catalogs/*.yaml`
 4. **yiu validate** -> strict schema + protocol-step invariant check plus deterministic state-trace report
-5. **yiu design** -> write explicit manifest, status, report, trace, CSV tables, and published state views
-6. **yiu trace** -> materialize the same protocol-state bundle for QA without implying solve-mode search
-7. **yiu solve** -> bounded search over declared source windows, explicit-validator admission, and solve-level/per-hit YIU artifacts
-8. **yiu show** -> inspect status and artifact paths for one explicit or solve YIU run
+5. **yiu trace** -> write the explicit manifest, status, report, trace, CSV tables, visual inventory, and published state views
+6. **yiu solve** -> bounded search over declared source windows, explicit-validator admission, and solve-level/per-hit YIU artifacts
+7. **yiu show** -> inspect status, render inventory, and artifact paths for one explicit or solve YIU run
+8. **yiu render** -> invoke BaseRender through the public file-contract surface using one bundle-local `visual_inventory.json`
 
 This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, or cassette-specific render contracts. It models intended protocol compatibility across changing molecular states.
 
@@ -335,10 +335,12 @@ Cassette runs are intentionally isolated from `sample` runs:
 
 A typical **YIU** run directory contains:
 
-- `yiu_manifest.json`, `yiu_status.json`, `yiu_report.json` - explicit YIU metadata, status, and structured report
-- `yiu_trace.jsonl` - ordered state graph records
-- `yiu_parts.csv`, `yiu_annotations.csv`, `yiu_fragments.csv` - protocol-oriented export tables
-- `published/views/*.json` - per-state neutral view contracts for source, duplex, digest, foldback, and downstream product states
+- `manifest.json`, `status.json`, `report.json` - explicit YIU metadata, status, and structured report
+- `state_trace.jsonl` - ordered state graph records
+- `tables/state_sequences.csv`, `tables/state_owners.csv`, `tables/effect_tags.csv`, `tables/fragment_summary.csv` - protocol-oriented export tables
+- `visual_inventory.json` - single bundle-local visual inventory and render-truth index
+- `contracts/visuals/*.json` - per-state neutral view contracts for source, duplex, digest, foldback, and downstream product states
+- `visuals/*.pdf` or `solution/visuals/*.pdf` - evidence renders listed in `visual_inventory.json`
 
 YIU runs are intentionally isolated from both `sample` and `cassette` runs:
 

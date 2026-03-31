@@ -1,125 +1,116 @@
 ## YIU Artifacts
 
 **Audience:** YIU workflow users and maintainers
-**Applies to:** `uv run cruncher yiu design|trace|solve`
+**Applies to:** `uv run cruncher yiu trace|solve|render`
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-03-29
 
-YIU now writes two bundle families:
+YIU writes two bundle families:
 
-- explicit bundles under `outputs/yiu/explicit/<spec.name>/<design_id>/`
-- solve bundles under `outputs/yiu/solve/<solve_name>/<solve_id>/`
+- explicit bundles under `outputs/yiu/explicit/<workflow>/<trace_id>/`
+- solve bundles under `outputs/yiu/solve/<workflow>/<solve_id>/`
 
-### Explicit bundle
+Both bundle families use one bundle-root render truth file:
 
-Explicit runs write:
+- `visual_inventory.json`
 
-- `yiu_report.json`
-- `yiu_status.json`
-- `yiu_manifest.json`
-- `yiu_trace.jsonl`
-- `yiu_trace_manifest.json`
-- `yiu_parts.csv`
-- `yiu_annotations.csv`
-- `yiu_fragments.csv`
-- `published/views/`
-- `published/visual_manifest.json`
-- `published/baserender_jobs/` when job emission is enabled
-- `published/renders/` as the target directory for emitted BaseRender jobs
+`visual_inventory.json` is the single source of truth for:
 
-Explicit `yiu_status.json`, `yiu_manifest.json`, and `yiu_report.json` preserve the resolved `protocol_template` and any deprecated alias metadata when the run uses a `schema_version: 2` template-driven spec.
+- `protocol_template`
+- view contract paths
+- render artifact paths
+- renderer kind
+- state ids
+- topology kinds
+- render request and completion truth
+- `render_count`
+- `render_status`
+- `last_rendered_at`
 
-`published/visual_manifest.json` is the operator-facing visual inventory. It unifies:
+`cruncher yiu render --run <bundle>` rereads this file, regenerates the listed PDFs through the public BaseRender API, and writes the updated render truth back into the same inventory.
 
-- neutral state views
-- render-oriented YIU contracts
-- BaseRender job files
-- rendered output locations
-- bundle-local view/job/render counts
-
-`yiu_manifest.json` now also includes:
-
-- `machine_artifacts`
-- `published_artifacts`
-- `artifacts` entries that enumerate the real publication layer on disk
-
-The split-template explicit lane emits render-oriented contracts such as:
-
-- `yiu_linear_state_v1`
-- `yiu_hairpin_topology_v1`
-- `yiu_topology_cartoon_v1`
-
-### Solve bundle
-
-Solve runs write:
+### Explicit bundle layout
 
 ```text
-outputs/yiu/solve/<solve_name>/<solve_id>/
-  yiu_solve_report.json
-  yiu_solve_status.json
-  yiu_solve_manifest.json
-  hits.csv
-  accepted_hits.jsonl
-  published/
-    views/
-    baserender_jobs/
-    renders/
-    visual_manifest.json
-  hits/
-    hit_0001/
-      ... standard explicit YIU bundle ...
+outputs/yiu/explicit/<workflow>/<trace_id>/
+  report.json
+  status.json
+  manifest.json
+  state_trace.jsonl
+  visual_inventory.json
+  tables/
+    state_sequences.csv
+    state_owners.csv
+    effect_tags.csv
+    fragment_summary.csv
+  contracts/
+    visuals/
+      *.json
+  visuals/
+    *.pdf
 ```
 
-`accepted_hits.jsonl` is the stable machine-readable solve hit stream. Each materialized hit includes:
+Optional debug-only render jobs are written under `contracts/render_jobs/*.job.yaml` only when `persist_render_jobs_debug: true`.
+Published view contracts live under `contracts/visuals/`.
 
-- `rank`
-- `hit_id`
-- `score`
-- `source_sequence`
-- `materialized_run_dir`
-- `final_state_id`
-- solve-level published view/job paths when available
+### Solve bundle layout
 
-`yiu_solve_manifest.json` now also includes:
+```text
+outputs/yiu/solve/<workflow>/<solve_id>/
+  solve_report.json
+  solve_status.json
+  solve_manifest.json
+  solution/
+    report.json
+    status.json
+    manifest.json
+    state_trace.jsonl
+    visual_inventory.json
+    tables/
+      state_sequences.csv
+      state_owners.csv
+      effect_tags.csv
+      fragment_summary.csv
+    contracts/
+      visuals/
+        *.json
+    visuals/
+      *.pdf
+  alternatives/
+    solution_0002/
+  comparison/
+    solutions.csv
+  visual_inventory.json
+```
 
-- `published_artifacts`
-- `hit_bundle_root`
-- `top_hit_ids`
-- `materialized_hit_bundle_roots`
-- `copied_top_hit_artifacts`
-- `hits_csv`
-- `accepted_hits_stream`
+`alternatives/` and `comparison/` are present only when `compare_solutions: true`.
+
+The solve-root `visual_inventory.json` points at the selected solution's view contracts and render artifacts. The selected solution remains the default operator story.
+Selected-solution PDFs live under `solution/visuals/`.
 
 ### Status semantics
 
 Explicit status:
 
-- `completed` means the explicit validator satisfied the requested spec
-- `unsatisfied` means the bundle was still materialized, but at least one hard issue remains
+- `satisfied` means the explicit validator accepted the authored spec
+- `unsatisfied` means the bundle was still materialized but at least one hard issue remained
 
 Solve status:
 
-- `solved` means at least one hit passed the explicit validator as the final oracle
-- `no_hits` means search completed without an admissible hit
-- `invalid_spec` is reserved for solve-spec or base-spec preflight failures
+- `solved` means at least one admissible solution was found and the selected solution bundle was materialized
+- `unsatisfied` means the bounded search completed without an admissible solution
+- `incomplete_search` means the configured search limits were hit before exhaustion, so no public success was reported
 
 ### Operator inspection
 
-`cruncher yiu show` reads both bundle families and surfaces:
+`cruncher yiu show` surfaces:
 
-- run root
-- bundle kind
-- status
-- run id or solve id
-- step/state/issue counts for explicit bundles
-- accepted/materialized hit counts for solve bundles
-- `published/views/`
-- `published/visual_manifest.json`
-- `published/baserender_jobs/`
-- `published/renders/`
-- solve-level `accepted_hits.jsonl` and the first hit path when the run is a solve bundle
-- top-hit explicit bundle roots when the run is a solve bundle
-
-`cruncher yiu show --json` emits the normalized artifact inventory that the CLI text view summarizes.
+- protocol template
+- schema version or solve status
+- final-state or selected-solution summary
+- exhaustive-search truth for solve runs
+- hard-invariant summary for the selected final state
+- render summary from `visual_inventory.json`
+- key artifact paths
 
 Use [YIU Workflow](../guides/yiu_workflow.md) for execution guidance and [YIU Spec Reference](yiu_spec.md) for schema details.
