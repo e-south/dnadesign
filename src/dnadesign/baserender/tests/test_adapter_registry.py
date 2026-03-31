@@ -23,7 +23,12 @@ from dnadesign.baserender.src.adapters.sequence_evidence_map_v1 import (
     _style_token_for_tag,
 )
 from dnadesign.baserender.src.adapters.sequence_windows_v1 import SequenceWindowsV1Adapter
-from dnadesign.baserender.src.adapters.yiu_hairpin_topology_v1 import YiuHairpinTopologyV1Adapter
+from dnadesign.baserender.src.adapters.yiu_hairpin_topology_v1 import (
+    YiuHairpinTopologyV1Adapter,
+)
+from dnadesign.baserender.src.adapters.yiu_hairpin_topology_v1 import (
+    _span as _yiu_hairpin_span,
+)
 from dnadesign.baserender.src.adapters.yiu_linear_state_v1 import YiuLinearStateV1Adapter
 from dnadesign.baserender.src.adapters.yiu_topology_cartoon_v1 import YiuTopologyCartoonV1Adapter
 from dnadesign.baserender.src.config import AdapterCfg
@@ -427,3 +432,279 @@ def test_sequence_evidence_map_adapter_rejects_invalid_record_after_contract_val
             },
             row_index=3,
         )
+
+
+def _linear_duplex_payload(*, sequence: str = "TTTACCTCAGCAAAGCTGAGGTAAA") -> dict:
+    return {
+        "version": 1,
+        "kind": "linear_duplex_v1",
+        "view_id": "hit_001.linear_duplex",
+        "solution_id": "abc123def456",
+        "title": "Hit 1 - Linear duplex",
+        "coordinate_semantics": "boundary_inclusive_v2",
+        "primary_sequence_5to3": sequence,
+        "sequence_span": {"start": 0, "end": len(sequence)},
+        "cassette_span": {"start": 0, "end": len(sequence)},
+        "row_labels": {
+            "primary": "5' -> 3' primary",
+            "complement": "3' -> 5' complement",
+        },
+        "target_strand": "complement",
+        "segments": [
+            {"id": "stem5p_arm", "start": 0, "end": 10, "semantic": "stem5p_arm", "label": "Stem 5' arm"},
+            {"id": "loop", "start": 10, "end": 15, "semantic": "loop", "label": "Loop"},
+            {"id": "stem3p_arm", "start": 15, "end": 25, "semantic": "stem3p_arm", "label": "Stem 3' arm"},
+        ],
+        "site_instances": [
+            {
+                "id": "left_site",
+                "variant_id": "Nb.BbvCI",
+                "specificity_id": "BbvCI",
+                "start": 2,
+                "end": 9,
+                "orientation": "forward",
+                "intent": "intended_left",
+                "label": "Nb.BbvCI",
+                "site_target_strand": "complement",
+            }
+        ],
+        "nick_events": [
+            {
+                "id": "left_nick",
+                "boundary": 7,
+                "target_strand": "complement",
+                "source_site_id": "left_site",
+                "intent": "intended_left",
+                "label": "Nick",
+            }
+        ],
+        "bounded_segment": {
+            "start_boundary": 7,
+            "end_boundary": 20,
+            "target_strand": "complement",
+            "label": "Bounded nicked segment",
+        },
+        "labels": [{"text": "Target strand: complement", "placement": "header"}],
+        "meta": {"rank": 1},
+    }
+
+
+def _hairpin_topology_payload(*, sequence: str = "ACCTCAGCAAAGCTGAGGT") -> dict:
+    return {
+        "version": 1,
+        "kind": "ssdna_hairpin_v1",
+        "view_id": "hit_001.ssdna_hairpin",
+        "solution_id": "abc123def456",
+        "title": "Hit 1 - ssDNA hairpin",
+        "primary_sequence_5to3": sequence,
+        "topology": {
+            "stem5p_span": {"start": 0, "end": 7},
+            "loop_span": {"start": 7, "end": 12},
+            "stem3p_span": {"start": 12, "end": 19},
+        },
+        "pair_map": [
+            {"left_index": 0, "right_index": 18},
+            {"left_index": 1, "right_index": 17},
+        ],
+        "feature_spans": [
+            {
+                "id": "left_site_projection",
+                "start": 1,
+                "end": 7,
+                "semantic": "motif_projection",
+                "label": "Nb.BbvCI motif",
+            }
+        ],
+        "duplex_derived_annotations": [
+            {
+                "kind": "informational_note",
+                "text": "Nicking is defined in the linear duplex interpretation.",
+            }
+        ],
+        "meta": {"rank": 1},
+    }
+
+
+def _yiu_linear_state_payload(*, sequence: str = "CCTCAGCCCGCTGATCCCTATCAGTGATAGA") -> dict:
+    return {
+        "contract_kind": "yiu_linear_state_v1",
+        "state_id": "hairpin_pcr_linear_insert",
+        "topology_kind": "linear_dsdna",
+        "alphabet": "iupac_dna",
+        "primary_sequence": sequence,
+        "complement_sequence": "TCTATCACTGATAGGGATCAGCGGGCTGAGG",
+        "segments": [
+            {"segment_id": "left_arm", "state_start": 0, "state_end": 5},
+            {"segment_id": "skip", "state_start": 5, "state_end": 5},
+        ],
+        "annotations": [],
+        "cuts": [{"site_id": "cut-1", "top_boundary": 4, "bottom_boundary": 8}],
+        "junctions": [{"id": "junction-1", "join_index": 12}],
+        "fragments": [],
+        "display": {"title": "Split-payload insert"},
+        "meta": {"evidence_mode": "pattern_compatibility"},
+    }
+
+
+def _yiu_hairpin_topology_payload(*, sequence: str = "CCTCAGCCCGCTGATCAGCGGGCTGAGG") -> dict:
+    return {
+        "contract_kind": "yiu_hairpin_topology_v1",
+        "state_id": "ligated_ssdna_hairpin",
+        "topology_kind": "ssdna_hairpin",
+        "sequence": sequence,
+        "stem_left_span": {"start": 0, "end": 8},
+        "stem_right_span": {"start": 20, "end": 28},
+        "loop_span": {"start": 8, "end": 20},
+        "pair_map": [{"left_index": 0, "right_index": 27}],
+        "adapter_branches": [],
+        "annotations": [{"note": "structured"}],
+        "display": {"title": "Ligation hairpin"},
+        "meta": {"evidence_mode": "concrete_realization"},
+    }
+
+
+def _yiu_topology_cartoon_payload(
+    *,
+    sequence: str = "CCGATGTCCCTATCAGTGATAGAGAGGGGGGGGGGGGCCTCAGCCCGCTGA",
+) -> dict:
+    return {
+        "contract_kind": "yiu_topology_cartoon_v1",
+        "state_id": "circularized_payload_candidate",
+        "topology_kind": "circular_duplex",
+        "sequence": sequence,
+        "segments": [
+            {"segment_id": "payload", "state_start": 0, "state_end": 10},
+            {"segment_id": "skip", "state_start": 10, "state_end": 10},
+        ],
+        "annotations": [],
+        "cuts": [],
+        "junctions": [{"id": "junction", "join_index": 15}],
+        "fragments": [],
+        "display": {"title": "Circularized payload"},
+        "meta": {"evidence_mode": "concrete_realization"},
+    }
+
+
+def test_duplex_sequence_adapter_applies_contract_payload() -> None:
+    adapter = DuplexSequenceV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    record = adapter.apply(_linear_duplex_payload(), row_index=0)
+
+    assert record.id == "hit_001.linear_duplex"
+    assert record.meta["adapter"] == "duplex_sequence_v1"
+    assert record.meta["target_strand"] == "complement"
+    assert record.display.tag_labels["bounded_segment"] == "Bounded nicked segment"
+
+
+def test_hairpin_topology_adapter_applies_contract_payload() -> None:
+    adapter = HairpinTopologyV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    record = adapter.apply(_hairpin_topology_payload(), row_index=1)
+
+    assert record.id == "hit_001.ssdna_hairpin"
+    assert record.meta["adapter"] == "hairpin_topology_v1"
+    assert record.meta["solution_id"] == "abc123def456"
+    assert record.display.tag_labels["feature_projection"] == "Motif projection"
+
+
+def test_hairpin_topology_adapter_wraps_invalid_contract_payload() -> None:
+    adapter = HairpinTopologyV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    with pytest.raises(SchemaError, match="Invalid ssdna_hairpin_v1 contract at row 2"):
+        adapter.apply({"kind": "ssdna_hairpin_v1"}, row_index=2)
+
+
+def test_yiu_linear_state_adapter_applies_contract_payload() -> None:
+    adapter = YiuLinearStateV1Adapter(columns={}, policies={}, alphabet="IUPAC_DNA")
+
+    record = adapter.apply(_yiu_linear_state_payload(), row_index=2)
+
+    assert record.id == "hairpin_pcr_linear_insert"
+    assert [feature.id for feature in record.features] == ["left_arm"]
+    assert [effect.kind for effect in record.effects] == [
+        "boundary_marker",
+        "boundary_marker",
+        "boundary_marker",
+    ]
+    assert record.meta["adapter"] == "yiu_linear_state_v1"
+
+
+def test_yiu_hairpin_topology_adapter_applies_contract_payload() -> None:
+    adapter = YiuHairpinTopologyV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    record = adapter.apply(_yiu_hairpin_topology_payload(), row_index=3)
+
+    assert record.id == "ligated_ssdna_hairpin"
+    assert [feature.id for feature in record.features] == ["stem5p_span", "loop_span", "stem3p_span"]
+    assert record.meta["adapter"] == "yiu_hairpin_topology_v1"
+    assert record.meta["hairpin_notes"] == [{"note": "structured"}]
+
+
+def test_yiu_topology_cartoon_adapter_applies_contract_payload() -> None:
+    adapter = YiuTopologyCartoonV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    record = adapter.apply(_yiu_topology_cartoon_payload(), row_index=4)
+
+    assert record.id == "circularized_payload_candidate"
+    assert [feature.id for feature in record.features] == ["payload"]
+    assert record.meta["adapter"] == "yiu_topology_cartoon_v1"
+
+
+@pytest.mark.parametrize(
+    ("adapter", "payload"),
+    [
+        (
+            DuplexSequenceV1Adapter(columns={}, policies={}, alphabet="DNA"),
+            _linear_duplex_payload(sequence="TTRACCTCAGCAAAGCTGAGGTAAA"),
+        ),
+        (
+            HairpinTopologyV1Adapter(columns={}, policies={}, alphabet="DNA"),
+            _hairpin_topology_payload(sequence="ACRTCAGCAAAGCTGAGGT"),
+        ),
+        (
+            YiuLinearStateV1Adapter(columns={}, policies={}, alphabet="DNA"),
+            _yiu_linear_state_payload(sequence="CCTRAGCCCGCTGATCCCTATCAGTGATAGA"),
+        ),
+        (
+            YiuHairpinTopologyV1Adapter(columns={}, policies={}, alphabet="DNA"),
+            _yiu_hairpin_topology_payload(sequence="CCTRAGCCCGCTGATCAGCGGGCTGAGG"),
+        ),
+        (
+            YiuTopologyCartoonV1Adapter(columns={}, policies={}, alphabet="DNA"),
+            _yiu_topology_cartoon_payload(sequence="CCRATGTCCCTATCAGTGATAGAGAGGGGGGGGGGGGCCTCAGCCCGCTGA"),
+        ),
+    ],
+)
+def test_contract_driven_adapters_wrap_record_validation_errors(adapter: object, payload: dict) -> None:
+    with pytest.raises(SchemaError, match="Sequence contains invalid characters for DNA"):
+        adapter.apply(payload, row_index=5)
+
+
+@pytest.mark.parametrize(
+    "adapter",
+    [
+        YiuLinearStateV1Adapter(columns={}, policies={}, alphabet="DNA"),
+        YiuHairpinTopologyV1Adapter(columns={}, policies={}, alphabet="DNA"),
+        YiuTopologyCartoonV1Adapter(columns={}, policies={}, alphabet="DNA"),
+    ],
+)
+def test_yiu_adapters_require_mapping_rows(adapter: object) -> None:
+    with pytest.raises(SchemaError, match="row 6 must be a mapping"):
+        adapter.apply("bad-row", row_index=6)
+
+
+def test_yiu_topology_cartoon_adapter_wraps_invalid_contract_payload() -> None:
+    adapter = YiuTopologyCartoonV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    with pytest.raises(SchemaError, match="Invalid yiu_topology_cartoon_v1 contract at row 7"):
+        adapter.apply({"contract_kind": "yiu_topology_cartoon_v1"}, row_index=7)
+
+
+def test_yiu_hairpin_span_helper_rejects_invalid_bounds() -> None:
+    assert _yiu_hairpin_span([2, 5], ctx="loop_span") == (2, 5)
+
+    with pytest.raises(SchemaError, match="loop_span must be a 2-item list"):
+        _yiu_hairpin_span([2], ctx="loop_span")
+
+    with pytest.raises(SchemaError, match="loop_span end must be > start"):
+        _yiu_hairpin_span([5, 5], ctx="loop_span")

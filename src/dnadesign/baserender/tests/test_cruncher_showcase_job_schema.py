@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+import dnadesign.baserender.src.config.cruncher_showcase_job as cruncher_showcase_job
 from dnadesign.baserender.src.config import load_cruncher_showcase_job, load_sequence_rows_job_from_mapping
 from dnadesign.baserender.src.core import SchemaError
 
@@ -386,3 +387,104 @@ def test_cassette_job_rejects_output_path_outside_owner_root(tmp_path: Path) -> 
 
     with pytest.raises(SchemaError, match="must stay within"):
         load_cruncher_showcase_job(job_path)
+
+
+def test_packaged_job_helpers_detect_examples_and_owner_roots(tmp_path: Path) -> None:
+    jobs_root = tmp_path / "jobs"
+    jobs_root.mkdir()
+    (jobs_root / "example.yml").write_text("version: 3\n")
+
+    owner_root = tmp_path / "cassette_run"
+    baserender_jobs = owner_root / "baserender_jobs"
+    baserender_jobs.mkdir(parents=True)
+    job_path = baserender_jobs / "top_hits_duplex.job.yaml"
+
+    missing_owner_job = tmp_path / "missing_owner" / "baserender_jobs" / "top_hits_duplex.job.yaml"
+
+    assert cruncher_showcase_job._has_packaged_job_examples(jobs_root) is True
+    assert cruncher_showcase_job._published_job_owner_root_from_job_path(job_path) == owner_root.resolve()
+    assert cruncher_showcase_job._cassette_run_root_from_job_path(job_path) == owner_root.resolve()
+    assert cruncher_showcase_job._published_job_owner_root_from_job_path(missing_owner_job) is None
+
+
+def test_inline_mapping_allowed_roots_collect_absolute_paths_and_ignore_empty_entries(tmp_path: Path) -> None:
+    input_path = _make_input_parquet(tmp_path / "inputs")
+    selection_path = tmp_path / "selection.csv"
+    selection_path.write_text("id\nr1\n")
+    config_path = tmp_path / "motifs.yaml"
+    config_path.write_text("cruncher:\n  pwms_info: {}\n")
+    output_dir = tmp_path / "images"
+    output_path = tmp_path / "render.png"
+    report_path = tmp_path / "report.json"
+    job_path = tmp_path / "job.yaml"
+
+    roots = cruncher_showcase_job._inline_mapping_allowed_roots(
+        {
+            "results_root": "",
+            "input": {
+                "path": str(input_path),
+                "adapter": {
+                    "columns": {
+                        "hits_path": str(input_path),
+                        "config_path": str(config_path),
+                    }
+                },
+            },
+            "selection": {"path": str(selection_path)},
+            "pipeline": {
+                "plugins": [
+                    {
+                        "attach_motifs_from_config": {
+                            "config_path": str(config_path),
+                        }
+                    }
+                ]
+            },
+            "outputs": [
+                "skip-me",
+                {"dir": str(output_dir), "path": str(output_path)},
+            ],
+            "run": {"report_path": str(report_path)},
+        },
+        caller_scope=tmp_path,
+        job_path=job_path,
+    )
+
+    assert input_path.resolve() in roots
+    assert selection_path.resolve() in roots
+    assert config_path.resolve() in roots
+    assert output_dir.resolve() in roots
+    assert output_path.resolve() in roots
+    assert report_path.resolve() in roots
+
+
+def test_resolve_job_path_prefers_packaged_jobs_when_present(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_root = tmp_path / "baserender"
+    jobs_root = fake_root / "jobs"
+    docs_root = fake_root / "docs" / "examples"
+    jobs_root.mkdir(parents=True)
+    docs_root.mkdir(parents=True)
+    packaged_job = jobs_root / "demo.yaml"
+    docs_job = docs_root / "demo.yaml"
+    packaged_job.write_text("version: 3\n")
+    docs_job.write_text("version: 3\n")
+    monkeypatch.setattr(cruncher_showcase_job, "_baserender_root", lambda: fake_root)
+
+    assert cruncher_showcase_job.resolve_job_path("demo") == packaged_job
+
+
+def test_resolve_job_path_reports_packaged_search_space_when_jobs_exist(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_root = tmp_path / "baserender"
+    jobs_root = fake_root / "jobs"
+    jobs_root.mkdir(parents=True)
+    (jobs_root / "other.yaml").write_text("version: 3\n")
+    monkeypatch.setattr(cruncher_showcase_job, "_baserender_root", lambda: fake_root)
+
+    with pytest.raises(FileNotFoundError, match="jobs/ or docs/examples"):
+        cruncher_showcase_job.resolve_job_path("missing")

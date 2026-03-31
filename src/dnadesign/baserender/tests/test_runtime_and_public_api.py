@@ -437,6 +437,34 @@ def test_public_api_accepts_render_job_v3_kind_alias(tmp_path: Path) -> None:
     assert "images_dir" in report.outputs
 
 
+def test_public_api_exposes_render_job_alias(tmp_path: Path) -> None:
+    parquet = write_parquet(
+        tmp_path / "input.parquet",
+        [
+            {
+                "id": "r1",
+                "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+                "densegen__used_tfbs_detail": [
+                    {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
+                ],
+                "details": "",
+            }
+        ],
+    )
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=tmp_path / "outputs",
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    validated = baserender.validate_render_job(job_path, caller_root=tmp_path)
+    report = baserender.run_render_job(job_path, caller_root=tmp_path)
+
+    assert validated.version == 3
+    assert "images_dir" in report.outputs
+
+
 def test_public_api_runs_densegen_and_cruncher_contracts_end_to_end(tmp_path: Path) -> None:
     pkg_root = Path(__file__).resolve().parents[1]
 
