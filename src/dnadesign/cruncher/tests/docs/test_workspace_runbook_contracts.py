@@ -51,6 +51,13 @@ def _load_machine_runbook(path: Path) -> dict:
     return runbook
 
 
+def _is_motif_ingest_workspace(config_path: Path) -> bool:
+    cfg = _load_config(config_path)
+    discover = cfg.get("discover")
+    assert isinstance(discover, dict)
+    return discover.get("enabled") is False
+
+
 def _assert_token_order(text: str, tokens: list[str], *, label: str) -> None:
     cursor = -1
     for token in tokens:
@@ -225,7 +232,7 @@ def test_step_by_step_commands_are_coupled_to_machine_runbooks() -> None:
         )
 
 
-def test_workspace_runbooks_encode_source_merge_then_meme_oops_flow() -> None:
+def test_workspace_runbooks_encode_supported_source_preparation_flow() -> None:
     root = _workspace_root()
     for config_path in sorted(root.glob("*/configs/config.yaml")):
         workspace = config_path.parent.parent
@@ -246,17 +253,26 @@ def test_workspace_runbooks_encode_source_merge_then_meme_oops_flow() -> None:
         discover_source_id = discover.get("source_id")
         assert isinstance(discover_source_id, str) and discover_source_id
         occurrence_aware = _is_occurrence_aware_workspace(config_path)
+        motif_ingest = _is_motif_ingest_workspace(config_path)
 
-        flow_tokens = [
-            "fetch sites --source",
-            "fetch sites --source regulondb",
-            "discover motifs",
-            "--tool meme --meme-mod oops",
-            f"--source-id {discover_source_id}",
-            'lock -c "$CONFIG"',
-            'parse --force-overwrite -c "$CONFIG"',
-            'sample --force-overwrite -c "$CONFIG"',
-        ]
+        if motif_ingest:
+            flow_tokens = [
+                "fetch motifs --source",
+                'lock -c "$CONFIG"',
+                'parse --force-overwrite -c "$CONFIG"',
+                'sample --force-overwrite -c "$CONFIG"',
+            ]
+        else:
+            flow_tokens = [
+                "fetch sites --source",
+                "fetch sites --source regulondb",
+                "discover motifs",
+                "--tool meme --meme-mod oops",
+                f"--source-id {discover_source_id}",
+                'lock -c "$CONFIG"',
+                'parse --force-overwrite -c "$CONFIG"',
+                'sample --force-overwrite -c "$CONFIG"',
+            ]
         if occurrence_aware:
             flow_tokens.extend(
                 [
@@ -272,11 +288,21 @@ def test_workspace_runbooks_encode_source_merge_then_meme_oops_flow() -> None:
                     'export sequences --latest -c "$CONFIG"',
                 ]
             )
+        if motif_ingest:
+            if not occurrence_aware:
+                flow_tokens.append("catalog logos")
+            flow_tokens.append("catalog export-meme")
 
         _assert_token_order(runbook, flow_tokens, label=f"{workspace.name}/runbook.md")
 
-        assert "merges all fetched site sets across sources" in runbook
-        assert "fetch sites --source regulondb" in runbook
+        if motif_ingest:
+            assert "Boltzmann normalization" in runbook
+            assert "fetch motifs --source" in runbook
+            assert "catalog export-meme" in runbook
+            assert "discover motifs" not in runbook
+        else:
+            assert "merges all fetched site sets across sources" in runbook
+            assert "fetch sites --source regulondb" in runbook
         for tf_name in regulator_names:
             assert f"--tf {tf_name}" in runbook, f"{workspace.name}: missing TF flag for {tf_name}"
 
@@ -297,7 +323,7 @@ def test_workspace_runbooks_encode_source_merge_then_meme_oops_flow() -> None:
             assert "fetch sites --source baer_chip_exo --tf baeR" in runbook
 
 
-def test_workspace_configs_keep_discovery_source_contracts() -> None:
+def test_workspace_configs_keep_source_contracts() -> None:
     root = _workspace_root()
     for config_path in sorted(root.glob("*/configs/config.yaml")):
         workspace = config_path.parent.parent
@@ -315,14 +341,11 @@ def test_workspace_configs_keep_discovery_source_contracts() -> None:
         assert isinstance(discover, dict)
         discover_source_id = discover.get("source_id")
         assert isinstance(discover_source_id, str) and discover_source_id
-        assert discover.get("tool") == "meme", f"{workspace.name}: discovery tool must be meme"
-        assert discover.get("meme_mod") == "oops", f"{workspace.name}: discovery meme_mod must be oops"
 
         catalog = cfg.get("catalog")
         assert isinstance(catalog, dict)
-        assert catalog.get("source_preference") == [discover_source_id], (
-            f"{workspace.name}: catalog.source_preference must point to discovered source_id"
-        )
+        source_preference = catalog.get("source_preference")
+        assert isinstance(source_preference, list) and len(source_preference) == 1
 
         ingest = cfg.get("ingest")
         assert isinstance(ingest, dict)
@@ -334,6 +357,21 @@ def test_workspace_configs_keep_discovery_source_contracts() -> None:
         local_sources = ingest.get("local_sources")
         assert isinstance(local_sources, list)
         source_ids = {entry.get("source_id") for entry in local_sources if isinstance(entry, dict)}
+        if _is_motif_ingest_workspace(config_path):
+            assert source_preference == [discover_source_id], (
+                f"{workspace.name}: motif-ingest workspace must pin source_preference to its fetch source"
+            )
+            assert discover.get("enabled") is False, f"{workspace.name}: motif-ingest workspace must disable discovery"
+            assert discover_source_id in source_ids, (
+                f"{workspace.name}: missing local motif source {discover_source_id}"
+            )
+            continue
+
+        assert discover.get("tool") == "meme", f"{workspace.name}: discovery tool must be meme"
+        assert discover.get("meme_mod") == "oops", f"{workspace.name}: discovery meme_mod must be oops"
+        assert source_preference == [discover_source_id], (
+            f"{workspace.name}: catalog.source_preference must point to discovered source_id"
+        )
         local_input = workspace / "inputs" / "local_motifs"
         if local_input.is_dir() and list(local_input.glob("*.txt")):
             assert "demo_local_meme" in source_ids, f"{workspace.name}: missing demo_local_meme local source"

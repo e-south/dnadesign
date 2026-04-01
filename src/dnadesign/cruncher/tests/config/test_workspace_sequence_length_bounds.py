@@ -19,6 +19,7 @@ WORKSPACES_ROOT = Path(__file__).resolve().parents[2] / "workspaces"
 
 # Workspace default sequence length policy for one-off optimization.
 EXPECTED_SEQUENCE_LENGTHS = {
+    "demo_monotypic_tetr": 19,
     "demo_multitf": 18,
     "demo_pairwise": 18,
     "multitf_baer_lexa_soxr": 18,

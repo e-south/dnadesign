@@ -22,6 +22,7 @@ from dnadesign.cruncher.app.motif_artifacts import (
 )
 from dnadesign.cruncher.cli.catalog_utils import ResolvedTarget, _matrix_site_count_from_tags, _safe_stem
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig
+from dnadesign.cruncher.io.meme_export import write_minimal_meme_motif
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.viz.logos import logo_subtitle, logo_title
@@ -146,6 +147,55 @@ def write_densegen_artifacts(
                 "source": target.entry.source,
                 "motif_id": target.entry.motif_id,
                 "path": dest.name,
+            }
+        )
+    return rows, manifest_entries
+
+
+def write_meme_artifacts(
+    *,
+    cfg: CruncherConfig,
+    catalog_root: Path,
+    targets: Sequence[ResolvedTarget],
+    out_dir: Path,
+    overwrite: bool,
+) -> tuple[list[dict[str, str]], list[dict[str, object]]]:
+    store = CatalogMotifStore(
+        catalog_root,
+        pwm_source=cfg.catalog.pwm_source,
+        site_kinds=cfg.catalog.site_kinds,
+        combine_sites=cfg.catalog.combine_sites,
+        site_window_lengths=cfg.catalog.site_window_lengths,
+        site_window_center=cfg.catalog.site_window_center,
+        apply_pwm_window=False,
+        min_sites_for_pwm=cfg.catalog.min_sites_for_pwm,
+        allow_low_sites=cfg.catalog.allow_low_sites,
+        pseudocounts=cfg.catalog.pseudocounts,
+    )
+    rows: list[dict[str, str]] = []
+    manifest_entries: list[dict[str, object]] = []
+    for target in sorted(targets, key=lambda t: (t.entry.source, t.entry.motif_id)):
+        pwm = store.get_pwm(target.ref)
+        stem = _safe_stem(f"{target.tf_name}__{target.entry.source}__{target.entry.motif_id}")
+        dest = out_dir / f"{stem}.meme"
+        if dest.exists() and not overwrite:
+            raise FileExistsError(str(dest))
+        motif_id = write_minimal_meme_motif(pwm, dest, motif_id=target.entry.motif_id)
+        rows.append(
+            {
+                "tf_name": target.tf_name,
+                "source": target.entry.source,
+                "motif_id": target.entry.motif_id,
+                "artifact": str(dest),
+            }
+        )
+        manifest_entries.append(
+            {
+                "tf_name": target.tf_name,
+                "source": target.entry.source,
+                "motif_id": target.entry.motif_id,
+                "path": dest.name,
+                "meme_motif_id": motif_id,
             }
         )
     return rows, manifest_entries

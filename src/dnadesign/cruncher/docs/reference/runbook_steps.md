@@ -28,6 +28,16 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `demo_monotypic_baer` | `analyze_summary` | Analyze the occurrence-aware run and render the standard static plot suite, including the multi-offset elite showcase. | `cruncher analyze --summary -c configs/config.yaml` |
 | `demo_monotypic_baer` | `show_sample_outputs` | Show the occurrence-aware run manifest and artifact inventory for the workspace root run. | `cruncher runs show outputs -c configs/config.yaml` |
 | `demo_monotypic_baer` | `render_logos` |  | `cruncher catalog logos --source demo_baer_multiplicity_meme_oops --set 1 -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
+| `demo_monotypic_tetr` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `fetch_motifs_westmann` |  | `cruncher fetch motifs --source westmann_tetr_mitomi --tf tetR --update -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `analyze_summary` | Analyze the occurrence-aware run and render the standard static plot suite, including the multi-offset elite showcase. | `cruncher analyze --summary -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `show_sample_outputs` | Show the occurrence-aware run manifest and artifact inventory for the workspace root run. | `cruncher runs show outputs -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `render_logos` |  | `cruncher catalog logos --source westmann_tetr_mitomi --set 1 -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `export_meme` | Export the normalized TetR PWM as a minimal MEME artifact under outputs/artifacts/meme for downstream motif-tool interoperability. | `cruncher catalog export-meme --set 1 --source westmann_tetr_mitomi -c configs/config.yaml` |
 | `demo_multitf` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
 | `demo_multitf` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
 | `demo_multitf` | `fetch_sites_demo_local_meme` |  | `cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c configs/config.yaml` |
