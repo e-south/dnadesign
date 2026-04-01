@@ -8,10 +8,17 @@ Author(s): Eric J. South
 """
 
 import logging
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Sequence
 
 import numpy as np
 
+from dnadesign.cruncher.core.objectives.capabilities import BEST_HIT_CAPABILITIES
+from dnadesign.cruncher.core.objectives.engine import ObjectiveEngine
+from dnadesign.cruncher.core.objectives.models import (
+    BestHitAggregationSpec,
+    BestHitSelectorSpec,
+    ObjectiveSpec,
+)
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
 from dnadesign.cruncher.core.state import SequenceState
@@ -39,6 +46,8 @@ class SequenceEvaluator:
         log_odds_clip: float | None = None,
         length_penalty_lambda: float = 0.0,
         length_penalty_ref: int | None = None,
+        objective_specs: Sequence[ObjectiveSpec] | None = None,
+        objective_engine: ObjectiveEngine | None = None,
     ) -> None:
         """
         Args:
@@ -82,6 +91,26 @@ class SequenceEvaluator:
             if set(pwms.keys()) != set(scorer.tf_names):
                 raise ValueError("SequenceEvaluator PWMs do not match scorer TF set.")
             self._scorer = scorer
+        if objective_engine is not None:
+            self._objective_engine = objective_engine
+        else:
+            specs = tuple(objective_specs or ())
+            if not specs:
+                specs = tuple(
+                    ObjectiveSpec(
+                        objective_id=tf_name,
+                        tf=tf_name,
+                        pwm_source_id=tf_name,
+                        score_scale=self._scale,
+                        bidirectional=bool(bidirectional),
+                        selector=BestHitSelectorSpec(),
+                        aggregator=BestHitAggregationSpec(),
+                        capabilities=BEST_HIT_CAPABILITIES,
+                        metadata={"objective_kind": "best_hit"},
+                    )
+                    for tf_name in sorted(pwms)
+                )
+            self._objective_engine = ObjectiveEngine(scorer=self._scorer, objectives=specs)
 
         if self._scale == "consensus-neglop-sum":
             if combiner is None:
@@ -117,8 +146,7 @@ class SequenceEvaluator:
         seq_arr = state.seq
         L = len(seq_arr)
         logger.debug("Evaluator __call__: computing per-TF for sequence length %d", L)
-        per_tf = self._scorer.compute_all_per_pwm(seq_arr, L)
-        return per_tf
+        return self._objective_engine.evaluate(seq_arr, seq_length=L).scalars
 
     def combined(self, state: SequenceState, beta: Optional[float] = None) -> float:
         """
@@ -210,24 +238,42 @@ class SequenceEvaluator:
 
     @property
     def tf_names(self) -> list[str]:
-        return self._scorer.tf_names
+        return [objective.objective_id for objective in self._objective_engine.objectives]
 
     @property
     def scorer(self) -> Scorer:
         return self._scorer
 
     def pwm_width(self, tf: str) -> int:
-        return self._scorer.pwm_width(tf)
+        objective = next((item for item in self._objective_engine.objectives if item.objective_id == tf), None)
+        if objective is None:
+            raise ValueError(f"Unknown objective '{tf}'.")
+        return self._scorer.pwm_width(objective.tf)
 
     def best_hits(self, state: SequenceState) -> Dict[str, tuple[float, int, str]]:
-        seq_arr = state.seq
-        return {tf: self._scorer.best_llr(seq_arr, tf) for tf in self._scorer.tf_names}
+        results = self._objective_engine.evaluate(state.seq, seq_length=len(state)).results
+        out: dict[str, tuple[float, int, str]] = {}
+        for objective_id, result in results.items():
+            rep = result.representative_hit
+            if rep is None:
+                out[objective_id] = (float("-inf"), 0, "+")
+            else:
+                out[objective_id] = (float(rep.raw_score), int(rep.start), str(rep.strand))
+        return out
 
     def best_hit(self, state: SequenceState, tf: str) -> tuple[float, int, str]:
-        return self._scorer.best_llr(state.seq, tf)
+        result = self._objective_engine.evaluate_objective(tf, state.seq, seq_length=len(state))
+        rep = result.representative_hit
+        if rep is None:
+            return float("-inf"), 0, "+"
+        return float(rep.raw_score), int(rep.start), str(rep.strand)
 
     def normalized_llr_map(self, state: SequenceState) -> Dict[str, float]:
         return self._scorer.normalized_llr_map(state.seq)
+
+    @property
+    def objective_engine(self) -> ObjectiveEngine:
+        return self._objective_engine
 
     def _apply_length_penalty(self, score: float, length: int | None) -> float:
         if self._length_penalty_lambda <= 0:

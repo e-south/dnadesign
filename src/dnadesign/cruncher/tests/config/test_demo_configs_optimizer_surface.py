@@ -23,6 +23,7 @@ def _demo_workspace_config_paths() -> list[Path]:
     return [
         root / "demo_pairwise" / "configs" / "config.yaml",
         root / "demo_multitf" / "configs" / "config.yaml",
+        root / "demo_monotypic_baer" / "configs" / "config.yaml",
     ]
 
 
@@ -116,6 +117,27 @@ def test_demo_configs_use_tuned_gibbs_annealing_defaults() -> None:
         assert budget.tune == values["tune"]
         assert optimizer_cfg.cooling.stages[-1].sweeps == budget.draws
         assert optimizer_cfg.cooling.stages[-1].beta == values["final_beta"]
+
+
+def test_demo_monotypic_config_uses_right_sized_multiplicity_budget() -> None:
+    config_path = Path(__file__).resolve().parents[2] / "workspaces" / "demo_monotypic_baer" / "configs" / "config.yaml"
+    cfg = load_config(config_path)
+
+    assert cfg.sample is not None
+    budget = cfg.sample.budget
+    optimizer_cfg = cfg.sample.optimizer
+    objective_cfg = cfg.sample.objective
+
+    assert budget.tune == 15000
+    assert budget.draws == 90000
+    assert optimizer_cfg.chains == 8
+    assert cfg.sample.elites.k == 1
+    assert optimizer_cfg.cooling.kind == "piecewise"
+    assert optimizer_cfg.cooling.stages[-1].sweeps == budget.draws
+    assert optimizer_cfg.cooling.stages[-1].beta == 24.0
+    assert objective_cfg.multiplicity.enabled is True
+    assert objective_cfg.multiplicity.copies == 4
+    assert objective_cfg.multiplicity.distinctness.mode == "offset"
 
 
 def test_project_workspace_defaults_match_tuned_surface() -> None:

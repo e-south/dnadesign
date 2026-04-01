@@ -29,6 +29,12 @@ from dnadesign.cruncher.artifacts.manifest import load_manifest
 from dnadesign.cruncher.portfolio.schema_models import PortfolioSource, PortfolioSpec
 
 
+def _representative_hit_contract_enabled(objective_payload: dict[str, object]) -> bool:
+    if "representative_hit_contract" in objective_payload:
+        return bool(objective_payload.get("representative_hit_contract", True))
+    return bool(objective_payload.get("legacy_hit_contract", True))
+
+
 def _preflight_source_readiness(source: PortfolioSource) -> dict[str, object]:
     issues: list[str] = []
     run_dir = source.run_dir
@@ -68,6 +74,17 @@ def _preflight_source_readiness(source: PortfolioSource) -> dict[str, object]:
             top_k_raw = run_manifest.get("top_k")
             if not isinstance(top_k_raw, int) or top_k_raw < 1:
                 issues.append("run manifest top_k must be a positive integer")
+            objective_payload = run_manifest.get("objective")
+            if isinstance(objective_payload, dict) and not _representative_hit_contract_enabled(objective_payload):
+                issues.append("occurrence-aware sample run is not portfolio-ready: representative_hit_contract=false")
+                return {
+                    "source_id": str(source.id),
+                    "workspace_name": source.workspace.name,
+                    "workspace_path": str(source.workspace),
+                    "run_dir": str(run_dir),
+                    "ready": False,
+                    "issues": issues,
+                }
 
     analysis_summary_file = summary_path(analysis_root(run_dir))
     if not analysis_summary_file.exists():
@@ -203,5 +220,13 @@ def _raise_aggregate_only_preflight(spec: PortfolioSpec, readiness: dict[str, di
             lines.append(
                 "    * nudge: run source pipeline first (`sample`, `analyze --summary`, `export sequences`) "
                 "or add portfolio.sources[].prepare and use prepare_then_aggregate."
+            )
+        if any(
+            str(issue).startswith("occurrence-aware sample run is not portfolio-ready")
+            for issue in list(record.get("issues", []))
+        ):
+            lines.append(
+                "    * nudge: use a representative-hit workspace for portfolio aggregation, "
+                "or add occurrence-aware portfolio readers before including this source."
             )
     raise ValueError("\n".join(lines))

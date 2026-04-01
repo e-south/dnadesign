@@ -22,7 +22,6 @@ from dnadesign.cruncher.app.parse_signature import compute_parse_signature
 from dnadesign.cruncher.app.progress import progress_adapter
 from dnadesign.cruncher.app.run_service import update_run_index_from_status
 from dnadesign.cruncher.app.sample.artifacts import (
-    _baseline_hits_parquet_schema,
     _save_config,
     _write_parquet_rows,
 )
@@ -39,6 +38,10 @@ from dnadesign.cruncher.app.sample.preflight import (
     _resolve_final_softmin_beta,
     _softmin_schedule_payload,
     _validate_objective_preflight,
+    prepare_objective_plan,
+)
+from dnadesign.cruncher.app.sample.random_baseline import (
+    write_random_baseline_artifacts as _write_random_baseline_artifacts,
 )
 from dnadesign.cruncher.app.sample.resources import _load_pwms_for_set
 from dnadesign.cruncher.app.sample.run_layout import prepare_run_layout, write_run_manifest_and_update
@@ -46,14 +49,13 @@ from dnadesign.cruncher.app.telemetry import RunTelemetry
 from dnadesign.cruncher.artifacts.entries import artifact_entry
 from dnadesign.cruncher.artifacts.layout import (
     config_used_path,
-    random_baseline_hits_path,
-    random_baseline_path,
     sequences_path,
     trace_path,
 )
 from dnadesign.cruncher.config.moves import resolve_move_config
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig, SampleConfig
 from dnadesign.cruncher.core.evaluator import SequenceEvaluator
+from dnadesign.cruncher.core.objectives.compiler import ObjectivePlanCompilation
 from dnadesign.cruncher.core.optimizers.kinds import resolve_optimizer_kind
 from dnadesign.cruncher.core.scoring import Scorer
 from dnadesign.cruncher.core.sequence import canon_int
@@ -81,6 +83,7 @@ class _SamplingPreparation:
     pwm_ref_by_tf: dict[str, str | None]
     pwm_hash_by_tf: dict[str, str | None]
     core_def_by_tf: dict[str, str]
+    objective_plan: ObjectivePlanCompilation
     parse_signature: str
     parse_inputs: dict[str, object]
     scorer: Scorer
@@ -133,6 +136,7 @@ def _build_scorer_and_evaluator(
     pwms: dict[str, object],
     sample_cfg: SampleConfig,
     tfs: list[str],
+    objective_plan: ObjectivePlanCompilation,
 ) -> tuple[Scorer, SequenceEvaluator, str]:
     scale = sample_cfg.objective.score_scale
     combine_cfg = sample_cfg.objective.combine
@@ -157,6 +161,7 @@ def _build_scorer_and_evaluator(
         background=(0.25, 0.25, 0.25, 0.25),
         pseudocounts=sample_cfg.objective.scoring.pwm_pseudocounts,
         log_odds_clip=sample_cfg.objective.scoring.log_odds_clip,
+        objective_specs=objective_plan.objectives,
     )
     logger.debug("Scorer and SequenceEvaluator instantiated")
     logger.debug("  Scorer.scale = %r", scorer.scale)
@@ -168,6 +173,7 @@ def _build_scorer_and_evaluator(
 def _build_optimizer_cfg(
     *,
     sample_cfg: SampleConfig,
+    objective_plan: ObjectivePlanCompilation,
     chain_count: int,
     draws: int,
     adapt_sweeps: int,
@@ -193,8 +199,14 @@ def _build_optimizer_cfg(
         "progress_bar": bool(progress_bar),
         "progress_every": int(progress_every),
         "mcmc_cooling": mcmc_cooling,
+        "enable_incremental_rescore": bool(objective_plan.runtime.supports_incremental_rescore),
         "early_stop": sample_cfg.optimizer.early_stop.model_dump(mode="json"),
-        **moves.model_dump(),
+        **{
+            **moves.model_dump(),
+            "target_worst_tf_prob": (
+                float(moves.target_worst_tf_prob) if objective_plan.runtime.supports_targeted_window_hint else 0.0
+            ),
+        },
         "softmin": {"enabled": softmin_cfg.enabled, **softmin_sched},
     }
 
@@ -500,193 +512,6 @@ def _write_sequences_artifact(
     )
 
 
-def _write_random_baseline_artifacts(
-    *,
-    out_dir: Path,
-    sample_cfg: SampleConfig,
-    set_index: int,
-    tfs: list[str],
-    scorer: Scorer,
-    pwms: dict[str, object],
-    pwm_ref_by_tf: dict[str, str | None],
-    pwm_hash_by_tf: dict[str, str | None],
-    core_def_by_tf: dict[str, str],
-    stage: str,
-    artifacts: list[dict[str, object]],
-) -> None:
-    if not sample_cfg.output.save_random_baseline:
-        return
-    baseline_seed = int(sample_cfg.seed + set_index - 1)
-    baseline_n = int(sample_cfg.output.random_baseline_n)
-    baseline_path = random_baseline_path(out_dir)
-    baseline_hits_path = random_baseline_hits_path(out_dir)
-    tf_order = sorted(tfs)
-    baseline_canonical = bool(sample_cfg.objective.bidirectional)
-    rng = np.random.default_rng(baseline_seed)
-    _write_random_baseline_tables(
-        baseline_path=baseline_path,
-        baseline_hits_path=baseline_hits_path,
-        baseline_seed=baseline_seed,
-        baseline_n=baseline_n,
-        baseline_canonical=baseline_canonical,
-        sequence_length=sample_cfg.sequence_length,
-        score_scale=sample_cfg.objective.score_scale,
-        tf_order=tf_order,
-        scorer=scorer,
-        pwms=pwms,
-        pwm_ref_by_tf=pwm_ref_by_tf,
-        pwm_hash_by_tf=pwm_hash_by_tf,
-        core_def_by_tf=core_def_by_tf,
-        rng=rng,
-    )
-    artifacts.append(
-        artifact_entry(
-            baseline_path,
-            out_dir,
-            kind="table",
-            label="Random baseline (Parquet)",
-            stage=stage,
-        )
-    )
-    artifacts.append(
-        artifact_entry(
-            baseline_hits_path,
-            out_dir,
-            kind="table",
-            label="Random baseline hits (Parquet)",
-            stage=stage,
-        )
-    )
-    logger.debug("Saved random baseline -> %s", baseline_path.relative_to(out_dir.parent))
-
-
-def _write_random_baseline_tables(
-    *,
-    baseline_path: Path,
-    baseline_hits_path: Path,
-    baseline_seed: int,
-    baseline_n: int,
-    baseline_canonical: bool,
-    sequence_length: int,
-    score_scale: str,
-    tf_order: list[str],
-    scorer: Scorer,
-    pwms: dict[str, object],
-    pwm_ref_by_tf: dict[str, str | None],
-    pwm_hash_by_tf: dict[str, str | None],
-    core_def_by_tf: dict[str, str],
-    rng: np.random.Generator,
-    chunk_size: int = 1024,
-) -> None:
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-
-    if chunk_size < 1:
-        raise ValueError("chunk_size must be >= 1")
-    baseline_path.parent.mkdir(parents=True, exist_ok=True)
-    baseline_hits_path.parent.mkdir(parents=True, exist_ok=True)
-    baseline_tmp_path = baseline_path.with_suffix(baseline_path.suffix + ".tmp")
-    baseline_hits_tmp_path = baseline_hits_path.with_suffix(baseline_hits_path.suffix + ".tmp")
-    baseline_writer: pq.ParquetWriter | None = None
-    baseline_hits_writer: pq.ParquetWriter | None = None
-    baseline_rows: list[dict[str, object]] = []
-    baseline_hit_rows: list[dict[str, object]] = []
-    hit_schema = _baseline_hits_parquet_schema()
-
-    def _flush() -> None:
-        nonlocal baseline_writer
-        nonlocal baseline_hits_writer
-        if baseline_rows:
-            table = pa.Table.from_pylist(baseline_rows)
-            if baseline_writer is None:
-                baseline_writer = pq.ParquetWriter(str(baseline_tmp_path), table.schema)
-            baseline_writer.write_table(table)
-            baseline_rows.clear()
-        if baseline_hit_rows:
-            table = pa.Table.from_pylist(baseline_hit_rows, schema=hit_schema)
-            if baseline_hits_writer is None:
-                baseline_hits_writer = pq.ParquetWriter(str(baseline_hits_tmp_path), table.schema)
-            baseline_hits_writer.write_table(table)
-            baseline_hit_rows.clear()
-
-    try:
-        for baseline_id in range(baseline_n):
-            seq_state = SequenceState.random(sequence_length, rng)
-            seq_arr = seq_state.seq
-            seq_str = seq_state.to_string()
-            per_tf, hit_map = scorer.compute_all_per_pwm_and_hits(seq_arr, sequence_length)
-            norm_map = _norm_map_for_elites(
-                seq_arr,
-                per_tf,
-                scorer=scorer,
-                score_scale=score_scale,
-            )
-            row: dict[str, object] = {
-                "baseline_id": baseline_id,
-                "sequence": seq_str,
-                "baseline_seed": baseline_seed,
-                "baseline_n": baseline_n,
-                "seed": baseline_seed,
-                "n_samples": baseline_n,
-                "sequence_length": sequence_length,
-                "length": sequence_length,
-                "score_scale": score_scale,
-                "bidirectional": bool(baseline_canonical),
-                "bg_model": "uniform",
-                "bg_a": 0.25,
-                "bg_c": 0.25,
-                "bg_g": 0.25,
-                "bg_t": 0.25,
-            }
-            if baseline_canonical:
-                row["canonical_sequence"] = SequenceState(canon_int(seq_arr)).to_string()
-            for tf_name in tf_order:
-                row[f"score_{tf_name}"] = float(per_tf[tf_name])
-                hit = hit_map[tf_name]
-                pwm = pwms.get(tf_name)
-                if pwm is None:
-                    raise ValueError(f"Missing PWM for TF '{tf_name}'.")
-                pwm_width = int(pwm.length)
-                width = hit.get("width")
-                core_width = int(width) if isinstance(width, int) else pwm_width
-                baseline_hit_rows.append(
-                    {
-                        "baseline_id": baseline_id,
-                        "tf": tf_name,
-                        "best_start": hit.get("best_start"),
-                        "best_core_offset": hit.get("best_start"),
-                        "best_strand": hit.get("strand"),
-                        "best_window_seq": hit.get("best_window_seq"),
-                        "best_core_seq": hit.get("best_core_seq"),
-                        "best_score_raw": hit.get("best_score_raw"),
-                        "best_score_scaled": float(per_tf[tf_name]),
-                        "best_score_norm": float(norm_map.get(tf_name, 0.0)),
-                        "tiebreak_rule": hit.get("best_hit_tiebreak"),
-                        "pwm_ref": pwm_ref_by_tf.get(tf_name),
-                        "pwm_hash": pwm_hash_by_tf.get(tf_name),
-                        "pwm_width": pwm_width,
-                        "core_width": core_width,
-                        "core_def_hash": core_def_by_tf.get(tf_name),
-                    }
-                )
-            baseline_rows.append(row)
-            if len(baseline_rows) >= chunk_size or len(baseline_hit_rows) >= chunk_size * max(1, len(tf_order)):
-                _flush()
-        _flush()
-    except Exception:
-        baseline_tmp_path.unlink(missing_ok=True)
-        baseline_hits_tmp_path.unlink(missing_ok=True)
-        raise
-    finally:
-        if baseline_writer is not None:
-            baseline_writer.close()
-        if baseline_hits_writer is not None:
-            baseline_hits_writer.close()
-
-    baseline_tmp_path.replace(baseline_path)
-    baseline_hits_tmp_path.replace(baseline_hits_path)
-
-
 def _finish_failed_and_raise(
     *,
     exc: Exception,
@@ -773,6 +598,7 @@ def _prepare_sampling(
 ) -> _SamplingPreparation:
     pwms = load_pwms_for_set(cfg=cfg, config_path=config_path, tfs=tfs, lockmap=lockmap)
     _assert_init_length_fits_pwms(sample_cfg, pwms)
+    objective_plan = prepare_objective_plan(sample_cfg=sample_cfg, tfs=tfs, pwms=pwms)
     pwm_ref_by_tf, pwm_hash_by_tf, core_def_by_tf = _build_pwm_provenance(
         tfs=tfs,
         pwms=pwms,
@@ -790,9 +616,11 @@ def _prepare_sampling(
         pwms=pwms,
         sample_cfg=sample_cfg,
         tfs=tfs,
+        objective_plan=objective_plan,
     )
     opt_cfg = _build_optimizer_cfg(
         sample_cfg=sample_cfg,
+        objective_plan=objective_plan,
         chain_count=chain_count,
         draws=draws,
         adapt_sweeps=adapt_sweeps,
@@ -816,6 +644,7 @@ def _prepare_sampling(
         pwm_ref_by_tf=pwm_ref_by_tf,
         pwm_hash_by_tf=pwm_hash_by_tf,
         core_def_by_tf=core_def_by_tf,
+        objective_plan=objective_plan,
         parse_signature=parse_signature,
         parse_inputs=parse_inputs,
         scorer=scorer,
@@ -871,9 +700,11 @@ def _persist_run_outputs(
     _write_random_baseline_artifacts(
         out_dir=out_dir,
         sample_cfg=sample_cfg,
+        objective_plan=preparation.objective_plan,
         set_index=set_index,
         tfs=tfs,
         scorer=preparation.scorer,
+        evaluator=preparation.evaluator,
         pwms=preparation.pwms,
         pwm_ref_by_tf=preparation.pwm_ref_by_tf,
         pwm_hash_by_tf=preparation.pwm_hash_by_tf,
@@ -895,6 +726,7 @@ def _persist_run_outputs(
     select_and_persist_elites(
         optimizer=preparation.optimizer,
         evaluator=preparation.evaluator,
+        objective_plan=preparation.objective_plan,
         scorer=preparation.scorer,
         sample_cfg=sample_cfg,
         pwms=preparation.pwms,
@@ -929,6 +761,7 @@ def _persist_run_outputs(
         optimizer_kind=optimizer_kind,
         combine_resolved=preparation.combine_resolved,
         beta_softmin_final=beta_softmin_final,
+        objective_plan=preparation.objective_plan,
         parse_signature=preparation.parse_signature,
         parse_inputs=preparation.parse_inputs,
         status_writer=status_writer,

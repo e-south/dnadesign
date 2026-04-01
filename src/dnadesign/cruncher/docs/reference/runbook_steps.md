@@ -17,6 +17,17 @@ This table is generated from workspace machine runbooks and is the standard cros
 <!-- docs:runbook-steps:start -->
 | Workspace | Step ID | Description | Command |
 | --- | --- | --- | --- |
+| `demo_monotypic_baer` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
+| `demo_monotypic_baer` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
+| `demo_monotypic_baer` | `fetch_sites_regulondb` |  | `cruncher fetch sites --source regulondb --tf baeR --update -c configs/config.yaml` |
+| `demo_monotypic_baer` | `fetch_sites_baer_chip_exo` |  | `cruncher fetch sites --source baer_chip_exo --tf baeR --update -c configs/config.yaml` |
+| `demo_monotypic_baer` | `discover_motifs` |  | `cruncher discover motifs --set 1 --tool meme --meme-mod oops --source-id demo_baer_multiplicity_meme_oops -c configs/config.yaml` |
+| `demo_monotypic_baer` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
+| `demo_monotypic_baer` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_baer` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_baer` | `analyze_summary` | Analyze the occurrence-aware run and render the standard static plot suite, including the multi-offset elite showcase. | `cruncher analyze --summary -c configs/config.yaml` |
+| `demo_monotypic_baer` | `show_sample_outputs` | Show the occurrence-aware run manifest and artifact inventory for the workspace root run. | `cruncher runs show outputs -c configs/config.yaml` |
+| `demo_monotypic_baer` | `render_logos` |  | `cruncher catalog logos --source demo_baer_multiplicity_meme_oops --set 1 -c configs/config.yaml` |
 | `demo_multitf` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
 | `demo_multitf` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
 | `demo_multitf` | `fetch_sites_demo_local_meme` |  | `cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c configs/config.yaml` |
@@ -44,6 +55,9 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `demo_pairwise` | `render_logos` |  | `cruncher catalog logos --source demo_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `demo_pairwise` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
 | `demo_pairwise` | `study_run_diversity_vs_score` | Sweep diversity from 0.00 to 1.00 at fixed workspace sequence_length and emit diversity-vs-score aggregates. | `cruncher study run --spec configs/studies/diversity_vs_score.study.yaml --force-overwrite` |
+| `demo_yiu_circularized` | `yiu_validate` | Validate the checked-in circularized YIU demo spec. | `cruncher yiu validate --spec configs/yiu/example_reference_circularized.yiu.yaml` |
+| `demo_yiu_circularized` | `yiu_trace` | Materialize the explicit YIU bundle and render its published BaseRender jobs. | `cruncher yiu trace --spec configs/yiu/example_reference_circularized.yiu.yaml --force-overwrite --emit-renders` |
+| `demo_yiu_circularized` | `yiu_solve` | Run the paired solve spec, materialize the selected solution bundle, and render solve-level visuals. | `cruncher yiu solve --spec configs/yiu/example_reference_circularized.yiu.solve.yaml --force-overwrite --emit-renders` |
 | `multitf_baer_lexa_soxr` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
 | `multitf_baer_lexa_soxr` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
 | `multitf_baer_lexa_soxr` | `fetch_sites_demo_local_meme` |  | `cruncher fetch sites --source demo_local_meme --tf lexA --tf soxR --update -c configs/config.yaml` |

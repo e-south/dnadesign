@@ -102,6 +102,7 @@ class GibbsAnnealOptimizer(Optimizer):
         self.progress_bar: bool = bool(cfg.get("progress_bar", True))
         self.progress_every: int = int(cfg.get("progress_every", 0))
         self.build_trace: bool = bool(cfg.get("build_trace", True))
+        self.enable_incremental_rescore: bool = bool(cfg.get("enable_incremental_rescore", True))
         self.telemetry = telemetry or NullTelemetry()
         self.progress = progress or passthrough_progress
         early_cfg = cfg.get("early_stop") or {}
@@ -326,7 +327,11 @@ class GibbsAnnealOptimizer(Optimizer):
         scorer = getattr(evaluator, "scorer", None)
         for c in range(self.chains):
             cache = None
-            if scorer is not None and getattr(scorer, "scale", None) in LocalScanCache.SUPPORTED_SCALES:
+            if (
+                self.enable_incremental_rescore
+                and scorer is not None
+                and getattr(scorer, "scale", None) in LocalScanCache.SUPPORTED_SCALES
+            ):
                 cache = scorer.make_local_cache(chain_states[c])
             scan_caches.append(cache)
         current_per_tf_maps: List[Dict[str, float]] = [evaluator(chain_state_objs[c]) for c in range(self.chains)]

@@ -131,3 +131,16 @@ def test_analyze_rejects_non_gibbs_optimizer_kind(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="optimizer kind.*gibbs_anneal"):
         run_analyze(cfg, config_path, runs_override=[run_name])
+
+
+def test_analyze_requires_occurrence_sidecars_for_occurrence_aware_runs(tmp_path: Path) -> None:
+    run_name = "sample_occurrence_only"
+    config_path = _write_config(tmp_path, run_name)
+    run_dir = _write_minimal_run(tmp_path, run_name)
+    manifest = json.loads(manifest_path(run_dir).read_text())
+    manifest["objective"] = {"representative_hit_contract": False}
+    manifest_path(run_dir).write_text(json.dumps(manifest, indent=2))
+    cfg = load_config(config_path)
+
+    with pytest.raises(FileNotFoundError, match="elites_occurrences"):
+        run_analyze(cfg, config_path, runs_override=[run_name])

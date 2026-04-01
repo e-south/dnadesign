@@ -150,6 +150,8 @@ def resolve_analysis_run_execution_context(
     artifacts = _load_run_artifacts_for_analysis(
         run_dir,
         require_random_baseline=require_random_baseline,
+        pwms=pwms,
+        manifest=manifest,
     )
 
     return AnalysisRunExecutionContext(

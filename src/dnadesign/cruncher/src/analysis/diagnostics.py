@@ -43,6 +43,16 @@ def _safe_int(value: object) -> int | None:
         return None
 
 
+def _safe_finite_reduction(values: np.ndarray, reducer) -> float | None:
+    arr = np.asarray(values, dtype=float)
+    if arr.size == 0:
+        return None
+    finite = arr[np.isfinite(arr)]
+    if finite.size == 0:
+        return None
+    return _safe_float(reducer(finite))
+
+
 def _trace_score_array(idata: Any) -> np.ndarray | None:
     posterior = getattr(idata, "posterior", None)
     if posterior is None or not hasattr(posterior, "get"):
@@ -536,7 +546,17 @@ def _resolve_elite_subset(
     if sample_meta:
         elites_metrics["top_k"] = top_k
     if top_k and len(elites_df) < top_k:
-        state.warn(f"Elite count {len(elites_df)} < top_k={top_k}; diversity constraint may be tight.")
+        selection_diversity = _safe_float(sample_meta.get("selection_diversity")) if sample_meta else None
+        if selection_diversity is not None and selection_diversity <= 0.0:
+            state.warn(
+                f"Elite count {len(elites_df)} < top_k={top_k}; postprocess dedup or candidate exhaustion "
+                "reduced the persisted elite set."
+            )
+        else:
+            state.warn(
+                f"Elite count {len(elites_df)} < top_k={top_k}; diversity pressure, postprocess dedup, or "
+                "candidate exhaustion reduced the persisted elite set."
+            )
     if top_k and "rank" in elites_df.columns:
         return elites_df.nsmallest(top_k, "rank")
     if top_k:
@@ -568,8 +588,8 @@ def _append_elite_balance_metrics(
         )
     if not balance.size:
         return
-    balance_max = _safe_float(np.nanmax(balance))
-    balance_median = _safe_float(np.nanmedian(balance))
+    balance_max = _safe_finite_reduction(balance, np.max)
+    balance_median = _safe_finite_reduction(balance, np.median)
     elites_metrics["balance_index_max"] = balance_max
     elites_metrics["balance_index_median"] = balance_median
     if balance_max is not None and balance_max < thresholds["balance_index_warn"]:
@@ -595,8 +615,8 @@ def _append_elite_normalized_balance_metrics(
             out=np.full_like(norm_min, np.nan, dtype=float),
             where=norm_mean != 0,
         )
-    elites_metrics["normalized_balance_median"] = _safe_float(np.nanmedian(norm_balance))
-    elites_metrics["normalized_min_median"] = _safe_float(np.nanmedian(norm_min))
+    elites_metrics["normalized_balance_median"] = _safe_finite_reduction(norm_balance, np.median)
+    elites_metrics["normalized_min_median"] = _safe_finite_reduction(norm_min, np.median)
 
 
 def _append_elite_canonical_uniques(

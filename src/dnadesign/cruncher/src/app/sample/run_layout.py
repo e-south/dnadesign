@@ -31,6 +31,7 @@ from dnadesign.cruncher.artifacts.layout import (
 from dnadesign.cruncher.artifacts.manifest import build_run_manifest, write_manifest
 from dnadesign.cruncher.artifacts.status import RunStatusWriter
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig, SampleConfig
+from dnadesign.cruncher.core.objectives.compiler import ObjectivePlanCompilation
 from dnadesign.cruncher.core.optimizers.kinds import resolve_optimizer_kind
 from dnadesign.cruncher.core.pvalue import logodds_cache_info
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
@@ -203,6 +204,7 @@ def write_run_manifest_and_update(
     optimizer_kind: str,
     combine_resolved: str,
     beta_softmin_final: float | None,
+    objective_plan: ObjectivePlanCompilation,
     parse_signature: str | None,
     parse_inputs: dict[str, object] | None,
     status_writer: RunStatusWriter,
@@ -272,6 +274,21 @@ def write_run_manifest_and_update(
                 "bidirectional": sample_cfg.objective.bidirectional,
                 "softmin": sample_cfg.objective.softmin.model_dump(),
                 "softmin_final_beta_used": beta_softmin_final,
+                "multiplicity": sample_cfg.objective.multiplicity.model_dump(),
+                "objective_plan_kind": "compiled",
+                "objective_kinds": [
+                    objective.metadata.get("objective_kind") for objective in objective_plan.objectives
+                ],
+                "artifact_contract_version": 2,
+                "representative_hit_contract": bool(objective_plan.runtime.supports_representative_hit_artifact),
+                "occurrence_artifacts": not bool(objective_plan.runtime.supports_representative_hit_artifact),
+                "runtime_capabilities": {
+                    "supports_incremental_rescore": bool(objective_plan.runtime.supports_incremental_rescore),
+                    "supports_targeted_window_hint": bool(objective_plan.runtime.supports_targeted_window_hint),
+                    "supports_representative_hit_artifact": bool(
+                        objective_plan.runtime.supports_representative_hit_artifact
+                    ),
+                },
             },
             "optimizer": {
                 "kind": optimizer_kind,

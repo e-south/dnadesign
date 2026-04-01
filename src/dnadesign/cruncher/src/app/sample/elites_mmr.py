@@ -65,19 +65,53 @@ def _deterministic_elite_id(*, workspace_slug: str, sequence_for_id: str) -> str
     return f"{workspace_slug}_elite_{token}"
 
 
-def hydrate_candidate_hits(candidates: list[_EliteCandidate], *, scorer: Scorer) -> None:
+def hydrate_candidate_hits(
+    candidates: list[_EliteCandidate],
+    *,
+    evaluator: SequenceEvaluator | None = None,
+    scorer: Scorer | None = None,
+) -> None:
     for candidate in candidates:
         if candidate.per_tf_hits is not None:
             continue
+        if evaluator is not None:
+            evaluation = evaluator.objective_engine.evaluate(candidate.seq_arr, seq_length=int(candidate.seq_arr.size))
+        elif scorer is not None:
+            per_tf_hits: dict[str, dict[str, object]] = {}
+            for tf_name in scorer.tf_names:
+                hit = scorer.best_hit(candidate.seq_arr, tf_name)
+                per_tf_hits[tf_name] = {
+                    **hit,
+                    "best_score_scaled": float(candidate.per_tf_map[tf_name]),
+                    "best_score_norm": float(candidate.norm_map.get(tf_name, 0.0)),
+                }
+            candidate.per_tf_hits = per_tf_hits
+            candidate.objective_results = None
+            continue
+        else:
+            raise ValueError("hydrate_candidate_hits requires either evaluator or scorer.")
         per_tf_hits: dict[str, dict[str, object]] = {}
-        for tf_name in scorer.tf_names:
-            hit = scorer.best_hit(candidate.seq_arr, tf_name)
-            per_tf_hits[tf_name] = {
-                **hit,
-                "best_score_scaled": float(candidate.per_tf_map[tf_name]),
-                "best_score_norm": float(candidate.norm_map.get(tf_name, 0.0)),
+        for objective_id, result in evaluation.results.items():
+            hit = result.representative_hit
+            if hit is None:
+                raise ValueError(f"Missing representative hit for objective '{objective_id}'.")
+            per_tf_hits[objective_id] = {
+                "best_score_raw": float(hit.raw_score),
+                "offset": int(hit.start),
+                "best_start": int(hit.start),
+                "strand": str(hit.strand),
+                "width": int(hit.width),
+                "best_window_seq": hit.window_seq,
+                "best_core_seq": hit.core_seq,
+                "best_hit_tiebreak": hit.tiebreak_rule or "representative_hit",
+                "best_score_scaled": float(candidate.per_tf_map[objective_id]),
+                "best_score_norm": float(candidate.norm_map.get(objective_id, 0.0)),
+                "objective_kind": result.diagnostics.get("objective_kind"),
+                "requested_copies": int(result.diagnostics.get("requested_copies", 1)),
+                "selected_copies": int(result.diagnostics.get("selected_copies", 1)),
             }
         candidate.per_tf_hits = per_tf_hits
+        candidate.objective_results = evaluation.results
 
 
 def build_elite_pool(
@@ -96,9 +130,14 @@ def build_elite_pool(
     for (chain_id, draw_idx), seq_arr, per_tf_map in zip(
         optimizer.all_meta, optimizer.all_samples, optimizer.all_scores
     ):
+        objective_engine = getattr(evaluator, "objective_engine", None)
+        objective_eval = (
+            objective_engine.evaluate(seq_arr, seq_length=int(seq_arr.size)) if objective_engine is not None else None
+        )
         norm_map = _norm_map_for_elites(
             seq_arr,
             per_tf_map,
+            objective_results=(objective_eval.results if objective_eval is not None else None),
             scorer=scorer,
             score_scale=sample_cfg.objective.score_scale,
         )
@@ -123,6 +162,7 @@ def build_elite_pool(
                 per_tf_map=per_tf_map,
                 norm_map=norm_map,
                 per_tf_hits=None,
+                objective_results=(objective_eval.results if objective_eval is not None else None),
             )
         )
 
@@ -139,6 +179,7 @@ def select_elites_mmr(
     raw_elites: list[_EliteCandidate],
     elite_k: int,
     pool_size: int,
+    evaluator: SequenceEvaluator | None = None,
     scorer: Scorer,
     pwms: dict[str, PWM],
     dsdna_mode: bool,
@@ -249,7 +290,9 @@ def select_elites_mmr(
                 )
             else:
                 mmr_raw_pool = [raw_by_id[f"{cand.chain_id}:{cand.draw_idx}"] for cand in mmr_pool]
-                hydrate_candidate_hits(mmr_raw_pool, scorer=scorer)
+                if evaluator is None:
+                    raise ValueError("MMR diversity selection requires an evaluator for hit hydration.")
+                hydrate_candidate_hits(mmr_raw_pool, evaluator=evaluator)
                 core_maps = {
                     f"{cand.chain_id}:{cand.draw_idx}": tfbs_cores_from_hits(
                         cand.seq_arr,
