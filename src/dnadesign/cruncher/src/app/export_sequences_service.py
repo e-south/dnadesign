@@ -19,7 +19,7 @@ from pathlib import Path
 import pandas as pd
 
 from dnadesign.cruncher.analysis.consensus import pwm_consensus
-from dnadesign.cruncher.analysis.hits import load_elites_hits
+from dnadesign.cruncher.analysis.hits import load_elites_hits, require_representative_hit_contract
 from dnadesign.cruncher.analysis.parquet import read_parquet, write_parquet
 from dnadesign.cruncher.app.analyze.metadata import load_pwms_from_config
 from dnadesign.cruncher.app.run_service import get_run, list_runs
@@ -447,6 +447,7 @@ def export_sequences_for_run(
 
     elites_file = elites_path(run_dir)
     hits_file = elites_hits_path(run_dir)
+    require_representative_hit_contract(run_dir, context="Sequence export")
     if not elites_file.exists():
         raise FileNotFoundError(f"Missing elites.parquet in run directory: {elites_file}")
     if not hits_file.exists():

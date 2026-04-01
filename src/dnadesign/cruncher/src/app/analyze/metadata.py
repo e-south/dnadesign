@@ -34,6 +34,7 @@ class SampleMeta:
     bidirectional: bool
     top_k: int
     mode: str
+    selection_diversity: float
 
 
 def _resolve_sampling_window(used_cfg: dict) -> tuple[int, int | None, str] | None:
@@ -117,6 +118,14 @@ def _resolve_sample_meta(used_cfg: dict, manifest: dict) -> SampleMeta:
     draws = int(manifest.get("draws") or 0)
     tune = int(manifest.get("adapt_sweeps") or 0)
     top_k = int(manifest.get("top_k") or 0)
+    elites_payload = manifest.get("elites") if isinstance(manifest, dict) else None
+    selection_diversity = 0.0
+    if isinstance(elites_payload, dict):
+        select_payload = elites_payload.get("select")
+        if isinstance(select_payload, dict):
+            raw_diversity = select_payload.get("diversity")
+            if raw_diversity is not None:
+                selection_diversity = float(raw_diversity)
     objective_payload = manifest.get("objective") if isinstance(manifest, dict) else None
     bidirectional = False
     if isinstance(objective_payload, dict):
@@ -138,6 +147,7 @@ def _resolve_sample_meta(used_cfg: dict, manifest: dict) -> SampleMeta:
         bidirectional=bidirectional,
         top_k=top_k,
         mode=optimizer_kind,
+        selection_diversity=selection_diversity,
     )
 
 

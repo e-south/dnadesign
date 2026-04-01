@@ -46,6 +46,38 @@ def _init_pair_stats(tf_list: list[str]) -> tuple[list[tuple[str, str]], dict[tu
     return pair_keys, pair_stats
 
 
+def _resolve_hit_keys(
+    *,
+    hits_df: pd.DataFrame,
+    tf_names: Iterable[str],
+) -> list[str]:
+    tf_list = [str(tf_name) for tf_name in tf_names]
+    if hits_df is None or hits_df.empty or "tf_slot" not in hits_df.columns:
+        return tf_list
+    slot_rows = hits_df[["tf", "tf_slot"]].dropna().copy()
+    if slot_rows.empty:
+        return tf_list
+    tf_order = {tf_name: idx for idx, tf_name in enumerate(tf_list)}
+    unique_rows = {
+        (str(tf_name), str(tf_slot))
+        for tf_name, tf_slot in slot_rows.itertuples(index=False, name=None)
+        if str(tf_name) in tf_order and str(tf_slot)
+    }
+    if not unique_rows:
+        return tf_list
+
+    def _sort_key(item: tuple[str, str]) -> tuple[int, int, str]:
+        tf_name, tf_slot = item
+        suffix = tf_slot[len(tf_name) + 1 :] if tf_slot.startswith(f"{tf_name}#") else ""
+        try:
+            occurrence_rank = int(suffix)
+        except (TypeError, ValueError):
+            occurrence_rank = 1
+        return (tf_order.get(tf_name, len(tf_order)), occurrence_rank, tf_slot)
+
+    return [slot for _tf, slot in sorted(unique_rows, key=_sort_key)]
+
+
 def _empty_overlap_output(*, pair_keys: list[tuple[str, str]], include_sequences: bool):
     pair_df = pd.DataFrame(
         [
@@ -97,19 +129,21 @@ def _elite_info_map(elites_df: pd.DataFrame) -> dict[str, dict[str, object]]:
 def _hits_by_elite_map(
     *,
     hits_df: pd.DataFrame,
-    tf_list: list[str],
+    hit_keys: list[str],
 ) -> dict[str, dict[str, tuple[int, int, str | None]]]:
     hits_by_elite: dict[str, dict[str, tuple[int, int, str | None]]] = {}
-    hit_cols = ["elite_id", "tf", "best_start", "pwm_width", "best_strand"]
-    for elite_id_raw, tf_name, start, width, strand in hits_df[hit_cols].itertuples(index=False, name=None):
+    hit_key_column = "tf_slot" if "tf_slot" in hits_df.columns else "tf"
+    hit_cols = ["elite_id", hit_key_column, "best_start", "pwm_width", "best_strand"]
+    for elite_id_raw, hit_key, start, width, strand in hits_df[hit_cols].itertuples(index=False, name=None):
         elite_id = str(elite_id_raw or "")
-        if not elite_id or tf_name not in tf_list:
+        hit_key = str(hit_key)
+        if not elite_id or hit_key not in hit_keys:
             continue
         if not isinstance(start, (int, float)) or not isinstance(width, (int, float)) or not isinstance(strand, str):
-            raise ValueError(f"Invalid hit metadata for elite '{elite_id}' TF '{tf_name}'.")
+            raise ValueError(f"Invalid hit metadata for elite '{elite_id}' key '{hit_key}'.")
         start_i = int(start)
         end_i = start_i + int(width)
-        hits_by_elite.setdefault(elite_id, {})[str(tf_name)] = (start_i, end_i, strand)
+        hits_by_elite.setdefault(elite_id, {})[hit_key] = (start_i, end_i, strand)
     return hits_by_elite
 
 
@@ -205,8 +239,8 @@ def compute_overlap_tables(
     *,
     include_sequences: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, float | None]]:
-    tf_list = list(tf_names)
-    pair_keys, pair_stats = _init_pair_stats(tf_list)
+    hit_keys = _resolve_hit_keys(hits_df=hits_df, tf_names=tf_names)
+    pair_keys, pair_stats = _init_pair_stats(hit_keys)
 
     elite_rows: list[dict[str, object]] = []
     if elites_df is None or elites_df.empty:
@@ -217,7 +251,7 @@ def compute_overlap_tables(
         raise ValueError("elites_hits.parquet is required to compute overlap metrics.")
 
     elite_info = _elite_info_map(elites_df)
-    hits_by_elite = _hits_by_elite_map(hits_df=hits_df, tf_list=tf_list)
+    hits_by_elite = _hits_by_elite_map(hits_df=hits_df, hit_keys=hit_keys)
 
     for elite_id, hits in hits_by_elite.items():
         elite_meta = elite_info.get(elite_id, {})
@@ -251,19 +285,21 @@ def extract_elite_hits(
     hits_df: pd.DataFrame,
     tf_names: Iterable[str],
 ) -> pd.DataFrame:
-    tf_list = list(tf_names)
+    hit_keys = set(_resolve_hit_keys(hits_df=hits_df, tf_names=tf_names))
     if hits_df is None or hits_df.empty:
         return pd.DataFrame(columns=["tf", "offset", "end", "strand", "elite_id"])
     rows: list[dict[str, object]] = []
-    hit_cols = ["elite_id", "tf", "best_start", "pwm_width", "best_strand"]
-    for elite_id, tf_name, start, width, strand in hits_df[hit_cols].itertuples(index=False, name=None):
-        if tf_name not in tf_list:
+    hit_key_column = "tf_slot" if "tf_slot" in hits_df.columns else "tf"
+    hit_cols = ["elite_id", "tf", hit_key_column, "best_start", "pwm_width", "best_strand"]
+    for elite_id, tf_name, hit_key, start, width, strand in hits_df[hit_cols].itertuples(index=False, name=None):
+        if str(hit_key) not in hit_keys:
             continue
         if not isinstance(start, (int, float)) or not isinstance(width, (int, float)) or not isinstance(strand, str):
             continue
         rows.append(
             {
                 "tf": tf_name,
+                "tf_slot": str(hit_key),
                 "offset": int(start),
                 "end": int(start) + int(width),
                 "strand": strand,

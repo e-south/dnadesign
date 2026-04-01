@@ -16,7 +16,12 @@ import hashlib
 import numpy as np
 import pytest
 
-from dnadesign.cruncher.app.sample.diagnostics import _EliteCandidate, dsdna_equivalence_enabled, resolve_dsdna_mode
+from dnadesign.cruncher.app.sample.diagnostics import (
+    _EliteCandidate,
+    _norm_map_for_elites,
+    dsdna_equivalence_enabled,
+    resolve_dsdna_mode,
+)
 from dnadesign.cruncher.app.sample.elites_mmr import (
     build_elite_entries,
     build_elite_pool,
@@ -32,6 +37,14 @@ from dnadesign.cruncher.app.sample.elites_stage import (
     _remaining_single_owner_polish_improvements,
 )
 from dnadesign.cruncher.config.schema_v3 import SampleConfig
+from dnadesign.cruncher.core.evaluator import SequenceEvaluator
+from dnadesign.cruncher.core.objectives.capabilities import KDISTINCT_V1_CAPABILITIES
+from dnadesign.cruncher.core.objectives.models import (
+    DistinctnessSpec,
+    ObjectiveSpec,
+    TopKDistinctSelectorSpec,
+    WeakestSelectedAggregationSpec,
+)
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
 from dnadesign.cruncher.core.sequence import canon_int
@@ -75,6 +88,30 @@ def _seq_str(arr: np.ndarray) -> str:
 def _expected_elite_id(*, workspace_slug: str, sequence: str) -> str:
     token = hashlib.sha256(sequence.encode("utf-8")).hexdigest()[:12]
     return f"{workspace_slug}_elite_{token}"
+
+
+def _multiplicity_candidate(seq: str, evaluator: SequenceEvaluator, scorer: Scorer) -> _EliteCandidate:
+    arr = _seq_arr(seq)
+    evaluation = evaluator.objective_engine.evaluate(arr, seq_length=int(arr.size))
+    norm_map = _norm_map_for_elites(
+        arr,
+        evaluation.scalars,
+        objective_results=evaluation.results,
+        scorer=scorer,
+        score_scale="normalized-llr",
+    )
+    return _EliteCandidate(
+        seq_arr=arr,
+        chain_id=0,
+        draw_idx=1,
+        combined_score=float(evaluator.combined_from_scores(evaluation.scalars, length=int(arr.size))),
+        min_norm=float(min(norm_map.values())),
+        sum_norm=float(sum(norm_map.values())),
+        per_tf_map=dict(evaluation.scalars),
+        norm_map=norm_map,
+        per_tf_hits=None,
+        objective_results=evaluation.results,
+    )
 
 
 def test_resolve_dsdna_mode_tracks_bidirectional_flag() -> None:
@@ -632,6 +669,54 @@ def test_postprocess_converges_without_remaining_reverse_single_owner_improvemen
     assert remaining == []
 
 
+def test_postprocess_polishes_multiplicity_occurrence_slots_without_moving_selected_offsets() -> None:
+    scorer = Scorer(
+        {"tfA": _make_pwm("tfA", "AAAA")},
+        bidirectional=False,
+        scale="normalized-llr",
+    )
+    objective_specs = [
+        ObjectiveSpec(
+            objective_id="tfA",
+            tf="tfA",
+            pwm_source_id="tfA",
+            score_scale="normalized-llr",
+            bidirectional=False,
+            selector=TopKDistinctSelectorSpec(
+                copies=2,
+                distinctness=DistinctnessSpec(mode="offset", min_gap=0, strand_rule="collapse_same_locus"),
+            ),
+            aggregator=WeakestSelectedAggregationSpec(),
+            capabilities=KDISTINCT_V1_CAPABILITIES,
+            metadata={"objective_kind": "k_distinct_weakest"},
+        )
+    ]
+    evaluator = SequenceEvaluator(
+        {"tfA": _make_pwm("tfA", "AAAA")},
+        scale="normalized-llr",
+        scorer=scorer,
+        bidirectional=False,
+        objective_specs=objective_specs,
+    )
+    candidate = _multiplicity_candidate("CAAAC", evaluator, scorer)
+
+    hydrate_candidate_hits([candidate], evaluator=evaluator)
+    processed, stats = _postprocess_elite_candidates(
+        candidates=[candidate],
+        scorer=scorer,
+        evaluator=evaluator,
+        dsdna_mode=False,
+        trim_uncovered_internal=False,
+    )
+
+    assert len(processed) == 1
+    assert stats["polish_edits"] >= 2
+    assert _seq_str(processed[0].seq_arr) == "AAAAA"
+    assert processed[0].objective_results is not None
+    selected = processed[0].objective_results["tfA"].selected_hits
+    assert [(int(hit.start), int(hit.end)) for hit in selected] == [(0, 4), (1, 5)]
+
+
 def test_postprocess_converges_after_edge_trim_reexposes_single_owner_edits() -> None:
     pwms = {
         "tf0": PWM(
@@ -830,7 +915,7 @@ def test_hits_match_polish_contract_rejects_reverse_flip_even_when_owner_score_i
 
     trial = np.asarray(candidate.seq_arr, dtype=np.int8).copy()
     trial[0] = 2  # A -> G creates a stronger reverse hit at the same start
-    _, trial_hits, _, _, _ = _candidate_payload(seq_arr=trial, scorer=scorer)
+    _, trial_hits, _, _, _, _ = _candidate_payload(seq_arr=trial, scorer=scorer)
 
     assert str(candidate.per_tf_hits["tfA"]["strand"]) == "+"
     assert str(trial_hits["tfA"]["strand"]) == "-"

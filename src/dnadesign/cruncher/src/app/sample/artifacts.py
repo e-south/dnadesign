@@ -218,6 +218,51 @@ def _baseline_hits_parquet_schema() -> Any:
     )
 
 
+def _objective_scores_parquet_schema(*, id_field: str) -> Any:
+    import pyarrow as pa
+
+    return pa.schema(
+        [
+            pa.field(id_field, pa.string() if id_field == "elite_id" else pa.int64()),
+            pa.field("objective_id", pa.string()),
+            pa.field("tf", pa.string()),
+            pa.field("pwm_source_id", pa.string()),
+            pa.field("objective_kind", pa.string()),
+            pa.field("score_scale", pa.string()),
+            pa.field("scalar_score", pa.float64()),
+            pa.field("normalized_scalar", pa.float64()),
+            pa.field("requested_copies", pa.int64()),
+            pa.field("selected_copies", pa.int64()),
+            pa.field("selection_kind", pa.string()),
+            pa.field("aggregation_kind", pa.string()),
+            pa.field("sequence_length", pa.int64()),
+        ]
+    )
+
+
+def _occurrences_parquet_schema(*, id_field: str) -> Any:
+    import pyarrow as pa
+
+    return pa.schema(
+        [
+            pa.field(id_field, pa.string() if id_field == "elite_id" else pa.int64()),
+            pa.field("objective_id", pa.string()),
+            pa.field("tf", pa.string()),
+            pa.field("occurrence_rank", pa.int64()),
+            pa.field("start", pa.int64()),
+            pa.field("end", pa.int64()),
+            pa.field("strand", pa.string()),
+            pa.field("raw_score", pa.float64()),
+            pa.field("scaled_score", pa.float64()),
+            pa.field("normalized_score", pa.float64()),
+            pa.field("selected", pa.bool_()),
+            pa.field("distinctness_mode", pa.string()),
+            pa.field("min_gap", pa.int64()),
+            pa.field("locus_group", pa.string()),
+        ]
+    )
+
+
 def _format_run_path(path: Path, *, base: Path) -> str:
     try:
         return str(path.relative_to(base))

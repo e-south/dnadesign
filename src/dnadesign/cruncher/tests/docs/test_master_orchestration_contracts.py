@@ -25,6 +25,28 @@ def _workspace_names() -> list[str]:
     return sorted(path.name for path in WORKSPACES_ROOT.iterdir() if path.is_dir())
 
 
+def _load_workspace_config(workspace_name: str) -> dict:
+    payload = yaml.safe_load((WORKSPACES_ROOT / workspace_name / "configs" / "config.yaml").read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    cruncher = payload.get("cruncher")
+    assert isinstance(cruncher, dict)
+    return cruncher
+
+
+def _is_occurrence_aware_workspace(workspace_name: str) -> bool:
+    cfg = _load_workspace_config(workspace_name)
+    sample = cfg.get("sample")
+    if not isinstance(sample, dict):
+        return False
+    objective = sample.get("objective")
+    if not isinstance(objective, dict):
+        return False
+    multiplicity = objective.get("multiplicity")
+    if not isinstance(multiplicity, dict):
+        return False
+    return bool(multiplicity.get("enabled"))
+
+
 def _non_portfolio_workspaces() -> list[str]:
     excluded = {"archived", "portfolio", "portfolios"}
     eligible: list[str] = []
@@ -37,8 +59,12 @@ def _non_portfolio_workspaces() -> list[str]:
     return eligible
 
 
-def test_all_non_portfolio_workspaces_have_length_and_diversity_study_specs() -> None:
-    for workspace_name in _non_portfolio_workspaces():
+def _study_orchestration_workspaces() -> list[str]:
+    return [name for name in _non_portfolio_workspaces() if not _is_occurrence_aware_workspace(name)]
+
+
+def test_representative_hit_workspaces_have_length_and_diversity_study_specs() -> None:
+    for workspace_name in _study_orchestration_workspaces():
         length_spec = WORKSPACES_ROOT / workspace_name / "configs" / "studies" / "length_vs_score.study.yaml"
         diversity_spec = WORKSPACES_ROOT / workspace_name / "configs" / "studies" / "diversity_vs_score.study.yaml"
         assert length_spec.exists(), f"{workspace_name}: missing configs/studies/length_vs_score.study.yaml"
@@ -51,8 +77,8 @@ def test_all_non_portfolio_workspaces_do_not_keep_legacy_portfolio_ready_studies
         assert not legacy.exists(), f"{workspace_name}: remove legacy {legacy.name}"
 
 
-def test_all_non_portfolio_workspaces_runbooks_have_length_and_diversity_study_steps() -> None:
-    for workspace_name in _non_portfolio_workspaces():
+def test_representative_hit_workspaces_runbooks_have_length_and_diversity_study_steps() -> None:
+    for workspace_name in _study_orchestration_workspaces():
         runbook_path = WORKSPACES_ROOT / workspace_name / "configs" / "runbook.yaml"
         payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
         runbook = payload["runbook"]
@@ -89,7 +115,7 @@ def test_master_portfolio_spec_exists_and_covers_every_non_portfolio_workspace()
     assert sequence_length_table.get("study_spec") == "configs/studies/length_vs_score.study.yaml"
     assert sequence_length_table.get("top_n_lengths") == 6
 
-    expected = _non_portfolio_workspaces()
+    expected = _study_orchestration_workspaces()
     sources = portfolio["sources"]
     seen_workspaces = sorted(Path(item["workspace"]).name for item in sources)
     assert seen_workspaces == expected

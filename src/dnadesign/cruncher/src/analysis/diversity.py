@@ -54,27 +54,61 @@ def _levenshtein_bp(a: str, b: str) -> int:
 
 def _tfbs_core_map(
     hits_df: pd.DataFrame,
-    tf_names: Iterable[str],
+    tf_slots: Iterable[str],
     *,
     id_column: str,
 ) -> dict[str, dict[str, np.ndarray]]:
-    tf_list = list(tf_names)
+    slot_list = list(tf_slots)
     core_by_id: dict[str, dict[str, np.ndarray]] = {}
     if hits_df is None or hits_df.empty:
         return core_by_id
-    required_cols = [id_column, "tf", "best_core_seq"]
+    slot_column = "tf_slot" if "tf_slot" in hits_df.columns else "tf"
+    required_cols = [id_column, slot_column, "best_core_seq"]
     if any(column not in hits_df.columns for column in required_cols):
         return core_by_id
-    for item_id, tf_name, core_seq in hits_df[required_cols].itertuples(index=False, name=None):
+    for item_id, tf_slot, core_seq in hits_df[required_cols].itertuples(index=False, name=None):
         if item_id is None:
             continue
         item_id = str(item_id)
-        if not item_id or tf_name not in tf_list:
+        tf_slot_name = str(tf_slot)
+        if not item_id or tf_slot_name not in slot_list:
             continue
         if not isinstance(core_seq, str) or not core_seq:
             continue
-        core_by_id.setdefault(item_id, {})[str(tf_name)] = np.frombuffer(core_seq.encode("ascii"), dtype=np.uint8)
+        core_by_id.setdefault(item_id, {})[tf_slot_name] = np.frombuffer(core_seq.encode("ascii"), dtype=np.uint8)
     return core_by_id
+
+
+def _resolve_tf_slots(
+    hits_df: pd.DataFrame,
+    tf_names: Iterable[str],
+) -> tuple[list[str], dict[str, str]]:
+    tf_list = [str(tf_name) for tf_name in tf_names]
+    if hits_df is None or hits_df.empty or "tf_slot" not in hits_df.columns:
+        return tf_list, {tf_name: tf_name for tf_name in tf_list}
+    mapping: dict[str, str] = {}
+    for tf_name, tf_slot in hits_df[["tf", "tf_slot"]].dropna().itertuples(index=False, name=None):
+        base_tf = str(tf_name)
+        slot_name = str(tf_slot)
+        if not slot_name or base_tf not in tf_list:
+            continue
+        mapping[slot_name] = base_tf
+    if not mapping:
+        return tf_list, {tf_name: tf_name for tf_name in tf_list}
+
+    slot_order_by_base = {tf_name: idx for idx, tf_name in enumerate(tf_list)}
+
+    def _slot_sort_key(slot_name: str) -> tuple[int, int, str]:
+        base_tf = mapping[slot_name]
+        suffix = slot_name[len(base_tf) + 1 :] if slot_name.startswith(f"{base_tf}#") else ""
+        try:
+            rank = int(suffix)
+        except (TypeError, ValueError):
+            rank = 1
+        return (slot_order_by_base.get(base_tf, len(slot_order_by_base)), rank, slot_name)
+
+    ordered_slots = sorted(mapping.keys(), key=_slot_sort_key)
+    return ordered_slots, mapping
 
 
 def compute_distance_matrix(
@@ -84,58 +118,60 @@ def compute_distance_matrix(
     *,
     id_column: str,
 ) -> tuple[list[str], np.ndarray]:
-    tf_list = list(tf_names)
-    core_by_id = _tfbs_core_map(hits_df, tf_list, id_column=id_column)
+    tf_slots, base_tf_by_slot = _resolve_tf_slots(hits_df, tf_names)
+    core_by_id = _tfbs_core_map(hits_df, tf_slots, id_column=id_column)
     item_ids = sorted(core_by_id.keys())
     n = len(item_ids)
     dist = np.full((n, n), np.nan, dtype=float)
     if n == 0:
         return item_ids, dist
 
-    weights_by_tf: dict[str, tuple[np.ndarray, float]] = {}
-    for tf in tf_list:
-        pwm = pwms.get(tf)
+    weights_by_slot: dict[str, tuple[np.ndarray, float]] = {}
+    for tf_slot in tf_slots:
+        base_tf = base_tf_by_slot.get(tf_slot, tf_slot)
+        pwm = pwms.get(base_tf)
         if pwm is None:
             continue
         weights_arr = np.asarray(compute_position_weights(pwm), dtype=float)
         weight_total = float(weights_arr.sum())
         if weights_arr.size == 0 or weight_total <= 0 or not np.isfinite(weight_total):
             continue
-        weights_by_tf[tf] = (weights_arr, weight_total)
+        weights_by_slot[tf_slot] = (weights_arr, weight_total)
 
-    expected_width_by_tf = {tf: payload[0].size for tf, payload in weights_by_tf.items()}
+    expected_width_by_slot = {tf_slot: payload[0].size for tf_slot, payload in weights_by_slot.items()}
     for item_id, tf_cores in core_by_id.items():
-        for tf, core in tf_cores.items():
-            expected_width = expected_width_by_tf.get(tf)
+        for tf_slot, core in tf_cores.items():
+            expected_width = expected_width_by_slot.get(tf_slot)
             if expected_width is None:
                 continue
             if core.size != expected_width:
                 raise ValueError(
-                    f"core width mismatch for TF '{tf}' in item '{item_id}': expected {expected_width}, got {core.size}"
+                    f"core width mismatch for TF slot '{tf_slot}' in item '{item_id}': "
+                    f"expected {expected_width}, got {core.size}"
                 )
 
     for i, item_i in enumerate(item_ids):
         dist[i, i] = 0.0
         for j in range(i + 1, n):
             item_j = item_ids[j]
-            per_tf_sum = 0.0
-            per_tf_count = 0
-            for tf in tf_list:
-                core_i = core_by_id[item_i].get(tf)
-                core_j = core_by_id[item_j].get(tf)
-                weight_payload = weights_by_tf.get(tf)
+            per_slot_sum = 0.0
+            per_slot_count = 0
+            for tf_slot in tf_slots:
+                core_i = core_by_id[item_i].get(tf_slot)
+                core_j = core_by_id[item_j].get(tf_slot)
+                weight_payload = weights_by_slot.get(tf_slot)
                 if core_i is None or core_j is None or weight_payload is None:
                     continue
                 weights_arr, weight_total = weight_payload
                 if core_i.shape != core_j.shape or core_i.size != weights_arr.size:
                     continue
                 distance = float(np.dot(weights_arr, np.not_equal(core_i, core_j))) / weight_total
-                per_tf_sum += distance
-                per_tf_count += 1
-            if per_tf_count == 0:
+                per_slot_sum += distance
+                per_slot_count += 1
+            if per_slot_count == 0:
                 value = float("nan")
             else:
-                value = per_tf_sum / float(per_tf_count)
+                value = per_slot_sum / float(per_slot_count)
             dist[i, j] = value
             dist[j, i] = value
     return item_ids, dist

@@ -24,13 +24,18 @@ Runbook coupling contract:
 - Optional verification or follow-up commands belong in a separate optional
   section so the one-line run command never drifts from the standard sequence.
 
-For optimization workspaces (non-portfolio), keep standard study specs:
+For representative-hit optimization workspaces (non-portfolio), keep standard study specs:
 `configs/studies/length_vs_score.study.yaml` and
 `configs/studies/diversity_vs_score.study.yaml`.
 
+Occurrence-aware multiplicity demos are narrower on purpose: keep them runnable
+through `analyze`, inspect the occurrence sidecars and static plots, and do not
+pretend they are portfolio-ready until the downstream readers support that
+contract.
+
 Current layout:
 
-- didactic demos: `demo_pairwise/`, `demo_multitf/`, `demo_yiu_circularized/`
+- didactic demos: `demo_pairwise/`, `demo_multitf/`, `demo_monotypic_baer/`, `demo_yiu_circularized/`
 - pairwise optimization slices:
   `pairwise_cpxr_baer/`,
   `pairwise_cpxr_lexa/`,
@@ -86,7 +91,7 @@ For the ten pairwise/multitf optimization slices above, keep one shared
 `workspace.regulator_sets`, discovery/catalog source IDs, and analysis pairwise
 projection.
 
-Standard lifecycle for any workspace:
+Representative-hit optimization lifecycle:
 
 ```bash
 # Pin config path for repeated CLI calls.
@@ -106,6 +111,27 @@ cruncher sample --force-overwrite -c "$CONFIG"
 cruncher analyze --summary -c "$CONFIG"
 # Export latest elite sequences for downstream use.
 cruncher export sequences --latest -c "$CONFIG"
+```
+
+Occurrence-aware multiplicity demo lifecycle:
+
+```bash
+# Pin config path for repeated CLI calls.
+CONFIG="$PWD/configs/config.yaml"
+# Fetch TF binding sites from the configured source.
+cruncher fetch sites ... -c "$CONFIG"
+# Run motif discovery over fetched site evidence.
+cruncher discover motifs ... -c "$CONFIG"
+# Freeze motif/source provenance for deterministic downstream steps.
+cruncher lock -c "$CONFIG"
+# Parse inputs into normalized Cruncher artifacts.
+cruncher parse --force-overwrite -c "$CONFIG"
+# Generate candidate sequences and occurrence-aware sidecars.
+cruncher sample --force-overwrite -c "$CONFIG"
+# Render the standard static plot suite from occurrence-aware placements.
+cruncher analyze --summary -c "$CONFIG"
+# Inspect the resulting run manifest + artifact inventory.
+cruncher runs show outputs -c "$CONFIG"
 ```
 
 Standard machine runbook execution:
@@ -184,7 +210,7 @@ Portfolio source `run_dir` guidance:
 - single regulator set workspace: `run_dir: outputs`
 - multi-set workspace: `run_dir: outputs/set<index>_<tf-slug>`
 
-Portfolio source precondition per included workspace run:
+Portfolio source precondition per included representative-hit workspace run:
 
 ```bash
 # Compute analysis summaries for generated sequence sets.

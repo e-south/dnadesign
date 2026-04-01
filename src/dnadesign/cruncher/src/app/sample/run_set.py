@@ -26,6 +26,7 @@ from dnadesign.cruncher.app.sample.preflight import (
     _resolve_final_softmin_beta,
     _softmin_schedule_payload,
     _validate_objective_preflight,
+    prepare_objective_plan,
 )
 from dnadesign.cruncher.app.sample.resources import _load_pwms_for_set
 from dnadesign.cruncher.app.sample.run_set_execution import run_sample_for_set
@@ -39,6 +40,7 @@ _REEXPORTED_PREFLIGHT = (
     _assert_trace_meta_aligned,
     _core_def_hash,
     _mcmc_cooling_payload,
+    prepare_objective_plan,
     _resolve_elite_pool_size,
     _resolve_final_softmin_beta,
     _softmin_schedule_payload,

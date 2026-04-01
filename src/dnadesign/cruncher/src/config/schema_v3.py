@@ -288,12 +288,45 @@ class SampleObjectiveScoringConfig(StrictBaseModel):
         return float(v)
 
 
+class SampleObjectiveMultiplicityDistinctnessConfig(StrictBaseModel):
+    mode: Literal["interval", "offset"] = "interval"
+    min_gap: int = 0
+    strand_rule: Literal["collapse_same_locus"] = "collapse_same_locus"
+
+    @field_validator("min_gap")
+    @classmethod
+    def _check_min_gap(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 0:
+            raise ValueError("objective.multiplicity.distinctness.min_gap must be >= 0")
+        return int(v)
+
+
+class SampleObjectiveMultiplicityAggregationConfig(StrictBaseModel):
+    selector: Literal["top_k_distinct"] = "top_k_distinct"
+    scalar: Literal["weakest_selected"] = "weakest_selected"
+
+
+class SampleObjectiveMultiplicityConfig(StrictBaseModel):
+    enabled: bool = False
+    copies: int = 1
+    distinctness: SampleObjectiveMultiplicityDistinctnessConfig = SampleObjectiveMultiplicityDistinctnessConfig()
+    aggregation: SampleObjectiveMultiplicityAggregationConfig = SampleObjectiveMultiplicityAggregationConfig()
+
+    @field_validator("copies")
+    @classmethod
+    def _check_copies(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("objective.multiplicity.copies must be >= 1")
+        return int(v)
+
+
 class SampleObjectiveConfig(StrictBaseModel):
     bidirectional: bool = True
     score_scale: Literal["normalized-llr", "llr", "logp", "z", "consensus-neglop-sum"] = "normalized-llr"
     combine: Literal["min", "sum"] = "min"
     softmin: SampleObjectiveSoftminConfig = SampleObjectiveSoftminConfig()
     scoring: SampleObjectiveScoringConfig = SampleObjectiveScoringConfig()
+    multiplicity: SampleObjectiveMultiplicityConfig = SampleObjectiveMultiplicityConfig()
 
 
 class MoveAdaptiveWeightsConfig(StrictBaseModel):

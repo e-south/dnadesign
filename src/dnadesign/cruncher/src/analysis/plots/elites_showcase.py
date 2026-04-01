@@ -99,6 +99,13 @@ def _required_columns(df: pd.DataFrame, columns: list[str], *, context: str) -> 
         raise ValueError(f"{context} missing required columns: {missing}")
 
 
+def _int_or_default(value: object, *, default: int) -> int:
+    numeric = pd.to_numeric(value, errors="coerce")
+    if pd.isna(numeric):
+        return default
+    return int(numeric)
+
+
 def _ordered_elites(elites_df: pd.DataFrame) -> pd.DataFrame:
     frame = elites_df.copy()
     frame["id"] = frame["id"].astype(str)
@@ -110,17 +117,26 @@ def _ordered_elites(elites_df: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
-def _hits_index(hits_df: pd.DataFrame) -> dict[tuple[str, str], pd.Series]:
+def _hits_by_elite(
+    hits_df: pd.DataFrame,
+    *,
+    tf_names: list[str],
+) -> dict[str, list[pd.Series]]:
     _required_columns(hits_df, ["elite_id", "tf", "best_start", "pwm_width", "best_strand"], context="hits_df")
-    key_counts = hits_df.groupby(["elite_id", "tf"]).size()
-    duplicates = key_counts[key_counts > 1]
-    if not duplicates.empty:
-        labels = [f"({idx[0]}, {idx[1]}) x{int(count)}" for idx, count in duplicates.items()]
-        raise ValueError(f"hits_df contains duplicate elite/tf rows: {labels}")
+    tf_order = {tf_name: idx for idx, tf_name in enumerate(tf_names)}
+    rows: dict[str, list[pd.Series]] = {}
 
-    rows: dict[tuple[str, str], pd.Series] = {}
+    def _sort_key(row: pd.Series) -> tuple[int, int, int, int]:
+        tf_name = str(row.get("tf") or "")
+        occurrence_rank = _int_or_default(row.get("occurrence_rank"), default=1)
+        start = _int_or_default(row.get("best_start"), default=0)
+        return (tf_order.get(tf_name, len(tf_order)), occurrence_rank, start, occurrence_rank)
+
     for _, row in hits_df.iterrows():
-        rows[(str(row["elite_id"]), str(row["tf"]))] = row
+        elite_id = str(row["elite_id"])
+        rows.setdefault(elite_id, []).append(row)
+    for elite_id, hit_rows in rows.items():
+        rows[elite_id] = sorted(hit_rows, key=_sort_key)
     return rows
 
 
@@ -272,7 +288,7 @@ def build_elites_showcase_records(
             "reduce elites or raise max_panels."
         )
 
-    hit_by_key = _hits_index(hits_df)
+    hits_by_elite = _hits_by_elite(hits_df, tf_names=tf_list)
     overlay_cols = len(ordered) if overlay_ncols is None else int(overlay_ncols)
     if overlay_cols < 1:
         raise ValueError("elites showcase overlay_ncols must be >= 1")
@@ -288,11 +304,16 @@ def build_elites_showcase_records(
         features: list[Feature] = []
         effects: list[Effect] = []
         tag_labels: dict[str, str] = {}
+        elite_hits = hits_by_elite.get(elite_id)
+        if not elite_hits:
+            raise ValueError(f"Missing hit rows for elite '{elite_id}'")
+        present_tfs = {str(hit.get("tf") or "") for hit in elite_hits}
+        missing_tfs = [tf_name for tf_name in tf_list if tf_name not in present_tfs]
+        if missing_tfs:
+            raise ValueError(f"Missing hit row for elite '{elite_id}' and TF(s) {missing_tfs}")
 
-        for tf_idx, tf_name in enumerate(tf_list):
-            hit = hit_by_key.get((elite_id, tf_name))
-            if hit is None:
-                raise ValueError(f"Missing hit row for elite '{elite_id}' and TF '{tf_name}'")
+        for tf_idx, hit in enumerate(elite_hits):
+            tf_name = str(hit["tf"])
 
             start = int(hit["best_start"])
             width = int(hit["pwm_width"])
@@ -320,7 +341,8 @@ def build_elites_showcase_records(
             segment = sequence[start:end]
             label = segment if strand == "fwd" else _revcomp(segment)
             tag = f"tf:{tf_name}"
-            feature_id = f"{elite_id}:best_window:{tf_name}:{tf_idx}"
+            occurrence_rank = _int_or_default(hit.get("occurrence_rank"), default=1)
+            feature_id = f"{elite_id}:best_window:{tf_name}:{occurrence_rank}:{tf_idx}"
             matrix = pwm_matrix_by_tf[tf_name]
             if len(matrix) != width:
                 raise ValueError(
@@ -335,7 +357,7 @@ def build_elites_showcase_records(
                     span=Span(start=start, end=end, strand=strand),
                     label=label,
                     tags=(tag,),
-                    attrs={"tf": tf_name},
+                    attrs={"tf": tf_name, "occurrence_rank": occurrence_rank},
                     render={"priority": 10},
                 )
             )

@@ -16,13 +16,21 @@ from typing import Dict, Sequence, Tuple
 
 import numpy as np
 
+from dnadesign.cruncher.core.objectives.models import WindowHit
 from dnadesign.cruncher.core.pvalue import logodds_to_p_lookup
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.sequence import revcomp_int
-from dnadesign.cruncher.core.state import SequenceState
 
 logger = logging.getLogger(__name__)
 _PWM_STATS_CACHE_MAXSIZE = 512
+_DNA_ALPHABET = np.array(["A", "C", "G", "T"], dtype="<U1")
+
+
+def _codes_to_string(seq: np.ndarray) -> str:
+    arr = np.asarray(seq, dtype=np.int8)
+    if arr.ndim != 1:
+        raise ValueError("DNA sequence string conversion requires a 1-D array.")
+    return "".join(_DNA_ALPHABET[arr])
 
 
 def _best_hit_from_llrs(
@@ -382,10 +390,17 @@ class Scorer:
             "best_start": int(start),
             "strand": str(strand),
             "width": int(width),
-            "best_window_seq": SequenceState(window).to_string(),
-            "best_core_seq": SequenceState(core).to_string(),
+            "best_window_seq": _codes_to_string(window),
+            "best_core_seq": _codes_to_string(core),
             "best_hit_tiebreak": str(tiebreak),
         }
+
+    def hit_sequences(self, seq: np.ndarray, *, start: int, width: int, strand: str) -> tuple[str, str]:
+        window = np.asarray(seq, dtype=np.int8)[int(start) : int(start) + int(width)]
+        if window.size != int(width):
+            raise ValueError("Hit window out of bounds while materializing sequences.")
+        core = revcomp_int(window) if str(strand) == "-" else window
+        return _codes_to_string(window), _codes_to_string(core)
 
     def compute_all_per_pwm_and_hits(
         self,
@@ -490,18 +505,32 @@ class Scorer:
         logger.debug("  Per-TF scaled map: %s", out)
         return out
 
-    def _scaled_value_from_raw_llr(self, tf: str, raw_llr: float, seq_length: int) -> float:
+    def _scale_name(self, scale: str | None) -> str:
+        normalized = (self.scale if scale is None else str(scale)).strip().lower()
+        if normalized not in self.SUPPORTED_SCALES:
+            raise ValueError(f"Unsupported scale '{scale}'; choose from {self.SUPPORTED_SCALES}.")
+        return normalized
+
+    def _scaled_value_from_raw_llr(
+        self,
+        tf: str,
+        raw_llr: float,
+        seq_length: int,
+        *,
+        scale: str | None = None,
+    ) -> float:
         info = self._info(tf)
-        if self.scale == "llr":
+        scale_name = self._scale_name(scale)
+        if scale_name == "llr":
             return float(raw_llr)
-        if self.scale == "z":
+        if scale_name == "z":
             return float((raw_llr - info.null_mean) / info.null_std)
-        if self.scale == "normalized-llr":
+        if scale_name == "normalized-llr":
             num, denom = raw_llr - info.null_mean, info.consensus_llr - info.null_mean
             frac = 0.0 if denom <= 0 else max(0.0, num / denom)
             return float(frac)
         neglogp_seq = self._per_pwm_neglogp(raw_llr, info, seq_length)
-        if self.scale == "logp":
+        if scale_name == "logp":
             return float(neglogp_seq)
         neglogp_cons = info.consensus_neglogp_by_len.get(seq_length)
         if neglogp_cons is None:
@@ -530,6 +559,61 @@ class Scorer:
         for tf, raw_llr in raw_llr_by_tf.items():
             out[tf] = self._scaled_value_from_raw_llr(tf, raw_llr, seq_length)
         return out
+
+    def scale_raw_score(self, tf: str, raw_llr: float, seq_length: int, *, scale: str | None = None) -> float:
+        return self._scaled_value_from_raw_llr(tf, raw_llr, seq_length, scale=scale)
+
+    def scan_hits(
+        self,
+        seq: np.ndarray,
+        tf: str,
+        seq_length: int,
+        *,
+        scale: str | None = None,
+        include_sequences: bool = True,
+    ) -> tuple[WindowHit, ...]:
+        info = self._info(tf)
+        L, w = seq.size, info.width
+        if L < w:
+            return ()
+
+        def _scan(arr: np.ndarray) -> np.ndarray:
+            windows = np.lib.stride_tricks.sliding_window_view(arr, w)
+            return info.lom[np.arange(w)[:, None], windows.T].sum(axis=0)
+
+        def _window_hit(
+            *,
+            start: int,
+            strand: str,
+            raw_score: float,
+        ) -> WindowHit:
+            window = np.asarray(seq, dtype=np.int8)[start : start + w]
+            if window.size != w:
+                raise ValueError(f"Window out of bounds while scanning TF '{tf}'.")
+            core = revcomp_int(window) if strand == "-" else window
+            return WindowHit(
+                tf=tf,
+                start=int(start),
+                end=int(start + w),
+                width=int(w),
+                strand=str(strand),
+                raw_score=float(raw_score),
+                scaled_score=self._scaled_value_from_raw_llr(tf, float(raw_score), seq_length, scale=scale),
+                window_seq=_codes_to_string(window) if include_sequences else None,
+                core_seq=_codes_to_string(core) if include_sequences else None,
+            )
+
+        llrs_fwd = _scan(seq)
+        hits: list[WindowHit] = [
+            _window_hit(start=int(offset), strand="+", raw_score=float(score)) for offset, score in enumerate(llrs_fwd)
+        ]
+        if self.bidirectional:
+            rev = (3 - seq)[::-1]
+            llrs_rev = _scan(rev)
+            for offset, score in enumerate(llrs_rev):
+                start = int(L - w - offset)
+                hits.append(_window_hit(start=start, strand="-", raw_score=float(score)))
+        return tuple(hits)
 
     def make_local_cache(self, seq: np.ndarray) -> "LocalScanCache":
         return LocalScanCache(self, seq)

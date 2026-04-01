@@ -215,6 +215,7 @@ def _compute_diagnostics_and_write(
             "optimizer_kind": sample_meta.optimizer_kind,
             "top_k": sample_meta.top_k,
             "dsdna_canonicalize": sample_meta.bidirectional,
+            "selection_diversity": sample_meta.selection_diversity,
         },
         trace_required=False,
         overlap_summary=overlap_summary,

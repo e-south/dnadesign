@@ -32,6 +32,26 @@ def _load_yaml(path: Path) -> dict:
     return payload
 
 
+def _is_occurrence_aware_config(config_path: Path) -> bool:
+    payload = _load_yaml(config_path)
+    cruncher = payload.get("cruncher")
+    assert isinstance(cruncher, dict)
+    sample = cruncher.get("sample")
+    if not isinstance(sample, dict):
+        return False
+    objective = sample.get("objective")
+    if not isinstance(objective, dict):
+        return False
+    multiplicity = objective.get("multiplicity")
+    if not isinstance(multiplicity, dict):
+        return False
+    return bool(multiplicity.get("enabled"))
+
+
+def _study_workspace_config_paths() -> list[Path]:
+    return [path for path in _workspace_config_paths() if not _is_occurrence_aware_config(path)]
+
+
 def _collect_factor_keys(study_payload: dict) -> set[str]:
     keys: set[str] = set()
     trials = study_payload.get("trials")
@@ -75,8 +95,8 @@ def _collect_sequence_lengths(study_payload: dict) -> list[int]:
     return sorted(set(values))
 
 
-def test_all_workspaces_define_length_and_diversity_study_specs() -> None:
-    for config_path in _workspace_config_paths():
+def test_representative_hit_workspaces_define_length_and_diversity_study_specs() -> None:
+    for config_path in _study_workspace_config_paths():
         workspace = config_path.parent.parent
         length_spec = workspace / "configs" / "studies" / "length_vs_score.study.yaml"
         diversity_spec = workspace / "configs" / "studies" / "diversity_vs_score.study.yaml"
@@ -85,7 +105,7 @@ def test_all_workspaces_define_length_and_diversity_study_specs() -> None:
 
 
 def test_length_vs_score_studies_follow_workspace_study_range_policy() -> None:
-    for config_path in _workspace_config_paths():
+    for config_path in _study_workspace_config_paths():
         workspace = config_path.parent.parent
         config_payload = _load_yaml(config_path)
         base_sequence_length = int(config_payload["cruncher"]["sample"]["sequence_length"])
@@ -118,7 +138,7 @@ def test_length_vs_score_studies_follow_workspace_study_range_policy() -> None:
 
 
 def test_diversity_vs_score_studies_inherit_workspace_sequence_length() -> None:
-    for config_path in _workspace_config_paths():
+    for config_path in _study_workspace_config_paths():
         workspace = config_path.parent.parent
         payload = _load_yaml(workspace / "configs" / "studies" / "diversity_vs_score.study.yaml")
         study = payload["study"]

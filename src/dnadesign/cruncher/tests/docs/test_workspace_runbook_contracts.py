@@ -29,6 +29,20 @@ def _load_config(path: Path) -> dict:
     return cruncher_payload
 
 
+def _is_occurrence_aware_workspace(config_path: Path) -> bool:
+    cfg = _load_config(config_path)
+    sample = cfg.get("sample")
+    if not isinstance(sample, dict):
+        return False
+    objective = sample.get("objective")
+    if not isinstance(objective, dict):
+        return False
+    multiplicity = objective.get("multiplicity")
+    if not isinstance(multiplicity, dict):
+        return False
+    return bool(multiplicity.get("enabled"))
+
+
 def _load_machine_runbook(path: Path) -> dict:
     payload = yaml.safe_load(path.read_text())
     assert isinstance(payload, dict)
@@ -145,7 +159,7 @@ def test_every_workspace_with_config_has_machine_runbook() -> None:
         assert runbook_yaml.exists(), f"missing configs/runbook.yaml for workspace: {config_path.parent.parent.name}"
 
 
-def test_machine_runbooks_include_fail_fast_analysis_and_export_steps() -> None:
+def test_machine_runbooks_match_supported_workflow_contract() -> None:
     root = _workspace_root()
     for config_path in sorted(root.glob("*/configs/config.yaml")):
         workspace = config_path.parent.parent
@@ -157,10 +171,19 @@ def test_machine_runbooks_include_fail_fast_analysis_and_export_steps() -> None:
         assert len(ids) == len(set(ids)), f"{workspace.name}: duplicate machine runbook step ids"
         assert "reset_workspace" in ids, f"{workspace.name}: missing reset_workspace step"
         assert "clean_transient" not in ids, f"{workspace.name}: replace clean_transient with reset_workspace"
-        assert "analyze_summary" in ids, f"{workspace.name}: missing analyze_summary step"
-        assert ("export_sequences_latest" in ids) or ("export_sequences_outputs" in ids), (
-            f"{workspace.name}: missing export sequence step for handoff readiness"
-        )
+        if _is_occurrence_aware_workspace(config_path):
+            assert "analyze_summary" in ids, f"{workspace.name}: occurrence-aware runbook missing analyze_summary"
+            assert "show_sample_outputs" in ids, (
+                f"{workspace.name}: occurrence-aware runbook missing show_sample_outputs"
+            )
+            assert "export_sequences_latest" not in ids and "export_sequences_outputs" not in ids, (
+                f"{workspace.name}: occurrence-aware runbook should not call export sequences"
+            )
+        else:
+            assert "analyze_summary" in ids, f"{workspace.name}: missing analyze_summary step"
+            assert ("export_sequences_latest" in ids) or ("export_sequences_outputs" in ids), (
+                f"{workspace.name}: missing export sequence step for handoff readiness"
+            )
 
 
 def test_machine_runbook_study_steps_include_human_readable_descriptions() -> None:
@@ -172,6 +195,14 @@ def test_machine_runbook_study_steps_include_human_readable_descriptions() -> No
         steps = runbook.get("steps")
         assert isinstance(steps, list) and steps
         by_id = {str(item.get("id")): item for item in steps if isinstance(item, dict)}
+        if _is_occurrence_aware_workspace(config_path):
+            assert "study_run_length_vs_score" not in by_id, (
+                f"{workspace.name}: occurrence-aware runbook should not expose length study"
+            )
+            assert "study_run_diversity_vs_score" not in by_id, (
+                f"{workspace.name}: occurrence-aware runbook should not expose diversity study"
+            )
+            continue
         for step_id in ("study_run_length_vs_score", "study_run_diversity_vs_score"):
             step = by_id.get(step_id)
             assert isinstance(step, dict), f"{workspace.name}: missing {step_id} step"
@@ -214,28 +245,45 @@ def test_workspace_runbooks_encode_source_merge_then_meme_oops_flow() -> None:
         assert isinstance(discover, dict)
         discover_source_id = discover.get("source_id")
         assert isinstance(discover_source_id, str) and discover_source_id
+        occurrence_aware = _is_occurrence_aware_workspace(config_path)
 
-        _assert_token_order(
-            runbook,
-            [
-                "fetch sites --source",
-                "fetch sites --source regulondb",
-                "discover motifs",
-                "--tool meme --meme-mod oops",
-                f"--source-id {discover_source_id}",
-                'lock -c "$CONFIG"',
-                'parse --force-overwrite -c "$CONFIG"',
-                'sample --force-overwrite -c "$CONFIG"',
-                'analyze --summary -c "$CONFIG"',
-                'export sequences --latest -c "$CONFIG"',
-            ],
-            label=f"{workspace.name}/runbook.md",
-        )
+        flow_tokens = [
+            "fetch sites --source",
+            "fetch sites --source regulondb",
+            "discover motifs",
+            "--tool meme --meme-mod oops",
+            f"--source-id {discover_source_id}",
+            'lock -c "$CONFIG"',
+            'parse --force-overwrite -c "$CONFIG"',
+            'sample --force-overwrite -c "$CONFIG"',
+        ]
+        if occurrence_aware:
+            flow_tokens.extend(
+                [
+                    'analyze --summary -c "$CONFIG"',
+                    'runs show outputs -c "$CONFIG"',
+                    "catalog logos",
+                ]
+            )
+        else:
+            flow_tokens.extend(
+                [
+                    'analyze --summary -c "$CONFIG"',
+                    'export sequences --latest -c "$CONFIG"',
+                ]
+            )
+
+        _assert_token_order(runbook, flow_tokens, label=f"{workspace.name}/runbook.md")
 
         assert "merges all fetched site sets across sources" in runbook
         assert "fetch sites --source regulondb" in runbook
         for tf_name in regulator_names:
             assert f"--tf {tf_name}" in runbook, f"{workspace.name}: missing TF flag for {tf_name}"
+
+        if occurrence_aware:
+            assert "Export, studies, and portfolio aggregation remain gated" in runbook
+            assert "elites_objective_scores.parquet" in runbook
+            assert "elites_occurrences.parquet" in runbook
 
         local_input = workspace / "inputs" / "local_motifs"
         if local_input.is_dir():
