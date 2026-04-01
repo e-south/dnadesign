@@ -73,3 +73,33 @@ def test_parse_ddg_table_rejects_nonsequential_positions(tmp_path: Path) -> None
     path.write_text("PO\tA\tT\tC\tG\n1\t0\t0\t0\t0\n3\t0\t0\t0\t0\n", encoding="utf-8")
     with pytest.raises(ValueError, match="position order"):
         parse_ddg_table(path)
+
+
+@pytest.mark.parametrize(
+    ("contents", "message"),
+    [
+        ("", "empty"),
+        ("XX\tA\tT\tC\tG\n1\t0\t0\t0\t0\n", "first column"),
+        ("PO\tA\tT\tC\n1\t0\t0\t0\n", "expected 5 columns"),
+        ("PO\tA\tT\tC\tG\n", "no data rows"),
+        ("PO\tA\tT\tC\tG\none\t0\t0\t0\t0\n", "Invalid ddG position"),
+        ("PO\tA\tT\tC\tG\n1\t0\t0\tbad\t0\n", "Invalid ddG value"),
+    ],
+)
+def test_parse_ddg_table_rejects_malformed_inputs(tmp_path: Path, contents: str, message: str) -> None:
+    path = tmp_path / "bad.tsv"
+    path.write_text(contents, encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        parse_ddg_table(path)
+
+
+def test_ddg_to_probability_matrix_rejects_invalid_temperature_shape_and_values() -> None:
+    with pytest.raises(ValueError, match="temperature_k"):
+        ddg_to_probability_matrix(np.array([[0.0, 1.0, 2.0, 3.0]], dtype=float), temperature_k=0.0)
+
+    with pytest.raises(ValueError, match="shape"):
+        ddg_to_probability_matrix(np.array([0.0, 1.0, 2.0, 3.0], dtype=float))
+
+    with pytest.raises(ValueError, match="finite"):
+        ddg_to_probability_matrix(np.array([[0.0, np.nan, 2.0, 3.0]], dtype=float))
