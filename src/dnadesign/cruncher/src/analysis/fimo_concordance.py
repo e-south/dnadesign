@@ -22,9 +22,15 @@ import pandas as pd
 
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.integrations.meme_suite import resolve_executable
-from dnadesign.cruncher.io.meme_export import sanitize_meme_id, write_minimal_meme_motif
+from dnadesign.cruncher.io.meme_export import sanitize_meme_id
+from dnadesign.cruncher.io.meme_export import write_minimal_meme_motif as _write_shared_meme_motif
 
 _HEADER_RE = re.compile(r"[\s\-]+")
+
+
+def _write_minimal_meme_motif(pwm: PWM, out_path: Path, motif_id: str | None = None) -> None:
+    """Compatibility wrapper retained for existing FIMO integration tests."""
+    _write_shared_meme_motif(pwm, out_path, motif_id=motif_id)
 
 
 def _normalize_header(name: str) -> str:
@@ -179,7 +185,7 @@ def build_fimo_concordance_table(
         if pwm is None:
             raise ValueError(f"Missing PWM for TF '{tf_name}' while computing FIMO concordance.")
         motif_path = work_dir / f"{sanitize_meme_id(tf_name)}.meme"
-        write_minimal_meme_motif(pwm, motif_path, motif_id=tf_name)
+        _write_shared_meme_motif(pwm, motif_path, motif_id=tf_name)
         rows = _run_fimo(
             motif_path=motif_path,
             fasta_path=fasta_path,
