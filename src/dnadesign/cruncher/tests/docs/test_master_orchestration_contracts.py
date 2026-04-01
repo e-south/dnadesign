@@ -22,7 +22,14 @@ MASTER_SPEC = PORTFOLIO_WORKSPACE / "configs" / "master_all_workspaces.portfolio
 
 
 def _workspace_names() -> list[str]:
-    return sorted(path.name for path in WORKSPACES_ROOT.iterdir() if path.is_dir())
+    names: list[str] = []
+    for path in WORKSPACES_ROOT.iterdir():
+        if not path.is_dir():
+            continue
+        config_path = path / "configs" / "config.yaml"
+        if config_path.exists() or path.name == "portfolios":
+            names.append(path.name)
+    return sorted(names)
 
 
 def _load_workspace_config(workspace_name: str) -> dict:
