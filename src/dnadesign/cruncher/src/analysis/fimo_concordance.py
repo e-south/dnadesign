@@ -22,18 +22,13 @@ import pandas as pd
 
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.integrations.meme_suite import resolve_executable
+from dnadesign.cruncher.io.meme_export import sanitize_meme_id, write_minimal_meme_motif
 
 _HEADER_RE = re.compile(r"[\s\-]+")
-_SAFE_ID_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
 def _normalize_header(name: str) -> str:
     return _HEADER_RE.sub("_", str(name).strip().lower())
-
-
-def _sanitize_id(text: str) -> str:
-    cleaned = _SAFE_ID_RE.sub("_", str(text).strip())
-    return cleaned or "motif"
 
 
 def _parse_fimo_tsv(text: str) -> list[dict[str, object]]:
@@ -91,27 +86,6 @@ def _run_fimo(
         stderr = (result.stderr or "").strip()
         raise RuntimeError(f"FIMO failed (exit {result.returncode}). {stderr or 'No stderr output.'}")
     return _parse_fimo_tsv(result.stdout)
-
-
-def _write_minimal_meme_motif(pwm: PWM, out_path: Path) -> str:
-    motif_id = _sanitize_id(pwm.name)
-    lines = [
-        "MEME version 4",
-        "",
-        "ALPHABET= ACGT",
-        "",
-        "strands: + -",
-        "",
-        "Background letter frequencies:",
-        "A 0.25 C 0.25 G 0.25 T 0.25",
-        "",
-        f"MOTIF {motif_id}",
-        f"letter-probability matrix: alength= 4 w= {int(pwm.length)}",
-    ]
-    for row in np.asarray(pwm.matrix, dtype=float):
-        lines.append(f"{float(row[0]):.6g} {float(row[1]):.6g} {float(row[2]):.6g} {float(row[3]):.6g}")
-    out_path.write_text("\n".join(lines) + "\n")
-    return motif_id
 
 
 def _write_candidates_fasta(records: list[tuple[str, str]], out_path: Path) -> None:
@@ -204,8 +178,8 @@ def build_fimo_concordance_table(
         pwm = pwms.get(tf_name)
         if pwm is None:
             raise ValueError(f"Missing PWM for TF '{tf_name}' while computing FIMO concordance.")
-        motif_path = work_dir / f"{_sanitize_id(tf_name)}.meme"
-        _write_minimal_meme_motif(pwm, motif_path)
+        motif_path = work_dir / f"{sanitize_meme_id(tf_name)}.meme"
+        write_minimal_meme_motif(pwm, motif_path, motif_id=tf_name)
         rows = _run_fimo(
             motif_path=motif_path,
             fasta_path=fasta_path,

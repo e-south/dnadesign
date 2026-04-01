@@ -47,6 +47,13 @@ def _is_occurrence_aware_workspace(workspace_name: str) -> bool:
     return bool(multiplicity.get("enabled"))
 
 
+def _is_motif_ingest_workspace(workspace_name: str) -> bool:
+    cfg = _load_workspace_config(workspace_name)
+    discover = cfg.get("discover")
+    assert isinstance(discover, dict)
+    return discover.get("enabled") is False
+
+
 def _non_portfolio_workspaces() -> list[str]:
     excluded = {"archived", "portfolio", "portfolios"}
     return [name for name in _workspace_names() if name not in excluded]
@@ -114,8 +121,6 @@ def test_master_portfolio_spec_exists_and_covers_every_non_portfolio_workspace()
     assert seen_workspaces == expected
 
     required_prepare_steps = [
-        "fetch_sites_regulondb",
-        "discover_motifs",
         "render_logos",
         "lock_targets",
         "parse_run",
@@ -133,3 +138,13 @@ def test_master_portfolio_spec_exists_and_covers_every_non_portfolio_workspace()
         assert isinstance(step_ids, list)
         for step in required_prepare_steps:
             assert step in step_ids, f"source={source['id']}: missing prepare step {step}"
+        if _is_motif_ingest_workspace(str(source["id"])):
+            assert any(str(step).startswith("fetch_motifs") for step in step_ids), (
+                f"source={source['id']}: motif-ingest workspace must fetch motifs during prepare"
+            )
+            assert "export_meme" in step_ids, f"source={source['id']}: motif-ingest workspace must export MEME"
+        else:
+            assert "fetch_sites_regulondb" in step_ids, (
+                f"source={source['id']}: discovery workspace must fetch RegulonDB sites during prepare"
+            )
+            assert "discover_motifs" in step_ids, f"source={source['id']}: discovery workspace must discover motifs"

@@ -208,6 +208,42 @@ def test_catalog_logos_default_output_is_flat_plots_dir(tmp_path: Path) -> None:
     assert not (plots_root / "logos").exists()
 
 
+def test_export_meme_defaults_to_workspace_artifacts_tree(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    entry = CatalogEntry(
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="PFM",
+        has_matrix=True,
+        matrix_source="alignment",
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+    _write_prob_motif(
+        catalog_root / "normalized" / "motifs" / "regulondb" / "RBM1.json",
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+    )
+
+    config_path = _write_config(tmp_path)
+    result = runner.invoke(
+        app,
+        ["catalog", "export-meme", "--tf", "lexA", str(config_path)],
+        color=False,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "MEME motif exports" in result.output
+    out_dir = tmp_path / "runs" / "artifacts" / "meme"
+    artifacts = list(out_dir.glob("*.meme"))
+    assert len(artifacts) == 1
+    text = artifacts[0].read_text()
+    assert "MEME version 4" in text
+    assert "MOTIF RBM1" in text
+    assert (out_dir / "meme_manifest.json").exists()
+
+
 def test_export_sites_ignores_pwm_source_for_selection(tmp_path: Path) -> None:
     catalog_root = tmp_path / ".cruncher"
     entry = CatalogEntry(
