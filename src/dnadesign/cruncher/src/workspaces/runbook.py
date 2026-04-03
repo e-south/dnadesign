@@ -161,8 +161,25 @@ def _is_writable_directory(path: Path) -> bool:
         return False
 
 
+def _normalize_runbook_locale_env(env: dict[str, str]) -> None:
+    """Avoid leaking unsupported locale tags into render subprocesses."""
+    normalized = False
+    for key in ("LANG", "LC_ALL", "LANGUAGE"):
+        value = str(env.get(key, "")).strip()
+        if value.casefold() != "c.utf-8":
+            continue
+        if key == "LANGUAGE":
+            env.pop(key, None)
+        else:
+            env[key] = "C"
+        normalized = True
+    if normalized:
+        env.setdefault("PYTHONUTF8", "1")
+
+
 def _runbook_subprocess_env(*, workspace_root: Path) -> dict[str, str]:
     env = dict(os.environ)
+    _normalize_runbook_locale_env(env)
     home_raw = str(env.get("HOME", "")).strip()
     home_path = Path(home_raw).expanduser() if home_raw else Path.home()
     if not _is_writable_directory(home_path):

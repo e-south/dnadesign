@@ -348,7 +348,11 @@ def test_yiu_validate_rejects_sample_hit_without_resolution_hints(tmp_path: Path
     result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
 
     assert result.exit_code == 1
-    assert "sample_hit requires payload_sequence or a resolvable source artifact reference" in result.output
+    normalized_output = " ".join(result.output.split())
+    assert (
+        "sample_hit requires payload_sequence or a resolvable source artifact reference "
+        "(source_artifact_path, source_artifact, or metadata.source_workspace)."
+    ) in normalized_output
 
 
 def test_yiu_validate_rejects_bundle_dir_traversal(tmp_path: Path) -> None:

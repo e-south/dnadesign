@@ -311,6 +311,42 @@ def test_runbook_sets_workspace_local_mpl_cache_for_child_processes(
     assert expected_cache.is_dir()
 
 
+def test_runbook_normalizes_c_utf8_locale_for_child_processes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace = tmp_path / "workspace"
+    runbook_path = _write_runbook(
+        workspace,
+        {
+            "runbook": {
+                "schema_version": 1,
+                "name": "demo",
+                "steps": [{"id": "sample", "run": ["sample", "-c", "configs/config.yaml"]}],
+            }
+        },
+    )
+
+    call_kwargs: list[dict[str, object]] = []
+
+    def _fake_subprocess_run(cmd, **kwargs):
+        _ = cmd
+        call_kwargs.append(dict(kwargs))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(runbook_module.subprocess, "run", _fake_subprocess_run)
+    monkeypatch.setenv("LANG", "C.UTF-8")
+    monkeypatch.setenv("LC_ALL", "C.UTF-8")
+    monkeypatch.setenv("LANGUAGE", "C.UTF-8")
+
+    run_workspace_runbook(runbook_path)
+
+    assert len(call_kwargs) == 1
+    env = call_kwargs[0].get("env")
+    assert isinstance(env, dict)
+    assert env["LANG"] == "C"
+    assert env["LC_ALL"] == "C"
+    assert "LANGUAGE" not in env
+    assert env["PYTHONUTF8"] == "1"
+
+
 def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cache_warning(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -325,6 +361,9 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
     runtime_home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("HOME", str(runtime_home))
     monkeypatch.setenv("CRUNCHER_NONINTERACTIVE", "1")
+    monkeypatch.setenv("LANG", "C.UTF-8")
+    monkeypatch.setenv("LC_ALL", "C.UTF-8")
+    monkeypatch.setenv("LANGUAGE", "C.UTF-8")
     monkeypatch.delenv("MPLCONFIGDIR", raising=False)
 
     result = run_workspace_runbook(runbook_path, output_log_path=output_log)
@@ -376,6 +415,7 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
     bundle_dir = workspace / "bundles" / "example_payload"
 
     log_text = output_log.read_text(encoding="utf-8")
+    assert "Fontconfig warning" not in log_text
     assert "Matplotlib is building the font cache" not in log_text
     assert "MPLCONFIGDIR" not in log_text
 
