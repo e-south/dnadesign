@@ -782,6 +782,19 @@ def test_show_yiu_bundle_rejects_missing_pdf_when_inventory_claims_rendered(tmp_
         show_yiu_bundle(bundle_dir)
 
 
+def test_show_yiu_bundle_rejects_stale_pdf_when_inventory_claims_not_requested(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec())
+
+    bundle_dir, _report = render_yiu_spec(spec_path)
+    pdf_path = bundle_dir / "payload_views.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\n% stale artifact\n")
+
+    with pytest.raises(YiuContractError, match="artifacts exist on disk"):
+        show_yiu_bundle(bundle_dir)
+
+
 def test_render_yiu_spec_emit_renders_marks_bundle_rendered(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"

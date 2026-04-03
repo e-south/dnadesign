@@ -301,6 +301,70 @@ def test_yiu_validate_and_show_json_share_payload_summary_contract(tmp_path: Pat
         assert show_payload[field_name] == validate_payload[field_name]
 
 
+def test_yiu_validate_rejects_invalid_pwm_mode_source_combo(tmp_path: Path) -> None:
+    workspace = tmp_path / "demo_yiu_payload"
+    spec_path = workspace / "configs" / "yiu" / "invalid_pwm.yiu.yaml"
+    payload = _payload_spec(name="invalid_pwm")
+    payload["optimization"]["pwm"] = {
+        "mode": "none",
+        "source": {"kind": "file", "path": "motifs/example_pwm_context.yaml"},
+        "objective": payload["optimization"]["pwm"]["objective"],
+    }
+    _write_yaml(spec_path, payload)
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
+
+    assert result.exit_code == 1
+    normalized_output = " ".join(result.output.split())
+    assert "optimization.pwm.mode=none requires optimization.pwm.source.kind=none" in normalized_output
+
+
+def test_yiu_validate_rejects_sample_hit_without_resolution_hints(tmp_path: Path) -> None:
+    workspace = tmp_path / "demo_yiu_payload"
+    spec_path = workspace / "configs" / "yiu" / "missing_sample_resolution.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        {
+            "yiu": {
+                "schema_version": 1,
+                "contract": "split_yiu_payload_rendering_v4",
+                "name": "missing_sample_resolution",
+            },
+            "input": {
+                "kind": "sample_hit",
+                "sample_hit": {
+                    "hit_id": "elite-1",
+                    "sample_name": "demo_sample",
+                },
+            },
+            "optimization": _payload_spec()["optimization"],
+            "output": {
+                "bundle_dir": "bundles/missing_sample_resolution",
+                "emit_render_jobs_debug": False,
+            },
+        },
+    )
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
+
+    assert result.exit_code == 1
+    assert "sample_hit requires payload_sequence or a resolvable source artifact reference" in result.output
+
+
+def test_yiu_validate_rejects_bundle_dir_traversal(tmp_path: Path) -> None:
+    workspace = tmp_path / "demo_yiu_payload"
+    spec_path = workspace / "configs" / "yiu" / "escaped_bundle.yiu.yaml"
+    payload = _payload_spec(name="escaped_bundle")
+    payload["output"]["bundle_dir"] = "../escaped_bundle"
+    _write_yaml(spec_path, payload)
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
+
+    assert result.exit_code == 1
+    normalized_output = " ".join(result.output.split())
+    assert "output.bundle_dir must not traverse outside the workspace root" in normalized_output
+
+
 def test_yiu_init_workspace_rejects_conflicting_output_and_workspace(tmp_path: Path) -> None:
     workspace = tmp_path / "demo_yiu_payload"
 

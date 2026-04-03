@@ -137,6 +137,14 @@ def test_yiu_docs_capture_payload_workspace_and_artifact_boundaries() -> None:
         in runbook_steps
     )
     assert "cruncher yiu show --bundle bundles/tetr_monotypic_hit" in runbook_steps
+    runbook_yaml = _read("workspaces/demo_yiu_payload/configs/runbook.yaml")
+    assert "description: Validate the checked-in user-sequence YIU demo spec." in runbook_yaml
+    assert (
+        "description: Publish the deterministic user-sequence YIU v4 payload bundle and render the canonical views."
+        in runbook_yaml
+    )
+    assert "description: Inspect the published user-sequence payload bundle and integrity checks." in runbook_yaml
+    assert "description: Validate the checked-in sample-hit YIU demo spec." in runbook_yaml
     assert "<workflow>.yiu.solve.yaml" not in workspaces_readme
     assert "bundles/\n      <workflow>/" in workspaces_readme
 

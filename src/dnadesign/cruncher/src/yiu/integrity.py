@@ -152,14 +152,20 @@ def validate_bundle_state(
         if any(path != expected_composite for path in expected_render_paths):
             _fail_bundle("published view render paths diverge from the bundle composite render target")
         expected_render_paths = [expected_composite]
+    existing_render_paths = [path for path in expected_render_paths if Path(path).exists()]
     if inventory.render_status == "rendered":
-        missing = [path for path in expected_render_paths if not Path(path).exists()]
+        missing = [path for path in expected_render_paths if path not in existing_render_paths]
         if missing:
             _fail_bundle("bundle inventory reports rendered outputs that are missing on disk: " + ", ".join(missing))
+    elif existing_render_paths:
+        _fail_bundle(
+            "bundle inventory does not report rendered outputs but artifacts exist on disk: "
+            + ", ".join(existing_render_paths)
+        )
     checks.append("render_artifacts")
     return {
         "checks": checks,
-        "available_renders": [path for path in expected_render_paths if Path(path).exists()],
+        "available_renders": existing_render_paths,
         "payload_view": payload_view,
         "split_rows": published_rows["split_payload"],
     }
