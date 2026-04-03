@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/src/yiu/load.py
 
-Load YIU specs and resolve workspace-relative paths.
+Load payload-centric YIU v4 specs and resolve workspace-relative paths.
 
 Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
@@ -16,12 +16,13 @@ from typing import Any
 
 import yaml
 
-from dnadesign.cruncher.yiu.models import (
-    YiuProcessSpecV4,
-    YiuSolveSpec,
-    YiuSolveSpecDocument,
-    YiuSpecDocumentV4,
+from dnadesign.cruncher.yiu.errors import (
+    YIU_CONTRACT_UNKNOWN,
+    YIU_PATH_INVALID,
+    YIU_SCHEMA_VERSION_UNSUPPORTED,
+    raise_yiu_error,
 )
+from dnadesign.cruncher.yiu.spec_models import YiuPayloadRenderingSpec
 
 
 def _resolve_workspace_root_for_suffix(spec_path: Path, *, suffix: str, help_message: str) -> Path:
@@ -43,20 +44,12 @@ def resolve_workspace_root_for_yiu_spec(spec_path: Path) -> Path:
     )
 
 
-def resolve_workspace_root_for_yiu_solve_spec(spec_path: Path) -> Path:
-    return _resolve_workspace_root_for_suffix(
-        spec_path,
-        suffix=".yiu.solve.yaml",
-        help_message="--spec must point to a <workspace>/configs/yiu/<name>.yiu.solve.yaml file.",
-    )
-
-
 def resolve_workspace_relative_path(raw_path: Path, *, workspace_root: Path, label: str) -> Path:
-    path = Path(raw_path)
+    path = Path(raw_path).expanduser()
     if path.is_absolute():
         return path.resolve()
     if any(part == ".." for part in path.parts):
-        raise ValueError(f"{label} must not traverse outside the workspace: {raw_path}")
+        raise ValueError(f"{YIU_PATH_INVALID}: {label} must not traverse outside the workspace")
     return (workspace_root / path).resolve()
 
 
@@ -70,55 +63,32 @@ def _load_yaml_mapping(path: Path) -> dict[str, Any]:
     return payload
 
 
-def load_yiu_spec(path: str | Path) -> tuple[YiuProcessSpecV4, Path, Path]:
+def load_yiu_spec(path: str | Path) -> tuple[YiuPayloadRenderingSpec, Path, Path]:
     spec_path = Path(path).expanduser().resolve()
     workspace_root = resolve_workspace_root_for_yiu_spec(spec_path)
     payload = _load_yaml_mapping(spec_path)
-    if "yiu" not in payload:
-        raise ValueError("YIU spec must define top-level key 'yiu'.")
-    raw_root = payload["yiu"]
+    raw_root = payload.get("yiu")
     if not isinstance(raw_root, dict):
-        raise ValueError("YIU spec root 'yiu' must be a mapping.")
-    raw_schema_version = raw_root.get("schema_version", 1)
+        raise_yiu_error(YIU_CONTRACT_UNKNOWN, "YIU spec must define a top-level mapping key 'yiu'.")
+    contract = raw_root.get("contract")
+    if contract != "split_yiu_payload_rendering_v4":
+        raise_yiu_error(
+            YIU_CONTRACT_UNKNOWN,
+            "YIU now writes native v4 specs only. Set yiu.contract=split_yiu_payload_rendering_v4 "
+            "and migrate legacy v3 fields into input/optimization/output.",
+        )
+    raw_schema_version = raw_root.get("schema_version")
     try:
         schema_version = int(raw_schema_version)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(
-            f"YIU schema validation failed for {spec_path}: invalid schema_version {raw_schema_version!r}"
-        ) from exc
-    if schema_version != 4:
-        raise ValueError(
-            "YIU ship runtime only supports schema_version 4. "
-            "Migrate legacy specs offline before validation, trace, or solve."
+    except (TypeError, ValueError):
+        raise_yiu_error(YIU_SCHEMA_VERSION_UNSUPPORTED, f"invalid schema_version {raw_schema_version!r}")
+    if schema_version != 1:
+        raise_yiu_error(
+            YIU_SCHEMA_VERSION_UNSUPPORTED,
+            "split_yiu_payload_rendering_v4 only supports schema_version=1.",
         )
     try:
-        document = YiuSpecDocumentV4.model_validate(payload)
+        document = YiuPayloadRenderingSpec.model_validate(payload)
     except Exception as exc:
         raise ValueError(f"YIU schema validation failed for {spec_path}: {exc}") from exc
-    return document.yiu, spec_path, workspace_root
-
-
-def load_yiu_solve_spec(path: str | Path) -> tuple[YiuSolveSpec, Path, Path]:
-    spec_path = Path(path).expanduser().resolve()
-    workspace_root = resolve_workspace_root_for_yiu_solve_spec(spec_path)
-    payload = _load_yaml_mapping(spec_path)
-    if "yiu_solve" not in payload:
-        raise ValueError("YIU solve spec must define top-level key 'yiu_solve'.")
-    raw_root = payload["yiu_solve"]
-    if not isinstance(raw_root, dict):
-        raise ValueError("YIU solve spec root 'yiu_solve' must be a mapping.")
-    try:
-        document = YiuSolveSpecDocument.model_validate(payload)
-    except Exception as exc:
-        raise ValueError(f"YIU solve schema validation failed for {spec_path}: {exc}") from exc
-    return document.yiu_solve, spec_path, workspace_root
-
-
-def resolve_base_spec_path_for_yiu_solve_spec(solve_spec: YiuSolveSpec, *, workspace_root: Path) -> Path:
-    base_spec_path = resolve_workspace_relative_path(
-        solve_spec.base_spec,
-        workspace_root=workspace_root,
-        label="yiu_solve.base_spec",
-    )
-    resolve_workspace_root_for_yiu_spec(base_spec_path)
-    return base_spec_path
+    return document, spec_path, workspace_root

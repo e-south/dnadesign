@@ -44,11 +44,19 @@ def recognition_matches_at(
     return motif_matches(window, target)
 
 
-def _oriented_boundary(*, start: int, motif_len: int, offset: int | None, orientation: str) -> int | None:
+def _oriented_boundary(
+    *,
+    start: int,
+    motif_len: int,
+    offset: int | None,
+    orientation: str,
+) -> int | None:
     if offset is None:
         return None
     if orientation == "forward":
         return start + offset
+    # Reverse-oriented sites swap the visible strand roles, so the top-strand
+    # boundary uses the bottom-strand offset and vice versa.
     return start + (motif_len - offset)
 
 
@@ -75,13 +83,13 @@ def derive_cut_geometry(
     top_boundary = _oriented_boundary(
         start=start,
         motif_len=motif_len,
-        offset=top_cut_offset,
+        offset=top_cut_offset if orientation == "forward" else bottom_cut_offset,
         orientation=orientation,
     )
     bottom_boundary = _oriented_boundary(
         start=start,
         motif_len=motif_len,
-        offset=bottom_cut_offset,
+        offset=bottom_cut_offset if orientation == "forward" else top_cut_offset,
         orientation=orientation,
     )
     for label, boundary in (("top", top_boundary), ("bottom", bottom_boundary)):

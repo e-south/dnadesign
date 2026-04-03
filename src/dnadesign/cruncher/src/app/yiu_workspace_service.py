@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/src/app/yiu_workspace_service.py
 
-Scaffold the canonical YIU v4 workspace.
+Scaffold the payload-centric YIU workspace.
 
 Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
@@ -12,21 +12,22 @@ Module Author(s): OpenAI Codex
 from __future__ import annotations
 
 import re
-import shlex
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from textwrap import dedent
 
 import yaml
 
 _WORKSPACE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-_DEMO_NAME = "example_reference_circularized"
-_DEMO_EXPLICIT_SPEC_FILENAME = f"{_DEMO_NAME}.yiu.yaml"
-_DEMO_SOLVE_SPEC_FILENAME = f"{_DEMO_NAME}.yiu.solve.yaml"
-_DEMO_EXPLICIT_SPEC_RELATIVE_PATH = f"configs/yiu/{_DEMO_EXPLICIT_SPEC_FILENAME}"
-_DEMO_SOLVE_SPEC_RELATIVE_PATH = f"configs/yiu/{_DEMO_SOLVE_SPEC_FILENAME}"
-_DEMO_EXPLICIT_RUN_ROOT = f"outputs/yiu/explicit/{_DEMO_NAME}"
-_DEMO_SOLVE_RUN_ROOT = f"outputs/yiu/solve/{_DEMO_NAME}"
+_DEMO_NAME = "example_payload"
+_DEMO_SPEC_FILENAME = f"{_DEMO_NAME}.yiu.yaml"
+_DEMO_SPEC_RELATIVE_PATH = f"configs/yiu/{_DEMO_SPEC_FILENAME}"
+_ADVANCED_SPEC_FILENAME = f"{_DEMO_NAME}.advanced_pwm.example.yaml"
+_ADVANCED_SPEC_RELATIVE_PATH = f"configs/yiu/{_ADVANCED_SPEC_FILENAME}"
+_PWM_CONTEXT_FILENAME = "example_pwm_context.yaml"
+_PWM_CONTEXT_RELATIVE_PATH = f"motifs/{_PWM_CONTEXT_FILENAME}"
+_DEMO_BUNDLE_DIR = f"bundles/{_DEMO_NAME}"
 
 
 @dataclass(frozen=True)
@@ -35,10 +36,18 @@ class YiuWorkspaceScaffoldResult:
     runbook_path: Path
     runbook_doc_path: Path
     spec_path: Path
-    solve_spec_path: Path
-    enzyme_catalog_path: Path
-    oligo_parts_catalog_path: Path
-    backbone_catalog_path: Path
+
+
+def _workspace_gitignore_text() -> str:
+    return "\n".join(
+        [
+            ".cruncher/",
+            "bundles/",
+            "outputs/",
+            ".DS_Store",
+            "",
+        ]
+    )
 
 
 def _repo_root_from(start: Path) -> Path | None:
@@ -75,460 +84,235 @@ def yiu_workspace_path(name: str, *, root: Path | None = None) -> Path:
     return parent / workspace_name
 
 
-def _owner_projection(state: str, strand: str, provenance_mode: str) -> dict[str, object]:
-    return {"state": state, "strand": strand, "provenance_mode": provenance_mode}
+def _canonical_spec_text() -> str:
+    return dedent(
+        f"""\
+        yiu:
+          contract: split_yiu_payload_rendering_v4
+          schema_version: 1
+          name: {_DEMO_NAME}
 
+        input:
+          kind: user_sequence
+          user_sequence:
+            sequence: AAATTTCCCGGGAAATTTCCC
 
-def _owner_lifecycle(
-    owner_id: str,
-    *,
-    projected_to: list[dict[str, object]],
-    disappears_after: str | None,
-) -> dict[str, object]:
-    late_owner_ids = {
-        "retained_region",
-        "sacrificial_region_short",
-        "y_adapter_complementary_arm",
-        "y_adapter_noncomplementary_arm",
-        "hairpin_pcr_forward_binding_region",
-        "hairpin_pcr_reverse_binding_region",
-    }
-    return {
-        "owner_id": owner_id,
-        "appears_in": [] if owner_id in late_owner_ids else ["source_oligo_ssdna"],
-        "projected_to": projected_to,
-        "disappears_after": disappears_after,
-    }
+        optimization:
+          junction:
+            mode: optimize
+            overhang_length: 4
+            max_payload_body_length: 12
+          mismatches:
+            count: 1
+            candidate_positions: [1, 2]
+            allowed_strands: [complement, payload]
+            strand_mode: per_position
+            default_strand_preference: complement
+          pwm:
+            mode: none
+            source:
+              kind: none
+            objective:
+              primary: maximin
+              secondary:
+                - total_loss
+                - midpoint_proximity
+                - body_length_balance
+                - terminal_position_avoidance
+                - default_strand_preference
+                - lexical_stability
 
-
-def _canonical_spec_payload() -> dict[str, object]:
-    sequence = "CACGAGAGGTCTCACGAGAAAAAAAAACCTCAGCCCGCTGAACCTATAGAGGAGACC"
-    owner_spans = {
-        "source_fwd_primer_binding_region": (0, 6),
-        "payload_left_half": (6, 15),
-        "sacrificial_region_long": (15, 27),
-        "tether_dock_complement": (27, 31),
-        "tether_cap": (31, 35),
-        "tether_dock": (35, 39),
-        "snapback_stem": (39, 41),
-        "payload_right_half": (41, 51),
-        "source_rev_primer_binding_region": (51, 57),
-    }
-    structural_owners = [{"id": owner_id, "start": start, "end": end} for owner_id, (start, end) in owner_spans.items()]
-    effect_tags = [
-        {"id": "source_forward_primer_bindable", "class": "primer_bindable_by_source_forward", "start": 0, "end": 6},
-        {"id": "left_nb_bsssi_member", "class": "nb_bsssi_array_member", "start": 0, "end": 6},
-        {"id": "left_bsssi_bsai_overlap_unit", "class": "left_bsssi_bsai_overlap_unit", "start": 0, "end": 18},
-        {"id": "payload_overhang_left", "class": "payload_overhang_left", "start": 6, "end": 10},
-        {"id": "type_iis_recognition_left", "class": "type_iis_recognition_left", "start": 7, "end": 13},
-        {"id": "right_nb_bsssi_member", "class": "nb_bsssi_array_member", "start": 12, "end": 18},
-        {"id": "sacrificial_region_long_tag", "class": "sacrificial", "start": 15, "end": 27},
-        {"id": "nt_bpu10i_snapback_site", "class": "nt_bpu10i_snapback_site", "start": 27, "end": 41},
-        {"id": "payload_overhang_right", "class": "payload_overhang_right", "start": 41, "end": 45},
-        {"id": "source_reverse_primer_bindable", "class": "primer_bindable_by_source_reverse", "start": 51, "end": 57},
-        {"id": "type_iis_recognition_right", "class": "type_iis_recognition_right", "start": 51, "end": 57},
-    ]
-    owner_lifecycle = [
-        _owner_lifecycle(
-            "source_fwd_primer_binding_region",
-            projected_to=[
-                _owner_projection("pcr_linear_duplex", "primary", "literal_source"),
-                _owner_projection("pcr_linear_duplex", "complement", "amplification_projection"),
-            ],
-            disappears_after="pcr_linear_duplex",
-        ),
-        _owner_lifecycle(
-            "payload_left_half",
-            projected_to=[
-                _owner_projection("pcr_linear_duplex", "primary", "literal_source"),
-                _owner_projection("pcr_linear_duplex", "complement", "amplification_projection"),
-                _owner_projection("type_iis_cut_product_duplex", "primary", "cut_product_projection"),
-                _owner_projection("type_iis_cut_product_duplex", "complement", "cut_product_projection"),
-                _owner_projection("circularized_payload_candidate", "primary", "ligation_assembly"),
-                _owner_projection("circularized_payload_candidate", "complement", "ligation_assembly"),
-                _owner_projection("post_sacrificial_fragmentation", "primary", "retained_projection"),
-                _owner_projection("post_fragment_cleanup", "primary", "retained_projection"),
-                _owner_projection("snapback_adapter_complex", "primary", "retained_projection"),
-                _owner_projection("ligated_ssdna_hairpin", "primary", "ligated_projection"),
-                _owner_projection("hairpin_pcr_linear_insert", "primary", "amplification_projection"),
-            ],
-            disappears_after=None,
-        ),
-        _owner_lifecycle(
-            "sacrificial_region_long",
-            projected_to=[
-                _owner_projection("pcr_linear_duplex", "primary", "literal_source"),
-                _owner_projection("pcr_linear_duplex", "complement", "amplification_projection"),
-                _owner_projection("type_iis_cut_product_duplex", "primary", "cut_product_projection"),
-                _owner_projection("type_iis_cut_product_duplex", "complement", "cut_product_projection"),
-                _owner_projection("circularized_payload_candidate", "primary", "ligation_assembly"),
-                _owner_projection("circularized_payload_candidate", "complement", "ligation_assembly"),
-                _owner_projection("post_sacrificial_fragmentation", "primary", "sacrificial_projection"),
-            ],
-            disappears_after="post_sacrificial_fragmentation",
-        ),
-        _owner_lifecycle(
-            "tether_dock_complement",
-            projected_to=[
-                _owner_projection("pcr_linear_duplex", "primary", "literal_source"),
-                _owner_projection("pcr_linear_duplex", "complement", "amplification_projection"),
-                _owner_projection("type_iis_cut_product_duplex", "primary", "cut_product_projection"),
-                _owner_projection("type_iis_cut_product_duplex", "complement", "cut_product_projection"),
-                _owner_projection("circularized_payload_candidate", "primary", "ligation_assembly"),
-                _owner_projection("circularized_payload_candidate", "complement", "ligation_assembly"),
-                _owner_projection("post_sacrificial_fragmentation", "primary", "retained_projection"),
-                _owner_projection("post_fragment_cleanup", "primary", "retained_projection"),
-                _owner_projection("snapback_adapter_complex", "primary", "retained_projection"),
-                _owner_projection("ligated_ssdna_hairpin", "primary", "ligated_projection"),
-                _owner_projection("hairpin_pcr_linear_insert", "primary", "amplification_projection"),
-            ],
-            disappears_after=None,
-        ),
-        _owner_lifecycle(
-            "tether_cap",
-            projected_to=[
-                _owner_projection("pcr_linear_duplex", "primary", "literal_source"),
-                _owner_projection("pcr_linear_duplex", "complement", "amplification_projection"),
-                _owner_projection("type_iis_cut_product_duplex", "primary", "cut_product_projection"),
-                _owner_projection("type_iis_cut_product_duplex", "complement", "cut_product_projection"),
-                _owner_projection("circularized_payload_candidate", "primary", "ligation_assembly"),
-                _owner_projection("circularized_payload_candidate", "complement", "ligation_assembly"),
-                _owner_projection("post_sacrificial_fragmentation", "primary", "retained_projection"),
-                _owner_projection("post_fragment_cleanup", "primary", "retained_projection"),
-                _owner_projection("snapback_adapter_complex", "primary", "retained_projection"),
-                _owner_projection("ligated_ssdna_hairpin", "primary", "ligated_projection"),
-                _owner_projection("hairpin_pcr_linear_insert", "primary", "amplification_projection"),
-            ],
-            disappears_after=None,
-        ),
-        _owner_lifecycle(
-            "tether_dock",
-            projected_to=[
-                _owner_projection("pcr_linear_duplex", "primary", "literal_source"),
-                _owner_projection("pcr_linear_duplex", "complement", "amplification_projection"),
-                _owner_projection("type_iis_cut_product_duplex", "primary", "cut_product_projection"),
-                _owner_projection("type_iis_cut_product_duplex", "complement", "cut_product_projection"),
-                _owner_projection("circularized_payload_candidate", "primary", "ligation_assembly"),
-                _owner_projection("circularized_payload_candidate", "complement", "ligation_assembly"),
-                _owner_projection("post_sacrificial_fragmentation", "primary", "retained_projection"),
-                _owner_projection("post_fragment_cleanup", "primary", "retained_projection"),
-                _owner_projection("snapback_adapter_complex", "primary", "retained_projection"),
-                _owner_projection("ligated_ssdna_hairpin", "primary", "ligated_projection"),
-                _owner_projection("hairpin_pcr_linear_insert", "primary", "amplification_projection"),
-            ],
-            disappears_after=None,
-        ),
-        _owner_lifecycle(
-            "snapback_stem",
-            projected_to=[
-                _owner_projection("pcr_linear_duplex", "primary", "literal_source"),
-                _owner_projection("pcr_linear_duplex", "complement", "amplification_projection"),
-                _owner_projection("type_iis_cut_product_duplex", "primary", "cut_product_projection"),
-                _owner_projection("type_iis_cut_product_duplex", "complement", "cut_product_projection"),
-                _owner_projection("circularized_payload_candidate", "primary", "ligation_assembly"),
-                _owner_projection("circularized_payload_candidate", "complement", "ligation_assembly"),
-                _owner_projection("post_sacrificial_fragmentation", "primary", "retained_projection"),
-                _owner_projection("post_fragment_cleanup", "primary", "retained_projection"),
-                _owner_projection("snapback_adapter_complex", "primary", "retained_projection"),
-                _owner_projection("ligated_ssdna_hairpin", "primary", "ligated_projection"),
-                _owner_projection("hairpin_pcr_linear_insert", "primary", "amplification_projection"),
-            ],
-            disappears_after=None,
-        ),
-        _owner_lifecycle(
-            "payload_right_half",
-            projected_to=[
-                _owner_projection("pcr_linear_duplex", "primary", "literal_source"),
-                _owner_projection("pcr_linear_duplex", "complement", "amplification_projection"),
-                _owner_projection("type_iis_cut_product_duplex", "primary", "cut_product_projection"),
-                _owner_projection("type_iis_cut_product_duplex", "complement", "cut_product_projection"),
-                _owner_projection("circularized_payload_candidate", "primary", "ligation_assembly"),
-                _owner_projection("circularized_payload_candidate", "complement", "ligation_assembly"),
-                _owner_projection("post_sacrificial_fragmentation", "primary", "retained_projection"),
-                _owner_projection("post_fragment_cleanup", "primary", "retained_projection"),
-                _owner_projection("snapback_adapter_complex", "primary", "retained_projection"),
-                _owner_projection("ligated_ssdna_hairpin", "primary", "ligated_projection"),
-                _owner_projection("hairpin_pcr_linear_insert", "primary", "amplification_projection"),
-            ],
-            disappears_after=None,
-        ),
-        _owner_lifecycle(
-            "source_rev_primer_binding_region",
-            projected_to=[
-                _owner_projection("pcr_linear_duplex", "primary", "literal_source"),
-                _owner_projection("pcr_linear_duplex", "complement", "amplification_projection"),
-            ],
-            disappears_after="pcr_linear_duplex",
-        ),
-        _owner_lifecycle(
-            "retained_region",
-            projected_to=[
-                _owner_projection("post_sacrificial_fragmentation", "primary", "retained_projection"),
-                _owner_projection("post_fragment_cleanup", "primary", "retained_projection"),
-                _owner_projection("hairpin_pcr_linear_insert", "complement", "amplification_projection"),
-            ],
-            disappears_after=None,
-        ),
-        _owner_lifecycle(
-            "sacrificial_region_short",
-            projected_to=[_owner_projection("post_sacrificial_fragmentation", "complement", "sacrificial_projection")],
-            disappears_after="post_sacrificial_fragmentation",
-        ),
-        _owner_lifecycle(
-            "y_adapter_complementary_arm",
-            projected_to=[
-                _owner_projection("snapback_adapter_complex", "primary", "late_introduction"),
-                _owner_projection("ligated_ssdna_hairpin", "primary", "late_introduction"),
-            ],
-            disappears_after="ligated_ssdna_hairpin",
-        ),
-        _owner_lifecycle(
-            "y_adapter_noncomplementary_arm",
-            projected_to=[
-                _owner_projection("snapback_adapter_complex", "primary", "late_introduction"),
-                _owner_projection("ligated_ssdna_hairpin", "primary", "late_introduction"),
-            ],
-            disappears_after="ligated_ssdna_hairpin",
-        ),
-        _owner_lifecycle(
-            "hairpin_pcr_forward_binding_region",
-            projected_to=[_owner_projection("hairpin_pcr_linear_insert", "primary", "derived_binding_region")],
-            disappears_after=None,
-        ),
-        _owner_lifecycle(
-            "hairpin_pcr_reverse_binding_region",
-            projected_to=[_owner_projection("hairpin_pcr_linear_insert", "primary", "derived_binding_region")],
-            disappears_after=None,
-        ),
-    ]
-    return {
-        "yiu": {
-            "schema_version": 4,
-            "family": "yiu",
-            "protocol_template": "yiu_circularized_payload_v1",
-            "name": _DEMO_NAME,
-            "source_oligo": {
-                "authored_sequence": sequence,
-                "structural_owners": structural_owners,
-                "effect_tags": effect_tags,
-            },
-            "owner_lifecycle": owner_lifecycle,
-            "external_parts": {
-                "primer_source_forward": "oES790",
-                "primer_source_reverse": "oES791",
-                "hairpin_pcr_forward": "oES793",
-                "hairpin_pcr_reverse": "oES794",
-                "y_adapter": "oES792",
-            },
-            "enzymes": {
-                "left_type_iis": "BsmBI",
-                "right_type_iis": "BsmBI",
-                "snapback_nickase": "Nt.Bpu10I",
-                "sacrificial_nickase": "Nb.BssSI",
-            },
-            "payload": {
-                "target_sequence": "AGGTCTCACACCTATAGAG",
-                "bulge_mask": [],
-            },
-            "catalogs": {
-                "enzymes": "catalogs/enzymes.yaml",
-                "oligo_parts": "catalogs/oligo_parts.yaml",
-                "backbones": "catalogs/backbones.yaml",
-            },
-            "output": {
-                "run_dir": "outputs/yiu/explicit",
-                "emit_view_contracts": True,
-                "publish_contract_version": 4,
-                "persist_render_jobs_debug": False,
-            },
-        }
-    }
-
-
-def _canonical_solve_payload() -> dict[str, object]:
-    return {
-        "yiu_solve": {
-            "schema_version": 1,
-            "base_spec": _DEMO_EXPLICIT_SPEC_RELATIVE_PATH,
-            "target": {
-                "payload_pattern": "AGGTCTCACACCTATAGAG",
-                "bulge_mask": [],
-            },
-            "scaffold_windows": [
-                {
-                    "id": "sacrificial_spacing_window",
-                    "owner_id": "sacrificial_region_long",
-                    "relative_start": 3,
-                    "relative_end": 12,
-                    "allowed_patterns": ["AAAAAAAAA", "AAAATAAAA"],
-                }
-            ],
-            "search": {
-                "max_search_nodes": 16,
-                "max_enumerated_candidates": 16,
-            },
-            "solve": {
-                "compare_solutions": False,
-                "max_solutions": 1,
-            },
-            "output": {
-                "run_dir": "outputs/yiu/solve",
-                "emit_view_contracts": True,
-                "publish_contract_version": 4,
-                "persist_render_jobs_debug": False,
-            },
-        }
-    }
-
-
-def _catalog_payloads() -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
-    return (
-        {
-            "enzymes": {
-                "entries": [
-                    {"id": "BsmBI", "recognition_sequence": "GGTCTC", "top_cut_offset": 6, "bottom_cut_offset": 10},
-                    {"id": "Nt.Bpu10I", "recognition_sequence": "CCTCAGC", "top_cut_offset": 2},
-                    {"id": "Nb.BssSI", "recognition_sequence": "CACGAG"},
-                ]
-            }
-        },
-        {
-            "oligo_parts": {
-                "entries": [
-                    {"id": "oES790", "part_kind": "primer", "sequence": "GGTCTCAA"},
-                    {"id": "oES791", "part_kind": "primer", "sequence": "GGTCTCAA"},
-                    {"id": "oES792", "part_kind": "adapter", "sequence": "TCAGCGGGCTGAGG", "phosphorylated_5p": True},
-                    {"id": "oES793", "part_kind": "primer", "sequence": "TCCCTA"},
-                    {"id": "oES794", "part_kind": "primer", "sequence": "CTCTAT"},
-                ]
-            }
-        },
-        {"backbones": {"entries": []}},
+        output:
+          bundle_dir: {_DEMO_BUNDLE_DIR}
+          emit_render_jobs_debug: false
+        """
     )
 
 
-def _runbook_steps() -> list[dict[str, object]]:
-    return [
-        {
-            "id": "yiu_validate",
-            "description": "Validate the checked-in YIU v4 replay/validation spec.",
-            "run": ["yiu", "validate", "--spec", _DEMO_EXPLICIT_SPEC_RELATIVE_PATH],
-        },
-        {
-            "id": "yiu_trace",
-            "description": "Materialize the explicit YIU state trace and evidence visuals.",
-            "run": ["yiu", "trace", "--spec", _DEMO_EXPLICIT_SPEC_RELATIVE_PATH, "--force-overwrite", "--emit-renders"],
-        },
-        {
-            "id": "yiu_solve",
-            "description": "Search the bounded scaffold window and materialize the selected satisfying solution.",
-            "run": ["yiu", "solve", "--spec", _DEMO_SOLVE_SPEC_RELATIVE_PATH, "--force-overwrite", "--emit-renders"],
-        },
-    ]
+def _advanced_pwm_spec_text() -> str:
+    return dedent(
+        f"""\
+        # Advanced example: file-backed PWM context with overlapping motifs on both strands.
+        # Copy this file to a `.yiu.yaml` name when you want to run it.
+        yiu:
+          contract: split_yiu_payload_rendering_v4
+          schema_version: 1
+          name: example_payload_pwm
+
+        input:
+          kind: user_sequence
+          user_sequence:
+            sequence: AAATTTCCCGGGAAATTTCCC
+
+        optimization:
+          junction:
+            mode: optimize
+            overhang_length: 4
+            max_payload_body_length: 12
+          mismatches:
+            count: 2
+            candidate_positions: [1, 2]
+            allowed_strands: [complement, payload]
+            strand_mode: per_position
+            default_strand_preference: complement
+          pwm:
+            mode: require
+            source:
+              kind: file
+              path: {_PWM_CONTEXT_RELATIVE_PATH}
+            objective:
+              primary: maximin
+              secondary:
+                - total_loss
+                - midpoint_proximity
+                - body_length_balance
+                - terminal_position_avoidance
+                - default_strand_preference
+                - lexical_stability
+
+        output:
+          bundle_dir: bundles/example_payload_pwm
+          emit_render_jobs_debug: false
+        """
+    )
 
 
-def _write_runbook_markdown(workspace_root: Path, *, runbook_path: Path) -> Path:
-    workspace_name = workspace_root.name
-    repo_root = _repo_root_from(workspace_root)
-    if repo_root is not None:
-        try:
-            workspace_display_path = workspace_root.relative_to(repo_root).as_posix()
-        except ValueError:
-            workspace_display_path = workspace_root.as_posix()
-    else:
-        workspace_display_path = workspace_root.as_posix()
-    workspace_root_arg = shlex.quote(workspace_display_path)
-    workspace_name_arg = shlex.quote(workspace_name)
-    runbook_arg = shlex.quote(runbook_path.relative_to(workspace_root).as_posix())
-    lines = [
-        f"## {workspace_name} YIU Runbook",
-        "",
-        "**Workspace Path**",
-        f"- {workspace_display_path}/",
-        "",
-        "**Purpose**",
-        "- Checked-in YIU replay/validation workspace with bounded scaffold solving.",
-        "- Covers validate, trace, solve, show, and render without the deprecated design surface.",
-        "",
-        "**Run This Single Command**",
-        "",
-        f"    uv run cruncher workspaces run --workspace {workspace_name_arg} --runbook {runbook_arg}",
-        "",
-        "### Step-by-Step Commands",
-        "",
-        "    set -euo pipefail",
-        f"    cd {workspace_root_arg}",
-        '    cruncher() { uv run cruncher "$@"; }',
-        "",
-        f"    cruncher yiu validate --spec {_DEMO_EXPLICIT_SPEC_RELATIVE_PATH}",
-        f"    cruncher yiu trace --spec {_DEMO_EXPLICIT_SPEC_RELATIVE_PATH} --force-overwrite --emit-renders",
-        f"    cruncher yiu solve --spec {_DEMO_SOLVE_SPEC_RELATIVE_PATH} --force-overwrite --emit-renders",
-        "",
-        "### Optional follow-up commands",
-        "",
-        f'    WORKFLOW_NAME="{_DEMO_NAME}"',
-        '    TRACE_ID="$(ls -1 "outputs/yiu/explicit/$WORKFLOW_NAME" | tail -n 1)"',
-        '    SOLVE_ID="$(ls -1 "outputs/yiu/solve/$WORKFLOW_NAME" | tail -n 1)"',
-        '    uv run cruncher yiu show --run "outputs/yiu/explicit/$WORKFLOW_NAME/$TRACE_ID"',
-        '    uv run cruncher yiu show --run "outputs/yiu/solve/$WORKFLOW_NAME/$SOLVE_ID"',
-        '    uv run cruncher yiu render --run "outputs/yiu/explicit/$WORKFLOW_NAME/$TRACE_ID"',
-        '    uv run cruncher yiu render --run "outputs/yiu/solve/$WORKFLOW_NAME/$SOLVE_ID"',
-        "",
-    ]
-    runbook_doc_path = workspace_root / "runbook.md"
-    runbook_doc_path.write_text("\n".join(lines), encoding="utf-8")
-    return runbook_doc_path
+def _example_pwm_context_text() -> str:
+    return dedent(
+        f"""\
+        contract: yiu_pwm_context_v1
+        schema_version: 1
+        name: example_pwm_context
+        motifs:
+          - motif_instance_id: motif_plus_example
+            tf_name: EXAMPLE_TF_PLUS
+            motif_name: example_plus
+            reference_strand: "+"
+            start: 7
+            end: 11
+            probabilities:
+              alphabet: [A, C, G, T]
+              rows:
+                - [0.70, 0.10, 0.10, 0.10]
+                - [0.10, 0.70, 0.10, 0.10]
+                - [0.10, 0.10, 0.70, 0.10]
+                - [0.10, 0.10, 0.10, 0.70]
+            provenance:
+              source_kind: file
+              source_ref: {_PWM_CONTEXT_RELATIVE_PATH}
+          - motif_instance_id: motif_minus_example
+            tf_name: EXAMPLE_TF_MINUS
+            motif_name: example_minus
+            reference_strand: "-"
+            start: 8
+            end: 12
+            probabilities:
+              alphabet: [A, C, G, T]
+              rows:
+                - [0.55, 0.15, 0.15, 0.15]
+                - [0.15, 0.55, 0.15, 0.15]
+                - [0.15, 0.15, 0.55, 0.15]
+                - [0.15, 0.15, 0.15, 0.55]
+            provenance:
+              source_kind: file
+              source_ref: {_PWM_CONTEXT_RELATIVE_PATH}
+        """
+    )
+
+
+def _runbook_payload(workspace_name: str) -> dict[str, object]:
+    return {
+        "runbook": {
+            "schema_version": 1,
+            "name": workspace_name,
+            "steps": [
+                {
+                    "id": "yiu_validate",
+                    "description": "Validate the minimal YIU v4 spec without writing bundle artifacts.",
+                    "run": ["yiu", "validate", "--spec", _DEMO_SPEC_RELATIVE_PATH],
+                },
+                {
+                    "id": "yiu_render",
+                    "description": "Publish the deterministic YIU v4 bundle and render the canonical views.",
+                    "run": ["yiu", "render", "--spec", _DEMO_SPEC_RELATIVE_PATH, "--force-overwrite", "--emit-renders"],
+                },
+                {
+                    "id": "yiu_show",
+                    "description": "Inspect the published bundle and run the v4 integrity checks.",
+                    "run": ["yiu", "show", "--bundle", _DEMO_BUNDLE_DIR],
+                },
+            ],
+        }
+    }
+
+
+def _runbook_markdown(workspace_root: Path, *, workspace_name: str) -> str:
+    return "\n".join(
+        [
+            f"## {workspace_name} YIU Runbook",
+            "",
+            "**Workspace Path**",
+            f"- {workspace_root.relative_to(_repo_root_from(workspace_root) or workspace_root.parent)}/",
+            "",
+            "**Purpose**",
+            "- YIU workspace for the v4 payload-centric optimization and rendering workflow.",
+            "- Covers the validate -> render -> show loop with one minimal no-PWM example.",
+            "",
+            "**Run This Single Command**",
+            "",
+            f"    uv run cruncher workspaces run --workspace {workspace_name} --runbook configs/runbook.yaml",
+            "",
+            "### Step-by-Step Commands",
+            "",
+            "    set -euo pipefail",
+            f"    cd {workspace_root.relative_to(_repo_root_from(workspace_root) or workspace_root.parent)}",
+            '    cruncher() { uv run cruncher "$@"; }',
+            "",
+            "    cruncher yiu validate --spec configs/yiu/example_payload.yiu.yaml",
+            "    cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml --force-overwrite --emit-renders",
+            "    cruncher yiu show --bundle bundles/example_payload",
+            "",
+            "### Advanced PWM-Aware Example",
+            "",
+            f"- Example spec template: `{_ADVANCED_SPEC_RELATIVE_PATH}`",
+            f"- Example PWM context: `{_PWM_CONTEXT_RELATIVE_PATH}`",
+            "- Copy the advanced example to a `.yiu.yaml` filename when you want to require PWM-aware optimization.",
+        ]
+    )
 
 
 def init_yiu_workspace(workspace_root: Path, *, force_overwrite: bool = False) -> YiuWorkspaceScaffoldResult:
-    resolved_root = workspace_root.expanduser().resolve()
-    if resolved_root.exists() and any(resolved_root.iterdir()) and not force_overwrite:
-        raise ValueError(f"YIU workspace root already exists and is not empty: {resolved_root}")
-    if resolved_root.exists() and force_overwrite:
+    resolved_root = Path(workspace_root).expanduser().resolve()
+    workspace_name = resolved_root.name
+    if resolved_root.exists():
+        if not force_overwrite:
+            raise ValueError(f"YIU workspace already exists: {resolved_root}")
         shutil.rmtree(resolved_root)
-
     (resolved_root / "configs" / "yiu").mkdir(parents=True, exist_ok=True)
-    (resolved_root / "catalogs").mkdir(parents=True, exist_ok=True)
-    (resolved_root / "outputs" / "yiu" / "explicit").mkdir(parents=True, exist_ok=True)
-    (resolved_root / "outputs" / "yiu" / "solve").mkdir(parents=True, exist_ok=True)
+    (resolved_root / "bundles").mkdir(parents=True, exist_ok=True)
+    (resolved_root / "motifs").mkdir(parents=True, exist_ok=True)
+
+    spec_path = resolved_root / "configs" / "yiu" / _DEMO_SPEC_FILENAME
+    spec_path.write_text(_canonical_spec_text(), encoding="utf-8")
+
+    advanced_spec_path = resolved_root / "configs" / "yiu" / _ADVANCED_SPEC_FILENAME
+    advanced_spec_path.write_text(_advanced_pwm_spec_text(), encoding="utf-8")
+
+    pwm_context_path = resolved_root / "motifs" / _PWM_CONTEXT_FILENAME
+    pwm_context_path.write_text(_example_pwm_context_text(), encoding="utf-8")
+
+    gitignore_path = resolved_root / ".gitignore"
+    gitignore_path.write_text(_workspace_gitignore_text(), encoding="utf-8")
 
     runbook_path = resolved_root / "configs" / "runbook.yaml"
-    runbook_path.write_text(
-        yaml.safe_dump(
-            {
-                "runbook": {
-                    "schema_version": 1,
-                    "name": resolved_root.name,
-                    "steps": _runbook_steps(),
-                }
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    runbook_doc_path = _write_runbook_markdown(resolved_root, runbook_path=runbook_path)
+    runbook_path.write_text(yaml.safe_dump(_runbook_payload(workspace_name), sort_keys=False), encoding="utf-8")
 
-    spec_path = resolved_root / "configs" / "yiu" / _DEMO_EXPLICIT_SPEC_FILENAME
-    spec_path.write_text(yaml.safe_dump(_canonical_spec_payload(), sort_keys=False), encoding="utf-8")
-
-    solve_spec_path = resolved_root / "configs" / "yiu" / _DEMO_SOLVE_SPEC_FILENAME
-    solve_spec_path.write_text(yaml.safe_dump(_canonical_solve_payload(), sort_keys=False), encoding="utf-8")
-
-    enzymes_payload, oligo_parts_payload, backbones_payload = _catalog_payloads()
-    enzyme_catalog_path = resolved_root / "catalogs" / "enzymes.yaml"
-    enzyme_catalog_path.write_text(yaml.safe_dump(enzymes_payload, sort_keys=False), encoding="utf-8")
-    oligo_parts_catalog_path = resolved_root / "catalogs" / "oligo_parts.yaml"
-    oligo_parts_catalog_path.write_text(yaml.safe_dump(oligo_parts_payload, sort_keys=False), encoding="utf-8")
-    backbone_catalog_path = resolved_root / "catalogs" / "backbones.yaml"
-    backbone_catalog_path.write_text(yaml.safe_dump(backbones_payload, sort_keys=False), encoding="utf-8")
+    runbook_doc_path = resolved_root / "runbook.md"
+    runbook_doc_path.write_text(_runbook_markdown(resolved_root, workspace_name=workspace_name), encoding="utf-8")
 
     return YiuWorkspaceScaffoldResult(
         workspace_root=resolved_root,
         runbook_path=runbook_path,
         runbook_doc_path=runbook_doc_path,
         spec_path=spec_path,
-        solve_spec_path=solve_spec_path,
-        enzyme_catalog_path=enzyme_catalog_path,
-        oligo_parts_catalog_path=oligo_parts_catalog_path,
-        backbone_catalog_path=backbone_catalog_path,
     )

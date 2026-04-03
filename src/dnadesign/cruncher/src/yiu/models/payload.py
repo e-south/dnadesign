@@ -1,24 +1,21 @@
 """
 --------------------------------------------------------------------------------
 <cruncher project>
-src/dnadesign/cruncher/src/yiu/models/__init__.py
+src/dnadesign/cruncher/src/yiu/models/payload.py
 
-Payload-centric YIU v4 model exports.
+Compatibility re-exports for YIU payload and spec models.
 
 Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
 """
 
-from dnadesign.cruncher.yiu.bundle_models import (
-    PayloadBundleManifest,
-    PayloadViewEntry,
-    PayloadVisualInventory,
-    YiuValidationIssue,
-    YiuValidationReport,
+from dnadesign.cruncher.yiu.domain_models import (
+    JunctionSelection as JunctionWindow,
 )
 from dnadesign.cruncher.yiu.domain_models import (
-    JunctionSelection,
-    MismatchSelection,
+    MismatchSelection as MismatchSite,
+)
+from dnadesign.cruncher.yiu.domain_models import (
     NormalizedMotifContext,
     NormalizedPayload,
     OptimizationDecision,
@@ -27,7 +24,6 @@ from dnadesign.cruncher.yiu.domain_models import (
 )
 from dnadesign.cruncher.yiu.spec_models import (
     InputSpec,
-    JunctionOptimizationSpec,
     MismatchesSpec,
     OptimizationSpec,
     OutputSpec,
@@ -41,12 +37,15 @@ from dnadesign.cruncher.yiu.spec_models import (
     YiuPwmMotifInstanceV1,
     YiuSpecRoot,
 )
+from dnadesign.cruncher.yiu.spec_models import (
+    JunctionOptimizationSpec as JunctionSelectionSpec,
+)
 
 __all__ = [
     "InputSpec",
-    "JunctionOptimizationSpec",
-    "JunctionSelection",
-    "MismatchSelection",
+    "JunctionSelectionSpec",
+    "JunctionWindow",
+    "MismatchSite",
     "MismatchesSpec",
     "NormalizedMotifContext",
     "NormalizedPayload",
@@ -55,9 +54,6 @@ __all__ = [
     "OptimizationSpec",
     "OptimizationWinner",
     "OutputSpec",
-    "PayloadBundleManifest",
-    "PayloadViewEntry",
-    "PayloadVisualInventory",
     "PwmObjectiveSpec",
     "PwmOptimizationSpec",
     "PwmSourceSpec",
@@ -67,6 +63,4 @@ __all__ = [
     "YiuPwmContextV1",
     "YiuPwmMotifInstanceV1",
     "YiuSpecRoot",
-    "YiuValidationIssue",
-    "YiuValidationReport",
 ]

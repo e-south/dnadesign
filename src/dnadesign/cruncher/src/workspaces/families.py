@@ -52,11 +52,11 @@ _WORKFLOW_FAMILIES: tuple[WorkflowFamilyDescriptor, ...] = (
     ),
     WorkflowFamilyDescriptor(
         id="yiu",
-        display_name="YIU hairpin oligo processing workflow",
+        display_name="payload-centric YIU rendering workflow",
         workspace_kind="runbook_family",
         runbook_command_roots=("yiu",),
-        spec_globs=("configs/yiu/*.yiu.yaml", "configs/yiu/*.yiu.solve.yaml"),
-        default_output_root="outputs/yiu",
+        spec_globs=("configs/yiu/*.yiu.yaml",),
+        default_output_root="outputs",
         docs_section_id="yiu",
     ),
     WorkflowFamilyDescriptor(

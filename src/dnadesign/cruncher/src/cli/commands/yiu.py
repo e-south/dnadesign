@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/src/cli/commands/yiu.py
 
-CLI entrypoints for the YIU hairpin oligo processing workflow family.
+CLI entrypoints for the payload-centric YIU workflow family.
 
 Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
@@ -11,9 +11,7 @@ Module Author(s): OpenAI Codex
 
 from __future__ import annotations
 
-import importlib
 import json
-from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
@@ -21,33 +19,27 @@ from rich.console import Console
 
 app = typer.Typer(
     no_args_is_help=True,
-    help="Scaffold, validate, trace, solve, render, and inspect YIU hairpin oligo processing workflows.",
+    help="Scaffold, validate, render, and inspect payload-centric YIU workflows.",
 )
 console = Console()
 
 
 def validate_yiu_spec(*args, **kwargs):
-    from dnadesign.cruncher.app.yiu_workflow import validate_yiu_spec as _validate_yiu_spec
+    from dnadesign.cruncher.app.yiu_workflow.validate import validate_yiu_spec as _validate_yiu_spec
 
     return _validate_yiu_spec(*args, **kwargs)
 
 
-def run_yiu_trace(*args, **kwargs):
-    from dnadesign.cruncher.app.yiu_workflow import run_yiu_trace as _run_yiu_trace
+def render_yiu_spec(*args, **kwargs):
+    from dnadesign.cruncher.app.yiu_workflow.render import render_yiu_spec as _render_yiu_spec
 
-    return _run_yiu_trace(*args, **kwargs)
-
-
-def run_yiu_solve(*args, **kwargs):
-    from dnadesign.cruncher.app.yiu_solve_workflow import run_yiu_solve as _run_yiu_solve
-
-    return _run_yiu_solve(*args, **kwargs)
+    return _render_yiu_spec(*args, **kwargs)
 
 
-def yiu_show_payload(*args, **kwargs):
-    from dnadesign.cruncher.app.yiu_workflow import yiu_show_payload as _yiu_show_payload
+def show_yiu_bundle(*args, **kwargs):
+    from dnadesign.cruncher.app.yiu_workflow.show import show_yiu_bundle as _show_yiu_bundle
 
-    return _yiu_show_payload(*args, **kwargs)
+    return _show_yiu_bundle(*args, **kwargs)
 
 
 def init_yiu_workspace(*args, **kwargs):
@@ -62,158 +54,52 @@ def yiu_workspace_path(*args, **kwargs):
     return _yiu_workspace_path(*args, **kwargs)
 
 
-def ensure_workspace_mpl_cache(*args, **kwargs):
-    from dnadesign.cruncher.viz.mpl import ensure_workspace_mpl_cache as _ensure_workspace_mpl_cache
-
-    return _ensure_workspace_mpl_cache(*args, **kwargs)
-
-
-def ensure_mpl_cache(*args, **kwargs):
-    from dnadesign.cruncher.viz.mpl import ensure_mpl_cache as _ensure_mpl_cache
-
-    return _ensure_mpl_cache(*args, **kwargs)
-
-
-def infer_workspace_root_from_output_artifact(*args, **kwargs):
-    from dnadesign.cruncher.viz.mpl import (
-        infer_workspace_root_from_output_artifact as _infer_workspace_root_from_output_artifact,
+def _mismatch_summary_text(mismatch_sites: list[dict[str, object]]) -> str:
+    return ", ".join(
+        f"idx={site['payload_index']} off={site['junction_offset']} "
+        f"{site['mutated_strand']} {site['native_base']}->{site['mutated_base']} "
+        f"(opp={site['opposing_base']})"
+        for site in mismatch_sites
     )
 
-    return _infer_workspace_root_from_output_artifact(*args, **kwargs)
+
+def _print_payload_summary(
+    *,
+    payload_label: str | None,
+    input_kind: str,
+    payload_length: int,
+    junction: dict[str, object],
+    mismatch_sites: list[dict[str, object]],
+    pwm_mode: str,
+    pwm_effective: bool,
+    worst_loss: float,
+    total_loss: float,
+) -> None:
+    if payload_label:
+        console.print(f"Payload label -> {payload_label}")
+    console.print(f"Input kind -> {input_kind}")
+    console.print(f"Payload length -> {payload_length}")
+    console.print(f"Junction window -> start={junction['start']} end={junction['end']} mode={junction['mode']}")
+    console.print(f"Mismatch count -> {len(mismatch_sites)}")
+    if mismatch_sites:
+        console.print(f"Mismatch sites -> {_mismatch_summary_text(mismatch_sites)}")
+    console.print(f"PWM -> mode={pwm_mode} effective={pwm_effective}")
+    if pwm_effective:
+        console.print(f"PWM losses -> worst={worst_loss:.6f} total={total_loss:.6f}")
 
 
-def _render_status(*, job_count: int, rendered_count: int) -> str:
-    if job_count <= 0:
-        return "not_requested"
-    if rendered_count <= 0:
-        return "missing"
-    if rendered_count >= job_count:
-        return "rendered"
-    return "partial"
-
-
-def _format_hard_invariant_summary(summary: object) -> str | None:
-    if not isinstance(summary, dict):
-        return None
-    total = summary.get("total")
-    guaranteed = summary.get("guaranteed")
-    impossible = summary.get("impossible")
-    state_id = summary.get("state_id")
-    if total is None or guaranteed is None or impossible is None:
-        return None
-    base = f"{guaranteed}/{total} guaranteed"
-    if impossible:
-        base = f"{base}, {impossible} impossible"
-    if state_id:
-        return f"{base} in {state_id}"
-    return base
-
-
-def _format_visual_render_summary(summary: object) -> str | None:
-    if not isinstance(summary, dict):
-        return None
-    render_status = summary.get("render_status")
-    render_count = summary.get("render_count")
-    view_count = summary.get("view_count")
-    if render_status is None or render_count is None or view_count is None:
-        return None
-    return f"{render_status} ({render_count}/{view_count})"
-
-
-def run_yiu_render(run: Path) -> dict[str, object]:
-    resolved = Path(run).expanduser().resolve()
-    visual_inventory_path = resolved / "visual_inventory.json"
-    if not visual_inventory_path.exists():
-        raise FileNotFoundError(f"visual inventory not found: {visual_inventory_path}")
-    payload = json.loads(visual_inventory_path.read_text(encoding="utf-8"))
-    views = payload.get("views")
-    if not isinstance(views, list):
-        raise ValueError("visual_inventory.json must define a 'views' list")
-    workspace_root = infer_workspace_root_from_output_artifact(visual_inventory_path)
-    if workspace_root is not None:
-        ensure_workspace_mpl_cache(workspace_root)
-    else:
-        ensure_mpl_cache(resolved)
-
-    baserender = importlib.import_module("dnadesign.baserender")
-
-    render_paths: list[str] = []
-    rendered_count = 0
-    job_count = 0
-    render_timestamp: str | None = None
-    for entry in views:
-        if not isinstance(entry, dict):
-            continue
-        contract_relpath = entry.get("view_contract_path")
-        render_relpath = entry.get("render_artifact_path")
-        if not contract_relpath or not render_relpath:
-            entry["render_requested"] = False
-            entry["render_completed"] = False
-            entry["last_rendered_at"] = None
-            continue
-        resolved_contract_path = (resolved / str(contract_relpath)).resolve()
-        resolved_render_path = (resolved / str(render_relpath)).resolve()
-        job_count += 1
-        baserender.run_job(
-            {
-                "version": 3,
-                "results_root": ".",
-                "input": {
-                    "kind": "json",
-                    "path": str(resolved_contract_path),
-                    "adapter": {"kind": str(entry.get("contract_kind") or "sequence_evidence_map_v1")},
-                    "alphabet": "iupac_dna",
-                },
-                "render": {
-                    "renderer": str(
-                        entry.get("renderer_kind") or payload.get("renderer_kind") or "nucleotide_evidence_map"
-                    ),
-                    "style": {"preset": None, "overrides": {}},
-                },
-                "outputs": [{"kind": "images", "path": str(resolved_render_path), "fmt": "pdf"}],
-                "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
-            },
-            kind="render_job_v3",
-            caller_root=resolved,
+def _print_split_row_debug(rows: list[dict[str, object]]) -> None:
+    for row in rows:
+        console.print(
+            "Split row -> "
+            f"{row['fragment_side']} "
+            f"selected_sticky_end={row['selected_sticky_end_sequence_5to3']} "
+            f"canonical_sticky_end={row['canonical_sticky_end_sequence_5to3']} "
+            f"ghost_excised_context={row['ghost_excised_context'] is not None}"
         )
-        if resolved_render_path.exists():
-            render_timestamp = datetime.now(timezone.utc).isoformat()
-            entry["render_requested"] = True
-            entry["render_completed"] = True
-            entry["last_rendered_at"] = render_timestamp
-            render_paths.append(str(resolved_render_path))
-            rendered_count += 1
-        else:
-            entry["render_requested"] = True
-            entry["render_completed"] = False
-            entry["last_rendered_at"] = None
-    payload["render_count"] = rendered_count
-    payload["render_status"] = _render_status(job_count=job_count, rendered_count=rendered_count)
-    payload["last_rendered_at"] = render_timestamp if rendered_count > 0 else None
-    visual_inventory_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    return {
-        "run_dir": str(resolved),
-        "visual_inventory_path": str(visual_inventory_path.resolve()),
-        "job_count": job_count,
-        "rendered_count": rendered_count,
-        "render_paths": render_paths,
-    }
 
 
-def _print_report(report) -> None:
-    console.print(f"YIU spec -> {report.spec_name}")
-    console.print(f"Status -> {report.status}")
-    console.print(f"Protocol -> {report.protocol}")
-    console.print(f"Sequence mode -> {report.sequence_mode}")
-    console.print(f"Validation mode -> {report.validation_mode}")
-    console.print(f"States -> {len(report.states)}")
-    if report.issues:
-        console.print("Issues:")
-        for issue in report.issues:
-            console.print(f"  - {issue.code}: {issue.message}")
-
-
-@app.command("init-workspace", help="Scaffold a YIU workflow workspace.")
+@app.command("init-workspace", help="Scaffold a payload-centric YIU workspace.")
 def init_workspace_cmd(
     workspace: str | None = typer.Argument(
         None,
@@ -248,16 +134,12 @@ def init_workspace_cmd(
     console.print(f"Runbook -> {result.runbook_path}")
     console.print(f"Runbook doc -> {result.runbook_doc_path}")
     console.print(f"Spec -> {result.spec_path}")
-    console.print(f"Solve spec -> {result.solve_spec_path}")
-    console.print(f"Enzyme catalog -> {result.enzyme_catalog_path}")
-    console.print(f"Oligo-parts catalog -> {result.oligo_parts_catalog_path}")
-    console.print(f"Backbone catalog -> {result.backbone_catalog_path}")
 
 
-@app.command("validate", help="Validate a YIU protocol spec and emit a deterministic step-trace report.")
+@app.command("validate", help="Validate a payload-centric YIU spec and print the normalized payload summary.")
 def validate_cmd(
     spec: Path = typer.Option(..., "--spec", help="Path to <workspace>/configs/yiu/<name>.yiu.yaml."),
-    json_output: bool = typer.Option(False, "--json", help="Print the full report as JSON."),
+    json_output: bool = typer.Option(False, "--json", help="Print the validation report as JSON."),
 ) -> None:
     try:
         report = validate_yiu_spec(spec)
@@ -266,152 +148,119 @@ def validate_cmd(
         raise typer.Exit(code=1) from exc
     if json_output:
         typer.echo(json.dumps(report.model_dump(mode="json"), indent=2))
-    else:
-        _print_report(report)
+        return
+    report_payload = report.model_dump(mode="json")
+    console.print(f"Spec -> {report.spec_name}")
+    console.print(f"Status -> {report.status}")
+    _print_payload_summary(
+        payload_label=report_payload.get("payload_label"),
+        input_kind=report.input_kind,
+        payload_length=report.payload_length,
+        junction=report_payload["junction"],
+        mismatch_sites=report_payload["mismatches"],
+        pwm_mode=report_payload["pwm_mode"],
+        pwm_effective=report_payload["pwm_effective"],
+        worst_loss=report_payload["worst_loss"],
+        total_loss=report_payload["total_loss"],
+    )
+    console.print("Bundle write -> no")
     if report.status != "satisfied":
         raise typer.Exit(code=1)
 
 
-@app.command(
-    "trace",
-    help="Materialize the modeled YIU state graph and explicit bundle.",
-)
-def trace_cmd(
+@app.command("render", help="Validate a payload-centric YIU spec, publish its bundle, and optionally render its views.")
+def render_cmd(
     spec: Path = typer.Option(..., "--spec", help="Path to <workspace>/configs/yiu/<name>.yiu.yaml."),
     force_overwrite: bool = typer.Option(
-        False, "--force-overwrite", help="Replace an existing deterministic run directory."
+        False, "--force-overwrite", help="Replace an existing deterministic bundle directory."
     ),
     emit_renders: bool = typer.Option(
         False,
         "--emit-renders",
-        help="Immediately render every published BaseRender job after the trace bundle is written.",
+        help="Immediately render every published BaseRender job after the bundle is written.",
     ),
-    json_output: bool = typer.Option(False, "--json", help="Print the full report as JSON."),
+    json_output: bool = typer.Option(False, "--json", help="Print the render report as JSON."),
 ) -> None:
-    if emit_renders and json_output:
-        raise typer.BadParameter("--emit-renders cannot be combined with --json.")
     try:
-        run_dir, report = run_yiu_trace(spec, force_overwrite=force_overwrite)
+        bundle_dir, report = render_yiu_spec(spec, force_overwrite=force_overwrite, emit_renders=emit_renders)
     except (FileNotFoundError, ValueError) as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
+    payload = {
+        "bundle_dir": str(bundle_dir),
+        "outputs_root": str(bundle_dir.parent.resolve()),
+        "composite_render_artifact_path": str((bundle_dir / "payload_views.pdf").resolve()),
+        "bundle_manifest_path": str((bundle_dir / "bundle_manifest.json").resolve()),
+        "normalized_payload_path": str((bundle_dir / "normalized_payload.json").resolve()),
+        "visual_inventory_path": str((bundle_dir / "visual_inventory.json").resolve()),
+        "report": report.model_dump(mode="json"),
+    }
     if json_output:
-        typer.echo(json.dumps(report.model_dump(mode="json"), indent=2))
-    else:
-        console.print(f"YIU trace outputs -> {run_dir}")
-        _print_report(report)
-        if emit_renders:
-            render_payload = run_yiu_render(run_dir)
-            typer.echo(f"Rendered jobs -> {render_payload['job_count']}")
-            for render_path in render_payload.get("render_paths", []):
-                typer.echo(f"Render -> {render_path}")
+        typer.echo(json.dumps(payload, indent=2))
+        return
+    console.print(f"YIU bundle -> {bundle_dir}")
+    console.print(f"Spec -> {report.spec_name}")
+    _print_payload_summary(
+        payload_label=report.payload_label,
+        input_kind=report.input_kind,
+        payload_length=report.payload_length,
+        junction=report.junction.model_dump(mode="json"),
+        mismatch_sites=[entry.model_dump(mode="json") for entry in report.mismatches],
+        pwm_mode=report.pwm_mode,
+        pwm_effective=report.pwm_effective,
+        worst_loss=report.worst_loss,
+        total_loss=report.total_loss,
+    )
+    console.print(f"Bundle write -> {bundle_dir}")
+    console.print(f"Bundle manifest -> {payload['bundle_manifest_path']}")
+    console.print(f"Normalized payload -> {payload['normalized_payload_path']}")
+    console.print(f"Visual inventory -> {payload['visual_inventory_path']}")
+    if emit_renders:
+        console.print(f"Composite render target -> {payload['composite_render_artifact_path']}")
     if report.status != "satisfied":
         raise typer.Exit(code=1)
 
 
-@app.command("render", help="Run every published BaseRender job listed in visual_inventory.json for one YIU bundle.")
-def render_cmd(
-    run: Path = typer.Option(..., "--run", help="Path to a YIU explicit or solve run directory."),
-) -> None:
-    try:
-        payload = run_yiu_render(run)
-    except Exception as exc:
-        console.print(f"Error: {exc}")
-        raise typer.Exit(code=1) from exc
-    visual_inventory_path = payload.get(
-        "visual_inventory_path",
-        str(Path(run).expanduser().resolve() / "visual_inventory.json"),
-    )
-    render_paths = payload.get("render_paths", [])
-    typer.echo(f"YIU render run -> {payload['run_dir']}")
-    typer.echo(f"Visual inventory -> {visual_inventory_path}")
-    typer.echo(f"Rendered jobs -> {payload['job_count']}")
-    for render_path in render_paths:
-        typer.echo(f"Render -> {render_path}")
-
-
-@app.command("solve", help="Search for a canonical satisfying YIU source sequence within the bounded solve window.")
-def solve_cmd(
-    spec: Path = typer.Option(..., "--spec", help="Path to <workspace>/configs/yiu/<name>.yiu.solve.yaml."),
-    force_overwrite: bool = typer.Option(
-        False, "--force-overwrite", help="Replace an existing deterministic solve directory."
-    ),
-    emit_renders: bool = typer.Option(
-        False,
-        "--emit-renders",
-        help="Immediately render every published BaseRender job after the solve bundle is written.",
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Print the full solve report as JSON."),
-) -> None:
-    if emit_renders and json_output:
-        raise typer.BadParameter("--emit-renders cannot be combined with --json.")
-    try:
-        run_dir, report = run_yiu_solve(spec, force_overwrite=force_overwrite)
-    except (FileNotFoundError, ValueError) as exc:
-        console.print(f"Error: {exc}")
-        raise typer.Exit(code=1) from exc
-    if json_output:
-        typer.echo(json.dumps(report.model_dump(mode="json"), indent=2))
-    else:
-        console.print(f"YIU solve outputs -> {run_dir}")
-        console.print(f"Status -> {report.status}")
-        console.print(f"Solve id -> {report.solve_id}")
-        console.print(f"Satisfying solutions -> {report.satisfying_solution_count}")
-        console.print(f"Exhaustive search -> {report.metadata.exhaustive_search}")
-        if report.selected_solution_path:
-            console.print(f"Selected solution -> {report.selected_solution_path}")
-        if report.metadata.warning_codes:
-            console.print(f"Warning codes -> {', '.join(report.metadata.warning_codes)}")
-        if emit_renders:
-            render_payload = run_yiu_render(run_dir)
-            typer.echo(f"Rendered jobs -> {render_payload['job_count']}")
-            for render_path in render_payload.get("render_paths", []):
-                typer.echo(f"Render -> {render_path}")
-    if report.status != "solved":
-        raise typer.Exit(code=1)
-
-
-@app.command("show", help="Show paths and summary for a YIU run directory.")
+@app.command("show", help="Show payload-centric summary for one YIU bundle.")
 def show_cmd(
-    run: Path = typer.Option(..., "--run", help="Path to a YIU run directory under outputs/yiu/explicit/."),
-    json_output: bool = typer.Option(False, "--json", help="Print the normalized bundle inventory as JSON."),
+    bundle: Path = typer.Option(..., "--bundle", help="Path to a published YIU payload bundle."),
+    json_output: bool = typer.Option(False, "--json", help="Print the normalized bundle summary as JSON."),
+    verbose: bool = typer.Option(False, "--verbose", help="Include split-row debug details in the output."),
 ) -> None:
     try:
-        payload = yiu_show_payload(run)
+        payload = show_yiu_bundle(bundle, verbose=verbose)
     except (FileNotFoundError, ValueError) as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
     if json_output:
         typer.echo(json.dumps(payload, indent=2))
         return
-    console.print(f"Bundle kind -> {payload['bundle_kind']}")
-    console.print(f"Run id -> {payload['run_id']}")
-    console.print(f"Run dir -> {payload['run_dir']}")
-    console.print(f"Protocol template -> {payload.get('protocol_template')}")
-    if payload["bundle_kind"] == "solve":
-        if payload.get("canonical_template_id"):
-            console.print(f"Template id -> {payload['canonical_template_id']}")
-        console.print(f"Solve status -> {payload.get('solve_status')}")
-        if payload.get("exhaustive_search") is not None:
-            console.print(f"Exhaustive search -> {payload['exhaustive_search']}")
-        console.print(f"Satisfying solutions -> {payload.get('satisfying_solution_count')}")
-        console.print(f"Comparison solutions -> {payload.get('comparison_solution_count')}")
-        if payload.get("selected_canonical_solution_path"):
-            console.print(f"Selected solution -> {payload['selected_canonical_solution_path']}")
-    else:
-        console.print(f"Schema version -> {payload.get('schema_version')}")
-        console.print(f"State count -> {payload.get('state_count')}")
-        console.print(f"Explicit final state -> {payload.get('explicit_final_state')}")
-    hard_invariants = _format_hard_invariant_summary(payload.get("hard_invariant_summary"))
-    if hard_invariants is not None:
-        console.print(f"Hard invariants -> {hard_invariants}")
-    visual_renders = _format_visual_render_summary(payload.get("visual_render_summary"))
-    if visual_renders is not None:
-        console.print(f"Visual renders -> {visual_renders}")
-    if payload.get("visual_inventory_path"):
-        console.print(f"Visual inventory -> {payload['visual_inventory_path']}")
-    key_artifact_paths = payload.get("key_artifact_paths")
-    if isinstance(key_artifact_paths, dict):
-        for label, artifact_path in key_artifact_paths.items():
-            if artifact_path:
-                console.print(f"{label.replace('_', ' ').title()} -> {artifact_path}")
+    console.print(f"Bundle -> {payload['bundle_dir']}")
+    console.print(f"Bundle contract -> {payload['bundle_contract']}")
+    console.print(f"Provenance -> {json.dumps(payload['provenance'], sort_keys=True)}")
+    _print_payload_summary(
+        payload_label=payload.get("payload_label"),
+        input_kind=payload["input_kind"],
+        payload_length=payload["payload_length"],
+        junction=payload["junction"],
+        mismatch_sites=payload.get("mismatches", []),
+        pwm_mode=payload["pwm_mode"],
+        pwm_effective=payload["pwm_effective"],
+        worst_loss=payload["worst_loss"],
+        total_loss=payload["total_loss"],
+    )
+    motif_context = payload.get("motif_context", {})
+    fallback_reason = motif_context.get("fallback_reason")
+    if payload["pwm_mode"] != "none" and not payload["pwm_effective"] and fallback_reason:
+        console.print(f"PWM fallback reason -> {fallback_reason}")
+    if verbose:
+        _print_split_row_debug(payload.get("split_row_debug", []))
+    console.print(f"Views -> {', '.join(payload['view_ids'])}")
+    console.print(f"Render status -> {payload['render_status']}")
+    console.print(f"Available renders -> {len(payload['available_renders'])}")
+    console.print(f"Integrity -> {payload['integrity']['status']}")
+    if payload.get("composite_render_artifact_path") is not None:
+        console.print(f"Composite render -> {payload['composite_render_artifact_path']}")
+    console.print(f"Bundle manifest -> {payload['bundle_manifest_path']}")
+    console.print(f"Normalized payload -> {payload['normalized_payload_path']}")
+    console.print(f"Visual inventory -> {payload['visual_inventory_path']}")
