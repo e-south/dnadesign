@@ -96,12 +96,26 @@ class SequenceRowsRenderer:
 
         tone_fwd: Sequence[float] | None = None
         tone_rev: Sequence[float] | None = None
+        explicit_complement_sequence: str | None = None
+        base_highlights: Mapping[str, Sequence[int]] = {}
+        dim_base_indices: Mapping[str, Sequence[int]] = {}
+        if isinstance(record.meta, Mapping):
+            raw_complement = record.meta.get("complement_sequence")
+            if isinstance(raw_complement, str) and len(raw_complement) == len(record.sequence):
+                explicit_complement_sequence = raw_complement
+            raw_highlights = record.meta.get("base_highlights")
+            if isinstance(raw_highlights, Mapping):
+                base_highlights = raw_highlights
+            raw_dim_indices = record.meta.get("dim_base_indices")
+            if isinstance(raw_dim_indices, Mapping):
+                dim_base_indices = raw_dim_indices
         if bool(style.sequence.bold_consensus_bases) and motif_geometries:
             tone_fwd, tone_rev = _sequence_tone_strengths(
                 record,
                 motif_geometries,
                 q_low=float(style.sequence.tone_quantile_low),
                 q_high=float(style.sequence.tone_quantile_high),
+                complement_sequence=explicit_complement_sequence,
             )
 
         fig_scale = float(style.figure_scale)
@@ -145,6 +159,7 @@ class SequenceRowsRenderer:
             panel_ax = None
             ax = fig.add_axes([0, 0, 1, 1])
         ax.set_axis_off()
+        ax._dnadesign_record_meta = record.meta
 
         x0 = layout.x_left
         _draw_sequence(
@@ -158,11 +173,13 @@ class SequenceRowsRenderer:
             "3'",
             tone_strengths=tone_fwd,
             row_id="fwd",
+            highlight_indices=base_highlights.get("primary"),
+            dim_indices=dim_base_indices.get("primary"),
         )
         if show_two:
             _draw_sequence(
                 ax,
-                comp(record.sequence),
+                explicit_complement_sequence or comp(record.sequence),
                 x0,
                 layout.y_reverse,
                 layout.cw,
@@ -171,9 +188,12 @@ class SequenceRowsRenderer:
                 "5'",
                 tone_strengths=tone_rev,
                 row_id="rev",
+                highlight_indices=base_highlights.get("complement"),
+                dim_indices=dim_base_indices.get("complement"),
             )
             _draw_connectors(ax, len(record.sequence), x0, layout.cw, layout, style)
         _draw_row_labels(ax, record, layout, style)
+        _draw_segment_labels(ax, record, layout, style)
         if bool(style.show_coordinate_ticks):
             _draw_coordinate_ticks(ax, record, layout, style)
 
@@ -265,15 +285,15 @@ class SequenceRowsRenderer:
         return fig
 
 
-@lru_cache(maxsize=1024)
-def _mono_text_path(char: str, font_family: str, size_pt: int) -> TextPath:
-    prop = FontProperties(family=font_family, size=size_pt)
+@lru_cache(maxsize=2048)
+def _mono_text_path(char: str, font_family: str, size_pt: int, weight: str = "normal") -> TextPath:
+    prop = FontProperties(family=font_family, size=size_pt, weight=weight)
     return TextPath((0, 0), char, prop=prop, usetex=False)
 
 
-@lru_cache(maxsize=64)
-def _mono_ag_mid_px(font_family: str, size_pt: int, dpi: int) -> float:
-    prop = FontProperties(family=font_family, size=size_pt)
+@lru_cache(maxsize=128)
+def _mono_ag_mid_px(font_family: str, size_pt: int, dpi: int, weight: str = "normal") -> float:
+    prop = FontProperties(family=font_family, size=size_pt, weight=weight)
     px_per_pt = dpi / 72.0
     ag = TextPath((0, 0), "Ag", prop=prop, usetex=False).get_extents()
     return ((ag.y0 + ag.y1) / 2.0) * px_per_pt
@@ -356,10 +376,11 @@ def _sequence_tone_strengths(
     *,
     q_low: float,
     q_high: float,
+    complement_sequence: str | None = None,
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     n = len(record.sequence)
     seq_fwd = record.sequence.upper()
-    seq_rev = comp(record.sequence).upper()
+    seq_rev = (complement_sequence or comp(record.sequence)).upper()
     covered_fwd = [0 for _ in range(n)]
     covered_rev = [0 for _ in range(n)]
     accum_fwd = [0.0 for _ in range(n)]
@@ -1076,8 +1097,38 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
     if y2 <= y1:
         return
     dash_pattern = tuple(float(value) for value in style.connector_dash)
+    hidden_indices: set[int] = set()
+    cross_indices: set[int] = set()
+    overhang_spans: list[tuple[int, int]] = []
+    record_meta = getattr(ax, "_dnadesign_record_meta", None)
+    if isinstance(record_meta, Mapping):
+        hidden_indices = {int(value) for value in record_meta.get("connector_hidden_indices", ())}
+        cross_indices = {int(value) for value in record_meta.get("connector_cross_indices", ())}
+        raw_spans = record_meta.get("connector_overhang_spans", ())
+        if isinstance(raw_spans, Sequence) and not isinstance(raw_spans, (str, bytes)):
+            for raw in raw_spans:
+                if not isinstance(raw, Mapping):
+                    continue
+                try:
+                    start = int(raw.get("start"))
+                    end = int(raw.get("end"))
+                except Exception:
+                    continue
+                if end > start:
+                    overhang_spans.append((start, end))
     for i in range(n):
+        if i in hidden_indices:
+            continue
         x = x0 + i * cw + cw / 2.0
+        if i in cross_indices:
+            dx = max(2.5, cw * 0.24)
+            ax.plot(
+                [x - dx, x + dx], [y1, y2], color="#6B7280", lw=max(1.1, style.connector_width), alpha=0.95, zorder=1.5
+            )
+            ax.plot(
+                [x - dx, x + dx], [y2, y1], color="#6B7280", lw=max(1.1, style.connector_width), alpha=0.95, zorder=1.5
+            )
+            continue
         (ln,) = ax.plot(
             [x, x],
             [y1, y2],
@@ -1088,6 +1139,15 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
         )
         if dash_pattern:
             ln.set_dashes(dash_pattern)
+    if overhang_spans:
+        center_y = (y1 + y2) / 2.0
+        for start, end in overhang_spans:
+            x_start = x0 + start * cw + cw * 0.12
+            x_end = x0 + end * cw - cw * 0.12
+            if x_end <= x_start:
+                continue
+            (ln,) = ax.plot([x_start, x_end], [center_y, center_y], color="#111827", lw=1.35, zorder=1.7)
+            ln.set_dashes((3.0, 2.0))
 
 
 def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) -> None:
@@ -1120,6 +1180,39 @@ def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) ->
             family=style.font_label,
             color="#374151",
             zorder=4.0,
+        )
+
+
+def _draw_segment_labels(ax, record: Record, layout: LayoutContext, style: Style) -> None:
+    segment_labels = record.meta.get("segment_labels") if isinstance(record.meta, Mapping) else None
+    if not isinstance(segment_labels, Sequence) or isinstance(segment_labels, (str, bytes)):
+        return
+    y = layout.y_forward + layout.sequence_extent_up + max(5.0, style.font_size_label * 0.4)
+    for raw in segment_labels:
+        if not isinstance(raw, Mapping):
+            continue
+        text = str(raw.get("text", "")).strip()
+        if not text:
+            continue
+        try:
+            start = int(raw.get("start"))
+            end = int(raw.get("end"))
+        except Exception:
+            continue
+        if end <= start:
+            continue
+        x = layout.x_left + ((start + end) / 2.0) * layout.cw
+        ax.text(
+            x,
+            y,
+            text,
+            ha="center",
+            va="bottom",
+            fontsize=max(10, style.font_size_label),
+            family=style.font_label,
+            color="#111827",
+            zorder=4.3,
+            clip_on=False,
         )
 
 
@@ -1159,6 +1252,8 @@ def _draw_sequence(
     *,
     tone_strengths: Sequence[float] | None = None,
     row_id: str = "fwd",
+    highlight_indices: Sequence[int] | None = None,
+    dim_indices: Sequence[int] | None = None,
 ) -> None:
     label_dx = style.font_size_label / 72.0 * style.dpi * 0.8
     ax.text(
@@ -1185,14 +1280,22 @@ def _draw_sequence(
     )
 
     px_per_pt = style.dpi / 72.0
-    y_mid_px = _mono_ag_mid_px(style.font_mono, style.font_size_seq, style.dpi)
+    highlight_set = {int(index) for index in (highlight_indices or ())}
+    dim_set = {int(index) for index in (dim_indices or ())}
     x = x0
     for idx, char in enumerate(seq):
-        tp = _mono_text_path(char, style.font_mono, style.font_size_seq)
+        is_highlighted = idx in highlight_set
+        weight = "bold" if is_highlighted else "normal"
+        tp = _mono_text_path(char, style.font_mono, style.font_size_seq, weight)
         glyph_color = style.color_sequence
         if tone_strengths is not None:
             strength = tone_strengths[idx] if idx < len(tone_strengths) else 0.0
             glyph_color = _mix_colors(style.sequence.non_consensus_color, style.color_sequence, strength)
+        if idx in dim_set and not is_highlighted:
+            glyph_color = "#D1D5DB"
+        if is_highlighted:
+            glyph_color = _darken_rgb(glyph_color, factor=0.72)
+        y_mid_px = _mono_ag_mid_px(style.font_mono, style.font_size_seq, style.dpi, weight)
         trans = Affine2D().scale(px_per_pt).translate(x, y_center - y_mid_px) + ax.transData
         patch = PathPatch(
             tp,
@@ -1203,7 +1306,10 @@ def _draw_sequence(
             zorder=2,
             clip_on=False,
         )
-        patch.set_gid(f"sequence:{row_id}:{idx}:{char}")
+        gid = f"sequence:{row_id}:{idx}:{char}"
+        if is_highlighted:
+            gid = f"{gid}:highlight"
+        patch.set_gid(gid)
         ax.add_patch(patch)
         x += cw
 

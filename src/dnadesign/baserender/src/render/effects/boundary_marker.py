@@ -29,8 +29,12 @@ def draw_boundary_marker(ax, effect: Effect, record, layout, style, palette, fea
     x = layout.x_left + boundary * layout.cw
     y = layout.y_forward if lane == "primary" else layout.y_reverse
     height = max(12.0, layout.ch * 0.8)
-    ax.plot([x, x], [y - height / 2.0, y + height / 2.0], color="#111827", linewidth=1.6, zorder=6.0)
-    ax.plot([x - 2.0, x + 2.0], [y + height / 2.0, y + height / 2.0], color="#111827", linewidth=1.2, zorder=6.0)
+    semantic = str(effect.params.get("semantic", "")).strip().lower()
+    (ln,) = ax.plot([x, x], [y - height / 2.0, y + height / 2.0], color="#111827", linewidth=1.35, zorder=6.0)
+    if semantic == "ligation_junction":
+        ln.set_dashes((3.0, 2.0))
+    else:
+        ax.plot([x - 2.0, x + 2.0], [y + height / 2.0, y + height / 2.0], color="#111827", linewidth=1.2, zorder=6.0)
     label = effect.params.get("label")
     if label:
         ax.text(

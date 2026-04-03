@@ -52,6 +52,138 @@ def _style_token_for_tag(tag_kind: str) -> str:
     return "site_effect"
 
 
+def _normalize_base_highlights(
+    meta: Mapping[str, Any], *, primary_length: int, complement_length: int
+) -> dict[str, tuple[int, ...]]:
+    raw = meta.get("base_highlights")
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping):
+        raise SchemaError("sequence_evidence_map_v1 meta.base_highlights must be a mapping")
+    normalized: dict[str, tuple[int, ...]] = {}
+    expected = {
+        "primary": primary_length,
+        "complement": complement_length,
+    }
+    for row_id, limit in expected.items():
+        values = raw.get(row_id)
+        if values is None:
+            continue
+        if isinstance(values, (str, bytes)) or not isinstance(values, (list, tuple)):
+            raise SchemaError(f"sequence_evidence_map_v1 meta.base_highlights.{row_id} must be a list of indices")
+        try:
+            indices = tuple(int(value) for value in values)
+        except Exception as exc:
+            raise SchemaError(
+                f"sequence_evidence_map_v1 meta.base_highlights.{row_id} must contain integer indices"
+            ) from exc
+        if any(index < 0 or index >= limit for index in indices):
+            raise SchemaError(
+                f"sequence_evidence_map_v1 meta.base_highlights.{row_id} indices must be within row bounds"
+            )
+        normalized[row_id] = indices
+    return normalized
+
+
+def _normalize_row_index_map(
+    meta: Mapping[str, Any],
+    *,
+    key: str,
+    primary_length: int,
+    complement_length: int,
+) -> dict[str, tuple[int, ...]]:
+    raw = meta.get(key)
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping):
+        raise SchemaError(f"sequence_evidence_map_v1 meta.{key} must be a mapping")
+    normalized: dict[str, tuple[int, ...]] = {}
+    expected = {
+        "primary": primary_length,
+        "complement": complement_length,
+    }
+    for row_id, limit in expected.items():
+        values = raw.get(row_id)
+        if values is None:
+            continue
+        if isinstance(values, (str, bytes)) or not isinstance(values, (list, tuple)):
+            raise SchemaError(f"sequence_evidence_map_v1 meta.{key}.{row_id} must be a list of indices")
+        try:
+            indices = tuple(int(value) for value in values)
+        except Exception as exc:
+            raise SchemaError(f"sequence_evidence_map_v1 meta.{key}.{row_id} must contain integer indices") from exc
+        if any(index < 0 or index >= limit for index in indices):
+            raise SchemaError(f"sequence_evidence_map_v1 meta.{key}.{row_id} indices must be within row bounds")
+        normalized[row_id] = indices
+    return normalized
+
+
+def _normalize_index_list(meta: Mapping[str, Any], key: str, *, limit: int) -> tuple[int, ...]:
+    raw = meta.get(key, ())
+    if raw is None:
+        return ()
+    if isinstance(raw, (str, bytes)) or not isinstance(raw, (list, tuple)):
+        raise SchemaError(f"sequence_evidence_map_v1 meta.{key} must be a list of indices")
+    try:
+        values = tuple(int(value) for value in raw)
+    except Exception as exc:
+        raise SchemaError(f"sequence_evidence_map_v1 meta.{key} must contain integer indices") from exc
+    if any(value < 0 or value >= limit for value in values):
+        raise SchemaError(f"sequence_evidence_map_v1 meta.{key} indices must be within row bounds")
+    return values
+
+
+def _normalize_connector_overhang_spans(meta: Mapping[str, Any], *, limit: int) -> tuple[dict[str, int], ...]:
+    raw = meta.get("connector_overhang_spans", ())
+    if raw is None:
+        return ()
+    if isinstance(raw, (str, bytes)) or not isinstance(raw, (list, tuple)):
+        raise SchemaError("sequence_evidence_map_v1 meta.connector_overhang_spans must be a list")
+    normalized: list[dict[str, int]] = []
+    for entry in raw:
+        if not isinstance(entry, Mapping):
+            raise SchemaError("sequence_evidence_map_v1 meta.connector_overhang_spans entries must be mappings")
+        try:
+            start = int(entry.get("start"))
+            end = int(entry.get("end"))
+        except Exception as exc:
+            raise SchemaError(
+                "sequence_evidence_map_v1 meta.connector_overhang_spans entries must contain integer start/end"
+            ) from exc
+        if start < 0 or end > limit or end <= start:
+            raise SchemaError("sequence_evidence_map_v1 meta.connector_overhang_spans entries must be within bounds")
+        normalized.append({"start": start, "end": end})
+    ordered = sorted(normalized, key=lambda entry: (entry["start"], entry["end"]))
+    for previous, current in zip(ordered, ordered[1:]):
+        if current["start"] < previous["end"]:
+            raise SchemaError("sequence_evidence_map_v1 meta.connector_overhang_spans entries must not overlap")
+    return tuple(normalized)
+
+
+def _normalize_segment_labels(meta: Mapping[str, Any], *, primary_length: int) -> tuple[dict[str, object], ...]:
+    raw = meta.get("segment_labels", ())
+    if raw is None:
+        return ()
+    if isinstance(raw, (str, bytes)) or not isinstance(raw, (list, tuple)):
+        raise SchemaError("sequence_evidence_map_v1 meta.segment_labels must be a list")
+    normalized: list[dict[str, object]] = []
+    for entry in raw:
+        if not isinstance(entry, Mapping):
+            raise SchemaError("sequence_evidence_map_v1 meta.segment_labels entries must be mappings")
+        text = str(entry.get("text", "")).strip()
+        if not text:
+            raise SchemaError("sequence_evidence_map_v1 meta.segment_labels entries require text")
+        try:
+            start = int(entry.get("start"))
+            end = int(entry.get("end"))
+        except Exception as exc:
+            raise SchemaError("sequence_evidence_map_v1 meta.segment_labels entries require integer start/end") from exc
+        if start < 0 or end > primary_length or end <= start:
+            raise SchemaError("sequence_evidence_map_v1 meta.segment_labels entries must be within primary bounds")
+        normalized.append({"text": text, "start": start, "end": end, "row_id": "primary"})
+    return tuple(normalized)
+
+
 @dataclass(frozen=True)
 class SequenceEvidenceMapV1Adapter:
     columns: Mapping[str, Any]
@@ -109,6 +241,12 @@ class SequenceEvidenceMapV1Adapter:
                 )
             )
 
+        meta = dict(contract.meta)
+        if "boundary_marker_style" in meta:
+            raise SchemaError(
+                "sequence_evidence_map_v1 meta.boundary_marker_style is no longer "
+                "supported; encode semantics in boundaries.boundary_kind"
+            )
         effects: list[Effect] = []
         for boundary in contract.boundaries:
             effects.append(
@@ -139,6 +277,57 @@ class SequenceEvidenceMapV1Adapter:
                     render={"track": 4},
                 )
             )
+        legend_exclude_tags_raw = meta.get("legend_exclude_tags", ())
+        if isinstance(legend_exclude_tags_raw, Mapping):
+            raise SchemaError("sequence_evidence_map_v1 meta.legend_exclude_tags must be a list of tag ids")
+        if isinstance(legend_exclude_tags_raw, (str, bytes)):
+            raise SchemaError("sequence_evidence_map_v1 meta.legend_exclude_tags must be a list of tag ids")
+        try:
+            legend_exclude_tags = tuple(str(tag).strip() for tag in legend_exclude_tags_raw if str(tag).strip())
+        except TypeError as exc:
+            raise SchemaError("sequence_evidence_map_v1 meta.legend_exclude_tags must be a list of tag ids") from exc
+        row_labels = meta.get("row_labels")
+        if not isinstance(row_labels, Mapping):
+            row_labels = {"primary": "Primary", "complement": "Complement"}
+        base_highlights = _normalize_base_highlights(
+            meta,
+            primary_length=len(contract.primary_sequence),
+            complement_length=len(contract.complement_sequence)
+            if contract.complement_sequence is not None
+            else len(contract.primary_sequence),
+        )
+        dim_base_indices = _normalize_row_index_map(
+            meta,
+            key="dim_base_indices",
+            primary_length=len(contract.primary_sequence),
+            complement_length=len(contract.complement_sequence)
+            if contract.complement_sequence is not None
+            else len(contract.primary_sequence),
+        )
+        connector_hidden_indices = _normalize_index_list(
+            meta, "connector_hidden_indices", limit=len(contract.primary_sequence)
+        )
+        connector_cross_indices = _normalize_index_list(
+            meta, "connector_cross_indices", limit=len(contract.primary_sequence)
+        )
+        connector_overhang_spans = _normalize_connector_overhang_spans(meta, limit=len(contract.primary_sequence))
+        if connector_overhang_spans:
+            overhang_indices = {
+                index for span in connector_overhang_spans for index in range(span["start"], span["end"])
+            }
+            if any(index not in overhang_indices for index in connector_hidden_indices):
+                raise SchemaError(
+                    "sequence_evidence_map_v1 meta.connector_hidden_indices must lie within connector_overhang_spans"
+                )
+            if any(index not in overhang_indices for index in connector_cross_indices):
+                raise SchemaError(
+                    "sequence_evidence_map_v1 meta.connector_cross_indices must lie within connector_overhang_spans"
+                )
+        elif connector_hidden_indices or connector_cross_indices:
+            raise SchemaError(
+                "sequence_evidence_map_v1 connector hidden/cross indices require connector_overhang_spans"
+            )
+        segment_labels = _normalize_segment_labels(meta, primary_length=len(contract.primary_sequence))
 
         record = Record(
             id=contract.state_id,
@@ -151,8 +340,15 @@ class SequenceEvidenceMapV1Adapter:
                 "adapter": "sequence_evidence_map_v1",
                 "contract": contract.model_dump(mode="json"),
                 "complement_sequence": contract.complement_sequence,
-                "view_meta": dict(contract.meta),
-                "row_labels": {"primary": "Primary", "complement": "Complement"},
+                "view_meta": meta,
+                "base_highlights": base_highlights,
+                "dim_base_indices": dim_base_indices,
+                "connector_hidden_indices": connector_hidden_indices,
+                "connector_cross_indices": connector_cross_indices,
+                "connector_overhang_spans": connector_overhang_spans,
+                "segment_labels": segment_labels,
+                "legend_exclude_tags": legend_exclude_tags,
+                "row_labels": dict(row_labels),
                 "show_reverse_complement": contract.complement_sequence is not None,
             },
         )

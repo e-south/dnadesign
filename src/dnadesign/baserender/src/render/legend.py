@@ -18,10 +18,15 @@ def legend_entries_for_record(record: Record) -> list[tuple[str, str]]:
     entries: list[tuple[str, str]] = []
     seen: set[str] = set()
     labels = dict(record.display.tag_labels)
+    excluded = {
+        str(tag).strip()
+        for tag in record.meta.get("legend_exclude_tags", ())
+        if isinstance(tag, str) and str(tag).strip()
+    }
 
     for feature in record.features:
         for tag in feature.tags:
-            if tag in seen:
+            if tag in seen or tag in excluded:
                 continue
             seen.add(tag)
             entries.append((tag, labels.get(tag, tag)))

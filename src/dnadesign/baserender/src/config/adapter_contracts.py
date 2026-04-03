@@ -20,6 +20,7 @@ from dnadesign.contracts.visual import (
     SequenceEvidenceMapV1,
     YiuHairpinTopologyV1,
     YiuLinearStateV1,
+    YiuPayloadVisualV1,
     YiuTopologyCartoonV1,
 )
 
@@ -140,6 +141,12 @@ def _build_yiu_linear_state(cfg: Any, alphabet: str) -> Any:
     from ..adapters.yiu_linear_state_v1 import YiuLinearStateV1Adapter
 
     return YiuLinearStateV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_yiu_payload_visual(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.yiu_payload_visual_v1 import YiuPayloadVisualV1Adapter
+
+    return YiuPayloadVisualV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
 
 
 def _build_yiu_hairpin_topology(cfg: Any, alphabet: str) -> Any:
@@ -310,6 +317,19 @@ ADAPTER_DESCRIPTORS: dict[str, AdapterDescriptor] = {
         supported_alphabets=("DNA", "IUPAC_DNA"),
         factory=_build_yiu_linear_state,
         docs_slug="yiu-linear-state-v1",
+        allowed_config_columns=(),
+        required_config_columns=(),
+        required_source_columns=(),
+    ),
+    "yiu_payload_visual_v1": AdapterDescriptor(
+        kind="yiu_payload_visual_v1",
+        owner_tool="yiu",
+        contract_kind="yiu_payload_visual_v1",
+        schema_model=YiuPayloadVisualV1,
+        supported_renderers=("nucleotide_evidence_map",),
+        supported_alphabets=("DNA", "IUPAC_DNA"),
+        factory=_build_yiu_payload_visual,
+        docs_slug="yiu-payload-visual-v1",
         allowed_config_columns=(),
         required_config_columns=(),
         required_source_columns=(),

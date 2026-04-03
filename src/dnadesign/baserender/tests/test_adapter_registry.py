@@ -34,6 +34,7 @@ from dnadesign.baserender.src.adapters.yiu_topology_cartoon_v1 import YiuTopolog
 from dnadesign.baserender.src.config import AdapterCfg
 from dnadesign.baserender.src.config.adapter_contracts import adapter_descriptor
 from dnadesign.baserender.src.core import SchemaError
+from dnadesign.baserender.src.render import legend_entries_for_record
 
 from .conftest import write_parquet
 
@@ -400,6 +401,236 @@ def test_sequence_evidence_map_adapter_applies_contract_without_complement_seque
     assert record.features[8].attrs["style_token"] == "site_boundary"
     assert record.features[9].attrs["style_token"] == "site_effect"
     assert [effect.kind for effect in record.effects] == ["boundary_marker", "span_link"]
+    assert record.effects[0].params["semantic"] == "cut"
+
+
+def test_sequence_evidence_map_adapter_can_exclude_tags_from_legend() -> None:
+    adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    record = adapter.apply(
+        {
+            "contract_kind": "sequence_evidence_map_v1",
+            "state_id": "assembled_payload",
+            "topology_kind": "linear_ssdna",
+            "alphabet": "iupac_dna",
+            "primary_sequence": "CTCTATATCTGATATAGAG",
+            "owners": [
+                {
+                    "owner_id": "payload_left_half",
+                    "row_id": "primary",
+                    "start": 0,
+                    "end": 9,
+                    "display_label": "Left payload half",
+                    "short_label": "L",
+                },
+                {
+                    "owner_id": "payload_right_half",
+                    "row_id": "primary",
+                    "start": 9,
+                    "end": 19,
+                    "display_label": "Right payload half",
+                    "short_label": "R",
+                },
+            ],
+            "effect_tags": [
+                {
+                    "tag_id": "bulge_2",
+                    "tag_kind": "payload_bulge_position",
+                    "row_id": "primary",
+                    "start": 10,
+                    "end": 11,
+                    "display_label": "Bulge 2",
+                    "short_label": "B2",
+                },
+            ],
+            "boundaries": [],
+            "pairings": [],
+            "display": {"title": "Assembled payload"},
+            "meta": {
+                "legend_exclude_tags": [
+                    "owner:payload_left_half",
+                    "owner:payload_right_half",
+                ]
+            },
+        },
+        row_index=0,
+    )
+
+    assert record.meta["legend_exclude_tags"] == (
+        "owner:payload_left_half",
+        "owner:payload_right_half",
+    )
+    assert legend_entries_for_record(record) == [
+        ("effect:payload_bulge_position", "Bulge 2"),
+    ]
+
+
+def test_sequence_evidence_map_adapter_preserves_explicit_complement_and_base_highlights() -> None:
+    adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    record = adapter.apply(
+        {
+            "contract_kind": "sequence_evidence_map_v1",
+            "state_id": "assembled_payload",
+            "topology_kind": "linear_dsdna",
+            "alphabet": "iupac_dna",
+            "primary_sequence": "CTCTATATCTGATATAGAG",
+            "complement_sequence": "GAGATATAGAATATATCTC",
+            "owners": [],
+            "effect_tags": [],
+            "boundaries": [
+                {
+                    "boundary_id": "left-overhang-boundary",
+                    "row_id": "primary",
+                    "boundary": 9,
+                    "boundary_kind": "ligation_junction",
+                    "display_label": "",
+                    "short_label": "",
+                },
+            ],
+            "pairings": [],
+            "display": {"title": "Assembled payload"},
+            "meta": {
+                "base_highlights": {
+                    "primary": [10],
+                    "complement": [10],
+                },
+                "dim_base_indices": {
+                    "primary": [0, 1, 2, 3, 4, 5, 6],
+                    "complement": [0, 1, 2, 3, 4, 5, 6],
+                },
+                "connector_hidden_indices": [9, 11, 12],
+                "connector_cross_indices": [10],
+                "connector_overhang_spans": [{"start": 9, "end": 13}],
+                "segment_labels": [
+                    {"text": "Left", "start": 0, "end": 9},
+                    {"text": "Right", "start": 9, "end": 19},
+                ],
+            },
+        },
+        row_index=0,
+    )
+
+    assert record.meta["show_reverse_complement"] is True
+    assert record.meta["complement_sequence"] == "GAGATATAGAATATATCTC"
+    assert record.meta["base_highlights"] == {"primary": (10,), "complement": (10,)}
+    assert record.meta["dim_base_indices"] == {
+        "primary": (0, 1, 2, 3, 4, 5, 6),
+        "complement": (0, 1, 2, 3, 4, 5, 6),
+    }
+    assert record.meta["connector_hidden_indices"] == (9, 11, 12)
+    assert record.meta["connector_cross_indices"] == (10,)
+    assert record.meta["connector_overhang_spans"] == ({"start": 9, "end": 13},)
+    assert record.meta["segment_labels"] == (
+        {"text": "Left", "start": 0, "end": 9, "row_id": "primary"},
+        {"text": "Right", "start": 9, "end": 19, "row_id": "primary"},
+    )
+    boundary_effects = [effect for effect in record.effects if effect.kind == "boundary_marker"]
+    assert len(boundary_effects) == 1
+    assert boundary_effects[0].target == {"boundary": 9, "lane": "primary"}
+
+
+def test_sequence_evidence_map_adapter_rejects_legacy_boundary_marker_style_meta() -> None:
+    adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    with pytest.raises(SchemaError, match="meta.boundary_marker_style is no longer supported"):
+        adapter.apply(
+            {
+                "contract_kind": "sequence_evidence_map_v1",
+                "state_id": "legacy-boundary-style",
+                "topology_kind": "linear_dsdna",
+                "alphabet": "iupac_dna",
+                "primary_sequence": "AACCGGTT",
+                "owners": [],
+                "effect_tags": [],
+                "boundaries": [],
+                "pairings": [],
+                "display": {"title": "Legacy"},
+                "meta": {"boundary_marker_style": "dashed_uncapped"},
+            },
+            row_index=0,
+        )
+
+
+def test_sequence_evidence_map_adapter_rejects_connector_indices_outside_overhang_spans() -> None:
+    adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    with pytest.raises(SchemaError, match="connector_cross_indices must lie within connector_overhang_spans"):
+        adapter.apply(
+            {
+                "contract_kind": "sequence_evidence_map_v1",
+                "state_id": "bad-overhang-cross",
+                "topology_kind": "linear_dsdna",
+                "alphabet": "iupac_dna",
+                "primary_sequence": "AACCGGTT",
+                "owners": [],
+                "effect_tags": [],
+                "boundaries": [
+                    {
+                        "boundary_id": "left",
+                        "row_id": "primary",
+                        "boundary": 2,
+                        "boundary_kind": "cut",
+                        "display_label": "",
+                        "short_label": "",
+                    },
+                    {
+                        "boundary_id": "right",
+                        "row_id": "complement",
+                        "boundary": 6,
+                        "boundary_kind": "cut",
+                        "display_label": "",
+                        "short_label": "",
+                    },
+                ],
+                "pairings": [],
+                "display": {"title": "Bad"},
+                "meta": {
+                    "connector_overhang_spans": [{"start": 2, "end": 6}],
+                    "connector_cross_indices": [1],
+                },
+            },
+            row_index=0,
+        )
+
+
+def test_sequence_evidence_map_adapter_allows_connector_spans_without_matching_boundary_positions() -> None:
+    adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    record = adapter.apply(
+        {
+            "contract_kind": "sequence_evidence_map_v1",
+            "state_id": "assembled-payload-single-seam",
+            "topology_kind": "linear_dsdna",
+            "alphabet": "iupac_dna",
+            "primary_sequence": "AACCGGTT",
+            "owners": [],
+            "effect_tags": [],
+            "boundaries": [
+                {
+                    "boundary_id": "join",
+                    "row_id": "primary",
+                    "boundary": 4,
+                    "boundary_kind": "ligation_junction",
+                    "display_label": "",
+                    "short_label": "",
+                },
+            ],
+            "pairings": [],
+            "display": {"title": "Assembled payload"},
+            "meta": {
+                "connector_overhang_spans": [{"start": 2, "end": 6}],
+                "connector_hidden_indices": [2, 3, 5],
+                "connector_cross_indices": [4],
+            },
+        },
+        row_index=0,
+    )
+
+    assert record.meta["connector_overhang_spans"] == ({"start": 2, "end": 6},)
+    boundary_effects = [effect for effect in record.effects if effect.kind == "boundary_marker"]
+    assert len(boundary_effects) == 1
+    assert boundary_effects[0].target == {"boundary": 4, "lane": "primary"}
 
 
 def test_sequence_evidence_map_adapter_rejects_invalid_contract_payload() -> None:

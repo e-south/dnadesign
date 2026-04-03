@@ -27,6 +27,7 @@ from .sequence_evidence_map_v1 import SequenceEvidenceMapV1Adapter
 from .sequence_windows_v1 import SequenceWindowsV1Adapter
 from .yiu_hairpin_topology_v1 import YiuHairpinTopologyV1Adapter
 from .yiu_linear_state_v1 import YiuLinearStateV1Adapter
+from .yiu_payload_visual_v1 import YiuPayloadVisualV1Adapter
 from .yiu_topology_cartoon_v1 import YiuTopologyCartoonV1Adapter
 
 __all__ = [
@@ -44,5 +45,6 @@ __all__ = [
     "HairpinTopologyV1Adapter",
     "YiuLinearStateV1Adapter",
     "YiuHairpinTopologyV1Adapter",
+    "YiuPayloadVisualV1Adapter",
     "YiuTopologyCartoonV1Adapter",
 ]
