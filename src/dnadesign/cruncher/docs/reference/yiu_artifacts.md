@@ -1,116 +1,93 @@
 ## YIU Artifacts
 
 **Audience:** YIU workflow users and maintainers
-**Applies to:** `uv run cruncher yiu trace|solve|render`
+**Applies to:** `uv run cruncher yiu render|show`
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-29
+**Last verified:** 2026-04-03
 
-YIU writes two bundle families:
+YIU writes one payload-centric bundle family under `bundles/<workflow>/`.
 
-- explicit bundles under `outputs/yiu/explicit/<workflow>/<trace_id>/`
-- solve bundles under `outputs/yiu/solve/<workflow>/<solve_id>/`
+Each bundle uses `visual_inventory.json` to track render status and published artifact paths.
 
-Both bundle families use one bundle-root render truth file:
+It records:
 
-- `visual_inventory.json`
-
-`visual_inventory.json` is the single source of truth for:
-
-- `protocol_template`
+- `split_yiu_payload_bundle_v4`
 - view contract paths
 - render artifact paths
+- bundle composite render artifact path
 - renderer kind
-- state ids
-- topology kinds
+- view ids
 - render request and completion truth
 - `render_count`
 - `render_status`
 - `last_rendered_at`
 
-`cruncher yiu render --run <bundle>` rereads this file, regenerates the listed PDFs through the public BaseRender API, and writes the updated render truth back into the same inventory.
-
-### Explicit bundle layout
+### Bundle layout
 
 ```text
-outputs/yiu/explicit/<workflow>/<trace_id>/
-  report.json
-  status.json
-  manifest.json
-  state_trace.jsonl
+bundles/<workflow>/
+  bundle_manifest.json
+  normalized_payload.json
   visual_inventory.json
-  tables/
-    state_sequences.csv
-    state_owners.csv
-    effect_tags.csv
-    fragment_summary.csv
-  contracts/
-    visuals/
-      *.json
-  visuals/
-    *.pdf
+  payload_view.json
+  split_payload_view.json
+  assembled_payload_view.json
+  payload_views.pdf
+  baserender_jobs/
+    *.job.yaml     # only when emit_render_jobs_debug: true
 ```
 
-Optional debug-only render jobs are written under `contracts/render_jobs/*.job.yaml` only when `persist_render_jobs_debug: true`.
-Published view contracts live under `contracts/visuals/`.
+`bundle_manifest.json` uses the `split_yiu_payload_bundle_v4` contract and records:
 
-### Solve bundle layout
+- input contract and input kind
+- payload label when available
+- payload length
+- selected payload and complement sequences
+- junction summary
+- mismatch plan
+- PWM mode and whether PWM scoring was effective
+- provenance
+- published view entries
+- one bundle-level `composite_render_artifact_path`
+- render status
+- one operator-facing composite PDF under `payload_views.pdf`
 
-```text
-outputs/yiu/solve/<workflow>/<solve_id>/
-  solve_report.json
-  solve_status.json
-  solve_manifest.json
-  solution/
-    report.json
-    status.json
-    manifest.json
-    state_trace.jsonl
-    visual_inventory.json
-    tables/
-      state_sequences.csv
-      state_owners.csv
-      effect_tags.csv
-      fragment_summary.csv
-    contracts/
-      visuals/
-        *.json
-    visuals/
-      *.pdf
-  alternatives/
-    solution_0002/
-  comparison/
-    solutions.csv
-  visual_inventory.json
-```
+`normalized_payload.json` is the canonical internal object serialized for inspection and downstream validation.
 
-`alternatives/` and `comparison/` are present only when `compare_solutions: true`.
+Published contract paths:
 
-The solve-root `visual_inventory.json` points at the selected solution's view contracts and render artifacts. The selected solution remains the default operator story.
-Selected-solution PDFs live under `solution/visuals/`.
+- `payload_view.json`
+- `split_payload_view.json`
+- `assembled_payload_view.json`
+
+The split and assembled views stay sequence-centric; the payload view uses `yiu_payload_visual_v1` and is the only place motif layers appear.
+
+The payload visual contract carries:
+
+- reference payload row visibility
+- selected payload and complement rows
+- junction annotations
+- mismatch annotations
+- optional motif layers aligned to payload-forward coordinates
 
 ### Status semantics
 
-Explicit status:
-
-- `satisfied` means the explicit validator accepted the authored spec
-- `unsatisfied` means the bundle was still materialized but at least one hard issue remained
-
-Solve status:
-
-- `solved` means at least one admissible solution was found and the selected solution bundle was materialized
-- `unsatisfied` means the bounded search completed without an admissible solution
-- `incomplete_search` means the configured search limits were hit before exhaustion, so no public success was reported
+- `render_status: not_requested` means the bundle was published without PDF rendering
+- `render_status: rendered` means all three payload views rendered successfully
+- `render_status: failed` means BaseRender failed and no substitute renders were fabricated
+- `cruncher yiu show` rejects bundles whose manifest, normalized payload, inventory, or published artifact paths disagree
 
 ### Operator inspection
 
 `cruncher yiu show` surfaces:
 
-- protocol template
-- schema version or solve status
-- final-state or selected-solution summary
-- exhaustive-search truth for solve runs
-- hard-invariant summary for the selected final state
+- bundle directory and bundle contract
+- provenance
+- selected payload length
+- selected junction and mismatch plan
+- PWM mode and effective status
 - render summary from `visual_inventory.json`
+- composite render path when available
 - key artifact paths
 
 Use [YIU Workflow](../guides/yiu_workflow.md) for execution guidance and [YIU Spec Reference](yiu_spec.md) for schema details.

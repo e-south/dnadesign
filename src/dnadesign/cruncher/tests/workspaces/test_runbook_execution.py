@@ -38,6 +38,14 @@ def _copytree_without_ds_store(src: Path, dest: Path) -> Path:
     return dest
 
 
+def _load_json(path: Path) -> dict[str, object]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _load_jsonl(path: Path) -> list[dict[str, object]]:
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
 def test_runbook_rejects_unknown_keys() -> None:
     payload = {
         "runbook": {
@@ -89,8 +97,8 @@ def test_runbook_accepts_yiu_cli_surface() -> None:
             "name": "demo",
             "steps": [
                 {
-                    "id": "yiu_trace",
-                    "run": ["yiu", "trace", "--spec", "configs/yiu/example.yiu.yaml"],
+                    "id": "yiu_render",
+                    "run": ["yiu", "render", "--spec", "configs/yiu/example.yiu.yaml"],
                 }
             ],
         }
@@ -306,8 +314,11 @@ def test_runbook_sets_workspace_local_mpl_cache_for_child_processes(
 def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cache_warning(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    source_workspace = Path("src/dnadesign/cruncher/workspaces/demo_yiu_circularized")
-    workspace = _copytree_without_ds_store(source_workspace, tmp_path / "demo_yiu_circularized")
+    source_workspace = Path("src/dnadesign/cruncher/workspaces/demo_yiu_payload")
+    workspace = _copytree_without_ds_store(source_workspace, tmp_path / "demo_yiu_payload")
+    shutil.rmtree(workspace / "outputs", ignore_errors=True)
+    shutil.rmtree(workspace / "bundles", ignore_errors=True)
+    shutil.rmtree(workspace / ".cruncher", ignore_errors=True)
     runbook_path = workspace / "configs" / "runbook.yaml"
     output_log = tmp_path / "demo-runbook.log"
     runtime_home = tmp_path / "home"
@@ -318,29 +329,57 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
 
     result = run_workspace_runbook(runbook_path, output_log_path=output_log)
 
-    assert result.executed_step_ids == ["yiu_validate", "yiu_trace", "yiu_solve"]
-    explicit_run_root = workspace / "outputs" / "yiu" / "explicit" / "example_reference_circularized"
-    solve_run_root = workspace / "outputs" / "yiu" / "solve" / "example_reference_circularized"
-    explicit_run_dir = next(explicit_run_root.iterdir())
-    solve_run_dir = next(solve_run_root.iterdir())
-    assert (explicit_run_dir / "visual_inventory.json").exists()
-    assert (solve_run_dir / "visual_inventory.json").exists()
-    explicit_inventory = json.loads((explicit_run_dir / "visual_inventory.json").read_text(encoding="utf-8"))
-    solve_inventory = json.loads((solve_run_dir / "visual_inventory.json").read_text(encoding="utf-8"))
-    assert explicit_inventory["render_status"] == "rendered"
-    assert explicit_inventory["render_count"] == 9
-    assert solve_inventory["render_status"] == "rendered"
-    assert solve_inventory["render_count"] == 9
-    assert (explicit_run_dir / "visuals" / "source_oligo_ssdna.pdf").exists()
-    assert (solve_run_dir / "solution" / "visuals" / "source_oligo_ssdna.pdf").exists()
-    assert not (explicit_run_dir / "inline_job").exists()
-    assert not (solve_run_dir / "inline_job").exists()
+    assert result.executed_step_ids == [
+        "yiu_validate",
+        "yiu_render",
+        "yiu_show",
+        "tetr_validate",
+        "tetr_render",
+        "tetr_show",
+    ]
+    for bundle_name in ("example_payload", "tetr_monotypic_hit"):
+        bundle_dir = workspace / "bundles" / bundle_name
+        assert (bundle_dir / "visual_inventory.json").exists()
+        inventory = _load_json(bundle_dir / "visual_inventory.json")
+        assert inventory["render_status"] == "rendered"
+        assert inventory["render_count"] == 3
+        assert inventory["bundle_contract"] == "split_yiu_payload_bundle_v4"
+        assert inventory["input_contract"] == "split_yiu_payload_rendering_v4"
+        assert [view["view_id"] for view in inventory["views"]] == ["payload", "split_payload", "assembled_payload"]
+        assert (bundle_dir / "payload_views.pdf").exists()
+        assert not (bundle_dir / "payload.pdf").exists()
+        assert not (bundle_dir / "split_payload.pdf").exists()
+        assert not (bundle_dir / "assembled_payload.pdf").exists()
+        assert not (bundle_dir / "inline_job").exists()
+
+        payload = _load_json(bundle_dir / "payload_view.json")
+        assembled = _load_json(bundle_dir / "assembled_payload_view.json")
+        split_rows = _load_jsonl(bundle_dir / "split_payload_view.json")
+
+        assert payload["state_id"] == "payload"
+        assert payload["contract_kind"] == "yiu_payload_visual_v1"
+        assert assembled["state_id"] == "assembled_payload"
+        assert assembled["contract_kind"] == "sequence_evidence_map_v1"
+        assert assembled["primary_sequence"] == payload["selected_payload_sequence"]
+        assert [row["state_id"] for row in split_rows] == ["split_payload_left", "split_payload_right"]
+        assert split_rows[0]["meta"]["panel_order"] == 0
+        assert split_rows[0]["meta"]["fragment_side"] == "left"
+        assert split_rows[0]["meta"]["sticky_end_orientation"] == "inward"
+        assert split_rows[1]["meta"]["panel_order"] == 1
+        assert split_rows[1]["meta"]["fragment_side"] == "right"
+        assert split_rows[1]["meta"]["sticky_end_orientation"] == "inward"
+        assert assembled["boundaries"] == []
+        assert "junction_span" in assembled["meta"]
+        assert "ligation_junction" not in json.dumps(assembled)
+        assert "linearization_seam" not in json.dumps(assembled)
+
+    bundle_dir = workspace / "bundles" / "example_payload"
 
     log_text = output_log.read_text(encoding="utf-8")
     assert "Matplotlib is building the font cache" not in log_text
     assert "MPLCONFIGDIR" not in log_text
 
-    job_path = explicit_run_dir / "circularized_payload_candidate.job.yaml"
+    job_path = bundle_dir / "payload.job.yaml"
     job_path.write_text(
         yaml.safe_dump(
             {
@@ -348,14 +387,12 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
                 "results_root": ".",
                 "input": {
                     "kind": "json",
-                    "path": "contracts/visuals/circularized_payload_candidate.json",
-                    "adapter": {"kind": "sequence_evidence_map_v1"},
+                    "path": "payload_view.json",
+                    "adapter": {"kind": "yiu_payload_visual_v1"},
                     "alphabet": "iupac_dna",
                 },
                 "render": {"renderer": "nucleotide_evidence_map", "style": {"preset": None, "overrides": {}}},
-                "outputs": [
-                    {"kind": "images", "path": "visuals/circularized_payload_candidate_replay.pdf", "fmt": "pdf"}
-                ],
+                "outputs": [{"kind": "images", "path": "payload_replay.pdf", "fmt": "pdf"}],
                 "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
             },
             sort_keys=False,
@@ -384,9 +421,4 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
     assert "MPLCONFIGDIR" not in validate_proc.stderr
     assert "Matplotlib" not in render_proc.stderr
     assert "MPLCONFIGDIR" not in render_proc.stderr
-    assert (
-        explicit_run_dir
-        / "circularized_payload_candidate.job"
-        / "visuals"
-        / "circularized_payload_candidate_replay.pdf"
-    ).exists()
+    assert (bundle_dir / "payload.job" / "payload_replay.pdf").exists()

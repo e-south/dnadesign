@@ -1,82 +1,61 @@
 ## YIU Workspace Demo
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-29
+**Last verified:** 2026-04-03
 
-Use this walkthrough to run the checked-in YIU reference workspace, inspect the explicit and solve bundles, and rerender their published visuals.
-
-The checked-in solve fixture is small but nontrivial. On 2026-03-29 the default run was exhaustive, found 2 satisfying solutions, and selected 1 deterministic solution for publication.
+Use this walkthrough to run the checked-in YIU reference workspace, publish its payload bundle, and inspect the three payload views.
 
 ```bash
 # Use the checked-in YIU demo workspace in the repo.
-DEMO_WORKSPACE=src/dnadesign/cruncher/workspaces/demo_yiu_circularized
+DEMO_WORKSPACE=src/dnadesign/cruncher/workspaces/demo_yiu_payload
 
-# Resolve the checked-in explicit spec without hard-coding the filename.
-EXPLICIT_SPEC="$(find "$DEMO_WORKSPACE/configs/yiu" -maxdepth 1 -name '*.yiu.yaml' ! -name '*.solve.yaml' | head -n 1)"
-
-# Resolve the checked-in solve spec without hard-coding the filename.
-SOLVE_SPEC="$(find "$DEMO_WORKSPACE/configs/yiu" -maxdepth 1 -name '*.yiu.solve.yaml' | head -n 1)"
+# Use the checked-in payload-centric YIU specs.
+USER_SPEC="$DEMO_WORKSPACE/configs/yiu/example_payload.yiu.yaml"
+TETR_SPEC="$DEMO_WORKSPACE/configs/yiu/tetr_monotypic_hit.yiu.yaml"
 
 # Confirm the checked-in workspace is discoverable.
 uv run cruncher workspaces list --root src/dnadesign/cruncher/workspaces
 
 # Run the checked-in machine runbook.
-uv run cruncher workspaces run --workspace demo_yiu_circularized --runbook configs/runbook.yaml
+uv run cruncher workspaces run --workspace demo_yiu_payload --runbook configs/runbook.yaml
 
-# Validate the explicit spec.
-uv run cruncher yiu validate --spec "$EXPLICIT_SPEC"
+# Validate the user-sequence payload spec.
+uv run cruncher yiu validate --spec "$USER_SPEC"
 
-# Materialize and render the explicit bundle.
-uv run cruncher yiu trace --spec "$EXPLICIT_SPEC" --force-overwrite --emit-renders
+# Publish and render the user-sequence payload bundle.
+uv run cruncher yiu render --spec "$USER_SPEC" --force-overwrite --emit-renders
 
-# Run the paired solve spec and render the selected solution bundle.
-uv run cruncher yiu solve --spec "$SOLVE_SPEC" --force-overwrite --emit-renders
+# Inspect the published user-sequence payload bundle.
+uv run cruncher yiu show --bundle "$DEMO_WORKSPACE/bundles/example_payload"
 
-# Derive the workflow directory name from the explicit spec path.
-WORKFLOW_NAME="$(basename "${EXPLICIT_SPEC%.yiu.yaml}")"
-
-# Resolve the newest explicit run id for that workflow.
-TRACE_ID="$(ls -1 "$DEMO_WORKSPACE/outputs/yiu/explicit/$WORKFLOW_NAME" | tail -n 1)"
-
-# Resolve the newest solve run id for that workflow.
-SOLVE_ID="$(ls -1 "$DEMO_WORKSPACE/outputs/yiu/solve/$WORKFLOW_NAME" | tail -n 1)"
-
-# Show the explicit bundle summary.
-uv run cruncher yiu show --run "$DEMO_WORKSPACE/outputs/yiu/explicit/$WORKFLOW_NAME/$TRACE_ID"
-
-# Show the solve bundle summary.
-uv run cruncher yiu show --run "$DEMO_WORKSPACE/outputs/yiu/solve/$WORKFLOW_NAME/$SOLVE_ID"
-
-# Rerender the explicit bundle from its persisted view contracts.
-uv run cruncher yiu render --run "$DEMO_WORKSPACE/outputs/yiu/explicit/$WORKFLOW_NAME/$TRACE_ID"
-
-# Rerender the solve bundle from its persisted view contracts.
-uv run cruncher yiu render --run "$DEMO_WORKSPACE/outputs/yiu/solve/$WORKFLOW_NAME/$SOLVE_ID"
+# Validate and render the checked-in sample-hit payload bundle.
+uv run cruncher yiu validate --spec "$TETR_SPEC"
+uv run cruncher yiu render --spec "$TETR_SPEC" --force-overwrite --emit-renders
+uv run cruncher yiu show --bundle "$DEMO_WORKSPACE/bundles/tetr_monotypic_hit"
 ```
 
-After `trace`, the explicit bundle lives under:
+The published bundles live under:
 
 ```text
-outputs/yiu/explicit/<workflow>/<trace_id>/
-```
-
-After `solve`, the solve bundle lives under:
-
-```text
-outputs/yiu/solve/<workflow>/<solve_id>/
+bundles/example_payload/
+bundles/tetr_monotypic_hit/
 ```
 
 Key YIU publication paths:
 
+- `bundle_manifest.json`
+- `normalized_payload.json`
 - bundle-root render truth: `visual_inventory.json`
-- persisted view contracts: `contracts/visuals/*.json`
-- explicit rendered PDFs: `visuals/*.pdf`
-- solve rendered PDFs: `solution/visuals/*.pdf`
+- published view contracts: `payload_view.json`, `split_payload_view.json`, `assembled_payload_view.json`
+- one composite operator PDF: `payload_views.pdf`
+- optional debug jobs: `baserender_jobs/*.job.yaml` when `emit_render_jobs_debug: true`
+
+The sample-hit spec is self-contained. The workspace also includes a local PWM context sidecar under `motifs/example_pwm_context.yaml` as an advanced example.
 
 If you want a disposable scratch copy instead of the checked-in repo workspace:
 
 ```bash
-# Create a fresh YIU workspace with the same reference inputs and catalogs.
+# Create a fresh YIU workspace with the same payload-centric schema.
 uv run cruncher yiu init-workspace yiu_lab_demo
 ```
 

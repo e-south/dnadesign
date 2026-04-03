@@ -1,0 +1,36 @@
+contract: yiu_pwm_context_v1
+schema_version: 1
+name: example_pwm_context
+motifs:
+  - motif_instance_id: motif_plus_example
+    tf_name: EXAMPLE_TF_PLUS
+    motif_name: example_plus
+    reference_strand: "+"
+    start: 7
+    end: 11
+    probabilities:
+      alphabet: [A, C, G, T]
+      rows:
+        - [0.70, 0.10, 0.10, 0.10]
+        - [0.10, 0.70, 0.10, 0.10]
+        - [0.10, 0.10, 0.70, 0.10]
+        - [0.10, 0.10, 0.10, 0.70]
+    provenance:
+      source_kind: file
+      source_ref: motifs/example_pwm_context.yaml
+  - motif_instance_id: motif_minus_example
+    tf_name: EXAMPLE_TF_MINUS
+    motif_name: example_minus
+    reference_strand: "-"
+    start: 8
+    end: 12
+    probabilities:
+      alphabet: [A, C, G, T]
+      rows:
+        - [0.55, 0.15, 0.15, 0.15]
+        - [0.15, 0.55, 0.15, 0.15]
+        - [0.15, 0.15, 0.55, 0.15]
+        - [0.15, 0.15, 0.15, 0.55]
+    provenance:
+      source_kind: file
+      source_ref: motifs/example_pwm_context.yaml

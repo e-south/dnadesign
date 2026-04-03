@@ -31,7 +31,7 @@ Cruncher is organized as peer workflow families, not one monolithic run shape:
 
 - **Fixed-length optimization workspaces** use `fetch -> lock -> parse -> sample -> analyze -> export`, then optional `study` and `portfolio` orchestration on top of the resulting run artifacts.
 - **Cassette workspaces** use `cassette init-workspace|validate|design|solve|show` and publish cassette-specific artifacts plus optional baserender job files.
-- **YIU workspaces** use `yiu init-workspace|validate|trace|solve|show|render` and publish protocol-state bundles plus per-step neutral view contracts.
+- **YIU workspaces** use `yiu init-workspace|validate|render|show` and publish one payload bundle with three BaseRender-ready views.
 
 These families deliberately keep separate workspace contracts, output trees, and orchestration seams. New families should add their own lane-specific artifacts rather than overload `sample`, `cassette`, or `yiu`.
 
@@ -62,16 +62,13 @@ This workflow does not currently use `core/evaluator.py`, `gibbs_anneal`, `study
 
 The YIU workflow is a peer lane, not a cassette submode:
 
-1. optional **yiu init-workspace** -> scaffold a runbook-only YIU workspace with one explicit example spec and paired solve spec
-2. author `<workspace>/configs/yiu/<name>.yiu.yaml` and optional `<workspace>/configs/yiu/<name>.yiu.solve.yaml`
-3. author optional protocol catalogs under `<workspace>/catalogs/*.yaml`
-4. **yiu validate** -> strict schema + protocol-step invariant check plus deterministic state-trace report
-5. **yiu trace** -> write the explicit manifest, status, report, trace, CSV tables, visual inventory, and published state views
-6. **yiu solve** -> bounded search over declared source windows, explicit-validator admission, and solve-level/per-hit YIU artifacts
-7. **yiu show** -> inspect status, render inventory, and artifact paths for one explicit or solve YIU run
-8. **yiu render** -> invoke BaseRender through the public file-contract surface using one bundle-local `visual_inventory.json`
+1. optional **yiu init-workspace** -> scaffold a runbook-only YIU workspace with one payload example spec
+2. author `<workspace>/configs/yiu/<name>.yiu.yaml`
+3. **yiu validate** -> strict schema + payload normalization check under `split_yiu_payload_rendering_v4`
+4. **yiu render** -> normalize the payload, exhaustively optimize the junction/mismatch plan, write the payload bundle, and optionally render the three payload views
+5. **yiu show** -> inspect the bundle contract, provenance, selected junction window, PWM state, and available renders for one YIU bundle
 
-This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, or cassette-specific render contracts. It models intended protocol compatibility across changing molecular states.
+This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, cassette-specific render contracts, or any legacy state graph.
 
 ---
 
@@ -123,11 +120,11 @@ Core contract:
 - cassette-specific artifact helpers
 - no dependency on legacy `sample` optimizer contracts
 
-#### `yiu/` (protocol-state YIU domain)
-- YIU spec schema and ordered step-graph contracts
-- source-state annotation validation across protocol stages
-- restriction/nickase geometry checks plus retained/sacrificial region validation
-- YIU-specific artifact helpers and neutral published step views
+#### `yiu/` (payload-centric YIU domain)
+- YIU spec schema for `split_yiu_payload_rendering_v4`
+- payload normalization for `user_sequence` and `sample_hit`
+- exhaustive optimization, split, display-orientation, and junction derivation
+- payload bundle publication and BaseRender handoff
 - no dependency on legacy `sample` or cassette-specific planner contracts
 
 #### `viz/` (plotting)
@@ -217,7 +214,6 @@ configs/
   portfolios/            # optional portfolio specs
 inputs/
   nickases/              # optional local nickase catalogs
-catalogs/                # optional YIU protocol catalogs
 .cruncher/
 outputs/
 ```
@@ -287,11 +283,10 @@ Cassette runs use a separate deterministic output root:
 <workspace>/outputs/cassettes/<spec.name>/<design_id>/
 ```
 
-YIU runs use family-rooted deterministic explicit and solve roots:
+YIU runs use one family-rooted deterministic payload bundle root:
 
 ```
-<workspace>/outputs/yiu/explicit/<spec.name>/<design_id>/
-<workspace>/outputs/yiu/solve/<solve_name>/<solve_id>/
+<workspace>/outputs/<spec.name>/
 ```
 
 ---
@@ -335,12 +330,14 @@ Cassette runs are intentionally isolated from `sample` runs:
 
 A typical **YIU** run directory contains:
 
-- `manifest.json`, `status.json`, `report.json` - explicit YIU metadata, status, and structured report
-- `state_trace.jsonl` - ordered state graph records
-- `tables/state_sequences.csv`, `tables/state_owners.csv`, `tables/effect_tags.csv`, `tables/fragment_summary.csv` - protocol-oriented export tables
+- `bundle_manifest.json` - payload bundle metadata under `split_yiu_payload_bundle_v4`
+- `normalized_payload.json` - canonical normalized payload object
 - `visual_inventory.json` - single bundle-local visual inventory and render-truth index
-- `contracts/visuals/*.json` - per-state neutral view contracts for source, duplex, digest, foldback, and downstream product states
-- `visuals/*.pdf` or `solution/visuals/*.pdf` - evidence renders listed in `visual_inventory.json`
+- `payload_view.json` - pure payload contract with optional PWM motif layers
+- `split_payload_view.json` - split payload contract rows (`split_payload_left`, then `split_payload_right`)
+- `assembled_payload_view.json` - rejoined payload contract in original payload order with one explicit `junction_span`
+- `payload_views.pdf` - operator-facing composite render listed in `visual_inventory.json`
+- `baserender_jobs/*.job.yaml` - optional debug-only jobs when explicitly requested
 
 YIU runs are intentionally isolated from both `sample` and `cassette` runs:
 

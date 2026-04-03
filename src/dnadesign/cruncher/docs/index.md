@@ -20,7 +20,7 @@ Cruncher has three first-class workflow families today:
 
 - fixed-length optimization workspaces built around `fetch -> lock -> parse -> sample -> analyze`
 - cassette workspaces built around `cassette init-workspace|validate|design|solve|show`
-- YIU protocol-state workspaces built around `yiu init-workspace|validate|trace|solve|show|render`
+- payload-centric YIU v4 workspaces built around `yiu init-workspace|validate|render|show`
 
 Studies and portfolios extend the fixed-length optimization lane. Cassette and YIU runs keep separate workspace and artifact contracts. More families can be added beside these lanes without rewriting the existing ones.
 
@@ -32,7 +32,7 @@ Studies and portfolios extend the fixed-length optimization lane. Cassette and Y
 - Run a YIU workspace end to end: [`demos/demo_yiu_workspace.md`](demos/demo_yiu_workspace.md)
 - Design a cassette from an authored spec: [`guides/cassette_workflow.md`](guides/cassette_workflow.md)
 - Search for ranked cassette hits: [`guides/cassette_solve_workflow.md`](guides/cassette_solve_workflow.md)
-- Design a YIU protocol-state workflow: [`guides/yiu_workflow.md`](guides/yiu_workflow.md)
+- Render Split YIU Payloads: [`guides/yiu_workflow.md`](guides/yiu_workflow.md)
 - Understand sample/Gibbs analysis outputs: [`guides/sampling_and_analysis.md`](guides/sampling_and_analysis.md)
 - Run study sweeps: [`guides/studies.md`](guides/studies.md)
 - Aggregate a portfolio: [`guides/portfolio_aggregation.md`](guides/portfolio_aggregation.md)
@@ -59,7 +59,7 @@ Studies and portfolios extend the fixed-length optimization lane. Cassette and Y
 - [Nickase Catalog Reference](reference/nickase_catalog.md)
 - [Cassette Artifacts](reference/cassette_artifacts.md)
 
-#### Model YIU Hairpin Oligo Processing
+#### Render Split YIU Payloads
 - [YIU Workspace Demo](demos/demo_yiu_workspace.md)
 - [YIU Workflow](guides/yiu_workflow.md)
 - [YIU Spec Reference](reference/yiu_spec.md)

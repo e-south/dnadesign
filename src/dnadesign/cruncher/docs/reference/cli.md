@@ -24,7 +24,7 @@ This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage a
 >
 > - `fetch|lock|parse|sample|analyze|export` plus `study` and `portfolio` cover fixed-length PWM optimization workspaces. This lane uses Gibbs annealing MCMC plus MMR elite selection and is not posterior inference.
 > - `cassette init-workspace|validate|design|solve|show` cover cassette workspaces. This lane uses explicit cassette planning plus bounded solve search and keeps separate artifact contracts.
-> - `yiu init-workspace|validate|trace|solve|show|render` cover YIU protocol-state workspaces. This lane uses explicit step-graph validation, deterministic state-bundle publication, a single bundle-local visual inventory, and bounded solve search.
+> - `yiu init-workspace|validate|render|show` cover payload-centric YIU workflows. This lane uses the strict `split_yiu_payload_rendering_v4` contract, deterministic exhaustive optimization over a 4 nt junction, three canonical published payload views, and one bundle-local `visual_inventory.json`.
 >
 > Choose the command family by the workspace contract you need. `cassette` and `yiu` do not fall back to `sample`, and `sample` runs do not reuse cassette or YIU artifacts.
 
@@ -56,7 +56,7 @@ cruncher study list
 * **Optimize fixed-length sequences** → `sample`
 * **Analyze optimization runs** → `analyze`, `notebook`
 * **Design and search cassettes** → `cassette init-workspace|validate|design|solve|show`
-* **Model YIU hairpin oligo processing** → `yiu init-workspace|validate|trace|solve|show|render`
+* **Render split YIU payloads** → `yiu init-workspace|validate|render|show`
 * **Study sweeps** → `study list|run|summarize|show|clean`
 * **Cross-workspace handoff aggregation** → `portfolio run|show`
 * **Export sequences** → `export sequences`
@@ -526,9 +526,8 @@ Notes:
 
 #### YIU workflows
 
-The YIU workflow is separate from both `sample` and `cassette`. It expects an explicit spec file at
-`<workspace>/configs/yiu/<name>.yiu.yaml` or a solve spec at
-`<workspace>/configs/yiu/<name>.yiu.solve.yaml`, validates a protocol-step state graph, and writes YIU-specific artifacts under `outputs/yiu/explicit/` and `outputs/yiu/solve/`.
+The YIU workflow is separate from both `sample` and `cassette`. It expects one payload-centric spec file at
+`<workspace>/configs/yiu/<name>.yiu.yaml`, validates the `split_yiu_payload_rendering_v4` contract, and writes a single payload bundle under `<workspace>/bundles/<name>/`.
 
 Deep contracts live in:
 
@@ -539,7 +538,7 @@ Deep contracts live in:
 
 #### `cruncher yiu init-workspace`
 
-Scaffold a YIU workspace root with one checked-in reference spec pair and the required catalogs.
+Scaffold a YIU workspace root with one checked-in payload example spec, one machine runbook, and an empty YIU bundles root.
 
 Examples:
 
@@ -549,73 +548,51 @@ Examples:
 Outputs:
 
 * writes `configs/runbook.yaml`
-* writes one explicit YIU spec under `configs/yiu/*.yiu.yaml`
-* writes one solve YIU spec under `configs/yiu/*.yiu.solve.yaml`
-* writes `catalogs/enzymes.yaml`
-* writes `catalogs/oligo_parts.yaml`
-* writes `catalogs/backbones.yaml`
-* creates `outputs/yiu/explicit/` and `outputs/yiu/solve/`
+* writes one payload-centric YIU spec under `configs/yiu/*.yiu.yaml`
+* creates `bundles/`
 
 #### `cruncher yiu validate`
 
-Validate one protocol-state YIU spec and print a deterministic state-trace report.
+Validate one payload-centric YIU spec, normalize it to one optimized payload object, and print the selected plan summary.
 
 Examples:
 
 * `uv run cruncher yiu validate --spec configs/yiu/<workflow>.yiu.yaml`
 * `uv run cruncher yiu validate --spec configs/yiu/<workflow>.yiu.yaml --json`
 
-#### `cruncher yiu trace`
+#### `cruncher yiu render`
 
-Materialize the modeled state graph for one `.yiu.yaml` spec. This is the only public explicit materialization command.
-
-Example:
-
-* `uv run cruncher yiu trace --spec configs/yiu/<workflow>.yiu.yaml`
-* `uv run cruncher yiu trace --spec configs/yiu/<workflow>.yiu.yaml --emit-renders`
-
-#### `cruncher yiu solve`
-
-Search for admissible YIU solutions from a separate `.yiu.solve.yaml` spec and materialize the selected solution bundle.
+Validate a payload-centric YIU spec, publish the bundle, and optionally render the three payload views through BaseRender.
 
 Examples:
 
-* `uv run cruncher yiu solve --spec configs/yiu/<workflow>.yiu.solve.yaml`
-* `uv run cruncher yiu solve --spec configs/yiu/<workflow>.yiu.solve.yaml --emit-renders`
-* `uv run cruncher yiu solve --spec configs/yiu/<workflow>.yiu.solve.yaml --json`
+* `uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml`
+* `uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml --emit-renders`
+* `uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml --json`
 
 Outputs:
 
-* writes under `<workspace>/outputs/yiu/solve/<solve_name>/<solve_id>/`
-* writes `solve_report.json`, `solve_status.json`, `solve_manifest.json`, and `visual_inventory.json`
-* materializes the selected solution under `solution/`
-* writes comparison outputs only when `compare_solutions: true`
+* writes under `<workspace>/bundles/<workflow>/`
+* writes `bundle_manifest.json`, `normalized_payload.json`, and `visual_inventory.json`
+* writes `payload_view.json`
+* writes `split_payload_view.json`
+* writes `assembled_payload_view.json`
+* writes one composite operator render `payload_views.pdf` when `--emit-renders` is set
+* writes optional debug jobs under `baserender_jobs/` only when `output.emit_render_jobs_debug: true`
 
 #### `cruncher yiu show`
 
-Show the normalized bundle inventory for one explicit or solve YIU run directory.
+Show the normalized payload bundle summary for one published YIU bundle directory.
 
 Example:
 
-* `uv run cruncher yiu show --run outputs/yiu/explicit/<workflow>/<trace_id>`
-* `uv run cruncher yiu show --run outputs/yiu/solve/<workflow>/<solve_id>`
-* `uv run cruncher yiu show --run outputs/yiu/solve/<workflow>/<solve_id> --json`
+* `uv run cruncher yiu show --bundle bundles/<workflow>`
+* `uv run cruncher yiu show --bundle bundles/<workflow> --json`
 
 Notes:
 
-* text output surfaces run id, bundle kind, template id, artifact paths, hard-invariant summary, and render summary
-* explicit bundles also show schema version, state count, and explicit final state
-* solve bundles also show solve status, exhaustive-search truth, satisfying-solution count, and selected solution path
-* `--json` prints the normalized bundle inventory instead of the human summary view
-
-#### `cruncher yiu render`
-
-Run every published BaseRender job listed in one bundle's `visual_inventory.json`.
-
-Examples:
-
-* `uv run cruncher yiu render --run outputs/yiu/explicit/<workflow>/<trace_id>`
-* `uv run cruncher yiu render --run outputs/yiu/solve/<workflow>/<solve_id>`
+* text output surfaces the bundle contract, provenance, selected payload/complement, selected junction summary, mismatch plan, PWM status, published views, the composite render path, and the core artifact paths
+* `--json` prints the normalized bundle summary plus integrity state instead of the human summary view
 
 #### `cruncher visuals validate`
 
@@ -623,7 +600,7 @@ Validate a published render job through the public `dnadesign.baserender` API.
 
 Example:
 
-* `uv run cruncher visuals validate --job outputs/yiu/explicit/<workflow>/<trace_id>/contracts/render_jobs/<state>.job.yaml`
+* `uv run cruncher visuals validate --job bundles/<workflow>/baserender_jobs/<view>.job.yaml`
 
 #### `cruncher visuals run`
 
@@ -631,7 +608,7 @@ Run a published render job through the public `dnadesign.baserender` API.
 
 Example:
 
-* `uv run cruncher visuals run --job outputs/yiu/explicit/<workflow>/<trace_id>/contracts/render_jobs/<state>.job.yaml`
+* `uv run cruncher visuals run --job bundles/<workflow>/baserender_jobs/<view>.job.yaml`
 
 ---
 

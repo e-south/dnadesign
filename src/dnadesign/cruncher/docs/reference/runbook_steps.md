@@ -65,9 +65,12 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `demo_pairwise` | `render_logos` |  | `cruncher catalog logos --source demo_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `demo_pairwise` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
 | `demo_pairwise` | `study_run_diversity_vs_score` | Sweep diversity from 0.00 to 1.00 at fixed workspace sequence_length and emit diversity-vs-score aggregates. | `cruncher study run --spec configs/studies/diversity_vs_score.study.yaml --force-overwrite` |
-| `demo_yiu_circularized` | `yiu_validate` | Validate the checked-in circularized YIU demo spec. | `cruncher yiu validate --spec configs/yiu/example_reference_circularized.yiu.yaml` |
-| `demo_yiu_circularized` | `yiu_trace` | Materialize the explicit YIU bundle and render its published BaseRender jobs. | `cruncher yiu trace --spec configs/yiu/example_reference_circularized.yiu.yaml --force-overwrite --emit-renders` |
-| `demo_yiu_circularized` | `yiu_solve` | Run the paired solve spec, materialize the selected solution bundle, and render solve-level visuals. | `cruncher yiu solve --spec configs/yiu/example_reference_circularized.yiu.solve.yaml --force-overwrite --emit-renders` |
+| `demo_yiu_payload` | `yiu_validate` | Validate the checked-in minimal YIU v4 demo spec. | `cruncher yiu validate --spec configs/yiu/example_payload.yiu.yaml` |
+| `demo_yiu_payload` | `yiu_render` | Publish the deterministic YIU v4 payload bundle and render the canonical views. | `cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml --force-overwrite --emit-renders` |
+| `demo_yiu_payload` | `yiu_show` | Inspect the published payload bundle and integrity checks. | `cruncher yiu show --bundle bundles/example_payload` |
+| `demo_yiu_payload` | `tetr_validate` | Validate the checked-in PWM-aware sample-hit YIU demo spec. | `cruncher yiu validate --spec configs/yiu/tetr_monotypic_hit.yiu.yaml` |
+| `demo_yiu_payload` | `tetr_render` | Publish the PWM-aware sample-hit payload bundle and render the canonical views. | `cruncher yiu render --spec configs/yiu/tetr_monotypic_hit.yiu.yaml --force-overwrite --emit-renders` |
+| `demo_yiu_payload` | `tetr_show` | Inspect the published sample-hit bundle and integrity checks. | `cruncher yiu show --bundle bundles/tetr_monotypic_hit` |
 | `multitf_baer_lexa_soxr` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
 | `multitf_baer_lexa_soxr` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
 | `multitf_baer_lexa_soxr` | `fetch_sites_demo_local_meme` |  | `cruncher fetch sites --source demo_local_meme --tf lexA --tf soxR --update -c configs/config.yaml` |

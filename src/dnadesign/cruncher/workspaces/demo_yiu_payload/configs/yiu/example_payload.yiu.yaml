@@ -1,0 +1,38 @@
+yiu:
+  schema_version: 1
+  contract: split_yiu_payload_rendering_v4
+  name: example_payload
+
+input:
+  kind: user_sequence
+  user_sequence:
+    sequence: AAATTTCCCGGGAAATTTCCC
+
+optimization:
+  junction:
+    mode: optimize
+    overhang_length: 4
+    max_payload_body_length: 12
+  mismatches:
+    count: 1
+    candidate_positions: [1, 2]
+    allowed_strands: [complement, payload]
+    strand_mode: per_position
+    default_strand_preference: complement
+  pwm:
+    mode: none
+    source:
+      kind: none
+    objective:
+      primary: maximin
+      secondary:
+        - total_loss
+        - midpoint_proximity
+        - body_length_balance
+        - terminal_position_avoidance
+        - default_strand_preference
+        - lexical_stability
+
+output:
+  bundle_dir: bundles/example_payload
+  emit_render_jobs_debug: false

@@ -1,96 +1,90 @@
 ## YIU Workflow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-29
+**Last verified:** 2026-04-03
 
-YIU is a replay/validation engine with bounded scaffold solving.
+YIU is a payload-centric rendering workflow with a strict v4 contract.
 
-It ships one v4 workflow lane:
+The public lane is:
 
-- `schema_version: 4`
-- `protocol_template: yiu_circularized_payload_v1`
-- explicit materialization through `cruncher yiu trace`
-- bounded solve through `cruncher yiu solve`
-- bundle-local `visual_inventory.json` as the render source of truth
+`input payload -> normalized payload -> optimized junction/mismatch plan -> canonical bundle -> BaseRender`
+
+YIU accepts two first-class inputs:
+
+- `user_sequence`
+- `sample_hit`
+
+Both inputs normalize into one payload object and publish exactly three views:
+
+- `payload`
+- `split_payload`
+- `assembled_payload`
+
+Row 1 shows the selected payload strand, selected complement strand, optional PWM motif layers, and mismatch annotations.
+
+Row 2 shows the two inward-facing post-BsmBI split fragments built from the selected 4 nt junction window.
+
+Row 3 shows those fragments reassembled back into the selected payload order.
+
+The public contract is `split_yiu_payload_rendering_v4`.
 
 ### Command surface
 
 ```bash
 uv run cruncher yiu init-workspace WORKSPACE
 uv run cruncher yiu validate --spec configs/yiu/<workflow>.yiu.yaml
-uv run cruncher yiu trace --spec configs/yiu/<workflow>.yiu.yaml
-uv run cruncher yiu trace --spec configs/yiu/<workflow>.yiu.yaml --emit-renders
-uv run cruncher yiu solve --spec configs/yiu/<workflow>.yiu.solve.yaml
-uv run cruncher yiu show --run outputs/yiu/explicit/<workflow>/<trace_id>
-uv run cruncher yiu show --run outputs/yiu/solve/<workflow>/<solve_id>
-uv run cruncher yiu render --run outputs/yiu/explicit/<workflow>/<trace_id>
-uv run cruncher yiu render --run outputs/yiu/solve/<workflow>/<solve_id>
+uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml
+uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml --emit-renders
+uv run cruncher yiu show --bundle bundles/<workflow>
 ```
 
 `design` is not part of the public YIU surface.
 
-### State graph
-
-The `yiu_circularized_payload_v1` workflow emits 9 states:
-
-1. `source_oligo_ssdna`
-2. `pcr_linear_duplex`
-3. `type_iis_cut_product_duplex`
-4. `circularized_payload_candidate`
-5. `post_sacrificial_fragmentation`
-6. `post_fragment_cleanup`
-7. `snapback_adapter_complex`
-8. `ligated_ssdna_hairpin`
-9. `hairpin_pcr_linear_insert`
-
-`post_exonuclease_cleanup` is method metadata only. It is not an emitted state in v4.
-
 ### What `validate` checks
 
-- the source primary strand follows the fixed owner order for `yiu_circularized_payload_v1`
-- every emitted nucleotide has exactly one structural owner on each emitted strand
-- effect-tag kinds are closed and unknown operational tags fail at load time
-- owner/tag overlap legality fails closed
-- `type_iis_cut_product_duplex` is a real cut-product state with sticky-end metadata
-- payload assembly remains interpretable where the payload exists
-- the `Nt.Bpu10I` local context, nick boundary, and exposed tether geometry all pass
-- sacrificial fragmentation stays within the declared fragment limit
-
-### Solve lane
-
-`cruncher yiu solve` resolves one base spec, derives payload halves and payload overhangs from a single target payload, and mutates only:
-
-- the payload target or pattern
-- the payload bulge mask
-- declared windows inside `sacrificial_region_long`
-
-It does not mutate fixed scaffold owners, enzyme identities, tether or snapback owners, or the Y adapter sequence.
-
-Default solve behavior is SAT-first:
-
-- search all bounded candidates
-- return `solved`, `unsatisfied`, or `incomplete_search`
-- materialize one deterministic solution by default
-- keep comparison solutions behind `compare_solutions: true`
-
-The checked-in demo workspace is exhaustive under its current search bounds. On 2026-03-29 it found 2 satisfying solutions and selected 1 deterministic solution.
+- the root contract and schema version match `split_yiu_payload_rendering_v4`
+- exactly one input kind is populated
+- the resolved payload sequence is present and contains valid IUPAC DNA characters
+- the junction policy yields one valid internal 4 nt window with non-empty left and right payload bodies
+- the mismatch policy is internally consistent and uses `strand_mode: per_position`
+- PWM mode and PWM source are compatible with the input kind
+- `sample_hit` provenance resolves to one exact payload sequence or fails fast
+- PWM-aware optimization is deterministic and exhaustive across the allowed candidate space
 
 ### Visuals and inspection
 
-Every emitted state publishes `sequence_evidence_map_v1` and renders through BaseRender's `nucleotide_evidence_map` surface.
+The payload view uses `yiu_payload_visual_v1`.
+
+When PWM context is available, the payload view includes motif layers aligned to payload-forward coordinates.
+When PWM is absent or disabled, the same contract stays valid with an empty `motif_layers` list.
+
+`sample_hit` can source payloads from:
+
+- direct `payload_sequence`
+- workspace-local `source_artifact_path`
+- sibling workspace public artifacts through `metadata.source_workspace` + `metadata.source_artifact`
+
+Relative `source_artifact_path` traversal stays inside the current workspace; sibling workspaces are resolved only through the explicit metadata pair above.
 
 `cruncher yiu show` surfaces:
 
-- bundle kind
-- protocol template
-- schema version or solve status
-- final-state or solve summary
-- exhaustive-search truth for solve runs
-- hard-invariant summary for the selected final state
-- render summary from `visual_inventory.json`
-- key artifact paths
+- bundle directory and bundle contract
+- provenance
+- selected payload and complement sequences
+- selected junction and mismatch summary
+- PWM mode, effective status, and fallback reason when applicable
+- render status from `visual_inventory.json`
+- integrity checks against the manifest, inventory, normalized payload, and published view contracts
+- composite render path when present
+- optional verbose split-row debug details when `--verbose` is requested
 
-`cruncher yiu render --run <bundle>` rereads `visual_inventory.json`, regenerates missing PDFs directly into the bundle's published `visuals/` paths, and updates render truth in the same inventory.
+`show` is fail-fast on bundle drift: missing published view contracts, manifest/inventory disagreements, payload-view motif drift, or a `rendered` bundle with a missing `payload_views.pdf` are treated as bundle corruption.
+
+`cruncher yiu render --spec <workflow>.yiu.yaml --emit-renders` validates the spec, writes the payload bundle under `bundles/<workflow>/`, renders one composite `payload_views.pdf` page with the three canonical panels, and updates `visual_inventory.json` in the same bundle directory.
+
+The split middle row renders `split_payload_left` before `split_payload_right`. Each panel shows the retained post-digestion fragment, its inward-facing sticky end, selected-versus-canonical sticky-end metadata, the reverse-complemented payload-body slice, and optional ghosted excision context.
+
+The assembled payload returns to original payload order. It publishes one explicit `junction_span` in payload coordinates and does not use a seam or ligation-boundary surrogate in the operator-facing contract.
 
 Start with [YIU Workspace Demo](../demos/demo_yiu_workspace.md), then use:
 
