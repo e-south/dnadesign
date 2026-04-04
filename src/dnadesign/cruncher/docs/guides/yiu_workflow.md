@@ -1,7 +1,7 @@
 ## YIU Workflow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-03
+**Last verified:** 2026-04-04
 
 YIU is a payload-centric rendering workflow with a strict v4 contract.
 
@@ -107,6 +107,8 @@ Relative `source_artifact_path` traversal stays inside the current workspace; si
 The split middle row renders `split_payload_left` before `split_payload_right`. Each panel shows the retained post-digestion fragment, its inward-facing sticky end, selected-versus-canonical sticky-end metadata, the reverse-complemented payload-body slice, and optional ghosted excision context.
 
 The assembled payload returns to original payload order. It publishes one explicit `junction_span` in payload coordinates and does not use a seam or ligation-boundary surrogate in the operator-facing contract.
+
+Maintainers should treat `dnadesign.cruncher.yiu.view_contracts` and `dnadesign.cruncher.yiu.publish` as compatibility facades. Shared row-label fragments live in `view_common.py`, display/title policy lives in `view_styles.py`, payload mismatch/motif/meta shaping lives in `view_payload_content.py`, payload-contract shells live in `view_payload_contracts.py`, split/assembled contract shells live in `view_sequence_contracts.py`, split sticky-end plus assembled junction metadata policy lives in `view_sequence_metadata.py`, bundle filesystem writes plus debug-job emission live in `publish_io.py`, bundle layout plus render-job/view-entry planning lives in `publish_layout.py`, and normalized/manifest/inventory shaping lives in `publish_inventory.py`. Downstream, baserender keeps `yiu_payload_visual_projection.py` as a compatibility facade while `yiu_payload_sequence_projection.py` owns sequence-evidence projection and `yiu_payload_motif_overlay.py` owns payload motif-overlay assembly.
 
 ### Related docs
 

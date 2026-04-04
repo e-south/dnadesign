@@ -25,6 +25,7 @@ import dnadesign.cruncher.yiu.payload_resolution as yiu_payload_resolution_modul
 from dnadesign.cruncher.app.yiu_workflow.render import render_yiu_spec
 from dnadesign.cruncher.app.yiu_workflow.show import show_yiu_bundle
 from dnadesign.cruncher.bio import reverse_complement_iupac
+from dnadesign.cruncher.yiu.bsmbi import build_split_fragment_display_specs
 from dnadesign.cruncher.yiu.bundle_models import PayloadViewEntry, PayloadVisualInventory
 from dnadesign.cruncher.yiu.bundle_paths import resolve_composite_render_artifact_path
 from dnadesign.cruncher.yiu.candidate_generation import CandidatePlan, MutationChoice
@@ -32,8 +33,39 @@ from dnadesign.cruncher.yiu.errors import NoFeasiblePlanError, YiuContractError
 from dnadesign.cruncher.yiu.load import load_yiu_spec
 from dnadesign.cruncher.yiu.normalize import normalize_payload
 from dnadesign.cruncher.yiu.optimizer import select_best_candidate
+from dnadesign.cruncher.yiu.publish_inventory import (
+    build_normalized_payload_dump,
+    build_payload_bundle_manifest,
+    build_payload_visual_inventory,
+)
+from dnadesign.cruncher.yiu.publish_io import (
+    write_debug_render_jobs,
+    write_normalized_payload_dump,
+    write_payload_bundle_state,
+    write_payload_bundle_views,
+)
+from dnadesign.cruncher.yiu.publish_layout import (
+    build_payload_view_entries,
+    build_published_artifacts,
+    build_render_job_payload,
+    resolve_payload_bundle_layout,
+)
 from dnadesign.cruncher.yiu.scoring import CandidateScore
-from dnadesign.cruncher.yiu.view_contracts import build_yiu_style_overrides
+from dnadesign.cruncher.yiu.view_contracts import (
+    build_assembled_payload_view_contract,
+    build_split_payload_view_rows,
+    build_yiu_style_overrides,
+)
+from dnadesign.cruncher.yiu.view_payload_content import (
+    build_payload_mismatch_annotations,
+    build_payload_motif_layers,
+    build_payload_view_meta,
+)
+from dnadesign.cruncher.yiu.view_payload_contracts import build_payload_view_contract
+from dnadesign.cruncher.yiu.view_sequence_metadata import (
+    build_assembled_payload_view_meta,
+    build_split_payload_row_meta,
+)
 
 TOY_SEQUENCE = "AAATTTCCCGGGAAATTTCCC"
 TOY_JUNCTION_START = 4
@@ -955,6 +987,239 @@ def test_split_and_assembled_views_center_titles() -> None:
     assert payload_overrides["figure_scale"] == split_overrides["figure_scale"] == assembled_overrides["figure_scale"]
     assert split_overrides["overlay_align"] == "center"
     assert assembled_overrides["overlay_align"] == "center"
+
+
+def test_split_payload_view_metadata_preserves_sticky_end_and_ghost_context_contract(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec())
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    normalized = normalize_payload(spec, workspace_root=workspace_root)
+    right_fragment = max(build_split_fragment_display_specs(normalized), key=lambda item: item.panel_order)
+    assert right_fragment.ghost_excised_context is not None
+
+    meta = build_split_payload_row_meta(right_fragment)
+    sticky_end_span = right_fragment.sticky_end_display_span.model_dump(mode="json")
+
+    assert meta["fragment_side"] == "right"
+    assert meta["selected_sticky_end_sequence_5to3"] == right_fragment.selected_sticky_end_sequence_5to3
+    assert meta["canonical_sticky_end_sequence_5to3"] == right_fragment.canonical_sticky_end_sequence_5to3
+    assert meta["sticky_end_display_span"] == sticky_end_span
+    assert meta["payload_junction_window"] == right_fragment.payload_junction_window.model_dump(mode="json")
+    assert meta["connector_hidden_indices"] == list(range(sticky_end_span["start"], sticky_end_span["end"]))
+    assert meta["connector_cross_indices"] == []
+    assert meta["connector_overhang_spans"] == [sticky_end_span]
+    assert meta["ghost_excised_context"] == right_fragment.ghost_excised_context.model_dump(mode="json")
+    assert meta["dim_base_indices"] == {
+        "primary": list(right_fragment.ghost_excised_context.primary_indices),
+        "complement": list(right_fragment.ghost_excised_context.complement_indices),
+    }
+
+
+def test_assembled_payload_view_metadata_preserves_junction_connector_contract(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec(mismatch_count=2, candidate_positions=[1, 2]))
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    normalized = normalize_payload(spec, workspace_root=workspace_root)
+
+    meta = build_assembled_payload_view_meta(normalized)
+    junction_span = {
+        "start": normalized.junction.start,
+        "end": normalized.junction.end,
+        "coordinate_space": "payload_forward",
+    }
+    mismatch_indices = [site.payload_index for site in normalized.mismatches]
+
+    assert meta["junction_span"] == junction_span
+    assert meta["mismatches"] == [site.model_dump(mode="json") for site in normalized.mismatches]
+    assert meta["base_highlights"] == {"primary": mismatch_indices, "complement": mismatch_indices}
+    assert meta["connector_hidden_indices"] == [
+        index
+        for index in range(normalized.junction.start, normalized.junction.end)
+        if index not in set(mismatch_indices)
+    ]
+    assert meta["connector_cross_indices"] == mismatch_indices
+    assert meta["connector_overhang_spans"] == [junction_span]
+
+
+def test_payload_view_content_preserves_motif_mismatch_and_meta_contract(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "pwm_payload.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _user_sequence_spec(
+            name="pwm_payload",
+            mismatch_count=2,
+            candidate_positions=[1, 2],
+            pwm_mode="require",
+            pwm_source={"kind": "inline", "inline_context": _inline_pwm_context()},
+        ),
+    )
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    normalized = normalize_payload(spec, workspace_root=workspace_root)
+
+    motif_layers = build_payload_motif_layers(normalized)
+    mismatch_annotations = build_payload_mismatch_annotations(normalized)
+    meta = build_payload_view_meta(normalized)
+    payload_view = build_payload_view_contract(normalized)
+
+    assert [layer.motif_instance_id for layer in motif_layers] == [
+        motif.motif_instance_id for motif in normalized.motif_context.motifs
+    ]
+    assert [layer.label for layer in motif_layers] == [
+        f"{motif.tf_name} ({motif.reference_strand})" for motif in normalized.motif_context.motifs
+    ]
+    assert [layer.matrix for layer in motif_layers] == [
+        [list(row) for row in motif.probabilities.rows] for motif in normalized.motif_context.motifs
+    ]
+    assert [entry.model_dump(mode="json") for entry in mismatch_annotations] == [
+        entry.model_dump(mode="json") for entry in normalized.mismatches
+    ]
+    assert meta == {
+        "payload_label": normalized.payload_label,
+        "site_label": normalized.site_label,
+        "row_labels": {},
+        "pwm_effective": normalized.motif_context.effective,
+        "motif_ids": [motif.motif_instance_id for motif in normalized.motif_context.motifs],
+    }
+    assert payload_view["motif_layers"] == [layer.model_dump(mode="json") for layer in motif_layers]
+    assert payload_view["mismatches"] == [entry.model_dump(mode="json") for entry in mismatch_annotations]
+    assert payload_view["meta"] == meta
+
+
+def test_publish_layout_tracks_relative_bundle_artifacts_and_view_entries(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec())
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    normalized = normalize_payload(spec, workspace_root=workspace_root)
+    layout = resolve_payload_bundle_layout(workspace / spec.output.bundle_dir)
+    published_artifacts = build_published_artifacts(
+        layout=layout,
+        published_plot_artifact_path=str(spec.output.published_plot_path),
+    )
+    view_entries = build_payload_view_entries(layout=layout, normalized=normalized)
+
+    assert published_artifacts == {
+        "normalized_payload": "normalized_payload.json",
+        "bundle_manifest": "bundle_manifest.json",
+        "visual_inventory": "visual_inventory.json",
+        "payload_view": "payload_view.json",
+        "split_payload_view": "split_payload_view.json",
+        "assembled_payload_view": "assembled_payload_view.json",
+        "payload_views_pdf": "payload_views.pdf",
+        "published_plot_pdf": "outputs/plot__demo_payload__payload_views.pdf",
+    }
+    assert [entry.view_id for entry in view_entries] == ["payload", "split_payload", "assembled_payload"]
+    assert [entry.view_contract_path for entry in view_entries] == [
+        "payload_view.json",
+        "split_payload_view.json",
+        "assembled_payload_view.json",
+    ]
+    assert {entry.render_artifact_path for entry in view_entries} == {"payload_views.pdf"}
+    assert view_entries[0].motif_layers_required is False
+
+
+def test_publish_io_writes_bundle_artifacts_at_canonical_paths(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec())
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    normalized = normalize_payload(spec, workspace_root=workspace_root)
+    layout = resolve_payload_bundle_layout(workspace / spec.output.bundle_dir)
+    payload_contract = build_payload_view_contract(normalized)
+    split_payload_rows = build_split_payload_view_rows(normalized)
+    assembled_payload_contract = build_assembled_payload_view_contract(normalized)
+    normalized_payload_dump = build_normalized_payload_dump(spec=spec, normalized=normalized, layout=layout)
+    view_entries = build_payload_view_entries(layout=layout, normalized=normalized)
+    inventory = build_payload_visual_inventory(
+        spec=spec,
+        normalized=normalized,
+        layout=layout,
+        view_entries=view_entries,
+    )
+    manifest = build_payload_bundle_manifest(normalized=normalized, inventory=inventory)
+
+    write_payload_bundle_views(
+        layout=layout,
+        payload_contract=payload_contract,
+        split_payload_rows=split_payload_rows,
+        assembled_payload_contract=assembled_payload_contract,
+    )
+    write_normalized_payload_dump(layout=layout, normalized_payload_dump=normalized_payload_dump)
+    write_payload_bundle_state(layout=layout, manifest=manifest, inventory=inventory)
+
+    assert _load_json(layout.payload_view_path) == payload_contract
+    assert _load_jsonl(layout.split_payload_view_path) == split_payload_rows
+    assert _load_json(layout.assembled_payload_view_path) == assembled_payload_contract
+    assert _load_json(layout.normalized_payload_path) == normalized_payload_dump
+    assert _load_json(layout.manifest_path) == manifest.model_dump(mode="json")
+    assert _load_json(layout.inventory_path) == inventory.model_dump(mode="json")
+
+
+def test_publish_io_writes_debug_render_jobs_from_view_entries(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec(emit_render_jobs_debug=True))
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    normalized = normalize_payload(spec, workspace_root=workspace_root)
+    layout = resolve_payload_bundle_layout(workspace / spec.output.bundle_dir)
+    view_entries = build_payload_view_entries(layout=layout, normalized=normalized)
+
+    write_debug_render_jobs(layout=layout, view_entries=view_entries)
+
+    for entry in view_entries:
+        job_path = layout.render_jobs_dir / f"{entry.view_id}.job.yaml"
+        assert job_path.exists()
+        expected_job = yaml.safe_load(yaml.safe_dump(build_render_job_payload(entry=entry), sort_keys=False))
+        assert yaml.safe_load(job_path.read_text(encoding="utf-8")) == expected_job
+
+
+def test_publish_inventory_and_manifest_share_bundle_state_contract(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "pwm_payload.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _user_sequence_spec(
+            name="pwm_payload",
+            mismatch_count=2,
+            candidate_positions=[1, 2],
+            pwm_mode="require",
+            pwm_source={"kind": "inline", "inline_context": _inline_pwm_context()},
+        ),
+    )
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    normalized = normalize_payload(spec, workspace_root=workspace_root)
+    layout = resolve_payload_bundle_layout(workspace / spec.output.bundle_dir)
+    view_entries = build_payload_view_entries(layout=layout, normalized=normalized)
+    inventory = build_payload_visual_inventory(
+        spec=spec,
+        normalized=normalized,
+        layout=layout,
+        view_entries=view_entries,
+    )
+    manifest = build_payload_bundle_manifest(normalized=normalized, inventory=inventory)
+    normalized_dump = build_normalized_payload_dump(spec=spec, normalized=normalized, layout=layout)
+
+    assert inventory.render_status == "not_requested"
+    assert inventory.payload_view_requires_motif_layers is True
+    assert manifest.render_status == inventory.render_status
+    assert manifest.view_contracts == inventory.views
+    assert manifest.composite_render_artifact_path == inventory.composite_render_artifact_path == "payload_views.pdf"
+    assert manifest.published_plot_artifact_path == inventory.published_plot_artifact_path
+    assert manifest.published_plot_artifact_path == "outputs/plot__pwm_payload__payload_views.pdf"
+    assert normalized_dump["published_artifacts"]["payload_view"] == "payload_view.json"
+    assert (
+        normalized_dump["published_artifacts"]["published_plot_pdf"] == "outputs/plot__pwm_payload__payload_views.pdf"
+    )
 
 
 def test_bundle_path_contract_rejects_divergent_view_render_targets(tmp_path: Path) -> None:

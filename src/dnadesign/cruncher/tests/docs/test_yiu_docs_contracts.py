@@ -92,6 +92,20 @@ def test_yiu_docs_capture_payload_workspace_and_artifact_boundaries() -> None:
     assert "The payload view uses `yiu_payload_visual_v1`." in guide
     assert "motif layers aligned to payload-forward coordinates" in guide
     assert "integrity checks against the manifest, inventory, normalized payload, and published view contracts" in guide
+    assert "dnadesign.cruncher.yiu.view_contracts" in guide
+    assert "view_common.py" in guide
+    assert "view_payload_content.py" in guide
+    assert "view_styles.py" in guide
+    assert "view_payload_contracts.py" in guide
+    assert "view_sequence_contracts.py" in guide
+    assert "view_sequence_metadata.py" in guide
+    assert "dnadesign.cruncher.yiu.publish" in guide
+    assert "publish_io.py" in guide
+    assert "publish_layout.py" in guide
+    assert "publish_inventory.py" in guide
+    assert "yiu_payload_visual_projection.py" in guide
+    assert "yiu_payload_sequence_projection.py" in guide
+    assert "yiu_payload_motif_overlay.py" in guide
     assert "user_sequence" in guide
     assert "sample_hit" in guide
     assert "payload" in guide
@@ -131,10 +145,26 @@ def test_yiu_docs_capture_payload_workspace_and_artifact_boundaries() -> None:
     assert "ship_v3" not in guide
     assert "ship_v4" not in guide
     assert "`yiu/` (payload-centric YIU domain)" in architecture
+    assert "yiu/view_common.py" in architecture
+    assert "yiu/view_payload_content.py" in architecture
+    assert "yiu/view_styles.py" in architecture
+    assert "yiu/view_payload_contracts.py" in architecture
+    assert "yiu/view_sequence_contracts.py" in architecture
+    assert "yiu/view_sequence_metadata.py" in architecture
+    assert "yiu/publish.py" in architecture
+    assert "yiu/publish_io.py" in architecture
+    assert "yiu/publish_layout.py" in architecture
+    assert "yiu/publish_inventory.py" in architecture
+    assert "yiu/bundle_paths.py" in architecture
+    assert "yiu/render_panels.py" in architecture
     assert "yiu init-workspace|validate|render|show" in architecture
     assert "trace|solve" not in architecture
     assert "split_yiu_payload_rendering_v4" in architecture
     assert "split_yiu_payload_bundle_v4" in architecture
+    assert "yiu_payload_visual_v1" in architecture
+    assert "yiu_payload_visual_projection.py" in architecture
+    assert "yiu_payload_sequence_projection.py" in architecture
+    assert "yiu_payload_motif_overlay.py" in architecture
     assert (
         "cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml --force-overwrite --emit-renders"
         in runbook_steps

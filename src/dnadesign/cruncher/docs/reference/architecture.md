@@ -1,10 +1,10 @@
 ## Cruncher architecture
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-04-04
 
 
-**Last updated by:** cruncher-maintainers on 2026-03-27
+**Last updated by:** cruncher-maintainers on 2026-04-04
 
 ### Contents
 - [Cruncher architecture](#cruncher-architecture)
@@ -124,7 +124,18 @@ Core contract:
 - YIU spec schema for `split_yiu_payload_rendering_v4`
 - payload normalization for `user_sequence` and `sample_hit`
 - exhaustive optimization, split, display-orientation, and junction derivation
-- payload bundle publication and BaseRender handoff
+- shared view fragments live in `yiu/view_common.py`
+- payload bundle publication orchestration lives in `yiu/publish.py`
+- payload bundle filesystem writes and debug-job emission live in `yiu/publish_io.py`
+- bundle layout plus view-entry/render-job planning lives in `yiu/publish_layout.py`
+- normalized-payload, inventory, and manifest assembly lives in `yiu/publish_inventory.py`
+- display/title policy lives in `yiu/view_styles.py`
+- payload mismatch/motif/meta shaping lives in `yiu/view_payload_content.py`
+- payload-view contract shells live in `yiu/view_payload_contracts.py`
+- split/assembled sequence-contract assembly lives in `yiu/view_sequence_contracts.py`
+- split sticky-end and assembled junction metadata policy lives in `yiu/view_sequence_metadata.py`
+- bundle-path invariants live in `yiu/bundle_paths.py`
+- panel render/load/save helpers live in `yiu/render_panels.py`
 - no dependency on legacy `sample` or cassette-specific planner contracts
 
 #### `viz/` (plotting)
@@ -176,6 +187,8 @@ Current Cruncher handoff for `elites_showcase.*` and `chain_trajectory_video.mp4
    - record-shaped rows (`id`, `sequence`, `features`, `effects`, `display`) and motif primitives
    - or equivalent in-memory `Record` objects through baserender public APIs
 3. Baserender validates contracts, performs layout/rendering, and emits assets.
+
+For payload-centric YIU, Cruncher publishes shared `yiu_payload_visual_v1` contracts only. Downstream, baserender keeps `yiu_payload_visual_projection.py` as a compatibility facade while `yiu_payload_sequence_projection.py` owns sequence-evidence projection and `yiu_payload_motif_overlay.py` owns payload motif `Feature`/`Effect` assembly.
 
 For `chain_trajectory_video.mp4`, Cruncher first resolves selected-chain trajectory rows and sampled frame indices, then writes temporary record rows and passes a strict sequence-rows video job contract to baserender.
 
