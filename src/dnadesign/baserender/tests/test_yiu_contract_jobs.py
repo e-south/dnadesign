@@ -262,7 +262,7 @@ def test_yiu_payload_visual_adapter_renders_pwm_layers_without_label_span_errors
                 }
             ],
             "display": {"title": "TetR payload"},
-            "meta": {"row_labels": {"primary": "Selected payload", "complement": "Selected complement"}},
+            "meta": {"row_labels": {}},
         },
         row_index=0,
     )
@@ -273,10 +273,13 @@ def test_yiu_payload_visual_adapter_renders_pwm_layers_without_label_span_errors
     )
     boundary_effects = [effect for effect in record.effects if effect.kind == "boundary_marker"]
     assert [effect.params["label"] for effect in boundary_effects] == ["", ""]
+    assert [effect.target["lane"] for effect in boundary_effects] == ["primary", "complement"]
     assert motif_feature.label == "CTCTATATCTGATATAG"
     assert motif_feature.tags[0] == "motif:tetR_payload_site"
-    assert motif_feature.attrs["style_token"] == "motif:tetR_payload_site"
+    assert motif_feature.attrs["style_token"] == "tf:tetR"
     assert motif_feature.attrs["display_label"] == "tetR (+)"
+    assert record.meta["segment_labels"] == ()
+    assert record.meta["row_labels"] == {"primary": "", "complement": ""}
     assert motif_effect.params["render_span"] == {"start": 0, "end": 19}
     assert motif_effect.params["observed_sequence_5to3"] == "CTCTATATCTGATATAGAG"
     assert len(motif_effect.params["matrix"]) == 19
@@ -320,7 +323,7 @@ def test_yiu_payload_visual_adapter_pwm_letters_follow_feature_fill_with_gray_de
                 }
             ],
             "display": {"title": "TetR payload"},
-            "meta": {"row_labels": {"primary": "Selected payload", "complement": "Selected complement"}},
+            "meta": {"row_labels": {}},
         },
         row_index=0,
     )
@@ -332,7 +335,7 @@ def test_yiu_payload_visual_adapter_pwm_letters_follow_feature_fill_with_gray_de
             "preset": "presentation_default",
             "overrides": {
                 "connectors": True,
-                "palette": {"motif:tetR_payload_site": "#D68AA7"},
+                "palette": {"tf:tetR": "#D68AA7"},
                 "motif_logo": {
                     "letter_coloring": {
                         "mode": "match_window_seq",
@@ -390,7 +393,7 @@ def test_yiu_payload_visual_adapter_preserves_reverse_strand_payload_wide_pwm_al
                 }
             ],
             "display": {"title": "Reverse payload"},
-            "meta": {"row_labels": {"primary": "Selected payload", "complement": "Selected complement"}},
+            "meta": {"row_labels": {}},
         },
         row_index=0,
     )
@@ -455,7 +458,7 @@ def test_yiu_payload_visual_adapter_stacks_overlapping_same_strand_motifs_withou
                 },
             ],
             "display": {"title": "BaeR payload"},
-            "meta": {"row_labels": {"primary": "Selected payload", "complement": "Selected complement"}},
+            "meta": {"row_labels": {}},
         },
         row_index=0,
     )
@@ -471,12 +474,158 @@ def test_yiu_payload_visual_adapter_stacks_overlapping_same_strand_motifs_withou
     assert set(feature_tracks.values()) == {0, 1, 2}
     assert {
         feature.attrs["style_token"] for feature in record.features if feature.id and feature.id.startswith("motif:")
-    } == {
-        "motif:baeR:0:11:+:1",
-        "motif:baeR:2:13:+:2",
-        "motif:baeR:3:14:+:3",
-    }
+    } == {"tf:baeR"}
 
     effect_indices = [idx for idx, effect in enumerate(record.effects) if effect.kind == "motif_logo"]
     effect_lanes = {layout.motif_logo_lane_by_effect[idx] for idx in effect_indices}
     assert effect_lanes == {0, 1, 2}
+
+
+def test_yiu_payload_visual_adapter_uses_distinct_style_tokens_for_distinct_regulators() -> None:
+    adapter = YiuPayloadVisualV1Adapter(columns={}, policies={}, alphabet="IUPAC_DNA")
+    record = adapter.apply(
+        {
+            "contract_kind": "yiu_payload_visual_v1",
+            "state_id": "payload",
+            "alphabet": "iupac_dna",
+            "reference_payload_sequence": "TTTTTCCCCCAAAA",
+            "selected_payload_sequence": "TTTTTCCCCCAAAA",
+            "selected_complement_sequence": "AAAAGGGGGGTTTT",
+            "show_reference_payload_row": False,
+            "junction": {"start": 5, "end": 9, "offsets": [0, 1, 2, 3]},
+            "mismatches": [],
+            "motif_layers": [
+                {
+                    "motif_instance_id": "baeR:0:11:+:1",
+                    "tf_name": "baeR",
+                    "motif_name": "baeR",
+                    "reference_strand": "+",
+                    "start": 0,
+                    "end": 11,
+                    "label": "baeR (+)",
+                    "matrix": [[0.97, 0.01, 0.01, 0.01]] * 11,
+                },
+                {
+                    "motif_instance_id": "cpxR:2:13:+:1",
+                    "tf_name": "cpxR",
+                    "motif_name": "cpxR",
+                    "reference_strand": "+",
+                    "start": 2,
+                    "end": 13,
+                    "label": "cpxR (+)",
+                    "matrix": [[0.01, 0.97, 0.01, 0.01]] * 11,
+                },
+            ],
+            "display": {"title": "Mixed payload"},
+            "meta": {"row_labels": {}},
+        },
+        row_index=0,
+    )
+
+    assert {
+        feature.attrs["style_token"] for feature in record.features if feature.id and feature.id.startswith("motif:")
+    } == {"tf:baeR", "tf:cpxR"}
+
+
+def test_yiu_payload_render_titles_are_not_smaller_than_sequence_glyphs_and_row_labels_are_suppressed() -> None:
+    adapter = YiuPayloadVisualV1Adapter(columns={}, policies={}, alphabet="IUPAC_DNA")
+    record = adapter.apply(
+        {
+            "contract_kind": "yiu_payload_visual_v1",
+            "state_id": "payload",
+            "alphabet": "iupac_dna",
+            "reference_payload_sequence": "CTCTATATCTGATATAGAG",
+            "selected_payload_sequence": "CTCTATATCTGATATAGAG",
+            "selected_complement_sequence": "GAGATATAGTGTATATCTC",
+            "show_reference_payload_row": False,
+            "junction": {"start": 8, "end": 12, "offsets": [0, 1, 2, 3]},
+            "mismatches": [],
+            "motif_layers": [
+                {
+                    "motif_instance_id": "tetR_payload_site",
+                    "tf_name": "tetR",
+                    "motif_name": "tetr_demo",
+                    "reference_strand": "+",
+                    "start": 0,
+                    "end": 17,
+                    "label": "tetR (+)",
+                    "matrix": _canonical_tetr_pwm_rows(),
+                }
+            ],
+            "display": {"title": "TetR payload (2 sites)"},
+            "meta": {"row_labels": {}},
+        },
+        row_index=0,
+    )
+
+    fig = baserender.render(
+        record,
+        renderer="nucleotide_evidence_map",
+        style={
+            "preset": "presentation_default",
+            "overrides": {
+                "figure_scale": 1.24,
+                "font_size_seq": 13,
+                "font_size_label": 11,
+                "overlay_align": "center",
+            },
+        },
+    )
+    try:
+        texts = {text.get_text(): text for text in fig.axes[0].texts}
+    finally:
+        plt.close(fig)
+
+    assert "Selected payload" not in texts
+    assert "Selected complement" not in texts
+    assert float(texts["TetR payload (2 sites)"].get_fontsize()) >= 13.0
+
+
+def test_sequence_rows_layout_reserves_left_gutter_for_long_row_labels() -> None:
+    adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="IUPAC_DNA")
+    short = adapter.apply(
+        {
+            "contract_kind": "sequence_evidence_map_v1",
+            "state_id": "short",
+            "topology_kind": "linear_dsdna",
+            "alphabet": "iupac_dna",
+            "primary_sequence": "ACGTACGT",
+            "complement_sequence": "TGCATGCA",
+            "owners": [],
+            "effect_tags": [],
+            "boundaries": [],
+            "pairings": [],
+            "display": {"title": "Short"},
+            "meta": {"row_labels": {"primary": "Payload", "complement": "Mate"}},
+        },
+        row_index=0,
+    )
+    long = adapter.apply(
+        {
+            "contract_kind": "sequence_evidence_map_v1",
+            "state_id": "long",
+            "topology_kind": "linear_dsdna",
+            "alphabet": "iupac_dna",
+            "primary_sequence": "ACGTACGT",
+            "complement_sequence": "TGCATGCA",
+            "owners": [],
+            "effect_tags": [],
+            "boundaries": [],
+            "pairings": [],
+            "display": {"title": "Long"},
+            "meta": {
+                "row_labels": {
+                    "primary": "Selected payload fragment",
+                    "complement": "Selected complement fragment",
+                }
+            },
+        },
+        row_index=0,
+    )
+
+    style = resolve_style(preset="presentation_default", overrides=None)
+    short_layout = compute_layout(short, style)
+    long_layout = compute_layout(long, style)
+
+    assert long_layout.x_left > short_layout.x_left
+    assert long_layout.width > short_layout.width

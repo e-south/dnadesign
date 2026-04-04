@@ -31,7 +31,7 @@ from ..config import Style
 from ..core import Record, RenderingError
 from .effects.motif_logo import MotifLogoGeometry, compute_motif_logo_geometry
 from .effects.registry import draw_effect
-from .layout import LayoutContext, comp, compute_layout
+from .layout import LayoutContext, comp, compute_layout, measure_text_width_px
 from .palette import Palette
 
 
@@ -859,13 +859,14 @@ def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
         x = style.padding_x
         ha = "left"
     synthetic_top_pad = max(0.0, float(layout.content_top) - _actual_content_top(layout))
+    title_size = max(float(style.font_size_label), float(style.font_size_seq))
     ax.text(
         x,
         layout.height - max(4.0, style.padding_y * 0.5) - synthetic_top_pad,
         text,
         ha=ha,
         va="top",
-        fontsize=style.font_size_label,
+        fontsize=title_size,
         family=style.font_label,
         color="#6B7280",
         alpha=0.95,
@@ -1156,7 +1157,13 @@ def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) ->
     row_labels = record.meta.get("row_labels") if isinstance(record.meta, Mapping) else None
     if not isinstance(row_labels, Mapping):
         return
-    x = layout.x_left - max(48.0, style.font_size_label * 3.2)
+    terminal_dx = style.font_size_label / 72.0 * style.dpi * 0.8
+    terminal_label_width = max(
+        measure_text_width_px("5'", style.font_label, style.font_size_label, style.dpi),
+        measure_text_width_px("3'", style.font_label, style.font_size_label, style.dpi),
+    )
+    row_gap = max(8.0, style.font_size_label / 72.0 * style.dpi * 0.35)
+    x = layout.x_left - terminal_dx - terminal_label_width - row_gap
     primary = row_labels.get("primary")
     complement = row_labels.get("complement")
     if primary:
@@ -1170,6 +1177,7 @@ def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) ->
             family=style.font_label,
             color="#374151",
             zorder=4.0,
+            clip_on=False,
         )
     if bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"}) and complement:
         ax.text(
@@ -1182,6 +1190,7 @@ def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) ->
             family=style.font_label,
             color="#374151",
             zorder=4.0,
+            clip_on=False,
         )
 
 

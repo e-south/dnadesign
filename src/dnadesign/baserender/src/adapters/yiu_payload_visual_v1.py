@@ -11,6 +11,7 @@ Module Author(s): OpenAI Codex
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -32,8 +33,8 @@ def _build_base_contract(contract: YiuPayloadVisualV1) -> dict[str, object]:
     ]
     row_labels_raw = contract.meta.get("row_labels")
     row_labels = row_labels_raw if isinstance(row_labels_raw, Mapping) else {}
-    payload_label = str(row_labels.get("primary") or "Selected payload")
-    complement_label = str(row_labels.get("complement") or "Selected complement")
+    payload_label = str(row_labels.get("primary") or "").strip()
+    complement_label = str(row_labels.get("complement") or "").strip()
     return {
         "contract_kind": "sequence_evidence_map_v1",
         "state_id": contract.state_id,
@@ -54,7 +55,7 @@ def _build_base_contract(contract: YiuPayloadVisualV1) -> dict[str, object]:
             },
             {
                 "boundary_id": "junction_end",
-                "row_id": "primary",
+                "row_id": "complement",
                 "boundary": contract.junction.end,
                 "boundary_kind": "ligation_junction",
                 "display_label": "Junction end",
@@ -75,16 +76,6 @@ def _build_base_contract(contract: YiuPayloadVisualV1) -> dict[str, object]:
             "connector_hidden_indices": junction_hidden,
             "connector_cross_indices": mismatch_indices,
             "connector_overhang_spans": [_junction_span(contract)],
-            "segment_labels": [
-                {"text": "Left body", "start": 0, "end": contract.junction.start},
-                {
-                    "text": "Right body",
-                    "start": contract.junction.end,
-                    "end": len(contract.selected_payload_sequence),
-                },
-            ]
-            if contract.junction.start > 0 and contract.junction.end < len(contract.selected_payload_sequence)
-            else [],
             "reference_payload_sequence": contract.reference_payload_sequence,
             "show_reference_payload_row": contract.show_reference_payload_row,
             "yiu_payload_meta": dict(contract.meta),
@@ -110,7 +101,7 @@ def _observed_sequence_5to3(contract: YiuPayloadVisualV1, motif) -> str:
 
 
 def _motif_style_token(motif) -> str:
-    return f"motif:{motif.motif_instance_id}"
+    return f"tf:{motif.tf_name}"
 
 
 @dataclass(frozen=True)
@@ -131,21 +122,24 @@ class YiuPayloadVisualV1Adapter:
         features = list(base_record.features)
         effects = list(base_record.effects)
         tag_labels = dict(base_record.display.tag_labels)
+        motif_tf_counts = Counter(motif.tf_name for motif in contract.motif_layers)
         for motif in contract.motif_layers:
             feature_id = f"motif:{motif.motif_instance_id}"
             style_token = _motif_style_token(motif)
+            motif_tag = f"motif:{motif.motif_instance_id}"
             strand = "fwd" if motif.reference_strand == "+" else "rev"
             span = Span(start=motif.start, end=motif.end, strand=strand)
             window_label = base_record.segment_for(span)
-            tag_labels.setdefault(style_token, motif.label)
-            tag_labels.setdefault(f"tf:{motif.tf_name}", motif.tf_name)
+            tag_labels.setdefault(style_token, motif.tf_name)
+            if motif_tf_counts[motif.tf_name] > 1:
+                tag_labels.setdefault(motif_tag, motif.label)
             features.append(
                 Feature(
                     id=feature_id,
                     kind="regulator_window",
                     span=span,
                     label=window_label,
-                    tags=(style_token, f"tf:{motif.tf_name}"),
+                    tags=(motif_tag, style_token),
                     attrs={
                         "tf": motif.tf_name,
                         "motif_name": motif.motif_name,
