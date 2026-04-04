@@ -189,7 +189,7 @@ def render_cmd(
     manifest_payload = json.loads((bundle_dir / "bundle_manifest.json").read_text(encoding="utf-8"))
     published_plot_artifact_path = manifest_payload.get("published_plot_artifact_path")
     if isinstance(published_plot_artifact_path, str) and published_plot_artifact_path.strip():
-        from dnadesign.cruncher.yiu.integrity import resolve_workspace_root
+        from dnadesign.cruncher.yiu.bundle_paths import resolve_workspace_root
 
         workspace_root = resolve_workspace_root(bundle_dir)
         published_plot_artifact_path = (

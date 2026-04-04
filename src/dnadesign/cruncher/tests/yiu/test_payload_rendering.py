@@ -25,13 +25,15 @@ import dnadesign.cruncher.yiu.payload_resolution as yiu_payload_resolution_modul
 from dnadesign.cruncher.app.yiu_workflow.render import render_yiu_spec
 from dnadesign.cruncher.app.yiu_workflow.show import show_yiu_bundle
 from dnadesign.cruncher.bio import reverse_complement_iupac
+from dnadesign.cruncher.yiu.bundle_models import PayloadViewEntry, PayloadVisualInventory
+from dnadesign.cruncher.yiu.bundle_paths import resolve_composite_render_artifact_path
 from dnadesign.cruncher.yiu.candidate_generation import CandidatePlan, MutationChoice
 from dnadesign.cruncher.yiu.errors import NoFeasiblePlanError, YiuContractError
 from dnadesign.cruncher.yiu.load import load_yiu_spec
 from dnadesign.cruncher.yiu.normalize import normalize_payload
 from dnadesign.cruncher.yiu.optimizer import select_best_candidate
-from dnadesign.cruncher.yiu.publish import _yiu_style_overrides
 from dnadesign.cruncher.yiu.scoring import CandidateScore
+from dnadesign.cruncher.yiu.view_contracts import build_yiu_style_overrides
 
 TOY_SEQUENCE = "AAATTTCCCGGGAAATTTCCC"
 TOY_JUNCTION_START = 4
@@ -936,13 +938,54 @@ def test_render_yiu_spec_with_pwm_effective_adds_payload_motif_layers_and_show_r
 
 
 def test_payload_view_uses_sample_inspired_pwm_style() -> None:
-    overrides = _yiu_style_overrides("payload")
+    overrides = build_yiu_style_overrides("payload")
 
     assert overrides["legend"] is False
     assert overrides["connectors"] is True
     assert overrides["sequence"]["bold_consensus_bases"] is True
     assert overrides["motif_logo"]["letter_coloring"]["mode"] == "match_window_seq"
     assert overrides["motif_logo"]["letter_coloring"]["observed_color_source"] == "feature_fill"
+
+
+def test_split_and_assembled_views_center_titles() -> None:
+    payload_overrides = build_yiu_style_overrides("payload")
+    split_overrides = build_yiu_style_overrides("split_payload")
+    assembled_overrides = build_yiu_style_overrides("assembled_payload")
+
+    assert payload_overrides["figure_scale"] == split_overrides["figure_scale"] == assembled_overrides["figure_scale"]
+    assert split_overrides["overlay_align"] == "center"
+    assert assembled_overrides["overlay_align"] == "center"
+
+
+def test_bundle_path_contract_rejects_divergent_view_render_targets(tmp_path: Path) -> None:
+    inventory = PayloadVisualInventory(
+        spec_name="demo_payload",
+        input_kind="user_sequence",
+        view_count=2,
+        render_count=0,
+        views=[
+            PayloadViewEntry(
+                view_id="payload",
+                contract_kind="yiu_payload_visual_v1",
+                input_kind="json",
+                view_contract_path="payload_view.json",
+                render_artifact_path="payload_views.pdf",
+                renderer_kind="nucleotide_evidence_map",
+            ),
+            PayloadViewEntry(
+                view_id="split_payload",
+                contract_kind="sequence_evidence_map_v1",
+                input_kind="jsonl",
+                view_contract_path="split_payload_view.json",
+                render_artifact_path="split_payload.pdf",
+                renderer_kind="sequence_rows",
+            ),
+        ],
+        composite_render_artifact_path="payload_views.pdf",
+    )
+
+    with pytest.raises(ValueError, match="diverge"):
+        resolve_composite_render_artifact_path(tmp_path, inventory)
 
 
 def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp_path: Path) -> None:
@@ -975,10 +1018,12 @@ def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp
     assert report.pwm_effective is True
     assert len(payload_view["motif_layers"]) == 1
     assert (workspace / "outputs" / "plots" / "plot__yiu__tetr_monotypic_hit__payload_views.pdf").exists()
+    assert payload_view["display"]["title"] == "TetR payload"
     assert payload_view["motif_layers"][0]["tf_name"] == "tetR"
     assert payload_view["motif_layers"][0]["reference_strand"] == "+"
     assert payload_view["motif_layers"][0]["start"] == 0
     assert payload_view["motif_layers"][0]["end"] == 17
+    assert payload_view["meta"]["row_labels"] == {}
     for got, expected in zip(payload_view["motif_layers"][0]["matrix"], _canonical_tetr_pwm_rows(), strict=True):
         assert got == pytest.approx(expected)
     assert show_payload["pwm_effective"] is True
@@ -987,6 +1032,20 @@ def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp
     assert show_payload["published_plot_artifact_path"] == str(
         (workspace / "outputs" / "plots" / "plot__yiu__tetr_monotypic_hit__payload_views.pdf").resolve()
     )
+
+    split_rows = _load_jsonl(bundle_dir / "split_payload_view.json")
+    assert split_rows[0]["meta"]["row_labels"] == {}
+    assert split_rows[1]["meta"]["row_labels"] == {}
+    assert split_rows[0]["meta"]["dim_base_indices"] == {
+        "primary": list(range(0, 7)),
+        "complement": list(range(0, 11)),
+    }
+    assert split_rows[1]["meta"]["dim_base_indices"] == {
+        "primary": list(range(7, 18)),
+        "complement": list(range(11, 18)),
+    }
+    assembled_view = _load_json(bundle_dir / "assembled_payload_view.json")
+    assert assembled_view["meta"]["row_labels"] == {}
 
 
 def test_render_sample_hit_with_sample_context_and_overlapping_selected_occurrences_stacks_pwm_layers(
@@ -1059,6 +1118,8 @@ def test_render_sample_hit_with_sample_context_and_overlapping_selected_occurren
 
     assert report.pwm_effective is True
     assert len(payload_view["motif_layers"]) == 3
+    assert payload_view["display"]["title"] == "BaeR payload (3 sites)"
+    assert payload_view["meta"]["row_labels"] == {}
     assert [layer["start"] for layer in payload_view["motif_layers"]] == [0, 2, 3]
     assert (bundle_dir / "payload_views.pdf").exists()
     assert show_payload["integrity"]["status"] == "ok"

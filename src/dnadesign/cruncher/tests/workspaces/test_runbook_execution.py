@@ -25,6 +25,8 @@ import yaml
 import dnadesign.cruncher.workspaces.runbook as runbook_module
 from dnadesign.cruncher.workspaces.runbook import load_workspace_runbook, run_workspace_runbook
 
+REPO_ROOT = Path(__file__).resolve().parents[5]
+
 
 def _write_runbook(workspace: Path, payload: dict) -> Path:
     runbook_path = workspace / "configs" / "runbook.yaml"
@@ -435,7 +437,11 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
         ),
         encoding="utf-8",
     )
-    base_env = {**os.environ, "PYTHONPATH": str(Path.cwd() / "src")}
+    existing_pythonpath = os.environ.get("PYTHONPATH")
+    pythonpath_entries = [str(REPO_ROOT / "src")]
+    if existing_pythonpath:
+        pythonpath_entries.append(existing_pythonpath)
+    base_env = {**os.environ, "PYTHONPATH": os.pathsep.join(pythonpath_entries)}
     validate_proc = subprocess.run(
         [sys.executable, "-m", "dnadesign.cruncher.cli.app", "visuals", "validate", "--job", str(job_path)],
         cwd=workspace,

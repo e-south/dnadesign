@@ -21,40 +21,20 @@ from dnadesign.cruncher.yiu.bundle_models import (
     normalized_payload_summary_dump,
     payload_summary_dump,
 )
+from dnadesign.cruncher.yiu.bundle_paths import (
+    resolve_expected_render_artifact_paths,
+    resolve_published_plot_path,
+)
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
 from dnadesign.cruncher.yiu.errors import YIU_BUNDLE_INVALID, raise_yiu_error
-from dnadesign.cruncher.yiu.publish import _assembled_contract, _split_contract_rows
+from dnadesign.cruncher.yiu.view_contracts import (
+    build_assembled_payload_view_contract,
+    build_split_payload_view_rows,
+)
 
 
 def _fail_bundle(message: str) -> None:
     raise_yiu_error(YIU_BUNDLE_INVALID, message)
-
-
-def resolve_outputs_root(bundle_dir: Path) -> Path | None:
-    resolved = bundle_dir.resolve()
-    for candidate in (resolved, *resolved.parents):
-        if candidate.name == "outputs":
-            return candidate
-    return None
-
-
-def resolve_workspace_root(bundle_dir: Path) -> Path | None:
-    resolved = bundle_dir.resolve()
-    for candidate in (resolved, *resolved.parents):
-        if candidate.name == "outputs":
-            return candidate.parent
-        if candidate.name == "bundles":
-            return candidate.parent
-    return None
-
-
-def resolve_published_plot_path(bundle_dir: Path, relative_path: str | None) -> Path | None:
-    if relative_path is None:
-        return None
-    workspace_root = resolve_workspace_root(bundle_dir)
-    if workspace_root is None:
-        return None
-    return (workspace_root / relative_path).resolve()
 
 
 def _normalize_view_dump(views: list[object]) -> list[dict[str, object]]:
@@ -157,23 +137,19 @@ def validate_bundle_state(
         _fail_bundle("payload view mismatch annotations disagree with normalized_payload.json")
     checks.append("payload_view_consistency")
 
-    expected_assembled = _assembled_contract(normalized)
+    expected_assembled = build_assembled_payload_view_contract(normalized)
     if published_rows["assembled_payload"][0] != expected_assembled:
         _fail_bundle("assembled_payload_view.json disagrees with the selected downstream sequences")
     checks.append("assembled_view_consistency")
-    expected_split_rows = _split_contract_rows(normalized)
+    expected_split_rows = build_split_payload_view_rows(normalized)
     if published_rows["split_payload"] != expected_split_rows:
         _fail_bundle("split_payload_view.json disagrees with the selected downstream sequences")
     checks.append("split_view_consistency")
 
-    expected_render_paths = sorted(
-        {str((bundle_dir / view.render_artifact_path).resolve()) for view in inventory.views}
-    )
-    if inventory.composite_render_artifact_path is not None:
-        expected_composite = str((bundle_dir / inventory.composite_render_artifact_path).resolve())
-        if any(path != expected_composite for path in expected_render_paths):
-            _fail_bundle("published view render paths diverge from the bundle composite render target")
-        expected_render_paths = [expected_composite]
+    try:
+        expected_render_paths = [str(path) for path in resolve_expected_render_artifact_paths(bundle_dir, inventory)]
+    except ValueError as exc:
+        _fail_bundle(str(exc))
     existing_render_paths = [path for path in expected_render_paths if Path(path).exists()]
     published_plot_path = resolve_published_plot_path(bundle_dir, inventory.published_plot_artifact_path)
     if inventory.published_plot_artifact_path is not None and published_plot_path is None:

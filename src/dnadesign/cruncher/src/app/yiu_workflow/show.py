@@ -14,8 +14,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from dnadesign.cruncher.yiu.bundle_paths import resolve_outputs_root
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
-from dnadesign.cruncher.yiu.integrity import resolve_outputs_root, validate_bundle_state
+from dnadesign.cruncher.yiu.integrity import validate_bundle_state
 from dnadesign.cruncher.yiu.models.bundle import PayloadBundleManifest, PayloadVisualInventory, payload_summary_dump
 
 
