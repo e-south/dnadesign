@@ -38,6 +38,25 @@ def resolve_outputs_root(bundle_dir: Path) -> Path | None:
     return None
 
 
+def resolve_workspace_root(bundle_dir: Path) -> Path | None:
+    resolved = bundle_dir.resolve()
+    for candidate in (resolved, *resolved.parents):
+        if candidate.name == "outputs":
+            return candidate.parent
+        if candidate.name == "bundles":
+            return candidate.parent
+    return None
+
+
+def resolve_published_plot_path(bundle_dir: Path, relative_path: str | None) -> Path | None:
+    if relative_path is None:
+        return None
+    workspace_root = resolve_workspace_root(bundle_dir)
+    if workspace_root is None:
+        return None
+    return (workspace_root / relative_path).resolve()
+
+
 def _normalize_view_dump(views: list[object]) -> list[dict[str, object]]:
     return [view.model_dump(mode="json") if hasattr(view, "model_dump") else dict(view) for view in views]
 
@@ -85,6 +104,9 @@ def validate_bundle_state(
     if manifest.composite_render_artifact_path != inventory.composite_render_artifact_path:
         _fail_bundle("bundle manifest and visual inventory disagree on composite render path")
     checks.append("composite_render_path")
+    if manifest.published_plot_artifact_path != inventory.published_plot_artifact_path:
+        _fail_bundle("bundle manifest and visual inventory disagree on published plot path")
+    checks.append("published_plot_path")
     if manifest.pwm_effective != inventory.pwm_effective:
         _fail_bundle("bundle manifest and visual inventory disagree on pwm_effective")
     checks.append("pwm_effective")
@@ -153,19 +175,30 @@ def validate_bundle_state(
             _fail_bundle("published view render paths diverge from the bundle composite render target")
         expected_render_paths = [expected_composite]
     existing_render_paths = [path for path in expected_render_paths if Path(path).exists()]
+    published_plot_path = resolve_published_plot_path(bundle_dir, inventory.published_plot_artifact_path)
+    if inventory.published_plot_artifact_path is not None and published_plot_path is None:
+        _fail_bundle("bundle inventory declares a published plot path but the workspace root cannot be resolved")
     if inventory.render_status == "rendered":
         missing = [path for path in expected_render_paths if path not in existing_render_paths]
         if missing:
             _fail_bundle("bundle inventory reports rendered outputs that are missing on disk: " + ", ".join(missing))
+        if published_plot_path is not None and not published_plot_path.exists():
+            _fail_bundle(f"bundle inventory reports a published plot that is missing on disk: {published_plot_path}")
     elif existing_render_paths:
         _fail_bundle(
             "bundle inventory does not report rendered outputs but artifacts exist on disk: "
             + ", ".join(existing_render_paths)
         )
+    elif published_plot_path is not None and published_plot_path.exists():
+        _fail_bundle(
+            "bundle inventory does not report rendered outputs but the published plot exists on disk: "
+            + str(published_plot_path)
+        )
     checks.append("render_artifacts")
     return {
         "checks": checks,
         "available_renders": existing_render_paths,
+        "published_plot_path": None if published_plot_path is None else str(published_plot_path),
         "payload_view": payload_view,
         "split_rows": published_rows["split_payload"],
     }

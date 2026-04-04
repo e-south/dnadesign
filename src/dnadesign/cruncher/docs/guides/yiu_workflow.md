@@ -35,7 +35,7 @@ uv run cruncher yiu init-workspace WORKSPACE
 uv run cruncher yiu validate --spec configs/yiu/<workflow>.yiu.yaml
 uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml
 uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml --emit-renders
-uv run cruncher yiu show --bundle bundles/<workflow>
+uv run cruncher yiu show --bundle outputs/<workflow>
 ```
 
 `design` is not part of the public YIU surface.
@@ -78,9 +78,9 @@ Relative `source_artifact_path` traversal stays inside the current workspace; si
 - composite render path when present
 - optional verbose split-row debug details when `--verbose` is requested
 
-`show` is fail-fast on bundle drift: missing published view contracts, manifest/inventory disagreements, payload-view motif drift, or a `rendered` bundle with a missing `payload_views.pdf` are treated as bundle corruption.
+`show` is fail-fast on bundle drift: missing published view contracts, manifest/inventory disagreements, payload-view motif drift, a `rendered` bundle with a missing `payload_views.pdf`, or a configured published plot path that does not exist are treated as bundle corruption.
 
-`cruncher yiu render --spec <workflow>.yiu.yaml --emit-renders` validates the spec, writes the payload bundle under `bundles/<workflow>/`, renders one composite `payload_views.pdf` page with the three canonical panels, and updates `visual_inventory.json` in the same bundle directory.
+`cruncher yiu render --spec <workflow>.yiu.yaml --emit-renders` validates the spec, writes the payload bundle under `output.bundle_dir`, renders one composite `payload_views.pdf` page with the three canonical panels, mirrors that PDF to `output.published_plot_path` when configured, and updates `visual_inventory.json` in the same bundle directory.
 
 The split middle row renders `split_payload_left` before `split_payload_right`. Each panel shows the retained post-digestion fragment, its inward-facing sticky end, selected-versus-canonical sticky-end metadata, the reverse-complemented payload-body slice, and optional ghosted excision context.
 

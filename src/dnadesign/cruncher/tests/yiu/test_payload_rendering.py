@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from pathlib import Path
 
 import pandas as pd
@@ -29,6 +30,7 @@ from dnadesign.cruncher.yiu.errors import NoFeasiblePlanError, YiuContractError
 from dnadesign.cruncher.yiu.load import load_yiu_spec
 from dnadesign.cruncher.yiu.normalize import normalize_payload
 from dnadesign.cruncher.yiu.optimizer import select_best_candidate
+from dnadesign.cruncher.yiu.publish import _yiu_style_overrides
 from dnadesign.cruncher.yiu.scoring import CandidateScore
 
 TOY_SEQUENCE = "AAATTTCCCGGGAAATTTCCC"
@@ -71,6 +73,11 @@ def _write_sample_parquet(
     pd.DataFrame([row]).to_parquet(path, index=False)
 
 
+def _write_occurrences_parquet(path: Path, *, rows: list[dict[str, object]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_parquet(path, index=False)
+
+
 def _write_sample_pwm_config(path: Path, *, tf_rows: dict[str, list[list[float]]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -95,6 +102,29 @@ def _pwm_rows(preferred_base: str, *, width: int = 4) -> list[list[float]]:
         row[index] = 0.97
         rows.append(row)
     return rows
+
+
+def _rounded_pwm_rows(preferred_base: str, *, width: int = 4) -> list[list[float]]:
+    rows = _pwm_rows(preferred_base, width=width)
+    rounded: list[list[float]] = []
+    for row in rows:
+        rounded.append([round(float(item), 2) for item in row])
+    return rounded
+
+
+def _canonical_tetr_pwm_rows() -> list[list[float]]:
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "workspaces"
+        / "demo_monotypic_tetr"
+        / ".cruncher"
+        / "demo_monotypic_tetr"
+        / "normalized"
+        / "motifs"
+        / "westmann_tetr_mitomi"
+        / "tetR.json"
+    )
+    return json.loads(path.read_text(encoding="utf-8"))["matrix"]
 
 
 def _inline_pwm_context() -> dict[str, object]:
@@ -123,6 +153,35 @@ def _inline_pwm_context() -> dict[str, object]:
                 "probabilities": {"alphabet": ["A", "C", "G", "T"], "rows": _pwm_rows("A")},
                 "provenance": {"source_kind": "inline", "source_ref": "test-inline"},
             },
+        ],
+    }
+
+
+def _tetr_pwm_context() -> dict[str, object]:
+    return {
+        "contract": "yiu_pwm_context_v1",
+        "schema_version": 1,
+        "name": "tetr_monotypic_pwm_context",
+        "motifs": [
+            {
+                "motif_instance_id": "tetR_payload_site",
+                "tf_name": "tetR",
+                "motif_name": "tetr_demo",
+                "reference_strand": "+",
+                "start": 0,
+                "end": 17,
+                "probabilities": {
+                    "alphabet": ["A", "C", "G", "T"],
+                    "rows": _canonical_tetr_pwm_rows(),
+                },
+                "provenance": {
+                    "source_kind": "file",
+                    "source_ref": (
+                        "../demo_monotypic_tetr/.cruncher/demo_monotypic_tetr/normalized/motifs/"
+                        "westmann_tetr_mitomi/tetR.json"
+                    ),
+                },
+            }
         ],
     }
 
@@ -196,7 +255,8 @@ def _user_sequence_spec(
             "pwm": _pwm_payload(mode=pwm_mode, source=pwm_source),
         },
         "output": {
-            "bundle_dir": f"bundles/{name}",
+            "bundle_dir": f"outputs/{name}",
+            "published_plot_path": f"outputs/plot__{name}__payload_views.pdf",
             "emit_render_jobs_debug": emit_render_jobs_debug,
         },
     }
@@ -250,7 +310,8 @@ def _sample_hit_spec(
             "pwm": _pwm_payload(mode=pwm_mode, source=pwm_source),
         },
         "output": {
-            "bundle_dir": f"bundles/{name}",
+            "bundle_dir": f"outputs/yiu__{name}",
+            "published_plot_path": f"outputs/plots/plot__yiu__{name}__payload_views.pdf",
             "emit_render_jobs_debug": False,
         },
     }
@@ -270,7 +331,7 @@ def _legacy_v1_payload_spec() -> dict[str, object]:
         "split": {"mode": "derived"},
         "bulge_mask": {"positions": [1]},
         "output": {
-            "bundle_dir": "bundles/legacy_payload",
+            "bundle_dir": "outputs/legacy_payload",
             "emit_render_jobs_debug": False,
         },
     }
@@ -549,6 +610,128 @@ def test_normalize_sample_context_builds_effective_multi_motif_context(tmp_path:
     assert {motif.tf_name for motif in normalized.motif_context.motifs} == {"TF_PLUS", "TF_MINUS"}
 
 
+def test_normalize_sample_context_renormalizes_rounded_pwm_rows(tmp_path: Path) -> None:
+    sibling_workspace = tmp_path / "demo_monotypic_tetr"
+    artifact_path = sibling_workspace / "outputs" / "optimize" / "tables" / "elites.parquet"
+    _write_sample_parquet(
+        artifact_path,
+        hit_id="demo_monotypic_tetr_elite_rounded",
+        sequence="CTCTATATCTGATATAGAG",
+        per_tf_json={
+            "TF_ROUNDED": {"best_start": 0, "width": 4, "strand": "+", "motif_name": "rounded"},
+        },
+    )
+    _write_sample_pwm_config(
+        sibling_workspace / "outputs" / "meta" / "config_used.yaml",
+        tf_rows={"TF_ROUNDED": _rounded_pwm_rows("T")},
+    )
+
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "sample_context_rounded.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _sample_hit_spec(
+            hit_id="demo_monotypic_tetr_elite_rounded",
+            sample_name="tetr_monotypic",
+            source_artifact_path=str(artifact_path.resolve()),
+            pwm_mode="require",
+            pwm_source={"kind": "sample_context"},
+            mismatch_count=1,
+            candidate_positions=[1],
+        ),
+    )
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    normalized = normalize_payload(spec, workspace_root=workspace_root)
+
+    assert normalized.motif_context.effective is True
+    motif = normalized.motif_context.motifs[0]
+    for row in motif.probabilities.rows:
+        assert sum(row) == pytest.approx(1.0)
+        assert row[3] > 0.96
+
+
+def test_normalize_sample_context_prefers_selected_occurrence_rows_for_multiplicity_payloads(tmp_path: Path) -> None:
+    sibling_workspace = tmp_path / "demo_monotypic_baer"
+    artifact_path = sibling_workspace / "outputs" / "optimize" / "tables" / "elites.parquet"
+    occurrences_path = sibling_workspace / "outputs" / "optimize" / "tables" / "elites_occurrences.parquet"
+    _write_sample_parquet(
+        artifact_path,
+        hit_id="demo_monotypic_baer_elite_001",
+        sequence="TTTTTTCGCGAAAAAA",
+        per_tf_json={
+            "baeR": {
+                "best_start": 0,
+                "width": 11,
+                "strand": "+",
+                "motif_name": "representative_only",
+            }
+        },
+    )
+    _write_occurrences_parquet(
+        occurrences_path,
+        rows=[
+            {
+                "elite_id": "demo_monotypic_baer_elite_001",
+                "tf": "baeR",
+                "occurrence_rank": 1,
+                "start": 0,
+                "end": 11,
+                "strand": "+",
+                "selected": True,
+            },
+            {
+                "elite_id": "demo_monotypic_baer_elite_001",
+                "tf": "baeR",
+                "occurrence_rank": 2,
+                "start": 2,
+                "end": 13,
+                "strand": "+",
+                "selected": True,
+            },
+            {
+                "elite_id": "demo_monotypic_baer_elite_001",
+                "tf": "baeR",
+                "occurrence_rank": 3,
+                "start": 3,
+                "end": 14,
+                "strand": "-",
+                "selected": True,
+            },
+        ],
+    )
+    _write_sample_pwm_config(
+        sibling_workspace / "outputs" / "meta" / "config_used.yaml",
+        tf_rows={"baeR": _pwm_rows("T", width=11)},
+    )
+
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "sample_context_occurrences.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _sample_hit_spec(
+            hit_id="demo_monotypic_baer_elite_001",
+            sample_name="baer_monotypic",
+            source_artifact_path=str(artifact_path.resolve()),
+            pwm_mode="require",
+            pwm_source={"kind": "sample_context"},
+            mismatch_count=2,
+            candidate_positions=[1, 2],
+        ),
+    )
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    normalized = normalize_payload(spec, workspace_root=workspace_root)
+
+    assert normalized.motif_context.effective is True
+    assert len(normalized.motif_context.motifs) == 3
+    assert [(motif.start, motif.end, motif.reference_strand) for motif in normalized.motif_context.motifs] == [
+        (0, 11, "+"),
+        (2, 13, "+"),
+        (3, 14, "-"),
+    ]
+
+
 def test_select_best_candidate_breaks_pwm_tie_on_total_loss(monkeypatch: pytest.MonkeyPatch) -> None:
     candidate_a = _candidate(lexical_key="a", default_strand_preference_count=1)
     candidate_b = _candidate(lexical_key="b", default_strand_preference_count=1)
@@ -712,8 +895,10 @@ def test_render_yiu_spec_publishes_v4_bundle_and_payload_visual_contract(tmp_pat
     assembled_view = _load_json(bundle_dir / "assembled_payload_view.json")
 
     assert manifest["bundle_contract"] == "split_yiu_payload_bundle_v4"
+    assert manifest["published_plot_artifact_path"] == "outputs/plot__demo_payload__payload_views.pdf"
     assert normalized["contract"] == "yiu_normalized_payload_v4"
     assert inventory["pwm_effective"] is False
+    assert inventory["published_plot_artifact_path"] == "outputs/plot__demo_payload__payload_views.pdf"
     assert payload_view["contract_kind"] == "yiu_payload_visual_v1"
     assert payload_view["motif_layers"] == []
     assert len(split_rows) == 2
@@ -734,15 +919,167 @@ def test_render_yiu_spec_with_pwm_effective_adds_payload_motif_layers_and_show_r
         ),
     )
 
-    bundle_dir, report = render_yiu_spec(spec_path)
+    bundle_dir, report = render_yiu_spec(spec_path, emit_renders=True)
     payload_view = _load_json(bundle_dir / "payload_view.json")
     show_payload = show_yiu_bundle(bundle_dir)
 
     assert report.pwm_effective is True
     assert len(payload_view["motif_layers"]) == 2
+    assert (bundle_dir / "payload_views.pdf").exists()
+    assert (workspace / "outputs" / "plot__pwm_payload__payload_views.pdf").exists()
     assert show_payload["pwm_effective"] is True
     assert show_payload["motif_context"]["effective"] is True
     assert show_payload["integrity"]["status"] == "ok"
+    assert show_payload["published_plot_artifact_path"] == str(
+        (workspace / "outputs" / "plot__pwm_payload__payload_views.pdf").resolve()
+    )
+
+
+def test_payload_view_uses_sample_inspired_pwm_style() -> None:
+    overrides = _yiu_style_overrides("payload")
+
+    assert overrides["legend"] is False
+    assert overrides["connectors"] is True
+    assert overrides["sequence"]["bold_consensus_bases"] is True
+    assert overrides["motif_logo"]["letter_coloring"]["mode"] == "match_window_seq"
+    assert overrides["motif_logo"]["letter_coloring"]["observed_color_source"] == "feature_fill"
+
+
+def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "tetr_monotypic_hit.yiu.yaml"
+    pwm_path = workspace / "motifs" / "tetr_monotypic_pwm_context.yaml"
+    _write_yaml(pwm_path, _tetr_pwm_context())
+    _write_yaml(
+        spec_path,
+        _sample_hit_spec(
+            name="tetr_monotypic_hit",
+            sample_name="tetr",
+            hit_id="demo_monotypic_tetr_elite_c4c42365d66b",
+            payload_sequence="CTCTATATCTGATATAGAG",
+            metadata={"tf_name": "tetR", "motif_name": "tetr_demo", "site_label": "tetr_site"},
+            junction_mode="explicit_window",
+            junction_start=8,
+            junction_end=12,
+            mismatch_count=2,
+            candidate_positions=[1, 2],
+            pwm_mode="require",
+            pwm_source={"kind": "file", "path": "motifs/tetr_monotypic_pwm_context.yaml"},
+        ),
+    )
+
+    bundle_dir, report = render_yiu_spec(spec_path, emit_renders=True)
+    payload_view = _load_json(bundle_dir / "payload_view.json")
+    show_payload = show_yiu_bundle(bundle_dir)
+
+    assert report.pwm_effective is True
+    assert len(payload_view["motif_layers"]) == 1
+    assert (workspace / "outputs" / "plots" / "plot__yiu__tetr_monotypic_hit__payload_views.pdf").exists()
+    assert payload_view["motif_layers"][0]["tf_name"] == "tetR"
+    assert payload_view["motif_layers"][0]["reference_strand"] == "+"
+    assert payload_view["motif_layers"][0]["start"] == 0
+    assert payload_view["motif_layers"][0]["end"] == 17
+    for got, expected in zip(payload_view["motif_layers"][0]["matrix"], _canonical_tetr_pwm_rows(), strict=True):
+        assert got == pytest.approx(expected)
+    assert show_payload["pwm_effective"] is True
+    assert show_payload["motif_context"]["effective"] is True
+    assert show_payload["integrity"]["status"] == "ok"
+    assert show_payload["published_plot_artifact_path"] == str(
+        (workspace / "outputs" / "plots" / "plot__yiu__tetr_monotypic_hit__payload_views.pdf").resolve()
+    )
+
+
+def test_render_sample_hit_with_sample_context_and_overlapping_selected_occurrences_stacks_pwm_layers(
+    tmp_path: Path,
+) -> None:
+    sibling_workspace = tmp_path / "demo_monotypic_baer"
+    artifact_path = sibling_workspace / "outputs" / "optimize" / "tables" / "elites.parquet"
+    occurrences_path = sibling_workspace / "outputs" / "optimize" / "tables" / "elites_occurrences.parquet"
+    _write_sample_parquet(
+        artifact_path,
+        hit_id="demo_monotypic_baer_elite_001",
+        sequence="TTTTTCCCCCAAAA",
+    )
+    _write_occurrences_parquet(
+        occurrences_path,
+        rows=[
+            {
+                "elite_id": "demo_monotypic_baer_elite_001",
+                "tf": "baeR",
+                "occurrence_rank": 1,
+                "start": 0,
+                "end": 11,
+                "strand": "+",
+                "selected": True,
+            },
+            {
+                "elite_id": "demo_monotypic_baer_elite_001",
+                "tf": "baeR",
+                "occurrence_rank": 2,
+                "start": 2,
+                "end": 13,
+                "strand": "+",
+                "selected": True,
+            },
+            {
+                "elite_id": "demo_monotypic_baer_elite_001",
+                "tf": "baeR",
+                "occurrence_rank": 3,
+                "start": 3,
+                "end": 14,
+                "strand": "+",
+                "selected": True,
+            },
+        ],
+    )
+    _write_sample_pwm_config(
+        sibling_workspace / "outputs" / "meta" / "config_used.yaml",
+        tf_rows={"baeR": _rounded_pwm_rows("T", width=11)},
+    )
+
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "baer_monotypic_hit.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _sample_hit_spec(
+            name="baer_monotypic_hit",
+            hit_id="demo_monotypic_baer_elite_001",
+            sample_name="baer_monotypic",
+            source_artifact_path=str(artifact_path.resolve()),
+            pwm_mode="require",
+            pwm_source={"kind": "sample_context"},
+            mismatch_count=2,
+            candidate_positions=[1, 2],
+        ),
+    )
+
+    bundle_dir, report = render_yiu_spec(spec_path, emit_renders=True)
+    payload_view = _load_json(bundle_dir / "payload_view.json")
+    show_payload = show_yiu_bundle(bundle_dir)
+
+    assert report.pwm_effective is True
+    assert len(payload_view["motif_layers"]) == 3
+    assert [layer["start"] for layer in payload_view["motif_layers"]] == [0, 2, 3]
+    assert (bundle_dir / "payload_views.pdf").exists()
+    assert show_payload["integrity"]["status"] == "ok"
+
+
+def test_checked_in_tetr_pwm_context_preserves_full_information_content() -> None:
+    motif = _tetr_pwm_context()["motifs"][0]
+    rows = motif["probabilities"]["rows"]
+    info_bits: list[float] = []
+    for row in rows:
+        entropy = 0.0
+        for prob in row:
+            if prob > 0:
+                entropy += -prob * math.log2(prob)
+        info_bits.append(max(0.0, 2.0 - entropy))
+
+    assert motif["start"] == 0
+    assert motif["end"] == 17
+    for got, expected in zip(rows, _canonical_tetr_pwm_rows(), strict=True):
+        assert got == pytest.approx(expected)
+    assert max(info_bits) - min(info_bits) > 0.35
 
 
 def test_show_yiu_bundle_rejects_payload_view_drift_when_pwm_effective_but_motifs_missing(tmp_path: Path) -> None:

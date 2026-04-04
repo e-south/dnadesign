@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,6 +25,7 @@ from dnadesign.cruncher.viz.mpl import (
     infer_workspace_root_from_output_artifact,
 )
 from dnadesign.cruncher.yiu.errors import YIU_RENDER_FAILED, raise_yiu_error
+from dnadesign.cruncher.yiu.integrity import resolve_published_plot_path
 from dnadesign.cruncher.yiu.models.bundle import PayloadBundleManifest, PayloadViewEntry, PayloadVisualInventory
 
 
@@ -259,6 +261,17 @@ def render_bundle_views(bundle_dir: str | Path) -> dict[str, object]:
         raise_yiu_error(YIU_RENDER_FAILED, "YIU composite render did not create payload_views.pdf")
     render_paths.append(str(composite_render_path.resolve()))
 
+    published_plot_path = resolve_published_plot_path(resolved, inventory.published_plot_artifact_path)
+    if inventory.published_plot_artifact_path is not None and published_plot_path is None:
+        raise_yiu_error(YIU_RENDER_FAILED, "YIU published plot path is set but the workspace root cannot be resolved")
+    if published_plot_path is not None:
+        if published_plot_path != composite_render_path.resolve():
+            published_plot_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(composite_render_path, published_plot_path)
+        published_plot_resolved = str(published_plot_path.resolve())
+        if published_plot_resolved not in render_paths:
+            render_paths.append(published_plot_resolved)
+
     updated_inventory = inventory.model_copy(
         update={
             "render_count": rendered_count,
@@ -284,5 +297,6 @@ def render_bundle_views(bundle_dir: str | Path) -> dict[str, object]:
         "render_status": updated_inventory.render_status,
         "render_count": rendered_count,
         "composite_render_artifact_path": str(composite_render_path.resolve()),
+        "published_plot_artifact_path": None if published_plot_path is None else str(published_plot_path.resolve()),
         "render_artifact_paths": render_paths,
     }

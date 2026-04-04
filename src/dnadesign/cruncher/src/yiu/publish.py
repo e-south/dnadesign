@@ -13,10 +13,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 import yaml
 
+from dnadesign.baserender import cruncher_showcase_style_overrides
 from dnadesign.contracts.visual import SequenceEvidenceMapV1, YiuPayloadVisualV1
 from dnadesign.contracts.visual.yiu_payload_visual_v1 import (
     YiuPayloadDisplayV1,
@@ -39,8 +40,51 @@ _YIU_ROW_LABELS = {
     "complement": "Selected complement",
 }
 
+_MOTIF_PASTEL_PALETTE: tuple[str, ...] = (
+    "#67BFA5",
+    "#D883A4",
+    "#7BA4D9",
+    "#C08A56",
+    "#5DA79F",
+    "#D1B06C",
+    "#74C0CB",
+    "#86A5D8",
+    "#9BC47B",
+    "#C9B082",
+    "#D68AA7",
+    "#D9A78A",
+)
 
-def _yiu_style_overrides(view_id: str) -> dict[str, object]:
+
+def _motif_palette_token(motif_instance_id: str) -> str:
+    return f"motif:{motif_instance_id}"
+
+
+def _motif_palette_entries(motif_layers: Sequence[YiuPayloadMotifLayerV1]) -> dict[str, str]:
+    return {
+        _motif_palette_token(motif.motif_instance_id): _MOTIF_PASTEL_PALETTE[index % len(_MOTIF_PASTEL_PALETTE)]
+        for index, motif in enumerate(motif_layers)
+    }
+
+
+def _yiu_style_overrides(view_id: str, *, motif_layers: Sequence[YiuPayloadMotifLayerV1] = ()) -> dict[str, object]:
+    if view_id == "payload":
+        base = dict(cruncher_showcase_style_overrides())
+        base["palette"] = {
+            **dict(base.get("palette", {})),
+            **_motif_palette_entries(motif_layers),
+        }
+        base["padding_x"] = 42.0
+        base["padding_y"] = 24.0
+        base["font_size_seq"] = 13
+        base["font_size_label"] = 11
+        base["legend"] = False
+        base["connectors"] = True
+        base["connector_width"] = 1.1
+        base["connector_alpha"] = 0.78
+        base["connector_dash"] = ()
+        return base
+
     base: dict[str, object] = {
         "figure_scale": 1.12,
         "padding_x": 42.0,
@@ -53,11 +97,6 @@ def _yiu_style_overrides(view_id: str) -> dict[str, object]:
         "layout": {"outer_pad_cells": 0.18},
         "sequence": {"strand_gap_cells": 0.22, "to_kmer_gap_cells": 0.18},
         "kmer": {"box_height_cells": 1.02, "fill_alpha": 0.94, "text_y_nudge_cells": 0.0},
-        "motif_logo": {
-            "lane_mode": "follow_feature_track",
-            "layout": "stack",
-            "letter_coloring": {"mode": "match_window_seq", "observed_color_source": "nucleotide_palette"},
-        },
         "connector_width": 1.1,
         "connector_alpha": 0.78,
         "connector_dash": (),
@@ -271,24 +310,27 @@ def publish_payload_bundle(
     manifest_path = bundle_dir / "bundle_manifest.json"
     inventory_path = bundle_dir / "visual_inventory.json"
 
-    _write_json(payload_path, _payload_contract(normalized))
+    payload_contract = _payload_contract(normalized)
+    _write_json(payload_path, payload_contract)
     _write_jsonl(split_path, _split_contract_rows(normalized))
     _write_json(assembled_path, _assembled_contract(normalized))
 
-    normalized_with_artifacts = normalized.model_copy(
-        update={
-            "published_artifacts": {
-                "normalized_payload": "normalized_payload.json",
-                "bundle_manifest": "bundle_manifest.json",
-                "visual_inventory": "visual_inventory.json",
-                "payload_view": "payload_view.json",
-                "split_payload_view": "split_payload_view.json",
-                "assembled_payload_view": "assembled_payload_view.json",
-                "payload_views_pdf": "payload_views.pdf",
-            }
-        }
-    )
+    published_artifacts = {
+        "normalized_payload": "normalized_payload.json",
+        "bundle_manifest": "bundle_manifest.json",
+        "visual_inventory": "visual_inventory.json",
+        "payload_view": "payload_view.json",
+        "split_payload_view": "split_payload_view.json",
+        "assembled_payload_view": "assembled_payload_view.json",
+        "payload_views_pdf": "payload_views.pdf",
+    }
+    if spec.output.published_plot_path is not None:
+        published_artifacts["published_plot_pdf"] = str(spec.output.published_plot_path)
+
+    normalized_with_artifacts = normalized.model_copy(update={"published_artifacts": published_artifacts})
     _write_json(normalized_path, normalized_with_artifacts.model_dump(mode="json"))
+
+    payload_motif_layers = [YiuPayloadMotifLayerV1.model_validate(layer) for layer in payload_contract["motif_layers"]]
 
     view_entries = [
         PayloadViewEntry(
@@ -299,7 +341,7 @@ def publish_payload_bundle(
             view_contract_path=_relative_to_bundle(bundle_dir, payload_path),
             render_artifact_path=_relative_to_bundle(bundle_dir, combined_render_path),
             renderer_kind="nucleotide_evidence_map",
-            style_overrides=_yiu_style_overrides("payload"),
+            style_overrides=_yiu_style_overrides("payload", motif_layers=payload_motif_layers),
             motif_layers_required=normalized.motif_context.effective,
         ),
         PayloadViewEntry(
@@ -339,6 +381,9 @@ def publish_payload_bundle(
         render_count=0,
         render_status="not_requested",
         composite_render_artifact_path=_relative_to_bundle(bundle_dir, combined_render_path),
+        published_plot_artifact_path=None
+        if spec.output.published_plot_path is None
+        else str(spec.output.published_plot_path),
         pwm_effective=normalized.motif_context.effective,
         payload_view_requires_motif_layers=normalized.motif_context.effective,
         views=view_entries,
@@ -349,6 +394,9 @@ def publish_payload_bundle(
         payload_view_requires_motif_layers=normalized.motif_context.effective,
         view_contracts=view_entries,
         composite_render_artifact_path=_relative_to_bundle(bundle_dir, combined_render_path),
+        published_plot_artifact_path=None
+        if spec.output.published_plot_path is None
+        else str(spec.output.published_plot_path),
         render_status=inventory.render_status,
         **payload_summary_from_normalized(normalized),
     )

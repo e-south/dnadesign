@@ -27,7 +27,8 @@ _ADVANCED_SPEC_FILENAME = f"{_DEMO_NAME}.advanced_pwm.example.yaml"
 _ADVANCED_SPEC_RELATIVE_PATH = f"configs/yiu/{_ADVANCED_SPEC_FILENAME}"
 _PWM_CONTEXT_FILENAME = "example_pwm_context.yaml"
 _PWM_CONTEXT_RELATIVE_PATH = f"motifs/{_PWM_CONTEXT_FILENAME}"
-_DEMO_BUNDLE_DIR = f"bundles/{_DEMO_NAME}"
+_DEMO_BUNDLE_DIR = f"outputs/{_DEMO_NAME}"
+_DEMO_PUBLISHED_PLOT = f"outputs/{_DEMO_NAME}__payload_views.pdf"
 
 
 @dataclass(frozen=True)
@@ -42,7 +43,6 @@ def _workspace_gitignore_text() -> str:
     return "\n".join(
         [
             ".cruncher/",
-            "bundles/",
             "outputs/",
             ".DS_Store",
             "",
@@ -124,6 +124,7 @@ def _canonical_spec_text() -> str:
 
         output:
           bundle_dir: {_DEMO_BUNDLE_DIR}
+          published_plot_path: {_DEMO_PUBLISHED_PLOT}
           emit_render_jobs_debug: false
         """
     )
@@ -171,7 +172,8 @@ def _advanced_pwm_spec_text() -> str:
                 - lexical_stability
 
         output:
-          bundle_dir: bundles/example_payload_pwm
+          bundle_dir: outputs/example_payload_pwm
+          published_plot_path: outputs/example_payload_pwm__payload_views.pdf
           emit_render_jobs_debug: false
         """
     )
@@ -270,7 +272,7 @@ def _runbook_markdown(workspace_root: Path, *, workspace_name: str) -> str:
             "",
             "    cruncher yiu validate --spec configs/yiu/example_payload.yiu.yaml",
             "    cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml --force-overwrite --emit-renders",
-            "    cruncher yiu show --bundle bundles/example_payload",
+            "    cruncher yiu show --bundle outputs/example_payload",
             "",
             "### Advanced PWM-Aware Example",
             "",
@@ -289,7 +291,7 @@ def init_yiu_workspace(workspace_root: Path, *, force_overwrite: bool = False) -
             raise ValueError(f"YIU workspace already exists: {resolved_root}")
         shutil.rmtree(resolved_root)
     (resolved_root / "configs" / "yiu").mkdir(parents=True, exist_ok=True)
-    (resolved_root / "bundles").mkdir(parents=True, exist_ok=True)
+    (resolved_root / "outputs").mkdir(parents=True, exist_ok=True)
     (resolved_root / "motifs").mkdir(parents=True, exist_ok=True)
 
     spec_path = resolved_root / "configs" / "yiu" / _DEMO_SPEC_FILENAME

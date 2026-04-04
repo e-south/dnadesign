@@ -186,10 +186,22 @@ def render_cmd(
     except (FileNotFoundError, ValueError) as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
+    manifest_payload = json.loads((bundle_dir / "bundle_manifest.json").read_text(encoding="utf-8"))
+    published_plot_artifact_path = manifest_payload.get("published_plot_artifact_path")
+    if isinstance(published_plot_artifact_path, str) and published_plot_artifact_path.strip():
+        from dnadesign.cruncher.yiu.integrity import resolve_workspace_root
+
+        workspace_root = resolve_workspace_root(bundle_dir)
+        published_plot_artifact_path = (
+            None if workspace_root is None else str((workspace_root / published_plot_artifact_path).resolve())
+        )
+    else:
+        published_plot_artifact_path = None
     payload = {
         "bundle_dir": str(bundle_dir),
         "outputs_root": str(bundle_dir.parent.resolve()),
         "composite_render_artifact_path": str((bundle_dir / "payload_views.pdf").resolve()),
+        "published_plot_artifact_path": published_plot_artifact_path,
         "bundle_manifest_path": str((bundle_dir / "bundle_manifest.json").resolve()),
         "normalized_payload_path": str((bundle_dir / "normalized_payload.json").resolve()),
         "visual_inventory_path": str((bundle_dir / "visual_inventory.json").resolve()),
@@ -217,6 +229,8 @@ def render_cmd(
     console.print(f"Visual inventory -> {payload['visual_inventory_path']}")
     if emit_renders:
         console.print(f"Composite render target -> {payload['composite_render_artifact_path']}")
+    if payload["published_plot_artifact_path"] is not None:
+        console.print(f"Published plot -> {payload['published_plot_artifact_path']}")
     if report.status != "satisfied":
         raise typer.Exit(code=1)
 
@@ -261,6 +275,8 @@ def show_cmd(
     console.print(f"Integrity -> {payload['integrity']['status']}")
     if payload.get("composite_render_artifact_path") is not None:
         console.print(f"Composite render -> {payload['composite_render_artifact_path']}")
+    if payload.get("published_plot_artifact_path") is not None:
+        console.print(f"Published plot -> {payload['published_plot_artifact_path']}")
     console.print(f"Bundle manifest -> {payload['bundle_manifest_path']}")
     console.print(f"Normalized payload -> {payload['normalized_payload_path']}")
     console.print(f"Visual inventory -> {payload['visual_inventory_path']}")

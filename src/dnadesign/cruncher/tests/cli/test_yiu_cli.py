@@ -78,7 +78,8 @@ def _payload_spec(
             },
         },
         "output": {
-            "bundle_dir": f"bundles/{name}",
+            "bundle_dir": f"outputs/{name}",
+            "published_plot_path": f"outputs/plot__{name}__payload_views.pdf",
             "emit_render_jobs_debug": False,
         },
     }
@@ -98,7 +99,7 @@ def _legacy_v1_payload_spec() -> dict[str, object]:
         "split": {"mode": "derived"},
         "bulge_mask": {"positions": [1]},
         "output": {
-            "bundle_dir": "bundles/legacy_payload",
+            "bundle_dir": "outputs/legacy_payload",
             "emit_render_jobs_debug": False,
         },
     }
@@ -147,13 +148,12 @@ def test_yiu_init_workspace_scaffolds_only_payload_config(tmp_path: Path) -> Non
     assert payload["input"]["kind"] in {"user_sequence", "sample_hit"}
     assert payload["optimization"]["junction"]["overhang_length"] == 4
     assert payload["optimization"]["mismatches"]["strand_mode"] == "per_position"
-    assert payload["output"]["bundle_dir"].startswith("bundles/")
-    assert "/yiu/" not in payload["output"]["bundle_dir"]
+    assert payload["output"]["bundle_dir"].startswith("outputs/")
+    assert payload["output"]["published_plot_path"].startswith("outputs/")
     assert (workspace / "configs" / "yiu" / "example_payload.advanced_pwm.example.yaml").exists()
     assert (workspace / "motifs" / "example_pwm_context.yaml").exists()
     assert (workspace / ".gitignore").read_text(encoding="utf-8").splitlines() == [
         ".cruncher/",
-        "bundles/",
         "outputs/",
         ".DS_Store",
     ]
@@ -174,14 +174,15 @@ def test_yiu_render_materializes_payload_bundle_from_spec(tmp_path: Path) -> Non
     spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
     _write_yaml(spec_path, _payload_spec())
 
-    result = runner.invoke(app, ["yiu", "render", "--spec", str(spec_path)])
+    result = runner.invoke(app, ["yiu", "render", "--spec", str(spec_path), "--emit-renders"])
 
     assert result.exit_code == 0
-    bundle_dir = workspace / "bundles" / "demo_payload"
+    bundle_dir = workspace / "outputs" / "demo_payload"
     assert (bundle_dir / "bundle_manifest.json").exists()
     assert (bundle_dir / "normalized_payload.json").exists()
     assert (bundle_dir / "visual_inventory.json").exists()
     assert (bundle_dir / "payload_view.json").exists()
+    assert (workspace / "outputs" / "plot__demo_payload__payload_views.pdf").exists()
     assert "Bundle manifest ->" in result.output
     assert "Bundle write ->" in result.output
 
@@ -210,7 +211,7 @@ def test_yiu_show_reports_payload_bundle_summary(tmp_path: Path) -> None:
     render_result = runner.invoke(app, ["yiu", "render", "--spec", str(spec_path)])
     assert render_result.exit_code == 0
 
-    show_result = runner.invoke(app, ["yiu", "show", "--bundle", str(workspace / "bundles" / "demo_payload")])
+    show_result = runner.invoke(app, ["yiu", "show", "--bundle", str(workspace / "outputs" / "demo_payload")])
 
     assert show_result.exit_code == 0
     assert "Bundle ->" in show_result.output
@@ -238,7 +239,7 @@ def test_yiu_show_verbose_json_exposes_split_row_debug_surface(tmp_path: Path) -
 
     default_show = runner.invoke(
         app,
-        ["yiu", "show", "--bundle", str(workspace / "bundles" / "demo_payload_bulged"), "--json"],
+        ["yiu", "show", "--bundle", str(workspace / "outputs" / "demo_payload_bulged"), "--json"],
     )
     verbose_show = runner.invoke(
         app,
@@ -246,7 +247,7 @@ def test_yiu_show_verbose_json_exposes_split_row_debug_surface(tmp_path: Path) -
             "yiu",
             "show",
             "--bundle",
-            str(workspace / "bundles" / "demo_payload_bulged"),
+            str(workspace / "outputs" / "demo_payload_bulged"),
             "--json",
             "--verbose",
         ],
@@ -273,7 +274,7 @@ def test_yiu_validate_and_show_json_share_payload_summary_contract(tmp_path: Pat
     render_result = runner.invoke(app, ["yiu", "render", "--spec", str(spec_path)])
     show_result = runner.invoke(
         app,
-        ["yiu", "show", "--bundle", str(workspace / "bundles" / "demo_payload"), "--json"],
+        ["yiu", "show", "--bundle", str(workspace / "outputs" / "demo_payload"), "--json"],
     )
 
     assert validate_result.exit_code == 0
@@ -282,9 +283,12 @@ def test_yiu_validate_and_show_json_share_payload_summary_contract(tmp_path: Pat
 
     validate_payload = json.loads(validate_result.output)
     show_payload = json.loads(show_result.output)
-    assert show_payload["outputs_root"] is None
+    assert show_payload["outputs_root"] == str((workspace / "outputs").resolve())
     assert show_payload["composite_render_artifact_path"] == str(
-        (workspace / "bundles" / "demo_payload" / "payload_views.pdf").resolve()
+        (workspace / "outputs" / "demo_payload" / "payload_views.pdf").resolve()
+    )
+    assert show_payload["published_plot_artifact_path"] == str(
+        (workspace / "outputs" / "plot__demo_payload__payload_views.pdf").resolve()
     )
     for field_name in [
         "input_kind",
@@ -339,7 +343,7 @@ def test_yiu_validate_rejects_sample_hit_without_resolution_hints(tmp_path: Path
             },
             "optimization": _payload_spec()["optimization"],
             "output": {
-                "bundle_dir": "bundles/missing_sample_resolution",
+                "bundle_dir": "outputs/missing_sample_resolution",
                 "emit_render_jobs_debug": False,
             },
         },
@@ -367,6 +371,20 @@ def test_yiu_validate_rejects_bundle_dir_traversal(tmp_path: Path) -> None:
     assert result.exit_code == 1
     normalized_output = " ".join(result.output.split())
     assert "output.bundle_dir must not traverse outside the workspace root" in normalized_output
+
+
+def test_yiu_validate_rejects_published_plot_path_traversal(tmp_path: Path) -> None:
+    workspace = tmp_path / "demo_yiu_payload"
+    spec_path = workspace / "configs" / "yiu" / "escaped_plot.yiu.yaml"
+    payload = _payload_spec(name="escaped_plot")
+    payload["output"]["published_plot_path"] = "../escaped_plot.pdf"
+    _write_yaml(spec_path, payload)
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
+
+    assert result.exit_code == 1
+    normalized_output = " ".join(result.output.split())
+    assert "output.published_plot_path must not traverse outside the workspace root" in normalized_output
 
 
 def test_yiu_init_workspace_rejects_conflicting_output_and_workspace(tmp_path: Path) -> None:

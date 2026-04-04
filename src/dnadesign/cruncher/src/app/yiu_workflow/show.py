@@ -76,6 +76,7 @@ def show_yiu_bundle(bundle_dir: str | Path, *, verbose: bool = False) -> dict[st
         "composite_render_artifact_path": None
         if inventory.composite_render_artifact_path is None
         else str((resolved / inventory.composite_render_artifact_path).resolve()),
+        "published_plot_artifact_path": integrity["published_plot_path"],
         "bundle_manifest_path": str(manifest_path.resolve()),
         "normalized_payload_path": str(normalized_path.resolve()),
         "visual_inventory_path": str(inventory_path.resolve()),

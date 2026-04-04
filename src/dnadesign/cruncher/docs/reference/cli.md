@@ -527,7 +527,7 @@ Notes:
 #### YIU workflows
 
 The YIU workflow is separate from both `sample` and `cassette`. It expects one payload-centric spec file at
-`<workspace>/configs/yiu/<name>.yiu.yaml`, validates the `split_yiu_payload_rendering_v4` contract, and writes a single payload bundle under `<workspace>/bundles/<name>/`.
+`<workspace>/configs/yiu/<name>.yiu.yaml`, validates the `split_yiu_payload_rendering_v4` contract, and writes a single payload bundle under the workspace-relative `output.bundle_dir` path, typically `<workspace>/outputs/<name>/`.
 
 Deep contracts live in:
 
@@ -538,7 +538,7 @@ Deep contracts live in:
 
 #### `cruncher yiu init-workspace`
 
-Scaffold a YIU workspace root with one checked-in payload example spec, one machine runbook, and an empty YIU bundles root.
+Scaffold a YIU workspace root with one checked-in payload example spec, one machine runbook, and an `outputs/` surface for generated YIU artifacts.
 
 Examples:
 
@@ -549,7 +549,7 @@ Outputs:
 
 * writes `configs/runbook.yaml`
 * writes one payload-centric YIU spec under `configs/yiu/*.yiu.yaml`
-* creates `bundles/`
+* creates `outputs/`
 
 #### `cruncher yiu validate`
 
@@ -572,12 +572,13 @@ Examples:
 
 Outputs:
 
-* writes under `<workspace>/bundles/<workflow>/`
+* writes under the workspace-relative `output.bundle_dir` path, usually `<workspace>/outputs/<workflow>/`
 * writes `bundle_manifest.json`, `normalized_payload.json`, and `visual_inventory.json`
 * writes `payload_view.json`
 * writes `split_payload_view.json`
 * writes `assembled_payload_view.json`
 * writes one composite operator render `payload_views.pdf` when `--emit-renders` is set
+* mirrors that composite PDF to `output.published_plot_path` when configured
 * writes optional debug jobs under `baserender_jobs/` only when `output.emit_render_jobs_debug: true`
 
 #### `cruncher yiu show`
@@ -586,8 +587,8 @@ Show the normalized payload bundle summary for one published YIU bundle director
 
 Example:
 
-* `uv run cruncher yiu show --bundle bundles/<workflow>`
-* `uv run cruncher yiu show --bundle bundles/<workflow> --json`
+* `uv run cruncher yiu show --bundle outputs/<workflow>`
+* `uv run cruncher yiu show --bundle outputs/<workflow> --json`
 
 Notes:
 
@@ -600,7 +601,7 @@ Validate a published render job through the public `dnadesign.baserender` API.
 
 Example:
 
-* `uv run cruncher visuals validate --job bundles/<workflow>/baserender_jobs/<view>.job.yaml`
+* `uv run cruncher visuals validate --job outputs/<workflow>/baserender_jobs/<view>.job.yaml`
 
 #### `cruncher visuals run`
 
@@ -608,7 +609,7 @@ Run a published render job through the public `dnadesign.baserender` API.
 
 Example:
 
-* `uv run cruncher visuals run --job bundles/<workflow>/baserender_jobs/<view>.job.yaml`
+* `uv run cruncher visuals run --job outputs/<workflow>/baserender_jobs/<view>.job.yaml`
 
 ---
 

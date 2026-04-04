@@ -12,6 +12,7 @@ Module Author(s): OpenAI Codex
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -93,7 +94,20 @@ def _rows_from_pwm_info(tf_name: str, pwm_info: dict[str, Any]) -> list[list[flo
                 YIU_PWM_CONTEXT_INVALID,
                 f"sample context pwm_matrix[{idx}] for TF {tf_name!r} must contain at least 4 values",
             )
-        rows.append([float(row[0]), float(row[1]), float(row[2]), float(row[3])])
+        parsed = [float(row[0]), float(row[1]), float(row[2]), float(row[3])]
+        if any(not math.isfinite(item) or item < 0.0 for item in parsed):
+            raise_yiu_error(
+                YIU_PWM_CONTEXT_INVALID,
+                f"sample context pwm_matrix[{idx}] for TF {tf_name!r} must be finite and >= 0",
+            )
+        total = sum(parsed)
+        if not math.isfinite(total) or total <= 0.0:
+            raise_yiu_error(
+                YIU_PWM_CONTEXT_INVALID,
+                f"sample context pwm_matrix[{idx}] for TF {tf_name!r} must have positive mass",
+            )
+        # Sample config_used.yaml rows may be rounded for publication; normalize once at the Yiu boundary.
+        rows.append([item / total for item in parsed])
     return rows
 
 
@@ -147,6 +161,88 @@ def _motif_from_sample_detail(
     )
 
 
+def _load_selected_occurrence_rows(*, sample_workspace_root: Path, elite_id: str) -> list[dict[str, Any]]:
+    path = sample_workspace_root / "outputs" / "optimize" / "tables" / "elites_occurrences.parquet"
+    if not path.exists():
+        return []
+    try:
+        import pandas as pd
+    except Exception as exc:  # pragma: no cover
+        raise_yiu_error(YIU_PWM_CONTEXT_INVALID, f"sample_context occurrence loading requires pandas ({exc})")
+
+    required = {"elite_id", "tf", "occurrence_rank", "start", "end", "strand", "selected"}
+    try:
+        import pyarrow.parquet as pq  # type: ignore
+
+        columns = set(pq.read_schema(path).names)
+    except Exception:
+        columns = set(pd.read_parquet(path, nrows=0).columns)
+    missing = sorted(required - columns)
+    if missing:
+        raise_yiu_error(
+            YIU_PWM_CONTEXT_INVALID,
+            f"sample_context occurrence table is missing required columns {missing}: {path}",
+        )
+    projected = ["elite_id", "tf", "occurrence_rank", "start", "end", "strand", "selected"]
+    try:
+        frame = pd.read_parquet(path, columns=projected, filters=[("elite_id", "==", elite_id)])
+    except Exception:
+        frame = pd.read_parquet(path, columns=projected)
+        frame = frame.loc[frame["elite_id"].astype(str) == elite_id]
+    frame = frame.loc[frame["selected"].astype(bool)]
+    if frame.empty:
+        return []
+    frame = frame.sort_values(["tf", "occurrence_rank", "start", "end", "strand"], kind="stable")
+    return frame.to_dict(orient="records")
+
+
+def _motif_from_occurrence_row(
+    *,
+    row: dict[str, Any],
+    pwm_info: dict[str, Any],
+    source_ref: str,
+) -> YiuPwmMotifInstanceV1:
+    tf_name = str(row.get("tf", "")).strip()
+    if not tf_name:
+        raise_yiu_error(YIU_PWM_CONTEXT_INVALID, "sample context occurrence row is missing tf")
+    rows = _rows_from_pwm_info(tf_name, pwm_info)
+    try:
+        start = int(row.get("start"))
+        end = int(row.get("end"))
+        occurrence_rank = int(row.get("occurrence_rank"))
+    except Exception as exc:
+        raise_yiu_error(
+            YIU_PWM_CONTEXT_INVALID,
+            f"sample context occurrence row for TF {tf_name!r} has invalid coordinates ({exc})",
+        )
+    width = end - start
+    if width != len(rows):
+        raise_yiu_error(
+            YIU_PWM_CONTEXT_INVALID,
+            f"sample context occurrence row for TF {tf_name!r} width={width} does not match pwm rows={len(rows)}",
+        )
+    strand_raw = str(row.get("strand", "")).strip()
+    if strand_raw.lower() in {"fwd", "+"}:
+        reference_strand = "+"
+    elif strand_raw.lower() in {"rev", "-"}:
+        reference_strand = "-"
+    else:
+        raise_yiu_error(
+            YIU_PWM_CONTEXT_INVALID,
+            f"sample context occurrence row for TF {tf_name!r} is missing a valid strand",
+        )
+    return YiuPwmMotifInstanceV1(
+        motif_instance_id=f"{tf_name}:{start}:{end}:{reference_strand}:{occurrence_rank}",
+        tf_name=tf_name,
+        motif_name=tf_name,
+        reference_strand=reference_strand,
+        start=start,
+        end=end,
+        probabilities=YiuPwmProbabilities(alphabet=["A", "C", "G", "T"], rows=rows),
+        provenance=YiuPwmProvenance(source_kind="sample_context", source_ref=source_ref),
+    )
+
+
 def _sample_context_to_model(
     *,
     resolved_input: ResolvedInputPayload,
@@ -170,27 +266,48 @@ def _sample_context_to_model(
     pwms_info = cruncher_cfg.get("pwms_info")
     if not isinstance(pwms_info, dict) or not pwms_info:
         raise_yiu_error(YIU_PWM_CONTEXT_INVALID, f"missing cruncher.pwms_info in {config_used_path}")
-    per_tf_payload = _parse_per_tf_json(resolved_input.hit_row.get("per_tf_json"))
-    if not per_tf_payload:
-        raise_yiu_error(
-            YIU_PWM_CONTEXT_REQUIRED,
-            "sample_context PWM resolution requires per_tf_json details on the selected sample-hit row",
-        )
     motifs: list[YiuPwmMotifInstanceV1] = []
-    for tf_name, raw_detail in sorted(per_tf_payload.items()):
-        pwm_info = pwms_info.get(tf_name)
-        if not isinstance(pwm_info, dict):
-            continue
-        for index, detail in enumerate(_coerce_detail_entries(tf_name, raw_detail)):
+    hit_id = str(resolved_input.provenance.get("hit_id", "")).strip()
+    if hit_id:
+        occurrences_path = (
+            resolved_input.sample_workspace_root / "outputs" / "optimize" / "tables" / "elites_occurrences.parquet"
+        )
+        for row in _load_selected_occurrence_rows(
+            sample_workspace_root=resolved_input.sample_workspace_root,
+            elite_id=hit_id,
+        ):
+            pwm_info = pwms_info.get(str(row.get("tf", "")).strip())
+            if not isinstance(pwm_info, dict):
+                continue
             motifs.append(
-                _motif_from_sample_detail(
-                    tf_name=tf_name,
+                _motif_from_occurrence_row(
+                    row=row,
                     pwm_info=pwm_info,
-                    detail=detail,
-                    source_ref=str(config_used_path.resolve()),
-                    index=index,
+                    source_ref=str(occurrences_path.resolve()),
                 )
             )
+    if not motifs:
+        per_tf_payload = _parse_per_tf_json(resolved_input.hit_row.get("per_tf_json"))
+        if not per_tf_payload:
+            raise_yiu_error(
+                YIU_PWM_CONTEXT_REQUIRED,
+                "sample_context PWM resolution requires per_tf_json details or selected elites_occurrences rows "
+                "for the selected sample-hit row",
+            )
+        for tf_name, raw_detail in sorted(per_tf_payload.items()):
+            pwm_info = pwms_info.get(tf_name)
+            if not isinstance(pwm_info, dict):
+                continue
+            for index, detail in enumerate(_coerce_detail_entries(tf_name, raw_detail)):
+                motifs.append(
+                    _motif_from_sample_detail(
+                        tf_name=tf_name,
+                        pwm_info=pwm_info,
+                        detail=detail,
+                        source_ref=str(config_used_path.resolve()),
+                        index=index,
+                    )
+                )
     if not motifs:
         raise_yiu_error(
             YIU_PWM_CONTEXT_REQUIRED,

@@ -16,8 +16,9 @@ configs/
     <workflow>.yiu.yaml
 motifs/
   <workflow>_pwm_context.yaml   # optional
-bundles/
+outputs/
   <workflow>/
+  <workflow>__payload_views.pdf
 ```
 
 ### Root contract
@@ -59,7 +60,8 @@ optimization:
         - lexical_stability
 
 output:
-  bundle_dir: bundles/<workflow>
+  bundle_dir: outputs/<workflow>
+  published_plot_path: outputs/<workflow>__payload_views.pdf
   emit_render_jobs_debug: false
 ```
 
@@ -89,6 +91,7 @@ input:
 - `optimization.mismatches.count` must be `1` or `2`
 - `optimization.mismatches.strand_mode` must be `per_position`
 - `output.bundle_dir` is workspace-relative and required
+- `output.published_plot_path` is workspace-relative when present and must point to a `.pdf`
 - YIU always publishes three canonical view contracts; there is no opt-out flag
 - YIU does not accept legacy state-graph fields, owners, enzymes, or external-part directives
 

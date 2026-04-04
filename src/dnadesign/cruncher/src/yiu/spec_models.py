@@ -412,16 +412,31 @@ class OptimizationSpec(StrictBaseModel):
 
 class OutputSpec(StrictBaseModel):
     bundle_dir: Path
+    published_plot_path: Path | None = None
     emit_render_jobs_debug: bool = False
 
     @field_validator("bundle_dir")
     @classmethod
     def _validate_bundle_dir(cls, value: Path) -> Path:
+        return cls._validate_workspace_relative_path(value=value, field_name="output.bundle_dir")
+
+    @field_validator("published_plot_path")
+    @classmethod
+    def _validate_published_plot_path(cls, value: Path | None) -> Path | None:
+        if value is None:
+            return None
+        path = cls._validate_workspace_relative_path(value=value, field_name="output.published_plot_path")
+        if path.suffix.lower() != ".pdf":
+            raise ValueError("output.published_plot_path must point to a .pdf artifact")
+        return path
+
+    @staticmethod
+    def _validate_workspace_relative_path(*, value: Path, field_name: str) -> Path:
         path = Path(value)
         if path.is_absolute():
-            raise ValueError(f"{YIU_PATH_INVALID}: output.bundle_dir must be relative to the workspace root")
+            raise ValueError(f"{YIU_PATH_INVALID}: {field_name} must be relative to the workspace root")
         if any(part == ".." for part in path.parts):
-            raise ValueError(f"{YIU_PATH_INVALID}: output.bundle_dir must not traverse outside the workspace root")
+            raise ValueError(f"{YIU_PATH_INVALID}: {field_name} must not traverse outside the workspace root")
         return path
 
 

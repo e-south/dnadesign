@@ -93,6 +93,7 @@ class PayloadBundleManifest(StrictBaseModel):
     payload_view_requires_motif_layers: bool = False
     view_contracts: list[PayloadViewEntry] = Field(default_factory=list)
     composite_render_artifact_path: str | None = None
+    published_plot_artifact_path: str | None = None
     render_status: Literal["not_requested", "rendered", "missing", "partial", "failed"] = "not_requested"
 
 
@@ -106,6 +107,7 @@ class PayloadVisualInventory(StrictBaseModel):
     render_status: Literal["not_requested", "rendered", "missing", "partial", "failed"] = "not_requested"
     last_rendered_at: str | None = None
     composite_render_artifact_path: str | None = None
+    published_plot_artifact_path: str | None = None
     pwm_effective: bool = False
     payload_view_requires_motif_layers: bool = False
     views: list[PayloadViewEntry] = Field(default_factory=list)

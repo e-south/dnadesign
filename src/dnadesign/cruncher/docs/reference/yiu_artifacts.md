@@ -5,7 +5,12 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-04-03
 
-YIU writes one payload-centric bundle family under `bundles/<workflow>/`.
+YIU writes one payload-centric bundle family under the workspace-relative `output.bundle_dir` path.
+
+Recommended patterns:
+
+- YIU-only workspace: `outputs/<workflow>/` plus `output.published_plot_path: outputs/<workflow>__payload_views.pdf`
+- Sample-backed workspace: `outputs/yiu__<workflow>/` plus `output.published_plot_path: outputs/plots/plot__yiu__<workflow>__payload_views.pdf`
 
 Each bundle uses `visual_inventory.json` to track render status and published artifact paths.
 
@@ -15,6 +20,7 @@ It records:
 - view contract paths
 - render artifact paths
 - bundle composite render artifact path
+- published plot artifact path when configured
 - renderer kind
 - view ids
 - render request and completion truth
@@ -25,7 +31,7 @@ It records:
 ### Bundle layout
 
 ```text
-bundles/<workflow>/
+outputs/<workflow>/
   bundle_manifest.json
   normalized_payload.json
   visual_inventory.json
@@ -49,6 +55,7 @@ bundles/<workflow>/
 - provenance
 - published view entries
 - one bundle-level `composite_render_artifact_path`
+- one optional workspace-level `published_plot_artifact_path`
 - render status
 - one operator-facing composite PDF under `payload_views.pdf`
 
@@ -88,6 +95,7 @@ The payload visual contract carries:
 - PWM mode and effective status
 - render summary from `visual_inventory.json`
 - composite render path when available
+- published plot path when configured
 - key artifact paths
 
 Use [YIU Workflow](../guides/yiu_workflow.md) for execution guidance and [YIU Spec Reference](yiu_spec.md) for schema details.
