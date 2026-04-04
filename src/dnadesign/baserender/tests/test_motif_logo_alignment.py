@@ -75,6 +75,54 @@ def test_motif_logo_geometry_aligns_to_feature_span_grid() -> None:
     assert geometry.columns[-1] == layout_span_to_x(layout, 9, 10)
 
 
+def test_motif_logo_geometry_can_render_against_explicit_payload_wide_span() -> None:
+    sequence = "TTACGTACGTTT"
+    record = Record(
+        id="align_payload_wide",
+        alphabet="DNA",
+        sequence=sequence,
+        features=(
+            Feature(
+                id="k1",
+                kind="kmer",
+                span=Span(start=4, end=8, strand="fwd"),
+                label=sequence[4:8],
+                tags=("tf:lexA",),
+                attrs={},
+                render={},
+            ),
+        ),
+        effects=(
+            Effect(
+                kind="motif_logo",
+                target={"feature_id": "k1"},
+                params={
+                    "matrix": _logo_matrix(len(sequence)),
+                    "render_span": {"start": 0, "end": len(sequence)},
+                    "observed_sequence_5to3": sequence,
+                },
+                render={},
+            ),
+        ),
+        display=Display(),
+        meta={},
+    )
+    style = resolve_style(
+        preset=None,
+        overrides={"motif_logo": {"layout": "stack", "lane_mode": "follow_feature_track"}},
+    )
+    layout = compute_layout(record, style)
+
+    geometry = compute_motif_logo_geometry(record=record, effect_index=0, layout=layout, style=style)
+    expected_x0, expected_x1 = layout_span_to_x(layout, 0, len(sequence))
+    assert geometry.render_start == 0
+    assert geometry.render_end == len(sequence)
+    assert geometry.x0 == expected_x0
+    assert geometry.x1 == expected_x1
+    assert geometry.columns[0] == layout_span_to_x(layout, 0, 1)
+    assert geometry.columns[-1] == layout_span_to_x(layout, len(sequence) - 1, len(sequence))
+
+
 def test_overlapping_motif_logos_use_distinct_lanes_in_stack_mode() -> None:
     sequence = "CTGCATATATTTACAG"
     record = Record(

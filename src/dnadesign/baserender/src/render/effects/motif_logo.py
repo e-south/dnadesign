@@ -38,6 +38,8 @@ _DEFAULT_BASE_COLORS: Mapping[str, str] = {
 @dataclass(frozen=True)
 class MotifLogoGeometry:
     feature_id: str
+    render_start: int
+    render_end: int
     x0: float
     x1: float
     columns: tuple[tuple[float, float], ...]
@@ -102,6 +104,15 @@ def _resolve_feature(record: Record, feature_id: str):
     return feature
 
 
+def _feature_color_token(feature) -> str:
+    style_token = str(feature.attrs.get("style_token", "")).strip()
+    if style_token:
+        return style_token
+    if feature.tags:
+        return str(feature.tags[0])
+    return str(feature.kind)
+
+
 def _coerce_matrix_rows(matrix_raw: object) -> list[list[float]]:
     if not isinstance(matrix_raw, list) or not matrix_raw:
         raise RenderingError("motif_logo params.matrix must be a non-empty list at draw time")
@@ -111,6 +122,24 @@ def _coerce_matrix_rows(matrix_raw: object) -> list[list[float]]:
             raise RenderingError("motif_logo matrix rows must be lists or tuples")
         matrix_rows.append([float(v) for v in row])
     return matrix_rows
+
+
+def _resolve_render_span(*, effect: Effect, feature, record: Record) -> tuple[int, int]:
+    raw = effect.params.get("render_span")
+    if raw is None:
+        return feature.span.start, feature.span.end
+    if not isinstance(raw, Mapping):
+        raise RenderingError("motif_logo params.render_span must be a mapping")
+    start_raw = raw.get("start")
+    end_raw = raw.get("end")
+    try:
+        start = int(start_raw)
+        end = int(end_raw)
+    except Exception as exc:
+        raise RenderingError("motif_logo params.render_span start/end must be integers") from exc
+    if start < 0 or end > len(record.sequence) or end <= start:
+        raise RenderingError("motif_logo params.render_span must fit within the record sequence")
+    return start, end
 
 
 def _style_base_colors(style) -> Mapping[str, str]:
@@ -173,21 +202,27 @@ def compute_motif_logo_geometry(
         raise RenderingError("motif_logo target.feature_id is required")
     feature_id = feature_id_raw
     feature = _resolve_feature(record, feature_id)
+    render_start, render_end = _resolve_render_span(effect=effect, feature=feature, record=record)
+    render_length = render_end - render_start
 
     matrix_rows = _coerce_matrix_rows(effect.params.get("matrix"))
-    if len(matrix_rows) != feature.span.length():
-        raise RenderingError("motif_logo matrix length must match target kmer length")
+    if len(matrix_rows) != render_length:
+        raise RenderingError("motif_logo matrix length must match target render span length")
 
-    observed = feature.label.upper()
+    observed_raw = effect.params.get("observed_sequence_5to3")
+    if observed_raw is None:
+        observed = feature.label.upper()
+    else:
+        observed = str(observed_raw).upper()
+        if len(observed) != render_length:
+            raise RenderingError("motif_logo observed_sequence_5to3 length must match target render span length")
     if feature.span.strand == "rev":
         matrix_rows = reverse_matrix_rows(matrix_rows)
         observed = observed[::-1]
 
     row_count = len(matrix_rows)
-    x0, x1 = span_to_x(layout, feature.span.start, feature.span.end)
-    columns = tuple(
-        span_to_x(layout, feature.span.start + offset, feature.span.start + offset + 1) for offset in range(row_count)
-    )
+    x0, x1 = span_to_x(layout, render_start, render_end)
+    columns = tuple(span_to_x(layout, render_start + offset, render_start + offset + 1) for offset in range(row_count))
 
     lane = int(layout.motif_logo_lane_by_effect.get(effect_index, 0))
     above = bool(layout.motif_logo_above_by_effect.get(effect_index, feature.span.strand != "rev"))
@@ -197,6 +232,8 @@ def compute_motif_logo_geometry(
 
     return MotifLogoGeometry(
         feature_id=feature_id,
+        render_start=render_start,
+        render_end=render_end,
         x0=x0,
         x1=x1,
         columns=columns,
@@ -271,7 +308,7 @@ def draw_motif_logo(
 
     base_colors = _style_base_colors(style)
     target_feature = _resolve_feature(record, geometry.feature_id)
-    feature_tag = target_feature.tags[0] if target_feature.tags else target_feature.kind
+    feature_tag = _feature_color_token(target_feature)
     feature_fill_color = palette.color_for(feature_tag)
     letter_coloring_mode = str(style.motif_logo.letter_coloring.mode).lower()
     if letter_coloring_mode not in {"classic", "match_window_seq"}:

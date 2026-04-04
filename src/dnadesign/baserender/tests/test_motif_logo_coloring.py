@@ -825,7 +825,67 @@ def test_sequence_tone_strengths_use_information_weighted_observed_probability()
     assert all(0.0 <= v <= 1.0 for v in tone_fwd)
     assert tone_fwd[0] == pytest.approx(1.0, abs=1e-6)
     assert tone_fwd[4] == pytest.approx(0.0, abs=1e-6)
-    assert tone_fwd[1] > tone_fwd[2] > tone_fwd[3] > tone_fwd[4]
+    assert tone_fwd[1] > tone_fwd[2] > tone_fwd[3]
+    assert tone_fwd[3] == pytest.approx(0.0, abs=1e-6)
+    assert tone_fwd[4] == pytest.approx(0.0, abs=1e-6)
+
+
+def test_sequence_tone_strengths_ignore_zero_information_padding_outside_true_motif_span() -> None:
+    initialize_runtime()
+    informative = [
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+    ]
+    padded = [[0.25, 0.25, 0.25, 0.25] for _ in range(6)]
+    padded[2:4] = informative
+    record = Record(
+        id="tone_payload_wide_padding",
+        alphabet="DNA",
+        sequence="AACCGG",
+        features=(
+            Feature(
+                id="f1",
+                kind="regulator_window",
+                span=Span(start=2, end=4, strand="fwd"),
+                label="CC",
+                tags=("tf:lexA",),
+                attrs={},
+                render={},
+            ),
+        ),
+        effects=(
+            Effect(
+                kind="motif_logo",
+                target={"feature_id": "f1"},
+                params={
+                    "matrix": padded,
+                    "render_span": {"start": 0, "end": 6},
+                    "observed_sequence_5to3": "AACCGG",
+                },
+                render={},
+            ),
+        ),
+        display=Display(),
+        meta={},
+    )
+    style = resolve_style(
+        preset=None,
+        overrides={
+            "sequence": {"bold_consensus_bases": True},
+            "motif_logo": {"lane_mode": "follow_feature_track"},
+        },
+    )
+    layout = compute_layout(record, style)
+    geometries = (compute_motif_logo_geometry(record=record, effect_index=0, layout=layout, style=style),)
+
+    tone_fwd, tone_rev = _sequence_tone_strengths(record, geometries, q_low=0.10, q_high=0.90)
+    assert tone_fwd[0] == pytest.approx(0.0, abs=1e-6)
+    assert tone_fwd[1] == pytest.approx(0.0, abs=1e-6)
+    assert tone_fwd[4] == pytest.approx(0.0, abs=1e-6)
+    assert tone_fwd[5] == pytest.approx(0.0, abs=1e-6)
+    assert tone_fwd[2] == pytest.approx(1.0, abs=1e-6)
+    assert tone_fwd[3] == pytest.approx(1.0, abs=1e-6)
+    assert all(value == pytest.approx(0.0, abs=1e-6) for value in tone_rev)
 
 
 def test_sequence_tone_coloring_varies_with_strength() -> None:
@@ -888,7 +948,8 @@ def test_sequence_tone_coloring_varies_with_strength() -> None:
         return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
 
     # Lower luminance = darker glyph color.
-    assert _luma(0) < _luma(1) < _luma(2) < _luma(3) < _luma(4)
+    assert _luma(0) < _luma(1) < _luma(2) < _luma(3)
+    assert _luma(3) <= _luma(4)
 
     plt.close(fig)
 

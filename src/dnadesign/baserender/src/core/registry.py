@@ -158,9 +158,34 @@ class _MotifLogoEffectContract:
             "motif_logo target feature must be kind='kmer' or 'regulator_window'",
             ContractError,
         )
-        reject_unknown_keys(effect.params, {"matrix", "motif_ref"}, "motif_logo.params")
+        reject_unknown_keys(
+            effect.params,
+            {"matrix", "motif_ref", "render_span", "observed_sequence_5to3"},
+            "motif_logo.params",
+        )
         matrix = effect.params.get("matrix")
         motif_ref = effect.params.get("motif_ref")
+        render_span = effect.params.get("render_span")
+        expected_length = feat.span.length()
+        if render_span is not None:
+            ensure(isinstance(render_span, Mapping), "motif_logo params.render_span must be a mapping", ContractError)
+            reject_unknown_keys(render_span, {"start", "end"}, "motif_logo.params.render_span")
+            ensure(
+                "start" in render_span and "end" in render_span,
+                "motif_logo params.render_span must include start and end",
+                ContractError,
+            )
+            try:
+                render_start = int(render_span["start"])
+                render_end = int(render_span["end"])
+            except Exception as exc:
+                raise ContractError("motif_logo params.render_span start/end must be integers") from exc
+            ensure(
+                0 <= render_start < render_end <= len(record.sequence),
+                "motif_logo params.render_span must fit within the record sequence",
+                ContractError,
+            )
+            expected_length = render_end - render_start
         ensure(
             matrix is not None or motif_ref is not None,
             "motif_logo params must include matrix and/or motif_ref",
@@ -173,8 +198,8 @@ class _MotifLogoEffectContract:
                 ContractError,
             )
             ensure(
-                len(matrix) == feat.span.length(),
-                "motif_logo matrix length must match target feature span length",
+                len(matrix) == expected_length,
+                "motif_logo matrix length must match target render span length",
                 ContractError,
             )
             for row in matrix:
@@ -194,6 +219,18 @@ class _MotifLogoEffectContract:
             ensure(
                 str(motif_ref.get("motif_id", "")).strip() != "",
                 "motif_logo params.motif_ref.motif_id is required",
+                ContractError,
+            )
+        observed_sequence = effect.params.get("observed_sequence_5to3")
+        if observed_sequence is not None:
+            ensure(
+                isinstance(observed_sequence, str) and observed_sequence != "",
+                "motif_logo params.observed_sequence_5to3 must be a non-empty string",
+                ContractError,
+            )
+            ensure(
+                len(observed_sequence) == expected_length,
+                "motif_logo params.observed_sequence_5to3 length must match target render span length",
                 ContractError,
             )
 

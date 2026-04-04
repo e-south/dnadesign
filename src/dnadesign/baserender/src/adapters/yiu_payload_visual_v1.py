@@ -50,7 +50,7 @@ def _build_base_contract(contract: YiuPayloadVisualV1) -> dict[str, object]:
                 "boundary": contract.junction.start,
                 "boundary_kind": "ligation_junction",
                 "display_label": "Junction start",
-                "short_label": "J0",
+                "short_label": "",
             },
             {
                 "boundary_id": "junction_end",
@@ -58,7 +58,7 @@ def _build_base_contract(contract: YiuPayloadVisualV1) -> dict[str, object]:
                 "boundary": contract.junction.end,
                 "boundary_kind": "ligation_junction",
                 "display_label": "Junction end",
-                "short_label": "J4",
+                "short_label": "",
             },
         ],
         "pairings": [],
@@ -92,8 +92,25 @@ def _build_base_contract(contract: YiuPayloadVisualV1) -> dict[str, object]:
     }
 
 
-def _motif_track(reference_strand: str) -> int:
-    return 0 if reference_strand == "+" else 1
+def _payload_wide_matrix(contract: YiuPayloadVisualV1, motif) -> list[list[float]]:
+    payload_length = len(contract.selected_payload_sequence)
+    padded = [[0.25, 0.25, 0.25, 0.25] for _ in range(payload_length)]
+    visible_rows = motif.matrix if motif.reference_strand == "+" else list(reversed(motif.matrix))
+    for offset, row in enumerate(visible_rows):
+        padded[motif.start + offset] = [float(row[0]), float(row[1]), float(row[2]), float(row[3])]
+    if motif.reference_strand == "+":
+        return padded
+    return [list(row) for row in reversed(padded)]
+
+
+def _observed_sequence_5to3(contract: YiuPayloadVisualV1, motif) -> str:
+    if motif.reference_strand == "+":
+        return contract.selected_payload_sequence
+    return contract.selected_complement_sequence[::-1]
+
+
+def _motif_style_token(motif) -> str:
+    return f"motif:{motif.motif_instance_id}"
 
 
 @dataclass(frozen=True)
@@ -116,33 +133,39 @@ class YiuPayloadVisualV1Adapter:
         tag_labels = dict(base_record.display.tag_labels)
         for motif in contract.motif_layers:
             feature_id = f"motif:{motif.motif_instance_id}"
-            track = _motif_track(motif.reference_strand)
+            style_token = _motif_style_token(motif)
+            strand = "fwd" if motif.reference_strand == "+" else "rev"
+            span = Span(start=motif.start, end=motif.end, strand=strand)
+            window_label = base_record.segment_for(span)
+            tag_labels.setdefault(style_token, motif.label)
             tag_labels.setdefault(f"tf:{motif.tf_name}", motif.tf_name)
             features.append(
                 Feature(
                     id=feature_id,
                     kind="regulator_window",
-                    span=Span(
-                        start=motif.start,
-                        end=motif.end,
-                        strand="fwd" if motif.reference_strand == "+" else "rev",
-                    ),
-                    label=motif.label,
-                    tags=(f"tf:{motif.tf_name}",),
+                    span=span,
+                    label=window_label,
+                    tags=(style_token, f"tf:{motif.tf_name}"),
                     attrs={
                         "tf": motif.tf_name,
                         "motif_name": motif.motif_name,
+                        "display_label": motif.label,
+                        "style_token": style_token,
                         "lane": "primary" if motif.reference_strand == "+" else "complement",
                     },
-                    render={"track": track, "priority": 10},
+                    render={"priority": 10},
                 )
             )
             effects.append(
                 Effect(
                     kind="motif_logo",
                     target={"feature_id": feature_id},
-                    params={"matrix": motif.matrix},
-                    render={"track": track, "priority": 20},
+                    params={
+                        "matrix": _payload_wide_matrix(contract, motif),
+                        "render_span": {"start": 0, "end": len(contract.selected_payload_sequence)},
+                        "observed_sequence_5to3": _observed_sequence_5to3(contract, motif),
+                    },
+                    render={"priority": 20},
                 )
             )
 

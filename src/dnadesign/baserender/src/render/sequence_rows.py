@@ -397,7 +397,7 @@ def _sequence_tone_strengths(
             )
 
         for offset, row in enumerate(geometry.matrix):
-            pos = feature.span.start + offset
+            pos = geometry.render_start + offset
             if pos < 0 or pos >= n:
                 raise RenderingError(
                     f"motif_logo geometry out of sequence bounds while computing sequence tone scores: pos={pos}, n={n}"
@@ -405,6 +405,8 @@ def _sequence_tone_strengths(
             if len(row) < 4:
                 raise RenderingError("motif_logo matrix rows must contain at least 4 probabilities [A,C,G,T]")
             info_weight = max(0.0, min(1.0, _column_information_bits(row) / 2.0))
+            if info_weight <= 0.0:
+                continue
             if feature.span.strand == "fwd":
                 p_fwd = _row_prob_for_base(row, seq_fwd[pos])
                 covered_fwd[pos] += 1
