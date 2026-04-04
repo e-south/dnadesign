@@ -38,11 +38,13 @@ def test_top_level_docs_route_three_workflow_families() -> None:
     docs_index = _read("docs/index.md")
 
     assert "payload-centric YIU" in package_readme
+    assert "outputs/<workflow>/" in package_readme
+    assert "bundles/<workflow>/" not in package_readme
     assert "docs/demos/demo_yiu_workspace.md" in package_readme
     assert "docs/guides/yiu_workflow.md" in package_readme
 
     for content in (docs_readme, docs_index):
-        assert "Render Split YIU Payloads" in content
+        assert "Payload-Centric YIU Workflows" in content
         assert "demos/demo_yiu_workspace.md" in content
         assert "guides/yiu_workflow.md" in content
 
@@ -81,7 +83,11 @@ def test_yiu_docs_capture_payload_workspace_and_artifact_boundaries() -> None:
     assert "uv run cruncher yiu render" in demo
     assert "demo_monotypic_tetr" in demo
     assert "strict v4 contract" in guide
+    assert "### Start here" in guide
+    assert "### Bundle surface" in guide
     assert "optimized junction/mismatch plan" in guide
+    assert "output.bundle_dir" in guide
+    assert "outputs/<workflow>/" in guide
     assert "selected payload strand, selected complement strand, optional PWM motif layers" in guide
     assert "The payload view uses `yiu_payload_visual_v1`." in guide
     assert "motif layers aligned to payload-forward coordinates" in guide
@@ -92,6 +98,7 @@ def test_yiu_docs_capture_payload_workspace_and_artifact_boundaries() -> None:
     assert "split_payload" in guide
     assert "assembled_payload" in guide
     assert "4 nt junction window" in guide
+    assert "CLI Reference" in guide
     assert "point split" not in guide.lower()
     assert "right-then-left" not in guide.lower()
     assert "split_yiu_payload_rendering_v4" in spec_ref

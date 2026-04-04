@@ -9,6 +9,17 @@ The public lane is:
 
 `input payload -> normalized payload -> optimized junction/mismatch plan -> canonical bundle -> BaseRender`
 
+### Start here
+
+Use the shortest path that matches your job:
+
+1. [YIU Workspace Demo](../demos/demo_yiu_workspace.md) for the checked-in workspace and machine runbook.
+2. `cruncher yiu validate` when you only need schema and payload-plan verification.
+3. `cruncher yiu render --emit-renders` when you need the canonical bundle plus the composite operator PDF.
+4. `cruncher yiu show` when you need one fail-fast inspection surface for manifest, inventory, payload, and render integrity.
+
+The checked-in reference workspace lives at `src/dnadesign/cruncher/workspaces/demo_yiu_payload`.
+
 YIU accepts two first-class inputs:
 
 - `user_sequence`
@@ -39,6 +50,17 @@ uv run cruncher yiu show --bundle outputs/<workflow>
 ```
 
 `design` is not part of the public YIU surface.
+
+### Bundle surface
+
+YIU publishes one deterministic bundle under `output.bundle_dir`, typically `outputs/<workflow>/`.
+
+The canonical operator-facing artifacts are:
+
+- bundle truth: `bundle_manifest.json`, `normalized_payload.json`, `visual_inventory.json`
+- view contracts: `payload_view.json`, `split_payload_view.json`, `assembled_payload_view.json`
+- composite render: `payload_views.pdf`
+- optional mirrored workspace PDF: `output.published_plot_path`
 
 ### What `validate` checks
 
@@ -86,7 +108,10 @@ The split middle row renders `split_payload_left` before `split_payload_right`. 
 
 The assembled payload returns to original payload order. It publishes one explicit `junction_span` in payload coordinates and does not use a seam or ligation-boundary surrogate in the operator-facing contract.
 
+### Related docs
+
 Start with [YIU Workspace Demo](../demos/demo_yiu_workspace.md), then use:
 
 - [YIU Spec Reference](../reference/yiu_spec.md)
 - [YIU Artifacts](../reference/yiu_artifacts.md)
+- [CLI Reference](../reference/cli.md)

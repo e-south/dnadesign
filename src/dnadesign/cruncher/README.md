@@ -4,7 +4,7 @@ Cruncher is a workspace-oriented DNA design tool with three first-class workflow
 
 - **Fixed-length optimization workspaces:** fetch TF evidence, lock exact inputs, run Gibbs annealing MCMC with MMR elite selection, then analyze, study, and aggregate the resulting runs.
 - **Cassette workspaces:** validate or solve dual-context hairpin cassette specs, publish explicit artifacts and shared visual contracts, and hand off render jobs without reusing the `sample` run layout.
-- **payload-centric YIU workflows:** validate strict `.yiu.yaml` payload specs, normalize `user_sequence` or `sample_hit` inputs, exhaustively optimize a 4-nt junction and per-position mismatches with optional PWM context, and publish three canonical BaseRender-ready views under `bundles/<workflow>/`.
+- **payload-centric YIU workflows:** validate strict `.yiu.yaml` payload specs, normalize `user_sequence` or `sample_hit` inputs, exhaustively optimize a 4-nt junction and per-position mismatches with optional PWM context, and publish three canonical BaseRender-ready views under `outputs/<workflow>/`.
 
 Use Cruncher when you need strict workspace contracts, deterministic artifacts, and a clear separation between workflow families. New families can be added beside these lanes without forcing sample workspaces, study workspaces, cassette workspaces, or YIU workspaces into one artifact model.
 

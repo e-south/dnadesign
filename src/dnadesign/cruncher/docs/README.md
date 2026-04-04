@@ -25,7 +25,7 @@ Studies and portfolios build on the fixed-length optimization lane. Cassette and
 
 - **Fixed-length optimization workspaces:** start with [Pairwise Demo](demos/demo_pairwise.md), then move to [Sampling and Analysis](guides/sampling_and_analysis.md) and [Intent and Lifecycle](guides/intent_and_lifecycle.md).
 - **Cassette workspaces:** start with [Cassette Workspace Demo](demos/demo_cassette_workspace.md), then use [Cassette Workflow](guides/cassette_workflow.md) or [Cassette Solve Workflow](guides/cassette_solve_workflow.md).
-- **Render Split YIU Payloads:** start with [YIU Workspace Demo](demos/demo_yiu_workspace.md), then use [YIU Workflow](guides/yiu_workflow.md), [YIU Spec Reference](reference/yiu_spec.md), and [YIU Artifacts](reference/yiu_artifacts.md). Public CLI: `yiu init-workspace|validate|render|show` with `split_yiu_payload_rendering_v4`.
+- **Payload-Centric YIU Workflows:** start with [YIU Workspace Demo](demos/demo_yiu_workspace.md), then use [YIU Workflow](guides/yiu_workflow.md), [YIU Spec Reference](reference/yiu_spec.md), and [YIU Artifacts](reference/yiu_artifacts.md). Public CLI: `yiu init-workspace|validate|render|show` with `split_yiu_payload_rendering_v4`.
 - **Study and aggregation workflows:** use [Studies](guides/studies.md) for workspace-scoped sweeps and [Portfolio Aggregation](guides/portfolio_aggregation.md) for cross-workspace handoff packages.
 - **Reference contracts:** use [CLI Reference](reference/cli.md), [Architecture](reference/architecture.md), and the relevant schema/artifact reference for your lane.
 
@@ -50,7 +50,7 @@ Studies and portfolios build on the fixed-length optimization lane. Cassette and
 - [Nickase Catalog Reference](reference/nickase_catalog.md)
 - [Cassette Artifacts](reference/cassette_artifacts.md)
 
-#### Render Split YIU Payloads
+#### Payload-Centric YIU Workflows
 - [YIU Workspace Demo](demos/demo_yiu_workspace.md)
 - [YIU Workflow](guides/yiu_workflow.md)
 - [YIU Spec Reference](reference/yiu_spec.md)

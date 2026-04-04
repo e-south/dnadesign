@@ -143,7 +143,7 @@ def _render_docs_map(catalog: DocsCatalog) -> str:
             ),
         ),
         "yiu": (
-            "Model YIU Hairpin Oligo Processing",
+            "Payload-Centric YIU Workflows",
             (
                 "demos/demo_yiu_workspace.md",
                 "guides/yiu_workflow.md",
