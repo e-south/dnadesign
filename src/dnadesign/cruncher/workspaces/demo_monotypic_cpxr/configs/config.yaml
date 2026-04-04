@@ -4,15 +4,15 @@ cruncher:
   workspace:
     out_dir: outputs
     regulator_sets:
-      - [baeR]
+      - [cpxR]
 
   io:
     parsers:
       extra_modules: []
 
   catalog:
-    root: .cruncher/demo_monotypic_baer
-    source_preference: [demo_baer_multiplicity_meme_oops]
+    root: .cruncher/demo_monotypic_cpxr
+    source_preference: [demo_cpxr_multiplicity_meme_oops]
     allow_ambiguous: false
     pwm_source: matrix
     site_kinds: null
@@ -26,7 +26,7 @@ cruncher:
   discover:
     enabled: true
     tool: meme
-    source_id: demo_baer_multiplicity_meme_oops
+    source_id: demo_cpxr_multiplicity_meme_oops
     tool_path: ../../../../../.pixi/envs/default/bin
     minw: null
     maxw: null
@@ -63,22 +63,21 @@ cruncher:
       ht_dataset_type: TFBINDING
       ht_binding_mode: tfbinding
       uppercase_binding_site_only: true
-    local_sources: []
-    site_sources:
-      - source_id: baer_chip_exo
-        description: Choudhary et al. BaeR ChIP-exo binding sites (processed FASTA)
-        path: ../../../../../../dnadesign-data/primary_literature/Choudhary_et_al/processed/BaeR_binding_sites.fasta
-        tf_name: BaeR
-        record_kind: chip_exo
+    local_sources:
+      - source_id: demo_local_meme
+        description: Local MEME motifs and sites for selected regulators
+        root: inputs/local_motifs
+        patterns: ["*.txt"]
+        recursive: false
+        format_map: {".txt": "MEME"}
+        tf_name_strategy: stem
+        matrix_semantics: probabilities
+        extract_sites: true
         organism:
           name: Escherichia coli
-          strain: K-12 MG1655
-          assembly: NC_000913.3
-        citation: "Choudhary et al. 2020 (DOI: 10.1128/mSystems.00980-20)"
-        source_url: https://doi.org/10.1128/mSystems.00980-20
         tags:
-          assay: chip_exo
-          doi: 10.1128/mSystems.00980-20
+          format: meme
+          assay: dapseq
 
   sample:
     seed: 42

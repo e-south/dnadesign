@@ -35,7 +35,16 @@ contract.
 
 Current layout:
 
-- didactic demos: `demo_pairwise/`, `demo_multitf/`, `demo_monotypic_baer/`, `demo_yiu_payload/`
+- didactic demos:
+  `demo_pairwise/`,
+  `demo_multitf/`,
+  `demo_monotypic_baer/`,
+  `demo_monotypic_cpxr/`,
+  `demo_monotypic_lexa/`,
+  `demo_monotypic_soxr/`,
+  `demo_monotypic_soxs/`,
+  `demo_monotypic_tetr/`,
+  `demo_yiu_payload/`
 - pairwise optimization slices:
   `pairwise_cpxr_baer/`,
   `pairwise_cpxr_lexa/`,
@@ -74,8 +83,9 @@ src/dnadesign/cruncher/workspaces/
     motifs/                   # optional YIU-local PWM context sidecars
       <workflow>_pwm_context.yaml
     runbook.md
-    bundles/
+    outputs/
       <workflow>/
+      <workflow>__payload_views.pdf
   portfolios/
     configs/
       runbook.yaml
@@ -181,7 +191,7 @@ Tip: `cd` into a fixed-length optimization workspace and run cruncher commands w
 discovery across tools, use [`docs/runbooks/README.md`](../../../docs/runbooks/README.md)
 or `uv run ops catalog list --section tool-sources`.
 
-For packaged YIU demo workspaces, treat `bundles/<workflow>/...` as generated runtime space. The checked-in demo is input-only and should not accumulate explicit bundles, solve bundles, render outputs, or caches in version control. `demo_yiu_payload/` demonstrates both `user_sequence` and `sample_hit` inputs, but the emitted bundles remain generated artifacts rather than checked-in fixtures.
+For packaged YIU demo workspaces, treat `outputs/<workflow>/...` as the generated YIU bundle home. YIU-only workspaces can mirror the operator PDF directly under `outputs/`, while sample-backed workspaces should keep the YIU bundle under `outputs/yiu__<workflow>/` and mirror the operator-facing PDF into the pre-existing `outputs/plots/` surface. `demo_yiu_payload/` is now the user-sequence-only YIU demo; sample-hit YIU handoffs live with the monotypic Sample workspaces that own the source payloads.
 
 Packaged workspace configs resolve `discover.tool_path` relative to their `configs/config.yaml`, so keep packaged workspaces under the repository layout (`src/dnadesign/cruncher/workspaces/...`). If you copy a workspace elsewhere, update `discover.tool_path` explicitly before running `discover motifs`.
 

@@ -93,3 +93,26 @@ runbook:
     - '1'
     - -c
     - configs/config.yaml
+  - id: yiu_validate
+    description: Validate the sample-backed YIU payload handoff against the selected occurrence-aware elite.
+    run:
+    - yiu
+    - validate
+    - --spec
+    - configs/yiu/baer_monotypic_hit.yiu.yaml
+  - id: yiu_render
+    description: Publish the YIU payload bundle under outputs/ and mirror the composite PDF into outputs/plots.
+    run:
+    - yiu
+    - render
+    - --spec
+    - configs/yiu/baer_monotypic_hit.yiu.yaml
+    - --force-overwrite
+    - --emit-renders
+  - id: yiu_show
+    description: Inspect the published YIU payload bundle and integrity checks.
+    run:
+    - yiu
+    - show
+    - --bundle
+    - outputs/yiu__baer_monotypic_hit

@@ -353,7 +353,6 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
     source_workspace = Path("src/dnadesign/cruncher/workspaces/demo_yiu_payload")
     workspace = _copytree_without_ds_store(source_workspace, tmp_path / "demo_yiu_payload")
     shutil.rmtree(workspace / "outputs", ignore_errors=True)
-    shutil.rmtree(workspace / "bundles", ignore_errors=True)
     shutil.rmtree(workspace / ".cruncher", ignore_errors=True)
     runbook_path = workspace / "configs" / "runbook.yaml"
     output_log = tmp_path / "demo-runbook.log"
@@ -372,47 +371,44 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
         "yiu_validate",
         "yiu_render",
         "yiu_show",
-        "tetr_validate",
-        "tetr_render",
-        "tetr_show",
     ]
-    for bundle_name in ("example_payload", "tetr_monotypic_hit"):
-        bundle_dir = workspace / "bundles" / bundle_name
-        assert (bundle_dir / "visual_inventory.json").exists()
-        inventory = _load_json(bundle_dir / "visual_inventory.json")
-        assert inventory["render_status"] == "rendered"
-        assert inventory["render_count"] == 3
-        assert inventory["bundle_contract"] == "split_yiu_payload_bundle_v4"
-        assert inventory["input_contract"] == "split_yiu_payload_rendering_v4"
-        assert [view["view_id"] for view in inventory["views"]] == ["payload", "split_payload", "assembled_payload"]
-        assert (bundle_dir / "payload_views.pdf").exists()
-        assert not (bundle_dir / "payload.pdf").exists()
-        assert not (bundle_dir / "split_payload.pdf").exists()
-        assert not (bundle_dir / "assembled_payload.pdf").exists()
-        assert not (bundle_dir / "inline_job").exists()
+    bundle_dir = workspace / "outputs" / "example_payload"
+    assert (bundle_dir / "visual_inventory.json").exists()
+    inventory = _load_json(bundle_dir / "visual_inventory.json")
+    assert inventory["render_status"] == "rendered"
+    assert inventory["render_count"] == 3
+    assert inventory["bundle_contract"] == "split_yiu_payload_bundle_v4"
+    assert inventory["input_contract"] == "split_yiu_payload_rendering_v4"
+    assert [view["view_id"] for view in inventory["views"]] == ["payload", "split_payload", "assembled_payload"]
+    assert (bundle_dir / "payload_views.pdf").exists()
+    assert (workspace / "outputs" / "example_payload__payload_views.pdf").exists()
+    assert inventory["published_plot_artifact_path"] == "outputs/example_payload__payload_views.pdf"
+    assert not (bundle_dir / "payload.pdf").exists()
+    assert not (bundle_dir / "split_payload.pdf").exists()
+    assert not (bundle_dir / "assembled_payload.pdf").exists()
+    assert not (bundle_dir / "inline_job").exists()
 
-        payload = _load_json(bundle_dir / "payload_view.json")
-        assembled = _load_json(bundle_dir / "assembled_payload_view.json")
-        split_rows = _load_jsonl(bundle_dir / "split_payload_view.json")
+    payload = _load_json(bundle_dir / "payload_view.json")
+    assembled = _load_json(bundle_dir / "assembled_payload_view.json")
+    split_rows = _load_jsonl(bundle_dir / "split_payload_view.json")
 
-        assert payload["state_id"] == "payload"
-        assert payload["contract_kind"] == "yiu_payload_visual_v1"
-        assert assembled["state_id"] == "assembled_payload"
-        assert assembled["contract_kind"] == "sequence_evidence_map_v1"
-        assert assembled["primary_sequence"] == payload["selected_payload_sequence"]
-        assert [row["state_id"] for row in split_rows] == ["split_payload_left", "split_payload_right"]
-        assert split_rows[0]["meta"]["panel_order"] == 0
-        assert split_rows[0]["meta"]["fragment_side"] == "left"
-        assert split_rows[0]["meta"]["sticky_end_orientation"] == "inward"
-        assert split_rows[1]["meta"]["panel_order"] == 1
-        assert split_rows[1]["meta"]["fragment_side"] == "right"
-        assert split_rows[1]["meta"]["sticky_end_orientation"] == "inward"
-        assert assembled["boundaries"] == []
-        assert "junction_span" in assembled["meta"]
-        assert "ligation_junction" not in json.dumps(assembled)
-        assert "linearization_seam" not in json.dumps(assembled)
-
-    bundle_dir = workspace / "bundles" / "example_payload"
+    assert payload["state_id"] == "payload"
+    assert payload["contract_kind"] == "yiu_payload_visual_v1"
+    assert payload["motif_layers"] == []
+    assert assembled["state_id"] == "assembled_payload"
+    assert assembled["contract_kind"] == "sequence_evidence_map_v1"
+    assert assembled["primary_sequence"] == payload["selected_payload_sequence"]
+    assert [row["state_id"] for row in split_rows] == ["split_payload_left", "split_payload_right"]
+    assert split_rows[0]["meta"]["panel_order"] == 0
+    assert split_rows[0]["meta"]["fragment_side"] == "left"
+    assert split_rows[0]["meta"]["sticky_end_orientation"] == "inward"
+    assert split_rows[1]["meta"]["panel_order"] == 1
+    assert split_rows[1]["meta"]["fragment_side"] == "right"
+    assert split_rows[1]["meta"]["sticky_end_orientation"] == "inward"
+    assert assembled["boundaries"] == []
+    assert "junction_span" in assembled["meta"]
+    assert "ligation_junction" not in json.dumps(assembled)
+    assert "linearization_seam" not in json.dumps(assembled)
 
     log_text = output_log.read_text(encoding="utf-8")
     assert "Fontconfig warning" not in log_text

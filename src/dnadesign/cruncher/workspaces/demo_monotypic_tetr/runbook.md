@@ -17,7 +17,7 @@ Run this single command to do everything below:
 
 Quick smoke path (main lifecycle only):
 
-    uv run cruncher workspaces run --runbook configs/runbook.yaml --step reset_workspace --step config_summary --step fetch_motifs_westmann --step lock_targets --step parse_run --step sample_run --step analyze_summary --step show_sample_outputs --step render_logos --step export_meme
+    uv run cruncher workspaces run --runbook configs/runbook.yaml --step reset_workspace --step config_summary --step fetch_motifs_westmann --step lock_targets --step parse_run --step sample_run --step analyze_summary --step show_sample_outputs --step render_logos --step export_meme --step yiu_validate --step yiu_render --step yiu_show
 
 ### Step-by-Step Commands
 
@@ -44,6 +44,10 @@ Quick smoke path (main lifecycle only):
     cruncher catalog logos --source westmann_tetr_mitomi --set 1 -c "$CONFIG"
     # Export the normalized TetR PWM as a minimal MEME file after the main outputs tree is stable.
     cruncher catalog export-meme --set 1 --source westmann_tetr_mitomi -c "$CONFIG"
+    # Validate and render the sample-backed YIU payload bundle, then inspect the published plot handoff.
+    cruncher yiu validate --spec configs/yiu/tetr_monotypic_hit.yiu.yaml
+    cruncher yiu render --spec configs/yiu/tetr_monotypic_hit.yiu.yaml --force-overwrite --emit-renders
+    cruncher yiu show --bundle outputs/yiu__tetr_monotypic_hit
 
 ### Optional output checks
 
@@ -59,3 +63,4 @@ Quick smoke path (main lifecycle only):
 
     find outputs/artifacts/meme -maxdepth 1 -type f | sort
     find outputs/plots -maxdepth 1 -type f | sort
+    find outputs/yiu__tetr_monotypic_hit -maxdepth 1 -type f | sort

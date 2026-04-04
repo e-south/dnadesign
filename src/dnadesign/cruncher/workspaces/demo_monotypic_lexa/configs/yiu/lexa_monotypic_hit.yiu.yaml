@@ -1,25 +1,21 @@
 yiu:
-  schema_version: 1
   contract: split_yiu_payload_rendering_v4
-  name: tetr_monotypic_hit
+  schema_version: 1
+  name: lexa_monotypic_hit
 
 input:
   kind: sample_hit
   sample_hit:
-    hit_id: demo_monotypic_tetr_elite_c4c42365d66b
-    sample_name: tetr
-    payload_sequence: CTCTATATCTGATATAGAG
+    hit_id: demo_monotypic_lexa_elite_f02ae0f15f3d
+    sample_name: demo_monotypic_lexa
+    source_artifact_path: outputs/optimize/tables/elites.parquet
     metadata:
-      tf_name: tetR
-      motif_name: tetr_demo
-      site_label: tetr_site
-      payload_label: tetr_payload
+      site_label: lexa_site
+      payload_label: lexa_payload
 
 optimization:
   junction:
-    mode: explicit_window
-    start: 8
-    end: 12
+    mode: optimize
     overhang_length: 4
     max_payload_body_length: 12
   mismatches:
@@ -29,9 +25,9 @@ optimization:
     strand_mode: per_position
     default_strand_preference: complement
   pwm:
-    mode: none
+    mode: require
     source:
-      kind: none
+      kind: sample_context
     objective:
       primary: maximin
       secondary:
@@ -43,5 +39,6 @@ optimization:
         - lexical_stability
 
 output:
-  bundle_dir: bundles/tetr_monotypic_hit
+  bundle_dir: outputs/yiu__lexa_monotypic_hit
+  published_plot_path: outputs/plots/plot__yiu__lexa_monotypic_hit__payload_views.pdf
   emit_render_jobs_debug: false

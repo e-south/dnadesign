@@ -1,6 +1,6 @@
 runbook:
   schema_version: 1
-  name: demo_monotypic_tetr
+  name: demo_monotypic_cpxr
   steps:
   - id: reset_workspace
     run:
@@ -15,15 +15,40 @@ runbook:
     - summary
     - -c
     - configs/config.yaml
-  - id: fetch_motifs_westmann
+  - id: fetch_sites_demo_local_meme
     run:
     - fetch
-    - motifs
+    - sites
     - --source
-    - westmann_tetr_mitomi
+    - demo_local_meme
     - --tf
-    - tetR
+    - cpxR
     - --update
+    - -c
+    - configs/config.yaml
+  - id: fetch_sites_regulondb
+    run:
+    - fetch
+    - sites
+    - --source
+    - regulondb
+    - --tf
+    - cpxR
+    - --update
+    - -c
+    - configs/config.yaml
+  - id: discover_motifs
+    run:
+    - discover
+    - motifs
+    - --set
+    - '1'
+    - --tool
+    - meme
+    - --meme-mod
+    - oops
+    - --source-id
+    - demo_cpxr_multiplicity_meme_oops
     - -c
     - configs/config.yaml
   - id: lock_targets
@@ -63,20 +88,9 @@ runbook:
     - catalog
     - logos
     - --source
-    - westmann_tetr_mitomi
+    - demo_cpxr_multiplicity_meme_oops
     - --set
     - '1'
-    - -c
-    - configs/config.yaml
-  - id: export_meme
-    description: Export the normalized TetR PWM as a minimal MEME artifact under outputs/artifacts/meme for downstream motif-tool interoperability.
-    run:
-    - catalog
-    - export-meme
-    - --set
-    - '1'
-    - --source
-    - westmann_tetr_mitomi
     - -c
     - configs/config.yaml
   - id: yiu_validate
@@ -85,14 +99,14 @@ runbook:
     - yiu
     - validate
     - --spec
-    - configs/yiu/tetr_monotypic_hit.yiu.yaml
+    - configs/yiu/cpxr_monotypic_hit.yiu.yaml
   - id: yiu_render
     description: Publish the YIU payload bundle under outputs/ and mirror the composite PDF into outputs/plots.
     run:
     - yiu
     - render
     - --spec
-    - configs/yiu/tetr_monotypic_hit.yiu.yaml
+    - configs/yiu/cpxr_monotypic_hit.yiu.yaml
     - --force-overwrite
     - --emit-renders
   - id: yiu_show
@@ -101,4 +115,4 @@ runbook:
     - yiu
     - show
     - --bundle
-    - outputs/yiu__tetr_monotypic_hit
+    - outputs/yiu__cpxr_monotypic_hit

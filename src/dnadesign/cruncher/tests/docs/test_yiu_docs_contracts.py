@@ -58,7 +58,7 @@ def test_cli_reference_lists_yiu_commands_and_contracts() -> None:
     assert ".yiu.yaml" in cli_ref
     assert ".yiu.solve.yaml" not in cli_ref
     assert "split_yiu_payload_rendering_v4" in cli_ref
-    assert "<workspace>/bundles/<name>/" in cli_ref
+    assert "<workspace>/outputs/<name>/" in cli_ref
 
 
 def test_yiu_docs_capture_payload_workspace_and_artifact_boundaries() -> None:
@@ -75,12 +75,11 @@ def test_yiu_docs_capture_payload_workspace_and_artifact_boundaries() -> None:
     assert "uv run cruncher yiu init-workspace yiu_lab_demo" in demo
     assert ".yiu.yaml" in demo
     assert ".yiu.solve.yaml" not in demo
-    assert "bundles/example_payload/" in demo
+    assert "outputs/example_payload/" in demo
     assert "normalized_payload.json" in demo
     assert "bundle_manifest.json" in demo
-    assert "configs/yiu/tetr_monotypic_hit.yiu.yaml" in demo
-    assert "bundles/tetr_monotypic_hit" in demo
     assert "uv run cruncher yiu render" in demo
+    assert "demo_monotypic_tetr" in demo
     assert "strict v4 contract" in guide
     assert "optimized junction/mismatch plan" in guide
     assert "selected payload strand, selected complement strand, optional PWM motif layers" in guide
@@ -99,6 +98,7 @@ def test_yiu_docs_capture_payload_workspace_and_artifact_boundaries() -> None:
     assert "sample_hit" in spec_ref
     assert "user_sequence" in spec_ref
     assert "bundle_dir" in spec_ref
+    assert "published_plot_path" in spec_ref
     assert "candidate_positions" in spec_ref
     assert "default_strand_preference" in spec_ref
     assert "primary: maximin" in spec_ref
@@ -117,6 +117,7 @@ def test_yiu_docs_capture_payload_workspace_and_artifact_boundaries() -> None:
     assert "ligation_junction" not in artifacts_ref
     assert "assembled seam" not in artifacts_ref.lower()
     assert "baserender_jobs/" in artifacts_ref
+    assert "published_plot_artifact_path" in artifacts_ref
     assert "trace" not in guide
     assert "9-state" not in guide
     assert "protocol replay" not in guide.lower()
@@ -131,12 +132,12 @@ def test_yiu_docs_capture_payload_workspace_and_artifact_boundaries() -> None:
         "cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml --force-overwrite --emit-renders"
         in runbook_steps
     )
-    assert "cruncher yiu show --bundle bundles/example_payload" in runbook_steps
+    assert "cruncher yiu show --bundle outputs/example_payload" in runbook_steps
     assert (
         "cruncher yiu render --spec configs/yiu/tetr_monotypic_hit.yiu.yaml --force-overwrite --emit-renders"
         in runbook_steps
     )
-    assert "cruncher yiu show --bundle bundles/tetr_monotypic_hit" in runbook_steps
+    assert "cruncher yiu show --bundle outputs/yiu__tetr_monotypic_hit" in runbook_steps
     runbook_yaml = _read("workspaces/demo_yiu_payload/configs/runbook.yaml")
     assert "description: Validate the checked-in user-sequence YIU demo spec." in runbook_yaml
     assert (
@@ -144,9 +145,8 @@ def test_yiu_docs_capture_payload_workspace_and_artifact_boundaries() -> None:
         in runbook_yaml
     )
     assert "description: Inspect the published user-sequence payload bundle and integrity checks." in runbook_yaml
-    assert "description: Validate the checked-in sample-hit YIU demo spec." in runbook_yaml
     assert "<workflow>.yiu.solve.yaml" not in workspaces_readme
-    assert "bundles/\n      <workflow>/" in workspaces_readme
+    assert "outputs/\n      <workflow>/" in workspaces_readme
 
 
 def test_checked_in_yiu_demo_workspace_exists() -> None:
@@ -156,12 +156,12 @@ def test_checked_in_yiu_demo_workspace_exists() -> None:
     assert (workspace_root / "runbook.md").exists()
     assert (workspace_root / "configs" / "runbook.yaml").exists()
     assert (workspace_root / "configs" / "yiu" / "example_payload.yiu.yaml").exists()
-    assert (workspace_root / "configs" / "yiu" / "tetr_monotypic_hit.yiu.yaml").exists()
     assert (workspace_root / "motifs" / "example_pwm_context.yaml").exists()
     assert not (workspace_root / "configs" / "yiu" / "example_payload.yiu.solve.yaml").exists()
     assert not (workspace_root / "catalogs").exists()
     runbook_doc = (workspace_root / "runbook.md").read_text(encoding="utf-8")
     assert "Checked-in YIU demo for the v4 payload optimization and rendering workflow." in runbook_doc
+    assert "user-sequence-only" in runbook_doc
     assert "uv run cruncher workspaces run --workspace demo_yiu_payload --runbook configs/runbook.yaml" in runbook_doc
     assert "uv run cruncher yiu render" in runbook_doc
     assert "uv run cruncher yiu show" in runbook_doc

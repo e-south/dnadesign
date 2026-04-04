@@ -1,0 +1,379 @@
+********************************************************************************
+MEME - Motif discovery tool
+********************************************************************************
+MEME version 4.12.0 (Release date: Tue Jun 27 16:22:50 2017 -0700)
+
+For further information on how to interpret these results or to get
+a copy of the MEME software please access http://meme-suite.org .
+
+This file may be used as input to the MAST algorithm for searching
+sequence databases for matches to groups of motifs.  MAST is available
+for interactive use and downloading at http://meme-suite.org .
+********************************************************************************
+
+
+********************************************************************************
+REFERENCE
+********************************************************************************
+If you use this program in your research, please cite:
+
+Timothy L. Bailey and Charles Elkan,
+"Fitting a mixture model by expectation maximization to discover
+motifs in biopolymers", Proceedings of the Second International
+Conference on Intelligent Systems for Molecular Biology, pp. 28-36,
+AAAI Press, Menlo Park, California, 1994.
+********************************************************************************
+
+
+********************************************************************************
+TRAINING SET
+********************************************************************************
+DATAFILE= /global/projectb/scratch/leo/multiMotifs/cpxR_A-AAACGCAG/cpxR_A-AAACGCAG_summits_combined_sorted.fasta
+ALPHABET= ACGT
+Sequence name            Weight Length  Sequence name            Weight Length
+-------------            ------ ------  -------------            ------ ------
+Escherichia_coli_MG1655_ 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60
+Echinicola_vietnamensis_ 1.0000     60  Shewanella_amazonensis_S 1.0000     60
+Aliivibrio_fischeri_ATCC 1.0000     60  Shewanella_sp_ANA-3_cpxR 1.0000     60
+Escherichia_coli_BW25113 1.0000     60  Haemophilus_influenzae_A 1.0000     60
+Shewanella_sp_ANA-3_cpxR 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60
+Shewanella_oneidensis_MR 1.0000     60  Shewanella_amazonensis_S 1.0000     60
+Sinorhizobium_meliloti_1 1.0000     60  Sphingobacteriaceae_sp_G 1.0000     60
+Marinobacter_adhaerens_H 1.0000     60  Echinicola_vietnamensis_ 1.0000     60
+Klebsiella_psneumoniae_A 1.0000     60  Sphingobacteriaceae_sp_G 1.0000     60
+Shewanella_oneidensis_MR 1.0000     60  Pseudomonas_putida_KT244 1.0000     60
+Saccharophagus_degradans 1.0000     60  Sphingobacteriaceae_sp_G 1.0000     60
+Escherichia_fergusonii_A 1.0000     60  Providencia_stuartii_ATC 1.0000     60
+Shewanella_loihica_PV-4_ 1.0000     60  Haemophilus_influenzae_A 1.0000     60
+Klebsiella_psneumoniae_A 1.0000     60  Escherichia_coli_MG1655_ 1.0000     60
+Shewanella_sp_ANA-3_cpxR 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60
+Providencia_stuartii_ATC 1.0000     60  Marinobacter_adhaerens_H 1.0000     60
+Pseudomonas_aeruginosa_P 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60
+Sphingobacteriaceae_sp_G 1.0000     60  Herbaspirillum_seropedic 1.0000     60
+Shewanella_amazonensis_S 1.0000     60  Shewanella_sp_ANA-3_cpxR 1.0000     60
+Shewanella_oneidensis_MR 1.0000     60  Kangiella_aquimarina_DSM 1.0000     60
+Paraburkholderia_phytofi 1.0000     60  Saccharophagus_degradans 1.0000     60
+Sphingobacteriaceae_sp_G 1.0000     60  Sphingobacteriaceae_sp_G 1.0000     60
+Pontibacter_actiniarum_K 1.0000     60  Escherichia_coli_MG1655_ 1.0000     60
+Aliivibrio_fischeri_ATCC 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60
+Pontibacter_actiniarum_K 1.0000     60  Escherichia_coli_MG1655_ 1.0000     60
+Aliivibrio_fischeri_ATCC 1.0000     60  Enterobacter_cloacae_ATC 1.0000     60
+Klebsiella_psneumoniae_A 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60
+Echinicola_vietnamensis_ 1.0000     60  Escherichia_fergusonii_A 1.0000     60
+Kangiella_aquimarina_DSM 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60
+Pontibacter_actiniarum_K 1.0000     60  Sphingobacteriaceae_sp_G 1.0000     60
+Enterobacter_cloacae_ATC 1.0000     60  Klebsiella_psneumoniae_A 1.0000     60
+Shewanella_oneidensis_MR 1.0000     60  Enterobacter_cloacae_ATC 1.0000     60
+Shewanella_loihica_PV-4_ 1.0000     60  Pontibacter_actiniarum_K 1.0000     60
+Shigella_flexneri_ATCC70 1.0000     60  Kangiella_aquimarina_DSM 1.0000     60
+Saccharophagus_degradans 1.0000     60  Saccharophagus_degradans 1.0000     60
+Sphingobacteriaceae_sp_G 1.0000     60  Escherichia_fergusonii_A 1.0000     60
+Citrobacter_koseri_ATCCB 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60
+Echinicola_vietnamensis_ 1.0000     60  Providencia_stuartii_ATC 1.0000     60
+Sphingobacteriaceae_sp_G 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+Providencia_stuartii_ATC 1.0000     60  Saccharophagus_degradans 1.0000     60
+Escherichia_coli_BW25113 1.0000     60  Citrobacter_koseri_ATCCB 1.0000     60
+Pseudomonas_simiae_WCS41 1.0000     60  Enterobacter_cloacae_ATC 1.0000     60
+Pseudomonas_simiae_WCS41 1.0000     60  Shewanella_amazonensis_S 1.0000     60
+Citrobacter_koseri_ATCCB 1.0000     60  Enterobacter_cloacae_ATC 1.0000     60
+Pseudomonas_putida_KT244 1.0000     60  Citrobacter_koseri_ATCCB 1.0000     60
+Salmonella_enterica_LT2_ 1.0000     60  Shewanella_sp_ANA-3_cpxR 1.0000     60
+Aliivibrio_fischeri_ATCC 1.0000     60  Escherichia_coli_MG1655_ 1.0000     60
+Escherichia_coli_MG1655_ 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60
+Escherichia_coli_BW25113 1.0000     60  Klebsiella_oxytoca_M5al_ 1.0000     60
+Providencia_stuartii_ATC 1.0000     60  Escherichia_fergusonii_A 1.0000     60
+********************************************************************************
+
+********************************************************************************
+COMMAND LINE SUMMARY
+********************************************************************************
+This information can also be useful in the event you wish to report a
+problem with the MEME software.
+
+command: meme /global/projectb/scratch/leo/multiMotifs/cpxR_A-AAACGCAG/cpxR_A-AAACGCAG_summits_combined_sorted.fasta -oc /global/projectb/scratch/leo/multiMotifs/cpxR_A-AAACGCAG_motifs_summits -dna -revcomp -mod anr -nmotifs 3 -minw 8 -maxw 32 -maxsize 1000000
+
+model:  mod=           anr    nmotifs=         3    evt=           inf
+object function=  E-value of product of p-values
+width:  minw=            8    maxw=           32
+width:  wg=             11    ws=              1    endgaps=       yes
+nsites: minsites=        2    maxsites=       50    wnsites=       0.8
+theta:  spmap=         uni    spfuzz=        0.5
+global: substring=     yes    branching=      no    wbranch=        no
+em:     prior=   dirichlet    b=            0.01    maxiter=        50
+        distance=    1e-05
+data:   n=            6000    N=             100    shuffle=        -1
+strands: + -
+sample: seed=            0    ctfrac=         -1    maxwords=       -1
+Letter frequencies in dataset:
+A 0.341 C 0.159 G 0.159 T 0.341
+Background letter frequencies (from dataset with add-one prior applied):
+A 0.341 C 0.159 G 0.159 T 0.341
+********************************************************************************
+
+
+********************************************************************************
+MOTIF cpxR MEME-1	width =  21  sites =  50  llr = 694  E-value = 9.9e-119
+********************************************************************************
+--------------------------------------------------------------------------------
+	Motif cpxR MEME-1 Description
+--------------------------------------------------------------------------------
+Simplified        A  3:::a182645:::a:95544
+pos.-specific     C  41:::912::51:::a:2:23
+probability       G  2::1::121::::3::11::2
+matrix            T  19a9:::446:9a7:::3541
+
+         bits    2.7                *
+                 2.4                *
+                 2.1      *         *
+                 1.9      *         *
+Relative         1.6     **        **
+Entropy          1.3   * **     ** **
+(20.0 bits)      1.1  *****     ** ***
+                 0.8  ******   *******
+                 0.5  ******  ******** *
+                 0.3 ******* ********* ***
+                 0.0 ---------------------
+
+Multilevel           CTTTACATATATTTACAATTA
+consensus            A      CTAC  G   TAAC
+sequence             G      A            G
+
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif cpxR MEME-1 sites sorted by position p-value
+--------------------------------------------------------------------------------
+Sequence name            Strand  Start   P-value                    Site
+-------------            ------  ----- ---------            ---------------------
+Haemophilus_influenzae_A     -     29  1.75e-10 CAAGAAAAAT CTTTACATTTCTTTACAAATC TTTACATTTC
+Sinorhizobium_meliloti_1     -     29  6.29e-09 GGCGCCGCGG CTTTACATTTCTTTACATTCG CCCAGAACGG
+Sphingobacteriaceae_sp_G     -     14  1.43e-08 TAAACATTTT ATTTACAGATATTTACAATCC ATTTTACAAG
+Citrobacter_koseri_ATCCB     -     19  1.71e-08 TGTTAATGTC ATTTACAGAAATTGACAATTC AGATGCCCTT
+Escherichia_coli_BW25113     +     28  2.38e-08 TGTTAACGTC ATTTACAGAAATTGACACATC AGATGCCTGC
+Escherichia_coli_MG1655_     +     27  2.38e-08 TGTTAACGTC ATTTACAGAAATTGACACATC AGATGCCTGC
+Shewanella_sp_ANA-3_cpxR     +     24  2.79e-08 ATTTAATCAT CTTTACACGAATTTACAATTC AGCGTGACTT
+Aliivibrio_fischeri_ATCC     +     22  3.25e-08 AAAATGTGAT CTTTACGTTTCTTGACACAAA AACAGATTAC
+Escherichia_fergusonii_A     -     19  4.91e-08 TGTTAACGTC GTTTACAGAAATTGACAGTTC AGATGCCAGA
+Shewanella_sp_ANA-3_cpxR     -     15  4.91e-08 ACTCCACTTT TTTTACATAACTTTACAAATA GGGTTGACAT
+Pseudomonas_simiae_WCS41     +     24  5.59e-08 CCGGGCCAAC CTTTACCTAACTTGACATTCA GTTAACCGCA
+Marinobacter_adhaerens_H     -     17  5.59e-08 GTTTGTTGTG GTTTACAAAAATTTACAAAAA AGTCGTTGCC
+Salmonella_enterica_LT2_     +     29  7.09e-08 TGTTAATGTC ATTTACAGAAATTGACAGTAC AGATACCTGC
+Shewanella_amazonensis_S     +     27  7.09e-08 ATTTGCTTTT CTTTACGGTAATTTACAATTG CTGGTGATGG
+Salmonella_enterica_LT2_     -     20  7.99e-08 TGCATTGTTT GTTGACATTTCTTTACATAAA GGCGGGGGAA
+Shewanella_oneidensis_MR     +     27  8.96e-08 ACTCCACTTT TTTTACATAACTTTACATATA GGGTTGACGT
+Haemophilus_influenzae_A     -     18  1.11e-07 CAAATAATTT CCTGACAAATCTTTACAAAAA TGAATTTTTG
+Escherichia_fergusonii_A     +     13  1.11e-07 GACTACCAGG ATTGACATAAATTGACAAATA TTGAATTTTC
+Paraburkholderia_phytofi     +     28  1.37e-07 GCGACACCAC ATTGACAATTCTTGACACATG ATTTGGCGGC
+Echinicola_vietnamensis_     -     38  1.37e-07         AT ATTTACAGGTATTGACAAAAA TATTTACAAA
+Shewanella_oneidensis_MR     +     10  1.52e-07  TCAATCGGG GCTTACATTAATTGACAATAA GCAAATCCGC
+Aliivibrio_fischeri_ATCC     +     14  1.52e-07 GTAACGCCGT CTTTACCTTTCTTTACGAATG CAAAGAATGT
+Klebsiella_psneumoniae_A     +     18  1.67e-07 ATCCGGTTTT TTTTACCCTTCTTTACACAAC TTTAATTTAT
+Echinicola_vietnamensis_     +     32  1.67e-07 GACACCAAAC GTTTACGAATATTTACACTTA TTGAATTT
+Aliivibrio_fischeri_ATCC     -     25  2.03e-07 TATATAAAAT CTTTACACATATTTACCAAAA TAGGACAACA
+Aliivibrio_fischeri_ATCC     -      7  2.23e-07 GTTGTATAAG CTTTACAGAAACTGACAGATA GAAAGG
+Escherichia_fergusonii_A     -     28  2.44e-07 ATCCGGTTTT TTTTACCTTTCTTTACACATA ATTTTCCCGC
+Sphingobacteriaceae_sp_G     +     19  2.44e-07 TTTTTCTTCG CGTTACAAAACTTTACAAATG CTTTTGGAAG
+Providencia_stuartii_ATC     +     20  2.44e-07 ATTTAGAAAA ATTTAAACTTCTTTACAATTC AAAAAAGCCT
+Salmonella_enterica_LT2_     +     23  2.68e-07 AGTGCATTTT CTTTAAACTTCTTTACATTAG GTTAGGCAAA
+Enterobacter_cloacae_ATC     -     15  2.68e-07 GCTGCGTTAT CTTTAAACTTCTTTACATAAG GTAAGGCAAC
+Saccharophagus_degradans     -     26  2.68e-07 AGTTTAACCG GTTTACACAAACTTACATTCA GTCAGCTTAA
+Escherichia_coli_MG1655_     +     23  2.68e-07 GCGCGCTTTT CTTTAAACTTCTTTACATTAG GTTATGTAAA
+Saccharophagus_degradans     -     21  2.68e-07 AACGATTAAA ATTTACATAAATTTACGCTAA AAACAGGGGT
+Echinicola_vietnamensis_     -     16  2.68e-07 TGACAAAAAT ATTTACAAATATTTACAAAAT GTGACAAAAG
+Echinicola_vietnamensis_     -     22  2.94e-07 AAACCAATTG ATTTACAAATACTTACATTAC AAGTTATATC
+Klebsiella_psneumoniae_A     +     27  3.21e-07 CCGAGGCCGC CTTTACGTTTATTTACGATTA AAAATAAACA
+Enterobacter_cloacae_ATC     -     16  3.51e-07 TGTGAATGAC TTTTACACAAACTGACAATTC GGATGCCGCC
+Citrobacter_koseri_ATCCB     +     16  3.84e-07 ATTTATTTCA GCTGACAAAAATTGACAAAAC CTGAGATTAC
+Shewanella_oneidensis_MR     +     26  3.84e-07 ATTTAAGGTT CTTTACATGAATTTACAATCT TGCGTGATAC
+Saccharophagus_degradans     -     31  4.20e-07  ATTTGTAGG GTTTACAAATCTTCACATTCC TTAACGTTTG
+Kangiella_aquimarina_DSM     -     15  4.20e-07 AAGATACTAT ATTTACACTGATTTACAAAAA AATTCAGCCT
+Klebsiella_psneumoniae_A     +     23  4.57e-07 TTCAATGTTA ATTTACATATCTATACAAAAG AAATTCAAAT
+Saccharophagus_degradans     +     27  4.99e-07 TGTATGCCAG ATTTACATTTCTTTACTTTTA CTTCGAAAAA
+Sphingobacteriaceae_sp_G     +     25  5.43e-07 CCAACTACAG GTTTACGTTTCTTTACAGTTT ATGGTCCATG
+Citrobacter_koseri_ATCCB     +     14  8.16e-07 ACATACAATC ACATACACATCTTTACATTTG GTGGTTTTCA
+Aliivibrio_fischeri_ATCC     -     24  8.16e-07 ATCGATACAT CTATACATATCTTTACATAAT CACTTAGCTC
+Shewanella_sp_ANA-3_cpxR     +     15  1.03e-06 CTTTCCCATC ATTTACCTATCTTTACTTTAA GTTTTTCATT
+Providencia_stuartii_ATC     -     26  1.28e-06 TGCTTCTTTA CCTTACAATTGTTTACACTCA CATAACCTTA
+Escherichia_fergusonii_A     -     14  2.49e-06 GAATGAAAGC GCTGACATATTTTTACAATCG TAAGAATTGA
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif cpxR MEME-1 block diagrams
+--------------------------------------------------------------------------------
+SEQUENCE NAME            POSITION P-VALUE  MOTIF DIAGRAM
+-------------            ----------------  -------------
+Haemophilus_influenzae_A          1.8e-10  28_[-1]_11
+Sinorhizobium_meliloti_1          6.3e-09  28_[-1]_11
+Sphingobacteriaceae_sp_G          1.4e-08  13_[-1]_26
+Citrobacter_koseri_ATCCB          1.7e-08  18_[-1]_21
+Escherichia_coli_BW25113          2.4e-08  27_[+1]_12
+Escherichia_coli_MG1655_          2.4e-08  26_[+1]_13
+Shewanella_sp_ANA-3_cpxR          2.8e-08  23_[+1]_16
+Aliivibrio_fischeri_ATCC          3.3e-08  21_[+1]_18
+Escherichia_fergusonii_A          4.9e-08  18_[-1]_21
+Shewanella_sp_ANA-3_cpxR          4.9e-08  14_[-1]_25
+Pseudomonas_simiae_WCS41          5.6e-08  23_[+1]_16
+Marinobacter_adhaerens_H          5.6e-08  16_[-1]_23
+Salmonella_enterica_LT2_          7.1e-08  28_[+1]_11
+Shewanella_amazonensis_S          7.1e-08  26_[+1]_13
+Salmonella_enterica_LT2_            8e-08  19_[-1]_20
+Shewanella_oneidensis_MR            9e-08  26_[+1]_13
+Haemophilus_influenzae_A          1.1e-07  17_[-1]_22
+Escherichia_fergusonii_A          1.1e-07  12_[+1]_27
+Paraburkholderia_phytofi          1.4e-07  27_[+1]_12
+Echinicola_vietnamensis_          1.4e-07  15_[-1]_1_[-1]_2
+Shewanella_oneidensis_MR          1.5e-07  9_[+1]_30
+Aliivibrio_fischeri_ATCC          1.5e-07  13_[+1]_26
+Klebsiella_psneumoniae_A          1.7e-07  17_[+1]_22
+Echinicola_vietnamensis_          1.7e-07  31_[+1]_8
+Aliivibrio_fischeri_ATCC            2e-07  24_[-1]_15
+Aliivibrio_fischeri_ATCC          2.2e-07  6_[-1]_33
+Escherichia_fergusonii_A          2.4e-07  27_[-1]_12
+Sphingobacteriaceae_sp_G          2.4e-07  18_[+1]_21
+Providencia_stuartii_ATC          2.4e-07  19_[+1]_20
+Salmonella_enterica_LT2_          2.7e-07  22_[+1]_17
+Enterobacter_cloacae_ATC          2.7e-07  14_[-1]_25
+Saccharophagus_degradans          2.7e-07  25_[-1]_14
+Escherichia_coli_MG1655_          2.7e-07  22_[+1]_17
+Saccharophagus_degradans          2.7e-07  20_[-1]_19
+Echinicola_vietnamensis_          2.9e-07  21_[-1]_18
+Klebsiella_psneumoniae_A          3.2e-07  26_[+1]_13
+Enterobacter_cloacae_ATC          3.5e-07  15_[-1]_24
+Citrobacter_koseri_ATCCB          3.8e-07  15_[+1]_24
+Shewanella_oneidensis_MR          3.8e-07  25_[+1]_14
+Saccharophagus_degradans          4.2e-07  30_[-1]_9
+Kangiella_aquimarina_DSM          4.2e-07  14_[-1]_25
+Klebsiella_psneumoniae_A          4.6e-07  22_[+1]_17
+Saccharophagus_degradans            5e-07  26_[+1]_13
+Sphingobacteriaceae_sp_G          5.4e-07  24_[+1]_15
+Citrobacter_koseri_ATCCB          8.2e-07  13_[+1]_26
+Aliivibrio_fischeri_ATCC          8.2e-07  23_[-1]_16
+Shewanella_sp_ANA-3_cpxR            1e-06  14_[+1]_25
+Providencia_stuartii_ATC          1.3e-06  25_[-1]_14
+Escherichia_fergusonii_A          2.5e-06  13_[-1]_26
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif cpxR MEME-1 in BLOCKS format
+--------------------------------------------------------------------------------
+BL   MOTIF cpxR width=21 seqs=50
+Haemophilus_influenzae_A (   29) CTTTACATTTCTTTACAAATC  1
+Sinorhizobium_meliloti_1 (   29) CTTTACATTTCTTTACATTCG  1
+Sphingobacteriaceae_sp_G (   14) ATTTACAGATATTTACAATCC  1
+Citrobacter_koseri_ATCCB (   19) ATTTACAGAAATTGACAATTC  1
+Escherichia_coli_BW25113 (   28) ATTTACAGAAATTGACACATC  1
+Escherichia_coli_MG1655_ (   27) ATTTACAGAAATTGACACATC  1
+Shewanella_sp_ANA-3_cpxR (   24) CTTTACACGAATTTACAATTC  1
+Aliivibrio_fischeri_ATCC (   22) CTTTACGTTTCTTGACACAAA  1
+Escherichia_fergusonii_A (   19) GTTTACAGAAATTGACAGTTC  1
+Shewanella_sp_ANA-3_cpxR (   15) TTTTACATAACTTTACAAATA  1
+Pseudomonas_simiae_WCS41 (   24) CTTTACCTAACTTGACATTCA  1
+Marinobacter_adhaerens_H (   17) GTTTACAAAAATTTACAAAAA  1
+Salmonella_enterica_LT2_ (   29) ATTTACAGAAATTGACAGTAC  1
+Shewanella_amazonensis_S (   27) CTTTACGGTAATTTACAATTG  1
+Salmonella_enterica_LT2_ (   20) GTTGACATTTCTTTACATAAA  1
+Shewanella_oneidensis_MR (   27) TTTTACATAACTTTACATATA  1
+Haemophilus_influenzae_A (   18) CCTGACAAATCTTTACAAAAA  1
+Escherichia_fergusonii_A (   13) ATTGACATAAATTGACAAATA  1
+Paraburkholderia_phytofi (   28) ATTGACAATTCTTGACACATG  1
+Echinicola_vietnamensis_ (   38) ATTTACAGGTATTGACAAAAA  1
+Shewanella_oneidensis_MR (   10) GCTTACATTAATTGACAATAA  1
+Aliivibrio_fischeri_ATCC (   14) CTTTACCTTTCTTTACGAATG  1
+Klebsiella_psneumoniae_A (   18) TTTTACCCTTCTTTACACAAC  1
+Echinicola_vietnamensis_ (   32) GTTTACGAATATTTACACTTA  1
+Aliivibrio_fischeri_ATCC (   25) CTTTACACATATTTACCAAAA  1
+Aliivibrio_fischeri_ATCC (    7) CTTTACAGAAACTGACAGATA  1
+Escherichia_fergusonii_A (   28) TTTTACCTTTCTTTACACATA  1
+Sphingobacteriaceae_sp_G (   19) CGTTACAAAACTTTACAAATG  1
+Providencia_stuartii_ATC (   20) ATTTAAACTTCTTTACAATTC  1
+Salmonella_enterica_LT2_ (   23) CTTTAAACTTCTTTACATTAG  1
+Enterobacter_cloacae_ATC (   15) CTTTAAACTTCTTTACATAAG  1
+Saccharophagus_degradans (   26) GTTTACACAAACTTACATTCA  1
+Escherichia_coli_MG1655_ (   23) CTTTAAACTTCTTTACATTAG  1
+Saccharophagus_degradans (   21) ATTTACATAAATTTACGCTAA  1
+Echinicola_vietnamensis_ (   16) ATTTACAAATATTTACAAAAT  1
+Echinicola_vietnamensis_ (   22) ATTTACAAATACTTACATTAC  1
+Klebsiella_psneumoniae_A (   27) CTTTACGTTTATTTACGATTA  1
+Enterobacter_cloacae_ATC (   16) TTTTACACAAACTGACAATTC  1
+Citrobacter_koseri_ATCCB (   16) GCTGACAAAAATTGACAAAAC  1
+Shewanella_oneidensis_MR (   26) CTTTACATGAATTTACAATCT  1
+Saccharophagus_degradans (   31) GTTTACAAATCTTCACATTCC  1
+Kangiella_aquimarina_DSM (   15) ATTTACACTGATTTACAAAAA  1
+Klebsiella_psneumoniae_A (   23) ATTTACATATCTATACAAAAG  1
+Saccharophagus_degradans (   27) ATTTACATTTCTTTACTTTTA  1
+Sphingobacteriaceae_sp_G (   25) GTTTACGTTTCTTTACAGTTT  1
+Citrobacter_koseri_ATCCB (   14) ACATACACATCTTTACATTTG  1
+Aliivibrio_fischeri_ATCC (   24) CTATACATATCTTTACATAAT  1
+Shewanella_sp_ANA-3_cpxR (   15) ATTTACCTATCTTTACTTTAA  1
+Providencia_stuartii_ATC (   26) CCTTACAATTGTTTACACTCA  1
+Escherichia_fergusonii_A (   14) GCTGACATATTTTTACAATCG  1
+//
+
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif cpxR MEME-1 position-specific scoring matrix
+--------------------------------------------------------------------------------
+log-odds matrix: alength= 4 w= 21 n= 4000 bayes= 6.79908 E= 9.9e-119
+     0    118     33   -177
+ -1229    -41   -299    134
+  -309  -1229  -1229    149
+ -1229  -1229    -41    137
+   155  -1229  -1229  -1229
+  -209    253  -1229  -1229
+   123    -67    -67  -1229
+   -77     47     18     23
+    72  -1229   -141     16
+    23  -1229   -299     77
+    49    159   -299   -409
+ -1229    -99  -1229    143
+  -409  -1229  -1229    152
+ -1229   -299     81    104
+   155  -1229  -1229  -1229
+ -1229    265  -1229  -1229
+   137   -299   -141   -309
+    43     18    -99    -28
+    49  -1229  -1229     61
+    23      1  -1229     37
+    30     81     47   -209
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif cpxR MEME-1 position-specific probability matrix
+--------------------------------------------------------------------------------
+letter-probability matrix: alength= 4 w= 21 nsites= 50 E= 9.9e-119
+ 0.340000  0.360000  0.200000  0.100000
+ 0.000000  0.120000  0.020000  0.860000
+ 0.040000  0.000000  0.000000  0.960000
+ 0.000000  0.000000  0.120000  0.880000
+ 1.000000  0.000000  0.000000  0.000000
+ 0.080000  0.920000  0.000000  0.000000
+ 0.800000  0.100000  0.100000  0.000000
+ 0.200000  0.220000  0.180000  0.400000
+ 0.560000  0.000000  0.060000  0.380000
+ 0.400000  0.000000  0.020000  0.580000
+ 0.480000  0.480000  0.020000  0.020000
+ 0.000000  0.080000  0.000000  0.920000
+ 0.020000  0.000000  0.000000  0.980000
+ 0.000000  0.020000  0.280000  0.700000
+ 1.000000  0.000000  0.000000  0.000000
+ 0.000000  1.000000  0.000000  0.000000
+ 0.880000  0.020000  0.060000  0.040000
+ 0.460000  0.180000  0.080000  0.280000
+ 0.480000  0.000000  0.000000  0.520000
+ 0.400000  0.160000  0.000000  0.440000
+ 0.420000  0.280000  0.220000  0.080000
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif cpxR MEME-1 regular expression
+--------------------------------------------------------------------------------
+[CAG]TTTACA[TCA][AT][TA][AC]TT[TG]ACA[AT][TA][TA][ACG]
+--------------------------------------------------------------------------------
+
+
+
+
+Time  4.91 secs.
+
+********************************************************************************

@@ -1,12 +1,17 @@
 yiu:
-  schema_version: 1
   contract: split_yiu_payload_rendering_v4
-  name: example_payload
+  schema_version: 1
+  name: soxr_monotypic_hit
 
 input:
-  kind: user_sequence
-  user_sequence:
-    sequence: AAATTTCCCGGGAAATTTCCC
+  kind: sample_hit
+  sample_hit:
+    hit_id: demo_monotypic_soxr_elite_f6b17ce1ba28
+    sample_name: demo_monotypic_soxr
+    source_artifact_path: outputs/optimize/tables/elites.parquet
+    metadata:
+      site_label: soxr_site
+      payload_label: soxr_payload
 
 optimization:
   junction:
@@ -14,15 +19,15 @@ optimization:
     overhang_length: 4
     max_payload_body_length: 12
   mismatches:
-    count: 1
+    count: 2
     candidate_positions: [1, 2]
     allowed_strands: [complement, payload]
     strand_mode: per_position
     default_strand_preference: complement
   pwm:
-    mode: none
+    mode: require
     source:
-      kind: none
+      kind: sample_context
     objective:
       primary: maximin
       secondary:
@@ -34,6 +39,6 @@ optimization:
         - lexical_stability
 
 output:
-  bundle_dir: outputs/example_payload
-  published_plot_path: outputs/example_payload__payload_views.pdf
+  bundle_dir: outputs/yiu__soxr_monotypic_hit
+  published_plot_path: outputs/plots/plot__yiu__soxr_monotypic_hit__payload_views.pdf
   emit_render_jobs_debug: false
