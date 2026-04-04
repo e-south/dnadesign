@@ -89,3 +89,17 @@ def test_reference_and_cruncher_integration_docs_cover_cassette_json_contract_pa
     assert "linear_duplex.v1.json" in cruncher
     assert "top_hits.linear_duplex.v1.jsonl" in cruncher
     assert "duplex_sequence_v1" in cruncher
+
+
+def test_reference_and_yiu_integration_docs_cover_payload_visual_adapter_surface() -> None:
+    reference = (_pkg_root() / "docs" / "reference.md").read_text()
+    yiu = (_pkg_root() / "docs" / "integrations" / "yiu.md").read_text()
+
+    assert "yiu_payload_visual_v1" in reference
+    assert "nucleotide_evidence_map" in reference
+    assert "YiuPayloadVisualV1" in yiu
+    assert "yiu_payload_visual_v1" in yiu
+    assert "nucleotide_evidence_map" in yiu
+    assert "yiu_payload_visual_projection.py" in yiu
+    assert "yiu_payload_sequence_projection.py" in yiu
+    assert "yiu_payload_motif_overlay.py" in yiu

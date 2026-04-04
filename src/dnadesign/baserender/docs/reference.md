@@ -83,6 +83,7 @@ Adapters:
 - `duplex_sequence_v1`
 - `hairpin_topology_v1`
 - `yiu_linear_state_v1`
+- `yiu_payload_visual_v1`
 - `yiu_hairpin_topology_v1`
 - `yiu_topology_cartoon_v1`
 
@@ -93,6 +94,7 @@ Input kinds:
 
 Renderer families:
 - `sequence_rows`
+- `nucleotide_evidence_map`
 - `hairpin_cartoon`
 - `topology_cartoon`
 

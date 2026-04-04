@@ -21,10 +21,13 @@ import pytest
 
 import dnadesign.baserender as baserender
 from dnadesign.baserender.src.adapters.sequence_evidence_map_v1 import SequenceEvidenceMapV1Adapter
+from dnadesign.baserender.src.adapters.yiu_payload_motif_overlay import build_motif_overlay
+from dnadesign.baserender.src.adapters.yiu_payload_visual_projection import build_sequence_evidence_map_contract
 from dnadesign.baserender.src.adapters.yiu_payload_visual_v1 import YiuPayloadVisualV1Adapter
 from dnadesign.baserender.src.config import resolve_style
 from dnadesign.baserender.src.render.effects.motif_logo import compute_motif_logo_geometry
 from dnadesign.baserender.src.render.layout import compute_layout
+from dnadesign.contracts.visual import YiuPayloadVisualV1
 
 from .conftest import write_job
 
@@ -217,6 +220,114 @@ def test_render_uses_explicit_complement_sequence_and_highlights_mismatch_bases(
     dimmed_rgb = mcolors.to_rgb(patch_by_gid["sequence:fwd:0:C"].get_facecolor())
     payload_rgb = mcolors.to_rgb(patch_by_gid["sequence:fwd:8:C"].get_facecolor())
     assert sum(dimmed_rgb) > sum(payload_rgb)
+
+
+def test_yiu_payload_projection_contract_normalizes_row_labels_and_connector_spans() -> None:
+    contract = YiuPayloadVisualV1.model_validate(
+        {
+            "contract_kind": "yiu_payload_visual_v1",
+            "state_id": "payload",
+            "alphabet": "iupac_dna",
+            "reference_payload_sequence": "CTCTATATCTGATATAGAG",
+            "selected_payload_sequence": "CTCTATATCTGATATAGAG",
+            "selected_complement_sequence": "GAGATATAGTGTATATCTC",
+            "show_reference_payload_row": False,
+            "junction": {"start": 8, "end": 12, "offsets": [0, 1, 2, 3]},
+            "mismatches": [
+                {
+                    "payload_index": 9,
+                    "junction_offset": 1,
+                    "mutated_strand": "complement",
+                    "native_base": "A",
+                    "mutated_base": "T",
+                    "opposing_base": "T",
+                },
+                {
+                    "payload_index": 10,
+                    "junction_offset": 2,
+                    "mutated_strand": "complement",
+                    "native_base": "C",
+                    "mutated_base": "G",
+                    "opposing_base": "G",
+                },
+            ],
+            "motif_layers": [],
+            "display": {"title": "TetR payload"},
+            "meta": {"row_labels": {"primary": " Selected payload ", "complement": None}},
+        }
+    )
+
+    projected = build_sequence_evidence_map_contract(contract)
+
+    assert projected["meta"]["row_labels"] == {"primary": "Selected payload", "complement": ""}
+    assert projected["meta"]["connector_hidden_indices"] == [8, 11]
+    assert projected["meta"]["connector_cross_indices"] == [9, 10]
+    assert projected["meta"]["connector_overhang_spans"] == [{"start": 8, "end": 12}]
+    assert projected["meta"]["yiu_payload_meta"]["row_labels"] == {"primary": " Selected payload ", "complement": None}
+
+
+def test_yiu_payload_motif_overlay_builder_keeps_duplicate_tf_labels_and_feature_pairs() -> None:
+    contract = YiuPayloadVisualV1.model_validate(
+        {
+            "contract_kind": "yiu_payload_visual_v1",
+            "state_id": "payload",
+            "alphabet": "iupac_dna",
+            "reference_payload_sequence": "TTTTTCCCCCAAAA",
+            "selected_payload_sequence": "TTTTTCCCCCAAAA",
+            "selected_complement_sequence": "AAAAGGGGGGTTTT",
+            "show_reference_payload_row": False,
+            "junction": {"start": 5, "end": 9, "offsets": [0, 1, 2, 3]},
+            "mismatches": [],
+            "motif_layers": [
+                {
+                    "motif_instance_id": "baeR:0:11:+:1",
+                    "tf_name": "baeR",
+                    "motif_name": "baeR",
+                    "reference_strand": "+",
+                    "start": 0,
+                    "end": 11,
+                    "label": "baeR#1 (+)",
+                    "matrix": [[0.97, 0.01, 0.01, 0.01]] * 11,
+                },
+                {
+                    "motif_instance_id": "baeR:2:13:+:2",
+                    "tf_name": "baeR",
+                    "motif_name": "baeR",
+                    "reference_strand": "+",
+                    "start": 2,
+                    "end": 13,
+                    "label": "baeR#2 (+)",
+                    "matrix": [[0.01, 0.97, 0.01, 0.01]] * 11,
+                },
+            ],
+            "display": {"title": "BaeR payload"},
+            "meta": {"row_labels": {}},
+        }
+    )
+
+    projected = build_sequence_evidence_map_contract(contract)
+    base_record = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="IUPAC_DNA").apply(
+        projected,
+        row_index=0,
+    )
+    overlay = build_motif_overlay(contract, base_record=base_record)
+
+    assert [feature.id for feature in overlay.features] == [
+        "motif:baeR:0:11:+:1",
+        "motif:baeR:2:13:+:2",
+    ]
+    assert [effect.target["feature_id"] for effect in overlay.effects] == [
+        "motif:baeR:0:11:+:1",
+        "motif:baeR:2:13:+:2",
+    ]
+    assert overlay.features[0].attrs["lane"] == "primary"
+    assert overlay.features[0].attrs["style_token"] == "tf:baeR"
+    assert overlay.effects[0].params["observed_sequence_5to3"] == "TTTTTCCCCCAAAA"
+    assert overlay.tag_labels == {
+        "tf:baeR": "baeR",
+        "motif:baeR:0:11:+:1": "baeR#1 (+)",
+        "motif:baeR:2:13:+:2": "baeR#2 (+)",
+    }
 
 
 def test_yiu_payload_visual_adapter_renders_pwm_layers_without_label_span_errors() -> None:

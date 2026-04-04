@@ -26,6 +26,7 @@ The default boundary is file-contract-first:
 YIU contracts are shared through `dnadesign.contracts.visual`:
 
 - `YiuLinearStateV1`
+- `YiuPayloadVisualV1`
 - `YiuHairpinTopologyV1`
 - `YiuTopologyCartoonV1`
 
@@ -36,14 +37,22 @@ These models are the source of truth for producer and consumer parsing.
 YIU adapter descriptors exposed by `dnadesign.baserender`:
 
 - `yiu_linear_state_v1` -> `sequence_rows`
+- `yiu_payload_visual_v1` -> `nucleotide_evidence_map`
 - `yiu_hairpin_topology_v1` -> `hairpin_cartoon`
 - `yiu_topology_cartoon_v1` -> `topology_cartoon`
 
 Recommended renderer usage:
 
 - `sequence_rows` for linear ssDNA or dsDNA states, retained fragments, and PCR/assembly intermediates
+- `nucleotide_evidence_map` for payload-centric YIU contracts that combine mismatch highlighting with PWM motif layers
 - `hairpin_cartoon` for ligated ssDNA hairpin states
 - `topology_cartoon` for circularized payload candidates and branched/composite topology views
+
+Maintain the payload-view adapter split:
+
+- `yiu_payload_visual_projection.py` stays the compatibility facade
+- `yiu_payload_sequence_projection.py` owns `yiu_payload_visual_v1 -> sequence_evidence_map_v1` projection
+- `yiu_payload_motif_overlay.py` owns motif `Feature`/`Effect` assembly for payload overlays
 
 ## Published bundle surface
 
