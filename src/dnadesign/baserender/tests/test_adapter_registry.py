@@ -491,6 +491,7 @@ def test_sequence_evidence_map_adapter_preserves_explicit_complement_and_base_hi
             "pairings": [],
             "display": {"title": "Assembled payload"},
             "meta": {
+                "base_highlight_color": "#B91C1C",
                 "base_highlights": {
                     "primary": [10],
                     "complement": [10],
@@ -513,6 +514,7 @@ def test_sequence_evidence_map_adapter_preserves_explicit_complement_and_base_hi
 
     assert record.meta["show_reverse_complement"] is True
     assert record.meta["complement_sequence"] == "GAGATATAGAATATATCTC"
+    assert record.meta["base_highlight_color"] == {"primary": "#B91C1C", "complement": "#B91C1C"}
     assert record.meta["base_highlights"] == {"primary": (10,), "complement": (10,)}
     assert record.meta["dim_base_indices"] == {
         "primary": (0, 1, 2, 3, 4, 5, 6),

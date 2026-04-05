@@ -13,9 +13,12 @@ from __future__ import annotations
 
 from dnadesign.contracts.visual import YiuPayloadVisualV1
 from dnadesign.contracts.visual.sequence_evidence_meta import (
-    build_sequence_evidence_connector_meta,
+    build_sequence_evidence_connector_span_meta,
     normalize_sequence_evidence_row_labels,
 )
+from dnadesign.contracts.visual.yiu_payload_visual_v1 import YiuPayloadMismatchV1
+
+YIU_MISMATCH_HIGHLIGHT_COLOR = "#B91C1C"
 
 
 def _build_junction_boundaries(contract: YiuPayloadVisualV1) -> list[dict[str, object]]:
@@ -39,25 +42,31 @@ def _build_junction_boundaries(contract: YiuPayloadVisualV1) -> list[dict[str, o
     ]
 
 
-def _build_projection_meta(contract: YiuPayloadVisualV1, *, mismatch_indices: list[int]) -> dict[str, object]:
+def _build_base_highlights(mismatches: list[YiuPayloadMismatchV1]) -> dict[str, list[int]]:
+    highlights = {"primary": [], "complement": []}
+    for mismatch in mismatches:
+        row_id = "primary" if mismatch.mutated_strand == "payload" else "complement"
+        highlights[row_id].append(mismatch.payload_index)
+    for row_id in highlights:
+        highlights[row_id].sort()
+    return highlights
+
+
+def _build_projection_meta(contract: YiuPayloadVisualV1) -> dict[str, object]:
     return {
         "row_labels": normalize_sequence_evidence_row_labels(contract.meta),
-        "base_highlights": {
-            "primary": mismatch_indices,
-            "complement": mismatch_indices,
-        },
+        "base_highlights": _build_base_highlights(contract.mismatches),
+        "base_highlight_color": YIU_MISMATCH_HIGHLIGHT_COLOR,
         "reference_payload_sequence": contract.reference_payload_sequence,
         "show_reference_payload_row": contract.show_reference_payload_row,
-        **build_sequence_evidence_connector_meta(
+        **build_sequence_evidence_connector_span_meta(
             start=contract.junction.start,
             end=contract.junction.end,
-            cross_indices=mismatch_indices,
         ),
     }
 
 
 def build_sequence_evidence_map_contract(contract: YiuPayloadVisualV1) -> dict[str, object]:
-    mismatch_indices = [entry.payload_index for entry in contract.mismatches]
     return {
         "contract_kind": "sequence_evidence_map_v1",
         "state_id": contract.state_id,
@@ -70,7 +79,7 @@ def build_sequence_evidence_map_contract(contract: YiuPayloadVisualV1) -> dict[s
         "boundaries": _build_junction_boundaries(contract),
         "pairings": [],
         "display": {"title": contract.display.title},
-        "meta": _build_projection_meta(contract, mismatch_indices=mismatch_indices),
+        "meta": _build_projection_meta(contract),
     }
 
 

@@ -283,8 +283,9 @@ def test_render_uses_explicit_complement_sequence_and_highlights_mismatch_bases(
                     "primary": [0, 1, 2, 3, 4, 5, 6],
                     "complement": [0, 1, 2, 3, 4, 5, 6],
                 },
+                "base_highlight_color": "#B91C1C",
                 "base_highlights": {
-                    "primary": [10],
+                    "primary": [],
                     "complement": [10],
                 },
                 "connector_hidden_indices": [9, 11, 12],
@@ -310,8 +311,9 @@ def test_render_uses_explicit_complement_sequence_and_highlights_mismatch_bases(
     finally:
         plt.close(fig)
 
-    assert "sequence:fwd:10:G:highlight" in gids
     assert "sequence:rev:10:A:highlight" in gids
+    assert "sequence:fwd:10:G:highlight" not in gids
+    assert mcolors.to_hex(patch_by_gid["sequence:rev:10:A:highlight"].get_facecolor(), keep_alpha=False) == "#b91c1c"
     assert {"Left", "Right"}.issubset(labels)
     assert any(y0 == y1 and x0 != x1 for (x0, x1), (y0, y1) in line_segments)
     assert sum(1 for (x0, x1), (y0, y1) in line_segments if x0 != x1 and y0 != y1) >= 2
@@ -364,6 +366,82 @@ def test_sequence_evidence_map_overhang_span_meta_draws_full_junction_guides() -
     assert horizontal_count >= 1
 
 
+def test_sequence_evidence_map_ligation_boundaries_render_dashed_vertical_markers() -> None:
+    adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="IUPAC_DNA")
+    record = adapter.apply(
+        {
+            "contract_kind": "sequence_evidence_map_v1",
+            "state_id": "assembled_payload",
+            "topology_kind": "linear_dsdna",
+            "alphabet": "iupac_dna",
+            "primary_sequence": "CTCTATATCTGATATAGAG",
+            "complement_sequence": "GAGATATAGCATATATCTC",
+            "owners": [],
+            "effect_tags": [],
+            "boundaries": [
+                {
+                    "boundary_id": "junction_start",
+                    "row_id": "primary",
+                    "boundary": 8,
+                    "boundary_kind": "ligation_junction",
+                    "display_label": "Junction start",
+                    "short_label": "",
+                },
+                {
+                    "boundary_id": "junction_end",
+                    "row_id": "complement",
+                    "boundary": 12,
+                    "boundary_kind": "ligation_junction",
+                    "display_label": "Junction end",
+                    "short_label": "",
+                },
+            ],
+            "pairings": [],
+            "display": {"title": "Assembled payload"},
+            "meta": {
+                "connector_hidden_indices": [],
+                "connector_cross_indices": [],
+                "connector_overhang_spans": [{"start": 8, "end": 12}],
+            },
+        },
+        row_index=0,
+    )
+
+    boundary_effects = [effect for effect in record.effects if effect.kind == "boundary_marker"]
+    assert len(boundary_effects) == 2
+    assert {effect.params.get("semantic") for effect in boundary_effects} == {"ligation_junction"}
+
+    style = resolve_style(preset="presentation_default", overrides={"connectors": True})
+    layout = compute_layout(record, style)
+    expected_x_positions = [
+        float(layout.x_left + 8 * layout.cw),
+        float(layout.x_left + 12 * layout.cw),
+    ]
+
+    fig = baserender.render(
+        record,
+        renderer="nucleotide_evidence_map",
+        style={"preset": "presentation_default", "overrides": {"connectors": True}},
+    )
+    try:
+        dashed_verticals = [
+            tuple(float(value) for value in line.get_xdata())
+            for line in fig.axes[0].lines
+            if line.is_dashed()
+            and len(line.get_xdata()) == 2
+            and len(line.get_ydata()) == 2
+            and abs(float(line.get_xdata()[0]) - float(line.get_xdata()[1])) < 1.0e-6
+            and abs(float(line.get_ydata()[0]) - float(line.get_ydata()[1])) > 1.0e-6
+        ]
+    finally:
+        plt.close(fig)
+
+    assert len(dashed_verticals) >= 2
+    observed_x_positions = [float(xs[0]) for xs in dashed_verticals]
+    for expected in expected_x_positions:
+        assert any(observed == pytest.approx(expected) for observed in observed_x_positions)
+
+
 def test_yiu_payload_projection_contract_normalizes_row_labels_and_connector_spans() -> None:
     contract = YiuPayloadVisualV1.model_validate(
         {
@@ -402,10 +480,53 @@ def test_yiu_payload_projection_contract_normalizes_row_labels_and_connector_spa
     projected = build_sequence_evidence_map_contract(contract)
 
     assert projected["meta"]["row_labels"] == {"primary": "Selected payload", "complement": ""}
-    assert projected["meta"]["connector_hidden_indices"] == [8, 11]
-    assert projected["meta"]["connector_cross_indices"] == [9, 10]
+    assert projected["meta"]["base_highlight_color"] == "#B91C1C"
+    assert projected["meta"]["base_highlights"] == {"primary": [], "complement": [9, 10]}
+    assert projected["meta"]["connector_hidden_indices"] == []
+    assert projected["meta"]["connector_cross_indices"] == []
     assert projected["meta"]["connector_overhang_spans"] == [{"start": 8, "end": 12}]
     assert "yiu_payload_meta" not in projected["meta"]
+
+
+def test_yiu_payload_projection_contract_partitions_highlights_by_mutated_strand() -> None:
+    contract = YiuPayloadVisualV1.model_validate(
+        {
+            "contract_kind": "yiu_payload_visual_v1",
+            "state_id": "payload",
+            "alphabet": "iupac_dna",
+            "reference_payload_sequence": "CTCTATATCTGATATAGAG",
+            "selected_payload_sequence": "CTCTATATCTGATATAGAG",
+            "selected_complement_sequence": "GAGATATAGCATATATCTC",
+            "show_reference_payload_row": False,
+            "junction": {"start": 8, "end": 12, "offsets": [0, 1, 2, 3]},
+            "mismatches": [
+                {
+                    "payload_index": 9,
+                    "junction_offset": 1,
+                    "mutated_strand": "payload",
+                    "native_base": "T",
+                    "mutated_base": "C",
+                    "opposing_base": "A",
+                },
+                {
+                    "payload_index": 10,
+                    "junction_offset": 2,
+                    "mutated_strand": "complement",
+                    "native_base": "C",
+                    "mutated_base": "A",
+                    "opposing_base": "G",
+                },
+            ],
+            "motif_layers": [],
+            "display": {"title": "Mixed strand payload"},
+            "meta": {"row_labels": {}},
+        }
+    )
+
+    projected = build_sequence_evidence_map_contract(contract)
+
+    assert projected["meta"]["base_highlight_color"] == "#B91C1C"
+    assert projected["meta"]["base_highlights"] == {"primary": [9], "complement": [10]}
 
 
 def test_yiu_payload_projection_contract_rejects_malformed_row_labels() -> None:
@@ -566,10 +687,17 @@ def test_yiu_payload_visual_adapter_renders_pwm_layers_without_label_span_errors
     fig = baserender.render(record, renderer="nucleotide_evidence_map", style={"preset": "presentation_default"})
     try:
         gids = {patch.get_gid() for patch in fig.axes[0].patches if patch.get_gid()}
+        diagonal_segments = [
+            (tuple(line.get_xdata()), tuple(line.get_ydata()))
+            for line in fig.axes[0].lines
+            if tuple(line.get_xdata())[0] != tuple(line.get_xdata())[1]
+            and tuple(line.get_ydata())[0] != tuple(line.get_ydata())[1]
+        ]
     finally:
         plt.close(fig)
 
     assert any(gid.startswith("motif_logo:motif:tetR_payload_site:") for gid in gids)
+    assert diagonal_segments == []
 
 
 def test_yiu_payload_visual_adapter_pwm_letters_follow_feature_fill_with_gray_deemphasis() -> None:

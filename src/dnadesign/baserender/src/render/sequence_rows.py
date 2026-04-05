@@ -98,6 +98,7 @@ class SequenceRowsRenderer:
         tone_rev: Sequence[float] | None = None
         explicit_complement_sequence: str | None = None
         base_highlights: Mapping[str, Sequence[int]] = {}
+        base_highlight_color: Mapping[str, str] = {}
         dim_base_indices: Mapping[str, Sequence[int]] = {}
         if isinstance(record.meta, Mapping):
             raw_complement = record.meta.get("complement_sequence")
@@ -106,6 +107,9 @@ class SequenceRowsRenderer:
             raw_highlights = record.meta.get("base_highlights")
             if isinstance(raw_highlights, Mapping):
                 base_highlights = raw_highlights
+            raw_highlight_color = record.meta.get("base_highlight_color")
+            if isinstance(raw_highlight_color, Mapping):
+                base_highlight_color = raw_highlight_color
             raw_dim_indices = record.meta.get("dim_base_indices")
             if isinstance(raw_dim_indices, Mapping):
                 dim_base_indices = raw_dim_indices
@@ -174,6 +178,7 @@ class SequenceRowsRenderer:
             tone_strengths=tone_fwd,
             row_id="fwd",
             highlight_indices=base_highlights.get("primary"),
+            highlight_color=base_highlight_color.get("primary"),
             dim_indices=dim_base_indices.get("primary"),
         )
         if show_two:
@@ -189,6 +194,7 @@ class SequenceRowsRenderer:
                 tone_strengths=tone_rev,
                 row_id="rev",
                 highlight_indices=base_highlights.get("complement"),
+                highlight_color=base_highlight_color.get("complement"),
                 dim_indices=dim_base_indices.get("complement"),
             )
             _draw_connectors(ax, len(record.sequence), x0, layout.cw, layout, style)
@@ -1275,6 +1281,7 @@ def _draw_sequence(
     tone_strengths: Sequence[float] | None = None,
     row_id: str = "fwd",
     highlight_indices: Sequence[int] | None = None,
+    highlight_color: str | None = None,
     dim_indices: Sequence[int] | None = None,
 ) -> None:
     label_dx = style.font_size_label / 72.0 * style.dpi * 0.8
@@ -1316,7 +1323,7 @@ def _draw_sequence(
         if idx in dim_set and not is_highlighted:
             glyph_color = "#D1D5DB"
         if is_highlighted:
-            glyph_color = _darken_rgb(glyph_color, factor=0.72)
+            glyph_color = str(highlight_color).strip() if highlight_color else _darken_rgb(glyph_color, factor=0.72)
         y_mid_px = _mono_ag_mid_px(style.font_mono, style.font_size_seq, style.dpi, weight)
         trans = Affine2D().scale(px_per_pt).translate(x, y_center - y_mid_px) + ax.transData
         patch = PathPatch(

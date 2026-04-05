@@ -118,6 +118,29 @@ def _normalize_row_index_map(
     return normalized
 
 
+def _normalize_row_color_map(meta: Mapping[str, Any], *, key: str) -> dict[str, str]:
+    raw = meta.get(key)
+    if raw is None:
+        return {}
+    if isinstance(raw, str):
+        value = raw.strip()
+        if not value:
+            raise SchemaError(f"sequence_evidence_map_v1 meta.{key} must be non-empty when provided")
+        return {"primary": value, "complement": value}
+    if not isinstance(raw, Mapping):
+        raise SchemaError(f"sequence_evidence_map_v1 meta.{key} must be a string or a row-id mapping")
+    normalized: dict[str, str] = {}
+    for row_id in ("primary", "complement"):
+        value = raw.get(row_id)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if not text:
+            raise SchemaError(f"sequence_evidence_map_v1 meta.{key}.{row_id} must be non-empty when provided")
+        normalized[row_id] = text
+    return normalized
+
+
 def _normalize_index_list(meta: Mapping[str, Any], key: str, *, limit: int) -> tuple[int, ...]:
     raw = meta.get(key, ())
     if raw is None:
@@ -296,6 +319,7 @@ class SequenceEvidenceMapV1Adapter:
             if contract.complement_sequence is not None
             else len(contract.primary_sequence),
         )
+        base_highlight_color = _normalize_row_color_map(meta, key="base_highlight_color")
         dim_base_indices = _normalize_row_index_map(
             meta,
             key="dim_base_indices",
@@ -342,6 +366,7 @@ class SequenceEvidenceMapV1Adapter:
                 "complement_sequence": contract.complement_sequence,
                 "view_meta": meta,
                 "base_highlights": base_highlights,
+                "base_highlight_color": base_highlight_color,
                 "dim_base_indices": dim_base_indices,
                 "connector_hidden_indices": connector_hidden_indices,
                 "connector_cross_indices": connector_cross_indices,
