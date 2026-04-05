@@ -12,7 +12,7 @@ This index tracks quality expectations for tests, CI signal, coverage gates, and
 - [CI workflow](../../.github/workflows/ci.yaml): lane semantics and gating contracts.
 - [Devtools modules](../../src/dnadesign/devtools): executable checks for docs, scope, and coverage.
 - [Coverage dashboard](https://codecov.io/gh/e-south/dnadesign): project and PR diff coverage signal.
-- [Codecov configuration](../../codecov.yml): status-check policy for project and patch coverage.
+- [Codecov configuration](../../codecov.yml): status-check policy for project coverage and informational patch coverage.
 - [Codecov per-tool components](../../codecov.yml): `component_management.individual_components` maps coverage by tool path.
 - [Codecov component status defaults](../../codecov.yml): `component_management.default_rules.statuses` enforces strict project-status semantics for every component.
 - [CI upload wiring](../../.github/workflows/ci.yaml): core/external integration lane uploads use `codecov/codecov-action@v5` with GitHub OIDC authentication (`use_oidc: true`).

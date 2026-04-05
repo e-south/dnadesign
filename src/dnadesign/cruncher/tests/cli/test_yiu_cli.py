@@ -18,6 +18,7 @@ import yaml
 from typer.testing import CliRunner
 
 from dnadesign.cruncher.cli.app import app
+from dnadesign.cruncher.tests.cli_output import normalized_cli_output
 
 runner = CliRunner()
 
@@ -126,10 +127,11 @@ def test_yiu_help_lists_payload_commands_only() -> None:
 
 def test_yiu_show_help_uses_bundle_language() -> None:
     result = runner.invoke(app, ["yiu", "show", "--help"])
+    normalized_output = normalized_cli_output(result.output)
 
     assert result.exit_code == 0
-    assert "--bundle" in result.output
-    assert "--run" not in result.output
+    assert "--bundle" in normalized_output
+    assert "--run" not in normalized_output
 
 
 def test_yiu_init_workspace_scaffolds_only_payload_config(tmp_path: Path) -> None:
@@ -319,7 +321,7 @@ def test_yiu_validate_rejects_invalid_pwm_mode_source_combo(tmp_path: Path) -> N
     result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
 
     assert result.exit_code == 1
-    normalized_output = " ".join(result.output.split())
+    normalized_output = normalized_cli_output(result.output)
     assert "optimization.pwm.mode=none requires optimization.pwm.source.kind=none" in normalized_output
 
 
@@ -352,7 +354,7 @@ def test_yiu_validate_rejects_sample_hit_without_resolution_hints(tmp_path: Path
     result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
 
     assert result.exit_code == 1
-    normalized_output = " ".join(result.output.split())
+    normalized_output = normalized_cli_output(result.output)
     assert (
         "sample_hit requires payload_sequence or a resolvable source artifact reference "
         "(source_artifact_path, source_artifact, or metadata.source_workspace)."
@@ -369,7 +371,7 @@ def test_yiu_validate_rejects_bundle_dir_traversal(tmp_path: Path) -> None:
     result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
 
     assert result.exit_code == 1
-    normalized_output = " ".join(result.output.split())
+    normalized_output = normalized_cli_output(result.output)
     assert "output.bundle_dir must not traverse outside the workspace root" in normalized_output
 
 
@@ -383,7 +385,7 @@ def test_yiu_validate_rejects_published_plot_path_traversal(tmp_path: Path) -> N
     result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
 
     assert result.exit_code == 1
-    normalized_output = " ".join(result.output.split())
+    normalized_output = normalized_cli_output(result.output)
     assert "output.published_plot_path must not traverse outside the workspace root" in normalized_output
 
 
@@ -391,9 +393,10 @@ def test_yiu_init_workspace_rejects_conflicting_output_and_workspace(tmp_path: P
     workspace = tmp_path / "demo_yiu_payload"
 
     result = runner.invoke(app, ["yiu", "init-workspace", "demo_payload", "--output", str(workspace)])
+    normalized_output = normalized_cli_output(result.output)
 
     assert result.exit_code == 2
-    assert "Use either WORKSPACE [--root] or --output, not both." in result.output
+    assert "Use either WORKSPACE [--root] or --output, not both." in normalized_output
 
 
 def test_yiu_render_refuses_to_overwrite_existing_bundle_without_force(tmp_path: Path) -> None:

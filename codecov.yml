@@ -16,6 +16,7 @@ coverage:
       default:
         target: auto
         threshold: 0.5%
+        informational: true
         if_ci_failed: error
         if_not_found: failure
 

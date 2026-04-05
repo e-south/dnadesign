@@ -17,6 +17,7 @@ from typer.testing import CliRunner
 
 from dnadesign.cruncher.cli.app import app
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
+from dnadesign.cruncher.tests.cli_output import normalized_cli_output
 
 runner = CliRunner()
 
@@ -268,9 +269,10 @@ def test_export_meme_rejects_blank_producer(tmp_path: Path) -> None:
         ["catalog", "export-meme", "--tf", "lexA", "--producer", "   ", str(config_path)],
         color=False,
     )
+    normalized_output = normalized_cli_output(result.output)
 
     assert result.exit_code != 0
-    assert "--producer must be a non-empty string" in result.output
+    assert "--producer must be a non-empty string" in normalized_output
 
 
 def test_export_meme_reports_config_resolution_errors(tmp_path: Path) -> None:
