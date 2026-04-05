@@ -106,3 +106,5 @@ def test_reference_and_yiu_integration_docs_cover_payload_visual_adapter_surface
     assert "zero-length separator spans are ignored" in yiu
     assert "dnadesign.baserender.src.*" in yiu
     assert "does not invent placeholder arms or bands" in yiu
+    assert "evidence_ribbon" in yiu
+    assert "operator_strip" in yiu

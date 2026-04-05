@@ -28,6 +28,7 @@ def test_docs_index_routes_to_yiu_guide_and_references() -> None:
         assert "guides/yiu_workflow.md" in content
         assert "reference/yiu_spec.md" in content
         assert "reference/yiu_artifacts.md" in content
+        assert "Ownership split:" in content
         assert "yiu init-workspace|validate|render|show" in content
         assert "trace|solve" not in content
 
@@ -83,6 +84,7 @@ def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
     assert "uv run cruncher yiu render" in demo
     assert "demo_monotypic_tetr" in demo
     assert "Use this guide for command flow and operator posture." in guide
+    assert "### Documentation ownership" in guide
     assert "[YIU Spec Reference](../reference/yiu_spec.md)" in guide
     assert "[YIU Artifacts](../reference/yiu_artifacts.md)" in guide
     assert "[Cruncher architecture](../reference/architecture.md)" in guide
@@ -94,6 +96,7 @@ def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
     assert "outputs/<workflow>/" in guide
     assert "shared bundle-artifact surface and one shared bundle-state family" in guide
     assert "The payload view uses `yiu_payload_visual_v1`." in guide
+    assert "The current YIU visual system is `bench_strip`" in guide
     assert "motif layers aligned to payload-forward coordinates" in guide
     assert (
         "bundle contract is intentionally split across bundle truth, published "
@@ -108,12 +111,14 @@ def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
     assert "Ambiguous or missing sources fail fast." in guide
     assert "split_yiu_payload_rendering_v4" in spec_ref
     assert "This page owns schema and normalization only." in spec_ref
+    assert "operator flow and visual posture" in spec_ref
     assert "Bundle layout, render-status semantics, and operator inspection fields live in" in spec_ref
     assert "current workspace root or its parent directory" in spec_ref
     assert "split_yiu_payload_bundle_v4" in artifacts_ref
     assert "source of truth for emitted files" in artifacts_ref
     assert "shared `render`/`show` inspection surface" in artifacts_ref
     assert "visual_inventory.json" in artifacts_ref
+    assert "visual_direction" in artifacts_ref
     assert "render_status: rendered" in artifacts_ref
     assert "render_status: failed" in artifacts_ref
     assert "bundle_dir" in artifacts_ref
@@ -134,11 +139,13 @@ def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
         "shared typed render/show bundle-artifact surfaces for app/CLI boundaries live in `yiu/bundle_surface.py`"
     ) in architecture
     assert "published-contract BaseRender execution lives in `yiu/render.py`" in architecture
+    assert "transactional render-plan execution" in architecture
     assert "app/yiu_workflow/render.py" in architecture
     assert "app/yiu_workflow/show.py" in architecture
     assert "payload bundle publication orchestration lives in `yiu/publish.py`" in architecture
     assert "canonical view-entry/render-job planning lives in `yiu/view_catalog.py`" in architecture
     assert "display/title policy plus named visual directions live in `yiu/view_styles.py`" in architecture
+    assert "the named YIU visual system is `bench_strip`" in architecture
     assert "shared view fragments live in `yiu/view_common.py`" in architecture
     assert "`yiu/` (payload-centric YIU domain)" in architecture
     assert "cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml" in runbook_steps
@@ -161,8 +168,10 @@ def test_yiu_docs_keep_render_state_and_artifact_surface_contracts_separate() ->
     ) in guide
     assert "This page owns schema and normalization only." in spec_ref
     assert "Bundle layout, render-status semantics, and operator inspection fields live in" in spec_ref
+    assert "operator flow and visual posture" in spec_ref
     assert "source of truth for emitted files" in artifacts_ref
     assert "Each bundle uses `visual_inventory.json` as the operator-facing render-state record." in artifacts_ref
+    assert "visual_direction" in artifacts_ref
     assert "cruncher yiu render" in artifacts_ref
     assert "cruncher yiu show" in artifacts_ref
     assert "render-status semantics" in artifacts_ref

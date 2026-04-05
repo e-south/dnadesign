@@ -54,6 +54,7 @@ Payload-centric YIU visuals follow an operator-first strip layout:
 
 - the payload panel emphasizes sequence truth first, then mismatch evidence, then PWM overlays
 - split and assembled panels stay diagrammatic and legend-light so the three-view composite reads top-to-bottom
+- Cruncher publishes those directions explicitly as `evidence_ribbon` for `payload` and `operator_strip` for `split_payload`/`assembled_payload`; consumers should treat that as producer policy rather than infer it from showcase defaults
 - style changes should preserve that information hierarchy instead of adding tool-specific ornament or hidden fallback rendering
 - when `yiu_payload_visual_v1` is projected into `sequence_evidence_map_v1`, the projected metadata stays generic (`row_labels`, base highlights, and connector spans only) rather than carrying YIU-namespaced payload metadata into the shared contract
 

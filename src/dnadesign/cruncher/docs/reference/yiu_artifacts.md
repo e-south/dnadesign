@@ -19,6 +19,7 @@ It records:
 
 - `split_yiu_payload_bundle_v4`
 - view contract paths
+- explicit `visual_direction` per published view
 - render artifact paths
 - bundle composite render artifact path
 - published plot artifact path when configured
@@ -91,6 +92,7 @@ The payload visual contract carries:
 - `visual_inventory_path`
 
 That shared surface is intentional: bundle layout changes should land once in the app layer, not be reconstructed independently in CLI commands. The workflow guide points here instead of duplicating the inspection-field list.
+Each view entry also records one explicit `visual_direction` so downstream tools do not infer layout policy from `view_id` or showcase defaults.
 
 ### Status semantics
 

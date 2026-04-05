@@ -128,6 +128,7 @@ Core contract:
 - shared manifest/inventory/normalized load-persist helpers live in `yiu/bundle_state.py`
 - shared typed render/show bundle-artifact surfaces for app/CLI boundaries live in `yiu/bundle_surface.py`
 - published-contract BaseRender execution lives in `yiu/render.py`
+- `yiu/render.py` also owns transactional render-plan execution, failure-state persistence, and cleanup of partial render artifacts
 - `app/yiu_workflow/render.py` owns bundle publication orchestration
 - `app/yiu_workflow/show.py` owns read-only inspection and drift checking over the shared bundle surfaces
 - payload bundle publication orchestration lives in `yiu/publish.py`
@@ -136,6 +137,7 @@ Core contract:
 - canonical view-entry/render-job planning lives in `yiu/view_catalog.py`
 - normalized-payload, inventory, and manifest assembly lives in `yiu/publish_inventory.py`
 - display/title policy plus named visual directions live in `yiu/view_styles.py`
+- the named YIU visual system is `bench_strip`, with `evidence_ribbon` for payload truth and `operator_strip` for assembly-oriented views
 - payload mismatch/motif/meta shaping lives in `yiu/view_payload_content.py`
 - payload-view contract shells live in `yiu/view_payload_contracts.py`
 - split/assembled sequence-contract assembly lives in `yiu/view_sequence_contracts.py`
