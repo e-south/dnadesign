@@ -4,6 +4,7 @@
 **Last verified:** 2026-04-04
 
 YIU is a payload-centric rendering workflow with a strict v4 contract.
+Use this guide for command flow and operator posture. Use [YIU Spec Reference](../reference/yiu_spec.md) for input and normalization rules, [YIU Artifacts](../reference/yiu_artifacts.md) for emitted files and render-state semantics, and [Cruncher architecture](../reference/architecture.md) for module ownership.
 
 The public lane is:
 
@@ -54,13 +55,9 @@ uv run cruncher yiu show --bundle outputs/<workflow>
 ### Bundle surface
 
 YIU publishes one deterministic bundle under `output.bundle_dir`, typically `outputs/<workflow>/`.
+`render` and `show` both consume one shared bundle-artifact surface and one shared bundle-state family so the CLI and app layer do not reconstruct bundle internals ad hoc.
 
-The canonical operator-facing artifacts are:
-
-- bundle truth: `bundle_manifest.json`, `normalized_payload.json`, `visual_inventory.json`
-- view contracts: `payload_view.json`, `split_payload_view.json`, `assembled_payload_view.json`
-- composite render: `payload_views.pdf`
-- optional mirrored workspace PDF: `output.published_plot_path`
+The bundle contract is intentionally split across bundle truth, published view contracts, and composite render output. Use [YIU Artifacts](../reference/yiu_artifacts.md) for the exact emitted files, shared inspection fields, and render-status semantics.
 
 ### What `validate` checks
 
@@ -80,25 +77,15 @@ The payload view uses `yiu_payload_visual_v1`.
 When PWM context is available, the payload view includes motif layers aligned to payload-forward coordinates.
 When PWM is absent or disabled, the same contract stays valid with an empty `motif_layers` list.
 
-`sample_hit` can source payloads from:
+The three-view composite follows one explicit visual system:
 
-- direct `payload_sequence`
-- workspace-local `source_artifact_path`
-- sibling workspace public artifacts through `metadata.source_workspace` + `metadata.source_artifact`
+- `payload` uses the `evidence_ribbon` direction so sequence truth, mismatch evidence, and motif overlays stay in one dense operator row
+- `split_payload` and `assembled_payload` use the `operator_strip` direction so assembly geometry stays centered, legend-light, and subordinate to the payload truth row
+- unknown view ids fail fast during style planning instead of silently inheriting a plausible strip preset
 
-Relative `source_artifact_path` traversal stays inside the current workspace; sibling workspaces are resolved only through the explicit metadata pair above.
+`sample_hit` source resolution follows the rules in [YIU Spec Reference](../reference/yiu_spec.md). Ambiguous or missing sources fail fast.
 
-`cruncher yiu show` surfaces:
-
-- bundle directory and bundle contract
-- provenance
-- selected payload and complement sequences
-- selected junction and mismatch summary
-- PWM mode, effective status, and fallback reason when applicable
-- render status from `visual_inventory.json`
-- integrity checks against the manifest, inventory, normalized payload, and published view contracts
-- composite render path when present
-- optional verbose split-row debug details when `--verbose` is requested
+`cruncher yiu show` surfaces the bundle contract, provenance, selected payload and complement sequences, junction and mismatch summary, PWM mode, render status, integrity checks, and artifact paths. Use [YIU Artifacts](../reference/yiu_artifacts.md) for the exact inspection fields and fail-fast drift rules.
 
 `show` is fail-fast on bundle drift: missing published view contracts, manifest/inventory disagreements, payload-view motif drift, a `rendered` bundle with a missing `payload_views.pdf`, or a configured published plot path that does not exist are treated as bundle corruption.
 
@@ -108,7 +95,11 @@ The split middle row renders `split_payload_left` before `split_payload_right`. 
 
 The assembled payload returns to original payload order. It publishes one explicit `junction_span` in payload coordinates and does not use a seam or ligation-boundary surrogate in the operator-facing contract.
 
-Maintainers should treat `dnadesign.cruncher.yiu.view_contracts` and `dnadesign.cruncher.yiu.publish` as compatibility facades. Shared row-label fragments live in `view_common.py`, display/title policy lives in `view_styles.py`, payload mismatch/motif/meta shaping lives in `view_payload_content.py`, payload-contract shells live in `view_payload_contracts.py`, split/assembled contract shells live in `view_sequence_contracts.py`, split sticky-end plus assembled junction metadata policy lives in `view_sequence_metadata.py`, bundle filesystem writes plus debug-job emission live in `publish_io.py`, bundle layout plus render-job/view-entry planning lives in `publish_layout.py`, and normalized/manifest/inventory shaping lives in `publish_inventory.py`. Downstream, baserender keeps `yiu_payload_visual_projection.py` as a compatibility facade while `yiu_payload_sequence_projection.py` owns sequence-evidence projection and `yiu_payload_motif_overlay.py` owns payload motif-overlay assembly.
+### Maintainer boundaries
+
+Keep this guide operator-first. The canonical module ownership map lives in [Architecture](../reference/architecture.md).
+
+At the tool boundary, YIU publishes contracts and jobs; `baserender` consumes those contracts through its public API. Cross-tool integrations should not import `dnadesign.baserender.src.*`.
 
 ### Related docs
 

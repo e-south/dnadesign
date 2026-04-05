@@ -125,11 +125,17 @@ Core contract:
 - payload normalization for `user_sequence` and `sample_hit`
 - exhaustive optimization, split, display-orientation, and junction derivation
 - shared view fragments live in `yiu/view_common.py`
+- shared manifest/inventory/normalized load-persist helpers live in `yiu/bundle_state.py`
+- shared typed render/show bundle-artifact surfaces for app/CLI boundaries live in `yiu/bundle_surface.py`
+- published-contract BaseRender execution lives in `yiu/render.py`
+- `app/yiu_workflow/render.py` owns bundle publication orchestration
+- `app/yiu_workflow/show.py` owns read-only inspection and drift checking over the shared bundle surfaces
 - payload bundle publication orchestration lives in `yiu/publish.py`
 - payload bundle filesystem writes and debug-job emission live in `yiu/publish_io.py`
-- bundle layout plus view-entry/render-job planning lives in `yiu/publish_layout.py`
+- bundle layout and artifact-path planning live in `yiu/publish_layout.py`
+- canonical view-entry/render-job planning lives in `yiu/view_catalog.py`
 - normalized-payload, inventory, and manifest assembly lives in `yiu/publish_inventory.py`
-- display/title policy lives in `yiu/view_styles.py`
+- display/title policy plus named visual directions live in `yiu/view_styles.py`
 - payload mismatch/motif/meta shaping lives in `yiu/view_payload_content.py`
 - payload-view contract shells live in `yiu/view_payload_contracts.py`
 - split/assembled sequence-contract assembly lives in `yiu/view_sequence_contracts.py`

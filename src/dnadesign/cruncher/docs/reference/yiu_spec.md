@@ -3,9 +3,10 @@
 **Audience:** YIU workflow users and maintainers
 **Applies to:** `configs/yiu/*.yiu.yaml`
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-03
+**Last verified:** 2026-04-04
 
 YIU ships one strict v4 payload-rendering document root.
+This page owns schema and normalization only. Bundle layout, render-status semantics, and operator inspection fields live in [YIU Artifacts](yiu_artifacts.md).
 
 ### Recommended workspace layout
 
@@ -123,7 +124,7 @@ YIU accepts three stable payload-source shapes for `sample_hit`:
 - workspace-local `source_artifact_path`
 - sibling-workspace public artifact references through `metadata.source_workspace` + `metadata.source_artifact`
 
-Relative `source_artifact_path` values are resolved inside the current workspace only. Sibling workspace resolution is explicit through the metadata pair above, and ambiguous or missing sources fail fast.
+Relative `source_artifact_path` values are resolved inside the current workspace only. `metadata.source_workspace` is explicit: use an absolute path or a sibling workspace path/name that resolves from the current workspace root or its parent directory. Ambiguous or missing sources fail fast.
 
 ### Junction and PWM rules
 

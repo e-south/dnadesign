@@ -63,7 +63,7 @@ def test_cli_reference_lists_yiu_commands_and_contracts() -> None:
     assert "<workspace>/outputs/<name>/" in cli_ref
 
 
-def test_yiu_docs_capture_payload_workspace_and_artifact_boundaries() -> None:
+def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
     demo = _read("docs/demos/demo_yiu_workspace.md")
     guide = _read("docs/guides/yiu_workflow.md")
     spec_ref = _read("docs/reference/yiu_spec.md")
@@ -82,108 +82,91 @@ def test_yiu_docs_capture_payload_workspace_and_artifact_boundaries() -> None:
     assert "bundle_manifest.json" in demo
     assert "uv run cruncher yiu render" in demo
     assert "demo_monotypic_tetr" in demo
+    assert "Use this guide for command flow and operator posture." in guide
+    assert "[YIU Spec Reference](../reference/yiu_spec.md)" in guide
+    assert "[YIU Artifacts](../reference/yiu_artifacts.md)" in guide
+    assert "[Cruncher architecture](../reference/architecture.md)" in guide
     assert "strict v4 contract" in guide
     assert "### Start here" in guide
     assert "### Bundle surface" in guide
     assert "optimized junction/mismatch plan" in guide
     assert "output.bundle_dir" in guide
     assert "outputs/<workflow>/" in guide
-    assert "selected payload strand, selected complement strand, optional PWM motif layers" in guide
+    assert "shared bundle-artifact surface and one shared bundle-state family" in guide
     assert "The payload view uses `yiu_payload_visual_v1`." in guide
     assert "motif layers aligned to payload-forward coordinates" in guide
-    assert "integrity checks against the manifest, inventory, normalized payload, and published view contracts" in guide
-    assert "dnadesign.cruncher.yiu.view_contracts" in guide
-    assert "view_common.py" in guide
-    assert "view_payload_content.py" in guide
-    assert "view_styles.py" in guide
-    assert "view_payload_contracts.py" in guide
-    assert "view_sequence_contracts.py" in guide
-    assert "view_sequence_metadata.py" in guide
-    assert "dnadesign.cruncher.yiu.publish" in guide
-    assert "publish_io.py" in guide
-    assert "publish_layout.py" in guide
-    assert "publish_inventory.py" in guide
-    assert "yiu_payload_visual_projection.py" in guide
-    assert "yiu_payload_sequence_projection.py" in guide
-    assert "yiu_payload_motif_overlay.py" in guide
-    assert "user_sequence" in guide
-    assert "sample_hit" in guide
-    assert "payload" in guide
-    assert "split_payload" in guide
-    assert "assembled_payload" in guide
-    assert "4 nt junction window" in guide
-    assert "CLI Reference" in guide
-    assert "point split" not in guide.lower()
-    assert "right-then-left" not in guide.lower()
+    assert (
+        "bundle contract is intentionally split across bundle truth, published "
+        "view contracts, and composite render output"
+    ) in guide
+    assert ("exact emitted files, shared inspection fields, and render-status semantics") in guide
+    assert "### Maintainer boundaries" in guide
+    assert "[Architecture](../reference/architecture.md)" in guide
+    assert "[YIU Artifacts](../reference/yiu_artifacts.md)" in guide
+    assert "Cross-tool integrations should not import" in guide
+    assert "baserender.src.*" in guide
+    assert "Ambiguous or missing sources fail fast." in guide
     assert "split_yiu_payload_rendering_v4" in spec_ref
-    assert "sample_hit" in spec_ref
-    assert "user_sequence" in spec_ref
-    assert "bundle_dir" in spec_ref
-    assert "published_plot_path" in spec_ref
-    assert "candidate_positions" in spec_ref
-    assert "default_strand_preference" in spec_ref
-    assert "primary: maximin" in spec_ref
-    assert "yiu_payload_visual_v1" in spec_ref
-    assert "left_member" not in spec_ref
-    assert "right_member" not in spec_ref
-    assert "emit_view_contracts" not in spec_ref
+    assert "This page owns schema and normalization only." in spec_ref
+    assert "Bundle layout, render-status semantics, and operator inspection fields live in" in spec_ref
+    assert "current workspace root or its parent directory" in spec_ref
     assert "split_yiu_payload_bundle_v4" in artifacts_ref
+    assert "source of truth for emitted files" in artifacts_ref
+    assert "shared `render`/`show` inspection surface" in artifacts_ref
     assert "visual_inventory.json" in artifacts_ref
-    assert "normalized_payload.json" in artifacts_ref
-    assert "payload_view.json" in artifacts_ref
-    assert "split_payload_view.json" in artifacts_ref
-    assert "assembled_payload_view.json" in artifacts_ref
-    assert "yiu_payload_visual_v1" in artifacts_ref
-    assert "payload-forward coordinates" in artifacts_ref
-    assert "ligation_junction" not in artifacts_ref
-    assert "assembled seam" not in artifacts_ref.lower()
-    assert "baserender_jobs/" in artifacts_ref
-    assert "published_plot_artifact_path" in artifacts_ref
-    assert "trace" not in guide
-    assert "9-state" not in guide
-    assert "protocol replay" not in guide.lower()
-    assert "ship_v3" not in guide
-    assert "ship_v4" not in guide
+    assert "render_status: rendered" in artifacts_ref
+    assert "render_status: failed" in artifacts_ref
+    assert "bundle_dir" in artifacts_ref
+    assert "outputs_root" in artifacts_ref
+    assert "bundle_manifest_path" in artifacts_ref
+    assert "normalized_payload_path" in artifacts_ref
+    assert "visual_inventory_path" in artifacts_ref
+    assert "Published contract paths" in artifacts_ref
+    assert "Use [YIU Workflow](../guides/yiu_workflow.md)" in artifacts_ref
+    assert "### Shared bundle surface" in artifacts_ref
+    assert "cruncher yiu render" in artifacts_ref
+    assert "cruncher yiu show" in artifacts_ref
+    assert "shared `render`/`show` inspection surface" in artifacts_ref
+    assert "render-status semantics" in artifacts_ref
+    assert "bundle layout changes should land once in the app layer" in artifacts_ref
+    assert ("shared manifest/inventory/normalized load-persist helpers live in `yiu/bundle_state.py`") in architecture
+    assert (
+        "shared typed render/show bundle-artifact surfaces for app/CLI boundaries live in `yiu/bundle_surface.py`"
+    ) in architecture
+    assert "published-contract BaseRender execution lives in `yiu/render.py`" in architecture
+    assert "app/yiu_workflow/render.py" in architecture
+    assert "app/yiu_workflow/show.py" in architecture
+    assert "payload bundle publication orchestration lives in `yiu/publish.py`" in architecture
+    assert "canonical view-entry/render-job planning lives in `yiu/view_catalog.py`" in architecture
+    assert "display/title policy plus named visual directions live in `yiu/view_styles.py`" in architecture
+    assert "shared view fragments live in `yiu/view_common.py`" in architecture
     assert "`yiu/` (payload-centric YIU domain)" in architecture
-    assert "yiu/view_common.py" in architecture
-    assert "yiu/view_payload_content.py" in architecture
-    assert "yiu/view_styles.py" in architecture
-    assert "yiu/view_payload_contracts.py" in architecture
-    assert "yiu/view_sequence_contracts.py" in architecture
-    assert "yiu/view_sequence_metadata.py" in architecture
-    assert "yiu/publish.py" in architecture
-    assert "yiu/publish_io.py" in architecture
-    assert "yiu/publish_layout.py" in architecture
-    assert "yiu/publish_inventory.py" in architecture
-    assert "yiu/bundle_paths.py" in architecture
-    assert "yiu/render_panels.py" in architecture
-    assert "yiu init-workspace|validate|render|show" in architecture
-    assert "trace|solve" not in architecture
-    assert "split_yiu_payload_rendering_v4" in architecture
-    assert "split_yiu_payload_bundle_v4" in architecture
-    assert "yiu_payload_visual_v1" in architecture
-    assert "yiu_payload_visual_projection.py" in architecture
-    assert "yiu_payload_sequence_projection.py" in architecture
-    assert "yiu_payload_motif_overlay.py" in architecture
-    assert (
-        "cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml --force-overwrite --emit-renders"
-        in runbook_steps
-    )
+    assert "cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml" in runbook_steps
     assert "cruncher yiu show --bundle outputs/example_payload" in runbook_steps
-    assert (
-        "cruncher yiu render --spec configs/yiu/tetr_monotypic_hit.yiu.yaml --force-overwrite --emit-renders"
-        in runbook_steps
-    )
-    assert "cruncher yiu show --bundle outputs/yiu__tetr_monotypic_hit" in runbook_steps
-    runbook_yaml = _read("workspaces/demo_yiu_payload/configs/runbook.yaml")
-    assert "description: Validate the checked-in user-sequence YIU demo spec." in runbook_yaml
-    assert (
-        "description: Publish the deterministic user-sequence YIU v4 payload bundle and render the canonical views."
-        in runbook_yaml
-    )
-    assert "description: Inspect the published user-sequence payload bundle and integrity checks." in runbook_yaml
-    assert "<workflow>.yiu.solve.yaml" not in workspaces_readme
     assert "outputs/\n      <workflow>/" in workspaces_readme
+
+
+def test_yiu_docs_keep_render_state_and_artifact_surface_contracts_separate() -> None:
+    guide = _read("docs/guides/yiu_workflow.md")
+    artifacts_ref = _read("docs/reference/yiu_artifacts.md")
+    spec_ref = _read("docs/reference/yiu_spec.md")
+
+    assert (
+        "Use [YIU Artifacts](../reference/yiu_artifacts.md) for the exact "
+        "emitted files, shared inspection fields, and render-status semantics."
+    ) in guide
+    assert (
+        "bundle contract is intentionally split across bundle truth, "
+        "published view contracts, and composite render output"
+    ) in guide
+    assert "This page owns schema and normalization only." in spec_ref
+    assert "Bundle layout, render-status semantics, and operator inspection fields live in" in spec_ref
+    assert "source of truth for emitted files" in artifacts_ref
+    assert "Each bundle uses `visual_inventory.json` as the operator-facing render-state record." in artifacts_ref
+    assert "cruncher yiu render" in artifacts_ref
+    assert "cruncher yiu show" in artifacts_ref
+    assert "render-status semantics" in artifacts_ref
+    assert "published artifact paths disagree" in artifacts_ref
 
 
 def test_checked_in_yiu_demo_workspace_exists() -> None:

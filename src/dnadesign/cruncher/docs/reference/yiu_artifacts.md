@@ -3,16 +3,17 @@
 **Audience:** YIU workflow users and maintainers
 **Applies to:** `uv run cruncher yiu render|show`
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-03
+**Last verified:** 2026-04-04
 
 YIU writes one payload-centric bundle family under the workspace-relative `output.bundle_dir` path.
+This page is the source of truth for emitted files, render-status semantics, and the shared `render`/`show` inspection surface.
 
 Recommended patterns:
 
 - YIU-only workspace: `outputs/<workflow>/` plus `output.published_plot_path: outputs/<workflow>__payload_views.pdf`
 - Sample-backed workspace: `outputs/yiu__<workflow>/` plus `output.published_plot_path: outputs/plots/plot__yiu__<workflow>__payload_views.pdf`
 
-Each bundle uses `visual_inventory.json` to track render status and published artifact paths.
+Each bundle uses `visual_inventory.json` as the operator-facing render-state record.
 
 It records:
 
@@ -76,6 +77,20 @@ The payload visual contract carries:
 - junction annotations
 - mismatch annotations
 - optional motif layers aligned to payload-forward coordinates
+
+### Shared bundle surface
+
+`cruncher yiu render` and `cruncher yiu show` share one bundle-artifact surface:
+
+- `bundle_dir`
+- `outputs_root`
+- `composite_render_artifact_path`
+- `published_plot_artifact_path`
+- `bundle_manifest_path`
+- `normalized_payload_path`
+- `visual_inventory_path`
+
+That shared surface is intentional: bundle layout changes should land once in the app layer, not be reconstructed independently in CLI commands. The workflow guide points here instead of duplicating the inspection-field list.
 
 ### Status semantics
 
