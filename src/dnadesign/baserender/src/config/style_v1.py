@@ -112,6 +112,7 @@ class Style:
     color_sequence: str = "#4b5563"
     color_ticks: str = "#9ca3af"
     overlay_align: str = "left"
+    overlay_title_gap_reduction_px: float = 0.0
 
     legend: bool = True
     legend_mode: str = "bottom"
@@ -193,6 +194,11 @@ class Style:
         ensure(
             str(self.overlay_align).lower() in {"left", "center", "right"},
             "style.overlay_align must be 'left', 'center', or 'right'",
+            SchemaError,
+        )
+        ensure(
+            self.overlay_title_gap_reduction_px >= 0,
+            "style.overlay_title_gap_reduction_px must be >= 0",
             SchemaError,
         )
         ensure(

@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.contracts.visual.sequence_evidence_meta import build_sequence_evidence_connector_meta
+from dnadesign.contracts.visual.sequence_evidence_meta import build_sequence_evidence_connector_span_meta
 from dnadesign.cruncher.yiu.bsmbi import GhostExcisedContext, SplitFragmentDisplaySpec
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
 from dnadesign.cruncher.yiu.view_common import YIU_EMPTY_ROW_LABELS
@@ -48,10 +48,9 @@ def build_split_payload_row_meta(fragment: SplitFragmentDisplaySpec) -> dict[str
         "ghost_excised_context": None if ghost_context is None else ghost_context.model_dump(mode="json"),
         "row_labels": YIU_EMPTY_ROW_LABELS,
         "dim_base_indices": _ghost_dim_base_indices(ghost_context),
-        **build_sequence_evidence_connector_meta(
+        **build_sequence_evidence_connector_span_meta(
             start=sticky_end_span["start"],
             end=sticky_end_span["end"],
-            cross_indices=[],
             coordinate_space=sticky_end_span.get("coordinate_space"),
         ),
     }
@@ -72,10 +71,9 @@ def build_assembled_payload_view_meta(normalized: NormalizedPayload) -> dict[str
         == normalized.reference_payload_sequence,
         "base_highlights": {"primary": highlight_indices, "complement": highlight_indices},
         "row_labels": YIU_EMPTY_ROW_LABELS,
-        **build_sequence_evidence_connector_meta(
+        **build_sequence_evidence_connector_span_meta(
             start=junction_span["start"],
             end=junction_span["end"],
-            cross_indices=highlight_indices,
             coordinate_space="payload_forward",
         ),
     }

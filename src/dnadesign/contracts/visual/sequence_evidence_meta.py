@@ -51,7 +51,26 @@ def build_sequence_evidence_connector_meta(
     }
 
 
+def build_sequence_evidence_connector_span_meta(
+    *,
+    start: int,
+    end: int,
+    coordinate_space: str | None = None,
+) -> dict[str, object]:
+    if end <= start:
+        raise ValueError("sequence-evidence connector spans require end > start")
+    span: dict[str, object] = {"start": int(start), "end": int(end)}
+    if coordinate_space is not None:
+        span["coordinate_space"] = str(coordinate_space)
+    return {
+        "connector_hidden_indices": [],
+        "connector_cross_indices": [],
+        "connector_overhang_spans": [span],
+    }
+
+
 __all__ = [
     "build_sequence_evidence_connector_meta",
+    "build_sequence_evidence_connector_span_meta",
     "normalize_sequence_evidence_row_labels",
 ]

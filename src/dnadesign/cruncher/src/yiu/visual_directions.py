@@ -35,6 +35,10 @@ _COMMON_STRIP_STYLE_OVERRIDES: dict[str, object] = {
     "connector_dash": (),
 }
 
+_OPERATOR_STRIP_TITLE_COMPACTION_OVERRIDES: dict[str, object] = {
+    "overlay_title_gap_reduction_px": 18.0,
+}
+
 
 def _merge_style_overrides(base: dict[str, object], **updates: object) -> dict[str, object]:
     merged = dict(base)
@@ -59,9 +63,10 @@ def _bench_strip_direction_base() -> dict[str, object]:
 def operator_strip_style_overrides(*, padding_y: float = 24.0) -> dict[str, object]:
     return _merge_style_overrides(
         _bench_strip_direction_base(),
+        **_OPERATOR_STRIP_TITLE_COMPACTION_OVERRIDES,
         padding_y=padding_y,
         legend=False,
-        connectors=False,
+        connectors=True,
     )
 
 

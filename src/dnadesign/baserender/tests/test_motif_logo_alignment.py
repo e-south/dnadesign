@@ -679,6 +679,45 @@ def test_overlay_title_gap_is_stable_when_only_antisense_layers_increase() -> No
     assert stacked_gap == pytest.approx(base_gap, abs=1e-6)
 
 
+def test_overlay_title_gap_reduction_style_lowers_sequence_rows_overlay() -> None:
+    overlay_text = "Overlay Title"
+    record = Record(
+        id="overlay_compact_gap",
+        alphabet="DNA",
+        sequence="TTGACAAAAAAAAAAAAAAAATATAAT",
+        features=(),
+        effects=(),
+        display=Display(overlay_text=overlay_text),
+        meta={},
+    )
+    base_style = resolve_style(preset=None, overrides=None)
+    compact_style = resolve_style(preset=None, overrides={"overlay_title_gap_reduction_px": 18.0})
+
+    def _actual_content_top(layout) -> float:
+        return max(
+            float(layout.y_forward + layout.sequence_extent_up),
+            float(layout.y_reverse + layout.sequence_extent_up),
+        )
+
+    def _overlay_gap(style) -> float:
+        initialize_runtime()
+        layout = compute_layout(record, style)
+        fig = SequenceRowsRenderer().render(record, style, Palette(style.palette))
+        ax = fig.axes[0]
+        try:
+            overlays = [text for text in ax.texts if text.get_text() == overlay_text]
+            assert len(overlays) == 1
+            return float(overlays[0].get_position()[1]) - _actual_content_top(layout)
+        finally:
+            plt.close(fig)
+
+    base_gap = _overlay_gap(base_style)
+    compact_gap = _overlay_gap(compact_style)
+
+    assert compact_gap < base_gap
+    assert compact_gap <= (base_gap - 12.0)
+
+
 def test_style_accepts_new_logo_coloring_and_scale_bar_location() -> None:
     style = resolve_style(
         preset=None,

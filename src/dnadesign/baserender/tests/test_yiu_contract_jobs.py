@@ -320,6 +320,50 @@ def test_render_uses_explicit_complement_sequence_and_highlights_mismatch_bases(
     assert sum(dimmed_rgb) > sum(payload_rgb)
 
 
+def test_sequence_evidence_map_overhang_span_meta_draws_full_junction_guides() -> None:
+    adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="IUPAC_DNA")
+    record = adapter.apply(
+        {
+            "contract_kind": "sequence_evidence_map_v1",
+            "state_id": "split_payload",
+            "topology_kind": "linear_dsdna",
+            "alphabet": "iupac_dna",
+            "primary_sequence": "CGTCTCATGCAT",
+            "complement_sequence": "GCAGAGTACGTA",
+            "owners": [],
+            "effect_tags": [],
+            "boundaries": [],
+            "pairings": [],
+            "display": {"title": "Split payload right"},
+            "meta": {
+                "connector_hidden_indices": [],
+                "connector_cross_indices": [],
+                "connector_overhang_spans": [{"start": 4, "end": 8}],
+            },
+        },
+        row_index=0,
+    )
+
+    fig = baserender.render(
+        record,
+        renderer="nucleotide_evidence_map",
+        style={"preset": "presentation_default", "overrides": {"connectors": True}},
+    )
+    try:
+        line_segments = [
+            (tuple(float(value) for value in line.get_xdata()), tuple(float(value) for value in line.get_ydata()))
+            for line in fig.axes[0].lines
+        ]
+    finally:
+        plt.close(fig)
+
+    vertical_count = sum(1 for (x0, x1), (y0, y1) in line_segments if abs(x0 - x1) < 1.0e-6 and abs(y0 - y1) > 1.0e-6)
+    horizontal_count = sum(1 for (x0, x1), (y0, y1) in line_segments if abs(y0 - y1) < 1.0e-6 and abs(x0 - x1) > 1.0e-6)
+
+    assert vertical_count >= 4
+    assert horizontal_count >= 1
+
+
 def test_yiu_payload_projection_contract_normalizes_row_labels_and_connector_spans() -> None:
     contract = YiuPayloadVisualV1.model_validate(
         {

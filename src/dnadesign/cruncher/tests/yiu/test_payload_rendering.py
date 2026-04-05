@@ -1034,14 +1034,23 @@ def test_payload_view_uses_sample_inspired_pwm_style() -> None:
     assert overrides["motif_logo"]["letter_coloring"]["observed_color_source"] == "feature_fill"
 
 
-def test_split_and_assembled_views_center_titles() -> None:
+def test_operator_strip_views_scale_up_for_legibility() -> None:
     payload_overrides = build_yiu_style_overrides("payload")
     split_overrides = build_yiu_style_overrides("split_payload")
     assembled_overrides = build_yiu_style_overrides("assembled_payload")
 
-    assert payload_overrides["figure_scale"] == split_overrides["figure_scale"] == assembled_overrides["figure_scale"]
     assert split_overrides["overlay_align"] == "center"
     assert assembled_overrides["overlay_align"] == "center"
+    assert split_overrides["figure_scale"] == payload_overrides["figure_scale"]
+    assert assembled_overrides["figure_scale"] == payload_overrides["figure_scale"]
+    assert split_overrides["font_size_seq"] == payload_overrides["font_size_seq"]
+    assert assembled_overrides["font_size_seq"] == payload_overrides["font_size_seq"]
+    assert split_overrides["font_size_label"] == payload_overrides["font_size_label"]
+    assert assembled_overrides["font_size_label"] == payload_overrides["font_size_label"]
+    assert split_overrides["connectors"] is True
+    assert assembled_overrides["connectors"] is True
+    assert split_overrides["overlay_title_gap_reduction_px"] > 0
+    assert assembled_overrides["overlay_title_gap_reduction_px"] > 0
 
 
 def test_operator_strip_views_inherit_bench_strip_foundation() -> None:
@@ -1089,7 +1098,7 @@ def test_split_payload_view_metadata_preserves_sticky_end_and_ghost_context_cont
     assert meta["canonical_sticky_end_sequence_5to3"] == right_fragment.canonical_sticky_end_sequence_5to3
     assert meta["sticky_end_display_span"] == sticky_end_span
     assert meta["payload_junction_window"] == right_fragment.payload_junction_window.model_dump(mode="json")
-    assert meta["connector_hidden_indices"] == list(range(sticky_end_span["start"], sticky_end_span["end"]))
+    assert meta["connector_hidden_indices"] == []
     assert meta["connector_cross_indices"] == []
     assert meta["connector_overhang_spans"] == [sticky_end_span]
     assert meta["ghost_excised_context"] == right_fragment.ghost_excised_context.model_dump(mode="json")
@@ -1118,12 +1127,8 @@ def test_assembled_payload_view_metadata_preserves_junction_connector_contract(t
     assert meta["junction_span"] == junction_span
     assert meta["mismatches"] == [site.model_dump(mode="json") for site in normalized.mismatches]
     assert meta["base_highlights"] == {"primary": mismatch_indices, "complement": mismatch_indices}
-    assert meta["connector_hidden_indices"] == [
-        index
-        for index in range(normalized.junction.start, normalized.junction.end)
-        if index not in set(mismatch_indices)
-    ]
-    assert meta["connector_cross_indices"] == mismatch_indices
+    assert meta["connector_hidden_indices"] == []
+    assert meta["connector_cross_indices"] == []
     assert meta["connector_overhang_spans"] == [junction_span]
 
 
@@ -1641,6 +1646,29 @@ def test_render_yiu_spec_force_overwrite_without_emit_renders_cleans_stale_publi
     assert show_payload.render_status == "not_requested"
     assert show_payload.available_renders == []
     assert show_payload.published_plot_artifact_path == str(published_plot_path.resolve())
+
+
+def test_render_yiu_spec_force_overwrite_with_emit_renders_replaces_stale_published_plot(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec())
+
+    bundle_dir, _report = render_yiu_spec(spec_path, emit_renders=True)
+    published_plot_path = workspace / "outputs" / "plot__demo_payload__payload_views.pdf"
+
+    assert published_plot_path.exists()
+    assert (bundle_dir / "payload_views.pdf").exists()
+
+    overwritten_bundle_dir, _report = render_yiu_spec(spec_path, force_overwrite=True, emit_renders=True)
+    inventory = _load_json(overwritten_bundle_dir / "visual_inventory.json")
+    manifest = _load_json(overwritten_bundle_dir / "bundle_manifest.json")
+
+    assert overwritten_bundle_dir == bundle_dir
+    assert inventory["render_status"] == "rendered"
+    assert inventory["render_count"] == 3
+    assert manifest["render_status"] == "rendered"
+    assert (bundle_dir / "payload_views.pdf").exists()
+    assert published_plot_path.exists()
 
 
 def test_render_yiu_spec_emit_renders_persists_failed_render_state(

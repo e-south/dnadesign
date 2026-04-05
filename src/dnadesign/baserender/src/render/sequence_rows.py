@@ -860,9 +860,20 @@ def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
         ha = "left"
     synthetic_top_pad = max(0.0, float(layout.content_top) - _actual_content_top(layout))
     title_size = max(float(style.font_size_label), float(style.font_size_seq))
+    title_lines = max(1, len([line for line in str(text).splitlines() if line.strip()]))
+    title_line_height = max((title_size / 72.0 * style.dpi) * 1.05, layout.ch * 0.5)
+    title_block_height = title_line_height * title_lines
+    min_overlay_y = _actual_content_top(layout) + title_block_height + max(4.0, style.font_size_label * 0.25)
+    overlay_y = (
+        layout.height
+        - max(4.0, style.padding_y * 0.5)
+        - synthetic_top_pad
+        - max(0.0, float(style.overlay_title_gap_reduction_px))
+    )
+    overlay_y = max(min_overlay_y, overlay_y)
     ax.text(
         x,
-        layout.height - max(4.0, style.padding_y * 0.5) - synthetic_top_pad,
+        overlay_y,
         text,
         ha=ha,
         va="top",
