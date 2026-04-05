@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** reference
 **Audience:** cassette workflow users and maintainers
-**Updated by:** cruncher-maintainers on 2026-03-25
+**Last updated by:** cruncher-maintainers on 2026-04-05
 **Applies to:** `uv run cruncher cassette design|solve`
 **Last verified:** 2026-03-25
 **Primary artifacts:** explicit cassette reports plus shared view contracts, solve reports, hit tables, top-hit JSONL batches, baserender jobs, and per-hit bundles

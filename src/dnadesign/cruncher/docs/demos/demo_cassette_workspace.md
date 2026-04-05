@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** tutorial
 **Audience:** cassette workflow users and maintainers
-**Updated by:** cruncher-maintainers on 2026-03-25
+**Last updated by:** cruncher-maintainers on 2026-04-05
 **Applies to:** `uv run cruncher cassette init-workspace|solve` plus `uv run baserender job validate|run`
 **Last verified:** 2026-03-25
 **Primary artifacts:** `cassette_workspace_manifest.json`, `outputs/cassette_solves/<solve_id>/views/*.jsonl`, `baserender_jobs/*.job.yaml`, and workspace-local `renders/*.pdf`
@@ -116,7 +116,7 @@ Use `solve_report.json`, `solve_status.json`, or `table__hits.csv` to fill in `<
 Everything stays inside the same cassette workspace root:
 
 ```text
-src/dnadesign/cruncher/workspaces/cassette_lab_demo/
+src/dnadesign/cruncher/workspaces/<workspace_name>/
   configs/
     runbook.yaml
     cassettes/

@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** reference
 **Audience:** cassette workflow users and maintainers
-**Updated by:** cruncher-maintainers on 2026-03-25
+**Last updated by:** cruncher-maintainers on 2026-04-05
 **Applies to:** workspace-local and built-in cassette nickase catalogs
 **Last verified:** 2026-03-25
 **Primary artifacts:** validated catalog entries used by `cassette validate|design`

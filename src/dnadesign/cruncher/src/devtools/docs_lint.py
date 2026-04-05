@@ -36,6 +36,52 @@ _LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 
 
 @dataclass(frozen=True)
+class SchemaRule:
+    allowed_versions: frozenset[str]
+    fix: str
+
+
+_SCHEMA_RULES = {
+    "cassette_solve": SchemaRule(
+        allowed_versions=frozenset({"1"}),
+        fix="Update cassette solve docs examples to `cassette_solve.schema_version: 1`.",
+    ),
+    "portfolio": SchemaRule(
+        allowed_versions=frozenset({"3"}),
+        fix="Update portfolio docs examples to `portfolio.schema_version: 3`.",
+    ),
+    "cruncher": SchemaRule(
+        allowed_versions=frozenset({"3"}),
+        fix="Update Cruncher config docs examples to `cruncher.schema_version: 3`.",
+    ),
+    "study": SchemaRule(
+        allowed_versions=frozenset({"3"}),
+        fix="Update study docs examples to `study.schema_version: 3`.",
+    ),
+    "cassette": SchemaRule(
+        allowed_versions=frozenset({"1", "2"}),
+        fix="Update cassette docs examples to `cassette.schema_version: 1` or `2`.",
+    ),
+    "nickases": SchemaRule(
+        allowed_versions=frozenset({"1"}),
+        fix="Update nickase catalog docs examples to `nickases.schema_version: 1`.",
+    ),
+    "runbook": SchemaRule(
+        allowed_versions=frozenset({"1"}),
+        fix="Update runbook docs examples to `runbook.schema_version: 1`.",
+    ),
+    "yiu": SchemaRule(
+        allowed_versions=frozenset({"1"}),
+        fix="Update YIU docs examples to `yiu.schema_version: 1`.",
+    ),
+}
+_SCHEMA_ROOT_PATTERN = re.compile(
+    r"^\s*(%s)\s*:" % "|".join(sorted(_SCHEMA_RULES, key=len, reverse=True)),
+    re.MULTILINE,
+)
+
+
+@dataclass(frozen=True)
 class LintIssue:
     path: Path
     rule_id: str
@@ -217,25 +263,33 @@ def _lint_schema_mentions() -> list[LintIssue]:
             found_versions = _SCHEMA_PATTERN.findall(block)
             if not found_versions:
                 continue
-            for found in found_versions:
-                if found != "3":
-                    issues.append(
-                        LintIssue(
-                            path=path,
-                            rule_id="SCH001",
-                            message=f"Found non-v3 schema_version mention: {found}",
-                            fix="Update docs examples to schema_version: 3.",
-                        )
-                    )
-            if not re.search(r"^\s*(cruncher|study|portfolio)\s*:", block, re.MULTILINE):
+            root_match = _SCHEMA_ROOT_PATTERN.search(block)
+            if root_match is None:
                 issues.append(
                     LintIssue(
                         path=path,
                         rule_id="SCH002",
                         message="YAML config example mentions schema_version but no recognized root key.",
-                        fix="Wrap config examples with one of: `cruncher:`, `study:`, or `portfolio:`.",
+                        fix=(
+                            "Wrap config examples with one of: `cruncher:`, `study:`, `portfolio:`, `yiu:`, "
+                            "`cassette:`, `cassette_solve:`, `nickases:`, or `runbook:`."
+                        ),
                     )
                 )
+                continue
+            root = root_match.group(1)
+            rule = _SCHEMA_RULES[root]
+            for found in found_versions:
+                if found not in rule.allowed_versions:
+                    allowed = " or ".join(sorted(rule.allowed_versions))
+                    issues.append(
+                        LintIssue(
+                            path=path,
+                            rule_id="SCH001",
+                            message=f"Found unsupported {root}.schema_version mention: {found} (allowed: {allowed})",
+                            fix=rule.fix,
+                        ),
+                    )
     return issues
 
 

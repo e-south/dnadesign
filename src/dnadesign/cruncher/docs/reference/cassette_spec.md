@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** reference
 **Audience:** cassette workflow users and maintainers
-**Updated by:** cruncher-maintainers on 2026-03-25
+**Last updated by:** cruncher-maintainers on 2026-04-05
 **Applies to:** `configs/cassettes/*.cassette.yaml`
 **Last verified:** 2026-03-25
 **Primary artifacts:** validated `report.json`, `report.md`, `views/linear_duplex.v1.json`, `views/ssdna_hairpin.v1.json`, and `views/views_manifest.v1.json`

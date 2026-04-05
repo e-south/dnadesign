@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** guide
 **Audience:** cassette workflow users and maintainers
-**Updated by:** cruncher-maintainers on 2026-03-25
+**Last updated by:** cruncher-maintainers on 2026-04-05
 **Applies to:** `uv run cruncher cassette solve`
 **Last verified:** 2026-03-25
 **Primary artifacts:** `solve_report.json`, `table__hits.csv`, `views/top_hits.linear_duplex.v1.jsonl`, `views/top_hits.ssdna_hairpin.v1.jsonl`, and per-hit explicit cassette bundles

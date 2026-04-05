@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** guide
 **Audience:** cassette workflow users and maintainers
-**Updated by:** cruncher-maintainers on 2026-03-25
+**Last updated by:** cruncher-maintainers on 2026-04-05
 **Applies to:** `uv run cruncher cassette validate|design|show`
 **Last verified:** 2026-03-25
 **Primary artifacts:** `analysis/reports/report.json`, `analysis/reports/report.md`, `views/linear_duplex.v1.json`, `views/ssdna_hairpin.v1.json`, `views/views_manifest.v1.json`, `export/table__candidates.csv`
