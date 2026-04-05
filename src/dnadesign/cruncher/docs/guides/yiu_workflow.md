@@ -10,6 +10,15 @@ The public lane is:
 
 `input payload -> normalized payload -> optimized junction/mismatch plan -> canonical bundle -> BaseRender`
 
+This page is the operator route map, not the schema definition. Keep emitted-file details in [YIU Artifacts](../reference/yiu_artifacts.md), input rules in [YIU Spec Reference](../reference/yiu_spec.md), and layout posture in [YIU Visual System](../reference/yiu_visual_system.md).
+
+### Route map
+
+- Use the demo when you need the checked-in workspace and runbook.
+- Use `validate` when you need contract and payload-plan checks only.
+- Use `render` when you need the bundle plus optional PDF publication.
+- Use `show` when you need a fail-fast bundle inspection surface.
+
 ### Documentation ownership
 
 - Use [YIU Workspace Demo](../demos/demo_yiu_workspace.md) for the checked-in workspace and runbook.

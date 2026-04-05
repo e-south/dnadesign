@@ -8,6 +8,12 @@
 YIU writes one payload-centric bundle family under the workspace-relative `output.bundle_dir` path.
 This page is the source of truth for emitted files, render-status semantics, and the shared `render`/`show` inspection surface.
 
+### Bundle truth vs mirror
+
+- `output.bundle_dir` is the bundle-local source of truth for YIU artifacts.
+- `output.published_plot_path` is an optional workspace-level mirror of the bundle PDF.
+- The CLI and app layer should read bundle truth from `visual_inventory.json` and `bundle_manifest.json`, not from filesystem guesswork.
+
 Recommended patterns:
 
 - YIU-only workspace: `outputs/<workflow>/` plus `output.published_plot_path: outputs/<workflow>__payload_views.pdf`

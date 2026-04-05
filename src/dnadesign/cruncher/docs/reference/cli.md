@@ -528,6 +528,7 @@ Notes:
 
 The YIU workflow is separate from both `sample` and `cassette`. It expects one payload-centric spec file at
 `<workspace>/configs/yiu/<name>.yiu.yaml`, validates the `split_yiu_payload_rendering_v4` contract, and writes a single payload bundle under the workspace-relative `output.bundle_dir` path, typically `<workspace>/outputs/<name>/`.
+Treat the bundle directory as the source of truth; the mirrored operator PDF is optional and follows `output.published_plot_path` only when configured.
 
 Deep contracts live in:
 

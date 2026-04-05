@@ -9,6 +9,12 @@ YIU ships one strict v4 payload-rendering document root.
 This page owns schema and normalization only. Bundle layout, render-status semantics, and operator inspection fields live in [YIU Artifacts](yiu_artifacts.md).
 Use [YIU Workflow](../guides/yiu_workflow.md) for operator flow and visual posture instead of repeating bundle/output narratives here.
 
+### Scope
+
+- This page owns the input contract, normalization rules, and optimization rules.
+- This page does not own emitted bundle layout, PDF mirroring, or bundle-drift checks.
+- When you need operator flow, use the workflow guide instead of expanding the schema page.
+
 ### Recommended workspace layout
 
 ```text

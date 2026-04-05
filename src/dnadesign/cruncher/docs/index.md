@@ -16,6 +16,8 @@
 ### Overview
 This index is the browsing map for Cruncher docs. Start with the package-level [Cruncher README](../README.md) for the short operational map, then route into one workflow family.
 
+Treat YIU as a separate contract stack: use the demo for the checked-in workspace, the workflow guide for operator flow, the spec reference for schema and normalization, the artifacts reference for emitted files and render state, and the visual system page for layout posture. That keeps its operator flow, schema rules, emitted bundle, and visual system on separate pages so each contract stays smaller and easier to change.
+
 Cruncher has three first-class workflow families today:
 
 - fixed-length optimization workspaces built around `fetch -> lock -> parse -> sample -> analyze`

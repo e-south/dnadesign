@@ -22,6 +22,16 @@ Scale and rhythm are intentionally stepped. The payload row is compact and infor
 
 The typography posture is technical rather than editorial. Titles should help a reader orient quickly, but the figure should still be driven by sequence geometry and explicit annotations. Text that does not help navigation or evidence interpretation should stay out of the render.
 
+### Information hierarchy
+
+The hierarchy is intentionally split into evidence, confirmation, and restoration:
+
+- `payload` is the evidence row. It carries the selected payload, mismatch annotations, and PWM overlays when available.
+- `split_payload` is the confirmation row. It shows fragment geometry, sticky-end context, and only the lightest necessary labels.
+- `assembled_payload` is the restoration row. It returns to payload order and makes the junction span obvious without adding a second story.
+
+Keep that order stable unless the contract changes with it. If the payload row stops being the strongest visual anchor, the page stops being `bench_strip` and starts becoming a generic multi-panel poster.
+
 ### Visual translation map
 
 - `payload` uses `evidence_ribbon`: payload truth first, mismatch evidence second, PWM overlays third.
@@ -31,6 +41,7 @@ The typography posture is technical rather than editorial. Titles should help a 
 ### Boundary rules
 
 - The producer-side style policy lives in `src/dnadesign/cruncher/src/yiu/visual_system.py`.
+- The title policy lives in `src/dnadesign/cruncher/src/yiu/view_styles.py`.
 - `cruncher` chooses the named visual direction and style overrides when it publishes bundle views.
 - `baserender` consumes those contracts through its public adapter and renderer APIs; it should not infer YIU layout policy from showcase defaults alone.
 - Visual-system edits should preserve the information hierarchy unless the contract and docs are updated together.

@@ -19,6 +19,8 @@ Studies and portfolios build on the fixed-length optimization lane. Cassette and
 2. Start with one demo or guide from that family.
 3. Use **Reference contracts** when you need strict CLI, schema, or artifact behavior.
 
+YIU keeps its operator flow, schema rules, emitted bundle, and visual system on separate pages so each contract stays smaller and easier to change.
+
 <!-- docs:toc:off -->
 
 ### Choose a workflow family

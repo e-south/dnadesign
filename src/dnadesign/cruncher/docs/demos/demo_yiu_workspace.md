@@ -5,6 +5,12 @@
 
 Use this walkthrough to run the checked-in YIU reference workspace, publish its payload bundle, and inspect the three payload views. Keep this page runnable-first; use [YIU Artifacts](../reference/yiu_artifacts.md) for the emitted-file contract and [YIU Visual System](../reference/yiu_visual_system.md) for the named visual directions.
 
+### Route map
+
+- Use this workspace when you want the checked-in user-sequence demo.
+- Use a monotypic workspace when you need a sample-hit-backed YIU example.
+- Use `init-workspace` when you want a disposable scratch workspace with the same schema.
+
 ```bash
 # Use the checked-in YIU demo workspace in the repo.
 DEMO_WORKSPACE=src/dnadesign/cruncher/workspaces/demo_yiu_payload

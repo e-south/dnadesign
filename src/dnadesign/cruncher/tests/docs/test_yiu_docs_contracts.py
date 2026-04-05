@@ -30,6 +30,7 @@ def test_docs_index_routes_to_yiu_guide_and_references() -> None:
         assert "reference/yiu_artifacts.md" in content
         assert "reference/yiu_visual_system.md" in content
         assert "Ownership split:" in content
+        assert "operator flow, schema rules, emitted bundle, and visual system" in content
         assert "yiu init-workspace|validate|render|show" in content
         assert "trace|solve" not in content
 
@@ -72,6 +73,7 @@ def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
     spec_ref = _read("docs/reference/yiu_spec.md")
     artifacts_ref = _read("docs/reference/yiu_artifacts.md")
     visual_ref = _read("docs/reference/yiu_visual_system.md")
+    cli_ref = _read("docs/reference/cli.md")
     architecture = _read("docs/reference/architecture.md")
     runbook_steps = _read("docs/reference/runbook_steps.md")
     workspaces_readme = _read("workspaces/README.md")
@@ -87,6 +89,8 @@ def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
     assert "[YIU Artifacts](../reference/yiu_artifacts.md)" in demo
     assert "[YIU Visual System](../reference/yiu_visual_system.md)" in demo
     assert "Use this guide for command flow and operator posture." in guide
+    assert "This page is the operator route map" in guide
+    assert "### Route map" in guide
     assert "### Documentation ownership" in guide
     assert "[YIU Spec Reference](../reference/yiu_spec.md)" in guide
     assert "[YIU Artifacts](../reference/yiu_artifacts.md)" in guide
@@ -115,6 +119,8 @@ def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
     assert "Ambiguous or missing sources fail fast." in guide
     assert "split_yiu_payload_rendering_v4" in spec_ref
     assert "This page owns schema and normalization only." in spec_ref
+    assert "This page owns the input contract, normalization rules, and optimization rules." in spec_ref
+    assert "### Scope" in spec_ref
     assert "operator flow and visual posture" in spec_ref
     assert "Bundle layout, render-status semantics, and operator inspection fields live in" in spec_ref
     assert "current workspace root or its parent directory" in spec_ref
@@ -139,6 +145,8 @@ def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
     assert "shared `render`/`show` inspection surface" in artifacts_ref
     assert "render-status semantics" in artifacts_ref
     assert "bundle layout changes should land once in the app layer" in artifacts_ref
+    assert "### Bundle truth vs mirror" in artifacts_ref
+    assert "optional workspace-level mirror" in artifacts_ref
     assert ("shared manifest/inventory/normalized load-persist helpers live in `yiu/bundle_state.py`") in architecture
     assert (
         "shared typed render/show bundle-artifact surfaces for app/CLI boundaries live in `yiu/bundle_surface.py`"
@@ -162,6 +170,9 @@ def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
     assert "cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml" in runbook_steps
     assert "cruncher yiu show --bundle outputs/example_payload" in runbook_steps
     assert "outputs/\n      <workflow>/" in workspaces_readme
+    assert "sample-hit-backed YIU example" in demo
+    assert "### Route map" in demo
+    assert "Treat the bundle directory as the source of truth" in cli_ref
 
 
 def test_yiu_docs_keep_render_state_and_artifact_surface_contracts_separate() -> None:
