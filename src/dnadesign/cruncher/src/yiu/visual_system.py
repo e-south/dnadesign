@@ -29,70 +29,87 @@ class YiuViewStyleProfile:
     style_overrides: dict[str, object]
 
 
-def _operator_strip_style_overrides() -> dict[str, object]:
-    return {
-        "figure_scale": _YIU_FIGURE_SCALE,
-        "padding_x": 42.0,
-        "padding_y": 24.0,
-        "track_spacing": 20.0,
-        "font_size_seq": 13,
-        "font_size_label": 11,
-        "legend_mode": "none",
-        "legend_font_size": 10,
-        "legend_gap_x": 10.0,
-        "legend_height_px": 52.0,
-        "layout": {"outer_pad_cells": 0.18},
-        "sequence": {"strand_gap_cells": 0.22, "to_kmer_gap_cells": 0.18},
-        "kmer": {"box_height_cells": 1.02, "fill_alpha": 0.94, "text_y_nudge_cells": 0.0},
-        "overlay_align": "center",
-        "connector_width": 1.1,
-        "connector_alpha": 0.78,
-        "connector_dash": (),
-    }
+_COMMON_STRIP_STYLE_OVERRIDES: dict[str, object] = {
+    "figure_scale": _YIU_FIGURE_SCALE,
+    "padding_x": 42.0,
+    "padding_y": 24.0,
+    "track_spacing": 20.0,
+    "font_size_seq": 13,
+    "font_size_label": 11,
+    "legend_mode": "none",
+    "legend_font_size": 10,
+    "legend_gap_x": 10.0,
+    "legend_height_px": 52.0,
+    "layout": {"outer_pad_cells": 0.18},
+    "sequence": {"strand_gap_cells": 0.22, "to_kmer_gap_cells": 0.18},
+    "kmer": {"box_height_cells": 1.02, "fill_alpha": 0.94, "text_y_nudge_cells": 0.0},
+    "overlay_align": "center",
+    "connector_width": 1.1,
+    "connector_alpha": 0.78,
+    "connector_dash": (),
+}
+
+
+def _merge_style_overrides(base: dict[str, object], **updates: object) -> dict[str, object]:
+    merged = dict(base)
+    for key, value in updates.items():
+        existing = merged.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            nested = dict(existing)
+            nested.update(value)
+            merged[key] = nested
+            continue
+        merged[key] = value
+    return merged
+
+
+def _operator_strip_style_overrides(*, padding_y: float = 24.0) -> dict[str, object]:
+    return {**_COMMON_STRIP_STYLE_OVERRIDES, "padding_y": padding_y, "legend": False}
 
 
 def _evidence_ribbon_style_overrides() -> dict[str, object]:
-    base = dict(cruncher_showcase_style_overrides())
-    base.update(
-        {
-            "figure_scale": _YIU_FIGURE_SCALE,
-            "padding_x": 42.0,
-            "padding_y": 24.0,
-            "track_spacing": 20.0,
-            "font_size_seq": 13,
-            "font_size_label": 11,
-            "legend": False,
-            "legend_mode": "none",
-            "connectors": True,
-            "connector_width": 1.1,
-            "connector_alpha": 0.78,
-            "connector_dash": (),
-        }
+    return _merge_style_overrides(
+        dict(cruncher_showcase_style_overrides()),
+        **_COMMON_STRIP_STYLE_OVERRIDES,
+        legend=False,
+        connectors=True,
     )
-    return base
+
+
+def _build_style_profile(
+    *,
+    view_id: str,
+    direction_name: str,
+    design_note: str,
+    style_overrides: dict[str, object],
+) -> YiuViewStyleProfile:
+    return YiuViewStyleProfile(
+        view_id=view_id,
+        direction_name=direction_name,
+        system_name=YIU_VISUAL_SYSTEM_NAME,
+        design_note=design_note,
+        style_overrides=style_overrides,
+    )
 
 
 _STYLE_PROFILES: dict[str, YiuViewStyleProfile] = {
-    "payload": YiuViewStyleProfile(
+    "payload": _build_style_profile(
         view_id="payload",
         direction_name="evidence_ribbon",
-        system_name=YIU_VISUAL_SYSTEM_NAME,
         design_note="Dense operator-first evidence row for payload truth, mismatches, and PWM overlays.",
         style_overrides=_evidence_ribbon_style_overrides(),
     ),
-    "split_payload": YiuViewStyleProfile(
+    "split_payload": _build_style_profile(
         view_id="split_payload",
         direction_name="operator_strip",
-        system_name=YIU_VISUAL_SYSTEM_NAME,
         design_note="Lean assembly strip that keeps split-fragment geometry readable without payload-row ornament.",
-        style_overrides={**_operator_strip_style_overrides(), "legend": False},
+        style_overrides=_operator_strip_style_overrides(),
     ),
-    "assembled_payload": YiuViewStyleProfile(
+    "assembled_payload": _build_style_profile(
         view_id="assembled_payload",
         direction_name="operator_strip",
-        system_name=YIU_VISUAL_SYSTEM_NAME,
         design_note="Lean reassembly strip that centers the restored payload order and junction context.",
-        style_overrides={**_operator_strip_style_overrides(), "legend": False, "padding_y": 28.0},
+        style_overrides=_operator_strip_style_overrides(padding_y=28.0),
     ),
 }
 
