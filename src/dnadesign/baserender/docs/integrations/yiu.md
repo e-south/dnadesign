@@ -1,7 +1,7 @@
 # YIU Integration Contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-04
+**Last verified:** 2026-04-05
 
 
 This page defines the YIU visual-contract handoff used by `baserender`.
@@ -58,6 +58,13 @@ Payload-centric YIU visuals follow an operator-first strip layout:
 - style changes should preserve that information hierarchy instead of adding tool-specific ornament or hidden fallback rendering
 - producer-side visual language is owned by Cruncher; `baserender` should consume explicit direction names and style overrides rather than reconstruct the YIU look from consumer-side showcase defaults
 - when `yiu_payload_visual_v1` is projected into `sequence_evidence_map_v1`, the projected metadata stays generic (`row_labels`, base highlights, and connector spans only) rather than carrying YIU-namespaced payload metadata into the shared contract
+
+Adapter responsibilities stay split on purpose:
+
+- `yiu_payload_visual_v1.py` orchestrates the public adapter and merges the base sequence projection with motif overlay output.
+- `yiu_payload_sequence_projection.py` owns the YIU-to-`sequence_evidence_map_v1` translation and should remain free of motif rendering concerns.
+- `yiu_payload_motif_overlay.py` owns motif feature/effect assembly and tag-label enrichment only.
+- `yiu_payload_visual_projection.py` is a compatibility facade for callers that need the two helper builders without importing the underlying modules directly.
 
 ## Published bundle surface
 

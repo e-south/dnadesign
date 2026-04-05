@@ -29,19 +29,25 @@ class YiuPayloadVisualV1Adapter:
     policies: Mapping[str, Any]
     alphabet: str
 
+    def _build_base_record(self, *, contract: YiuPayloadVisualV1, row_index: int) -> Record:
+        base_adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet=self.alphabet)
+        return base_adapter.apply(build_sequence_evidence_map_contract(contract), row_index=row_index)
+
+    @staticmethod
+    def _merge_tag_labels(*, base_record: Record, overlay_tag_labels: dict[str, str]) -> dict[str, str]:
+        tag_labels = dict(base_record.display.tag_labels)
+        for tag, label in overlay_tag_labels.items():
+            tag_labels.setdefault(tag, label)
+        return tag_labels
+
     def apply(self, row: dict, *, row_index: int) -> Record:
         try:
             contract = YiuPayloadVisualV1.model_validate(row)
         except Exception as exc:
             raise SchemaError(f"Invalid yiu_payload_visual_v1 contract at row {row_index}: {exc}") from exc
 
-        base_adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet=self.alphabet)
-        base_record = base_adapter.apply(build_sequence_evidence_map_contract(contract), row_index=row_index)
+        base_record = self._build_base_record(contract=contract, row_index=row_index)
         overlay = build_motif_overlay(contract, base_record=base_record)
-
-        tag_labels = dict(base_record.display.tag_labels)
-        for tag, label in overlay.tag_labels.items():
-            tag_labels.setdefault(tag, label)
 
         record = Record(
             id=base_record.id,
@@ -52,7 +58,7 @@ class YiuPayloadVisualV1Adapter:
             display=Display(
                 overlay_text=base_record.display.overlay_text,
                 video_subtitle=base_record.display.video_subtitle,
-                tag_labels=tag_labels,
+                tag_labels=self._merge_tag_labels(base_record=base_record, overlay_tag_labels=overlay.tag_labels),
                 trajectory_panel=base_record.display.trajectory_panel,
             ),
             meta={

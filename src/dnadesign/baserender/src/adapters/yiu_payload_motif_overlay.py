@@ -11,7 +11,6 @@ Module Author(s): OpenAI Codex
 
 from __future__ import annotations
 
-from collections import Counter
 from dataclasses import dataclass
 
 from dnadesign.contracts.visual import YiuPayloadVisualV1
@@ -94,18 +93,28 @@ class YiuPayloadMotifOverlay:
     tag_labels: dict[str, str]
 
 
-def build_motif_overlay(contract: YiuPayloadVisualV1, *, base_record: Record) -> YiuPayloadMotifOverlay:
-    features: list[Feature] = []
-    effects: list[Effect] = []
+def _build_tag_labels(contract: YiuPayloadVisualV1) -> dict[str, str]:
     tag_labels: dict[str, str] = {}
-    motif_tf_counts = Counter(motif.tf_name for motif in contract.motif_layers)
+    motif_tf_counts: dict[str, int] = {}
     for motif in contract.motif_layers:
-        feature_id = f"motif:{motif.motif_instance_id}"
+        motif_tf_counts[motif.tf_name] = motif_tf_counts.get(motif.tf_name, 0) + 1
+    for motif in contract.motif_layers:
         style_token = _motif_style_token(motif)
         motif_tag = f"motif:{motif.motif_instance_id}"
         tag_labels.setdefault(style_token, motif.tf_name)
         if motif_tf_counts[motif.tf_name] > 1:
             tag_labels.setdefault(motif_tag, motif.label)
+    return tag_labels
+
+
+def build_motif_overlay(contract: YiuPayloadVisualV1, *, base_record: Record) -> YiuPayloadMotifOverlay:
+    features: list[Feature] = []
+    effects: list[Effect] = []
+    tag_labels = _build_tag_labels(contract)
+    for motif in contract.motif_layers:
+        feature_id = f"motif:{motif.motif_instance_id}"
+        style_token = _motif_style_token(motif)
+        motif_tag = f"motif:{motif.motif_instance_id}"
         features.append(
             _build_motif_feature(
                 motif=motif,
