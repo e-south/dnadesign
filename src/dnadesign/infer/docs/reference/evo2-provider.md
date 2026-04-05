@@ -14,20 +14,23 @@ Use this page for the repo-aligned Evo2 promoter feature contract inside `infer`
 
 ### Project default intermediate selector
 
-`infer` treats block `26` as a project default for promoter feature extraction.
+`infer` uses a model-aware project default for promoter feature extraction.
 
 - this is a repo default, not a universal scientific claim
-- `evo2_7b` uses block `26` because it is a defensible default from public interpretability work
-- `evo2_20b` keeps the same default until repo-local benchmarks justify a different lane
+- `evo2_7b` uses block `26` because public Evo 2 interpretability work examined layer 26 and reported biologically meaningful features there; see [Interpreting Evo 2](https://www.goodfire.ai/research/interpreting-evo-2)
+- `evo2_20b` uses block `23` because the upstream 20B surface exposes blocks `0..23`
 
 User-facing config should set:
 
 ```yaml
 feature_bundle:
-  intermediate_block: 26
+  intermediate_block: 26  # on evo2_20b this resolves to the model-aware default block 23
 ```
 
-The bundle resolves that to the canonical selector `block26_mlp_out`, and the adapter maps that to the provider-layer path currently used by the Evo2 surface.
+The bundle resolves that to a model-aware canonical selector:
+
+- `evo2_7b`: `block26_mlp_out` -> `blocks.26.mlp.l3`
+- `evo2_20b`: `block23_mlp_out` -> `blocks.23.mlp.l3`
 
 ### Feature groups
 
@@ -87,13 +90,16 @@ Promoter bundles emit stable out ids such as:
 - `log_likelihood__mean_per_token`
 - `output_layer_mean__seq_mean`
 - `output_layer_mean__anchor_mean`
-- `intermediate_embedding__block26_mlp_out__seq_mean`
-- `intermediate_embedding__block26_mlp_out__anchor_mean`
+- `intermediate_embedding__block26_mlp_out__seq_mean` for `evo2_7b`
+- `intermediate_embedding__block26_mlp_out__anchor_mean` for templated `evo2_7b` contexts
+- `intermediate_embedding__block23_mlp_out__seq_mean` for `evo2_20b`
+- `intermediate_embedding__block23_mlp_out__anchor_mean` for templated `evo2_20b` contexts
 
 Read these ids literally:
 
 - `output_layer_mean__seq_mean` is the mean-pooled final-layer embedding across sequence positions
-- `intermediate_embedding__block26_mlp_out__seq_mean` is the mean-pooled block-26 representation across sequence positions
+- `intermediate_embedding__block26_mlp_out__seq_mean` is the mean-pooled 7B block-26 representation across sequence positions
+- `intermediate_embedding__block23_mlp_out__seq_mean` is the mean-pooled 20B block-23 representation across sequence positions
 - bare names such as `output_layer_mean` or `intermediate_embedding` are bundle categories, not raw persisted tensors
 
 Structured bundle metadata is persisted as additional infer out ids such as:
@@ -109,11 +115,15 @@ Feature-bundle resume does not trust column presence alone.
 
 - each row carries `metadata__feature_request_digest`
 - when the persisted digest does not match the current bundle request, `infer` recomputes that row instead of silently reusing stale outputs
+- `overwrite: false` prevents recomputing already-written feature outputs on
+  rerun
+- reruns can still backfill metadata fields when stored values are null; treat
+  that as idempotent metadata completion rather than duplicated feature work
 
 ### Hardware and performance posture
 
 - `evo2_7b` is the default local and SCC smoke lane
-- `evo2_20b` requires Hopper-class GPUs in the current upstream contract
-- first-run latency is dominated by upstream Evo2 backend startup, not the bundle wrapper
+- `evo2_20b` requires GPUs at compute capability `>= 9.0` in the current upstream contract; on SCC that usually means H200, but newer higher-capability lanes also qualify when memory is sufficient
+- first-run latency is dominated by upstream Evo2 backend startup, not the bundle wrapper; for `evo2_20b`, expect a cold-start phase of `fetch -> hydration -> GPU residency -> first attach events`
 
 Use [SCC Evo2 GPU environment runbook](../operations/scc-evo2-gpu-uv-runbook.md) for GPU environment setup and failure-mode handling.

@@ -55,6 +55,8 @@ def test_infer_scc_gpu_env_runbook_exists_and_covers_uv_stack_contract() -> None
     assert "layer" in doc
     assert "block26_mlp_out" in doc
     assert "blocks.26.mlp.l3" in doc
+    assert "block23_mlp_out" in doc
+    assert "blocks.23.mlp.l3" in doc
     assert "params.layer: mid" in doc
     assert "params.layer: final" in doc
     assert 'export UV_PROJECT_ENVIRONMENT="$PWD/.venv"' in doc

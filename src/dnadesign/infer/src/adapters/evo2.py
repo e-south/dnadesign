@@ -21,13 +21,14 @@ from __future__ import annotations
 
 import contextlib
 import re
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import torch
 
 from .._logging import get_logger
 from ..errors import CapabilityError, ModelLoadError
 from ..features.selectors import provider_layer_from_selector
+from ..registry import get_default_embedding_layer
 from ..utils import pool_tensor, to_format
 from . import EVO2_DEFAULT_EMBEDDING_LAYER
 
@@ -236,6 +237,35 @@ class Evo2Adapter:
             raise CapabilityError("Evo2 extract output assembly failed: missing batch outputs.")
         return [value for value in per_index if value is not None]
 
+    def _run_dual_extract_batches_by_length(
+        self,
+        *,
+        tokens: List[List[int]],
+        batch_forward: Callable[[torch.Tensor], Tuple[torch.Tensor, torch.Tensor]],
+    ) -> tuple[List[torch.Tensor], List[torch.Tensor]]:
+        if not tokens:
+            return [], []
+
+        logits_by_index: List[Optional[torch.Tensor]] = [None] * len(tokens)
+        embeddings_by_index: List[Optional[torch.Tensor]] = [None] * len(tokens)
+        with torch.inference_mode(), self._autocast_ctx():
+            for group in _bucket_indices_by_token_length(tokens):
+                batch_tokens = [tokens[idx] for idx in group]
+                x = self._stack_equal_len(batch_tokens)
+                logits_batch, embedding_batch = batch_forward(x)
+                if logits_batch.size(0) != len(group) or embedding_batch.size(0) != len(group):
+                    raise CapabilityError("Evo2 dual extract output assembly failed: batch axis mismatch.")
+                for row_index, sample_index in enumerate(group):
+                    logits_by_index[sample_index] = logits_batch[row_index]
+                    embeddings_by_index[sample_index] = embedding_batch[row_index]
+
+        if any(value is None for value in logits_by_index) or any(value is None for value in embeddings_by_index):
+            raise CapabilityError("Evo2 dual extract output assembly failed: missing batch outputs.")
+        return (
+            [value for value in logits_by_index if value is not None],
+            [value for value in embeddings_by_index if value is not None],
+        )
+
     def _resolve_embedding_layer_alias(self, layer: str) -> str:
         value = str(layer).strip()
         if not value:
@@ -243,7 +273,8 @@ class Evo2Adapter:
 
         alias = value.lower()
         if alias in {"mid", "default"}:
-            resolved = provider_layer_from_selector(EVO2_DEFAULT_EMBEDDING_LAYER)
+            default_selector = get_default_embedding_layer(self.model_id) or EVO2_DEFAULT_EMBEDDING_LAYER
+            resolved = provider_layer_from_selector(default_selector)
             return self._validate_resolved_embedding_layer(resolved, original=value)
 
         if alias not in {"final", "endpoint"}:
@@ -329,6 +360,43 @@ class Evo2Adapter:
         )
         return [to_format(item, fmt) for item in logits_by_input]
 
+    def logits_and_embedding(
+        self,
+        seqs: List[str],
+        *,
+        layer: str,
+        fmt: str,
+    ) -> tuple[List[Any], List[Any]]:
+        if not isinstance(layer, str):
+            raise CapabilityError(
+                "Evo2 embedding expects a string layer name like 'blocks.28.mlp.l3'. "
+                "Pass adapter-specific names explicitly to avoid ambiguity."
+            )
+        resolved_layer = self._resolve_embedding_layer_alias(layer)
+        tokens = self._tokenize_many(seqs)
+
+        def _forward_dual(x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+            outputs, embeddings = self.model(x, return_embeddings=True, layer_names=[resolved_layer])
+            if isinstance(outputs, (list, tuple)):
+                try:
+                    logits_batch = outputs[0]
+                except Exception as e:
+                    raise CapabilityError(f"Evo2 forward returned unexpected structure: {e}")
+            else:
+                logits_batch = outputs
+            if resolved_layer not in embeddings:
+                raise CapabilityError(f"Embedding layer '{resolved_layer}' not found in Evo2 response.")
+            return logits_batch, embeddings[resolved_layer]
+
+        logits_by_input, embeddings_by_input = self._run_dual_extract_batches_by_length(
+            tokens=tokens,
+            batch_forward=_forward_dual,
+        )
+        return (
+            [to_format(item, fmt) for item in logits_by_input],
+            [to_format(item, fmt) for item in embeddings_by_input],
+        )
+
     def embedding(
         self,
         seqs: List[str],
@@ -390,7 +458,11 @@ class Evo2Adapter:
             raise CapabilityError("Evo2 log_likelihood supports reduction='sum' or 'mean' only.")
         red = reduction
         with torch.inference_mode():
-            values = self.model.score_sequences(seqs, reduce_method=red)
+            values = self.model.score_sequences(
+                seqs,
+                batch_size=max(1, len(seqs)),
+                reduce_method=red,
+            )
         return [float(v) for v in values]
 
     def generate(

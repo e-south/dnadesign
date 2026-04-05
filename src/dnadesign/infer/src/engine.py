@@ -29,7 +29,10 @@ from .runtime.adapter_runtime import clear_adapter_cache as _clear_adapter_cache
 from .runtime.adapter_runtime import get_adapter as _get_adapter
 from .runtime.adapter_runtime import is_oom as _is_oom
 from .runtime.batch_policy import resolve_extract_batch_policy, resolve_micro_batch_size
-from .runtime.extract_chunk_writeback import build_extract_chunk_write_back
+from .runtime.extract_chunk_writeback import (
+    build_extract_chunk_group_write_back,
+    build_extract_chunk_write_back,
+)
 from .runtime.extract_execution import execute_extract_output
 from .runtime.extract_params import resolve_extract_params
 from .runtime.generate_execution import execute_generate_batches, validate_generate_payload
@@ -70,6 +73,15 @@ def run_extract_job(
     records = payload.records
     pt_path = payload.pt_path
     ds = payload.dataset
+
+    if job.feature_bundle is not None:
+        from .config import OutputSpec
+        from .features.execution import build_feature_bundle_outputs
+
+        job.outputs = [
+            OutputSpec(**payload)
+            for payload in build_feature_bundle_outputs(bundle=job.feature_bundle, model_id=model.id)
+        ]
 
     validate_extract_output_namespace(model_id=model.id, outputs=job.outputs or [])
     _validate_alphabet(model.alphabet, seqs)
@@ -127,6 +139,26 @@ def run_extract_job(
             )
             for out_id in feature_metadata_output_ids()
         }
+        on_chunk_output_group = build_extract_chunk_group_write_back(
+            source=source,
+            write_back=bool(job.io.write_back),
+            ds=ds,
+            ids=ids,
+            model_id=model.id,
+            job_id=job.id,
+            overwrite=bool(job.io.overwrite),
+            writer=write_back_usr,
+        )
+        on_chunk_metadata_group = build_extract_chunk_group_write_back(
+            source=source,
+            write_back=bool(job.io.write_back),
+            ds=ds,
+            ids=ids,
+            model_id=model.id,
+            job_id=job.id,
+            overwrite=bool(job.io.overwrite),
+            writer=write_back_usr,
+        )
         pbar = create_progress_handle(
             progress_factory=progress_factory,
             label=f"{job.id}/feature_bundle",
@@ -153,6 +185,8 @@ def run_extract_job(
                 on_progress=pbar.update,
                 on_chunk_by_output=on_chunk_by_output,
                 on_chunk_by_metadata=on_chunk_by_metadata,
+                on_chunk_output_group=on_chunk_output_group,
+                on_chunk_metadata_group=on_chunk_metadata_group,
             )
         finally:
             pbar.close()

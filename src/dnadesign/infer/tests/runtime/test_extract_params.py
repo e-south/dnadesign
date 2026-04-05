@@ -43,6 +43,19 @@ def test_resolve_extract_params_sets_evo2_default_embedding_layer_when_missing()
     assert "layer" not in params
 
 
+def test_resolve_extract_params_sets_evo2_20b_default_embedding_layer_when_missing() -> None:
+    params = {"pool": {"method": "mean", "dim": 1}}
+
+    resolved = resolve_extract_params(
+        model_id="evo2_20b",
+        method_name="embedding",
+        params=params,
+    )
+
+    assert resolved["layer"] == "block23_mlp_out"
+    assert "layer" not in params
+
+
 def test_resolve_extract_params_preserves_explicit_embedding_layer() -> None:
     resolved = resolve_extract_params(
         model_id="agnostic_1b",

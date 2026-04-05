@@ -161,6 +161,202 @@ namespaces:
       type: list<string>
     description: DenseGen derived outputs.
     owner: densegen
+  infer:
+    columns:
+    - name: infer__evo2_20b__anchor_only_20b_features__log_likelihood__total
+      type: float64
+    - name: infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token
+      type: float64
+    - name: infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean
+      type: list<float64>
+    - name: infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean
+      type: list<float64>
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__sequence_id
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__anchor_id
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__is_wildtype
+      type: bool
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__context_id
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__context_kind
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__template_id
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__resolved_length
+      type: int64
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__anchor_start
+      type: int64
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__anchor_end
+      type: int64
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__model_name
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__provider_name
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__provider_version
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__intermediate_block
+      type: int64
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__intermediate_selector
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__pooling_modes
+      type: list<string>
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__feature_schema_version
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__construct_version
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__timestamp
+      type: string
+    - name: infer__evo2_20b__anchor_only_20b_features__metadata__feature_request_digest
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__log_likelihood__total
+      type: float64
+    - name: infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token
+      type: float64
+    - name: infer__evo2_20b__template_1kb_20b_features__output_layer_mean__seq_mean
+      type: list<float64>
+    - name: infer__evo2_20b__template_1kb_20b_features__output_layer_mean__anchor_mean
+      type: list<float64>
+    - name: infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__seq_mean
+      type: list<float64>
+    - name: infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__anchor_mean
+      type: list<float64>
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__sequence_id
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__anchor_id
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__is_wildtype
+      type: bool
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__context_id
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__context_kind
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__template_id
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__resolved_length
+      type: int64
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__anchor_start
+      type: int64
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__anchor_end
+      type: int64
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__model_name
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__provider_name
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__provider_version
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__intermediate_block
+      type: int64
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__intermediate_selector
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__pooling_modes
+      type: list<string>
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__feature_schema_version
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__construct_version
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__timestamp
+      type: string
+    - name: infer__evo2_20b__template_1kb_20b_features__metadata__feature_request_digest
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__log_likelihood__total
+      type: float64
+    - name: infer__evo2_7b__anchor_only_7b_features__log_likelihood__mean_per_token
+      type: float64
+    - name: infer__evo2_7b__anchor_only_7b_features__output_layer_mean__seq_mean
+      type: list<float64>
+    - name: infer__evo2_7b__anchor_only_7b_features__intermediate_embedding__block26_mlp_out__seq_mean
+      type: list<float64>
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__sequence_id
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__anchor_id
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__is_wildtype
+      type: bool
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__context_id
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__context_kind
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__template_id
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__resolved_length
+      type: int64
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__anchor_start
+      type: int64
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__anchor_end
+      type: int64
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__model_name
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__provider_name
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__provider_version
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__intermediate_block
+      type: int64
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__intermediate_selector
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__pooling_modes
+      type: list<string>
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__feature_schema_version
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__construct_version
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__timestamp
+      type: string
+    - name: infer__evo2_7b__anchor_only_7b_features__metadata__feature_request_digest
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__log_likelihood__total
+      type: float64
+    - name: infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token
+      type: float64
+    - name: infer__evo2_7b__template_1kb_7b_features__output_layer_mean__seq_mean
+      type: list<float64>
+    - name: infer__evo2_7b__template_1kb_7b_features__output_layer_mean__anchor_mean
+      type: list<float64>
+    - name: infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__seq_mean
+      type: list<float64>
+    - name: infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__anchor_mean
+      type: list<float64>
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__sequence_id
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__anchor_id
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__is_wildtype
+      type: bool
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__context_id
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__context_kind
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__template_id
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__resolved_length
+      type: int64
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__anchor_start
+      type: int64
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__anchor_end
+      type: int64
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__model_name
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__provider_name
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__provider_version
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__intermediate_block
+      type: int64
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__intermediate_selector
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__pooling_modes
+      type: list<string>
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__feature_schema_version
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__construct_version
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__timestamp
+      type: string
+    - name: infer__evo2_7b__template_1kb_7b_features__metadata__feature_request_digest
+      type: string
+    description: null
+    owner: null
   mock:
     columns:
     - name: mock__X_value

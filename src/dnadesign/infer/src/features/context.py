@@ -22,6 +22,18 @@ _CONSTRUCT_REQUIRED_COLUMNS = (
     "construct__anchor_start",
     "construct__anchor_end",
 )
+_USR_CONTEXT_COLUMNS = (
+    "construct__context_id",
+    "construct__template_id",
+    "construct__anchor_start",
+    "construct__anchor_end",
+    "construct__anchor_id",
+    "construct__input_id",
+    "construct__anchor_orientation",
+    "construct__resolved_length",
+    "construct__spec_id",
+    "is_wildtype",
+)
 
 
 def _bool_or_none(value: object) -> bool | None:
@@ -38,8 +50,49 @@ def _bool_or_none(value: object) -> bool | None:
 
 
 def _ordered_usr_rows(ds, *, ids: List[str]) -> List[Dict[str, object]]:
+    wanted_ids = [str(row_id) for row_id in ids]
+    if hasattr(ds, "_duckdb_query"):
+        if hasattr(ds, "schema"):
+            schema_names = {field.name for field in ds.schema()}
+            query_columns = [
+                "id",
+                *[column_name for column_name in _USR_CONTEXT_COLUMNS if column_name in schema_names],
+            ]
+        else:
+            query_columns = ["id", *_USR_CONTEXT_COLUMNS]
+        placeholders = ", ".join("?" for _ in wanted_ids)
+        con, query, params = ds._duckdb_query(
+            columns=query_columns,
+            include_overlays=True,
+            include_deleted=False,
+            where=f"b.id IN ({placeholders})",
+            params=wanted_ids,
+            limit=len(wanted_ids),
+        )
+        found: dict[str, dict[str, object]] = {}
+        try:
+            con.execute(query, params)
+            reader = con.fetch_record_batch(max(len(wanted_ids), 1))
+            for batch in reader:
+                payload = batch.to_pydict()
+                for row_index in range(batch.num_rows):
+                    row = {
+                        "id": payload["id"][row_index],
+                        **{column_name: None for column_name in _USR_CONTEXT_COLUMNS},
+                    }
+                    for name in payload:
+                        row[name] = payload[name][row_index]
+                    row_id = str(row["id"])
+                    if row_id not in found:
+                        found[row_id] = row
+        finally:
+            con.close()
+        missing = [row_id for row_id in wanted_ids if row_id not in found]
+        if not missing:
+            return [found[row_id] for row_id in wanted_ids]
+
     found: dict[str, dict[str, object]] = {}
-    wanted = set(str(value) for value in ids)
+    wanted = set(wanted_ids)
     for batch in ds.scan(include_overlays=True):
         payload = batch.to_pydict()
         for row_index in range(batch.num_rows):

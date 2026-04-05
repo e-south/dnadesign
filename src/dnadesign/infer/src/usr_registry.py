@@ -16,6 +16,29 @@ from dataclasses import dataclass
 from .config import RootConfig
 from .contracts import infer_usr_column_name
 from .errors import ConfigError
+from .features.execution import feature_metadata_output_ids
+
+_FEATURE_BUNDLE_METADATA_TYPES: dict[str, str] = {
+    "metadata__sequence_id": "string",
+    "metadata__anchor_id": "string",
+    "metadata__is_wildtype": "bool",
+    "metadata__context_id": "string",
+    "metadata__context_kind": "string",
+    "metadata__template_id": "string",
+    "metadata__resolved_length": "int64",
+    "metadata__anchor_start": "int64",
+    "metadata__anchor_end": "int64",
+    "metadata__model_name": "string",
+    "metadata__provider_name": "string",
+    "metadata__provider_version": "string",
+    "metadata__intermediate_block": "int64",
+    "metadata__intermediate_selector": "string",
+    "metadata__pooling_modes": "list<string>",
+    "metadata__feature_schema_version": "string",
+    "metadata__construct_version": "string",
+    "metadata__timestamp": "string",
+    "metadata__feature_request_digest": "string",
+}
 
 
 @dataclass(frozen=True)
@@ -39,6 +62,13 @@ def _registry_type_for_output_format(output_format: str) -> str:
     if output_format == "list":
         return "list<float64>"
     raise ConfigError("USR registry spec only supports infer output formats: float, list")
+
+
+def _registry_type_for_metadata_output(output_id: str) -> str:
+    try:
+        return _FEATURE_BUNDLE_METADATA_TYPES[output_id]
+    except KeyError as e:
+        raise ConfigError(f"Unsupported feature-bundle metadata output for USR registry spec: {output_id}") from e
 
 
 def derive_usr_registry_spec(*, root: RootConfig, job_id: str | None = None) -> UsrRegistrySpec:
@@ -75,5 +105,12 @@ def derive_usr_registry_spec(*, root: RootConfig, job_id: str | None = None) -> 
                 raise ConfigError(f"Duplicate infer USR column derived from config: {column_name}")
             seen.add(column_name)
             columns.append(f"{column_name}:{_registry_type_for_output_format(output.format)}")
+        if job.feature_bundle is not None:
+            for output_id in feature_metadata_output_ids():
+                column_name = infer_usr_column_name(model_id=root.model.id, job_id=job.id, out_id=output_id)
+                if column_name in seen:
+                    raise ConfigError(f"Duplicate infer USR column derived from config: {column_name}")
+                seen.add(column_name)
+                columns.append(f"{column_name}:{_registry_type_for_metadata_output(output_id)}")
 
     return UsrRegistrySpec(namespace="infer", root=usr_root, columns=tuple(columns))

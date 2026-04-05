@@ -57,7 +57,7 @@ jobs: # Keep contexts explicit as separate infer jobs.
       path: inputs/anchor_only_records.jsonl # Point at the anchor-only input plane.
       field: sequence # Read the sequence field from each input record.
     feature_bundle: # Let the bundle surface choose the default feature groups.
-      intermediate_block: 26 # Use the project-default intermediate block.
+      intermediate_block: 26 # Use the legacy config default; runtime resolves it model-aware.
       context: # Record the explicit context metadata for this job.
         kind: anchor_only # Mark this lane as the anchor-only context.
 
@@ -68,7 +68,7 @@ jobs: # Keep contexts explicit as separate infer jobs.
       path: inputs/template_1kb_records.jsonl # Point at the construct-expanded input plane.
       field: sequence # Read the sequence field from each input record.
     feature_bundle: # Keep feature collection consistent across contexts.
-      intermediate_block: 26 # Use the same project-default block for comparison.
+      intermediate_block: 26 # Keep the same config default; evo2_20b resolves it to block 23.
       context: # Record the explicit context metadata for this job.
         kind: template_1kb # Mark this lane as the default templated context.
 ```
@@ -77,7 +77,9 @@ jobs: # Keep contexts explicit as separate infer jobs.
 
 - use `evo2_7b` for the first green path and local smoke runs
 - switch to `evo2_20b` with a one-line config change: `model.id: evo2_20b`
-- keep `intermediate_block: 26` unchanged unless repo-local benchmarks justify another lane
+- keep the project-default intermediate selector unchanged unless repo-local
+  benchmarks justify another lane; the legacy config default `26` resolves
+  model-aware, so `evo2_20b` uses block 23 at runtime
 
 ### What the bundle writes
 
@@ -113,7 +115,7 @@ payload = export_evo2_promoter_opal_matrix(
 
 - `feature_bundle` with templated contexts fails if `construct__anchor_start` / `construct__anchor_end` are missing
 - `pool.dim < 1` fails during config parsing
-- `evo2_20b` on non-Hopper GPUs fails at validate/dry-run time
+- `evo2_20b` fails the capacity gate on GPUs below compute capability `9.0`
 - stale bundle outputs are recomputed when `metadata__feature_request_digest` does not match the current request
 
 For GPU environment setup and capacity gating, use:

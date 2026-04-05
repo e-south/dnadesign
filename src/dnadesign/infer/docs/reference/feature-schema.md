@@ -18,7 +18,7 @@ The semantic bundle is one resolved context per row:
 ```yaml
 feature_bundle:
   kind: evo2_promoter_v1
-  intermediate_block: 26
+  intermediate_block: 26  # legacy config default; evo2_20b resolves it to block 23
   collect_log_likelihood: true
   collect_output_layer_mean: true
   collect_intermediate_embedding: true
@@ -41,8 +41,10 @@ Supported context kinds:
 - `log_likelihood__mean_per_token`
 - `output_layer_mean__seq_mean`
 - `output_layer_mean__anchor_mean` for templated contexts
-- `intermediate_embedding__block26_mlp_out__seq_mean`
-- `intermediate_embedding__block26_mlp_out__anchor_mean` for templated contexts
+- `intermediate_embedding__block26_mlp_out__seq_mean` for `evo2_7b`
+- `intermediate_embedding__block26_mlp_out__anchor_mean` for templated `evo2_7b` contexts
+- `intermediate_embedding__block23_mlp_out__seq_mean` for `evo2_20b`
+- `intermediate_embedding__block23_mlp_out__anchor_mean` for templated `evo2_20b` contexts
 
 ### Metadata out ids
 
@@ -72,12 +74,12 @@ The v1 bundle persists these metadata out ids:
 
 Users configure:
 
-- `intermediate_block: 26`
+- `intermediate_block: 26` as the stable config default
 
 `infer` resolves that to:
 
-- canonical selector: `block26_mlp_out`
-- current provider-layer path: `blocks.26.mlp.l3`
+- `evo2_7b`: canonical selector `block26_mlp_out`, provider-layer path `blocks.26.mlp.l3`
+- `evo2_20b`: canonical selector `block23_mlp_out`, provider-layer path `blocks.23.mlp.l3`
 
 The canonical selector is the stable contract. Provider-layer strings are adapter internals.
 
@@ -96,6 +98,7 @@ Example exported feature names:
 - `infer.evo2.evo2_7b.anchor_only.log_likelihood.total`
 - `infer.evo2.evo2_7b.anchor_only.output_layer_mean.seq_mean[0]`
 - `infer.evo2.evo2_7b.template_1kb.intermediate_embedding.block26_mlp_out.anchor_mean[17]`
+- `infer.evo2.evo2_20b.template_1kb.intermediate_embedding.block23_mlp_out.anchor_mean[17]`
 
 ### Fail-fast rules
 
