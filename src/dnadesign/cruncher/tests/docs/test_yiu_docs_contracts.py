@@ -151,20 +151,31 @@ def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
     assert (
         "shared typed render/show bundle-artifact surfaces for app/CLI boundaries live in `yiu/bundle_surface.py`"
     ) in architecture
-    assert "published-contract BaseRender execution lives in `yiu/render.py`" in architecture
-    assert "transactional render-plan execution" in architecture
+    assert "`yiu/render.py` is the thin public render facade" in architecture
+    assert (
+        "render preflight, runtime loading, and transactional plan assembly live in `yiu/render_plan.py`"
+    ) in architecture
+    assert "panel execution and output publication live in `yiu/render_execution.py`" in architecture
+    assert (
+        "failure-state persistence and cleanup of partial render artifacts live in `yiu/render_state.py`"
+    ) in architecture
     assert "app/yiu_workflow/render.py" in architecture
     assert "app/yiu_workflow/show.py" in architecture
     assert "payload bundle publication orchestration lives in `yiu/publish.py`" in architecture
     assert "canonical view-entry/render-job planning lives in `yiu/view_catalog.py`" in architecture
-    assert "display/title policy plus named visual directions live in `yiu/view_styles.py`" in architecture
+    assert "display-title policy lives in `yiu/view_styles.py`" in architecture
+    assert "producer-owned YIU visual foundations live in `yiu/visual_foundations.py`" in architecture
+    assert "named visual directions and style profiles live in `yiu/visual_system.py`" in architecture
     assert "the named YIU visual system is `bench_strip`" in architecture
     assert "This page owns the named visual directions and information hierarchy" in visual_ref
     assert "`bench_strip`" in visual_ref
     assert "`payload` uses `evidence_ribbon`" in visual_ref
     assert "`split_payload` uses `operator_strip`" in visual_ref
     assert "`assembled_payload` uses `operator_strip`" in visual_ref
-    assert "producer-side style policy lives in `src/dnadesign/cruncher/src/yiu/visual_system.py`" in visual_ref
+    assert "producer-owned style seed lives in `src/dnadesign/cruncher/src/yiu/visual_foundations.py`" in visual_ref
+    assert (
+        "named visual-direction registry and style profiles live in `src/dnadesign/cruncher/src/yiu/visual_system.py`"
+    ) in visual_ref
     assert "shared view fragments live in `yiu/view_common.py`" in architecture
     assert "`yiu/` (payload-centric YIU domain)" in architecture
     assert "cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml" in runbook_steps
