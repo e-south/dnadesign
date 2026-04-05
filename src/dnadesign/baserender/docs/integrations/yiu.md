@@ -1,7 +1,7 @@
 # YIU Integration Contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-04-04
 
 
 This page defines the YIU visual-contract handoff used by `baserender`.
@@ -47,24 +47,29 @@ Recommended renderer usage:
 - `nucleotide_evidence_map` for payload-centric YIU contracts that combine mismatch highlighting with PWM motif layers
 - `hairpin_cartoon` for ligated ssDNA hairpin states
 - `topology_cartoon` for circularized payload candidates and branched/composite topology views
+  - topology views must publish explicit segment geometry; baserender does not invent placeholder arms or bands when the contract is incomplete
+  - structural zero-length separator spans are ignored by the renderer; visible topology must come from positive-length segments
 
-Maintain the payload-view adapter split:
+Payload-centric YIU visuals follow an operator-first strip layout:
 
-- `yiu_payload_visual_projection.py` stays the compatibility facade
-- `yiu_payload_sequence_projection.py` owns `yiu_payload_visual_v1 -> sequence_evidence_map_v1` projection
-- `yiu_payload_motif_overlay.py` owns motif `Feature`/`Effect` assembly for payload overlays
+- the payload panel emphasizes sequence truth first, then mismatch evidence, then PWM overlays
+- split and assembled panels stay diagrammatic and legend-light so the three-view composite reads top-to-bottom
+- style changes should preserve that information hierarchy instead of adding tool-specific ornament or hidden fallback rendering
+- when `yiu_payload_visual_v1` is projected into `sequence_evidence_map_v1`, the projected metadata stays generic (`row_labels`, base highlights, and connector spans only) rather than carrying YIU-namespaced payload metadata into the shared contract
 
 ## Published bundle surface
 
-YIU bundles publish render-facing assets under:
+YIU bundles publish render-facing assets at the bundle root:
 
-- `published/views/`
-- `published/baserender_jobs/`
-- `published/renders/`
-- `published/visual_manifest.json`
+- `payload_view.json`
+- `split_payload_view.json`
+- `assembled_payload_view.json`
+- `baserender_jobs/`
+- `payload_views.pdf`
+- `visual_inventory.json`
 
 Each emitted job is self-contained and resolves paths relative to the owning
-bundle. `published/visual_manifest.json` is the operator-facing inventory.
+bundle. `visual_inventory.json` is the operator-facing inventory.
 
 ## Public API examples
 
@@ -75,22 +80,27 @@ import dnadesign.baserender as baserender
 
 adapter = baserender.get_adapter_descriptor("yiu_topology_cartoon_v1")
 renderer = baserender.get_renderer_descriptor("topology_cartoon")
-job = baserender.validate_job("published/baserender_jobs/circularized_payload_candidate.job.yaml")
-report = baserender.run_job("published/baserender_jobs/circularized_payload_candidate.job.yaml")
+record = baserender.adapt_record(
+    row=payload_contract_mapping,
+    adapter_kind="yiu_payload_visual_v1",
+    alphabet="IUPAC_DNA",
+)
+job = baserender.validate_job("baserender_jobs/payload.job.yaml")
+report = baserender.run_job("baserender_jobs/payload.job.yaml")
 ```
 
 CLI path:
 
 ```bash
-uv run baserender job validate published/baserender_jobs/circularized_payload_candidate.job.yaml
-uv run baserender job run published/baserender_jobs/circularized_payload_candidate.job.yaml
+uv run baserender job validate baserender_jobs/payload.job.yaml
+uv run baserender job run baserender_jobs/payload.job.yaml
 ```
 
 Cruncher also exposes a thin public-API wrapper:
 
 ```bash
-uv run cruncher visuals validate --job published/baserender_jobs/circularized_payload_candidate.job.yaml
-uv run cruncher visuals run --job published/baserender_jobs/circularized_payload_candidate.job.yaml
+uv run cruncher visuals validate --job baserender_jobs/payload.job.yaml
+uv run cruncher visuals run --job baserender_jobs/payload.job.yaml
 ```
 
 ## Boundary rules

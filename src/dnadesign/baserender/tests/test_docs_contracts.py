@@ -97,9 +97,12 @@ def test_reference_and_yiu_integration_docs_cover_payload_visual_adapter_surface
 
     assert "yiu_payload_visual_v1" in reference
     assert "nucleotide_evidence_map" in reference
+    assert "adapt_record" in reference
+    assert "topology cartoons require explicit segment geometry" in reference
     assert "YiuPayloadVisualV1" in yiu
     assert "yiu_payload_visual_v1" in yiu
     assert "nucleotide_evidence_map" in yiu
-    assert "yiu_payload_visual_projection.py" in yiu
-    assert "yiu_payload_sequence_projection.py" in yiu
-    assert "yiu_payload_motif_overlay.py" in yiu
+    assert "adapt_record" in yiu
+    assert "zero-length separator spans are ignored" in yiu
+    assert "dnadesign.baserender.src.*" in yiu
+    assert "does not invent placeholder arms or bands" in yiu

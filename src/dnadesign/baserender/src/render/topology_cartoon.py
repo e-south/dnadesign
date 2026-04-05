@@ -27,6 +27,9 @@ from ..config import Style
 from ..core import Record, RenderingError
 from .palette import Palette
 
+_CIRCULAR_TOPOLOGY_KINDS = {"circular_duplex", "circular_dsdna_candidate"}
+_SUPPORTED_TOPOLOGY_KINDS = _CIRCULAR_TOPOLOGY_KINDS | {"branched_y", "fragment_pool"}
+
 
 def _mapping_list(value: object) -> list[Mapping[str, Any]]:
     if not isinstance(value, list):
@@ -46,6 +49,12 @@ def _sorted_segments(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     )
 
 
+def _segment_span(segment: Mapping[str, Any]) -> tuple[int, int]:
+    start = int(segment.get("state_start", 0))
+    end = int(segment.get("state_end", 0))
+    return start, end
+
+
 def _segment_color(segment: Mapping[str, Any], palette: Palette) -> tuple[float, float, float]:
     segment_id = str(segment.get("segment_id") or "segment")
     return palette.color_for(f"yiu:{segment_id}")
@@ -63,6 +72,25 @@ def _sequence_length(payload: Mapping[str, Any]) -> int:
     if not segments:
         return 1
     return max(int(segment.get("state_end", 0)) for segment in segments)
+
+
+def _renderable_segments(payload: Mapping[str, Any], *, topology_kind: str) -> list[Mapping[str, Any]]:
+    segments = _sorted_segments(payload)
+    renderable_segments: list[Mapping[str, Any]] = []
+    for segment in segments:
+        start, end = _segment_span(segment)
+        if end <= start:
+            continue
+        renderable_segments.append(segment)
+    if not renderable_segments:
+        raise RenderingError(
+            f"topology_cartoon requires at least one positive-length segment for topology_kind '{topology_kind}'"
+        )
+    if topology_kind == "branched_y" and len(renderable_segments) != 3:
+        raise RenderingError(
+            "topology_cartoon requires exactly three positive-length segments for topology_kind 'branched_y'"
+        )
+    return renderable_segments
 
 
 def _index_to_angle(index: int, total_length: int) -> float:
@@ -89,22 +117,25 @@ def _draw_legend(ax, *, entries: list[tuple[str, tuple[float, float, float]]], s
         ax.text(x0 + 0.07, y, label, ha="left", va="center", fontsize=style.font_size_label)
 
 
-def _draw_circular_topology(ax, payload: Mapping[str, Any], *, style: Style, palette: Palette) -> None:
+def _draw_circular_topology(
+    ax,
+    payload: Mapping[str, Any],
+    *,
+    segments: list[Mapping[str, Any]],
+    style: Style,
+    palette: Palette,
+) -> None:
     center = (0.38, 0.52)
     radius = 0.24
     total_length = _sequence_length(payload)
-    segments = _sorted_segments(payload)
-    if not segments:
-        segments = [{"segment_id": "circular_duplex", "state_start": 0, "state_end": total_length}]
 
     legend_entries: list[tuple[str, tuple[float, float, float]]] = []
     for segment in segments:
-        start = int(segment.get("state_start", 0))
-        end = max(start + 1, int(segment.get("state_end", start + 1)))
+        start, end = _segment_span(segment)
+        if end <= start:
+            continue
         theta1 = _index_to_angle(start, total_length)
         theta2 = _index_to_angle(end, total_length)
-        if theta2 <= theta1:
-            theta2 += 360.0
         color = _segment_color(segment, palette)
         ax.add_patch(
             Arc(
@@ -152,19 +183,19 @@ def _draw_circular_topology(ax, payload: Mapping[str, Any], *, style: Style, pal
     _draw_legend(ax, entries=legend_entries[:5], style=style)
 
 
-def _draw_branched_y_topology(ax, payload: Mapping[str, Any], *, style: Style, palette: Palette) -> None:
+def _draw_branched_y_topology(
+    ax,
+    payload: Mapping[str, Any],
+    *,
+    segments: list[Mapping[str, Any]],
+    style: Style,
+    palette: Palette,
+) -> None:
     center = (0.38, 0.48)
-    segments = _sorted_segments(payload)
-    if not segments:
-        segments = [
-            {"segment_id": "left_arm"},
-            {"segment_id": "right_arm"},
-            {"segment_id": "retained_stem"},
-        ]
     arm_specs = [
         (segments[0], (0.22, 0.80)),
-        (segments[1] if len(segments) > 1 else {"segment_id": "right_arm"}, (0.54, 0.80)),
-        (segments[2] if len(segments) > 2 else {"segment_id": "retained_stem"}, (0.38, 0.16)),
+        (segments[1], (0.54, 0.80)),
+        (segments[2], (0.38, 0.16)),
     ]
     legend_entries: list[tuple[str, tuple[float, float, float]]] = []
     for segment, endpoint in arm_specs:
@@ -192,19 +223,24 @@ def _draw_branched_y_topology(ax, payload: Mapping[str, Any], *, style: Style, p
     _draw_legend(ax, entries=legend_entries[:5], style=style)
 
 
-def _draw_linear_topology(ax, payload: Mapping[str, Any], *, style: Style, palette: Palette) -> None:
+def _draw_linear_topology(
+    ax,
+    payload: Mapping[str, Any],
+    *,
+    segments: list[Mapping[str, Any]],
+    style: Style,
+    palette: Palette,
+) -> None:
     x_left = 0.10
     x_right = 0.66
     y = 0.52
     total_length = _sequence_length(payload)
-    segments = _sorted_segments(payload)
-    if not segments:
-        segments = [{"segment_id": "retained_product", "state_start": 0, "state_end": total_length}]
 
     legend_entries: list[tuple[str, tuple[float, float, float]]] = []
     for segment in segments:
-        start = int(segment.get("state_start", 0))
-        end = max(start + 1, int(segment.get("state_end", start + 1)))
+        start, end = _segment_span(segment)
+        if end <= start:
+            continue
         span_left = x_left + ((start / total_length) * (x_right - x_left))
         span_right = x_left + ((end / total_length) * (x_right - x_left))
         color = _segment_color(segment, palette)
@@ -257,15 +293,21 @@ class TopologyCartoonRenderer:
         topology_kind = str(payload.get("topology_kind") or "")
         meta = payload.get("meta")
         evidence_mode = str(meta.get("evidence_mode") or "") if isinstance(meta, Mapping) else ""
+        if topology_kind not in _SUPPORTED_TOPOLOGY_KINDS:
+            raise RenderingError(
+                "topology_cartoon does not support topology_kind "
+                f"{topology_kind!r}; expected one of {sorted(_SUPPORTED_TOPOLOGY_KINDS)}"
+            )
+        segments = _renderable_segments(payload, topology_kind=topology_kind)
         fig, ax = plt.subplots(figsize=(8.4, 5.0), dpi=style.dpi)
         ax.set_axis_off()
 
-        if topology_kind == "circular_duplex":
-            _draw_circular_topology(ax, payload, style=style, palette=palette)
+        if topology_kind in _CIRCULAR_TOPOLOGY_KINDS:
+            _draw_circular_topology(ax, payload, segments=segments, style=style, palette=palette)
         elif topology_kind == "branched_y":
-            _draw_branched_y_topology(ax, payload, style=style, palette=palette)
+            _draw_branched_y_topology(ax, payload, segments=segments, style=style, palette=palette)
         else:
-            _draw_linear_topology(ax, payload, style=style, palette=palette)
+            _draw_linear_topology(ax, payload, segments=segments, style=style, palette=palette)
 
         title = str(record.display.overlay_text or "")
         if title:

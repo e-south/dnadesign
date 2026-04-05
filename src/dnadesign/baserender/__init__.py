@@ -10,6 +10,8 @@ Module Author(s): Eric J. South
 """
 
 from .src.api import (
+    adapt_record,
+    adapt_records,
     cruncher_showcase_style_overrides,
     get_adapter_descriptor,
     get_renderer_descriptor,
@@ -37,6 +39,8 @@ from .src.runtime import initialize_runtime
 
 __all__ = [
     "initialize_runtime",
+    "adapt_record",
+    "adapt_records",
     "RenderJobV3",
     "run_sequence_rows_job",
     "run_render_job",

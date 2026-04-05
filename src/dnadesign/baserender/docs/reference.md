@@ -1,7 +1,7 @@
 # baserender Reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-04-04
 
 
 Single technical reference for operators and integrators.
@@ -97,6 +97,7 @@ Renderer families:
 - `nucleotide_evidence_map`
 - `hairpin_cartoon`
 - `topology_cartoon`
+  - topology cartoons require explicit segment geometry; zero-length separator spans are ignored, and visible bands must be positive-length
 
 Shared cross-tool contract models live under `dnadesign.contracts.visual`. Cruncher and other producers publish those contracts; BaseRender parses them and adapts them to `Record`.
 
@@ -156,6 +157,7 @@ Default `results_root`:
 ## Public API Boundary
 
 Stable API surface:
+- `adapt_record`, `adapt_records`
 - `validate_job`, `run_job`, `render`
 - `validate_render_job`, `run_render_job`
 - `validate_sequence_rows_job`, `run_sequence_rows_job`

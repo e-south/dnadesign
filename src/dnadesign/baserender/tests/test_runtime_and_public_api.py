@@ -145,6 +145,29 @@ def test_public_batch_parquet_record_loader_raises_on_missing_record_ids(tmp_pat
         )
 
 
+def test_public_adapter_helpers_adapt_in_memory_contract_rows() -> None:
+    row = {
+        "contract_kind": "sequence_evidence_map_v1",
+        "state_id": "assembled_payload",
+        "topology_kind": "linear_dsdna",
+        "alphabet": "iupac_dna",
+        "primary_sequence": "CTCTATATCTGATATAGAG",
+        "complement_sequence": "GAGATATAGTGTATATCTC",
+        "owners": [],
+        "effect_tags": [],
+        "boundaries": [],
+        "pairings": [],
+        "display": {"title": "Assembled payload"},
+        "meta": {},
+    }
+
+    record = baserender.adapt_record(row, adapter_kind="sequence_evidence_map_v1", alphabet="IUPAC_DNA")
+    records = baserender.adapt_records([row, row], adapter_kind="sequence_evidence_map_v1", alphabet="IUPAC_DNA")
+
+    assert record.id == "assembled_payload"
+    assert [item.id for item in records] == ["assembled_payload", "assembled_payload"]
+
+
 def test_public_parquet_render_helper_rejects_legacy_densegen_tfbs_keys(tmp_path) -> None:
     parquet = write_parquet(
         tmp_path / "input.parquet",
@@ -246,6 +269,8 @@ def test_public_api_exposes_generic_job_entrypoints(tmp_path) -> None:
     assert hasattr(baserender, "RenderJobV3")
     assert hasattr(baserender, "validate_sequence_rows_job")
     assert hasattr(baserender, "run_sequence_rows_job")
+    assert hasattr(baserender, "adapt_record")
+    assert hasattr(baserender, "adapt_records")
     assert hasattr(baserender, "list_adapters")
     assert hasattr(baserender, "list_renderers")
     assert hasattr(baserender, "get_adapter_descriptor")

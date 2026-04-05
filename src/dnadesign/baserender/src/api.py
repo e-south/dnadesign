@@ -39,6 +39,70 @@ from .runtime import initialize_runtime
 from .showcase_style import cruncher_showcase_style_overrides as _cruncher_showcase_style_overrides
 
 
+def _build_public_adapter(
+    *,
+    adapter_kind: str,
+    adapter_columns: Mapping[str, object] | None,
+    adapter_policies: Mapping[str, object] | None,
+    alphabet: str,
+):
+    cfg = AdapterCfg(
+        kind=str(adapter_kind),
+        columns={} if adapter_columns is None else dict(adapter_columns),
+        policies={} if adapter_policies is None else dict(adapter_policies),
+    )
+    return cfg, build_adapter(cfg, alphabet=alphabet)
+
+
+def _apply_public_adapter_row(
+    *,
+    adapter,
+    row: Mapping[str, object],
+    row_index: int,
+) -> Record:
+    ensure(isinstance(row, Mapping), "row must be a mapping", SchemaError)
+    return adapter.apply(dict(row), row_index=row_index)
+
+
+def adapt_record(
+    row: Mapping[str, object],
+    *,
+    adapter_kind: str,
+    adapter_columns: Mapping[str, object] | None = None,
+    adapter_policies: Mapping[str, object] | None = None,
+    alphabet: str = "DNA",
+    row_index: int = 0,
+) -> Record:
+    initialize_runtime()
+    _cfg, adapter = _build_public_adapter(
+        adapter_kind=adapter_kind,
+        adapter_columns=adapter_columns,
+        adapter_policies=adapter_policies,
+        alphabet=alphabet,
+    )
+    return _apply_public_adapter_row(adapter=adapter, row=row, row_index=row_index)
+
+
+def adapt_records(
+    rows: Iterable[Mapping[str, object]],
+    *,
+    adapter_kind: str,
+    adapter_columns: Mapping[str, object] | None = None,
+    adapter_policies: Mapping[str, object] | None = None,
+    alphabet: str = "DNA",
+) -> list[Record]:
+    initialize_runtime()
+    _cfg, adapter = _build_public_adapter(
+        adapter_kind=adapter_kind,
+        adapter_columns=adapter_columns,
+        adapter_policies=adapter_policies,
+        alphabet=alphabet,
+    )
+    return [
+        _apply_public_adapter_row(adapter=adapter, row=row, row_index=row_index) for row_index, row in enumerate(rows)
+    ]
+
+
 def load_record_from_parquet(
     dataset_path: str | Path,
     *,
@@ -51,12 +115,12 @@ def load_record_from_parquet(
 ) -> Record:
     initialize_runtime()
 
-    cfg = AdapterCfg(
-        kind=str(adapter_kind),
-        columns=dict(adapter_columns),
-        policies={} if adapter_policies is None else dict(adapter_policies),
+    cfg, adapter = _build_public_adapter(
+        adapter_kind=adapter_kind,
+        adapter_columns=adapter_columns,
+        adapter_policies=adapter_policies,
+        alphabet=alphabet,
     )
-    adapter = build_adapter(cfg, alphabet=alphabet)
     source_columns = required_source_columns(cfg)
 
     if match_column is None:
@@ -102,12 +166,12 @@ def load_records_from_parquet(
         SchemaError,
     )
 
-    cfg = AdapterCfg(
-        kind=str(adapter_kind),
-        columns=dict(adapter_columns),
-        policies={} if adapter_policies is None else dict(adapter_policies),
+    cfg, adapter = _build_public_adapter(
+        adapter_kind=adapter_kind,
+        adapter_columns=adapter_columns,
+        adapter_policies=adapter_policies,
+        alphabet=alphabet,
     )
-    adapter = build_adapter(cfg, alphabet=alphabet)
     source_columns = required_source_columns(cfg)
 
     if match_column is None:

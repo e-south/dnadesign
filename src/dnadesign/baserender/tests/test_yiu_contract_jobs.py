@@ -25,6 +25,7 @@ from dnadesign.baserender.src.adapters.yiu_payload_motif_overlay import build_mo
 from dnadesign.baserender.src.adapters.yiu_payload_visual_projection import build_sequence_evidence_map_contract
 from dnadesign.baserender.src.adapters.yiu_payload_visual_v1 import YiuPayloadVisualV1Adapter
 from dnadesign.baserender.src.config import resolve_style
+from dnadesign.baserender.src.core import RenderingError
 from dnadesign.baserender.src.render.effects.motif_logo import compute_motif_logo_geometry
 from dnadesign.baserender.src.render.layout import compute_layout
 from dnadesign.contracts.visual import YiuPayloadVisualV1
@@ -165,6 +166,114 @@ def test_run_job_renders_sequence_evidence_map_contract(tmp_path: Path) -> None:
     assert Path(report.outputs["images_path"]).exists()
 
 
+def test_topology_cartoon_rejects_unknown_topology_kind() -> None:
+    record = baserender.adapt_record(
+        {
+            "contract_kind": "yiu_topology_cartoon_v1",
+            "state_id": "bad_topology",
+            "topology_kind": "typo_kind",
+            "sequence": "ACGT",
+            "segments": [{"segment_id": "payload", "state_start": 0, "state_end": 4}],
+            "annotations": [],
+            "cuts": [],
+            "junctions": [],
+            "fragments": [],
+            "display": {"title": "Bad topology"},
+            "meta": {},
+        },
+        adapter_kind="yiu_topology_cartoon_v1",
+        alphabet="DNA",
+    )
+
+    with pytest.raises(RenderingError, match="does not support topology_kind"):
+        baserender.render(record, renderer="topology_cartoon", style={"preset": "presentation_default"})
+
+
+def test_topology_cartoon_requires_non_empty_segments() -> None:
+    record = baserender.adapt_record(
+        {
+            "contract_kind": "yiu_topology_cartoon_v1",
+            "state_id": "missing_segments",
+            "topology_kind": "circular_duplex",
+            "sequence": "ACGT",
+            "segments": [],
+            "annotations": [],
+            "cuts": [],
+            "junctions": [],
+            "fragments": [],
+            "display": {"title": "Missing segments"},
+            "meta": {},
+        },
+        adapter_kind="yiu_topology_cartoon_v1",
+        alphabet="DNA",
+    )
+
+    with pytest.raises(RenderingError, match="requires at least one positive-length segment"):
+        baserender.render(record, renderer="topology_cartoon", style={"preset": "presentation_default"})
+
+
+def test_topology_cartoon_requires_exactly_three_branched_y_segments() -> None:
+    record = baserender.adapt_record(
+        {
+            "contract_kind": "yiu_topology_cartoon_v1",
+            "state_id": "missing_branch_arm",
+            "topology_kind": "branched_y",
+            "sequence": "ACGTACGT",
+            "segments": [
+                {"segment_id": "left_arm", "state_start": 0, "state_end": 2},
+                {"segment_id": "right_arm", "state_start": 2, "state_end": 4},
+            ],
+            "annotations": [],
+            "cuts": [],
+            "junctions": [],
+            "fragments": [],
+            "display": {"title": "Incomplete branch"},
+            "meta": {},
+        },
+        adapter_kind="yiu_topology_cartoon_v1",
+        alphabet="DNA",
+    )
+
+    with pytest.raises(RenderingError, match="requires exactly three positive-length segments"):
+        baserender.render(record, renderer="topology_cartoon", style={"preset": "presentation_default"})
+
+
+def test_topology_cartoon_ignores_structural_zero_length_segments() -> None:
+    record = baserender.adapt_record(
+        {
+            "contract_kind": "yiu_topology_cartoon_v1",
+            "state_id": "circularized_payload_candidate",
+            "topology_kind": "circular_duplex",
+            "sequence": "CCGATGTCCCTATCAGTGATAGAGAGGGGGGGGGGGGCCTCAGCCCGCTGA",
+            "segments": [
+                {"segment_id": "payload", "state_start": 0, "state_end": 10},
+                {"segment_id": "skip", "state_start": 10, "state_end": 10},
+                {"segment_id": "retained", "state_start": 10, "state_end": 20},
+            ],
+            "annotations": [],
+            "cuts": [],
+            "junctions": [{"id": "junction", "join_index": 15}],
+            "fragments": [],
+            "display": {"title": "Circularized payload"},
+            "meta": {"evidence_mode": "concrete_realization"},
+        },
+        adapter_kind="yiu_topology_cartoon_v1",
+        alphabet="DNA",
+    )
+
+    fig = baserender.render(record, renderer="topology_cartoon", style={"preset": "presentation_default"})
+    try:
+        texts = {text.get_text() for text in fig.axes[0].texts}
+    finally:
+        plt.close(fig)
+
+    assert "Circularized payload" in texts
+    assert "evidence_mode: concrete_realization" in texts
+    assert "payload" in texts
+    assert "retained" in texts
+    assert "skip" not in texts
+
+
 def test_render_uses_explicit_complement_sequence_and_highlights_mismatch_bases() -> None:
     adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="IUPAC_DNA")
     record = adapter.apply(
@@ -263,7 +372,29 @@ def test_yiu_payload_projection_contract_normalizes_row_labels_and_connector_spa
     assert projected["meta"]["connector_hidden_indices"] == [8, 11]
     assert projected["meta"]["connector_cross_indices"] == [9, 10]
     assert projected["meta"]["connector_overhang_spans"] == [{"start": 8, "end": 12}]
-    assert projected["meta"]["yiu_payload_meta"]["row_labels"] == {"primary": " Selected payload ", "complement": None}
+    assert "yiu_payload_meta" not in projected["meta"]
+
+
+def test_yiu_payload_projection_contract_rejects_malformed_row_labels() -> None:
+    contract = YiuPayloadVisualV1.model_validate(
+        {
+            "contract_kind": "yiu_payload_visual_v1",
+            "state_id": "payload",
+            "alphabet": "iupac_dna",
+            "reference_payload_sequence": "CTCTATATCTGATATAGAG",
+            "selected_payload_sequence": "CTCTATATCTGATATAGAG",
+            "selected_complement_sequence": "GAGATATAGTGTATATCTC",
+            "show_reference_payload_row": False,
+            "junction": {"start": 8, "end": 12, "offsets": [0, 1, 2, 3]},
+            "mismatches": [],
+            "motif_layers": [],
+            "display": {"title": "TetR payload"},
+            "meta": {"row_labels": "oops"},
+        }
+    )
+
+    with pytest.raises(ValueError, match="meta\\.row_labels must be a mapping"):
+        build_sequence_evidence_map_contract(contract)
 
 
 def test_yiu_payload_motif_overlay_builder_keeps_duplicate_tf_labels_and_feature_pairs() -> None:
