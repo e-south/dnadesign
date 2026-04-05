@@ -108,6 +108,85 @@ def _merge_attach_event_args(
     return args
 
 
+def _merge_write_overlay_part_event_args(
+    *,
+    namespace: str,
+    key: str,
+    columns: list[str],
+    rows_incoming: int,
+    rows_written: int,
+    rows_missing: int,
+    allow_missing: bool,
+    event_args: Mapping[str, object] | None,
+) -> dict[str, object]:
+    args: dict[str, object] = {
+        "namespace": namespace,
+        "key": key,
+        "columns": list(columns),
+        "rows_incoming": rows_incoming,
+        # Keep infer/notify consumers attach-compatible on the faster parts path.
+        "rows_matched": rows_written,
+        "rows_written": rows_written,
+        "rows_missing": rows_missing,
+        "allow_missing": allow_missing,
+    }
+    if event_args is None:
+        return args
+    for event_key, event_value in event_args.items():
+        if event_key in args:
+            raise SchemaError(f"write_overlay_part event_args cannot override reserved key '{event_key}'.")
+        args[event_key] = event_value
+    return args
+
+
+def _merge_overlay_frame(
+    *,
+    existing_df: pd.DataFrame,
+    incoming_df: pd.DataFrame,
+    key: str,
+    allow_overwrite: bool,
+    fail_on_non_null_overwrite: bool = False,
+) -> pd.DataFrame:
+    if key not in existing_df.columns:
+        raise SchemaError(f"Existing overlay missing key column '{key}'.")
+    if existing_df[key].duplicated().any():
+        raise SchemaError(f"Existing overlay has duplicate keys for '{key}'.")
+
+    existing_indexed = existing_df.set_index(key, drop=False)
+    incoming_indexed = incoming_df.set_index(key, drop=False)
+    overlap_cols = sorted((set(existing_indexed.columns) & set(incoming_indexed.columns)) - {key})
+    if overlap_cols and not allow_overwrite:
+        raise NamespaceError(f"Columns already exist: {', '.join(overlap_cols)}. Use --allow-overwrite.")
+    if fail_on_non_null_overwrite and overlap_cols:
+        existing_for_incoming = existing_indexed.reindex(incoming_indexed.index)
+        for col in overlap_cols:
+            occupied = existing_for_incoming[col].notna()
+            if not occupied.any():
+                continue
+            collision_ids = [str(row_id) for row_id in existing_for_incoming.index[occupied].tolist()]
+            sample = ", ".join(collision_ids[:5])
+            raise SchemaError(
+                f"Refusing overwrite for existing values in column '{col}' (sample ids: {sample}). "
+                "Re-run with overwrite=true."
+            )
+
+    all_index = existing_indexed.index.union(incoming_indexed.index)
+    combined = existing_indexed.reindex(all_index)
+    incoming_cols = [col for col in incoming_indexed.columns if col != key]
+    for col in incoming_cols:
+        if col not in combined.columns:
+            combined[col] = pd.NA
+    if incoming_cols:
+        combined.loc[incoming_indexed.index, incoming_cols] = incoming_indexed[incoming_cols]
+    combined[key] = combined.index
+
+    ordered_cols = [key, *[col for col in existing_df.columns if col != key]]
+    for col in incoming_df.columns:
+        if col != key and col not in ordered_cols:
+            ordered_cols.append(col)
+    return combined.loc[:, ordered_cols].reset_index(drop=True)
+
+
 def _attach_frame_dataset(
     *,
     dataset: Any,
@@ -119,6 +198,7 @@ def _attach_frame_dataset(
     allow_overwrite: bool = False,
     allow_missing: bool = False,
     parse_json: bool = True,
+    fail_on_non_null_overwrite: bool = False,
     note: str = "",
     actor: Optional[dict] = None,
     event_args: Mapping[str, object] | None = None,
@@ -272,26 +352,13 @@ def _attach_frame_dataset(
                 raise SchemaError(
                     f"Overlay key mismatch for namespace '{namespace}': existing={meta.get('key')} new={key}"
                 )
-            if key not in existing_df.columns:
-                raise SchemaError(f"Existing overlay missing key column '{key}'.")
-            if existing_df[key].duplicated().any():
-                raise SchemaError(f"Existing overlay has duplicate keys for '{key}'.")
-            existing_df = existing_df.set_index(key, drop=False)
-            new_df = overlay_df.set_index(key, drop=False)
-            overlap_cols = sorted((set(existing_df.columns) & set(new_df.columns)) - {key})
-            if overlap_cols and not allow_overwrite:
-                raise NamespaceError(f"Columns already exist: {', '.join(overlap_cols)}. Use --allow-overwrite.")
-            combined = existing_df
-            for col in new_df.columns:
-                if col == key:
-                    continue
-                if col in combined.columns:
-                    combined = combined.reindex(combined.index.union(new_df.index))
-                    combined.loc[new_df.index, col] = new_df[col]
-                else:
-                    combined = combined.join(new_df[[col]], how="outer")
-            combined[key] = combined.index
-            overlay_df = combined.reset_index(drop=True)
+            overlay_df = _merge_overlay_frame(
+                existing_df=existing_df,
+                incoming_df=overlay_df,
+                key=key,
+                allow_overwrite=allow_overwrite,
+                fail_on_non_null_overwrite=fail_on_non_null_overwrite,
+            )
 
         if namespace in reserved_namespaces:
             tbl = pa.Table.from_pandas(overlay_df, preserve_index=False)
@@ -416,18 +483,21 @@ def _overlay_table_from_registry(overlay_df: pd.DataFrame, *, entry: Any, key: s
         fields.append(pa.field(name, _registry_type_to_arrow(allowed[name])))
     schema = pa.schema(fields)
     try:
-        return pa.table(
-            {
-                field.name: pa.array(
-                    [_normalize_arrow_value(value) for value in overlay_df[field.name].tolist()],
-                    type=field.type,
-                )
-                for field in schema
-            },
-            schema=schema,
-        )
+        arrays: dict[str, pa.Array] = {}
+        for field in schema:
+            arrays[field.name] = _overlay_arrow_array(overlay_df[field.name], field=field)
+        return pa.table(arrays, schema=schema)
     except (pa.ArrowInvalid, pa.ArrowTypeError) as error:
         raise SchemaError(f"Overlay type mismatch under namespace '{entry.namespace}': {error}") from error
+
+
+def _overlay_arrow_array(series: pd.Series, *, field: pa.Field) -> pa.Array:
+    if field.name == "id" or pa.types.is_string(field.type) or pa.types.is_struct(field.type):
+        values = [_normalize_arrow_value(value) for value in series.tolist()]
+        return pa.array(values, type=field.type)
+    if pa.types.is_list(field.type) or pa.types.is_large_list(field.type) or pa.types.is_fixed_size_list(field.type):
+        return pa.array(series.tolist(), type=field.type)
+    return pa.Array.from_pandas(series, type=field.type)
 
 
 def _normalize_arrow_value(value: object) -> object:
@@ -508,6 +578,37 @@ def _split_top_level_registry_fields(text: str) -> list[str]:
     if current:
         parts.append("".join(current).strip())
     return [part for part in parts if part]
+
+
+def _coerce_null_overlay_columns_to_registry_schema(
+    *,
+    dataset: Any,
+    namespace: str,
+    tbl: pa.Table,
+    key: str,
+) -> pa.Table:
+    if not any(pa.types.is_null(field.type) for field in tbl.schema if field.name != key):
+        return tbl
+    registry = dataset._registry(required=True)
+    entry = registry_entry(registry, namespace)
+    target_types = {column.name: _registry_type_to_arrow(column.type) for column in entry.columns}
+    arrays: list[pa.Array | pa.ChunkedArray] = []
+    names: list[str] = []
+    changed = False
+    for field in tbl.schema:
+        names.append(field.name)
+        if field.name == key or not pa.types.is_null(field.type):
+            arrays.append(tbl[field.name])
+            continue
+        target_type = target_types.get(field.name)
+        if target_type is None:
+            arrays.append(tbl[field.name])
+            continue
+        arrays.append(pa.nulls(tbl.num_rows, type=target_type))
+        changed = True
+    if not changed:
+        return tbl
+    return pa.Table.from_arrays(arrays, names=names)
 
 
 def attach_duckdb_dataset(
@@ -860,6 +961,7 @@ def write_overlay_part_dataset(
     key_col: Optional[str] = None,
     allow_missing: bool = False,
     actor: Optional[dict] = None,
+    event_args: Mapping[str, object] | None = None,
     reserved_namespaces: set[str],
     write_lock=dataset_write_lock,
 ) -> int:
@@ -909,6 +1011,7 @@ def write_overlay_part_dataset(
         if "__" not in col:
             raise NamespaceError(f"Derived columns must be namespaced (got '{col}').")
 
+    tbl = _coerce_null_overlay_columns_to_registry_schema(dataset=dataset, namespace=namespace, tbl=tbl, key=key)
     dataset._validate_registry_schema(namespace=namespace, schema=tbl.schema, key=key)
 
     def _write_part() -> int:
@@ -1019,14 +1122,16 @@ def write_overlay_part_dataset(
 
         dataset._record_event(
             "write_overlay_part",
-            args={
-                "namespace": namespace,
-                "key": key,
-                "rows_incoming": rows_incoming,
-                "rows_written": rows_written,
-                "rows_missing": rows_missing,
-                "allow_missing": allow_missing,
-            },
+            args=_merge_write_overlay_part_event_args(
+                namespace=namespace,
+                key=key,
+                columns=attach_cols,
+                rows_incoming=rows_incoming,
+                rows_written=rows_written,
+                rows_missing=rows_missing,
+                allow_missing=allow_missing,
+                event_args=event_args,
+            ),
             metrics={
                 "rows_incoming": rows_incoming,
                 "rows_written": rows_written,

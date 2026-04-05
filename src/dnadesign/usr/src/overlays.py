@@ -32,6 +32,11 @@ _OVERLAY_LIST_CACHE: dict[str, tuple[tuple[tuple[str, bool, int, int], ...], tup
 _OVERLAY_LIST_CACHE_MAX = 4_000
 
 
+def _is_temporary_overlay_entry(entry: Path) -> bool:
+    name = entry.name
+    return name.endswith(".tmp.parquet")
+
+
 def derived_dir(dataset_dir: Path) -> Path:
     return Path(dataset_dir) / DERIVED_DIR_NAME
 
@@ -68,6 +73,8 @@ def list_overlays(dataset_dir: Path) -> List[Path]:
     overlays: List[Path] = []
     for name, is_dir, _mtime_ns, _size in signature:
         entry = d / name
+        if _is_temporary_overlay_entry(entry):
+            continue
         if not is_dir and entry.suffix == ".parquet":
             overlays.append(entry)
             continue

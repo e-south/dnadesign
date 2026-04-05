@@ -30,6 +30,8 @@ from dnadesign.usr.src.registry import (
     load_registry_file,
     namespace_contract_hash_for_entries,
     register_namespace,
+    registry_bytes,
+    registry_hash,
 )
 from dnadesign.usr.src.schema import META_REGISTRY_HASH
 
@@ -195,6 +197,78 @@ def test_namespace_contract_hash_ignores_catalog_fields_but_tracks_column_order(
 
     assert first == second
     assert reordered != first
+
+
+def test_registry_hash_and_bytes_reuse_cached_canonical_yaml(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "datasets"
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "unit-test",
+                "description": "test namespace",
+                "columns": [{"name": "mock__score", "type": "float64"}],
+            }
+        },
+    )
+
+    import dnadesign.usr.src.registry as registry_mod
+
+    safe_dump_calls = {"count": 0}
+    safe_dump_original = registry_mod.yaml.safe_dump
+
+    def _count_safe_dump(*args, **kwargs):
+        safe_dump_calls["count"] += 1
+        return safe_dump_original(*args, **kwargs)
+
+    monkeypatch.setattr(registry_mod.yaml, "safe_dump", _count_safe_dump)
+
+    first_hash = registry_hash(root, required=True)
+    first_bytes = registry_bytes(root)
+    second_hash = registry_hash(root, required=True)
+    second_bytes = registry_bytes(root)
+
+    assert first_hash == second_hash
+    assert first_bytes == second_bytes
+    assert safe_dump_calls["count"] == 1
+
+
+def test_registry_hash_cache_invalidates_after_registry_update(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "unit-test",
+                "description": "test namespace",
+                "columns": [{"name": "mock__score", "type": "float64"}],
+            }
+        },
+    )
+    first_hash = registry_hash(root, required=True)
+    first_bytes = registry_bytes(root)
+
+    _write_registry(
+        root,
+        {
+            "mock": {
+                "owner": "unit-test",
+                "description": "test namespace",
+                "columns": [
+                    {"name": "mock__score", "type": "float64"},
+                    {"name": "mock__rank", "type": "int64"},
+                ],
+            }
+        },
+    )
+    second_hash = registry_hash(root, required=True)
+    second_bytes = registry_bytes(root)
+
+    assert first_hash != second_hash
+    assert first_bytes != second_bytes
 
 
 def test_registry_requires_usr_state(tmp_path: Path) -> None:

@@ -716,6 +716,23 @@ def test_list_overlays_cache_invalidates_when_new_overlay_part_is_added(tmp_path
         assert calls["count"] > first_call_count
 
 
+def test_list_overlays_ignores_temporary_parquet_files(tmp_path: Path) -> None:
+    ds = _make_dataset(tmp_path)
+    target_id = ds.head(1)["id"].iloc[0]
+    ds.write_overlay_part("mock", pa.table({"id": [target_id], "mock__score": [1.0]}), key="id")
+
+    from dnadesign.usr.src import overlays as overlays_module
+
+    overlay_part = next((ds.dir / "_derived" / "mock").glob("part-*.parquet"))
+    tmp_overlay = ds.dir / "_derived" / "infer.tmp.parquet"
+    tmp_overlay.write_bytes(overlay_part.read_bytes())
+
+    paths = overlays_module.list_overlays(ds.dir)
+
+    assert tmp_overlay not in paths
+    assert (ds.dir / "_derived" / "mock") in paths
+
+
 def test_head_reuses_cached_result_when_dataset_state_is_unchanged(tmp_path: Path) -> None:
     ds = _make_dataset(tmp_path)
     target_id = ds.head(1)["id"].iloc[0]

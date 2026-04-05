@@ -23,7 +23,7 @@ from .errors import SchemaError
 
 REGISTRY_FILENAME = "registry.yaml"
 USR_STATE_NAMESPACE = "usr_state"
-_REGISTRY_CACHE: dict[str, tuple[int, int, Dict[str, "RegistryEntry"]]] = {}
+_REGISTRY_CACHE: dict[str, _RegistryCacheEntry] = {}
 _REGISTRY_CACHE_MAX = 4_096
 
 
@@ -39,6 +39,15 @@ class RegistryEntry:
     owner: Optional[str]
     description: Optional[str]
     columns: List[RegistryColumn]
+
+
+@dataclass
+class _RegistryCacheEntry:
+    mtime_ns: int
+    size: int
+    entries: Dict[str, RegistryEntry]
+    canonical_bytes: bytes | None = None
+    canonical_hash: str | None = None
 
 
 USR_STATE_COLUMNS: list[RegistryColumn] = [
@@ -67,19 +76,17 @@ def load_registry_file(path: Path) -> Dict[str, RegistryEntry]:
     return _load_registry_file(Path(path))
 
 
-def _load_registry_file(path: Path) -> Dict[str, RegistryEntry]:
+def _registry_cache_entry(path: Path) -> _RegistryCacheEntry:
     resolved_path = Path(path).resolve()
     cache_key = str(resolved_path)
     try:
         stat = resolved_path.stat()
     except FileNotFoundError as exc:
         raise SchemaError(f"Registry required but not found: {resolved_path}.") from exc
-    cached = _REGISTRY_CACHE.get(cache_key)
     stat_key = (int(stat.st_mtime_ns), int(stat.st_size))
-    if cached is not None:
-        cached_mtime_ns, cached_size, cached_entries = cached
-        if (cached_mtime_ns, cached_size) == stat_key:
-            return _clone_registry_entries(cached_entries)
+    cached = _REGISTRY_CACHE.get(cache_key)
+    if cached is not None and (cached.mtime_ns, cached.size) == stat_key:
+        return cached
 
     with resolved_path.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
@@ -90,10 +97,37 @@ def _load_registry_file(path: Path) -> Dict[str, RegistryEntry]:
     for ns, entry in namespaces.items():
         out[str(ns)] = _parse_entry(str(ns), entry)
     _ensure_usr_state_entry(out)
-    _REGISTRY_CACHE[cache_key] = (stat_key[0], stat_key[1], _clone_registry_entries(out))
+    cache_entry = _RegistryCacheEntry(
+        mtime_ns=stat_key[0],
+        size=stat_key[1],
+        entries=_clone_registry_entries(out),
+    )
+    _REGISTRY_CACHE[cache_key] = cache_entry
     if len(_REGISTRY_CACHE) > _REGISTRY_CACHE_MAX:
         _REGISTRY_CACHE.clear()
-    return _clone_registry_entries(out)
+    return cache_entry
+
+
+def _load_registry_file(path: Path) -> Dict[str, RegistryEntry]:
+    cache_entry = _registry_cache_entry(path)
+    return _clone_registry_entries(cache_entry.entries)
+
+
+def _registry_canonical_bytes(path: Path) -> bytes:
+    cache_entry = _registry_cache_entry(path)
+    if cache_entry.canonical_bytes is None:
+        payload = _registry_payload(cache_entry.entries)
+        cache_entry.canonical_bytes = yaml.safe_dump(payload, sort_keys=True).encode("utf-8")
+        cache_entry.canonical_hash = hashlib.sha256(cache_entry.canonical_bytes).hexdigest()
+    return cache_entry.canonical_bytes
+
+
+def _registry_canonical_hash(path: Path) -> str:
+    cache_entry = _registry_cache_entry(path)
+    if cache_entry.canonical_hash is None:
+        _registry_canonical_bytes(path)
+    assert cache_entry.canonical_hash is not None
+    return cache_entry.canonical_hash
 
 
 def _clone_registry_entries(entries: Dict[str, RegistryEntry]) -> Dict[str, RegistryEntry]:
@@ -157,13 +191,11 @@ def registry_hash(root: Path, *, required: bool) -> Optional[str]:
         if required:
             raise SchemaError(f"Registry required but not found: {path}.")
         return None
-    entries = load_registry(root, required=True)
-    return registry_hash_for_entries(entries)
+    return _registry_canonical_hash(path)
 
 
 def registry_bytes(root: Path) -> bytes:
-    entries = load_registry(root, required=True)
-    return registry_bytes_for_entries(entries)
+    return _registry_canonical_bytes(registry_path(root))
 
 
 def registry_bytes_for_entries(entries: Dict[str, RegistryEntry]) -> bytes:

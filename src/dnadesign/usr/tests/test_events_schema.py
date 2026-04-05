@@ -115,11 +115,12 @@ def test_write_overlay_part_uses_explicit_actor_when_provided(tmp_path: Path) ->
     table = pa.table({"id": [target_id], "mock__score": [1.25]})
 
     actor = {"tool": "densegen", "run_id": "run-2", "host": "host-b", "pid": 202}
-    ds.write_overlay_part("mock", table, key="id", actor=actor)
+    ds.write_overlay_part("mock", table, key="id", actor=actor, event_args={"custom_tag": "x"})
 
     payload = json.loads(ds.events_path.read_text(encoding="utf-8").strip().splitlines()[-1])
     assert payload["action"] == "write_overlay_part"
     assert payload["actor"] == actor
+    assert payload["args"]["custom_tag"] == "x"
 
 
 def test_event_schema_rejects_explicit_actor_missing_tool(tmp_path: Path) -> None:

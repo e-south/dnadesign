@@ -280,6 +280,53 @@ def test_usr_events_watch_can_skip_invalid_events_when_configured(tmp_path: Path
     assert '"tool": "densegen"' in result.stdout
 
 
+def test_usr_events_watch_rejects_completed_malformed_json_record(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    events.write_text('{"event_version":1\n', encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--url",
+            "http://example.com",
+            "--events",
+            str(events),
+        ],
+    )
+    assert result.exit_code == 1
+    assert "event line is not valid JSON" in result.stdout
+
+
+def test_usr_events_watch_can_skip_completed_malformed_json_record_when_configured(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    good = _event(action="materialize")
+    events.write_text('{"event_version":1\n' + json.dumps(good) + "\n", encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--events",
+            str(events),
+            "--on-invalid-event",
+            "skip",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "skipping invalid event line" in result.stdout.lower()
+    assert '"tool": "densegen"' in result.stdout
+
+
 def test_usr_events_watch_cursor_prevents_duplicate_sends(tmp_path: Path, monkeypatch) -> None:
     events = tmp_path / "events.log"
     cursor = tmp_path / "cursor.txt"
@@ -500,6 +547,65 @@ def test_iter_file_lines_waits_for_events_file_when_configured(tmp_path: Path, m
     _offset, line = next(rows)
     parsed = json.loads(line)
     assert parsed["action"] == "materialize"
+
+
+def test_iter_file_lines_follow_waits_for_newline_terminated_tail_record(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    payload = json.dumps(_event(action="materialize")) + "\n"
+    partial = payload[:37]
+    remainder = payload[37:]
+    events.write_text(partial, encoding="utf-8")
+    sleep_calls = {"n": 0}
+
+    def _fake_sleep(_seconds: float) -> None:
+        sleep_calls["n"] += 1
+        if sleep_calls["n"] == 1:
+            with events.open("a", encoding="utf-8") as handle:
+                handle.write(remainder)
+            return
+        raise RuntimeError("follow loop did not wait for newline-terminated tail record")
+
+    monkeypatch.setattr("dnadesign.notify.runtime.cursor.iteration.time.sleep", _fake_sleep)
+
+    rows = _iter_file_lines(
+        events,
+        start_offset=0,
+        on_truncate="error",
+        follow=True,
+    )
+    offset, line = next(rows)
+    assert line == payload
+    assert offset == len(payload)
+    assert sleep_calls["n"] == 1
+
+
+def test_iter_file_lines_follow_waits_for_json_decodable_tail_record(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    first_payload = json.dumps(_event(action="write_overlay_part")) + "\n"
+    invalid_tail = first_payload + '{"event_version":1\n'
+    payload = json.dumps(_event(action="materialize")) + "\n"
+    events.write_text(invalid_tail, encoding="utf-8")
+    sleep_calls = {"n": 0}
+
+    def _fake_sleep(_seconds: float) -> None:
+        sleep_calls["n"] += 1
+        if sleep_calls["n"] == 1:
+            events.write_text(first_payload + payload, encoding="utf-8")
+            return
+        raise RuntimeError("follow loop did not wait for JSON-decodable tail record")
+
+    monkeypatch.setattr("dnadesign.notify.runtime.cursor.iteration.time.sleep", _fake_sleep)
+
+    rows = _iter_file_lines(
+        events,
+        start_offset=len(first_payload),
+        on_truncate="error",
+        follow=True,
+    )
+    offset, line = next(rows)
+    assert line == payload
+    assert offset == len(first_payload) + len(payload)
+    assert sleep_calls["n"] == 1
 
 
 def test_iter_file_lines_follow_exits_after_idle_timeout(tmp_path: Path, monkeypatch) -> None:

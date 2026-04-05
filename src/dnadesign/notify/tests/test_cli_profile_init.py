@@ -139,7 +139,7 @@ def test_profile_init_writes_infer_policy_defaults(tmp_path: Path) -> None:
     assert data["webhook"] == {"source": "env", "ref": "DENSEGEN_WEBHOOK"}
     assert data["policy"] == "infer"
     assert data["only_tools"] == "infer"
-    assert data["only_actions"] == "attach,materialize"
+    assert data["only_actions"] == "attach,write_overlay_part,materialize"
 
 
 def test_profile_init_resolves_runtime_paths_from_cli_cwd(tmp_path: Path, monkeypatch) -> None:

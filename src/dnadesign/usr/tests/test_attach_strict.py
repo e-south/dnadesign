@@ -139,3 +139,45 @@ def test_attach_allow_overwrite_preserves_registered_int_schema(tmp_path: Path) 
     by_id = {row["id"]: row["mock__rank"] for _, row in out.iterrows()}
     assert by_id[ids[0]] == 1
     assert by_id[ids[1]] == 2
+
+
+def test_attach_allow_overwrite_preserves_unmentioned_cells(tmp_path: Path) -> None:
+    ds = _make_dataset(tmp_path)
+    ids = ds.head(2, columns=["id"])["id"].tolist()
+
+    first = pd.DataFrame(
+        {
+            "id": ids,
+            "score": [1.0, 2.0],
+            "vec": ['["a"]', '["b"]'],
+        }
+    )
+    first_path = tmp_path / "attach_first_full.csv"
+    first.to_csv(first_path, index=False)
+    ds.attach(
+        first_path,
+        namespace="mock",
+        key="id",
+        key_col="id",
+        columns=["score", "vec"],
+        parse_json=False,
+    )
+
+    second = pd.DataFrame({"id": [ids[0]], "score": [9.0]})
+    second_path = tmp_path / "attach_second_partial.csv"
+    second.to_csv(second_path, index=False)
+    ds.attach(
+        second_path,
+        namespace="mock",
+        key="id",
+        key_col="id",
+        columns=["score"],
+        allow_overwrite=True,
+    )
+
+    out = ds.head(2, columns=["id", "mock__score", "mock__vec"])
+    by_id = {row["id"]: row for _, row in out.iterrows()}
+    assert by_id[ids[0]]["mock__score"] == 9.0
+    assert by_id[ids[0]]["mock__vec"] == '["a"]'
+    assert by_id[ids[1]]["mock__score"] == 2.0
+    assert by_id[ids[1]]["mock__vec"] == '["b"]'

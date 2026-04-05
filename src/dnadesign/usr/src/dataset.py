@@ -696,6 +696,7 @@ class Dataset:
         key_col: Optional[str] = None,
         allow_missing: bool = False,
         actor: Optional[dict] = None,
+        event_args: Mapping[str, object] | None = None,
     ) -> int:
         return write_overlay_part_dataset(
             dataset=self,
@@ -705,6 +706,7 @@ class Dataset:
             key_col=key_col,
             allow_missing=allow_missing,
             actor=actor,
+            event_args=event_args,
             reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
             write_lock=dataset_write_lock,
         )

@@ -120,6 +120,33 @@ uv run notify usr-events watch --profile "$PROFILE" --dry-run
 uv run notify usr-events watch --profile "$PROFILE" --follow --wait-for-events
 ```
 
+Cold-start on an existing event stream:
+
+If a profile already points at a long-lived `.events.log` and you want a new
+watcher to consume only future events, seed the cursor to the current file size
+before `--follow`:
+
+```bash
+EVENTS=/abs/path/to/dataset/.events.log
+PROFILE=/abs/path/to/profile.json
+CURSOR=/abs/path/to/cursor
+
+mkdir -p "$(dirname "$CURSOR")"
+stat -c %s "$EVENTS" > "$CURSOR"
+uv run notify usr-events watch --profile "$PROFILE" --follow --idle-timeout 900
+```
+
+Do not preseed the cursor when replay is the goal.
+
+Healthy watcher signals:
+
+- watcher cursor advances
+- watcher spool stays empty
+- target dataset `.events.log` gains new events
+- follow mode can briefly sit at the live tail while waiting for a newline-terminated event record; that is healthy and should not be treated as corruption
+- Slack delivery can remain intentionally sparse between progress thresholds or
+  heartbeat intervals
+
 Cluster operations:
 - BU SCC qsub workflow: [docs/bu-scc/batch-notify.md](../bu-scc/batch-notify.md)
 - Submit-ready watcher job: [docs/bu-scc/jobs/notify-watch.qsub](../bu-scc/jobs/notify-watch.qsub)
@@ -150,6 +177,8 @@ uv run notify spool drain --profile "$PROFILE" --fail-fast
 - Running live HTTPS delivery without trust roots.
 - Expecting Notify to consume DenseGen telemetry (`outputs/meta/events.jsonl`).
 - Sharing one cursor or spool path across unrelated runs.
+- Starting a new live watcher on an old stream without seeding the cursor when
+  replay is not desired.
 - Expecting default policy filters to surface USR maintenance merge actions. If merge/carry operations must be visible, pass `--only-actions merge_datasets,attach,materialize` or set `NOTIFY_ACTIONS` explicitly.
 
 ### DenseGen progress semantics
