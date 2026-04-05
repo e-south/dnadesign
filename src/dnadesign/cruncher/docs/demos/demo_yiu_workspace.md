@@ -3,7 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-04-03
 
-Use this walkthrough to run the checked-in YIU reference workspace, publish its payload bundle, and inspect the three payload views.
+Use this walkthrough to run the checked-in YIU reference workspace, publish its payload bundle, and inspect the three payload views. Keep this page runnable-first; use [YIU Artifacts](../reference/yiu_artifacts.md) for the emitted-file contract and [YIU Visual System](../reference/yiu_visual_system.md) for the named visual directions.
 
 ```bash
 # Use the checked-in YIU demo workspace in the repo.
@@ -35,15 +35,7 @@ outputs/example_payload/
 outputs/example_payload__payload_views.pdf
 ```
 
-Key YIU publication paths:
-
-- `bundle_manifest.json`
-- `normalized_payload.json`
-- bundle-root render truth: `visual_inventory.json`
-- published view contracts: `payload_view.json`, `split_payload_view.json`, `assembled_payload_view.json`
-- one composite operator PDF inside the bundle: `payload_views.pdf`
-- one mirrored operator PDF at `outputs/example_payload__payload_views.pdf`
-- optional debug jobs: `baserender_jobs/*.job.yaml` when `emit_render_jobs_debug: true`
+Use [YIU Artifacts](../reference/yiu_artifacts.md) for the exact emitted files, render-status semantics, and shared `render`/`show` inspection surface.
 
 The checked-in workspace is intentionally user-sequence-only. Sample-hit YIU demos now live beside their source Sample outputs in the monotypic workspaces such as `demo_monotypic_tetr`, where the YIU bundle sits under `outputs/yiu__tetr_monotypic_hit/` and the mirrored operator PDF lands in `outputs/plots/`.
 The workspace still includes a generic local PWM context sidecar under `motifs/example_pwm_context.yaml` for extra experimentation.
@@ -59,3 +51,4 @@ Next:
 
 - [YIU Workflow](../guides/yiu_workflow.md)
 - [YIU Artifacts](../reference/yiu_artifacts.md)
+- [YIU Visual System](../reference/yiu_visual_system.md)

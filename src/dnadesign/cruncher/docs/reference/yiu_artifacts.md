@@ -115,4 +115,4 @@ Each view entry also records one explicit `visual_direction` so downstream tools
 - published plot path when configured
 - key artifact paths
 
-Use [YIU Workflow](../guides/yiu_workflow.md) for execution guidance and [YIU Spec Reference](yiu_spec.md) for schema details.
+Use [YIU Workflow](../guides/yiu_workflow.md) for execution guidance, [YIU Visual System](yiu_visual_system.md) for named visual directions and hierarchy, and [YIU Spec Reference](yiu_spec.md) for schema details.

@@ -33,7 +33,7 @@ Studies and portfolios extend the fixed-length optimization lane. Cassette and Y
 - Design a cassette from an authored spec: [`guides/cassette_workflow.md`](guides/cassette_workflow.md)
 - Search for ranked cassette hits: [`guides/cassette_solve_workflow.md`](guides/cassette_solve_workflow.md)
 - Run payload-centric YIU workflows: [`guides/yiu_workflow.md`](guides/yiu_workflow.md)
-  Ownership split: demo = checked-in workspace/runbook, workflow = command flow plus visual posture, spec = schema/normalization, artifacts = emitted files/render state, architecture = module ownership.
+  Ownership split: demo = checked-in workspace/runbook, workflow = command flow, visual system = named directions and hierarchy, spec = schema/normalization, artifacts = emitted files/render state, architecture = module ownership.
 - Understand sample/Gibbs analysis outputs: [`guides/sampling_and_analysis.md`](guides/sampling_and_analysis.md)
 - Run study sweeps: [`guides/studies.md`](guides/studies.md)
 - Aggregate a portfolio: [`guides/portfolio_aggregation.md`](guides/portfolio_aggregation.md)
@@ -65,6 +65,7 @@ Studies and portfolios extend the fixed-length optimization lane. Cassette and Y
 - [YIU Workflow](guides/yiu_workflow.md)
 - [YIU Spec Reference](reference/yiu_spec.md)
 - [YIU Artifacts](reference/yiu_artifacts.md)
+- [YIU Visual System](reference/yiu_visual_system.md)
 
 #### Run Studies and Portfolio Aggregation
 - [Studies](guides/studies.md)
@@ -128,6 +129,7 @@ Studies and portfolios extend the fixed-length optimization lane. Cassette and Y
 - [`reference/cassette_artifacts.md`](reference/cassette_artifacts.md)
 - [`reference/yiu_spec.md`](reference/yiu_spec.md)
 - [`reference/yiu_artifacts.md`](reference/yiu_artifacts.md)
+- [`reference/yiu_visual_system.md`](reference/yiu_visual_system.md)
 - [`reference/glossary.md`](reference/glossary.md)
 - [`reference/doc_conventions.md`](reference/doc_conventions.md)
 - [`reference/runbook_steps.md`](reference/runbook_steps.md)

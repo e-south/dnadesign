@@ -28,6 +28,7 @@ def test_docs_index_routes_to_yiu_guide_and_references() -> None:
         assert "guides/yiu_workflow.md" in content
         assert "reference/yiu_spec.md" in content
         assert "reference/yiu_artifacts.md" in content
+        assert "reference/yiu_visual_system.md" in content
         assert "Ownership split:" in content
         assert "yiu init-workspace|validate|render|show" in content
         assert "trace|solve" not in content
@@ -48,6 +49,7 @@ def test_top_level_docs_route_three_workflow_families() -> None:
         assert "Payload-Centric YIU Workflows" in content
         assert "demos/demo_yiu_workspace.md" in content
         assert "guides/yiu_workflow.md" in content
+        assert "reference/yiu_visual_system.md" in content
 
 
 def test_cli_reference_lists_yiu_commands_and_contracts() -> None:
@@ -69,6 +71,7 @@ def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
     guide = _read("docs/guides/yiu_workflow.md")
     spec_ref = _read("docs/reference/yiu_spec.md")
     artifacts_ref = _read("docs/reference/yiu_artifacts.md")
+    visual_ref = _read("docs/reference/yiu_visual_system.md")
     architecture = _read("docs/reference/architecture.md")
     runbook_steps = _read("docs/reference/runbook_steps.md")
     workspaces_readme = _read("workspaces/README.md")
@@ -79,14 +82,15 @@ def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
     assert ".yiu.yaml" in demo
     assert ".yiu.solve.yaml" not in demo
     assert "outputs/example_payload/" in demo
-    assert "normalized_payload.json" in demo
-    assert "bundle_manifest.json" in demo
     assert "uv run cruncher yiu render" in demo
     assert "demo_monotypic_tetr" in demo
+    assert "[YIU Artifacts](../reference/yiu_artifacts.md)" in demo
+    assert "[YIU Visual System](../reference/yiu_visual_system.md)" in demo
     assert "Use this guide for command flow and operator posture." in guide
     assert "### Documentation ownership" in guide
     assert "[YIU Spec Reference](../reference/yiu_spec.md)" in guide
     assert "[YIU Artifacts](../reference/yiu_artifacts.md)" in guide
+    assert "[YIU Visual System](../reference/yiu_visual_system.md)" in guide
     assert "[Cruncher architecture](../reference/architecture.md)" in guide
     assert "strict v4 contract" in guide
     assert "### Start here" in guide
@@ -117,6 +121,7 @@ def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
     assert "split_yiu_payload_bundle_v4" in artifacts_ref
     assert "source of truth for emitted files" in artifacts_ref
     assert "shared `render`/`show` inspection surface" in artifacts_ref
+    assert "[YIU Visual System](yiu_visual_system.md)" in artifacts_ref
     assert "visual_inventory.json" in artifacts_ref
     assert "visual_direction" in artifacts_ref
     assert "render_status: rendered" in artifacts_ref
@@ -146,6 +151,12 @@ def test_yiu_docs_route_readers_to_their_primary_reference_pages() -> None:
     assert "canonical view-entry/render-job planning lives in `yiu/view_catalog.py`" in architecture
     assert "display/title policy plus named visual directions live in `yiu/view_styles.py`" in architecture
     assert "the named YIU visual system is `bench_strip`" in architecture
+    assert "This page owns the named visual directions and information hierarchy" in visual_ref
+    assert "`bench_strip`" in visual_ref
+    assert "`payload` uses `evidence_ribbon`" in visual_ref
+    assert "`split_payload` uses `operator_strip`" in visual_ref
+    assert "`assembled_payload` uses `operator_strip`" in visual_ref
+    assert "producer-side style policy lives in `src/dnadesign/cruncher/src/yiu/visual_system.py`" in visual_ref
     assert "shared view fragments live in `yiu/view_common.py`" in architecture
     assert "`yiu/` (payload-centric YIU domain)" in architecture
     assert "cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml" in runbook_steps
@@ -162,6 +173,7 @@ def test_yiu_docs_keep_render_state_and_artifact_surface_contracts_separate() ->
         "Use [YIU Artifacts](../reference/yiu_artifacts.md) for the exact "
         "emitted files, shared inspection fields, and render-status semantics."
     ) in guide
+    assert "[YIU Visual System](../reference/yiu_visual_system.md)" in guide
     assert (
         "bundle contract is intentionally split across bundle truth, "
         "published view contracts, and composite render output"
@@ -172,6 +184,7 @@ def test_yiu_docs_keep_render_state_and_artifact_surface_contracts_separate() ->
     assert "source of truth for emitted files" in artifacts_ref
     assert "Each bundle uses `visual_inventory.json` as the operator-facing render-state record." in artifacts_ref
     assert "visual_direction" in artifacts_ref
+    assert "YIU Visual System" in artifacts_ref
     assert "cruncher yiu render" in artifacts_ref
     assert "cruncher yiu show" in artifacts_ref
     assert "render-status semantics" in artifacts_ref

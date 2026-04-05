@@ -4,7 +4,7 @@
 **Last verified:** 2026-04-04
 
 YIU is a payload-centric rendering workflow with a strict v4 contract.
-Use this guide for command flow and operator posture. Use [YIU Spec Reference](../reference/yiu_spec.md) for input and normalization rules, [YIU Artifacts](../reference/yiu_artifacts.md) for emitted files and render-state semantics, and [Cruncher architecture](../reference/architecture.md) for module ownership.
+Use this guide for command flow and operator posture. Use [YIU Spec Reference](../reference/yiu_spec.md) for input and normalization rules, [YIU Artifacts](../reference/yiu_artifacts.md) for emitted files and render-state semantics, [YIU Visual System](../reference/yiu_visual_system.md) for named visual directions and hierarchy, and [Cruncher architecture](../reference/architecture.md) for module ownership.
 
 The public lane is:
 
@@ -13,7 +13,8 @@ The public lane is:
 ### Documentation ownership
 
 - Use [YIU Workspace Demo](../demos/demo_yiu_workspace.md) for the checked-in workspace and runbook.
-- Use this guide for command flow, operator posture, and the visual system split across the three views.
+- Use this guide for command flow and operator posture.
+- Use [YIU Visual System](../reference/yiu_visual_system.md) for the `bench_strip` design language and the `evidence_ribbon` versus `operator_strip` split across the three views.
 - Use [YIU Spec Reference](../reference/yiu_spec.md) for schema and normalization only.
 - Use [YIU Artifacts](../reference/yiu_artifacts.md) for emitted files, render-status semantics, and the shared inspection surface.
 - Use [Cruncher architecture](../reference/architecture.md) when you need module ownership or app/domain boundaries.
@@ -81,7 +82,7 @@ The bundle contract is intentionally split across bundle truth, published view c
 ### Visuals and inspection
 
 The payload view uses `yiu_payload_visual_v1`.
-The current YIU visual system is `bench_strip`: `payload` uses the `evidence_ribbon` direction, while `split_payload` and `assembled_payload` use `operator_strip`.
+The current YIU visual system is `bench_strip`: `payload` uses the `evidence_ribbon` direction, while `split_payload` and `assembled_payload` use `operator_strip`. Use [YIU Visual System](../reference/yiu_visual_system.md) for the hierarchy rationale and style-boundary rules.
 
 When PWM context is available, the payload view includes motif layers aligned to payload-forward coordinates.
 When PWM is absent or disabled, the same contract stays valid with an empty `motif_layers` list.

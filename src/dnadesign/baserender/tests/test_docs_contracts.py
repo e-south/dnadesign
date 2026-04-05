@@ -108,3 +108,4 @@ def test_reference_and_yiu_integration_docs_cover_payload_visual_adapter_surface
     assert "does not invent placeholder arms or bands" in yiu
     assert "evidence_ribbon" in yiu
     assert "operator_strip" in yiu
+    assert "producer-side visual language is owned by Cruncher" in yiu
