@@ -63,14 +63,25 @@ def _merge_style_overrides(base: dict[str, object], **updates: object) -> dict[s
     return merged
 
 
+def _bench_strip_direction_base() -> dict[str, object]:
+    return _merge_style_overrides(
+        dict(bench_strip_style_foundation()),
+        **_COMMON_STRIP_STYLE_OVERRIDES,
+    )
+
+
 def _operator_strip_style_overrides(*, padding_y: float = 24.0) -> dict[str, object]:
-    return {**_COMMON_STRIP_STYLE_OVERRIDES, "padding_y": padding_y, "legend": False}
+    return _merge_style_overrides(
+        _bench_strip_direction_base(),
+        padding_y=padding_y,
+        legend=False,
+        connectors=False,
+    )
 
 
 def _evidence_ribbon_style_overrides() -> dict[str, object]:
     return _merge_style_overrides(
-        dict(bench_strip_style_foundation()),
-        **_COMMON_STRIP_STYLE_OVERRIDES,
+        _bench_strip_direction_base(),
         legend=False,
         connectors=True,
     )

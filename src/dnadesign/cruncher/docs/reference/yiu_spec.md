@@ -3,7 +3,7 @@
 **Audience:** YIU workflow users and maintainers
 **Applies to:** `configs/yiu/*.yiu.yaml`
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-04
+**Last verified:** 2026-04-05
 
 YIU ships one strict v4 payload-rendering document root.
 This page owns schema and normalization only. Bundle layout, render-status semantics, and operator inspection fields live in [YIU Artifacts](yiu_artifacts.md).
@@ -132,6 +132,12 @@ YIU accepts three stable payload-source shapes for `sample_hit`:
 - sibling-workspace public artifact references through `metadata.source_workspace` + `metadata.source_artifact`
 
 Relative `source_artifact_path` values are resolved inside the current workspace only. `metadata.source_workspace` is explicit: use an absolute path or a sibling workspace path/name that resolves from the current workspace root or its parent directory. Ambiguous or missing sources fail fast.
+
+### Maintainer seams
+
+- `yiu/spec_models.py` is the stable public schema facade; focused input, PWM, and rendering validators live in `yiu/spec_input_models.py`, `yiu/spec_pwm_models.py`, and `yiu/spec_rendering_models.py`.
+- `yiu/payload_resolution.py` is the stable public input-resolution seam; sample-hit artifact lookup and table loading live in `yiu/sample_hit_sources.py`.
+- Keep schema and source-resolution changes inside those focused helpers unless the public facade contract itself is changing.
 
 ### Junction and PWM rules
 

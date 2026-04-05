@@ -14,54 +14,54 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Mapping
 
-_BENCH_STRIP_FOUNDATION: dict[str, object] = {
-    "padding_y": 24.0,
-    "overlay_align": "center",
-    "layout": {
-        "outer_pad_cells": 0.20,
-    },
-    "sequence": {
-        "strand_gap_cells": 0.18,
-        "to_kmer_gap_cells": 0.12,
+
+def _bench_strip_palette() -> dict[str, str]:
+    return {
+        "tf:acrR": "#4C8E7F",
+        "tf:araC": "#B86E8D",
+        "tf:baeR": "#5E84B8",
+        "tf:lexA": "#A87644",
+        "tf:cpxR": "#3E927F",
+        "tf:fnr": "#B89756",
+        "tf:fur": "#5B98A5",
+        "tf:lacI": "#6B84B8",
+        "tf:lrp": "#789A63",
+        "tf:rcdA": "#A29070",
+        "tf:soxR": "#B66F8C",
+        "tf:soxS": "#BC8466",
+    }
+
+
+def _bench_strip_sequence_style() -> dict[str, object]:
+    return {
+        "strand_gap_cells": 0.16,
+        "to_kmer_gap_cells": 0.10,
         "bold_consensus_bases": True,
-        "non_consensus_color": "#9CA3AF",
+        "non_consensus_color": "#9AA4B3",
         "tone_quantile_low": 0.10,
         "tone_quantile_high": 0.90,
-    },
-    "palette": {
-        "tf:acrR": "#67BFA5",
-        "tf:araC": "#D883A4",
-        "tf:baeR": "#7BA4D9",
-        "tf:lexA": "#C08A56",
-        "tf:cpxR": "#5DA79F",
-        "tf:fnr": "#D1B06C",
-        "tf:fur": "#74C0CB",
-        "tf:lacI": "#86A5D8",
-        "tf:lrp": "#9BC47B",
-        "tf:rcdA": "#C9B082",
-        "tf:soxR": "#D68AA7",
-        "tf:soxS": "#D9A78A",
-    },
-    "connectors": False,
-    "legend_mode": "inline",
-    "legend_inline_side": "auto",
-    "legend_inline_margin_cells": 0.28,
-    "legend_font_size": 10,
-    "kmer": {
-        "box_height_cells": 1.12,
+    }
+
+
+def _bench_strip_kmer_style() -> dict[str, object]:
+    return {
+        "box_height_cells": 1.08,
         "fill_alpha": 0.94,
         "text_y_nudge_cells": 0.0,
-        "to_logo_gap_cells": 0.12,
-    },
-    "motif_logo": {
+        "to_logo_gap_cells": 0.10,
+    }
+
+
+def _bench_strip_motif_logo_style() -> dict[str, object]:
+    return {
         "layout": "stack",
         "lane_mode": "follow_feature_track",
         "display_mode": "information",
         "height_bits": 2.0,
-        "bits_to_cells": 1.35,
+        "bits_to_cells": 1.28,
         "y_pad_cells": 0.0,
-        "letter_x_pad_frac": 0.06,
-        "alpha_other": 0.80,
+        "letter_x_pad_frac": 0.05,
+        "alpha_other": 0.82,
         "alpha_observed": 1.0,
         "debug_bounds": False,
         "letter_coloring": {
@@ -73,7 +73,22 @@ _BENCH_STRIP_FOUNDATION: dict[str, object] = {
             "enabled": True,
             "location": "left_of_logo",
         },
-    },
+    }
+
+
+_BENCH_STRIP_FOUNDATION: dict[str, object] = {
+    "padding_y": 26.0,
+    "overlay_align": "center",
+    "layout": {"outer_pad_cells": 0.22},
+    "sequence": _bench_strip_sequence_style(),
+    "palette": _bench_strip_palette(),
+    "connectors": False,
+    "legend_mode": "inline",
+    "legend_inline_side": "auto",
+    "legend_inline_margin_cells": 0.24,
+    "legend_font_size": 10,
+    "kmer": _bench_strip_kmer_style(),
+    "motif_logo": _bench_strip_motif_logo_style(),
 }
 
 

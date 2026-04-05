@@ -1057,6 +1057,17 @@ def test_split_and_assembled_views_center_titles() -> None:
     assert assembled_overrides["overlay_align"] == "center"
 
 
+def test_operator_strip_views_inherit_bench_strip_foundation() -> None:
+    payload_overrides = build_yiu_style_overrides("payload")
+    split_overrides = build_yiu_style_overrides("split_payload")
+    assembled_overrides = build_yiu_style_overrides("assembled_payload")
+
+    assert split_overrides["sequence"]["bold_consensus_bases"] is True
+    assert assembled_overrides["sequence"]["bold_consensus_bases"] is True
+    assert split_overrides["sequence"]["non_consensus_color"] == payload_overrides["sequence"]["non_consensus_color"]
+    assert assembled_overrides["kmer"]["box_height_cells"] == split_overrides["kmer"]["box_height_cells"]
+
+
 def test_yiu_style_profiles_return_defensive_copies() -> None:
     profile = get_yiu_style_profile("payload")
     profile.style_overrides["sequence"]["bold_consensus_bases"] = False

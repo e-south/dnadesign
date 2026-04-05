@@ -42,6 +42,7 @@ Keep that order stable unless the contract changes with it. If the payload row s
 
 - The producer-owned style seed lives in `src/dnadesign/cruncher/src/yiu/visual_foundations.py`.
 - The named visual-direction registry and style profiles live in `src/dnadesign/cruncher/src/yiu/visual_system.py`.
+- `evidence_ribbon` and `operator_strip` should share the same `bench_strip` foundation and diverge only where emphasis changes.
 - The title policy lives in `src/dnadesign/cruncher/src/yiu/view_styles.py`.
 - `cruncher` chooses the named visual direction and style overrides when it publishes bundle views.
 - `baserender` consumes those contracts through its public adapter and renderer APIs; it should not infer YIU layout policy from consumer-side showcase defaults or hidden heuristics.

@@ -1,7 +1,7 @@
 ## YIU Workflow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-04
+**Last verified:** 2026-04-05
 
 YIU is a payload-centric rendering workflow with a strict v4 contract.
 Use this guide for command flow and operator posture. Use [YIU Spec Reference](../reference/yiu_spec.md) for input and normalization rules, [YIU Artifacts](../reference/yiu_artifacts.md) for emitted files and render-state semantics, [YIU Visual System](../reference/yiu_visual_system.md) for named visual directions and hierarchy, and [Cruncher architecture](../reference/architecture.md) for module ownership.
@@ -119,6 +119,7 @@ The assembled payload returns to original payload order. It publishes one explic
 Keep this guide operator-first. The canonical module ownership map lives in [Architecture](../reference/architecture.md).
 
 At the tool boundary, YIU publishes contracts and jobs; `baserender` consumes those contracts through its public API. Cross-tool integrations should not import `dnadesign.baserender.src.*`.
+Keep schema and source-resolution edits narrow: `yiu/spec_models.py` and `yiu/payload_resolution.py` stay public facades, while the detailed validators and sample-hit artifact IO helpers live behind those seams.
 
 ### Related docs
 
