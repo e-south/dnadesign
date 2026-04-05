@@ -15,6 +15,7 @@ from pathlib import Path
 
 from dnadesign.cruncher.yiu.bundle_models import payload_summary_dump
 from dnadesign.cruncher.yiu.bundle_state import load_bundle_state
+from dnadesign.cruncher.yiu.bundle_summary import build_bundle_summary
 from dnadesign.cruncher.yiu.bundle_surface import (
     YiuBundleIntegrity,
     YiuShowOutcome,
@@ -37,9 +38,10 @@ def _split_row_debug(rows: list[dict[str, object]]) -> list[YiuSplitRowDebug]:
                 panel_order=meta.get("panel_order"),
                 selected_sticky_end_sequence_5to3=meta.get("selected_sticky_end_sequence_5to3"),
                 canonical_sticky_end_sequence_5to3=meta.get("canonical_sticky_end_sequence_5to3"),
+                payload_body_sequence_5to3=meta.get("payload_body_sequence_5to3"),
+                display_payload_body_sequence_5to3=meta.get("display_payload_body_sequence_5to3"),
                 retained_primary_sequence_5to3=meta.get("retained_primary_sequence_5to3"),
                 retained_complement_sequence_3to5=meta.get("retained_complement_sequence_3to5"),
-                retained_payload_body_sequence_5to3=meta.get("retained_payload_body_sequence_5to3"),
                 sticky_end_display_span=meta.get("sticky_end_display_span"),
                 payload_body_display_span=meta.get("payload_body_display_span"),
                 payload_junction_window=meta.get("payload_junction_window"),
@@ -69,6 +71,7 @@ def show_yiu_bundle(bundle_dir: str | Path, *, verbose: bool = False) -> YiuShow
     )
     outcome_kwargs = {
         "bundle_contract": state.manifest.bundle_contract,
+        "bundle_summary": build_bundle_summary(normalized=state.normalized, inventory=state.inventory),
         "provenance": state.manifest.provenance,
         **payload_summary_dump(state.manifest),
         "view_ids": [view.view_id for view in state.inventory.views],

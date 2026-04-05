@@ -33,7 +33,6 @@ def _ordering_key(
 ) -> tuple[object, ...]:
     common = (
         candidate.midpoint_distance,
-        candidate.body_length_balance,
         candidate.terminal_positions_used,
         -candidate.default_strand_preference_count,
         candidate.lexical_key,

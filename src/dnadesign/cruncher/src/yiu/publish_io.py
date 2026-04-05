@@ -14,6 +14,7 @@ from __future__ import annotations
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_yaml
 from dnadesign.cruncher.yiu.bundle_models import PayloadBundleManifest, PayloadViewEntry, PayloadVisualInventory
 from dnadesign.cruncher.yiu.bundle_state import persist_bundle_models
+from dnadesign.cruncher.yiu.bundle_summary import YiuBundleSummary
 from dnadesign.cruncher.yiu.publish_layout import PayloadBundleLayout
 from dnadesign.cruncher.yiu.view_catalog import build_render_job_payload
 from dnadesign.cruncher.yiu.view_io import write_json_payload, write_jsonl_rows
@@ -37,6 +38,14 @@ def write_normalized_payload_dump(
     normalized_payload_dump: dict[str, object],
 ) -> None:
     write_json_payload(layout.normalized_payload_path, normalized_payload_dump)
+
+
+def write_payload_bundle_summary(
+    *,
+    layout: PayloadBundleLayout,
+    bundle_summary: YiuBundleSummary,
+) -> None:
+    write_json_payload(layout.bundle_summary_path, bundle_summary.model_dump(mode="json"))
 
 
 def write_payload_bundle_state(
@@ -63,6 +72,7 @@ def write_debug_render_jobs(*, layout: PayloadBundleLayout, view_entries: list[P
 __all__ = [
     "write_debug_render_jobs",
     "write_normalized_payload_dump",
+    "write_payload_bundle_summary",
     "write_payload_bundle_state",
     "write_payload_bundle_views",
 ]

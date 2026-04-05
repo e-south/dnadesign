@@ -70,7 +70,6 @@ def _payload_spec(
                     "secondary": [
                         "total_loss",
                         "midpoint_proximity",
-                        "body_length_balance",
                         "terminal_position_avoidance",
                         "default_strand_preference",
                         "lexical_stability",
@@ -161,6 +160,29 @@ def test_yiu_init_workspace_scaffolds_only_payload_config(tmp_path: Path) -> Non
     ]
 
 
+def test_yiu_init_workspace_can_seed_payload_sequence_and_center_locked_mode(tmp_path: Path) -> None:
+    workspace = tmp_path / "seeded_yiu_payload"
+
+    result = runner.invoke(
+        app,
+        [
+            "yiu",
+            "init-workspace",
+            "--output",
+            str(workspace),
+            "--sequence",
+            "AACCGGTTGGTT",
+            "--junction-mode",
+            "center_locked",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = yaml.safe_load((workspace / "configs" / "yiu" / "example_payload.yiu.yaml").read_text(encoding="utf-8"))
+    assert payload["input"]["user_sequence"]["sequence"] == "AACCGGTTGGTT"
+    assert payload["optimization"]["junction"]["mode"] == "center_locked"
+
+
 def test_yiu_validate_fails_fast_on_legacy_v1_spec(tmp_path: Path) -> None:
     spec_path = tmp_path / "demo_yiu_payload" / "configs" / "yiu" / "legacy.yiu.yaml"
     _write_yaml(spec_path, _legacy_v1_payload_spec())
@@ -180,11 +202,13 @@ def test_yiu_render_materializes_payload_bundle_from_spec(tmp_path: Path) -> Non
 
     assert result.exit_code == 0
     bundle_dir = workspace / "outputs" / "demo_payload"
+    assert (bundle_dir / "bundle_summary.json").exists()
     assert (bundle_dir / "bundle_manifest.json").exists()
     assert (bundle_dir / "normalized_payload.json").exists()
     assert (bundle_dir / "visual_inventory.json").exists()
     assert (bundle_dir / "payload_view.json").exists()
     assert (workspace / "outputs" / "plot__demo_payload__payload_views.pdf").exists()
+    assert "Bundle summary ->" in result.output
     assert "Bundle manifest ->" in result.output
     assert "Bundle write ->" in result.output
 
@@ -205,6 +229,19 @@ def test_yiu_validate_reports_junction_window_summary(tmp_path: Path) -> None:
     assert "Watson-Crick pairing valid ->" not in result.output
 
 
+def test_yiu_validate_rejects_ambiguous_iupac_payload(tmp_path: Path) -> None:
+    workspace = tmp_path / "demo_yiu_payload"
+    spec_path = workspace / "configs" / "yiu" / "ambiguous_payload.yiu.yaml"
+    _write_yaml(spec_path, _payload_spec(sequence="AANNNNTT", name="ambiguous_payload"))
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
+
+    assert result.exit_code == 1
+    normalized_output = normalized_cli_output(result.output)
+    assert "YIU_SEQUENCE_INVALID" in normalized_output
+    assert "A/C/G/T" in normalized_output
+
+
 def test_yiu_show_reports_payload_bundle_summary(tmp_path: Path) -> None:
     workspace = tmp_path / "demo_yiu_payload"
     spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
@@ -212,6 +249,8 @@ def test_yiu_show_reports_payload_bundle_summary(tmp_path: Path) -> None:
 
     render_result = runner.invoke(app, ["yiu", "render", "--spec", str(spec_path)])
     assert render_result.exit_code == 0
+    bundle_summary = json.loads((workspace / "outputs" / "demo_payload" / "bundle_summary.json").read_text())
+    split_payload = bundle_summary["sequence_summary"]["split_payload"]
 
     show_result = runner.invoke(app, ["yiu", "show", "--bundle", str(workspace / "outputs" / "demo_payload")])
 
@@ -224,10 +263,25 @@ def test_yiu_show_reports_payload_bundle_summary(tmp_path: Path) -> None:
     assert "Junction window -> start=4 end=8 mode=explicit_window" in show_result.output
     assert "Mismatch count -> 1" in show_result.output
     assert "PWM -> mode=none effective=False" in show_result.output
+    assert "Payload 5' -> 3' -> AAATTTCCCGGGAAATTTCCC" in show_result.output
+    assert (
+        "Split payload 5' -> 3' -> "
+        f"left={split_payload['left_payload_body_sequence_5to3']} "
+        f"sticky={split_payload['selected_sticky_end_sequence_5to3']} "
+        f"right={split_payload['right_payload_body_sequence_5to3']}"
+    ) in show_result.output
+    assert (
+        f"Reference sticky end 5' -> 3' -> {split_payload['canonical_sticky_end_sequence_5to3']}"
+    ) in show_result.output
     assert "Views -> payload, split_payload, assembled_payload" in show_result.output
     assert "Render status -> not_requested" in show_result.output
     assert "Integrity -> ok" in show_result.output
-    assert "Composite render ->" in show_result.output
+    assert "Composite render -> payload_views.pdf" in show_result.output
+    assert "Published plot -> ../plot__demo_payload__payload_views.pdf" in show_result.output
+    assert "Bundle summary -> bundle_summary.json" in show_result.output
+    assert "Bundle manifest -> bundle_manifest.json" in show_result.output
+    assert "Normalized payload -> normalized_payload.json" in show_result.output
+    assert "Visual inventory -> visual_inventory.json" in show_result.output
     assert "Selected sticky end" not in show_result.output
 
 
@@ -261,10 +315,24 @@ def test_yiu_show_verbose_json_exposes_split_row_debug_surface(tmp_path: Path) -
     default_payload = json.loads(default_show.output)
     verbose_payload = json.loads(verbose_show.output)
 
+    assert "bundle_summary" in default_payload
+    assert (
+        default_payload["bundle_summary"]["sequence_summary"]["selected_payload_sequence_5to3"]
+        == "AAATTTCCCGGGAAATTTCCC"
+    )
+    assert (
+        default_payload["bundle_summary"]["sequence_summary"]["split_payload"]["left_payload_body_sequence_5to3"]
+        == "AAAT"
+    )
+    assert "optimization_decision" not in default_payload
+    assert "motif_context" not in default_payload
     assert "split_row_debug" not in default_payload
+    assert "optimization_decision" in verbose_payload
+    assert "motif_context" in verbose_payload
     assert [entry["fragment_side"] for entry in verbose_payload["split_row_debug"]] == ["left", "right"]
     assert len(verbose_payload["split_row_debug"][1]["selected_sticky_end_sequence_5to3"]) == 4
     assert len(verbose_payload["split_row_debug"][1]["canonical_sticky_end_sequence_5to3"]) == 4
+    assert verbose_payload["split_row_debug"][0]["payload_body_sequence_5to3"] == "AAAT"
 
 
 def test_yiu_validate_and_show_json_share_payload_summary_contract(tmp_path: Path) -> None:
@@ -292,6 +360,9 @@ def test_yiu_validate_and_show_json_share_payload_summary_contract(tmp_path: Pat
     assert show_payload["published_plot_artifact_path"] == str(
         (workspace / "outputs" / "plot__demo_payload__payload_views.pdf").resolve()
     )
+    assert show_payload["bundle_summary_path"] == str(
+        (workspace / "outputs" / "demo_payload" / "bundle_summary.json").resolve()
+    )
     for field_name in [
         "input_kind",
         "payload_length",
@@ -305,6 +376,10 @@ def test_yiu_validate_and_show_json_share_payload_summary_contract(tmp_path: Pat
         "total_loss",
     ]:
         assert show_payload[field_name] == validate_payload[field_name]
+    assert (
+        show_payload["bundle_summary"]["sequence_summary"]["split_payload"]["selected_sticky_end_sequence_5to3"]
+        == (show_payload["selected_complement_sequence"][4:8][::-1])
+    )
 
 
 def test_yiu_validate_rejects_invalid_pwm_mode_source_combo(tmp_path: Path) -> None:

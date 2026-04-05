@@ -2,14 +2,17 @@
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-04-03
+**Last updated by:** cruncher-maintainers on 2026-04-05
 
 Use this walkthrough to run the checked-in YIU reference workspace, publish its payload bundle, and inspect the three payload views. Keep this page runnable-first; use [YIU Artifacts](../reference/yiu_artifacts.md) for the emitted-file contract and [YIU Visual System](../reference/yiu_visual_system.md) for the named visual directions.
+
+<!-- docs:toc:off -->
 
 ### Route map
 
 - Use this workspace when you want the checked-in user-sequence demo.
 - Use a monotypic workspace when you need a sample-hit-backed YIU example.
-- Use `init-workspace` when you want a disposable scratch workspace with the same schema.
+- Use `init-workspace` when you want a disposable scratch workspace with the same schema and a starter `center_locked` or `optimize` junction policy.
 
 ```bash
 # Use the checked-in YIU demo workspace in the repo.
@@ -51,6 +54,9 @@ If you want a disposable scratch copy instead of the checked-in repo workspace:
 ```bash
 # Create a fresh YIU workspace with the same payload-centric schema.
 uv run cruncher yiu init-workspace yiu_lab_demo
+
+# Or seed a scratch workspace with your own payload and a center-locked starter junction.
+uv run cruncher yiu init-workspace yiu_lab_center --sequence AACCGGTTGGTT --junction-mode center_locked
 ```
 
 Next:

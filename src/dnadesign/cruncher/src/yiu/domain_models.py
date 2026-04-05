@@ -23,7 +23,7 @@ class JunctionSelection(StrictBaseModel):
     start: int = Field(ge=0)
     end: int = Field(ge=1)
     offsets: list[int] = Field(default_factory=lambda: [0, 1, 2, 3])
-    mode: Literal["derived", "explicit_window", "optimize"]
+    mode: Literal["derived", "center_locked", "explicit_window", "optimize"]
     left_body_length: int = Field(ge=1)
     right_body_length: int = Field(ge=1)
 

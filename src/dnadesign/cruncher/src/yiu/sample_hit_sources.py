@@ -15,12 +15,13 @@ import csv
 from pathlib import Path
 from typing import Any
 
-from dnadesign.cruncher.bio import normalize_iupac
+from dnadesign.cruncher.bio import normalize_dna
 from dnadesign.cruncher.yiu.errors import (
     YIU_PATH_INVALID,
     YIU_SAMPLE_HIT_AMBIGUOUS,
     YIU_SAMPLE_HIT_SEQUENCE_MISSING,
     YIU_SAMPLE_HIT_UNSUPPORTED_SOURCE,
+    YIU_SEQUENCE_INVALID,
     raise_yiu_error,
 )
 from dnadesign.cruncher.yiu.spec_input_models import SampleHitInput
@@ -36,9 +37,9 @@ def metadata_text(sample_hit: SampleHitInput, key: str) -> str | None:
 
 def _normalize_source_sequence(value: str, *, ctx: str) -> str:
     try:
-        return normalize_iupac(value)
+        return normalize_dna(value)
     except Exception as exc:
-        raise_yiu_error(YIU_SAMPLE_HIT_SEQUENCE_MISSING, f"{ctx} is not a normalized DNA sequence ({exc})")
+        raise_yiu_error(YIU_SEQUENCE_INVALID, f"{ctx} must contain exact A/C/G/T bases for YIU v4 ({exc})")
 
 
 def _resolve_workspace_ref(raw: str, *, workspace_root: Path) -> Path:
@@ -114,20 +115,41 @@ def _resolve_hit_table_fields(columns: set[str], artifact_path: Path) -> tuple[s
     )
 
 
-def _load_csv_hit_rows(artifact_path: Path, *, sample_hit: SampleHitInput) -> list[dict[str, Any]]:
-    matches: list[dict[str, Any]] = []
+def _prefer_sample_hit_row(
+    existing: dict[str, Any] | None,
+    candidate: dict[str, Any],
+) -> dict[str, Any]:
+    if existing is None:
+        return candidate
+    existing_detail = str(existing.get("per_tf_json", "")).strip()
+    candidate_detail = str(candidate.get("per_tf_json", "")).strip()
+    if not existing_detail and candidate_detail:
+        return candidate
+    return existing
+
+
+def _load_csv_hit_sequences(artifact_path: Path, *, sample_hit: SampleHitInput) -> dict[str, dict[str, Any]]:
+    sequence_rows: dict[str, dict[str, Any]] = {}
     with artifact_path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         if reader.fieldnames is None:
             raise_yiu_error(YIU_SAMPLE_HIT_SEQUENCE_MISSING, f"sample-hit source artifact is empty: {artifact_path}")
-        id_field, _sequence_field = _resolve_hit_table_fields(set(reader.fieldnames), artifact_path)
+        id_field, sequence_field = _resolve_hit_table_fields(set(reader.fieldnames), artifact_path)
         for row in reader:
             if str(row.get(id_field, "")).strip() == sample_hit.hit_id:
-                matches.append(dict(row))
-    return matches
+                sequence_text = str(row.get(sequence_field, "")).strip()
+                if not sequence_text:
+                    continue
+                normalized = _normalize_source_sequence(
+                    sequence_text,
+                    ctx=f"{artifact_path.name}:{sequence_field}",
+                )
+                candidate = dict(row)
+                sequence_rows[normalized] = _prefer_sample_hit_row(sequence_rows.get(normalized), candidate)
+    return sequence_rows
 
 
-def _load_parquet_hit_rows(artifact_path: Path, *, sample_hit: SampleHitInput) -> list[dict[str, Any]]:
+def _load_parquet_hit_sequences(artifact_path: Path, *, sample_hit: SampleHitInput) -> dict[str, dict[str, Any]]:
     try:
         import pandas as pd
     except Exception as exc:  # pragma: no cover
@@ -149,17 +171,25 @@ def _load_parquet_hit_rows(artifact_path: Path, *, sample_hit: SampleHitInput) -
     except Exception:
         frame = pd.read_parquet(artifact_path, columns=projected_columns)
         frame = frame.loc[frame[id_field].astype(str) == sample_hit.hit_id]
-    return frame.to_dict(orient="records")
+    sequence_rows: dict[str, dict[str, Any]] = {}
+    for row in frame.to_dict(orient="records"):
+        sequence_text = str(row.get(sequence_field, "")).strip()
+        if not sequence_text:
+            continue
+        normalized = _normalize_source_sequence(sequence_text, ctx=f"{artifact_path.name}:{sequence_field}")
+        candidate = dict(row)
+        sequence_rows[normalized] = _prefer_sample_hit_row(sequence_rows.get(normalized), candidate)
+    return sequence_rows
 
 
-def _load_matching_hit_rows(artifact_path: Path, *, sample_hit: SampleHitInput) -> list[dict[str, Any]]:
+def _load_matching_hit_sequences(artifact_path: Path, *, sample_hit: SampleHitInput) -> dict[str, dict[str, Any]]:
     if not artifact_path.exists():
         raise_yiu_error(YIU_SAMPLE_HIT_UNSUPPORTED_SOURCE, f"sample-hit source artifact not found: {artifact_path}")
     suffix = artifact_path.suffix.lower()
     if suffix == ".csv":
-        return _load_csv_hit_rows(artifact_path, sample_hit=sample_hit)
+        return _load_csv_hit_sequences(artifact_path, sample_hit=sample_hit)
     if suffix == ".parquet":
-        return _load_parquet_hit_rows(artifact_path, sample_hit=sample_hit)
+        return _load_parquet_hit_sequences(artifact_path, sample_hit=sample_hit)
     raise_yiu_error(
         YIU_SAMPLE_HIT_UNSUPPORTED_SOURCE,
         f"unsupported sample-hit source artifact: {artifact_path.name}",
@@ -176,22 +206,13 @@ def resolve_sample_hit_payload(
     selected_row: dict[str, Any] | None = None
     derived_sequence: str | None = None
     if artifact_path is not None:
-        rows = _load_matching_hit_rows(artifact_path, sample_hit=sample_hit)
-        if not rows:
+        sequence_rows = _load_matching_hit_sequences(artifact_path, sample_hit=sample_hit)
+        if not sequence_rows:
             raise_yiu_error(
                 YIU_SAMPLE_HIT_SEQUENCE_MISSING,
                 f"sample-hit hit_id={sample_hit.hit_id!r} was not found in {artifact_path.name}",
             )
-        id_field, sequence_field = _resolve_hit_table_fields(set(rows[0].keys()), artifact_path)
-        sequences = sorted(
-            {
-                _normalize_source_sequence(
-                    str(row.get(sequence_field, "")).strip(), ctx=f"{artifact_path.name}:{sequence_field}"
-                )
-                for row in rows
-                if str(row.get(sequence_field, "")).strip()
-            }
-        )
+        sequences = sorted(sequence_rows)
         if not sequences:
             raise_yiu_error(
                 YIU_SAMPLE_HIT_SEQUENCE_MISSING,
@@ -203,18 +224,7 @@ def resolve_sample_hit_payload(
                 "sample-hit lookup resolved to multiple payload sequences: " + ", ".join(sequences),
             )
         derived_sequence = sequences[0]
-        selected_row = next(
-            (
-                dict(row)
-                for row in rows
-                if _normalize_source_sequence(
-                    str(row.get(sequence_field, "")).strip(), ctx=f"{artifact_path.name}:{sequence_field}"
-                )
-                == derived_sequence
-                and str(row.get(id_field, "")).strip() == sample_hit.hit_id
-            ),
-            dict(rows[0]),
-        )
+        selected_row = dict(sequence_rows[derived_sequence])
     if direct_sequence is not None and derived_sequence is not None and direct_sequence != derived_sequence:
         raise_yiu_error(
             YIU_SAMPLE_HIT_AMBIGUOUS,

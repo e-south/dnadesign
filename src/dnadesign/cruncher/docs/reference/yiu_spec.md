@@ -4,10 +4,13 @@
 **Applies to:** `configs/yiu/*.yiu.yaml`
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-04-05
+**Last updated by:** cruncher-maintainers on 2026-04-05
 
 YIU ships one strict v4 payload-rendering document root.
 This page owns schema and normalization only. Bundle layout, render-status semantics, and operator inspection fields live in [YIU Artifacts](yiu_artifacts.md).
 Use [YIU Workflow](../guides/yiu_workflow.md) for operator flow and visual posture instead of repeating bundle/output narratives here.
+
+<!-- docs:toc:off -->
 
 ### Scope
 
@@ -44,7 +47,7 @@ input:
 
 optimization:
   junction:
-    mode: optimize
+    mode: center_locked
     overhang_length: 4
     max_payload_body_length: 12
   mismatches:
@@ -62,7 +65,6 @@ optimization:
       secondary:
         - total_loss
         - midpoint_proximity
-        - body_length_balance
         - terminal_position_avoidance
         - default_strand_preference
         - lexical_stability
@@ -102,14 +104,16 @@ output:
 - `optimization.junction.overhang_length` must equal `4`
 - `optimization.mismatches.count` must be `1` or `2`
 - `optimization.mismatches.strand_mode` must be `per_position`
+- YIU v4 payload inputs must contain exact `A/C/G/T` bases; ambiguous IUPAC symbols are rejected
 - `output.bundle_dir` is workspace-relative and required
 - `output.published_plot_path` is workspace-relative when present and must point to a `.pdf`
 - YIU always publishes three fixed view contracts; there is no opt-out flag
 - YIU does not accept legacy state-graph fields, owners, enzymes, or external-part directives
+- YIU v4 is mismatch-centric, not bulge-aware; legacy `bulge_mask` and `split` keys are rejected
 
 ### Input normalization
 
-`user_sequence` must provide one exact payload sequence.
+`user_sequence` must provide one exact payload sequence using `A/C/G/T` only.
 
 `sample_hit` must provide:
 
@@ -123,7 +127,7 @@ Optional provenance fields:
 - `source_artifact`
 - `metadata`
 
-YIU may adapt a public Sample artifact when the artifact yields one exact payload sequence. Supported public hit-table shapes currently include:
+YIU may adapt a public Sample artifact when the artifact yields one exact payload sequence with `A/C/G/T` only. Supported public hit-table shapes currently include:
 
 - `export/table__elites.csv` with `elite_id` / `elite_sequence`
 - YIU-owned hit tables with `hit_id` / `payload_sequence`
@@ -146,9 +150,12 @@ Relative `source_artifact_path` values are resolved inside the current workspace
 
 ### Junction and PWM rules
 
-- `junction.mode: derived` searches valid internal 4 nt windows and chooses the candidate closest to the payload midpoint
+- `junction.mode: center_locked` searches valid internal 4 nt windows and chooses the candidate closest to the payload midpoint
+- `junction.mode: derived` is accepted as a legacy alias for `center_locked`
 - `junction.mode: explicit_window` is allowed only when the window is internal and leaves non-empty left and right payload bodies
-- `junction.mode: optimize` enumerates all valid windows and mismatch plans exhaustively
+- `junction.mode: optimize` enumerates all valid windows and mismatch plans exhaustively, ranking candidates by PWM/log-likelihood retention first and midpoint proximity second
+- `optimization.pwm.objective.secondary` canonically uses `total_loss`, `midpoint_proximity`, `terminal_position_avoidance`, `default_strand_preference`, and `lexical_stability`
+- legacy specs that still list `body_length_balance` are accepted and normalized to the canonical ladder because that metric is redundant with `midpoint_proximity` for a fixed 4 nt junction
 - the normalized model stores `junction.start`, `junction.end`, `selected_payload_sequence`, and `selected_complement_sequence`
 - `mismatches.candidate_positions` are zero-based offsets inside the 4 nt junction window `[0, 1, 2, 3]`
 - terminal positions `0` and `3` are opt-in only

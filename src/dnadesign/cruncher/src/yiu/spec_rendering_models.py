@@ -30,7 +30,7 @@ from dnadesign.cruncher.yiu.spec_pwm_models import PwmOptimizationSpec
 
 
 class JunctionOptimizationSpec(StrictBaseModel):
-    mode: Literal["derived", "explicit_window", "optimize"] = "derived"
+    mode: Literal["derived", "center_locked", "explicit_window", "optimize"] = "derived"
     start: int | None = None
     end: int | None = None
     overhang_length: Literal[4] = 4

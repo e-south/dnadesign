@@ -20,6 +20,7 @@ class PayloadBundleLayout:
     bundle_dir: Path
     render_jobs_dir: Path
     composite_render_path: Path
+    bundle_summary_path: Path
     payload_view_path: Path
     split_payload_view_path: Path
     assembled_payload_view_path: Path
@@ -37,6 +38,7 @@ def resolve_payload_bundle_layout(bundle_dir: Path) -> PayloadBundleLayout:
         bundle_dir=resolved_bundle_dir,
         render_jobs_dir=resolved_bundle_dir / "baserender_jobs",
         composite_render_path=resolved_bundle_dir / "payload_views.pdf",
+        bundle_summary_path=resolved_bundle_dir / "bundle_summary.json",
         payload_view_path=resolved_bundle_dir / "payload_view.json",
         split_payload_view_path=resolved_bundle_dir / "split_payload_view.json",
         assembled_payload_view_path=resolved_bundle_dir / "assembled_payload_view.json",
@@ -52,6 +54,7 @@ def build_published_artifacts(
     published_plot_artifact_path: str | None,
 ) -> dict[str, str]:
     artifacts = {
+        "bundle_summary": layout.relative_artifact_path(layout.bundle_summary_path),
         "normalized_payload": layout.relative_artifact_path(layout.normalized_payload_path),
         "bundle_manifest": layout.relative_artifact_path(layout.manifest_path),
         "visual_inventory": layout.relative_artifact_path(layout.inventory_path),

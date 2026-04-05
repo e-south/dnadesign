@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from dnadesign.cruncher.yiu.bundle_models import PayloadBundleManifest, PayloadVisualInventory
+from dnadesign.cruncher.yiu.bundle_summary import build_bundle_summary
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
 from dnadesign.cruncher.yiu.publish_inventory import (
     build_normalized_payload_dump,
@@ -24,6 +25,7 @@ from dnadesign.cruncher.yiu.publish_io import (
     write_debug_render_jobs,
     write_normalized_payload_dump,
     write_payload_bundle_state,
+    write_payload_bundle_summary,
     write_payload_bundle_views,
 )
 from dnadesign.cruncher.yiu.publish_layout import resolve_payload_bundle_layout
@@ -61,6 +63,7 @@ def publish_payload_bundle(
         view_entries=view_entries,
     )
     manifest = build_payload_bundle_manifest(normalized=normalized, inventory=inventory)
+    bundle_summary = build_bundle_summary(normalized=normalized, inventory=inventory)
 
     write_payload_bundle_views(
         layout=layout,
@@ -68,6 +71,7 @@ def publish_payload_bundle(
         split_payload_rows=split_payload_rows,
         assembled_payload_contract=assembled_payload_contract,
     )
+    write_payload_bundle_summary(layout=layout, bundle_summary=bundle_summary)
     write_normalized_payload_dump(layout=layout, normalized_payload_dump=normalized_payload_dump)
     if spec.output.emit_render_jobs_debug:
         write_debug_render_jobs(layout=layout, view_entries=view_entries)

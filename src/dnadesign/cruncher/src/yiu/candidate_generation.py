@@ -50,15 +50,6 @@ class CandidateWindowSummary:
     feasible_windows: int
 
 
-def deterministic_fallback_mutated_base(*, native_base: str, opposing_base: str) -> str:
-    if opposing_base in _BASES and opposing_base != native_base:
-        return opposing_base
-    for base in _BASES:
-        if base != native_base:
-            return base
-    raise ValueError("unable to choose a deterministic fallback mutated base")
-
-
 def internal_window_starts(payload_length: int, *, overhang_length: int = 4) -> tuple[int, ...]:
     if payload_length <= overhang_length + 1:
         return ()
@@ -86,7 +77,7 @@ def resolve_window_starts(
                 "optimization.junction.start/end must define an internal 4-nt window with non-empty left/right bodies",
             )
         return (junction_spec.start,), CandidateWindowSummary(len(valid_internal), 1)
-    if junction_spec.mode == "derived":
+    if junction_spec.mode in {"derived", "center_locked"}:
         midpoint = payload_length
         winner = min(valid_internal, key=lambda start: (abs((start + (start + 4)) - midpoint), start))
         return (winner,), CandidateWindowSummary(len(valid_internal), 1)
@@ -108,15 +99,8 @@ def resolve_window_starts(
     return feasible, CandidateWindowSummary(len(valid_internal), len(feasible))
 
 
-def _base_candidates(
-    *,
-    native_base: str,
-    opposing_base: str,
-    pwm_effective: bool,
-) -> tuple[str, ...]:
-    if pwm_effective:
-        return tuple(base for base in _BASES if base != native_base)
-    return (deterministic_fallback_mutated_base(native_base=native_base, opposing_base=opposing_base),)
+def _base_candidates(*, native_base: str) -> tuple[str, ...]:
+    return tuple(base for base in _BASES if base != native_base)
 
 
 def enumerate_candidates(
@@ -148,13 +132,7 @@ def enumerate_candidates(
                         if strand == "payload"
                         else reference_payload_sequence[payload_index]
                     )
-                    base_options.append(
-                        _base_candidates(
-                            native_base=native_base,
-                            opposing_base=opposing_base,
-                            pwm_effective=pwm_effective,
-                        )
-                    )
+                    base_options.append(_base_candidates(native_base=native_base))
                     mutation_metadata.append((offset, payload_index, strand, native_base, opposing_base))
                 for selected_bases in product(*base_options):
                     mutations = tuple(

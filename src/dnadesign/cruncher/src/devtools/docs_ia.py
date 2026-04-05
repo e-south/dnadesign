@@ -149,6 +149,7 @@ def _render_docs_map(catalog: DocsCatalog) -> str:
                 "guides/yiu_workflow.md",
                 "reference/yiu_spec.md",
                 "reference/yiu_artifacts.md",
+                "reference/yiu_visual_system.md",
             ),
         ),
         "study": (
@@ -181,6 +182,7 @@ def _render_docs_map(catalog: DocsCatalog) -> str:
                     "reference/cassette_artifacts.md",
                     "reference/yiu_spec.md",
                     "reference/yiu_artifacts.md",
+                    "reference/yiu_visual_system.md",
                     "reference/glossary.md",
                     "reference/runbook_steps.md",
                     "reference/doc_conventions.md",

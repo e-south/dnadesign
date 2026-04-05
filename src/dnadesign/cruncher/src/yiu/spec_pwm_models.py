@@ -18,7 +18,12 @@ from pydantic import Field, field_validator, model_validator
 
 from dnadesign.cruncher.config.schema_v3 import StrictBaseModel
 from dnadesign.cruncher.yiu.errors import YIU_PWM_CONTEXT_INVALID
-from dnadesign.cruncher.yiu.spec_common import BASES, SECONDARY_OBJECTIVE_LADDER, require_non_empty_text
+from dnadesign.cruncher.yiu.spec_common import (
+    BASES,
+    LEGACY_SECONDARY_OBJECTIVE_LADDER,
+    SECONDARY_OBJECTIVE_LADDER,
+    require_non_empty_text,
+)
 
 
 class YiuPwmProbabilities(StrictBaseModel):
@@ -169,6 +174,8 @@ class PwmObjectiveSpec(StrictBaseModel):
     @classmethod
     def _validate_secondary(cls, value: list[str]) -> list[str]:
         secondary = [str(item).strip() for item in value]
+        if secondary == list(LEGACY_SECONDARY_OBJECTIVE_LADDER):
+            return list(SECONDARY_OBJECTIVE_LADDER)
         if secondary != list(SECONDARY_OBJECTIVE_LADDER):
             raise ValueError(
                 "optimization.pwm.objective.secondary must use the canonical Yiu v4 ladder order: "

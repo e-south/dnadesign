@@ -363,6 +363,7 @@ Cassette runs are intentionally isolated from `sample` runs:
 
 A typical **YIU** run directory contains:
 
+- `bundle_summary.json` - operator-facing 5' to 3' run summary with payload, split left/sticky/right, mismatch, PWM, and render status
 - `bundle_manifest.json` - payload bundle metadata under `split_yiu_payload_bundle_v4`
 - `normalized_payload.json` - normalized payload object
 - `visual_inventory.json` - single bundle-local visual inventory and render-truth index

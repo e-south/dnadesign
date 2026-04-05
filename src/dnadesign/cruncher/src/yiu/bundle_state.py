@@ -34,6 +34,7 @@ def _load_bundle_model(path: Path, *, model_type: type[BundleModelT], label: str
 @dataclass(frozen=True)
 class YiuBundleStatePaths:
     bundle_dir: Path
+    bundle_summary_path: Path
     manifest_path: Path
     normalized_payload_path: Path
     inventory_path: Path
@@ -87,6 +88,7 @@ def resolve_bundle_state_paths(bundle_dir: str | Path) -> YiuBundleStatePaths:
     resolved = Path(bundle_dir).expanduser().resolve()
     return YiuBundleStatePaths(
         bundle_dir=resolved,
+        bundle_summary_path=resolved / "bundle_summary.json",
         manifest_path=resolved / "bundle_manifest.json",
         normalized_payload_path=resolved / "normalized_payload.json",
         inventory_path=resolved / "visual_inventory.json",

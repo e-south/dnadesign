@@ -23,9 +23,11 @@ PWM_CONTEXT_FILENAME = "example_pwm_context.yaml"
 PWM_CONTEXT_RELATIVE_PATH = f"motifs/{PWM_CONTEXT_FILENAME}"
 DEMO_BUNDLE_DIR = f"outputs/{DEMO_NAME}"
 DEMO_PUBLISHED_PLOT = f"outputs/{DEMO_NAME}__payload_views.pdf"
+DEFAULT_DEMO_SEQUENCE = "AAATTTCCCGGGAAATTTCCC"
+STARTER_JUNCTION_MODES = ("center_locked", "optimize")
 
 
-def canonical_spec_text() -> str:
+def canonical_spec_text(*, sequence: str = DEFAULT_DEMO_SEQUENCE, junction_mode: str = "center_locked") -> str:
     return dedent(
         f"""\
         yiu:
@@ -36,11 +38,12 @@ def canonical_spec_text() -> str:
         input:
           kind: user_sequence
           user_sequence:
-            sequence: AAATTTCCCGGGAAATTTCCC
+            # YIU v4 accepts exact A/C/G/T payloads only.
+            sequence: {sequence}
 
         optimization:
           junction:
-            mode: optimize
+            mode: {junction_mode}
             overhang_length: 4
             max_payload_body_length: 12
           mismatches:
@@ -58,7 +61,6 @@ def canonical_spec_text() -> str:
               secondary:
                 - total_loss
                 - midpoint_proximity
-                - body_length_balance
                 - terminal_position_avoidance
                 - default_strand_preference
                 - lexical_stability
@@ -84,6 +86,7 @@ def advanced_pwm_spec_text() -> str:
         input:
           kind: user_sequence
           user_sequence:
+            # YIU v4 accepts exact A/C/G/T payloads only.
             sequence: AAATTTCCCGGGAAATTTCCC
 
         optimization:
@@ -107,7 +110,6 @@ def advanced_pwm_spec_text() -> str:
               secondary:
                 - total_loss
                 - midpoint_proximity
-                - body_length_balance
                 - terminal_position_avoidance
                 - default_strand_preference
                 - lexical_stability
@@ -200,7 +202,7 @@ def runbook_markdown(*, workspace_name: str, workspace_display_path: Path | str)
             "",
             "**Purpose**",
             "- YIU workspace for the v4 payload-centric optimization and rendering workflow.",
-            "- Covers the validate -> render -> show loop with one minimal no-PWM example.",
+            "- Covers the validate -> render -> show loop with one minimal mismatch-centric example.",
             "",
             "**Run This Single Command**",
             "",

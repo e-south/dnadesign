@@ -232,7 +232,15 @@ docs_catalog:
       audience: [cruncher-maintainers]
       applies_to: schema_v3
       last_verified: "2026-03-26"
-      next: [guides/yiu_workflow.md, reference/cli.md]
+      next: [guides/yiu_workflow.md, reference/yiu_visual_system.md, reference/cli.md]
+    - id: ref_yiu_visual_system
+      path: reference/yiu_visual_system.md
+      title: YIU Visual System
+      kind: reference
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-04-05"
+      next: [guides/yiu_workflow.md, reference/yiu_artifacts.md]
     - id: ref_glossary
       path: reference/glossary.md
       title: Glossary

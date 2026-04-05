@@ -2,9 +2,12 @@
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-04-05
+**Last updated by:** cruncher-maintainers on 2026-04-05
 
 YIU is a payload-centric rendering workflow with a strict v4 contract.
 Use this guide for command flow and operator posture. Use [YIU Spec Reference](../reference/yiu_spec.md) for input and normalization rules, [YIU Artifacts](../reference/yiu_artifacts.md) for emitted files and render-state semantics, [YIU Visual System](../reference/yiu_visual_system.md) for named visual directions and hierarchy, and [Cruncher architecture](../reference/architecture.md) for module ownership.
+
+<!-- docs:toc:off -->
 
 The public lane is:
 
@@ -54,10 +57,13 @@ Contract-level row semantics for those three views live in [YIU Artifacts](../re
 
 The public contract is `split_yiu_payload_rendering_v4`.
 
+YIU is mismatch-centric. The junction itself is always a 4 nt internal window; the optimization layer chooses mismatch positions and mutated strands/bases inside that window. Legacy bulge/topology keys are rejected rather than interpreted heuristically.
+
 ### Command surface
 
 ```bash
 uv run cruncher yiu init-workspace WORKSPACE
+uv run cruncher yiu init-workspace WORKSPACE --sequence AACCGGTTGGTT --junction-mode center_locked
 uv run cruncher yiu validate --spec configs/yiu/<workflow>.yiu.yaml
 uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml
 uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml --emit-renders
@@ -65,6 +71,43 @@ uv run cruncher yiu show --bundle outputs/<workflow>
 ```
 
 `design` is not part of the public YIU surface.
+
+### Minimal authoring example
+
+Keep the first spec minimal and concrete:
+
+```yaml
+yiu:
+  contract: split_yiu_payload_rendering_v4
+  schema_version: 1
+  name: example_payload
+
+input:
+  kind: user_sequence
+  user_sequence:
+    sequence: AAATTTCCCGGGAAATTTCCC
+
+optimization:
+  junction:
+    mode: center_locked
+  mismatches:
+    count: 1
+    candidate_positions: [1, 2]
+  pwm:
+    mode: none
+    source:
+      kind: none
+
+output:
+  bundle_dir: outputs/example_payload
+```
+
+For v4, payload inputs must be exact `A/C/G/T` sequences. Ambiguous IUPAC symbols and legacy bulge/split topology keys are not part of the public v4 lane.
+
+The two main junction policies are:
+
+- `center_locked`: choose the valid internal 4 nt window nearest the payload midpoint and keep the junction fixed there.
+- `optimize`: search valid internal windows around the midpoint and rank candidates by PWM/log-likelihood retention first, then midpoint proximity and the remaining tie-break ladder.
 
 ### Bundle surface
 
@@ -77,12 +120,13 @@ The bundle contract is intentionally split across bundle truth, published view c
 
 - the root contract and schema version match `split_yiu_payload_rendering_v4`
 - exactly one input kind is populated
-- the resolved payload sequence is present and contains valid IUPAC DNA characters
+- the resolved payload sequence is present and contains exact `A/C/G/T` bases
 - the junction policy yields one valid internal 4 nt window with non-empty left and right payload bodies
 - the mismatch policy is internally consistent and uses `strand_mode: per_position`
 - PWM mode and PWM source are compatible with the input kind
 - `sample_hit` provenance resolves to one exact payload sequence or fails fast
-- PWM-aware optimization is deterministic and exhaustive across the allowed candidate space
+- PWM-aware optimization is deterministic and exhaustive across valid windows, mismatch positions, strand assignments, and non-native base substitutions in the allowed candidate space
+- legacy `bulge_mask` and `split` keys are rejected because they are not part of `split_yiu_payload_rendering_v4`
 
 ### Visuals and inspection
 
@@ -100,13 +144,13 @@ The three-view composite follows one explicit visual system:
 
 `sample_hit` source resolution follows the rules in [YIU Spec Reference](../reference/yiu_spec.md). Ambiguous or missing sources fail fast.
 
-`cruncher yiu show` surfaces the bundle contract, provenance, selected payload and complement sequences, junction and mismatch summary, PWM mode, render status, integrity checks, and artifact paths. Use [YIU Artifacts](../reference/yiu_artifacts.md) for the exact inspection fields and fail-fast drift rules.
+`cruncher yiu show` surfaces the bundle contract, provenance, one concise payload-forward sequence summary, junction and mismatch summary, PWM mode, render status, integrity checks, and artifact paths. Use [YIU Artifacts](../reference/yiu_artifacts.md) for the exact inspection fields and fail-fast drift rules. Use `--verbose` when you need the optimizer trace and split-row debug details rather than the summary-first handoff.
 
 `show` is fail-fast on bundle drift: missing published view contracts, manifest/inventory disagreements, payload-view motif drift, a `rendered` bundle with a missing `payload_views.pdf`, or a configured published plot path that does not exist are treated as bundle corruption.
 
 `cruncher yiu render --spec <workflow>.yiu.yaml --emit-renders` validates the spec, writes the payload bundle under `output.bundle_dir`, renders one composite `payload_views.pdf` page with the three standard panels, mirrors that PDF to `output.published_plot_path` when configured, and updates `visual_inventory.json` in the same bundle directory.
 
-The split middle row renders `split_payload_left` before `split_payload_right`. Each panel shows the retained post-digestion fragment, its inward-facing sticky end, selected-versus-reference sticky-end metadata, the reverse-complemented payload-body slice, and optional ghosted excision context.
+The split middle row renders `split_payload_left` before `split_payload_right`. Each panel shows the retained post-digestion fragment, its inward-facing sticky end, selected-versus-reference sticky-end metadata, the fragment-display payload-body slice, and optional ghosted excision context. The bundle summary and split-row metadata also publish the corresponding payload-forward left/right body sequences in explicit 5' to 3' orientation so downstream readers do not have to infer them from fragment geometry.
 
 The assembled payload returns to original payload order. It publishes one explicit `junction_span` in payload coordinates and does not use a seam or ligation-boundary surrogate in the operator-facing contract.
 

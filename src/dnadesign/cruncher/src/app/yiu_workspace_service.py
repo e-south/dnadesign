@@ -20,8 +20,10 @@ import yaml
 
 from dnadesign.cruncher.app.yiu_workspace_blueprints import (
     ADVANCED_SPEC_FILENAME,
+    DEFAULT_DEMO_SEQUENCE,
     DEMO_SPEC_FILENAME,
     PWM_CONTEXT_FILENAME,
+    STARTER_JUNCTION_MODES,
     advanced_pwm_spec_text,
     canonical_spec_text,
     example_pwm_context_text,
@@ -30,6 +32,7 @@ from dnadesign.cruncher.app.yiu_workspace_blueprints import (
 )
 
 _WORKSPACE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_EXACT_DNA_SEQUENCE_RE = re.compile(r"^[ACGT]+$")
 
 
 @dataclass(frozen=True)
@@ -85,9 +88,34 @@ def yiu_workspace_path(name: str, *, root: Path | None = None) -> Path:
     return parent / workspace_name
 
 
-def init_yiu_workspace(workspace_root: Path, *, force_overwrite: bool = False) -> YiuWorkspaceScaffoldResult:
+def _validate_starter_sequence(sequence: str) -> str:
+    normalized = str(sequence).strip().upper()
+    if not normalized:
+        return DEFAULT_DEMO_SEQUENCE
+    if _EXACT_DNA_SEQUENCE_RE.fullmatch(normalized) is None:
+        raise ValueError("YIU starter sequence must use exact A/C/G/T bases only.")
+    return normalized
+
+
+def _validate_starter_junction_mode(junction_mode: str) -> str:
+    normalized = str(junction_mode).strip()
+    if normalized not in STARTER_JUNCTION_MODES:
+        allowed = ", ".join(STARTER_JUNCTION_MODES)
+        raise ValueError(f"Unsupported YIU starter junction mode {normalized!r}. Expected one of: {allowed}.")
+    return normalized
+
+
+def init_yiu_workspace(
+    workspace_root: Path,
+    *,
+    force_overwrite: bool = False,
+    sequence: str = DEFAULT_DEMO_SEQUENCE,
+    junction_mode: str = "center_locked",
+) -> YiuWorkspaceScaffoldResult:
     resolved_root = Path(workspace_root).expanduser().resolve()
     workspace_name = resolved_root.name
+    starter_sequence = _validate_starter_sequence(sequence)
+    starter_junction_mode = _validate_starter_junction_mode(junction_mode)
     if resolved_root.exists():
         if not force_overwrite:
             raise ValueError(f"YIU workspace already exists: {resolved_root}")
@@ -97,7 +125,10 @@ def init_yiu_workspace(workspace_root: Path, *, force_overwrite: bool = False) -
     (resolved_root / "motifs").mkdir(parents=True, exist_ok=True)
 
     spec_path = resolved_root / "configs" / "yiu" / DEMO_SPEC_FILENAME
-    spec_path.write_text(canonical_spec_text(), encoding="utf-8")
+    spec_path.write_text(
+        canonical_spec_text(sequence=starter_sequence, junction_mode=starter_junction_mode),
+        encoding="utf-8",
+    )
 
     advanced_spec_path = resolved_root / "configs" / "yiu" / ADVANCED_SPEC_FILENAME
     advanced_spec_path.write_text(advanced_pwm_spec_text(), encoding="utf-8")

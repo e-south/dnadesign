@@ -18,6 +18,7 @@ import typer
 from rich.console import Console
 
 from dnadesign.cruncher.cli.yiu_presenter import (
+    build_show_json_payload,
     print_render_outcome,
     print_show_outcome,
     print_validation_report,
@@ -83,6 +84,16 @@ def init_workspace_cmd(
         "--output",
         help="Explicit YIU workspace root to create. Overrides WORKSPACE/--root.",
     ),
+    sequence: str = typer.Option(
+        "",
+        "--sequence",
+        help="Optional exact A/C/G/T payload sequence to seed into the starter spec.",
+    ),
+    junction_mode: str = typer.Option(
+        "center_locked",
+        "--junction-mode",
+        help="Starter junction mode for the scaffolded spec. Use center_locked or optimize.",
+    ),
     force_overwrite: bool = typer.Option(False, "--force-overwrite", help="Replace an existing workspace root."),
 ) -> None:
     try:
@@ -93,7 +104,12 @@ def init_workspace_cmd(
         if output is None and workspace is None:
             raise typer.BadParameter("Provide WORKSPACE or --output.")
         target_root = output if output is not None else yiu_workspace_path(workspace, root=root)
-        result = init_yiu_workspace(target_root, force_overwrite=force_overwrite)
+        result = init_yiu_workspace(
+            target_root,
+            force_overwrite=force_overwrite,
+            sequence=sequence,
+            junction_mode=junction_mode,
+        )
     except (FileNotFoundError, ValueError) as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
@@ -139,10 +155,9 @@ def render_cmd(
     except (FileNotFoundError, ValueError) as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
-    payload = outcome.model_dump(mode="json")
     report = outcome.report
     if json_output:
-        typer.echo(json.dumps(payload, indent=2))
+        typer.echo(json.dumps(outcome.model_dump(mode="json"), indent=2))
         return
     print_render_outcome(console, outcome, emit_renders=emit_renders)
     if report.status != "satisfied":
@@ -161,6 +176,6 @@ def show_cmd(
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
     if json_output:
-        typer.echo(json.dumps(outcome.model_dump(mode="json", exclude_unset=True), indent=2))
+        typer.echo(json.dumps(build_show_json_payload(outcome, verbose=verbose), indent=2))
         return
     print_show_outcome(console, outcome, verbose=verbose)

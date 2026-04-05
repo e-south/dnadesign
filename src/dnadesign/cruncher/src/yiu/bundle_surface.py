@@ -24,6 +24,7 @@ from dnadesign.cruncher.yiu.bundle_paths import (
     resolve_published_plot_path,
 )
 from dnadesign.cruncher.yiu.bundle_state import load_bundle_state, resolve_bundle_state_paths
+from dnadesign.cruncher.yiu.bundle_summary import YiuBundleSummary
 from dnadesign.cruncher.yiu.domain_models import (
     JunctionSelection,
     MismatchSelection,
@@ -37,6 +38,7 @@ class YiuBundleArtifactSurface(StrictBaseModel):
     outputs_root: str | None = None
     composite_render_artifact_path: str | None = None
     published_plot_artifact_path: str | None = None
+    bundle_summary_path: str
     bundle_manifest_path: str
     normalized_payload_path: str
     visual_inventory_path: str
@@ -65,9 +67,10 @@ class YiuSplitRowDebug(StrictBaseModel):
     panel_order: int | None = None
     selected_sticky_end_sequence_5to3: str | None = None
     canonical_sticky_end_sequence_5to3: str | None = None
+    payload_body_sequence_5to3: str | None = None
+    display_payload_body_sequence_5to3: str | None = None
     retained_primary_sequence_5to3: str | None = None
     retained_complement_sequence_3to5: str | None = None
-    retained_payload_body_sequence_5to3: str | None = None
     sticky_end_display_span: dict[str, object] | None = None
     payload_body_display_span: dict[str, object] | None = None
     payload_junction_window: dict[str, object] | None = None
@@ -76,6 +79,7 @@ class YiuSplitRowDebug(StrictBaseModel):
 
 class YiuShowOutcome(YiuBundleArtifactSurface):
     bundle_contract: Literal["split_yiu_payload_bundle_v4"] = "split_yiu_payload_bundle_v4"
+    bundle_summary: YiuBundleSummary
     provenance: dict[str, object] = Field(default_factory=dict)
     payload_label: str | None = None
     input_kind: Literal["user_sequence", "sample_hit"]
@@ -123,6 +127,7 @@ def resolve_bundle_artifact_surface(
         published_plot_artifact_path=(
             None if resolved_published_plot is None else str(resolved_published_plot.resolve())
         ),
+        bundle_summary_path=str(paths.bundle_summary_path.resolve()),
         bundle_manifest_path=str(paths.manifest_path.resolve()),
         normalized_payload_path=str(paths.normalized_payload_path.resolve()),
         visual_inventory_path=str(paths.inventory_path.resolve()),

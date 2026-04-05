@@ -16,7 +16,9 @@ from pathlib import Path
 
 from dnadesign.cruncher.yiu.bundle_models import PayloadViewEntry
 from dnadesign.cruncher.yiu.bundle_state import RenderStatus, YiuBundleState
+from dnadesign.cruncher.yiu.bundle_summary import build_bundle_summary
 from dnadesign.cruncher.yiu.render_plan import YiuRenderPlan, YiuRenderProgress
+from dnadesign.cruncher.yiu.view_io import write_json_payload
 
 
 def render_status(*, job_count: int, rendered_count: int) -> RenderStatus:
@@ -44,6 +46,14 @@ def persist_render_state(
         render_status=current_render_status,
     )
     updated_state.persist()
+    if updated_state.normalized is not None:
+        write_json_payload(
+            updated_state.paths.bundle_summary_path,
+            build_bundle_summary(
+                normalized=updated_state.normalized,
+                inventory=updated_state.inventory,
+            ).model_dump(mode="json"),
+        )
     return updated_state
 
 

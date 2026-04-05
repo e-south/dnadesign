@@ -3,10 +3,13 @@
 **Audience:** YIU workflow users and maintainers
 **Applies to:** `uv run cruncher yiu render|show`
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-04
+**Last verified:** 2026-04-05
+**Last updated by:** cruncher-maintainers on 2026-04-05
 
 YIU writes one payload-centric bundle family under the workspace-relative `output.bundle_dir` path.
 This page is the source of truth for emitted files, render-status semantics, and the shared `render`/`show` inspection surface.
+
+<!-- docs:toc:off -->
 
 ### Bundle truth vs mirror
 
@@ -40,6 +43,7 @@ It records:
 
 ```text
 outputs/<workflow>/
+  bundle_summary.json
   bundle_manifest.json
   normalized_payload.json
   visual_inventory.json
@@ -67,6 +71,14 @@ outputs/<workflow>/
 - render status
 - one operator-facing composite PDF under `payload_views.pdf`
 
+`bundle_summary.json` is the operator-facing handoff surface for one run.
+It keeps the essential sequence story in one place:
+
+- selected payload and complement sequences in explicit 5' to 3' / 3' to 5' orientation
+- payload-forward left body, 4 bp junction span, and payload-forward right body
+- selected and canonical sticky ends in explicit 5' to 3' orientation
+- mismatch list, PWM summary, published view ids, and render status
+
 `normalized_payload.json` is the normalized internal object serialized for inspection and downstream validation.
 
 Published contract paths:
@@ -93,6 +105,7 @@ The payload visual contract carries:
 - `outputs_root`
 - `composite_render_artifact_path`
 - `published_plot_artifact_path`
+- `bundle_summary_path`
 - `bundle_manifest_path`
 - `normalized_payload_path`
 - `visual_inventory_path`
@@ -104,6 +117,8 @@ Each view entry also records one explicit `visual_direction` so downstream tools
 
 - `render_status: not_requested` means the bundle was published without PDF rendering
 - `render_status: rendered` means all three payload views rendered successfully
+- `render_status: missing` means the bundle expects rendered outputs but they are absent on disk
+- `render_status: partial` means at least one render completed but the full bundle render set is incomplete
 - `render_status: failed` means BaseRender failed and no substitute renders were fabricated
 - `cruncher yiu show` rejects bundles whose manifest, normalized payload, inventory, or published artifact paths disagree
 
@@ -114,11 +129,15 @@ Each view entry also records one explicit `visual_direction` so downstream tools
 - bundle directory and bundle contract
 - provenance
 - selected payload length
+- one concise sequence summary with payload 5' to 3' and split left/sticky/right payload-forward bodies
 - selected junction and mismatch plan
 - PWM mode and effective status
 - render summary from `visual_inventory.json`
 - composite render path when available
 - published plot path when configured
 - key artifact paths
+
+Default `show --json` stays summary-first and omits heavy optimizer trace and full PWM matrices.
+Use `--verbose` when you need split-row debug details plus the full normalized optimizer and PWM context.
 
 Use [YIU Workflow](../guides/yiu_workflow.md) for execution guidance, [YIU Visual System](yiu_visual_system.md) for named visual directions and hierarchy, and [YIU Spec Reference](yiu_spec.md) for schema details.

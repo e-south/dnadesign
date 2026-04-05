@@ -28,7 +28,6 @@ optimization:
       secondary:
         - total_loss
         - midpoint_proximity
-        - body_length_balance
         - terminal_position_avoidance
         - default_strand_preference
         - lexical_stability

@@ -3,6 +3,8 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-03-27
 
+**Last updated by:** cruncher-maintainers on 2026-04-05
+
 
 ### Contents
 - [Overview](#overview)
@@ -67,6 +69,7 @@ Studies and portfolios extend the fixed-length optimization lane. Cassette and Y
 - [YIU Workflow](guides/yiu_workflow.md)
 - [YIU Spec Reference](reference/yiu_spec.md)
 - [YIU Artifacts](reference/yiu_artifacts.md)
+- [YIU Visual System](reference/yiu_visual_system.md)
 
 #### Run Studies and Portfolio Aggregation
 - [Studies](guides/studies.md)
@@ -87,6 +90,7 @@ Studies and portfolios extend the fixed-length optimization lane. Cassette and Y
 - [Cassette Artifacts](reference/cassette_artifacts.md)
 - [YIU Spec Reference](reference/yiu_spec.md)
 - [YIU Artifacts](reference/yiu_artifacts.md)
+- [YIU Visual System](reference/yiu_visual_system.md)
 - [Glossary](reference/glossary.md)
 - [Runbook Step Reference](reference/runbook_steps.md)
 - [Doc Conventions](reference/doc_conventions.md)

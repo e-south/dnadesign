@@ -30,7 +30,7 @@ from dnadesign.cruncher.yiu.bsmbi import build_split_fragment_display_specs
 from dnadesign.cruncher.yiu.bundle_models import PayloadViewEntry, PayloadVisualInventory
 from dnadesign.cruncher.yiu.bundle_paths import resolve_composite_render_artifact_path
 from dnadesign.cruncher.yiu.bundle_surface import YiuShowOutcome
-from dnadesign.cruncher.yiu.candidate_generation import CandidatePlan, MutationChoice
+from dnadesign.cruncher.yiu.candidate_generation import CandidatePlan, MutationChoice, enumerate_candidates
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
 from dnadesign.cruncher.yiu.errors import NoFeasiblePlanError, YiuContractError
 from dnadesign.cruncher.yiu.load import load_yiu_spec
@@ -49,6 +49,7 @@ from dnadesign.cruncher.yiu.publish_io import (
 )
 from dnadesign.cruncher.yiu.publish_layout import build_published_artifacts, resolve_payload_bundle_layout
 from dnadesign.cruncher.yiu.scoring import CandidateScore
+from dnadesign.cruncher.yiu.spec_models import MismatchesSpec
 from dnadesign.cruncher.yiu.view_catalog import build_payload_view_entries, build_render_job_payload
 from dnadesign.cruncher.yiu.view_contracts import (
     build_assembled_payload_view_contract,
@@ -72,6 +73,13 @@ TOY_SEQUENCE = "AAATTTCCCGGGAAATTTCCC"
 TOY_JUNCTION_START = 4
 TOY_JUNCTION_END = 8
 SECONDARY_OBJECTIVES = [
+    "total_loss",
+    "midpoint_proximity",
+    "terminal_position_avoidance",
+    "default_strand_preference",
+    "lexical_stability",
+]
+LEGACY_SECONDARY_OBJECTIVES = [
     "total_loss",
     "midpoint_proximity",
     "body_length_balance",
@@ -496,6 +504,20 @@ def test_normalize_derived_mode_selects_midpoint_nearest_internal_window(tmp_pat
     assert normalized.junction.end == 8
 
 
+def test_normalize_center_locked_mode_selects_midpoint_nearest_internal_window(tmp_path: Path) -> None:
+    spec_path = tmp_path / "workspace" / "configs" / "yiu" / "center_locked_payload.yiu.yaml"
+    _write_yaml(
+        spec_path, _user_sequence_spec(sequence="AACCGGTTGGTT", junction_mode="center_locked", candidate_positions=[1])
+    )
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    normalized = normalize_payload(spec, workspace_root=workspace_root)
+
+    assert normalized.junction.mode == "center_locked"
+    assert normalized.junction.start == 4
+    assert normalized.junction.end == 8
+
+
 def test_normalize_optimize_mode_raises_no_feasible_plan_for_tight_body_bound(tmp_path: Path) -> None:
     spec_path = tmp_path / "workspace" / "configs" / "yiu" / "no_plan.yiu.yaml"
     payload = _user_sequence_spec(sequence="AACCGGTTA", junction_mode="optimize")
@@ -505,6 +527,40 @@ def test_normalize_optimize_mode_raises_no_feasible_plan_for_tight_body_bound(tm
     spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
     with pytest.raises(NoFeasiblePlanError, match="No feasible optimized junction found"):
         normalize_payload(spec, workspace_root=workspace_root)
+
+
+def test_enumerate_candidates_without_pwm_enumerates_all_non_native_bases() -> None:
+    mismatches_spec = MismatchesSpec.model_validate(
+        {
+            "count": 1,
+            "candidate_positions": [1],
+            "allowed_strands": ["complement", "payload"],
+            "strand_mode": "per_position",
+            "default_strand_preference": "complement",
+        }
+    )
+
+    candidates = enumerate_candidates(
+        reference_payload_sequence=TOY_SEQUENCE,
+        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
+        junction_starts=(TOY_JUNCTION_START,),
+        mismatches_spec=mismatches_spec,
+        pwm_effective=False,
+    )
+
+    assert len(candidates) == 6
+    mutated_bases_by_strand = {
+        strand: {
+            candidate.mutations[0].mutated_base
+            for candidate in candidates
+            if candidate.mutations[0].mutated_strand == strand
+        }
+        for strand in ("complement", "payload")
+    }
+    assert mutated_bases_by_strand == {
+        "complement": {"C", "G", "T"},
+        "payload": {"A", "C", "G"},
+    }
 
 
 def test_normalize_sample_hit_resolves_csv_and_enforces_payload_assertion(tmp_path: Path) -> None:
@@ -541,6 +597,33 @@ def test_normalize_sample_hit_resolves_csv_and_enforces_payload_assertion(tmp_pa
     bad_spec, _resolved_bad_path, workspace_root = load_yiu_spec(bad_spec_path)
     with pytest.raises(YiuContractError, match="payload_sequence does not match"):
         normalize_payload(bad_spec, workspace_root=workspace_root)
+
+
+def test_load_yiu_spec_rejects_ambiguous_user_sequence_iupac_payload(tmp_path: Path) -> None:
+    spec_path = tmp_path / "workspace" / "configs" / "yiu" / "ambiguous_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec(sequence="AANNNNTT"))
+
+    with pytest.raises(ValueError, match="YIU_SEQUENCE_INVALID"):
+        load_yiu_spec(spec_path)
+
+
+def test_normalize_sample_hit_rejects_ambiguous_source_sequence(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    export_table = workspace / "sample_outputs" / "export" / "table__elites.csv"
+    _write_sample_csv(export_table, hit_id="elite-1", sequence="AANNNNTT")
+
+    spec_path = workspace / "configs" / "yiu" / "sample_hit_ambiguous_source.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _sample_hit_spec(
+            source_artifact_path=str(export_table.relative_to(workspace)),
+            candidate_positions=[1],
+        ),
+    )
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    with pytest.raises(YiuContractError, match="exact A/C/G/T bases for YIU v4"):
+        normalize_payload(spec, workspace_root=workspace_root)
 
 
 def test_normalize_sample_hit_resolves_sibling_workspace_from_parent_root(tmp_path: Path) -> None:
@@ -858,20 +941,20 @@ def test_select_best_candidate_breaks_pwm_tie_on_midpoint_proximity(monkeypatch:
     assert result.winner.lexical_key == "closer"
 
 
-def test_select_best_candidate_breaks_pwm_tie_on_body_length_balance(monkeypatch: pytest.MonkeyPatch) -> None:
-    less_balanced = _candidate(
-        lexical_key="less-balanced",
+def test_select_best_candidate_ignores_redundant_body_length_balance(monkeypatch: pytest.MonkeyPatch) -> None:
+    lexical_first = _candidate(
+        lexical_key="a",
         default_strand_preference_count=1,
         midpoint_distance=1,
         body_length_balance=3,
         terminal_positions_used=0,
     )
-    more_balanced = _candidate(
-        lexical_key="more-balanced",
+    lexical_second = _candidate(
+        lexical_key="b",
         default_strand_preference_count=1,
         midpoint_distance=1,
         body_length_balance=1,
-        terminal_positions_used=1,
+        terminal_positions_used=0,
     )
 
     monkeypatch.setattr(
@@ -880,14 +963,14 @@ def test_select_best_candidate_breaks_pwm_tie_on_body_length_balance(monkeypatch
         lambda **_: CandidateScore(worst_loss=1.0, total_loss=1.0),
     )
     result = select_best_candidate(
-        candidates=(less_balanced, more_balanced),
+        candidates=(lexical_second, lexical_first),
         reference_payload_sequence=TOY_SEQUENCE,
         reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
         scorable_motifs=(),
         pwm_effective=True,
     )
 
-    assert result.winner.lexical_key == "more-balanced"
+    assert result.winner.lexical_key == "a"
 
 
 def test_select_best_candidate_breaks_pwm_tie_on_terminal_position_avoidance(
@@ -950,6 +1033,17 @@ def test_select_best_candidate_without_pwm_prefers_default_strand_then_lexical_o
     assert lexical_result.winner.lexical_key == "a"
 
 
+def test_load_yiu_spec_canonicalizes_legacy_body_length_balance_secondary_ladder(tmp_path: Path) -> None:
+    spec_path = tmp_path / "workspace" / "configs" / "yiu" / "legacy_secondary.yiu.yaml"
+    payload = _user_sequence_spec()
+    payload["optimization"]["pwm"]["objective"]["secondary"] = list(LEGACY_SECONDARY_OBJECTIVES)
+    _write_yaml(spec_path, payload)
+
+    spec, _resolved_spec_path, _workspace_root = load_yiu_spec(spec_path)
+
+    assert spec.optimization.pwm.objective.secondary == SECONDARY_OBJECTIVES
+
+
 def test_render_yiu_spec_publishes_v4_bundle_and_payload_visual_contract(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
@@ -959,6 +1053,7 @@ def test_render_yiu_spec_publishes_v4_bundle_and_payload_visual_contract(tmp_pat
 
     assert report.contract == "split_yiu_payload_rendering_v4"
     manifest = _load_json(bundle_dir / "bundle_manifest.json")
+    bundle_summary = _load_json(bundle_dir / "bundle_summary.json")
     normalized = _load_json(bundle_dir / "normalized_payload.json")
     inventory = _load_json(bundle_dir / "visual_inventory.json")
     payload_view = _load_json(bundle_dir / "payload_view.json")
@@ -967,7 +1062,10 @@ def test_render_yiu_spec_publishes_v4_bundle_and_payload_visual_contract(tmp_pat
 
     assert manifest["bundle_contract"] == "split_yiu_payload_bundle_v4"
     assert manifest["published_plot_artifact_path"] == "outputs/plot__demo_payload__payload_views.pdf"
+    assert bundle_summary["summary_contract"] == "yiu_bundle_summary_v1"
+    assert bundle_summary["sequence_summary"]["selected_payload_sequence_5to3"] == manifest["selected_payload_sequence"]
     assert normalized["contract"] == "yiu_normalized_payload_v4"
+    assert normalized["published_artifacts"]["bundle_summary"] == "bundle_summary.json"
     assert inventory["pwm_effective"] is False
     assert inventory["published_plot_artifact_path"] == "outputs/plot__demo_payload__payload_views.pdf"
     assert payload_view["contract_kind"] == "yiu_payload_visual_v1"
@@ -990,6 +1088,9 @@ def test_render_yiu_spec_outcome_uses_shared_bundle_surface(tmp_path: Path) -> N
     )
     assert outcome.published_plot_artifact_path == str(
         (workspace / "outputs" / "plot__demo_payload__payload_views.pdf").resolve()
+    )
+    assert outcome.bundle_summary_path == str(
+        (workspace / "outputs" / "demo_payload" / "bundle_summary.json").resolve()
     )
     assert outcome.report.spec_name == "demo_payload"
 
@@ -1019,6 +1120,7 @@ def test_render_yiu_spec_with_pwm_effective_adds_payload_motif_layers_and_show_r
     assert (workspace / "outputs" / "plot__pwm_payload__payload_views.pdf").exists()
     assert show_payload.pwm_effective is True
     assert show_payload.motif_context.effective is True
+    assert show_payload.bundle_summary.pwm.motif_count == 2
     assert show_payload.integrity.status == "ok"
     assert show_payload.published_plot_artifact_path == str(
         (workspace / "outputs" / "plot__pwm_payload__payload_views.pdf").resolve()
@@ -1099,6 +1201,8 @@ def test_split_payload_view_metadata_preserves_sticky_end_and_ghost_context_cont
     )
 
     assert meta["fragment_side"] == "right"
+    assert meta["payload_body_sequence_5to3"] == normalized.selected_payload_sequence[normalized.junction.end :]
+    assert meta["display_payload_body_sequence_5to3"] == right_fragment.display_payload_body_sequence_5to3
     assert meta["selected_sticky_end_sequence_5to3"] == right_fragment.selected_sticky_end_sequence_5to3
     assert meta["canonical_sticky_end_sequence_5to3"] == right_fragment.canonical_sticky_end_sequence_5to3
     assert meta["sticky_end_display_span"] == sticky_end_span
@@ -1312,6 +1416,7 @@ def test_publish_layout_tracks_relative_bundle_artifacts_and_view_entries(tmp_pa
     view_entries = build_payload_view_entries(layout=layout, normalized=normalized)
 
     assert published_artifacts == {
+        "bundle_summary": "bundle_summary.json",
         "normalized_payload": "normalized_payload.json",
         "bundle_manifest": "bundle_manifest.json",
         "visual_inventory": "visual_inventory.json",
@@ -1428,6 +1533,7 @@ def test_publish_inventory_and_manifest_share_bundle_state_contract(tmp_path: Pa
     assert manifest.published_plot_artifact_path == inventory.published_plot_artifact_path
     assert manifest.published_plot_artifact_path == "outputs/plot__pwm_payload__payload_views.pdf"
     assert normalized_dump["published_artifacts"]["payload_view"] == "payload_view.json"
+    assert normalized_dump["published_artifacts"]["bundle_summary"] == "bundle_summary.json"
     assert (
         normalized_dump["published_artifacts"]["published_plot_pdf"] == "outputs/plot__pwm_payload__payload_views.pdf"
     )
@@ -1506,6 +1612,10 @@ def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp
         assert got == pytest.approx(expected)
     assert show_payload.pwm_effective is True
     assert show_payload.motif_context.effective is True
+    assert (
+        show_payload.bundle_summary.sequence_summary.split_payload.selected_sticky_end_sequence_5to3
+        == show_payload.selected_complement_sequence[8:12][::-1]
+    )
     assert show_payload.integrity.status == "ok"
     assert show_payload.published_plot_artifact_path == str(
         (workspace / "outputs" / "plots" / "plot__yiu__tetr_monotypic_hit__payload_views.pdf").resolve()
@@ -1514,6 +1624,14 @@ def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp
     split_rows = _load_jsonl(bundle_dir / "split_payload_view.json")
     assert split_rows[0]["meta"]["row_labels"] == {}
     assert split_rows[1]["meta"]["row_labels"] == {}
+    assert split_rows[0]["meta"]["payload_body_sequence_5to3"] == payload_view["selected_payload_sequence"][:8]
+    assert split_rows[0]["meta"]["display_payload_body_sequence_5to3"] == reverse_complement_iupac(
+        payload_view["selected_payload_sequence"][:8]
+    )
+    assert split_rows[1]["meta"]["payload_body_sequence_5to3"] == payload_view["selected_payload_sequence"][12:]
+    assert split_rows[1]["meta"]["display_payload_body_sequence_5to3"] == reverse_complement_iupac(
+        payload_view["selected_payload_sequence"][12:]
+    )
     assert split_rows[0]["boundaries"] == [
         {
             "boundary_id": "junction_start",
@@ -1698,6 +1816,21 @@ def test_show_yiu_bundle_rejects_missing_pdf_when_inventory_claims_rendered(tmp_
     pdf_path.unlink()
 
     with pytest.raises(YiuContractError, match="rendered outputs that are missing on disk"):
+        show_yiu_bundle(bundle_dir)
+
+
+def test_show_yiu_bundle_rejects_bundle_summary_drift(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec())
+
+    bundle_dir, _report = render_yiu_spec(spec_path)
+    summary_path = bundle_dir / "bundle_summary.json"
+    bundle_summary = _load_json(summary_path)
+    bundle_summary["sequence_summary"]["split_payload"]["left_payload_body_sequence_5to3"] = "WRONG"
+    summary_path.write_text(json.dumps(bundle_summary, indent=2), encoding="utf-8")
+
+    with pytest.raises(YiuContractError, match="bundle_summary.json disagrees"):
         show_yiu_bundle(bundle_dir)
 
 

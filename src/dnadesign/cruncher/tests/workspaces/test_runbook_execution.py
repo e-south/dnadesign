@@ -389,6 +389,7 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
     assert not (bundle_dir / "split_payload.pdf").exists()
     assert not (bundle_dir / "assembled_payload.pdf").exists()
     assert not (bundle_dir / "inline_job").exists()
+    assert (bundle_dir / "bundle_summary.json").exists()
 
     payload = _load_json(bundle_dir / "payload_view.json")
     assembled = _load_json(bundle_dir / "assembled_payload_view.json")
@@ -407,9 +408,25 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
     assert split_rows[1]["meta"]["panel_order"] == 1
     assert split_rows[1]["meta"]["fragment_side"] == "right"
     assert split_rows[1]["meta"]["sticky_end_orientation"] == "inward"
-    assert assembled["boundaries"] == []
+    assert assembled["boundaries"] == [
+        {
+            "boundary_id": "junction_start",
+            "row_id": "primary",
+            "boundary": 8,
+            "boundary_kind": "ligation_junction",
+            "display_label": "Junction start",
+            "short_label": "",
+        },
+        {
+            "boundary_id": "junction_end",
+            "row_id": "complement",
+            "boundary": 12,
+            "boundary_kind": "ligation_junction",
+            "display_label": "Junction end",
+            "short_label": "",
+        },
+    ]
     assert "junction_span" in assembled["meta"]
-    assert "ligation_junction" not in json.dumps(assembled)
     assert "linearization_seam" not in json.dumps(assembled)
 
     log_text = output_log.read_text(encoding="utf-8")

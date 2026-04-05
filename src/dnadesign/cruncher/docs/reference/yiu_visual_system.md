@@ -4,9 +4,12 @@
 **Applies to:** `uv run cruncher yiu render|show` and the published BaseRender handoff
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-04-05
+**Last updated by:** cruncher-maintainers on 2026-04-05
 
 This page owns the named visual directions and information hierarchy for payload-centric YIU views.
 Use [YIU Workflow](../guides/yiu_workflow.md) for command flow, [YIU Artifacts](yiu_artifacts.md) for emitted files and render-state semantics, and [Architecture](architecture.md) for module ownership.
+
+<!-- docs:toc:off -->
 
 ### Movement
 
