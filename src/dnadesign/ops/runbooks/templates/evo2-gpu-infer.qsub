@@ -32,6 +32,7 @@ fi
 export CC="$(which gcc)"
 export CXX="$(which g++)"
 export CUDAHOSTCXX="$(which g++)"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-${NSLOTS:-1}}"
 
 if [[ -z "${INFER_CONFIG:-}" ]]; then
   echo "INFER_CONFIG is required and must point to an infer config file." >&2
