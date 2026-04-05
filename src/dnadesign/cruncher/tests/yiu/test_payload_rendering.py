@@ -21,13 +21,14 @@ import pytest
 import yaml
 
 import dnadesign.cruncher.yiu.optimizer as yiu_optimizer_module
-import dnadesign.cruncher.yiu.payload_resolution as yiu_payload_resolution_module
-from dnadesign.cruncher.app.yiu_workflow.render import render_yiu_spec
+import dnadesign.cruncher.yiu.render as yiu_render_module
+from dnadesign.cruncher.app.yiu_workflow.render import render_yiu_spec, render_yiu_spec_outcome
 from dnadesign.cruncher.app.yiu_workflow.show import show_yiu_bundle
 from dnadesign.cruncher.bio import reverse_complement_iupac
 from dnadesign.cruncher.yiu.bsmbi import build_split_fragment_display_specs
 from dnadesign.cruncher.yiu.bundle_models import PayloadViewEntry, PayloadVisualInventory
 from dnadesign.cruncher.yiu.bundle_paths import resolve_composite_render_artifact_path
+from dnadesign.cruncher.yiu.bundle_surface import YiuShowOutcome
 from dnadesign.cruncher.yiu.candidate_generation import CandidatePlan, MutationChoice
 from dnadesign.cruncher.yiu.errors import NoFeasiblePlanError, YiuContractError
 from dnadesign.cruncher.yiu.load import load_yiu_spec
@@ -44,13 +45,9 @@ from dnadesign.cruncher.yiu.publish_io import (
     write_payload_bundle_state,
     write_payload_bundle_views,
 )
-from dnadesign.cruncher.yiu.publish_layout import (
-    build_payload_view_entries,
-    build_published_artifacts,
-    build_render_job_payload,
-    resolve_payload_bundle_layout,
-)
+from dnadesign.cruncher.yiu.publish_layout import build_published_artifacts, resolve_payload_bundle_layout
 from dnadesign.cruncher.yiu.scoring import CandidateScore
+from dnadesign.cruncher.yiu.view_catalog import build_payload_view_entries, build_render_job_payload
 from dnadesign.cruncher.yiu.view_contracts import (
     build_assembled_payload_view_contract,
     build_split_payload_view_rows,
@@ -525,19 +522,17 @@ def test_normalize_sample_hit_resolves_csv_and_enforces_payload_assertion(tmp_pa
         normalize_payload(bad_spec, workspace_root=workspace_root)
 
 
-def test_normalize_sample_hit_resolves_repo_sibling_workspace_from_metadata(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    sibling_workspace = tmp_path / "demo_monotypic_tetr"
+def test_normalize_sample_hit_resolves_sibling_workspace_from_parent_root(tmp_path: Path) -> None:
+    workspaces_root = tmp_path / "workspaces"
+    sibling_workspace = workspaces_root / "demo_monotypic_tetr"
     artifact_path = sibling_workspace / "outputs" / "optimize" / "tables" / "elites.parquet"
     _write_sample_parquet(
         artifact_path,
         hit_id="demo_monotypic_tetr_elite_001",
         sequence="CTCTATATCTGATATAGAG",
     )
-    monkeypatch.setattr(yiu_payload_resolution_module, "_default_cruncher_workspaces_root", lambda: tmp_path)
 
-    yiu_workspace = tmp_path / "yiu_workspace"
+    yiu_workspace = workspaces_root / "yiu_workspace"
     spec_path = yiu_workspace / "configs" / "yiu" / "sample_hit_payload.yiu.yaml"
     _write_yaml(
         spec_path,
@@ -557,6 +552,27 @@ def test_normalize_sample_hit_resolves_repo_sibling_workspace_from_metadata(
 
     assert normalized.reference_payload_sequence == "CTCTATATCTGATATAGAG"
     assert normalized.source_provenance["source_workspace"] == str(sibling_workspace.resolve())
+
+
+def test_normalize_sample_hit_missing_sibling_workspace_fails_fast(tmp_path: Path) -> None:
+    yiu_workspace = tmp_path / "workspaces" / "yiu_workspace"
+    spec_path = yiu_workspace / "configs" / "yiu" / "sample_hit_payload.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _sample_hit_spec(
+            hit_id="missing_elite_001",
+            sample_name="missing_workspace",
+            metadata={
+                "source_workspace": "missing_workspace",
+                "source_artifact": "outputs/optimize/tables/elites.parquet",
+            },
+            candidate_positions=[1],
+        ),
+    )
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    with pytest.raises(YiuContractError, match="sample-hit source workspace not found"):
+        normalize_payload(spec, workspace_root=workspace_root)
 
 
 def test_normalize_pwm_use_if_available_records_fallback_reason(tmp_path: Path) -> None:
@@ -939,6 +955,24 @@ def test_render_yiu_spec_publishes_v4_bundle_and_payload_visual_contract(tmp_pat
     assert assembled_view["contract_kind"] == "sequence_evidence_map_v1"
 
 
+def test_render_yiu_spec_outcome_uses_shared_bundle_surface(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec())
+
+    outcome = render_yiu_spec_outcome(spec_path)
+
+    assert outcome.bundle_dir == str((workspace / "outputs" / "demo_payload").resolve())
+    assert outcome.outputs_root == str((workspace / "outputs").resolve())
+    assert outcome.composite_render_artifact_path == str(
+        (workspace / "outputs" / "demo_payload" / "payload_views.pdf").resolve()
+    )
+    assert outcome.published_plot_artifact_path == str(
+        (workspace / "outputs" / "plot__demo_payload__payload_views.pdf").resolve()
+    )
+    assert outcome.report.spec_name == "demo_payload"
+
+
 def test_render_yiu_spec_with_pwm_effective_adds_payload_motif_layers_and_show_roundtrips(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     spec_path = workspace / "configs" / "yiu" / "pwm_payload.yiu.yaml"
@@ -957,14 +991,15 @@ def test_render_yiu_spec_with_pwm_effective_adds_payload_motif_layers_and_show_r
     payload_view = _load_json(bundle_dir / "payload_view.json")
     show_payload = show_yiu_bundle(bundle_dir)
 
+    assert isinstance(show_payload, YiuShowOutcome)
     assert report.pwm_effective is True
     assert len(payload_view["motif_layers"]) == 2
     assert (bundle_dir / "payload_views.pdf").exists()
     assert (workspace / "outputs" / "plot__pwm_payload__payload_views.pdf").exists()
-    assert show_payload["pwm_effective"] is True
-    assert show_payload["motif_context"]["effective"] is True
-    assert show_payload["integrity"]["status"] == "ok"
-    assert show_payload["published_plot_artifact_path"] == str(
+    assert show_payload.pwm_effective is True
+    assert show_payload.motif_context.effective is True
+    assert show_payload.integrity.status == "ok"
+    assert show_payload.published_plot_artifact_path == str(
         (workspace / "outputs" / "plot__pwm_payload__payload_views.pdf").resolve()
     )
 
@@ -987,6 +1022,11 @@ def test_split_and_assembled_views_center_titles() -> None:
     assert payload_overrides["figure_scale"] == split_overrides["figure_scale"] == assembled_overrides["figure_scale"]
     assert split_overrides["overlay_align"] == "center"
     assert assembled_overrides["overlay_align"] == "center"
+
+
+def test_yiu_style_overrides_fail_fast_for_unknown_view_ids() -> None:
+    with pytest.raises(ValueError, match="unsupported YIU view id"):
+        build_yiu_style_overrides("bogus")
 
 
 def test_split_payload_view_metadata_preserves_sticky_end_and_ghost_context_contract(tmp_path: Path) -> None:
@@ -1291,10 +1331,10 @@ def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp
     assert payload_view["meta"]["row_labels"] == {}
     for got, expected in zip(payload_view["motif_layers"][0]["matrix"], _canonical_tetr_pwm_rows(), strict=True):
         assert got == pytest.approx(expected)
-    assert show_payload["pwm_effective"] is True
-    assert show_payload["motif_context"]["effective"] is True
-    assert show_payload["integrity"]["status"] == "ok"
-    assert show_payload["published_plot_artifact_path"] == str(
+    assert show_payload.pwm_effective is True
+    assert show_payload.motif_context.effective is True
+    assert show_payload.integrity.status == "ok"
+    assert show_payload.published_plot_artifact_path == str(
         (workspace / "outputs" / "plots" / "plot__yiu__tetr_monotypic_hit__payload_views.pdf").resolve()
     )
 
@@ -1387,7 +1427,7 @@ def test_render_sample_hit_with_sample_context_and_overlapping_selected_occurren
     assert payload_view["meta"]["row_labels"] == {}
     assert [layer["start"] for layer in payload_view["motif_layers"]] == [0, 2, 3]
     assert (bundle_dir / "payload_views.pdf").exists()
-    assert show_payload["integrity"]["status"] == "ok"
+    assert show_payload.integrity.status == "ok"
 
 
 def test_checked_in_tetr_pwm_context_preserves_full_information_content() -> None:
@@ -1458,6 +1498,34 @@ def test_show_yiu_bundle_rejects_stale_pdf_when_inventory_claims_not_requested(t
         show_yiu_bundle(bundle_dir)
 
 
+def test_render_bundle_views_rejects_corrupt_view_registry_before_mutation(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec())
+
+    bundle_dir, _report = render_yiu_spec(spec_path)
+    inventory_path = bundle_dir / "visual_inventory.json"
+    manifest_path = bundle_dir / "bundle_manifest.json"
+    inventory = _load_json(inventory_path)
+    manifest = _load_json(manifest_path)
+
+    inventory["view_count"] = 1
+    inventory["views"] = inventory["views"][:1]
+    manifest["view_contracts"] = manifest["view_contracts"][:1]
+
+    inventory_path.write_text(json.dumps(inventory, indent=2), encoding="utf-8")
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+    with pytest.raises(YiuContractError, match="canonical YIU view ids"):
+        yiu_render_module.render_bundle_views(bundle_dir)
+
+    persisted_inventory = _load_json(inventory_path)
+    persisted_manifest = _load_json(manifest_path)
+    assert persisted_inventory["render_status"] == "not_requested"
+    assert persisted_inventory["render_count"] == 0
+    assert persisted_manifest["render_status"] == "not_requested"
+
+
 def test_render_yiu_spec_emit_renders_marks_bundle_rendered(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
@@ -1471,3 +1539,33 @@ def test_render_yiu_spec_emit_renders_marks_bundle_rendered(tmp_path: Path) -> N
     assert inventory["render_count"] == 3
     assert manifest["render_status"] == "rendered"
     assert (bundle_dir / "payload_views.pdf").exists()
+
+
+def test_render_yiu_spec_emit_renders_persists_failed_render_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec())
+
+    def _raise_render_failure(*args, **kwargs):
+        raise RuntimeError("synthetic panel failure")
+
+    monkeypatch.setattr(yiu_render_module, "render_view_panel", _raise_render_failure)
+
+    with pytest.raises(YiuContractError, match="BaseRender failed for view 'payload'"):
+        render_yiu_spec(spec_path, emit_renders=True)
+
+    bundle_dir = workspace / "outputs" / "demo_payload"
+    inventory = _load_json(bundle_dir / "visual_inventory.json")
+    manifest = _load_json(bundle_dir / "bundle_manifest.json")
+
+    assert inventory["render_status"] == "failed"
+    assert inventory["render_count"] == 0
+    assert inventory["last_rendered_at"] is None
+    assert inventory["views"][0]["render_requested"] is True
+    assert inventory["views"][0]["render_completed"] is False
+    assert inventory["views"][1]["render_requested"] is False
+    assert manifest["render_status"] == "failed"
+    assert manifest["view_contracts"] == inventory["views"]

@@ -11,41 +11,29 @@ Module Author(s): OpenAI Codex
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import numpy as np
 
 from dnadesign.cruncher.yiu.bundle_models import PayloadViewEntry
+from dnadesign.cruncher.yiu.view_io import load_contract_rows
 
 
-def adapter_for_view(view: PayloadViewEntry):
+def _adapter_kind_for_view(view: PayloadViewEntry) -> str:
     if view.contract_kind == "sequence_evidence_map_v1":
-        from dnadesign.baserender.src.adapters.sequence_evidence_map_v1 import SequenceEvidenceMapV1Adapter
-
-        return SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="IUPAC_DNA")
+        return "sequence_evidence_map_v1"
     if view.contract_kind == "yiu_payload_visual_v1":
-        from dnadesign.baserender.src.adapters.yiu_payload_visual_v1 import YiuPayloadVisualV1Adapter
-
-        return YiuPayloadVisualV1Adapter(columns={}, policies={}, alphabet="IUPAC_DNA")
+        return "yiu_payload_visual_v1"
     raise ValueError(f"unsupported YIU view contract for rendering: {view.contract_kind}")
 
 
-def load_contract_rows(contract_path: Path, *, input_kind: str) -> list[dict[str, object]]:
-    if input_kind == "jsonl":
-        return [json.loads(line) for line in contract_path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    payload = json.loads(contract_path.read_text(encoding="utf-8"))
-    if isinstance(payload, list):
-        return [dict(item) for item in payload]
-    if isinstance(payload, dict):
-        return [payload]
-    raise ValueError(f"render input must decode to a mapping or list: {contract_path}")
-
-
-def load_view_records(contract_path: Path, *, view: PayloadViewEntry):
-    adapter = adapter_for_view(view)
+def load_view_records(contract_path: Path, *, view: PayloadViewEntry, baserender_module):
     rows = load_contract_rows(contract_path, input_kind=view.input_kind)
-    return [adapter.apply(row, row_index=index) for index, row in enumerate(rows)]
+    return baserender_module.adapt_records(
+        rows,
+        adapter_kind=_adapter_kind_for_view(view),
+        alphabet="IUPAC_DNA",
+    )
 
 
 def render_view_panel(

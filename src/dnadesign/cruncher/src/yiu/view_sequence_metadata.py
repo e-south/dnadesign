@@ -11,24 +11,10 @@ Module Author(s): OpenAI Codex
 
 from __future__ import annotations
 
+from dnadesign.contracts.visual.sequence_evidence_meta import build_sequence_evidence_connector_meta
 from dnadesign.cruncher.yiu.bsmbi import GhostExcisedContext, SplitFragmentDisplaySpec
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
 from dnadesign.cruncher.yiu.view_common import YIU_EMPTY_ROW_LABELS
-
-
-def _build_connector_meta(
-    *,
-    span: dict[str, object],
-    cross_indices: list[int],
-) -> dict[str, object]:
-    start = int(span["start"])
-    end = int(span["end"])
-    crossed = set(cross_indices)
-    return {
-        "connector_hidden_indices": [index for index in range(start, end) if index not in crossed],
-        "connector_cross_indices": cross_indices,
-        "connector_overhang_spans": [span],
-    }
 
 
 def _ghost_dim_base_indices(ghost_context: GhostExcisedContext | None) -> dict[str, list[int]]:
@@ -62,7 +48,12 @@ def build_split_payload_row_meta(fragment: SplitFragmentDisplaySpec) -> dict[str
         "ghost_excised_context": None if ghost_context is None else ghost_context.model_dump(mode="json"),
         "row_labels": YIU_EMPTY_ROW_LABELS,
         "dim_base_indices": _ghost_dim_base_indices(ghost_context),
-        **_build_connector_meta(span=sticky_end_span, cross_indices=[]),
+        **build_sequence_evidence_connector_meta(
+            start=sticky_end_span["start"],
+            end=sticky_end_span["end"],
+            cross_indices=[],
+            coordinate_space=sticky_end_span.get("coordinate_space"),
+        ),
     }
 
 
@@ -81,7 +72,12 @@ def build_assembled_payload_view_meta(normalized: NormalizedPayload) -> dict[str
         == normalized.reference_payload_sequence,
         "base_highlights": {"primary": highlight_indices, "complement": highlight_indices},
         "row_labels": YIU_EMPTY_ROW_LABELS,
-        **_build_connector_meta(span=junction_span, cross_indices=highlight_indices),
+        **build_sequence_evidence_connector_meta(
+            start=junction_span["start"],
+            end=junction_span["end"],
+            cross_indices=highlight_indices,
+            coordinate_space="payload_forward",
+        ),
     }
 
 

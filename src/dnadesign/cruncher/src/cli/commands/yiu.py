@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, Mapping
 
 import typer
 from rich.console import Console
@@ -34,6 +35,12 @@ def render_yiu_spec(*args, **kwargs):
     from dnadesign.cruncher.app.yiu_workflow.render import render_yiu_spec as _render_yiu_spec
 
     return _render_yiu_spec(*args, **kwargs)
+
+
+def render_yiu_spec_outcome(*args, **kwargs):
+    from dnadesign.cruncher.app.yiu_workflow.render import render_yiu_spec_outcome as _render_yiu_spec_outcome
+
+    return _render_yiu_spec_outcome(*args, **kwargs)
 
 
 def show_yiu_bundle(*args, **kwargs):
@@ -88,14 +95,23 @@ def _print_payload_summary(
         console.print(f"PWM losses -> worst={worst_loss:.6f} total={total_loss:.6f}")
 
 
-def _print_split_row_debug(rows: list[dict[str, object]]) -> None:
+def _row_payload(row: object) -> Mapping[str, Any]:
+    if isinstance(row, Mapping):
+        return row
+    if hasattr(row, "model_dump"):
+        return row.model_dump(mode="json")
+    raise TypeError(f"unsupported split-row debug payload: {type(row)!r}")
+
+
+def _print_split_row_debug(rows: list[object]) -> None:
     for row in rows:
+        payload = _row_payload(row)
         console.print(
             "Split row -> "
-            f"{row['fragment_side']} "
-            f"selected_sticky_end={row['selected_sticky_end_sequence_5to3']} "
-            f"canonical_sticky_end={row['canonical_sticky_end_sequence_5to3']} "
-            f"ghost_excised_context={row['ghost_excised_context'] is not None}"
+            f"{payload['fragment_side']} "
+            f"selected_sticky_end={payload['selected_sticky_end_sequence_5to3']} "
+            f"canonical_sticky_end={payload['canonical_sticky_end_sequence_5to3']} "
+            f"ghost_excised_context={payload['ghost_excised_context'] is not None}"
         )
 
 
@@ -182,35 +198,16 @@ def render_cmd(
     json_output: bool = typer.Option(False, "--json", help="Print the render report as JSON."),
 ) -> None:
     try:
-        bundle_dir, report = render_yiu_spec(spec, force_overwrite=force_overwrite, emit_renders=emit_renders)
+        outcome = render_yiu_spec_outcome(spec, force_overwrite=force_overwrite, emit_renders=emit_renders)
     except (FileNotFoundError, ValueError) as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
-    manifest_payload = json.loads((bundle_dir / "bundle_manifest.json").read_text(encoding="utf-8"))
-    published_plot_artifact_path = manifest_payload.get("published_plot_artifact_path")
-    if isinstance(published_plot_artifact_path, str) and published_plot_artifact_path.strip():
-        from dnadesign.cruncher.yiu.bundle_paths import resolve_workspace_root
-
-        workspace_root = resolve_workspace_root(bundle_dir)
-        published_plot_artifact_path = (
-            None if workspace_root is None else str((workspace_root / published_plot_artifact_path).resolve())
-        )
-    else:
-        published_plot_artifact_path = None
-    payload = {
-        "bundle_dir": str(bundle_dir),
-        "outputs_root": str(bundle_dir.parent.resolve()),
-        "composite_render_artifact_path": str((bundle_dir / "payload_views.pdf").resolve()),
-        "published_plot_artifact_path": published_plot_artifact_path,
-        "bundle_manifest_path": str((bundle_dir / "bundle_manifest.json").resolve()),
-        "normalized_payload_path": str((bundle_dir / "normalized_payload.json").resolve()),
-        "visual_inventory_path": str((bundle_dir / "visual_inventory.json").resolve()),
-        "report": report.model_dump(mode="json"),
-    }
+    payload = outcome.model_dump(mode="json")
+    report = outcome.report
     if json_output:
         typer.echo(json.dumps(payload, indent=2))
         return
-    console.print(f"YIU bundle -> {bundle_dir}")
+    console.print(f"YIU bundle -> {outcome.bundle_dir}")
     console.print(f"Spec -> {report.spec_name}")
     _print_payload_summary(
         payload_label=report.payload_label,
@@ -223,7 +220,7 @@ def render_cmd(
         worst_loss=report.worst_loss,
         total_loss=report.total_loss,
     )
-    console.print(f"Bundle write -> {bundle_dir}")
+    console.print(f"Bundle write -> {outcome.bundle_dir}")
     console.print(f"Bundle manifest -> {payload['bundle_manifest_path']}")
     console.print(f"Normalized payload -> {payload['normalized_payload_path']}")
     console.print(f"Visual inventory -> {payload['visual_inventory_path']}")
@@ -242,41 +239,40 @@ def show_cmd(
     verbose: bool = typer.Option(False, "--verbose", help="Include split-row debug details in the output."),
 ) -> None:
     try:
-        payload = show_yiu_bundle(bundle, verbose=verbose)
+        outcome = show_yiu_bundle(bundle, verbose=verbose)
     except (FileNotFoundError, ValueError) as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
     if json_output:
-        typer.echo(json.dumps(payload, indent=2))
+        typer.echo(json.dumps(outcome.model_dump(mode="json", exclude_unset=True), indent=2))
         return
-    console.print(f"Bundle -> {payload['bundle_dir']}")
-    console.print(f"Bundle contract -> {payload['bundle_contract']}")
-    console.print(f"Provenance -> {json.dumps(payload['provenance'], sort_keys=True)}")
+    console.print(f"Bundle -> {outcome.bundle_dir}")
+    console.print(f"Bundle contract -> {outcome.bundle_contract}")
+    console.print(f"Provenance -> {json.dumps(outcome.provenance, sort_keys=True)}")
     _print_payload_summary(
-        payload_label=payload.get("payload_label"),
-        input_kind=payload["input_kind"],
-        payload_length=payload["payload_length"],
-        junction=payload["junction"],
-        mismatch_sites=payload.get("mismatches", []),
-        pwm_mode=payload["pwm_mode"],
-        pwm_effective=payload["pwm_effective"],
-        worst_loss=payload["worst_loss"],
-        total_loss=payload["total_loss"],
+        payload_label=outcome.payload_label,
+        input_kind=outcome.input_kind,
+        payload_length=outcome.payload_length,
+        junction=outcome.junction.model_dump(mode="json"),
+        mismatch_sites=[entry.model_dump(mode="json") for entry in outcome.mismatches],
+        pwm_mode=outcome.pwm_mode,
+        pwm_effective=outcome.pwm_effective,
+        worst_loss=outcome.worst_loss,
+        total_loss=outcome.total_loss,
     )
-    motif_context = payload.get("motif_context", {})
-    fallback_reason = motif_context.get("fallback_reason")
-    if payload["pwm_mode"] != "none" and not payload["pwm_effective"] and fallback_reason:
+    fallback_reason = outcome.motif_context.fallback_reason
+    if outcome.pwm_mode != "none" and not outcome.pwm_effective and fallback_reason:
         console.print(f"PWM fallback reason -> {fallback_reason}")
     if verbose:
-        _print_split_row_debug(payload.get("split_row_debug", []))
-    console.print(f"Views -> {', '.join(payload['view_ids'])}")
-    console.print(f"Render status -> {payload['render_status']}")
-    console.print(f"Available renders -> {len(payload['available_renders'])}")
-    console.print(f"Integrity -> {payload['integrity']['status']}")
-    if payload.get("composite_render_artifact_path") is not None:
-        console.print(f"Composite render -> {payload['composite_render_artifact_path']}")
-    if payload.get("published_plot_artifact_path") is not None:
-        console.print(f"Published plot -> {payload['published_plot_artifact_path']}")
-    console.print(f"Bundle manifest -> {payload['bundle_manifest_path']}")
-    console.print(f"Normalized payload -> {payload['normalized_payload_path']}")
-    console.print(f"Visual inventory -> {payload['visual_inventory_path']}")
+        _print_split_row_debug(outcome.split_row_debug)
+    console.print(f"Views -> {', '.join(outcome.view_ids)}")
+    console.print(f"Render status -> {outcome.render_status}")
+    console.print(f"Available renders -> {len(outcome.available_renders)}")
+    console.print(f"Integrity -> {outcome.integrity.status}")
+    if outcome.composite_render_artifact_path is not None:
+        console.print(f"Composite render -> {outcome.composite_render_artifact_path}")
+    if outcome.published_plot_artifact_path is not None:
+        console.print(f"Published plot -> {outcome.published_plot_artifact_path}")
+    console.print(f"Bundle manifest -> {outcome.bundle_manifest_path}")
+    console.print(f"Normalized payload -> {outcome.normalized_payload_path}")
+    console.print(f"Visual inventory -> {outcome.visual_inventory_path}")

@@ -12,6 +12,7 @@ Module Author(s): OpenAI Codex
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from dnadesign.baserender import cruncher_showcase_style_overrides
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
@@ -39,7 +40,14 @@ def build_payload_view_title(normalized: NormalizedPayload) -> str:
     return _pretty_label(normalized.name) or "Payload"
 
 
-def _base_sequence_style_overrides() -> dict[str, object]:
+@dataclass(frozen=True)
+class YiuViewStyleProfile:
+    view_id: str
+    direction_name: str
+    style_overrides: dict[str, object]
+
+
+def _operator_strip_style_overrides() -> dict[str, object]:
     return {
         "figure_scale": _YIU_FIGURE_SCALE,
         "padding_x": 42.0,
@@ -59,30 +67,59 @@ def _base_sequence_style_overrides() -> dict[str, object]:
     }
 
 
-def build_yiu_style_overrides(view_id: str) -> dict[str, object]:
-    if view_id == "payload":
-        base = dict(cruncher_showcase_style_overrides())
-        base["figure_scale"] = _YIU_FIGURE_SCALE
-        base["padding_x"] = 42.0
-        base["padding_y"] = 24.0
-        base["font_size_seq"] = 13
-        base["font_size_label"] = 11
-        base["legend"] = False
-        base["connectors"] = True
-        base["connector_width"] = 1.1
-        base["connector_alpha"] = 0.78
-        base["connector_dash"] = ()
-        return base
-
-    base = _base_sequence_style_overrides()
-    if view_id in {"payload", "split_payload", "assembled_payload"}:
-        base["legend"] = False
-    if view_id == "assembled_payload":
-        base["padding_y"] = 28.0
+def _payload_evidence_style_overrides() -> dict[str, object]:
+    base = dict(cruncher_showcase_style_overrides())
+    base.update(
+        {
+            "figure_scale": _YIU_FIGURE_SCALE,
+            "padding_x": 42.0,
+            "padding_y": 24.0,
+            "font_size_seq": 13,
+            "font_size_label": 11,
+            "legend": False,
+            "connectors": True,
+            "connector_width": 1.1,
+            "connector_alpha": 0.78,
+            "connector_dash": (),
+        }
+    )
     return base
+
+
+_STYLE_PROFILES: dict[str, YiuViewStyleProfile] = {
+    "payload": YiuViewStyleProfile(
+        view_id="payload",
+        direction_name="evidence_ribbon",
+        style_overrides=_payload_evidence_style_overrides(),
+    ),
+    "split_payload": YiuViewStyleProfile(
+        view_id="split_payload",
+        direction_name="operator_strip",
+        style_overrides={**_operator_strip_style_overrides(), "legend": False},
+    ),
+    "assembled_payload": YiuViewStyleProfile(
+        view_id="assembled_payload",
+        direction_name="operator_strip",
+        style_overrides={**_operator_strip_style_overrides(), "legend": False, "padding_y": 28.0},
+    ),
+}
+
+
+def get_yiu_style_profile(view_id: str) -> YiuViewStyleProfile:
+    try:
+        return _STYLE_PROFILES[view_id]
+    except KeyError as exc:
+        supported = ", ".join(sorted(_STYLE_PROFILES))
+        raise ValueError(f"unsupported YIU view id {view_id!r}; expected one of: {supported}") from exc
+
+
+def build_yiu_style_overrides(view_id: str) -> dict[str, object]:
+    return dict(get_yiu_style_profile(view_id).style_overrides)
 
 
 __all__ = [
     "build_payload_view_title",
     "build_yiu_style_overrides",
+    "YiuViewStyleProfile",
+    "get_yiu_style_profile",
 ]

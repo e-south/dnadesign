@@ -14,6 +14,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from dnadesign.cruncher.yiu.bundle_surface import YiuRenderOutcome, load_render_outcome
 from dnadesign.cruncher.yiu.load import load_yiu_spec
 from dnadesign.cruncher.yiu.models.bundle import YiuValidationReport, build_validation_report
 from dnadesign.cruncher.yiu.normalize import normalize_payload
@@ -44,3 +45,17 @@ def render_yiu_spec(
         bundle_dir=str(bundle_dir.resolve()),
     )
     return bundle_dir.resolve(), report
+
+
+def render_yiu_spec_outcome(
+    path: str | Path,
+    *,
+    force_overwrite: bool = False,
+    emit_renders: bool = False,
+) -> YiuRenderOutcome:
+    bundle_dir, report = render_yiu_spec(
+        path,
+        force_overwrite=force_overwrite,
+        emit_renders=emit_renders,
+    )
+    return load_render_outcome(bundle_dir, report=report)

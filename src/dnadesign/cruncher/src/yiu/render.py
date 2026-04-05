@@ -12,7 +12,6 @@ Module Author(s): OpenAI Codex
 from __future__ import annotations
 
 import importlib
-import json
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,8 +25,10 @@ from dnadesign.cruncher.yiu.bundle_paths import (
     resolve_composite_render_artifact_path,
     resolve_published_plot_path,
 )
-from dnadesign.cruncher.yiu.errors import YIU_RENDER_FAILED, raise_yiu_error
-from dnadesign.cruncher.yiu.models.bundle import PayloadBundleManifest, PayloadViewEntry, PayloadVisualInventory
+from dnadesign.cruncher.yiu.bundle_state import RenderStatus, YiuBundleState, load_bundle_state
+from dnadesign.cruncher.yiu.errors import YIU_BUNDLE_INVALID, YIU_RENDER_FAILED, raise_yiu_error
+from dnadesign.cruncher.yiu.integrity import validate_bundle_state
+from dnadesign.cruncher.yiu.models.bundle import PayloadViewEntry
 from dnadesign.cruncher.yiu.render_panels import (
     figure_to_rgba_array,
     load_view_records,
@@ -36,7 +37,7 @@ from dnadesign.cruncher.yiu.render_panels import (
 )
 
 
-def _render_status(*, job_count: int, rendered_count: int) -> str:
+def _render_status(*, job_count: int, rendered_count: int) -> RenderStatus:
     if job_count <= 0:
         return "not_requested"
     if rendered_count <= 0:
@@ -46,66 +47,37 @@ def _render_status(*, job_count: int, rendered_count: int) -> str:
     return "partial"
 
 
-def _load_bundle_state(bundle_dir: Path) -> tuple[PayloadBundleManifest, PayloadVisualInventory, Path, Path]:
-    manifest_path = bundle_dir / "bundle_manifest.json"
-    inventory_path = bundle_dir / "visual_inventory.json"
-    if not inventory_path.exists():
-        raise FileNotFoundError(f"visual inventory not found: {inventory_path}")
-    if not manifest_path.exists():
-        raise FileNotFoundError(f"bundle manifest not found: {manifest_path}")
-    manifest = PayloadBundleManifest.model_validate(json.loads(manifest_path.read_text(encoding="utf-8")))
-    inventory = PayloadVisualInventory.model_validate(json.loads(inventory_path.read_text(encoding="utf-8")))
-    return manifest, inventory, manifest_path, inventory_path
-
-
-def _persist_bundle_state(
+def _persist_render_state(
     *,
-    manifest: PayloadBundleManifest,
-    inventory: PayloadVisualInventory,
-    manifest_path: Path,
-    inventory_path: Path,
-) -> None:
-    manifest_path.write_text(json.dumps(manifest.model_dump(mode="json"), indent=2), encoding="utf-8")
-    inventory_path.write_text(json.dumps(inventory.model_dump(mode="json"), indent=2), encoding="utf-8")
-
-
-def _persist_failed_render(
-    *,
-    manifest: PayloadBundleManifest,
-    inventory: PayloadVisualInventory,
-    manifest_path: Path,
-    inventory_path: Path,
+    bundle_state: YiuBundleState,
+    render_status: RenderStatus,
     rendered_count: int,
     last_rendered_at: str | None,
-    updated_views: list[PayloadViewEntry],
-    remaining_views: list[PayloadViewEntry],
-) -> None:
-    failed_inventory = inventory.model_copy(
-        update={
-            "render_count": rendered_count,
-            "render_status": "failed",
-            "last_rendered_at": last_rendered_at,
-            "views": updated_views + remaining_views,
-        }
+    views: list[PayloadViewEntry],
+) -> YiuBundleState:
+    updated_state = bundle_state.with_render_state(
+        rendered_count=rendered_count,
+        last_rendered_at=last_rendered_at,
+        views=views,
+        render_status=render_status,
     )
-    failed_manifest = manifest.model_copy(
-        update={
-            "render_status": "failed",
-            "view_contracts": failed_inventory.views,
-        }
-    )
-    _persist_bundle_state(
-        manifest=failed_manifest,
-        inventory=failed_inventory,
-        manifest_path=manifest_path,
-        inventory_path=inventory_path,
-    )
+    updated_state.persist()
+    return updated_state
 
 
 def render_bundle_views(bundle_dir: str | Path) -> dict[str, object]:
-    resolved = Path(bundle_dir).expanduser().resolve()
-    manifest, inventory, manifest_path, inventory_path = _load_bundle_state(resolved)
-    workspace_root = infer_workspace_root_from_output_artifact(inventory_path)
+    bundle_state = load_bundle_state(bundle_dir, include_normalized=True)
+    if bundle_state.normalized is None:
+        raise_yiu_error(YIU_BUNDLE_INVALID, "normalized_payload.json is required for YIU render preflight")
+    validate_bundle_state(
+        bundle_dir=bundle_state.bundle_dir,
+        manifest=bundle_state.manifest,
+        inventory=bundle_state.inventory,
+        normalized=bundle_state.normalized,
+    )
+    resolved = bundle_state.bundle_dir
+    inventory = bundle_state.inventory
+    workspace_root = infer_workspace_root_from_output_artifact(bundle_state.paths.inventory_path)
     if workspace_root is not None:
         ensure_workspace_mpl_cache(workspace_root)
     else:
@@ -125,7 +97,7 @@ def render_bundle_views(bundle_dir: str | Path) -> dict[str, object]:
         contract_path = (resolved / view.view_contract_path).resolve()
         requested_view = view.model_copy(update={"render_requested": True})
         try:
-            records = load_view_records(contract_path, view=view)
+            records = load_view_records(contract_path, view=view, baserender_module=baserender)
             panel = render_view_panel(
                 baserender_module=baserender,
                 records=records,
@@ -135,15 +107,12 @@ def render_bundle_views(bundle_dir: str | Path) -> dict[str, object]:
             )
         except Exception as exc:
             updated_views.append(requested_view)
-            _persist_failed_render(
-                manifest=manifest,
-                inventory=inventory,
-                manifest_path=manifest_path,
-                inventory_path=inventory_path,
+            _persist_render_state(
+                bundle_state=bundle_state,
+                render_status="failed",
                 rendered_count=rendered_count,
                 last_rendered_at=last_rendered_at,
-                updated_views=updated_views,
-                remaining_views=inventory.views[len(updated_views) :],
+                views=updated_views + inventory.views[len(updated_views) :],
             )
             raise_yiu_error(YIU_RENDER_FAILED, f"BaseRender failed for view {view.view_id!r} ({exc})")
         try:
@@ -168,15 +137,12 @@ def render_bundle_views(bundle_dir: str | Path) -> dict[str, object]:
     try:
         save_composite_render(panel_images=panel_images, render_path=composite_render_path)
     except Exception as exc:
-        _persist_failed_render(
-            manifest=manifest,
-            inventory=inventory,
-            manifest_path=manifest_path,
-            inventory_path=inventory_path,
+        _persist_render_state(
+            bundle_state=bundle_state,
+            render_status="failed",
             rendered_count=rendered_count,
             last_rendered_at=last_rendered_at,
-            updated_views=updated_views,
-            remaining_views=[],
+            views=updated_views,
         )
         raise_yiu_error(YIU_RENDER_FAILED, f"BaseRender composite assembly failed ({exc})")
     if not composite_render_path.exists():
@@ -194,29 +160,16 @@ def render_bundle_views(bundle_dir: str | Path) -> dict[str, object]:
         if published_plot_resolved not in render_paths:
             render_paths.append(published_plot_resolved)
 
-    updated_inventory = inventory.model_copy(
-        update={
-            "render_count": rendered_count,
-            "render_status": _render_status(job_count=len(inventory.views), rendered_count=rendered_count),
-            "last_rendered_at": last_rendered_at,
-            "views": updated_views,
-        }
-    )
-    updated_manifest = manifest.model_copy(
-        update={
-            "render_status": updated_inventory.render_status,
-            "view_contracts": updated_inventory.views,
-        }
-    )
-    _persist_bundle_state(
-        manifest=updated_manifest,
-        inventory=updated_inventory,
-        manifest_path=manifest_path,
-        inventory_path=inventory_path,
+    updated_state = _persist_render_state(
+        bundle_state=bundle_state,
+        render_status=_render_status(job_count=len(inventory.views), rendered_count=rendered_count),
+        rendered_count=rendered_count,
+        last_rendered_at=last_rendered_at,
+        views=updated_views,
     )
     return {
         "bundle_dir": str(resolved),
-        "render_status": updated_inventory.render_status,
+        "render_status": updated_state.inventory.render_status,
         "render_count": rendered_count,
         "composite_render_artifact_path": str(composite_render_path.resolve()),
         "published_plot_artifact_path": None if published_plot_path is None else str(published_plot_path.resolve()),

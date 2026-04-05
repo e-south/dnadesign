@@ -1,0 +1,111 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/yiu/view_catalog.py
+
+Canonical view registry and render-job planning for payload-centric YIU bundles.
+
+Module Author(s): OpenAI Codex
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from dnadesign.cruncher.yiu.bundle_models import PayloadViewEntry
+from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
+from dnadesign.cruncher.yiu.view_styles import build_yiu_style_overrides
+
+if TYPE_CHECKING:
+    from dnadesign.cruncher.yiu.publish_layout import PayloadBundleLayout
+
+
+@dataclass(frozen=True)
+class PayloadViewDefinition:
+    view_id: str
+    contract_kind: str
+    input_kind: str
+    renderer_kind: str
+
+
+_CANONICAL_PAYLOAD_VIEW_DEFINITIONS: tuple[PayloadViewDefinition, ...] = (
+    PayloadViewDefinition(
+        view_id="payload",
+        contract_kind="yiu_payload_visual_v1",
+        input_kind="json",
+        renderer_kind="nucleotide_evidence_map",
+    ),
+    PayloadViewDefinition(
+        view_id="split_payload",
+        contract_kind="sequence_evidence_map_v1",
+        input_kind="jsonl",
+        renderer_kind="sequence_rows",
+    ),
+    PayloadViewDefinition(
+        view_id="assembled_payload",
+        contract_kind="sequence_evidence_map_v1",
+        input_kind="json",
+        renderer_kind="nucleotide_evidence_map",
+    ),
+)
+
+
+def canonical_payload_view_definitions() -> tuple[PayloadViewDefinition, ...]:
+    return _CANONICAL_PAYLOAD_VIEW_DEFINITIONS
+
+
+def build_payload_view_entries(
+    *,
+    layout: PayloadBundleLayout,
+    normalized: NormalizedPayload,
+) -> list[PayloadViewEntry]:
+    composite_render_path = layout.relative_artifact_path(layout.composite_render_path)
+    view_paths = {
+        "payload": layout.relative_artifact_path(layout.payload_view_path),
+        "split_payload": layout.relative_artifact_path(layout.split_payload_view_path),
+        "assembled_payload": layout.relative_artifact_path(layout.assembled_payload_view_path),
+    }
+    motif_layers_required = {"payload": normalized.motif_context.effective}
+    return [
+        PayloadViewEntry(
+            view_id=view.view_id,
+            contract_kind=view.contract_kind,
+            schema_version=1,
+            input_kind=view.input_kind,
+            view_contract_path=view_paths[view.view_id],
+            render_artifact_path=composite_render_path,
+            renderer_kind=view.renderer_kind,
+            style_overrides=build_yiu_style_overrides(view.view_id),
+            motif_layers_required=motif_layers_required.get(view.view_id, False),
+        )
+        for view in canonical_payload_view_definitions()
+    ]
+
+
+def build_render_job_payload(*, entry: PayloadViewEntry) -> dict[str, object]:
+    return {
+        "version": 3,
+        "results_root": "..",
+        "input": {
+            "kind": entry.input_kind,
+            "path": f"../{entry.view_contract_path}",
+            "adapter": {"kind": entry.contract_kind},
+            "alphabet": "iupac_dna",
+        },
+        "render": {
+            "renderer": entry.renderer_kind,
+            "style": {"preset": entry.style_preset, "overrides": entry.style_overrides},
+        },
+        "outputs": [{"kind": "images", "path": f"../debug/rerenders/{entry.view_id}.pdf", "fmt": "pdf"}],
+        "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+    }
+
+
+__all__ = [
+    "PayloadViewDefinition",
+    "build_payload_view_entries",
+    "build_render_job_payload",
+    "canonical_payload_view_definitions",
+]

@@ -11,7 +11,6 @@ Module Author(s): OpenAI Codex
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -25,12 +24,15 @@ from dnadesign.cruncher.yiu.bundle_paths import (
     resolve_expected_render_artifact_paths,
     resolve_published_plot_path,
 )
+from dnadesign.cruncher.yiu.bundle_surface import YiuBundleIntegrityState
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
 from dnadesign.cruncher.yiu.errors import YIU_BUNDLE_INVALID, raise_yiu_error
+from dnadesign.cruncher.yiu.view_catalog import canonical_payload_view_definitions
 from dnadesign.cruncher.yiu.view_contracts import (
     build_assembled_payload_view_contract,
     build_split_payload_view_rows,
 )
+from dnadesign.cruncher.yiu.view_io import load_contract_rows
 
 
 def _fail_bundle(message: str) -> None:
@@ -41,18 +43,6 @@ def _normalize_view_dump(views: list[object]) -> list[dict[str, object]]:
     return [view.model_dump(mode="json") if hasattr(view, "model_dump") else dict(view) for view in views]
 
 
-def _load_rows(path: Path, *, input_kind: str) -> list[dict[str, Any]]:
-    if input_kind == "jsonl":
-        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if isinstance(payload, list):
-        return [dict(item) for item in payload]
-    if isinstance(payload, dict):
-        return [payload]
-    _fail_bundle(f"published view must decode to a mapping or list: {path}")
-    return []
-
-
 def _validate_payload_summary(*, manifest: PayloadBundleManifest, normalized: NormalizedPayload) -> None:
     expected_summary = normalized_payload_summary_dump(normalized)
     actual_summary = payload_summary_dump(manifest)
@@ -61,17 +51,29 @@ def _validate_payload_summary(*, manifest: PayloadBundleManifest, normalized: No
             _fail_bundle(f"normalized payload and bundle manifest disagree on {field_name}")
 
 
+def _validate_view_registry(*, manifest: PayloadBundleManifest, inventory: PayloadVisualInventory) -> None:
+    expected_view_ids = [entry.view_id for entry in canonical_payload_view_definitions()]
+    inventory_view_ids = [view.view_id for view in inventory.views]
+    manifest_view_ids = [view.view_id for view in manifest.view_contracts]
+    if inventory_view_ids != expected_view_ids:
+        _fail_bundle("visual inventory must publish canonical YIU view ids in order: " + ", ".join(expected_view_ids))
+    if manifest_view_ids != expected_view_ids:
+        _fail_bundle("bundle manifest must publish canonical YIU view ids in order: " + ", ".join(expected_view_ids))
+
+
 def validate_bundle_state(
     *,
     bundle_dir: Path,
     manifest: PayloadBundleManifest,
     inventory: PayloadVisualInventory,
     normalized: NormalizedPayload,
-) -> dict[str, object]:
+) -> YiuBundleIntegrityState:
     checks: list[str] = []
     if inventory.view_count != len(inventory.views):
         _fail_bundle("visual inventory view_count does not match the number of published views")
     checks.append("inventory.view_count")
+    _validate_view_registry(manifest=manifest, inventory=inventory)
+    checks.append("view_registry")
     if manifest.spec_name != inventory.spec_name:
         _fail_bundle("bundle manifest and visual inventory disagree on spec_name")
     checks.append("spec_name")
@@ -107,7 +109,7 @@ def validate_bundle_state(
         contract_path = (bundle_dir / view.view_contract_path).resolve()
         if not contract_path.exists():
             _fail_bundle(f"published view contract is missing: {contract_path}")
-        rows = _load_rows(contract_path, input_kind=view.input_kind)
+        rows = load_contract_rows(contract_path, input_kind=view.input_kind)
         if not rows:
             _fail_bundle(f"published view contract is empty: {contract_path}")
         published_rows[view.view_id] = rows
@@ -171,10 +173,10 @@ def validate_bundle_state(
             + str(published_plot_path)
         )
     checks.append("render_artifacts")
-    return {
-        "checks": checks,
-        "available_renders": existing_render_paths,
-        "published_plot_path": None if published_plot_path is None else str(published_plot_path),
-        "payload_view": payload_view,
-        "split_rows": published_rows["split_payload"],
-    }
+    return YiuBundleIntegrityState(
+        checks=checks,
+        available_renders=existing_render_paths,
+        published_plot_path=None if published_plot_path is None else str(published_plot_path),
+        payload_view=payload_view,
+        split_rows=published_rows["split_payload"],
+    )

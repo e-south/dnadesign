@@ -39,24 +39,6 @@ class ResolvedInputPayload:
     sample_workspace_root: Path | None
 
 
-def _repo_root_from(start: Path) -> Path | None:
-    cursor = start.resolve()
-    for root in [cursor, *cursor.parents]:
-        if (root / "pyproject.toml").exists() or (root / ".git").exists():
-            return root
-    return None
-
-
-def _default_cruncher_workspaces_root() -> Path:
-    repo_root = _repo_root_from(Path(__file__).resolve())
-    if repo_root is None:
-        raise_yiu_error(
-            YIU_SAMPLE_HIT_UNSUPPORTED_SOURCE,
-            "unable to locate the default Cruncher workspaces root for sample-hit resolution",
-        )
-    return (repo_root / "src" / "dnadesign" / "cruncher" / "workspaces").resolve()
-
-
 def _metadata_text(sample_hit: SampleHitInput, key: str) -> str | None:
     raw = sample_hit.metadata.get(key)
     if raw is None:
@@ -75,12 +57,25 @@ def _normalize_sequence(value: str, *, ctx: str) -> str:
 def _resolve_workspace_ref(raw: str, *, workspace_root: Path) -> Path:
     path = Path(raw).expanduser()
     if path.is_absolute():
-        return path.resolve()
-    candidate = (workspace_root / path).resolve()
-    if candidate.exists():
-        return candidate
-    fallback = (_default_cruncher_workspaces_root() / path).resolve()
-    return fallback
+        resolved = path.resolve()
+        if resolved.exists():
+            return resolved
+        raise_yiu_error(YIU_SAMPLE_HIT_UNSUPPORTED_SOURCE, f"sample-hit source workspace not found: {resolved}")
+
+    candidates: list[Path] = []
+    for candidate_root in (workspace_root, workspace_root.parent):
+        candidate = (candidate_root / path).resolve()
+        if candidate not in candidates:
+            candidates.append(candidate)
+        if candidate.exists():
+            return candidate
+
+    searched = ", ".join(str(candidate) for candidate in candidates)
+    raise_yiu_error(
+        YIU_SAMPLE_HIT_UNSUPPORTED_SOURCE,
+        "sample-hit source workspace not found; use an absolute path or a sibling workspace path/name "
+        f"that resolves from the current workspace root or its parent ({searched})",
+    )
 
 
 def _resolve_source_artifact_path(
