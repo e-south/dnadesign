@@ -24,23 +24,27 @@ from dnadesign.cruncher.yiu.domain_models import (
     OptimizationObjective,
     OptimizationWinner,
 )
-from dnadesign.cruncher.yiu.spec_models import (
+from dnadesign.cruncher.yiu.spec_input_models import (
     InputSpec,
-    MismatchesSpec,
-    OptimizationSpec,
-    OutputSpec,
+    SampleHitInput,
+    UserSequenceInput,
+    YiuSpecRoot,
+)
+from dnadesign.cruncher.yiu.spec_pwm_models import (
     PwmObjectiveSpec,
     PwmOptimizationSpec,
     PwmSourceSpec,
-    SampleHitInput,
-    UserSequenceInput,
-    YiuPayloadRenderingSpec,
     YiuPwmContextV1,
     YiuPwmMotifInstanceV1,
-    YiuSpecRoot,
 )
-from dnadesign.cruncher.yiu.spec_models import (
+from dnadesign.cruncher.yiu.spec_rendering_models import (
     JunctionOptimizationSpec as JunctionSelectionSpec,
+)
+from dnadesign.cruncher.yiu.spec_rendering_models import (
+    MismatchesSpec,
+    OptimizationSpec,
+    OutputSpec,
+    YiuPayloadRenderingSpec,
 )
 
 __all__ = [

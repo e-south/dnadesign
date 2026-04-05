@@ -16,7 +16,7 @@ from itertools import combinations, product
 from typing import Iterable
 
 from dnadesign.cruncher.yiu.errors import YIU_JUNCTION_INVALID, NoFeasiblePlanError, raise_yiu_error
-from dnadesign.cruncher.yiu.spec_models import JunctionOptimizationSpec, MismatchesSpec
+from dnadesign.cruncher.yiu.spec_rendering_models import JunctionOptimizationSpec, MismatchesSpec
 
 _BASES = ("A", "C", "G", "T")
 

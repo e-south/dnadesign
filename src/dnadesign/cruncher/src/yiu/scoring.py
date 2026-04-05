@@ -15,7 +15,7 @@ import math
 from dataclasses import dataclass
 
 from dnadesign.cruncher.yiu.candidate_generation import CandidatePlan
-from dnadesign.cruncher.yiu.spec_models import YiuPwmMotifInstanceV1
+from dnadesign.cruncher.yiu.spec_pwm_models import YiuPwmMotifInstanceV1
 
 _BASE_INDEX = {"A": 0, "C": 1, "G": 2, "T": 3}
 _LOG_FLOOR = 1e-9

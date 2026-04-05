@@ -16,7 +16,7 @@ from typing import Any, Literal
 from pydantic import Field, model_validator
 
 from dnadesign.cruncher.config.schema_v3 import StrictBaseModel
-from dnadesign.cruncher.yiu.spec_models import YiuPwmMotifInstanceV1
+from dnadesign.cruncher.yiu.spec_pwm_models import YiuPwmMotifInstanceV1
 
 
 class JunctionSelection(StrictBaseModel):

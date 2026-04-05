@@ -25,8 +25,8 @@ from dnadesign.cruncher.yiu.errors import (
     YIU_PWM_CONTEXT_REQUIRED,
     raise_yiu_error,
 )
-from dnadesign.cruncher.yiu.payload_resolution import ResolvedInputPayload
-from dnadesign.cruncher.yiu.spec_models import (
+from dnadesign.cruncher.yiu.input_payload_models import ResolvedInputPayload
+from dnadesign.cruncher.yiu.spec_pwm_models import (
     PwmOptimizationSpec,
     YiuPwmContextV1,
     YiuPwmMotifInstanceV1,
