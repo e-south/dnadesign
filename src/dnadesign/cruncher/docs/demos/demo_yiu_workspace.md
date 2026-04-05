@@ -43,7 +43,7 @@ outputs/example_payload__payload_views.pdf
 
 Use [YIU Artifacts](../reference/yiu_artifacts.md) for the exact emitted files, render-status semantics, and shared `render`/`show` inspection surface.
 
-The checked-in workspace is intentionally user-sequence-only. Sample-hit YIU demos now live beside their source Sample outputs in the monotypic workspaces such as `demo_monotypic_tetr`, where the YIU bundle sits under `outputs/yiu__tetr_monotypic_hit/` and the mirrored operator PDF lands in `outputs/plots/`.
+The checked-in workspace is intentionally user-sequence-only. Sample-hit YIU demos now live beside their source Sample outputs in the monotypic workspaces such as `demo_monotypic_tetr`, where the whole YIU bundle is consolidated under `outputs/plots/yiu__tetr_monotypic_hit/`.
 The workspace still includes a generic local PWM context sidecar under `motifs/example_pwm_context.yaml` for extra experimentation.
 
 If you want a disposable scratch copy instead of the checked-in repo workspace:

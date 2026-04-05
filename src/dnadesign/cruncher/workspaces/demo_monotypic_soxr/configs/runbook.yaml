@@ -101,7 +101,7 @@ runbook:
     - --spec
     - configs/yiu/soxr_monotypic_hit.yiu.yaml
   - id: yiu_render
-    description: Publish the YIU payload bundle under outputs/ and mirror the composite PDF into outputs/plots.
+    description: Publish the YIU payload bundle under outputs/plots without a redundant workspace-level mirror.
     run:
     - yiu
     - render
@@ -115,4 +115,4 @@ runbook:
     - yiu
     - show
     - --bundle
-    - outputs/yiu__soxr_monotypic_hit
+    - outputs/plots/yiu__soxr_monotypic_hit

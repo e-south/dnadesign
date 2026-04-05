@@ -39,6 +39,5 @@ optimization:
         - lexical_stability
 
 output:
-  bundle_dir: outputs/yiu__baer_monotypic_hit
-  published_plot_path: outputs/plots/plot__yiu__baer_monotypic_hit__payload_views.pdf
+  bundle_dir: outputs/plots/yiu__baer_monotypic_hit
   emit_render_jobs_debug: false

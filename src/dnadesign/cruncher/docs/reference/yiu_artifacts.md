@@ -17,7 +17,7 @@ This page is the source of truth for emitted files, render-status semantics, and
 Recommended patterns:
 
 - YIU-only workspace: `outputs/<workflow>/` plus `output.published_plot_path: outputs/<workflow>__payload_views.pdf`
-- Sample-backed workspace: `outputs/yiu__<workflow>/` plus `output.published_plot_path: outputs/plots/plot__yiu__<workflow>__payload_views.pdf`
+- Sample-backed workspace: `outputs/plots/yiu__<workflow>/` with no second workspace-level mirror
 
 Each bundle uses `visual_inventory.json` as the operator-facing render-state record.
 

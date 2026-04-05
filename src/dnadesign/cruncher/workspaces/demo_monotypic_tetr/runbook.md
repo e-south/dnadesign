@@ -44,10 +44,10 @@ Quick smoke path (main lifecycle only):
     cruncher catalog logos --source westmann_tetr_mitomi --set 1 -c "$CONFIG"
     # Export the normalized TetR PWM as a minimal MEME file after the main outputs tree is stable.
     cruncher catalog export-meme --set 1 --source westmann_tetr_mitomi -c "$CONFIG"
-    # Validate and render the sample-backed YIU payload bundle, then inspect the published plot handoff.
+    # Validate and render the sample-backed YIU payload bundle under outputs/plots, then inspect that bundle.
     cruncher yiu validate --spec configs/yiu/tetr_monotypic_hit.yiu.yaml
     cruncher yiu render --spec configs/yiu/tetr_monotypic_hit.yiu.yaml --force-overwrite --emit-renders
-    cruncher yiu show --bundle outputs/yiu__tetr_monotypic_hit
+    cruncher yiu show --bundle outputs/plots/yiu__tetr_monotypic_hit
 
 ### Optional output checks
 
@@ -63,4 +63,4 @@ Quick smoke path (main lifecycle only):
 
     find outputs/artifacts/meme -maxdepth 1 -type f | sort
     find outputs/plots -maxdepth 1 -type f | sort
-    find outputs/yiu__tetr_monotypic_hit -maxdepth 1 -type f | sort
+    find outputs/plots/yiu__tetr_monotypic_hit -maxdepth 1 -type f | sort

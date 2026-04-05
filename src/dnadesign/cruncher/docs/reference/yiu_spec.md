@@ -12,7 +12,7 @@ Use [YIU Workflow](../guides/yiu_workflow.md) for operator flow and visual postu
 ### Scope
 
 - This page owns the input contract, normalization rules, and optimization rules.
-- This page does not own emitted bundle layout, PDF mirroring, or bundle-drift checks.
+- This page does not own emitted bundle layout, optional PDF mirroring, or bundle-drift checks.
 - When you need operator flow, use the workflow guide instead of expanding the schema page.
 
 ### Input-side workspace adjacency
@@ -87,6 +87,10 @@ input:
       source_workspace: demo_monotypic_tetr
       source_artifact: outputs/optimize/tables/elites.parquet
       payload_label: tetr_payload
+
+output:
+  bundle_dir: outputs/plots/yiu__tetr_monotypic_hit
+  emit_render_jobs_debug: false
 ```
 
 ### Contract rules

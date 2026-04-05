@@ -227,28 +227,28 @@ def test_checked_in_yiu_demo_specs_publish_into_outputs_not_bundles() -> None:
             "outputs/example_payload__payload_views.pdf",
         ),
         root / "demo_monotypic_baer" / "configs" / "yiu" / "baer_monotypic_hit.yiu.yaml": (
-            "outputs/yiu__baer_monotypic_hit",
-            "outputs/plots/plot__yiu__baer_monotypic_hit__payload_views.pdf",
+            "outputs/plots/yiu__baer_monotypic_hit",
+            None,
         ),
         root / "demo_monotypic_cpxr" / "configs" / "yiu" / "cpxr_monotypic_hit.yiu.yaml": (
-            "outputs/yiu__cpxr_monotypic_hit",
-            "outputs/plots/plot__yiu__cpxr_monotypic_hit__payload_views.pdf",
+            "outputs/plots/yiu__cpxr_monotypic_hit",
+            None,
         ),
         root / "demo_monotypic_lexa" / "configs" / "yiu" / "lexa_monotypic_hit.yiu.yaml": (
-            "outputs/yiu__lexa_monotypic_hit",
-            "outputs/plots/plot__yiu__lexa_monotypic_hit__payload_views.pdf",
+            "outputs/plots/yiu__lexa_monotypic_hit",
+            None,
         ),
         root / "demo_monotypic_soxr" / "configs" / "yiu" / "soxr_monotypic_hit.yiu.yaml": (
-            "outputs/yiu__soxr_monotypic_hit",
-            "outputs/plots/plot__yiu__soxr_monotypic_hit__payload_views.pdf",
+            "outputs/plots/yiu__soxr_monotypic_hit",
+            None,
         ),
         root / "demo_monotypic_soxs" / "configs" / "yiu" / "soxs_monotypic_hit.yiu.yaml": (
-            "outputs/yiu__soxs_monotypic_hit",
-            "outputs/plots/plot__yiu__soxs_monotypic_hit__payload_views.pdf",
+            "outputs/plots/yiu__soxs_monotypic_hit",
+            None,
         ),
         root / "demo_monotypic_tetr" / "configs" / "yiu" / "tetr_monotypic_hit.yiu.yaml": (
-            "outputs/yiu__tetr_monotypic_hit",
-            "outputs/plots/plot__yiu__tetr_monotypic_hit__payload_views.pdf",
+            "outputs/plots/yiu__tetr_monotypic_hit",
+            None,
         ),
     }
 
@@ -256,9 +256,10 @@ def test_checked_in_yiu_demo_specs_publish_into_outputs_not_bundles() -> None:
         payload = yaml.safe_load(spec_path.read_text())
         output = payload["output"]
         assert output["bundle_dir"] == bundle_dir
-        assert output["published_plot_path"] == published_plot_path
+        assert output.get("published_plot_path") == published_plot_path
         assert not str(output["bundle_dir"]).startswith("bundles/")
-        assert not str(output["published_plot_path"]).startswith("bundles/")
+        if output.get("published_plot_path") is not None:
+            assert not str(output["published_plot_path"]).startswith("bundles/")
 
 
 def test_lexa_cpxr_local_meme_inputs_match_across_workspaces() -> None:

@@ -50,13 +50,12 @@ def render_yiu_spec(
     except Exception:
         remove_managed_path(staged_bundle_dir)
         raise
-    if bundle_preexisted and not emit_renders:
-        remove_managed_path(
-            resolve_published_plot_path(
-                bundle_dir,
-                None if spec.output.published_plot_path is None else str(spec.output.published_plot_path),
-            )
-        )
+    published_plot_path = resolve_published_plot_path(
+        bundle_dir,
+        None if spec.output.published_plot_path is None else str(spec.output.published_plot_path),
+    )
+    if bundle_preexisted:
+        remove_managed_path(published_plot_path)
     if emit_renders:
         render_bundle_views(bundle_dir)
     report = build_validation_report(

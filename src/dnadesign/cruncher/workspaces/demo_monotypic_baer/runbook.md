@@ -42,10 +42,10 @@ Run this single command to do everything below:
     # Occurrence-aware runs write elites_objective_scores.parquet and elites_occurrences.parquet instead of representative-hit tables.
     cruncher runs show outputs -c "$CONFIG"
     cruncher catalog logos --source demo_baer_multiplicity_meme_oops --set 1 -c "$CONFIG"
-    # Validate and render the sample-backed YIU payload bundle, then inspect the published plot handoff.
+    # Validate and render the sample-backed YIU payload bundle under outputs/plots, then inspect that bundle.
     cruncher yiu validate --spec configs/yiu/baer_monotypic_hit.yiu.yaml
     cruncher yiu render --spec configs/yiu/baer_monotypic_hit.yiu.yaml --force-overwrite --emit-renders
-    cruncher yiu show --bundle outputs/yiu__baer_monotypic_hit
+    cruncher yiu show --bundle outputs/plots/yiu__baer_monotypic_hit
 
 ### Optional output checks
 
@@ -60,4 +60,4 @@ Run this single command to do everything below:
     PY
 
     find outputs/plots -maxdepth 1 -type f | sort
-    find outputs/yiu__baer_monotypic_hit -maxdepth 1 -type f | sort
+    find outputs/plots/yiu__baer_monotypic_hit -maxdepth 1 -type f | sort
