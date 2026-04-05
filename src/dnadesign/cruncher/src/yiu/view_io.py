@@ -16,19 +16,17 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_text
+
 
 def write_json_payload(path: Path, payload: object) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    atomic_write_json(path, payload, indent=2, sort_keys=False, allow_nan=False)
     return path
 
 
 def write_jsonl_rows(path: Path, rows: list[dict[str, object]]) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        for row in rows:
-            handle.write(json.dumps(row))
-            handle.write("\n")
+    text = "".join(f"{json.dumps(row, allow_nan=False)}\n" for row in rows)
+    atomic_write_text(path, text)
     return path
 
 

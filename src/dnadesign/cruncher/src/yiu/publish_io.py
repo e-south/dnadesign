@@ -11,8 +11,7 @@ Module Author(s): OpenAI Codex
 
 from __future__ import annotations
 
-import yaml
-
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_yaml
 from dnadesign.cruncher.yiu.bundle_models import PayloadBundleManifest, PayloadViewEntry, PayloadVisualInventory
 from dnadesign.cruncher.yiu.bundle_state import persist_bundle_models
 from dnadesign.cruncher.yiu.publish_layout import PayloadBundleLayout
@@ -58,7 +57,7 @@ def write_debug_render_jobs(*, layout: PayloadBundleLayout, view_entries: list[P
     layout.render_jobs_dir.mkdir(parents=True, exist_ok=True)
     for entry in view_entries:
         job_path = layout.render_jobs_dir / f"{entry.view_id}.job.yaml"
-        job_path.write_text(yaml.safe_dump(build_render_job_payload(entry=entry), sort_keys=False), encoding="utf-8")
+        atomic_write_yaml(job_path, build_render_job_payload(entry=entry), sort_keys=False, default_flow_style=False)
 
 
 __all__ = [

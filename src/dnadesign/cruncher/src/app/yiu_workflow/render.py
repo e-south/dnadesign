@@ -11,9 +11,14 @@ Module Author(s): OpenAI Codex
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
+from dnadesign.cruncher.app.yiu_workflow.staging import (
+    create_bundle_staging_dir,
+    promote_staged_bundle,
+    remove_managed_path,
+)
+from dnadesign.cruncher.yiu.bundle_paths import resolve_published_plot_path
 from dnadesign.cruncher.yiu.bundle_surface import YiuRenderOutcome, load_render_outcome
 from dnadesign.cruncher.yiu.load import load_yiu_spec
 from dnadesign.cruncher.yiu.models.bundle import YiuValidationReport, build_validation_report
@@ -31,12 +36,27 @@ def render_yiu_spec(
     spec, _resolved_spec_path, workspace_root = load_yiu_spec(path)
     normalized = normalize_payload(spec, workspace_root=workspace_root)
     bundle_dir = (workspace_root / spec.output.bundle_dir).resolve()
-    if bundle_dir.exists():
-        if not force_overwrite:
-            raise ValueError(f"YIU bundle directory already exists: {bundle_dir}. Use --force-overwrite to replace it.")
-        shutil.rmtree(bundle_dir)
-    bundle_dir.mkdir(parents=True, exist_ok=True)
-    publish_payload_bundle(spec=spec, normalized=normalized, bundle_dir=bundle_dir)
+    bundle_preexisted = bundle_dir.exists()
+    if bundle_preexisted and not force_overwrite:
+        raise ValueError(f"YIU bundle directory already exists: {bundle_dir}. Use --force-overwrite to replace it.")
+    staged_bundle_dir = create_bundle_staging_dir(bundle_dir)
+    try:
+        publish_payload_bundle(spec=spec, normalized=normalized, bundle_dir=staged_bundle_dir)
+        promote_staged_bundle(
+            staged_bundle_dir=staged_bundle_dir,
+            bundle_dir=bundle_dir,
+            force_overwrite=force_overwrite,
+        )
+    except Exception:
+        remove_managed_path(staged_bundle_dir)
+        raise
+    if bundle_preexisted and not emit_renders:
+        remove_managed_path(
+            resolve_published_plot_path(
+                bundle_dir,
+                None if spec.output.published_plot_path is None else str(spec.output.published_plot_path),
+            )
+        )
     if emit_renders:
         render_bundle_views(bundle_dir)
     report = build_validation_report(

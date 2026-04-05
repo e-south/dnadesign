@@ -20,6 +20,7 @@ import pandas as pd
 import pytest
 import yaml
 
+import dnadesign.cruncher.app.yiu_workflow.render as yiu_workflow_render_module
 import dnadesign.cruncher.yiu.optimizer as yiu_optimizer_module
 import dnadesign.cruncher.yiu.render as yiu_render_module
 from dnadesign.cruncher.app.yiu_workflow.render import render_yiu_spec, render_yiu_spec_outcome
@@ -1574,6 +1575,59 @@ def test_render_yiu_spec_emit_renders_marks_bundle_rendered(tmp_path: Path) -> N
     assert inventory["render_count"] == 3
     assert manifest["render_status"] == "rendered"
     assert (bundle_dir / "payload_views.pdf").exists()
+
+
+def test_render_yiu_spec_force_overwrite_preserves_live_bundle_on_publish_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec())
+
+    bundle_dir, _report = render_yiu_spec(spec_path)
+    manifest_before = _load_json(bundle_dir / "bundle_manifest.json")
+
+    def _raise_publish_failure(*args, **kwargs):
+        raise RuntimeError("synthetic publish failure")
+
+    monkeypatch.setattr(yiu_workflow_render_module, "publish_payload_bundle", _raise_publish_failure)
+
+    with pytest.raises(RuntimeError, match="synthetic publish failure"):
+        render_yiu_spec(spec_path, force_overwrite=True)
+
+    assert bundle_dir.exists()
+    assert _load_json(bundle_dir / "bundle_manifest.json") == manifest_before
+    assert list((workspace / "outputs").glob(".demo_payload.staging.*")) == []
+
+
+def test_render_yiu_spec_force_overwrite_without_emit_renders_cleans_stale_published_plot(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec())
+
+    bundle_dir, _report = render_yiu_spec(spec_path, emit_renders=True)
+    published_plot_path = workspace / "outputs" / "plot__demo_payload__payload_views.pdf"
+
+    assert published_plot_path.exists()
+    assert (bundle_dir / "payload_views.pdf").exists()
+
+    overwritten_bundle_dir, _report = render_yiu_spec(spec_path, force_overwrite=True, emit_renders=False)
+    inventory = _load_json(overwritten_bundle_dir / "visual_inventory.json")
+    manifest = _load_json(overwritten_bundle_dir / "bundle_manifest.json")
+
+    assert overwritten_bundle_dir == bundle_dir
+    assert inventory["render_status"] == "not_requested"
+    assert inventory["render_count"] == 0
+    assert manifest["render_status"] == "not_requested"
+    assert not (bundle_dir / "payload_views.pdf").exists()
+    assert not published_plot_path.exists()
+
+    show_payload = show_yiu_bundle(bundle_dir)
+
+    assert show_payload.render_status == "not_requested"
+    assert show_payload.available_renders == []
+    assert show_payload.published_plot_artifact_path == str(published_plot_path.resolve())
 
 
 def test_render_yiu_spec_emit_renders_persists_failed_render_state(
