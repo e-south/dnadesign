@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/tests/core/test_objective_engine.py
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

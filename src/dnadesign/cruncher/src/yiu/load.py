@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/load.py
 
 Load payload-centric YIU v4 specs and resolve workspace-relative paths.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

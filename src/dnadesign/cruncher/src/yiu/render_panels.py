@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/render_panels.py
 
 Shared YIU helpers for loading view contracts and assembling composite renders.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/visual_foundations.py
 
 Producer-owned style foundations for the payload-centric YIU visual system.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

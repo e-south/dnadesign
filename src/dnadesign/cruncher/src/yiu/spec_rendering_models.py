@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/spec_rendering_models.py
 
 Rendering-facing YIU spec models and cross-field validation rules.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

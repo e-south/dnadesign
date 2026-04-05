@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/scoring.py
 
 PWM-aware scoring primitives for YIU v4 optimization.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

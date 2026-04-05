@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/cli/test_yiu_cli.py
 
 CLI contracts for the payload-centric YIU surface.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

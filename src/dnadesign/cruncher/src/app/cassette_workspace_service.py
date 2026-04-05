@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/cassette_workspace_service.py
 
 Scaffold cassette solve workspaces with deterministic runtime profiles.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -9,7 +9,7 @@ Prefer the focused helper modules for implementation changes:
 - `spec_pwm_models.py`
 - `spec_rendering_models.py`
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

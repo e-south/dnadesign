@@ -8,7 +8,7 @@ integrity.
 Prefer the specialized `view_payload_contracts.py` and
 `view_sequence_contracts.py` modules for new internal imports.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

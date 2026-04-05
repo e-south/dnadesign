@@ -5,7 +5,7 @@ src/dnadesign/contracts/visual/hairpin_topology_v1.py
 
 Shared ssDNA hairpin visual contract for cassette QA rendering.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

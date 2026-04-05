@@ -6,7 +6,7 @@ src/dnadesign/baserender/tests/test_cassette_contract_jobs.py
 Tests for direct JSON/JSONL cassette visual-contract rendering through the
 public baserender job surface.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

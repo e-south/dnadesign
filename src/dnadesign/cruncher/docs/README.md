@@ -58,7 +58,6 @@ YIU keeps its operator flow, schema rules, emitted bundle, and visual system on 
 - [YIU Workflow](guides/yiu_workflow.md)
 - [YIU Spec Reference](reference/yiu_spec.md)
 - [YIU Artifacts](reference/yiu_artifacts.md)
-- [YIU Visual System](reference/yiu_visual_system.md)
 
 #### Run Studies and Portfolio Aggregation
 - [Studies](guides/studies.md)
@@ -79,7 +78,6 @@ YIU keeps its operator flow, schema rules, emitted bundle, and visual system on 
 - [Cassette Artifacts](reference/cassette_artifacts.md)
 - [YIU Spec Reference](reference/yiu_spec.md)
 - [YIU Artifacts](reference/yiu_artifacts.md)
-- [YIU Visual System](reference/yiu_visual_system.md)
 - [Glossary](reference/glossary.md)
 - [Runbook Step Reference](reference/runbook_steps.md)
 - [Doc Conventions](reference/doc_conventions.md)

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/view_sequence_contracts.py
 
 Sequence-evidence contract shells for split and assembled YIU views.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

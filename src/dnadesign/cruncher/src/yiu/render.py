@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/render.py
 
 Run published BaseRender jobs for payload-centric YIU bundles.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

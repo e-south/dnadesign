@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/view_sequence_metadata.py
 
 Metadata policy for split and assembled payload sequence-view contracts.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

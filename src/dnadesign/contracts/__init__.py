@@ -5,7 +5,7 @@ src/dnadesign/contracts/__init__.py
 
 Neutral cross-tool contract exports.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

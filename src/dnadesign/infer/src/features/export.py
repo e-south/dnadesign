@@ -5,7 +5,7 @@ src/dnadesign/infer/src/features/export.py
 
 Deterministic OPAL-ready matrix export for Evo2 promoter feature bundles.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

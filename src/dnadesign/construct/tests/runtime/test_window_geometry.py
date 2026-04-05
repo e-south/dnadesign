@@ -5,7 +5,7 @@ src/dnadesign/construct/tests/runtime/test_window_geometry.py
 
 Direct tests for construct window-geometry normalization helpers.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

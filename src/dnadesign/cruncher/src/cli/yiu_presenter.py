@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/cli/yiu_presenter.py
 
 Presentation helpers for the YIU CLI surface.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

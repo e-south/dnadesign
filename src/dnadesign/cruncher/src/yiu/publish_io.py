@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/publish_io.py
 
 Filesystem write helpers for payload-centric YIU publication.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

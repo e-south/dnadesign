@@ -5,7 +5,7 @@ src/dnadesign/construct/tests/runtime/test_output_store.py
 
 Direct tests for construct output-store helpers.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/bundle_paths.py
 
 Shared bundle-path resolution for YIU publication, rendering, and inspection.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

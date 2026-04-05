@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/bio/__init__.py
 
 Shared biology helpers reused across explicit Cruncher workflow families.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

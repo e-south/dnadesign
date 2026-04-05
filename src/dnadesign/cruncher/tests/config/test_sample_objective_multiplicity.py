@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/tests/config/test_sample_objective_multiplicity.py
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

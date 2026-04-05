@@ -21,7 +21,6 @@ study:
   - id_prefix: L
     factors:
       sample.sequence_length:
-      - 17
       - 19
       - 21
       - 23

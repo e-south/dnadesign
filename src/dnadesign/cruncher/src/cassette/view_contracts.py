@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/cassette/view_contracts.py
 
 Neutral shared-view publication for cassette explicit and solve workflows.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

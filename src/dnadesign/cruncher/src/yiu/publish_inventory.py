@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/publish_inventory.py
 
 Normalized-payload, inventory, and manifest builders for YIU publication.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

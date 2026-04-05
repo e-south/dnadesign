@@ -5,7 +5,7 @@ src/dnadesign/contracts/tests/test_visual_contracts.py
 
 Shared cassette visual-contract validation tests.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

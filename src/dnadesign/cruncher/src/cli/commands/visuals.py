@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/cli/commands/visuals.py
 
 Thin Cruncher wrapper over the public BaseRender job API.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

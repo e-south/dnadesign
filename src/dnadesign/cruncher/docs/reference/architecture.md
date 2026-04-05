@@ -125,6 +125,11 @@ Core contract:
 - focused input, PWM, and rendering validators live in `yiu/spec_input_models.py`, `yiu/spec_pwm_models.py`, and `yiu/spec_rendering_models.py`
 - payload normalization for `user_sequence` and `sample_hit`
 - public input-resolution orchestration lives in `yiu/payload_resolution.py`, while sample-hit artifact IO stays isolated in `yiu/sample_hit_sources.py`
+- public PWM-resolution orchestration lives in `yiu/pwm_context.py`
+- inline/file PWM source dispatch lives in `yiu/pwm_context_sources.py`
+- sample-backed PWM-context orchestration lives in `yiu/pwm_context_sample_context.py`
+- selected-occurrence parquet loading lives in `yiu/pwm_context_sample_occurrences.py`
+- sample-backed motif-instance materialization lives in `yiu/pwm_context_sample_motifs.py`
 - exhaustive optimization, split, display-orientation, and junction derivation
 - shared view fragments live in `yiu/view_common.py`
 - shared manifest/inventory/normalized load-persist helpers live in `yiu/bundle_state.py`
@@ -138,11 +143,12 @@ Core contract:
 - payload bundle publication orchestration lives in `yiu/publish.py`
 - payload bundle filesystem writes and debug-job emission live in `yiu/publish_io.py`
 - bundle layout and artifact-path planning live in `yiu/publish_layout.py`
-- canonical view-entry/render-job planning lives in `yiu/view_catalog.py`
+- view-entry/render-job planning lives in `yiu/view_catalog.py`
 - normalized-payload, inventory, and manifest assembly lives in `yiu/publish_inventory.py`
 - display-title policy lives in `yiu/view_styles.py`
 - producer-owned YIU visual foundations live in `yiu/visual_foundations.py`
-- named visual directions and style profiles live in `yiu/visual_system.py`
+- named visual-direction deltas live in `yiu/visual_directions.py`
+- view registry and style profiles live in `yiu/visual_system.py`
 - the named YIU visual system is `bench_strip`, with `evidence_ribbon` for payload truth and `operator_strip` for assembly-oriented views
 - payload mismatch/motif/meta shaping lives in `yiu/view_payload_content.py`
 - payload-view contract shells live in `yiu/view_payload_contracts.py`
@@ -202,7 +208,7 @@ Current Cruncher handoff for `elites_showcase.*` and `chain_trajectory_video.mp4
    - or equivalent in-memory `Record` objects through baserender public APIs
 3. Baserender validates contracts, performs layout/rendering, and emits assets.
 
-For payload-centric YIU, Cruncher publishes shared `yiu_payload_visual_v1` contracts only. Downstream, baserender keeps `yiu_payload_visual_projection.py` as a compatibility facade while `yiu_payload_visual_v1.py` owns public adapter orchestration, `yiu_payload_sequence_projection.py` owns sequence-evidence projection, and `yiu_payload_motif_overlay.py` owns payload motif `Feature`/`Effect` assembly.
+For payload-centric YIU, Cruncher publishes shared `yiu_payload_visual_v1` contracts only. Downstream, baserender keeps the adapter split explicit: `yiu_payload_visual_v1.py` owns public adapter orchestration, `yiu_payload_sequence_projection.py` owns sequence-evidence projection, and `yiu_payload_motif_overlay.py` owns payload motif `Feature`/`Effect` assembly.
 
 For `chain_trajectory_video.mp4`, Cruncher first resolves selected-chain trajectory rows and sampled frame indices, then writes temporary record rows and passes a strict sequence-rows video job contract to baserender.
 
@@ -358,7 +364,7 @@ Cassette runs are intentionally isolated from `sample` runs:
 A typical **YIU** run directory contains:
 
 - `bundle_manifest.json` - payload bundle metadata under `split_yiu_payload_bundle_v4`
-- `normalized_payload.json` - canonical normalized payload object
+- `normalized_payload.json` - normalized payload object
 - `visual_inventory.json` - single bundle-local visual inventory and render-truth index
 - `payload_view.json` - pure payload contract with optional PWM motif layers
 - `split_payload_view.json` - split payload contract rows (`split_payload_left`, then `split_payload_right`)

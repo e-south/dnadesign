@@ -67,7 +67,7 @@ outputs/<workflow>/
 - render status
 - one operator-facing composite PDF under `payload_views.pdf`
 
-`normalized_payload.json` is the canonical internal object serialized for inspection and downstream validation.
+`normalized_payload.json` is the normalized internal object serialized for inspection and downstream validation.
 
 Published contract paths:
 

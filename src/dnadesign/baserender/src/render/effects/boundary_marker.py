@@ -5,7 +5,7 @@ src/dnadesign/baserender/src/render/effects/boundary_marker.py
 
 Boundary-marker drawer for strand-local nick/cut annotations.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/contracts/visual/sequence_evidence_meta.py
 
 Shared helpers for producer metadata attached to sequence-evidence contracts.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

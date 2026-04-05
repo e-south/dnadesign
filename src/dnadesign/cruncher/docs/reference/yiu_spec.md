@@ -15,7 +15,10 @@ Use [YIU Workflow](../guides/yiu_workflow.md) for operator flow and visual postu
 - This page does not own emitted bundle layout, PDF mirroring, or bundle-drift checks.
 - When you need operator flow, use the workflow guide instead of expanding the schema page.
 
-### Recommended workspace layout
+### Input-side workspace adjacency
+
+This page only names the local input-side files that commonly sit next to a YIU spec.
+Bundle layout, rendered PDFs, and operator inspection surfaces live in [YIU Artifacts](yiu_artifacts.md).
 
 ```text
 configs/
@@ -24,9 +27,6 @@ configs/
     <workflow>.yiu.yaml
 motifs/
   <workflow>_pwm_context.yaml   # optional
-outputs/
-  <workflow>/
-  <workflow>__payload_views.pdf
 ```
 
 ### Root contract
@@ -100,7 +100,7 @@ input:
 - `optimization.mismatches.strand_mode` must be `per_position`
 - `output.bundle_dir` is workspace-relative and required
 - `output.published_plot_path` is workspace-relative when present and must point to a `.pdf`
-- YIU always publishes three canonical view contracts; there is no opt-out flag
+- YIU always publishes three fixed view contracts; there is no opt-out flag
 - YIU does not accept legacy state-graph fields, owners, enzymes, or external-part directives
 
 ### Input normalization
@@ -137,6 +137,7 @@ Relative `source_artifact_path` values are resolved inside the current workspace
 
 - `yiu/spec_models.py` is the stable public schema facade; focused input, PWM, and rendering validators live in `yiu/spec_input_models.py`, `yiu/spec_pwm_models.py`, and `yiu/spec_rendering_models.py`.
 - `yiu/payload_resolution.py` is the stable public input-resolution seam; sample-hit artifact lookup and table loading live in `yiu/sample_hit_sources.py`.
+- `yiu/pwm_context.py` is the stable public PWM-resolution seam; inline/file dispatch lives in `yiu/pwm_context_sources.py`, sample-context orchestration lives in `yiu/pwm_context_sample_context.py`, occurrence-table loading lives in `yiu/pwm_context_sample_occurrences.py`, and motif-instance materialization lives in `yiu/pwm_context_sample_motifs.py`.
 - Keep schema and source-resolution changes inside those focused helpers unless the public facade contract itself is changing.
 
 ### Junction and PWM rules
@@ -151,16 +152,16 @@ Relative `source_artifact_path` values are resolved inside the current workspace
 - PWM mode `use_if_available` records a deterministic fallback reason when context is unavailable
 - PWM mode `require` fails fast when context is missing, malformed, or ambiguous
 
-### Published metadata
+### Derived normalized payload fields
 
 Every valid spec derives:
 
-- canonical payload forward/aligned-complement/reverse-complement sequences
+- payload forward/aligned-complement/reverse-complement sequences
 - one internal `junction` window with exact left body, right body, payload-forward sequence, and selected complement sequence
 - a normalized mismatch plan with one mutated strand per mismatch position
 - PWM context metadata when available
 - top-level optimization decision fields used by `validate`, `render`, and `show`
 
-The derived split-row publication exposes row-2 display truth separately from the canonical normalized payload object. The payload view uses `yiu_payload_visual_v1` so PWM motif layers can be added without changing the split/assembled view contracts.
+The derived split-row publication exposes row-2 display truth separately from the normalized payload object. The payload view uses `yiu_payload_visual_v1` so PWM motif layers can be added without changing the split/assembled view contracts.
 
 Use [YIU Workflow](../guides/yiu_workflow.md) for execution guidance and [YIU Artifacts](yiu_artifacts.md) for the emitted bundle contracts.

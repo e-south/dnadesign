@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/normalizer.py
 
 Normalize YIU v4 specs into deterministic payload bundles.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

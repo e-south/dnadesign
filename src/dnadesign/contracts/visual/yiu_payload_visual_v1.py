@@ -5,7 +5,7 @@ src/dnadesign/contracts/visual/yiu_payload_visual_v1.py
 
 Shared YIU payload visual contract with optional PWM motif layers.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

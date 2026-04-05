@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/bio/enzymes.py
 
 Shared recognition-site validation and duplex-cut geometry helpers.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

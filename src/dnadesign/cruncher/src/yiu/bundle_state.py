@@ -6,7 +6,7 @@ src/dnadesign/cruncher/src/yiu/bundle_state.py
 Shared bundle-state load/persist helpers for YIU publication, rendering, and
 inspection.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

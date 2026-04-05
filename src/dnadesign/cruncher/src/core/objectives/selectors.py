@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/src/core/objectives/selectors.py
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

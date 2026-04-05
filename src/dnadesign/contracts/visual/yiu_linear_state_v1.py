@@ -5,7 +5,7 @@ src/dnadesign/contracts/visual/yiu_linear_state_v1.py
 
 Shared YIU linear-state visual contract.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

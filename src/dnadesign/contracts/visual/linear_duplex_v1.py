@@ -5,7 +5,7 @@ src/dnadesign/contracts/visual/linear_duplex_v1.py
 
 Shared linear duplex visual contract for cassette QA rendering.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

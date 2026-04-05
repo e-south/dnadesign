@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/input_payload_models.py
 
 Resolved input payload models for payload-centric YIU workflows.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

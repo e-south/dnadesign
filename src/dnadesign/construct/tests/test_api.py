@@ -5,7 +5,7 @@ src/dnadesign/construct/tests/test_api.py
 
 Public API boundary tests for construct.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

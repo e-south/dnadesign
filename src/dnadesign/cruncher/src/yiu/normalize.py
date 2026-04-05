@@ -6,7 +6,7 @@ src/dnadesign/cruncher/src/yiu/normalize.py
 Compatibility wrapper for YIU v4 normalization.
 Prefer `dnadesign.cruncher.yiu.normalizer`.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

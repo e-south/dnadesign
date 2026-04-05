@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/docs/test_yiu_demo_workspace_contracts.py
 
 Checked-in demo workspace contracts for payload-centric YIU docs surfaces.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

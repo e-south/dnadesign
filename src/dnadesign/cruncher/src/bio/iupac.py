@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/bio/iupac.py
 
 Shared DNA/IUPAC normalization and matching helpers.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

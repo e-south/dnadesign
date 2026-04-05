@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/yiu_workflow/staging.py
 
 Staging helpers for payload-centric YIU bundle publication.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

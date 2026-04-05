@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/domain_models.py
 
 Pure-domain models for normalized YIU payloads and optimization outcomes.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/bundle_surface.py
 
 Shared bundle-artifact surfaces for YIU app and CLI boundaries.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

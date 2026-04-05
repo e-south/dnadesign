@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/sample_hit_sources.py
 
 Sample-hit payload source resolution helpers for payload-centric YIU workflows.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

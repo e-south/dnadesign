@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/spec_common.py
 
 Shared validation helpers for payload-centric YIU spec models.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

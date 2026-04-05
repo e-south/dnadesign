@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/view_styles.py
 
 Display-title and style policy for payload-centric YIU views.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/baserender/src/adapters/hairpin_topology_v1.py
 
 Adapter from shared hairpin-topology cassette contracts to baserender Record v1.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

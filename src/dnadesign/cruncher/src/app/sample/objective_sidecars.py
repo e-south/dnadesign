@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/sample/objective_sidecars.py
 
 Persist occurrence-aware objective sidecars for sample runs.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

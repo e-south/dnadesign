@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/yiu_workflow/render.py
 
 Render payload-centric YIU bundles from specs.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/candidate_generation.py
 
 Deterministic candidate enumeration for YIU v4 optimization.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

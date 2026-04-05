@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/__init__.py
 
 Public payload-centric YIU workflow contracts for Cruncher.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -111,3 +111,9 @@ def test_reference_and_yiu_integration_docs_cover_payload_visual_adapter_surface
     assert "evidence_ribbon" in yiu
     assert "operator_strip" in yiu
     assert "producer-side visual language is owned by Cruncher" in yiu
+    assert "Do not reintroduce an intermediate compatibility shim" in yiu
+
+
+def test_yiu_payload_visual_projection_shim_stays_removed() -> None:
+    shim = _pkg_root() / "src" / "adapters" / "yiu_payload_visual_projection.py"
+    assert not shim.exists()

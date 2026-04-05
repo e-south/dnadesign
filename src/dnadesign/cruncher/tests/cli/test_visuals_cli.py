@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/cli/test_visuals_cli.py
 
 CLI contract tests for the generic Cruncher visual wrapper over BaseRender.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -65,7 +65,10 @@ def test_visuals_validate_and_run_delegate_through_public_baserender_surface(tmp
             "state_id": "circularized_payload_candidate",
             "topology_kind": "circular_duplex",
             "sequence": "CCGATGTCCCTATCAGTGATAGAGAGGGGGGGGGGGGCCTCAGCCCGCTGA",
-            "segments": [],
+            "segments": [
+                {"segment_id": "payload", "state_start": 0, "state_end": 15},
+                {"segment_id": "retained", "state_start": 15, "state_end": 51},
+            ],
             "annotations": [],
             "cuts": [],
             "junctions": [{"id": "junction", "join_index": 15}],

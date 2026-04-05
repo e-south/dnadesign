@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/sample/random_baseline.py
 
 Random-baseline artifact writers for sample runs.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/render_execution.py
 
 Panel execution and output publication helpers for payload-centric YIU bundles.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

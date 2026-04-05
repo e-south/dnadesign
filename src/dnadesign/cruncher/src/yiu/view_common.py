@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/view_common.py
 
 Shared contract fragments for payload-centric YIU view builders.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

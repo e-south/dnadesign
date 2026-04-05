@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/workspaces/families.py
 
 Typed workflow-family registration for family-aware workspace discovery and docs.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

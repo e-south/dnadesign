@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/test_dataset_write_session_module.py
 
 Layout contract tests for Dataset write-session decomposition.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

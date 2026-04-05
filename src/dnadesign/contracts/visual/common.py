@@ -5,7 +5,7 @@ src/dnadesign/contracts/visual/common.py
 
 Shared model helpers for cassette visual contracts.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

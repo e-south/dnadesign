@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/publish.py
 
 Publish YIU v4 bundles and BaseRender-ready view contracts.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

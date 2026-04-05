@@ -8,7 +8,7 @@ Use this guide for command flow and operator posture. Use [YIU Spec Reference](.
 
 The public lane is:
 
-`input payload -> normalized payload -> optimized junction/mismatch plan -> canonical bundle -> BaseRender`
+`input payload -> normalized payload -> optimized junction/mismatch plan -> published bundle -> BaseRender`
 
 This page is the operator route map, not the schema definition. Keep emitted-file details in [YIU Artifacts](../reference/yiu_artifacts.md), input rules in [YIU Spec Reference](../reference/yiu_spec.md), and layout posture in [YIU Visual System](../reference/yiu_visual_system.md).
 
@@ -34,7 +34,7 @@ Use the shortest path that matches your job:
 
 1. [YIU Workspace Demo](../demos/demo_yiu_workspace.md) for the checked-in workspace and machine runbook.
 2. `cruncher yiu validate` when you only need schema and payload-plan verification.
-3. `cruncher yiu render --emit-renders` when you need the canonical bundle plus the composite operator PDF.
+3. `cruncher yiu render --emit-renders` when you need the published bundle plus the composite operator PDF.
 4. `cruncher yiu show` when you need one fail-fast inspection surface for manifest, inventory, payload, and render integrity.
 
 The checked-in reference workspace lives at `src/dnadesign/cruncher/workspaces/demo_yiu_payload`.
@@ -50,11 +50,7 @@ Both inputs normalize into one payload object and publish exactly three views:
 - `split_payload`
 - `assembled_payload`
 
-Row 1 shows the selected payload strand, selected complement strand, optional PWM motif layers, and mismatch annotations.
-
-Row 2 shows the two inward-facing post-BsmBI split fragments built from the selected 4 nt junction window.
-
-Row 3 shows those fragments reassembled back into the selected payload order.
+Contract-level row semantics for those three views live in [YIU Artifacts](../reference/yiu_artifacts.md) and [YIU Visual System](../reference/yiu_visual_system.md) so the operator guide does not duplicate contract prose.
 
 The public contract is `split_yiu_payload_rendering_v4`.
 
@@ -108,18 +104,19 @@ The three-view composite follows one explicit visual system:
 
 `show` is fail-fast on bundle drift: missing published view contracts, manifest/inventory disagreements, payload-view motif drift, a `rendered` bundle with a missing `payload_views.pdf`, or a configured published plot path that does not exist are treated as bundle corruption.
 
-`cruncher yiu render --spec <workflow>.yiu.yaml --emit-renders` validates the spec, writes the payload bundle under `output.bundle_dir`, renders one composite `payload_views.pdf` page with the three canonical panels, mirrors that PDF to `output.published_plot_path` when configured, and updates `visual_inventory.json` in the same bundle directory.
+`cruncher yiu render --spec <workflow>.yiu.yaml --emit-renders` validates the spec, writes the payload bundle under `output.bundle_dir`, renders one composite `payload_views.pdf` page with the three standard panels, mirrors that PDF to `output.published_plot_path` when configured, and updates `visual_inventory.json` in the same bundle directory.
 
-The split middle row renders `split_payload_left` before `split_payload_right`. Each panel shows the retained post-digestion fragment, its inward-facing sticky end, selected-versus-canonical sticky-end metadata, the reverse-complemented payload-body slice, and optional ghosted excision context.
+The split middle row renders `split_payload_left` before `split_payload_right`. Each panel shows the retained post-digestion fragment, its inward-facing sticky end, selected-versus-reference sticky-end metadata, the reverse-complemented payload-body slice, and optional ghosted excision context.
 
 The assembled payload returns to original payload order. It publishes one explicit `junction_span` in payload coordinates and does not use a seam or ligation-boundary surrogate in the operator-facing contract.
 
 ### Maintainer boundaries
 
-Keep this guide operator-first. The canonical module ownership map lives in [Architecture](../reference/architecture.md).
+Keep this guide operator-first. The authoritative module ownership map lives in [Architecture](../reference/architecture.md).
 
 At the tool boundary, YIU publishes contracts and jobs; `baserender` consumes those contracts through its public API. Cross-tool integrations should not import `dnadesign.baserender.src.*`.
 Keep schema and source-resolution edits narrow: `yiu/spec_models.py` and `yiu/payload_resolution.py` stay public facades, while the detailed validators and sample-hit artifact IO helpers live behind those seams.
+The PWM resolver follows the same pattern: `yiu/pwm_context.py` stays the public seam, `yiu/pwm_context_sources.py` owns inline/file dispatch, and `yiu/pwm_context_sample_context.py` orchestrates sample-backed loading through the focused `yiu/pwm_context_sample_occurrences.py` and `yiu/pwm_context_sample_motifs.py` helpers.
 
 ### Related docs
 

@@ -5,7 +5,7 @@ src/dnadesign/baserender/src/adapters/yiu_payload_motif_overlay.py
 
 Motif-overlay assembly helpers for YIU payload visual contracts.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

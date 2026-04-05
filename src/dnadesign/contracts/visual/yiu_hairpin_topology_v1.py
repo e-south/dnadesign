@@ -5,7 +5,7 @@ src/dnadesign/contracts/visual/yiu_hairpin_topology_v1.py
 
 Shared YIU hairpin-topology visual contract.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

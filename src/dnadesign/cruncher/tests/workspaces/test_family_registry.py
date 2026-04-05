@@ -6,7 +6,7 @@ src/dnadesign/cruncher/tests/workspaces/test_family_registry.py
 Contracts for typed workflow-family registration and family-aware workspace
 discovery.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

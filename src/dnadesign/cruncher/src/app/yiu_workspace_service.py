@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/yiu_workspace_service.py
 
 Scaffold the payload-centric YIU workspace.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/usr/src/dataset_write_session.py
 
 Explicit single-lock write session for producer-style dataset mutations.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

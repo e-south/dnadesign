@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/cli/commands/yiu.py
 
 CLI entrypoints for the payload-centric YIU workflow family.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

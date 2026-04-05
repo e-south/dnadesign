@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/models/__init__.py
 
 Payload-centric YIU v4 model exports.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

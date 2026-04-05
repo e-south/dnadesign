@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/tests/cli/test_sample_multiplicity_smoke.py
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

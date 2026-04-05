@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/spec_input_models.py
 
 Input-facing YIU spec models and validation rules.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

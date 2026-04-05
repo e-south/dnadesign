@@ -5,7 +5,7 @@ src/dnadesign/construct/src/output_store.py
 
 Construct registry and output persistence helpers.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

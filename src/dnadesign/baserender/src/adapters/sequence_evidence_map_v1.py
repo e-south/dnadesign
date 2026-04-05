@@ -5,7 +5,7 @@ src/dnadesign/baserender/src/adapters/sequence_evidence_map_v1.py
 
 Adapter from shared sequence-evidence contracts to baserender Record v1.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/test_merge_overlay_carry.py
 
 Contracts for explicit overlay carry during USR maintenance merges.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

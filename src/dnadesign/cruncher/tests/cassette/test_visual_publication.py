@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/cassette/test_visual_publication.py
 
 End-to-end publication tests for cassette view contracts and baserender jobs.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

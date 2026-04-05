@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/bsmbi.py
 
 Shared BsmBI helpers for payload-centric YIU rendering.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

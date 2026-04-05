@@ -6,7 +6,7 @@ src/dnadesign/cruncher/src/yiu/render_plan.py
 Render preflight, runtime loading, and plan models for payload-centric YIU
 bundles.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

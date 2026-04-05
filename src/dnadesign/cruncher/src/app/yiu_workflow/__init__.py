@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/yiu_workflow/__init__.py
 
 Payload-centric YIU workflow validation, publication, and inspection.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

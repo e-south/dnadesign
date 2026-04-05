@@ -5,7 +5,7 @@ src/dnadesign/contracts/visual/yiu_topology_cartoon_v1.py
 
 Shared YIU topology-cartoon visual contract.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

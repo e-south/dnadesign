@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/tests/app/test_sample_runtime_capabilities.py
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

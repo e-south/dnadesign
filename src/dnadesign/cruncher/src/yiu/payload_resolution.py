@@ -7,7 +7,7 @@ Resolve YIU payload sequences from direct input or Sample hit artifacts.
 This module is the public orchestration seam; sample-hit IO details live in
 `sample_hit_sources.py`.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -11,15 +11,26 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 
 def _violations_for_tool(tool_dir: Path) -> list[str]:
     violations: list[str] = []
     for path in sorted(tool_dir.rglob("*.py")):
-        text = path.read_text()
-        if "dnadesign.baserender.src." in text:
-            violations.append(str(path))
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        matches: list[str] = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.startswith("dnadesign.baserender.src."):
+                        matches.append(alias.name)
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                if module.startswith("dnadesign.baserender.src."):
+                    matches.append(module)
+        if matches:
+            violations.append(f"{path}: {sorted(set(matches))}")
     return violations
 
 

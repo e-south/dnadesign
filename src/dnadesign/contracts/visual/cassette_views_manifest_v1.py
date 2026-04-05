@@ -5,7 +5,7 @@ src/dnadesign/contracts/visual/cassette_views_manifest_v1.py
 
 Discovery manifest for cassette visual-contract bundles.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

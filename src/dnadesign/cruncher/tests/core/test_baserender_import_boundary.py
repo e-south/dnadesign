@@ -39,4 +39,4 @@ def test_yiu_visual_system_is_producer_local() -> None:
     file_path = _package_root() / "src" / "yiu" / "visual_system.py"
     text = file_path.read_text()
     assert "dnadesign.baserender" not in text
-    assert "visual_foundations" in text
+    assert "visual_directions" in text

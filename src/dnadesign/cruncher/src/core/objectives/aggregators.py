@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/src/core/objectives/aggregators.py
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

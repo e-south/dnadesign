@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/view_payload_content.py
 
 Payload-view content policy for payload-centric YIU bundles.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

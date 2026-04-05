@@ -5,7 +5,7 @@ src/dnadesign/infer/src/features/context.py
 
 Sequence-context resolution for Evo2 promoter feature extraction.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

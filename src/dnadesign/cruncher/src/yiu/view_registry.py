@@ -6,7 +6,7 @@ src/dnadesign/cruncher/src/yiu/view_registry.py
 Canonical view registry for payload-centric YIU bundle publication and render
 planning.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

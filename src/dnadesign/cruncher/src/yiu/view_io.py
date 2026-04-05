@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/view_io.py
 
 Shared JSON/JSONL helpers for published YIU view contracts.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

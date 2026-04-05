@@ -5,7 +5,7 @@ src/dnadesign/baserender/src/adapters/yiu_topology_cartoon_v1.py
 
 Adapter from YIU topology-cartoon contracts to baserender Record v1.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/docs/test_yiu_reference_docs.py
 
 Reference-page contracts for payload-centric YIU docs surfaces.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -29,6 +29,11 @@ def test_yiu_spec_reference_stays_schema_scoped() -> None:
     assert "Ambiguous or missing sources fail fast." in spec_ref
     assert "`yiu/spec_models.py` is the stable public schema facade" in spec_ref
     assert "`yiu/payload_resolution.py` is the stable public input-resolution seam" in spec_ref
+    assert "`yiu/pwm_context.py` is the stable public PWM-resolution seam" in spec_ref
+    assert "`yiu/pwm_context_sources.py`" in spec_ref
+    assert "`yiu/pwm_context_sample_context.py`" in spec_ref
+    assert "`yiu/pwm_context_sample_occurrences.py`" in spec_ref
+    assert "`yiu/pwm_context_sample_motifs.py`" in spec_ref
 
 
 def test_yiu_artifacts_reference_stays_bundle_scoped() -> None:
@@ -59,4 +64,11 @@ def test_yiu_architecture_names_boundary_seams() -> None:
     assert "`yiu/spec_input_models.py`, `yiu/spec_pwm_models.py`, and `yiu/spec_rendering_models.py`" in architecture
     assert "`yiu/payload_resolution.py`" in architecture
     assert "`yiu/sample_hit_sources.py`" in architecture
-    assert "named visual directions and style profiles live in `yiu/visual_system.py`" in architecture
+    assert "`yiu/pwm_context.py`" in architecture
+    assert "`yiu/pwm_context_sources.py`" in architecture
+    assert "`yiu/pwm_context_sample_context.py`" in architecture
+    assert "`yiu/pwm_context_sample_occurrences.py`" in architecture
+    assert "`yiu/pwm_context_sample_motifs.py`" in architecture
+    assert "named visual-direction deltas live in `yiu/visual_directions.py`" in architecture
+    assert "view registry and style profiles live in `yiu/visual_system.py`" in architecture
+    assert "`yiu_payload_visual_v1.py` owns public adapter orchestration" in architecture

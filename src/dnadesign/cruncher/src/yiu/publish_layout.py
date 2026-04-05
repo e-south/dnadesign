@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/publish_layout.py
 
 Bundle layout helpers for YIU payload publication.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -64,7 +64,7 @@ Adapter responsibilities stay split on purpose:
 - `yiu_payload_visual_v1.py` orchestrates the public adapter and merges the base sequence projection with motif overlay output.
 - `yiu_payload_sequence_projection.py` owns the YIU-to-`sequence_evidence_map_v1` translation and should remain free of motif rendering concerns.
 - `yiu_payload_motif_overlay.py` owns motif feature/effect assembly and tag-label enrichment only.
-- `yiu_payload_visual_projection.py` is a compatibility facade for callers that need the two helper builders without importing the underlying modules directly.
+- Keep those responsibilities direct. Do not reintroduce an intermediate compatibility shim over the helper modules.
 
 ## Published bundle surface
 

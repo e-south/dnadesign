@@ -6,7 +6,7 @@ src/dnadesign/baserender/src/render/topology_cartoon.py
 QA-oriented topology-cartoon renderer for YIU circular, branched, and retained
 states.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

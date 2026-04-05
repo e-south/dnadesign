@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/yiu/test_payload_rendering.py
 
 Runtime contracts for the payload-centric YIU v4 lane.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -177,17 +177,7 @@ def _rounded_pwm_rows(preferred_base: str, *, width: int = 4) -> list[list[float
 
 
 def _canonical_tetr_pwm_rows() -> list[list[float]]:
-    path = (
-        Path(__file__).resolve().parents[2]
-        / "workspaces"
-        / "demo_monotypic_tetr"
-        / ".cruncher"
-        / "demo_monotypic_tetr"
-        / "normalized"
-        / "motifs"
-        / "westmann_tetr_mitomi"
-        / "tetR.json"
-    )
+    path = Path(__file__).resolve().parents[1] / "fixtures" / "tetr_pwm_rows.json"
     return json.loads(path.read_text(encoding="utf-8"))["matrix"]
 
 
@@ -240,10 +230,7 @@ def _tetr_pwm_context() -> dict[str, object]:
                 },
                 "provenance": {
                     "source_kind": "file",
-                    "source_ref": (
-                        "../demo_monotypic_tetr/.cruncher/demo_monotypic_tetr/normalized/motifs/"
-                        "westmann_tetr_mitomi/tetR.json"
-                    ),
+                    "source_ref": "tests/fixtures/tetr_pwm_rows.json",
                 },
             }
         ],

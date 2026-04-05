@@ -6,7 +6,7 @@ src/dnadesign/baserender/tests/test_yiu_contract_jobs.py
 Tests for direct YIU evidence-contract rendering through the public baserender
 job surface.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -22,7 +22,7 @@ import pytest
 import dnadesign.baserender as baserender
 from dnadesign.baserender.src.adapters.sequence_evidence_map_v1 import SequenceEvidenceMapV1Adapter
 from dnadesign.baserender.src.adapters.yiu_payload_motif_overlay import build_motif_overlay
-from dnadesign.baserender.src.adapters.yiu_payload_visual_projection import build_sequence_evidence_map_contract
+from dnadesign.baserender.src.adapters.yiu_payload_sequence_projection import build_sequence_evidence_map_contract
 from dnadesign.baserender.src.adapters.yiu_payload_visual_v1 import YiuPayloadVisualV1Adapter
 from dnadesign.baserender.src.config import resolve_style
 from dnadesign.baserender.src.core import RenderingError
@@ -40,18 +40,7 @@ def _write_json(path: Path, payload: object) -> Path:
 
 
 def _canonical_tetr_pwm_rows() -> list[list[float]]:
-    path = (
-        Path(__file__).resolve().parents[2]
-        / "cruncher"
-        / "workspaces"
-        / "demo_monotypic_tetr"
-        / ".cruncher"
-        / "demo_monotypic_tetr"
-        / "normalized"
-        / "motifs"
-        / "westmann_tetr_mitomi"
-        / "tetR.json"
-    )
+    path = Path(__file__).resolve().parents[2] / "cruncher" / "tests" / "fixtures" / "tetr_pwm_rows.json"
     return json.loads(path.read_text(encoding="utf-8"))["matrix"]
 
 

@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/yiu_workflow/validate.py
 
 Validate payload-centric YIU specs.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

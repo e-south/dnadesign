@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/yiu/bundle_models.py
 
 Bundle, inventory, and summary models for YIU v4 publication.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

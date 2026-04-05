@@ -5,7 +5,7 @@ src/dnadesign/cruncher/src/app/yiu_workflow/show.py
 
 Inspect payload-centric YIU bundles.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

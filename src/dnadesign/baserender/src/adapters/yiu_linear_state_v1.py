@@ -5,7 +5,7 @@ src/dnadesign/baserender/src/adapters/yiu_linear_state_v1.py
 
 Adapter from YIU linear-state contracts to baserender Record v1.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

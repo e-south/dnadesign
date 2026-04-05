@@ -5,7 +5,7 @@ src/dnadesign/baserender/src/io/json_source.py
 
 Strict JSON and JSONL row readers for contract-first baserender inputs.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

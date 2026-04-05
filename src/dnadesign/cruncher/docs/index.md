@@ -67,7 +67,6 @@ Studies and portfolios extend the fixed-length optimization lane. Cassette and Y
 - [YIU Workflow](guides/yiu_workflow.md)
 - [YIU Spec Reference](reference/yiu_spec.md)
 - [YIU Artifacts](reference/yiu_artifacts.md)
-- [YIU Visual System](reference/yiu_visual_system.md)
 
 #### Run Studies and Portfolio Aggregation
 - [Studies](guides/studies.md)

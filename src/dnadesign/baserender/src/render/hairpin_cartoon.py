@@ -5,7 +5,7 @@ src/dnadesign/baserender/src/render/hairpin_cartoon.py
 
 Folded ssDNA hairpin renderer for topology-first cassette QA views.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

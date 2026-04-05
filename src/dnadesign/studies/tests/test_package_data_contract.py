@@ -5,7 +5,7 @@ src/dnadesign/studies/tests/test_package_data_contract.py
 
 Package-data contracts for studies family status registries.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

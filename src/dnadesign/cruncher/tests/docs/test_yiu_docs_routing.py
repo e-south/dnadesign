@@ -5,7 +5,7 @@ src/dnadesign/cruncher/tests/docs/test_yiu_docs_routing.py
 
 Routing contracts for payload-centric YIU docs surfaces.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
