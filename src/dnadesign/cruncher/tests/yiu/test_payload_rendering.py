@@ -59,6 +59,7 @@ from dnadesign.cruncher.yiu.view_payload_content import (
     build_payload_view_meta,
 )
 from dnadesign.cruncher.yiu.view_payload_contracts import build_payload_view_contract
+from dnadesign.cruncher.yiu.view_registry import validate_payload_view_entry
 from dnadesign.cruncher.yiu.view_sequence_metadata import (
     build_assembled_payload_view_meta,
     build_split_payload_row_meta,
@@ -76,6 +77,21 @@ SECONDARY_OBJECTIVES = [
     "default_strand_preference",
     "lexical_stability",
 ]
+
+
+def test_validate_payload_view_entry_rejects_registry_drift() -> None:
+    entry = PayloadViewEntry(
+        view_id="payload",
+        visual_direction="evidence_ribbon",
+        contract_kind="sequence_evidence_map_v1",
+        input_kind="json",
+        view_contract_path="payload_view.json",
+        render_artifact_path="payload_views.pdf",
+        renderer_kind="nucleotide_evidence_map",
+    )
+
+    with pytest.raises(ValueError, match="YIU view entry drift"):
+        validate_payload_view_entry(entry)
 
 
 def _write_yaml(path: Path, payload: dict[str, object]) -> None:

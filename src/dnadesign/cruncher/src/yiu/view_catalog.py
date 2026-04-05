@@ -11,49 +11,15 @@ Module Author(s): OpenAI Codex
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from dnadesign.cruncher.yiu.bundle_models import PayloadViewEntry
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
+from dnadesign.cruncher.yiu.view_registry import canonical_payload_view_definitions
 from dnadesign.cruncher.yiu.view_styles import get_yiu_style_profile
 
 if TYPE_CHECKING:
     from dnadesign.cruncher.yiu.publish_layout import PayloadBundleLayout
-
-
-@dataclass(frozen=True)
-class PayloadViewDefinition:
-    view_id: str
-    contract_kind: str
-    input_kind: str
-    renderer_kind: str
-
-
-_CANONICAL_PAYLOAD_VIEW_DEFINITIONS: tuple[PayloadViewDefinition, ...] = (
-    PayloadViewDefinition(
-        view_id="payload",
-        contract_kind="yiu_payload_visual_v1",
-        input_kind="json",
-        renderer_kind="nucleotide_evidence_map",
-    ),
-    PayloadViewDefinition(
-        view_id="split_payload",
-        contract_kind="sequence_evidence_map_v1",
-        input_kind="jsonl",
-        renderer_kind="sequence_rows",
-    ),
-    PayloadViewDefinition(
-        view_id="assembled_payload",
-        contract_kind="sequence_evidence_map_v1",
-        input_kind="json",
-        renderer_kind="nucleotide_evidence_map",
-    ),
-)
-
-
-def canonical_payload_view_definitions() -> tuple[PayloadViewDefinition, ...]:
-    return _CANONICAL_PAYLOAD_VIEW_DEFINITIONS
 
 
 def build_payload_view_entries(
@@ -108,7 +74,6 @@ def build_render_job_payload(*, entry: PayloadViewEntry) -> dict[str, object]:
 
 
 __all__ = [
-    "PayloadViewDefinition",
     "build_payload_view_entries",
     "build_render_job_payload",
     "canonical_payload_view_definitions",

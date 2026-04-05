@@ -17,14 +17,11 @@ import numpy as np
 
 from dnadesign.cruncher.yiu.bundle_models import PayloadViewEntry
 from dnadesign.cruncher.yiu.view_io import load_contract_rows
+from dnadesign.cruncher.yiu.view_registry import validate_payload_view_entry
 
 
 def _adapter_kind_for_view(view: PayloadViewEntry) -> str:
-    if view.contract_kind == "sequence_evidence_map_v1":
-        return "sequence_evidence_map_v1"
-    if view.contract_kind == "yiu_payload_visual_v1":
-        return "yiu_payload_visual_v1"
-    raise ValueError(f"unsupported YIU view contract for rendering: {view.contract_kind}")
+    return validate_payload_view_entry(view).adapter_kind
 
 
 def load_view_records(contract_path: Path, *, view: PayloadViewEntry, baserender_module):
