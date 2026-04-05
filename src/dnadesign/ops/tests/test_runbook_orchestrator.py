@@ -1734,7 +1734,9 @@ def test_infer_qsub_template_exports_usr_actor_tags() -> None:
     template_text = (repo_root / "docs" / "bu-scc" / "jobs" / "evo2-gpu-infer.qsub").read_text(encoding="utf-8")
 
     assert 'export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-infer}"' in template_text
-    assert 'export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-${JOB_ID:-manual}.${SGE_TASK_ID:-0}}"' in template_text
+    assert 'DEFAULT_RUN_ID="${OPS_JOB_NAME_SLUG:-$JOB_ID_VALUE}"' in template_text
+    assert 'if [[ -n "$TASK_ID_VALUE" && "$TASK_ID_VALUE" != "undefined" && "$TASK_ID_VALUE" != "NONE" ]]; then' in template_text
+    assert 'export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-$DEFAULT_RUN_ID}"' in template_text
 
 
 def test_densegen_analysis_template_requires_records_for_placement_map() -> None:

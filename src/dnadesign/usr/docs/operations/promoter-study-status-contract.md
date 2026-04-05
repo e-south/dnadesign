@@ -75,6 +75,13 @@ repo-summary scope from `ops.study.yaml`, reports the current phase from the
 checked-in record, and highlights the next ready phase without submitting jobs
 or mutating USR. Host-local readiness such as GPU visibility remains advisory
 here and moves into preflight for hard blockers.
+For `evo2_20b`, describe GPU readiness from the declared capability floor
+(`gpu_capability >= 9.0` plus the study memory floor), not from one exact BU
+queue name; H200 is one valid lane, but newer higher-capability lanes also
+satisfy the same contract.
+The snapshot now also calls out stale downstream handoffs when merged anchor or
+Construct context datasets trail the upstream DenseGen source even though those
+datasets still exist.
 The implementation boundary is explicit: OPS resolves the registered provider,
 and the stress-promoter family code that assembles the snapshot lives under
 `src/dnadesign/studies/families/promoter/`.

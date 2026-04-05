@@ -22,6 +22,16 @@ Configs:
 - `config.full_lane_set.evo2_20b.yaml`
 - `config.yaml` points at the default 7B full-lane set
 
+Operational unit:
+
+- treat one lane config as one operational unit for real study work:
+  one dataset, one watcher, one resume surface
+- use `anchor_only` or `anchor_plus_template` for cold-start, notify, and
+  resume work
+- keep the full-lane configs for local composition, validation, or dry-runs;
+  they are the wrong default for live notify or resumable study execution
+  because they span multiple USR destinations
+
 Portable preflight:
 
 ```bash
@@ -53,6 +63,22 @@ Planning those presets on this node requires the same webhook secret-file
 surface DenseGen already uses. Export `NOTIFY_WEBHOOK_FILE` or materialize a
 profile with `webhook.source=secret_ref` before submit.
 
+Cold-start gate for first real write-back:
+
+1. current study snapshot:
+   `uv run ops progress show usr.data-plane.promoter-study-status --json`
+2. current host readiness:
+   `NOTIFY_WEBHOOK_FILE=<...> SSL_CERT_FILE=<...> uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+3. live GPU runtime:
+   `uv run infer validate config --config <lane-config>`
+   `uv run infer run --config <lane-config> --dry-run`
+   `uv run infer extract --model-id evo2_20b --device cuda:0 --precision bf16 --alphabet dna --batch-size 1 --fn evo2.log_likelihood --format float --seq ACGTACGTACGT --no-progress`
+4. canonical USR namespace registration before first write-back:
+   `uv run infer validate usr-registry --config <lane-config>`
+   `uv run usr --root src/dnadesign/usr/datasets namespace show infer`
+   if `namespace show` fails, run the register command emitted by
+   `infer validate usr-registry`
+
 For this workspace, use `--config` per lane for Notify setup/watch. Do not use
 `--workspace study_stress_ethanol_cipro` for Notify because the workspace
 default `config.yaml` points at a multi-destination full-lane config, which is
@@ -80,6 +106,21 @@ uv run notify profile doctor \
   --profile src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_7b/profile.json
 ```
 
+Interactive watcher cold-start for an existing study stream:
+
+```bash
+PROFILE=src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_20b/profile.json
+EVENTS=src/dnadesign/usr/datasets/promoter/stress_ethanol_cipro_anchor_set/.events.log
+CURSOR=src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_20b/cursor
+
+mkdir -p "$(dirname "$CURSOR")"
+stat -c %s "$EVENTS" > "$CURSOR"
+uv run notify usr-events watch --profile "$PROFILE" --follow --idle-timeout 7200
+```
+
+Seed the cursor only when you want a new watcher to start at the current end
+of an existing event stream. If you want replay, do not preseed it.
+
 Current Slack delivery semantics come from USR `.events.log` write-back events:
 
 - `attach` emits a `running` update with an Infer-specific message that names
@@ -89,6 +130,27 @@ Current Slack delivery semantics come from USR `.events.log` write-back events:
 - Profile defaults for this study keep `include_args`, `include_context`, and
   `include_raw_event` disabled, so the webhook metadata stays concise unless you
   opt into a richer profile.
+- Running updates are intentionally sparse. Do not expect one Slack message or
+  one watcher stdout line per attach or per flush. A healthy watcher can stay
+  quiet while the cursor advances and the spool stays empty.
+
+Hydration versus hung for `evo2_20b`:
+
+- expected startup path is `fetch -> weight hydration -> GPU residency ->
+  first attach events`
+- before declaring a hang, check:
+  - `nvidia-smi` shows the infer process and rising/stable memory residency
+  - the target dataset `.events.log` gains new `attach` events
+  - the watcher cursor advances
+  - the watcher spool remains empty
+
+Resume semantics:
+
+- `overwrite: false` prevents recomputing already-written feature outputs
+- reruns may still backfill metadata fields when stored values are null
+- treat "features skipped, metadata filled" as healthy resume behavior rather
+  than feature duplication
 
 Use the matching `anchor_only` and `anchor_plus_template` 20B presets only on
-Hopper or H200.
+GPU lanes that satisfy the checked-in 20B floor (`gpu_capability >= 9.0` and
+sufficient memory), such as H200 or newer higher-capability lanes.

@@ -22,6 +22,7 @@ from dnadesign.ops.preflight import (
     ContractPreflightCheckDependencies,
     PreflightCheck,
     build_contract_preflight_checks,
+    build_state_check,
     contract_environment_flag_state,
     evaluate_preflight_checks,
     execute_runbook_plan,
@@ -67,6 +68,7 @@ class PromoterPreflightResolvedContext:
     phase_states: tuple[Mapping[str, object], ...]
     current_phase: str | None
     next_ready_phase: Mapping[str, object] | None
+    dataset_refresh_states: tuple[Mapping[str, object], ...]
     infer_runtime: PromoterStudyInferRuntimeResolvedContext
     infer_phase_targets: dict[str, PromoterInferPhaseTarget]
     scope_plan: StudyPreflightPlan
@@ -114,6 +116,7 @@ def resolve_promoter_preflight_context(
         phase_states=phase_states,
         current_phase=current_phase,
         next_ready_phase=next_ready_phase,
+        dataset_refresh_states=tuple(dict(state) for state in study_context.dataset_refresh_states),
         infer_runtime=infer_runtime,
         infer_phase_targets=infer_phase_targets,
         scope_plan=scope_plan,
@@ -169,6 +172,8 @@ def build_promoter_preflight_progress(
             inspect_local_gpu_inventory=dependencies.inspect_local_gpu_inventory,
         ),
     ):
+        add_check(check)
+    for check in _build_dataset_refresh_checks(context=context):
         add_check(check)
 
     resolved_evidence.update(
@@ -237,3 +242,41 @@ __all__ = [
     "build_promoter_preflight_progress",
     "resolve_promoter_preflight_context",
 ]
+
+
+def _build_dataset_refresh_checks(
+    *,
+    context: PromoterPreflightResolvedContext,
+) -> tuple[PreflightCheck, ...]:
+    checks: list[PreflightCheck] = []
+    phase_id = _infer_freshness_phase_id(context=context)
+    if phase_id is None:
+        return ()
+    for refresh_state in context.dataset_refresh_states:
+        state = str(refresh_state.get("state") or "").strip()
+        if state not in {"ok", "attention", "missing"}:
+            continue
+        checks.append(
+            build_state_check(
+                check_id=f"infer.input.{str(refresh_state.get('id') or '').strip()}",
+                kind="dataset_snapshot",
+                required=True,
+                check_group="infer",
+                phase="infer",
+                phase_id=phase_id,
+                state=state,
+                summary=str(refresh_state.get("summary") or "").strip(),
+                artifact_id=str(refresh_state.get("downstream_dataset") or "").strip() or None,
+                details=dict(refresh_state),
+            )
+        )
+    return tuple(checks)
+
+
+def _infer_freshness_phase_id(*, context: PromoterPreflightResolvedContext) -> str | None:
+    target_phase_id = str(context.scope_plan.target_phase_id or "").strip()
+    if target_phase_id.startswith("infer"):
+        return target_phase_id
+    if str(context.current_phase or "").strip().startswith("infer"):
+        return str(context.current_phase)
+    return "infer_batch_preparation"

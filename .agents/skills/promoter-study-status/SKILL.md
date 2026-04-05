@@ -74,6 +74,16 @@ Out of scope:
 - Use `ops progress ...` and `usr ...` commands only to refresh those checked-in
   study records; do not infer live study state from demo workspaces, journal
   notes, or generic runbooks.
+- For source-phase studies that still write Infer outputs directly onto shared
+  anchor or Construct-context datasets, do not treat "config validates" as
+  first-write readiness by itself. Confirm the canonical `infer` namespace
+  registration surface before the first real write-back.
+- Distinguish model-fit from environment portability for GPU-backed Infer.
+  Scheduler eligibility or `gpu_c` floors do not prove that the currently
+  compiled `.venv` can execute on the landed GPU family. If the checked-in
+  study record or recent operator evidence shows a GPU-family-specific build,
+  report that explicitly instead of assuming a valid `evo2_7b` or `evo2_20b`
+  config is portable across Hopper, Blackwell, or smaller lanes.
 - Treat `promoter-study-status` as the repo-backed snapshot surface and
   `promoter-study-preflight` as the execution-readiness surface. Do not answer
   "what should run next?" from snapshot alone when preflight blockers are in
@@ -161,6 +171,12 @@ Out of scope:
   `uv run infer validate config --config <infer-config>`
 - Then run:
   `uv run infer run --config <infer-config> --dry-run`
+- Before the first real write-back on a shared study dataset, run:
+  `uv run infer validate usr-registry --config <infer-config>`
+- Then run:
+  `uv run usr --root <usr-root> namespace show infer`
+- If that namespace is missing, use the register command emitted by
+  `infer validate usr-registry` before live write-back.
 
 6. Refresh batch or notify evidence only when asked
 - DenseGen or Infer batch posture: read the recorded runbook or `qsub` command
@@ -181,6 +197,7 @@ Return:
   any supplemental runtime detail from `pipeline.yaml` and derived Infer Notify
   profile paths from the checked-in lane configs
 - completed versus pending infer slices
+- first-write infer namespace readiness when no canonical feature dataset exists yet
 - rollback paths (`infer prune`, `usr maintenance overlay-remove`,
   `usr maintenance overlay-compact`)
 - batch and notify readiness

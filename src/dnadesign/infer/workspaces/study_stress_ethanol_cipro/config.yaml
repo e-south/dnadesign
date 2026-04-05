@@ -3,7 +3,7 @@ model:
   device: cuda:0
   precision: bf16
   alphabet: dna
-  batch_size: 16
+  batch_size: 128
 
 jobs:
   - id: anchor_only_7b_features

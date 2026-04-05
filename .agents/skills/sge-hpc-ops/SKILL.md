@@ -72,6 +72,9 @@ Clarification policy:
   - `generic_sge_ops`
 - detect `execution_locus` (local shell, SCC login shell, OnDemand shell, OnDemand app shell, unknown)
 - if user is already in OnDemand, route to `ondemand_session_handoff` and skip session-creation flow
+- if the user is already in a GPU-capable OnDemand app shell for an Infer
+  cold start, keep that shell and continue with in-place GPU/runtime probes;
+  do not bounce the user back to `qrsh` just to satisfy a generic recipe
 
 ### Step 2: Load minimum reference set (progressive disclosure)
 
@@ -101,6 +104,16 @@ Clarification policy:
 ### Step 5: Build deterministic execution plan
 
 - map workload to resource profile (CPU, GPU, watcher, transfer)
+- prefer numeric GPU capability and memory floors from the runbook or config
+  over queue-name assumptions; `gpu_c=9.0` means Hopper-class or newer, so a
+  higher-capability lane such as Blackwell also satisfies the contract when the
+  memory floor is met
+- for Infer cold starts, prefer one lane config, one dataset, and one watcher
+  per live run; multi-destination configs are not the safe default for Notify
+  and resumable operations
+- when starting a live watcher against an existing USR event stream and replay
+  is not desired, seed the watcher cursor to the current `.events.log` size
+  before `notify usr-events watch --follow`
 - align threaded workloads (`OMP_NUM_THREADS`) with `NSLOTS`
 - prefer arrays (`SGE_TASK_ID`) for fanout and `-hold_jid` chains for ordered pipelines
 - run `scripts/sge-submit-shape-advisor.sh --warn-over-running 3` before multi-submit plans
@@ -142,6 +155,9 @@ Clarification policy:
 - keep separate run handles for each submitted job (`densegen_job_id`, `notify_job_id`)
 - track transitions with `qstat` and post-run evidence with `qacct` when available
 - triage `Eqw` and process-reaper events before retries or mutations
+- for Infer cold starts, distinguish `fetch -> weight hydration -> GPU
+  residency -> first attach events` from a true hang by checking GPU memory,
+  dataset `.events.log` growth, watcher cursor movement, and spool backlog
 - allow at most one guarded retry with explicit reason and user confirmation
 
 ### Step 8: Report using output contract

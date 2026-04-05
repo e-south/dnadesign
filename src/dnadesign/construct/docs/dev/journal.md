@@ -154,9 +154,9 @@ Harden `construct` around the first real biological use case:
 
 - Control promoters and wild-type promoters are ordinary USR anchor records, not DenseGen exceptions.
 - The workspace scaffold now includes `inputs/anchor_manifest.template.yaml` as a worksheet for:
-  - `spyP_MG1655`
+  - `spyp`
   - `sulAp`
-  - `soxS`
+  - `soxSp`
   - `J23105`
   - optional `pDual-10` template reference metadata
 

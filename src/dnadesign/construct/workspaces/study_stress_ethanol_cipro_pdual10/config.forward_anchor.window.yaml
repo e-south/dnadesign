@@ -43,6 +43,7 @@ job:
       size_bp: 1000
       offset_bp: 0
   output:
+    on_conflict: ignore
     target:
       kind: usr
       dataset: promoter/stress_ethanol_cipro_construct_contexts

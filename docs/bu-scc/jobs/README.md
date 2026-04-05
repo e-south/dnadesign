@@ -119,6 +119,7 @@ Use that direct submit as the default `evo2_7b` lane. For `evo2_20b`, keep the s
 - fail-fast gate: `INFER_CONFIG` is required
 - preflight: `uv run infer validate config --config "$INFER_CONFIG"`
 - run: `uv run infer run --config "$INFER_CONFIG" ${INFER_RUN_ARGS:-}`
+- actor tags: `USR_ACTOR_TOOL=infer`, `USR_ACTOR_RUN_ID=${OPS_JOB_NAME_SLUG:-$JOB_ID}` with `.SGE_TASK_ID` appended only for real array tasks
 - optional reset contract: set `INFER_RUN_ARGS=--overwrite` when an orchestration layer intentionally wants infer to recompute the requested write-back outputs in place
 
 Before first submit on a host, run deterministic environment bootstrap:

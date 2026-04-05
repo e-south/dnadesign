@@ -26,7 +26,7 @@ If you need the current study status rather than route discovery, keep one check
    Template-backed routes should go through [Construct -> USR -> Infer shared dataset runbook](construct-infer-shared-dataset-runbook.md) plus the Construct-owned [template/context contract](../../../construct/docs/reference/template-contexts.md).
 4. Run infer-owned Evo2 feature extraction.
    Use [Evo2 promoter-study feature runbook](../../../infer/docs/operations/evo2-promoter-features.md) for validate, dry-run, run, and OPAL-export flow.
-   Use [Evo2 provider reference](../../../infer/docs/reference/evo2-provider.md) for `evo2_7b`, `evo2_20b`, block-26 default, pooling, and stored output names.
+   Use [Evo2 provider reference](../../../infer/docs/reference/evo2-provider.md) for `evo2_7b`, `evo2_20b`, the model-aware intermediate default, pooling, and stored output names.
 5. Validate the optional Notify side branch only when watcher behavior matters.
    Use [Notify operations route](../../../../../docs/notify/README.md) or the operator manual [Notify: consuming Universal Sequence Record events](../../../../../docs/notify/usr-events.md).
 6. Hand off into the cross-tool feature-matrix route, then branch downstream.

@@ -68,6 +68,8 @@ checked-in study record and uses `ops.study.yaml` to decide which study phases
 belong to the next actionable scope versus the full study surface:
 
 - `path_exists` and `dataset_snapshot` checks over declared study artifacts
+- study-owned freshness checks when merged anchor or Construct context
+  datasets trail upstream row counts despite still being materialized
 - `workspace_layout` checks over declared Construct and Infer workspaces
 - `environment` checks for webhook and TLS contracts
 - `gpu_availability` checks for local infer posture when that scope is relevant
@@ -92,6 +94,7 @@ longer hides a second imperative readiness graph behind the contract.
 - Keep degraded state explicit:
   - missing datasets => `missing`
   - failed command preflights => `attention`
+  - stale downstream handoffs => `attention`
   - blocked GPU-only lanes remain visible; there is no hidden 20B -> 7B fallback
 - Use `ops.study.yaml` as the OPS-facing source of lifecycle phase order,
   execution surfaces, snapshot scope, and preflight phase-target grouping.
@@ -137,4 +140,6 @@ longer hides a second imperative readiness graph behind the contract.
    - materialize the merged anchor set
    - materialize Construct contexts
    - fix Notify secret/profile contracts
-   - move Infer execution to a Hopper/H200-capable GPU node
+   - move Infer execution to a GPU node that satisfies the checked-in 20B
+     contract (`gpu_capability >= 9.0` with sufficient memory), such as H200
+     or newer higher-capability lanes

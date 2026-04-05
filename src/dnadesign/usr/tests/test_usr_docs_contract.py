@@ -446,7 +446,8 @@ def test_promoter_study_record_is_checked_in_for_stress_ethanol_cipro_growth() -
     assert "group_phase_bindings:" in ops_study
     assert "runtime_shared_groups: [notify_environment]" in ops_study
     assert "densegen/study_stress_ethanol_cipro" in status
-    assert "130864" in status
+    assert "157160" in status
+    assert "157164" in status
     assert "100000" in status
 
 

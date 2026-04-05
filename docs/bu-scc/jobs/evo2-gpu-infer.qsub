@@ -32,6 +32,7 @@ fi
 export CC="$(which gcc)"
 export CXX="$(which g++)"
 export CUDAHOSTCXX="$(which g++)"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-${NSLOTS:-1}}"
 
 if [[ -z "${INFER_CONFIG:-}" ]]; then
   echo "INFER_CONFIG is required and must point to an infer config file." >&2
@@ -51,7 +52,13 @@ if ! uv run infer validate config --config "$INFER_CONFIG"; then
 fi
 
 export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-infer}"
-export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-${JOB_ID:-manual}.${SGE_TASK_ID:-0}}"
+JOB_ID_VALUE="${JOB_ID:-manual}"
+TASK_ID_VALUE="${SGE_TASK_ID:-}"
+DEFAULT_RUN_ID="${OPS_JOB_NAME_SLUG:-$JOB_ID_VALUE}"
+if [[ -n "$TASK_ID_VALUE" && "$TASK_ID_VALUE" != "undefined" && "$TASK_ID_VALUE" != "NONE" ]]; then
+  DEFAULT_RUN_ID="${DEFAULT_RUN_ID}.${TASK_ID_VALUE}"
+fi
+export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-$DEFAULT_RUN_ID}"
 
 infer_run_args=()
 if [[ -n "${INFER_RUN_ARGS:-}" ]]; then

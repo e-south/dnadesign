@@ -101,12 +101,16 @@ def build_promoter_study_status(
         summary_parts.append(f"next in_progress {study_context.next_in_progress_phase['id']}")
     elif study_context.next_planned_phase is not None:
         summary_parts.append(f"next planned {study_context.next_planned_phase['id']}")
+    if study_context.stale_dataset_ids:
+        summary_parts.append("stale " + ", ".join(study_context.stale_dataset_ids))
 
     attention_reasons: list[str] = []
     if study_context.current_phase is not None and not study_context.current_phase_is_known:
         attention_reasons.append("current_phase does not match any declared phase id")
     if study_context.present_but_planned:
         attention_reasons.append("datasets.yaml is stale for newly materialized outputs")
+    if study_context.stale_dataset_ids:
+        attention_reasons.append("construct handoff datasets trail upstream source rows")
     if study_context.densegen_row_gap not in (None, 0):
         attention_reasons.append("DenseGen anchor target not met")
     if status_context.infer_runtime.preferred_model_family is not None and any(

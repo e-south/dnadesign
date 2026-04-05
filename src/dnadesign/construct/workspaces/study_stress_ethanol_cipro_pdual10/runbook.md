@@ -1,32 +1,40 @@
 ## study_stress_ethanol_cipro_pdual10 Runbook
 
-Use this runbook after `densegen/study_stress_ethanol_cipro` and
-`mg1655_promoters` have been merged into the study-owned anchor set.
+Use this runbook after `densegen/study_stress_ethanol_cipro` grows or when the
+study-owned shared anchor/context datasets need to be refreshed without losing
+existing Construct outputs.
 
-### 1) Bootstrap the merged anchor dataset without mutating the source datasets
+### 1) Refresh the merged anchor dataset without mutating the source datasets
 
 ```bash
-# Initialize the shared merged-anchor handoff dataset.
+# Initialize the shared merged-anchor handoff dataset only once.
 uv run usr --root src/dnadesign/usr/datasets init \
   promoter/stress_ethanol_cipro_anchor_set \
   --source stress_ethanol_cipro_growth \
   --notes "Merged anchor set for Construct and Infer"
 
+# Preview the DenseGen delta before mutating the shared anchor dataset.
+uv run usr --root src/dnadesign/usr/datasets maintenance merge \
+  --dest promoter/stress_ethanol_cipro_anchor_set \
+  --src densegen/study_stress_ethanol_cipro \
+  --union-columns \
+  --if-duplicate error \
+  --dry-run
+
 # Merge the curated wildtype anchors without mutating their source dataset.
+# This is idempotent for the current study handoff and adds 0 rows on refresh.
 uv run usr --root src/dnadesign/usr/datasets maintenance merge \
   --dest promoter/stress_ethanol_cipro_anchor_set \
   --src mg1655_promoters \
   --union-columns \
-  --if-duplicate error \
-  --carry-namespace usr_label
+  --if-duplicate error
 
 # Merge the DenseGen study output into the same shared anchor handoff.
 uv run usr --root src/dnadesign/usr/datasets maintenance merge \
   --dest promoter/stress_ethanol_cipro_anchor_set \
   --src densegen/study_stress_ethanol_cipro \
   --union-columns \
-  --if-duplicate error \
-  --carry-namespace usr_label
+  --if-duplicate error
 
 # Validate the merged handoff dataset before Construct reads it.
 uv run usr --root src/dnadesign/usr/datasets validate \
@@ -51,7 +59,9 @@ uv run construct workspace validate-project \
 ### 3) Preview the shared downstream writes
 
 ```bash
-# Plan the Construct write without mutating the shared downstream dataset.
+# Plan the Construct refresh without mutating the shared downstream dataset.
+# The checked-in config now uses output.on_conflict=ignore, so existing
+# contexts are skipped and only new upstream anchors are planned for write.
 uv run construct workspace run-project \
   --workspace src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10 \
   --project forward_anchor_window \
@@ -62,6 +72,7 @@ uv run construct workspace run-project \
 
 ```bash
 # Materialize the shared Construct context dataset once the dry run is green.
+# Existing output ids are preserved; only new Construct contexts are appended.
 uv run construct workspace run-project \
   --workspace src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10 \
   --project forward_anchor_window

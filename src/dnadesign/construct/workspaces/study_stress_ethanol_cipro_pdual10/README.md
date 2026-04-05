@@ -14,6 +14,9 @@ It is not a demo. It assumes:
   `GAATTCGCCAGCTGTCACCGGA`
 
 Use this workspace after the study's merged anchor dataset exists.
+The checked-in project is refresh-safe by default: rerunning it against the
+same shared context dataset skips already-present output ids and appends only
+new Construct contexts.
 The supporting study record lives under:
 
 - `docs/studies/stress_ethanol_cipro_growth/pipeline.yaml`
@@ -44,4 +47,6 @@ tracks the expected config `job.id`, so a renamed or swapped study config fails
 in `workspace doctor` before execution.
 
 Materialize the study project only after the merged anchor dataset has been
-validated strictly and the write target is still `output.on_conflict=error`.
+validated strictly. The checked-in config now sets
+`output.on_conflict=ignore`, so repeated refreshes preserve existing context
+rows instead of failing on already-materialized output ids.

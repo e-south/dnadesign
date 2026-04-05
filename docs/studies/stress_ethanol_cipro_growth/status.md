@@ -1,28 +1,28 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-03-24
+- Last verified: 2026-04-01
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Study execution map: `pipeline.yaml`
 - USR root: `src/dnadesign/usr/datasets`
 - Target row count: at least `100000` DenseGen anchor rows before the first shared feature-matrix realization
-- Current shared feature dataset: `n/a`
+- Current shared feature dataset: `n/a` (lane-specific Infer outputs are still being attached directly to the shared anchor and Construct-context datasets first)
 - Current feature-dataset row count: `n/a`
 - Preferred infer model family: `evo2_20b`
 - Alternate infer model family: `evo2_7b`
 
 ### Source datasets
 
-- DenseGen anchor shared dataset: `densegen/study_stress_ethanol_cipro` (`130864` rows, written directly to the shared USR root)
-- Wildtype or manual dataset: `mg1655_promoters` (`4` rows: `spyP_MG1655`, `sulAp`, `soxS`, `J23105`)
+- DenseGen anchor shared dataset: `densegen/study_stress_ethanol_cipro` (`157160` rows, written directly to the shared USR root)
+- Wildtype or manual dataset: `mg1655_promoters` (`4` rows: `spyp`, `sulAp`, `soxSp`, `J23105`)
 - Construct template seed dataset: `plasmids` (`1` row)
-- Shared merged anchor dataset: `promoter/stress_ethanol_cipro_anchor_set` (`130868` rows)
-- Shared Construct context dataset: `promoter/stress_ethanol_cipro_construct_contexts` (`130868` rows)
+- Shared merged anchor dataset: `promoter/stress_ethanol_cipro_anchor_set` (`157164` rows)
+- Shared Construct context dataset: `promoter/stress_ethanol_cipro_construct_contexts` (`157164` rows)
 
 ### Shared downstream datasets
 
-- Merged anchor dataset: `promoter/stress_ethanol_cipro_anchor_set` (`130868` rows)
-- Construct-expanded context dataset: `promoter/stress_ethanol_cipro_construct_contexts` (`130868` rows, 1 kb realized outputs)
+- Merged anchor dataset: `promoter/stress_ethanol_cipro_anchor_set` (`157164` rows)
+- Construct-expanded context dataset: `promoter/stress_ethanol_cipro_construct_contexts` (`157164` rows, 1 kb realized outputs)
 - Canonical full-lane feature dataset: `promoter/stress_ethanol_cipro_feature_matrix` or `n/a`
 - Cluster results root: `n/a`
 - OPAL config: `n/a`
@@ -35,43 +35,66 @@ implicit. The study-owned Construct surface is one
 `forward_anchor_window` workspace project; the placement contract lives in the
 checked-in Construct config and workspace registry rather than being duplicated
 throughout the study note.
+Blackwell tuning note: current checked-in lane defaults follow the latest
+pressure-test operating points on the Blackwell Evo2 environment:
+`anchor_only_7b=1024`, `anchor_plus_template_7b=128`,
+`anchor_only_20b=256`, `anchor_plus_template_20b=48`. The local-only
+full-lane configs inherit the tighter templated limit for each model family
+(`7b=128`, `20b=48`) because they share one model-level `batch_size` across
+both dataset planes.
 
 Execution note: all checked-in Infer configs target `cuda:0`. A login-node
 `infer validate config` or `infer run --dry-run` can still pass while local
 GPU capacity is absent, so treat those commands as config-validity checks, not
 as proof that the current host can execute Infer directly.
+Cold-start note: the first live `evo2_20b` run can spend a visible startup
+window in `fetch -> weight hydration -> GPU residency -> first attach events`.
+During that window, lack of new USR writes alone is not evidence that Infer is
+hung. Check GPU memory growth plus `.events.log` movement before intervening.
+Environment portability note: model fit and `.venv` portability are separate.
+The current working Evo2 environment should be treated as Blackwell-pinned
+until a real `infer extract` smoke proves portability on another GPU family.
+`evo2_7b` being eligible for smaller GPUs is not enough to assume that this
+specific `.venv` will run there.
 
 ### Infer matrix status
 
-- `anchor_only`: `batch-prep`
+- `anchor_only`: `in_progress`
   - preferred 20B config: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml`
   - alternate 7B config: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml`
+  - tuned Blackwell defaults: `20b batch_size=256`, `7b batch_size=1024`
   - preferred 20B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml`
   - alternate 7B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml`
   - dataset: `promoter/stress_ethanol_cipro_anchor_set`
-  - readiness note: config validation is green; notify profiles plus webhook/TLS env are still missing; direct execution still requires a GPU host
-  - outputs expected: `ll`, `output_layer_mean`, `intermediate_embedding`
-- `anchor_plus_template`: `batch-prep`
+  - readiness note: `promoter-study-preflight --scope next --json` is green on a GPU host when `NOTIFY_WEBHOOK_FILE` or `NOTIFY_WEBHOOK` plus `SSL_CERT_FILE` are exported.
+  - live run note: canonical 20B write-back has already started on the shared anchor dataset; inspect the target dataset `.events.log` or infer overlay counts for the current checkpoint before resuming or submitting another anchor-only lane.
+  - cold-start signals: treat `nvidia-smi` memory growth, first `attach` events with `completed_rows`, watcher cursor movement, and `spool_files=0` as the healthy startup sequence.
+  - outputs expected: `log_likelihood__total`, `log_likelihood__mean_per_token`, `output_layer_mean__seq_mean`, `intermediate_embedding__block23_mlp_out__seq_mean`
+- `anchor_plus_template`: `ready`
   - preferred 20B config: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml`
   - alternate 7B config: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml`
+  - tuned Blackwell defaults: `20b batch_size=48`, `7b batch_size=128`
   - preferred 20B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml`
   - alternate 7B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml`
   - dataset: `promoter/stress_ethanol_cipro_construct_contexts`
-  - readiness note: config validation is green; notify profiles plus webhook/TLS env are still missing; direct execution still requires a GPU host
-  - outputs expected: `ll`, `output_layer_mean`, `intermediate_embedding`
-- `full_lane_set`: `pending`
+  - readiness note: preflight is green on a GPU host with notify env exported; this is the next recommended lane after the active anchor-only collection or via the notify-enabled batch preset.
+  - outputs expected: `log_likelihood__total`, `log_likelihood__mean_per_token`, `output_layer_mean__seq_mean`, `output_layer_mean__anchor_mean`, `intermediate_embedding__block23_mlp_out__seq_mean`, `intermediate_embedding__block23_mlp_out__anchor_mean`
+- `full_lane_set`: `local-only`
   - config: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.yaml`
-  - preferred Hopper lane: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_20b.yaml`
+  - preferred 20B lane config: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_20b.yaml`
   - alternate 7B lane: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_7b.yaml`
+  - tuned local-only defaults: `20b batch_size=48`, `7b batch_size=128`
   - datasets: `promoter/stress_ethanol_cipro_anchor_set`, `promoter/stress_ethanol_cipro_construct_contexts`
   - outputs expected: `ll`, `output_layer_mean`, `intermediate_embedding`
   - model lanes: `evo2_7b`, `evo2_20b`
-  - batch note: use the lane-specific presets above because ops auto/resume requires one USR destination per runbook.
+  - batch note: use the lane-specific presets above because ops auto/resume and Notify expect one USR destination and one watcher surface per run.
 
 ### Rollback and maintenance
 
-- Infer reset: `uv run infer prune --usr promoter/stress_ethanol_cipro_feature_matrix --usr-root src/dnadesign/usr/datasets`
-- Infer namespace archive: `uv run usr maintenance overlay-remove promoter/stress_ethanol_cipro_feature_matrix --namespace infer --mode archive`
+- Infer reset, anchor-only lane: `uv run infer prune --usr promoter/stress_ethanol_cipro_anchor_set --usr-root src/dnadesign/usr/datasets`
+- Infer reset, anchor-plus-template lane: `uv run infer prune --usr promoter/stress_ethanol_cipro_construct_contexts --usr-root src/dnadesign/usr/datasets`
+- Infer namespace archive, anchor-only lane: `uv run usr maintenance overlay-remove promoter/stress_ethanol_cipro_anchor_set --namespace infer --mode archive`
+- Infer namespace archive, anchor-plus-template lane: `uv run usr maintenance overlay-remove promoter/stress_ethanol_cipro_construct_contexts --namespace infer --mode archive`
 - DenseGen overlay compaction: `uv run usr maintenance overlay-compact densegen/study_stress_ethanol_cipro --namespace densegen`
 
 ### Batch and notify
@@ -88,20 +111,32 @@ as proof that the current host can execute Infer directly.
 - Infer anchor-only 7B derived Notify profile path: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_7b/profile.json`
 - Infer anchor-plus-template 7B derived Notify profile path: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_plus_template_7b/profile.json`
 - Notify secret prerequisite: export `NOTIFY_WEBHOOK_FILE=/usr4/dl523/esouth/.config/dnadesign/notify/secrets/study_stress_ethanol_cipro.webhook` or materialize the same `file://` secret ref into the lane profile before submit.
+- Notify readiness note: on a GPU-capable host with `NOTIFY_WEBHOOK_FILE` or `NOTIFY_WEBHOOK` plus `SSL_CERT_FILE` exported, `promoter-study-preflight --scope next --json` is green (`28 ok, 0 attention` as of 2026-03-30).
 - Infer Notify profile materialization: use `uv run ops progress show usr.data-plane.promoter-study-preflight --scope full --json` and inspect the failing `notify.profile.*` command checks plus their `surface_id` and `command` fields, or run `notify setup slack --tool infer --config <checked-in-infer-config>` directly. The study pipeline no longer records separate Infer notify profile paths; Infer derives the lane-specific profile path from the single-lane config contract, so `--profile` should not be needed for the checked-in lane configs.
 - Infer Notify scope note: use `--config` per lane, not `--workspace study_stress_ethanol_cipro`, because the workspace default `config.yaml` is a multi-destination full-lane config and is intentionally ambiguous for a single USR events stream.
 - TLS prerequisite for `notify profile doctor` and live Slack delivery: export `SSL_CERT_FILE` or store the same CA bundle path in the materialized profile.
+- Interactive watcher cold-start: when a live profile exists but its cursor file does not, seed the cursor to the current `.events.log` size before `notify usr-events watch --follow` so Slack does not replay historical Infer events from the same dataset.
 - DenseGen watch command: `uv run notify usr-events watch --events src/dnadesign/usr/datasets/densegen/study_stress_ethanol_cipro/.events.log --dry-run --no-advance-cursor-on-dry-run`
 - Infer anchor-only 20B resolve command: `uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml --json`
 - Infer anchor-plus-template 20B resolve command: `uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml --json`
 - Infer anchor-only 7B resolve command: `uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_7b.yaml --json`
 - Infer anchor-plus-template 7B resolve command: `uv run notify setup resolve-events --tool infer --config src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_7b.yaml --json`
 - Infer Slack message semantics: `attach` sends `running` progress with run id, dataset, chunk rows, and workspace rows; `materialize` sends `success` with `rows_written`.
+- Anti-spam note: the infer notify policy is intentionally sparse. A healthy watcher may stay quiet on stdout and Slack between progress thresholds or heartbeat intervals; trust cursor advancement plus `spool_files=0` over an expectation of one message per flush.
+- Concurrency note: the clean maximum is one live infer writer per target
+  dataset. For this study, that means `max clean concurrency = 2`: one run on
+  `promoter/stress_ethanol_cipro_anchor_set` and one run on
+  `promoter/stress_ethanol_cipro_construct_contexts`. Same-dataset mixed-model
+  runs are mostly data-safe but share one dataset lock and one `.events.log`,
+  so they are second-tier operationally.
+- Current pragmatic routing note: keep the current working `.venv` pinned to
+  Blackwell-family submit routes for both `evo2_20b` and `evo2_7b` until a
+  different GPU family is intentionally rebuilt or proven with a real runtime
+  smoke.
 
 ### Next actions
 
-- The source assembly and Construct context phases are already materialized locally. Additional DenseGen growth can continue in parallel if desired, but the checked-in study focus is now Infer batch preparation.
-- Materialize the lane-specific Infer Notify profiles for both 20B and 7B configs. Treat 20B as the preferred default and 7B as the alternate path.
-- Export `NOTIFY_WEBHOOK_FILE` and `SSL_CERT_FILE` before rerunning `notify profile doctor` or `ops runbook plan`.
-- Use `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json` to focus on the infer-batch-preparation blockers rather than the full historical study surface.
-- Submit the preferred 20B anchor-only and anchor-plus-template presets on Hopper/H200-capable GPU infrastructure when available; use the 7B presets on other GPU-capable nodes when a non-Hopper lane is needed.
+- The source assembly and Construct context phases are already materialized locally. Additional DenseGen growth can continue in parallel if desired, but the checked-in study focus is now active Infer collection.
+- Resume the lane-specific Blackwell 20B batch presets from the current shared dataset checkpoints; keep one live writer per target dataset.
+- Use the tuned batch defaults for new resumes (`anchor_only_20b=256`, `anchor_plus_template_20b=48`, `anchor_only_7b=1024`, `anchor_plus_template_7b=128`) and keep the full-lane configs for local composition or dry-runs only.
+- On any new GPU host, follow the strict cold-start gate in the Infer workspace docs: current snapshot, green preflight, verified Evo2 runtime import/load, then explicit `infer` namespace registration before first real write-back.
