@@ -63,6 +63,7 @@ from dnadesign.cruncher.yiu.view_sequence_metadata import (
     build_assembled_payload_view_meta,
     build_split_payload_row_meta,
 )
+from dnadesign.cruncher.yiu.view_styles import get_yiu_style_profile
 
 TOY_SEQUENCE = "AAATTTCCCGGGAAATTTCCC"
 TOY_JUNCTION_START = 4
@@ -1024,6 +1025,17 @@ def test_split_and_assembled_views_center_titles() -> None:
     assert assembled_overrides["overlay_align"] == "center"
 
 
+def test_yiu_style_profiles_return_defensive_copies() -> None:
+    profile = get_yiu_style_profile("payload")
+    profile.style_overrides["sequence"]["bold_consensus_bases"] = False
+
+    refreshed = get_yiu_style_profile("payload")
+
+    assert refreshed.system_name == "bench_strip"
+    assert refreshed.direction_name == "evidence_ribbon"
+    assert refreshed.style_overrides["sequence"]["bold_consensus_bases"] is True
+
+
 def test_yiu_style_overrides_fail_fast_for_unknown_view_ids() -> None:
     with pytest.raises(ValueError, match="unsupported YIU view id"):
         build_yiu_style_overrides("bogus")
@@ -1161,6 +1173,11 @@ def test_publish_layout_tracks_relative_bundle_artifacts_and_view_entries(tmp_pa
         "split_payload_view.json",
         "assembled_payload_view.json",
     ]
+    assert [entry.visual_direction for entry in view_entries] == [
+        "evidence_ribbon",
+        "operator_strip",
+        "operator_strip",
+    ]
     assert {entry.render_artifact_path for entry in view_entries} == {"payload_views.pdf"}
     assert view_entries[0].motif_layers_required is False
 
@@ -1271,6 +1288,7 @@ def test_bundle_path_contract_rejects_divergent_view_render_targets(tmp_path: Pa
         views=[
             PayloadViewEntry(
                 view_id="payload",
+                visual_direction="evidence_ribbon",
                 contract_kind="yiu_payload_visual_v1",
                 input_kind="json",
                 view_contract_path="payload_view.json",
@@ -1279,6 +1297,7 @@ def test_bundle_path_contract_rejects_divergent_view_render_targets(tmp_path: Pa
             ),
             PayloadViewEntry(
                 view_id="split_payload",
+                visual_direction="operator_strip",
                 contract_kind="sequence_evidence_map_v1",
                 input_kind="jsonl",
                 view_contract_path="split_payload_view.json",
@@ -1569,3 +1588,31 @@ def test_render_yiu_spec_emit_renders_persists_failed_render_state(
     assert inventory["views"][1]["render_requested"] is False
     assert manifest["render_status"] == "failed"
     assert manifest["view_contracts"] == inventory["views"]
+
+
+def test_render_yiu_spec_emit_renders_cleans_partial_artifacts_when_published_plot_copy_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
+    _write_yaml(spec_path, _user_sequence_spec())
+
+    def _raise_copy_failure(src: Path, dst: Path, *args, **kwargs):
+        Path(dst).write_bytes(b"%PDF-1.4\n% partial published copy\n")
+        raise OSError("synthetic copy failure")
+
+    monkeypatch.setattr(yiu_render_module.shutil, "copyfile", _raise_copy_failure)
+
+    with pytest.raises(YiuContractError, match="published-plot mirror failed"):
+        render_yiu_spec(spec_path, emit_renders=True)
+
+    bundle_dir = workspace / "outputs" / "demo_payload"
+    inventory = _load_json(bundle_dir / "visual_inventory.json")
+    manifest = _load_json(bundle_dir / "bundle_manifest.json")
+
+    assert inventory["render_status"] == "failed"
+    assert inventory["render_count"] == 3
+    assert manifest["render_status"] == "failed"
+    assert not (bundle_dir / "payload_views.pdf").exists()
+    assert not (workspace / "outputs" / "plot__demo_payload__payload_views.pdf").exists()

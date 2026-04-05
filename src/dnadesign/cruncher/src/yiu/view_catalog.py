@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 from dnadesign.cruncher.yiu.bundle_models import PayloadViewEntry
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
-from dnadesign.cruncher.yiu.view_styles import build_yiu_style_overrides
+from dnadesign.cruncher.yiu.view_styles import get_yiu_style_profile
 
 if TYPE_CHECKING:
     from dnadesign.cruncher.yiu.publish_layout import PayloadBundleLayout
@@ -68,20 +68,24 @@ def build_payload_view_entries(
         "assembled_payload": layout.relative_artifact_path(layout.assembled_payload_view_path),
     }
     motif_layers_required = {"payload": normalized.motif_context.effective}
-    return [
-        PayloadViewEntry(
-            view_id=view.view_id,
-            contract_kind=view.contract_kind,
-            schema_version=1,
-            input_kind=view.input_kind,
-            view_contract_path=view_paths[view.view_id],
-            render_artifact_path=composite_render_path,
-            renderer_kind=view.renderer_kind,
-            style_overrides=build_yiu_style_overrides(view.view_id),
-            motif_layers_required=motif_layers_required.get(view.view_id, False),
+    entries: list[PayloadViewEntry] = []
+    for view in canonical_payload_view_definitions():
+        style_profile = get_yiu_style_profile(view.view_id)
+        entries.append(
+            PayloadViewEntry(
+                view_id=view.view_id,
+                visual_direction=style_profile.direction_name,
+                contract_kind=view.contract_kind,
+                schema_version=1,
+                input_kind=view.input_kind,
+                view_contract_path=view_paths[view.view_id],
+                render_artifact_path=composite_render_path,
+                renderer_kind=view.renderer_kind,
+                style_overrides=style_profile.style_overrides,
+                motif_layers_required=motif_layers_required.get(view.view_id, False),
+            )
         )
-        for view in canonical_payload_view_definitions()
-    ]
+    return entries
 
 
 def build_render_job_payload(*, entry: PayloadViewEntry) -> dict[str, object]:

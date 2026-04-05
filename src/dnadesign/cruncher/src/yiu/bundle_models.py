@@ -60,6 +60,7 @@ class YiuValidationReport(StrictBaseModel):
 
 class PayloadViewEntry(StrictBaseModel):
     view_id: Literal["payload", "split_payload", "assembled_payload"]
+    visual_direction: str
     contract_kind: str
     schema_version: int = 1
     input_kind: Literal["json", "jsonl"]
