@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dnadesign.cruncher.yiu.bundle_models import payload_summary_dump
 from dnadesign.cruncher.yiu.bundle_state import load_bundle_state
 from dnadesign.cruncher.yiu.bundle_surface import (
     YiuBundleIntegrity,
@@ -22,7 +23,6 @@ from dnadesign.cruncher.yiu.bundle_surface import (
 )
 from dnadesign.cruncher.yiu.errors import YIU_BUNDLE_INVALID, raise_yiu_error
 from dnadesign.cruncher.yiu.integrity import validate_bundle_state
-from dnadesign.cruncher.yiu.models.bundle import payload_summary_dump
 
 
 def _split_row_debug(rows: list[dict[str, object]]) -> list[YiuSplitRowDebug]:

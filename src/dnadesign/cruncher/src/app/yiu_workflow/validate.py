@@ -13,9 +13,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dnadesign.cruncher.yiu.bundle_models import YiuValidationReport, build_validation_report
 from dnadesign.cruncher.yiu.load import load_yiu_spec
-from dnadesign.cruncher.yiu.models.bundle import YiuValidationReport, build_validation_report
-from dnadesign.cruncher.yiu.normalize import normalize_payload
+from dnadesign.cruncher.yiu.normalizer import normalize_payload
 
 
 def validate_yiu_spec(path: str | Path) -> YiuValidationReport:

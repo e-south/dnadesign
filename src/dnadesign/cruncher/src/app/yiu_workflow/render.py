@@ -18,11 +18,11 @@ from dnadesign.cruncher.app.yiu_workflow.staging import (
     promote_staged_bundle,
     remove_managed_path,
 )
+from dnadesign.cruncher.yiu.bundle_models import YiuValidationReport, build_validation_report
 from dnadesign.cruncher.yiu.bundle_paths import resolve_published_plot_path
 from dnadesign.cruncher.yiu.bundle_surface import YiuRenderOutcome, load_render_outcome
 from dnadesign.cruncher.yiu.load import load_yiu_spec
-from dnadesign.cruncher.yiu.models.bundle import YiuValidationReport, build_validation_report
-from dnadesign.cruncher.yiu.normalize import normalize_payload
+from dnadesign.cruncher.yiu.normalizer import normalize_payload
 from dnadesign.cruncher.yiu.publish import publish_payload_bundle
 from dnadesign.cruncher.yiu.render import render_bundle_views
 

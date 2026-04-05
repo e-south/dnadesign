@@ -40,10 +40,11 @@ Keep that order stable unless the contract changes with it. If the payload row s
 
 ### Boundary rules
 
-- The producer-side style policy lives in `src/dnadesign/cruncher/src/yiu/visual_system.py`.
+- The producer-owned style seed lives in `src/dnadesign/cruncher/src/yiu/visual_foundations.py`.
+- The named visual-direction registry and style profiles live in `src/dnadesign/cruncher/src/yiu/visual_system.py`.
 - The title policy lives in `src/dnadesign/cruncher/src/yiu/view_styles.py`.
 - `cruncher` chooses the named visual direction and style overrides when it publishes bundle views.
-- `baserender` consumes those contracts through its public adapter and renderer APIs; it should not infer YIU layout policy from showcase defaults alone.
+- `baserender` consumes those contracts through its public adapter and renderer APIs; it should not infer YIU layout policy from consumer-side showcase defaults or hidden heuristics.
 - Visual-system edits should preserve the information hierarchy unless the contract and docs are updated together.
 
 ### Related docs

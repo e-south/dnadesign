@@ -20,6 +20,7 @@ from dnadesign.cruncher.yiu.bundle_models import PayloadViewEntry
 @dataclass(frozen=True)
 class PayloadViewDefinition:
     view_id: str
+    visual_direction: str
     contract_kind: str
     adapter_kind: str
     input_kind: str
@@ -29,6 +30,7 @@ class PayloadViewDefinition:
 _CANONICAL_PAYLOAD_VIEW_DEFINITIONS: tuple[PayloadViewDefinition, ...] = (
     PayloadViewDefinition(
         view_id="payload",
+        visual_direction="evidence_ribbon",
         contract_kind="yiu_payload_visual_v1",
         adapter_kind="yiu_payload_visual_v1",
         input_kind="json",
@@ -36,6 +38,7 @@ _CANONICAL_PAYLOAD_VIEW_DEFINITIONS: tuple[PayloadViewDefinition, ...] = (
     ),
     PayloadViewDefinition(
         view_id="split_payload",
+        visual_direction="operator_strip",
         contract_kind="sequence_evidence_map_v1",
         adapter_kind="sequence_evidence_map_v1",
         input_kind="jsonl",
@@ -43,6 +46,7 @@ _CANONICAL_PAYLOAD_VIEW_DEFINITIONS: tuple[PayloadViewDefinition, ...] = (
     ),
     PayloadViewDefinition(
         view_id="assembled_payload",
+        visual_direction="operator_strip",
         contract_kind="sequence_evidence_map_v1",
         adapter_kind="sequence_evidence_map_v1",
         input_kind="json",
@@ -68,6 +72,8 @@ def payload_view_definition(view_id: str) -> PayloadViewDefinition:
 def validate_payload_view_entry(entry: PayloadViewEntry) -> PayloadViewDefinition:
     definition = payload_view_definition(entry.view_id)
     mismatches: list[str] = []
+    if entry.visual_direction != definition.visual_direction:
+        mismatches.append(f"visual_direction={entry.visual_direction!r} expected {definition.visual_direction!r}")
     if entry.contract_kind != definition.contract_kind:
         mismatches.append(f"contract_kind={entry.contract_kind!r} expected {definition.contract_kind!r}")
     if entry.input_kind != definition.input_kind:

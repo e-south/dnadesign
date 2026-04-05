@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 from dnadesign.cruncher.yiu.bundle_models import PayloadViewEntry
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
-from dnadesign.cruncher.yiu.view_registry import canonical_payload_view_definitions
+from dnadesign.cruncher.yiu.view_registry import canonical_payload_view_definitions, payload_view_definition
 from dnadesign.cruncher.yiu.view_styles import get_yiu_style_profile
 
 if TYPE_CHECKING:
@@ -36,11 +36,17 @@ def build_payload_view_entries(
     motif_layers_required = {"payload": normalized.motif_context.effective}
     entries: list[PayloadViewEntry] = []
     for view in canonical_payload_view_definitions():
+        definition = payload_view_definition(view.view_id)
         style_profile = get_yiu_style_profile(view.view_id)
+        if style_profile.direction_name != definition.visual_direction:
+            raise ValueError(
+                f"YIU visual-direction drift for {view.view_id!r}: "
+                f"{style_profile.direction_name!r} != {definition.visual_direction!r}"
+            )
         entries.append(
             PayloadViewEntry(
                 view_id=view.view_id,
-                visual_direction=style_profile.direction_name,
+                visual_direction=definition.visual_direction,
                 contract_kind=view.contract_kind,
                 schema_version=1,
                 input_kind=view.input_kind,

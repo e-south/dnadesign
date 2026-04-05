@@ -5,6 +5,8 @@ src/dnadesign/cruncher/src/yiu/view_contracts.py
 
 Compatibility facade for YIU view-contract builders shared by publish and
 integrity.
+Prefer the specialized `view_payload_contracts.py` and
+`view_sequence_contracts.py` modules for new internal imports.
 
 Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------

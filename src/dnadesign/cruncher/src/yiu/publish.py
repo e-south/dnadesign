@@ -29,9 +29,9 @@ from dnadesign.cruncher.yiu.publish_io import (
 from dnadesign.cruncher.yiu.publish_layout import resolve_payload_bundle_layout
 from dnadesign.cruncher.yiu.spec_models import YiuPayloadRenderingSpec
 from dnadesign.cruncher.yiu.view_catalog import build_payload_view_entries
-from dnadesign.cruncher.yiu.view_contracts import (
+from dnadesign.cruncher.yiu.view_payload_contracts import build_payload_view_contract
+from dnadesign.cruncher.yiu.view_sequence_contracts import (
     build_assembled_payload_view_contract,
-    build_payload_view_contract,
     build_split_payload_view_rows,
 )
 

@@ -56,7 +56,7 @@ Payload-centric YIU visuals follow an operator-first strip layout:
 - split and assembled panels stay diagrammatic and legend-light so the three-view composite reads top-to-bottom
 - Cruncher publishes those directions explicitly as `evidence_ribbon` for `payload` and `operator_strip` for `split_payload`/`assembled_payload`; consumers should treat that as producer policy rather than infer it from showcase defaults
 - style changes should preserve that information hierarchy instead of adding tool-specific ornament or hidden fallback rendering
-- producer-side visual language is owned by Cruncher; `baserender` should consume explicit direction names and style overrides rather than reconstruct the YIU look from showcase defaults
+- producer-side visual language is owned by Cruncher; `baserender` should consume explicit direction names and style overrides rather than reconstruct the YIU look from consumer-side showcase defaults
 - when `yiu_payload_visual_v1` is projected into `sequence_evidence_map_v1`, the projected metadata stays generic (`row_labels`, base highlights, and connector spans only) rather than carrying YIU-namespaced payload metadata into the shared contract
 
 ## Published bundle surface

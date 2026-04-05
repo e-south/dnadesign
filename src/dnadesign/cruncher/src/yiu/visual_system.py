@@ -14,7 +14,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 
-from dnadesign.baserender import cruncher_showcase_style_overrides
+from dnadesign.cruncher.yiu.visual_foundations import bench_strip_style_foundation
 
 YIU_VISUAL_SYSTEM_NAME = "bench_strip"
 _YIU_FIGURE_SCALE = 1.24
@@ -69,7 +69,7 @@ def _operator_strip_style_overrides(*, padding_y: float = 24.0) -> dict[str, obj
 
 def _evidence_ribbon_style_overrides() -> dict[str, object]:
     return _merge_style_overrides(
-        dict(cruncher_showcase_style_overrides()),
+        dict(bench_strip_style_foundation()),
         **_COMMON_STRIP_STYLE_OVERRIDES,
         legend=False,
         connectors=True,

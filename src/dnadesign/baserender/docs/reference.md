@@ -45,13 +45,13 @@ Primary commands:
 
 | Job key | Purpose | Primary module(s) |
 | --- | --- | --- |
-| `version` | Contract version gate (`3`) | `src/config/cruncher_showcase_job.py` |
-| `results_root` | Output root resolution | `src/config/cruncher_showcase_job.py`, `src/workspace.py` |
+| `version` | Contract version gate (`3`) | `src/config/jobs/sequence_rows_v3.py` |
+| `results_root` | Output root resolution | `src/config/jobs/sequence_rows_v3.py`, `src/workspace.py` |
 | `input` | Source kind/path + adapter contract | `src/config/adapter_contracts.py`, `src/io/`, `src/adapters/` |
 | `selection` | Optional subset/ordering overlay | `src/pipeline/transforms.py` |
 | `pipeline` | Transform plugin chain | `src/pipeline/` |
 | `render` | Renderer + style preset/overrides | `src/render/`, `src/config/style_v1.py` |
-| `outputs` | Explicit artifact declaration | `src/config/cruncher_showcase_job.py`, `src/outputs/` |
+| `outputs` | Explicit artifact declaration | `src/config/jobs/sequence_rows_v3.py`, `src/outputs/` |
 | `run` | Strictness and optional report emission | `src/runner.py`, `src/reporting/` |
 
 ## Job Contract (`RenderJobV3`)
@@ -73,6 +73,8 @@ Contract behavior:
 - `outputs` must be non-empty and explicit
 - non-workspace default output root is `<job_dir>/results`
 - workspace `job.yaml` with sibling `inputs/` and `outputs/` defaults to `<workspace>/outputs`
+- `src/config/jobs/sequence_rows_v3.py` is the canonical config namespace
+- the legacy implementation path `src/config/cruncher_showcase_job.py` remains as a compatibility import shim
 - compatibility aliases `SequenceRowsJobV3` and `CruncherShowcaseJob` still load the same schema, but `RenderJobV3` is the canonical public model name
 
 Adapters:

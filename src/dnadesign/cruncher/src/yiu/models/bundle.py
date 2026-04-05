@@ -4,6 +4,7 @@
 src/dnadesign/cruncher/src/yiu/models/bundle.py
 
 Compatibility re-exports for YIU bundle models.
+Prefer `dnadesign.cruncher.yiu.bundle_models`.
 
 Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------

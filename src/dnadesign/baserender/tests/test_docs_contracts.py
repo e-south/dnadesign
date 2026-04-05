@@ -82,6 +82,8 @@ def test_reference_and_cruncher_integration_docs_cover_cassette_json_contract_pa
     reference = (_pkg_root() / "docs" / "reference.md").read_text()
     cruncher = (_pkg_root() / "docs" / "integrations" / "cruncher.md").read_text()
 
+    assert "src/config/jobs/sequence_rows_v3.py" in reference
+    assert "src/config/cruncher_showcase_job.py" in reference
     assert "`json`" in reference
     assert "`jsonl`" in reference
     assert "duplex_sequence_v1" in reference

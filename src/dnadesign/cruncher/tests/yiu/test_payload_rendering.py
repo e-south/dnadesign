@@ -95,6 +95,21 @@ def test_validate_payload_view_entry_rejects_registry_drift() -> None:
         validate_payload_view_entry(entry)
 
 
+def test_validate_payload_view_entry_rejects_visual_direction_drift() -> None:
+    entry = PayloadViewEntry(
+        view_id="payload",
+        visual_direction="operator_strip",
+        contract_kind="yiu_payload_visual_v1",
+        input_kind="json",
+        view_contract_path="payload_view.json",
+        render_artifact_path="payload_views.pdf",
+        renderer_kind="nucleotide_evidence_map",
+    )
+
+    with pytest.raises(ValueError, match="visual_direction"):
+        validate_payload_view_entry(entry)
+
+
 def _write_yaml(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")

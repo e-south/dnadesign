@@ -9,9 +9,10 @@ Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
 """
 
+from dnadesign.cruncher.yiu.bundle_models import YiuValidationIssue, YiuValidationReport
+from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
 from dnadesign.cruncher.yiu.load import load_yiu_spec
-from dnadesign.cruncher.yiu.models.bundle import YiuValidationIssue, YiuValidationReport
-from dnadesign.cruncher.yiu.models.payload import NormalizedPayload, YiuPayloadRenderingSpec
+from dnadesign.cruncher.yiu.spec_models import YiuPayloadRenderingSpec
 
 __all__ = [
     "NormalizedPayload",

@@ -28,11 +28,11 @@ from dnadesign.cruncher.yiu.bundle_surface import YiuBundleIntegrityState
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
 from dnadesign.cruncher.yiu.errors import YIU_BUNDLE_INVALID, raise_yiu_error
 from dnadesign.cruncher.yiu.view_catalog import canonical_payload_view_definitions
-from dnadesign.cruncher.yiu.view_contracts import (
+from dnadesign.cruncher.yiu.view_io import load_contract_rows
+from dnadesign.cruncher.yiu.view_sequence_contracts import (
     build_assembled_payload_view_contract,
     build_split_payload_view_rows,
 )
-from dnadesign.cruncher.yiu.view_io import load_contract_rows
 
 
 def _fail_bundle(message: str) -> None:
