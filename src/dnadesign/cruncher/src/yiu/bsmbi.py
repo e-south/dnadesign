@@ -76,14 +76,20 @@ def _build_forward_fragment_display(
     panel_order: int,
     title: str,
     sticky_end_sequence_5to3: str,
+    sticky_end_payload_sequence_3to5: str,
     canonical_sticky_end_sequence_5to3: str,
     payload_body_sequence_5to3: str,
+    payload_body_sequence_3to5: str,
     payload_junction_window: DisplaySpan,
 ) -> SplitFragmentDisplaySpec:
     display_primary = (
         f"{BSMBI_RECOGNITION_SEQUENCE}{BSMBI_GHOST_SPACER_BASE}{sticky_end_sequence_5to3}{payload_body_sequence_5to3}"
     )
-    display_complement = aligned_complement_3to5(display_primary)
+    display_complement = (
+        aligned_complement_3to5(f"{BSMBI_RECOGNITION_SEQUENCE}{BSMBI_GHOST_SPACER_BASE}")
+        + sticky_end_payload_sequence_3to5
+        + payload_body_sequence_3to5
+    )
     geometry = derive_cut_geometry(
         display_primary,
         start=0,
@@ -128,8 +134,10 @@ def _build_reverse_fragment_display(
     panel_order: int,
     title: str,
     sticky_end_sequence_5to3: str,
+    sticky_end_payload_sequence_3to5: str,
     canonical_sticky_end_sequence_5to3: str,
     payload_body_sequence_5to3: str,
+    payload_body_sequence_3to5: str,
     payload_junction_window: DisplaySpan,
 ) -> SplitFragmentDisplaySpec:
     recognition_reverse_complement = reverse_complement_iupac(BSMBI_RECOGNITION_SEQUENCE)
@@ -139,7 +147,12 @@ def _build_reverse_fragment_display(
         f"{BSMBI_GHOST_SPACER_BASE}"
         f"{recognition_reverse_complement}"
     )
-    display_complement = aligned_complement_3to5(display_primary)
+    display_complement = (
+        f"{payload_body_sequence_3to5}"
+        f"{sticky_end_payload_sequence_3to5}"
+        f"{BSMBI_GHOST_SPACER_BASE}"
+        f"{BSMBI_RECOGNITION_SEQUENCE[::-1]}"
+    )
     recognition_start = len(display_primary) - len(recognition_reverse_complement)
     geometry = derive_cut_geometry(
         display_primary,
@@ -184,6 +197,9 @@ def build_split_fragment_display_specs(
     selected_sticky_end = normalized.selected_complement_sequence[normalized.junction.start : normalized.junction.end][
         ::-1
     ]
+    selected_payload_sticky_end = normalized.selected_payload_sequence[
+        normalized.junction.start : normalized.junction.end
+    ][::-1]
     canonical_sticky_end = normalized.reference_complement_sequence[
         normalized.junction.start : normalized.junction.end
     ][::-1]
@@ -193,8 +209,10 @@ def build_split_fragment_display_specs(
         panel_order=0,
         title="Split payload left",
         sticky_end_sequence_5to3=selected_sticky_end,
+        sticky_end_payload_sequence_3to5=selected_payload_sticky_end,
         canonical_sticky_end_sequence_5to3=canonical_sticky_end,
         payload_body_sequence_5to3=reverse_complement_iupac(left_body),
+        payload_body_sequence_3to5=left_body[::-1],
         payload_junction_window=payload_junction_window,
     )
     right = _build_reverse_fragment_display(
@@ -202,8 +220,10 @@ def build_split_fragment_display_specs(
         panel_order=1,
         title="Split payload right",
         sticky_end_sequence_5to3=selected_sticky_end,
+        sticky_end_payload_sequence_3to5=selected_payload_sticky_end,
         canonical_sticky_end_sequence_5to3=canonical_sticky_end,
         payload_body_sequence_5to3=reverse_complement_iupac(right_body),
+        payload_body_sequence_3to5=right_body[::-1],
         payload_junction_window=payload_junction_window,
     )
     return left, right

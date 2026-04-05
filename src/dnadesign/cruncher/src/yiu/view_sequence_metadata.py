@@ -13,8 +13,10 @@ from __future__ import annotations
 
 from dnadesign.contracts.visual.sequence_evidence_meta import build_sequence_evidence_connector_span_meta
 from dnadesign.cruncher.yiu.bsmbi import GhostExcisedContext, SplitFragmentDisplaySpec
-from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
+from dnadesign.cruncher.yiu.domain_models import MismatchSelection, NormalizedPayload
 from dnadesign.cruncher.yiu.view_common import YIU_EMPTY_ROW_LABELS
+
+YIU_MISMATCH_HIGHLIGHT_COLOR = "#B91C1C"
 
 
 def _ghost_dim_base_indices(ghost_context: GhostExcisedContext | None) -> dict[str, list[int]]:
@@ -26,7 +28,36 @@ def _ghost_dim_base_indices(ghost_context: GhostExcisedContext | None) -> dict[s
     }
 
 
-def build_split_payload_row_meta(fragment: SplitFragmentDisplaySpec) -> dict[str, object]:
+def _mismatch_highlight_indices(mismatches: list[MismatchSelection]) -> dict[str, list[int]]:
+    highlights = {"primary": [], "complement": []}
+    for mismatch in mismatches:
+        row_id = "primary" if mismatch.mutated_strand == "payload" else "complement"
+        highlights[row_id].append(mismatch.payload_index)
+    for row_id in highlights:
+        highlights[row_id].sort()
+    return highlights
+
+
+def _split_mismatch_highlight_indices(
+    fragment: SplitFragmentDisplaySpec,
+    normalized: NormalizedPayload,
+) -> dict[str, list[int]]:
+    highlights = {"primary": [], "complement": []}
+    sticky_start = fragment.sticky_end_display_span.start
+    junction_end = normalized.junction.end
+    for mismatch in normalized.mismatches:
+        display_index = sticky_start + (junction_end - 1 - mismatch.payload_index)
+        row_id = "primary" if mismatch.mutated_strand == "complement" else "complement"
+        highlights[row_id].append(display_index)
+    for row_id in highlights:
+        highlights[row_id].sort()
+    return highlights
+
+
+def build_split_payload_row_meta(
+    fragment: SplitFragmentDisplaySpec,
+    normalized: NormalizedPayload,
+) -> dict[str, object]:
     sticky_end_span = fragment.sticky_end_display_span.model_dump(mode="json")
     ghost_context = fragment.ghost_excised_context
     return {
@@ -47,6 +78,8 @@ def build_split_payload_row_meta(fragment: SplitFragmentDisplaySpec) -> dict[str
         "recognition_site_orientation": fragment.recognition_site_orientation,
         "ghost_excised_context": None if ghost_context is None else ghost_context.model_dump(mode="json"),
         "row_labels": YIU_EMPTY_ROW_LABELS,
+        "base_highlights": _split_mismatch_highlight_indices(fragment, normalized),
+        "base_highlight_color": YIU_MISMATCH_HIGHLIGHT_COLOR,
         "dim_base_indices": _ghost_dim_base_indices(ghost_context),
         **build_sequence_evidence_connector_span_meta(
             start=sticky_end_span["start"],
@@ -57,7 +90,6 @@ def build_split_payload_row_meta(fragment: SplitFragmentDisplaySpec) -> dict[str
 
 
 def build_assembled_payload_view_meta(normalized: NormalizedPayload) -> dict[str, object]:
-    highlight_indices = [site.payload_index for site in normalized.mismatches]
     junction_span = {
         "start": normalized.junction.start,
         "end": normalized.junction.end,
@@ -69,7 +101,8 @@ def build_assembled_payload_view_meta(normalized: NormalizedPayload) -> dict[str
         "mismatches": [site.model_dump(mode="json") for site in normalized.mismatches],
         "sequence_identity_to_reference_payload": normalized.selected_payload_sequence
         == normalized.reference_payload_sequence,
-        "base_highlights": {"primary": highlight_indices, "complement": highlight_indices},
+        "base_highlights": _mismatch_highlight_indices(normalized.mismatches),
+        "base_highlight_color": YIU_MISMATCH_HIGHLIGHT_COLOR,
         "row_labels": YIU_EMPTY_ROW_LABELS,
         **build_sequence_evidence_connector_span_meta(
             start=junction_span["start"],

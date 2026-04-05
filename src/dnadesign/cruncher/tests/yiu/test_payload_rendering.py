@@ -31,6 +31,7 @@ from dnadesign.cruncher.yiu.bundle_models import PayloadViewEntry, PayloadVisual
 from dnadesign.cruncher.yiu.bundle_paths import resolve_composite_render_artifact_path
 from dnadesign.cruncher.yiu.bundle_surface import YiuShowOutcome
 from dnadesign.cruncher.yiu.candidate_generation import CandidatePlan, MutationChoice
+from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
 from dnadesign.cruncher.yiu.errors import NoFeasiblePlanError, YiuContractError
 from dnadesign.cruncher.yiu.load import load_yiu_spec
 from dnadesign.cruncher.yiu.normalize import normalize_payload
@@ -1088,16 +1089,22 @@ def test_split_payload_view_metadata_preserves_sticky_end_and_ghost_context_cont
     spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
     normalized = normalize_payload(spec, workspace_root=workspace_root)
     right_fragment = max(build_split_fragment_display_specs(normalized), key=lambda item: item.panel_order)
+    right_row = max(build_split_payload_view_rows(normalized), key=lambda item: item["state_id"])
     assert right_fragment.ghost_excised_context is not None
 
-    meta = build_split_payload_row_meta(right_fragment)
+    meta = build_split_payload_row_meta(right_fragment, normalized)
     sticky_end_span = right_fragment.sticky_end_display_span.model_dump(mode="json")
+    expected_split_highlight_index = sticky_end_span["start"] + (
+        normalized.junction.end - 1 - normalized.mismatches[0].payload_index
+    )
 
     assert meta["fragment_side"] == "right"
     assert meta["selected_sticky_end_sequence_5to3"] == right_fragment.selected_sticky_end_sequence_5to3
     assert meta["canonical_sticky_end_sequence_5to3"] == right_fragment.canonical_sticky_end_sequence_5to3
     assert meta["sticky_end_display_span"] == sticky_end_span
     assert meta["payload_junction_window"] == right_fragment.payload_junction_window.model_dump(mode="json")
+    assert meta["base_highlights"] == {"primary": [expected_split_highlight_index], "complement": []}
+    assert meta["base_highlight_color"] == "#B91C1C"
     assert meta["connector_hidden_indices"] == []
     assert meta["connector_cross_indices"] == []
     assert meta["connector_overhang_spans"] == [sticky_end_span]
@@ -1106,6 +1113,98 @@ def test_split_payload_view_metadata_preserves_sticky_end_and_ghost_context_cont
         "primary": list(right_fragment.ghost_excised_context.primary_indices),
         "complement": list(right_fragment.ghost_excised_context.complement_indices),
     }
+    assert right_row["boundaries"] == [
+        {
+            "boundary_id": "junction_start",
+            "row_id": "primary",
+            "boundary": sticky_end_span["start"],
+            "boundary_kind": "ligation_junction",
+            "display_label": "Junction start",
+            "short_label": "",
+        },
+        {
+            "boundary_id": "junction_end",
+            "row_id": "complement",
+            "boundary": sticky_end_span["end"],
+            "boundary_kind": "ligation_junction",
+            "display_label": "Junction end",
+            "short_label": "",
+        },
+    ]
+
+
+def test_split_payload_view_metadata_partitions_mixed_strand_mismatches_into_split_rows() -> None:
+    normalized = NormalizedPayload.model_validate(
+        {
+            "name": "mixed_split_payload",
+            "input_kind": "user_sequence",
+            "reference_payload_sequence": "CTGTATTTATATACAG",
+            "reference_complement_sequence": "GACATAAATATATGTC",
+            "selected_payload_sequence": "CTGTATAAATATACAG",
+            "selected_complement_sequence": "GACATAAATATATGTC",
+            "source_provenance": {},
+            "junction": {
+                "start": 5,
+                "end": 9,
+                "offsets": [0, 1, 2, 3],
+                "mode": "optimize",
+                "left_body_length": 5,
+                "right_body_length": 7,
+            },
+            "mismatches": [
+                {
+                    "payload_index": 6,
+                    "junction_offset": 1,
+                    "mutated_strand": "complement",
+                    "native_base": "T",
+                    "mutated_base": "A",
+                    "opposing_base": "A",
+                },
+                {
+                    "payload_index": 7,
+                    "junction_offset": 2,
+                    "mutated_strand": "payload",
+                    "native_base": "T",
+                    "mutated_base": "A",
+                    "opposing_base": "A",
+                },
+            ],
+            "motif_context": {
+                "requested_mode": "none",
+                "effective": False,
+                "source_kind": "none",
+                "motifs": [],
+            },
+            "optimization_decision": {
+                "candidate_count": 1,
+                "objective": {"primary": "maximin", "secondary": []},
+                "winner": {
+                    "junction_start": 5,
+                    "junction_end": 9,
+                    "selected_positions": [6, 7],
+                    "mutated_strands": ["complement", "payload"],
+                    "mutated_bases": ["A", "A"],
+                    "worst_loss": 0.0,
+                    "total_loss": 0.0,
+                    "midpoint_distance": 0,
+                    "body_length_balance": 0,
+                    "terminal_positions_used": 0,
+                    "default_strand_preference_count": 1,
+                    "lexical_key": "mixed-split",
+                },
+                "trace": [],
+            },
+        }
+    )
+
+    left_fragment, right_fragment = build_split_fragment_display_specs(normalized)
+    left_meta = build_split_payload_row_meta(left_fragment, normalized)
+    right_meta = build_split_payload_row_meta(right_fragment, normalized)
+
+    assert left_meta["base_highlights"] == {"primary": [9], "complement": [8]}
+    assert right_meta["base_highlights"] == {"primary": [9], "complement": [8]}
+    assert left_fragment.display_complement_sequence_3to5[8:10] == "AA"
+    assert right_fragment.display_complement_sequence_3to5[8:10] == "AA"
 
 
 def test_assembled_payload_view_metadata_preserves_junction_connector_contract(tmp_path: Path) -> None:
@@ -1115,6 +1214,7 @@ def test_assembled_payload_view_metadata_preserves_junction_connector_contract(t
 
     spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
     normalized = normalize_payload(spec, workspace_root=workspace_root)
+    assembled_contract = build_assembled_payload_view_contract(normalized)
 
     meta = build_assembled_payload_view_meta(normalized)
     junction_span = {
@@ -1126,10 +1226,29 @@ def test_assembled_payload_view_metadata_preserves_junction_connector_contract(t
 
     assert meta["junction_span"] == junction_span
     assert meta["mismatches"] == [site.model_dump(mode="json") for site in normalized.mismatches]
-    assert meta["base_highlights"] == {"primary": mismatch_indices, "complement": mismatch_indices}
+    assert meta["base_highlights"] == {"primary": [], "complement": mismatch_indices}
+    assert meta["base_highlight_color"] == "#B91C1C"
     assert meta["connector_hidden_indices"] == []
     assert meta["connector_cross_indices"] == []
     assert meta["connector_overhang_spans"] == [junction_span]
+    assert assembled_contract["boundaries"] == [
+        {
+            "boundary_id": "junction_start",
+            "row_id": "primary",
+            "boundary": normalized.junction.start,
+            "boundary_kind": "ligation_junction",
+            "display_label": "Junction start",
+            "short_label": "",
+        },
+        {
+            "boundary_id": "junction_end",
+            "row_id": "complement",
+            "boundary": normalized.junction.end,
+            "boundary_kind": "ligation_junction",
+            "display_label": "Junction end",
+            "short_label": "",
+        },
+    ]
 
 
 def test_payload_view_content_preserves_motif_mismatch_and_meta_contract(tmp_path: Path) -> None:
@@ -1395,6 +1514,29 @@ def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp
     split_rows = _load_jsonl(bundle_dir / "split_payload_view.json")
     assert split_rows[0]["meta"]["row_labels"] == {}
     assert split_rows[1]["meta"]["row_labels"] == {}
+    assert split_rows[0]["boundaries"] == [
+        {
+            "boundary_id": "junction_start",
+            "row_id": "primary",
+            "boundary": 7,
+            "boundary_kind": "ligation_junction",
+            "display_label": "Junction start",
+            "short_label": "",
+        },
+        {
+            "boundary_id": "junction_end",
+            "row_id": "complement",
+            "boundary": 11,
+            "boundary_kind": "ligation_junction",
+            "display_label": "Junction end",
+            "short_label": "",
+        },
+    ]
+    assert split_rows[1]["boundaries"] == split_rows[0]["boundaries"]
+    assert split_rows[0]["meta"]["base_highlights"] == {"primary": [8, 9], "complement": []}
+    assert split_rows[1]["meta"]["base_highlights"] == {"primary": [8, 9], "complement": []}
+    assert split_rows[0]["meta"]["base_highlight_color"] == "#B91C1C"
+    assert split_rows[1]["meta"]["base_highlight_color"] == "#B91C1C"
     assert split_rows[0]["meta"]["dim_base_indices"] == {
         "primary": list(range(0, 7)),
         "complement": list(range(0, 11)),
@@ -1405,6 +1547,26 @@ def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp
     }
     assembled_view = _load_json(bundle_dir / "assembled_payload_view.json")
     assert assembled_view["meta"]["row_labels"] == {}
+    assert assembled_view["meta"]["base_highlights"] == {"primary": [], "complement": [9, 10]}
+    assert assembled_view["meta"]["base_highlight_color"] == "#B91C1C"
+    assert assembled_view["boundaries"] == [
+        {
+            "boundary_id": "junction_start",
+            "row_id": "primary",
+            "boundary": 8,
+            "boundary_kind": "ligation_junction",
+            "display_label": "Junction start",
+            "short_label": "",
+        },
+        {
+            "boundary_id": "junction_end",
+            "row_id": "complement",
+            "boundary": 12,
+            "boundary_kind": "ligation_junction",
+            "display_label": "Junction end",
+            "short_label": "",
+        },
+    ]
 
 
 def test_render_sample_hit_with_sample_context_and_overlapping_selected_occurrences_stacks_pwm_layers(

@@ -30,6 +30,7 @@ def _build_sequence_contract(
     title: str,
     sequence: str,
     complement_sequence: str,
+    boundaries: list[dict[str, object]],
     meta: dict[str, object],
 ) -> dict[str, object]:
     return SequenceEvidenceMapV1.model_validate(
@@ -42,12 +43,33 @@ def _build_sequence_contract(
             "complement_sequence": complement_sequence,
             "owners": [],
             "effect_tags": [],
-            "boundaries": [],
+            "boundaries": boundaries,
             "pairings": [],
             "display": {"title": title},
             "meta": meta,
         }
     ).model_dump(mode="json")
+
+
+def _build_ligation_junction_boundaries(*, start: int, end: int) -> list[dict[str, object]]:
+    return [
+        {
+            "boundary_id": "junction_start",
+            "row_id": "primary",
+            "boundary": start,
+            "boundary_kind": "ligation_junction",
+            "display_label": "Junction start",
+            "short_label": "",
+        },
+        {
+            "boundary_id": "junction_end",
+            "row_id": "complement",
+            "boundary": end,
+            "boundary_kind": "ligation_junction",
+            "display_label": "Junction end",
+            "short_label": "",
+        },
+    ]
 
 
 def build_split_payload_view_rows(normalized: NormalizedPayload) -> list[dict[str, object]]:
@@ -59,7 +81,11 @@ def build_split_payload_view_rows(normalized: NormalizedPayload) -> list[dict[st
                 title=fragment.title,
                 sequence=fragment.display_primary_sequence_5to3,
                 complement_sequence=fragment.display_complement_sequence_3to5,
-                meta=build_split_payload_row_meta(fragment),
+                boundaries=_build_ligation_junction_boundaries(
+                    start=fragment.sticky_end_display_span.start,
+                    end=fragment.sticky_end_display_span.end,
+                ),
+                meta=build_split_payload_row_meta(fragment, normalized),
             )
         )
     return rows
@@ -71,6 +97,10 @@ def build_assembled_payload_view_contract(normalized: NormalizedPayload) -> dict
         title="Assembled payload",
         sequence=normalized.selected_payload_sequence,
         complement_sequence=assembled_payload_aligned_complement_3to5(normalized),
+        boundaries=_build_ligation_junction_boundaries(
+            start=normalized.junction.start,
+            end=normalized.junction.end,
+        ),
         meta=build_assembled_payload_view_meta(normalized),
     )
 
