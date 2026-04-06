@@ -6,10 +6,15 @@
 **Last verified:** 2026-04-05
 **Last updated by:** cruncher-maintainers on 2026-04-05
 
-YIU writes one payload-centric bundle family under the workspace-relative `output.bundle_dir` path.
-This page is the source of truth for emitted files, render-status semantics, and the shared `render`/`show` inspection surface.
+A successful YIU render writes one deterministic bundle under the workspace-relative `output.bundle_dir` path. Treat that bundle directory as the source of truth. `output.published_plot_path` is only an optional mirror of the composite PDF. Use this reference for emitted files, render-status semantics, and the shared `render`/`show` inspection surface.
 
 <!-- docs:toc:off -->
+
+Useful links:
+
+- [YIU Workflow](../guides/yiu_workflow.md)
+- [YIU Spec Reference](yiu_spec.md)
+- [YIU Visual System](yiu_visual_system.md)
 
 ### Bundle truth vs mirror
 
@@ -71,12 +76,11 @@ outputs/<workflow>/
 - render status
 - one operator-facing composite PDF under `payload_views.pdf`
 
-`bundle_summary.json` is the operator-facing handoff surface for one run.
-It keeps the essential sequence story in one place:
+`bundle_summary.json` is the concise handoff surface for one run. It keeps the main sequence story in one place:
 
 - selected payload and complement sequences in explicit 5' to 3' / 3' to 5' orientation
 - payload-forward left body, 4 bp junction span, and payload-forward right body
-- selected and canonical sticky ends in explicit 5' to 3' orientation
+- selected and reference sticky ends in explicit 5' to 3' orientation
 - mismatch list, PWM summary, published view ids, and render status
 
 `normalized_payload.json` is the normalized internal object serialized for inspection and downstream validation.
@@ -129,7 +133,7 @@ Each view entry also records one explicit `visual_direction` so downstream tools
 - bundle directory and bundle contract
 - provenance
 - selected payload length
-- one concise sequence summary with payload 5' to 3' and split left/sticky/right payload-forward bodies
+- one concise sequence summary with payload 5' to 3' and split left, sticky, and right payload-forward bodies
 - selected junction and mismatch plan
 - PWM mode and effective status
 - render summary from `visual_inventory.json`
@@ -137,7 +141,17 @@ Each view entry also records one explicit `visual_direction` so downstream tools
 - published plot path when configured
 - key artifact paths
 
-Default `show --json` stays summary-first and omits heavy optimizer trace and full PWM matrices.
-Use `--verbose` when you need split-row debug details plus the full normalized optimizer and PWM context.
+Default `show --json` returns the full bundle surface and omits `motif_context`, `optimization_decision`, and `split_row_debug` unless `--verbose` is set.
+Human-readable `show --verbose` adds split-row debug lines only; the optimizer trace and PWM context remain JSON-only.
+
+### Integrity checks
+
+`show` treats the bundle as corrupt when:
+
+- the manifest and inventory disagree
+- a published view contract is missing
+- `normalized_payload.json` and the published views disagree on sequence or mismatch truth
+- PWM motif layers drift away from the normalized payload
+- `render_status: rendered` is recorded but `payload_views.pdf` or a configured published plot is missing
 
 Use [YIU Workflow](../guides/yiu_workflow.md) for execution guidance, [YIU Visual System](yiu_visual_system.md) for named visual directions and hierarchy, and [YIU Spec Reference](yiu_spec.md) for schema details.

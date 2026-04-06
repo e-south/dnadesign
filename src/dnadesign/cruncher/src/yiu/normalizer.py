@@ -75,7 +75,7 @@ def normalize_payload(spec: YiuPayloadRenderingSpec, *, workspace_root: Path) ->
         ),
         payload_length=len(reference_payload_sequence),
     )
-    junction_starts, _window_summary = resolve_window_starts(
+    junction_starts = resolve_window_starts(
         payload_length=len(reference_payload_sequence),
         junction_spec=spec.optimization.junction,
     )
@@ -138,7 +138,7 @@ def normalize_payload(spec: YiuPayloadRenderingSpec, *, workspace_root: Path) ->
             start=winner.junction_start,
             end=winner.junction_end,
             offsets=[0, 1, 2, 3],
-            mode=spec.optimization.junction.mode,
+            mode=spec.optimization.junction.canonical_mode,
             left_body_length=winner.junction_start,
             right_body_length=len(reference_payload_sequence) - winner.junction_end,
         ),

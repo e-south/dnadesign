@@ -593,8 +593,8 @@ Example:
 
 Notes:
 
-* text output surfaces the bundle contract, provenance, selected payload/complement, selected junction summary, mismatch plan, PWM status, published views, the composite render path, and the core artifact paths
-* `--json` prints the normalized bundle summary plus integrity state instead of the human summary view
+* text output surfaces the bundle contract, provenance, selected payload/complement, selected junction summary, mismatch plan, PWM status, published views, the composite render path, and the core artifact paths; `--verbose` adds split-row debug lines
+* `--json` prints the bundle surface plus summary and integrity fields; `--verbose` additionally includes `motif_context`, `optimization_decision`, and `split_row_debug`
 
 #### `cruncher visuals validate`
 

@@ -127,7 +127,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `demo_pairwise` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
 | `demo_pairwise` | `study_run_diversity_vs_score` | Sweep diversity from 0.00 to 1.00 at fixed workspace sequence_length and emit diversity-vs-score aggregates. | `cruncher study run --spec configs/studies/diversity_vs_score.study.yaml --force-overwrite` |
 | `demo_yiu_payload` | `yiu_validate` | Validate the checked-in user-sequence YIU demo spec. | `cruncher yiu validate --spec configs/yiu/example_payload.yiu.yaml` |
-| `demo_yiu_payload` | `yiu_render` | Publish the deterministic user-sequence YIU v4 payload bundle and render the canonical views. | `cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml --force-overwrite --emit-renders` |
+| `demo_yiu_payload` | `yiu_render` | Publish the deterministic user-sequence YIU v4 payload bundle and render the standard views. | `cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml --force-overwrite --emit-renders` |
 | `demo_yiu_payload` | `yiu_show` | Inspect the published user-sequence payload bundle and integrity checks. | `cruncher yiu show --bundle outputs/example_payload` |
 | `multitf_baer_lexa_soxr` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
 | `multitf_baer_lexa_soxr` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |

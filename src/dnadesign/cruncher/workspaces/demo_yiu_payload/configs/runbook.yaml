@@ -10,7 +10,7 @@ runbook:
     - --spec
     - configs/yiu/example_payload.yiu.yaml
   - id: yiu_render
-    description: Publish the deterministic user-sequence YIU v4 payload bundle and render the canonical views.
+    description: Publish the deterministic user-sequence YIU v4 payload bundle and render the standard views.
     run:
     - yiu
     - render

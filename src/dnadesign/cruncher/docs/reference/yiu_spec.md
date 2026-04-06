@@ -6,22 +6,22 @@
 **Last verified:** 2026-04-05
 **Last updated by:** cruncher-maintainers on 2026-04-05
 
-YIU ships one strict v4 payload-rendering document root.
-This page owns schema and normalization only. Bundle layout, render-status semantics, and operator inspection fields live in [YIU Artifacts](yiu_artifacts.md).
-Use [YIU Workflow](../guides/yiu_workflow.md) for operator flow and visual posture instead of repeating bundle/output narratives here.
+YIU uses one strict v4 payload-rendering document root. A YIU spec tells Cruncher where the payload comes from, which 4 nt junction windows and mismatch plans are allowed, how PWM context should be resolved, and where the published bundle should be written.
+
+Use [YIU Workflow](../guides/yiu_workflow.md) for command flow, [YIU Artifacts](yiu_artifacts.md) for emitted files and `show`, and [YIU Visual System](yiu_visual_system.md) for view hierarchy.
 
 <!-- docs:toc:off -->
 
-### Scope
+### Quick links
 
-- This page owns the input contract, normalization rules, and optimization rules.
-- This page does not own emitted bundle layout, optional PDF mirroring, or bundle-drift checks.
-- When you need operator flow, use the workflow guide instead of expanding the schema page.
+- [YIU Workflow](../guides/yiu_workflow.md)
+- [YIU Artifacts](yiu_artifacts.md)
+- [YIU Visual System](yiu_visual_system.md)
+- [Sampling and Analysis](../guides/sampling_and_analysis.md)
 
 ### Input-side workspace adjacency
 
-This page only names the local input-side files that commonly sit next to a YIU spec.
-Bundle layout, rendered PDFs, and operator inspection surfaces live in [YIU Artifacts](yiu_artifacts.md).
+These are the input-side files that usually sit next to a YIU spec. Bundle layout, rendered PDFs, and inspection surfaces are described in [YIU Artifacts](yiu_artifacts.md).
 
 ```text
 configs/
@@ -139,7 +139,9 @@ YIU accepts three stable payload-source shapes for `sample_hit`:
 - workspace-local `source_artifact_path`
 - sibling-workspace public artifact references through `metadata.source_workspace` + `metadata.source_artifact`
 
-Relative `source_artifact_path` values are resolved inside the current workspace only. `metadata.source_workspace` is explicit: use an absolute path or a sibling workspace path/name that resolves from the current workspace root or its parent directory. Ambiguous or missing sources fail fast.
+Relative `source_artifact_path` values are resolved inside the current workspace only. `metadata.source_workspace` is explicit: use an absolute path or a sibling workspace path or name that resolves from the current workspace root or its parent directory. Ambiguous or missing sources fail fast.
+
+The most common `sample_hit` handoff is a Sample public hit table such as `outputs/optimize/tables/elites.parquet`.
 
 ### Maintainer seams
 
@@ -150,29 +152,31 @@ Relative `source_artifact_path` values are resolved inside the current workspace
 
 ### Junction and PWM rules
 
+- `optimization.junction.max_payload_body_length` is part of junction validity for all modes: the selected window must leave left and right payload bodies less than or equal to that bound
 - `junction.mode: center_locked` searches valid internal 4 nt windows and chooses the candidate closest to the payload midpoint
-- `junction.mode: derived` is accepted as a legacy alias for `center_locked`
-- `junction.mode: explicit_window` is allowed only when the window is internal and leaves non-empty left and right payload bodies
-- `junction.mode: optimize` enumerates all valid windows and mismatch plans exhaustively, ranking candidates by PWM/log-likelihood retention first and midpoint proximity second
-- `optimization.pwm.objective.secondary` canonically uses `total_loss`, `midpoint_proximity`, `terminal_position_avoidance`, `default_strand_preference`, and `lexical_stability`
-- legacy specs that still list `body_length_balance` are accepted and normalized to the canonical ladder because that metric is redundant with `midpoint_proximity` for a fixed 4 nt junction
+- `junction.mode: derived` is accepted as a legacy alias for `center_locked`, and normalized outputs emit `center_locked`
+- `junction.mode: explicit_window` is allowed only when the window is internal and also satisfies `max_payload_body_length`
+- `junction.mode: optimize` enumerates all valid windows and mismatch plans exhaustively, ranking candidates by PWM or log-likelihood retention first and midpoint proximity second
+- `optimization.pwm.objective.secondary` uses the fixed ladder `total_loss`, `midpoint_proximity`, `terminal_position_avoidance`, `default_strand_preference`, and `lexical_stability`
+- legacy specs that still list `body_length_balance` are accepted and normalized to that fixed ladder because the metric is redundant with `midpoint_proximity` for a fixed 4 nt junction
 - the normalized model stores `junction.start`, `junction.end`, `selected_payload_sequence`, and `selected_complement_sequence`
 - `mismatches.candidate_positions` are zero-based offsets inside the 4 nt junction window `[0, 1, 2, 3]`
 - terminal positions `0` and `3` are opt-in only
 - PWM mode `none` disables scoring even if a source is available
 - PWM mode `use_if_available` records a deterministic fallback reason when context is unavailable
 - PWM mode `require` fails fast when context is missing, malformed, or ambiguous
+- `optimization.pwm.source.kind: sample_context` is only valid with `input.kind: sample_hit`
 
 ### Derived normalized payload fields
 
 Every valid spec derives:
 
-- payload forward/aligned-complement/reverse-complement sequences
+- payload forward, aligned-complement, and reverse-complement sequences
 - one internal `junction` window with exact left body, right body, payload-forward sequence, and selected complement sequence
 - a normalized mismatch plan with one mutated strand per mismatch position
 - PWM context metadata when available
 - top-level optimization decision fields used by `validate`, `render`, and `show`
 
-The derived split-row publication exposes row-2 display truth separately from the normalized payload object. The payload view uses `yiu_payload_visual_v1` so PWM motif layers can be added without changing the split/assembled view contracts.
+The derived split-row publication exposes row-2 display truth separately from the normalized payload object. The payload view uses `yiu_payload_visual_v1` so PWM motif layers can be added without changing the split or assembled view contracts.
 
 Use [YIU Workflow](../guides/yiu_workflow.md) for execution guidance and [YIU Artifacts](yiu_artifacts.md) for the emitted bundle contracts.

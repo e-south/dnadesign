@@ -30,7 +30,7 @@ from dnadesign.cruncher.yiu.spec_pwm_models import PwmOptimizationSpec
 
 
 class JunctionOptimizationSpec(StrictBaseModel):
-    mode: Literal["derived", "center_locked", "explicit_window", "optimize"] = "derived"
+    mode: Literal["derived", "center_locked", "explicit_window", "optimize"] = "center_locked"
     start: int | None = None
     end: int | None = None
     overhang_length: Literal[4] = 4
@@ -54,6 +54,10 @@ class JunctionOptimizationSpec(StrictBaseModel):
                 f"{YIU_JUNCTION_INVALID}: optimization.junction.start/end are only valid for explicit_window"
             )
         return self
+
+    @property
+    def canonical_mode(self) -> Literal["center_locked", "explicit_window", "optimize"]:
+        return "center_locked" if self.mode == "derived" else self.mode
 
 
 class MismatchesSpec(StrictBaseModel):

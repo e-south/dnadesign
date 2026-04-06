@@ -6,34 +6,37 @@
 **Last verified:** 2026-04-05
 **Last updated by:** cruncher-maintainers on 2026-04-05
 
-This page owns the named visual directions and information hierarchy for payload-centric YIU views.
+YIU renders one composite page with a clear priority order: payload evidence first, split geometry second, and assembled confirmation third. The named visual system for that page is `bench_strip`.
+
 Use [YIU Workflow](../guides/yiu_workflow.md) for command flow, [YIU Artifacts](yiu_artifacts.md) for emitted files and render-state semantics, and [Architecture](architecture.md) for module ownership.
 
 <!-- docs:toc:off -->
 
-### Movement
+### Quick map
 
-`bench_strip`
+- `payload` uses `evidence_ribbon`
+- `split_payload` uses `operator_strip`
+- `assembled_payload` uses `operator_strip`
 
-`bench_strip` treats the composite render as a lab-bench strip rather than a poster. The page should read like an operator surface: one dense row for sequence truth, followed by quieter rows for mechanical assembly state. The visual goal is not ornament. It is to make one payload decision legible at a glance without hiding the biology behind decorative chrome.
+### `bench_strip`
 
-Space is used asymmetrically. The payload row earns the widest semantic bandwidth because it carries the selected payload, the complement, the mismatch plan, and optional PWM evidence. The split and assembled rows deliberately feel lighter so they behave like procedural confirmation instead of competing stories.
+`bench_strip` treats the composite render as an operator surface rather than a poster. One dense row carries sequence truth, mismatch evidence, and optional PWM overlays. The rows below it confirm how the payload is split and then reassembled.
 
-Color stays subordinate to structural meaning. TF-linked palette tokens are allowed to carry motif identity, but the page background, connector treatment, and sequence typography remain restrained. That keeps the PWM layer expressive without letting it overpower the payload truth row.
+The payload row gets the most bandwidth because it carries the selected payload, the complement, the mismatch plan, and motif context when PWM is effective. The split and assembled rows stay lighter so they confirm geometry without competing with the payload row.
 
-Scale and rhythm are intentionally stepped. The payload row is compact and information-dense, while the assembly rows preserve larger margins, fewer legends, and calmer connector treatment. The result should feel like descending certainty: selected truth first, then cut geometry, then restored order.
+Color stays subordinate to structure. TF-linked palette tokens can identify motifs, but the page background, connectors, and sequence typography stay restrained so the evidence row remains readable.
 
-The typography posture is technical rather than editorial. Titles should help a reader orient quickly, but the figure should still be driven by sequence geometry and explicit annotations. Text that does not help navigation or evidence interpretation should stay out of the render.
+Scale is intentionally stepped: selected truth first, cut geometry second, restored order third.
 
 ### Information hierarchy
 
-The hierarchy is intentionally split into evidence, confirmation, and restoration:
+The hierarchy is split into evidence, confirmation, and restoration:
 
 - `payload` is the evidence row. It carries the selected payload, mismatch annotations, and PWM overlays when available.
 - `split_payload` is the confirmation row. It shows fragment geometry, sticky-end context, and only the lightest necessary labels.
 - `assembled_payload` is the restoration row. It returns to payload order and makes the junction span obvious without adding a second story.
 
-Keep that order stable unless the contract changes with it. If the payload row stops being the strongest visual anchor, the page stops being `bench_strip` and starts becoming a generic multi-panel poster.
+Keep that order stable unless the contract changes with it. If the payload row stops being the strongest visual anchor, the render is no longer `bench_strip`.
 
 ### Visual translation map
 
@@ -41,9 +44,11 @@ Keep that order stable unless the contract changes with it. If the payload row s
 - `split_payload` uses `operator_strip`: fragment geometry and sticky-end context stay centered and legend-light.
 - `assembled_payload` uses `operator_strip`: restored payload order and the explicit junction span stay readable without extra ornament.
 
+All three sequence-evidence families publish the optimizer-chosen junction through shared `meta.span_backdrops` metadata so BaseRender can draw the same rounded light-blue duplex backdrop behind the active span without introducing a YIU-only renderer path.
+
 ### Boundary rules
 
-- [Architecture](architecture.md) owns the full module map; this page should stay scoped to visual-language policy.
+- [Architecture](architecture.md) owns the full module map.
 - The producer-owned style seed lives in `src/dnadesign/cruncher/src/yiu/visual_foundations.py`.
 - Named direction deltas live in `src/dnadesign/cruncher/src/yiu/visual_directions.py`.
 - The view registry and style profiles live in `src/dnadesign/cruncher/src/yiu/visual_system.py`.

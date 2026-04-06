@@ -44,10 +44,44 @@ class CandidatePlan:
     lexical_key: str
 
 
-@dataclass(frozen=True)
-class CandidateWindowSummary:
-    valid_internal_windows: int
-    feasible_windows: int
+def _body_lengths(*, payload_length: int, start: int, overhang_length: int) -> tuple[int, int]:
+    left_body_length = start
+    right_body_length = payload_length - (start + overhang_length)
+    return left_body_length, right_body_length
+
+
+def _window_satisfies_body_length_bound(
+    *,
+    payload_length: int,
+    start: int,
+    junction_spec: JunctionOptimizationSpec,
+) -> bool:
+    left_body_length, right_body_length = _body_lengths(
+        payload_length=payload_length,
+        start=start,
+        overhang_length=junction_spec.overhang_length,
+    )
+    return (
+        left_body_length <= junction_spec.max_payload_body_length
+        and right_body_length <= junction_spec.max_payload_body_length
+    )
+
+
+def _raise_no_feasible_window_error(
+    *,
+    payload_length: int,
+    junction_spec: JunctionOptimizationSpec,
+    valid_internal_count: int,
+    optimize_mode: bool,
+) -> None:
+    prefix = "No feasible optimized junction found for " if optimize_mode else "No feasible junction window found for "
+    raise NoFeasiblePlanError(
+        prefix
+        + f"payload length {payload_length} under max_payload_body_length={junction_spec.max_payload_body_length}. "
+        + f"Required internal 4-nt windows exist: {valid_internal_count}. "
+        + "Windows satisfying the body-length constraint: 0. "
+        + "Reduce payload length, relax the body-length bound, or use an explicit internal window."
+    )
 
 
 def internal_window_starts(payload_length: int, *, overhang_length: int = 4) -> tuple[int, ...]:
@@ -62,41 +96,61 @@ def resolve_window_starts(
     *,
     payload_length: int,
     junction_spec: JunctionOptimizationSpec,
-) -> tuple[tuple[int, ...], CandidateWindowSummary]:
+) -> tuple[int, ...]:
     valid_internal = internal_window_starts(payload_length, overhang_length=junction_spec.overhang_length)
     if not valid_internal:
         raise_yiu_error(
             YIU_JUNCTION_INVALID,
             f"payload length {payload_length} is too short for any internal 4-nt junction window",
         )
-    if junction_spec.mode == "explicit_window":
+    feasible = tuple(
+        start
+        for start in valid_internal
+        if _window_satisfies_body_length_bound(
+            payload_length=payload_length,
+            start=start,
+            junction_spec=junction_spec,
+        )
+    )
+    if junction_spec.canonical_mode == "explicit_window":
         assert junction_spec.start is not None
         if junction_spec.start not in valid_internal:
             raise_yiu_error(
                 YIU_JUNCTION_INVALID,
                 "optimization.junction.start/end must define an internal 4-nt window with non-empty left/right bodies",
             )
-        return (junction_spec.start,), CandidateWindowSummary(len(valid_internal), 1)
-    if junction_spec.mode in {"derived", "center_locked"}:
+        if junction_spec.start not in feasible:
+            left_body_length, right_body_length = _body_lengths(
+                payload_length=payload_length,
+                start=junction_spec.start,
+                overhang_length=junction_spec.overhang_length,
+            )
+            raise_yiu_error(
+                YIU_JUNCTION_INVALID,
+                "optimization.junction.start/end must satisfy max_payload_body_length="
+                f"{junction_spec.max_payload_body_length}; "
+                f"got left_body_length={left_body_length}, right_body_length={right_body_length}",
+            )
+        return (junction_spec.start,)
+    if junction_spec.canonical_mode == "center_locked":
+        if not feasible:
+            _raise_no_feasible_window_error(
+                payload_length=payload_length,
+                junction_spec=junction_spec,
+                valid_internal_count=len(valid_internal),
+                optimize_mode=False,
+            )
         midpoint = payload_length
-        winner = min(valid_internal, key=lambda start: (abs((start + (start + 4)) - midpoint), start))
-        return (winner,), CandidateWindowSummary(len(valid_internal), 1)
-
-    feasible = tuple(
-        start
-        for start in valid_internal
-        if start <= junction_spec.max_payload_body_length
-        and (payload_length - (start + 4)) <= junction_spec.max_payload_body_length
-    )
+        winner = min(feasible, key=lambda start: (abs((start + (start + 4)) - midpoint), start))
+        return (winner,)
     if not feasible:
-        raise NoFeasiblePlanError(
-            "No feasible optimized junction found for "
-            f"payload length {payload_length} under max_payload_body_length={junction_spec.max_payload_body_length}. "
-            f"Required internal 4-nt windows exist: {len(valid_internal)}. "
-            "Windows satisfying the body-length constraint: 0. "
-            "Reduce payload length, relax the body-length bound, or use an explicit internal window."
+        _raise_no_feasible_window_error(
+            payload_length=payload_length,
+            junction_spec=junction_spec,
+            valid_internal_count=len(valid_internal),
+            optimize_mode=True,
         )
-    return feasible, CandidateWindowSummary(len(valid_internal), len(feasible))
+    return feasible
 
 
 def _base_candidates(*, native_base: str) -> tuple[str, ...]:

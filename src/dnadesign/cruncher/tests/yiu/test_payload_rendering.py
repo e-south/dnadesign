@@ -16,6 +16,9 @@ import json
 import math
 from pathlib import Path
 
+import matplotlib.image as mpimg
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import pytest
 import yaml
@@ -48,6 +51,12 @@ from dnadesign.cruncher.yiu.publish_io import (
     write_payload_bundle_views,
 )
 from dnadesign.cruncher.yiu.publish_layout import build_published_artifacts, resolve_payload_bundle_layout
+from dnadesign.cruncher.yiu.render_panels import (
+    YIU_NUCLEOTIDE_LEGEND_CANONICAL_COLOR,
+    YIU_NUCLEOTIDE_LEGEND_MISMATCH_COLOR,
+    _draw_composite_nucleotide_legend,
+    save_composite_render,
+)
 from dnadesign.cruncher.yiu.scoring import CandidateScore
 from dnadesign.cruncher.yiu.spec_models import MismatchesSpec
 from dnadesign.cruncher.yiu.view_catalog import build_payload_view_entries, build_render_job_payload
@@ -251,12 +260,15 @@ def _junction_payload(
     mode: str = "explicit_window",
     start: int = TOY_JUNCTION_START,
     end: int = TOY_JUNCTION_END,
-    max_payload_body_length: int = 12,
+    max_payload_body_length: int | None = None,
 ) -> dict[str, object]:
+    effective_max_payload_body_length = (
+        13 if max_payload_body_length is None and mode == "explicit_window" else max_payload_body_length or 12
+    )
     payload: dict[str, object] = {
         "mode": mode,
         "overhang_length": 4,
-        "max_payload_body_length": max_payload_body_length,
+        "max_payload_body_length": effective_max_payload_body_length,
     }
     if mode == "explicit_window":
         payload["start"] = start
@@ -499,7 +511,7 @@ def test_normalize_derived_mode_selects_midpoint_nearest_internal_window(tmp_pat
     spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
     normalized = normalize_payload(spec, workspace_root=workspace_root)
 
-    assert normalized.junction.mode == "derived"
+    assert normalized.junction.mode == "center_locked"
     assert normalized.junction.start == 4
     assert normalized.junction.end == 8
 
@@ -518,6 +530,34 @@ def test_normalize_center_locked_mode_selects_midpoint_nearest_internal_window(t
     assert normalized.junction.end == 8
 
 
+def test_normalize_center_locked_mode_raises_when_no_window_satisfies_body_bound(tmp_path: Path) -> None:
+    spec_path = tmp_path / "workspace" / "configs" / "yiu" / "center_locked_body_bound.yiu.yaml"
+    payload = _user_sequence_spec(sequence="AACCGGTTGGTT", junction_mode="center_locked")
+    payload["optimization"]["junction"]["max_payload_body_length"] = 3
+    _write_yaml(spec_path, payload)
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    with pytest.raises(NoFeasiblePlanError, match="No feasible junction window found"):
+        normalize_payload(spec, workspace_root=workspace_root)
+
+
+def test_normalize_explicit_window_raises_when_body_bound_is_exceeded(tmp_path: Path) -> None:
+    spec_path = tmp_path / "workspace" / "configs" / "yiu" / "explicit_body_bound.yiu.yaml"
+    payload = _user_sequence_spec(
+        sequence="AACCGGTTAA",
+        junction_mode="explicit_window",
+        junction_start=1,
+        junction_end=5,
+        candidate_positions=[1],
+    )
+    payload["optimization"]["junction"]["max_payload_body_length"] = 4
+    _write_yaml(spec_path, payload)
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    with pytest.raises(YiuContractError, match="max_payload_body_length=4"):
+        normalize_payload(spec, workspace_root=workspace_root)
+
+
 def test_normalize_optimize_mode_raises_no_feasible_plan_for_tight_body_bound(tmp_path: Path) -> None:
     spec_path = tmp_path / "workspace" / "configs" / "yiu" / "no_plan.yiu.yaml"
     payload = _user_sequence_spec(sequence="AACCGGTTA", junction_mode="optimize")
@@ -526,6 +566,18 @@ def test_normalize_optimize_mode_raises_no_feasible_plan_for_tight_body_bound(tm
 
     spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
     with pytest.raises(NoFeasiblePlanError, match="No feasible optimized junction found"):
+        normalize_payload(spec, workspace_root=workspace_root)
+
+
+def test_normalize_payload_raises_when_payload_is_too_short_for_any_internal_window(tmp_path: Path) -> None:
+    spec_path = tmp_path / "workspace" / "configs" / "yiu" / "short_payload.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _user_sequence_spec(sequence="AACCG", junction_mode="center_locked", candidate_positions=[1]),
+    )
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    with pytest.raises(YiuContractError, match="too short for any internal 4-nt junction window"):
         normalize_payload(spec, workspace_root=workspace_root)
 
 
@@ -1144,6 +1196,9 @@ def test_operator_strip_views_scale_up_for_legibility() -> None:
 
     assert split_overrides["overlay_align"] == "center"
     assert assembled_overrides["overlay_align"] == "center"
+    assert payload_overrides["overlay_title_color"] == "#111827"
+    assert split_overrides["overlay_title_color"] == "#111827"
+    assert assembled_overrides["overlay_title_color"] == "#111827"
     assert split_overrides["figure_scale"] == payload_overrides["figure_scale"]
     assert assembled_overrides["figure_scale"] == payload_overrides["figure_scale"]
     assert split_overrides["font_size_seq"] == payload_overrides["font_size_seq"]
@@ -1152,8 +1207,9 @@ def test_operator_strip_views_scale_up_for_legibility() -> None:
     assert assembled_overrides["font_size_label"] == payload_overrides["font_size_label"]
     assert split_overrides["connectors"] is True
     assert assembled_overrides["connectors"] is True
-    assert split_overrides["overlay_title_gap_reduction_px"] > 0
-    assert assembled_overrides["overlay_title_gap_reduction_px"] > 0
+    assert payload_overrides["overlay_title_gap_reduction_px"] > 0
+    assert split_overrides["overlay_title_gap_reduction_px"] > payload_overrides["overlay_title_gap_reduction_px"]
+    assert assembled_overrides["overlay_title_gap_reduction_px"] > payload_overrides["overlay_title_gap_reduction_px"]
 
 
 def test_operator_strip_views_inherit_bench_strip_foundation() -> None:
@@ -1196,10 +1252,6 @@ def test_split_payload_view_metadata_preserves_sticky_end_and_ghost_context_cont
 
     meta = build_split_payload_row_meta(right_fragment, normalized)
     sticky_end_span = right_fragment.sticky_end_display_span.model_dump(mode="json")
-    expected_split_highlight_index = sticky_end_span["start"] + (
-        normalized.junction.end - 1 - normalized.mismatches[0].payload_index
-    )
-
     assert meta["fragment_side"] == "right"
     assert meta["payload_body_sequence_5to3"] == normalized.selected_payload_sequence[normalized.junction.end :]
     assert meta["display_payload_body_sequence_5to3"] == right_fragment.display_payload_body_sequence_5to3
@@ -1207,11 +1259,22 @@ def test_split_payload_view_metadata_preserves_sticky_end_and_ghost_context_cont
     assert meta["canonical_sticky_end_sequence_5to3"] == right_fragment.canonical_sticky_end_sequence_5to3
     assert meta["sticky_end_display_span"] == sticky_end_span
     assert meta["payload_junction_window"] == right_fragment.payload_junction_window.model_dump(mode="json")
-    assert meta["base_highlights"] == {"primary": [expected_split_highlight_index], "complement": []}
+    assert meta["base_highlights"] == {"primary": [], "complement": []}
     assert meta["base_highlight_color"] == "#B91C1C"
     assert meta["connector_hidden_indices"] == []
     assert meta["connector_cross_indices"] == []
     assert meta["connector_overhang_spans"] == [sticky_end_span]
+    assert meta["span_backdrops"] == [
+        {
+            "start": sticky_end_span["start"],
+            "end": sticky_end_span["end"],
+            "coordinate_space": sticky_end_span["coordinate_space"],
+            "fill": "#BFDBFE",
+            "alpha": 0.3,
+            "corner_radius": 8.0,
+            "cover_rows": "both",
+        }
+    ]
     assert meta["ghost_excised_context"] == right_fragment.ghost_excised_context.model_dump(mode="json")
     assert meta["dim_base_indices"] == {
         "primary": list(right_fragment.ghost_excised_context.primary_indices),
@@ -1305,8 +1368,8 @@ def test_split_payload_view_metadata_partitions_mixed_strand_mismatches_into_spl
     left_meta = build_split_payload_row_meta(left_fragment, normalized)
     right_meta = build_split_payload_row_meta(right_fragment, normalized)
 
-    assert left_meta["base_highlights"] == {"primary": [9], "complement": [8]}
-    assert right_meta["base_highlights"] == {"primary": [9], "complement": [8]}
+    assert left_meta["base_highlights"] == {"primary": [9], "complement": []}
+    assert right_meta["base_highlights"] == {"primary": [], "complement": [8]}
     assert left_fragment.display_complement_sequence_3to5[8:10] == "AA"
     assert right_fragment.display_complement_sequence_3to5[8:10] == "AA"
 
@@ -1335,6 +1398,17 @@ def test_assembled_payload_view_metadata_preserves_junction_connector_contract(t
     assert meta["connector_hidden_indices"] == []
     assert meta["connector_cross_indices"] == []
     assert meta["connector_overhang_spans"] == [junction_span]
+    assert meta["span_backdrops"] == [
+        {
+            "start": junction_span["start"],
+            "end": junction_span["end"],
+            "coordinate_space": junction_span["coordinate_space"],
+            "fill": "#BFDBFE",
+            "alpha": 0.3,
+            "corner_radius": 8.0,
+            "cover_rows": "both",
+        }
+    ]
     assert assembled_contract["boundaries"] == [
         {
             "boundary_id": "junction_start",
@@ -1395,6 +1469,17 @@ def test_payload_view_content_preserves_motif_mismatch_and_meta_contract(tmp_pat
         "row_labels": {},
         "pwm_effective": normalized.motif_context.effective,
         "motif_ids": [motif.motif_instance_id for motif in normalized.motif_context.motifs],
+        "span_backdrops": [
+            {
+                "start": normalized.junction.start,
+                "end": normalized.junction.end,
+                "coordinate_space": "payload_forward",
+                "fill": "#BFDBFE",
+                "alpha": 0.3,
+                "corner_radius": 8.0,
+                "cover_rows": "both",
+            }
+        ],
     }
     assert payload_view["motif_layers"] == [layer.model_dump(mode="json") for layer in motif_layers]
     assert payload_view["mismatches"] == [entry.model_dump(mode="json") for entry in mismatch_annotations]
@@ -1602,7 +1687,7 @@ def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp
     assert report.pwm_effective is True
     assert len(payload_view["motif_layers"]) == 1
     assert (workspace / "outputs" / "plots" / "plot__yiu__tetr_monotypic_hit__payload_views.pdf").exists()
-    assert payload_view["display"]["title"] == "TetR payload"
+    assert payload_view["display"]["title"] == "TetR payload with 1 motif site"
     assert payload_view["motif_layers"][0]["tf_name"] == "tetR"
     assert payload_view["motif_layers"][0]["reference_strand"] == "+"
     assert payload_view["motif_layers"][0]["start"] == 0
@@ -1624,6 +1709,8 @@ def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp
     split_rows = _load_jsonl(bundle_dir / "split_payload_view.json")
     assert split_rows[0]["meta"]["row_labels"] == {}
     assert split_rows[1]["meta"]["row_labels"] == {}
+    assert split_rows[0]["display"]["title"] == "Left split fragment"
+    assert split_rows[1]["display"]["title"] == "Right split fragment"
     assert split_rows[0]["meta"]["payload_body_sequence_5to3"] == payload_view["selected_payload_sequence"][:8]
     assert split_rows[0]["meta"]["display_payload_body_sequence_5to3"] == reverse_complement_iupac(
         payload_view["selected_payload_sequence"][:8]
@@ -1652,7 +1739,7 @@ def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp
     ]
     assert split_rows[1]["boundaries"] == split_rows[0]["boundaries"]
     assert split_rows[0]["meta"]["base_highlights"] == {"primary": [8, 9], "complement": []}
-    assert split_rows[1]["meta"]["base_highlights"] == {"primary": [8, 9], "complement": []}
+    assert split_rows[1]["meta"]["base_highlights"] == {"primary": [], "complement": []}
     assert split_rows[0]["meta"]["base_highlight_color"] == "#B91C1C"
     assert split_rows[1]["meta"]["base_highlight_color"] == "#B91C1C"
     assert split_rows[0]["meta"]["dim_base_indices"] == {
@@ -1664,6 +1751,7 @@ def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp
         "complement": list(range(11, 18)),
     }
     assembled_view = _load_json(bundle_dir / "assembled_payload_view.json")
+    assert assembled_view["display"]["title"] == "Reassembled payload"
     assert assembled_view["meta"]["row_labels"] == {}
     assert assembled_view["meta"]["base_highlights"] == {"primary": [], "complement": [9, 10]}
     assert assembled_view["meta"]["base_highlight_color"] == "#B91C1C"
@@ -1757,7 +1845,7 @@ def test_render_sample_hit_with_sample_context_and_overlapping_selected_occurren
 
     assert report.pwm_effective is True
     assert len(payload_view["motif_layers"]) == 3
-    assert payload_view["display"]["title"] == "BaeR payload (3 sites)"
+    assert payload_view["display"]["title"] == "BaeR payload with 3 motif sites"
     assert payload_view["meta"]["row_labels"] == {}
     assert [layer["start"] for layer in payload_view["motif_layers"]] == [0, 2, 3]
     assert (bundle_dir / "payload_views.pdf").exists()
@@ -2022,3 +2110,50 @@ def test_render_yiu_spec_emit_renders_cleans_partial_artifacts_when_published_pl
     assert manifest["render_status"] == "failed"
     assert not (bundle_dir / "payload_views.pdf").exists()
     assert not (workspace / "outputs" / "plot__demo_payload__payload_views.pdf").exists()
+
+
+def test_save_composite_render_adds_bottom_nucleotide_legend(tmp_path: Path) -> None:
+    panel = np.full((48, 128, 4), 255, dtype=np.uint8)
+    panel[:, :, 3] = 255
+    panel[12:36, 20:108, :3] = np.array([191, 219, 254], dtype=np.uint8)
+    render_path = tmp_path / "composite.png"
+
+    save_composite_render(panel_images=[panel], render_path=render_path)
+    composite = mpimg.imread(render_path)
+
+    canonical = np.array([75, 85, 99], dtype=np.float32) / 255.0
+    mismatch = np.array([185, 28, 28], dtype=np.float32) / 255.0
+    legend_band = composite[int(composite.shape[0] * 0.75) :, :, :3]
+
+    assert np.any(np.linalg.norm(legend_band - canonical, axis=2) < 0.05)
+    assert np.any(np.linalg.norm(legend_band - mismatch, axis=2) < 0.05)
+
+
+def test_composite_nucleotide_legend_centers_items_with_tight_square_swatch_spacing() -> None:
+    fig, axis = plt.subplots(figsize=(4, 1), dpi=100)
+    try:
+        _draw_composite_nucleotide_legend(axis)
+        legend = axis.get_legend()
+
+        assert legend is not None
+        assert [text.get_text() for text in legend.get_texts()] == ["Canonical", "Mismatch"]
+        assert all(text.get_text() != "A" for text in legend.get_texts())
+        assert not axis.patches
+        assert len(legend.legend_handles) == 2
+        assert legend.legend_handles[0].get_marker() == "s"
+        assert legend.legend_handles[1].get_marker() == "s"
+        assert legend.legend_handles[0].get_color() == YIU_NUCLEOTIDE_LEGEND_CANONICAL_COLOR
+        assert legend.legend_handles[1].get_color() == YIU_NUCLEOTIDE_LEGEND_MISMATCH_COLOR
+        assert all(float(text.get_fontsize()) < 10.0 for text in legend.get_texts())
+        assert math.isclose(
+            float(legend.legend_handles[0].get_markersize()),
+            float(legend.legend_handles[1].get_markersize()),
+        )
+        assert float(legend.columnspacing) <= 1.0
+
+        fig.canvas.draw()
+        bbox = legend.get_window_extent(renderer=fig.canvas.get_renderer()).transformed(axis.transAxes.inverted())
+        assert math.isclose(float(bbox.x0 + bbox.width / 2.0), 0.5, abs_tol=0.03)
+        assert float(bbox.y0 + bbox.height / 2.0) < 0.45
+    finally:
+        plt.close(fig)

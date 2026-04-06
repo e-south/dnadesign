@@ -1,7 +1,7 @@
 ## Cruncher docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-04-05
 
 **Last updated by:** cruncher-maintainers on 2026-04-05
 
@@ -18,7 +18,7 @@
 ### Overview
 This index is the browsing map for Cruncher docs. Start with the package-level [Cruncher README](../README.md) for the short operational map, then route into one workflow family.
 
-Treat YIU as a separate contract stack: use the demo for the checked-in workspace, the workflow guide for operator flow, the spec reference for schema and normalization, the artifacts reference for emitted files and render state, and the visual system page for layout posture. That keeps its operator flow, schema rules, emitted bundle, and visual system on separate pages so each contract stays smaller and easier to change.
+YIU is its own workflow family, not a special case of `sample` or cassette work. It accepts either an exact payload sequence or a `sample_hit` resolved from public Sample outputs, searches a 4 nt internal junction plus allowed mismatch plans, and publishes a deterministic three-view bundle. Use the demo for the checked-in workspace, the workflow guide for command flow, the spec reference for schema and normalization, the artifacts page for emitted files and `show`, and the visual-system page for view hierarchy.
 
 Cruncher has three first-class workflow families today:
 
@@ -34,10 +34,13 @@ Studies and portfolios extend the fixed-length optimization lane. Cassette and Y
 - Run the larger study-ready optimization workspace: [`demos/project_all_tfs.md`](demos/project_all_tfs.md)
 - Run a cassette workspace end to end: [`demos/demo_cassette_workspace.md`](demos/demo_cassette_workspace.md)
 - Run a YIU workspace end to end: [`demos/demo_yiu_workspace.md`](demos/demo_yiu_workspace.md)
+- Run a sample-backed YIU example beside the upstream Sample outputs:
+  [`../workspaces/demo_monotypic_tetr/runbook.md`](../workspaces/demo_monotypic_tetr/runbook.md) or
+  [`../workspaces/demo_monotypic_lexa/runbook.md`](../workspaces/demo_monotypic_lexa/runbook.md)
 - Design a cassette from an authored spec: [`guides/cassette_workflow.md`](guides/cassette_workflow.md)
 - Search for ranked cassette hits: [`guides/cassette_solve_workflow.md`](guides/cassette_solve_workflow.md)
 - Run payload-centric YIU workflows: [`guides/yiu_workflow.md`](guides/yiu_workflow.md)
-  Ownership split: demo = checked-in workspace/runbook, workflow = command flow, visual system = named directions and hierarchy, spec = schema/normalization, artifacts = emitted files/render state, architecture = module ownership.
+  Use the demo for the checked-in workspace, the workflow guide for command flow, the spec reference for schema and normalization, the artifacts page for emitted files and `show`, and the visual-system page for view hierarchy.
 - Understand sample/Gibbs analysis outputs: [`guides/sampling_and_analysis.md`](guides/sampling_and_analysis.md)
 - Run study sweeps: [`guides/studies.md`](guides/studies.md)
 - Aggregate a portfolio: [`guides/portfolio_aggregation.md`](guides/portfolio_aggregation.md)

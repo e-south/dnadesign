@@ -4,41 +4,32 @@
 **Last verified:** 2026-04-05
 **Last updated by:** cruncher-maintainers on 2026-04-05
 
-YIU is a payload-centric rendering workflow with a strict v4 contract.
-Use this guide for command flow and operator posture. Use [YIU Spec Reference](../reference/yiu_spec.md) for input and normalization rules, [YIU Artifacts](../reference/yiu_artifacts.md) for emitted files and render-state semantics, [YIU Visual System](../reference/yiu_visual_system.md) for named visual directions and hierarchy, and [Cruncher architecture](../reference/architecture.md) for module ownership.
+YIU turns one payload sequence into a checked junction-mismatch bundle. It accepts either an exact `user_sequence` or a `sample_hit` resolved from public Cruncher Sample outputs, searches valid 4 nt internal junction plans plus one or two mismatches, optionally scores those candidates against PWM context, and publishes three BaseRender-ready views.
 
 <!-- docs:toc:off -->
+
+Useful links:
+
+- [YIU Workspace Demo](../demos/demo_yiu_workspace.md)
+- [Sampling and Analysis](../guides/sampling_and_analysis.md)
+- [YIU Spec Reference](../reference/yiu_spec.md)
+- [YIU Artifacts](../reference/yiu_artifacts.md)
+- [YIU Visual System](../reference/yiu_visual_system.md)
+- [Cruncher architecture](../reference/architecture.md)
 
 The public lane is:
 
 `input payload -> normalized payload -> optimized junction/mismatch plan -> published bundle -> BaseRender`
 
-This page is the operator route map, not the schema definition. Keep emitted-file details in [YIU Artifacts](../reference/yiu_artifacts.md), input rules in [YIU Spec Reference](../reference/yiu_spec.md), and layout posture in [YIU Visual System](../reference/yiu_visual_system.md).
+### Pick the shortest path
 
-### Route map
+- Use [YIU Workspace Demo](../demos/demo_yiu_workspace.md) for the checked-in user-sequence workspace and runbook.
+- Use `cruncher yiu validate` when you only need schema, source-resolution, and payload-plan checks.
+- Use `cruncher yiu render` when you need the published bundle. Add `--emit-renders` when you also want the composite PDF.
+- Use `cruncher yiu show` when you need one fail-fast inspection surface for manifest, inventory, payload summary, and rendered artifacts.
+- Use [YIU Spec Reference](../reference/yiu_spec.md) for input rules, [YIU Artifacts](../reference/yiu_artifacts.md) for emitted files and `show`, and [YIU Visual System](../reference/yiu_visual_system.md) for view hierarchy.
 
-- Use the demo when you need the checked-in workspace and runbook.
-- Use `validate` when you need contract and payload-plan checks only.
-- Use `render` when you need the bundle plus optional PDF publication.
-- Use `show` when you need a fail-fast bundle inspection surface.
-
-### Documentation ownership
-
-- Use [YIU Workspace Demo](../demos/demo_yiu_workspace.md) for the checked-in workspace and runbook.
-- Use this guide for command flow and operator posture.
-- Use [YIU Visual System](../reference/yiu_visual_system.md) for the `bench_strip` design language and the `evidence_ribbon` versus `operator_strip` split across the three views.
-- Use [YIU Spec Reference](../reference/yiu_spec.md) for schema and normalization only.
-- Use [YIU Artifacts](../reference/yiu_artifacts.md) for emitted files, render-status semantics, and the shared inspection surface.
-- Use [Cruncher architecture](../reference/architecture.md) when you need module ownership or app/domain boundaries.
-
-### Start here
-
-Use the shortest path that matches your job:
-
-1. [YIU Workspace Demo](../demos/demo_yiu_workspace.md) for the checked-in workspace and machine runbook.
-2. `cruncher yiu validate` when you only need schema and payload-plan verification.
-3. `cruncher yiu render --emit-renders` when you need the published bundle plus the composite operator PDF.
-4. `cruncher yiu show` when you need one fail-fast inspection surface for manifest, inventory, payload, and render integrity.
+### Inputs and published views
 
 The checked-in reference workspace lives at `src/dnadesign/cruncher/workspaces/demo_yiu_payload`.
 
@@ -53,11 +44,21 @@ Both inputs normalize into one payload object and publish exactly three views:
 - `split_payload`
 - `assembled_payload`
 
-Contract-level row semantics for those three views live in [YIU Artifacts](../reference/yiu_artifacts.md) and [YIU Visual System](../reference/yiu_visual_system.md) so the operator guide does not duplicate contract prose.
-
 The public contract is `split_yiu_payload_rendering_v4`.
 
-YIU is mismatch-centric. The junction itself is always a 4 nt internal window; the optimization layer chooses mismatch positions and mutated strands/bases inside that window. Legacy bulge/topology keys are rejected rather than interpreted heuristically.
+YIU is mismatch-centric. The junction is always a 4 nt internal window. The optimizer chooses the window, mismatch positions, mutated strands, and mutated bases within the rules in the spec. Legacy bulge and topology keys are rejected rather than guessed.
+
+### Where `sample_hit` comes from
+
+YIU can reuse public Sample outputs instead of starting from a hand-written payload sequence.
+
+`sample_hit` supports three stable source shapes:
+
+- a direct `payload_sequence`
+- a workspace-local `source_artifact_path`
+- a sibling-workspace reference through `metadata.source_workspace` plus `source_artifact` or `metadata.source_artifact`
+
+The common handoff is a Sample public hit table such as `outputs/optimize/tables/elites.parquet`. When `optimization.pwm.source.kind: sample_context` is selected, YIU also resolves motif context from the same Sample-backed payload source. Ambiguous or missing sources fail fast.
 
 ### Command surface
 
@@ -65,9 +66,12 @@ YIU is mismatch-centric. The junction itself is always a 4 nt internal window; t
 uv run cruncher yiu init-workspace WORKSPACE
 uv run cruncher yiu init-workspace WORKSPACE --sequence AACCGGTTGGTT --junction-mode center_locked
 uv run cruncher yiu validate --spec configs/yiu/<workflow>.yiu.yaml
+uv run cruncher yiu validate --spec configs/yiu/<workflow>.yiu.yaml --json
 uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml
 uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml --emit-renders
+uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml --json
 uv run cruncher yiu show --bundle outputs/<workflow>
+uv run cruncher yiu show --bundle outputs/<workflow> --json --verbose
 ```
 
 `design` is not part of the public YIU surface.
@@ -102,70 +106,83 @@ output:
   bundle_dir: outputs/example_payload
 ```
 
-For v4, payload inputs must be exact `A/C/G/T` sequences. Ambiguous IUPAC symbols and legacy bulge/split topology keys are not part of the public v4 lane.
+For v4, payload inputs must be exact `A/C/G/T` sequences. Ambiguous IUPAC symbols and legacy bulge or split topology keys are not part of the public v4 lane.
 
-The two main junction policies are:
+The main junction policies are:
 
 - `center_locked`: choose the valid internal 4 nt window nearest the payload midpoint and keep the junction fixed there.
+- `derived`: accept legacy specs that still mean midpoint-nearest fixed-window behavior.
+- `explicit_window`: use one explicit internal 4 nt window.
 - `optimize`: search valid internal windows around the midpoint and rank candidates by PWM/log-likelihood retention first, then midpoint proximity and the remaining tie-break ladder.
-
-### Bundle surface
-
-YIU publishes one deterministic bundle under `output.bundle_dir`, typically `outputs/<workflow>/`.
-`render` and `show` both consume one shared bundle-artifact surface and one shared bundle-state family so the CLI and app layer do not reconstruct bundle internals ad hoc.
-
-The bundle contract is intentionally split across bundle truth, published view contracts, and composite render output. Use [YIU Artifacts](../reference/yiu_artifacts.md) for the exact emitted files, shared inspection fields, and render-status semantics.
 
 ### What `validate` checks
 
 - the root contract and schema version match `split_yiu_payload_rendering_v4`
 - exactly one input kind is populated
-- the resolved payload sequence is present and contains exact `A/C/G/T` bases
-- the junction policy yields one valid internal 4 nt window with non-empty left and right payload bodies
-- the mismatch policy is internally consistent and uses `strand_mode: per_position`
+- the resolved payload sequence exists and contains exact `A/C/G/T` bases
+- the junction policy yields at least one valid internal 4 nt window with non-empty left and right payload bodies
+- the mismatch policy is internally consistent and keeps `strand_mode: per_position`
 - PWM mode and PWM source are compatible with the input kind
 - `sample_hit` provenance resolves to one exact payload sequence or fails fast
-- PWM-aware optimization is deterministic and exhaustive across valid windows, mismatch positions, strand assignments, and non-native base substitutions in the allowed candidate space
+- PWM-aware optimization remains deterministic and exhaustive across valid windows, mismatch positions, strand assignments, and allowed non-native base substitutions
 - legacy `bulge_mask` and `split` keys are rejected because they are not part of `split_yiu_payload_rendering_v4`
 
-### Visuals and inspection
+### What `render` writes
 
-The payload view uses `yiu_payload_visual_v1`.
-The current YIU visual system is `bench_strip`: `payload` uses the `evidence_ribbon` direction, while `split_payload` and `assembled_payload` use `operator_strip`. Use [YIU Visual System](../reference/yiu_visual_system.md) for the hierarchy rationale and style-boundary rules.
+`cruncher yiu render` validates the spec, reruns normalization and optimization, and writes one deterministic bundle under `output.bundle_dir`, usually `outputs/<workflow>/`.
 
-When PWM context is available, the payload view includes motif layers aligned to payload-forward coordinates.
-When PWM is absent or disabled, the same contract stays valid with an empty `motif_layers` list.
+With `--emit-renders`, YIU also renders one composite `payload_views.pdf` page and mirrors that PDF to `output.published_plot_path` when configured.
 
-The three-view composite follows one explicit visual system:
+Use [YIU Artifacts](../reference/yiu_artifacts.md) for the exact emitted files. The important operator files are:
 
-- `payload` uses the `evidence_ribbon` direction so sequence truth, mismatch evidence, and motif overlays stay in one dense operator row
-- `split_payload` and `assembled_payload` use the `operator_strip` direction so assembly geometry stays centered, legend-light, and subordinate to the payload truth row
-- unknown view ids fail fast during style planning instead of silently inheriting a plausible strip preset
+- `bundle_manifest.json`
+- `bundle_summary.json`
+- `normalized_payload.json`
+- `visual_inventory.json`
+- `payload_view.json`
+- `split_payload_view.json`
+- `assembled_payload_view.json`
 
-`sample_hit` source resolution follows the rules in [YIU Spec Reference](../reference/yiu_spec.md). Ambiguous or missing sources fail fast.
+The payload view uses `yiu_payload_visual_v1`. When PWM context is effective, that view carries motif layers aligned to payload-forward coordinates. When PWM is absent or disabled, the same contract stays valid with an empty `motif_layers` list.
 
-`cruncher yiu show` surfaces the bundle contract, provenance, one concise payload-forward sequence summary, junction and mismatch summary, PWM mode, render status, integrity checks, and artifact paths. Use [YIU Artifacts](../reference/yiu_artifacts.md) for the exact inspection fields and fail-fast drift rules. Use `--verbose` when you need the optimizer trace and split-row debug details rather than the summary-first handoff.
+### What `show` checks and reports
 
-`show` is fail-fast on bundle drift: missing published view contracts, manifest/inventory disagreements, payload-view motif drift, a `rendered` bundle with a missing `payload_views.pdf`, or a configured published plot path that does not exist are treated as bundle corruption.
+`cruncher yiu show` reads the bundle, checks that the manifest, inventory, normalized payload, published view contracts, and rendered artifacts all agree, and then prints a concise summary or JSON.
 
-`cruncher yiu render --spec <workflow>.yiu.yaml --emit-renders` validates the spec, writes the payload bundle under `output.bundle_dir`, renders one composite `payload_views.pdf` page with the three standard panels, mirrors that PDF to `output.published_plot_path` when configured, and updates `visual_inventory.json` in the same bundle directory.
+`show` is fail-fast on bundle drift. Missing published view contracts, manifest and inventory disagreements, payload-view motif drift, a `rendered` bundle with a missing `payload_views.pdf`, or a configured published plot path that does not exist are treated as bundle corruption.
 
-The split middle row renders `split_payload_left` before `split_payload_right`. Each panel shows the retained post-digestion fragment, its inward-facing sticky end, selected-versus-reference sticky-end metadata, the fragment-display payload-body slice, and optional ghosted excision context. The bundle summary and split-row metadata also publish the corresponding payload-forward left/right body sequences in explicit 5' to 3' orientation so downstream readers do not have to infer them from fragment geometry.
+Default `show --json` prints the full bundle surface while omitting `motif_context`, `optimization_decision`, and `split_row_debug` unless `--verbose` is set. Human-readable `--verbose` adds split-row debug lines only; the optimizer trace and motif context remain JSON-only.
 
-The assembled payload returns to original payload order. It publishes one explicit `junction_span` in payload coordinates and does not use a seam or ligation-boundary surrogate in the operator-facing contract.
+The split middle row renders `split_payload_left` before `split_payload_right`. Each panel shows the retained fragment, its inward-facing sticky end, selected-versus-reference sticky-end metadata, the fragment-display payload-body slice, and optional ghosted excision context. The bundle summary and split-row metadata also publish the corresponding payload-forward left and right body sequences in explicit 5' to 3' orientation.
+
+The assembled payload returns to original payload order. It publishes one explicit `junction_span` in payload coordinates rather than a seam surrogate.
+
+### Visual direction
+
+The current YIU visual system is `bench_strip`:
+
+- `payload` uses `evidence_ribbon`
+- `split_payload` uses `operator_strip`
+- `assembled_payload` uses `operator_strip`
+
+Use [YIU Visual System](../reference/yiu_visual_system.md) for the rationale and style-boundary rules.
 
 ### Maintainer boundaries
 
-Keep this guide operator-first. The authoritative module ownership map lives in [Architecture](../reference/architecture.md).
-
 At the tool boundary, YIU publishes contracts and jobs; `baserender` consumes those contracts through its public API. Cross-tool integrations should not import `dnadesign.baserender.src.*`.
-Keep schema and source-resolution edits narrow: `yiu/spec_models.py` and `yiu/payload_resolution.py` stay public facades, while the detailed validators and sample-hit artifact IO helpers live behind those seams.
-The PWM resolver follows the same pattern: `yiu/pwm_context.py` stays the public seam, `yiu/pwm_context_sources.py` owns inline/file dispatch, and `yiu/pwm_context_sample_context.py` orchestrates sample-backed loading through the focused `yiu/pwm_context_sample_occurrences.py` and `yiu/pwm_context_sample_motifs.py` helpers.
+
+Keep schema and source-resolution edits narrow:
+
+- `yiu/spec_models.py` stays the public schema facade
+- `yiu/payload_resolution.py` stays the public input-resolution seam
+- `yiu/pwm_context.py` stays the public PWM-resolution seam
+- focused validators and source loaders stay behind `yiu/spec_input_models.py`, `yiu/spec_pwm_models.py`, `yiu/spec_rendering_models.py`, `yiu/sample_hit_sources.py`, `yiu/pwm_context_sources.py`, `yiu/pwm_context_sample_context.py`, `yiu/pwm_context_sample_occurrences.py`, and `yiu/pwm_context_sample_motifs.py`
 
 ### Related docs
 
-Start with [YIU Workspace Demo](../demos/demo_yiu_workspace.md), then use:
-
+- [YIU Workspace Demo](../demos/demo_yiu_workspace.md)
+- [Sampling and Analysis](../guides/sampling_and_analysis.md)
 - [YIU Spec Reference](../reference/yiu_spec.md)
 - [YIU Artifacts](../reference/yiu_artifacts.md)
+- [YIU Visual System](../reference/yiu_visual_system.md)
 - [CLI Reference](../reference/cli.md)

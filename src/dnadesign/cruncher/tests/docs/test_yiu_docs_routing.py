@@ -28,6 +28,9 @@ def test_top_level_docs_route_readers_to_yiu_surfaces() -> None:
     assert "payload-centric YIU" in package_readme
     assert "docs/demos/demo_yiu_workspace.md" in package_readme
     assert "docs/guides/yiu_workflow.md" in package_readme
+    assert "sample_hit" in package_readme
+    assert "docs/reference/yiu_spec.md" in package_readme
+    assert "docs/reference/yiu_artifacts.md" in package_readme
 
     for content in (docs_readme, docs_index):
         assert "Payload-Centric YIU Workflows" in content
@@ -37,6 +40,7 @@ def test_top_level_docs_route_readers_to_yiu_surfaces() -> None:
         assert "reference/yiu_artifacts.md" in content
         assert "reference/yiu_visual_system.md" in content
         assert "yiu init-workspace|validate|render|show" in content
+        assert "workspaces/demo_monotypic_tetr/runbook.md" in content
         assert "trace|solve" not in content
 
 
@@ -50,16 +54,19 @@ def test_cli_reference_lists_public_yiu_surface() -> None:
     assert "cruncher yiu show" in cli_ref
     assert "split_yiu_payload_rendering_v4" in cli_ref
     assert "Treat the bundle directory as the source of truth" in cli_ref
+    assert "`motif_context`, `optimization_decision`, and `split_row_debug`" in cli_ref
 
 
 def test_yiu_workflow_routes_to_contract_pages() -> None:
     guide = _read("docs/guides/yiu_workflow.md")
 
-    assert "This page is the operator route map" in guide
-    assert "### Documentation ownership" in guide
+    assert "YIU turns one payload sequence into a checked junction-mismatch bundle." in guide
+    assert "### Where `sample_hit` comes from" in guide
     assert "[YIU Spec Reference](../reference/yiu_spec.md)" in guide
     assert "[YIU Artifacts](../reference/yiu_artifacts.md)" in guide
     assert "[YIU Visual System](../reference/yiu_visual_system.md)" in guide
     assert "[Cruncher architecture](../reference/architecture.md)" in guide
+    assert "[Sampling and Analysis](../guides/sampling_and_analysis.md)" in guide
     assert "Ambiguous or missing sources fail fast." in guide
     assert "Cross-tool integrations should not import `dnadesign.baserender.src.*`." in guide
+    assert "Human-readable `--verbose` adds split-row debug lines only" in guide
