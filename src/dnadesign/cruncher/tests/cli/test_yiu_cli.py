@@ -35,6 +35,8 @@ def _payload_spec(
     candidate_positions: list[int] | None = None,
     mismatch_count: int = 1,
 ) -> dict[str, object]:
+    junction_start = 4
+    junction_end = 8
     return {
         "yiu": {
             "schema_version": 1,
@@ -50,10 +52,10 @@ def _payload_spec(
         "optimization": {
             "junction": {
                 "mode": "explicit_window",
-                "start": 4,
-                "end": 8,
+                "start": junction_start,
+                "end": junction_end,
                 "overhang_length": 4,
-                "max_payload_body_length": 12,
+                "max_payload_body_length": max(junction_start, len(sequence) - junction_end),
             },
             "mismatches": {
                 "count": mismatch_count,
