@@ -14,6 +14,7 @@ from __future__ import annotations
 from dnadesign.cruncher.bio import derive_cut_geometry, reverse_complement_iupac
 from dnadesign.cruncher.config.schema_v3 import StrictBaseModel
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
+from dnadesign.cruncher.yiu.view_styles import build_split_payload_view_title
 
 BSMBI_RECOGNITION_SEQUENCE = "CGTCTC"
 BSMBI_PRIMARY_CUT_OFFSET = 7
@@ -215,7 +216,7 @@ def build_split_fragment_display_specs(
     left = _build_forward_fragment_display(
         fragment_side="left",
         panel_order=0,
-        title="Split payload left",
+        title=build_split_payload_view_title("left"),
         sticky_end_sequence_5to3=selected_sticky_end,
         sticky_end_payload_sequence_3to5=selected_payload_sticky_end,
         canonical_sticky_end_sequence_5to3=canonical_sticky_end,
@@ -227,7 +228,7 @@ def build_split_fragment_display_specs(
     right = _build_reverse_fragment_display(
         fragment_side="right",
         panel_order=1,
-        title="Split payload right",
+        title=build_split_payload_view_title("right"),
         sticky_end_sequence_5to3=selected_sticky_end,
         sticky_end_payload_sequence_3to5=selected_payload_sticky_end,
         canonical_sticky_end_sequence_5to3=canonical_sticky_end,

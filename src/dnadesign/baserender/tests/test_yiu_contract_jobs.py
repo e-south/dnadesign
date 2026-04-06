@@ -18,6 +18,7 @@ from pathlib import Path
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import pytest
+from matplotlib.patches import FancyBboxPatch
 
 import dnadesign.baserender as baserender
 from dnadesign.baserender.src.adapters.sequence_evidence_map_v1 import SequenceEvidenceMapV1Adapter
@@ -485,6 +486,17 @@ def test_yiu_payload_projection_contract_normalizes_row_labels_and_connector_spa
     assert projected["meta"]["connector_hidden_indices"] == []
     assert projected["meta"]["connector_cross_indices"] == []
     assert projected["meta"]["connector_overhang_spans"] == [{"start": 8, "end": 12}]
+    assert projected["meta"]["span_backdrops"] == [
+        {
+            "start": 8,
+            "end": 12,
+            "coordinate_space": "payload_forward",
+            "fill": "#BFDBFE",
+            "alpha": 0.3,
+            "corner_radius": 8.0,
+            "cover_rows": "both",
+        }
+    ]
     assert "yiu_payload_meta" not in projected["meta"]
 
 
@@ -527,6 +539,76 @@ def test_yiu_payload_projection_contract_partitions_highlights_by_mutated_strand
 
     assert projected["meta"]["base_highlight_color"] == "#B91C1C"
     assert projected["meta"]["base_highlights"] == {"primary": [9], "complement": [10]}
+
+
+def test_sequence_evidence_map_backdrop_meta_renders_rounded_duplex_patch_behind_highlights() -> None:
+    adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="IUPAC_DNA")
+    record = adapter.apply(
+        {
+            "contract_kind": "sequence_evidence_map_v1",
+            "state_id": "assembled_payload",
+            "topology_kind": "linear_dsdna",
+            "alphabet": "iupac_dna",
+            "primary_sequence": "CTCTATATCTGATATAGAG",
+            "complement_sequence": "GAGATATAGAATATATCTC",
+            "owners": [],
+            "effect_tags": [],
+            "boundaries": [],
+            "pairings": [],
+            "display": {"title": "Assembled payload"},
+            "meta": {
+                "base_highlight_color": "#B91C1C",
+                "base_highlights": {
+                    "primary": [],
+                    "complement": [10],
+                },
+                "connector_hidden_indices": [9, 11, 12],
+                "connector_cross_indices": [10],
+                "connector_overhang_spans": [{"start": 9, "end": 13}],
+                "span_backdrops": [
+                    {
+                        "start": 9,
+                        "end": 13,
+                        "coordinate_space": "payload_forward",
+                        "fill": "#BFDBFE",
+                        "alpha": 0.3,
+                        "corner_radius": 8.0,
+                        "cover_rows": "both",
+                    }
+                ],
+            },
+        },
+        row_index=0,
+    )
+
+    style = resolve_style(preset="presentation_default", overrides={"connectors": True})
+    layout = compute_layout(record, style)
+    expected_x = layout.x_left + 9 * layout.cw
+    expected_y = layout.y_reverse - layout.sequence_extent_down
+    expected_width = 4 * layout.cw
+    expected_height = (layout.y_forward + layout.sequence_extent_up) - expected_y
+
+    fig = baserender.render(
+        record,
+        renderer="nucleotide_evidence_map",
+        style={"preset": "presentation_default", "overrides": {"connectors": True}},
+    )
+    try:
+        patch_by_gid = {patch.get_gid(): patch for patch in fig.axes[0].patches if patch.get_gid()}
+        backdrop = patch_by_gid["sequence_backdrop:0"]
+        highlight = patch_by_gid["sequence:rev:10:A:highlight"]
+    finally:
+        plt.close(fig)
+
+    assert isinstance(backdrop, FancyBboxPatch)
+    x, y, width, height = backdrop.get_bbox().bounds
+    assert x == pytest.approx(expected_x)
+    assert y == pytest.approx(expected_y)
+    assert width == pytest.approx(expected_width)
+    assert height == pytest.approx(expected_height)
+    assert mcolors.to_hex(backdrop.get_facecolor(), keep_alpha=False) == "#bfdbfe"
+    assert float(backdrop.get_facecolor()[3]) == pytest.approx(0.3)
+    assert float(backdrop.get_zorder()) < float(highlight.get_zorder())
 
 
 def test_yiu_payload_projection_contract_rejects_malformed_row_labels() -> None:
@@ -955,7 +1037,7 @@ def test_yiu_payload_render_titles_are_not_smaller_than_sequence_glyphs_and_row_
                     "matrix": _canonical_tetr_pwm_rows(),
                 }
             ],
-            "display": {"title": "TetR payload (2 sites)"},
+            "display": {"title": "TetR payload with 2 motif sites"},
             "meta": {"row_labels": {}},
         },
         row_index=0,
@@ -971,6 +1053,7 @@ def test_yiu_payload_render_titles_are_not_smaller_than_sequence_glyphs_and_row_
                 "font_size_seq": 13,
                 "font_size_label": 11,
                 "overlay_align": "center",
+                "overlay_title_color": "#111827",
             },
         },
     )
@@ -981,7 +1064,8 @@ def test_yiu_payload_render_titles_are_not_smaller_than_sequence_glyphs_and_row_
 
     assert "Selected payload" not in texts
     assert "Selected complement" not in texts
-    assert float(texts["TetR payload (2 sites)"].get_fontsize()) >= 13.0
+    assert float(texts["TetR payload with 2 motif sites"].get_fontsize()) >= 13.0
+    assert mcolors.to_hex(texts["TetR payload with 2 motif sites"].get_color(), keep_alpha=False) == "#111827"
 
 
 def test_sequence_rows_layout_reserves_left_gutter_for_long_row_labels() -> None:

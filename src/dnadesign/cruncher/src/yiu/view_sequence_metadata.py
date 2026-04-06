@@ -11,7 +11,10 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.contracts.visual.sequence_evidence_meta import build_sequence_evidence_connector_span_meta
+from dnadesign.contracts.visual.sequence_evidence_meta import (
+    build_sequence_evidence_connector_span_meta,
+    build_sequence_evidence_span_backdrop_meta,
+)
 from dnadesign.cruncher.yiu.bsmbi import GhostExcisedContext, SplitFragmentDisplaySpec
 from dnadesign.cruncher.yiu.domain_models import MismatchSelection, NormalizedPayload
 from dnadesign.cruncher.yiu.view_common import YIU_EMPTY_ROW_LABELS
@@ -25,6 +28,15 @@ def _ghost_dim_base_indices(ghost_context: GhostExcisedContext | None) -> dict[s
     return {
         "primary": list(ghost_context.primary_indices),
         "complement": list(ghost_context.complement_indices),
+    }
+
+
+def _ghost_dim_index_sets(ghost_context: GhostExcisedContext | None) -> dict[str, set[int]]:
+    if ghost_context is None:
+        return {"primary": set(), "complement": set()}
+    return {
+        "primary": set(int(index) for index in ghost_context.primary_indices),
+        "complement": set(int(index) for index in ghost_context.complement_indices),
     }
 
 
@@ -43,11 +55,14 @@ def _split_mismatch_highlight_indices(
     normalized: NormalizedPayload,
 ) -> dict[str, list[int]]:
     highlights = {"primary": [], "complement": []}
+    ghost_indices = _ghost_dim_index_sets(fragment.ghost_excised_context)
     sticky_start = fragment.sticky_end_display_span.start
     junction_end = normalized.junction.end
     for mismatch in normalized.mismatches:
         display_index = sticky_start + (junction_end - 1 - mismatch.payload_index)
         row_id = "primary" if mismatch.mutated_strand == "complement" else "complement"
+        if display_index in ghost_indices[row_id]:
+            continue
         highlights[row_id].append(display_index)
     for row_id in highlights:
         highlights[row_id].sort()
@@ -87,6 +102,11 @@ def build_split_payload_row_meta(
             end=sticky_end_span["end"],
             coordinate_space=sticky_end_span.get("coordinate_space"),
         ),
+        **build_sequence_evidence_span_backdrop_meta(
+            start=sticky_end_span["start"],
+            end=sticky_end_span["end"],
+            coordinate_space=sticky_end_span.get("coordinate_space"),
+        ),
     }
 
 
@@ -106,6 +126,11 @@ def build_assembled_payload_view_meta(normalized: NormalizedPayload) -> dict[str
         "base_highlight_color": YIU_MISMATCH_HIGHLIGHT_COLOR,
         "row_labels": YIU_EMPTY_ROW_LABELS,
         **build_sequence_evidence_connector_span_meta(
+            start=junction_span["start"],
+            end=junction_span["end"],
+            coordinate_space="payload_forward",
+        ),
+        **build_sequence_evidence_span_backdrop_meta(
             start=junction_span["start"],
             end=junction_span["end"],
             coordinate_space="payload_forward",

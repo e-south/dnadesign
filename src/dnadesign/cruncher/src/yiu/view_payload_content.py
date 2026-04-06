@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from dnadesign.contracts.visual.sequence_evidence_meta import build_sequence_evidence_span_backdrop_meta
 from dnadesign.contracts.visual.yiu_payload_visual_v1 import (
     YiuPayloadMismatchV1,
     YiuPayloadMotifLayerV1,
@@ -56,6 +57,11 @@ def build_payload_view_meta(normalized: NormalizedPayload) -> dict[str, object]:
         "row_labels": YIU_EMPTY_ROW_LABELS,
         "pwm_effective": normalized.motif_context.effective,
         "motif_ids": [motif.motif_instance_id for motif in normalized.motif_context.motifs],
+        **build_sequence_evidence_span_backdrop_meta(
+            start=normalized.junction.start,
+            end=normalized.junction.end,
+            coordinate_space="payload_forward",
+        ),
     }
 
 

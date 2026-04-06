@@ -11,7 +11,13 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Mapping
+
+SEQUENCE_EVIDENCE_DEFAULT_SPAN_BACKDROP_FILL = "#BFDBFE"
+SEQUENCE_EVIDENCE_DEFAULT_SPAN_BACKDROP_ALPHA = 0.3
+SEQUENCE_EVIDENCE_DEFAULT_SPAN_BACKDROP_CORNER_RADIUS = 8.0
+SEQUENCE_EVIDENCE_ALLOWED_SPAN_BACKDROP_ROW_COVERAGE = frozenset({"primary", "complement", "both"})
 
 
 def normalize_sequence_evidence_row_labels(meta: Mapping[str, object]) -> dict[str, str]:
@@ -69,8 +75,46 @@ def build_sequence_evidence_connector_span_meta(
     }
 
 
+def build_sequence_evidence_span_backdrop_meta(
+    *,
+    start: int,
+    end: int,
+    coordinate_space: str | None = None,
+    fill: str = SEQUENCE_EVIDENCE_DEFAULT_SPAN_BACKDROP_FILL,
+    alpha: float = SEQUENCE_EVIDENCE_DEFAULT_SPAN_BACKDROP_ALPHA,
+    corner_radius: float = SEQUENCE_EVIDENCE_DEFAULT_SPAN_BACKDROP_CORNER_RADIUS,
+    cover_rows: str = "both",
+) -> dict[str, object]:
+    if end <= start:
+        raise ValueError("sequence-evidence span backdrops require end > start")
+    fill_text = str(fill).strip()
+    if not fill_text:
+        raise ValueError("sequence-evidence span backdrops require a non-empty fill color")
+    alpha_value = float(alpha)
+    if not math.isfinite(alpha_value) or alpha_value < 0.0 or alpha_value > 1.0:
+        raise ValueError("sequence-evidence span backdrop alpha must be finite and within [0, 1]")
+    corner_radius_value = float(corner_radius)
+    if not math.isfinite(corner_radius_value) or corner_radius_value < 0.0:
+        raise ValueError("sequence-evidence span backdrop corner radius must be finite and >= 0")
+    cover_rows_value = str(cover_rows).strip().lower()
+    if cover_rows_value not in SEQUENCE_EVIDENCE_ALLOWED_SPAN_BACKDROP_ROW_COVERAGE:
+        raise ValueError("sequence-evidence span backdrop cover_rows must be primary, complement, or both")
+    span: dict[str, object] = {
+        "start": int(start),
+        "end": int(end),
+        "fill": fill_text,
+        "alpha": alpha_value,
+        "corner_radius": corner_radius_value,
+        "cover_rows": cover_rows_value,
+    }
+    if coordinate_space is not None:
+        span["coordinate_space"] = str(coordinate_space)
+    return {"span_backdrops": [span]}
+
+
 __all__ = [
     "build_sequence_evidence_connector_meta",
     "build_sequence_evidence_connector_span_meta",
+    "build_sequence_evidence_span_backdrop_meta",
     "normalize_sequence_evidence_row_labels",
 ]

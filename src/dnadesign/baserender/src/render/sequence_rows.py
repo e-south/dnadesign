@@ -100,6 +100,7 @@ class SequenceRowsRenderer:
         base_highlights: Mapping[str, Sequence[int]] = {}
         base_highlight_color: Mapping[str, str] = {}
         dim_base_indices: Mapping[str, Sequence[int]] = {}
+        span_backdrops: Sequence[Mapping[str, object]] = ()
         if isinstance(record.meta, Mapping):
             raw_complement = record.meta.get("complement_sequence")
             if isinstance(raw_complement, str) and len(raw_complement) == len(record.sequence):
@@ -113,6 +114,9 @@ class SequenceRowsRenderer:
             raw_dim_indices = record.meta.get("dim_base_indices")
             if isinstance(raw_dim_indices, Mapping):
                 dim_base_indices = raw_dim_indices
+            raw_span_backdrops = record.meta.get("span_backdrops")
+            if isinstance(raw_span_backdrops, Sequence) and not isinstance(raw_span_backdrops, (str, bytes)):
+                span_backdrops = raw_span_backdrops
         if bool(style.sequence.bold_consensus_bases) and motif_geometries:
             tone_fwd, tone_rev = _sequence_tone_strengths(
                 record,
@@ -166,6 +170,7 @@ class SequenceRowsRenderer:
         ax._dnadesign_record_meta = record.meta
 
         x0 = layout.x_left
+        _draw_span_backdrops(ax, layout, span_backdrops, show_two=show_two)
         _draw_sequence(
             ax,
             record.sequence,
@@ -885,7 +890,7 @@ def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
         va="top",
         fontsize=title_size,
         family=style.font_label,
-        color="#6B7280",
+        color=style.overlay_title_color,
         alpha=0.95,
         zorder=15,
         clip_on=False,
@@ -1168,6 +1173,72 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
                 continue
             (ln,) = ax.plot([x_start, x_end], [center_y, center_y], color="#111827", lw=1.35, zorder=1.7)
             ln.set_dashes((3.0, 2.0))
+
+
+def _draw_span_backdrops(
+    ax,
+    layout: LayoutContext,
+    span_backdrops: Sequence[Mapping[str, object]],
+    *,
+    show_two: bool,
+) -> None:
+    for index, raw in enumerate(span_backdrops):
+        if not isinstance(raw, Mapping):
+            continue
+        try:
+            start = int(raw.get("start"))
+            end = int(raw.get("end"))
+            alpha = float(raw.get("alpha"))
+            corner_radius = float(raw.get("corner_radius"))
+        except Exception:
+            continue
+        if end <= start:
+            continue
+        fill = str(raw.get("fill", "")).strip()
+        if not fill:
+            continue
+        cover_rows = str(raw.get("cover_rows", "both")).strip().lower()
+        row_bounds: list[tuple[float, float]] = []
+        if cover_rows in {"primary", "both"}:
+            row_bounds.append(
+                (
+                    float(layout.y_forward - layout.sequence_extent_down),
+                    float(layout.y_forward + layout.sequence_extent_up),
+                )
+            )
+        if show_two and cover_rows in {"complement", "both"}:
+            row_bounds.append(
+                (
+                    float(layout.y_reverse - layout.sequence_extent_down),
+                    float(layout.y_reverse + layout.sequence_extent_up),
+                )
+            )
+        elif not row_bounds and cover_rows == "complement":
+            row_bounds.append(
+                (
+                    float(layout.y_forward - layout.sequence_extent_down),
+                    float(layout.y_forward + layout.sequence_extent_up),
+                )
+            )
+        if not row_bounds:
+            continue
+        x = layout.x_left + start * layout.cw
+        y0 = min(bound[0] for bound in row_bounds)
+        y1 = max(bound[1] for bound in row_bounds)
+        ax.add_patch(
+            FancyBboxPatch(
+                (x, y0),
+                (end - start) * layout.cw,
+                y1 - y0,
+                boxstyle=f"round,pad=0.0,rounding_size={corner_radius}",
+                linewidth=0.0,
+                facecolor=mcolors.to_rgba(fill, alpha),
+                edgecolor="none",
+                zorder=0.6,
+                clip_on=False,
+                gid=f"sequence_backdrop:{index}",
+            )
+        )
 
 
 def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) -> None:

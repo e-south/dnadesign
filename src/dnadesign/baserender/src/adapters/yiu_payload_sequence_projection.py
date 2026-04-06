@@ -14,6 +14,7 @@ from __future__ import annotations
 from dnadesign.contracts.visual import YiuPayloadVisualV1
 from dnadesign.contracts.visual.sequence_evidence_meta import (
     build_sequence_evidence_connector_span_meta,
+    build_sequence_evidence_span_backdrop_meta,
     normalize_sequence_evidence_row_labels,
 )
 from dnadesign.contracts.visual.yiu_payload_visual_v1 import YiuPayloadMismatchV1
@@ -53,12 +54,22 @@ def _build_base_highlights(mismatches: list[YiuPayloadMismatchV1]) -> dict[str, 
 
 
 def _build_projection_meta(contract: YiuPayloadVisualV1) -> dict[str, object]:
+    backdrop_meta = contract.meta.get("span_backdrops")
     return {
         "row_labels": normalize_sequence_evidence_row_labels(contract.meta),
         "base_highlights": _build_base_highlights(contract.mismatches),
         "base_highlight_color": YIU_MISMATCH_HIGHLIGHT_COLOR,
         "reference_payload_sequence": contract.reference_payload_sequence,
         "show_reference_payload_row": contract.show_reference_payload_row,
+        **(
+            {"span_backdrops": backdrop_meta}
+            if backdrop_meta is not None
+            else build_sequence_evidence_span_backdrop_meta(
+                start=contract.junction.start,
+                end=contract.junction.end,
+                coordinate_space="payload_forward",
+            )
+        ),
         **build_sequence_evidence_connector_span_meta(
             start=contract.junction.start,
             end=contract.junction.end,

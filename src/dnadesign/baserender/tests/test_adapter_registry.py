@@ -532,6 +532,52 @@ def test_sequence_evidence_map_adapter_preserves_explicit_complement_and_base_hi
     assert boundary_effects[0].target == {"boundary": 9, "lane": "primary"}
 
 
+def test_sequence_evidence_map_adapter_normalizes_span_backdrops() -> None:
+    adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    record = adapter.apply(
+        {
+            "contract_kind": "sequence_evidence_map_v1",
+            "state_id": "assembled_payload",
+            "topology_kind": "linear_dsdna",
+            "alphabet": "iupac_dna",
+            "primary_sequence": "CTCTATATCTGATATAGAG",
+            "complement_sequence": "GAGATATAGAATATATCTC",
+            "owners": [],
+            "effect_tags": [],
+            "boundaries": [],
+            "pairings": [],
+            "display": {"title": "Assembled payload"},
+            "meta": {
+                "span_backdrops": [
+                    {
+                        "start": 9,
+                        "end": 13,
+                        "coordinate_space": "payload_forward",
+                        "fill": "#BFDBFE",
+                        "alpha": 0.3,
+                        "corner_radius": 8.0,
+                        "cover_rows": "both",
+                    }
+                ]
+            },
+        },
+        row_index=0,
+    )
+
+    assert record.meta["span_backdrops"] == (
+        {
+            "start": 9,
+            "end": 13,
+            "coordinate_space": "payload_forward",
+            "fill": "#BFDBFE",
+            "alpha": 0.3,
+            "corner_radius": 8.0,
+            "cover_rows": "both",
+        },
+    )
+
+
 def test_sequence_evidence_map_adapter_rejects_legacy_boundary_marker_style_meta() -> None:
     adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="DNA")
 

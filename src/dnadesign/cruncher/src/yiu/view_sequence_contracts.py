@@ -22,6 +22,7 @@ from dnadesign.cruncher.yiu.view_sequence_metadata import (
     build_assembled_payload_view_meta,
     build_split_payload_row_meta,
 )
+from dnadesign.cruncher.yiu.view_styles import build_assembled_payload_view_title
 
 
 def _build_sequence_contract(
@@ -94,7 +95,7 @@ def build_split_payload_view_rows(normalized: NormalizedPayload) -> list[dict[st
 def build_assembled_payload_view_contract(normalized: NormalizedPayload) -> dict[str, object]:
     return _build_sequence_contract(
         state_id="assembled_payload",
-        title="Assembled payload",
+        title=build_assembled_payload_view_title(),
         sequence=normalized.selected_payload_sequence,
         complement_sequence=assembled_payload_aligned_complement_3to5(normalized),
         boundaries=_build_ligation_junction_boundaries(

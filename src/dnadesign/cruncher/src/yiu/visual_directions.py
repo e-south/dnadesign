@@ -30,13 +30,15 @@ _COMMON_STRIP_STYLE_OVERRIDES: dict[str, object] = {
     "sequence": {"strand_gap_cells": 0.22, "to_kmer_gap_cells": 0.18},
     "kmer": {"box_height_cells": 1.02, "fill_alpha": 0.94, "text_y_nudge_cells": 0.0},
     "overlay_align": "center",
+    "overlay_title_color": "#111827",
+    "overlay_title_gap_reduction_px": 8.0,
     "connector_width": 1.1,
     "connector_alpha": 0.78,
     "connector_dash": (),
 }
 
 _OPERATOR_STRIP_TITLE_COMPACTION_OVERRIDES: dict[str, object] = {
-    "overlay_title_gap_reduction_px": 18.0,
+    "overlay_title_gap_reduction_px": 24.0,
 }
 
 

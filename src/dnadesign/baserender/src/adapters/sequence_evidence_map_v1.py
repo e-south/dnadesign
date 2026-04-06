@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -183,6 +184,78 @@ def _normalize_connector_overhang_spans(meta: Mapping[str, Any], *, limit: int) 
     return tuple(normalized)
 
 
+def _normalize_span_backdrops(
+    meta: Mapping[str, Any],
+    *,
+    primary_length: int,
+    complement_length: int,
+) -> tuple[dict[str, object], ...]:
+    raw = meta.get("span_backdrops", ())
+    if raw is None:
+        return ()
+    if isinstance(raw, (str, bytes)) or not isinstance(raw, (list, tuple)):
+        raise SchemaError("sequence_evidence_map_v1 meta.span_backdrops must be a list")
+    normalized: list[dict[str, object]] = []
+    for entry in raw:
+        if not isinstance(entry, Mapping):
+            raise SchemaError("sequence_evidence_map_v1 meta.span_backdrops entries must be mappings")
+        try:
+            start = int(entry.get("start"))
+            end = int(entry.get("end"))
+        except Exception as exc:
+            raise SchemaError("sequence_evidence_map_v1 meta.span_backdrops entries require integer start/end") from exc
+        cover_rows = str(entry.get("cover_rows", "both")).strip().lower()
+        if cover_rows not in {"primary", "complement", "both"}:
+            raise SchemaError(
+                "sequence_evidence_map_v1 meta.span_backdrops entries cover_rows must be primary, complement, or both"
+            )
+        fill = str(entry.get("fill", "")).strip()
+        if not fill:
+            raise SchemaError("sequence_evidence_map_v1 meta.span_backdrops entries require a non-empty fill")
+        try:
+            alpha = float(entry.get("alpha"))
+        except Exception as exc:
+            raise SchemaError("sequence_evidence_map_v1 meta.span_backdrops entries require numeric alpha") from exc
+        if not math.isfinite(alpha) or alpha < 0.0 or alpha > 1.0:
+            raise SchemaError("sequence_evidence_map_v1 meta.span_backdrops entries alpha must be within [0, 1]")
+        try:
+            corner_radius = float(entry.get("corner_radius"))
+        except Exception as exc:
+            raise SchemaError(
+                "sequence_evidence_map_v1 meta.span_backdrops entries require numeric corner_radius"
+            ) from exc
+        if not math.isfinite(corner_radius) or corner_radius < 0.0:
+            raise SchemaError(
+                "sequence_evidence_map_v1 meta.span_backdrops entries corner_radius must be finite and >= 0"
+            )
+        if cover_rows == "primary":
+            limit = primary_length
+        elif cover_rows == "complement":
+            limit = complement_length
+        else:
+            limit = min(primary_length, complement_length)
+        if start < 0 or end > limit or end <= start:
+            raise SchemaError("sequence_evidence_map_v1 meta.span_backdrops entries must be within row bounds")
+        normalized_entry: dict[str, object] = {
+            "start": start,
+            "end": end,
+            "fill": fill,
+            "alpha": alpha,
+            "corner_radius": corner_radius,
+            "cover_rows": cover_rows,
+        }
+        coordinate_space_raw = entry.get("coordinate_space")
+        if coordinate_space_raw is not None:
+            coordinate_space = str(coordinate_space_raw).strip()
+            if not coordinate_space:
+                raise SchemaError(
+                    "sequence_evidence_map_v1 meta.span_backdrops entries coordinate_space must be non-empty"
+                )
+            normalized_entry["coordinate_space"] = coordinate_space
+        normalized.append(normalized_entry)
+    return tuple(normalized)
+
+
 def _normalize_segment_labels(meta: Mapping[str, Any], *, primary_length: int) -> tuple[dict[str, object], ...]:
     raw = meta.get("segment_labels", ())
     if raw is None:
@@ -312,21 +385,22 @@ class SequenceEvidenceMapV1Adapter:
         row_labels = meta.get("row_labels")
         if not isinstance(row_labels, Mapping):
             row_labels = {"primary": "Primary", "complement": "Complement"}
+        complement_length = (
+            len(contract.complement_sequence)
+            if contract.complement_sequence is not None
+            else len(contract.primary_sequence)
+        )
         base_highlights = _normalize_base_highlights(
             meta,
             primary_length=len(contract.primary_sequence),
-            complement_length=len(contract.complement_sequence)
-            if contract.complement_sequence is not None
-            else len(contract.primary_sequence),
+            complement_length=complement_length,
         )
         base_highlight_color = _normalize_row_color_map(meta, key="base_highlight_color")
         dim_base_indices = _normalize_row_index_map(
             meta,
             key="dim_base_indices",
             primary_length=len(contract.primary_sequence),
-            complement_length=len(contract.complement_sequence)
-            if contract.complement_sequence is not None
-            else len(contract.primary_sequence),
+            complement_length=complement_length,
         )
         connector_hidden_indices = _normalize_index_list(
             meta, "connector_hidden_indices", limit=len(contract.primary_sequence)
@@ -335,6 +409,11 @@ class SequenceEvidenceMapV1Adapter:
             meta, "connector_cross_indices", limit=len(contract.primary_sequence)
         )
         connector_overhang_spans = _normalize_connector_overhang_spans(meta, limit=len(contract.primary_sequence))
+        span_backdrops = _normalize_span_backdrops(
+            meta,
+            primary_length=len(contract.primary_sequence),
+            complement_length=complement_length,
+        )
         if connector_overhang_spans:
             overhang_indices = {
                 index for span in connector_overhang_spans for index in range(span["start"], span["end"])
@@ -371,6 +450,7 @@ class SequenceEvidenceMapV1Adapter:
                 "connector_hidden_indices": connector_hidden_indices,
                 "connector_cross_indices": connector_cross_indices,
                 "connector_overhang_spans": connector_overhang_spans,
+                "span_backdrops": span_backdrops,
                 "segment_labels": segment_labels,
                 "legend_exclude_tags": legend_exclude_tags,
                 "row_labels": dict(row_labels),
