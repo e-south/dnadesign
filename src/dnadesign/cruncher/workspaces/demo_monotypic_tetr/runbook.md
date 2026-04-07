@@ -8,6 +8,7 @@
 
 **Purpose**
 - Run a single-TF multiplicity demo that optimizes a 19 bp sequence for two offset-distinct TetR placements from the Westmann MITOMI ddG matrix. The raw `PO A T C G` table is ingested through an explicit `DDG_TABLE` parser module, converted into a probability PWM with a Boltzmann normalization step, exported as a minimal MEME artifact for downstream tool interoperability, and then carried through the standard `lock -> parse -> sample -> analyze -> logos` lifecycle. This workspace uses the same 8-chain `15k/90k` occurrence-aware sweep posture as the monotypic BaeR demo, but asks for two selected TetR copies instead of four. Export, studies, and portfolio aggregation remain gated for this demo because those downstream readers still require the representative-hit contract.
+- The workspace carries two checked-in YIU entry points: the Sample-backed `configs/yiu/tetr_monotypic_hit.yiu.yaml` handoff, and the direct no-PWM wild-type TetR TetO2 payload `configs/yiu/tetr_teto2_wt_direct.yiu.yaml` with sequence `TCCCTATCAGTGATAGAGA`.
 
 **Run This Single Command**
 
@@ -64,3 +65,10 @@ Quick smoke path (main lifecycle only):
     find outputs/artifacts/meme -maxdepth 1 -type f | sort
     find outputs/plots -maxdepth 1 -type f | sort
     find outputs/plots/yiu__tetr_monotypic_hit -maxdepth 1 -type f | sort
+
+### Optional direct-input YIU path
+
+    # Validate and render the wild-type TetR TetO2 payload directly, without a Sample handoff or PWM context.
+    cruncher yiu validate --spec configs/yiu/tetr_teto2_wt_direct.yiu.yaml
+    cruncher yiu render --spec configs/yiu/tetr_teto2_wt_direct.yiu.yaml --force-overwrite --emit-renders
+    cruncher yiu show --bundle outputs/plots/yiu__tetr_teto2_wt_direct

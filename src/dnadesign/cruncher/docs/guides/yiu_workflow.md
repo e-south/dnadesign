@@ -1,8 +1,8 @@
 ## YIU Workflow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-05
-**Last updated by:** cruncher-maintainers on 2026-04-05
+**Last verified:** 2026-04-07
+**Last updated by:** cruncher-maintainers on 2026-04-07
 
 YIU turns one payload sequence into a checked junction-mismatch bundle. It accepts either an exact `user_sequence` or a `sample_hit` resolved from public Cruncher Sample outputs, searches valid 4 nt internal junction plans plus one or two mismatches, optionally scores those candidates against PWM context, and publishes three BaseRender-ready views.
 
@@ -56,7 +56,7 @@ YIU can reuse public Sample outputs instead of starting from a hand-written payl
 
 - a direct `payload_sequence`
 - a workspace-local `source_artifact_path`
-- a sibling-workspace reference through `metadata.source_workspace` plus `source_artifact` or `metadata.source_artifact`
+- a sibling-workspace reference through `metadata.source_workspace` plus `source_artifact_path`
 
 The common handoff is a Sample public hit table such as `outputs/optimize/tables/elites.parquet`. When `optimization.pwm.source.kind: sample_context` is selected, YIU also resolves motif context from the same Sample-backed payload source. Ambiguous or missing sources fail fast.
 
@@ -96,7 +96,10 @@ optimization:
     mode: center_locked
   mismatches:
     count: 1
-    candidate_positions: [1, 2]
+    candidate_positions: [0, 1, 2, 3]
+    ligation_profile: t4
+    ligation_awareness_mode: secondary
+    bad_pattern_heuristics: false
   pwm:
     mode: none
     source:
@@ -107,13 +110,13 @@ output:
 ```
 
 For v4, payload inputs must be exact `A/C/G/T` sequences. Ambiguous IUPAC symbols and legacy bulge or split topology keys are not part of the public v4 lane.
+Use `candidate_positions: [0, 1, 2, 3]` when you want ligation-aware ranking to compare edge and middle offsets. Restricting the pool to `[1, 2]` intentionally keeps the search middle-only.
 
 The main junction policies are:
 
 - `center_locked`: choose the valid internal 4 nt window nearest the payload midpoint and keep the junction fixed there.
-- `derived`: accept legacy specs that still mean midpoint-nearest fixed-window behavior.
 - `explicit_window`: use one explicit internal 4 nt window.
-- `optimize`: search valid internal windows around the midpoint and rank candidates by PWM/log-likelihood retention first, then midpoint proximity and the remaining tie-break ladder.
+- `optimize`: search valid internal windows around the midpoint and rank candidates by PWM/log-likelihood retention first, ligation awareness second when enabled, then midpoint proximity and the remaining deterministic tie-break ladder.
 
 ### What `validate` checks
 
@@ -133,14 +136,22 @@ The main junction policies are:
 
 With `--emit-renders`, YIU also renders one composite `payload_views.pdf` page and mirrors that PDF to `output.published_plot_path` when configured.
 
-Use [YIU Artifacts](../reference/yiu_artifacts.md) for the exact emitted files. The important operator files are:
+Use [YIU Artifacts](../reference/yiu_artifacts.md) for the exact emitted files. For most operators, the handoff surface is:
+
+- `bundle_summary.json`
+- `payload_views.pdf`
+- `cruncher yiu show --bundle <bundle_dir>`
+
+That summary artifact now makes the reference duplex and mismatch-present duplex explicit side by side, with payload 5' to 3' and complement 3' to 5' spelled out directly.
+The current operator surface goes one step further: `bundle_summary.json` and default `cruncher yiu show` publish one `views` block for `payload`, `split_left`, `split_right`, and `assembled`, with reference and mismatch-present top/bottom rows all rewritten into explicit 5' to 3' orientation plus `changed_rows`.
+
+The remaining published JSON files are machine-facing bundle ledgers or render contracts:
 
 - `bundle_manifest.json`
-- `bundle_summary.json`
 - `normalized_payload.json`
 - `visual_inventory.json`
 - `payload_view.json`
-- `split_payload_view.json`
+- `split_payload_view.jsonl` (JSONL rows)
 - `assembled_payload_view.json`
 
 The payload view uses `yiu_payload_visual_v1`. When PWM context is effective, that view carries motif layers aligned to payload-forward coordinates. When PWM is absent or disabled, the same contract stays valid with an empty `motif_layers` list.
@@ -151,11 +162,23 @@ The payload view uses `yiu_payload_visual_v1`. When PWM context is effective, th
 
 `show` is fail-fast on bundle drift. Missing published view contracts, manifest and inventory disagreements, payload-view motif drift, a `rendered` bundle with a missing `payload_views.pdf`, or a configured published plot path that does not exist are treated as bundle corruption.
 
-Default `show --json` prints the full bundle surface while omitting `motif_context`, `optimization_decision`, and `split_row_debug` unless `--verbose` is set. Human-readable `--verbose` adds split-row debug lines only; the optimizer trace and motif context remain JSON-only.
+Default human-readable `show` keeps the payload handoff in the foreground: one ligation summary line, one overhang summary, then payload, split-left, split-right, and assembled views with reference-vs-mismatch-present top/bottom rows in 5' to 3', followed by compact mismatch edits and PWM state. Default `show --json` stays operator-focused and omits the machine ledger paths plus normalized payload detail unless `--verbose` is set. Human-readable `--verbose` adds provenance, bundle contract, render/integrity details, machine-facing artifact paths, and split-row debug lines; the optimizer trace and motif context remain JSON-only.
 
-The split middle row renders `split_payload_left` before `split_payload_right`. Each panel shows the retained fragment, its inward-facing sticky end, selected-versus-reference sticky-end metadata, the fragment-display payload-body slice, and optional ghosted excision context. The bundle summary and split-row metadata also publish the corresponding payload-forward left and right body sequences in explicit 5' to 3' orientation.
+The split middle row renders `split_payload_left` before `split_payload_right`. Each panel shows the retained fragment, its inward-facing sticky end, selected-versus-reference sticky-end metadata, the fragment-display payload-body slice, and optional ghosted excision context. The bundle summary now also publishes those retained left and right fragment duplexes as explicit top/bottom 5' to 3' rows for both reference and mismatch-present variants.
 
 The assembled payload returns to original payload order. It publishes one explicit `junction_span` in payload coordinates rather than a seam surrogate.
+
+### Ligation-aware mismatch ranking
+
+YIU can optionally apply ligation-aware ranking for 4-bp junction mismatches. This ranking is based on Bilotti et al. (Nucleic Acids Research, 2022), who profiled mismatch discrimination during end-joining by several DNA ligases. In those data, G:T/T:G mismatches were the most commonly tolerated across ligases, mismatches near the ligation seam were better tolerated than mismatches in the middle of the 4-bp overhang, and T3/PBCV-1/hLig3 were more permissive of G:A/G:G than T4/T7. YIU uses these observations as deterministic ranking heuristics after PWM-preservation scoring, not as hard physical guarantees for any specific construct.
+
+YIU stores junction offsets in payload-forward coordinates `0..3` and scores on aligned duplex coordinates. Human-facing payload, split, and assembled views may rewrite strands into explicit 5' to 3' display. Ligation-aware scoring therefore derives mismatch class from the final duplex base pair and does not depend on whether the payload or complement strand was mutated.
+
+`ligation_profile=none` preserves legacy behavior. `ligation_profile=t4` is the recommended default for T4-like assembly workflows.
+
+Candidate generation does not change when ligation awareness is enabled. YIU still enumerates all feasible windows, mismatch offsets, strand assignments, and non-native bases; the Bilotti-derived rules only change the deterministic ranking layer.
+
+The paper does not isolate every exact two-mismatch geometry that YIU can generate. The strongest direct support is for G:T dominance, edge better than middle, T4/T7 versus T3/PBCV-1/hLig3 permissiveness differences, and TNNA inefficiency. Penalties such as `double_middle_flag` are engineering extrapolations grounded in the paper, not direct one-to-one measurements for every possible YIU candidate geometry.
 
 ### Visual direction
 

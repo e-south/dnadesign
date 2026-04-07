@@ -393,7 +393,7 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
 
     payload = _load_json(bundle_dir / "payload_view.json")
     assembled = _load_json(bundle_dir / "assembled_payload_view.json")
-    split_rows = _load_jsonl(bundle_dir / "split_payload_view.json")
+    split_rows = _load_jsonl(bundle_dir / "split_payload_view.jsonl")
 
     assert payload["state_id"] == "payload"
     assert payload["contract_kind"] == "yiu_payload_visual_v1"

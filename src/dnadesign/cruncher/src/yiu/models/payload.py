@@ -12,17 +12,19 @@ Module Author(s): Eric J. South
 """
 
 from dnadesign.cruncher.yiu.domain_models import (
-    JunctionSelection as JunctionWindow,
-)
-from dnadesign.cruncher.yiu.domain_models import (
-    MismatchSelection as MismatchSite,
-)
-from dnadesign.cruncher.yiu.domain_models import (
+    ChosenLigationKey,
+    LigationMismatchRationale,
     NormalizedMotifContext,
     NormalizedPayload,
     OptimizationDecision,
     OptimizationObjective,
     OptimizationWinner,
+)
+from dnadesign.cruncher.yiu.domain_models import (
+    JunctionSelection as JunctionWindow,
+)
+from dnadesign.cruncher.yiu.domain_models import (
+    MismatchSelection as MismatchSite,
 )
 from dnadesign.cruncher.yiu.spec_input_models import (
     InputSpec,
@@ -49,8 +51,10 @@ from dnadesign.cruncher.yiu.spec_rendering_models import (
 
 __all__ = [
     "InputSpec",
+    "ChosenLigationKey",
     "JunctionSelectionSpec",
     "JunctionWindow",
+    "LigationMismatchRationale",
     "MismatchSite",
     "MismatchesSpec",
     "NormalizedMotifContext",

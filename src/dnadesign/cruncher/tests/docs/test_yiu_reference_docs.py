@@ -37,6 +37,9 @@ def test_yiu_spec_reference_stays_schema_scoped() -> None:
     assert "`yiu/pwm_context_sample_context.py`" in spec_ref
     assert "`yiu/pwm_context_sample_occurrences.py`" in spec_ref
     assert "`yiu/pwm_context_sample_motifs.py`" in spec_ref
+    assert "## Ligation-aware mismatch ranking" in spec_ref
+    assert "`ligation_profile=none` preserves legacy behavior." in spec_ref
+    assert "derives mismatch class from the final duplex base pair" in spec_ref
 
 
 def test_yiu_artifacts_reference_stays_bundle_scoped() -> None:
@@ -44,12 +47,23 @@ def test_yiu_artifacts_reference_stays_bundle_scoped() -> None:
 
     assert "split_yiu_payload_bundle_v4" in artifacts_ref
     assert "visual_inventory.json" in artifacts_ref
-    assert "shared `render`/`show` inspection surface" in artifacts_ref
+    assert "shared `render`/`show --verbose` inspection surface" in artifacts_ref
     assert "render-status semantics" in artifacts_ref
     assert "bundle truth vs mirror" in artifacts_ref.lower()
     assert "Treat that bundle directory as the source of truth." in artifacts_ref
+    assert "`split_payload_view.jsonl` (JSONL)" in artifacts_ref
+    assert "`PS` for the displayed payload strand and `AS` for the opposite strand" in artifacts_ref
+    assert "reference duplex" in artifacts_ref
+    assert "mismatch-present duplex" in artifacts_ref
+    assert "one ligation summary line" in artifacts_ref
+    assert "`views.payload`" in artifacts_ref
+    assert "`views.split_left`" in artifacts_ref
+    assert "`views.assembled`" in artifacts_ref
     assert "### Integrity checks" in artifacts_ref
-    assert "Human-readable `show --verbose` adds split-row debug lines only" in artifacts_ref
+    assert (
+        "Human-readable `show --verbose` adds provenance, bundle contract, render and integrity detail,"
+        in artifacts_ref
+    )
 
 
 def test_yiu_visual_system_describes_bench_strip_hierarchy() -> None:
@@ -61,6 +75,8 @@ def test_yiu_visual_system_describes_bench_strip_hierarchy() -> None:
     assert "`assembled_payload` uses `operator_strip`" in visual_ref
     assert "should share the same `bench_strip` foundation" in visual_ref
     assert "operator surface rather than a poster" in visual_ref
+    assert "payload-forward coordinates `0..3`" in visual_ref
+    assert "does not depend on whether the payload or complement strand was mutated" in visual_ref
 
 
 def test_yiu_architecture_names_boundary_seams() -> None:

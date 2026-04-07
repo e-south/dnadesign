@@ -18,15 +18,26 @@ from typing import Any, Mapping
 from rich.console import Console
 
 from dnadesign.cruncher.cli.paths import render_path
+from dnadesign.cruncher.yiu.mismatch_notation import compact_mismatch_notation_text
 
 
 def mismatch_summary_text(mismatch_sites: list[dict[str, object]]) -> str:
-    return ", ".join(
-        f"idx={site['payload_index']} off={site['junction_offset']} "
-        f"{site['mutated_strand']} {site['native_base']}->{site['mutated_base']} "
-        f"(opp={site['opposing_base']})"
-        for site in mismatch_sites
+    return compact_mismatch_notation_text(mismatch_sites)
+
+
+def print_ligation_summary(console: Console, *, ligation: object) -> None:
+    chosen_classes = ",".join(ligation.chosen_mismatch_classes) if ligation.chosen_mismatch_classes else "-"
+    position_classes = ",".join(ligation.position_classes) if ligation.position_classes else "-"
+    console.print(
+        "Ligation -> "
+        f"profile={ligation.profile} "
+        f"mode={ligation.awareness_mode} "
+        f"applied={ligation.applied} "
+        f"classes={chosen_classes} "
+        f"positions={position_classes} "
+        f"bad_patterns={ligation.bad_pattern_heuristics}"
     )
+    console.print(f"Ligation note -> {ligation.decision_note}")
 
 
 def print_payload_summary(
@@ -49,10 +60,27 @@ def print_payload_summary(
     console.print(f"Junction window -> start={junction['start']} end={junction['end']} mode={junction['mode']}")
     console.print(f"Mismatch count -> {len(mismatch_sites)}")
     if mismatch_sites:
-        console.print(f"Mismatch sites -> {mismatch_summary_text(mismatch_sites)}")
+        console.print(f"Mismatch edits (PS=payload, AS=complement; 1-based) -> {mismatch_summary_text(mismatch_sites)}")
     console.print(f"PWM -> mode={pwm_mode} effective={pwm_effective}")
     if pwm_effective:
         console.print(f"PWM losses -> worst={worst_loss:.6f} total={total_loss:.6f}")
+
+
+def print_sequence_view_summary(console: Console, *, label: str, view_summary: object) -> None:
+    console.print(
+        f"{label} canonical 5' -> 3' -> "
+        f"top={view_summary.canonical.top_strand_5to3} "
+        f"bottom={view_summary.canonical.bottom_strand_5to3}",
+        soft_wrap=True,
+    )
+    console.print(
+        f"{label} mismatch-present 5' -> 3' -> "
+        f"top={view_summary.mismatch_present.top_strand_5to3} "
+        f"bottom={view_summary.mismatch_present.bottom_strand_5to3}",
+        soft_wrap=True,
+    )
+    if view_summary.changed_rows:
+        console.print(f"{label} changed rows -> {', '.join(view_summary.changed_rows)}")
 
 
 def row_payload(row: object) -> Mapping[str, Any]:
@@ -80,7 +108,29 @@ def print_split_row_debug(console: Console, rows: list[object]) -> None:
 def build_show_json_payload(outcome: object, *, verbose: bool) -> dict[str, Any]:
     exclude: set[str] = set()
     if not verbose:
-        exclude.update({"motif_context", "optimization_decision", "split_row_debug"})
+        exclude.update(
+            {
+                "motif_context",
+                "optimization_decision",
+                "split_row_debug",
+                "bundle_manifest_path",
+                "normalized_payload_path",
+                "visual_inventory_path",
+                "provenance",
+                "payload_label",
+                "input_kind",
+                "payload_length",
+                "selected_payload_sequence",
+                "selected_complement_sequence",
+                "junction",
+                "mismatches",
+                "pwm_mode",
+                "pwm_effective",
+                "worst_loss",
+                "total_loss",
+                "view_ids",
+            }
+        )
     return outcome.model_dump(mode="json", exclude=exclude, exclude_unset=True)
 
 
@@ -103,12 +153,13 @@ def print_validation_report(console: Console, report: object) -> None:
         worst_loss=report.worst_loss,
         total_loss=report.total_loss,
     )
+    print_ligation_summary(console, ligation=report.ligation)
     console.print("Bundle write -> no")
 
 
 def print_render_outcome(console: Console, outcome: object, *, emit_renders: bool) -> None:
     report = outcome.report
-    console.print(f"YIU bundle -> {outcome.bundle_dir}")
+    print_path_detail(console, "Bundle", outcome.bundle_dir)
     console.print(f"Spec -> {report.spec_name}")
     print_payload_summary(
         console,
@@ -122,24 +173,19 @@ def print_render_outcome(console: Console, outcome: object, *, emit_renders: boo
         worst_loss=report.worst_loss,
         total_loss=report.total_loss,
     )
-    console.print(f"Bundle write -> {outcome.bundle_dir}")
-    console.print(f"Bundle summary -> {outcome.bundle_summary_path}")
-    console.print(f"Bundle manifest -> {outcome.bundle_manifest_path}")
-    console.print(f"Normalized payload -> {outcome.normalized_payload_path}")
-    console.print(f"Visual inventory -> {outcome.visual_inventory_path}")
+    print_ligation_summary(console, ligation=report.ligation)
     if emit_renders:
-        console.print(f"Composite render target -> {outcome.composite_render_artifact_path}")
-    if outcome.published_plot_artifact_path is not None:
-        console.print(f"Published plot -> {outcome.published_plot_artifact_path}")
+        bundle_base = Path(outcome.bundle_dir)
+        if outcome.composite_render_artifact_path is not None:
+            print_path_detail(console, "Composite render", outcome.composite_render_artifact_path, base=bundle_base)
+        if outcome.published_plot_artifact_path is not None:
+            print_path_detail(console, "Published plot", outcome.published_plot_artifact_path, base=bundle_base)
 
 
 def print_show_outcome(console: Console, outcome: object, *, verbose: bool) -> None:
     sequence_summary = outcome.bundle_summary.sequence_summary
-    split_summary = sequence_summary.split_payload
     bundle_base = Path(outcome.bundle_dir)
     print_path_detail(console, "Bundle", outcome.bundle_dir)
-    console.print(f"Bundle contract -> {outcome.bundle_contract}")
-    console.print(f"Provenance -> {json.dumps(outcome.provenance, sort_keys=True)}")
     print_payload_summary(
         console,
         payload_label=outcome.payload_label,
@@ -152,37 +198,43 @@ def print_show_outcome(console: Console, outcome: object, *, verbose: bool) -> N
         worst_loss=outcome.worst_loss,
         total_loss=outcome.total_loss,
     )
-    console.print(f"Payload 5' -> 3' -> {sequence_summary.selected_payload_sequence_5to3}")
+    print_ligation_summary(console, ligation=outcome.bundle_summary.ligation)
+    console.print(f"Junction payload 5' -> 3' -> {sequence_summary.junction_payload_sequence_5to3}")
     console.print(
-        "Split payload 5' -> 3' -> "
-        f"left={split_summary.left_payload_body_sequence_5to3} "
-        f"sticky={split_summary.selected_sticky_end_sequence_5to3} "
-        f"right={split_summary.right_payload_body_sequence_5to3}"
+        "Overhang 5' -> 3' -> "
+        f"canonical={sequence_summary.overhang_5to3.canonical_sequence_5to3} "
+        f"mismatch-present={sequence_summary.overhang_5to3.mismatch_present_sequence_5to3}"
     )
-    console.print(f"Reference sticky end 5' -> 3' -> {split_summary.canonical_sticky_end_sequence_5to3}")
+    print_sequence_view_summary(console, label="Payload", view_summary=sequence_summary.views.payload)
+    print_sequence_view_summary(console, label="Split left", view_summary=sequence_summary.views.split_left)
+    print_sequence_view_summary(console, label="Split right", view_summary=sequence_summary.views.split_right)
+    print_sequence_view_summary(console, label="Assembled", view_summary=sequence_summary.views.assembled)
     fallback_reason = outcome.motif_context.fallback_reason
     if outcome.pwm_mode != "none" and not outcome.pwm_effective and fallback_reason:
         console.print(f"PWM fallback reason -> {fallback_reason}")
     if verbose:
+        console.print(f"Bundle contract -> {outcome.bundle_contract}")
+        console.print(f"Provenance -> {json.dumps(outcome.provenance, sort_keys=True)}")
+        console.print(f"Views -> {', '.join(outcome.view_ids)}")
+        console.print(f"Render status -> {outcome.render_status}")
+        console.print(f"Available renders -> {len(outcome.available_renders)}")
+        console.print(f"Integrity -> {outcome.integrity.status}")
+        if outcome.composite_render_artifact_path is not None:
+            print_path_detail(console, "Composite render", outcome.composite_render_artifact_path, base=bundle_base)
+        if outcome.published_plot_artifact_path is not None:
+            print_path_detail(console, "Published plot", outcome.published_plot_artifact_path, base=bundle_base)
+        print_path_detail(console, "Bundle summary", outcome.bundle_summary_path, base=bundle_base)
+        print_path_detail(console, "Bundle manifest", outcome.bundle_manifest_path, base=bundle_base)
+        print_path_detail(console, "Normalized payload", outcome.normalized_payload_path, base=bundle_base)
+        print_path_detail(console, "Visual inventory", outcome.visual_inventory_path, base=bundle_base)
         print_split_row_debug(console, outcome.split_row_debug)
-    console.print(f"Views -> {', '.join(outcome.view_ids)}")
-    console.print(f"Render status -> {outcome.render_status}")
-    console.print(f"Available renders -> {len(outcome.available_renders)}")
-    console.print(f"Integrity -> {outcome.integrity.status}")
-    if outcome.composite_render_artifact_path is not None:
-        print_path_detail(console, "Composite render", outcome.composite_render_artifact_path, base=bundle_base)
-    if outcome.published_plot_artifact_path is not None:
-        print_path_detail(console, "Published plot", outcome.published_plot_artifact_path, base=bundle_base)
-    print_path_detail(console, "Bundle summary", outcome.bundle_summary_path, base=bundle_base)
-    print_path_detail(console, "Bundle manifest", outcome.bundle_manifest_path, base=bundle_base)
-    print_path_detail(console, "Normalized payload", outcome.normalized_payload_path, base=bundle_base)
-    print_path_detail(console, "Visual inventory", outcome.visual_inventory_path, base=bundle_base)
 
 
 __all__ = [
     "build_show_json_payload",
     "print_render_outcome",
     "print_show_outcome",
+    "print_ligation_summary",
     "print_split_row_debug",
     "print_validation_report",
     "print_payload_summary",

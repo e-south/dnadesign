@@ -155,7 +155,7 @@ def validate_bundle_state(
     checks.append("assembled_view_consistency")
     expected_split_rows = build_split_payload_view_rows(normalized)
     if published_rows["split_payload"] != expected_split_rows:
-        _fail_bundle("split_payload_view.json disagrees with the selected downstream sequences")
+        _fail_bundle("split_payload_view.jsonl disagrees with the selected downstream sequences")
     checks.append("split_view_consistency")
 
     try:

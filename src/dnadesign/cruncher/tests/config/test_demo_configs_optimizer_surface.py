@@ -250,6 +250,10 @@ def test_checked_in_yiu_demo_specs_publish_into_outputs_not_bundles() -> None:
             "outputs/plots/yiu__tetr_monotypic_hit",
             None,
         ),
+        root / "demo_monotypic_tetr" / "configs" / "yiu" / "tetr_teto2_wt_direct.yiu.yaml": (
+            "outputs/plots/yiu__tetr_teto2_wt_direct",
+            None,
+        ),
     }
 
     for spec_path, (bundle_dir, published_plot_path) in expected.items():

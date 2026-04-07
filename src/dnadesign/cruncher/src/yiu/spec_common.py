@@ -19,16 +19,8 @@ from dnadesign.cruncher.yiu.errors import YIU_PATH_INVALID, YIU_SEQUENCE_INVALID
 BASES = ("A", "C", "G", "T")
 SECONDARY_OBJECTIVE_LADDER = (
     "total_loss",
+    "ligation_awareness",
     "midpoint_proximity",
-    "terminal_position_avoidance",
-    "default_strand_preference",
-    "lexical_stability",
-)
-LEGACY_SECONDARY_OBJECTIVE_LADDER = (
-    "total_loss",
-    "midpoint_proximity",
-    "body_length_balance",
-    "terminal_position_avoidance",
     "default_strand_preference",
     "lexical_stability",
 )
@@ -66,7 +58,6 @@ def validate_workspace_relative_path(*, value: Path, field_name: str) -> Path:
 
 __all__ = [
     "BASES",
-    "LEGACY_SECONDARY_OBJECTIVE_LADDER",
     "SECONDARY_OBJECTIVE_LADDER",
     "normalize_optional_text",
     "normalize_yiu_sequence",

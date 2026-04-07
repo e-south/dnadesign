@@ -18,7 +18,7 @@ from dnadesign.cruncher.yiu.bundle_models import (
     payload_summary_from_normalized,
 )
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
-from dnadesign.cruncher.yiu.publish_layout import PayloadBundleLayout, build_published_artifacts
+from dnadesign.cruncher.yiu.publish_layout import PayloadBundleLayout
 from dnadesign.cruncher.yiu.spec_models import YiuPayloadRenderingSpec
 
 
@@ -30,15 +30,9 @@ def _published_plot_artifact_path(spec: YiuPayloadRenderingSpec) -> str | None:
 
 def build_normalized_payload_dump(
     *,
-    spec: YiuPayloadRenderingSpec,
     normalized: NormalizedPayload,
-    layout: PayloadBundleLayout,
 ) -> dict[str, object]:
-    published_artifacts = build_published_artifacts(
-        layout=layout,
-        published_plot_artifact_path=_published_plot_artifact_path(spec),
-    )
-    return normalized.model_copy(update={"published_artifacts": published_artifacts}).model_dump(mode="json")
+    return normalized.model_dump(mode="json")
 
 
 def build_payload_visual_inventory(

@@ -48,10 +48,13 @@ def canonical_spec_text(*, sequence: str = DEFAULT_DEMO_SEQUENCE, junction_mode:
             max_payload_body_length: 12
           mismatches:
             count: 1
-            candidate_positions: [1, 2]
+            candidate_positions: [0, 1, 2, 3]
             allowed_strands: [complement, payload]
             strand_mode: per_position
             default_strand_preference: complement
+            ligation_profile: t4
+            ligation_awareness_mode: secondary
+            bad_pattern_heuristics: false
           pwm:
             mode: none
             source:
@@ -60,8 +63,8 @@ def canonical_spec_text(*, sequence: str = DEFAULT_DEMO_SEQUENCE, junction_mode:
               primary: maximin
               secondary:
                 - total_loss
+                - ligation_awareness
                 - midpoint_proximity
-                - terminal_position_avoidance
                 - default_strand_preference
                 - lexical_stability
 
@@ -96,10 +99,13 @@ def advanced_pwm_spec_text() -> str:
             max_payload_body_length: 12
           mismatches:
             count: 2
-            candidate_positions: [1, 2]
+            candidate_positions: [0, 1, 2, 3]
             allowed_strands: [complement, payload]
             strand_mode: per_position
             default_strand_preference: complement
+            ligation_profile: t4
+            ligation_awareness_mode: secondary
+            bad_pattern_heuristics: false
           pwm:
             mode: require
             source:
@@ -109,8 +115,8 @@ def advanced_pwm_spec_text() -> str:
               primary: maximin
               secondary:
                 - total_loss
+                - ligation_awareness
                 - midpoint_proximity
-                - terminal_position_avoidance
                 - default_strand_preference
                 - lexical_stability
 

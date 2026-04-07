@@ -30,7 +30,7 @@ from dnadesign.cruncher.yiu.spec_pwm_models import PwmOptimizationSpec
 
 
 class JunctionOptimizationSpec(StrictBaseModel):
-    mode: Literal["derived", "center_locked", "explicit_window", "optimize"] = "center_locked"
+    mode: Literal["center_locked", "explicit_window", "optimize"] = "center_locked"
     start: int | None = None
     end: int | None = None
     overhang_length: Literal[4] = 4
@@ -55,10 +55,6 @@ class JunctionOptimizationSpec(StrictBaseModel):
             )
         return self
 
-    @property
-    def canonical_mode(self) -> Literal["center_locked", "explicit_window", "optimize"]:
-        return "center_locked" if self.mode == "derived" else self.mode
-
 
 class MismatchesSpec(StrictBaseModel):
     count: Literal[1, 2]
@@ -66,6 +62,9 @@ class MismatchesSpec(StrictBaseModel):
     allowed_strands: list[Literal["complement", "payload"]] = Field(default_factory=lambda: ["complement", "payload"])
     strand_mode: Literal["per_position"] = "per_position"
     default_strand_preference: Literal["complement", "payload"] = "complement"
+    ligation_profile: Literal["none", "t4", "t7", "t3", "pbcv1", "hlig3"] = "none"
+    ligation_awareness_mode: Literal["disabled", "secondary"] = "secondary"
+    bad_pattern_heuristics: bool = False
 
     @field_validator("candidate_positions")
     @classmethod
@@ -99,6 +98,12 @@ class MismatchesSpec(StrictBaseModel):
             raise ValueError(f"{YIU_MISMATCH_INVALID}: optimization.mismatches.strand_mode must be per_position")
         if self.count > len(self.candidate_positions):
             raise ValueError(f"{YIU_MISMATCH_INVALID}: mismatches.count exceeds the candidate position pool size")
+        if self.bad_pattern_heuristics and self.ligation_awareness_mode != "secondary":
+            raise ValueError(
+                f"{YIU_MISMATCH_INVALID}: bad_pattern_heuristics requires ligation_awareness_mode=secondary"
+            )
+        if self.bad_pattern_heuristics and self.ligation_profile == "none":
+            raise ValueError(f"{YIU_MISMATCH_INVALID}: bad_pattern_heuristics requires a ligation_profile")
         return self
 
 

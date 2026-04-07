@@ -23,7 +23,7 @@ class JunctionSelection(StrictBaseModel):
     start: int = Field(ge=0)
     end: int = Field(ge=1)
     offsets: list[int] = Field(default_factory=lambda: [0, 1, 2, 3])
-    mode: Literal["derived", "center_locked", "explicit_window", "optimize"]
+    mode: Literal["center_locked", "explicit_window", "optimize"]
     left_body_length: int = Field(ge=1)
     right_body_length: int = Field(ge=1)
 
@@ -53,6 +53,38 @@ class MismatchSelection(StrictBaseModel):
         if self.native_base == self.mutated_base:
             raise ValueError("mutated_base must differ from native_base")
         return self
+
+
+class LigationMismatchRationale(StrictBaseModel):
+    payload_index: int = Field(ge=0)
+    junction_offset: int = Field(ge=0, le=3)
+    position_class: Literal["edge", "middle"]
+    mutated_strand: Literal["payload", "complement"]
+    native_base: str
+    partner_base: str
+    canonical_mismatch_class: str
+    class_tier: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _validate_values(self) -> "LigationMismatchRationale":
+        for field_name in ("native_base", "partner_base"):
+            value = getattr(self, field_name)
+            if value not in {"A", "C", "G", "T"}:
+                raise ValueError(f"{field_name} must be one of A/C/G/T")
+        mismatch_class = self.canonical_mismatch_class
+        if len(mismatch_class) not in {2}:
+            raise ValueError("canonical_mismatch_class must contain two bases")
+        if any(base not in {"A", "C", "G", "T"} for base in mismatch_class):
+            raise ValueError("canonical_mismatch_class must contain A/C/G/T only")
+        return self
+
+
+class ChosenLigationKey(StrictBaseModel):
+    worst_mismatch_class_tier: int = Field(ge=0)
+    total_mismatch_class_tier: int = Field(ge=0)
+    middle_mismatch_count: int = Field(ge=0)
+    double_middle_flag: bool = False
+    bad_pattern_penalty: int = Field(ge=0)
 
 
 class NormalizedMotifContext(StrictBaseModel):
@@ -85,8 +117,8 @@ class OptimizationWinner(StrictBaseModel):
     worst_loss: float = Field(ge=0.0)
     total_loss: float = Field(ge=0.0)
     midpoint_distance: int = Field(ge=0)
-    body_length_balance: int = Field(ge=0)
-    terminal_positions_used: int = Field(ge=0)
+    middle_mismatch_count: int = Field(ge=0)
+    double_middle_flag: bool = False
     default_strand_preference_count: int = Field(ge=0)
     lexical_key: str
 
@@ -109,7 +141,7 @@ class OptimizationDecision(StrictBaseModel):
 
 
 class NormalizedPayload(StrictBaseModel):
-    contract: Literal["yiu_normalized_payload_v4"] = "yiu_normalized_payload_v4"
+    contract: Literal["yiu_normalized_payload_v5"] = "yiu_normalized_payload_v5"
     schema_version: Literal[1] = 1
     name: str
     input_kind: Literal["user_sequence", "sample_hit"]
@@ -120,11 +152,15 @@ class NormalizedPayload(StrictBaseModel):
     selected_payload_sequence: str
     selected_complement_sequence: str
     source_provenance: dict[str, Any] = Field(default_factory=dict)
+    ligation_profile: Literal["none", "t4", "t7", "t3", "pbcv1", "hlig3"] = "none"
+    ligation_awareness_mode: Literal["disabled", "secondary"] = "disabled"
+    bad_pattern_heuristics: bool = False
+    chosen_ligation_key: ChosenLigationKey | None = None
+    ligation_rationale: list[LigationMismatchRationale] = Field(default_factory=list)
     junction: JunctionSelection
     mismatches: list[MismatchSelection] = Field(default_factory=list)
     motif_context: NormalizedMotifContext
     optimization_decision: OptimizationDecision
-    published_artifacts: dict[str, str] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _validate_payload(self) -> "NormalizedPayload":
@@ -148,6 +184,8 @@ class NormalizedPayload(StrictBaseModel):
             if mismatch.payload_index in seen_positions:
                 raise ValueError("mismatch payload_index values must be unique")
             seen_positions.add(mismatch.payload_index)
+        if self.chosen_ligation_key is None and self.ligation_rationale:
+            raise ValueError("ligation_rationale requires chosen_ligation_key")
         return self
 
     @property

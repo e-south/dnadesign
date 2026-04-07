@@ -20,7 +20,6 @@ from dnadesign.cruncher.config.schema_v3 import StrictBaseModel
 from dnadesign.cruncher.yiu.errors import YIU_PWM_CONTEXT_INVALID
 from dnadesign.cruncher.yiu.spec_common import (
     BASES,
-    LEGACY_SECONDARY_OBJECTIVE_LADDER,
     SECONDARY_OBJECTIVE_LADDER,
     require_non_empty_text,
 )
@@ -159,23 +158,12 @@ class PwmSourceSpec(StrictBaseModel):
 
 class PwmObjectiveSpec(StrictBaseModel):
     primary: Literal["maximin"] = "maximin"
-    secondary: list[
-        Literal[
-            "total_loss",
-            "midpoint_proximity",
-            "body_length_balance",
-            "terminal_position_avoidance",
-            "default_strand_preference",
-            "lexical_stability",
-        ]
-    ] = Field(default_factory=lambda: list(SECONDARY_OBJECTIVE_LADDER))
+    secondary: list[str] = Field(default_factory=lambda: list(SECONDARY_OBJECTIVE_LADDER))
 
     @field_validator("secondary")
     @classmethod
     def _validate_secondary(cls, value: list[str]) -> list[str]:
         secondary = [str(item).strip() for item in value]
-        if secondary == list(LEGACY_SECONDARY_OBJECTIVE_LADDER):
-            return list(SECONDARY_OBJECTIVE_LADDER)
         if secondary != list(SECONDARY_OBJECTIVE_LADDER):
             raise ValueError(
                 "optimization.pwm.objective.secondary must use the canonical Yiu v4 ladder order: "

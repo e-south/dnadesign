@@ -3,10 +3,10 @@
 **Audience:** YIU workflow users and maintainers
 **Applies to:** `uv run cruncher yiu render|show`
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-05
-**Last updated by:** cruncher-maintainers on 2026-04-05
+**Last verified:** 2026-04-07
+**Last updated by:** cruncher-maintainers on 2026-04-07
 
-A successful YIU render writes one deterministic bundle under the workspace-relative `output.bundle_dir` path. Treat that bundle directory as the source of truth. `output.published_plot_path` is only an optional mirror of the composite PDF. Use this reference for emitted files, render-status semantics, and the shared `render`/`show` inspection surface.
+A successful YIU render writes one deterministic bundle under the workspace-relative `output.bundle_dir` path. Treat that bundle directory as the source of truth. `output.published_plot_path` is only an optional mirror of the composite PDF. Use this reference for emitted files, render-status semantics, and the shared `render`/`show --verbose` inspection surface.
 
 <!-- docs:toc:off -->
 
@@ -27,7 +27,7 @@ Recommended patterns:
 - YIU-only workspace: `outputs/<workflow>/` plus `output.published_plot_path: outputs/<workflow>__payload_views.pdf`
 - Sample-backed workspace: `outputs/plots/yiu__<workflow>/` with no second workspace-level mirror
 
-Each bundle uses `visual_inventory.json` as the operator-facing render-state record.
+Each bundle uses `visual_inventory.json` as the machine-facing render-state and integrity record.
 
 It records:
 
@@ -53,7 +53,7 @@ outputs/<workflow>/
   normalized_payload.json
   visual_inventory.json
   payload_view.json
-  split_payload_view.json
+  split_payload_view.jsonl   # JSONL rows: split_payload_left then split_payload_right
   assembled_payload_view.json
   payload_views.pdf
   baserender_jobs/
@@ -78,20 +78,42 @@ outputs/<workflow>/
 
 `bundle_summary.json` is the concise handoff surface for one run. It keeps the main sequence story in one place:
 
-- selected payload and complement sequences in explicit 5' to 3' / 3' to 5' orientation
-- payload-forward left body, 4 bp junction span, and payload-forward right body
-- selected and reference sticky ends in explicit 5' to 3' orientation
-- mismatch list, PWM summary, published view ids, and render status
+- one explicit `views` block for `payload`, `split_left`, `split_right`, and `assembled`
+- reference and mismatch-present variants for each view
+- one reference duplex and one mismatch-present duplex view for every published handoff row
+- top and bottom strand sequences in explicit 5' to 3' orientation for every view
+- one `changed_rows` list per view so the mismatch-bearing row is obvious at a glance
+- one explicit `overhang_5to3` block with reference and mismatch-present sticky ends
+- one explicit `junction_payload_sequence_5to3` block for the 4 bp payload window
+- compact strand-aware mismatch notation using 1-based payload positions
+- raw mismatch list, PWM summary, published view ids, and render status
 
-`normalized_payload.json` is the normalized internal object serialized for inspection and downstream validation.
+Inside `sequence_summary`, the operator handoff is published as:
+
+- `views.payload`
+- `views.split_left`
+- `views.split_right`
+- `views.assembled`
+
+Each view entry carries:
+
+- `canonical.top_strand_5to3`
+- `canonical.bottom_strand_5to3`
+- `mismatch_present.top_strand_5to3`
+- `mismatch_present.bottom_strand_5to3`
+- `changed_rows`
+
+`normalized_payload.json` is the normalized semantic payload object serialized for inspection and downstream validation. It does not mirror bundle file layout or render artifacts.
+
+`bundle_manifest.json` and `visual_inventory.json` are machine-facing ledgers. They exist so `render`, `show`, and downstream integrity checks can agree on published contracts, render status, and artifact paths without guessing from the filesystem.
 
 Published contract paths:
 
 - `payload_view.json`
-- `split_payload_view.json`
+- `split_payload_view.jsonl` (JSONL)
 - `assembled_payload_view.json`
 
-The split and assembled views stay sequence-centric; the payload view uses `yiu_payload_visual_v1` and is the only place motif layers appear.
+The split and assembled views stay sequence-centric machine contracts; the payload view uses `yiu_payload_visual_v1` and is the only place motif layers appear.
 
 The payload visual contract carries:
 
@@ -103,7 +125,7 @@ The payload visual contract carries:
 
 ### Shared bundle surface
 
-`cruncher yiu render` and `cruncher yiu show` share one bundle-artifact surface:
+`cruncher yiu render` and `cruncher yiu show --verbose` share one machine-facing bundle-artifact surface:
 
 - `bundle_dir`
 - `outputs_root`
@@ -130,19 +152,18 @@ Each view entry also records one explicit `visual_direction` so downstream tools
 
 `cruncher yiu show` surfaces:
 
-- bundle directory and bundle contract
-- provenance
+- bundle directory
 - selected payload length
-- one concise sequence summary with payload 5' to 3' and split left, sticky, and right payload-forward bodies
+- one concise sequence summary with payload, split-left, split-right, and assembled views in explicit 5' to 3' top/bottom rows
+- one explicit reference-vs-mismatch-present overhang summary
+- compact mismatch edits using `PS` for the displayed payload strand and `AS` for the opposite strand
+- one ligation summary line with profile, whether ligation-aware ranking applied, chosen mismatch classes, position classes, and the decision note
 - selected junction and mismatch plan
 - PWM mode and effective status
-- render summary from `visual_inventory.json`
-- composite render path when available
-- published plot path when configured
-- key artifact paths
+- no machine-facing bundle ledger paths by default
 
-Default `show --json` returns the full bundle surface and omits `motif_context`, `optimization_decision`, and `split_row_debug` unless `--verbose` is set.
-Human-readable `show --verbose` adds split-row debug lines only; the optimizer trace and PWM context remain JSON-only.
+Default `show --json` keeps the operator bundle surface and omits machine ledger paths, normalized payload detail, `motif_context`, `optimization_decision`, and `split_row_debug` unless `--verbose` is set.
+Human-readable `show --verbose` adds provenance, bundle contract, render and integrity detail, machine-facing artifact paths, and split-row debug lines; the optimizer trace and PWM context remain JSON-only.
 
 ### Integrity checks
 

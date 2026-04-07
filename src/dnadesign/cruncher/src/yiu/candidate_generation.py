@@ -38,8 +38,8 @@ class CandidatePlan:
     mismatch_positions: tuple[int, ...]
     mutations: tuple[MutationChoice, ...]
     midpoint_distance: int
-    body_length_balance: int
-    terminal_positions_used: int
+    middle_mismatch_count: int
+    double_middle_flag: bool
     default_strand_preference_count: int
     lexical_key: str
 
@@ -112,7 +112,7 @@ def resolve_window_starts(
             junction_spec=junction_spec,
         )
     )
-    if junction_spec.canonical_mode == "explicit_window":
+    if junction_spec.mode == "explicit_window":
         assert junction_spec.start is not None
         if junction_spec.start not in valid_internal:
             raise_yiu_error(
@@ -132,7 +132,7 @@ def resolve_window_starts(
                 f"got left_body_length={left_body_length}, right_body_length={right_body_length}",
             )
         return (junction_spec.start,)
-    if junction_spec.canonical_mode == "center_locked":
+    if junction_spec.mode == "center_locked":
         if not feasible:
             _raise_no_feasible_window_error(
                 payload_length=payload_length,
@@ -219,8 +219,10 @@ def enumerate_candidates(
                             mismatch_positions=tuple(positions),
                             mutations=mutations,
                             midpoint_distance=abs((junction_start + (junction_start + 4)) - payload_length),
-                            body_length_balance=abs(junction_start - (payload_length - (junction_start + 4))),
-                            terminal_positions_used=sum(1 for item in positions if item in {0, 3}),
+                            middle_mismatch_count=sum(1 for item in positions if item in {1, 2}),
+                            # Bilotti et al. directly support edge-vs-middle trends; "double middle" is an
+                            # engineering extrapolation used only as a deterministic late penalty.
+                            double_middle_flag=len(positions) == 2 and all(item in {1, 2} for item in positions),
                             default_strand_preference_count=sum(
                                 1 for item in strands if item == mismatches_spec.default_strand_preference
                             ),

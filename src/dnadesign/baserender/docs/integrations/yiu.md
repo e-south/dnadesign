@@ -71,14 +71,14 @@ Adapter responsibilities stay split on purpose:
 YIU bundles publish render-facing assets at the bundle root:
 
 - `payload_view.json`
-- `split_payload_view.json`
+- `split_payload_view.jsonl`
 - `assembled_payload_view.json`
 - `baserender_jobs/`
 - `payload_views.pdf`
 - `visual_inventory.json`
 
 Each emitted job is self-contained and resolves paths relative to the owning
-bundle. `visual_inventory.json` is the operator-facing inventory.
+bundle. `visual_inventory.json` is the machine-facing inventory.
 
 ## Public API examples
 

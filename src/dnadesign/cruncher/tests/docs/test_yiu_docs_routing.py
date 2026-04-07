@@ -55,6 +55,9 @@ def test_cli_reference_lists_public_yiu_surface() -> None:
     assert "split_yiu_payload_rendering_v4" in cli_ref
     assert "Treat the bundle directory as the source of truth" in cli_ref
     assert "`motif_context`, `optimization_decision`, and `split_row_debug`" in cli_ref
+    assert "operator-facing handoff summary `bundle_summary.json`" in cli_ref
+    assert "`split_payload_view.jsonl` (JSONL rows)" in cli_ref
+    assert "one ligation summary line" in cli_ref
 
 
 def test_yiu_workflow_routes_to_contract_pages() -> None:
@@ -69,4 +72,13 @@ def test_yiu_workflow_routes_to_contract_pages() -> None:
     assert "[Sampling and Analysis](../guides/sampling_and_analysis.md)" in guide
     assert "Ambiguous or missing sources fail fast." in guide
     assert "Cross-tool integrations should not import `dnadesign.baserender.src.*`." in guide
-    assert "Human-readable `--verbose` adds split-row debug lines only" in guide
+    assert "Human-readable `--verbose` adds provenance, bundle contract, render/integrity details," in guide
+    assert "The remaining published JSON files are machine-facing bundle ledgers or render contracts" in guide
+    assert "reference duplex and mismatch-present duplex" in guide
+    assert (
+        "Use `candidate_positions: [0, 1, 2, 3]` when you want ligation-aware ranking "
+        "to compare edge and middle offsets." in guide
+    )
+    assert "### Ligation-aware mismatch ranking" in guide
+    assert "Bilotti et al." in guide
+    assert "`ligation_profile=t4` is the recommended default for T4-like assembly workflows." in guide

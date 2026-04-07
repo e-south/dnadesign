@@ -40,7 +40,7 @@ def resolve_payload_bundle_layout(bundle_dir: Path) -> PayloadBundleLayout:
         composite_render_path=resolved_bundle_dir / "payload_views.pdf",
         bundle_summary_path=resolved_bundle_dir / "bundle_summary.json",
         payload_view_path=resolved_bundle_dir / "payload_view.json",
-        split_payload_view_path=resolved_bundle_dir / "split_payload_view.json",
+        split_payload_view_path=resolved_bundle_dir / "split_payload_view.jsonl",
         assembled_payload_view_path=resolved_bundle_dir / "assembled_payload_view.json",
         normalized_payload_path=resolved_bundle_dir / "normalized_payload.json",
         manifest_path=resolved_bundle_dir / "bundle_manifest.json",
@@ -48,28 +48,7 @@ def resolve_payload_bundle_layout(bundle_dir: Path) -> PayloadBundleLayout:
     )
 
 
-def build_published_artifacts(
-    *,
-    layout: PayloadBundleLayout,
-    published_plot_artifact_path: str | None,
-) -> dict[str, str]:
-    artifacts = {
-        "bundle_summary": layout.relative_artifact_path(layout.bundle_summary_path),
-        "normalized_payload": layout.relative_artifact_path(layout.normalized_payload_path),
-        "bundle_manifest": layout.relative_artifact_path(layout.manifest_path),
-        "visual_inventory": layout.relative_artifact_path(layout.inventory_path),
-        "payload_view": layout.relative_artifact_path(layout.payload_view_path),
-        "split_payload_view": layout.relative_artifact_path(layout.split_payload_view_path),
-        "assembled_payload_view": layout.relative_artifact_path(layout.assembled_payload_view_path),
-        "payload_views_pdf": layout.relative_artifact_path(layout.composite_render_path),
-    }
-    if published_plot_artifact_path is not None:
-        artifacts["published_plot_pdf"] = published_plot_artifact_path
-    return artifacts
-
-
 __all__ = [
     "PayloadBundleLayout",
-    "build_published_artifacts",
     "resolve_payload_bundle_layout",
 ]

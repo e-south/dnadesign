@@ -52,7 +52,6 @@ class SampleHitInput(StrictBaseModel):
     sample_name: str
     payload_sequence: str | None = None
     source_artifact_path: str | None = None
-    source_artifact: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("hit_id", "sample_name")
@@ -67,7 +66,7 @@ class SampleHitInput(StrictBaseModel):
             return None
         return normalize_yiu_sequence(value, ctx="input.sample_hit.payload_sequence")
 
-    @field_validator("source_artifact_path", "source_artifact")
+    @field_validator("source_artifact_path")
     @classmethod
     def _validate_optional_text(cls, value: str | None) -> str | None:
         return normalize_optional_text(value)
@@ -79,13 +78,11 @@ class SampleHitInput(StrictBaseModel):
 
     @model_validator(mode="after")
     def _validate_resolution_paths(self) -> "SampleHitInput":
-        source_workspace = self.metadata.get("source_workspace")
-        has_workspace_ref = isinstance(source_workspace, str) and str(source_workspace).strip() != ""
-        has_artifact_ref = self.source_artifact_path is not None or self.source_artifact is not None
-        if self.payload_sequence is None and not has_artifact_ref and not has_workspace_ref:
+        has_artifact_ref = self.source_artifact_path is not None
+        if self.payload_sequence is None and not has_artifact_ref:
             raise ValueError(
-                "sample_hit requires payload_sequence or a resolvable source artifact reference "
-                "(source_artifact_path, source_artifact, or metadata.source_workspace)."
+                "sample_hit requires payload_sequence or source_artifact_path "
+                "(optionally resolved relative to metadata.source_workspace)."
             )
         return self
 

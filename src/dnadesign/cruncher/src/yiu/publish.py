@@ -49,7 +49,7 @@ def publish_payload_bundle(
     payload_contract = build_payload_view_contract(normalized)
     split_payload_rows = build_split_payload_view_rows(normalized)
     assembled_payload_contract = build_assembled_payload_view_contract(normalized)
-    normalized_payload_dump = build_normalized_payload_dump(spec=spec, normalized=normalized, layout=layout)
+    normalized_payload_dump = build_normalized_payload_dump(normalized=normalized)
 
     view_entries = build_payload_view_entries(
         layout=layout,

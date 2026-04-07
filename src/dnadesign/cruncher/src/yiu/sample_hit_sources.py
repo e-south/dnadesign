@@ -77,29 +77,24 @@ def _infer_sample_workspace_root(artifact_path: Path) -> Path | None:
 def _resolve_source_artifact_path(
     sample_hit: SampleHitInput, *, workspace_root: Path
 ) -> tuple[Path | None, Path | None]:
-    if sample_hit.source_artifact_path is not None:
-        raw_path = Path(sample_hit.source_artifact_path).expanduser()
-        if raw_path.is_absolute():
-            artifact_path = raw_path.resolve()
-        else:
-            if any(part == ".." for part in raw_path.parts):
-                raise_yiu_error(
-                    YIU_PATH_INVALID,
-                    "input.sample_hit.source_artifact_path must not traverse outside the current workspace",
-                )
-            artifact_path = (workspace_root / raw_path).resolve()
-        return artifact_path, _infer_sample_workspace_root(artifact_path)
-
-    source_workspace = metadata_text(sample_hit, "source_workspace")
-    source_artifact = sample_hit.source_artifact or metadata_text(sample_hit, "source_artifact")
-    if source_workspace is None or source_artifact is None:
+    if sample_hit.source_artifact_path is None:
         return None, None
-    workspace_ref = _resolve_workspace_ref(source_workspace, workspace_root=workspace_root)
-    artifact_path = Path(source_artifact).expanduser()
-    artifact_path = (
-        artifact_path.resolve() if artifact_path.is_absolute() else (workspace_ref / artifact_path).resolve()
-    )
-    return artifact_path, workspace_ref.resolve()
+    raw_path = Path(sample_hit.source_artifact_path).expanduser()
+    source_workspace = metadata_text(sample_hit, "source_workspace")
+    if raw_path.is_absolute():
+        artifact_path = raw_path.resolve()
+        return artifact_path, _infer_sample_workspace_root(artifact_path)
+    if any(part == ".." for part in raw_path.parts):
+        raise_yiu_error(
+            YIU_PATH_INVALID,
+            "input.sample_hit.source_artifact_path must not traverse outside the current workspace",
+        )
+    if source_workspace is not None:
+        workspace_ref = _resolve_workspace_ref(source_workspace, workspace_root=workspace_root)
+        artifact_path = (workspace_ref / raw_path).resolve()
+        return artifact_path, workspace_ref.resolve()
+    artifact_path = (workspace_root / raw_path).resolve()
+    return artifact_path, _infer_sample_workspace_root(artifact_path)
 
 
 def _resolve_hit_table_fields(columns: set[str], artifact_path: Path) -> tuple[str, str]:

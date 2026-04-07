@@ -363,13 +363,13 @@ Cassette runs are intentionally isolated from `sample` runs:
 
 A typical **YIU** run directory contains:
 
-- `bundle_summary.json` - operator-facing 5' to 3' run summary with payload, split left/sticky/right, mismatch, PWM, and render status
-- `bundle_manifest.json` - payload bundle metadata under `split_yiu_payload_bundle_v4`
-- `normalized_payload.json` - normalized payload object
-- `visual_inventory.json` - single bundle-local visual inventory and render-truth index
+- `bundle_summary.json` - operator-facing 5' to 3' run summary with one `views` block for payload, split-left, split-right, and assembled reference-vs-mismatch-present rows
+- `bundle_manifest.json` - machine-facing payload bundle metadata under `split_yiu_payload_bundle_v4`
+- `normalized_payload.json` - normalized semantic payload object for validation and debug
+- `visual_inventory.json` - machine-facing bundle-local visual inventory and render-truth index
 - `payload_view.json` - pure payload contract with optional PWM motif layers
-- `split_payload_view.json` - split payload contract rows (`split_payload_left`, then `split_payload_right`)
-- `assembled_payload_view.json` - rejoined payload contract in original payload order with one explicit `junction_span`
+- `split_payload_view.jsonl` - JSONL split payload contract rows (`split_payload_left`, then `split_payload_right`)
+- `assembled_payload_view.json` - rejoined payload machine contract in original payload order with one explicit `junction_span`
 - `payload_views.pdf` - operator-facing composite render listed in `visual_inventory.json`
 - `baserender_jobs/*.job.yaml` - optional debug-only jobs when explicitly requested
 

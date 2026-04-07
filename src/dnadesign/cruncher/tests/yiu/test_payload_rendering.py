@@ -14,6 +14,7 @@ from __future__ import annotations
 import csv
 import json
 import math
+import shutil
 from pathlib import Path
 
 import matplotlib.image as mpimg
@@ -37,6 +38,7 @@ from dnadesign.cruncher.yiu.candidate_generation import CandidatePlan, MutationC
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
 from dnadesign.cruncher.yiu.errors import NoFeasiblePlanError, YiuContractError
 from dnadesign.cruncher.yiu.load import load_yiu_spec
+from dnadesign.cruncher.yiu.mismatch_notation import compact_mismatch_notation_groups
 from dnadesign.cruncher.yiu.normalize import normalize_payload
 from dnadesign.cruncher.yiu.optimizer import select_best_candidate
 from dnadesign.cruncher.yiu.publish_inventory import (
@@ -50,7 +52,7 @@ from dnadesign.cruncher.yiu.publish_io import (
     write_payload_bundle_state,
     write_payload_bundle_views,
 )
-from dnadesign.cruncher.yiu.publish_layout import build_published_artifacts, resolve_payload_bundle_layout
+from dnadesign.cruncher.yiu.publish_layout import resolve_payload_bundle_layout
 from dnadesign.cruncher.yiu.render_panels import (
     YIU_NUCLEOTIDE_LEGEND_CANONICAL_COLOR,
     YIU_NUCLEOTIDE_LEGEND_MISMATCH_COLOR,
@@ -83,16 +85,8 @@ TOY_JUNCTION_START = 4
 TOY_JUNCTION_END = 8
 SECONDARY_OBJECTIVES = [
     "total_loss",
+    "ligation_awareness",
     "midpoint_proximity",
-    "terminal_position_avoidance",
-    "default_strand_preference",
-    "lexical_stability",
-]
-LEGACY_SECONDARY_OBJECTIVES = [
-    "total_loss",
-    "midpoint_proximity",
-    "body_length_balance",
-    "terminal_position_avoidance",
     "default_strand_preference",
     "lexical_stability",
 ]
@@ -301,6 +295,10 @@ def _user_sequence_spec(
     junction_end: int = TOY_JUNCTION_END,
     mismatch_count: int = 1,
     candidate_positions: list[int] | None = None,
+    allowed_strands: list[str] | None = None,
+    ligation_profile: str = "none",
+    ligation_awareness_mode: str = "secondary",
+    bad_pattern_heuristics: bool = False,
     pwm_mode: str = "none",
     pwm_source: dict[str, object] | None = None,
     emit_render_jobs_debug: bool = False,
@@ -320,9 +318,12 @@ def _user_sequence_spec(
             "mismatches": {
                 "count": mismatch_count,
                 "candidate_positions": candidate_positions or [1, 2],
-                "allowed_strands": ["complement", "payload"],
+                "allowed_strands": allowed_strands or ["complement", "payload"],
                 "strand_mode": "per_position",
                 "default_strand_preference": "complement",
+                "ligation_profile": ligation_profile,
+                "ligation_awareness_mode": ligation_awareness_mode,
+                "bad_pattern_heuristics": bad_pattern_heuristics,
             },
             "pwm": _pwm_payload(mode=pwm_mode, source=pwm_source),
         },
@@ -341,13 +342,16 @@ def _sample_hit_spec(
     sample_name: str = "sample",
     payload_sequence: str | None = None,
     source_artifact_path: str | None = None,
-    source_artifact: str | None = None,
     metadata: dict[str, object] | None = None,
-    junction_mode: str = "derived",
+    junction_mode: str = "center_locked",
     junction_start: int = TOY_JUNCTION_START,
     junction_end: int = TOY_JUNCTION_END,
     mismatch_count: int = 1,
     candidate_positions: list[int] | None = None,
+    allowed_strands: list[str] | None = None,
+    ligation_profile: str = "none",
+    ligation_awareness_mode: str = "secondary",
+    bad_pattern_heuristics: bool = False,
     pwm_mode: str = "none",
     pwm_source: dict[str, object] | None = None,
 ) -> dict[str, object]:
@@ -356,8 +360,6 @@ def _sample_hit_spec(
         sample_hit["payload_sequence"] = payload_sequence
     if source_artifact_path is not None:
         sample_hit["source_artifact_path"] = source_artifact_path
-    if source_artifact is not None:
-        sample_hit["source_artifact"] = source_artifact
     if metadata is not None:
         sample_hit["metadata"] = metadata
     return {
@@ -375,9 +377,12 @@ def _sample_hit_spec(
             "mismatches": {
                 "count": mismatch_count,
                 "candidate_positions": candidate_positions or [1, 2],
-                "allowed_strands": ["complement", "payload"],
+                "allowed_strands": allowed_strands or ["complement", "payload"],
                 "strand_mode": "per_position",
                 "default_strand_preference": "complement",
+                "ligation_profile": ligation_profile,
+                "ligation_awareness_mode": ligation_awareness_mode,
+                "bad_pattern_heuristics": bad_pattern_heuristics,
             },
             "pwm": _pwm_payload(mode=pwm_mode, source=pwm_source),
         },
@@ -422,28 +427,49 @@ def _candidate(
     lexical_key: str,
     default_strand_preference_count: int,
     midpoint_distance: int = 0,
-    body_length_balance: int = 0,
-    terminal_positions_used: int = 0,
+    mismatch_positions: tuple[int, ...] = (1,),
+    mutations: tuple[MutationChoice, ...] | None = None,
 ) -> CandidatePlan:
+    resolved_mutations = mutations or (
+        MutationChoice(
+            junction_offset=mismatch_positions[0],
+            payload_index=4 + mismatch_positions[0],
+            mutated_strand="complement",
+            native_base="A",
+            mutated_base="C",
+            opposing_base="T",
+        ),
+    )
     return CandidatePlan(
         junction_start=4,
         junction_end=8,
-        mismatch_positions=(1,),
-        mutations=(
-            MutationChoice(
-                junction_offset=1,
-                payload_index=5,
-                mutated_strand="complement",
-                native_base="A",
-                mutated_base="C",
-                opposing_base="T",
-            ),
-        ),
+        mismatch_positions=mismatch_positions,
+        mutations=resolved_mutations,
         midpoint_distance=midpoint_distance,
-        body_length_balance=body_length_balance,
-        terminal_positions_used=terminal_positions_used,
+        middle_mismatch_count=sum(1 for item in mismatch_positions if item in {1, 2}),
+        double_middle_flag=len(mismatch_positions) == 2 and all(item in {1, 2} for item in mismatch_positions),
         default_strand_preference_count=default_strand_preference_count,
         lexical_key=lexical_key,
+    )
+
+
+def _select_result(
+    *,
+    candidates: tuple[CandidatePlan, ...],
+    pwm_effective: bool,
+    ligation_profile: str = "none",
+    ligation_awareness_mode: str = "disabled",
+    bad_pattern_heuristics: bool = False,
+) -> object:
+    return select_best_candidate(
+        candidates=candidates,
+        reference_payload_sequence=TOY_SEQUENCE,
+        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
+        scorable_motifs=(),
+        pwm_effective=pwm_effective,
+        ligation_profile=ligation_profile,
+        ligation_awareness_mode=ligation_awareness_mode,
+        bad_pattern_heuristics=bad_pattern_heuristics,
     )
 
 
@@ -488,7 +514,7 @@ def test_normalize_user_sequence_explicit_window_keeps_reference_payload_when_co
     spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
     normalized = normalize_payload(spec, workspace_root=workspace_root)
 
-    assert normalized.contract == "yiu_normalized_payload_v4"
+    assert normalized.contract == "yiu_normalized_payload_v5"
     assert normalized.reference_complement_sequence == "".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE)
     assert normalized.selected_payload_sequence == TOY_SEQUENCE
     assert normalized.junction.start == TOY_JUNCTION_START
@@ -502,18 +528,47 @@ def test_normalize_user_sequence_explicit_window_keeps_reference_payload_when_co
     assert normalized.selected_complement_sequence[mismatch.payload_index] == mismatch.mutated_base
 
 
-def test_normalize_derived_mode_selects_midpoint_nearest_internal_window(tmp_path: Path) -> None:
-    spec_path = tmp_path / "workspace" / "configs" / "yiu" / "derived_payload.yiu.yaml"
+def test_normalize_payload_persists_ligation_rationale_fields(tmp_path: Path) -> None:
+    spec_path = tmp_path / "workspace" / "configs" / "yiu" / "ligation_payload.yiu.yaml"
     _write_yaml(
-        spec_path, _user_sequence_spec(sequence="AACCGGTTGGTT", junction_mode="derived", candidate_positions=[1])
+        spec_path,
+        _user_sequence_spec(
+            name="ligation_payload",
+            candidate_positions=[0],
+            ligation_profile="t4",
+            ligation_awareness_mode="secondary",
+        ),
     )
 
     spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
     normalized = normalize_payload(spec, workspace_root=workspace_root)
 
-    assert normalized.junction.mode == "center_locked"
-    assert normalized.junction.start == 4
-    assert normalized.junction.end == 8
+    assert normalized.ligation_profile == "t4"
+    assert normalized.ligation_awareness_mode == "secondary"
+    assert normalized.chosen_ligation_key is not None
+    assert normalized.ligation_rationale
+    assert normalized.ligation_rationale[0].position_class == "edge"
+    assert normalized.ligation_rationale[0].canonical_mismatch_class == "GT"
+
+
+def test_load_yiu_spec_rejects_removed_derived_junction_mode(tmp_path: Path) -> None:
+    spec_path = tmp_path / "workspace" / "configs" / "yiu" / "derived_payload.yiu.yaml"
+    _write_yaml(
+        spec_path, _user_sequence_spec(sequence="AACCGGTTGGTT", junction_mode="derived", candidate_positions=[1])
+    )
+
+    with pytest.raises(ValueError, match="optimization\\.junction\\.mode"):
+        load_yiu_spec(spec_path)
+
+
+def test_load_yiu_spec_rejects_removed_source_artifact_alias(tmp_path: Path) -> None:
+    spec_path = tmp_path / "workspace" / "configs" / "yiu" / "source_alias_payload.yiu.yaml"
+    payload = _sample_hit_spec(payload_sequence="AACCGGTTGGTT", candidate_positions=[1])
+    payload["input"]["sample_hit"]["source_artifact"] = "outputs/optimize/tables/elites.parquet"
+    _write_yaml(spec_path, payload)
+
+    with pytest.raises(ValueError, match="source_artifact"):
+        load_yiu_spec(spec_path)
 
 
 def test_normalize_center_locked_mode_selects_midpoint_nearest_internal_window(tmp_path: Path) -> None:
@@ -615,6 +670,61 @@ def test_enumerate_candidates_without_pwm_enumerates_all_non_native_bases() -> N
     }
 
 
+def test_candidate_generation_count_unchanged() -> None:
+    legacy_spec = MismatchesSpec.model_validate(
+        {
+            "count": 2,
+            "candidate_positions": [0, 1, 2, 3],
+            "allowed_strands": ["complement", "payload"],
+            "strand_mode": "per_position",
+            "default_strand_preference": "complement",
+        }
+    )
+    ligation_spec = MismatchesSpec.model_validate(
+        {
+            "count": 2,
+            "candidate_positions": [0, 1, 2, 3],
+            "allowed_strands": ["complement", "payload"],
+            "strand_mode": "per_position",
+            "default_strand_preference": "complement",
+            "ligation_profile": "t4",
+            "ligation_awareness_mode": "secondary",
+            "bad_pattern_heuristics": False,
+        }
+    )
+
+    legacy_candidates = enumerate_candidates(
+        reference_payload_sequence=TOY_SEQUENCE,
+        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
+        junction_starts=(TOY_JUNCTION_START,),
+        mismatches_spec=legacy_spec,
+        pwm_effective=False,
+    )
+    ligation_candidates = enumerate_candidates(
+        reference_payload_sequence=TOY_SEQUENCE,
+        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
+        junction_starts=(TOY_JUNCTION_START,),
+        mismatches_spec=ligation_spec,
+        pwm_effective=False,
+    )
+
+    assert len(ligation_candidates) == len(legacy_candidates)
+
+
+def test_bad_pattern_heuristics_disabled_by_default() -> None:
+    spec = MismatchesSpec.model_validate(
+        {
+            "count": 1,
+            "candidate_positions": [0, 1, 2, 3],
+            "allowed_strands": ["complement", "payload"],
+            "strand_mode": "per_position",
+            "default_strand_preference": "complement",
+        }
+    )
+
+    assert spec.bad_pattern_heuristics is False
+
+
 def test_normalize_sample_hit_resolves_csv_and_enforces_payload_assertion(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     export_table = workspace / "sample_outputs" / "export" / "table__elites.csv"
@@ -695,9 +805,9 @@ def test_normalize_sample_hit_resolves_sibling_workspace_from_parent_root(tmp_pa
         _sample_hit_spec(
             hit_id="demo_monotypic_tetr_elite_001",
             sample_name="tetr_monotypic",
+            source_artifact_path="outputs/optimize/tables/elites.parquet",
             metadata={
                 "source_workspace": "demo_monotypic_tetr",
-                "source_artifact": "outputs/optimize/tables/elites.parquet",
             },
             candidate_positions=[1],
         ),
@@ -718,9 +828,9 @@ def test_normalize_sample_hit_missing_sibling_workspace_fails_fast(tmp_path: Pat
         _sample_hit_spec(
             hit_id="missing_elite_001",
             sample_name="missing_workspace",
+            source_artifact_path="outputs/optimize/tables/elites.parquet",
             metadata={
                 "source_workspace": "missing_workspace",
-                "source_artifact": "outputs/optimize/tables/elites.parquet",
             },
             candidate_positions=[1],
         ),
@@ -949,13 +1059,7 @@ def test_select_best_candidate_breaks_pwm_tie_on_total_loss(monkeypatch: pytest.
         return CandidateScore(worst_loss=1.0, total_loss=1.0)
 
     monkeypatch.setattr(yiu_optimizer_module, "score_candidate", _stub_score_candidate)
-    result = select_best_candidate(
-        candidates=(candidate_a, candidate_b),
-        reference_payload_sequence=TOY_SEQUENCE,
-        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
-        scorable_motifs=(),
-        pwm_effective=True,
-    )
+    result = _select_result(candidates=(candidate_a, candidate_b), pwm_effective=True)
 
     assert result.winner.lexical_key == "b"
     assert result.score.total_loss == 1.0
@@ -966,15 +1070,11 @@ def test_select_best_candidate_breaks_pwm_tie_on_midpoint_proximity(monkeypatch:
         lexical_key="farther",
         default_strand_preference_count=1,
         midpoint_distance=2,
-        body_length_balance=0,
-        terminal_positions_used=0,
     )
     closer = _candidate(
         lexical_key="closer",
         default_strand_preference_count=1,
         midpoint_distance=1,
-        body_length_balance=9,
-        terminal_positions_used=1,
     )
 
     monkeypatch.setattr(
@@ -982,31 +1082,21 @@ def test_select_best_candidate_breaks_pwm_tie_on_midpoint_proximity(monkeypatch:
         "score_candidate",
         lambda **_: CandidateScore(worst_loss=1.0, total_loss=1.0),
     )
-    result = select_best_candidate(
-        candidates=(farther, closer),
-        reference_payload_sequence=TOY_SEQUENCE,
-        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
-        scorable_motifs=(),
-        pwm_effective=True,
-    )
+    result = _select_result(candidates=(farther, closer), pwm_effective=True)
 
     assert result.winner.lexical_key == "closer"
 
 
-def test_select_best_candidate_ignores_redundant_body_length_balance(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_select_best_candidate_breaks_full_tie_on_lexical_key(monkeypatch: pytest.MonkeyPatch) -> None:
     lexical_first = _candidate(
         lexical_key="a",
         default_strand_preference_count=1,
         midpoint_distance=1,
-        body_length_balance=3,
-        terminal_positions_used=0,
     )
     lexical_second = _candidate(
         lexical_key="b",
         default_strand_preference_count=1,
         midpoint_distance=1,
-        body_length_balance=1,
-        terminal_positions_used=0,
     )
 
     monkeypatch.setattr(
@@ -1014,86 +1104,440 @@ def test_select_best_candidate_ignores_redundant_body_length_balance(monkeypatch
         "score_candidate",
         lambda **_: CandidateScore(worst_loss=1.0, total_loss=1.0),
     )
-    result = select_best_candidate(
-        candidates=(lexical_second, lexical_first),
-        reference_payload_sequence=TOY_SEQUENCE,
-        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
-        scorable_motifs=(),
-        pwm_effective=True,
-    )
+    result = _select_result(candidates=(lexical_second, lexical_first), pwm_effective=True)
 
     assert result.winner.lexical_key == "a"
 
 
-def test_select_best_candidate_breaks_pwm_tie_on_terminal_position_avoidance(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    terminal_heavy = _candidate(
-        lexical_key="terminal-heavy",
+def test_ligation_profile_none_preserves_legacy_order() -> None:
+    edge_candidate = _candidate(
+        lexical_key="edge",
         default_strand_preference_count=1,
-        midpoint_distance=1,
-        body_length_balance=1,
-        terminal_positions_used=1,
+        mismatch_positions=(0,),
+        mutations=(
+            MutationChoice(
+                junction_offset=0,
+                payload_index=4,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="G",
+                opposing_base="T",
+            ),
+        ),
     )
-    terminal_safe = _candidate(
-        lexical_key="terminal-safe",
+    middle_candidate = _candidate(
+        lexical_key="middle",
+        default_strand_preference_count=1,
+        mismatch_positions=(1,),
+        mutations=(
+            MutationChoice(
+                junction_offset=1,
+                payload_index=5,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="G",
+                opposing_base="T",
+            ),
+        ),
+    )
+
+    result = _select_result(
+        candidates=(edge_candidate, middle_candidate),
+        pwm_effective=False,
+        ligation_profile="none",
+        ligation_awareness_mode="secondary",
+    )
+
+    assert result.winner.lexical_key == "middle"
+
+
+def test_t4_prefers_gt_edge_over_ag_middle_when_pwm_equal() -> None:
+    gt_edge = _candidate(
+        lexical_key="gt-edge",
+        default_strand_preference_count=1,
+        mismatch_positions=(0,),
+        mutations=(
+            MutationChoice(
+                junction_offset=0,
+                payload_index=4,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="G",
+                opposing_base="T",
+            ),
+        ),
+    )
+    ag_middle = _candidate(
+        lexical_key="ag-middle",
+        default_strand_preference_count=1,
+        mismatch_positions=(1,),
+        mutations=(
+            MutationChoice(
+                junction_offset=1,
+                payload_index=5,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="G",
+                opposing_base="A",
+            ),
+        ),
+    )
+
+    result = _select_result(
+        candidates=(ag_middle, gt_edge),
+        pwm_effective=False,
+        ligation_profile="t4",
+        ligation_awareness_mode="secondary",
+    )
+
+    assert result.winner.lexical_key == "gt-edge"
+
+
+def test_t4_prefers_edge_gt_over_middle_gt_when_pwm_equal() -> None:
+    edge_gt = _candidate(
+        lexical_key="edge-gt",
+        default_strand_preference_count=1,
+        mismatch_positions=(0,),
+        mutations=(
+            MutationChoice(
+                junction_offset=0,
+                payload_index=4,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="G",
+                opposing_base="T",
+            ),
+        ),
+    )
+    middle_gt = _candidate(
+        lexical_key="middle-gt",
+        default_strand_preference_count=1,
+        mismatch_positions=(1,),
+        mutations=(
+            MutationChoice(
+                junction_offset=1,
+                payload_index=5,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="G",
+                opposing_base="T",
+            ),
+        ),
+    )
+
+    result = _select_result(
+        candidates=(middle_gt, edge_gt),
+        pwm_effective=False,
+        ligation_profile="t4",
+        ligation_awareness_mode="secondary",
+    )
+
+    assert result.winner.lexical_key == "edge-gt"
+
+
+def test_t4_penalizes_double_middle_more_than_edge_plus_middle() -> None:
+    double_middle = _candidate(
+        lexical_key="double-middle",
+        default_strand_preference_count=1,
+        mismatch_positions=(1, 2),
+        mutations=(
+            MutationChoice(
+                junction_offset=1,
+                payload_index=5,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="G",
+                opposing_base="T",
+            ),
+            MutationChoice(
+                junction_offset=2,
+                payload_index=6,
+                mutated_strand="payload",
+                native_base="C",
+                mutated_base="T",
+                opposing_base="G",
+            ),
+        ),
+    )
+    edge_plus_middle = _candidate(
+        lexical_key="edge-plus-middle",
+        default_strand_preference_count=1,
+        mismatch_positions=(0, 1),
+        mutations=(
+            MutationChoice(
+                junction_offset=0,
+                payload_index=4,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="G",
+                opposing_base="T",
+            ),
+            MutationChoice(
+                junction_offset=1,
+                payload_index=5,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="G",
+                opposing_base="T",
+            ),
+        ),
+    )
+
+    result = _select_result(
+        candidates=(double_middle, edge_plus_middle),
+        pwm_effective=False,
+        ligation_profile="t4",
+        ligation_awareness_mode="secondary",
+    )
+
+    assert result.winner.lexical_key == "edge-plus-middle"
+
+
+def test_hlig3_allows_ag_or_gg_as_second_tier() -> None:
+    ag_middle = _candidate(
+        lexical_key="ag-middle",
+        default_strand_preference_count=1,
+        mismatch_positions=(1,),
+        mutations=(
+            MutationChoice(
+                junction_offset=1,
+                payload_index=5,
+                mutated_strand="payload",
+                native_base="T",
+                mutated_base="A",
+                opposing_base="G",
+            ),
+        ),
+    )
+    ct_middle = _candidate(
+        lexical_key="ct-middle",
+        default_strand_preference_count=1,
+        mismatch_positions=(1,),
+        mutations=(
+            MutationChoice(
+                junction_offset=1,
+                payload_index=5,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="C",
+                opposing_base="T",
+            ),
+        ),
+    )
+
+    result = _select_result(
+        candidates=(ct_middle, ag_middle),
+        pwm_effective=False,
+        ligation_profile="hlig3",
+        ligation_awareness_mode="secondary",
+    )
+
+    assert result.winner.lexical_key == "ag-middle"
+
+
+@pytest.mark.parametrize(
+    ("ligation_profile", "mismatch_class", "expected_tier"),
+    [
+        ("t7", "AG", 2),
+        ("t7", "GG", 2),
+        ("t3", "AG", 1),
+        ("pbcv1", "GG", 1),
+    ],
+)
+def test_ligation_profile_tier_tables_cover_remaining_profiles(
+    ligation_profile: str,
+    mismatch_class: str,
+    expected_tier: int,
+) -> None:
+    from dnadesign.cruncher.yiu.ligation_scoring import mismatch_class_tier
+
+    assert mismatch_class_tier(mismatch_class=mismatch_class, ligation_profile=ligation_profile) == expected_tier
+
+
+def test_pwm_primary_ligation_secondary(monkeypatch: pytest.MonkeyPatch) -> None:
+    better_pwm_but_biologically_worse = _candidate(
+        lexical_key="better-pwm",
         default_strand_preference_count=0,
-        midpoint_distance=1,
-        body_length_balance=1,
-        terminal_positions_used=0,
+        mismatch_positions=(1,),
+        mutations=(
+            MutationChoice(
+                junction_offset=1,
+                payload_index=5,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="C",
+                opposing_base="T",
+            ),
+        ),
+    )
+    better_ligation_but_worse_pwm = _candidate(
+        lexical_key="better-ligation",
+        default_strand_preference_count=1,
+        mismatch_positions=(0,),
+        mutations=(
+            MutationChoice(
+                junction_offset=0,
+                payload_index=4,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="G",
+                opposing_base="T",
+            ),
+        ),
     )
 
-    monkeypatch.setattr(
-        yiu_optimizer_module,
-        "score_candidate",
-        lambda **_: CandidateScore(worst_loss=1.0, total_loss=1.0),
-    )
-    result = select_best_candidate(
-        candidates=(terminal_heavy, terminal_safe),
-        reference_payload_sequence=TOY_SEQUENCE,
-        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
-        scorable_motifs=(),
+    def _stub_score_candidate(*, candidate, reference_payload_sequence, reference_complement_sequence, scorable_motifs):
+        _ = (reference_payload_sequence, reference_complement_sequence, scorable_motifs)
+        if candidate.lexical_key == "better-pwm":
+            return CandidateScore(worst_loss=0.5, total_loss=0.5)
+        return CandidateScore(worst_loss=1.0, total_loss=1.0)
+
+    monkeypatch.setattr(yiu_optimizer_module, "score_candidate", _stub_score_candidate)
+    result = _select_result(
+        candidates=(better_ligation_but_worse_pwm, better_pwm_but_biologically_worse),
         pwm_effective=True,
+        ligation_profile="t4",
+        ligation_awareness_mode="secondary",
     )
 
-    assert result.winner.lexical_key == "terminal-safe"
+    assert result.winner.lexical_key == "better-pwm"
+
+
+def test_default_strand_preference_remains_late() -> None:
+    preferred = _candidate(lexical_key="z", default_strand_preference_count=1)
+    nonpreferred = _candidate(lexical_key="a", default_strand_preference_count=0)
+
+    result = _select_result(
+        candidates=(nonpreferred, preferred),
+        pwm_effective=False,
+        ligation_profile="t4",
+        ligation_awareness_mode="secondary",
+    )
+
+    assert result.winner.lexical_key == "z"
 
 
 def test_select_best_candidate_without_pwm_prefers_default_strand_then_lexical_order() -> None:
     preferred = _candidate(lexical_key="z", default_strand_preference_count=1)
     nonpreferred = _candidate(lexical_key="a", default_strand_preference_count=0)
 
-    result = select_best_candidate(
-        candidates=(nonpreferred, preferred),
-        reference_payload_sequence=TOY_SEQUENCE,
-        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
-        scorable_motifs=(),
-        pwm_effective=False,
-    )
+    result = _select_result(candidates=(nonpreferred, preferred), pwm_effective=False)
 
     assert result.winner.lexical_key == "z"
 
     lexical_a = _candidate(lexical_key="a", default_strand_preference_count=1)
     lexical_b = _candidate(lexical_key="b", default_strand_preference_count=1)
-    lexical_result = select_best_candidate(
-        candidates=(lexical_b, lexical_a),
-        reference_payload_sequence=TOY_SEQUENCE,
-        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
-        scorable_motifs=(),
-        pwm_effective=False,
-    )
+    lexical_result = _select_result(candidates=(lexical_b, lexical_a), pwm_effective=False)
     assert lexical_result.winner.lexical_key == "a"
 
 
-def test_load_yiu_spec_canonicalizes_legacy_body_length_balance_secondary_ladder(tmp_path: Path) -> None:
+def test_load_yiu_spec_rejects_noncanonical_secondary_ladder(tmp_path: Path) -> None:
     spec_path = tmp_path / "workspace" / "configs" / "yiu" / "legacy_secondary.yiu.yaml"
     payload = _user_sequence_spec()
-    payload["optimization"]["pwm"]["objective"]["secondary"] = list(LEGACY_SECONDARY_OBJECTIVES)
+    payload["optimization"]["pwm"]["objective"]["secondary"] = [
+        "total_loss",
+        "midpoint_proximity",
+        "body_length_balance",
+        "terminal_position_avoidance",
+        "default_strand_preference",
+        "lexical_stability",
+    ]
     _write_yaml(spec_path, payload)
 
-    spec, _resolved_spec_path, _workspace_root = load_yiu_spec(spec_path)
+    with pytest.raises(ValueError, match="canonical Yiu v4 ladder order"):
+        load_yiu_spec(spec_path)
 
-    assert spec.optimization.pwm.objective.secondary == SECONDARY_OBJECTIVES
+
+def test_mismatch_class_is_orientation_independent() -> None:
+    from dnadesign.cruncher.yiu.ligation_scoring import build_candidate_ligation_score
+
+    payload_mutated = _candidate(
+        lexical_key="payload-mutated",
+        default_strand_preference_count=1,
+        mismatch_positions=(1,),
+        mutations=(
+            MutationChoice(
+                junction_offset=1,
+                payload_index=5,
+                mutated_strand="payload",
+                native_base="T",
+                mutated_base="G",
+                opposing_base="T",
+            ),
+        ),
+    )
+    complement_mutated = _candidate(
+        lexical_key="complement-mutated",
+        default_strand_preference_count=1,
+        mismatch_positions=(1,),
+        mutations=(
+            MutationChoice(
+                junction_offset=1,
+                payload_index=5,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="G",
+                opposing_base="T",
+            ),
+        ),
+    )
+
+    payload_score = build_candidate_ligation_score(
+        candidate=payload_mutated,
+        ligation_profile="t4",
+        bad_pattern_heuristics=False,
+        reference_payload_sequence=TOY_SEQUENCE,
+        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
+    )
+    complement_score = build_candidate_ligation_score(
+        candidate=complement_mutated,
+        ligation_profile="t4",
+        bad_pattern_heuristics=False,
+        reference_payload_sequence=TOY_SEQUENCE,
+        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
+    )
+
+    assert payload_score.mismatch_rationales[0].canonical_mismatch_class == "GT"
+    assert complement_score.mismatch_rationales[0].canonical_mismatch_class == "GT"
+    assert payload_score.key == complement_score.key
+
+
+def test_bad_pattern_heuristics_can_penalize_tnna_like_overhangs() -> None:
+    from dnadesign.cruncher.yiu.ligation_scoring import build_candidate_ligation_score
+
+    tnna_candidate = _candidate(
+        lexical_key="tnna-like",
+        default_strand_preference_count=1,
+        mismatch_positions=(3,),
+        mutations=(
+            MutationChoice(
+                junction_offset=3,
+                payload_index=7,
+                mutated_strand="complement",
+                native_base="G",
+                mutated_base="T",
+                opposing_base="C",
+            ),
+        ),
+    )
+
+    disabled_score = build_candidate_ligation_score(
+        candidate=tnna_candidate,
+        ligation_profile="t4",
+        bad_pattern_heuristics=False,
+        reference_payload_sequence=TOY_SEQUENCE,
+        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
+    )
+    enabled_score = build_candidate_ligation_score(
+        candidate=tnna_candidate,
+        ligation_profile="t4",
+        bad_pattern_heuristics=True,
+        reference_payload_sequence=TOY_SEQUENCE,
+        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
+    )
+
+    assert disabled_score.chosen_key.bad_pattern_penalty == 0
+    assert enabled_score.chosen_key.bad_pattern_penalty == 1
 
 
 def test_render_yiu_spec_publishes_v4_bundle_and_payload_visual_contract(tmp_path: Path) -> None:
@@ -1109,21 +1553,112 @@ def test_render_yiu_spec_publishes_v4_bundle_and_payload_visual_contract(tmp_pat
     normalized = _load_json(bundle_dir / "normalized_payload.json")
     inventory = _load_json(bundle_dir / "visual_inventory.json")
     payload_view = _load_json(bundle_dir / "payload_view.json")
-    split_rows = _load_jsonl(bundle_dir / "split_payload_view.json")
+    split_rows = _load_jsonl(bundle_dir / "split_payload_view.jsonl")
     assembled_view = _load_json(bundle_dir / "assembled_payload_view.json")
 
     assert manifest["bundle_contract"] == "split_yiu_payload_bundle_v4"
     assert manifest["published_plot_artifact_path"] == "outputs/plot__demo_payload__payload_views.pdf"
-    assert bundle_summary["summary_contract"] == "yiu_bundle_summary_v1"
-    assert bundle_summary["sequence_summary"]["selected_payload_sequence_5to3"] == manifest["selected_payload_sequence"]
-    assert normalized["contract"] == "yiu_normalized_payload_v4"
-    assert normalized["published_artifacts"]["bundle_summary"] == "bundle_summary.json"
+    assert bundle_summary["summary_contract"] == "yiu_bundle_summary_v3"
+    normalized_model = NormalizedPayload.model_validate(normalized)
+    canonical_model = normalized_model.model_copy(
+        update={
+            "selected_payload_sequence": normalized_model.reference_payload_sequence,
+            "selected_complement_sequence": normalized_model.reference_complement_sequence,
+        }
+    )
+    canonical_fragments = {
+        fragment.fragment_side: fragment for fragment in build_split_fragment_display_specs(canonical_model)
+    }
+    selected_fragments = {
+        fragment.fragment_side: fragment for fragment in build_split_fragment_display_specs(normalized_model)
+    }
+    payload_view_summary = bundle_summary["sequence_summary"]["views"]["payload"]
+    split_left_view_summary = bundle_summary["sequence_summary"]["views"]["split_left"]
+    split_right_view_summary = bundle_summary["sequence_summary"]["views"]["split_right"]
+    assembled_view_summary = bundle_summary["sequence_summary"]["views"]["assembled"]
+    assert payload_view_summary["canonical"]["top_strand_5to3"] == normalized["reference_payload_sequence"]
+    assert payload_view_summary["canonical"]["bottom_strand_5to3"] == normalized["reference_complement_sequence"][::-1]
+    assert payload_view_summary["mismatch_present"]["top_strand_5to3"] == normalized["selected_payload_sequence"]
+    assert (
+        payload_view_summary["mismatch_present"]["bottom_strand_5to3"] == manifest["selected_complement_sequence"][::-1]
+    )
+    assert (
+        bundle_summary["sequence_summary"]["overhang_5to3"]["canonical_sequence_5to3"]
+        == normalized["reference_complement_sequence"][TOY_JUNCTION_START:TOY_JUNCTION_END][::-1]
+    )
+    assert (
+        bundle_summary["sequence_summary"]["overhang_5to3"]["mismatch_present_sequence_5to3"]
+        == manifest["selected_complement_sequence"][TOY_JUNCTION_START:TOY_JUNCTION_END][::-1]
+    )
+    assert (
+        split_left_view_summary["canonical"]["top_strand_5to3"]
+        == canonical_fragments["left"].retained_primary_sequence_5to3
+    )
+    assert (
+        split_left_view_summary["canonical"]["bottom_strand_5to3"]
+        == canonical_fragments["left"].retained_complement_sequence_3to5[::-1]
+    )
+    assert (
+        split_left_view_summary["mismatch_present"]["top_strand_5to3"]
+        == selected_fragments["left"].retained_primary_sequence_5to3
+    )
+    assert (
+        split_left_view_summary["mismatch_present"]["bottom_strand_5to3"]
+        == selected_fragments["left"].retained_complement_sequence_3to5[::-1]
+    )
+    assert (
+        split_right_view_summary["canonical"]["top_strand_5to3"]
+        == canonical_fragments["right"].retained_primary_sequence_5to3
+    )
+    assert (
+        split_right_view_summary["canonical"]["bottom_strand_5to3"]
+        == canonical_fragments["right"].retained_complement_sequence_3to5[::-1]
+    )
+    assert (
+        split_right_view_summary["mismatch_present"]["top_strand_5to3"]
+        == selected_fragments["right"].retained_primary_sequence_5to3
+    )
+    assert (
+        split_right_view_summary["mismatch_present"]["bottom_strand_5to3"]
+        == selected_fragments["right"].retained_complement_sequence_3to5[::-1]
+    )
+    assert assembled_view_summary == payload_view_summary
+    assert bundle_summary["mismatch_notation"] == compact_mismatch_notation_groups(bundle_summary["mismatches"])
+    assert normalized["contract"] == "yiu_normalized_payload_v5"
+    assert "published_artifacts" not in normalized
     assert inventory["pwm_effective"] is False
     assert inventory["published_plot_artifact_path"] == "outputs/plot__demo_payload__payload_views.pdf"
     assert payload_view["contract_kind"] == "yiu_payload_visual_v1"
     assert payload_view["motif_layers"] == []
     assert len(split_rows) == 2
     assert assembled_view["contract_kind"] == "sequence_evidence_map_v1"
+
+
+def test_render_yiu_spec_bundle_summary_reports_ligation_rationale(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "ligation_payload.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _user_sequence_spec(
+            name="ligation_payload",
+            candidate_positions=[0, 1],
+            ligation_profile="t4",
+            ligation_awareness_mode="secondary",
+        ),
+    )
+
+    bundle_dir, _report = render_yiu_spec(spec_path)
+    bundle_summary = _load_json(bundle_dir / "bundle_summary.json")
+    normalized = _load_json(bundle_dir / "normalized_payload.json")
+
+    assert bundle_summary["ligation"]["profile"] == "t4"
+    assert bundle_summary["ligation"]["awareness_mode"] == "secondary"
+    assert bundle_summary["ligation"]["applied"] is True
+    assert "ligation-aware" in bundle_summary["ligation"]["decision_note"]
+    assert bundle_summary["ligation"]["chosen_mismatch_classes"]
+    assert bundle_summary["ligation"]["position_classes"]
+    assert normalized["chosen_ligation_key"]["middle_mismatch_count"] >= 0
+    assert normalized["ligation_rationale"]
 
 
 def test_render_yiu_spec_outcome_uses_shared_bundle_surface(tmp_path: Path) -> None:
@@ -1155,7 +1690,8 @@ def test_render_yiu_spec_with_pwm_effective_adds_payload_motif_layers_and_show_r
         _user_sequence_spec(
             name="pwm_payload",
             mismatch_count=2,
-            candidate_positions=[1, 2],
+            candidate_positions=[0, 1, 2, 3],
+            ligation_profile="t4",
             pwm_mode="require",
             pwm_source={"kind": "inline", "inline_context": _inline_pwm_context()},
         ),
@@ -1173,6 +1709,11 @@ def test_render_yiu_spec_with_pwm_effective_adds_payload_motif_layers_and_show_r
     assert show_payload.pwm_effective is True
     assert show_payload.motif_context.effective is True
     assert show_payload.bundle_summary.pwm.motif_count == 2
+    assert show_payload.bundle_summary.ligation.profile == "t4"
+    assert show_payload.bundle_summary.ligation.applied is True
+    assert show_payload.bundle_summary.ligation.chosen_mismatch_classes
+    assert show_payload.bundle_summary.ligation.position_classes
+    assert show_payload.bundle_summary.ligation.decision_note == "PWM preserved first, ligation-aware tie-break applied"
     assert show_payload.integrity.status == "ok"
     assert show_payload.published_plot_artifact_path == str(
         (workspace / "outputs" / "plot__pwm_payload__payload_views.pdf").resolve()
@@ -1310,6 +1851,11 @@ def test_split_payload_view_metadata_partitions_mixed_strand_mismatches_into_spl
             "selected_payload_sequence": "CTGTATAAATATACAG",
             "selected_complement_sequence": "GACATAAATATATGTC",
             "source_provenance": {},
+            "ligation_profile": "none",
+            "ligation_awareness_mode": "disabled",
+            "bad_pattern_heuristics": False,
+            "chosen_ligation_key": None,
+            "ligation_rationale": [],
             "junction": {
                 "start": 5,
                 "end": 9,
@@ -1348,14 +1894,14 @@ def test_split_payload_view_metadata_partitions_mixed_strand_mismatches_into_spl
                 "winner": {
                     "junction_start": 5,
                     "junction_end": 9,
-                    "selected_positions": [6, 7],
+                    "selected_positions": [1, 2],
                     "mutated_strands": ["complement", "payload"],
                     "mutated_bases": ["A", "A"],
                     "worst_loss": 0.0,
                     "total_loss": 0.0,
                     "midpoint_distance": 0,
-                    "body_length_balance": 0,
-                    "terminal_positions_used": 0,
+                    "middle_mismatch_count": 2,
+                    "double_middle_flag": True,
                     "default_strand_preference_count": 1,
                     "lexical_key": "mixed-split",
                 },
@@ -1486,7 +2032,7 @@ def test_payload_view_content_preserves_motif_mismatch_and_meta_contract(tmp_pat
     assert payload_view["meta"] == meta
 
 
-def test_publish_layout_tracks_relative_bundle_artifacts_and_view_entries(tmp_path: Path) -> None:
+def test_publish_layout_tracks_relative_view_artifacts_and_entries(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
     _write_yaml(spec_path, _user_sequence_spec())
@@ -1494,27 +2040,17 @@ def test_publish_layout_tracks_relative_bundle_artifacts_and_view_entries(tmp_pa
     spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
     normalized = normalize_payload(spec, workspace_root=workspace_root)
     layout = resolve_payload_bundle_layout(workspace / spec.output.bundle_dir)
-    published_artifacts = build_published_artifacts(
-        layout=layout,
-        published_plot_artifact_path=str(spec.output.published_plot_path),
-    )
     view_entries = build_payload_view_entries(layout=layout, normalized=normalized)
 
-    assert published_artifacts == {
-        "bundle_summary": "bundle_summary.json",
-        "normalized_payload": "normalized_payload.json",
-        "bundle_manifest": "bundle_manifest.json",
-        "visual_inventory": "visual_inventory.json",
-        "payload_view": "payload_view.json",
-        "split_payload_view": "split_payload_view.json",
-        "assembled_payload_view": "assembled_payload_view.json",
-        "payload_views_pdf": "payload_views.pdf",
-        "published_plot_pdf": "outputs/plot__demo_payload__payload_views.pdf",
-    }
+    assert layout.relative_artifact_path(layout.bundle_summary_path) == "bundle_summary.json"
+    assert layout.relative_artifact_path(layout.payload_view_path) == "payload_view.json"
+    assert layout.relative_artifact_path(layout.split_payload_view_path) == "split_payload_view.jsonl"
+    assert layout.relative_artifact_path(layout.assembled_payload_view_path) == "assembled_payload_view.json"
+    assert layout.relative_artifact_path(layout.composite_render_path) == "payload_views.pdf"
     assert [entry.view_id for entry in view_entries] == ["payload", "split_payload", "assembled_payload"]
     assert [entry.view_contract_path for entry in view_entries] == [
         "payload_view.json",
-        "split_payload_view.json",
+        "split_payload_view.jsonl",
         "assembled_payload_view.json",
     ]
     assert [entry.visual_direction for entry in view_entries] == [
@@ -1537,7 +2073,7 @@ def test_publish_io_writes_bundle_artifacts_at_canonical_paths(tmp_path: Path) -
     payload_contract = build_payload_view_contract(normalized)
     split_payload_rows = build_split_payload_view_rows(normalized)
     assembled_payload_contract = build_assembled_payload_view_contract(normalized)
-    normalized_payload_dump = build_normalized_payload_dump(spec=spec, normalized=normalized, layout=layout)
+    normalized_payload_dump = build_normalized_payload_dump(normalized=normalized)
     view_entries = build_payload_view_entries(layout=layout, normalized=normalized)
     inventory = build_payload_visual_inventory(
         spec=spec,
@@ -1546,6 +2082,9 @@ def test_publish_io_writes_bundle_artifacts_at_canonical_paths(tmp_path: Path) -
         view_entries=view_entries,
     )
     manifest = build_payload_bundle_manifest(normalized=normalized, inventory=inventory)
+    legacy_split_path = layout.bundle_dir / "split_payload_view.json"
+    legacy_split_path.parent.mkdir(parents=True, exist_ok=True)
+    legacy_split_path.write_text("{}\n", encoding="utf-8")
 
     write_payload_bundle_views(
         layout=layout,
@@ -1558,6 +2097,7 @@ def test_publish_io_writes_bundle_artifacts_at_canonical_paths(tmp_path: Path) -
 
     assert _load_json(layout.payload_view_path) == payload_contract
     assert _load_jsonl(layout.split_payload_view_path) == split_payload_rows
+    assert not legacy_split_path.exists()
     assert _load_json(layout.assembled_payload_view_path) == assembled_payload_contract
     assert _load_json(layout.normalized_payload_path) == normalized_payload_dump
     assert _load_json(layout.manifest_path) == manifest.model_dump(mode="json")
@@ -1608,7 +2148,7 @@ def test_publish_inventory_and_manifest_share_bundle_state_contract(tmp_path: Pa
         view_entries=view_entries,
     )
     manifest = build_payload_bundle_manifest(normalized=normalized, inventory=inventory)
-    normalized_dump = build_normalized_payload_dump(spec=spec, normalized=normalized, layout=layout)
+    normalized_dump = build_normalized_payload_dump(normalized=normalized)
 
     assert inventory.render_status == "not_requested"
     assert inventory.payload_view_requires_motif_layers is True
@@ -1617,11 +2157,7 @@ def test_publish_inventory_and_manifest_share_bundle_state_contract(tmp_path: Pa
     assert manifest.composite_render_artifact_path == inventory.composite_render_artifact_path == "payload_views.pdf"
     assert manifest.published_plot_artifact_path == inventory.published_plot_artifact_path
     assert manifest.published_plot_artifact_path == "outputs/plot__pwm_payload__payload_views.pdf"
-    assert normalized_dump["published_artifacts"]["payload_view"] == "payload_view.json"
-    assert normalized_dump["published_artifacts"]["bundle_summary"] == "bundle_summary.json"
-    assert (
-        normalized_dump["published_artifacts"]["published_plot_pdf"] == "outputs/plot__pwm_payload__payload_views.pdf"
-    )
+    assert "published_artifacts" not in normalized_dump
 
 
 def test_bundle_path_contract_rejects_divergent_view_render_targets(tmp_path: Path) -> None:
@@ -1645,7 +2181,7 @@ def test_bundle_path_contract_rejects_divergent_view_render_targets(tmp_path: Pa
                 visual_direction="operator_strip",
                 contract_kind="sequence_evidence_map_v1",
                 input_kind="jsonl",
-                view_contract_path="split_payload_view.json",
+                view_contract_path="split_payload_view.jsonl",
                 render_artifact_path="split_payload.pdf",
                 renderer_kind="sequence_rows",
             ),
@@ -1698,7 +2234,7 @@ def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp
     assert show_payload.pwm_effective is True
     assert show_payload.motif_context.effective is True
     assert (
-        show_payload.bundle_summary.sequence_summary.split_payload.selected_sticky_end_sequence_5to3
+        show_payload.bundle_summary.sequence_summary.overhang_5to3.mismatch_present_sequence_5to3
         == show_payload.selected_complement_sequence[8:12][::-1]
     )
     assert show_payload.integrity.status == "ok"
@@ -1706,7 +2242,7 @@ def test_render_sample_hit_with_file_backed_pwm_renders_payload_motif_layers(tmp
         (workspace / "outputs" / "plots" / "plot__yiu__tetr_monotypic_hit__payload_views.pdf").resolve()
     )
 
-    split_rows = _load_jsonl(bundle_dir / "split_payload_view.json")
+    split_rows = _load_jsonl(bundle_dir / "split_payload_view.jsonl")
     assert split_rows[0]["meta"]["row_labels"] == {}
     assert split_rows[1]["meta"]["row_labels"] == {}
     assert split_rows[0]["display"]["title"] == "Left split fragment"
@@ -1870,6 +2406,63 @@ def test_checked_in_tetr_pwm_context_preserves_full_information_content() -> Non
     assert max(info_bits) - min(info_bits) > 0.35
 
 
+def test_checked_in_tetr_direct_user_sequence_spec_renders_without_sample_handoff_or_pwm(tmp_path: Path) -> None:
+    source_workspace = Path(__file__).resolve().parents[2] / "workspaces" / "demo_monotypic_tetr"
+    workspace = tmp_path / "demo_monotypic_tetr"
+    shutil.copytree(
+        source_workspace,
+        workspace,
+        ignore=shutil.ignore_patterns(".DS_Store", "outputs", ".cruncher"),
+    )
+
+    spec_path = workspace / "configs" / "yiu" / "tetr_teto2_wt_direct.yiu.yaml"
+
+    bundle_dir, report = render_yiu_spec(spec_path, emit_renders=True)
+    payload_view = _load_json(bundle_dir / "payload_view.json")
+    show_payload = show_yiu_bundle(bundle_dir)
+
+    assert report.input_kind == "user_sequence"
+    assert report.pwm_effective is False
+    assert report.payload_length == 19
+    assert payload_view["reference_payload_sequence"] == "TCCCTATCAGTGATAGAGA"
+    assert len(payload_view["selected_payload_sequence"]) == 19
+    assert payload_view["motif_layers"] == []
+    assert payload_view["meta"]["pwm_effective"] is False
+    assert (bundle_dir / "payload_views.pdf").exists()
+    assert show_payload.input_kind == "user_sequence"
+    assert show_payload.pwm_effective is False
+    assert show_payload.published_plot_artifact_path is None
+    assert show_payload.integrity.status == "ok"
+
+
+def test_checked_in_yiu_demo_bundles_roundtrip_show() -> None:
+    workspaces_root = Path(__file__).resolve().parents[2] / "workspaces"
+    current_normalized_contract = NormalizedPayload.model_fields["contract"].default
+    bundle_dirs = [
+        workspaces_root / "demo_yiu_payload" / "outputs" / "example_payload",
+        workspaces_root / "demo_monotypic_baer" / "outputs" / "plots" / "yiu__baer_monotypic_hit",
+        workspaces_root / "demo_monotypic_cpxr" / "outputs" / "plots" / "yiu__cpxr_monotypic_hit",
+        workspaces_root / "demo_monotypic_lexa" / "outputs" / "plots" / "yiu__lexa_monotypic_hit",
+        workspaces_root / "demo_monotypic_soxr" / "outputs" / "plots" / "yiu__soxr_monotypic_hit",
+        workspaces_root / "demo_monotypic_soxs" / "outputs" / "plots" / "yiu__soxs_monotypic_hit",
+        workspaces_root / "demo_monotypic_tetr" / "outputs" / "plots" / "yiu__tetr_monotypic_hit",
+        workspaces_root / "demo_monotypic_tetr" / "outputs" / "plots" / "yiu__tetr_teto2_wt_direct",
+    ]
+    if any(not bundle_dir.exists() for bundle_dir in bundle_dirs):
+        pytest.skip("checked-in demo bundle outputs are not present in this checkout")
+    if any(
+        json.loads((bundle_dir / "normalized_payload.json").read_text(encoding="utf-8")).get("contract")
+        != current_normalized_contract
+        for bundle_dir in bundle_dirs
+    ):
+        pytest.skip("checked-in demo bundle outputs were generated with an older normalized payload contract")
+
+    for bundle_dir in bundle_dirs:
+        outcome = show_yiu_bundle(bundle_dir)
+        assert outcome.integrity.status == "ok"
+        assert outcome.bundle_summary.mismatch_notation
+
+
 def test_show_yiu_bundle_rejects_payload_view_drift_when_pwm_effective_but_motifs_missing(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     spec_path = workspace / "configs" / "yiu" / "pwm_payload.yiu.yaml"
@@ -1915,7 +2508,7 @@ def test_show_yiu_bundle_rejects_bundle_summary_drift(tmp_path: Path) -> None:
     bundle_dir, _report = render_yiu_spec(spec_path)
     summary_path = bundle_dir / "bundle_summary.json"
     bundle_summary = _load_json(summary_path)
-    bundle_summary["sequence_summary"]["split_payload"]["left_payload_body_sequence_5to3"] = "WRONG"
+    bundle_summary["sequence_summary"]["views"]["payload"]["canonical"]["bottom_strand_5to3"] = "WRONG"
     summary_path.write_text(json.dumps(bundle_summary, indent=2), encoding="utf-8")
 
     with pytest.raises(YiuContractError, match="bundle_summary.json disagrees"):

@@ -15,10 +15,13 @@ optimization:
     max_payload_body_length: 12
   mismatches:
     count: 1
-    candidate_positions: [1, 2]
+    candidate_positions: [0, 1, 2, 3]
     allowed_strands: [complement, payload]
     strand_mode: per_position
     default_strand_preference: complement
+    ligation_profile: t4
+    ligation_awareness_mode: secondary
+    bad_pattern_heuristics: false
   pwm:
     mode: none
     source:
@@ -27,8 +30,8 @@ optimization:
       primary: maximin
       secondary:
         - total_loss
+        - ligation_awareness
         - midpoint_proximity
-        - terminal_position_avoidance
         - default_strand_preference
         - lexical_stability
 

@@ -38,6 +38,16 @@ class YiuValidationIssue(StrictBaseModel):
     message: str
 
 
+class YiuValidationLigationSummary(StrictBaseModel):
+    profile: Literal["none", "t4", "t7", "t3", "pbcv1", "hlig3"]
+    awareness_mode: Literal["disabled", "secondary"]
+    applied: bool
+    bad_pattern_heuristics: bool
+    chosen_mismatch_classes: list[str] = Field(default_factory=list)
+    position_classes: list[Literal["edge", "middle"]] = Field(default_factory=list)
+    decision_note: str
+
+
 class YiuValidationReport(StrictBaseModel):
     workflow: Literal["yiu"] = "yiu"
     contract: Literal["split_yiu_payload_rendering_v4"] = "split_yiu_payload_rendering_v4"
@@ -54,6 +64,7 @@ class YiuValidationReport(StrictBaseModel):
     pwm_effective: bool
     worst_loss: float = Field(ge=0.0)
     total_loss: float = Field(ge=0.0)
+    ligation: YiuValidationLigationSummary
     bundle_dir: str | None = None
     issues: list[YiuValidationIssue] = Field(default_factory=list)
 
@@ -157,9 +168,27 @@ def build_validation_report(
     normalized: NormalizedPayload,
     bundle_dir: str | None = None,
 ) -> YiuValidationReport:
+    ligation_applied = normalized.chosen_ligation_key is not None
     return YiuValidationReport(
         spec_name=spec_name,
         status="satisfied",
         bundle_dir=bundle_dir,
+        ligation=YiuValidationLigationSummary(
+            profile=normalized.ligation_profile,
+            awareness_mode=normalized.ligation_awareness_mode,
+            applied=ligation_applied,
+            bad_pattern_heuristics=normalized.bad_pattern_heuristics,
+            chosen_mismatch_classes=[entry.canonical_mismatch_class for entry in normalized.ligation_rationale],
+            position_classes=[entry.position_class for entry in normalized.ligation_rationale],
+            decision_note=(
+                "PWM preserved first, ligation-aware tie-break applied"
+                if ligation_applied and normalized.motif_context.effective
+                else (
+                    "No PWM context; ligation-aware ranking applied"
+                    if ligation_applied
+                    else "Legacy geometric ranking applied"
+                )
+            ),
+        ),
         **payload_summary_from_normalized(normalized),
     )

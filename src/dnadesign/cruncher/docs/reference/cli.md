@@ -574,10 +574,9 @@ Examples:
 Outputs:
 
 * writes under the workspace-relative `output.bundle_dir` path, usually `<workspace>/outputs/<workflow>/`
-* writes `bundle_manifest.json`, `normalized_payload.json`, and `visual_inventory.json`
-* writes `payload_view.json`
-* writes `split_payload_view.json`
-* writes `assembled_payload_view.json`
+* writes the operator-facing handoff summary `bundle_summary.json`
+* writes the machine-facing bundle ledgers `bundle_manifest.json`, `normalized_payload.json`, and `visual_inventory.json`
+* writes the published render contracts `payload_view.json`, `split_payload_view.jsonl` (JSONL rows), and `assembled_payload_view.json`
 * writes one composite operator render `payload_views.pdf` when `--emit-renders` is set
 * mirrors that composite PDF to `output.published_plot_path` when configured
 * writes optional debug jobs under `baserender_jobs/` only when `output.emit_render_jobs_debug: true`
@@ -593,8 +592,8 @@ Example:
 
 Notes:
 
-* text output surfaces the bundle contract, provenance, selected payload/complement, selected junction summary, mismatch plan, PWM status, published views, the composite render path, and the core artifact paths; `--verbose` adds split-row debug lines
-* `--json` prints the bundle surface plus summary and integrity fields; `--verbose` additionally includes `motif_context`, `optimization_decision`, and `split_row_debug`
+* text output surfaces one ligation summary line, one overhang summary, payload/split-left/split-right/assembled 5' to 3' reference-vs-mismatch-present rows, compact strand-aware mismatch edits (`PS` = payload strand, `AS` = opposite strand, 1-based payload positions), and PWM status; `--verbose` adds provenance, bundle contract, render/integrity detail, machine-facing artifact paths, and split-row debug lines
+* default `--json` stays operator-focused and omits machine ledger paths plus normalized payload detail; `--verbose` additionally includes those paths, `motif_context`, `optimization_decision`, and `split_row_debug`
 
 #### `cruncher visuals validate`
 

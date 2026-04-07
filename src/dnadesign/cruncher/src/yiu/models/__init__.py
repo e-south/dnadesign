@@ -17,7 +17,9 @@ from dnadesign.cruncher.yiu.bundle_models import (
     YiuValidationReport,
 )
 from dnadesign.cruncher.yiu.domain_models import (
+    ChosenLigationKey,
     JunctionSelection,
+    LigationMismatchRationale,
     MismatchSelection,
     NormalizedMotifContext,
     NormalizedPayload,
@@ -48,8 +50,10 @@ from dnadesign.cruncher.yiu.spec_rendering_models import (
 
 __all__ = [
     "InputSpec",
+    "ChosenLigationKey",
     "JunctionOptimizationSpec",
     "JunctionSelection",
+    "LigationMismatchRationale",
     "MismatchSelection",
     "MismatchesSpec",
     "NormalizedMotifContext",

@@ -11,6 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_yaml
 from dnadesign.cruncher.yiu.bundle_models import PayloadBundleManifest, PayloadViewEntry, PayloadVisualInventory
 from dnadesign.cruncher.yiu.bundle_state import persist_bundle_models
@@ -20,6 +22,13 @@ from dnadesign.cruncher.yiu.view_catalog import build_render_job_payload
 from dnadesign.cruncher.yiu.view_io import write_json_payload, write_jsonl_rows
 
 
+def remove_stale_payload_bundle_artifacts(*, layout: PayloadBundleLayout) -> None:
+    legacy_paths = [layout.bundle_dir / "split_payload_view.json"]
+    for path in legacy_paths:
+        if path != layout.split_payload_view_path and path.exists():
+            Path(path).unlink()
+
+
 def write_payload_bundle_views(
     *,
     layout: PayloadBundleLayout,
@@ -27,6 +36,7 @@ def write_payload_bundle_views(
     split_payload_rows: list[dict[str, object]],
     assembled_payload_contract: dict[str, object],
 ) -> None:
+    remove_stale_payload_bundle_artifacts(layout=layout)
     write_json_payload(layout.payload_view_path, payload_contract)
     write_jsonl_rows(layout.split_payload_view_path, split_payload_rows)
     write_json_payload(layout.assembled_payload_view_path, assembled_payload_contract)
@@ -70,6 +80,7 @@ def write_debug_render_jobs(*, layout: PayloadBundleLayout, view_entries: list[P
 
 
 __all__ = [
+    "remove_stale_payload_bundle_artifacts",
     "write_debug_render_jobs",
     "write_normalized_payload_dump",
     "write_payload_bundle_summary",

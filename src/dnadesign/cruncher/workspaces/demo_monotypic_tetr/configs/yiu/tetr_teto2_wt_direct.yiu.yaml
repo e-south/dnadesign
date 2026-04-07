@@ -1,17 +1,12 @@
 yiu:
   contract: split_yiu_payload_rendering_v4
   schema_version: 1
-  name: soxs_monotypic_hit
+  name: tetr_teto2_wt_direct
 
 input:
-  kind: sample_hit
-  sample_hit:
-    hit_id: demo_monotypic_soxs_elite_1b6ba8ad76ab
-    sample_name: demo_monotypic_soxs
-    source_artifact_path: outputs/optimize/tables/elites.parquet
-    metadata:
-      site_label: soxs_site
-      payload_label: soxs_payload
+  kind: user_sequence
+  user_sequence:
+    sequence: TCCCTATCAGTGATAGAGA
 
 optimization:
   junction:
@@ -28,9 +23,9 @@ optimization:
     ligation_awareness_mode: secondary
     bad_pattern_heuristics: false
   pwm:
-    mode: require
+    mode: none
     source:
-      kind: sample_context
+      kind: none
     objective:
       primary: maximin
       secondary:
@@ -41,5 +36,5 @@ optimization:
         - lexical_stability
 
 output:
-  bundle_dir: outputs/plots/yiu__soxs_monotypic_hit
+  bundle_dir: outputs/plots/yiu__tetr_teto2_wt_direct
   emit_render_jobs_debug: false

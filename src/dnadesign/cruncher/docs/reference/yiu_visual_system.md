@@ -3,8 +3,8 @@
 **Audience:** YIU workflow users and maintainers
 **Applies to:** `uv run cruncher yiu render|show` and the published BaseRender handoff
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-05
-**Last updated by:** cruncher-maintainers on 2026-04-05
+**Last verified:** 2026-04-07
+**Last updated by:** cruncher-maintainers on 2026-04-07
 
 YIU renders one composite page with a clear priority order: payload evidence first, split geometry second, and assembled confirmation third. The named visual system for that page is `bench_strip`.
 
@@ -45,6 +45,12 @@ Keep that order stable unless the contract changes with it. If the payload row s
 - `assembled_payload` uses `operator_strip`: restored payload order and the explicit junction span stay readable without extra ornament.
 
 All three sequence-evidence families publish the optimizer-chosen junction through shared `meta.span_backdrops` metadata so BaseRender can draw the same rounded light-blue duplex backdrop behind the active span without introducing a YIU-only renderer path.
+
+### Ligation-aware mismatch ranking
+
+The visual system does not perform ligation scoring, but it does need to explain it correctly. YIU stores junction offsets in payload-forward coordinates `0..3`, while the operator views rewrite strands into explicit 5' to 3' display when needed. Ligation-aware scoring therefore derives mismatch class from the final duplex base pair and does not depend on whether the payload or complement strand was mutated.
+
+When bundle summaries describe ligation-aware choices, they should present the chosen mismatch class, edge-versus-middle position class, and the fact that PWM preservation stayed primary. The visual layer should not invent a strand-owned biology story that disagrees with the aligned-duplex scoring model.
 
 ### Boundary rules
 

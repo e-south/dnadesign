@@ -203,6 +203,15 @@ src/dnadesign/opal/campaigns/**/inputs/**/.DS_Store
 
 # OPAL per-run products anywhere
 **/outputs/
+# Cruncher demo fixtures: keep packaged YIU demo bundle outputs, not full run trees.
+!src/dnadesign/cruncher/workspaces/demo_yiu_payload/outputs/
+!src/dnadesign/cruncher/workspaces/demo_yiu_payload/outputs/*/
+!src/dnadesign/cruncher/workspaces/demo_yiu_payload/outputs/*/**
+!src/dnadesign/cruncher/workspaces/demo_yiu_payload/outputs/*__payload_views.pdf
+!src/dnadesign/cruncher/workspaces/demo_monotypic_*/outputs/
+!src/dnadesign/cruncher/workspaces/demo_monotypic_*/outputs/plots/
+!src/dnadesign/cruncher/workspaces/demo_monotypic_*/outputs/plots/yiu__*/
+!src/dnadesign/cruncher/workspaces/demo_monotypic_*/outputs/plots/yiu__*/**
 # DenseGen code package named "outputs" (not a run artifact)
 !src/dnadesign/densegen/src/adapters/outputs/
 !src/dnadesign/densegen/src/adapters/outputs/**
