@@ -25,7 +25,68 @@ def mismatch_summary_text(mismatch_sites: list[dict[str, object]]) -> str:
     return compact_mismatch_notation_text(mismatch_sites)
 
 
+def _ligation_state(ligation: object) -> str:
+    explicit_state = getattr(ligation, "state", None)
+    if explicit_state:
+        return str(explicit_state)
+    profile = getattr(ligation, "profile", None)
+    awareness_mode = getattr(ligation, "awareness_mode", None)
+    applied = bool(getattr(ligation, "applied", False))
+    if profile == "none":
+        return "legacy"
+    if not applied or awareness_mode == "disabled":
+        return "inert"
+    position_classes = getattr(ligation, "position_classes", [])
+    if position_classes and all(position == "middle" for position in position_classes):
+        return "edge_blind"
+    return "active"
+
+
+def _ligation_state_note(ligation: object) -> str:
+    state = _ligation_state(ligation)
+    if state == "legacy":
+        return "Legacy ranking is active because ligation_profile=none."
+    if state == "inert":
+        return "Ligation profile is configured, but ligation-aware scoring is disabled."
+    if state == "edge_blind":
+        return "Ligation-aware scoring is active, but edge-vs-middle comparison is unavailable in the winning plan."
+    return "Ligation-aware scoring is active and edge-vs-middle comparison is available."
+
+
+def _edge_comparison_available(ligation: object) -> bool:
+    explicit_value = getattr(ligation, "edge_comparison_available", None)
+    if explicit_value is not None:
+        return bool(explicit_value)
+    position_classes = getattr(ligation, "position_classes", [])
+    return bool(position_classes) and any(position == "edge" for position in position_classes)
+
+
+def _candidate_position_pool(ligation: object) -> str:
+    positions = getattr(ligation, "candidate_positions", []) or []
+    return "-" if not positions else ",".join(str(position) for position in positions)
+
+
+def _bad_pattern_scope(ligation: object) -> str:
+    return "tnna_like_only" if getattr(ligation, "bad_pattern_heuristics", False) else "disabled"
+
+
+def _trace_summary_text(source: object) -> str | None:
+    trace = getattr(source, "trace", None)
+    if trace is None:
+        trace = getattr(source, "trace_sample", None)
+    if trace is None:
+        return None
+    sampled_count = getattr(trace, "sample_count", getattr(trace, "sampled_count", None))
+    if sampled_count is None:
+        return None
+    sample_limit = getattr(trace, "sample_limit", sampled_count)
+    note = getattr(trace, "note", "Optimizer trace summary unavailable.")
+    truncated = bool(getattr(trace, "truncated", False))
+    return f"Trace -> sampled={sampled_count} sample_limit={sample_limit} truncated={truncated} note={note}"
+
+
 def print_ligation_summary(console: Console, *, ligation: object) -> None:
+    state = _ligation_state(ligation)
     chosen_classes = ",".join(ligation.chosen_mismatch_classes) if ligation.chosen_mismatch_classes else "-"
     position_classes = ",".join(ligation.position_classes) if ligation.position_classes else "-"
     console.print(
@@ -33,10 +94,16 @@ def print_ligation_summary(console: Console, *, ligation: object) -> None:
         f"profile={ligation.profile} "
         f"mode={ligation.awareness_mode} "
         f"applied={ligation.applied} "
+        f"pool={_candidate_position_pool(ligation)} "
         f"classes={chosen_classes} "
         f"positions={position_classes} "
-        f"bad_patterns={ligation.bad_pattern_heuristics}"
+        f"bad_patterns={_bad_pattern_scope(ligation)}"
     )
+    console.print(f"Ligation state -> state={state} edge_comparison_available={_edge_comparison_available(ligation)}")
+    if getattr(ligation, "state_note", None):
+        console.print(f"Ligation state note -> {ligation.state_note}")
+    else:
+        console.print(f"Ligation state note -> {_ligation_state_note(ligation)}")
     console.print(f"Ligation note -> {ligation.decision_note}")
 
 
@@ -154,6 +221,9 @@ def print_validation_report(console: Console, report: object) -> None:
         total_loss=report.total_loss,
     )
     print_ligation_summary(console, ligation=report.ligation)
+    trace_summary = _trace_summary_text(report)
+    if trace_summary is not None:
+        console.print(trace_summary)
     console.print("Bundle write -> no")
 
 
@@ -174,6 +244,9 @@ def print_render_outcome(console: Console, outcome: object, *, emit_renders: boo
         total_loss=report.total_loss,
     )
     print_ligation_summary(console, ligation=report.ligation)
+    trace_summary = _trace_summary_text(report)
+    if trace_summary is not None:
+        console.print(trace_summary)
     if emit_renders:
         bundle_base = Path(outcome.bundle_dir)
         if outcome.composite_render_artifact_path is not None:
@@ -199,6 +272,9 @@ def print_show_outcome(console: Console, outcome: object, *, verbose: bool) -> N
         total_loss=outcome.total_loss,
     )
     print_ligation_summary(console, ligation=outcome.bundle_summary.ligation)
+    trace_summary = _trace_summary_text(outcome.bundle_summary)
+    if trace_summary is not None:
+        console.print(trace_summary)
     console.print(f"Junction payload 5' -> 3' -> {sequence_summary.junction_payload_sequence_5to3}")
     console.print(
         "Overhang 5' -> 3' -> "

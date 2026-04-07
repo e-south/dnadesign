@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
@@ -41,6 +42,17 @@ def _payload_spec(
 ) -> dict[str, object]:
     junction_start = 4
     junction_end = 8
+    mismatches: dict[str, object] = {
+        "count": mismatch_count,
+        "allowed_strands": ["complement", "payload"],
+        "strand_mode": "per_position",
+        "default_strand_preference": "complement",
+        "ligation_profile": ligation_profile,
+        "ligation_awareness_mode": ligation_awareness_mode,
+        "bad_pattern_heuristics": bad_pattern_heuristics,
+    }
+    if candidate_positions is not None:
+        mismatches["candidate_positions"] = candidate_positions
     return {
         "yiu": {
             "schema_version": 1,
@@ -61,16 +73,7 @@ def _payload_spec(
                 "overhang_length": 4,
                 "max_payload_body_length": max(junction_start, len(sequence) - junction_end),
             },
-            "mismatches": {
-                "count": mismatch_count,
-                "candidate_positions": candidate_positions or [1, 2],
-                "allowed_strands": ["complement", "payload"],
-                "strand_mode": "per_position",
-                "default_strand_preference": "complement",
-                "ligation_profile": ligation_profile,
-                "ligation_awareness_mode": ligation_awareness_mode,
-                "bad_pattern_heuristics": bad_pattern_heuristics,
-            },
+            "mismatches": mismatches,
             "pwm": {
                 "mode": "none",
                 "source": {"kind": "none"},
@@ -95,17 +98,40 @@ def _payload_spec(
 
 
 def _ligation_summary_lines(ligation: dict[str, object]) -> tuple[str, str]:
+    pool = ",".join(str(item) for item in ligation.get("candidate_positions", [])) or "-"
     chosen_classes = ",".join(str(item) for item in ligation["chosen_mismatch_classes"]) or "-"
     position_classes = ",".join(str(item) for item in ligation["position_classes"]) or "-"
+    bad_patterns = "tnna_like_only" if ligation["bad_pattern_heuristics"] else "disabled"
     return (
         "Ligation -> "
         f"profile={ligation['profile']} "
         f"mode={ligation['awareness_mode']} "
         f"applied={ligation['applied']} "
+        f"pool={pool} "
         f"classes={chosen_classes} "
         f"positions={position_classes} "
-        f"bad_patterns={ligation['bad_pattern_heuristics']}",
+        f"bad_patterns={bad_patterns}",
+        "Ligation state -> "
+        f"state={ligation.get('state', 'active')} "
+        f"edge_comparison_available={ligation.get('edge_comparison_available', False)}",
+    )
+
+
+def _ligation_note_lines(ligation: dict[str, object]) -> tuple[str, str]:
+    state_note = ligation.get("state_note") or "Ligation state note unavailable."
+    return (
+        f"Ligation state note -> {state_note}",
         f"Ligation note -> {ligation['decision_note']}",
+    )
+
+
+def _trace_summary_line(trace: dict[str, object]) -> str:
+    return (
+        "Trace -> "
+        f"sampled={trace['sampled_count']} "
+        f"sample_limit={trace['sample_limit']} "
+        f"truncated={trace['truncated']} "
+        f"note={trace['note']}"
     )
 
 
@@ -272,9 +298,13 @@ def test_yiu_render_materializes_payload_bundle_from_spec(tmp_path: Path) -> Non
     assert "Bundle ->" in result.output
     assert "Composite render ->" in result.output
     assert "Published plot ->" in result.output
-    ligation_line, ligation_note_line = _ligation_summary_lines(bundle_summary["ligation"])
+    ligation_line, ligation_state_line = _ligation_summary_lines(bundle_summary["ligation"])
+    ligation_state_note_line, ligation_note_line = _ligation_note_lines(bundle_summary["ligation"])
     assert normalized_cli_output(ligation_line) in normalized_output
+    assert normalized_cli_output(ligation_state_line) in normalized_output
+    assert normalized_cli_output(ligation_state_note_line) in normalized_output
     assert normalized_cli_output(ligation_note_line) in normalized_output
+    assert normalized_cli_output(_trace_summary_line(bundle_summary["trace"])) in normalized_output
     assert "Bundle summary ->" not in result.output
     assert "Bundle manifest ->" not in result.output
     assert "Normalized payload ->" not in result.output
@@ -300,9 +330,13 @@ def test_yiu_validate_reports_junction_window_summary(tmp_path: Path) -> None:
         f"{mismatch_summary_text(validate_payload['mismatches'])}"
     ) in result.output
     assert "PWM -> mode=none effective=False" in result.output
-    ligation_line, ligation_note_line = _ligation_summary_lines(validate_payload["ligation"])
+    ligation_line, ligation_state_line = _ligation_summary_lines(validate_payload["ligation"])
+    ligation_state_note_line, ligation_note_line = _ligation_note_lines(validate_payload["ligation"])
     assert normalized_cli_output(ligation_line) in normalized_output
+    assert normalized_cli_output(ligation_state_line) in normalized_output
+    assert normalized_cli_output(ligation_state_note_line) in normalized_output
     assert normalized_cli_output(ligation_note_line) in normalized_output
+    assert normalized_cli_output(_trace_summary_line(validate_payload["trace"])) in normalized_output
     assert "Bundle write -> no" in result.output
     assert "Bulge mask ->" not in result.output
     assert "Watson-Crick pairing valid ->" not in result.output
@@ -319,6 +353,87 @@ def test_yiu_validate_rejects_ambiguous_iupac_payload(tmp_path: Path) -> None:
     normalized_output = normalized_cli_output(result.output)
     assert "YIU_SEQUENCE_INVALID" in normalized_output
     assert "A/C/G/T" in normalized_output
+
+
+def test_yiu_validate_marks_profile_none_secondary_mode_as_legacy(tmp_path: Path) -> None:
+    workspace = tmp_path / "demo_yiu_payload"
+    spec_path = workspace / "configs" / "yiu" / "legacy_ligation_payload.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _payload_spec(
+            name="legacy_ligation_payload",
+            candidate_positions=[0, 1, 2, 3],
+            ligation_profile="none",
+            ligation_awareness_mode="secondary",
+        ),
+    )
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
+    normalized_output = normalized_cli_output(result.output)
+
+    assert result.exit_code == 0
+    assert "Ligation -> profile=none mode=secondary applied=False" in normalized_output
+    assert "Ligation state -> state=legacy edge_comparison_available=False" in normalized_output
+    assert "legacy mode because ligation_profile=none" in normalized_output.lower()
+
+
+def test_yiu_validate_defaults_omitted_candidate_positions_to_full_pool(tmp_path: Path) -> None:
+    workspace = tmp_path / "demo_yiu_payload"
+    spec_path = workspace / "configs" / "yiu" / "default_pool_payload.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _payload_spec(
+            name="default_pool_payload",
+            ligation_profile="t4",
+        ),
+    )
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
+    normalized_output = normalized_cli_output(result.output)
+
+    assert result.exit_code == 0
+    assert "Ligation -> profile=t4 mode=secondary applied=True pool=0,1,2,3" in normalized_output
+    assert "Ligation state -> state=active edge_comparison_available=True" in normalized_output
+
+
+def test_yiu_validate_rejects_empty_candidate_position_pool(tmp_path: Path) -> None:
+    workspace = tmp_path / "demo_yiu_payload"
+    spec_path = workspace / "configs" / "yiu" / "empty_candidate_pool.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _payload_spec(
+            name="empty_candidate_pool",
+            candidate_positions=[],
+        ),
+    )
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
+    normalized_output = normalized_cli_output(result.output)
+
+    assert result.exit_code == 1
+    assert "candidate_positions must be non-empty" in normalized_output
+
+
+@pytest.mark.parametrize("bad_pattern_heuristics", [False, True])
+def test_yiu_validate_surfaces_bad_pattern_heuristics_toggle(tmp_path: Path, bad_pattern_heuristics: bool) -> None:
+    workspace = tmp_path / "demo_yiu_payload"
+    spec_path = workspace / "configs" / "yiu" / f"bad_pattern_{bad_pattern_heuristics}.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _payload_spec(
+            name=f"bad_pattern_{bad_pattern_heuristics}",
+            candidate_positions=[0, 1, 2, 3],
+            ligation_profile="t4",
+            bad_pattern_heuristics=bad_pattern_heuristics,
+        ),
+    )
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
+    normalized_output = normalized_cli_output(result.output)
+
+    assert result.exit_code == 0
+    expected_scope = "tnna_like_only" if bad_pattern_heuristics else "disabled"
+    assert f"bad_patterns={expected_scope}" in normalized_output
 
 
 def test_yiu_show_reports_payload_bundle_summary(tmp_path: Path) -> None:
@@ -346,9 +461,13 @@ def test_yiu_show_reports_payload_bundle_summary(tmp_path: Path) -> None:
         in show_result.output
     )
     assert "PWM -> mode=none effective=False" in show_result.output
-    ligation_line, ligation_note_line = _ligation_summary_lines(bundle_summary["ligation"])
+    ligation_line, ligation_state_line = _ligation_summary_lines(bundle_summary["ligation"])
+    ligation_state_note_line, ligation_note_line = _ligation_note_lines(bundle_summary["ligation"])
     assert normalized_cli_output(ligation_line) in normalized_output
+    assert normalized_cli_output(ligation_state_line) in normalized_output
+    assert normalized_cli_output(ligation_state_note_line) in normalized_output
     assert normalized_cli_output(ligation_note_line) in normalized_output
+    assert normalized_cli_output(_trace_summary_line(bundle_summary["trace"])) in normalized_output
     assert (
         f"Junction payload 5' -> 3' -> {bundle_summary['sequence_summary']['junction_payload_sequence_5to3']}"
     ) in show_result.output
@@ -385,6 +504,33 @@ def test_yiu_show_reports_payload_bundle_summary(tmp_path: Path) -> None:
     assert "Bundle manifest -> bundle_manifest.json" not in show_result.output
     assert "Normalized payload -> normalized_payload.json" not in show_result.output
     assert "Visual inventory -> visual_inventory.json" not in show_result.output
+
+
+def test_yiu_show_marks_middle_only_ligation_pool_as_edge_blind(tmp_path: Path) -> None:
+    workspace = tmp_path / "demo_yiu_payload"
+    spec_path = workspace / "configs" / "yiu" / "middle_only_ligation_payload.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _payload_spec(
+            name="middle_only_ligation_payload",
+            candidate_positions=[1, 2],
+            ligation_profile="t4",
+        ),
+    )
+
+    render_result = runner.invoke(app, ["yiu", "render", "--spec", str(spec_path)])
+    assert render_result.exit_code == 0
+
+    show_result = runner.invoke(
+        app,
+        ["yiu", "show", "--bundle", str(workspace / "outputs" / "middle_only_ligation_payload")],
+    )
+    normalized_output = normalized_cli_output(show_result.output)
+
+    assert show_result.exit_code == 0
+    assert "Ligation -> profile=t4 mode=secondary applied=True pool=1,2" in normalized_output
+    assert "Ligation state -> state=edge_blind edge_comparison_available=False" in normalized_output
+    assert "candidate_positions excludes 0/3" in normalized_output
 
 
 def test_yiu_show_verbose_text_adds_bundle_detail(tmp_path: Path) -> None:

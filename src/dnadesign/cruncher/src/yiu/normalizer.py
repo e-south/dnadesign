@@ -23,6 +23,7 @@ from dnadesign.cruncher.yiu.domain_models import (
     OptimizationDecision,
     OptimizationObjective,
     OptimizationWinner,
+    build_ligation_search_state,
 )
 from dnadesign.cruncher.yiu.errors import YIU_PWM_CONTEXT_INVALID, YIU_PWM_CONTEXT_REQUIRED, raise_yiu_error
 from dnadesign.cruncher.yiu.optimizer import select_best_candidate
@@ -66,6 +67,11 @@ def normalize_payload(spec: YiuPayloadRenderingSpec, *, workspace_root: Path) ->
     resolved_input = resolve_input_payload(spec.input, workspace_root=workspace_root, spec_name=spec.yiu.name)
     reference_payload_sequence = resolved_input.payload_sequence
     reference_complement_sequence = aligned_complement_3to5(reference_payload_sequence)
+    ligation_state = build_ligation_search_state(
+        ligation_profile=spec.optimization.mismatches.ligation_profile,
+        ligation_awareness_mode=spec.optimization.mismatches.ligation_awareness_mode,
+        candidate_positions=spec.optimization.mismatches.candidate_positions,
+    )
     motif_context = _bounded_motif_context(
         motif_context=resolve_motif_context(
             pwm_spec=spec.optimization.pwm,
@@ -84,7 +90,6 @@ def normalize_payload(spec: YiuPayloadRenderingSpec, *, workspace_root: Path) ->
         reference_complement_sequence=reference_complement_sequence,
         junction_starts=junction_starts,
         mismatches_spec=spec.optimization.mismatches,
-        pwm_effective=motif_context.effective,
     )
     if not candidates:
         raise_yiu_error(
@@ -106,8 +111,7 @@ def normalize_payload(spec: YiuPayloadRenderingSpec, *, workspace_root: Path) ->
         reference_complement_sequence=reference_complement_sequence,
         scorable_motifs=scorable_motifs,
         pwm_effective=motif_context.effective,
-        ligation_profile=spec.optimization.mismatches.ligation_profile,
-        ligation_awareness_mode=spec.optimization.mismatches.ligation_awareness_mode,
+        ligation_state=ligation_state,
         bad_pattern_heuristics=spec.optimization.mismatches.bad_pattern_heuristics,
     )
     selected_payload_sequence, selected_complement_sequence = apply_candidate_sequences(
@@ -140,6 +144,7 @@ def normalize_payload(spec: YiuPayloadRenderingSpec, *, workspace_root: Path) ->
         ligation_profile=spec.optimization.mismatches.ligation_profile,
         ligation_awareness_mode=spec.optimization.mismatches.ligation_awareness_mode,
         bad_pattern_heuristics=spec.optimization.mismatches.bad_pattern_heuristics,
+        ligation_state=optimizer_result.ligation_state,
         chosen_ligation_key=optimizer_result.chosen_ligation_key,
         ligation_rationale=list(optimizer_result.ligation_rationale),
         junction=JunctionSelection(
@@ -176,6 +181,7 @@ def normalize_payload(spec: YiuPayloadRenderingSpec, *, workspace_root: Path) ->
                 default_strand_preference_count=winner.default_strand_preference_count,
                 lexical_key=winner.lexical_key,
             ),
+            trace_sample=optimizer_result.trace_sample,
             trace=list(optimizer_result.trace),
         ),
     )

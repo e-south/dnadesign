@@ -163,7 +163,6 @@ def enumerate_candidates(
     reference_complement_sequence: str,
     junction_starts: Iterable[int],
     mismatches_spec: MismatchesSpec,
-    pwm_effective: bool,
 ) -> tuple[CandidatePlan, ...]:
     payload_length = len(reference_payload_sequence)
     ordered_strands = tuple(item for item in ("complement", "payload") if item in set(mismatches_spec.allowed_strands))

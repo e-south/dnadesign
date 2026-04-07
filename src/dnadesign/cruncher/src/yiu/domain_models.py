@@ -18,6 +18,8 @@ from pydantic import Field, model_validator
 from dnadesign.cruncher.config.schema_v3 import StrictBaseModel
 from dnadesign.cruncher.yiu.spec_pwm_models import YiuPwmMotifInstanceV1
 
+_LIGATION_POSITIONS = {0, 3}
+
 
 class JunctionSelection(StrictBaseModel):
     start: int = Field(ge=0)
@@ -87,6 +89,46 @@ class ChosenLigationKey(StrictBaseModel):
     bad_pattern_penalty: int = Field(ge=0)
 
 
+class LigationSearchState(StrictBaseModel):
+    profile: Literal["none", "t4", "t7", "t3", "pbcv1", "hlig3"] = "none"
+    awareness_mode: Literal["disabled", "secondary"] = "disabled"
+    enabled: bool = False
+    legacy_mode: bool = True
+    candidate_positions: list[int] = Field(default_factory=list)
+    edge_positions_available: bool = False
+    edge_comparison_available: bool = False
+    state_note: str = "Legacy geometric ranking applied"
+
+    @model_validator(mode="after")
+    def _validate_state(self) -> "LigationSearchState":
+        if self.legacy_mode and self.profile != "none":
+            raise ValueError("legacy ligation mode requires ligation_profile=none")
+        if self.enabled and self.legacy_mode:
+            raise ValueError("enabled ligation ranking cannot be legacy mode")
+        if self.edge_comparison_available and not self.enabled:
+            raise ValueError("edge comparison cannot be available when ligation ranking is disabled")
+        if self.edge_comparison_available and not self.edge_positions_available:
+            raise ValueError("edge comparison requires candidate_positions to include 0 or 3")
+        return self
+
+
+class OptimizationTraceSample(StrictBaseModel):
+    sample_limit: int = Field(ge=0)
+    sampled_count: int = Field(ge=0)
+    candidate_count: int = Field(ge=1)
+    truncated: bool = False
+
+    @model_validator(mode="after")
+    def _validate_sample(self) -> "OptimizationTraceSample":
+        if self.sampled_count > self.candidate_count:
+            raise ValueError("sampled_count cannot exceed candidate_count")
+        if self.sampled_count > self.sample_limit:
+            raise ValueError("sampled_count cannot exceed sample_limit")
+        if self.truncated != (self.candidate_count > self.sample_limit):
+            raise ValueError("truncated must reflect whether the trace exceeded sample_limit")
+        return self
+
+
 class NormalizedMotifContext(StrictBaseModel):
     requested_mode: Literal["none", "use_if_available", "require"]
     effective: bool
@@ -138,6 +180,7 @@ class OptimizationDecision(StrictBaseModel):
     objective: OptimizationObjective
     winner: OptimizationWinner
     trace: list[dict[str, Any]] = Field(default_factory=list)
+    trace_sample: OptimizationTraceSample | None = None
 
 
 class NormalizedPayload(StrictBaseModel):
@@ -155,6 +198,7 @@ class NormalizedPayload(StrictBaseModel):
     ligation_profile: Literal["none", "t4", "t7", "t3", "pbcv1", "hlig3"] = "none"
     ligation_awareness_mode: Literal["disabled", "secondary"] = "disabled"
     bad_pattern_heuristics: bool = False
+    ligation_state: LigationSearchState | None = None
     chosen_ligation_key: ChosenLigationKey | None = None
     ligation_rationale: list[LigationMismatchRationale] = Field(default_factory=list)
     junction: JunctionSelection
@@ -186,8 +230,65 @@ class NormalizedPayload(StrictBaseModel):
             seen_positions.add(mismatch.payload_index)
         if self.chosen_ligation_key is None and self.ligation_rationale:
             raise ValueError("ligation_rationale requires chosen_ligation_key")
+        if self.ligation_state is not None:
+            if self.ligation_state.profile != self.ligation_profile:
+                raise ValueError("ligation_state.profile must match ligation_profile")
+            if self.ligation_state.awareness_mode != self.ligation_awareness_mode:
+                raise ValueError("ligation_state.awareness_mode must match ligation_awareness_mode")
+        if self.optimization_decision.trace_sample is not None:
+            if self.optimization_decision.trace_sample.candidate_count != self.optimization_decision.candidate_count:
+                raise ValueError("trace_sample.candidate_count must match candidate_count")
+            if self.optimization_decision.trace_sample.sampled_count != len(self.optimization_decision.trace):
+                raise ValueError("trace_sample.sampled_count must match sampled trace length")
         return self
 
     @property
     def payload_length(self) -> int:
         return len(self.reference_payload_sequence)
+
+
+def build_ligation_search_state(
+    *,
+    ligation_profile: Literal["none", "t4", "t7", "t3", "pbcv1", "hlig3"],
+    ligation_awareness_mode: Literal["disabled", "secondary"],
+    candidate_positions: list[int] | tuple[int, ...],
+) -> LigationSearchState:
+    positions = [int(position) for position in candidate_positions]
+    enabled = ligation_awareness_mode == "secondary" and ligation_profile != "none"
+    legacy_mode = ligation_profile == "none"
+    edge_positions_available = any(position in _LIGATION_POSITIONS for position in positions)
+    if legacy_mode:
+        state_note = "Legacy mode because ligation_profile=none"
+    elif not enabled:
+        state_note = "Ligation-aware scoring disabled by config"
+    elif not edge_positions_available:
+        state_note = (
+            "Ligation-aware scoring active; edge-vs-middle comparison unavailable because "
+            "candidate_positions excludes 0/3"
+        )
+    else:
+        state_note = "Ligation-aware scoring active; edge-vs-middle comparison available"
+    return LigationSearchState(
+        profile=ligation_profile,
+        awareness_mode=ligation_awareness_mode,
+        enabled=enabled,
+        legacy_mode=legacy_mode,
+        candidate_positions=sorted(positions),
+        edge_positions_available=edge_positions_available,
+        edge_comparison_available=enabled and edge_positions_available,
+        state_note=state_note,
+    )
+
+
+def build_trace_sample(
+    *,
+    candidate_count: int,
+    sample_limit: int,
+    sampled_count: int,
+) -> OptimizationTraceSample:
+    return OptimizationTraceSample(
+        candidate_count=candidate_count,
+        sample_limit=sample_limit,
+        sampled_count=sampled_count,
+        truncated=candidate_count > sample_limit,
+    )

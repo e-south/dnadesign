@@ -141,7 +141,7 @@
       },
       "render_requested": true,
       "render_completed": true,
-      "last_rendered_at": "2026-04-07T16:59:40.379330+00:00",
+      "last_rendered_at": "2026-04-07T19:50:21.442835+00:00",
       "motif_layers_required": true
     },
     {
@@ -230,7 +230,7 @@
       },
       "render_requested": true,
       "render_completed": true,
-      "last_rendered_at": "2026-04-07T16:59:40.455611+00:00",
+      "last_rendered_at": "2026-04-07T19:50:21.527819+00:00",
       "motif_layers_required": false
     },
     {
@@ -319,7 +319,7 @@
       },
       "render_requested": true,
       "render_completed": true,
-      "last_rendered_at": "2026-04-07T16:59:40.487396+00:00",
+      "last_rendered_at": "2026-04-07T19:50:21.562151+00:00",
       "motif_layers_required": false
     }
   ],

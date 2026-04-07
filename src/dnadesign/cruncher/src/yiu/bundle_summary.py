@@ -17,7 +17,14 @@ from pydantic import Field
 
 from dnadesign.cruncher.config.schema_v3 import StrictBaseModel
 from dnadesign.cruncher.yiu.bsmbi import SplitFragmentDisplaySpec, build_split_fragment_display_specs
-from dnadesign.cruncher.yiu.bundle_models import PayloadVisualInventory
+from dnadesign.cruncher.yiu.bundle_models import (
+    PayloadVisualInventory,
+    resolve_ligation_decision_note,
+    resolve_ligation_surface_state,
+)
+from dnadesign.cruncher.yiu.bundle_models import (
+    build_trace_summary as build_validation_trace_summary,
+)
 from dnadesign.cruncher.yiu.domain_models import (
     ChosenLigationKey,
     JunctionSelection,
@@ -69,6 +76,13 @@ class YiuLigationSummary(StrictBaseModel):
     profile: Literal["none", "t4", "t7", "t3", "pbcv1", "hlig3"]
     awareness_mode: Literal["disabled", "secondary"]
     applied: bool
+    state: Literal["legacy", "inert", "edge_blind", "active"] | None = None
+    state_note: str | None = None
+    enabled: bool | None = None
+    legacy_mode: bool | None = None
+    candidate_positions: list[int] = Field(default_factory=list)
+    edge_positions_available: bool | None = None
+    edge_comparison_available: bool | None = None
     bad_pattern_heuristics: bool
     chosen_mismatch_classes: list[str] = Field(default_factory=list)
     position_classes: list[Literal["edge", "middle"]] = Field(default_factory=list)
@@ -78,6 +92,18 @@ class YiuLigationSummary(StrictBaseModel):
     double_middle_flag: bool | None = None
     bad_pattern_penalty: int | None = Field(default=None, ge=0)
     decision_note: str
+
+
+class YiuTraceSummary(StrictBaseModel):
+    sample_limit: int = Field(ge=0)
+    sampled_count: int = Field(ge=0)
+    candidate_count: int = Field(ge=1)
+    truncated: bool
+    note: str
+
+    @property
+    def sample_count(self) -> int:
+        return self.sampled_count
 
 
 class YiuBundleSummary(StrictBaseModel):
@@ -93,6 +119,7 @@ class YiuBundleSummary(StrictBaseModel):
     mismatch_notation: list[str] = Field(default_factory=list)
     pwm: YiuPwmSummary
     ligation: YiuLigationSummary
+    trace: YiuTraceSummary | None = None
     view_ids: list[str] = Field(default_factory=list)
     render_status: Literal["not_requested", "rendered", "missing", "partial", "failed"] = "not_requested"
 
@@ -155,6 +182,16 @@ def _canonical_normalized(normalized: NormalizedPayload) -> NormalizedPayload:
     )
 
 
+def _trace_summary(normalized: NormalizedPayload) -> YiuTraceSummary:
+    return YiuTraceSummary.model_validate(
+        build_validation_trace_summary(
+            candidate_count=normalized.optimization_decision.candidate_count,
+            trace_sample=normalized.optimization_decision.trace_sample,
+            trace_len=len(normalized.optimization_decision.trace),
+        ).model_dump(mode="json")
+    )
+
+
 def build_sequence_summary(normalized: NormalizedPayload) -> YiuSequenceSummary:
     junction_start = normalized.junction.start
     junction_end = normalized.junction.end
@@ -208,6 +245,8 @@ def build_bundle_summary(
     ligation_key: ChosenLigationKey | None = normalized.chosen_ligation_key
     ligation_rationale: list[LigationMismatchRationale] = normalized.ligation_rationale
     ligation_applied = ligation_key is not None
+    ligation_state, ligation_state_note, edge_comparison_available = resolve_ligation_surface_state(normalized)
+    trace_summary = _trace_summary(normalized)
     return YiuBundleSummary(
         spec_name=inventory.spec_name,
         payload_label=normalized.payload_label,
@@ -228,6 +267,17 @@ def build_bundle_summary(
             profile=normalized.ligation_profile,
             awareness_mode=normalized.ligation_awareness_mode,
             applied=ligation_applied,
+            state=ligation_state,
+            state_note=ligation_state_note,
+            enabled=False if normalized.ligation_state is None else normalized.ligation_state.enabled,
+            legacy_mode=True if normalized.ligation_state is None else normalized.ligation_state.legacy_mode,
+            candidate_positions=[]
+            if normalized.ligation_state is None
+            else list(normalized.ligation_state.candidate_positions),
+            edge_positions_available=False
+            if normalized.ligation_state is None
+            else normalized.ligation_state.edge_positions_available,
+            edge_comparison_available=edge_comparison_available,
             bad_pattern_heuristics=normalized.bad_pattern_heuristics,
             chosen_mismatch_classes=[entry.canonical_mismatch_class for entry in ligation_rationale],
             position_classes=[entry.position_class for entry in ligation_rationale],
@@ -236,16 +286,13 @@ def build_bundle_summary(
             middle_mismatch_count=None if ligation_key is None else ligation_key.middle_mismatch_count,
             double_middle_flag=None if ligation_key is None else ligation_key.double_middle_flag,
             bad_pattern_penalty=None if ligation_key is None else ligation_key.bad_pattern_penalty,
-            decision_note=(
-                "PWM preserved first, ligation-aware tie-break applied"
-                if ligation_applied and normalized.motif_context.effective
-                else (
-                    "No PWM context; ligation-aware ranking applied"
-                    if ligation_applied
-                    else "Legacy geometric ranking applied"
-                )
+            decision_note=resolve_ligation_decision_note(
+                state=ligation_state,
+                ligation_applied=ligation_applied,
+                pwm_effective=normalized.motif_context.effective,
             ),
         ),
+        trace=trace_summary,
         view_ids=[view.view_id for view in inventory.views],
         render_status=inventory.render_status,
     )
@@ -259,6 +306,7 @@ __all__ = [
     "YiuSequenceSummary",
     "YiuSequenceViewsSummary",
     "YiuStrandPair5to3Summary",
+    "YiuTraceSummary",
     "YiuViewSequenceSummary",
     "build_bundle_summary",
     "build_sequence_summary",

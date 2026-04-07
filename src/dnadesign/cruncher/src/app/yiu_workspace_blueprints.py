@@ -48,10 +48,12 @@ def canonical_spec_text(*, sequence: str = DEFAULT_DEMO_SEQUENCE, junction_mode:
             max_payload_body_length: 12
           mismatches:
             count: 1
+            # Omit this field only when you intentionally want the modern all-offset default.
             candidate_positions: [0, 1, 2, 3]
             allowed_strands: [complement, payload]
             strand_mode: per_position
             default_strand_preference: complement
+            # Use a concrete ligation profile for modern ranking; `none` is legacy ranking.
             ligation_profile: t4
             ligation_awareness_mode: secondary
             bad_pattern_heuristics: false
@@ -209,6 +211,8 @@ def runbook_markdown(*, workspace_name: str, workspace_display_path: Path | str)
             "**Purpose**",
             "- YIU workspace for the v4 payload-centric optimization and rendering workflow.",
             "- Covers the validate -> render -> show loop with one minimal mismatch-centric example.",
+            "- Omitting `candidate_positions` now defaults to the full 4-offset pool `[0, 1, 2, 3]`.",
+            "- `ligation_profile=none` is legacy ranking; use a concrete profile for modern ligation-aware workflows.",
             "",
             "**Run This Single Command**",
             "",

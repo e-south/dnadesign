@@ -35,7 +35,7 @@ from dnadesign.cruncher.yiu.bundle_models import PayloadViewEntry, PayloadVisual
 from dnadesign.cruncher.yiu.bundle_paths import resolve_composite_render_artifact_path
 from dnadesign.cruncher.yiu.bundle_surface import YiuShowOutcome
 from dnadesign.cruncher.yiu.candidate_generation import CandidatePlan, MutationChoice, enumerate_candidates
-from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
+from dnadesign.cruncher.yiu.domain_models import NormalizedPayload, build_ligation_search_state
 from dnadesign.cruncher.yiu.errors import NoFeasiblePlanError, YiuContractError
 from dnadesign.cruncher.yiu.load import load_yiu_spec
 from dnadesign.cruncher.yiu.mismatch_notation import compact_mismatch_notation_groups
@@ -303,6 +303,18 @@ def _user_sequence_spec(
     pwm_source: dict[str, object] | None = None,
     emit_render_jobs_debug: bool = False,
 ) -> dict[str, object]:
+    effective_allowed_strands = ["complement", "payload"] if allowed_strands is None else allowed_strands
+    mismatches: dict[str, object] = {
+        "count": mismatch_count,
+        "allowed_strands": effective_allowed_strands,
+        "strand_mode": "per_position",
+        "default_strand_preference": "complement",
+        "ligation_profile": ligation_profile,
+        "ligation_awareness_mode": ligation_awareness_mode,
+        "bad_pattern_heuristics": bad_pattern_heuristics,
+    }
+    if candidate_positions is not None:
+        mismatches["candidate_positions"] = candidate_positions
     return {
         "yiu": {
             "schema_version": 1,
@@ -315,16 +327,7 @@ def _user_sequence_spec(
         },
         "optimization": {
             "junction": _junction_payload(mode=junction_mode, start=junction_start, end=junction_end),
-            "mismatches": {
-                "count": mismatch_count,
-                "candidate_positions": candidate_positions or [1, 2],
-                "allowed_strands": allowed_strands or ["complement", "payload"],
-                "strand_mode": "per_position",
-                "default_strand_preference": "complement",
-                "ligation_profile": ligation_profile,
-                "ligation_awareness_mode": ligation_awareness_mode,
-                "bad_pattern_heuristics": bad_pattern_heuristics,
-            },
+            "mismatches": mismatches,
             "pwm": _pwm_payload(mode=pwm_mode, source=pwm_source),
         },
         "output": {
@@ -362,6 +365,18 @@ def _sample_hit_spec(
         sample_hit["source_artifact_path"] = source_artifact_path
     if metadata is not None:
         sample_hit["metadata"] = metadata
+    effective_allowed_strands = ["complement", "payload"] if allowed_strands is None else allowed_strands
+    mismatches: dict[str, object] = {
+        "count": mismatch_count,
+        "allowed_strands": effective_allowed_strands,
+        "strand_mode": "per_position",
+        "default_strand_preference": "complement",
+        "ligation_profile": ligation_profile,
+        "ligation_awareness_mode": ligation_awareness_mode,
+        "bad_pattern_heuristics": bad_pattern_heuristics,
+    }
+    if candidate_positions is not None:
+        mismatches["candidate_positions"] = candidate_positions
     return {
         "yiu": {
             "schema_version": 1,
@@ -374,16 +389,7 @@ def _sample_hit_spec(
         },
         "optimization": {
             "junction": _junction_payload(mode=junction_mode, start=junction_start, end=junction_end),
-            "mismatches": {
-                "count": mismatch_count,
-                "candidate_positions": candidate_positions or [1, 2],
-                "allowed_strands": allowed_strands or ["complement", "payload"],
-                "strand_mode": "per_position",
-                "default_strand_preference": "complement",
-                "ligation_profile": ligation_profile,
-                "ligation_awareness_mode": ligation_awareness_mode,
-                "bad_pattern_heuristics": bad_pattern_heuristics,
-            },
+            "mismatches": mismatches,
             "pwm": _pwm_payload(mode=pwm_mode, source=pwm_source),
         },
         "output": {
@@ -461,14 +467,18 @@ def _select_result(
     ligation_awareness_mode: str = "disabled",
     bad_pattern_heuristics: bool = False,
 ) -> object:
+    ligation_state = build_ligation_search_state(
+        ligation_profile=ligation_profile,
+        ligation_awareness_mode=ligation_awareness_mode,
+        candidate_positions=sorted({position for candidate in candidates for position in candidate.mismatch_positions}),
+    )
     return select_best_candidate(
         candidates=candidates,
         reference_payload_sequence=TOY_SEQUENCE,
         reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
         scorable_motifs=(),
         pwm_effective=pwm_effective,
-        ligation_profile=ligation_profile,
-        ligation_awareness_mode=ligation_awareness_mode,
+        ligation_state=ligation_state,
         bad_pattern_heuristics=bad_pattern_heuristics,
     )
 
@@ -652,7 +662,6 @@ def test_enumerate_candidates_without_pwm_enumerates_all_non_native_bases() -> N
         reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
         junction_starts=(TOY_JUNCTION_START,),
         mismatches_spec=mismatches_spec,
-        pwm_effective=False,
     )
 
     assert len(candidates) == 6
@@ -698,14 +707,12 @@ def test_candidate_generation_count_unchanged() -> None:
         reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
         junction_starts=(TOY_JUNCTION_START,),
         mismatches_spec=legacy_spec,
-        pwm_effective=False,
     )
     ligation_candidates = enumerate_candidates(
         reference_payload_sequence=TOY_SEQUENCE,
         reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
         junction_starts=(TOY_JUNCTION_START,),
         mismatches_spec=ligation_spec,
-        pwm_effective=False,
     )
 
     assert len(ligation_candidates) == len(legacy_candidates)
@@ -723,6 +730,43 @@ def test_bad_pattern_heuristics_disabled_by_default() -> None:
     )
 
     assert spec.bad_pattern_heuristics is False
+
+
+def test_mismatches_spec_defaults_omitted_candidate_positions_to_all_junction_offsets() -> None:
+    spec = MismatchesSpec.model_validate({"count": 1})
+
+    assert spec.candidate_positions == [0, 1, 2, 3]
+
+
+def test_mismatches_spec_rejects_empty_candidate_position_pool() -> None:
+    with pytest.raises(ValueError, match="candidate_positions must be non-empty"):
+        MismatchesSpec.model_validate({"count": 1, "candidate_positions": []})
+
+
+def test_mismatches_spec_rejects_count_larger_than_candidate_position_pool() -> None:
+    with pytest.raises(ValueError, match="exceeds the candidate position pool size"):
+        MismatchesSpec.model_validate({"count": 2, "candidate_positions": [0]})
+
+
+def test_enumerate_candidates_supports_all_junction_offsets() -> None:
+    mismatches_spec = MismatchesSpec.model_validate(
+        {
+            "count": 1,
+            "candidate_positions": [0, 1, 2, 3],
+            "allowed_strands": ["complement", "payload"],
+            "strand_mode": "per_position",
+            "default_strand_preference": "complement",
+        }
+    )
+
+    candidates = enumerate_candidates(
+        reference_payload_sequence=TOY_SEQUENCE,
+        reference_complement_sequence="".join(reverse_complement_iupac(base) for base in TOY_SEQUENCE),
+        junction_starts=(TOY_JUNCTION_START,),
+        mismatches_spec=mismatches_spec,
+    )
+
+    assert {candidate.mutations[0].junction_offset for candidate in candidates} == {0, 1, 2, 3}
 
 
 def test_normalize_sample_hit_resolves_csv_and_enforces_payload_assertion(tmp_path: Path) -> None:
@@ -1659,6 +1703,94 @@ def test_render_yiu_spec_bundle_summary_reports_ligation_rationale(tmp_path: Pat
     assert bundle_summary["ligation"]["position_classes"]
     assert normalized["chosen_ligation_key"]["middle_mismatch_count"] >= 0
     assert normalized["ligation_rationale"]
+
+
+def test_render_yiu_spec_bundle_summary_marks_profile_none_as_legacy_mode(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "legacy_ligation_payload.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _user_sequence_spec(
+            name="legacy_ligation_payload",
+            candidate_positions=[0, 1, 2, 3],
+            ligation_profile="none",
+            ligation_awareness_mode="secondary",
+        ),
+    )
+
+    bundle_dir, _report = render_yiu_spec(spec_path)
+    bundle_summary = _load_json(bundle_dir / "bundle_summary.json")
+
+    assert bundle_summary["ligation"]["profile"] == "none"
+    assert bundle_summary["ligation"]["awareness_mode"] == "secondary"
+    assert bundle_summary["ligation"]["state"] == "legacy"
+    assert bundle_summary["ligation"]["edge_comparison_available"] is False
+    assert "legacy mode" in bundle_summary["ligation"]["decision_note"].lower()
+
+
+def test_render_yiu_spec_bundle_summary_marks_middle_only_pool_as_edge_blind(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "middle_only_ligation_payload.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _user_sequence_spec(
+            name="middle_only_ligation_payload",
+            candidate_positions=[1, 2],
+            ligation_profile="t4",
+            ligation_awareness_mode="secondary",
+        ),
+    )
+
+    bundle_dir, _report = render_yiu_spec(spec_path)
+    bundle_summary = _load_json(bundle_dir / "bundle_summary.json")
+
+    assert bundle_summary["ligation"]["profile"] == "t4"
+    assert bundle_summary["ligation"]["state"] == "edge_blind"
+    assert bundle_summary["ligation"]["candidate_positions"] == [1, 2]
+    assert bundle_summary["ligation"]["edge_comparison_available"] is False
+    assert bundle_summary["ligation"]["position_classes"] == ["middle"]
+    assert "candidate_positions excludes 0/3" in bundle_summary["ligation"]["decision_note"]
+
+
+def test_normalize_payload_caps_optimizer_trace_at_bounded_sample_size(tmp_path: Path) -> None:
+    spec_path = tmp_path / "workspace" / "configs" / "yiu" / "dense_trace_payload.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _user_sequence_spec(
+            name="dense_trace_payload",
+            mismatch_count=2,
+            candidate_positions=[0, 1, 2, 3],
+        ),
+    )
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    normalized = normalize_payload(spec, workspace_root=workspace_root)
+
+    assert len(normalized.optimization_decision.trace) == 32
+    assert normalized.optimization_decision.trace[0]["junction_start"] == 4
+
+
+def test_normalize_payload_exposes_optimizer_trace_truncation_metadata(tmp_path: Path) -> None:
+    spec_path = tmp_path / "workspace" / "configs" / "yiu" / "dense_trace_payload.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _user_sequence_spec(
+            name="dense_trace_payload",
+            mismatch_count=2,
+            candidate_positions=[0, 1, 2, 3],
+        ),
+    )
+
+    spec, _resolved_spec_path, workspace_root = load_yiu_spec(spec_path)
+    normalized = normalize_payload(spec, workspace_root=workspace_root)
+    decision = normalized.optimization_decision.model_dump(mode="json")
+
+    assert decision["trace_sample"] == {
+        "sample_limit": 32,
+        "sampled_count": 32,
+        "candidate_count": decision["candidate_count"],
+        "truncated": True,
+    }
 
 
 def test_render_yiu_spec_outcome_uses_shared_bundle_surface(tmp_path: Path) -> None:

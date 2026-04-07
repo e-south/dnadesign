@@ -114,6 +114,18 @@
     "profile": "t4",
     "awareness_mode": "secondary",
     "applied": true,
+    "state": "active",
+    "state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+    "enabled": true,
+    "legacy_mode": false,
+    "candidate_positions": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "edge_positions_available": true,
+    "edge_comparison_available": true,
     "bad_pattern_heuristics": false,
     "chosen_mismatch_classes": [
       "GT",
@@ -129,6 +141,13 @@
     "double_middle_flag": false,
     "bad_pattern_penalty": 0,
     "decision_note": "No PWM context; ligation-aware ranking applied"
+  },
+  "trace": {
+    "sample_limit": 32,
+    "sampled_count": 32,
+    "candidate_count": 2160,
+    "truncated": true,
+    "note": "Optimizer trace is a bounded sample (32/2160 candidates, limit=32)."
   },
   "view_ids": [
     "payload",

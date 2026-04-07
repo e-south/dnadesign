@@ -16,7 +16,13 @@ from typing import Literal
 from pydantic import Field
 
 from dnadesign.cruncher.config.schema_v3 import StrictBaseModel
-from dnadesign.cruncher.yiu.domain_models import JunctionSelection, MismatchSelection, NormalizedPayload
+from dnadesign.cruncher.yiu.domain_models import (
+    JunctionSelection,
+    LigationSearchState,
+    MismatchSelection,
+    NormalizedPayload,
+    OptimizationTraceSample,
+)
 
 _SUMMARY_FIELDS = (
     "payload_label",
@@ -42,10 +48,25 @@ class YiuValidationLigationSummary(StrictBaseModel):
     profile: Literal["none", "t4", "t7", "t3", "pbcv1", "hlig3"]
     awareness_mode: Literal["disabled", "secondary"]
     applied: bool
+    state: Literal["legacy", "inert", "edge_blind", "active"] | None = None
+    state_note: str | None = None
+    enabled: bool | None = None
+    legacy_mode: bool | None = None
+    candidate_positions: list[int] = Field(default_factory=list)
+    edge_positions_available: bool | None = None
+    edge_comparison_available: bool | None = None
     bad_pattern_heuristics: bool
     chosen_mismatch_classes: list[str] = Field(default_factory=list)
     position_classes: list[Literal["edge", "middle"]] = Field(default_factory=list)
     decision_note: str
+
+
+class YiuValidationTraceSummary(StrictBaseModel):
+    sample_limit: int = Field(ge=0)
+    sampled_count: int = Field(ge=0)
+    candidate_count: int = Field(ge=1)
+    truncated: bool
+    note: str
 
 
 class YiuValidationReport(StrictBaseModel):
@@ -65,6 +86,7 @@ class YiuValidationReport(StrictBaseModel):
     worst_loss: float = Field(ge=0.0)
     total_loss: float = Field(ge=0.0)
     ligation: YiuValidationLigationSummary
+    trace: YiuValidationTraceSummary | None = None
     bundle_dir: str | None = None
     issues: list[YiuValidationIssue] = Field(default_factory=list)
 
@@ -162,6 +184,69 @@ def payload_summary_dump(summary: YiuValidationReport | PayloadBundleManifest) -
     return summary.model_dump(mode="json", include=set(_SUMMARY_FIELDS))
 
 
+def resolve_ligation_surface_state(
+    normalized: NormalizedPayload,
+) -> tuple[Literal["legacy", "inert", "edge_blind", "active"], str, bool]:
+    ligation_state: LigationSearchState | None = normalized.ligation_state
+    if ligation_state is None:
+        return "inert", "Ligation state is unavailable in the normalized payload.", False
+    if ligation_state.legacy_mode:
+        return "legacy", ligation_state.state_note, ligation_state.edge_comparison_available
+    if not ligation_state.enabled:
+        return "inert", ligation_state.state_note, ligation_state.edge_comparison_available
+    if not ligation_state.edge_comparison_available:
+        return "edge_blind", ligation_state.state_note, False
+    return "active", ligation_state.state_note, True
+
+
+def resolve_ligation_decision_note(
+    *,
+    state: Literal["legacy", "inert", "edge_blind", "active"],
+    ligation_applied: bool,
+    pwm_effective: bool,
+) -> str:
+    if state == "legacy":
+        return "Legacy mode; geometric ranking only because ligation_profile=none."
+    if state == "inert":
+        return "Ligation-aware scoring is disabled; geometric ranking only."
+    if state == "edge_blind":
+        return (
+            "PWM preserved first, ligation-aware tie-break applied; edge-vs-middle comparison unavailable "
+            "because candidate_positions excludes 0/3."
+            if pwm_effective
+            else "No PWM context; ligation-aware ranking applied; edge-vs-middle comparison unavailable because "
+            "candidate_positions excludes 0/3."
+        )
+    if ligation_applied and pwm_effective:
+        return "PWM preserved first, ligation-aware tie-break applied"
+    if ligation_applied:
+        return "No PWM context; ligation-aware ranking applied"
+    return "Legacy geometric ranking applied"
+
+
+def build_trace_summary(
+    *,
+    candidate_count: int,
+    trace_sample: OptimizationTraceSample | None,
+    trace_len: int,
+) -> YiuValidationTraceSummary:
+    sample_limit = trace_len if trace_sample is None else trace_sample.sample_limit
+    sampled_count = trace_len if trace_sample is None else trace_sample.sampled_count
+    truncated = sampled_count < candidate_count
+    note = (
+        f"Optimizer trace is a bounded sample ({sampled_count}/{candidate_count} candidates, limit={sample_limit})."
+        if truncated
+        else f"Optimizer trace covers all {candidate_count} candidates."
+    )
+    return YiuValidationTraceSummary(
+        sample_limit=sample_limit,
+        sampled_count=sampled_count,
+        candidate_count=candidate_count,
+        truncated=truncated,
+        note=note,
+    )
+
+
 def build_validation_report(
     *,
     spec_name: str,
@@ -169,6 +254,7 @@ def build_validation_report(
     bundle_dir: str | None = None,
 ) -> YiuValidationReport:
     ligation_applied = normalized.chosen_ligation_key is not None
+    state, state_note, edge_comparison_available = resolve_ligation_surface_state(normalized)
     return YiuValidationReport(
         spec_name=spec_name,
         status="satisfied",
@@ -177,18 +263,30 @@ def build_validation_report(
             profile=normalized.ligation_profile,
             awareness_mode=normalized.ligation_awareness_mode,
             applied=ligation_applied,
+            state=state,
+            state_note=state_note,
+            enabled=False if normalized.ligation_state is None else normalized.ligation_state.enabled,
+            legacy_mode=True if normalized.ligation_state is None else normalized.ligation_state.legacy_mode,
+            candidate_positions=[]
+            if normalized.ligation_state is None
+            else list(normalized.ligation_state.candidate_positions),
+            edge_positions_available=False
+            if normalized.ligation_state is None
+            else normalized.ligation_state.edge_positions_available,
+            edge_comparison_available=edge_comparison_available,
             bad_pattern_heuristics=normalized.bad_pattern_heuristics,
             chosen_mismatch_classes=[entry.canonical_mismatch_class for entry in normalized.ligation_rationale],
             position_classes=[entry.position_class for entry in normalized.ligation_rationale],
-            decision_note=(
-                "PWM preserved first, ligation-aware tie-break applied"
-                if ligation_applied and normalized.motif_context.effective
-                else (
-                    "No PWM context; ligation-aware ranking applied"
-                    if ligation_applied
-                    else "Legacy geometric ranking applied"
-                )
+            decision_note=resolve_ligation_decision_note(
+                state=state,
+                ligation_applied=ligation_applied,
+                pwm_effective=normalized.motif_context.effective,
             ),
+        ),
+        trace=build_trace_summary(
+            candidate_count=normalized.optimization_decision.candidate_count,
+            trace_sample=normalized.optimization_decision.trace_sample,
+            trace_len=len(normalized.optimization_decision.trace),
         ),
         **payload_summary_from_normalized(normalized),
     )

@@ -58,7 +58,7 @@ class JunctionOptimizationSpec(StrictBaseModel):
 
 class MismatchesSpec(StrictBaseModel):
     count: Literal[1, 2]
-    candidate_positions: list[int] = Field(default_factory=lambda: [1, 2])
+    candidate_positions: list[int] = Field(default_factory=lambda: [0, 1, 2, 3])
     allowed_strands: list[Literal["complement", "payload"]] = Field(default_factory=lambda: ["complement", "payload"])
     strand_mode: Literal["per_position"] = "per_position"
     default_strand_preference: Literal["complement", "payload"] = "complement"
