@@ -6,9 +6,11 @@
 
 YIU turns one payload sequence into a checked junction-mismatch bundle. It accepts either an exact `user_sequence` or a `sample_hit` resolved from public Cruncher Sample outputs, searches valid 4 nt internal junction plans plus one or two mismatches, optionally scores those candidates against PWM context, and publishes three BaseRender-ready views.
 
+Use this guide when you need command flow and solver behavior. Use the spec reference for field-by-field schema, the artifacts page for bundle contents and `show`, and the visual-system page for render hierarchy.
+
 <!-- docs:toc:off -->
 
-Useful links:
+Use other pages for:
 
 - [YIU Workspace Demo](../demos/demo_yiu_workspace.md)
 - [Sampling and Analysis](../guides/sampling_and_analysis.md)
@@ -21,13 +23,13 @@ The public lane is:
 
 `input payload -> normalized payload -> optimized junction/mismatch plan -> published bundle -> BaseRender`
 
-### Pick the shortest path
+### YIU docs route
 
-- Use [YIU Workspace Demo](../demos/demo_yiu_workspace.md) for the checked-in user-sequence workspace and runbook.
-- Use `cruncher yiu validate` when you only need schema, source-resolution, and payload-plan checks.
-- Use `cruncher yiu render` when you need the published bundle. Add `--emit-renders` when you also want the composite PDF.
-- Use `cruncher yiu show` when you need one fail-fast inspection surface for manifest, inventory, payload summary, and rendered artifacts.
-- Use [YIU Spec Reference](../reference/yiu_spec.md) for input rules, [YIU Artifacts](../reference/yiu_artifacts.md) for emitted files and `show`, and [YIU Visual System](../reference/yiu_visual_system.md) for view hierarchy.
+1. Start with [YIU Workspace Demo](../demos/demo_yiu_workspace.md) for the checked-in user-sequence workspace and runbook.
+2. Stay in this guide for the public `init-workspace -> validate -> render -> show` flow and the ranking logic.
+3. Move to [YIU Spec Reference](../reference/yiu_spec.md) when you are editing `.yiu.yaml` fields, defaults, or degraded-mode behavior.
+4. Move to [YIU Artifacts](../reference/yiu_artifacts.md) when you need emitted files, `show`, or bundle-integrity rules.
+5. Move to [YIU Visual System](../reference/yiu_visual_system.md) when you need payload/split/assembled hierarchy or render emphasis.
 
 ### Inputs and published views
 
@@ -46,7 +48,17 @@ Both inputs normalize into one payload object and publish exactly three views:
 
 The public contract is `split_yiu_payload_rendering_v4`.
 
-YIU is mismatch-centric. The junction is always a 4 nt internal window. The optimizer chooses the window, mismatch positions, mutated strands, and mutated bases within the rules in the spec. Legacy bulge and topology keys are rejected rather than guessed.
+YIU is mismatch-centric. The junction is always a 4 nt internal window. Legacy bulge and topology keys are rejected rather than guessed.
+
+### How YIU chooses a plan
+
+1. Resolve one exact payload from either `user_sequence` or `sample_hit`. Ambiguous or missing sources fail fast.
+2. Build the valid internal 4 nt junction windows allowed by the junction mode and payload-body bounds.
+3. Enumerate mismatch plans exhaustively across the allowed junction offsets, mismatch count, strand assignments, and non-native substitutions. If you omit `optimization.mismatches.candidate_positions`, YIU uses `[0, 1, 2, 3]`.
+4. Rank the candidates. PWM or log-likelihood retention stays primary when effective. Ligation rules can refine the decision after PWM. Midpoint proximity and the remaining deterministic tie-breakers only act after those higher-order rules.
+5. Publish one deterministic bundle with `payload`, `split_payload`, and `assembled_payload` views.
+
+Middle-only pools such as `[1, 2]` are still allowed, but the resulting bundle will say edge-vs-middle comparison is unavailable for the winning plan.
 
 ### Where `sample_hit` comes from
 
@@ -118,6 +130,14 @@ The main junction policies are:
 - `explicit_window`: use one explicit internal 4 nt window.
 - `optimize`: search valid internal windows around the midpoint and rank candidates by PWM/log-likelihood retention first, ligation awareness second when enabled, then midpoint proximity and the remaining deterministic tie-break ladder.
 
+### Ligation posture
+
+- `ligation_profile=none` is legacy ranking, not a quietly disabled secondary mode.
+- `ligation_awareness_mode=disabled` makes ligation-aware scoring inert even if a profile is configured.
+- candidate pools that exclude `0` and `3` are edge-blind by configuration, not by fallback
+- `bad_pattern_heuristics` is the TNNA-style penalty heuristic only.
+- The bundle summary and `show` output now name `legacy`, `inert`, `edge_blind`, and `active` ligation states explicitly.
+
 ### What `validate` checks
 
 - the root contract and schema version match `split_yiu_payload_rendering_v4`
@@ -129,6 +149,7 @@ The main junction policies are:
 - `sample_hit` provenance resolves to one exact payload sequence or fails fast
 - PWM-aware optimization remains deterministic and exhaustive across valid windows, mismatch positions, strand assignments, and allowed non-native base substitutions
 - legacy `bulge_mask` and `split` keys are rejected because they are not part of `split_yiu_payload_rendering_v4`
+- optimizer traces in the normalized and summary surfaces are bounded samples, not full search ledgers
 
 ### What `render` writes
 
@@ -142,8 +163,7 @@ Use [YIU Artifacts](../reference/yiu_artifacts.md) for the exact emitted files. 
 - `payload_views.pdf`
 - `cruncher yiu show --bundle <bundle_dir>`
 
-That summary artifact now makes the reference duplex and mismatch-present duplex explicit side by side, with payload 5' to 3' and complement 3' to 5' spelled out directly.
-The current operator surface goes one step further: `bundle_summary.json` and default `cruncher yiu show` publish one `views` block for `payload`, `split_left`, `split_right`, and `assembled`, with reference and mismatch-present top/bottom rows all rewritten into explicit 5' to 3' orientation plus `changed_rows`.
+`bundle_summary.json` and default `cruncher yiu show` keep the operator handoff tight. They publish one `views` block for `payload`, `split_left`, `split_right`, and `assembled`, with reference and mismatch-present top/bottom rows rewritten into explicit 5' to 3' orientation plus `changed_rows`. That makes the reference duplex and mismatch-present duplex easy to compare without opening the machine-facing ledgers.
 
 The remaining published JSON files are machine-facing bundle ledgers or render contracts:
 
@@ -162,9 +182,17 @@ The payload view uses `yiu_payload_visual_v1`. When PWM context is effective, th
 
 `show` is fail-fast on bundle drift. Missing published view contracts, manifest and inventory disagreements, payload-view motif drift, a `rendered` bundle with a missing `payload_views.pdf`, or a configured published plot path that does not exist are treated as bundle corruption.
 
-Default human-readable `show` keeps the payload handoff in the foreground: one ligation summary line, one overhang summary, then payload, split-left, split-right, and assembled views with reference-vs-mismatch-present top/bottom rows in 5' to 3', followed by compact mismatch edits and PWM state. Default `show --json` stays operator-focused and omits the machine ledger paths plus normalized payload detail unless `--verbose` is set. Human-readable `--verbose` adds provenance, bundle contract, render/integrity details, machine-facing artifact paths, and split-row debug lines; the optimizer trace and motif context remain JSON-only.
+Default human-readable `show` keeps the payload handoff in the foreground:
+
+- a ligation summary block
+- one overhang summary
+- payload, split-left, split-right, and assembled views with reference-vs-mismatch-present top/bottom rows in 5' to 3'
+- compact mismatch edits, PWM state, and a bounded trace summary
+
+Default `show --json` stays operator-focused and omits the machine ledger paths plus normalized payload detail unless `--verbose` is set. Human-readable `--verbose` adds provenance, bundle contract, render/integrity details, machine-facing artifact paths, and split-row debug lines; the full optimizer trace and motif context remain JSON-only.
 
 The split middle row renders `split_payload_left` before `split_payload_right`. Each panel shows the retained fragment, its inward-facing sticky end, selected-versus-reference sticky-end metadata, the fragment-display payload-body slice, and optional ghosted excision context. The bundle summary now also publishes those retained left and right fragment duplexes as explicit top/bottom 5' to 3' rows for both reference and mismatch-present variants.
+The bundle summary also includes an explicit ligation posture block and a trace sampling note so operators can tell when ligation is legacy, inert, edge-blind, or active without guessing from the selected candidate alone.
 
 The assembled payload returns to original payload order. It publishes one explicit `junction_span` in payload coordinates rather than a seam surrogate.
 

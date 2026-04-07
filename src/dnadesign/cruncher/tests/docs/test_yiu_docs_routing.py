@@ -26,11 +26,13 @@ def test_top_level_docs_route_readers_to_yiu_surfaces() -> None:
     docs_index = _read("docs/index.md")
 
     assert "payload-centric YIU" in package_readme
-    assert "docs/demos/demo_yiu_workspace.md" in package_readme
+    assert "`sample` and fixed-length optimization" in package_readme
+    assert "docs/README.md" in package_readme
     assert "docs/guides/yiu_workflow.md" in package_readme
+    assert "docs/guides/sampling_and_analysis.md" in package_readme
     assert "sample_hit" in package_readme
-    assert "docs/reference/yiu_spec.md" in package_readme
-    assert "docs/reference/yiu_artifacts.md" in package_readme
+    assert "This README stays light on purpose." in package_readme
+    assert "[Docs map](docs/README.md): the comprehensive index." in package_readme
 
     for content in (docs_readme, docs_index):
         assert "Payload-Centric YIU Workflows" in content
@@ -39,6 +41,7 @@ def test_top_level_docs_route_readers_to_yiu_surfaces() -> None:
         assert "reference/yiu_spec.md" in content
         assert "reference/yiu_artifacts.md" in content
         assert "reference/yiu_visual_system.md" in content
+        assert "YIU docs route" in content
         assert "yiu init-workspace|validate|render|show" in content
         assert "workspaces/demo_monotypic_tetr/runbook.md" in content
         assert "trace|solve" not in content
@@ -75,6 +78,8 @@ def test_yiu_workflow_routes_to_contract_pages() -> None:
     assert "Human-readable `--verbose` adds provenance, bundle contract, render/integrity details," in guide
     assert "The remaining published JSON files are machine-facing bundle ledgers or render contracts" in guide
     assert "reference duplex and mismatch-present duplex" in guide
+    assert "### How YIU chooses a plan" in guide
+    assert "Enumerate mismatch plans exhaustively" in guide
     assert (
         "Use `candidate_positions: [0, 1, 2, 3]` when you want ligation-aware ranking "
         "to compare edge and middle offsets." in guide

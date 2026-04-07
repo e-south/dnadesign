@@ -8,9 +8,11 @@
 
 A successful YIU render writes one deterministic bundle under the workspace-relative `output.bundle_dir` path. Treat that bundle directory as the source of truth. `output.published_plot_path` is only an optional mirror of the composite PDF. Use this reference for emitted files, render-status semantics, and the shared `render`/`show --verbose` inspection surface.
 
+Use the workflow guide for command flow and solver behavior. Use the spec reference for `.yiu.yaml` rules. This page is only about the published bundle and the checks around it.
+
 <!-- docs:toc:off -->
 
-Useful links:
+Use other pages for:
 
 - [YIU Workflow](../guides/yiu_workflow.md)
 - [YIU Spec Reference](yiu_spec.md)
@@ -78,13 +80,13 @@ outputs/<workflow>/
 
 `bundle_summary.json` is the concise handoff surface for one run. It keeps the main sequence story in one place:
 
-- one explicit `views` block for `payload`, `split_left`, `split_right`, and `assembled`
+- one `views` block for `payload`, `split_left`, `split_right`, and `assembled`
 - reference and mismatch-present variants for each view
 - one reference duplex and one mismatch-present duplex view for every published handoff row
 - top and bottom strand sequences in explicit 5' to 3' orientation for every view
 - one `changed_rows` list per view so the mismatch-bearing row is obvious at a glance
-- one explicit `overhang_5to3` block with reference and mismatch-present sticky ends
-- one explicit `junction_payload_sequence_5to3` block for the 4 bp payload window
+- one `overhang_5to3` block with reference and mismatch-present sticky ends
+- one `junction_payload_sequence_5to3` block for the 4 bp payload window
 - compact strand-aware mismatch notation using 1-based payload positions
 - raw mismatch list, PWM summary, published view ids, and render status
 
@@ -136,7 +138,8 @@ The payload visual contract carries:
 - `normalized_payload_path`
 - `visual_inventory_path`
 
-That shared surface is intentional: bundle layout changes should land once in the app layer, not be reconstructed independently in CLI commands. The workflow guide points here instead of duplicating the inspection-field list.
+That shared surface is intentional: bundle layout changes should land once in the app layer, not be reconstructed independently in CLI commands. The workflow guide points here instead of restating the inspection-field list.
+
 Each view entry also records one explicit `visual_direction` so downstream tools do not infer layout policy from `view_id` or showcase defaults.
 
 ### Status semantics

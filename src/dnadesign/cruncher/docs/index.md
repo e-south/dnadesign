@@ -1,14 +1,15 @@
 ## Cruncher docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-05
+**Last verified:** 2026-04-07
 
-**Last updated by:** cruncher-maintainers on 2026-04-05
+**Last updated by:** cruncher-maintainers on 2026-04-07
 
 
 ### Contents
 - [Overview](#overview)
 - [Choose your path](#choose-your-path)
+- [YIU docs route](#yiu-docs-route)
 - [Docs map](#docs-map)
 - [Demos](#demos)
 - [Guides](#guides)
@@ -18,7 +19,7 @@
 ### Overview
 This index is the browsing map for Cruncher docs. Start with the package-level [Cruncher README](../README.md) for the short operational map, then route into one workflow family.
 
-YIU is its own workflow family, not a special case of `sample` or cassette work. It accepts either an exact payload sequence or a `sample_hit` resolved from public Sample outputs, searches a 4 nt internal junction plus allowed mismatch plans, and publishes a deterministic three-view bundle. Use the demo for the checked-in workspace, the workflow guide for command flow, the spec reference for schema and normalization, the artifacts page for emitted files and `show`, and the visual-system page for view hierarchy.
+YIU is its own workflow family, not a special case of `sample` or cassette work. It accepts either an exact payload sequence or a `sample_hit` resolved from public Sample outputs, searches a 4 nt internal junction plus allowed mismatch plans, and publishes a deterministic three-view bundle. Use the demo for the checked-in workspace, the workflow guide for command flow and solver behavior, the spec reference for schema and normalization, the artifacts page for emitted files and `show`, and the visual-system page for view hierarchy.
 
 Cruncher has three first-class workflow families today:
 
@@ -45,6 +46,19 @@ Studies and portfolios extend the fixed-length optimization lane. Cassette and Y
 - Run study sweeps: [`guides/studies.md`](guides/studies.md)
 - Aggregate a portfolio: [`guides/portfolio_aggregation.md`](guides/portfolio_aggregation.md)
 - Debug failures quickly: [`guides/troubleshooting.md`](guides/troubleshooting.md)
+
+### YIU docs route
+Read the YIU pages in this order when you want the shortest path from first run to contract detail:
+
+1. [`demos/demo_yiu_workspace.md`](demos/demo_yiu_workspace.md) for one checked-in user-sequence workspace.
+2. [`guides/yiu_workflow.md`](guides/yiu_workflow.md) for command flow and the optimizer's behavioral logic.
+3. [`reference/yiu_spec.md`](reference/yiu_spec.md) for `.yiu.yaml` fields, defaults, and failure rules.
+4. [`reference/yiu_artifacts.md`](reference/yiu_artifacts.md) for bundle contents, `show`, and integrity checks.
+5. [`reference/yiu_visual_system.md`](reference/yiu_visual_system.md) for the payload/split/assembled layout hierarchy.
+
+Use the monotypic runbooks when you need `sample_hit` examples that stay beside the upstream Sample outputs:
+- [`../workspaces/demo_monotypic_tetr/runbook.md`](../workspaces/demo_monotypic_tetr/runbook.md)
+- [`../workspaces/demo_monotypic_lexa/runbook.md`](../workspaces/demo_monotypic_lexa/runbook.md)
 
 ### Docs map
 <!-- docs:map:start -->

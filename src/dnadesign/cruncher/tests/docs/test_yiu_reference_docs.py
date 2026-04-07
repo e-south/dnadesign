@@ -30,6 +30,8 @@ def test_yiu_spec_reference_stays_schema_scoped() -> None:
     )
     assert "metadata.source_workspace" in spec_ref
     assert "Ambiguous or missing sources fail fast." in spec_ref
+    assert "### How the solver uses this spec" in spec_ref
+    assert "does not change the biological search" in spec_ref
     assert "`yiu/spec_models.py` is the stable public schema facade" in spec_ref
     assert "`yiu/payload_resolution.py` is the stable public input-resolution seam" in spec_ref
     assert "`yiu/pwm_context.py` is the stable public PWM-resolution seam" in spec_ref
@@ -49,6 +51,7 @@ def test_yiu_artifacts_reference_stays_bundle_scoped() -> None:
     assert "visual_inventory.json" in artifacts_ref
     assert "shared `render`/`show --verbose` inspection surface" in artifacts_ref
     assert "render-status semantics" in artifacts_ref
+    assert "This page is only about the published bundle and the checks around it." in artifacts_ref
     assert "bundle truth vs mirror" in artifacts_ref.lower()
     assert "Treat that bundle directory as the source of truth." in artifacts_ref
     assert "`split_payload_view.jsonl` (JSONL)" in artifacts_ref

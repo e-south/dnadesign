@@ -8,6 +8,8 @@
 
 YIU uses one strict v4 payload-rendering document root. A YIU spec tells Cruncher where the payload comes from, which 4 nt junction windows and mismatch plans are allowed, how PWM context should be resolved, and where the published bundle should be written.
 
+Use this page when you are authoring or reviewing `.yiu.yaml` fields. Use the workflow guide for command flow and solver behavior, the artifacts page for bundle contents and `show`, and the visual-system page for render hierarchy.
+
 Use [YIU Workflow](../guides/yiu_workflow.md) for command flow, [YIU Artifacts](yiu_artifacts.md) for emitted files and `show`, and [YIU Visual System](yiu_visual_system.md) for view hierarchy.
 
 <!-- docs:toc:off -->
@@ -19,7 +21,7 @@ Use [YIU Workflow](../guides/yiu_workflow.md) for command flow, [YIU Artifacts](
 - [YIU Visual System](yiu_visual_system.md)
 - [Sampling and Analysis](../guides/sampling_and_analysis.md)
 
-### Input-side workspace adjacency
+### Files next to a spec
 
 These are the input-side files that usually sit next to a YIU spec. Bundle layout, rendered PDFs, and inspection surfaces are described in [YIU Artifacts](yiu_artifacts.md).
 
@@ -98,6 +100,14 @@ output:
   emit_render_jobs_debug: false
 ```
 
+### How the solver uses this spec
+
+- `input` resolves one exact payload sequence from either `user_sequence` or `sample_hit`.
+- `optimization.junction` limits which internal 4 nt windows are legal.
+- `optimization.mismatches` controls exhaustive enumeration across offsets, mutated strands, and mismatch count.
+- `optimization.pwm` controls the primary scoring surface and whether degraded PWM mode is visible or fatal.
+- `output` controls where the deterministic bundle is written; it does not change the biological search.
+
 ### Contract rules
 
 - `yiu.contract` must equal `split_yiu_payload_rendering_v4`
@@ -110,6 +120,7 @@ output:
 - `optimization.mismatches.ligation_profile` must be one of `none`, `t4`, `t7`, `t3`, `pbcv1`, or `hlig3`
 - `optimization.mismatches.ligation_awareness_mode` must be `disabled` or `secondary`
 - `optimization.mismatches.bad_pattern_heuristics` is optional and only valid when ligation awareness is active
+- if `optimization.mismatches.candidate_positions` is omitted, YIU defaults to `[0, 1, 2, 3]`
 - YIU v4 payload inputs must contain exact `A/C/G/T` bases; ambiguous IUPAC symbols are rejected
 - `output.bundle_dir` is workspace-relative and required
 - `output.published_plot_path` is workspace-relative when present and must point to a `.pdf`
@@ -164,8 +175,10 @@ The most common `sample_hit` handoff is a Sample public hit table such as `outpu
 - `optimization.pwm.objective.secondary` uses the fixed ladder `total_loss`, `ligation_awareness`, `midpoint_proximity`, `default_strand_preference`, and `lexical_stability`
 - the normalized model stores `junction.start`, `junction.end`, `selected_payload_sequence`, and `selected_complement_sequence`
 - `mismatches.candidate_positions` are zero-based offsets inside the 4 nt junction window `[0, 1, 2, 3]`
-- use `[0, 1, 2, 3]` when you want ligation-aware ranking to compare edge (`0`, `3`) versus middle (`1`, `2`) positions; limiting the pool to `[1, 2]` intentionally disables edge preference
-- terminal positions `0` and `3` are opt-in only
+- use `[0, 1, 2, 3]` when you want ligation-aware ranking to compare edge (`0`, `3`) versus middle (`1`, `2`) positions
+- limiting the pool to `[1, 2]` intentionally keeps the search middle-only and makes edge-vs-middle comparison unavailable in the winning plan
+- `ligation_profile=none` preserves legacy ranking and should be read as legacy mode, not as a quietly disabled secondary mode
+- `ligation_awareness_mode=disabled` makes ligation-aware scoring inert even when a ligation profile is present
 - PWM mode `none` disables scoring even if a source is available
 - PWM mode `use_if_available` records a deterministic fallback reason when context is unavailable
 - PWM mode `require` fails fast when context is missing, malformed, or ambiguous
@@ -187,9 +200,13 @@ YIU can optionally apply ligation-aware ranking for 4-bp junction mismatches. Th
 
 YIU stores junction offsets in payload-forward coordinates `0..3` and scores on aligned duplex coordinates. Human-facing payload, split, and assembled views may rewrite strands into explicit 5' to 3' display. Ligation-aware scoring therefore derives mismatch class from the final duplex base pair and does not depend on whether the payload or complement strand was mutated.
 
-`ligation_profile=none` preserves legacy behavior. `ligation_profile=t4` is the recommended default for T4-like assembly workflows.
+`ligation_profile=none` preserves legacy behavior.
+That legacy behavior should be read as legacy mode, not as a quietly disabled secondary mode.
+`ligation_profile=t4` is the recommended default for T4-like assembly workflows.
+When ligation-aware scoring is active but the selected winning plan only uses middle positions, bundle summaries and CLI output mark edge-vs-middle comparison as unavailable for that plan.
+`bad_pattern_heuristics` is the TNNA-style penalty heuristic only; it is not a general mismatch-quality classifier.
 
-When ligation awareness is active, YIU keeps PWM loss primary and then ranks by mismatch-class tier, middle-mismatch count, double-middle penalty, and optional bad-pattern heuristics before falling back to midpoint distance, strand preference, and lexical stability. Candidate generation stays exhaustive; the biology rules only affect ranking.
+When ligation awareness is active, YIU keeps PWM loss primary and then ranks by mismatch-class tier, middle-mismatch count, double-middle penalty, and optional bad-pattern heuristics before falling back to midpoint distance, strand preference, and lexical stability. Candidate generation stays exhaustive; the biology rules only affect ranking. When `candidate_positions` is omitted, that exhaustive search covers all payload-forward offsets `0..3`.
 
 The paper does not isolate every exact two-mismatch geometry that YIU can generate. The strongest direct support is for G:T dominance, edge better than middle, T4/T7 versus T3/PBCV-1/hLig3 permissiveness differences, and TNNA inefficiency. Penalties such as `double_middle_flag` are engineering extrapolations grounded in the paper, not direct one-to-one measurements for every possible YIU candidate geometry.
 

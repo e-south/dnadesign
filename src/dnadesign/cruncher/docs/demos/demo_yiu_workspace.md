@@ -1,10 +1,12 @@
 ## YIU Workspace Demo
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-05
-**Last updated by:** cruncher-maintainers on 2026-04-05
+**Last verified:** 2026-04-07
+**Last updated by:** cruncher-maintainers on 2026-04-07
 
 Use this walkthrough when you want the checked-in YIU user-sequence demo: validate a strict `.yiu.yaml` spec, publish its payload bundle, and inspect the three payload views. For sample-backed YIU examples that start from `sample` outputs, use the monotypic runbooks such as [demo_monotypic_tetr](../../workspaces/demo_monotypic_tetr/runbook.md) or [demo_monotypic_lexa](../../workspaces/demo_monotypic_lexa/runbook.md).
+
+Read [YIU Workflow](../guides/yiu_workflow.md) next when you want the full command flow and ranking logic, then move to [YIU Spec Reference](../reference/yiu_spec.md) or [YIU Artifacts](../reference/yiu_artifacts.md) for strict contracts.
 
 <!-- docs:toc:off -->
 

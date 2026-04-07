@@ -1,10 +1,10 @@
 ## Cruncher Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-05
+**Last verified:** 2026-04-07
 
 
-**Last updated by:** cruncher-maintainers on 2026-04-05
+**Last updated by:** cruncher-maintainers on 2026-04-07
 
 Cruncher currently has three first-class workflow families:
 
@@ -14,7 +14,7 @@ Cruncher currently has three first-class workflow families:
 
 Studies and portfolios build on the fixed-length optimization lane. Cassette and YIU runs keep their own workspace and artifact contracts. Future lanes should sit beside these families rather than overload them.
 
-For YIU, the shortest mental model is:
+For YIU, the shortest mental model is five steps:
 
 - start from either `user_sequence` or `sample_hit`
 - validate and normalize the payload
@@ -24,15 +24,26 @@ For YIU, the shortest mental model is:
 
 ### Quick routes
 
-- Need the checked-in user-sequence demo: [YIU Workspace Demo](demos/demo_yiu_workspace.md)
-- Need a sample-backed YIU example that starts from `sample` outputs:
+- Checked-in user-sequence demo: [YIU Workspace Demo](demos/demo_yiu_workspace.md)
+- Sample-backed YIU example that starts from `sample` outputs:
   [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md) and
   [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md)
-- Need the public YIU command flow: [YIU Workflow](guides/yiu_workflow.md)
-- Need the strict input contract: [YIU Spec Reference](reference/yiu_spec.md)
-- Need emitted files and `show` semantics: [YIU Artifacts](reference/yiu_artifacts.md)
-- Need render hierarchy and view emphasis: [YIU Visual System](reference/yiu_visual_system.md)
-- Need the upstream Sample lane: [Sampling and Analysis](guides/sampling_and_analysis.md)
+- Public YIU command flow: [YIU Workflow](guides/yiu_workflow.md)
+- Strict input contract: [YIU Spec Reference](reference/yiu_spec.md)
+- Emitted files and `show` semantics: [YIU Artifacts](reference/yiu_artifacts.md)
+- Render hierarchy and view emphasis: [YIU Visual System](reference/yiu_visual_system.md)
+- Upstream Sample lane: [Sampling and Analysis](guides/sampling_and_analysis.md)
+
+### YIU docs route
+Read the YIU pages in this order when you are new to the lane:
+
+1. [YIU Workspace Demo](demos/demo_yiu_workspace.md) for one checked-in workspace and the shortest runnable path.
+2. [YIU Workflow](guides/yiu_workflow.md) for command flow and the solver's behavioral logic.
+3. [YIU Spec Reference](reference/yiu_spec.md) for field-level schema, defaults, and degraded-mode rules.
+4. [YIU Artifacts](reference/yiu_artifacts.md) for bundle files, `show`, and integrity semantics.
+5. [YIU Visual System](reference/yiu_visual_system.md) for payload/split/assembled hierarchy and render emphasis.
+
+Use the sample-backed monotypic runbooks when you need `sample_hit` examples beside real Sample outputs.
 
 ### Progressive disclosure route
 1. Choose one workflow family under **Choose a workflow family**.
@@ -45,8 +56,8 @@ For YIU, the shortest mental model is:
 
 - **Fixed-length optimization workspaces:** start with [Pairwise Demo](demos/demo_pairwise.md), then move to [Sampling and Analysis](guides/sampling_and_analysis.md) and [Intent and Lifecycle](guides/intent_and_lifecycle.md).
 - **Cassette workspaces:** start with [Cassette Workspace Demo](demos/demo_cassette_workspace.md), then use [Cassette Workflow](guides/cassette_workflow.md) or [Cassette Solve Workflow](guides/cassette_solve_workflow.md).
-- **Payload-Centric YIU Workflows:** start with [YIU Workspace Demo](demos/demo_yiu_workspace.md), then use [YIU Workflow](guides/yiu_workflow.md), [YIU Spec Reference](reference/yiu_spec.md), [YIU Artifacts](reference/yiu_artifacts.md), and [YIU Visual System](reference/yiu_visual_system.md). Public CLI: `yiu init-workspace|validate|render|show` with `split_yiu_payload_rendering_v4`.
-  Use the demo for the checked-in workspace, the workflow guide for command flow, the spec reference for schema and normalization, the artifacts page for emitted files and `show`, and the visual-system page for view hierarchy.
+- **Payload-Centric YIU Workflows:** start with [YIU Workspace Demo](demos/demo_yiu_workspace.md), then follow the [YIU docs route](#yiu-docs-route). Public CLI: `yiu init-workspace|validate|render|show` with `split_yiu_payload_rendering_v4`.
+  Use the demo for the checked-in workspace, the workflow guide for command flow and solver behavior, the spec reference for schema and normalization, the artifacts page for emitted files and `show`, and the visual-system page for view hierarchy.
 - **Study and aggregation workflows:** use [Studies](guides/studies.md) for workspace-scoped sweeps and [Portfolio Aggregation](guides/portfolio_aggregation.md) for cross-workspace handoff packages.
 - **Reference contracts:** use [CLI Reference](reference/cli.md), [Architecture](reference/architecture.md), and the relevant schema/artifact reference for your lane.
 
