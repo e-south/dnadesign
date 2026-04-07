@@ -1,0 +1,134 @@
+{
+  "summary_contract": "yiu_bundle_summary_v3",
+  "schema_version": 3,
+  "spec_name": "tetr_monotypic_hit",
+  "payload_label": "tetr_payload",
+  "input_kind": "sample_hit",
+  "payload_length": 19,
+  "sequence_summary": {
+    "junction_payload_sequence_5to3": "CTGA",
+    "overhang_5to3": {
+      "canonical_sequence_5to3": "TCAG",
+      "mismatch_present_sequence_5to3": "GTAG"
+    },
+    "views": {
+      "payload": {
+        "canonical": {
+          "top_strand_5to3": "CTCTATATCTGATATAGAG",
+          "bottom_strand_5to3": "CTCTATATCAGATATAGAG"
+        },
+        "mismatch_present": {
+          "top_strand_5to3": "CTCTATATCTGATATAGAG",
+          "bottom_strand_5to3": "CTCTATAGTAGATATAGAG"
+        },
+        "changed_rows": [
+          "bottom"
+        ]
+      },
+      "split_left": {
+        "canonical": {
+          "top_strand_5to3": "TCAGATATAGAG",
+          "bottom_strand_5to3": "CTCTATAT"
+        },
+        "mismatch_present": {
+          "top_strand_5to3": "GTAGATATAGAG",
+          "bottom_strand_5to3": "CTCTATAT"
+        },
+        "changed_rows": [
+          "top"
+        ]
+      },
+      "split_right": {
+        "canonical": {
+          "top_strand_5to3": "CTCTATA",
+          "bottom_strand_5to3": "CTGATATAGAG"
+        },
+        "mismatch_present": {
+          "top_strand_5to3": "CTCTATA",
+          "bottom_strand_5to3": "CTGATATAGAG"
+        },
+        "changed_rows": []
+      },
+      "assembled": {
+        "canonical": {
+          "top_strand_5to3": "CTCTATATCTGATATAGAG",
+          "bottom_strand_5to3": "CTCTATATCAGATATAGAG"
+        },
+        "mismatch_present": {
+          "top_strand_5to3": "CTCTATATCTGATATAGAG",
+          "bottom_strand_5to3": "CTCTATAGTAGATATAGAG"
+        },
+        "changed_rows": [
+          "bottom"
+        ]
+      }
+    }
+  },
+  "junction": {
+    "start": 8,
+    "end": 12,
+    "offsets": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "mode": "optimize",
+    "left_body_length": 8,
+    "right_body_length": 7
+  },
+  "mismatches": [
+    {
+      "payload_index": 10,
+      "junction_offset": 2,
+      "mutated_strand": "complement",
+      "native_base": "C",
+      "mutated_base": "T",
+      "opposing_base": "G"
+    },
+    {
+      "payload_index": 11,
+      "junction_offset": 3,
+      "mutated_strand": "complement",
+      "native_base": "T",
+      "mutated_base": "G",
+      "opposing_base": "A"
+    }
+  ],
+  "mismatch_notation": [
+    "AS11C>T,12T>G"
+  ],
+  "pwm": {
+    "mode": "require",
+    "effective": true,
+    "motif_count": 2,
+    "worst_loss": 0.0,
+    "total_loss": 0.0
+  },
+  "ligation": {
+    "profile": "t4",
+    "awareness_mode": "secondary",
+    "applied": true,
+    "bad_pattern_heuristics": false,
+    "chosen_mismatch_classes": [
+      "GT",
+      "AG"
+    ],
+    "position_classes": [
+      "middle",
+      "edge"
+    ],
+    "worst_mismatch_class_tier": 2,
+    "total_mismatch_class_tier": 2,
+    "middle_mismatch_count": 1,
+    "double_middle_flag": false,
+    "bad_pattern_penalty": 0,
+    "decision_note": "PWM preserved first, ligation-aware tie-break applied"
+  },
+  "view_ids": [
+    "payload",
+    "split_payload",
+    "assembled_payload"
+  ],
+  "render_status": "rendered"
+}

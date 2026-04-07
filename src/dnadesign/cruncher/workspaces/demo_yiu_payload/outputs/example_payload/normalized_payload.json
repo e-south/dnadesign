@@ -1,0 +1,1001 @@
+{
+  "contract": "yiu_normalized_payload_v5",
+  "schema_version": 1,
+  "name": "example_payload",
+  "input_kind": "user_sequence",
+  "payload_label": null,
+  "site_label": null,
+  "reference_payload_sequence": "AAATTTCCCGGGAAATTTCCC",
+  "reference_complement_sequence": "TTTAAAGGGCCCTTTAAAGGG",
+  "selected_payload_sequence": "AAATTTCCCGGGAAATTTCCC",
+  "selected_complement_sequence": "TTTAAAGGGCCTTTTAAAGGG",
+  "source_provenance": {
+    "spec_name": "example_payload",
+    "sample_name": null,
+    "hit_id": null,
+    "source_artifact_path": null
+  },
+  "ligation_profile": "t4",
+  "ligation_awareness_mode": "secondary",
+  "bad_pattern_heuristics": false,
+  "chosen_ligation_key": {
+    "worst_mismatch_class_tier": 0,
+    "total_mismatch_class_tier": 0,
+    "middle_mismatch_count": 0,
+    "double_middle_flag": false,
+    "bad_pattern_penalty": 0
+  },
+  "ligation_rationale": [
+    {
+      "payload_index": 11,
+      "junction_offset": 3,
+      "position_class": "edge",
+      "mutated_strand": "complement",
+      "native_base": "C",
+      "partner_base": "G",
+      "canonical_mismatch_class": "GT",
+      "class_tier": 0
+    }
+  ],
+  "junction": {
+    "start": 8,
+    "end": 12,
+    "offsets": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "mode": "optimize",
+    "left_body_length": 8,
+    "right_body_length": 9
+  },
+  "mismatches": [
+    {
+      "payload_index": 11,
+      "junction_offset": 3,
+      "mutated_strand": "complement",
+      "native_base": "C",
+      "mutated_base": "T",
+      "opposing_base": "G"
+    }
+  ],
+  "motif_context": {
+    "requested_mode": "none",
+    "effective": false,
+    "source_kind": "none",
+    "fallback_reason": null,
+    "motifs": []
+  },
+  "optimization_decision": {
+    "candidate_count": 192,
+    "objective": {
+      "primary": "maximin",
+      "secondary": [
+        "total_loss",
+        "ligation_awareness",
+        "midpoint_proximity",
+        "default_strand_preference",
+        "lexical_stability"
+      ]
+    },
+    "winner": {
+      "junction_start": 8,
+      "junction_end": 12,
+      "selected_positions": [
+        3
+      ],
+      "mutated_strands": [
+        "complement"
+      ],
+      "mutated_bases": [
+        "T"
+      ],
+      "worst_loss": 0.0,
+      "total_loss": 0.0,
+      "midpoint_distance": 1,
+      "middle_mismatch_count": 0,
+      "double_middle_flag": false,
+      "default_strand_preference_count": 1,
+      "lexical_key": "8|3|complement|T"
+    },
+    "trace": [
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          0
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "C"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 1,
+        "lexical_key": "5|0|complement|C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          0
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "G"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 1,
+        "lexical_key": "5|0|complement|G",
+        "worst_mismatch_class_tier": 0,
+        "total_mismatch_class_tier": 0,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          0
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 1,
+        "lexical_key": "5|0|complement|T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "TT"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          0
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 0,
+        "lexical_key": "5|0|payload|A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AA"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          0
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "C"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 0,
+        "lexical_key": "5|0|payload|C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          0
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "G"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 0,
+        "lexical_key": "5|0|payload|G",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 2,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AG"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          1
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 1,
+        "lexical_key": "5|1|complement|A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC"
+        ],
+        "position_classes": [
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          1
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "C"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 1,
+        "lexical_key": "5|1|complement|C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CC"
+        ],
+        "position_classes": [
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          1
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 1,
+        "lexical_key": "5|1|complement|T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT"
+        ],
+        "position_classes": [
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          1
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 0,
+        "lexical_key": "5|1|payload|A",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 2,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AG"
+        ],
+        "position_classes": [
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          1
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "G"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 0,
+        "lexical_key": "5|1|payload|G",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 2,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GG"
+        ],
+        "position_classes": [
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          1
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 0,
+        "lexical_key": "5|1|payload|T",
+        "worst_mismatch_class_tier": 0,
+        "total_mismatch_class_tier": 0,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT"
+        ],
+        "position_classes": [
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          2
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 1,
+        "lexical_key": "5|2|complement|A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC"
+        ],
+        "position_classes": [
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          2
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "C"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 1,
+        "lexical_key": "5|2|complement|C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CC"
+        ],
+        "position_classes": [
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          2
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 1,
+        "lexical_key": "5|2|complement|T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT"
+        ],
+        "position_classes": [
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          2
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 0,
+        "lexical_key": "5|2|payload|A",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 2,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AG"
+        ],
+        "position_classes": [
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          2
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "G"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 0,
+        "lexical_key": "5|2|payload|G",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 2,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GG"
+        ],
+        "position_classes": [
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          2
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 0,
+        "lexical_key": "5|2|payload|T",
+        "worst_mismatch_class_tier": 0,
+        "total_mismatch_class_tier": 0,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT"
+        ],
+        "position_classes": [
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          3
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 1,
+        "lexical_key": "5|3|complement|A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          3
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "C"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 1,
+        "lexical_key": "5|3|complement|C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CC"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          3
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 1,
+        "lexical_key": "5|3|complement|T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          3
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 0,
+        "lexical_key": "5|3|payload|A",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 2,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AG"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          3
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "G"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 0,
+        "lexical_key": "5|3|payload|G",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 2,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GG"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 5,
+        "mismatch_positions": [
+          3
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 7,
+        "default_strand_preference_count": 0,
+        "lexical_key": "5|3|payload|T",
+        "worst_mismatch_class_tier": 0,
+        "total_mismatch_class_tier": 0,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 6,
+        "mismatch_positions": [
+          0
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 5,
+        "default_strand_preference_count": 1,
+        "lexical_key": "6|0|complement|A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 6,
+        "mismatch_positions": [
+          0
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "C"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 5,
+        "default_strand_preference_count": 1,
+        "lexical_key": "6|0|complement|C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CC"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 6,
+        "mismatch_positions": [
+          0
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 5,
+        "default_strand_preference_count": 1,
+        "lexical_key": "6|0|complement|T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 6,
+        "mismatch_positions": [
+          0
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 5,
+        "default_strand_preference_count": 0,
+        "lexical_key": "6|0|payload|A",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 2,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AG"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 6,
+        "mismatch_positions": [
+          0
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "G"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 5,
+        "default_strand_preference_count": 0,
+        "lexical_key": "6|0|payload|G",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 2,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GG"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 6,
+        "mismatch_positions": [
+          0
+        ],
+        "mutated_strands": [
+          "payload"
+        ],
+        "mutated_bases": [
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 5,
+        "default_strand_preference_count": 0,
+        "lexical_key": "6|0|payload|T",
+        "worst_mismatch_class_tier": 0,
+        "total_mismatch_class_tier": 0,
+        "middle_mismatch_count": 0,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT"
+        ],
+        "position_classes": [
+          "edge"
+        ]
+      },
+      {
+        "junction_start": 6,
+        "mismatch_positions": [
+          1
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 5,
+        "default_strand_preference_count": 1,
+        "lexical_key": "6|1|complement|A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC"
+        ],
+        "position_classes": [
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 6,
+        "mismatch_positions": [
+          1
+        ],
+        "mutated_strands": [
+          "complement"
+        ],
+        "mutated_bases": [
+          "C"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 5,
+        "default_strand_preference_count": 1,
+        "lexical_key": "6|1|complement|C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CC"
+        ],
+        "position_classes": [
+          "middle"
+        ]
+      }
+    ]
+  }
+}

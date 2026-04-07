@@ -1,0 +1,1452 @@
+{
+  "contract": "yiu_normalized_payload_v5",
+  "schema_version": 1,
+  "name": "baer_monotypic_hit",
+  "input_kind": "sample_hit",
+  "payload_label": "baer_payload",
+  "site_label": "baer_site",
+  "reference_payload_sequence": "TTTTTCCCCCAAAA",
+  "reference_complement_sequence": "AAAAAGGGGGTTTT",
+  "selected_payload_sequence": "TTTTTCCCCCAAAA",
+  "selected_complement_sequence": "AGAAGGGGGGTTTT",
+  "source_provenance": {
+    "spec_name": "baer_monotypic_hit",
+    "sample_name": "demo_monotypic_baer",
+    "hit_id": "demo_monotypic_baer_elite_bedae1e5b7bc",
+    "source_artifact_path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_monotypic_baer/outputs/optimize/tables/elites.parquet",
+    "source_workspace": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_monotypic_baer",
+    "metadata": {
+      "site_label": "baer_site",
+      "payload_label": "baer_payload"
+    }
+  },
+  "ligation_profile": "t4",
+  "ligation_awareness_mode": "secondary",
+  "bad_pattern_heuristics": false,
+  "chosen_ligation_key": {
+    "worst_mismatch_class_tier": 0,
+    "total_mismatch_class_tier": 0,
+    "middle_mismatch_count": 0,
+    "double_middle_flag": false,
+    "bad_pattern_penalty": 0
+  },
+  "ligation_rationale": [
+    {
+      "payload_index": 1,
+      "junction_offset": 0,
+      "position_class": "edge",
+      "mutated_strand": "complement",
+      "native_base": "A",
+      "partner_base": "T",
+      "canonical_mismatch_class": "GT",
+      "class_tier": 0
+    },
+    {
+      "payload_index": 4,
+      "junction_offset": 3,
+      "position_class": "edge",
+      "mutated_strand": "complement",
+      "native_base": "A",
+      "partner_base": "T",
+      "canonical_mismatch_class": "GT",
+      "class_tier": 0
+    }
+  ],
+  "junction": {
+    "start": 1,
+    "end": 5,
+    "offsets": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "mode": "optimize",
+    "left_body_length": 1,
+    "right_body_length": 9
+  },
+  "mismatches": [
+    {
+      "payload_index": 1,
+      "junction_offset": 0,
+      "mutated_strand": "complement",
+      "native_base": "A",
+      "mutated_base": "G",
+      "opposing_base": "T"
+    },
+    {
+      "payload_index": 4,
+      "junction_offset": 3,
+      "mutated_strand": "complement",
+      "native_base": "A",
+      "mutated_base": "G",
+      "opposing_base": "T"
+    }
+  ],
+  "motif_context": {
+    "requested_mode": "require",
+    "effective": true,
+    "source_kind": "sample_context",
+    "fallback_reason": null,
+    "motifs": [
+      {
+        "motif_instance_id": "baeR:0:11:+:1",
+        "tf_name": "baeR",
+        "motif_name": "baeR",
+        "reference_strand": "+",
+        "start": 0,
+        "end": 11,
+        "probabilities": {
+          "alphabet": [
+            "A",
+            "C",
+            "G",
+            "T"
+          ],
+          "rows": [
+            [
+              0.2,
+              0.04,
+              0.16,
+              0.6
+            ],
+            [
+              0.04,
+              0.28,
+              0.04,
+              0.64
+            ],
+            [
+              0.04,
+              0.2,
+              0.0,
+              0.76
+            ],
+            [
+              0.08,
+              0.64,
+              0.0,
+              0.28
+            ],
+            [
+              0.2,
+              0.12,
+              0.08,
+              0.6
+            ],
+            [
+              0.0,
+              0.36,
+              0.48,
+              0.16
+            ],
+            [
+              0.0,
+              0.76,
+              0.12,
+              0.12
+            ],
+            [
+              0.44,
+              0.24,
+              0.24,
+              0.08
+            ],
+            [
+              0.4,
+              0.28,
+              0.08,
+              0.24
+            ],
+            [
+              0.28,
+              0.28,
+              0.24,
+              0.2
+            ],
+            [
+              0.88,
+              0.0,
+              0.12,
+              0.0
+            ]
+          ]
+        },
+        "provenance": {
+          "source_kind": "sample_context",
+          "source_ref": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_monotypic_baer/outputs/optimize/tables/elites_occurrences.parquet"
+        }
+      },
+      {
+        "motif_instance_id": "baeR:2:13:+:2",
+        "tf_name": "baeR",
+        "motif_name": "baeR",
+        "reference_strand": "+",
+        "start": 2,
+        "end": 13,
+        "probabilities": {
+          "alphabet": [
+            "A",
+            "C",
+            "G",
+            "T"
+          ],
+          "rows": [
+            [
+              0.2,
+              0.04,
+              0.16,
+              0.6
+            ],
+            [
+              0.04,
+              0.28,
+              0.04,
+              0.64
+            ],
+            [
+              0.04,
+              0.2,
+              0.0,
+              0.76
+            ],
+            [
+              0.08,
+              0.64,
+              0.0,
+              0.28
+            ],
+            [
+              0.2,
+              0.12,
+              0.08,
+              0.6
+            ],
+            [
+              0.0,
+              0.36,
+              0.48,
+              0.16
+            ],
+            [
+              0.0,
+              0.76,
+              0.12,
+              0.12
+            ],
+            [
+              0.44,
+              0.24,
+              0.24,
+              0.08
+            ],
+            [
+              0.4,
+              0.28,
+              0.08,
+              0.24
+            ],
+            [
+              0.28,
+              0.28,
+              0.24,
+              0.2
+            ],
+            [
+              0.88,
+              0.0,
+              0.12,
+              0.0
+            ]
+          ]
+        },
+        "provenance": {
+          "source_kind": "sample_context",
+          "source_ref": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_monotypic_baer/outputs/optimize/tables/elites_occurrences.parquet"
+        }
+      },
+      {
+        "motif_instance_id": "baeR:3:14:+:3",
+        "tf_name": "baeR",
+        "motif_name": "baeR",
+        "reference_strand": "+",
+        "start": 3,
+        "end": 14,
+        "probabilities": {
+          "alphabet": [
+            "A",
+            "C",
+            "G",
+            "T"
+          ],
+          "rows": [
+            [
+              0.2,
+              0.04,
+              0.16,
+              0.6
+            ],
+            [
+              0.04,
+              0.28,
+              0.04,
+              0.64
+            ],
+            [
+              0.04,
+              0.2,
+              0.0,
+              0.76
+            ],
+            [
+              0.08,
+              0.64,
+              0.0,
+              0.28
+            ],
+            [
+              0.2,
+              0.12,
+              0.08,
+              0.6
+            ],
+            [
+              0.0,
+              0.36,
+              0.48,
+              0.16
+            ],
+            [
+              0.0,
+              0.76,
+              0.12,
+              0.12
+            ],
+            [
+              0.44,
+              0.24,
+              0.24,
+              0.08
+            ],
+            [
+              0.4,
+              0.28,
+              0.08,
+              0.24
+            ],
+            [
+              0.28,
+              0.28,
+              0.24,
+              0.2
+            ],
+            [
+              0.88,
+              0.0,
+              0.12,
+              0.0
+            ]
+          ]
+        },
+        "provenance": {
+          "source_kind": "sample_context",
+          "source_ref": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_monotypic_baer/outputs/optimize/tables/elites_occurrences.parquet"
+        }
+      }
+    ]
+  },
+  "optimization_decision": {
+    "candidate_count": 1944,
+    "objective": {
+      "primary": "maximin",
+      "secondary": [
+        "total_loss",
+        "ligation_awareness",
+        "midpoint_proximity",
+        "default_strand_preference",
+        "lexical_stability"
+      ]
+    },
+    "winner": {
+      "junction_start": 1,
+      "junction_end": 5,
+      "selected_positions": [
+        0,
+        3
+      ],
+      "mutated_strands": [
+        "complement",
+        "complement"
+      ],
+      "mutated_bases": [
+        "G",
+        "G"
+      ],
+      "worst_loss": 0.0,
+      "total_loss": 0.0,
+      "midpoint_distance": 8,
+      "middle_mismatch_count": 0,
+      "double_middle_flag": false,
+      "default_strand_preference_count": 2,
+      "lexical_key": "1|0,3|complement,complement|G,G"
+    },
+    "trace": [
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "C",
+          "C"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|C,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT",
+          "CT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "C",
+          "G"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|C,G",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT",
+          "GT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "C",
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|C,T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT",
+          "TT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "G",
+          "C"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|G,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT",
+          "CT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "G",
+          "G"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|G,G",
+        "worst_mismatch_class_tier": 0,
+        "total_mismatch_class_tier": 0,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT",
+          "GT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "G",
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|G,T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT",
+          "TT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "T",
+          "C"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|T,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "TT",
+          "CT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "T",
+          "G"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|T,G",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "TT",
+          "GT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "T",
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|T,T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "TT",
+          "TT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "C",
+          "A"
+        ],
+        "worst_loss": 2.944438979166442,
+        "total_loss": 4.043051267834551,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|C,A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT",
+          "AA"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "C",
+          "C"
+        ],
+        "worst_loss": 2.7080502011022087,
+        "total_loss": 4.043051267834549,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|C,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT",
+          "AC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "C",
+          "G"
+        ],
+        "worst_loss": 20.44882899124465,
+        "total_loss": 21.77058483122697,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|C,G",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT",
+          "AG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "G",
+          "A"
+        ],
+        "worst_loss": 2.944438979166442,
+        "total_loss": 4.043051267834551,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|G,A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT",
+          "AA"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "G",
+          "C"
+        ],
+        "worst_loss": 2.7080502011022087,
+        "total_loss": 4.043051267834549,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|G,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT",
+          "AC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "G",
+          "G"
+        ],
+        "worst_loss": 20.44882899124465,
+        "total_loss": 21.77058483122697,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|G,G",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 2,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT",
+          "AG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "T",
+          "A"
+        ],
+        "worst_loss": 2.944438979166442,
+        "total_loss": 4.043051267834551,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|T,A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "TT",
+          "AA"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "T",
+          "C"
+        ],
+        "worst_loss": 2.7080502011022087,
+        "total_loss": 4.043051267834549,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|T,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "TT",
+          "AC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "T",
+          "G"
+        ],
+        "worst_loss": 20.44882899124465,
+        "total_loss": 21.77058483122697,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|T,G",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "TT",
+          "AG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "A",
+          "C"
+        ],
+        "worst_loss": 2.7725887222397834,
+        "total_loss": 2.7725887222397834,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|A,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AA",
+          "CT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "A",
+          "G"
+        ],
+        "worst_loss": 2.7725887222397834,
+        "total_loss": 2.7725887222397834,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|A,G",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AA",
+          "GT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "A",
+          "T"
+        ],
+        "worst_loss": 2.7725887222397834,
+        "total_loss": 2.7725887222397834,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|A,T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AA",
+          "TT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "C",
+          "C"
+        ],
+        "worst_loss": 0.8266785731844681,
+        "total_loss": 0.8266785731844681,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|C,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC",
+          "CT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "C",
+          "G"
+        ],
+        "worst_loss": 0.8266785731844681,
+        "total_loss": 0.8266785731844681,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|C,G",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC",
+          "GT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "C",
+          "T"
+        ],
+        "worst_loss": 0.8266785731844681,
+        "total_loss": 0.8266785731844681,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|C,T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC",
+          "TT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "G",
+          "C"
+        ],
+        "worst_loss": 2.7725887222397834,
+        "total_loss": 2.7725887222397834,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|G,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AG",
+          "CT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "G",
+          "G"
+        ],
+        "worst_loss": 2.7725887222397834,
+        "total_loss": 2.7725887222397834,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|G,G",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 2,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AG",
+          "GT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "G",
+          "T"
+        ],
+        "worst_loss": 2.7725887222397834,
+        "total_loss": 2.7725887222397834,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|G,T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AG",
+          "TT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "payload"
+        ],
+        "mutated_bases": [
+          "A",
+          "A"
+        ],
+        "worst_loss": 5.717027701406224,
+        "total_loss": 6.815639990074333,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 0,
+        "lexical_key": "1|0,1|payload,payload|A,A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AA",
+          "AA"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "payload"
+        ],
+        "mutated_bases": [
+          "A",
+          "C"
+        ],
+        "worst_loss": 4.107589788972124,
+        "total_loss": 6.815639990074333,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 0,
+        "lexical_key": "1|0,1|payload,payload|A,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AA",
+          "AC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "payload"
+        ],
+        "mutated_bases": [
+          "A",
+          "G"
+        ],
+        "worst_loss": 23.22141771348443,
+        "total_loss": 24.54317355346675,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 0,
+        "lexical_key": "1|0,1|payload,payload|A,G",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AA",
+          "AG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "payload"
+        ],
+        "mutated_bases": [
+          "C",
+          "A"
+        ],
+        "worst_loss": 3.77111755235091,
+        "total_loss": 4.869729841019019,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 0,
+        "lexical_key": "1|0,1|payload,payload|C,A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC",
+          "AA"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "payload"
+        ],
+        "mutated_bases": [
+          "C",
+          "C"
+        ],
+        "worst_loss": 2.7080502011022087,
+        "total_loss": 4.8697298410190175,
+        "midpoint_distance": 8,
+        "default_strand_preference_count": 0,
+        "lexical_key": "1|0,1|payload,payload|C,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC",
+          "AC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      }
+    ]
+  }
+}

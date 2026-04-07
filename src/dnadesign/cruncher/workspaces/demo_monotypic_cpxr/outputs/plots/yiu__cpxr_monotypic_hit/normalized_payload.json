@@ -1,0 +1,1452 @@
+{
+  "contract": "yiu_normalized_payload_v5",
+  "schema_version": 1,
+  "name": "cpxr_monotypic_hit",
+  "input_kind": "sample_hit",
+  "payload_label": "cpxr_payload",
+  "site_label": "cpxr_site",
+  "reference_payload_sequence": "CAGATCGTAACGTTACG",
+  "reference_complement_sequence": "GTCTAGCATTGCAATGC",
+  "selected_payload_sequence": "CAGATCGTAACGTTACG",
+  "selected_complement_sequence": "GTTTGGCATTGCAATGC",
+  "source_provenance": {
+    "spec_name": "cpxr_monotypic_hit",
+    "sample_name": "demo_monotypic_cpxr",
+    "hit_id": "demo_monotypic_cpxr_elite_2656f6680d87",
+    "source_artifact_path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_monotypic_cpxr/outputs/optimize/tables/elites.parquet",
+    "source_workspace": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_monotypic_cpxr",
+    "metadata": {
+      "site_label": "cpxr_site",
+      "payload_label": "cpxr_payload"
+    }
+  },
+  "ligation_profile": "t4",
+  "ligation_awareness_mode": "secondary",
+  "bad_pattern_heuristics": false,
+  "chosen_ligation_key": {
+    "worst_mismatch_class_tier": 0,
+    "total_mismatch_class_tier": 0,
+    "middle_mismatch_count": 1,
+    "double_middle_flag": false,
+    "bad_pattern_penalty": 0
+  },
+  "ligation_rationale": [
+    {
+      "payload_index": 2,
+      "junction_offset": 0,
+      "position_class": "edge",
+      "mutated_strand": "complement",
+      "native_base": "C",
+      "partner_base": "G",
+      "canonical_mismatch_class": "GT",
+      "class_tier": 0
+    },
+    {
+      "payload_index": 4,
+      "junction_offset": 2,
+      "position_class": "middle",
+      "mutated_strand": "complement",
+      "native_base": "A",
+      "partner_base": "T",
+      "canonical_mismatch_class": "GT",
+      "class_tier": 0
+    }
+  ],
+  "junction": {
+    "start": 2,
+    "end": 6,
+    "offsets": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "mode": "optimize",
+    "left_body_length": 2,
+    "right_body_length": 11
+  },
+  "mismatches": [
+    {
+      "payload_index": 2,
+      "junction_offset": 0,
+      "mutated_strand": "complement",
+      "native_base": "C",
+      "mutated_base": "T",
+      "opposing_base": "G"
+    },
+    {
+      "payload_index": 4,
+      "junction_offset": 2,
+      "mutated_strand": "complement",
+      "native_base": "A",
+      "mutated_base": "G",
+      "opposing_base": "T"
+    }
+  ],
+  "motif_context": {
+    "requested_mode": "require",
+    "effective": true,
+    "source_kind": "sample_context",
+    "fallback_reason": null,
+    "motifs": [
+      {
+        "motif_instance_id": "cpxR:0:11:+:1",
+        "tf_name": "cpxR",
+        "motif_name": "cpxR",
+        "reference_strand": "+",
+        "start": 0,
+        "end": 11,
+        "probabilities": {
+          "alphabet": [
+            "A",
+            "C",
+            "G",
+            "T"
+          ],
+          "rows": [
+            [
+              0.313725,
+              0.514706,
+              0.04902,
+              0.122549
+            ],
+            [
+              0.588235,
+              0.107843,
+              0.142157,
+              0.161765
+            ],
+            [
+              0.2352942352942353,
+              0.1960781960781961,
+              0.20098020098020097,
+              0.36764736764736766
+            ],
+            [
+              0.44607844607844604,
+              0.10294110294110295,
+              0.09803909803909805,
+              0.352941352941353
+            ],
+            [
+              0.269608,
+              0.093137,
+              0.156863,
+              0.480392
+            ],
+            [
+              0.367647,
+              0.29902,
+              0.127451,
+              0.205882
+            ],
+            [
+              0.07843100000000001,
+              0.08333300000000002,
+              0.27451000000000003,
+              0.5637260000000001
+            ],
+            [
+              0.078431,
+              0.034314,
+              0.176471,
+              0.710784
+            ],
+            [
+              0.176471,
+              0.009804,
+              0.093137,
+              0.720588
+            ],
+            [
+              0.82353,
+              0.063725,
+              0.068627,
+              0.044118
+            ],
+            [
+              0.377451,
+              0.607843,
+              0.0,
+              0.014706
+            ]
+          ]
+        },
+        "provenance": {
+          "source_kind": "sample_context",
+          "source_ref": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_monotypic_cpxr/outputs/optimize/tables/elites_occurrences.parquet"
+        }
+      },
+      {
+        "motif_instance_id": "cpxR:5:16:+:2",
+        "tf_name": "cpxR",
+        "motif_name": "cpxR",
+        "reference_strand": "+",
+        "start": 5,
+        "end": 16,
+        "probabilities": {
+          "alphabet": [
+            "A",
+            "C",
+            "G",
+            "T"
+          ],
+          "rows": [
+            [
+              0.313725,
+              0.514706,
+              0.04902,
+              0.122549
+            ],
+            [
+              0.588235,
+              0.107843,
+              0.142157,
+              0.161765
+            ],
+            [
+              0.2352942352942353,
+              0.1960781960781961,
+              0.20098020098020097,
+              0.36764736764736766
+            ],
+            [
+              0.44607844607844604,
+              0.10294110294110295,
+              0.09803909803909805,
+              0.352941352941353
+            ],
+            [
+              0.269608,
+              0.093137,
+              0.156863,
+              0.480392
+            ],
+            [
+              0.367647,
+              0.29902,
+              0.127451,
+              0.205882
+            ],
+            [
+              0.07843100000000001,
+              0.08333300000000002,
+              0.27451000000000003,
+              0.5637260000000001
+            ],
+            [
+              0.078431,
+              0.034314,
+              0.176471,
+              0.710784
+            ],
+            [
+              0.176471,
+              0.009804,
+              0.093137,
+              0.720588
+            ],
+            [
+              0.82353,
+              0.063725,
+              0.068627,
+              0.044118
+            ],
+            [
+              0.377451,
+              0.607843,
+              0.0,
+              0.014706
+            ]
+          ]
+        },
+        "provenance": {
+          "source_kind": "sample_context",
+          "source_ref": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_monotypic_cpxr/outputs/optimize/tables/elites_occurrences.parquet"
+        }
+      },
+      {
+        "motif_instance_id": "cpxR:6:17:-:3",
+        "tf_name": "cpxR",
+        "motif_name": "cpxR",
+        "reference_strand": "-",
+        "start": 6,
+        "end": 17,
+        "probabilities": {
+          "alphabet": [
+            "A",
+            "C",
+            "G",
+            "T"
+          ],
+          "rows": [
+            [
+              0.313725,
+              0.514706,
+              0.04902,
+              0.122549
+            ],
+            [
+              0.588235,
+              0.107843,
+              0.142157,
+              0.161765
+            ],
+            [
+              0.2352942352942353,
+              0.1960781960781961,
+              0.20098020098020097,
+              0.36764736764736766
+            ],
+            [
+              0.44607844607844604,
+              0.10294110294110295,
+              0.09803909803909805,
+              0.352941352941353
+            ],
+            [
+              0.269608,
+              0.093137,
+              0.156863,
+              0.480392
+            ],
+            [
+              0.367647,
+              0.29902,
+              0.127451,
+              0.205882
+            ],
+            [
+              0.07843100000000001,
+              0.08333300000000002,
+              0.27451000000000003,
+              0.5637260000000001
+            ],
+            [
+              0.078431,
+              0.034314,
+              0.176471,
+              0.710784
+            ],
+            [
+              0.176471,
+              0.009804,
+              0.093137,
+              0.720588
+            ],
+            [
+              0.82353,
+              0.063725,
+              0.068627,
+              0.044118
+            ],
+            [
+              0.377451,
+              0.607843,
+              0.0,
+              0.014706
+            ]
+          ]
+        },
+        "provenance": {
+          "source_kind": "sample_context",
+          "source_ref": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_monotypic_cpxr/outputs/optimize/tables/elites_occurrences.parquet"
+        }
+      }
+    ]
+  },
+  "optimization_decision": {
+    "candidate_count": 2592,
+    "objective": {
+      "primary": "maximin",
+      "secondary": [
+        "total_loss",
+        "ligation_awareness",
+        "midpoint_proximity",
+        "default_strand_preference",
+        "lexical_stability"
+      ]
+    },
+    "winner": {
+      "junction_start": 2,
+      "junction_end": 6,
+      "selected_positions": [
+        0,
+        2
+      ],
+      "mutated_strands": [
+        "complement",
+        "complement"
+      ],
+      "mutated_bases": [
+        "T",
+        "G"
+      ],
+      "worst_loss": 0.0,
+      "total_loss": 0.0,
+      "midpoint_distance": 9,
+      "middle_mismatch_count": 1,
+      "double_middle_flag": false,
+      "default_strand_preference_count": 2,
+      "lexical_key": "2|0,2|complement,complement|T,G"
+    },
+    "trace": [
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "A",
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|A,A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AA",
+          "AG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "A",
+          "G"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|A,G",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AA",
+          "GG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "A",
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|A,T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AA",
+          "GT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "C",
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|C,A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC",
+          "AG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "C",
+          "G"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|C,G",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC",
+          "GG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "C",
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|C,T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC",
+          "GT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "G",
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|G,A",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 4,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AG",
+          "AG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "G",
+          "G"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|G,G",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 4,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AG",
+          "GG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "complement"
+        ],
+        "mutated_bases": [
+          "G",
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 2,
+        "lexical_key": "1|0,1|complement,complement|G,T",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 2,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AG",
+          "GT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "A",
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|A,A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AA",
+          "AC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "A",
+          "C"
+        ],
+        "worst_loss": 0.02469286137137594,
+        "total_loss": 0.02469286137137594,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|A,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AA",
+          "CC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "A",
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|A,T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AA",
+          "CT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "C",
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|C,A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC",
+          "AC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "C",
+          "C"
+        ],
+        "worst_loss": 0.02469286137137594,
+        "total_loss": 0.02469286137137594,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|C,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC",
+          "CC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "C",
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|C,T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AC",
+          "CT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "G",
+          "A"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|G,A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AG",
+          "AC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "G",
+          "C"
+        ],
+        "worst_loss": 0.02469286137137594,
+        "total_loss": 0.02469286137137594,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|G,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AG",
+          "CC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "complement",
+          "payload"
+        ],
+        "mutated_bases": [
+          "G",
+          "T"
+        ],
+        "worst_loss": 0.0,
+        "total_loss": 0.0,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|complement,payload|G,T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "AG",
+          "CT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "C",
+          "A"
+        ],
+        "worst_loss": 1.6964500621516887,
+        "total_loss": 1.6964500621516887,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|C,A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT",
+          "AG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "C",
+          "G"
+        ],
+        "worst_loss": 1.6964500621516887,
+        "total_loss": 1.6964500621516887,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|C,G",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT",
+          "GG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "C",
+          "T"
+        ],
+        "worst_loss": 1.6964500621516887,
+        "total_loss": 1.6964500621516887,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|C,T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT",
+          "GT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "G",
+          "A"
+        ],
+        "worst_loss": 1.4201944472786714,
+        "total_loss": 1.4201944472786714,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|G,A",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 2,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT",
+          "AG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "G",
+          "G"
+        ],
+        "worst_loss": 1.4201944472786714,
+        "total_loss": 1.4201944472786714,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|G,G",
+        "worst_mismatch_class_tier": 2,
+        "total_mismatch_class_tier": 2,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT",
+          "GG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "G",
+          "T"
+        ],
+        "worst_loss": 1.4201944472786714,
+        "total_loss": 1.4201944472786714,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|G,T",
+        "worst_mismatch_class_tier": 0,
+        "total_mismatch_class_tier": 0,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT",
+          "GT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "T",
+          "A"
+        ],
+        "worst_loss": 1.2909818631352756,
+        "total_loss": 1.2909818631352756,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|T,A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "TT",
+          "AG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "T",
+          "G"
+        ],
+        "worst_loss": 1.2909818631352756,
+        "total_loss": 1.2909818631352756,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|T,G",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 5,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "TT",
+          "GG"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "complement"
+        ],
+        "mutated_bases": [
+          "T",
+          "T"
+        ],
+        "worst_loss": 1.2909818631352756,
+        "total_loss": 1.2909818631352756,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 1,
+        "lexical_key": "1|0,1|payload,complement|T,T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "TT",
+          "GT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "payload"
+        ],
+        "mutated_bases": [
+          "C",
+          "A"
+        ],
+        "worst_loss": 1.5388196667268144,
+        "total_loss": 1.5388196667268144,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 0,
+        "lexical_key": "1|0,1|payload,payload|C,A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT",
+          "AC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "payload"
+        ],
+        "mutated_bases": [
+          "C",
+          "C"
+        ],
+        "worst_loss": 1.7211429235230646,
+        "total_loss": 1.7211429235230646,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 0,
+        "lexical_key": "1|0,1|payload,payload|C,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT",
+          "CC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "payload"
+        ],
+        "mutated_bases": [
+          "C",
+          "T"
+        ],
+        "worst_loss": 1.0925322240982833,
+        "total_loss": 1.0925322240982833,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 0,
+        "lexical_key": "1|0,1|payload,payload|C,T",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 6,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "CT",
+          "CT"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "payload"
+        ],
+        "mutated_bases": [
+          "G",
+          "A"
+        ],
+        "worst_loss": 1.2625640518537988,
+        "total_loss": 1.2625640518537988,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 0,
+        "lexical_key": "1|0,1|payload,payload|G,A",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT",
+          "AC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      },
+      {
+        "junction_start": 1,
+        "mismatch_positions": [
+          0,
+          1
+        ],
+        "mutated_strands": [
+          "payload",
+          "payload"
+        ],
+        "mutated_bases": [
+          "G",
+          "C"
+        ],
+        "worst_loss": 1.4448873086500473,
+        "total_loss": 1.4448873086500473,
+        "midpoint_distance": 11,
+        "default_strand_preference_count": 0,
+        "lexical_key": "1|0,1|payload,payload|G,C",
+        "worst_mismatch_class_tier": 3,
+        "total_mismatch_class_tier": 3,
+        "middle_mismatch_count": 1,
+        "double_middle_flag": false,
+        "bad_pattern_penalty": 0,
+        "canonical_mismatch_classes": [
+          "GT",
+          "CC"
+        ],
+        "position_classes": [
+          "edge",
+          "middle"
+        ]
+      }
+    ]
+  }
+}
