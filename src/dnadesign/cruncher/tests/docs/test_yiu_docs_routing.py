@@ -87,3 +87,16 @@ def test_yiu_workflow_routes_to_contract_pages() -> None:
     assert "### Ligation-aware mismatch ranking" in guide
     assert "Bilotti et al." in guide
     assert "`ligation_profile=t4` is the recommended default for T4-like assembly workflows." in guide
+    assert "`ligation_selection_mode=hard_ligation_filter`" in guide
+    assert "fails fast and prints a short relaxation hint" in guide
+    assert "### How candidate counts work" in guide
+    assert "YIU runs in three stages: generate candidates, apply the ligation policy, then rank the survivors." in guide
+    assert "`before` is the full candidate pool" in guide
+    assert "In `hard_ligation_filter`, PWM does not change either count." in guide
+    assert "`count: 1` gives `4 positions × 2 strands × 3 bases = 24` candidates per window." in guide
+    assert "`count: 2` gives `C(4,2) × 2^2 × 3^2 = 6 × 4 × 9 = 216` candidates per window." in guide
+    assert '"feasible windows × per-window combinatorics"' in guide
+    assert "### What strict mode removes" in guide
+    assert "That leaves at most `5` survivors per window, or about `2.3%`" in guide
+    assert "### Why PWM still changes the winner" in guide
+    assert "PWM may prefer the `edge,middle` survivor" in guide

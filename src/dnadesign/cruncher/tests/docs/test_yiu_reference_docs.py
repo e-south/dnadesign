@@ -41,7 +41,20 @@ def test_yiu_spec_reference_stays_schema_scoped() -> None:
     assert "`yiu/pwm_context_sample_motifs.py`" in spec_ref
     assert "## Ligation-aware mismatch ranking" in spec_ref
     assert "`ligation_profile=none` preserves legacy behavior." in spec_ref
+    assert "`ligation_selection_mode=hard_ligation_filter`" in spec_ref
+    assert "`pwm_tolerance_then_ligation`" in spec_ref
+    assert "fails fast and nudges the user toward the shortest relevant relaxation list" in spec_ref
     assert "derives mismatch class from the final duplex base pair" in spec_ref
+    assert "When PWM is absent or ineffective, the ligation key becomes the leading comparator." in spec_ref
+    assert "### How to read candidate counts" in spec_ref
+    assert "`candidate_count_before_filter`" in spec_ref
+    assert "`candidate_count_after_filter`" in spec_ref
+    assert "`count: 1` gives `4 × 2 × 3 = 24` candidates per feasible junction window" in spec_ref
+    assert "`count: 2` gives `C(4,2) × 2^2 × 3^2 = 216` candidates per feasible junction window" in spec_ref
+    assert "Use [YIU Workflow](../guides/yiu_workflow.md) for the worked derivation and examples." in spec_ref
+    assert "### Why strict mode filters so aggressively" in spec_ref
+    assert "`hard_ligation_filter` often removes `97%` to `98%` of a two-mismatch pool." in spec_ref
+    assert "It does not inflate or shrink the `before` or `after` counts in `hard_ligation_filter`." in spec_ref
 
 
 def test_yiu_artifacts_reference_stays_bundle_scoped() -> None:

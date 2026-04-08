@@ -75,6 +75,7 @@ class YiuPwmSummary(StrictBaseModel):
 class YiuLigationSummary(StrictBaseModel):
     profile: Literal["none", "t4", "t7", "t3", "pbcv1", "hlig3"]
     awareness_mode: Literal["disabled", "secondary"]
+    selection_mode: Literal["secondary", "pwm_tolerance_then_ligation", "hard_ligation_filter"] = "secondary"
     applied: bool
     state: Literal["legacy", "inert", "edge_blind", "active"] | None = None
     state_note: str | None = None
@@ -91,6 +92,9 @@ class YiuLigationSummary(StrictBaseModel):
     middle_mismatch_count: int | None = Field(default=None, ge=0)
     double_middle_flag: bool | None = None
     bad_pattern_penalty: int | None = Field(default=None, ge=0)
+    candidate_count_before_filter: int | None = Field(default=None, ge=1)
+    candidate_count_after_filter: int | None = Field(default=None, ge=1)
+    filtered_candidate_count: int | None = Field(default=None, ge=0)
     decision_note: str
 
 
@@ -246,6 +250,7 @@ def build_bundle_summary(
     ligation_rationale: list[LigationMismatchRationale] = normalized.ligation_rationale
     ligation_applied = ligation_key is not None
     ligation_state, ligation_state_note, edge_comparison_available = resolve_ligation_surface_state(normalized)
+    ligation_policy = normalized.optimization_decision.ligation_policy
     trace_summary = _trace_summary(normalized)
     return YiuBundleSummary(
         spec_name=inventory.spec_name,
@@ -266,6 +271,7 @@ def build_bundle_summary(
         ligation=YiuLigationSummary(
             profile=normalized.ligation_profile,
             awareness_mode=normalized.ligation_awareness_mode,
+            selection_mode=normalized.ligation_selection_mode,
             applied=ligation_applied,
             state=ligation_state,
             state_note=ligation_state_note,
@@ -286,10 +292,19 @@ def build_bundle_summary(
             middle_mismatch_count=None if ligation_key is None else ligation_key.middle_mismatch_count,
             double_middle_flag=None if ligation_key is None else ligation_key.double_middle_flag,
             bad_pattern_penalty=None if ligation_key is None else ligation_key.bad_pattern_penalty,
+            candidate_count_before_filter=(
+                None if ligation_policy is None else ligation_policy.candidate_count_before_filter
+            ),
+            candidate_count_after_filter=(
+                None if ligation_policy is None else ligation_policy.candidate_count_after_filter
+            ),
+            filtered_candidate_count=None if ligation_policy is None else ligation_policy.filtered_candidate_count,
             decision_note=resolve_ligation_decision_note(
                 state=ligation_state,
+                selection_mode=normalized.ligation_selection_mode,
                 ligation_applied=ligation_applied,
                 pwm_effective=normalized.motif_context.effective,
+                filtered_candidate_count=0 if ligation_policy is None else ligation_policy.filtered_candidate_count,
             ),
         ),
         trace=trace_summary,

@@ -1,8 +1,8 @@
 ## YIU Workflow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-07
-**Last updated by:** cruncher-maintainers on 2026-04-07
+**Last verified:** 2026-04-08
+**Last updated by:** cruncher-maintainers on 2026-04-08
 
 YIU turns one payload sequence into a checked junction-mismatch bundle. It accepts either an exact `user_sequence` or a `sample_hit` resolved from public Cruncher Sample outputs, searches valid 4 nt internal junction plans plus one or two mismatches, optionally scores those candidates against PWM context, and publishes three BaseRender-ready views.
 
@@ -55,7 +55,7 @@ YIU is mismatch-centric. The junction is always a 4 nt internal window. Legacy b
 1. Resolve one exact payload from either `user_sequence` or `sample_hit`. Ambiguous or missing sources fail fast.
 2. Build the valid internal 4 nt junction windows allowed by the junction mode and payload-body bounds.
 3. Enumerate mismatch plans exhaustively across the allowed junction offsets, mismatch count, strand assignments, and non-native substitutions. If you omit `optimization.mismatches.candidate_positions`, YIU uses `[0, 1, 2, 3]`.
-4. Rank the candidates. PWM or log-likelihood retention stays primary when effective. Ligation rules can refine the decision after PWM. Midpoint proximity and the remaining deterministic tie-breakers only act after those higher-order rules.
+4. Rank the candidates. PWM or log-likelihood retention stays primary when effective unless `ligation_selection_mode` says otherwise. `secondary` keeps ligation advisory, `pwm_tolerance_then_ligation` gates a PWM-near set before ligation ranking, and `hard_ligation_filter` removes inadmissible ligation plans before PWM and geometry ranking act on survivors.
 5. Publish one deterministic bundle with `payload`, `split_payload`, and `assembled_payload` views.
 
 Middle-only pools such as `[1, 2]` are still allowed, but the resulting bundle will say edge-vs-middle comparison is unavailable for the winning plan.
@@ -111,6 +111,7 @@ optimization:
     candidate_positions: [0, 1, 2, 3]
     ligation_profile: t4
     ligation_awareness_mode: secondary
+    ligation_selection_mode: secondary
     bad_pattern_heuristics: false
   pwm:
     mode: none
@@ -128,15 +129,87 @@ The main junction policies are:
 
 - `center_locked`: choose the valid internal 4 nt window nearest the payload midpoint and keep the junction fixed there.
 - `explicit_window`: use one explicit internal 4 nt window.
-- `optimize`: search valid internal windows around the midpoint and rank candidates by PWM/log-likelihood retention first, ligation awareness second when enabled, then midpoint proximity and the remaining deterministic tie-break ladder.
+- `optimize`: search valid internal windows around the midpoint and rank candidates by the active ligation policy plus PWM/log-likelihood retention, then midpoint proximity and the remaining deterministic tie-break ladder.
 
 ### Ligation posture
 
 - `ligation_profile=none` is legacy ranking, not a quietly disabled secondary mode.
 - `ligation_awareness_mode=disabled` makes ligation-aware scoring inert even if a profile is configured.
+- `ligation_selection_mode=secondary` preserves the existing PWM-first contract when ligation is active.
+- `ligation_selection_mode=pwm_tolerance_then_ligation` keeps candidates within the declared PWM loss budget, then lets ligation outrank small PWM differences inside that admissible pool.
+- `ligation_selection_mode=hard_ligation_filter` hard-gates the pool using the ligation contract before ranking survivors.
 - candidate pools that exclude `0` and `3` are edge-blind by configuration, not by fallback
 - `bad_pattern_heuristics` is the TNNA-style penalty heuristic only.
-- The bundle summary and `show` output now name `legacy`, `inert`, `edge_blind`, and `active` ligation states explicitly.
+- The bundle summary and `show` output now name `legacy`, `inert`, `edge_blind`, and `active` ligation states explicitly, plus the selected ligation policy mode and before/after candidate counts when filtering happens.
+
+### How candidate counts work
+
+YIU runs in three stages: generate candidates, apply the ligation policy, then rank the survivors. The `before` and `after` counts are just the first two stages made visible.
+
+- `before` is the full candidate pool after YIU has enumerated every feasible junction window, mismatch-position set, strand assignment, and non-native base choice.
+- `after` is the subset that survives the active ligation policy.
+- In `hard_ligation_filter`, PWM does not change either count. PWM only ranks the survivors once the strict ligation gate has finished.
+
+For the common full-pool case:
+
+- `candidate_positions: [0, 1, 2, 3]`
+- `allowed_strands: [complement, payload]`
+- `junction.mode: optimize`
+- `count: 1` or `count: 2`
+
+For each feasible internal 4 nt window, YIU builds candidates in four steps:
+
+1. Choose a feasible internal 4 nt junction window.
+2. Choose which offsets inside that 4 nt window will carry mismatches.
+3. Choose which strand is mutated at each selected offset.
+4. Choose the non-native base at each selected site.
+
+Each chosen site has `3` base choices, not `4`, because YIU never keeps the native base when it is enumerating a mutation.
+
+That gives clean per-window counts:
+
+- `count: 1` gives `4 positions × 2 strands × 3 bases = 24` candidates per window.
+- `count: 2` gives `C(4,2) × 2^2 × 3^2 = 6 × 4 × 9 = 216` candidates per window.
+
+That is why workspace totals often factor into "feasible windows × per-window combinatorics". For example, `192` means `8` feasible windows with `24` single-mismatch candidates each, while `2376` means `11` feasible windows with `216` two-mismatch candidates each.
+
+### What strict mode removes
+
+Strict mode is the `hard_ligation_filter` policy with these defaults:
+
+- `max_worst_mismatch_class_tier: 0`
+- `max_middle_mismatch_count: 1`
+- `allow_double_middle: false`
+- `allow_tnna_like_overhangs: false`
+
+In practice, that means:
+
+- every mismatch must score as canonical `GT`
+- a two-mismatch plan may use at most one middle offset
+- the `(1,2)` double-middle geometry is rejected
+- a final overhang shaped like `T N N A` is rejected
+
+The GT rule does most of the work. At one chosen site there are `6` local mutation choices: `2` strand choices times `3` non-native bases. In the standard Watson-Crick background YIU operates on, only one of those six local choices produces canonical `GT`. Most of the raw pool disappears right there, before middle-position and TNNA checks have a chance to act.
+
+For the full two-mismatch pool, the best-case strict ceiling is still small:
+
+- start from `216` raw candidates per window
+- keep only the `GT`-compatible choices
+- then remove the `(1,2)` double-middle pair
+
+That leaves at most `5` survivors per window, or about `2.3%` of the raw two-mismatch pool. So filtering away `97%` to `98%` of candidates under strict mode is normal.
+
+### Why PWM still changes the winner
+
+Strict mode does not mean "pick the most edge-heavy survivor". It means "throw out the inadmissible plans first."
+
+After that:
+
+- the ligation filter decides which candidates are still legal
+- PWM decides which legal candidate wins when PWM context is effective
+- ligation and geometry break ties among those remaining legal candidates
+
+That is why a strict-mode winner can still be `GT,GT edge,middle` instead of `GT,GT edge,edge`. Both are admissible. PWM may prefer the `edge,middle` survivor, and only then do the later tie-breaks apply.
 
 ### What `validate` checks
 
@@ -205,6 +278,14 @@ YIU stores junction offsets in payload-forward coordinates `0..3` and scores on 
 `ligation_profile=none` preserves legacy behavior. `ligation_profile=t4` is the recommended default for T4-like assembly workflows.
 
 Candidate generation does not change when ligation awareness is enabled. YIU still enumerates all feasible windows, mismatch offsets, strand assignments, and non-native bases; the Bilotti-derived rules only change the deterministic ranking layer.
+
+Three ligation policy modes are public:
+
+- `secondary`: keep the current PWM-first ladder and use ligation as the secondary comparator.
+- `pwm_tolerance_then_ligation`: admit candidates within `pwm_worst_loss_tolerance` and `pwm_total_loss_tolerance`, then let ligation outrank small PWM differences inside that set.
+- `hard_ligation_filter`: reject candidates that exceed `max_worst_mismatch_class_tier`, `max_middle_mismatch_count`, `allow_double_middle`, or `allow_tnna_like_overhangs` before ranking survivors.
+
+The strict `hard_ligation_filter` defaults are intentionally conservative and never silently degrade. If they remove the entire pool, YIU fails fast and prints a short relaxation hint naming the smallest relevant config fields to change, based on the rejected candidate pool. The legacy alias `hard_filter` is accepted for compatibility, but YIU emits and reports the normalized name `hard_ligation_filter`.
 
 The paper does not isolate every exact two-mismatch geometry that YIU can generate. The strongest direct support is for G:T dominance, edge better than middle, T4/T7 versus T3/PBCV-1/hLig3 permissiveness differences, and TNNA inefficiency. Penalties such as `double_middle_flag` are engineering extrapolations grounded in the paper, not direct one-to-one measurements for every possible YIU candidate geometry.
 

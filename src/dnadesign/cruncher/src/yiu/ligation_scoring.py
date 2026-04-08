@@ -32,6 +32,12 @@ class CandidateLigationScore:
     key: tuple[int, int, int, bool, int]
 
 
+@dataclass(frozen=True)
+class CandidateLigationFilterResult:
+    admissible: bool
+    failure_fields: tuple[str, ...]
+
+
 def canonical_mismatch_class(base_a: str, base_b: str) -> str:
     return "".join(sorted((base_a, base_b)))
 
@@ -73,6 +79,7 @@ def build_candidate_ligation_score(
     candidate: CandidatePlan,
     ligation_profile: LigationProfile,
     bad_pattern_heuristics: bool,
+    force_bad_pattern_penalty: bool = False,
     reference_payload_sequence: str,
     reference_complement_sequence: str,
 ) -> CandidateLigationScore:
@@ -105,7 +112,7 @@ def build_candidate_ligation_score(
                 reference_payload_sequence=reference_payload_sequence,
                 reference_complement_sequence=reference_complement_sequence,
             )
-            if bad_pattern_heuristics
+            if bad_pattern_heuristics or force_bad_pattern_penalty
             else 0
         ),
     )
@@ -122,10 +129,35 @@ def build_candidate_ligation_score(
     )
 
 
+def evaluate_hard_ligation_filter(
+    *,
+    ligation_score: CandidateLigationScore,
+    max_worst_mismatch_class_tier: int,
+    max_middle_mismatch_count: int,
+    allow_double_middle: bool,
+    allow_tnna_like_overhangs: bool,
+) -> CandidateLigationFilterResult:
+    failure_fields: list[str] = []
+    if ligation_score.chosen_key.worst_mismatch_class_tier > max_worst_mismatch_class_tier:
+        failure_fields.append("max_worst_mismatch_class_tier")
+    if ligation_score.chosen_key.middle_mismatch_count > max_middle_mismatch_count:
+        failure_fields.append("max_middle_mismatch_count")
+    if not allow_double_middle and ligation_score.chosen_key.double_middle_flag:
+        failure_fields.append("allow_double_middle")
+    if not allow_tnna_like_overhangs and ligation_score.chosen_key.bad_pattern_penalty > 0:
+        failure_fields.append("allow_tnna_like_overhangs")
+    return CandidateLigationFilterResult(
+        admissible=not failure_fields,
+        failure_fields=tuple(failure_fields),
+    )
+
+
 __all__ = [
     "CandidateLigationScore",
+    "CandidateLigationFilterResult",
     "LigationProfile",
     "build_candidate_ligation_score",
+    "evaluate_hard_ligation_filter",
     "canonical_mismatch_class",
     "mismatch_class_tier",
     "position_class_for_offset",

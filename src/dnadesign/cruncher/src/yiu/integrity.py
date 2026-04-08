@@ -25,7 +25,7 @@ from dnadesign.cruncher.yiu.bundle_paths import (
     resolve_expected_render_artifact_paths,
     resolve_published_plot_path,
 )
-from dnadesign.cruncher.yiu.bundle_summary import build_bundle_summary
+from dnadesign.cruncher.yiu.bundle_summary import YiuBundleSummary, build_bundle_summary
 from dnadesign.cruncher.yiu.bundle_surface import YiuBundleIntegrityState
 from dnadesign.cruncher.yiu.domain_models import NormalizedPayload
 from dnadesign.cruncher.yiu.errors import YIU_BUNDLE_INVALID, raise_yiu_error
@@ -108,7 +108,9 @@ def validate_bundle_state(
     summary_path = bundle_dir / "bundle_summary.json"
     if not summary_path.exists():
         _fail_bundle(f"published bundle summary is missing: {summary_path}")
-    actual_summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    actual_summary = YiuBundleSummary.model_validate(json.loads(summary_path.read_text(encoding="utf-8"))).model_dump(
+        mode="json"
+    )
     expected_summary = build_bundle_summary(normalized=normalized, inventory=inventory).model_dump(mode="json")
     if actual_summary != expected_summary:
         _fail_bundle("bundle_summary.json disagrees with the selected downstream sequences and render summary")

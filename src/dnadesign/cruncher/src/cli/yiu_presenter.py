@@ -89,16 +89,33 @@ def print_ligation_summary(console: Console, *, ligation: object) -> None:
     state = _ligation_state(ligation)
     chosen_classes = ",".join(ligation.chosen_mismatch_classes) if ligation.chosen_mismatch_classes else "-"
     position_classes = ",".join(ligation.position_classes) if ligation.position_classes else "-"
+    selection_mode = getattr(ligation, "selection_mode", "secondary")
+    candidate_count_before_filter = getattr(ligation, "candidate_count_before_filter", None)
+    candidate_count_after_filter = getattr(ligation, "candidate_count_after_filter", None)
+    filtered_candidate_count = getattr(ligation, "filtered_candidate_count", None)
     console.print(
         "Ligation -> "
         f"profile={ligation.profile} "
         f"mode={ligation.awareness_mode} "
+        f"selection={selection_mode} "
         f"applied={ligation.applied} "
         f"pool={_candidate_position_pool(ligation)} "
         f"classes={chosen_classes} "
         f"positions={position_classes} "
         f"bad_patterns={_bad_pattern_scope(ligation)}"
     )
+    if (
+        candidate_count_before_filter is not None
+        and candidate_count_after_filter is not None
+        and filtered_candidate_count is not None
+        and filtered_candidate_count > 0
+    ):
+        console.print(
+            "Ligation filter -> "
+            f"before={candidate_count_before_filter} "
+            f"after={candidate_count_after_filter} "
+            f"filtered={filtered_candidate_count}"
+        )
     console.print(f"Ligation state -> state={state} edge_comparison_available={_edge_comparison_available(ligation)}")
     if getattr(ligation, "state_note", None):
         console.print(f"Ligation state note -> {ligation.state_note}")

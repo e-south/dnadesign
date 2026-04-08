@@ -47,6 +47,7 @@ class YiuValidationIssue(StrictBaseModel):
 class YiuValidationLigationSummary(StrictBaseModel):
     profile: Literal["none", "t4", "t7", "t3", "pbcv1", "hlig3"]
     awareness_mode: Literal["disabled", "secondary"]
+    selection_mode: Literal["secondary", "pwm_tolerance_then_ligation", "hard_ligation_filter"] = "secondary"
     applied: bool
     state: Literal["legacy", "inert", "edge_blind", "active"] | None = None
     state_note: str | None = None
@@ -58,6 +59,9 @@ class YiuValidationLigationSummary(StrictBaseModel):
     bad_pattern_heuristics: bool
     chosen_mismatch_classes: list[str] = Field(default_factory=list)
     position_classes: list[Literal["edge", "middle"]] = Field(default_factory=list)
+    candidate_count_before_filter: int | None = Field(default=None, ge=1)
+    candidate_count_after_filter: int | None = Field(default=None, ge=1)
+    filtered_candidate_count: int | None = Field(default=None, ge=0)
     decision_note: str
 
 
@@ -202,13 +206,39 @@ def resolve_ligation_surface_state(
 def resolve_ligation_decision_note(
     *,
     state: Literal["legacy", "inert", "edge_blind", "active"],
+    selection_mode: Literal["secondary", "pwm_tolerance_then_ligation", "hard_ligation_filter"],
     ligation_applied: bool,
     pwm_effective: bool,
+    filtered_candidate_count: int,
 ) -> str:
     if state == "legacy":
         return "Legacy mode; geometric ranking only because ligation_profile=none."
     if state == "inert":
         return "Ligation-aware scoring is disabled; geometric ranking only."
+    if selection_mode == "hard_ligation_filter":
+        filter_note = (
+            f"Hard ligation filter removed {filtered_candidate_count} candidates before ranking. "
+            if filtered_candidate_count > 0
+            else "Hard ligation filter admitted the full pool before ranking. "
+        )
+        if state == "edge_blind":
+            return (
+                filter_note + "Edge-vs-middle comparison remained unavailable because candidate_positions excludes 0/3."
+            )
+        return (
+            filter_note + "PWM preserved first among surviving candidates."
+            if pwm_effective
+            else filter_note + "No PWM context; ligation-aware ranking applied among surviving candidates."
+        )
+    if selection_mode == "pwm_tolerance_then_ligation":
+        if not pwm_effective:
+            return "No PWM context; tolerance gate unavailable, so ligation-aware ranking applied."
+        if state == "edge_blind":
+            return (
+                "PWM tolerance gate applied before ligation-aware ranking; edge-vs-middle comparison unavailable "
+                "because candidate_positions excludes 0/3."
+            )
+        return "PWM tolerance gate applied before ligation-aware ranking"
     if state == "edge_blind":
         return (
             "PWM preserved first, ligation-aware tie-break applied; edge-vs-middle comparison unavailable "
@@ -255,6 +285,7 @@ def build_validation_report(
 ) -> YiuValidationReport:
     ligation_applied = normalized.chosen_ligation_key is not None
     state, state_note, edge_comparison_available = resolve_ligation_surface_state(normalized)
+    ligation_policy = normalized.optimization_decision.ligation_policy
     return YiuValidationReport(
         spec_name=spec_name,
         status="satisfied",
@@ -262,6 +293,7 @@ def build_validation_report(
         ligation=YiuValidationLigationSummary(
             profile=normalized.ligation_profile,
             awareness_mode=normalized.ligation_awareness_mode,
+            selection_mode=normalized.ligation_selection_mode,
             applied=ligation_applied,
             state=state,
             state_note=state_note,
@@ -277,10 +309,19 @@ def build_validation_report(
             bad_pattern_heuristics=normalized.bad_pattern_heuristics,
             chosen_mismatch_classes=[entry.canonical_mismatch_class for entry in normalized.ligation_rationale],
             position_classes=[entry.position_class for entry in normalized.ligation_rationale],
+            candidate_count_before_filter=(
+                None if ligation_policy is None else ligation_policy.candidate_count_before_filter
+            ),
+            candidate_count_after_filter=(
+                None if ligation_policy is None else ligation_policy.candidate_count_after_filter
+            ),
+            filtered_candidate_count=None if ligation_policy is None else ligation_policy.filtered_candidate_count,
             decision_note=resolve_ligation_decision_note(
                 state=state,
+                selection_mode=normalized.ligation_selection_mode,
                 ligation_applied=ligation_applied,
                 pwm_effective=normalized.motif_context.effective,
+                filtered_candidate_count=0 if ligation_policy is None else ligation_policy.filtered_candidate_count,
             ),
         ),
         trace=build_trace_summary(

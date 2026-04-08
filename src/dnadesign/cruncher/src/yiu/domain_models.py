@@ -92,11 +92,18 @@ class ChosenLigationKey(StrictBaseModel):
 class LigationSearchState(StrictBaseModel):
     profile: Literal["none", "t4", "t7", "t3", "pbcv1", "hlig3"] = "none"
     awareness_mode: Literal["disabled", "secondary"] = "disabled"
+    selection_mode: Literal["secondary", "pwm_tolerance_then_ligation", "hard_ligation_filter"] = "secondary"
     enabled: bool = False
     legacy_mode: bool = True
     candidate_positions: list[int] = Field(default_factory=list)
     edge_positions_available: bool = False
     edge_comparison_available: bool = False
+    pwm_worst_loss_tolerance: float = Field(default=0.0, ge=0.0)
+    pwm_total_loss_tolerance: float = Field(default=0.0, ge=0.0)
+    max_worst_mismatch_class_tier: int = Field(default=0, ge=0, le=3)
+    max_middle_mismatch_count: int = Field(default=1, ge=0, le=2)
+    allow_double_middle: bool = False
+    allow_tnna_like_overhangs: bool = False
     state_note: str = "Legacy geometric ranking applied"
 
     @model_validator(mode="after")
@@ -109,6 +116,23 @@ class LigationSearchState(StrictBaseModel):
             raise ValueError("edge comparison cannot be available when ligation ranking is disabled")
         if self.edge_comparison_available and not self.edge_positions_available:
             raise ValueError("edge comparison requires candidate_positions to include 0 or 3")
+        return self
+
+
+class LigationPolicyDecision(StrictBaseModel):
+    selection_mode: Literal["secondary", "pwm_tolerance_then_ligation", "hard_ligation_filter"] = "secondary"
+    filter_applied: bool = False
+    candidate_count_before_filter: int = Field(ge=1)
+    candidate_count_after_filter: int = Field(ge=1)
+    filtered_candidate_count: int = Field(ge=0)
+    fallback_outcome: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_counts(self) -> "LigationPolicyDecision":
+        if self.candidate_count_after_filter > self.candidate_count_before_filter:
+            raise ValueError("candidate_count_after_filter cannot exceed candidate_count_before_filter")
+        if self.filtered_candidate_count != self.candidate_count_before_filter - self.candidate_count_after_filter:
+            raise ValueError("filtered_candidate_count must equal before_filter - after_filter")
         return self
 
 
@@ -179,6 +203,7 @@ class OptimizationDecision(StrictBaseModel):
     candidate_count: int = Field(ge=1)
     objective: OptimizationObjective
     winner: OptimizationWinner
+    ligation_policy: LigationPolicyDecision | None = None
     trace: list[dict[str, Any]] = Field(default_factory=list)
     trace_sample: OptimizationTraceSample | None = None
 
@@ -197,6 +222,7 @@ class NormalizedPayload(StrictBaseModel):
     source_provenance: dict[str, Any] = Field(default_factory=dict)
     ligation_profile: Literal["none", "t4", "t7", "t3", "pbcv1", "hlig3"] = "none"
     ligation_awareness_mode: Literal["disabled", "secondary"] = "disabled"
+    ligation_selection_mode: Literal["secondary", "pwm_tolerance_then_ligation", "hard_ligation_filter"] = "secondary"
     bad_pattern_heuristics: bool = False
     ligation_state: LigationSearchState | None = None
     chosen_ligation_key: ChosenLigationKey | None = None
@@ -235,11 +261,19 @@ class NormalizedPayload(StrictBaseModel):
                 raise ValueError("ligation_state.profile must match ligation_profile")
             if self.ligation_state.awareness_mode != self.ligation_awareness_mode:
                 raise ValueError("ligation_state.awareness_mode must match ligation_awareness_mode")
+            if self.ligation_state.selection_mode != self.ligation_selection_mode:
+                raise ValueError("ligation_state.selection_mode must match ligation_selection_mode")
         if self.optimization_decision.trace_sample is not None:
             if self.optimization_decision.trace_sample.candidate_count != self.optimization_decision.candidate_count:
                 raise ValueError("trace_sample.candidate_count must match candidate_count")
             if self.optimization_decision.trace_sample.sampled_count != len(self.optimization_decision.trace):
                 raise ValueError("trace_sample.sampled_count must match sampled trace length")
+        if self.optimization_decision.ligation_policy is not None:
+            if (
+                self.optimization_decision.ligation_policy.candidate_count_before_filter
+                != self.optimization_decision.candidate_count
+            ):
+                raise ValueError("ligation_policy.candidate_count_before_filter must match candidate_count")
         return self
 
     @property
@@ -251,7 +285,14 @@ def build_ligation_search_state(
     *,
     ligation_profile: Literal["none", "t4", "t7", "t3", "pbcv1", "hlig3"],
     ligation_awareness_mode: Literal["disabled", "secondary"],
+    ligation_selection_mode: Literal["secondary", "pwm_tolerance_then_ligation", "hard_ligation_filter"] = "secondary",
     candidate_positions: list[int] | tuple[int, ...],
+    pwm_worst_loss_tolerance: float = 0.0,
+    pwm_total_loss_tolerance: float = 0.0,
+    max_worst_mismatch_class_tier: int = 0,
+    max_middle_mismatch_count: int = 1,
+    allow_double_middle: bool = False,
+    allow_tnna_like_overhangs: bool = False,
 ) -> LigationSearchState:
     positions = [int(position) for position in candidate_positions]
     enabled = ligation_awareness_mode == "secondary" and ligation_profile != "none"
@@ -261,6 +302,19 @@ def build_ligation_search_state(
         state_note = "Legacy mode because ligation_profile=none"
     elif not enabled:
         state_note = "Ligation-aware scoring disabled by config"
+    elif ligation_selection_mode == "hard_ligation_filter":
+        state_note = (
+            "Hard ligation filter active; edge-vs-middle comparison unavailable because "
+            "candidate_positions excludes 0/3"
+            if not edge_positions_available
+            else "Hard ligation filter active before PWM-preserving ranking"
+        )
+    elif ligation_selection_mode == "pwm_tolerance_then_ligation":
+        state_note = (
+            "PWM tolerance gate active; edge-vs-middle comparison unavailable because candidate_positions excludes 0/3"
+            if not edge_positions_available
+            else "PWM tolerance gate active before ligation-aware ranking"
+        )
     elif not edge_positions_available:
         state_note = (
             "Ligation-aware scoring active; edge-vs-middle comparison unavailable because "
@@ -271,11 +325,18 @@ def build_ligation_search_state(
     return LigationSearchState(
         profile=ligation_profile,
         awareness_mode=ligation_awareness_mode,
+        selection_mode=ligation_selection_mode,
         enabled=enabled,
         legacy_mode=legacy_mode,
         candidate_positions=sorted(positions),
         edge_positions_available=edge_positions_available,
         edge_comparison_available=enabled and edge_positions_available,
+        pwm_worst_loss_tolerance=pwm_worst_loss_tolerance,
+        pwm_total_loss_tolerance=pwm_total_loss_tolerance,
+        max_worst_mismatch_class_tier=max_worst_mismatch_class_tier,
+        max_middle_mismatch_count=max_middle_mismatch_count,
+        allow_double_middle=allow_double_middle,
+        allow_tnna_like_overhangs=allow_tnna_like_overhangs,
         state_note=state_note,
     )
 

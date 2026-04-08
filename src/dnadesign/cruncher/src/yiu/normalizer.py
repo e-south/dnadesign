@@ -70,7 +70,14 @@ def normalize_payload(spec: YiuPayloadRenderingSpec, *, workspace_root: Path) ->
     ligation_state = build_ligation_search_state(
         ligation_profile=spec.optimization.mismatches.ligation_profile,
         ligation_awareness_mode=spec.optimization.mismatches.ligation_awareness_mode,
+        ligation_selection_mode=spec.optimization.mismatches.ligation_selection_mode,
         candidate_positions=spec.optimization.mismatches.candidate_positions,
+        pwm_worst_loss_tolerance=spec.optimization.mismatches.pwm_worst_loss_tolerance,
+        pwm_total_loss_tolerance=spec.optimization.mismatches.pwm_total_loss_tolerance,
+        max_worst_mismatch_class_tier=spec.optimization.mismatches.max_worst_mismatch_class_tier,
+        max_middle_mismatch_count=spec.optimization.mismatches.max_middle_mismatch_count,
+        allow_double_middle=spec.optimization.mismatches.allow_double_middle,
+        allow_tnna_like_overhangs=spec.optimization.mismatches.allow_tnna_like_overhangs,
     )
     motif_context = _bounded_motif_context(
         motif_context=resolve_motif_context(
@@ -143,6 +150,7 @@ def normalize_payload(spec: YiuPayloadRenderingSpec, *, workspace_root: Path) ->
         source_provenance=resolved_input.provenance,
         ligation_profile=spec.optimization.mismatches.ligation_profile,
         ligation_awareness_mode=spec.optimization.mismatches.ligation_awareness_mode,
+        ligation_selection_mode=spec.optimization.mismatches.ligation_selection_mode,
         bad_pattern_heuristics=spec.optimization.mismatches.bad_pattern_heuristics,
         ligation_state=optimizer_result.ligation_state,
         chosen_ligation_key=optimizer_result.chosen_ligation_key,
@@ -163,6 +171,7 @@ def normalize_payload(spec: YiuPayloadRenderingSpec, *, workspace_root: Path) ->
                 primary=spec.optimization.pwm.objective.primary,
                 secondary=list(spec.optimization.pwm.objective.secondary),
             ),
+            ligation_policy=optimizer_result.ligation_policy,
             winner=OptimizationWinner(
                 junction_start=winner.junction_start,
                 junction_end=winner.junction_end,

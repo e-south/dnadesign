@@ -299,6 +299,13 @@ def _user_sequence_spec(
     ligation_profile: str = "none",
     ligation_awareness_mode: str = "secondary",
     bad_pattern_heuristics: bool = False,
+    ligation_selection_mode: str | None = None,
+    pwm_worst_loss_tolerance: float | None = None,
+    pwm_total_loss_tolerance: float | None = None,
+    max_worst_mismatch_class_tier: int | None = None,
+    max_middle_mismatch_count: int | None = None,
+    allow_double_middle: bool | None = None,
+    allow_tnna_like_overhangs: bool | None = None,
     pwm_mode: str = "none",
     pwm_source: dict[str, object] | None = None,
     emit_render_jobs_debug: bool = False,
@@ -313,6 +320,20 @@ def _user_sequence_spec(
         "ligation_awareness_mode": ligation_awareness_mode,
         "bad_pattern_heuristics": bad_pattern_heuristics,
     }
+    if ligation_selection_mode is not None:
+        mismatches["ligation_selection_mode"] = ligation_selection_mode
+    if pwm_worst_loss_tolerance is not None:
+        mismatches["pwm_worst_loss_tolerance"] = pwm_worst_loss_tolerance
+    if pwm_total_loss_tolerance is not None:
+        mismatches["pwm_total_loss_tolerance"] = pwm_total_loss_tolerance
+    if max_worst_mismatch_class_tier is not None:
+        mismatches["max_worst_mismatch_class_tier"] = max_worst_mismatch_class_tier
+    if max_middle_mismatch_count is not None:
+        mismatches["max_middle_mismatch_count"] = max_middle_mismatch_count
+    if allow_double_middle is not None:
+        mismatches["allow_double_middle"] = allow_double_middle
+    if allow_tnna_like_overhangs is not None:
+        mismatches["allow_tnna_like_overhangs"] = allow_tnna_like_overhangs
     if candidate_positions is not None:
         mismatches["candidate_positions"] = candidate_positions
     return {
@@ -355,6 +376,13 @@ def _sample_hit_spec(
     ligation_profile: str = "none",
     ligation_awareness_mode: str = "secondary",
     bad_pattern_heuristics: bool = False,
+    ligation_selection_mode: str | None = None,
+    pwm_worst_loss_tolerance: float | None = None,
+    pwm_total_loss_tolerance: float | None = None,
+    max_worst_mismatch_class_tier: int | None = None,
+    max_middle_mismatch_count: int | None = None,
+    allow_double_middle: bool | None = None,
+    allow_tnna_like_overhangs: bool | None = None,
     pwm_mode: str = "none",
     pwm_source: dict[str, object] | None = None,
 ) -> dict[str, object]:
@@ -375,6 +403,20 @@ def _sample_hit_spec(
         "ligation_awareness_mode": ligation_awareness_mode,
         "bad_pattern_heuristics": bad_pattern_heuristics,
     }
+    if ligation_selection_mode is not None:
+        mismatches["ligation_selection_mode"] = ligation_selection_mode
+    if pwm_worst_loss_tolerance is not None:
+        mismatches["pwm_worst_loss_tolerance"] = pwm_worst_loss_tolerance
+    if pwm_total_loss_tolerance is not None:
+        mismatches["pwm_total_loss_tolerance"] = pwm_total_loss_tolerance
+    if max_worst_mismatch_class_tier is not None:
+        mismatches["max_worst_mismatch_class_tier"] = max_worst_mismatch_class_tier
+    if max_middle_mismatch_count is not None:
+        mismatches["max_middle_mismatch_count"] = max_middle_mismatch_count
+    if allow_double_middle is not None:
+        mismatches["allow_double_middle"] = allow_double_middle
+    if allow_tnna_like_overhangs is not None:
+        mismatches["allow_tnna_like_overhangs"] = allow_tnna_like_overhangs
     if candidate_positions is not None:
         mismatches["candidate_positions"] = candidate_positions
     return {
@@ -466,11 +508,25 @@ def _select_result(
     ligation_profile: str = "none",
     ligation_awareness_mode: str = "disabled",
     bad_pattern_heuristics: bool = False,
+    ligation_selection_mode: str = "secondary",
+    pwm_worst_loss_tolerance: float = 0.0,
+    pwm_total_loss_tolerance: float = 0.0,
+    max_worst_mismatch_class_tier: int = 0,
+    max_middle_mismatch_count: int = 1,
+    allow_double_middle: bool = False,
+    allow_tnna_like_overhangs: bool = False,
 ) -> object:
     ligation_state = build_ligation_search_state(
         ligation_profile=ligation_profile,
         ligation_awareness_mode=ligation_awareness_mode,
+        ligation_selection_mode=ligation_selection_mode,
         candidate_positions=sorted({position for candidate in candidates for position in candidate.mismatch_positions}),
+        pwm_worst_loss_tolerance=pwm_worst_loss_tolerance,
+        pwm_total_loss_tolerance=pwm_total_loss_tolerance,
+        max_worst_mismatch_class_tier=max_worst_mismatch_class_tier,
+        max_middle_mismatch_count=max_middle_mismatch_count,
+        allow_double_middle=allow_double_middle,
+        allow_tnna_like_overhangs=allow_tnna_like_overhangs,
     )
     return select_best_candidate(
         candidates=candidates,
@@ -1447,6 +1503,168 @@ def test_pwm_primary_ligation_secondary(monkeypatch: pytest.MonkeyPatch) -> None
     assert result.winner.lexical_key == "better-pwm"
 
 
+def test_pwm_tolerance_then_ligation_prefers_better_ligation_within_tolerance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    better_pwm_but_biologically_worse = _candidate(
+        lexical_key="better-pwm",
+        default_strand_preference_count=0,
+        mismatch_positions=(1,),
+        mutations=(
+            MutationChoice(
+                junction_offset=1,
+                payload_index=5,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="C",
+                opposing_base="T",
+            ),
+        ),
+    )
+    better_ligation_but_slightly_worse_pwm = _candidate(
+        lexical_key="better-ligation",
+        default_strand_preference_count=1,
+        mismatch_positions=(0,),
+        mutations=(
+            MutationChoice(
+                junction_offset=0,
+                payload_index=4,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="G",
+                opposing_base="T",
+            ),
+        ),
+    )
+
+    def _stub_score_candidate(*, candidate, reference_payload_sequence, reference_complement_sequence, scorable_motifs):
+        _ = (reference_payload_sequence, reference_complement_sequence, scorable_motifs)
+        if candidate.lexical_key == "better-pwm":
+            return CandidateScore(worst_loss=0.5, total_loss=0.5)
+        return CandidateScore(worst_loss=0.7, total_loss=0.7)
+
+    monkeypatch.setattr(yiu_optimizer_module, "score_candidate", _stub_score_candidate)
+    result = _select_result(
+        candidates=(better_ligation_but_slightly_worse_pwm, better_pwm_but_biologically_worse),
+        pwm_effective=True,
+        ligation_profile="t4",
+        ligation_awareness_mode="secondary",
+        ligation_selection_mode="pwm_tolerance_then_ligation",
+        pwm_worst_loss_tolerance=0.25,
+        pwm_total_loss_tolerance=0.25,
+    )
+
+    assert result.winner.lexical_key == "better-ligation"
+
+
+def test_secondary_mode_does_not_force_tnna_penalty_without_bad_pattern_heuristics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tnna_candidate = _candidate(
+        lexical_key="a-tnna",
+        default_strand_preference_count=1,
+        mismatch_positions=(3,),
+        mutations=(
+            MutationChoice(
+                junction_offset=3,
+                payload_index=7,
+                mutated_strand="complement",
+                native_base="G",
+                mutated_base="T",
+                opposing_base="C",
+            ),
+        ),
+    )
+    plain_candidate = _candidate(
+        lexical_key="z-plain",
+        default_strand_preference_count=1,
+        mismatch_positions=(0,),
+        mutations=(
+            MutationChoice(
+                junction_offset=0,
+                payload_index=4,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="C",
+                opposing_base="T",
+            ),
+        ),
+    )
+
+    def _stub_score_candidate(*, candidate, reference_payload_sequence, reference_complement_sequence, scorable_motifs):
+        _ = (candidate, reference_payload_sequence, reference_complement_sequence, scorable_motifs)
+        return CandidateScore(worst_loss=0.0, total_loss=0.0)
+
+    monkeypatch.setattr(yiu_optimizer_module, "score_candidate", _stub_score_candidate)
+    result = _select_result(
+        candidates=(plain_candidate, tnna_candidate),
+        pwm_effective=True,
+        ligation_profile="t4",
+        ligation_awareness_mode="secondary",
+        bad_pattern_heuristics=False,
+    )
+
+    assert result.winner.lexical_key == "a-tnna"
+    assert result.chosen_ligation_key is not None
+    assert result.chosen_ligation_key.bad_pattern_penalty == 0
+
+
+def test_hard_ligation_filter_demotes_better_pwm_candidate_when_it_violates_ligation_limits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    better_pwm_but_weak_ligation = _candidate(
+        lexical_key="better-pwm",
+        default_strand_preference_count=0,
+        mismatch_positions=(1,),
+        mutations=(
+            MutationChoice(
+                junction_offset=1,
+                payload_index=5,
+                mutated_strand="payload",
+                native_base="T",
+                mutated_base="A",
+                opposing_base="A",
+            ),
+        ),
+    )
+    admissible_gt_edge = _candidate(
+        lexical_key="gt-edge",
+        default_strand_preference_count=1,
+        mismatch_positions=(0,),
+        mutations=(
+            MutationChoice(
+                junction_offset=0,
+                payload_index=4,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="G",
+                opposing_base="T",
+            ),
+        ),
+    )
+
+    def _stub_score_candidate(*, candidate, reference_payload_sequence, reference_complement_sequence, scorable_motifs):
+        _ = (reference_payload_sequence, reference_complement_sequence, scorable_motifs)
+        if candidate.lexical_key == "better-pwm":
+            return CandidateScore(worst_loss=0.1, total_loss=0.1)
+        return CandidateScore(worst_loss=0.8, total_loss=0.8)
+
+    monkeypatch.setattr(yiu_optimizer_module, "score_candidate", _stub_score_candidate)
+    result = _select_result(
+        candidates=(better_pwm_but_weak_ligation, admissible_gt_edge),
+        pwm_effective=True,
+        ligation_profile="t4",
+        ligation_awareness_mode="secondary",
+        ligation_selection_mode="hard_ligation_filter",
+        max_worst_mismatch_class_tier=0,
+        max_middle_mismatch_count=1,
+        allow_double_middle=False,
+        allow_tnna_like_overhangs=False,
+    )
+
+    assert result.winner.lexical_key == "gt-edge"
+
+
 def test_default_strand_preference_remains_late() -> None:
     preferred = _candidate(lexical_key="z", default_strand_preference_count=1)
     nonpreferred = _candidate(lexical_key="a", default_strand_preference_count=0)
@@ -1584,6 +1802,96 @@ def test_bad_pattern_heuristics_can_penalize_tnna_like_overhangs() -> None:
     assert enabled_score.chosen_key.bad_pattern_penalty == 1
 
 
+def test_hard_ligation_filter_raises_relaxation_hint_when_it_eliminates_the_pool() -> None:
+    middle_only_double_mismatch = _candidate(
+        lexical_key="middle-only",
+        default_strand_preference_count=1,
+        mismatch_positions=(1, 2),
+        mutations=(
+            MutationChoice(
+                junction_offset=1,
+                payload_index=5,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="G",
+                opposing_base="T",
+            ),
+            MutationChoice(
+                junction_offset=2,
+                payload_index=6,
+                mutated_strand="payload",
+                native_base="C",
+                mutated_base="T",
+                opposing_base="G",
+            ),
+        ),
+    )
+
+    with pytest.raises(NoFeasiblePlanError, match="hard_ligation_filter"):
+        _select_result(
+            candidates=(middle_only_double_mismatch,),
+            pwm_effective=False,
+            ligation_profile="t4",
+            ligation_awareness_mode="secondary",
+            ligation_selection_mode="hard_ligation_filter",
+            max_worst_mismatch_class_tier=0,
+            max_middle_mismatch_count=0,
+            allow_double_middle=False,
+            allow_tnna_like_overhangs=False,
+        )
+
+
+def test_hard_ligation_filter_relaxation_hint_uses_smallest_relevant_thresholds() -> None:
+    tnna_edge = _candidate(
+        lexical_key="tnna-edge",
+        default_strand_preference_count=1,
+        mismatch_positions=(3,),
+        mutations=(
+            MutationChoice(
+                junction_offset=3,
+                payload_index=7,
+                mutated_strand="complement",
+                native_base="G",
+                mutated_base="T",
+                opposing_base="C",
+            ),
+        ),
+    )
+    middle_only = _candidate(
+        lexical_key="middle-only",
+        default_strand_preference_count=1,
+        mismatch_positions=(1,),
+        mutations=(
+            MutationChoice(
+                junction_offset=1,
+                payload_index=5,
+                mutated_strand="complement",
+                native_base="A",
+                mutated_base="C",
+                opposing_base="T",
+            ),
+        ),
+    )
+
+    with pytest.raises(NoFeasiblePlanError, match="hard_ligation_filter") as exc_info:
+        _select_result(
+            candidates=(tnna_edge, middle_only),
+            pwm_effective=False,
+            ligation_profile="t4",
+            ligation_awareness_mode="secondary",
+            ligation_selection_mode="hard_ligation_filter",
+            max_worst_mismatch_class_tier=3,
+            max_middle_mismatch_count=0,
+            allow_double_middle=False,
+            allow_tnna_like_overhangs=False,
+        )
+
+    message = str(exc_info.value)
+    assert "max_middle_mismatch_count=1" in message
+    assert "allow_tnna_like_overhangs=true" in message
+    assert "max_middle_mismatch_count=0" not in message
+
+
 def test_render_yiu_spec_publishes_v4_bundle_and_payload_visual_contract(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     spec_path = workspace / "configs" / "yiu" / "demo_payload.yiu.yaml"
@@ -1703,6 +2011,55 @@ def test_render_yiu_spec_bundle_summary_reports_ligation_rationale(tmp_path: Pat
     assert bundle_summary["ligation"]["position_classes"]
     assert normalized["chosen_ligation_key"]["middle_mismatch_count"] >= 0
     assert normalized["ligation_rationale"]
+
+
+def test_render_yiu_spec_bundle_summary_reports_ligation_policy_mode_and_filter_counts(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    spec_path = workspace / "configs" / "yiu" / "strict_ligation_payload.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _user_sequence_spec(
+            name="strict_ligation_payload",
+            candidate_positions=[0, 1, 2, 3],
+            ligation_profile="t4",
+            ligation_awareness_mode="secondary",
+            ligation_selection_mode="hard_ligation_filter",
+            max_worst_mismatch_class_tier=2,
+            max_middle_mismatch_count=1,
+            allow_double_middle=False,
+            allow_tnna_like_overhangs=False,
+        ),
+    )
+
+    bundle_dir, _report = render_yiu_spec(spec_path)
+    bundle_summary = _load_json(bundle_dir / "bundle_summary.json")
+    normalized = _load_json(bundle_dir / "normalized_payload.json")
+
+    assert bundle_summary["ligation"]["selection_mode"] == "hard_ligation_filter"
+    assert bundle_summary["ligation"]["filtered_candidate_count"] > 0
+    assert (
+        bundle_summary["ligation"]["candidate_count_before_filter"]
+        > bundle_summary["ligation"]["candidate_count_after_filter"]
+    )
+    assert normalized["optimization_decision"]["ligation_policy"]["selection_mode"] == "hard_ligation_filter"
+    assert normalized["optimization_decision"]["ligation_policy"]["filter_applied"] is True
+
+
+def test_load_yiu_spec_normalizes_hard_filter_alias(tmp_path: Path) -> None:
+    spec_path = tmp_path / "workspace" / "configs" / "yiu" / "hard_filter_alias.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _user_sequence_spec(
+            name="hard_filter_alias",
+            candidate_positions=[0, 1, 2, 3],
+            ligation_profile="t4",
+            ligation_selection_mode="hard_filter",
+        ),
+    )
+
+    spec, _resolved_spec_path, _workspace_root = load_yiu_spec(spec_path)
+
+    assert spec.optimization.mismatches.ligation_selection_mode == "hard_ligation_filter"
 
 
 def test_render_yiu_spec_bundle_summary_marks_profile_none_as_legacy_mode(tmp_path: Path) -> None:

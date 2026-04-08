@@ -65,6 +65,20 @@ class MismatchesSpec(StrictBaseModel):
     ligation_profile: Literal["none", "t4", "t7", "t3", "pbcv1", "hlig3"] = "none"
     ligation_awareness_mode: Literal["disabled", "secondary"] = "secondary"
     bad_pattern_heuristics: bool = False
+    ligation_selection_mode: Literal["secondary", "pwm_tolerance_then_ligation", "hard_ligation_filter"] = "secondary"
+    pwm_worst_loss_tolerance: float = Field(default=0.0, ge=0.0)
+    pwm_total_loss_tolerance: float = Field(default=0.0, ge=0.0)
+    max_worst_mismatch_class_tier: int = Field(default=0, ge=0, le=3)
+    max_middle_mismatch_count: int = Field(default=1, ge=0, le=2)
+    allow_double_middle: bool = False
+    allow_tnna_like_overhangs: bool = False
+
+    @field_validator("ligation_selection_mode", mode="before")
+    @classmethod
+    def _normalize_ligation_selection_mode(cls, value: object) -> object:
+        if isinstance(value, str) and value.strip() == "hard_filter":
+            return "hard_ligation_filter"
+        return value
 
     @field_validator("candidate_positions")
     @classmethod
@@ -104,6 +118,33 @@ class MismatchesSpec(StrictBaseModel):
             )
         if self.bad_pattern_heuristics and self.ligation_profile == "none":
             raise ValueError(f"{YIU_MISMATCH_INVALID}: bad_pattern_heuristics requires a ligation_profile")
+        if self.ligation_selection_mode != "secondary" and self.ligation_awareness_mode != "secondary":
+            raise ValueError(
+                f"{YIU_MISMATCH_INVALID}: ligation_selection_mode={self.ligation_selection_mode} "
+                "requires ligation_awareness_mode=secondary"
+            )
+        if self.ligation_selection_mode != "secondary" and self.ligation_profile == "none":
+            raise ValueError(
+                f"{YIU_MISMATCH_INVALID}: ligation_selection_mode={self.ligation_selection_mode} "
+                "requires ligation_profile to name a ligase instead of none"
+            )
+        if self.ligation_selection_mode != "pwm_tolerance_then_ligation" and (
+            self.pwm_worst_loss_tolerance > 0.0 or self.pwm_total_loss_tolerance > 0.0
+        ):
+            raise ValueError(
+                f"{YIU_MISMATCH_INVALID}: pwm_*_loss_tolerance fields require "
+                "ligation_selection_mode=pwm_tolerance_then_ligation"
+            )
+        if self.ligation_selection_mode != "hard_ligation_filter" and (
+            self.max_worst_mismatch_class_tier != 0
+            or self.max_middle_mismatch_count != 1
+            or self.allow_double_middle
+            or self.allow_tnna_like_overhangs
+        ):
+            raise ValueError(
+                f"{YIU_MISMATCH_INVALID}: hard_ligation_filter-only fields require "
+                "ligation_selection_mode=hard_ligation_filter"
+            )
         return self
 
 

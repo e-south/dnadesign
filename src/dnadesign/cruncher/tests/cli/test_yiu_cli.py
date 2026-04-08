@@ -39,6 +39,13 @@ def _payload_spec(
     ligation_profile: str = "none",
     ligation_awareness_mode: str = "secondary",
     bad_pattern_heuristics: bool = False,
+    ligation_selection_mode: str | None = None,
+    pwm_worst_loss_tolerance: float | None = None,
+    pwm_total_loss_tolerance: float | None = None,
+    max_worst_mismatch_class_tier: int | None = None,
+    max_middle_mismatch_count: int | None = None,
+    allow_double_middle: bool | None = None,
+    allow_tnna_like_overhangs: bool | None = None,
 ) -> dict[str, object]:
     junction_start = 4
     junction_end = 8
@@ -51,6 +58,20 @@ def _payload_spec(
         "ligation_awareness_mode": ligation_awareness_mode,
         "bad_pattern_heuristics": bad_pattern_heuristics,
     }
+    if ligation_selection_mode is not None:
+        mismatches["ligation_selection_mode"] = ligation_selection_mode
+    if pwm_worst_loss_tolerance is not None:
+        mismatches["pwm_worst_loss_tolerance"] = pwm_worst_loss_tolerance
+    if pwm_total_loss_tolerance is not None:
+        mismatches["pwm_total_loss_tolerance"] = pwm_total_loss_tolerance
+    if max_worst_mismatch_class_tier is not None:
+        mismatches["max_worst_mismatch_class_tier"] = max_worst_mismatch_class_tier
+    if max_middle_mismatch_count is not None:
+        mismatches["max_middle_mismatch_count"] = max_middle_mismatch_count
+    if allow_double_middle is not None:
+        mismatches["allow_double_middle"] = allow_double_middle
+    if allow_tnna_like_overhangs is not None:
+        mismatches["allow_tnna_like_overhangs"] = allow_tnna_like_overhangs
     if candidate_positions is not None:
         mismatches["candidate_positions"] = candidate_positions
     return {
@@ -106,6 +127,7 @@ def _ligation_summary_lines(ligation: dict[str, object]) -> tuple[str, str]:
         "Ligation -> "
         f"profile={ligation['profile']} "
         f"mode={ligation['awareness_mode']} "
+        f"selection={ligation.get('selection_mode', 'secondary')} "
         f"applied={ligation['applied']} "
         f"pool={pool} "
         f"classes={chosen_classes} "
@@ -115,6 +137,15 @@ def _ligation_summary_lines(ligation: dict[str, object]) -> tuple[str, str]:
         f"state={ligation.get('state', 'active')} "
         f"edge_comparison_available={ligation.get('edge_comparison_available', False)}",
     )
+
+
+def _ligation_filter_line(ligation: dict[str, object]) -> str | None:
+    before = ligation.get("candidate_count_before_filter")
+    after = ligation.get("candidate_count_after_filter")
+    filtered = ligation.get("filtered_candidate_count")
+    if before is None or after is None or filtered in (None, 0):
+        return None
+    return f"Ligation filter -> before={before} after={after} filtered={filtered}"
 
 
 def _ligation_note_lines(ligation: dict[str, object]) -> tuple[str, str]:
@@ -372,7 +403,7 @@ def test_yiu_validate_marks_profile_none_secondary_mode_as_legacy(tmp_path: Path
     normalized_output = normalized_cli_output(result.output)
 
     assert result.exit_code == 0
-    assert "Ligation -> profile=none mode=secondary applied=False" in normalized_output
+    assert "Ligation -> profile=none mode=secondary selection=secondary applied=False" in normalized_output
     assert "Ligation state -> state=legacy edge_comparison_available=False" in normalized_output
     assert "legacy mode because ligation_profile=none" in normalized_output.lower()
 
@@ -392,7 +423,7 @@ def test_yiu_validate_defaults_omitted_candidate_positions_to_full_pool(tmp_path
     normalized_output = normalized_cli_output(result.output)
 
     assert result.exit_code == 0
-    assert "Ligation -> profile=t4 mode=secondary applied=True pool=0,1,2,3" in normalized_output
+    assert "Ligation -> profile=t4 mode=secondary selection=secondary applied=True pool=0,1,2,3" in normalized_output
     assert "Ligation state -> state=active edge_comparison_available=True" in normalized_output
 
 
@@ -434,6 +465,65 @@ def test_yiu_validate_surfaces_bad_pattern_heuristics_toggle(tmp_path: Path, bad
     assert result.exit_code == 0
     expected_scope = "tnna_like_only" if bad_pattern_heuristics else "disabled"
     assert f"bad_patterns={expected_scope}" in normalized_output
+
+
+def test_yiu_validate_hard_ligation_filter_failure_surfaces_relaxation_hint(tmp_path: Path) -> None:
+    workspace = tmp_path / "demo_yiu_payload"
+    spec_path = workspace / "configs" / "yiu" / "strict_failure.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _payload_spec(
+            name="strict_failure",
+            candidate_positions=[1, 2],
+            mismatch_count=2,
+            ligation_profile="t4",
+            ligation_awareness_mode="secondary",
+            ligation_selection_mode="hard_ligation_filter",
+            max_worst_mismatch_class_tier=0,
+            max_middle_mismatch_count=0,
+            allow_double_middle=False,
+            allow_tnna_like_overhangs=False,
+        ),
+    )
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
+    normalized_output = normalized_cli_output(result.output)
+
+    assert result.exit_code == 1
+    assert "hard_ligation_filter" in normalized_output
+    assert "max_middle_mismatch_count" in normalized_output
+    assert "allow_double_middle" in normalized_output
+
+
+def test_yiu_validate_surfaces_hard_ligation_filter_counts_and_normalized_alias(tmp_path: Path) -> None:
+    workspace = tmp_path / "demo_yiu_payload"
+    spec_path = workspace / "configs" / "yiu" / "strict_filter_alias.yiu.yaml"
+    _write_yaml(
+        spec_path,
+        _payload_spec(
+            name="strict_filter_alias",
+            candidate_positions=[0, 1, 2, 3],
+            ligation_profile="t4",
+            ligation_awareness_mode="secondary",
+            ligation_selection_mode="hard_filter",
+            max_worst_mismatch_class_tier=2,
+            max_middle_mismatch_count=1,
+            allow_double_middle=False,
+            allow_tnna_like_overhangs=False,
+        ),
+    )
+
+    result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path)])
+    json_result = runner.invoke(app, ["yiu", "validate", "--spec", str(spec_path), "--json"])
+    validate_payload = json.loads(json_result.output)
+    normalized_output = normalized_cli_output(result.output)
+
+    assert result.exit_code == 0
+    assert json_result.exit_code == 0
+    assert "selection=hard_ligation_filter" in normalized_output
+    filter_line = _ligation_filter_line(validate_payload["ligation"])
+    assert filter_line is not None
+    assert normalized_cli_output(filter_line) in normalized_output
 
 
 def test_yiu_show_reports_payload_bundle_summary(tmp_path: Path) -> None:
@@ -528,7 +618,7 @@ def test_yiu_show_marks_middle_only_ligation_pool_as_edge_blind(tmp_path: Path) 
     normalized_output = normalized_cli_output(show_result.output)
 
     assert show_result.exit_code == 0
-    assert "Ligation -> profile=t4 mode=secondary applied=True pool=1,2" in normalized_output
+    assert "Ligation -> profile=t4 mode=secondary selection=secondary applied=True pool=1,2" in normalized_output
     assert "Ligation state -> state=edge_blind edge_comparison_available=False" in normalized_output
     assert "candidate_positions excludes 0/3" in normalized_output
 
