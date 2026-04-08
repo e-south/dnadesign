@@ -38,15 +38,15 @@ def test_top_level_docs_route_both_workflow_families() -> None:
     docs_readme = _read("docs/README.md")
     docs_index = _read("docs/index.md")
 
-    assert "Gibbs annealing MCMC" in package_readme
-    assert "cassette workspaces" in package_readme
-    assert "docs/demos/demo_pairwise.md" in package_readme
-    assert "docs/demos/demo_multitf.md" in package_readme
-    assert "docs/demos/project_all_tfs.md" in package_readme
+    assert "`sample` and fixed-length optimization" in package_readme
+    assert "Cassette workflows" in package_readme
+    assert "payload-centric YIU" in package_readme
+    assert "docs/README.md" in package_readme
     assert "docs/demos/demo_cassette_workspace.md" in package_readme
     assert "docs/guides/sampling_and_analysis.md" in package_readme
-    assert "docs/guides/studies.md" in package_readme
-    assert "docs/guides/portfolio_aggregation.md" in package_readme
+    assert "docs/guides/yiu_workflow.md" in package_readme
+    assert "docs/reference/cli.md" in package_readme
+    assert "This README stays light on purpose." in package_readme
 
     for content in (docs_readme, docs_index):
         assert "Optimize Fixed-Length Sequences" in content

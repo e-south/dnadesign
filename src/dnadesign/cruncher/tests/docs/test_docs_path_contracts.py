@@ -76,9 +76,10 @@ def test_artifacts_reference_uses_analysis_subdir_contract() -> None:
 
 def test_readme_routes_to_demos_not_quickstart() -> None:
     readme = (_package_root() / "README.md").read_text()
-    assert "docs/demos/demo_pairwise.md" in readme
-    assert "docs/demos/demo_multitf.md" in readme
-    assert "docs/demos/project_all_tfs.md" in readme
+    assert "docs/README.md" in readme
+    assert "docs/demos/demo_cassette_workspace.md" in readme
+    assert "docs/guides/sampling_and_analysis.md" in readme
+    assert "docs/guides/yiu_workflow.md" in readme
     assert "Quickstart" not in readme
     assert "pixi run cruncher --" not in readme
 
