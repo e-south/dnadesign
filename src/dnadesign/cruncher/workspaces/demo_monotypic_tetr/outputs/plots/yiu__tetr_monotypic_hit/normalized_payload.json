@@ -7,8 +7,8 @@
   "site_label": "tetr_site",
   "reference_payload_sequence": "CTCTATATCTGATATAGAG",
   "reference_complement_sequence": "GAGATATAGACTATATCTC",
-  "selected_payload_sequence": "CTCTATATCTGATATAGAG",
-  "selected_complement_sequence": "GAGATATAGATGATATCTC",
+  "selected_payload_sequence": "CTCTATATTTGATATAGAG",
+  "selected_complement_sequence": "GAGATATAGATTATATCTC",
   "source_provenance": {
     "spec_name": "tetr_monotypic_hit",
     "sample_name": "demo_monotypic_tetr",
@@ -22,10 +22,12 @@
   },
   "ligation_profile": "t4",
   "ligation_awareness_mode": "secondary",
+  "ligation_selection_mode": "hard_ligation_filter",
   "bad_pattern_heuristics": false,
   "ligation_state": {
     "profile": "t4",
     "awareness_mode": "secondary",
+    "selection_mode": "hard_ligation_filter",
     "enabled": true,
     "legacy_mode": false,
     "candidate_positions": [
@@ -36,16 +38,32 @@
     ],
     "edge_positions_available": true,
     "edge_comparison_available": true,
-    "state_note": "Ligation-aware scoring active; edge-vs-middle comparison available"
+    "pwm_worst_loss_tolerance": 0.0,
+    "pwm_total_loss_tolerance": 0.0,
+    "max_worst_mismatch_class_tier": 0,
+    "max_middle_mismatch_count": 1,
+    "allow_double_middle": false,
+    "allow_tnna_like_overhangs": false,
+    "state_note": "Hard ligation filter active before PWM-preserving ranking"
   },
   "chosen_ligation_key": {
-    "worst_mismatch_class_tier": 2,
-    "total_mismatch_class_tier": 2,
+    "worst_mismatch_class_tier": 0,
+    "total_mismatch_class_tier": 0,
     "middle_mismatch_count": 1,
     "double_middle_flag": false,
     "bad_pattern_penalty": 0
   },
   "ligation_rationale": [
+    {
+      "payload_index": 8,
+      "junction_offset": 0,
+      "position_class": "edge",
+      "mutated_strand": "payload",
+      "native_base": "C",
+      "partner_base": "G",
+      "canonical_mismatch_class": "GT",
+      "class_tier": 0
+    },
     {
       "payload_index": 10,
       "junction_offset": 2,
@@ -55,16 +73,6 @@
       "partner_base": "G",
       "canonical_mismatch_class": "GT",
       "class_tier": 0
-    },
-    {
-      "payload_index": 11,
-      "junction_offset": 3,
-      "position_class": "edge",
-      "mutated_strand": "complement",
-      "native_base": "T",
-      "partner_base": "A",
-      "canonical_mismatch_class": "AG",
-      "class_tier": 2
     }
   ],
   "junction": {
@@ -82,20 +90,20 @@
   },
   "mismatches": [
     {
+      "payload_index": 8,
+      "junction_offset": 0,
+      "mutated_strand": "payload",
+      "native_base": "C",
+      "mutated_base": "T",
+      "opposing_base": "G"
+    },
+    {
       "payload_index": 10,
       "junction_offset": 2,
       "mutated_strand": "complement",
       "native_base": "C",
       "mutated_base": "T",
       "opposing_base": "G"
-    },
-    {
-      "payload_index": 11,
-      "junction_offset": 3,
-      "mutated_strand": "complement",
-      "native_base": "T",
-      "mutated_base": "G",
-      "opposing_base": "A"
     }
   ],
   "motif_context": {
@@ -370,24 +378,32 @@
       "junction_start": 8,
       "junction_end": 12,
       "selected_positions": [
-        2,
-        3
+        0,
+        2
       ],
       "mutated_strands": [
-        "complement",
+        "payload",
         "complement"
       ],
       "mutated_bases": [
         "T",
-        "G"
+        "T"
       ],
-      "worst_loss": 0.0,
-      "total_loss": 0.0,
+      "worst_loss": 0.27692070770870103,
+      "total_loss": 0.5538414154174021,
       "midpoint_distance": 1,
       "middle_mismatch_count": 1,
       "double_middle_flag": false,
-      "default_strand_preference_count": 2,
-      "lexical_key": "8|2,3|complement,complement|T,G"
+      "default_strand_preference_count": 1,
+      "lexical_key": "8|0,2|payload,complement|T,T"
+    },
+    "ligation_policy": {
+      "selection_mode": "hard_ligation_filter",
+      "filter_applied": true,
+      "candidate_count_before_filter": 2160,
+      "candidate_count_after_filter": 44,
+      "filtered_candidate_count": 2116,
+      "fallback_outcome": null
     },
     "trace": [
       {
@@ -408,11 +424,12 @@
         "total_loss": 0.5483787754651352,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 2,
         "lexical_key": "3|0,1|complement,complement|C,A",
@@ -428,6 +445,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -448,11 +469,12 @@
         "total_loss": 1.4699365738212435,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 2,
         "lexical_key": "3|0,1|complement,complement|C,C",
@@ -468,6 +490,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -488,11 +514,12 @@
         "total_loss": 0.0,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 2,
         "lexical_key": "3|0,1|complement,complement|C,G",
@@ -508,6 +535,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -528,11 +559,12 @@
         "total_loss": 0.07799032227160474,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 2,
         "lexical_key": "3|0,1|complement,complement|G,A",
@@ -548,6 +580,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -568,11 +604,12 @@
         "total_loss": 0.9995481206277148,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 2,
         "lexical_key": "3|0,1|complement,complement|G,C",
@@ -588,6 +625,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -608,11 +649,12 @@
         "total_loss": 0.0,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 2,
         "lexical_key": "3|0,1|complement,complement|G,G",
@@ -628,6 +670,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -648,11 +694,12 @@
         "total_loss": 0.27425969605104683,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 2,
         "lexical_key": "3|0,1|complement,complement|T,A",
@@ -668,6 +715,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -688,11 +739,12 @@
         "total_loss": 1.1958174944071551,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 2,
         "lexical_key": "3|0,1|complement,complement|T,C",
@@ -708,6 +760,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -728,11 +784,12 @@
         "total_loss": 0.0,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 2,
         "lexical_key": "3|0,1|complement,complement|T,G",
@@ -748,6 +805,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -768,11 +829,12 @@
         "total_loss": 3.877803942038499,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|complement,payload|C,C",
@@ -788,6 +850,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -808,11 +874,12 @@
         "total_loss": 3.493246989103275,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|complement,payload|C,G",
@@ -828,6 +895,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -848,11 +919,12 @@
         "total_loss": 2.8722820764364005,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|complement,payload|C,T",
@@ -868,6 +940,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -888,11 +964,12 @@
         "total_loss": 3.40741548884497,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|complement,payload|G,C",
@@ -908,6 +985,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -928,11 +1009,12 @@
         "total_loss": 3.022858535909746,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|complement,payload|G,G",
@@ -948,7 +1030,9 @@
         "position_classes": [
           "edge",
           "middle"
-        ]
+        ],
+        "ligation_filter_passed": true,
+        "ligation_filter_failures": []
       },
       {
         "junction_start": 3,
@@ -968,11 +1052,12 @@
         "total_loss": 2.401893623242872,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|complement,payload|G,T",
@@ -988,6 +1073,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -1008,11 +1097,12 @@
         "total_loss": 3.6036848626244105,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|complement,payload|T,C",
@@ -1028,6 +1118,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -1048,11 +1142,12 @@
         "total_loss": 3.2191279096891865,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|complement,payload|T,G",
@@ -1068,6 +1163,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -1088,11 +1187,12 @@
         "total_loss": 2.598162997022312,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|complement,payload|T,T",
@@ -1108,6 +1208,10 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier"
         ]
       },
       {
@@ -1128,11 +1232,12 @@
         "total_loss": 1.342771569332891,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|payload,complement|A,A",
@@ -1140,7 +1245,7 @@
         "total_mismatch_class_tier": 6,
         "middle_mismatch_count": 1,
         "double_middle_flag": false,
-        "bad_pattern_penalty": 0,
+        "bad_pattern_penalty": 1,
         "canonical_mismatch_classes": [
           "AA",
           "AA"
@@ -1148,6 +1253,11 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier",
+          "allow_tnna_like_overhangs"
         ]
       },
       {
@@ -1168,11 +1278,12 @@
         "total_loss": 1.6870803386981787,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|payload,complement|A,C",
@@ -1180,7 +1291,7 @@
         "total_mismatch_class_tier": 6,
         "middle_mismatch_count": 1,
         "double_middle_flag": false,
-        "bad_pattern_penalty": 0,
+        "bad_pattern_penalty": 1,
         "canonical_mismatch_classes": [
           "AA",
           "AC"
@@ -1188,6 +1299,11 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier",
+          "allow_tnna_like_overhangs"
         ]
       },
       {
@@ -1208,11 +1324,12 @@
         "total_loss": 1.342771569332891,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|payload,complement|A,G",
@@ -1220,7 +1337,7 @@
         "total_mismatch_class_tier": 5,
         "middle_mismatch_count": 1,
         "double_middle_flag": false,
-        "bad_pattern_penalty": 0,
+        "bad_pattern_penalty": 1,
         "canonical_mismatch_classes": [
           "AA",
           "AG"
@@ -1228,6 +1345,11 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier",
+          "allow_tnna_like_overhangs"
         ]
       },
       {
@@ -1248,11 +1370,12 @@
         "total_loss": 3.394640973265611,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|payload,complement|C,A",
@@ -1260,7 +1383,7 @@
         "total_mismatch_class_tier": 6,
         "middle_mismatch_count": 1,
         "double_middle_flag": false,
-        "bad_pattern_penalty": 0,
+        "bad_pattern_penalty": 1,
         "canonical_mismatch_classes": [
           "AC",
           "AA"
@@ -1268,6 +1391,11 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier",
+          "allow_tnna_like_overhangs"
         ]
       },
       {
@@ -1288,11 +1416,12 @@
         "total_loss": 3.738949742630899,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|payload,complement|C,C",
@@ -1300,7 +1429,7 @@
         "total_mismatch_class_tier": 6,
         "middle_mismatch_count": 1,
         "double_middle_flag": false,
-        "bad_pattern_penalty": 0,
+        "bad_pattern_penalty": 1,
         "canonical_mismatch_classes": [
           "AC",
           "AC"
@@ -1308,6 +1437,11 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier",
+          "allow_tnna_like_overhangs"
         ]
       },
       {
@@ -1328,11 +1462,12 @@
         "total_loss": 3.394640973265611,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|payload,complement|C,G",
@@ -1340,7 +1475,7 @@
         "total_mismatch_class_tier": 5,
         "middle_mismatch_count": 1,
         "double_middle_flag": false,
-        "bad_pattern_penalty": 0,
+        "bad_pattern_penalty": 1,
         "canonical_mismatch_classes": [
           "AC",
           "AG"
@@ -1348,6 +1483,11 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier",
+          "allow_tnna_like_overhangs"
         ]
       },
       {
@@ -1368,11 +1508,12 @@
         "total_loss": 0.9365402535277472,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|payload,complement|G,A",
@@ -1380,7 +1521,7 @@
         "total_mismatch_class_tier": 5,
         "middle_mismatch_count": 1,
         "double_middle_flag": false,
-        "bad_pattern_penalty": 0,
+        "bad_pattern_penalty": 1,
         "canonical_mismatch_classes": [
           "AG",
           "AA"
@@ -1388,6 +1529,11 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier",
+          "allow_tnna_like_overhangs"
         ]
       },
       {
@@ -1408,11 +1554,12 @@
         "total_loss": 1.280849022893035,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|payload,complement|G,C",
@@ -1420,7 +1567,7 @@
         "total_mismatch_class_tier": 5,
         "middle_mismatch_count": 1,
         "double_middle_flag": false,
-        "bad_pattern_penalty": 0,
+        "bad_pattern_penalty": 1,
         "canonical_mismatch_classes": [
           "AG",
           "AC"
@@ -1428,6 +1575,11 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier",
+          "allow_tnna_like_overhangs"
         ]
       },
       {
@@ -1448,11 +1600,12 @@
         "total_loss": 0.9365402535277472,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 1,
         "lexical_key": "3|0,1|payload,complement|G,G",
@@ -1460,7 +1613,7 @@
         "total_mismatch_class_tier": 4,
         "middle_mismatch_count": 1,
         "double_middle_flag": false,
-        "bad_pattern_penalty": 0,
+        "bad_pattern_penalty": 1,
         "canonical_mismatch_classes": [
           "AG",
           "AG"
@@ -1468,6 +1621,11 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier",
+          "allow_tnna_like_overhangs"
         ]
       },
       {
@@ -1488,11 +1646,12 @@
         "total_loss": 4.094947706915436,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 0,
         "lexical_key": "3|0,1|payload,payload|A,C",
@@ -1500,7 +1659,7 @@
         "total_mismatch_class_tier": 6,
         "middle_mismatch_count": 1,
         "double_middle_flag": false,
-        "bad_pattern_penalty": 0,
+        "bad_pattern_penalty": 1,
         "canonical_mismatch_classes": [
           "AA",
           "CT"
@@ -1508,6 +1667,11 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier",
+          "allow_tnna_like_overhangs"
         ]
       },
       {
@@ -1528,11 +1692,12 @@
         "total_loss": 3.710390753980212,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 0,
         "lexical_key": "3|0,1|payload,payload|A,G",
@@ -1540,7 +1705,7 @@
         "total_mismatch_class_tier": 3,
         "middle_mismatch_count": 1,
         "double_middle_flag": false,
-        "bad_pattern_penalty": 0,
+        "bad_pattern_penalty": 1,
         "canonical_mismatch_classes": [
           "AA",
           "GT"
@@ -1548,6 +1713,11 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier",
+          "allow_tnna_like_overhangs"
         ]
       },
       {
@@ -1568,11 +1738,12 @@
         "total_loss": 3.0894258413133375,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 0,
         "lexical_key": "3|0,1|payload,payload|A,T",
@@ -1580,7 +1751,7 @@
         "total_mismatch_class_tier": 6,
         "middle_mismatch_count": 1,
         "double_middle_flag": false,
-        "bad_pattern_penalty": 0,
+        "bad_pattern_penalty": 1,
         "canonical_mismatch_classes": [
           "AA",
           "TT"
@@ -1588,6 +1759,11 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier",
+          "allow_tnna_like_overhangs"
         ]
       },
       {
@@ -1608,11 +1784,12 @@
         "total_loss": 6.146817110848156,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 0,
         "lexical_key": "3|0,1|payload,payload|C,C",
@@ -1620,7 +1797,7 @@
         "total_mismatch_class_tier": 6,
         "middle_mismatch_count": 1,
         "double_middle_flag": false,
-        "bad_pattern_penalty": 0,
+        "bad_pattern_penalty": 1,
         "canonical_mismatch_classes": [
           "AC",
           "CT"
@@ -1628,6 +1805,11 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier",
+          "allow_tnna_like_overhangs"
         ]
       },
       {
@@ -1648,11 +1830,12 @@
         "total_loss": 5.762260157912932,
         "ligation_profile": "t4",
         "ligation_awareness_mode": "secondary",
+        "ligation_selection_mode": "hard_ligation_filter",
         "ligation_enabled": true,
         "ligation_legacy_mode": false,
         "ligation_edge_positions_available": true,
         "ligation_edge_comparison_available": true,
-        "ligation_state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+        "ligation_state_note": "Hard ligation filter active before PWM-preserving ranking",
         "midpoint_distance": 9,
         "default_strand_preference_count": 0,
         "lexical_key": "3|0,1|payload,payload|C,G",
@@ -1660,7 +1843,7 @@
         "total_mismatch_class_tier": 3,
         "middle_mismatch_count": 1,
         "double_middle_flag": false,
-        "bad_pattern_penalty": 0,
+        "bad_pattern_penalty": 1,
         "canonical_mismatch_classes": [
           "AC",
           "GT"
@@ -1668,6 +1851,11 @@
         "position_classes": [
           "edge",
           "middle"
+        ],
+        "ligation_filter_passed": false,
+        "ligation_filter_failures": [
+          "max_worst_mismatch_class_tier",
+          "allow_tnna_like_overhangs"
         ]
       }
     ],

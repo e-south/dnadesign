@@ -108,9 +108,10 @@
   "ligation": {
     "profile": "t4",
     "awareness_mode": "secondary",
+    "selection_mode": "hard_ligation_filter",
     "applied": true,
     "state": "active",
-    "state_note": "Ligation-aware scoring active; edge-vs-middle comparison available",
+    "state_note": "Hard ligation filter active before PWM-preserving ranking",
     "enabled": true,
     "legacy_mode": false,
     "candidate_positions": [
@@ -135,7 +136,10 @@
     "middle_mismatch_count": 1,
     "double_middle_flag": false,
     "bad_pattern_penalty": 0,
-    "decision_note": "PWM preserved first, ligation-aware tie-break applied"
+    "candidate_count_before_filter": 2592,
+    "candidate_count_after_filter": 60,
+    "filtered_candidate_count": 2532,
+    "decision_note": "Hard ligation filter removed 2532 candidates before ranking. PWM preserved first among surviving candidates."
   },
   "trace": {
     "sample_limit": 32,

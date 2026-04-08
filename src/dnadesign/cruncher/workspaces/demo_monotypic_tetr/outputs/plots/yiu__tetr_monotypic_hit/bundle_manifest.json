@@ -5,8 +5,8 @@
   "input_kind": "sample_hit",
   "payload_label": "tetr_payload",
   "payload_length": 19,
-  "selected_payload_sequence": "CTCTATATCTGATATAGAG",
-  "selected_complement_sequence": "GAGATATAGATGATATCTC",
+  "selected_payload_sequence": "CTCTATATTTGATATAGAG",
+  "selected_complement_sequence": "GAGATATAGATTATATCTC",
   "junction": {
     "start": 8,
     "end": 12,
@@ -22,26 +22,26 @@
   },
   "mismatches": [
     {
+      "payload_index": 8,
+      "junction_offset": 0,
+      "mutated_strand": "payload",
+      "native_base": "C",
+      "mutated_base": "T",
+      "opposing_base": "G"
+    },
+    {
       "payload_index": 10,
       "junction_offset": 2,
       "mutated_strand": "complement",
       "native_base": "C",
       "mutated_base": "T",
       "opposing_base": "G"
-    },
-    {
-      "payload_index": 11,
-      "junction_offset": 3,
-      "mutated_strand": "complement",
-      "native_base": "T",
-      "mutated_base": "G",
-      "opposing_base": "A"
     }
   ],
   "pwm_mode": "require",
   "pwm_effective": true,
-  "worst_loss": 0.0,
-  "total_loss": 0.0,
+  "worst_loss": 0.27692070770870103,
+  "total_loss": 0.5538414154174021,
   "provenance": {
     "spec_name": "tetr_monotypic_hit",
     "sample_name": "demo_monotypic_tetr",
@@ -141,7 +141,7 @@
       },
       "render_requested": true,
       "render_completed": true,
-      "last_rendered_at": "2026-04-07T19:50:21.399294+00:00",
+      "last_rendered_at": "2026-04-08T18:00:07.145315+00:00",
       "motif_layers_required": true
     },
     {
@@ -230,7 +230,7 @@
       },
       "render_requested": true,
       "render_completed": true,
-      "last_rendered_at": "2026-04-07T19:50:21.479200+00:00",
+      "last_rendered_at": "2026-04-08T18:00:07.215849+00:00",
       "motif_layers_required": false
     },
     {
@@ -319,7 +319,7 @@
       },
       "render_requested": true,
       "render_completed": true,
-      "last_rendered_at": "2026-04-07T19:50:21.508296+00:00",
+      "last_rendered_at": "2026-04-08T18:00:07.239672+00:00",
       "motif_layers_required": false
     }
   ],

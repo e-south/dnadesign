@@ -24,6 +24,11 @@ optimization:
     default_strand_preference: complement
     ligation_profile: t4
     ligation_awareness_mode: secondary
+    ligation_selection_mode: hard_ligation_filter
+    max_worst_mismatch_class_tier: 0
+    max_middle_mismatch_count: 1
+    allow_double_middle: false
+    allow_tnna_like_overhangs: false
     bad_pattern_heuristics: false
   pwm:
     mode: require

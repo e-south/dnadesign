@@ -4,8 +4,8 @@
   "state_id": "payload",
   "alphabet": "iupac_dna",
   "reference_payload_sequence": "CTGTATATATATACAG",
-  "selected_payload_sequence": "CTGTATATAAATACAG",
-  "selected_complement_sequence": "GACATAAATATATGTC",
+  "selected_payload_sequence": "CTGTATGTATATACAG",
+  "selected_complement_sequence": "GACATATATGTATGTC",
   "show_reference_payload_row": true,
   "junction": {
     "start": 6,
@@ -21,18 +21,18 @@
     {
       "payload_index": 6,
       "junction_offset": 0,
-      "mutated_strand": "complement",
-      "native_base": "T",
-      "mutated_base": "A",
-      "opposing_base": "A"
+      "mutated_strand": "payload",
+      "native_base": "A",
+      "mutated_base": "G",
+      "opposing_base": "T"
     },
     {
       "payload_index": 9,
       "junction_offset": 3,
-      "mutated_strand": "payload",
-      "native_base": "T",
-      "mutated_base": "A",
-      "opposing_base": "A"
+      "mutated_strand": "complement",
+      "native_base": "A",
+      "mutated_base": "G",
+      "opposing_base": "T"
     }
   ],
   "motif_layers": [

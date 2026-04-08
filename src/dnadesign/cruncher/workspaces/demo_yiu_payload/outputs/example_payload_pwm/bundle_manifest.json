@@ -1,15 +1,15 @@
 {
   "bundle_contract": "split_yiu_payload_bundle_v4",
   "input_contract": "split_yiu_payload_rendering_v4",
-  "spec_name": "soxs_monotypic_hit",
-  "input_kind": "sample_hit",
-  "payload_label": "soxs_payload",
-  "payload_length": 18,
-  "selected_payload_sequence": "GCACAACACGTATTGCGC",
-  "selected_complement_sequence": "CGTGTTGTGTGTAACGCG",
+  "spec_name": "example_payload_pwm",
+  "input_kind": "user_sequence",
+  "payload_label": null,
+  "payload_length": 21,
+  "selected_payload_sequence": "AAATTTCCCGGGGAATTTCCC",
+  "selected_complement_sequence": "TTTAAAGGGTCCTTTAAAGGG",
   "junction": {
-    "start": 7,
-    "end": 11,
+    "start": 9,
+    "end": 13,
     "offsets": [
       0,
       1,
@@ -17,22 +17,22 @@
       3
     ],
     "mode": "optimize",
-    "left_body_length": 7,
-    "right_body_length": 7
+    "left_body_length": 9,
+    "right_body_length": 8
   },
   "mismatches": [
     {
       "payload_index": 9,
-      "junction_offset": 2,
+      "junction_offset": 0,
       "mutated_strand": "complement",
       "native_base": "C",
       "mutated_base": "T",
       "opposing_base": "G"
     },
     {
-      "payload_index": 10,
+      "payload_index": 12,
       "junction_offset": 3,
-      "mutated_strand": "complement",
+      "mutated_strand": "payload",
       "native_base": "A",
       "mutated_base": "G",
       "opposing_base": "T"
@@ -43,15 +43,10 @@
   "worst_loss": 0.0,
   "total_loss": 0.0,
   "provenance": {
-    "spec_name": "soxs_monotypic_hit",
-    "sample_name": "demo_monotypic_soxs",
-    "hit_id": "demo_monotypic_soxs_elite_1b6ba8ad76ab",
-    "source_artifact_path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_monotypic_soxs/outputs/optimize/tables/elites.parquet",
-    "source_workspace": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_monotypic_soxs",
-    "metadata": {
-      "site_label": "soxs_site",
-      "payload_label": "soxs_payload"
-    }
+    "spec_name": "example_payload_pwm",
+    "sample_name": null,
+    "hit_id": null,
+    "source_artifact_path": null
   },
   "payload_view_requires_motif_layers": true,
   "view_contracts": [
@@ -141,7 +136,7 @@
       },
       "render_requested": true,
       "render_completed": true,
-      "last_rendered_at": "2026-04-08T18:00:09.978614+00:00",
+      "last_rendered_at": "2026-04-08T18:00:16.226698+00:00",
       "motif_layers_required": true
     },
     {
@@ -230,7 +225,7 @@
       },
       "render_requested": true,
       "render_completed": true,
-      "last_rendered_at": "2026-04-08T18:00:10.061559+00:00",
+      "last_rendered_at": "2026-04-08T18:00:16.312679+00:00",
       "motif_layers_required": false
     },
     {
@@ -319,11 +314,11 @@
       },
       "render_requested": true,
       "render_completed": true,
-      "last_rendered_at": "2026-04-08T18:00:10.094085+00:00",
+      "last_rendered_at": "2026-04-08T18:00:16.345322+00:00",
       "motif_layers_required": false
     }
   ],
   "composite_render_artifact_path": "payload_views.pdf",
-  "published_plot_artifact_path": null,
+  "published_plot_artifact_path": "outputs/example_payload_pwm__payload_views.pdf",
   "render_status": "rendered"
 }

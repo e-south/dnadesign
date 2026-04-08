@@ -5,8 +5,8 @@
   "input_kind": "sample_hit",
   "payload_label": "lexa_payload",
   "payload_length": 16,
-  "selected_payload_sequence": "CTGTATATAAATACAG",
-  "selected_complement_sequence": "GACATAAATATATGTC",
+  "selected_payload_sequence": "CTGTATGTATATACAG",
+  "selected_complement_sequence": "GACATATATGTATGTC",
   "junction": {
     "start": 6,
     "end": 10,
@@ -24,24 +24,24 @@
     {
       "payload_index": 6,
       "junction_offset": 0,
-      "mutated_strand": "complement",
-      "native_base": "T",
-      "mutated_base": "A",
-      "opposing_base": "A"
+      "mutated_strand": "payload",
+      "native_base": "A",
+      "mutated_base": "G",
+      "opposing_base": "T"
     },
     {
       "payload_index": 9,
       "junction_offset": 3,
-      "mutated_strand": "payload",
-      "native_base": "T",
-      "mutated_base": "A",
-      "opposing_base": "A"
+      "mutated_strand": "complement",
+      "native_base": "A",
+      "mutated_base": "G",
+      "opposing_base": "T"
     }
   ],
   "pwm_mode": "require",
   "pwm_effective": true,
-  "worst_loss": 0.0,
-  "total_loss": 0.0,
+  "worst_loss": 1.8458279931303645,
+  "total_loss": 3.691655986260729,
   "provenance": {
     "spec_name": "lexa_monotypic_hit",
     "sample_name": "demo_monotypic_lexa",
@@ -141,7 +141,7 @@
       },
       "render_requested": true,
       "render_completed": true,
-      "last_rendered_at": "2026-04-07T19:49:59.918506+00:00",
+      "last_rendered_at": "2026-04-08T18:00:01.688275+00:00",
       "motif_layers_required": true
     },
     {
@@ -230,7 +230,7 @@
       },
       "render_requested": true,
       "render_completed": true,
-      "last_rendered_at": "2026-04-07T19:49:59.989582+00:00",
+      "last_rendered_at": "2026-04-08T18:00:01.757019+00:00",
       "motif_layers_required": false
     },
     {
@@ -319,7 +319,7 @@
       },
       "render_requested": true,
       "render_completed": true,
-      "last_rendered_at": "2026-04-07T19:50:00.011590+00:00",
+      "last_rendered_at": "2026-04-08T18:00:01.778989+00:00",
       "motif_layers_required": false
     }
   ],

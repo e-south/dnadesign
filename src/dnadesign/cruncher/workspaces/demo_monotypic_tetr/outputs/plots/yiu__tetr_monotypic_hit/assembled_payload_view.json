@@ -3,8 +3,8 @@
   "state_id": "assembled_payload",
   "topology_kind": "linear_dsdna",
   "alphabet": "iupac_dna",
-  "primary_sequence": "CTCTATATCTGATATAGAG",
-  "complement_sequence": "GAGATATAGATGATATCTC",
+  "primary_sequence": "CTCTATATTTGATATAGAG",
+  "complement_sequence": "GAGATATAGATTATATCTC",
   "owners": [],
   "effect_tags": [],
   "boundaries": [
@@ -38,28 +38,29 @@
     },
     "mismatches": [
       {
+        "payload_index": 8,
+        "junction_offset": 0,
+        "mutated_strand": "payload",
+        "native_base": "C",
+        "mutated_base": "T",
+        "opposing_base": "G"
+      },
+      {
         "payload_index": 10,
         "junction_offset": 2,
         "mutated_strand": "complement",
         "native_base": "C",
         "mutated_base": "T",
         "opposing_base": "G"
-      },
-      {
-        "payload_index": 11,
-        "junction_offset": 3,
-        "mutated_strand": "complement",
-        "native_base": "T",
-        "mutated_base": "G",
-        "opposing_base": "A"
       }
     ],
-    "sequence_identity_to_reference_payload": true,
+    "sequence_identity_to_reference_payload": false,
     "base_highlights": {
-      "primary": [],
+      "primary": [
+        8
+      ],
       "complement": [
-        10,
-        11
+        10
       ]
     },
     "base_highlight_color": "#B91C1C",
