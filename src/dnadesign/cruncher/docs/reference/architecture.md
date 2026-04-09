@@ -1,17 +1,22 @@
 ## Cruncher architecture
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-04-05
 
 
-**Last updated by:** cruncher-maintainers on 2026-02-28
+**Last updated by:** cruncher-maintainers on 2026-04-05
 
 ### Contents
 - [Cruncher architecture](#cruncher-architecture)
-- [Run lifecycle](#run-lifecycle)
+- [Workflow families](#workflow-families)
+- [Fixed-length optimization lifecycle](#fixed-length-optimization-lifecycle)
+- [Cassette lifecycle](#cassette-lifecycle)
+- [YIU lifecycle](#yiu-lifecycle)
 - [Layers and responsibilities](#layers-and-responsibilities)
 - [On-disk layout](#on-disk-layout)
 - [Run artifacts](#run-artifacts)
+- [Cassette artifacts](#cassette-artifacts)
+- [YIU artifacts](#yiu-artifacts)
 - [Study artifacts](#study-artifacts)
 - [Portfolio artifacts](#portfolio-artifacts)
 - [Reproducibility boundaries](#reproducibility-boundaries)
@@ -20,7 +25,17 @@
 
 This doc describes the Cruncher run lifecycle, module boundaries, and on-disk artifacts.
 
-#### Run lifecycle
+#### Workflow families
+
+Cruncher is organized as peer workflow families, not one monolithic run shape:
+
+- **Fixed-length optimization workspaces** use `fetch -> lock -> parse -> sample -> analyze -> export`, then optional `study` and `portfolio` orchestration on top of the resulting run artifacts.
+- **Cassette workspaces** use `cassette init-workspace|validate|design|solve|show` and publish cassette-specific artifacts plus optional baserender job files.
+- **YIU workspaces** use `yiu init-workspace|validate|render|show` and publish one payload bundle with three BaseRender-ready views.
+
+These families deliberately keep separate workspace contracts, output trees, and orchestration seams. New families should add their own lane-specific artifacts rather than overload `sample`, `cassette`, or `yiu`.
+
+#### Fixed-length optimization lifecycle
 
 1. **fetch** -> cache motifs/sites and update `catalog.json`
 2. **lock** -> resolve TFs to exact cached artifacts (`<workspace>/.cruncher/locks/<config>.lock.json`)
@@ -28,6 +43,32 @@ This doc describes the Cruncher run lifecycle, module boundaries, and on-disk ar
 4. **sample** -> run MCMC and write sequences/trace + manifests
 5. **analyze** -> curated `plots/*` and `tables/table__*` artifacts + report from sample artifacts (offline, written into the run directory)
 6. **export** -> sequence-centric contract tables for wrappers/operators (`cruncher export sequences`)
+
+#### Cassette lifecycle
+
+The cassette workflow is a peer lane, not a variant of `sample`:
+
+1. optional **cassette init-workspace** -> scaffold a runbook-only cassette workspace with shipped solve profiles
+2. author `<workspace>/configs/cassettes/<name>.cassette.yaml` or `<workspace>/configs/cassettes/<name>.cassette.solve.yaml`
+3. author or select a local nickase catalog (for example `<workspace>/inputs/nickases/*.yaml`) or use a built-in solve preset
+4. **cassette validate** -> strict schema + invariant check plus deterministic planning report
+5. **cassette design** -> write cassette-specific manifest, status, report, provenance snapshots, views, and optional baserender jobs
+6. **cassette solve** -> bounded search, selected-hit materialization, shared view publication, and solve-level/per-hit baserender jobs
+7. **cassette show** -> inspect status and artifact paths for one explicit cassette run
+
+This workflow does not currently use `core/evaluator.py`, `gibbs_anneal`, `study`/`portfolio` orchestration, or workspace `run_index.json`.
+
+#### YIU lifecycle
+
+The YIU workflow is a peer lane, not a cassette submode:
+
+1. optional **yiu init-workspace** -> scaffold a runbook-only YIU workspace with one payload example spec
+2. author `<workspace>/configs/yiu/<name>.yiu.yaml`
+3. **yiu validate** -> strict schema + payload normalization check under `split_yiu_payload_rendering_v4`
+4. **yiu render** -> normalize the payload, exhaustively optimize the junction/mismatch plan, write the payload bundle, and optionally render the three payload views
+5. **yiu show** -> inspect the bundle contract, provenance, selected junction window, PWM state, and available renders for one YIU bundle
+
+This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, cassette-specific render contracts, or any legacy state graph.
 
 ---
 
@@ -72,6 +113,51 @@ Core contract:
 - run directory layout + status helpers
 - manifest + artifact bookkeeping utilities
 
+#### `cassette/` (dual-context cassette domain)
+- cassette spec and nickase catalog schemas
+- workspace-relative loading and path validation
+- deterministic nick-site scanning and bounded-segment planning
+- cassette-specific artifact helpers
+- no dependency on legacy `sample` optimizer contracts
+
+#### `yiu/` (payload-centric YIU domain)
+- YIU spec schema for `split_yiu_payload_rendering_v4`, exposed through the stable `yiu/spec_models.py` facade
+- focused input, PWM, and rendering validators live in `yiu/spec_input_models.py`, `yiu/spec_pwm_models.py`, and `yiu/spec_rendering_models.py`
+- payload normalization for `user_sequence` and `sample_hit`
+- public input-resolution orchestration lives in `yiu/payload_resolution.py`, while sample-hit artifact IO stays isolated in `yiu/sample_hit_sources.py`
+- public PWM-resolution orchestration lives in `yiu/pwm_context.py`
+- inline/file PWM source dispatch lives in `yiu/pwm_context_sources.py`
+- sample-backed PWM-context orchestration lives in `yiu/pwm_context_sample_context.py`
+- selected-occurrence parquet loading lives in `yiu/pwm_context_sample_occurrences.py`
+- sample-backed motif-instance materialization lives in `yiu/pwm_context_sample_motifs.py`
+- exhaustive optimization, split, display-orientation, and junction derivation
+- shared view fragments live in `yiu/view_common.py`
+- shared manifest/inventory/normalized load-persist helpers live in `yiu/bundle_state.py`
+- shared typed render/show bundle-artifact surfaces for app/CLI boundaries live in `yiu/bundle_surface.py`
+- `yiu/render.py` is the thin public render facade
+- render preflight, runtime loading, and transactional plan assembly live in `yiu/render_plan.py`
+- panel execution and output publication live in `yiu/render_execution.py`
+- failure-state persistence and cleanup of partial render artifacts live in `yiu/render_state.py`
+- `app/yiu_workflow/render.py` owns bundle publication orchestration
+- `app/yiu_workflow/show.py` owns read-only inspection and drift checking over the shared bundle surfaces
+- payload bundle publication orchestration lives in `yiu/publish.py`
+- payload bundle filesystem writes and debug-job emission live in `yiu/publish_io.py`
+- bundle layout and artifact-path planning live in `yiu/publish_layout.py`
+- view-entry/render-job planning lives in `yiu/view_catalog.py`
+- normalized-payload, inventory, and manifest assembly lives in `yiu/publish_inventory.py`
+- display-title policy lives in `yiu/view_styles.py`
+- producer-owned YIU visual foundations live in `yiu/visual_foundations.py`
+- named visual-direction deltas live in `yiu/visual_directions.py`
+- view registry and style profiles live in `yiu/visual_system.py`
+- the named YIU visual system is `bench_strip`, with `evidence_ribbon` for payload truth and `operator_strip` for assembly-oriented views
+- payload mismatch/motif/meta shaping lives in `yiu/view_payload_content.py`
+- payload-view contract shells live in `yiu/view_payload_contracts.py`
+- split/assembled sequence-contract assembly lives in `yiu/view_sequence_contracts.py`
+- split sticky-end and assembled junction metadata policy lives in `yiu/view_sequence_metadata.py`
+- bundle-path invariants live in `yiu/bundle_paths.py`
+- panel render/load/save helpers live in `yiu/render_panels.py`
+- no dependency on legacy `sample` or cassette-specific planner contracts
+
 #### `viz/` (plotting)
 - matplotlib/logomaker setup
 - PWM logo rendering + visualization helpers
@@ -81,6 +167,7 @@ Core contract:
 
 #### `app/` (orchestration)
 - fetch / lock / parse / sample / analyze coordination
+- cassette workflow coordination in `app/cassette_workflow.py`
 - study coordination (`study run|summarize|show`)
 - portfolio coordination (`portfolio run|show`)
 - translates CLI intent + config into concrete runs and artifacts
@@ -121,7 +208,18 @@ Current Cruncher handoff for `elites_showcase.*` and `chain_trajectory_video.mp4
    - or equivalent in-memory `Record` objects through baserender public APIs
 3. Baserender validates contracts, performs layout/rendering, and emits assets.
 
+For payload-centric YIU, Cruncher publishes shared `yiu_payload_visual_v1` contracts only. Downstream, baserender keeps the adapter split explicit: `yiu_payload_visual_v1.py` owns public adapter orchestration, `yiu_payload_sequence_projection.py` owns sequence-evidence projection, and `yiu_payload_motif_overlay.py` owns payload motif `Feature`/`Effect` assembly.
+
 For `chain_trajectory_video.mp4`, Cruncher first resolves selected-chain trajectory rows and sampled frame indices, then writes temporary record rows and passes a strict sequence-rows video job contract to baserender.
+
+For cassette runs, Cruncher now publishes shared, file-based visual contracts rather than a Cruncher-owned render payload:
+
+* `views/linear_duplex.v1.json` for the duplex interpretation
+* `views/ssdna_hairpin.v1.json` for the folded hairpin interpretation
+* `views/views_manifest.v1.json` for grouping and discovery
+* sibling `baserender_jobs/*.job.yaml` files that reference those contracts by path
+
+Cassette runs do not call baserender directly; they publish the contracts and jobs for downstream consumers and fail fast on schema violations before write-out.
 
 The showcase/video renderers do not require overlap tables; overlap metrics remain separate analysis artifacts.
 
@@ -143,8 +241,12 @@ Recommended workspace layout:
 <workspace>/
 configs/
   config.yaml
+  cassettes/             # optional cassette specs
+  yiu/                   # optional YIU specs
   studies/               # optional study specs
   portfolios/            # optional portfolio specs
+inputs/
+  nickases/              # optional local nickase catalogs
 .cruncher/
 outputs/
 ```
@@ -208,6 +310,18 @@ Within each run directory, Cruncher uses a stable, stage-agnostic subdirectory l
   export/
 ```
 
+Cassette runs use a separate deterministic output root:
+
+```
+<workspace>/outputs/cassettes/<spec.name>/<design_id>/
+```
+
+YIU runs use one family-rooted deterministic payload bundle root:
+
+```
+<workspace>/outputs/<spec.name>/
+```
+
 ---
 
 #### Run artifacts
@@ -225,6 +339,45 @@ A typical **sample** run directory contains:
 - `plots/*` - curated analysis plots and catalog logo renders
 - `plots/chain_trajectory_video.mp4` - optional trajectory-video artifact (`analysis.trajectory_video.enabled=true`)
 - `analysis/tables/table__*` - curated table outputs
+
+#### Cassette artifacts
+
+A typical **cassette** run directory contains:
+
+- `meta/cassette_manifest.json`, `meta/cassette_status.json` - cassette-stage metadata + status
+- `provenance/spec_used.yaml`, `provenance/nickase_catalog.yaml` - frozen input snapshots
+- `analysis/reports/report.json`, `analysis/reports/report.md` - deterministic planning report
+- `export/table__candidates.csv` - candidate table (one row for the satisfied candidate when present)
+- `views/linear_duplex.v1.json`, `views/ssdna_hairpin.v1.json`, `views/views_manifest.v1.json` - shared file-based visual contracts
+- `baserender_jobs/linear_duplex.job.yaml`, `baserender_jobs/ssdna_hairpin.job.yaml` - optional downstream baserender jobs
+
+Cassette runs are intentionally isolated from `sample` runs:
+
+- they do not write `meta/run_manifest.json`
+- they do not append to workspace `run_index.json`
+- they do not share `optimize/`, `plots/`, or `analysis/tables/` sample-stage contracts
+
+---
+
+#### YIU artifacts
+
+A typical **YIU** run directory contains:
+
+- `bundle_summary.json` - operator-facing 5' to 3' run summary with one `views` block for payload, split-left, split-right, and assembled reference-vs-mismatch-present rows
+- `bundle_manifest.json` - machine-facing payload bundle metadata under `split_yiu_payload_bundle_v4`
+- `normalized_payload.json` - normalized semantic payload object for validation and debug
+- `visual_inventory.json` - machine-facing bundle-local visual inventory and render-truth index
+- `payload_view.json` - pure payload contract with optional PWM motif layers
+- `split_payload_view.jsonl` - JSONL split payload contract rows (`split_payload_left`, then `split_payload_right`)
+- `assembled_payload_view.json` - rejoined payload machine contract in original payload order with one explicit `junction_span`
+- `payload_views.pdf` - operator-facing composite render listed in `visual_inventory.json`
+- `baserender_jobs/*.job.yaml` - optional debug-only jobs when explicitly requested
+
+YIU runs are intentionally isolated from both `sample` and `cassette` runs:
+
+- they do not write `meta/run_manifest.json`
+- they do not append to workspace `run_index.json`
+- they do not reuse cassette-specific `views/*.v1.json` render contracts
 
 ---
 

@@ -23,6 +23,7 @@ from dnadesign.cruncher.app.motif_artifacts import build_manifest
 from dnadesign.cruncher.cli.catalog_execution import (
     collect_site_export_rows,
     write_densegen_artifacts,
+    write_meme_artifacts,
     write_site_export,
 )
 from dnadesign.cruncher.cli.catalog_targets import _resolve_site_targets, _resolve_targets
@@ -192,6 +193,18 @@ def _print_densegen_export_table(*, table_rows: list[dict[str, str]], manifest_p
     console.print(f"[green]Wrote manifest:[/] {manifest_path}")
 
 
+def _print_meme_export_table(*, table_rows: list[dict[str, str]], manifest_path: Path) -> None:
+    table = Table(title="MEME motif exports", header_style="bold")
+    table.add_column("TF")
+    table.add_column("Source")
+    table.add_column("Motif ID")
+    table.add_column("Artifact")
+    for row in table_rows:
+        table.add_row(row["tf_name"], row["source"], row["motif_id"], row["artifact"])
+    console.print(table)
+    console.print(f"[green]Wrote manifest:[/] {manifest_path}")
+
+
 def _print_site_export_table(*, table_rows: list[dict[str, str]], out_path: Path, row_count: int) -> None:
     table = Table(title="DenseGen binding-site export", header_style="bold")
     table.add_column("TF")
@@ -205,6 +218,90 @@ def _print_site_export_table(*, table_rows: list[dict[str, str]], out_path: Path
 
 
 def register_catalog_export_commands(app: typer.Typer) -> None:
+    @app.command("export-meme", help="Export cached motifs as minimal MEME files (one file per motif).")
+    def export_meme(
+        config: Path | None = typer.Argument(
+            None,
+            help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+            metavar="CONFIG",
+        ),
+        config_option: Path | None = typer.Option(
+            None,
+            "--config",
+            "-c",
+            help="Path to cruncher config.yaml (overrides positional CONFIG).",
+        ),
+        tf: list[str] = typer.Option([], "--tf", help="TF name to include (repeatable)."),
+        ref: list[str] = typer.Option([], "--ref", help="Catalog reference (<source>:<motif_id>, repeatable)."),
+        set_index: int | None = typer.Option(
+            None,
+            "--set",
+            help="Regulator set index from config (1-based).",
+        ),
+        source: str | None = typer.Option(
+            None,
+            "--source",
+            help="Limit TF resolution to a single source adapter.",
+        ),
+        out_dir: Path | None = typer.Option(
+            None,
+            "--out",
+            "-o",
+            help="Directory to write MEME files (defaults to <out_dir>/artifacts/meme).",
+        ),
+        producer: str = typer.Option(
+            "cruncher",
+            "--producer",
+            help="Producer label written into the export manifest.",
+        ),
+        overwrite: bool = typer.Option(False, "--overwrite", help="Allow overwriting existing files."),
+    ) -> None:
+        try:
+            config_path = resolve_config_path(config_option or config)
+        except ConfigResolutionError as exc:
+            console.print(str(exc))
+            raise typer.Exit(code=1)
+        cfg = load_config_or_exit(config_path)
+        producer_clean = producer.strip()
+        if not producer_clean:
+            raise typer.BadParameter("--producer must be a non-empty string.")
+        targets, _catalog = _resolve_densegen_export_targets(
+            cfg=cfg,
+            config_path=config_path,
+            tfs=tf,
+            refs=ref,
+            set_index=set_index,
+            source=source,
+        )
+        catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
+        base_dir = resolve_workspace_root(config_path)
+        default_out = base_dir / cfg.out_dir / "artifacts" / "meme"
+        out_dir = _resolve_user_path(out_dir or default_out, base_dir=base_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            table_rows, manifest_entries = write_meme_artifacts(
+                cfg=cfg,
+                catalog_root=catalog_root,
+                targets=targets,
+                out_dir=out_dir,
+                overwrite=overwrite,
+            )
+        except FileExistsError as exc:
+            console.print(f"[red]Artifact already exists:[/] {exc}")
+            raise typer.Exit(code=1)
+
+        manifest = {
+            "schema_version": "1.0",
+            "producer": producer_clean,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "config_path": str(_portable_manifest_path(config_path, start=_manifest_anchor(config_path))),
+            "catalog_root": str(_portable_manifest_path(catalog_root, start=_manifest_anchor(config_path))),
+            "artifacts": manifest_entries,
+        }
+        manifest_path = out_dir / "meme_manifest.json"
+        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
+        _print_meme_export_table(table_rows=table_rows, manifest_path=manifest_path)
+
     @app.command("export-densegen", help="Export DenseGen motif artifacts (one file per motif).")
     def export_densegen(
         config: Path | None = typer.Argument(

@@ -16,6 +16,8 @@ import json
 import numpy as np
 
 from dnadesign.cruncher.config.schema_v3 import SampleConfig
+from dnadesign.cruncher.core.objectives.capabilities import resolve_score_scale_capabilities
+from dnadesign.cruncher.core.objectives.compiler import ObjectivePlanCompilation, compile_objective_plan
 from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.utils.hashing import sha256_bytes
@@ -66,6 +68,7 @@ def _validate_objective_preflight(sample_cfg: SampleConfig, *, n_tfs: int) -> No
     scale = sample_cfg.objective.score_scale
     combine_cfg = sample_cfg.objective.combine
     softmin_enabled = bool(sample_cfg.objective.softmin.enabled)
+    multiplicity_enabled = bool(sample_cfg.objective.multiplicity.enabled)
 
     if n_tfs >= 2 and scale == "llr":
         raise ConfigError(
@@ -86,6 +89,64 @@ def _validate_objective_preflight(sample_cfg: SampleConfig, *, n_tfs: int) -> No
             "cruncher.sample.objective.score_scale='consensus-neglop-sum'. Disable softmin or switch combine to "
             "min/softmin-compatible mode."
         )
+
+    if multiplicity_enabled and n_tfs != 1:
+        raise ConfigError(
+            "cruncher.sample.objective.multiplicity.enabled=true is only supported for runs with exactly one TF."
+        )
+
+
+def prepare_objective_plan(
+    *,
+    sample_cfg: SampleConfig,
+    tfs: list[str],
+    pwms: dict[str, PWM],
+) -> ObjectivePlanCompilation:
+    _validate_objective_preflight(sample_cfg, n_tfs=len(tfs))
+    multiplicity_cfg = sample_cfg.objective.multiplicity
+    if multiplicity_cfg.enabled:
+        scale_caps = resolve_score_scale_capabilities(sample_cfg.objective.score_scale)
+        if not scale_caps.occurrence_aggregation_safe:
+            raise ConfigError(
+                "cruncher.sample.objective.multiplicity requires an occurrence-safe score scale. "
+                "Use llr, normalized-llr, or z."
+            )
+        if float(sample_cfg.elites.select.diversity) > 0.0:
+            raise ConfigError(
+                "cruncher.sample.elites.select.diversity is unsupported when multiplicity scoring is enabled."
+            )
+        if bool(sample_cfg.elites.postprocess.trim_uncovered_internal):
+            raise ConfigError(
+                "cruncher.sample.elites.postprocess.trim_uncovered_internal is unsupported when multiplicity "
+                "scoring is enabled."
+            )
+        if not tfs:
+            raise ConfigError("Multiplicity scoring requires exactly one active TF.")
+        tf = tfs[0]
+        pwm = pwms.get(tf)
+        if pwm is None:
+            raise ConfigError(f"Missing PWM for multiplicity objective TF '{tf}'.")
+        copies = int(multiplicity_cfg.copies)
+        min_gap = int(multiplicity_cfg.distinctness.min_gap)
+        distinctness_mode = str(multiplicity_cfg.distinctness.mode)
+        if distinctness_mode == "interval":
+            minimum_span = int(pwm.length) * copies + max(0, copies - 1) * min_gap
+        elif distinctness_mode == "offset":
+            minimum_span = int(pwm.length) + max(0, copies - 1) * (min_gap + 1)
+        else:
+            raise ConfigError(
+                f"Unsupported cruncher.sample.objective.multiplicity.distinctness.mode value '{distinctness_mode}'."
+            )
+        if minimum_span > int(sample_cfg.sequence_length):
+            raise ConfigError(
+                "Requested multiplicity objective is infeasible for the configured sequence length. "
+                f"Need at least {minimum_span} bp for copies={copies}, motif_width={pwm.length}, "
+                f"min_gap={min_gap}, distinctness_mode={distinctness_mode}."
+            )
+    try:
+        return compile_objective_plan(sample_cfg=sample_cfg, tfs=tfs, pwms=pwms)
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
 
 
 def _softmin_schedule_payload(sample_cfg: SampleConfig) -> dict[str, object]:
@@ -221,6 +282,7 @@ __all__ = [
     "_assert_trace_meta_aligned",
     "_core_def_hash",
     "_mcmc_cooling_payload",
+    "prepare_objective_plan",
     "_resolve_elite_pool_size",
     "_resolve_final_softmin_beta",
     "_softmin_schedule_payload",

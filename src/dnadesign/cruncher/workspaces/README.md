@@ -1,8 +1,19 @@
 ## Workspaces
 
-Put cruncher workspaces in this folder. Each workspace should contain
-`configs/config.yaml`, `configs/runbook.yaml`, and a sibling `runbook.md`, plus
-any inputs you want to keep alongside it.
+Put Cruncher workspaces in this folder. Not every workspace uses the same config
+shape. The packaged workspace roots here fall into three kinds:
+
+- `config` workspaces: fixed-length optimization roots with `configs/config.yaml`,
+  optional `configs/studies/*.study.yaml`, `configs/runbook.yaml`, and a sibling
+  `runbook.md`
+- `runbook-family` workspaces: runbook-driven roots for peer families such as
+  cassette or YIU, with `configs/runbook.yaml`, a sibling `runbook.md`, and
+  family-specific spec folders such as `configs/cassettes/` or `configs/yiu/`
+- `family-spec` workspaces: roots discovered from family spec globs even when
+  they do not expose a generic `configs/config.yaml`
+
+Optimization workspaces still require `configs/config.yaml`. YIU and cassette
+workspaces do not.
 
 Runbook coupling contract:
 
@@ -13,13 +24,27 @@ Runbook coupling contract:
 - Optional verification or follow-up commands belong in a separate optional
   section so the one-line run command never drifts from the standard sequence.
 
-For optimization workspaces (non-portfolio), keep standard study specs:
+For representative-hit optimization workspaces (non-portfolio), keep standard study specs:
 `configs/studies/length_vs_score.study.yaml` and
 `configs/studies/diversity_vs_score.study.yaml`.
 
+Occurrence-aware multiplicity demos are narrower on purpose: keep them runnable
+through `analyze`, inspect the occurrence sidecars and static plots, and do not
+pretend they are portfolio-ready until the downstream readers support that
+contract.
+
 Current layout:
 
-- didactic demos: `demo_pairwise/`, `demo_multitf/`
+- didactic demos:
+  `demo_pairwise/`,
+  `demo_multitf/`,
+  `demo_monotypic_baer/`,
+  `demo_monotypic_cpxr/`,
+  `demo_monotypic_lexa/`,
+  `demo_monotypic_soxr/`,
+  `demo_monotypic_soxs/`,
+  `demo_monotypic_tetr/`,
+  `demo_yiu_payload/`
 - pairwise optimization slices:
   `pairwise_cpxr_baer/`,
   `pairwise_cpxr_lexa/`,
@@ -50,6 +75,17 @@ src/dnadesign/cruncher/workspaces/
     inputs/                   # demo inputs
     .cruncher/                # local cache + lockfiles (generated)
     outputs/                  # run outputs (parse/sample/analyze/report)
+  demo_yiu_payload/
+    configs/
+      runbook.yaml            # machine runbook for the YIU family lane
+      yiu/
+        <workflow>.yiu.yaml
+    motifs/                   # optional YIU-local PWM context sidecars
+      <workflow>_pwm_context.yaml
+    runbook.md
+    outputs/
+      <workflow>/
+      <workflow>__payload_views.pdf
   portfolios/
     configs/
       runbook.yaml
@@ -63,7 +99,7 @@ For the ten pairwise/multitf optimization slices above, keep one shared
 `workspace.regulator_sets`, discovery/catalog source IDs, and analysis pairwise
 projection.
 
-Standard lifecycle for any workspace:
+Representative-hit optimization lifecycle:
 
 ```bash
 # Pin config path for repeated CLI calls.
@@ -83,6 +119,27 @@ cruncher sample --force-overwrite -c "$CONFIG"
 cruncher analyze --summary -c "$CONFIG"
 # Export latest elite sequences for downstream use.
 cruncher export sequences --latest -c "$CONFIG"
+```
+
+Occurrence-aware multiplicity demo lifecycle:
+
+```bash
+# Pin config path for repeated CLI calls.
+CONFIG="$PWD/configs/config.yaml"
+# Fetch TF binding sites from the configured source.
+cruncher fetch sites ... -c "$CONFIG"
+# Run motif discovery over fetched site evidence.
+cruncher discover motifs ... -c "$CONFIG"
+# Freeze motif/source provenance for deterministic downstream steps.
+cruncher lock -c "$CONFIG"
+# Parse inputs into normalized Cruncher artifacts.
+cruncher parse --force-overwrite -c "$CONFIG"
+# Generate candidate sequences and occurrence-aware sidecars.
+cruncher sample --force-overwrite -c "$CONFIG"
+# Render the standard static plot suite from occurrence-aware placements.
+cruncher analyze --summary -c "$CONFIG"
+# Inspect the resulting run manifest + artifact inventory.
+cruncher runs show outputs -c "$CONFIG"
 ```
 
 Standard machine runbook execution:
@@ -128,7 +185,13 @@ cruncher workspaces reset --root src/dnadesign/cruncher/workspaces --confirm
 cruncher workspaces reset --root src/dnadesign/cruncher/workspaces --all-workspaces --confirm
 ```
 
-Tip: `cd` into a workspace and run cruncher commands without passing `--config`; Cruncher resolves `configs/config.yaml` automatically. You can also run from anywhere with `--workspace <name>` or inspect what is available via `cruncher workspaces list`.
+Tip: `cd` into a fixed-length optimization workspace and run cruncher commands without passing `--config`; Cruncher resolves `configs/config.yaml` automatically for that workspace kind. For runbook-family workspaces, use the family CLI surface or `cruncher workspaces run --runbook configs/runbook.yaml`. You can also run from anywhere with `--workspace <name>` or inspect what is available via `cruncher workspaces list`.
+
+`cruncher workspaces list` is intentionally tool-local. For repo-wide runbook
+discovery across tools, use [`docs/runbooks/README.md`](../../../docs/runbooks/README.md)
+or `uv run ops catalog list --section tool-sources`.
+
+YIU bundle layout and sample-backed handoff rules live in [YIU Workflow](../docs/guides/yiu_workflow.md), [YIU Artifacts](../docs/reference/yiu_artifacts.md), and the relevant workspace runbook.
 
 Packaged workspace configs resolve `discover.tool_path` relative to their `configs/config.yaml`, so keep packaged workspaces under the repository layout (`src/dnadesign/cruncher/workspaces/...`). If you copy a workspace elsewhere, update `discover.tool_path` explicitly before running `discover motifs`.
 
@@ -155,7 +218,7 @@ Portfolio source `run_dir` guidance:
 - single regulator set workspace: `run_dir: outputs`
 - multi-set workspace: `run_dir: outputs/set<index>_<tf-slug>`
 
-Portfolio source precondition per included workspace run:
+Portfolio source precondition per included representative-hit workspace run:
 
 ```bash
 # Compute analysis summaries for generated sequence sets.

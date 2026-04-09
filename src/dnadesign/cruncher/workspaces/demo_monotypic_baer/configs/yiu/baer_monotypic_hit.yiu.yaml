@@ -1,0 +1,50 @@
+yiu:
+  contract: split_yiu_payload_rendering_v4
+  schema_version: 1
+  name: baer_monotypic_hit
+
+input:
+  kind: sample_hit
+  sample_hit:
+    hit_id: demo_monotypic_baer_elite_bedae1e5b7bc
+    sample_name: demo_monotypic_baer
+    source_artifact_path: outputs/optimize/tables/elites.parquet
+    metadata:
+      site_label: baer_site
+      payload_label: baer_payload
+
+optimization:
+  junction:
+    mode: optimize
+    overhang_length: 4
+    max_payload_body_length: 12
+  mismatches:
+    count: 2
+    candidate_positions: [0, 1, 2, 3]
+    allowed_strands: [complement, payload]
+    strand_mode: per_position
+    default_strand_preference: complement
+    ligation_profile: t4
+    ligation_awareness_mode: secondary
+    ligation_selection_mode: hard_ligation_filter
+    max_worst_mismatch_class_tier: 0
+    max_middle_mismatch_count: 1
+    allow_double_middle: false
+    allow_tnna_like_overhangs: false
+    bad_pattern_heuristics: false
+  pwm:
+    mode: require
+    source:
+      kind: sample_context
+    objective:
+      primary: maximin
+      secondary:
+        - total_loss
+        - ligation_awareness
+        - midpoint_proximity
+        - default_strand_preference
+        - lexical_stability
+
+output:
+  bundle_dir: outputs/plots/yiu__baer_monotypic_hit
+  emit_render_jobs_debug: false

@@ -195,6 +195,16 @@ sample:
     bidirectional: true
     score_scale: normalized-llr   # normalized-llr | llr | logp | z | consensus-neglop-sum
     combine: min                  # min | sum
+    multiplicity:
+      enabled: false
+      copies: 1
+      distinctness:
+        mode: interval
+        min_gap: 0
+        strand_rule: collapse_same_locus
+      aggregation:
+        selector: top_k_distinct
+        scalar: weakest_selected
     softmin:
       enabled: true
       schedule: fixed             # fixed | linear
@@ -276,6 +286,17 @@ Notes:
 - `sequence_length` must be at least the widest PWM after applying `sample.motif_width` bounds.
 - `motif_width.maxw` enforces a contiguous max-information trim during sampling only.
 - Orientation normalization is automatic when `objective.bidirectional=true`.
+- `objective.multiplicity.enabled=true` switches the sample scorer to an occurrence-aware objective plan for a single locked TF/PWM in v1.
+- Multiplicity v1 requires exactly one TF in the active regulator set, an occurrence-safe per-window score scale, `sample.elites.select.diversity: 0.0`, and `sample.elites.postprocess.trim_uncovered_internal: false`.
+- `objective.multiplicity.copies` requests the number of distinct selected occurrences.
+- `objective.multiplicity.distinctness.mode: interval` requires non-overlapping windows, expanded by `objective.multiplicity.distinctness.min_gap`.
+- `objective.multiplicity.distinctness.mode: offset` requires distinct window starts, so partial overlap is allowed; `min_gap: 0` permits adjacent starts, and larger values require at least `min_gap + 1` bp between starts.
+- `objective.multiplicity.aggregation.selector: top_k_distinct` uses exact selection for the configured distinctness mode rather than greedy overlap masking.
+- `objective.multiplicity.aggregation.scalar: weakest_selected` exposes the weakest selected occurrence as the scalar objective value seen by the optimizer.
+- Same-locus `+` and `-` hits count once when `objective.multiplicity.distinctness.strand_rule=collapse_same_locus`.
+- Occurrence-aware multiplicity disables the representative-hit incremental/targeted fast paths, so it can run substantially slower than standard sample runs at the same chains/sweeps. Treat pairwise-sized sweep budgets as long-form runs, not quick demos.
+- Occurrence-aware v1 runs support `analyze` for the standard static plot suite, including `plots/elites_showcase.*` with multiple placements from one TF.
+- `export sequences`, studies, and portfolio aggregation still expect the representative-hit contract and fail fast when `representative_hit_contract=false`.
 - MMR uses a hybrid distance: full-sequence Hamming + motif-core weighted Hamming (low-information core positions get higher weight).
 - `moves.overrides.*` contains optional expert controls (operator mix + adaptation). Leave unset unless you are actively tuning proposals.
 - Default operator mix is `S=0.85, B=0.07, M=0.04, I=0.04, L=0, W=0` (not `P(S)=1`).

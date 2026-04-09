@@ -159,13 +159,20 @@ jobs:
         if: >
           needs.detect-ci-scope.outputs.run-full-core == 'true' ||
           contains(format(',{0},', needs.detect-ci-scope.outputs.affected-tools-csv), ',baserender,')
+        shell: bash
         run: |
           if command -v ffmpeg >/dev/null 2>&1; then
             ffmpeg -version
             exit 0
           fi
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+
+          echo "FFmpeg not present on runner; attempting bounded apt install."
+          if timeout 300 bash -lc 'sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg'; then
+            ffmpeg -version
+            exit 0
+          fi
+
+          echo "FFmpeg install timed out or failed; continuing without video-output coverage."
 
       - name: Docs checks (links + naming)
         run: uv run python -m dnadesign.devtools.docs_checks

@@ -33,3 +33,10 @@ def test_elites_showcase_uses_public_baserender_imports() -> None:
     file_path = _package_root() / "src" / "analysis" / "plots" / "elites_showcase.py"
     text = file_path.read_text()
     assert "from dnadesign.baserender import " in text
+
+
+def test_yiu_visual_system_is_producer_local() -> None:
+    file_path = _package_root() / "src" / "yiu" / "visual_system.py"
+    text = file_path.read_text()
+    assert "dnadesign.baserender" not in text
+    assert "visual_directions" in text

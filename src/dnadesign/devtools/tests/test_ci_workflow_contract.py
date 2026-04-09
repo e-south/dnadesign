@@ -39,7 +39,10 @@ def test_core_lane_installs_ffmpeg() -> None:
     assert "run-full-core == 'true'" in condition
     assert "baserender" in condition
     assert "command -v ffmpeg" in run_script
-    assert "sudo apt-get install -y ffmpeg" in run_script
+    assert "timeout 300 bash -lc" in run_script
+    assert "sudo apt-get update" in run_script
+    assert "apt-get install -y --no-install-recommends ffmpeg" in run_script
+    assert "continuing without video-output coverage" in run_script
 
 
 def test_ci_gate_is_the_required_aggregate_check() -> None:

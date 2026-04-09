@@ -9,6 +9,8 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
+import warnings
+
 import pandas as pd
 import pytest
 
@@ -125,3 +127,59 @@ def test_unique_fraction_uses_canonical_column_without_identity_remap(monkeypatc
     seq_metrics = diagnostics["metrics"]["sequences"]
     assert seq_metrics["unique_sequences_canonical"] == 1
     assert seq_metrics["unique_sequences_raw"] == 2
+
+
+def test_single_tf_all_nan_balance_metrics_do_not_emit_runtime_warning() -> None:
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        diagnostics = summarize_sampling_diagnostics(
+            trace_idata=None,
+            sequences_df=pd.DataFrame({"phase": ["draw"], "sequence": ["ATGC"]}),
+            elites_df=pd.DataFrame(
+                {
+                    "id": ["elite-1"],
+                    "rank": [1],
+                    "score_tf1": [0.0],
+                    "norm_tf1": [0.0],
+                }
+            ),
+            elites_hits_df=None,
+            tf_names=["tf1"],
+            optimizer={"kind": "gibbs_anneal"},
+            optimizer_stats={},
+            sample_meta={},
+            trace_required=False,
+            overlap_summary={},
+        )
+
+    elites_metrics = diagnostics["metrics"]["elites"]
+    assert elites_metrics["balance_index_max"] is None
+    assert elites_metrics["balance_index_median"] is None
+    assert elites_metrics["normalized_balance_median"] is None
+    assert elites_metrics["normalized_min_median"] == 0.0
+
+
+def test_elite_shortfall_warning_is_not_misreported_as_diversity_when_score_only() -> None:
+    diagnostics = summarize_sampling_diagnostics(
+        trace_idata=None,
+        sequences_df=pd.DataFrame({"phase": ["draw"], "sequence": ["ATGC"], "score_tf1": [0.4]}),
+        elites_df=pd.DataFrame(
+            {
+                "id": ["elite-1", "elite-2"],
+                "rank": [1, 2],
+                "score_tf1": [0.8, 0.7],
+                "norm_tf1": [0.8, 0.7],
+            }
+        ),
+        elites_hits_df=None,
+        tf_names=["tf1"],
+        optimizer={"kind": "gibbs_anneal"},
+        optimizer_stats={},
+        sample_meta={"top_k": 4, "selection_diversity": 0.0},
+        trace_required=False,
+        overlap_summary={},
+    )
+
+    warnings = diagnostics.get("warnings") or []
+    assert any("postprocess dedup or candidate exhaustion" in warning for warning in warnings)
+    assert not any("diversity constraint may be tight" in warning for warning in warnings)

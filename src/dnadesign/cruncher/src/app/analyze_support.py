@@ -25,20 +25,32 @@ from dnadesign.cruncher.analysis.diversity import (
     representative_elite_ids,
     summarize_elite_distances,
 )
-from dnadesign.cruncher.analysis.hits import load_baseline_hits, load_elites_hits
+from dnadesign.cruncher.analysis.hits import (
+    load_baseline_hits,
+    load_baseline_occurrences,
+    load_elite_occurrences,
+    load_elites_hits,
+    representative_hit_contract_enabled,
+)
 from dnadesign.cruncher.analysis.objective_labels import objective_scale_label
 from dnadesign.cruncher.analysis.parquet import read_parquet, write_parquet
+from dnadesign.cruncher.app.sample.preflight import _core_def_hash
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_yaml
 from dnadesign.cruncher.artifacts.layout import (
     elites_hits_path,
+    elites_occurrences_path,
     elites_path,
     elites_yaml_path,
     random_baseline_hits_path,
+    random_baseline_occurrences_path,
     random_baseline_path,
     sequences_path,
     trace_path,
 )
+from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.sequence import identity_key
+
+_DNA_COMP = str.maketrans("ACGTacgtNn", "TGCAtgcaNn")
 
 
 @dataclass(frozen=True)
@@ -64,33 +76,227 @@ def _load_elites_meta(path: Path) -> dict[str, object]:
     return payload
 
 
-def _load_run_artifacts_for_analysis(run_dir: Path, *, require_random_baseline: bool) -> _AnalyzeRunArtifacts:
+def _revcomp(seq: str) -> str:
+    return seq.translate(_DNA_COMP)[::-1]
+
+
+def _representative_hit_contract(manifest: dict[str, object]) -> bool:
+    objective_payload = manifest.get("objective")
+    if not isinstance(objective_payload, dict):
+        return True
+    return representative_hit_contract_enabled(objective_payload)
+
+
+def _motif_provenance_by_tf(
+    *,
+    manifest: dict[str, object],
+    pwms: dict[str, PWM],
+) -> tuple[dict[str, str | None], dict[str, str | None], dict[str, str], dict[str, int]]:
+    pwm_ref_by_tf: dict[str, str | None] = {}
+    pwm_hash_by_tf: dict[str, str | None] = {}
+    motifs_payload = manifest.get("motifs")
+    if isinstance(motifs_payload, list):
+        for item in motifs_payload:
+            if not isinstance(item, dict):
+                continue
+            tf_name = str(item.get("tf_name") or "").strip()
+            if not tf_name:
+                continue
+            source = str(item.get("source") or "").strip()
+            motif_id = str(item.get("motif_id") or "").strip()
+            pwm_ref_by_tf[tf_name] = f"{source}:{motif_id}" if source and motif_id else None
+            sha256 = item.get("sha256")
+            pwm_hash_by_tf[tf_name] = str(sha256) if isinstance(sha256, str) and sha256.strip() else None
+    core_def_by_tf: dict[str, str] = {}
+    pwm_width_by_tf: dict[str, int] = {}
+    for tf_name, pwm in pwms.items():
+        pwm_width_by_tf[tf_name] = int(pwm.length)
+        core_def_by_tf[tf_name] = _core_def_hash(pwm, pwm_hash_by_tf.get(tf_name))
+    return pwm_ref_by_tf, pwm_hash_by_tf, core_def_by_tf, pwm_width_by_tf
+
+
+def _sequence_by_id(frame: pd.DataFrame, *, id_column: str) -> dict[object, str]:
+    if frame is None or frame.empty:
+        return {}
+    if id_column not in frame.columns or "sequence" not in frame.columns:
+        raise ValueError(f"Cannot build sequence map without columns '{id_column}' and 'sequence'.")
+    mapping: dict[object, str] = {}
+    for item_id, sequence in frame[[id_column, "sequence"]].itertuples(index=False, name=None):
+        if item_id is None:
+            continue
+        mapping[item_id] = str(sequence).upper()
+    return mapping
+
+
+def _slot_label(tf_name: str, occurrence_rank: int, *, duplicate_tfs: set[str]) -> str:
+    if tf_name not in duplicate_tfs:
+        return tf_name
+    return f"{tf_name}#{occurrence_rank}"
+
+
+def _normalize_occurrence_hits(
+    *,
+    occurrences_df: pd.DataFrame,
+    sequence_map: dict[object, str],
+    id_column: str,
+    pwms: dict[str, PWM],
+    manifest: dict[str, object],
+) -> pd.DataFrame:
+    if occurrences_df is None or occurrences_df.empty:
+        columns = [
+            id_column,
+            "tf",
+            "tf_slot",
+            "occurrence_rank",
+            "best_start",
+            "best_core_offset",
+            "best_strand",
+            "best_window_seq",
+            "best_core_seq",
+            "best_score_raw",
+            "best_score_scaled",
+            "best_score_norm",
+            "tiebreak_rule",
+            "pwm_ref",
+            "pwm_hash",
+            "pwm_width",
+            "core_width",
+            "core_def_hash",
+        ]
+        return pd.DataFrame(columns=columns)
+
+    pwm_ref_by_tf, pwm_hash_by_tf, core_def_by_tf, pwm_width_by_tf = _motif_provenance_by_tf(
+        manifest=manifest,
+        pwms=pwms,
+    )
+    selected_df = occurrences_df.copy()
+    if "selected" in selected_df.columns:
+        selected_df = selected_df[selected_df["selected"].fillna(False)].copy()
+    if selected_df.empty:
+        return pd.DataFrame()
+    occurrence_counts = (
+        selected_df.groupby("tf")["occurrence_rank"].nunique().to_dict()
+        if "occurrence_rank" in selected_df.columns
+        else {}
+    )
+    duplicate_tfs = {str(tf_name) for tf_name, count in occurrence_counts.items() if int(count) > 1}
+    rows: list[dict[str, object]] = []
+    for row in selected_df.to_dict(orient="records"):
+        item_id = row.get(id_column)
+        if item_id not in sequence_map:
+            raise ValueError(f"Missing sequence for {id_column}={item_id!r} while normalizing occurrences.")
+        tf_name = str(row.get("tf") or "").strip()
+        if not tf_name:
+            raise ValueError(f"Occurrence row missing TF for {id_column}={item_id!r}.")
+        pwm = pwms.get(tf_name)
+        if pwm is None:
+            raise ValueError(f"Missing PWM for TF '{tf_name}' while normalizing occurrences.")
+        occurrence_rank = int(row.get("occurrence_rank") or 0)
+        if occurrence_rank < 1:
+            raise ValueError(f"Occurrence row has invalid occurrence_rank for TF '{tf_name}': {occurrence_rank}")
+        start = int(row.get("start"))
+        end = int(row.get("end"))
+        if end <= start:
+            raise ValueError(f"Occurrence row has invalid interval for TF '{tf_name}': [{start}, {end})")
+        sequence = sequence_map[item_id]
+        if start < 0 or end > len(sequence):
+            raise ValueError(
+                f"Occurrence row span out of bounds for {id_column}={item_id!r}, TF '{tf_name}': "
+                f"[{start}, {end}) with sequence length {len(sequence)}"
+            )
+        window_seq = sequence[start:end]
+        strand = str(row.get("strand") or "").strip()
+        if strand not in {"+", "-"}:
+            raise ValueError(f"Occurrence row has invalid strand for TF '{tf_name}': {strand!r}")
+        oriented_core = window_seq if strand == "+" else _revcomp(window_seq)
+        pwm_width = pwm_width_by_tf.get(tf_name, int(end - start))
+        rows.append(
+            {
+                id_column: item_id,
+                "tf": tf_name,
+                "tf_slot": _slot_label(tf_name, occurrence_rank, duplicate_tfs=duplicate_tfs),
+                "occurrence_rank": occurrence_rank,
+                "best_start": start,
+                "best_core_offset": start,
+                "best_strand": strand,
+                "best_window_seq": window_seq,
+                "best_core_seq": oriented_core,
+                "best_score_raw": float(row.get("raw_score")),
+                "best_score_scaled": float(row.get("scaled_score")),
+                "best_score_norm": float(row.get("normalized_score")),
+                "tiebreak_rule": "occurrence_rank",
+                "pwm_ref": pwm_ref_by_tf.get(tf_name),
+                "pwm_hash": pwm_hash_by_tf.get(tf_name),
+                "pwm_width": pwm_width,
+                "core_width": int(end - start),
+                "core_def_hash": core_def_by_tf.get(tf_name),
+            }
+        )
+    normalized = pd.DataFrame(rows)
+    sort_columns = [id_column, "tf", "occurrence_rank", "best_start"]
+    return normalized.sort_values(sort_columns).reset_index(drop=True)
+
+
+def _load_run_artifacts_for_analysis(
+    run_dir: Path,
+    *,
+    require_random_baseline: bool,
+    pwms: dict[str, PWM],
+    manifest: dict[str, object],
+) -> _AnalyzeRunArtifacts:
     sequences_file = sequences_path(run_dir)
     elites_file = elites_path(run_dir)
     hits_file = elites_hits_path(run_dir)
+    elite_occurrences_file = elites_occurrences_path(run_dir)
     baseline_file = random_baseline_path(run_dir)
     baseline_hits_file = random_baseline_hits_path(run_dir)
+    baseline_occurrences_file = random_baseline_occurrences_path(run_dir)
     if not sequences_file.exists():
         raise FileNotFoundError(f"Missing sequences parquet: {sequences_file}")
     if not elites_file.exists():
         raise FileNotFoundError(f"Missing elites parquet: {elites_file}")
-    if not hits_file.exists():
-        raise FileNotFoundError(f"Missing elites hits parquet: {hits_file}")
     sequences_df = read_parquet(sequences_file)
     elites_df = read_parquet(elites_file)
-    hits_df = load_elites_hits(hits_file)
-    if baseline_file.exists() and baseline_hits_file.exists():
+    representative_hits = _representative_hit_contract(manifest)
+    if representative_hits:
+        if not hits_file.exists():
+            raise FileNotFoundError(f"Missing elites hits parquet: {hits_file}")
+        hits_df = load_elites_hits(hits_file)
+    else:
+        if not elite_occurrences_file.exists():
+            raise FileNotFoundError(f"Missing elites occurrences parquet: {elite_occurrences_file}")
+        hits_df = _normalize_occurrence_hits(
+            occurrences_df=load_elite_occurrences(elite_occurrences_file),
+            sequence_map=_sequence_by_id(elites_df, id_column="id"),
+            id_column="elite_id",
+            pwms=pwms,
+            manifest=manifest,
+        )
+    if representative_hits and baseline_file.exists() and baseline_hits_file.exists():
         baseline_df = read_parquet(baseline_file)
         baseline_hits_df = load_baseline_hits(baseline_hits_file)
+    elif (not representative_hits) and baseline_file.exists() and baseline_occurrences_file.exists():
+        baseline_df = read_parquet(baseline_file)
+        baseline_hits_df = _normalize_occurrence_hits(
+            occurrences_df=load_baseline_occurrences(baseline_occurrences_file),
+            sequence_map=_sequence_by_id(baseline_df, id_column="baseline_id"),
+            id_column="baseline_id",
+            pwms=pwms,
+            manifest=manifest,
+        )
     else:
         if require_random_baseline:
             if not baseline_file.exists():
                 raise FileNotFoundError(f"Missing random baseline parquet: {baseline_file}")
-            raise FileNotFoundError(f"Missing random baseline hits parquet: {baseline_hits_file}")
-        if baseline_file.exists() != baseline_hits_file.exists():
+            missing_path = baseline_hits_file if representative_hits else baseline_occurrences_file
+            label = "hits" if representative_hits else "occurrences"
+            raise FileNotFoundError(f"Missing random baseline {label} parquet: {missing_path}")
+        expected_companion = baseline_hits_file if representative_hits else baseline_occurrences_file
+        if baseline_file.exists() != expected_companion.exists():
             if baseline_file.exists():
                 raise FileNotFoundError(
-                    f"Missing random baseline hits parquet: {baseline_hits_file}. "
+                    f"Missing random baseline {'hits' if representative_hits else 'occurrences'} parquet: "
+                    f"{expected_companion}. "
                     "Baseline artifacts must be written together."
                 )
             raise FileNotFoundError(

@@ -94,7 +94,8 @@ def test_workspaces_reset_requires_workspace_layout(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 1
-    assert "Workspace root must contain configs/runbook.yaml or configs/config.yaml" in result.output
+    assert "Workspace root must contain configs/runbook.yaml, configs/config.yaml, or" in result.output
+    assert "family-spec files matched by" in result.output
 
 
 def test_workspaces_reset_all_workspaces_dry_run_reports_targets_without_deleting(tmp_path: Path) -> None:

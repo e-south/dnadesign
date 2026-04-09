@@ -17,6 +17,7 @@ from typer.testing import CliRunner
 
 from dnadesign.cruncher.cli.app import app
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
+from dnadesign.cruncher.tests.cli_output import normalized_cli_output
 
 runner = CliRunner()
 
@@ -206,6 +207,128 @@ def test_catalog_logos_default_output_is_flat_plots_dir(tmp_path: Path) -> None:
     assert list(plots_root.glob("*_logo.png"))
     assert (plots_root / "logo_manifest.json").exists()
     assert not (plots_root / "logos").exists()
+
+
+def test_export_meme_defaults_to_workspace_artifacts_tree(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    entry = CatalogEntry(
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="PFM",
+        has_matrix=True,
+        matrix_source="alignment",
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+    _write_prob_motif(
+        catalog_root / "normalized" / "motifs" / "regulondb" / "RBM1.json",
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+    )
+
+    config_path = _write_config(tmp_path)
+    result = runner.invoke(
+        app,
+        ["catalog", "export-meme", "--tf", "lexA", str(config_path)],
+        color=False,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "MEME motif exports" in result.output
+    out_dir = tmp_path / "runs" / "artifacts" / "meme"
+    artifacts = list(out_dir.glob("*.meme"))
+    assert len(artifacts) == 1
+    text = artifacts[0].read_text()
+    assert "MEME version 4" in text
+    assert "MOTIF RBM1" in text
+    assert (out_dir / "meme_manifest.json").exists()
+
+
+def test_export_meme_rejects_blank_producer(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    entry = CatalogEntry(
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="PFM",
+        has_matrix=True,
+        matrix_source="alignment",
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+    _write_prob_motif(
+        catalog_root / "normalized" / "motifs" / "regulondb" / "RBM1.json",
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+    )
+
+    config_path = _write_config(tmp_path)
+    result = runner.invoke(
+        app,
+        ["catalog", "export-meme", "--tf", "lexA", "--producer", "   ", str(config_path)],
+        color=False,
+    )
+    normalized_output = normalized_cli_output(result.output)
+
+    assert result.exit_code != 0
+    assert "--producer must be a non-empty string" in normalized_output
+
+
+def test_export_meme_reports_config_resolution_errors(tmp_path: Path) -> None:
+    missing = tmp_path / "missing.yaml"
+
+    result = runner.invoke(
+        app,
+        ["catalog", "export-meme", str(missing)],
+        color=False,
+    )
+
+    assert result.exit_code == 1
+    assert "Config file not found" in result.output
+
+
+def test_export_meme_requires_overwrite_for_existing_artifact(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    entry = CatalogEntry(
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="PFM",
+        has_matrix=True,
+        matrix_source="alignment",
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+    _write_prob_motif(
+        catalog_root / "normalized" / "motifs" / "regulondb" / "RBM1.json",
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+    )
+
+    config_path = _write_config(tmp_path)
+    out_dir = tmp_path / "runs" / "artifacts" / "meme"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    existing = out_dir / "lexA__regulondb__RBM1.meme"
+    existing.write_text("old\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["catalog", "export-meme", "--tf", "lexA", str(config_path)],
+        color=False,
+    )
+
+    assert result.exit_code == 1
+    assert "Artifact already exists" in result.output
+    assert existing.read_text(encoding="utf-8") == "old\n"
+
+    overwrite = runner.invoke(
+        app,
+        ["catalog", "export-meme", "--tf", "lexA", "--overwrite", str(config_path)],
+        color=False,
+    )
+    assert overwrite.exit_code == 0, overwrite.output
+    assert existing.read_text(encoding="utf-8").startswith("MEME version 4")
 
 
 def test_export_sites_ignores_pwm_source_for_selection(tmp_path: Path) -> None:

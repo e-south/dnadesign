@@ -19,7 +19,10 @@ from .contracts import ensure
 from .errors import AlphabetError, ContractError
 from .types import Alphabet, Span
 
-_DNA_COMP = str.maketrans("ACGTacgtNn", "TGCAtgcaNn")
+_DNA_COMP = str.maketrans(
+    "ACGTRYSWKMBDHVNacgtryswkmbdhvn",  # pragma: allowlist secret
+    "TGCAYRSWMKVHDBNtgcayrswmkvhdbn",  # pragma: allowlist secret
+)
 
 
 def revcomp(seq: str) -> str:
@@ -188,7 +191,11 @@ class Record:
 
     def validate(self) -> "Record":
         ensure(isinstance(self.id, str) and self.id.strip() != "", "record.id must be a non-empty string")
-        ensure(self.alphabet in {"DNA", "RNA", "PROTEIN"}, f"Unsupported alphabet: {self.alphabet}", AlphabetError)
+        ensure(
+            self.alphabet in {"DNA", "IUPAC_DNA", "RNA", "PROTEIN"},
+            f"Unsupported alphabet: {self.alphabet}",
+            AlphabetError,
+        )
         ensure(isinstance(self.sequence, str) and self.sequence != "", "record.sequence must be a non-empty string")
         self._validate_sequence_alphabet()
 
@@ -205,6 +212,8 @@ class Record:
     def _validate_sequence_alphabet(self) -> None:
         if self.alphabet == "DNA":
             allowed = set("ACGTNacgtn")
+        elif self.alphabet == "IUPAC_DNA":
+            allowed = set("ACGTRYSWKMBDHVNacgtryswkmbdhvn")
         elif self.alphabet == "RNA":
             allowed = set("ACGUNacgun")
         else:

@@ -18,25 +18,30 @@ from typing import Iterable, Iterator
 from .adapters import build_adapter, required_source_columns
 from .config import (
     ImagesOutputCfg,
-    SequenceRowsJobV3,
+    RenderJobV3,
     VideoOutputCfg,
     load_sequence_rows_job,
     output_kind,
     resolve_style,
 )
 from .core import Record, SchemaError, SkipRecord
-from .io import iter_parquet_rows
+from .io import iter_json_rows, iter_jsonl_rows, iter_parquet_rows
 from .pipeline import apply_selection, apply_transforms, enforce_selection_policy, load_transforms
 from .reporting import RunReport
 from .runtime import initialize_runtime
 
 
-def _iter_records(job: SequenceRowsJobV3, report: RunReport) -> Iterator[Record]:
+def _iter_records(job: RenderJobV3, report: RunReport) -> Iterator[Record]:
     adapter = build_adapter(job.input.adapter, alphabet=job.input.alphabet)
     transforms = load_transforms(job.pipeline.plugins)
-    columns = required_source_columns(job.input.adapter)
+    if job.input.kind == "parquet":
+        rows: Iterable[dict] = iter_parquet_rows(job.input.path, columns=required_source_columns(job.input.adapter))
+    elif job.input.kind == "json":
+        rows = iter_json_rows(job.input.path)
+    else:
+        rows = iter_jsonl_rows(job.input.path)
 
-    for row_index, row in enumerate(iter_parquet_rows(job.input.path, columns=columns)):
+    for row_index, row in enumerate(rows):
         report.total_rows_seen += 1
         try:
             record = adapter.apply(row, row_index=row_index)
@@ -46,7 +51,7 @@ def _iter_records(job: SequenceRowsJobV3, report: RunReport) -> Iterator[Record]
             report.note_skip_row(str(skip) or "skip_record")
 
 
-def _sample_or_limit_unselected(records: Iterable[Record], job: SequenceRowsJobV3) -> Iterable[Record] | list[Record]:
+def _sample_or_limit_unselected(records: Iterable[Record], job: RenderJobV3) -> Iterable[Record] | list[Record]:
     sample = job.input.sample
     if sample is not None:
         if sample.mode == "first_n":
@@ -66,14 +71,14 @@ def _sample_or_limit_unselected(records: Iterable[Record], job: SequenceRowsJobV
 
 
 def run_sequence_rows_job(
-    job_or_path: SequenceRowsJobV3 | str,
+    job_or_path: RenderJobV3 | str,
     *,
     caller_root: str | Path | None = None,
 ) -> RunReport:
     initialize_runtime()
     job = (
         job_or_path
-        if isinstance(job_or_path, SequenceRowsJobV3)
+        if isinstance(job_or_path, RenderJobV3)
         else load_sequence_rows_job(
             job_or_path,
             caller_root=caller_root,
@@ -133,17 +138,6 @@ def run_sequence_rows_job(
 
         if isinstance(records, list):
             materialized = records
-            report.yielded_records = len(materialized)
-            if not materialized:
-                raise SchemaError("No records to render after adapter, transforms, and selection")
-            out_dir = write_images(
-                materialized,
-                output=img_output,
-                renderer_name=job.render.renderer,
-                style=style,
-                palette=palette,
-            )
-            report.outputs["images_dir"] = str(out_dir)
         else:
             iterator = iter(records)
             try:
@@ -161,15 +155,23 @@ def run_sequence_rows_job(
                     emitted += 1
                     yield record
 
-            out_dir = write_images(
-                _counted_records(),
-                output=img_output,
-                renderer_name=job.render.renderer,
-                style=style,
-                palette=palette,
-            )
-            report.outputs["images_dir"] = str(out_dir)
+            materialized = list(_counted_records())
             report.yielded_records = emitted
+
+        if not materialized:
+            raise SchemaError("No records to render after adapter, transforms, and selection")
+        out_path_or_dir = write_images(
+            materialized,
+            output=img_output,
+            renderer_name=job.render.renderer,
+            style=style,
+            palette=palette,
+        )
+        report.yielded_records = len(materialized)
+        if img_output.path is not None:
+            report.outputs["images_path"] = str(out_path_or_dir)
+        else:
+            report.outputs["images_dir"] = str(out_path_or_dir)
     else:
         raise SchemaError("No supported outputs configured")
 
@@ -185,7 +187,7 @@ def run_sequence_rows_job(
 
 
 def run_cruncher_showcase_job(
-    job_or_path: SequenceRowsJobV3 | str,
+    job_or_path: RenderJobV3 | str,
     *,
     caller_root: str | Path | None = None,
 ) -> RunReport:

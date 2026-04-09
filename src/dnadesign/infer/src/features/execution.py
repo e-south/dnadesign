@@ -5,7 +5,7 @@ src/dnadesign/infer/src/features/execution.py
 
 Execution helpers for Evo2 promoter-feature bundles.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

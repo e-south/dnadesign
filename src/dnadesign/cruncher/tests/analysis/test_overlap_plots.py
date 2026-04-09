@@ -124,6 +124,61 @@ def test_elites_showcase_reverse_hits_match_antisense_positioning() -> None:
     assert np.allclose(np.asarray(effect.params["matrix"], dtype=float), np.asarray(matrix, dtype=float))
 
 
+def test_elites_showcase_supports_multiple_occurrences_for_one_tf() -> None:
+    elites_df = pd.DataFrame([{"id": "elite-1", "rank": 1, "sequence": "ATACAGTTGGTT", "norm_tfA": 0.91}])
+    hits_df = pd.DataFrame(
+        [
+            {
+                "elite_id": "elite-1",
+                "tf": "tfA",
+                "tf_slot": "tfA#1",
+                "occurrence_rank": 1,
+                "best_start": 0,
+                "pwm_width": 4,
+                "best_strand": "+",
+            },
+            {
+                "elite_id": "elite-1",
+                "tf": "tfA",
+                "tf_slot": "tfA#2",
+                "occurrence_rank": 2,
+                "best_start": 6,
+                "pwm_width": 4,
+                "best_strand": "-",
+            },
+        ]
+    )
+    pwms = {
+        "tfA": PWM(
+            name="tfA",
+            matrix=np.array(
+                [
+                    [0.8, 0.1, 0.05, 0.05],
+                    [0.1, 0.8, 0.05, 0.05],
+                    [0.05, 0.05, 0.8, 0.1],
+                    [0.05, 0.05, 0.1, 0.8],
+                ],
+                dtype=float,
+            ),
+        ),
+    }
+
+    records = build_elites_showcase_records(
+        elites_df=elites_df,
+        hits_df=hits_df,
+        tf_names=["tfA"],
+        pwms=pwms,
+        max_panels=12,
+    )
+    assert len(records) == 1
+    record = records[0]
+    assert len(record.features) == 2
+    assert [feature.span.start for feature in record.features] == [0, 6]
+    assert [feature.span.strand for feature in record.features] == ["fwd", "rev"]
+    assert [feature.attrs["occurrence_rank"] for feature in record.features] == [1, 2]
+    assert all(feature.tags == ("tf:tfA",) for feature in record.features)
+
+
 def test_elites_showcase_style_uses_match_window_coloring() -> None:
     overrides = cruncher_showcase_style_overrides()
     motif_logo = dict(overrides.get("motif_logo", {}))

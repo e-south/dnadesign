@@ -5,7 +5,7 @@ src/dnadesign/usr/src/merge_overlay_carry.py
 
 Explicit overlay-carry planning and application for USR dataset merges.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

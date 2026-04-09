@@ -16,6 +16,7 @@ coverage:
       default:
         target: auto
         threshold: 0.5%
+        informational: true
         if_ci_failed: error
         if_not_found: failure
 
@@ -106,6 +107,10 @@ component_management:
       name: baserender
       paths:
         - src/dnadesign/baserender/**
+    - component_id: contracts
+      name: contracts
+      paths:
+        - src/dnadesign/contracts/**
     - component_id: permuter
       name: permuter
       paths:

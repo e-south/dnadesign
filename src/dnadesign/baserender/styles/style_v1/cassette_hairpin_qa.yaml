@@ -1,0 +1,10 @@
+legend: false
+legend_mode: none
+show_pair_rungs: true
+show_loop_label: true
+show_base_text: false
+palette:
+  segment_stem5p: "#93c5fd"
+  segment_loop: "#fcd34d"
+  segment_stem3p: "#86efac"
+  feature_projection: "#2563eb"

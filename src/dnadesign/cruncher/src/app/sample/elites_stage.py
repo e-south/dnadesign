@@ -11,38 +11,34 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
-from collections.abc import Callable, Iterable
-from datetime import datetime, timezone
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
 
-from dnadesign.cruncher.app.sample.artifacts import (
-    _elite_hits_parquet_schema,
-    _elite_parquet_schema,
-    _write_parquet_rows,
-)
-from dnadesign.cruncher.app.sample.diagnostics import _EliteCandidate
+from dnadesign.cruncher.app.sample.diagnostics import _EliteCandidate, _norm_map_for_elites
 from dnadesign.cruncher.app.sample.elites_mmr import (
     build_elite_entries,
     build_elite_pool,
     hydrate_candidate_hits,
     select_elites_mmr,
 )
+from dnadesign.cruncher.app.sample.elites_persistence import (
+    _append_elite_artifacts,
+    _build_elites_metadata,
+    _write_elite_tables,
+    _write_mmr_meta,
+)
+from dnadesign.cruncher.app.sample.objective_sidecars import write_elite_objective_sidecars
 from dnadesign.cruncher.app.sample.preflight import RunError, _resolve_elite_pool_size
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_yaml
-from dnadesign.cruncher.artifacts.entries import artifact_entry
 from dnadesign.cruncher.artifacts.layout import (
-    config_used_path,
-    elites_hits_path,
     elites_json_path,
-    elites_mmr_meta_path,
-    elites_path,
     elites_yaml_path,
 )
 from dnadesign.cruncher.config.schema_v3 import SampleConfig
-from dnadesign.cruncher.core.labels import format_regulator_slug
+from dnadesign.cruncher.core.objectives.compiler import ObjectivePlanCompilation
+from dnadesign.cruncher.core.objectives.models import ObjectiveResult, SelectedHit
 from dnadesign.cruncher.core.scoring import Scorer
 from dnadesign.cruncher.core.sequence import canon_int
 
@@ -90,6 +86,7 @@ def _select_elites(
     *,
     raw_elites: list[object],
     elite_k: int,
+    evaluator: object,
     scorer: Scorer,
     pwms: dict[str, object],
     sample_cfg: SampleConfig,
@@ -104,6 +101,7 @@ def _select_elites(
         raw_elites=raw_elites,
         elite_k=elite_k,
         pool_size=pool_size,
+        evaluator=evaluator,
         scorer=scorer,
         pwms=pwms,
         dsdna_mode=bool(sample_cfg.objective.bidirectional),
@@ -166,74 +164,6 @@ def _validate_elite_uniqueness(
         )
 
 
-def _elite_rows_from(entries: list[dict[str, object]]) -> Iterable[dict[str, object]]:
-    for entry in entries:
-        row = dict(entry)
-        per_tf = row.pop("per_tf", None)
-        if per_tf is not None:
-            row["per_tf_json"] = json.dumps(per_tf, sort_keys=True)
-            for tf_name, details in per_tf.items():
-                row[f"score_{tf_name}"] = details.get("best_score_scaled")
-                row[f"norm_{tf_name}"] = details.get("best_score_norm")
-        yield row
-
-
-def _elite_hits_rows(
-    *,
-    entries: list[dict[str, object]],
-    pwms: dict[str, object],
-    pwm_ref_by_tf: dict[str, str | None],
-    pwm_hash_by_tf: dict[str, str | None],
-    core_def_by_tf: dict[str, str],
-) -> Iterable[dict[str, object]]:
-    for entry in entries:
-        elite_id = entry.get("id")
-        rank = entry.get("rank")
-        chain_id = entry.get("chain")
-        draw_idx = entry.get("draw_idx")
-        per_tf = entry.get("per_tf")
-        if not isinstance(per_tf, dict):
-            raise ValueError("Elite entry missing per_tf metadata.")
-        for tf_name, details in per_tf.items():
-            if not isinstance(details, dict):
-                raise ValueError(f"Elite per_tf details missing for '{tf_name}'.")
-            start = details.get("best_start")
-            if start is None:
-                start = details.get("offset")
-            if not isinstance(start, int):
-                raise ValueError(f"Elite hit missing best_start for '{tf_name}'.")
-            strand = details.get("strand")
-            if not isinstance(strand, str):
-                raise ValueError(f"Elite hit missing strand for '{tf_name}'.")
-            width = details.get("width")
-            pwm = pwms.get(tf_name)
-            if pwm is None:
-                raise ValueError(f"Missing PWM for TF '{tf_name}'.")
-            pwm_width = int(pwm.length)
-            core_width = int(width) if isinstance(width, int) else pwm_width
-            yield {
-                "elite_id": elite_id,
-                "tf": tf_name,
-                "rank": rank,
-                "chain": chain_id,
-                "draw_idx": draw_idx,
-                "best_start": int(start),
-                "best_core_offset": int(start),
-                "best_strand": strand,
-                "best_window_seq": details.get("best_window_seq"),
-                "best_core_seq": details.get("best_core_seq"),
-                "best_score_raw": details.get("best_score_raw"),
-                "best_score_scaled": details.get("best_score_scaled"),
-                "best_score_norm": details.get("best_score_norm"),
-                "tiebreak_rule": details.get("best_hit_tiebreak"),
-                "pwm_ref": pwm_ref_by_tf.get(tf_name),
-                "pwm_hash": pwm_hash_by_tf.get(tf_name),
-                "pwm_width": pwm_width,
-                "core_width": core_width,
-                "core_def_hash": core_def_by_tf.get(tf_name),
-            }
-
-
 def _hit_window_map(
     *,
     per_tf_hits: dict[str, dict[str, object]] | None,
@@ -254,6 +184,87 @@ def _hit_window_map(
         if not isinstance(start, int) or not isinstance(width, int) or not isinstance(strand, str):
             raise ValueError(f"Invalid hit metadata for TF '{tf_name}' in elite postprocessing.")
         windows[tf_name] = (int(start), int(width), str(strand))
+    return windows
+
+
+def _slot_hits_from_objective_results(
+    objective_results: dict[str, ObjectiveResult] | None,
+) -> dict[str, dict[str, object]]:
+    if not isinstance(objective_results, dict):
+        return {}
+    slot_hits: dict[str, dict[str, object]] = {}
+    for objective_id, result in objective_results.items():
+        if not isinstance(result, ObjectiveResult):
+            continue
+        selected = tuple(result.selected_hits)
+        if not selected:
+            continue
+        multi = len(selected) > 1
+        for occurrence_rank, hit in enumerate(selected, start=1):
+            slot_id = f"{objective_id}#{occurrence_rank}" if multi else str(objective_id)
+            slot_hits[slot_id] = {
+                "objective_id": str(objective_id),
+                "occurrence_rank": int(occurrence_rank),
+                "best_start": int(hit.start),
+                "offset": int(hit.start),
+                "width": int(hit.width),
+                "strand": str(hit.strand),
+                "best_score_raw": float(hit.raw_score),
+                "best_score_scaled": float(hit.scaled_score),
+                "best_score_norm": float(hit.normalized_score),
+                "best_window_seq": hit.window_seq,
+                "best_core_seq": hit.core_seq,
+                "best_hit_tiebreak": hit.tiebreak_rule or "selected_hit",
+            }
+    return slot_hits
+
+
+def _slot_hits_from_per_tf_hits(
+    *,
+    per_tf_hits: dict[str, dict[str, object]] | None,
+    scorer: Scorer,
+) -> dict[str, dict[str, object]]:
+    if not isinstance(per_tf_hits, dict):
+        raise ValueError("Elite candidate missing per_tf_hits for postprocessing.")
+    slot_hits: dict[str, dict[str, object]] = {}
+    for tf_name in scorer.tf_names:
+        hit = per_tf_hits.get(tf_name)
+        if not isinstance(hit, dict):
+            raise ValueError(f"Elite candidate missing hit metadata for TF '{tf_name}'.")
+        slot_hits[tf_name] = {
+            "objective_id": str(tf_name),
+            "occurrence_rank": 1,
+            **hit,
+        }
+    return slot_hits
+
+
+def _resolve_slot_hits(
+    *,
+    per_tf_hits: dict[str, dict[str, object]] | None,
+    objective_results: dict[str, ObjectiveResult] | None,
+    scorer: Scorer,
+) -> dict[str, dict[str, object]]:
+    slot_hits = _slot_hits_from_objective_results(objective_results)
+    if slot_hits:
+        return slot_hits
+    return _slot_hits_from_per_tf_hits(per_tf_hits=per_tf_hits, scorer=scorer)
+
+
+def _slot_window_map(
+    *,
+    slot_hits: dict[str, dict[str, object]],
+) -> dict[str, tuple[int, int, str]]:
+    windows: dict[str, tuple[int, int, str]] = {}
+    for slot_id, hit in slot_hits.items():
+        start = hit.get("best_start")
+        if start is None:
+            start = hit.get("offset")
+        width = hit.get("width")
+        strand = hit.get("strand")
+        if not isinstance(start, int) or not isinstance(width, int) or not isinstance(strand, str):
+            raise ValueError(f"Invalid hit metadata for slot '{slot_id}' in elite postprocessing.")
+        windows[str(slot_id)] = (int(start), int(width), str(strand))
     return windows
 
 
@@ -282,6 +293,16 @@ def _hit_raw_score(*, per_tf_hits: dict[str, dict[str, object]], tf_name: str) -
     return float(raw_score)
 
 
+def _slot_raw_score(*, slot_hits: dict[str, dict[str, object]], slot_id: str) -> float:
+    hit = slot_hits.get(slot_id)
+    if not isinstance(hit, dict):
+        raise ValueError(f"Postprocess payload missing hit data for slot '{slot_id}'.")
+    raw_score = hit.get("best_score_raw")
+    if not isinstance(raw_score, (int, float)):
+        raise ValueError(f"Postprocess payload missing raw hit score for slot '{slot_id}'.")
+    return float(raw_score)
+
+
 def _removed_bp_before(*, removed_segments: list[tuple[int, int]], position: int) -> int:
     removed = 0
     for start, end in removed_segments:
@@ -298,6 +319,34 @@ def _hits_match_trim_contract(
 ) -> bool:
     for tf_name, (expected_start, expected_width, expected_strand) in expected_windows.items():
         hit = per_tf_hits.get(tf_name)
+        if not isinstance(hit, dict):
+            return False
+        start = hit.get("best_start")
+        width = hit.get("width")
+        strand = hit.get("strand")
+        if not isinstance(start, int) or not isinstance(width, int) or not isinstance(strand, str):
+            return False
+        shifted_expected_start = int(expected_start) - _removed_bp_before(
+            removed_segments=removed_segments,
+            position=int(expected_start),
+        )
+        if int(start) != int(shifted_expected_start):
+            return False
+        if int(width) != int(expected_width):
+            return False
+        if str(strand) != str(expected_strand):
+            return False
+    return True
+
+
+def _slot_hits_match_trim_contract(
+    *,
+    slot_hits: dict[str, dict[str, object]],
+    expected_windows: dict[str, tuple[int, int, str]],
+    removed_segments: list[tuple[int, int]],
+) -> bool:
+    for slot_id, (expected_start, expected_width, expected_strand) in expected_windows.items():
+        hit = slot_hits.get(slot_id)
         if not isinstance(hit, dict):
             return False
         start = hit.get("best_start")
@@ -350,11 +399,45 @@ def _hits_match_polish_contract(
     return True
 
 
+def _slot_hits_match_polish_contract(
+    *,
+    slot_hits: dict[str, dict[str, object]],
+    expected_windows: dict[str, tuple[int, int, str]],
+    owner_slot: str,
+    owner_position: int,
+) -> bool:
+    for slot_id, (expected_start, expected_width, expected_strand) in expected_windows.items():
+        hit = slot_hits.get(slot_id)
+        if not isinstance(hit, dict):
+            return False
+        start = hit.get("best_start")
+        width = hit.get("width")
+        strand = hit.get("strand")
+        if not isinstance(start, int) or not isinstance(width, int) or not isinstance(strand, str):
+            return False
+        if int(start) != int(expected_start):
+            return False
+        if int(width) != int(expected_width):
+            return False
+        if str(strand) != str(expected_strand):
+            return False
+        if slot_id != owner_slot:
+            continue
+        owner_end = int(expected_start) + int(expected_width)
+        if int(expected_start) < 0 or owner_end <= int(expected_start):
+            return False
+        if int(owner_position) < int(expected_start) or int(owner_position) >= owner_end:
+            return False
+    return True
+
+
 def _candidate_payload(
     *,
     seq_arr: np.ndarray,
     scorer: Scorer,
-) -> tuple[dict[str, float], dict[str, dict[str, object]], dict[str, float], float, float]:
+) -> tuple[
+    dict[str, float], dict[str, dict[str, object]], dict[str, float], float, float, dict[str, ObjectiveResult] | None
+]:
     per_tf_map, per_tf_hits = scorer.compute_all_per_pwm_and_hits(seq_arr, int(seq_arr.size))
     norm_map = scorer.normalized_llr_map(seq_arr)
     for tf_name in scorer.tf_names:
@@ -369,7 +452,50 @@ def _candidate_payload(
         hit["best_score_norm"] = float(norm_value)
     min_norm = float(min(norm_map.values())) if norm_map else 0.0
     sum_norm = float(sum(norm_map.values())) if norm_map else 0.0
-    return per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm
+    return per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm, None
+
+
+def _candidate_payload_with_evaluator(
+    *,
+    seq_arr: np.ndarray,
+    scorer: Scorer,
+    evaluator: object,
+) -> tuple[dict[str, float], dict[str, dict[str, object]], dict[str, float], float, float, dict[str, ObjectiveResult]]:
+    objective_engine = getattr(evaluator, "objective_engine", None)
+    if objective_engine is None:
+        raise ValueError("Elite postprocess requires evaluator.objective_engine for occurrence-aware payloads.")
+    evaluation = objective_engine.evaluate(seq_arr, seq_length=int(seq_arr.size))
+    per_tf_map = {str(key): float(value) for key, value in evaluation.scalars.items()}
+    norm_map = _norm_map_for_elites(
+        seq_arr,
+        per_tf_map,
+        objective_results=evaluation.results,
+        scorer=scorer,
+        score_scale=scorer.scale,
+    )
+    per_tf_hits: dict[str, dict[str, object]] = {}
+    for objective_id, result in evaluation.results.items():
+        hit: SelectedHit | None = result.representative_hit
+        if hit is None:
+            raise ValueError(f"Postprocess payload missing representative hit for objective '{objective_id}'.")
+        per_tf_hits[str(objective_id)] = {
+            "best_score_raw": float(hit.raw_score),
+            "offset": int(hit.start),
+            "best_start": int(hit.start),
+            "strand": str(hit.strand),
+            "width": int(hit.width),
+            "best_window_seq": hit.window_seq,
+            "best_core_seq": hit.core_seq,
+            "best_hit_tiebreak": hit.tiebreak_rule or "representative_hit",
+            "best_score_scaled": float(per_tf_map[str(objective_id)]),
+            "best_score_norm": float(norm_map.get(str(objective_id), 0.0)),
+            "objective_kind": result.diagnostics.get("objective_kind"),
+            "requested_copies": int(result.diagnostics.get("requested_copies", 1)),
+            "selected_copies": int(result.diagnostics.get("selected_copies", 1)),
+        }
+    min_norm = float(min(norm_map.values())) if norm_map else 0.0
+    sum_norm = float(sum(norm_map.values())) if norm_map else 0.0
+    return per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm, evaluation.results
 
 
 def _uncovered_segments(
@@ -421,37 +547,56 @@ def _remaining_single_owner_polish_improvements(
     seq_arr: np.ndarray,
     per_tf_hits: dict[str, dict[str, object]],
     scorer: Scorer,
+    objective_results: dict[str, ObjectiveResult] | None = None,
+    evaluator: object | None = None,
     eps: float = 1.0e-12,
 ) -> list[dict[str, object]]:
-    expected_windows = _hit_window_map(per_tf_hits=per_tf_hits, scorer=scorer)
+    slot_hits = _resolve_slot_hits(per_tf_hits=per_tf_hits, objective_results=objective_results, scorer=scorer)
+    expected_windows = _slot_window_map(slot_hits=slot_hits)
     single_owner_positions = _windows_cover_ownership(windows=expected_windows, seq_length=int(seq_arr.size))
     source = np.asarray(seq_arr, dtype=np.int8)
     remaining: list[dict[str, object]] = []
-    for pos, tf_owner in single_owner_positions:
+    for pos, slot_owner in single_owner_positions:
         current_base = int(source[pos])
-        owner_score = _hit_raw_score(per_tf_hits=per_tf_hits, tf_name=tf_owner)
+        owner_score = _slot_raw_score(slot_hits=slot_hits, slot_id=slot_owner)
         for base in (0, 1, 2, 3):
             if int(base) == current_base:
                 continue
             trial = source.copy()
             trial[pos] = int(base)
-            _, trial_hits, _, _, _ = _candidate_payload(
-                seq_arr=trial,
+            if evaluator is not None:
+                _, trial_hits, _, _, _, trial_objective_results = _candidate_payload_with_evaluator(
+                    seq_arr=trial,
+                    scorer=scorer,
+                    evaluator=evaluator,
+                )
+            else:
+                _, trial_hits, _, _, _, trial_objective_results = _candidate_payload(
+                    seq_arr=trial,
+                    scorer=scorer,
+                )
+            trial_slot_hits = _resolve_slot_hits(
+                per_tf_hits=trial_hits,
+                objective_results=trial_objective_results,
                 scorer=scorer,
             )
-            if not _hits_match_polish_contract(
-                per_tf_hits=trial_hits,
+            if not _slot_hits_match_polish_contract(
+                slot_hits=trial_slot_hits,
                 expected_windows=expected_windows,
-                owner_tf=tf_owner,
+                owner_slot=slot_owner,
                 owner_position=int(pos),
             ):
                 continue
-            trial_owner_score = _hit_raw_score(per_tf_hits=trial_hits, tf_name=tf_owner)
+            trial_owner_score = _slot_raw_score(slot_hits=trial_slot_hits, slot_id=slot_owner)
             if trial_owner_score > owner_score + float(eps):
-                start, width, strand = expected_windows[tf_owner]
+                start, width, strand = expected_windows[slot_owner]
+                objective_id = str(trial_slot_hits[slot_owner].get("objective_id") or slot_owner)
+                occurrence_rank = int(trial_slot_hits[slot_owner].get("occurrence_rank") or 1)
                 remaining.append(
                     {
-                        "tf": str(tf_owner),
+                        "tf": objective_id,
+                        "slot_id": str(slot_owner),
+                        "occurrence_rank": occurrence_rank,
                         "position": int(pos),
                         "strand": str(strand),
                         "start": int(start),
@@ -471,6 +616,7 @@ def _apply_uncovered_trim(
     candidate: _EliteCandidate,
     scorer: Scorer,
     removed_segments: list[tuple[int, int]],
+    evaluator: object | None = None,
 ) -> None:
     if not removed_segments:
         return
@@ -479,14 +625,19 @@ def _apply_uncovered_trim(
         removed_segments=removed_segments,
         seq_length=int(source.size),
     )
-    expected_windows = _hit_window_map(per_tf_hits=candidate.per_tf_hits, scorer=scorer)
-    for tf_name, (start, width, _strand) in expected_windows.items():
+    slot_hits = _resolve_slot_hits(
+        per_tf_hits=candidate.per_tf_hits,
+        objective_results=candidate.objective_results,
+        scorer=scorer,
+    )
+    expected_windows = _slot_window_map(slot_hits=slot_hits)
+    for slot_id, (start, width, _strand) in expected_windows.items():
         end = int(start) + int(width)
         for seg_start, seg_end in normalized_segments:
             overlap_start = max(int(start), int(seg_start))
             overlap_end = min(int(end), int(seg_end))
             if overlap_start < overlap_end:
-                raise ValueError(f"Elite trim segment overlaps hit window for TF '{tf_name}'.")
+                raise ValueError(f"Elite trim segment overlaps hit window for slot '{slot_id}'.")
     kept_ranges: list[tuple[int, int]] = []
     cursor = 0
     for seg_start, seg_end in normalized_segments:
@@ -500,9 +651,24 @@ def _apply_uncovered_trim(
     trimmed = np.concatenate([source[int(start) : int(end)] for start, end in kept_ranges]).astype(np.int8, copy=False)
     if int(trimmed.size) < 1:
         raise ValueError("Elite uncovered trim produced empty sequence.")
-    per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm = _candidate_payload(seq_arr=trimmed, scorer=scorer)
-    if not _hits_match_trim_contract(
+    if evaluator is not None:
+        per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm, objective_results = _candidate_payload_with_evaluator(
+            seq_arr=trimmed,
+            scorer=scorer,
+            evaluator=evaluator,
+        )
+    else:
+        per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm, objective_results = _candidate_payload(
+            seq_arr=trimmed,
+            scorer=scorer,
+        )
+    trimmed_slot_hits = _resolve_slot_hits(
         per_tf_hits=per_tf_hits,
+        objective_results=objective_results,
+        scorer=scorer,
+    )
+    if not _slot_hits_match_trim_contract(
+        slot_hits=trimmed_slot_hits,
         expected_windows=expected_windows,
         removed_segments=normalized_segments,
     ):
@@ -513,6 +679,7 @@ def _apply_uncovered_trim(
     candidate.norm_map = norm_map
     candidate.min_norm = float(min_norm)
     candidate.sum_norm = float(sum_norm)
+    candidate.objective_results = objective_results
 
 
 def _dedupe_postprocessed_candidates(
@@ -539,6 +706,7 @@ def _polish_candidate_to_convergence(
     *,
     seq_arr: np.ndarray,
     scorer: Scorer,
+    evaluator: object | None = None,
 ) -> tuple[
     np.ndarray,
     dict[str, float],
@@ -547,18 +715,30 @@ def _polish_candidate_to_convergence(
     float,
     float,
     int,
+    dict[str, ObjectiveResult] | None,
 ]:
     polished_seq = np.asarray(seq_arr, dtype=np.int8).copy()
-    per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm = _candidate_payload(seq_arr=polished_seq, scorer=scorer)
+    if evaluator is not None:
+        per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm, objective_results = _candidate_payload_with_evaluator(
+            seq_arr=polished_seq,
+            scorer=scorer,
+            evaluator=evaluator,
+        )
+    else:
+        per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm, objective_results = _candidate_payload(
+            seq_arr=polished_seq,
+            scorer=scorer,
+        )
     edits = 0
 
     while True:
-        expected_windows = _hit_window_map(per_tf_hits=per_tf_hits, scorer=scorer)
+        slot_hits = _resolve_slot_hits(per_tf_hits=per_tf_hits, objective_results=objective_results, scorer=scorer)
+        expected_windows = _slot_window_map(slot_hits=slot_hits)
         single_owner_positions = _windows_cover_ownership(windows=expected_windows, seq_length=int(polished_seq.size))
         changed = False
-        for pos, tf_owner in single_owner_positions:
+        for pos, slot_owner in single_owner_positions:
             current_base = int(polished_seq[pos])
-            owner_score = _hit_raw_score(per_tf_hits=per_tf_hits, tf_name=tf_owner)
+            owner_score = _slot_raw_score(slot_hits=slot_hits, slot_id=slot_owner)
             best_update: (
                 tuple[
                     np.ndarray,
@@ -567,6 +747,7 @@ def _polish_candidate_to_convergence(
                     dict[str, float],
                     float,
                     float,
+                    dict[str, ObjectiveResult] | None,
                 ]
                 | None
             ) = None
@@ -576,18 +757,44 @@ def _polish_candidate_to_convergence(
                     continue
                 trial = polished_seq.copy()
                 trial[pos] = int(base)
-                trial_per_tf_map, trial_hits, trial_norm_map, trial_min_norm, trial_sum_norm = _candidate_payload(
-                    seq_arr=trial,
+                if evaluator is not None:
+                    (
+                        trial_per_tf_map,
+                        trial_hits,
+                        trial_norm_map,
+                        trial_min_norm,
+                        trial_sum_norm,
+                        trial_objective_results,
+                    ) = _candidate_payload_with_evaluator(
+                        seq_arr=trial,
+                        scorer=scorer,
+                        evaluator=evaluator,
+                    )
+                else:
+                    (
+                        trial_per_tf_map,
+                        trial_hits,
+                        trial_norm_map,
+                        trial_min_norm,
+                        trial_sum_norm,
+                        trial_objective_results,
+                    ) = _candidate_payload(
+                        seq_arr=trial,
+                        scorer=scorer,
+                    )
+                trial_slot_hits = _resolve_slot_hits(
+                    per_tf_hits=trial_hits,
+                    objective_results=trial_objective_results,
                     scorer=scorer,
                 )
-                if not _hits_match_polish_contract(
-                    per_tf_hits=trial_hits,
+                if not _slot_hits_match_polish_contract(
+                    slot_hits=trial_slot_hits,
                     expected_windows=expected_windows,
-                    owner_tf=tf_owner,
+                    owner_slot=slot_owner,
                     owner_position=int(pos),
                 ):
                     continue
-                trial_owner_score = _hit_raw_score(per_tf_hits=trial_hits, tf_name=tf_owner)
+                trial_owner_score = _slot_raw_score(slot_hits=trial_slot_hits, slot_id=slot_owner)
                 if trial_owner_score > best_owner_score + 1.0e-12:
                     best_owner_score = trial_owner_score
                     best_update = (
@@ -597,16 +804,17 @@ def _polish_candidate_to_convergence(
                         trial_norm_map,
                         float(trial_min_norm),
                         float(trial_sum_norm),
+                        trial_objective_results,
                     )
             if best_update is None:
                 continue
-            polished_seq, per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm = best_update
+            polished_seq, per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm, objective_results = best_update
             edits += 1
             changed = True
         if not changed:
             break
 
-    return polished_seq, per_tf_map, per_tf_hits, norm_map, float(min_norm), float(sum_norm), edits
+    return polished_seq, per_tf_map, per_tf_hits, norm_map, float(min_norm), float(sum_norm), edits, objective_results
 
 
 def _postprocess_elite_candidates(
@@ -614,6 +822,7 @@ def _postprocess_elite_candidates(
     candidates: list[_EliteCandidate],
     scorer: Scorer,
     dsdna_mode: bool,
+    evaluator: object | None = None,
     trim_uncovered_internal: bool = True,
 ) -> tuple[list[_EliteCandidate], dict[str, int]]:
     stats = {
@@ -628,9 +837,19 @@ def _postprocess_elite_candidates(
         return candidates, stats
 
     for cand in candidates:
-        seq_arr, per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm, polish_edits = _polish_candidate_to_convergence(
+        (
+            seq_arr,
+            per_tf_map,
+            per_tf_hits,
+            norm_map,
+            min_norm,
+            sum_norm,
+            polish_edits,
+            objective_results,
+        ) = _polish_candidate_to_convergence(
             seq_arr=np.asarray(cand.seq_arr, dtype=np.int8),
             scorer=scorer,
+            evaluator=evaluator,
         )
         stats["polish_edits"] += int(polish_edits)
 
@@ -640,7 +859,13 @@ def _postprocess_elite_candidates(
         cand.norm_map = norm_map
         cand.min_norm = float(min_norm)
         cand.sum_norm = float(sum_norm)
-        expected_windows = _hit_window_map(per_tf_hits=per_tf_hits, scorer=scorer)
+        cand.objective_results = objective_results
+        slot_hits = _resolve_slot_hits(
+            per_tf_hits=per_tf_hits,
+            objective_results=objective_results,
+            scorer=scorer,
+        )
+        expected_windows = _slot_window_map(slot_hits=slot_hits)
         removed_segments: list[tuple[int, int]] = []
         for seg_start, seg_end in _uncovered_segments(windows=expected_windows, seq_length=int(seq_arr.size)):
             segment_bp = int(seg_end) - int(seg_start)
@@ -661,6 +886,7 @@ def _postprocess_elite_candidates(
                 candidate=cand,
                 scorer=scorer,
                 removed_segments=removed_segments,
+                evaluator=evaluator,
             )
             (
                 trimmed_seq_arr,
@@ -670,9 +896,11 @@ def _postprocess_elite_candidates(
                 trimmed_min_norm,
                 trimmed_sum_norm,
                 post_trim_polish_edits,
+                trimmed_objective_results,
             ) = _polish_candidate_to_convergence(
                 seq_arr=np.asarray(cand.seq_arr, dtype=np.int8),
                 scorer=scorer,
+                evaluator=evaluator,
             )
             cand.seq_arr = np.asarray(trimmed_seq_arr, dtype=np.int8)
             cand.per_tf_map = trimmed_per_tf_map
@@ -680,20 +908,24 @@ def _postprocess_elite_candidates(
             cand.norm_map = trimmed_norm_map
             cand.min_norm = float(trimmed_min_norm)
             cand.sum_norm = float(trimmed_sum_norm)
+            cand.objective_results = trimmed_objective_results
             stats["polish_edits"] += int(post_trim_polish_edits)
         remaining = _remaining_single_owner_polish_improvements(
             seq_arr=np.asarray(cand.seq_arr, dtype=np.int8),
             per_tf_hits=cand.per_tf_hits,
             scorer=scorer,
+            objective_results=cand.objective_results,
+            evaluator=evaluator,
         )
         if remaining:
             first = remaining[0]
             raise ValueError(
-                "Elite polish convergence failed for chain=%d draw=%d tf=%s pos=%d strand=%s."
+                "Elite polish convergence failed for chain=%d draw=%d tf=%s slot=%s pos=%d strand=%s."
                 % (
                     int(cand.chain_id),
                     int(cand.draw_idx),
                     str(first["tf"]),
+                    str(first["slot_id"]),
                     int(first["position"]),
                     str(first["strand"]),
                 )
@@ -724,211 +956,11 @@ def _refresh_candidate_combined_scores(
         )
 
 
-def _write_elite_tables(
-    *,
-    out_dir: Path,
-    tfs: list[str],
-    elites: list[dict[str, object]],
-    pwms: dict[str, object],
-    pwm_ref_by_tf: dict[str, str | None],
-    pwm_hash_by_tf: dict[str, str | None],
-    core_def_by_tf: dict[str, str],
-    want_canonical: bool,
-) -> tuple[Path, Path]:
-    parquet_path = elites_path(out_dir)
-    elite_schema = _elite_parquet_schema(tfs, include_canonical=want_canonical)
-    _write_parquet_rows(parquet_path, _elite_rows_from(elites), chunk_size=2000, schema=elite_schema)
-
-    hits_path = elites_hits_path(out_dir)
-    hits_schema = _elite_hits_parquet_schema()
-    _write_parquet_rows(
-        hits_path,
-        _elite_hits_rows(
-            entries=elites,
-            pwms=pwms,
-            pwm_ref_by_tf=pwm_ref_by_tf,
-            pwm_hash_by_tf=pwm_hash_by_tf,
-            core_def_by_tf=core_def_by_tf,
-        ),
-        chunk_size=2000,
-        schema=hits_schema,
-    )
-    return parquet_path, hits_path
-
-
-def _selection_fields(
-    *,
-    mmr_summary: dict[str, object] | None,
-    diversity_value: float,
-) -> tuple[str, str, str, float, float]:
-    selection_policy = "mmr"
-    relevance_label = "min_tf_score"
-    pool_strategy = "stratified"
-    score_weight = 1.0 - diversity_value
-    diversity_weight = diversity_value
-    if isinstance(mmr_summary, dict):
-        selection_policy = str(mmr_summary.get("selection_policy") or selection_policy)
-        relevance_label = str(mmr_summary.get("relevance") or relevance_label)
-        pool_strategy = str(mmr_summary.get("pool_strategy") or pool_strategy)
-        score_weight_meta = mmr_summary.get("score_weight")
-        diversity_weight_meta = mmr_summary.get("diversity_weight")
-        if score_weight_meta is not None:
-            score_weight = float(score_weight_meta)
-        if diversity_weight_meta is not None:
-            diversity_weight = float(diversity_weight_meta)
-    return selection_policy, relevance_label, pool_strategy, score_weight, diversity_weight
-
-
-def _write_mmr_meta(*, out_dir: Path, mmr_meta_rows: list[dict[str, object]] | None) -> Path | None:
-    if not mmr_meta_rows:
-        return None
-    mmr_meta_path = elites_mmr_meta_path(out_dir)
-    _write_parquet_rows(mmr_meta_path, mmr_meta_rows, chunk_size=2000)
-    return mmr_meta_path
-
-
-def _append_optimizer_stats(*, meta: dict[str, object], optimizer: object) -> None:
-    if not hasattr(optimizer, "stats"):
-        return
-    optimizer_stats = optimizer.stats()
-    if not isinstance(optimizer_stats, dict) or not optimizer_stats:
-        return
-    beta_base = optimizer_stats.get("beta_ladder_base")
-    beta_final = optimizer_stats.get("beta_ladder_final")
-    if isinstance(beta_base, (list, tuple)):
-        meta["beta_ladder_base"] = [float(item) for item in beta_base]
-    if isinstance(beta_final, (list, tuple)):
-        meta["beta_ladder_final"] = [float(item) for item in beta_final]
-    final_beta = optimizer_stats.get("final_mcmc_beta")
-    meta["final_mcmc_beta"] = float(final_beta) if final_beta is not None else None
-    cooling_payload = optimizer_stats.get("mcmc_cooling")
-    if isinstance(cooling_payload, dict):
-        meta["mcmc_cooling"] = cooling_payload
-
-
-def _build_elites_metadata(
-    *,
-    sample_cfg: SampleConfig,
-    tfs: list[str],
-    out_dir: Path,
-    elites: list[dict[str, object]],
-    raw_elites: list[object],
-    kept_after_mmr: int,
-    total_draws_seen: int,
-    combine_resolved: str,
-    beta_softmin_final: float | None,
-    pool_size: int,
-    diversity_value: float,
-    dsdna_mode: bool,
-    mmr_summary: dict[str, object] | None,
-    optimizer: object,
-    postprocess_stats: dict[str, int] | None = None,
-) -> dict[str, object]:
-    tf_label = format_regulator_slug(tfs)
-    selection_policy, relevance_label, pool_strategy, score_weight, diversity_weight = _selection_fields(
-        mmr_summary=mmr_summary,
-        diversity_value=diversity_value,
-    )
-    meta = {
-        "generated": datetime.now(timezone.utc).isoformat(),
-        "n_elites": len(elites),
-        "selection_policy": selection_policy,
-        "selection_relevance": relevance_label,
-        "selection_score_weight": score_weight,
-        "selection_diversity_weight": diversity_weight,
-        "selection_diversity": diversity_value,
-        "dsdna_canonicalize": dsdna_mode,
-        "total_draws_seen": total_draws_seen,
-        "candidate_count": len(raw_elites),
-        "kept_after_mmr": kept_after_mmr,
-        "objective_combine": combine_resolved,
-        "softmin_final_beta_used": beta_softmin_final,
-        "pool_size": pool_size,
-        "pool_strategy": pool_strategy,
-        "indexing_note": (
-            "chain is a 0-based independent chain index; chain_1based is 1-based; "
-            "draw_idx/sweep_idx are absolute sweeps; "
-            "draw_in_phase is phase-relative"
-        ),
-        "tf_label": tf_label,
-        "sequence_length": sample_cfg.sequence_length,
-        "config_file": str(config_used_path(out_dir).resolve()),
-    }
-    _append_optimizer_stats(meta=meta, optimizer=optimizer)
-    if mmr_summary is not None:
-        meta["mmr_summary"] = mmr_summary
-    if isinstance(postprocess_stats, dict):
-        meta["postprocess"] = {
-            "polish_edits": int(postprocess_stats.get("polish_edits", 0)),
-            "trim_left": int(postprocess_stats.get("trim_left", 0)),
-            "trim_right": int(postprocess_stats.get("trim_right", 0)),
-            "trim_internal_bp": int(postprocess_stats.get("trim_internal_bp", 0)),
-            "trim_internal_segments": int(postprocess_stats.get("trim_internal_segments", 0)),
-            "dedup_dropped": int(postprocess_stats.get("dedup_dropped", 0)),
-        }
-    return meta
-
-
-def _append_elite_artifacts(
-    *,
-    out_dir: Path,
-    stage: str,
-    artifacts: list[dict[str, object]],
-    parquet_path: Path,
-    json_path: Path,
-    yaml_path: Path,
-    hits_path: Path,
-    mmr_meta_path: Path | None,
-) -> None:
-    artifacts.extend(
-        [
-            artifact_entry(
-                parquet_path,
-                out_dir,
-                kind="table",
-                label="Elite sequences (Parquet)",
-                stage=stage,
-            ),
-            artifact_entry(
-                json_path,
-                out_dir,
-                kind="json",
-                label="Elite sequences (JSON)",
-                stage=stage,
-            ),
-            artifact_entry(
-                yaml_path,
-                out_dir,
-                kind="metadata",
-                label="Elite metadata (YAML)",
-                stage=stage,
-            ),
-            artifact_entry(
-                hits_path,
-                out_dir,
-                kind="table",
-                label="Elite best-hit metadata (Parquet)",
-                stage=stage,
-            ),
-        ]
-    )
-    if mmr_meta_path is None:
-        return
-    artifacts.append(
-        artifact_entry(
-            mmr_meta_path,
-            out_dir,
-            kind="table",
-            label="Elite MMR selection metadata",
-            stage=stage,
-        )
-    )
-
-
 def select_and_persist_elites(
     *,
     optimizer: object,
     evaluator: object,
+    objective_plan: ObjectivePlanCompilation,
     scorer: Scorer,
     sample_cfg: SampleConfig,
     pwms: dict[str, object],
@@ -980,6 +1012,7 @@ def select_and_persist_elites(
     kept_elites, kept_after_mmr, pool_size, mmr_meta_rows, mmr_summary = _select_elites(
         raw_elites=raw_elites,
         elite_k=elite_k,
+        evaluator=evaluator,
         scorer=scorer,
         pwms=pwms,
         sample_cfg=sample_cfg,
@@ -992,10 +1025,11 @@ def select_and_persist_elites(
     )
 
     status_writer.update(status_message="hydrating_elite_hits")
-    hydrate_candidate_hits(kept_elites, scorer=scorer)
+    hydrate_candidate_hits(kept_elites, evaluator=evaluator)
     kept_elites, postprocess_stats = _postprocess_elite_candidates(
         candidates=kept_elites,
         scorer=scorer,
+        evaluator=evaluator,
         dsdna_mode=bool(dsdna_mode),
         trim_uncovered_internal=bool(sample_cfg.elites.postprocess.trim_uncovered_internal),
     )
@@ -1049,7 +1083,17 @@ def select_and_persist_elites(
         pwm_hash_by_tf=pwm_hash_by_tf,
         core_def_by_tf=core_def_by_tf,
         want_canonical=want_canonical,
+        write_representative_hits=bool(objective_plan.runtime.supports_representative_hit_artifact),
     )
+    objective_scores_file: Path | None = None
+    occurrences_file: Path | None = None
+    if not objective_plan.runtime.supports_representative_hit_artifact:
+        objective_scores_file, occurrences_file = write_elite_objective_sidecars(
+            out_dir=out_dir,
+            entries=elites,
+            evaluator=evaluator,
+            objective_plan=objective_plan,
+        )
     json_path = elites_json_path(out_dir)
     atomic_write_json(json_path, elites)
 
@@ -1083,5 +1127,7 @@ def select_and_persist_elites(
         json_path=json_path,
         yaml_path=yaml_path,
         hits_path=hits_path,
+        objective_scores_path=objective_scores_file,
+        occurrences_path=occurrences_file,
         mmr_meta_path=mmr_meta_path,
     )

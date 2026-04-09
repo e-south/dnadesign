@@ -5,7 +5,7 @@ src/dnadesign/usr/tests/test_dataset_write_session.py
 
 Behavior tests for the explicit Dataset write-session contract.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

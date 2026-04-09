@@ -31,7 +31,7 @@ from ..config import Style
 from ..core import Record, RenderingError
 from .effects.motif_logo import MotifLogoGeometry, compute_motif_logo_geometry
 from .effects.registry import draw_effect
-from .layout import LayoutContext, comp, compute_layout
+from .layout import LayoutContext, comp, compute_layout, measure_text_width_px
 from .palette import Palette
 
 
@@ -39,7 +39,7 @@ from .palette import Palette
 class SequenceRowsRenderer:
     def render(self, record: Record, style: Style, palette: Palette):
         record = record.validate()
-        show_two = bool(style.show_reverse_complement and record.alphabet == "DNA")
+        show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
         fixed_content_top_extent_px: float | None = None
         fixed_content_bottom_extent_px: float | None = None
         fixed_content_radius_px: float | None = None
@@ -96,12 +96,34 @@ class SequenceRowsRenderer:
 
         tone_fwd: Sequence[float] | None = None
         tone_rev: Sequence[float] | None = None
+        explicit_complement_sequence: str | None = None
+        base_highlights: Mapping[str, Sequence[int]] = {}
+        base_highlight_color: Mapping[str, str] = {}
+        dim_base_indices: Mapping[str, Sequence[int]] = {}
+        span_backdrops: Sequence[Mapping[str, object]] = ()
+        if isinstance(record.meta, Mapping):
+            raw_complement = record.meta.get("complement_sequence")
+            if isinstance(raw_complement, str) and len(raw_complement) == len(record.sequence):
+                explicit_complement_sequence = raw_complement
+            raw_highlights = record.meta.get("base_highlights")
+            if isinstance(raw_highlights, Mapping):
+                base_highlights = raw_highlights
+            raw_highlight_color = record.meta.get("base_highlight_color")
+            if isinstance(raw_highlight_color, Mapping):
+                base_highlight_color = raw_highlight_color
+            raw_dim_indices = record.meta.get("dim_base_indices")
+            if isinstance(raw_dim_indices, Mapping):
+                dim_base_indices = raw_dim_indices
+            raw_span_backdrops = record.meta.get("span_backdrops")
+            if isinstance(raw_span_backdrops, Sequence) and not isinstance(raw_span_backdrops, (str, bytes)):
+                span_backdrops = raw_span_backdrops
         if bool(style.sequence.bold_consensus_bases) and motif_geometries:
             tone_fwd, tone_rev = _sequence_tone_strengths(
                 record,
                 motif_geometries,
                 q_low=float(style.sequence.tone_quantile_low),
                 q_high=float(style.sequence.tone_quantile_high),
+                complement_sequence=explicit_complement_sequence,
             )
 
         fig_scale = float(style.figure_scale)
@@ -145,8 +167,10 @@ class SequenceRowsRenderer:
             panel_ax = None
             ax = fig.add_axes([0, 0, 1, 1])
         ax.set_axis_off()
+        ax._dnadesign_record_meta = record.meta
 
         x0 = layout.x_left
+        _draw_span_backdrops(ax, layout, span_backdrops, show_two=show_two)
         _draw_sequence(
             ax,
             record.sequence,
@@ -158,11 +182,14 @@ class SequenceRowsRenderer:
             "3'",
             tone_strengths=tone_fwd,
             row_id="fwd",
+            highlight_indices=base_highlights.get("primary"),
+            highlight_color=base_highlight_color.get("primary"),
+            dim_indices=dim_base_indices.get("primary"),
         )
         if show_two:
             _draw_sequence(
                 ax,
-                comp(record.sequence),
+                explicit_complement_sequence or comp(record.sequence),
                 x0,
                 layout.y_reverse,
                 layout.cw,
@@ -171,8 +198,15 @@ class SequenceRowsRenderer:
                 "5'",
                 tone_strengths=tone_rev,
                 row_id="rev",
+                highlight_indices=base_highlights.get("complement"),
+                highlight_color=base_highlight_color.get("complement"),
+                dim_indices=dim_base_indices.get("complement"),
             )
             _draw_connectors(ax, len(record.sequence), x0, layout.cw, layout, style)
+        _draw_row_labels(ax, record, layout, style)
+        _draw_segment_labels(ax, record, layout, style)
+        if bool(style.show_coordinate_ticks):
+            _draw_coordinate_ticks(ax, record, layout, style)
 
         feature_boxes = dict(layout.feature_boxes)
         promoter_source = "densegen_promoter"
@@ -197,10 +231,10 @@ class SequenceRowsRenderer:
         # Draw feature boxes first.
         for placement in layout.placements:
             feature = record.features[placement.feature_index]
-            tag = feature.tags[0] if feature.tags else feature.kind
+            tag = str(feature.attrs.get("style_token", "")) or (feature.tags[0] if feature.tags else feature.kind)
             color = palette.color_for(tag)
             label = feature.label or ""
-            if not placement.above:
+            if not placement.above and feature.kind != "interval_annotation":
                 label = label[::-1]
             source = str(feature.attrs.get("source", "")).strip().lower()
             placement_box = (
@@ -262,15 +296,15 @@ class SequenceRowsRenderer:
         return fig
 
 
-@lru_cache(maxsize=1024)
-def _mono_text_path(char: str, font_family: str, size_pt: int) -> TextPath:
-    prop = FontProperties(family=font_family, size=size_pt)
+@lru_cache(maxsize=2048)
+def _mono_text_path(char: str, font_family: str, size_pt: int, weight: str = "normal") -> TextPath:
+    prop = FontProperties(family=font_family, size=size_pt, weight=weight)
     return TextPath((0, 0), char, prop=prop, usetex=False)
 
 
-@lru_cache(maxsize=64)
-def _mono_ag_mid_px(font_family: str, size_pt: int, dpi: int) -> float:
-    prop = FontProperties(family=font_family, size=size_pt)
+@lru_cache(maxsize=128)
+def _mono_ag_mid_px(font_family: str, size_pt: int, dpi: int, weight: str = "normal") -> float:
+    prop = FontProperties(family=font_family, size=size_pt, weight=weight)
     px_per_pt = dpi / 72.0
     ag = TextPath((0, 0), "Ag", prop=prop, usetex=False).get_extents()
     return ((ag.y0 + ag.y1) / 2.0) * px_per_pt
@@ -353,10 +387,11 @@ def _sequence_tone_strengths(
     *,
     q_low: float,
     q_high: float,
+    complement_sequence: str | None = None,
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     n = len(record.sequence)
     seq_fwd = record.sequence.upper()
-    seq_rev = comp(record.sequence).upper()
+    seq_rev = (complement_sequence or comp(record.sequence)).upper()
     covered_fwd = [0 for _ in range(n)]
     covered_rev = [0 for _ in range(n)]
     accum_fwd = [0.0 for _ in range(n)]
@@ -373,7 +408,7 @@ def _sequence_tone_strengths(
             )
 
         for offset, row in enumerate(geometry.matrix):
-            pos = feature.span.start + offset
+            pos = geometry.render_start + offset
             if pos < 0 or pos >= n:
                 raise RenderingError(
                     f"motif_logo geometry out of sequence bounds while computing sequence tone scores: pos={pos}, n={n}"
@@ -381,6 +416,8 @@ def _sequence_tone_strengths(
             if len(row) < 4:
                 raise RenderingError("motif_logo matrix rows must contain at least 4 probabilities [A,C,G,T]")
             info_weight = max(0.0, min(1.0, _column_information_bits(row) / 2.0))
+            if info_weight <= 0.0:
+                continue
             if feature.span.strand == "fwd":
                 p_fwd = _row_prob_for_base(row, seq_fwd[pos])
                 covered_fwd[pos] += 1
@@ -690,7 +727,7 @@ def _draw_inline_feature_labels(ax, record: Record, layout: LayoutContext, palet
             float(layout.y_forward + layout.sequence_extent_up),
         )
     )
-    if bool(style.show_reverse_complement and record.alphabet == "DNA"):
+    if bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"}):
         occupied_boxes.append(
             (
                 sequence_x0,
@@ -833,15 +870,27 @@ def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
         x = style.padding_x
         ha = "left"
     synthetic_top_pad = max(0.0, float(layout.content_top) - _actual_content_top(layout))
+    title_size = max(float(style.font_size_label), float(style.font_size_seq))
+    title_lines = max(1, len([line for line in str(text).splitlines() if line.strip()]))
+    title_line_height = max((title_size / 72.0 * style.dpi) * 1.05, layout.ch * 0.5)
+    title_block_height = title_line_height * title_lines
+    min_overlay_y = _actual_content_top(layout) + title_block_height + max(4.0, style.font_size_label * 0.25)
+    overlay_y = (
+        layout.height
+        - max(4.0, style.padding_y * 0.5)
+        - synthetic_top_pad
+        - max(0.0, float(style.overlay_title_gap_reduction_px))
+    )
+    overlay_y = max(min_overlay_y, overlay_y)
     ax.text(
         x,
-        layout.height - max(4.0, style.padding_y * 0.5) - synthetic_top_pad,
+        overlay_y,
         text,
         ha=ha,
         va="top",
-        fontsize=style.font_size_label,
+        fontsize=title_size,
         family=style.font_label,
-        color="#6B7280",
+        color=style.overlay_title_color,
         alpha=0.95,
         zorder=15,
         clip_on=False,
@@ -1073,8 +1122,38 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
     if y2 <= y1:
         return
     dash_pattern = tuple(float(value) for value in style.connector_dash)
+    hidden_indices: set[int] = set()
+    cross_indices: set[int] = set()
+    overhang_spans: list[tuple[int, int]] = []
+    record_meta = getattr(ax, "_dnadesign_record_meta", None)
+    if isinstance(record_meta, Mapping):
+        hidden_indices = {int(value) for value in record_meta.get("connector_hidden_indices", ())}
+        cross_indices = {int(value) for value in record_meta.get("connector_cross_indices", ())}
+        raw_spans = record_meta.get("connector_overhang_spans", ())
+        if isinstance(raw_spans, Sequence) and not isinstance(raw_spans, (str, bytes)):
+            for raw in raw_spans:
+                if not isinstance(raw, Mapping):
+                    continue
+                try:
+                    start = int(raw.get("start"))
+                    end = int(raw.get("end"))
+                except Exception:
+                    continue
+                if end > start:
+                    overhang_spans.append((start, end))
     for i in range(n):
+        if i in hidden_indices:
+            continue
         x = x0 + i * cw + cw / 2.0
+        if i in cross_indices:
+            dx = max(2.5, cw * 0.24)
+            ax.plot(
+                [x - dx, x + dx], [y1, y2], color="#6B7280", lw=max(1.1, style.connector_width), alpha=0.95, zorder=1.5
+            )
+            ax.plot(
+                [x - dx, x + dx], [y2, y1], color="#6B7280", lw=max(1.1, style.connector_width), alpha=0.95, zorder=1.5
+            )
+            continue
         (ln,) = ax.plot(
             [x, x],
             [y1, y2],
@@ -1085,6 +1164,179 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
         )
         if dash_pattern:
             ln.set_dashes(dash_pattern)
+    if overhang_spans:
+        center_y = (y1 + y2) / 2.0
+        for start, end in overhang_spans:
+            x_start = x0 + start * cw + cw * 0.12
+            x_end = x0 + end * cw - cw * 0.12
+            if x_end <= x_start:
+                continue
+            (ln,) = ax.plot([x_start, x_end], [center_y, center_y], color="#111827", lw=1.35, zorder=1.7)
+            ln.set_dashes((3.0, 2.0))
+
+
+def _draw_span_backdrops(
+    ax,
+    layout: LayoutContext,
+    span_backdrops: Sequence[Mapping[str, object]],
+    *,
+    show_two: bool,
+) -> None:
+    for index, raw in enumerate(span_backdrops):
+        if not isinstance(raw, Mapping):
+            continue
+        try:
+            start = int(raw.get("start"))
+            end = int(raw.get("end"))
+            alpha = float(raw.get("alpha"))
+            corner_radius = float(raw.get("corner_radius"))
+        except Exception:
+            continue
+        if end <= start:
+            continue
+        fill = str(raw.get("fill", "")).strip()
+        if not fill:
+            continue
+        cover_rows = str(raw.get("cover_rows", "both")).strip().lower()
+        row_bounds: list[tuple[float, float]] = []
+        if cover_rows in {"primary", "both"}:
+            row_bounds.append(
+                (
+                    float(layout.y_forward - layout.sequence_extent_down),
+                    float(layout.y_forward + layout.sequence_extent_up),
+                )
+            )
+        if show_two and cover_rows in {"complement", "both"}:
+            row_bounds.append(
+                (
+                    float(layout.y_reverse - layout.sequence_extent_down),
+                    float(layout.y_reverse + layout.sequence_extent_up),
+                )
+            )
+        elif not row_bounds and cover_rows == "complement":
+            row_bounds.append(
+                (
+                    float(layout.y_forward - layout.sequence_extent_down),
+                    float(layout.y_forward + layout.sequence_extent_up),
+                )
+            )
+        if not row_bounds:
+            continue
+        x = layout.x_left + start * layout.cw
+        y0 = min(bound[0] for bound in row_bounds)
+        y1 = max(bound[1] for bound in row_bounds)
+        ax.add_patch(
+            FancyBboxPatch(
+                (x, y0),
+                (end - start) * layout.cw,
+                y1 - y0,
+                boxstyle=f"round,pad=0.0,rounding_size={corner_radius}",
+                linewidth=0.0,
+                facecolor=mcolors.to_rgba(fill, alpha),
+                edgecolor="none",
+                zorder=0.6,
+                clip_on=False,
+                gid=f"sequence_backdrop:{index}",
+            )
+        )
+
+
+def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) -> None:
+    row_labels = record.meta.get("row_labels") if isinstance(record.meta, Mapping) else None
+    if not isinstance(row_labels, Mapping):
+        return
+    terminal_dx = style.font_size_label / 72.0 * style.dpi * 0.8
+    terminal_label_width = max(
+        measure_text_width_px("5'", style.font_label, style.font_size_label, style.dpi),
+        measure_text_width_px("3'", style.font_label, style.font_size_label, style.dpi),
+    )
+    row_gap = max(8.0, style.font_size_label / 72.0 * style.dpi * 0.35)
+    x = layout.x_left - terminal_dx - terminal_label_width - row_gap
+    primary = row_labels.get("primary")
+    complement = row_labels.get("complement")
+    if primary:
+        ax.text(
+            x,
+            layout.y_forward,
+            str(primary),
+            ha="right",
+            va="center",
+            fontsize=style.font_size_label,
+            family=style.font_label,
+            color="#374151",
+            zorder=4.0,
+            clip_on=False,
+        )
+    if bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"}) and complement:
+        ax.text(
+            x,
+            layout.y_reverse,
+            str(complement),
+            ha="right",
+            va="center",
+            fontsize=style.font_size_label,
+            family=style.font_label,
+            color="#374151",
+            zorder=4.0,
+            clip_on=False,
+        )
+
+
+def _draw_segment_labels(ax, record: Record, layout: LayoutContext, style: Style) -> None:
+    segment_labels = record.meta.get("segment_labels") if isinstance(record.meta, Mapping) else None
+    if not isinstance(segment_labels, Sequence) or isinstance(segment_labels, (str, bytes)):
+        return
+    y = layout.y_forward + layout.sequence_extent_up + max(5.0, style.font_size_label * 0.4)
+    for raw in segment_labels:
+        if not isinstance(raw, Mapping):
+            continue
+        text = str(raw.get("text", "")).strip()
+        if not text:
+            continue
+        try:
+            start = int(raw.get("start"))
+            end = int(raw.get("end"))
+        except Exception:
+            continue
+        if end <= start:
+            continue
+        x = layout.x_left + ((start + end) / 2.0) * layout.cw
+        ax.text(
+            x,
+            y,
+            text,
+            ha="center",
+            va="bottom",
+            fontsize=max(10, style.font_size_label),
+            family=style.font_label,
+            color="#111827",
+            zorder=4.3,
+            clip_on=False,
+        )
+
+
+def _draw_coordinate_ticks(ax, record: Record, layout: LayoutContext, style: Style) -> None:
+    tick_every = 5 if len(record.sequence) > 12 else 2
+    show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
+    y = (
+        layout.y_reverse - max(20.0, style.font_size_label * 1.8)
+        if show_two
+        else layout.y_forward - max(20.0, style.font_size_label * 1.8)
+    )
+    for boundary in range(0, len(record.sequence) + 1, tick_every):
+        x = layout.x_left + boundary * layout.cw
+        ax.plot([x, x], [y + 2.0, y + 8.0], color=style.color_ticks, linewidth=0.8, zorder=1.2)
+        ax.text(
+            x,
+            y,
+            str(boundary),
+            ha="center",
+            va="top",
+            fontsize=max(7, style.font_size_label - 2),
+            family=style.font_label,
+            color=style.color_ticks,
+            zorder=1.3,
+        )
 
 
 def _draw_sequence(
@@ -1099,6 +1351,9 @@ def _draw_sequence(
     *,
     tone_strengths: Sequence[float] | None = None,
     row_id: str = "fwd",
+    highlight_indices: Sequence[int] | None = None,
+    highlight_color: str | None = None,
+    dim_indices: Sequence[int] | None = None,
 ) -> None:
     label_dx = style.font_size_label / 72.0 * style.dpi * 0.8
     ax.text(
@@ -1125,14 +1380,22 @@ def _draw_sequence(
     )
 
     px_per_pt = style.dpi / 72.0
-    y_mid_px = _mono_ag_mid_px(style.font_mono, style.font_size_seq, style.dpi)
+    highlight_set = {int(index) for index in (highlight_indices or ())}
+    dim_set = {int(index) for index in (dim_indices or ())}
     x = x0
     for idx, char in enumerate(seq):
-        tp = _mono_text_path(char, style.font_mono, style.font_size_seq)
+        is_highlighted = idx in highlight_set
+        weight = "bold" if is_highlighted else "normal"
+        tp = _mono_text_path(char, style.font_mono, style.font_size_seq, weight)
         glyph_color = style.color_sequence
         if tone_strengths is not None:
             strength = tone_strengths[idx] if idx < len(tone_strengths) else 0.0
             glyph_color = _mix_colors(style.sequence.non_consensus_color, style.color_sequence, strength)
+        if idx in dim_set and not is_highlighted:
+            glyph_color = "#D1D5DB"
+        if is_highlighted:
+            glyph_color = str(highlight_color).strip() if highlight_color else _darken_rgb(glyph_color, factor=0.72)
+        y_mid_px = _mono_ag_mid_px(style.font_mono, style.font_size_seq, style.dpi, weight)
         trans = Affine2D().scale(px_per_pt).translate(x, y_center - y_mid_px) + ax.transData
         patch = PathPatch(
             tp,
@@ -1143,7 +1406,10 @@ def _draw_sequence(
             zorder=2,
             clip_on=False,
         )
-        patch.set_gid(f"sequence:{row_id}:{idx}:{char}")
+        gid = f"sequence:{row_id}:{idx}:{char}"
+        if is_highlighted:
+            gid = f"{gid}:highlight"
+        patch.set_gid(gid)
         ax.add_patch(patch)
         x += cw
 
@@ -1188,6 +1454,8 @@ def _draw_feature_box(
 
     y_text_center = y + float(style.kmer.text_y_nudge_cells) * ch
     for idx, char in enumerate(label):
+        if char.isspace():
+            continue
         tp = _mono_text_path(char, style.font_mono, style.font_size_seq)
         gb = tp.get_extents()
         gx = ((gb.x0 + gb.x1) / 2.0) * px_per_pt

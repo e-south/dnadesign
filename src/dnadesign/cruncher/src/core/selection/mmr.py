@@ -73,6 +73,108 @@ class MmrSelectionResult:
     relax_steps_used: int = 0
 
 
+@dataclass(frozen=True)
+class RankedMmrChoice:
+    idx: int
+    utility: float
+    max_similarity: float | None
+
+
+@dataclass(frozen=True)
+class RankedMmrSelectionResult:
+    selected_indices: list[int]
+    choices: list[RankedMmrChoice]
+
+
+def select_ranked_mmr(
+    *,
+    item_count: int,
+    k: int,
+    alpha: float,
+    relevance: Sequence[float],
+    similarity_at: Callable[[int, int], float],
+    min_distance: float | None = None,
+    distance_at: Callable[[int, int], float] | None = None,
+) -> RankedMmrSelectionResult:
+    """Generic deterministic MMR over an already-ranked candidate pool.
+
+    Lower candidate indices are treated as better deterministic tie-breaks, so
+    callers should provide items in their canonical score/tie-break order.
+    """
+
+    if item_count < 0:
+        raise ValueError("item_count must be >= 0")
+    if k < 0:
+        raise ValueError("k must be >= 0")
+    if alpha < 0.0 or alpha > 1.0:
+        raise ValueError("alpha must be in [0, 1]")
+    if len(relevance) != item_count:
+        raise ValueError("relevance length must equal item_count")
+    if min_distance is not None and distance_at is None:
+        raise ValueError("distance_at is required when min_distance is set")
+    if item_count == 0 or k == 0:
+        return RankedMmrSelectionResult(selected_indices=[], choices=[])
+
+    pair_cache: dict[tuple[int, int], tuple[float, float | None]] = {}
+
+    def _pair_metrics(left_idx: int, right_idx: int) -> tuple[float, float | None]:
+        key = (left_idx, right_idx) if left_idx < right_idx else (right_idx, left_idx)
+        cached = pair_cache.get(key)
+        if cached is not None:
+            return cached
+        distance = float(distance_at(left_idx, right_idx)) if distance_at is not None else None
+        similarity = float(similarity_at(left_idx, right_idx))
+        cached = (similarity, distance)
+        pair_cache[key] = cached
+        return cached
+
+    utility_tolerance = 1e-12
+    selected_indices = [0]
+    choices = [
+        RankedMmrChoice(
+            idx=0,
+            utility=float(alpha * float(relevance[0])),
+            max_similarity=None,
+        )
+    ]
+    remaining_indices = list(range(1, item_count))
+    while remaining_indices and len(selected_indices) < k:
+        best_choice: RankedMmrChoice | None = None
+        for idx in remaining_indices:
+            max_similarity = 0.0
+            blocked = False
+            for selected_idx in selected_indices:
+                similarity, distance = _pair_metrics(idx, selected_idx)
+                if min_distance is not None:
+                    assert distance is not None
+                    if distance < min_distance:
+                        blocked = True
+                        break
+                max_similarity = max(max_similarity, similarity)
+            if blocked:
+                continue
+            utility = float((alpha * float(relevance[idx])) - ((1.0 - alpha) * max_similarity))
+            candidate_choice = RankedMmrChoice(
+                idx=idx,
+                utility=utility,
+                max_similarity=max_similarity,
+            )
+            if best_choice is None:
+                best_choice = candidate_choice
+                continue
+            if candidate_choice.utility > best_choice.utility + utility_tolerance or (
+                abs(candidate_choice.utility - best_choice.utility) <= utility_tolerance
+                and candidate_choice.idx < best_choice.idx
+            ):
+                best_choice = candidate_choice
+        if best_choice is None:
+            break
+        selected_indices.append(best_choice.idx)
+        choices.append(best_choice)
+        remaining_indices = [idx for idx in remaining_indices if idx != best_choice.idx]
+    return RankedMmrSelectionResult(selected_indices=selected_indices, choices=choices)
+
+
 def _candidate_id(candidate: MmrCandidate) -> str:
     return f"{int(candidate.chain_id)}:{int(candidate.draw_idx)}"
 

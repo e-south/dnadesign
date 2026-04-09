@@ -95,6 +95,9 @@ dev  = [{ include-group = "test" }, { include-group = "lint" }]
 where = ["src"]
 
 [tool.setuptools.package-data]
+"dnadesign.cruncher" = [
+  "resources/cassette/catalogs/*.yaml",
+]
 "dnadesign.cluster" = [
   "presets/*/*.yaml",
   "workspaces/*/config.yaml",
@@ -128,7 +131,7 @@ where = ["src"]
   "runbooks/templates/*.qsub",
 ]
 "dnadesign.studies" = [
-  "*/status.registry.yaml",
+  "families/*/ops/status.registry.yaml",
 ]
 
 [tool.pytest.ini_options]

@@ -53,9 +53,14 @@ def test_workspace_init_scaffolds_standard_layout(tmp_path: Path) -> None:
     assert workspace.name == "demo_workspace"
     assert workspace.root == (tmp_path / "demo_workspace").resolve()
     assert workspace.job_path == workspace.root / "job.yaml"
+    assert (workspace.root / "README.md").exists()
     assert (workspace.root / "inputs").exists()
+    assert (workspace.root / "inputs" / "README.md").exists()
     assert (workspace.root / "outputs").exists()
+    assert (workspace.root / "outputs" / "README.md").exists()
     assert not (workspace.root / "reports").exists()
+    assert "inputs/input.parquet" in (workspace.root / "README.md").read_text(encoding="utf-8")
+    assert "outputs/plots/" in (workspace.root / "outputs" / "README.md").read_text(encoding="utf-8")
 
 
 def test_workspace_job_uses_workspace_outputs_by_default(tmp_path: Path) -> None:
@@ -142,6 +147,13 @@ def test_workspace_init_rejects_path_like_name_with_actionable_error() -> None:
     result = runner.invoke(app, ["workspace", "init", "/tmp/path_like_name"])
     assert result.exit_code == 2
     assert "use --root <dir>" in result.output
+
+
+def test_workspace_init_cli_prints_next_step_hint(tmp_path: Path) -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["workspace", "init", "demo_workspace", "--root", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "inputs/input.parquet" in result.output
 
 
 def test_workspace_run_defaults_outputs_to_workspace_outputs_root(tmp_path: Path) -> None:

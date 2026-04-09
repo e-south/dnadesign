@@ -1,52 +1,85 @@
-## Cruncher Documentation Index
+## Cruncher docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-04-07
 
 
-**Last updated by:** cruncher-maintainers on 2026-02-23
+**Last updated by:** cruncher-maintainers on 2026-04-07
 
-### Progressive disclosure route
-1. Start with one demo from **Run End-to-End Workflows**.
-2. Move to one guide in **Optimize and Analyze Outputs** for your immediate task.
-3. Use **Reference Contracts** when you need strict schema, CLI, or artifact details.
+Cruncher has three workflow families:
+
+- fixed-length optimization workspaces for sequence sampling, analysis, studies, and aggregation
+- cassette workspaces for cassette design and ranked search
+- payload-centric YIU workspaces for payload validation, rendering, and bundle inspection
+
+Studies and portfolio aggregation build on the fixed-length optimization lane.
+
+### Start here
+
+- **Fixed-length optimization:** [Pairwise Demo](demos/demo_pairwise.md), [Sampling and Analysis](guides/sampling_and_analysis.md), and [Intent and Lifecycle](guides/intent_and_lifecycle.md)
+- **Cassette workflows:** [Cassette Workspace Demo](demos/demo_cassette_workspace.md), [Cassette Workflow](guides/cassette_workflow.md), and [Cassette Solve Workflow](guides/cassette_solve_workflow.md)
+- **Payload-Centric YIU Workflows:** [YIU Workspace Demo](demos/demo_yiu_workspace.md), [YIU Workflow](guides/yiu_workflow.md), [YIU Spec Reference](reference/yiu_spec.md), [YIU Artifacts](reference/yiu_artifacts.md), and [YIU Visual System](reference/yiu_visual_system.md)
+- **Sample-backed YIU examples:** [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md) and [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md)
+- **Studies and aggregation:** [Studies](guides/studies.md) and [Portfolio Aggregation](guides/portfolio_aggregation.md)
+- **Tool-wide references:** [CLI Reference](reference/cli.md), [Architecture](reference/architecture.md), [Config Reference](reference/config.md), [Glossary](reference/glossary.md), and [Runbook Step Reference](reference/runbook_steps.md)
 
 <!-- docs:toc:off -->
 
-### Documentation by workflow
+### Documentation map
 <!-- docs:map:start -->
-#### Run End-to-End Workflows
-- [Pairwise Demo](demos/demo_pairwise.md): run the two-TF workflow from fetch to analysis artifacts.
-- [MultiTF Demo](demos/demo_multitf.md): run the multi-TF workflow with full output surfaces.
-- [Project Workspace Demo](demos/project_all_tfs.md): execute workspace-scale runs across all configured TFs.
+#### Optimize Fixed-Length Sequences
+- [Pairwise Demo](demos/demo_pairwise.md)
+- [MultiTF Demo](demos/demo_multitf.md)
+- [Project Workspace Demo](demos/project_all_tfs.md)
+- [Intent and Lifecycle](guides/intent_and_lifecycle.md)
+- [Sampling and Analysis](guides/sampling_and_analysis.md)
+- [Ingestion](guides/ingestion.md)
+- [MEME Suite](guides/meme_suite.md)
+- [Artifacts Reference](reference/artifacts.md)
 
-#### Ingest and Prepare Inputs
-- [Ingestion](guides/ingestion.md): prepare and validate motif inputs before optimization.
-- [MEME Suite](guides/meme_suite.md): run MEME/FIMO integration flows and expected outputs.
-- [Troubleshooting](guides/troubleshooting.md): diagnose common input and runtime failures.
+#### Design and Search Cassettes
+- [Cassette Workspace Demo](demos/demo_cassette_workspace.md)
+- [Cassette Workflow](guides/cassette_workflow.md)
+- [Cassette Solve Workflow](guides/cassette_solve_workflow.md)
+- [Cassette Spec Reference](reference/cassette_spec.md)
+- [Cassette Solve Spec Reference](reference/cassette_solve_spec.md)
+- [Nickase Catalog Reference](reference/nickase_catalog.md)
+- [Cassette Artifacts](reference/cassette_artifacts.md)
 
-#### Optimize and Analyze Outputs
-- [Intent and Lifecycle](guides/intent_and_lifecycle.md): understand stage transitions and artifact contracts.
-- [Sampling and Analysis](guides/sampling_and_analysis.md): tune optimization settings and interpret results.
-- [Artifacts Reference](reference/artifacts.md): verify generated files and schema expectations.
+#### Payload-Centric YIU Workflows
+- [YIU Workspace Demo](demos/demo_yiu_workspace.md)
+- [YIU Workflow](guides/yiu_workflow.md)
+- [YIU Spec Reference](reference/yiu_spec.md)
+- [YIU Artifacts](reference/yiu_artifacts.md)
+- [YIU Visual System](reference/yiu_visual_system.md)
 
 #### Run Studies and Portfolio Aggregation
-- [Studies](guides/studies.md): orchestrate repeatable study execution loops.
-- [Study Length vs Score](guides/study_length_vs_score.md): run and interpret the length-score tradeoff study.
-- [Study Diversity vs Score](guides/study_diversity_vs_score.md): run and interpret diversity-score tradeoff study.
-- [Portfolio Aggregation](guides/portfolio_aggregation.md): aggregate study outputs for project-level comparison.
+- [Studies](guides/studies.md)
+- [Study Length vs Score](guides/study_length_vs_score.md)
+- [Study Diversity vs Score](guides/study_diversity_vs_score.md)
+- [Portfolio Aggregation](guides/portfolio_aggregation.md)
 
-#### Reference Contracts
-- [Config Reference](reference/config.md): authoritative configuration schema and field semantics.
-- [CLI Reference](reference/cli.md): command/flag contracts and invocation patterns.
-- [Architecture](reference/architecture.md): dataflow and module boundaries.
-- [Glossary](reference/glossary.md): shared vocabulary for models, metrics, and artifacts.
-- [Runbook Step Reference](reference/runbook_steps.md): shared runbook stage names and meanings.
-- [Doc Conventions](reference/doc_conventions.md): documentation structure and writing contracts.
+#### Troubleshooting and Support
+- [Troubleshooting](guides/troubleshooting.md)
+
+#### Reference contracts
+- [Config Reference](reference/config.md)
+- [CLI Reference](reference/cli.md)
+- [Architecture](reference/architecture.md)
+- [Cassette Spec Reference](reference/cassette_spec.md)
+- [Cassette Solve Spec Reference](reference/cassette_solve_spec.md)
+- [Nickase Catalog Reference](reference/nickase_catalog.md)
+- [Cassette Artifacts](reference/cassette_artifacts.md)
+- [YIU Spec Reference](reference/yiu_spec.md)
+- [YIU Artifacts](reference/yiu_artifacts.md)
+- [YIU Visual System](reference/yiu_visual_system.md)
+- [Glossary](reference/glossary.md)
+- [Runbook Step Reference](reference/runbook_steps.md)
+- [Doc Conventions](reference/doc_conventions.md)
 
 #### Maintainer Internals
-- [Cruncher Internals Spec](internals/spec.md): implementation-level behavior and invariants.
-- [Optimizer Improvements Plan](internals/optimizer_improvements_plan.md): active optimization design backlog and rationale.
-- [Dev Journal](dev/journal.md): maintainer investigations, decisions, and validation notes.
-- [Docs Style Guide](meta/style_guide.md): style rules for sustaining docs consistency.
+- [Cruncher Internals Spec](internals/spec.md)
+- [Optimizer Improvements Plan](internals/optimizer_improvements_plan.md)
+- [Dev Journal](dev/journal.md)
+- [Docs Style Guide](meta/style_guide.md)
 <!-- docs:map:end -->

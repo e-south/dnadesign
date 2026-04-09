@@ -102,12 +102,18 @@ class Style:
     track_spacing: float = 22.0
     baseline_spacing: float = 56.0
     show_reverse_complement: bool = True
+    show_coordinate_ticks: bool = False
+    show_pair_rungs: bool = True
+    show_loop_label: bool = True
+    show_base_text: bool = False
     layout: LayoutStyle = field(default_factory=LayoutStyle)
     sequence: SequenceStyle = field(default_factory=SequenceStyle)
 
     color_sequence: str = "#4b5563"
     color_ticks: str = "#9ca3af"
     overlay_align: str = "left"
+    overlay_title_color: str = "#6b7280"
+    overlay_title_gap_reduction_px: float = 0.0
 
     legend: bool = True
     legend_mode: str = "bottom"
@@ -189,6 +195,16 @@ class Style:
         ensure(
             str(self.overlay_align).lower() in {"left", "center", "right"},
             "style.overlay_align must be 'left', 'center', or 'right'",
+            SchemaError,
+        )
+        ensure(
+            str(self.overlay_title_color).strip() != "",
+            "style.overlay_title_color must be non-empty",
+            SchemaError,
+        )
+        ensure(
+            self.overlay_title_gap_reduction_px >= 0,
+            "style.overlay_title_gap_reduction_px must be >= 0",
             SchemaError,
         )
         ensure(

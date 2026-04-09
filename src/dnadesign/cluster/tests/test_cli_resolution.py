@@ -5,7 +5,7 @@ src/dnadesign/cluster/tests/test_cli_resolution.py
 
 CLI resolution contracts for cluster preset and method-param merging.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

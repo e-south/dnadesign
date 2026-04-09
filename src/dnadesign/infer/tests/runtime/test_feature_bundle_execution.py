@@ -5,7 +5,7 @@ src/dnadesign/infer/tests/runtime/test_feature_bundle_execution.py
 
 Runtime contract tests for Evo2 promoter feature bundles.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

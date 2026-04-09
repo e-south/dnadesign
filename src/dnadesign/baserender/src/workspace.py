@@ -122,6 +122,58 @@ def _workspace_job_template() -> dict:
     }
 
 
+def _workspace_readme_text() -> str:
+    return "\n".join(
+        [
+            "# BaseRender Workspace",
+            "",
+            "This scaffold is intentionally minimal.",
+            "",
+            "- edit `job.yaml` or replace it with your own job contract",
+            "- place input data at `inputs/input.parquet`, or update `input.path` in `job.yaml`",
+            "- rendered artifacts and optional `run_report.json` are written under `outputs/`",
+            "",
+            "Checked-in package demos live under `src/dnadesign/baserender/workspaces/`.",
+            (
+                "Cruncher cassette jobs are not BaseRender workspaces; "
+                "run those job files by path from the owning Cruncher workspace."
+            ),
+            "",
+        ]
+    )
+
+
+def _inputs_readme_text() -> str:
+    return "\n".join(
+        [
+            "# Inputs",
+            "",
+            "Place runtime input files here for the scaffolded `job.yaml`.",
+            "",
+            "- default scaffold path: `inputs/input.parquet`",
+            (
+                "- if you use a different filename or format, update `job.yaml` "
+                "accordingly before `baserender job validate|run`"
+            ),
+            "",
+        ]
+    )
+
+
+def _outputs_readme_text() -> str:
+    return "\n".join(
+        [
+            "# Outputs",
+            "",
+            "BaseRender writes rendered artifacts here by default.",
+            "",
+            "- image jobs default to `outputs/plots/` when no explicit output dir is set",
+            "- optional `run_report.json` is also written under this root when enabled",
+            "",
+        ]
+    )
+
+
 def init_workspace(name: str, *, root: Path | None = None) -> Workspace:
     ws_root = workspace_root(name, root=root)
     root_path = ws_root.parent
@@ -141,6 +193,9 @@ def init_workspace(name: str, *, root: Path | None = None) -> Workspace:
     outputs_dir.mkdir(parents=False, exist_ok=False)
 
     job_path.write_text(yaml.safe_dump(_workspace_job_template(), sort_keys=False))
+    (ws_root / "README.md").write_text(_workspace_readme_text(), encoding="utf-8")
+    (inputs_dir / "README.md").write_text(_inputs_readme_text(), encoding="utf-8")
+    (outputs_dir / "README.md").write_text(_outputs_readme_text(), encoding="utf-8")
 
     return Workspace(
         name=ws_root.name,

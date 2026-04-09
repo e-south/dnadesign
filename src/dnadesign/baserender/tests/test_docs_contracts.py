@@ -30,6 +30,7 @@ def test_docs_surface_stays_compact() -> None:
         "docs/integrations/README.md",
         "docs/integrations/cruncher.md",
         "docs/integrations/densegen.md",
+        "docs/integrations/yiu.md",
         "docs/reference.md",
     ]
 
@@ -64,6 +65,9 @@ def test_workspace_demo_guide_matches_output_contract() -> None:
     text = (_pkg_root() / "docs" / "demos" / "workspaces.md").read_text()
     assert "outputs/plots/" in text
     assert "run.emit_report: true" in text
+    assert "workspace init --root /path/to/workspaces demo_run" in text
+    assert "inputs/input.parquet" in text
+    assert "not BaseRender workspaces" in text
 
 
 def test_densegen_integration_doc_declares_strict_tfbs_contract() -> None:
@@ -72,3 +76,44 @@ def test_densegen_integration_doc_declares_strict_tfbs_contract() -> None:
         assert f"`{key}`" in text
     assert "Legacy TFBS keys (`tf`, `tfbs`, `stage_a_*`) are not accepted" in text
     assert "`on_invalid_row=error`" in text
+
+
+def test_reference_and_cruncher_integration_docs_cover_cassette_json_contract_path() -> None:
+    reference = (_pkg_root() / "docs" / "reference.md").read_text()
+    cruncher = (_pkg_root() / "docs" / "integrations" / "cruncher.md").read_text()
+
+    assert "src/config/jobs/sequence_rows_v3.py" in reference
+    assert "src/config/cruncher_showcase_job.py" in reference
+    assert "`json`" in reference
+    assert "`jsonl`" in reference
+    assert "duplex_sequence_v1" in reference
+    assert "hairpin_topology_v1" in reference
+    assert "linear_duplex.v1.json" in cruncher
+    assert "top_hits.linear_duplex.v1.jsonl" in cruncher
+    assert "duplex_sequence_v1" in cruncher
+
+
+def test_reference_and_yiu_integration_docs_cover_payload_visual_adapter_surface() -> None:
+    reference = (_pkg_root() / "docs" / "reference.md").read_text()
+    yiu = (_pkg_root() / "docs" / "integrations" / "yiu.md").read_text()
+
+    assert "yiu_payload_visual_v1" in reference
+    assert "nucleotide_evidence_map" in reference
+    assert "adapt_record" in reference
+    assert "topology cartoons require explicit segment geometry" in reference
+    assert "YiuPayloadVisualV1" in yiu
+    assert "yiu_payload_visual_v1" in yiu
+    assert "nucleotide_evidence_map" in yiu
+    assert "adapt_record" in yiu
+    assert "zero-length separator spans are ignored" in yiu
+    assert "dnadesign.baserender.src.*" in yiu
+    assert "does not invent placeholder arms or bands" in yiu
+    assert "evidence_ribbon" in yiu
+    assert "operator_strip" in yiu
+    assert "producer-side visual language is owned by Cruncher" in yiu
+    assert "Do not reintroduce an intermediate compatibility shim" in yiu
+
+
+def test_yiu_payload_visual_projection_shim_stays_removed() -> None:
+    shim = _pkg_root() / "src" / "adapters" / "yiu_payload_visual_projection.py"
+    assert not shim.exists()

@@ -1,0 +1,162 @@
+{
+  "summary_contract": "yiu_bundle_summary_v3",
+  "schema_version": 3,
+  "spec_name": "tetr_monotypic_hit",
+  "payload_label": "tetr_payload",
+  "input_kind": "sample_hit",
+  "payload_length": 19,
+  "sequence_summary": {
+    "junction_payload_sequence_5to3": "TTGA",
+    "overhang_5to3": {
+      "canonical_sequence_5to3": "TCAG",
+      "mismatch_present_sequence_5to3": "TTAG"
+    },
+    "views": {
+      "payload": {
+        "canonical": {
+          "top_strand_5to3": "CTCTATATCTGATATAGAG",
+          "bottom_strand_5to3": "CTCTATATCAGATATAGAG"
+        },
+        "mismatch_present": {
+          "top_strand_5to3": "CTCTATATTTGATATAGAG",
+          "bottom_strand_5to3": "CTCTATATTAGATATAGAG"
+        },
+        "changed_rows": [
+          "top",
+          "bottom"
+        ]
+      },
+      "split_left": {
+        "canonical": {
+          "top_strand_5to3": "TCAGATATAGAG",
+          "bottom_strand_5to3": "CTCTATAT"
+        },
+        "mismatch_present": {
+          "top_strand_5to3": "TTAGATATAGAG",
+          "bottom_strand_5to3": "CTCTATAT"
+        },
+        "changed_rows": [
+          "top"
+        ]
+      },
+      "split_right": {
+        "canonical": {
+          "top_strand_5to3": "CTCTATA",
+          "bottom_strand_5to3": "CTGATATAGAG"
+        },
+        "mismatch_present": {
+          "top_strand_5to3": "CTCTATA",
+          "bottom_strand_5to3": "TTGATATAGAG"
+        },
+        "changed_rows": [
+          "bottom"
+        ]
+      },
+      "assembled": {
+        "canonical": {
+          "top_strand_5to3": "CTCTATATCTGATATAGAG",
+          "bottom_strand_5to3": "CTCTATATCAGATATAGAG"
+        },
+        "mismatch_present": {
+          "top_strand_5to3": "CTCTATATTTGATATAGAG",
+          "bottom_strand_5to3": "CTCTATATTAGATATAGAG"
+        },
+        "changed_rows": [
+          "top",
+          "bottom"
+        ]
+      }
+    }
+  },
+  "junction": {
+    "start": 8,
+    "end": 12,
+    "offsets": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "mode": "optimize",
+    "left_body_length": 8,
+    "right_body_length": 7
+  },
+  "mismatches": [
+    {
+      "payload_index": 8,
+      "junction_offset": 0,
+      "mutated_strand": "payload",
+      "native_base": "C",
+      "mutated_base": "T",
+      "opposing_base": "G"
+    },
+    {
+      "payload_index": 10,
+      "junction_offset": 2,
+      "mutated_strand": "complement",
+      "native_base": "C",
+      "mutated_base": "T",
+      "opposing_base": "G"
+    }
+  ],
+  "mismatch_notation": [
+    "PS9C>T",
+    "AS11C>T"
+  ],
+  "pwm": {
+    "mode": "require",
+    "effective": true,
+    "motif_count": 2,
+    "worst_loss": 0.27692070770870103,
+    "total_loss": 0.5538414154174021
+  },
+  "ligation": {
+    "profile": "t4",
+    "awareness_mode": "secondary",
+    "selection_mode": "hard_ligation_filter",
+    "applied": true,
+    "state": "active",
+    "state_note": "Hard ligation filter active before PWM-preserving ranking",
+    "enabled": true,
+    "legacy_mode": false,
+    "candidate_positions": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "edge_positions_available": true,
+    "edge_comparison_available": true,
+    "bad_pattern_heuristics": false,
+    "chosen_mismatch_classes": [
+      "GT",
+      "GT"
+    ],
+    "position_classes": [
+      "edge",
+      "middle"
+    ],
+    "worst_mismatch_class_tier": 0,
+    "total_mismatch_class_tier": 0,
+    "middle_mismatch_count": 1,
+    "double_middle_flag": false,
+    "bad_pattern_penalty": 0,
+    "candidate_count_before_filter": 2160,
+    "candidate_count_after_filter": 44,
+    "filtered_candidate_count": 2116,
+    "decision_note": "Hard ligation filter removed 2116 candidates before ranking. PWM preserved first among surviving candidates."
+  },
+  "trace": {
+    "sample_limit": 32,
+    "sampled_count": 32,
+    "candidate_count": 2160,
+    "truncated": true,
+    "note": "Optimizer trace is a bounded sample (32/2160 candidates, limit=32)."
+  },
+  "view_ids": [
+    "payload",
+    "split_payload",
+    "assembled_payload"
+  ],
+  "render_status": "rendered"
+}

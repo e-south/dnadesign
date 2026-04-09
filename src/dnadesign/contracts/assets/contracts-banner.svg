@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="240" viewBox="0 0 1200 240" role="img" aria-labelledby="title desc">
+  <title id="title">contracts banner</title>
+  <desc id="desc">Banner for the dnadesign contracts package.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10243f" />
+      <stop offset="100%" stop-color="#1f6aa5" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="240" fill="url(#bg)" />
+  <g fill="none" stroke="#8fd3ff" stroke-width="4" opacity="0.75">
+    <path d="M90 170 L250 70 L410 170 L570 70 L730 170" />
+    <path d="M470 170 L630 70 L790 170 L950 70 L1110 170" />
+  </g>
+  <g fill="#e8f6ff" font-family="Helvetica, Arial, sans-serif">
+    <text x="88" y="110" font-size="28" opacity="0.85">dnadesign</text>
+    <text x="88" y="162" font-size="68" font-weight="700">contracts</text>
+    <text x="88" y="198" font-size="24" opacity="0.9">Shared cross-tool artifact schemas</text>
+  </g>
+</svg>

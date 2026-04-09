@@ -145,6 +145,29 @@ def test_public_batch_parquet_record_loader_raises_on_missing_record_ids(tmp_pat
         )
 
 
+def test_public_adapter_helpers_adapt_in_memory_contract_rows() -> None:
+    row = {
+        "contract_kind": "sequence_evidence_map_v1",
+        "state_id": "assembled_payload",
+        "topology_kind": "linear_dsdna",
+        "alphabet": "iupac_dna",
+        "primary_sequence": "CTCTATATCTGATATAGAG",
+        "complement_sequence": "GAGATATAGTGTATATCTC",
+        "owners": [],
+        "effect_tags": [],
+        "boundaries": [],
+        "pairings": [],
+        "display": {"title": "Assembled payload"},
+        "meta": {},
+    }
+
+    record = baserender.adapt_record(row, adapter_kind="sequence_evidence_map_v1", alphabet="IUPAC_DNA")
+    records = baserender.adapt_records([row, row], adapter_kind="sequence_evidence_map_v1", alphabet="IUPAC_DNA")
+
+    assert record.id == "assembled_payload"
+    assert [item.id for item in records] == ["assembled_payload", "assembled_payload"]
+
+
 def test_public_parquet_render_helper_rejects_legacy_densegen_tfbs_keys(tmp_path) -> None:
     parquet = write_parquet(
         tmp_path / "input.parquet",
@@ -243,14 +266,51 @@ def test_public_api_exposes_generic_job_entrypoints(tmp_path) -> None:
 
     assert hasattr(baserender, "validate_job")
     assert hasattr(baserender, "run_job")
+    assert hasattr(baserender, "RenderJobV3")
     assert hasattr(baserender, "validate_sequence_rows_job")
     assert hasattr(baserender, "run_sequence_rows_job")
+    assert hasattr(baserender, "adapt_record")
+    assert hasattr(baserender, "adapt_records")
+    assert hasattr(baserender, "list_adapters")
+    assert hasattr(baserender, "list_renderers")
+    assert hasattr(baserender, "get_adapter_descriptor")
+    assert hasattr(baserender, "get_renderer_descriptor")
     assert hasattr(baserender, "render")
 
     validated = baserender.validate_job(job_path, caller_root=tmp_path)
     report = baserender.run_job(job_path, caller_root=tmp_path)
     assert validated.version == 3
+    assert isinstance(validated, baserender.RenderJobV3)
     assert "images_dir" in report.outputs
+
+    adapter_kinds = baserender.list_adapters()
+    renderer_names = baserender.list_renderers()
+    assert "yiu_topology_cartoon_v1" in adapter_kinds
+    assert "sequence_evidence_map_v1" in adapter_kinds
+    assert "topology_cartoon" in renderer_names
+    assert "nucleotide_evidence_map" in renderer_names
+    adapter_descriptor = baserender.get_adapter_descriptor("yiu_topology_cartoon_v1")
+    renderer_descriptor = baserender.get_renderer_descriptor("topology_cartoon")
+    assert adapter_descriptor.owner_tool == "yiu"
+    assert "topology_cartoon" in adapter_descriptor.supported_renderers
+    assert renderer_descriptor.name == "topology_cartoon"
+    assert "DNA" in renderer_descriptor.accepted_alphabets
+    evidence_adapter_descriptor = baserender.get_adapter_descriptor("sequence_evidence_map_v1")
+    evidence_renderer_descriptor = baserender.get_renderer_descriptor("nucleotide_evidence_map")
+    assert evidence_adapter_descriptor.owner_tool is None
+    assert evidence_adapter_descriptor.required_source_columns == ()
+    assert evidence_adapter_descriptor.supported_renderers == ("nucleotide_evidence_map",)
+    assert evidence_renderer_descriptor.name == "nucleotide_evidence_map"
+    assert "span_link" in evidence_renderer_descriptor.optional_record_features
+
+
+def test_public_api_rejects_unknown_renderer_lookup() -> None:
+    from dnadesign.baserender.src.render.renderer import get_renderer
+
+    with pytest.raises(RenderingError, match="Unknown renderer: missing"):
+        get_renderer("missing")
+    with pytest.raises(RenderingError, match="Unknown renderer: missing"):
+        baserender.get_renderer_descriptor("missing")
 
 
 def test_public_api_accepts_in_memory_job_mapping(tmp_path) -> None:
@@ -372,6 +432,62 @@ def test_public_render_defaults_to_single_row_for_record_lists(monkeypatch: pyte
 def test_public_api_rejects_unknown_kind() -> None:
     with pytest.raises(baserender.SchemaError, match="kind must be one of"):
         baserender.validate_job("densegen_job", kind="v4")
+
+
+def test_public_api_accepts_render_job_v3_kind_alias(tmp_path: Path) -> None:
+    parquet = write_parquet(
+        tmp_path / "input.parquet",
+        [
+            {
+                "id": "r1",
+                "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+                "densegen__used_tfbs_detail": [
+                    {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
+                ],
+                "details": "",
+            }
+        ],
+    )
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=tmp_path / "outputs",
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    validated = baserender.validate_job(job_path, kind="render_job_v3", caller_root=tmp_path)
+    report = baserender.run_job(job_path, kind="render_job_v3", caller_root=tmp_path)
+
+    assert validated.version == 3
+    assert "images_dir" in report.outputs
+
+
+def test_public_api_exposes_render_job_alias(tmp_path: Path) -> None:
+    parquet = write_parquet(
+        tmp_path / "input.parquet",
+        [
+            {
+                "id": "r1",
+                "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+                "densegen__used_tfbs_detail": [
+                    {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
+                ],
+                "details": "",
+            }
+        ],
+    )
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=tmp_path / "outputs",
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    validated = baserender.validate_render_job(job_path, caller_root=tmp_path)
+    report = baserender.run_render_job(job_path, caller_root=tmp_path)
+
+    assert validated.version == 3
+    assert "images_dir" in report.outputs
 
 
 def test_public_api_runs_densegen_and_cruncher_contracts_end_to_end(tmp_path: Path) -> None:

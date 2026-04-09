@@ -16,6 +16,7 @@ import typer
 
 from dnadesign.cruncher.cli.commands.analyze import analyze as analyze_cmd
 from dnadesign.cruncher.cli.commands.cache import app as cache_app
+from dnadesign.cruncher.cli.commands.cassette import app as cassette_app
 from dnadesign.cruncher.cli.commands.catalog import app as catalog_app
 from dnadesign.cruncher.cli.commands.config import app as config_app
 from dnadesign.cruncher.cli.commands.discover import app as discover_app
@@ -33,13 +34,20 @@ from dnadesign.cruncher.cli.commands.sources import app as sources_app
 from dnadesign.cruncher.cli.commands.status import status as status_cmd
 from dnadesign.cruncher.cli.commands.study import app as study_app
 from dnadesign.cruncher.cli.commands.targets import app as targets_app
+from dnadesign.cruncher.cli.commands.visuals import app as visuals_app
 from dnadesign.cruncher.cli.commands.workspaces import app as workspaces_app
+from dnadesign.cruncher.cli.commands.yiu import app as yiu_app
 from dnadesign.cruncher.cli.config_resolver import CONFIG_ENV_VAR, WORKSPACE_ENV_VAR
 from dnadesign.cruncher.utils.logging import configure_logging
 
+_APP_HELP = (
+    "Design TF-scored sequences, scaffold cassette or YIU workspaces, "
+    "and run explicit workflow families beside the fixed-length sampling lane."
+)
+
 app = typer.Typer(
     no_args_is_help=True,
-    help="Design short DNA sequences that score highly across TF motifs.",
+    help=_APP_HELP,
 )
 app.info.epilog = "Tip: run `cruncher <command> --help` for examples and details."
 
@@ -67,7 +75,7 @@ def main(
         help="Select a workspace by name, index, or path.",
     ),
 ) -> None:
-    """Design short DNA sequences that score highly across multiple TF motifs."""
+    """Design TF-scored sequences, scaffold cassette or YIU workspaces, and run explicit workflow families."""
     configure_logging(log_level)
     if config:
         os.environ[CONFIG_ENV_VAR] = str(config)
@@ -101,6 +109,24 @@ app.command(
     help="Generate an optional marimo notebook for analysis.",
     short_help="Generate a marimo notebook.",
 )(notebook_cmd)
+app.add_typer(
+    cassette_app,
+    name="cassette",
+    help="Scaffold, validate, design, solve, inspect, and catalog dual-context hairpin cassette workflows.",
+    short_help="dual-context hairpin cassette workflows.",
+)
+app.add_typer(
+    yiu_app,
+    name="yiu",
+    help="Scaffold, validate, render, and inspect payload-centric YIU workflows.",
+    short_help="payload-centric YIU workflows.",
+)
+app.add_typer(
+    visuals_app,
+    name="visuals",
+    help="Validate or run published visual jobs through BaseRender's public API.",
+    short_help="Run published visual jobs.",
+)
 app.add_typer(
     fetch_app,
     name="fetch",

@@ -172,3 +172,52 @@ def test_local_adapter_extracts_sites_from_meme_blocks(tmp_path: Path) -> None:
     assert sites[0].provenance.tags["record_kind"] == "meme_blocks"
     sites_for_motif = list(adapter.get_sites_for_motif("cusR", SiteQuery()))
     assert len(sites_for_motif) == 2
+
+
+def test_local_adapter_ingests_ddg_table_via_extra_parser_module(tmp_path: Path) -> None:
+    root = tmp_path / "motifs"
+    root.mkdir()
+    (root / "tetR.tsv").write_text(
+        "PO\tA\tT\tC\tG\n"
+        "1\t0.164072\t0.519334\t-0.0468541\t0.22966\n"
+        "2\t0.642569\t0.164072\t0.188965\t0.943314\n"
+        "3\t1.04481\t0.558693\t0.164072\t0.848264\n"
+        "4\t0.959646\t0.164072\t2.17536\t0.718959\n"
+        "5\t0.164072\t1.19894\t1.79469\t1.56685\n"
+        "6\t1.46463\t0.164072\t1.74384\t1.54845\n"
+        "7\t0.966397\t1.07557\t0.164072\t1.72883\n"
+        "8\t0.164072\t0.504312\t0.755195\t0.148902\n"
+        "9\t0.0876645\t0.164072\t0\t0.0156484\n"
+        "10\t0.289722\t0.164072\t0.00707563\t0.843474\n"
+        "11\t1.77568\t1.3447\t2.34804\t0.164072\n"
+        "12\t0.164072\t1.72354\t1.62782\t1.49176\n"
+        "13\t0.877518\t0.164072\t1.30879\t1.9052\n"
+        "14\t0.164072\t0.544642\t0.3387\t1.7537\n"
+        "15\t0.540091\t0.8821\t1.0861\t0.164072\n"
+        "16\t-0.224147\t0.280358\t0.442769\t0.164072\n"
+        "17\t0.31238\t-0.0651059\t0.164072\t-0.303844\n",
+        encoding="utf-8",
+    )
+
+    cfg = LocalMotifAdapterConfig(
+        source_id="westmann_tetr_mitomi",
+        root=root,
+        patterns=("*.tsv",),
+        recursive=False,
+        format_map={".tsv": "DDG_TABLE"},
+        default_format=None,
+        tf_name_strategy="stem",
+        matrix_semantics="probabilities",
+        extra_parser_modules=("dnadesign.cruncher.io.parsers.ddg_table",),
+    )
+    adapter = LocalMotifAdapter(cfg)
+    catalog_root = tmp_path / ".cruncher"
+    written = fetch_motifs(adapter, catalog_root, names=["tetR"], motif_ids=None)
+
+    assert written
+    catalog = CatalogIndex.load(catalog_root)
+    entry = catalog.entries.get("westmann_tetr_mitomi:tetR")
+    assert entry is not None
+    assert entry.tf_name == "tetR"
+    assert entry.matrix_length == 17
+    assert entry.has_matrix is True

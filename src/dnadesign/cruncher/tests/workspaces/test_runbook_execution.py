@@ -11,6 +11,11 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
+import os
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -20,12 +25,27 @@ import yaml
 import dnadesign.cruncher.workspaces.runbook as runbook_module
 from dnadesign.cruncher.workspaces.runbook import load_workspace_runbook, run_workspace_runbook
 
+REPO_ROOT = Path(__file__).resolve().parents[5]
+
 
 def _write_runbook(workspace: Path, payload: dict) -> Path:
     runbook_path = workspace / "configs" / "runbook.yaml"
     runbook_path.parent.mkdir(parents=True, exist_ok=True)
     runbook_path.write_text(yaml.safe_dump(payload))
     return runbook_path
+
+
+def _copytree_without_ds_store(src: Path, dest: Path) -> Path:
+    shutil.copytree(src, dest, ignore=shutil.ignore_patterns(".DS_Store"))
+    return dest
+
+
+def _load_json(path: Path) -> dict[str, object]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _load_jsonl(path: Path) -> list[dict[str, object]]:
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
 def test_runbook_rejects_unknown_keys() -> None:
@@ -51,6 +71,44 @@ def test_runbook_rejects_disallowed_cli_surface() -> None:
     }
     with pytest.raises(ValueError, match="disallowed cruncher command"):
         load_workspace_runbook(Path("runbook.yaml"), raw=payload)
+
+
+def test_runbook_accepts_cassette_cli_surface() -> None:
+    payload = {
+        "runbook": {
+            "schema_version": 1,
+            "name": "demo",
+            "steps": [
+                {
+                    "id": "cassette_solve_fast",
+                    "run": ["cassette", "solve", "--spec", "configs/cassettes/demo_hairpin_fast.cassette.solve.yaml"],
+                }
+            ],
+        }
+    }
+
+    runbook = load_workspace_runbook(Path("runbook.yaml"), raw=payload)
+
+    assert runbook.steps[0].run[0] == "cassette"
+
+
+def test_runbook_accepts_yiu_cli_surface() -> None:
+    payload = {
+        "runbook": {
+            "schema_version": 1,
+            "name": "demo",
+            "steps": [
+                {
+                    "id": "yiu_render",
+                    "run": ["yiu", "render", "--spec", "configs/yiu/example.yiu.yaml"],
+                }
+            ],
+        }
+    }
+
+    runbook = load_workspace_runbook(Path("runbook.yaml"), raw=payload)
+
+    assert runbook.steps[0].run[0] == "yiu"
 
 
 def test_runbook_executes_selected_steps_in_runbook_order(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -218,3 +276,208 @@ def test_runbook_sets_writable_home_for_child_processes_when_home_is_not_writabl
     expected_home = (workspace / ".cruncher" / ".runtime_home").resolve()
     assert Path(str(env["HOME"])).resolve() == expected_home
     assert expected_home.is_dir()
+
+
+def test_runbook_sets_workspace_local_mpl_cache_for_child_processes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    runbook_path = _write_runbook(
+        workspace,
+        {
+            "runbook": {
+                "schema_version": 1,
+                "name": "demo",
+                "steps": [{"id": "sample", "run": ["sample", "-c", "configs/config.yaml"]}],
+            }
+        },
+    )
+
+    call_kwargs: list[dict[str, object]] = []
+
+    def _fake_subprocess_run(cmd, **kwargs):
+        _ = cmd
+        call_kwargs.append(dict(kwargs))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(runbook_module.subprocess, "run", _fake_subprocess_run)
+    monkeypatch.delenv("MPLCONFIGDIR", raising=False)
+
+    run_workspace_runbook(runbook_path)
+
+    assert len(call_kwargs) == 1
+    env = call_kwargs[0].get("env")
+    assert isinstance(env, dict)
+    expected_cache = (workspace / ".cruncher" / ".runtime_mplconfig").resolve()
+    assert Path(str(env["MPLCONFIGDIR"])).resolve() == expected_cache
+    assert expected_cache.is_dir()
+
+
+def test_runbook_normalizes_c_utf8_locale_for_child_processes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace = tmp_path / "workspace"
+    runbook_path = _write_runbook(
+        workspace,
+        {
+            "runbook": {
+                "schema_version": 1,
+                "name": "demo",
+                "steps": [{"id": "sample", "run": ["sample", "-c", "configs/config.yaml"]}],
+            }
+        },
+    )
+
+    call_kwargs: list[dict[str, object]] = []
+
+    def _fake_subprocess_run(cmd, **kwargs):
+        _ = cmd
+        call_kwargs.append(dict(kwargs))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(runbook_module.subprocess, "run", _fake_subprocess_run)
+    monkeypatch.setenv("LANG", "C.UTF-8")
+    monkeypatch.setenv("LC_ALL", "C.UTF-8")
+    monkeypatch.setenv("LANGUAGE", "C.UTF-8")
+
+    run_workspace_runbook(runbook_path)
+
+    assert len(call_kwargs) == 1
+    env = call_kwargs[0].get("env")
+    assert isinstance(env, dict)
+    assert env["LANG"] == "C"
+    assert env["LC_ALL"] == "C"
+    assert "LANGUAGE" not in env
+    assert env["PYTHONUTF8"] == "1"
+
+
+def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cache_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_workspace = Path("src/dnadesign/cruncher/workspaces/demo_yiu_payload")
+    workspace = _copytree_without_ds_store(source_workspace, tmp_path / "demo_yiu_payload")
+    shutil.rmtree(workspace / "outputs", ignore_errors=True)
+    shutil.rmtree(workspace / ".cruncher", ignore_errors=True)
+    runbook_path = workspace / "configs" / "runbook.yaml"
+    output_log = tmp_path / "demo-runbook.log"
+    runtime_home = tmp_path / "home"
+    runtime_home.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HOME", str(runtime_home))
+    monkeypatch.setenv("CRUNCHER_NONINTERACTIVE", "1")
+    monkeypatch.setenv("LANG", "C.UTF-8")
+    monkeypatch.setenv("LC_ALL", "C.UTF-8")
+    monkeypatch.setenv("LANGUAGE", "C.UTF-8")
+    monkeypatch.delenv("MPLCONFIGDIR", raising=False)
+
+    result = run_workspace_runbook(runbook_path, output_log_path=output_log)
+
+    assert result.executed_step_ids == [
+        "yiu_validate",
+        "yiu_render",
+        "yiu_show",
+    ]
+    bundle_dir = workspace / "outputs" / "example_payload"
+    assert (bundle_dir / "visual_inventory.json").exists()
+    inventory = _load_json(bundle_dir / "visual_inventory.json")
+    assert inventory["render_status"] == "rendered"
+    assert inventory["render_count"] == 3
+    assert inventory["bundle_contract"] == "split_yiu_payload_bundle_v4"
+    assert inventory["input_contract"] == "split_yiu_payload_rendering_v4"
+    assert [view["view_id"] for view in inventory["views"]] == ["payload", "split_payload", "assembled_payload"]
+    assert (bundle_dir / "payload_views.pdf").exists()
+    assert (workspace / "outputs" / "example_payload__payload_views.pdf").exists()
+    assert inventory["published_plot_artifact_path"] == "outputs/example_payload__payload_views.pdf"
+    assert not (bundle_dir / "payload.pdf").exists()
+    assert not (bundle_dir / "split_payload.pdf").exists()
+    assert not (bundle_dir / "assembled_payload.pdf").exists()
+    assert not (bundle_dir / "inline_job").exists()
+    assert (bundle_dir / "bundle_summary.json").exists()
+
+    payload = _load_json(bundle_dir / "payload_view.json")
+    assembled = _load_json(bundle_dir / "assembled_payload_view.json")
+    split_rows = _load_jsonl(bundle_dir / "split_payload_view.jsonl")
+
+    assert payload["state_id"] == "payload"
+    assert payload["contract_kind"] == "yiu_payload_visual_v1"
+    assert payload["motif_layers"] == []
+    assert assembled["state_id"] == "assembled_payload"
+    assert assembled["contract_kind"] == "sequence_evidence_map_v1"
+    assert assembled["primary_sequence"] == payload["selected_payload_sequence"]
+    assert [row["state_id"] for row in split_rows] == ["split_payload_left", "split_payload_right"]
+    assert split_rows[0]["meta"]["panel_order"] == 0
+    assert split_rows[0]["meta"]["fragment_side"] == "left"
+    assert split_rows[0]["meta"]["sticky_end_orientation"] == "inward"
+    assert split_rows[1]["meta"]["panel_order"] == 1
+    assert split_rows[1]["meta"]["fragment_side"] == "right"
+    assert split_rows[1]["meta"]["sticky_end_orientation"] == "inward"
+    assert assembled["boundaries"] == [
+        {
+            "boundary_id": "junction_start",
+            "row_id": "primary",
+            "boundary": 8,
+            "boundary_kind": "ligation_junction",
+            "display_label": "Junction start",
+            "short_label": "",
+        },
+        {
+            "boundary_id": "junction_end",
+            "row_id": "complement",
+            "boundary": 12,
+            "boundary_kind": "ligation_junction",
+            "display_label": "Junction end",
+            "short_label": "",
+        },
+    ]
+    assert "junction_span" in assembled["meta"]
+    assert "linearization_seam" not in json.dumps(assembled)
+
+    log_text = output_log.read_text(encoding="utf-8")
+    assert "Fontconfig warning" not in log_text
+    assert "Matplotlib is building the font cache" not in log_text
+    assert "MPLCONFIGDIR" not in log_text
+
+    job_path = bundle_dir / "payload.job.yaml"
+    job_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": 3,
+                "results_root": ".",
+                "input": {
+                    "kind": "json",
+                    "path": "payload_view.json",
+                    "adapter": {"kind": "yiu_payload_visual_v1"},
+                    "alphabet": "iupac_dna",
+                },
+                "render": {"renderer": "nucleotide_evidence_map", "style": {"preset": None, "overrides": {}}},
+                "outputs": [{"kind": "images", "path": "payload_replay.pdf", "fmt": "pdf"}],
+                "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    existing_pythonpath = os.environ.get("PYTHONPATH")
+    pythonpath_entries = [str(REPO_ROOT / "src")]
+    if existing_pythonpath:
+        pythonpath_entries.append(existing_pythonpath)
+    base_env = {**os.environ, "PYTHONPATH": os.pathsep.join(pythonpath_entries)}
+    validate_proc = subprocess.run(
+        [sys.executable, "-m", "dnadesign.cruncher.cli.app", "visuals", "validate", "--job", str(job_path)],
+        cwd=workspace,
+        env=base_env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    render_proc = subprocess.run(
+        [sys.executable, "-m", "dnadesign.cruncher.cli.app", "visuals", "run", "--job", str(job_path)],
+        cwd=workspace,
+        env=base_env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "Matplotlib" not in validate_proc.stderr
+    assert "MPLCONFIGDIR" not in validate_proc.stderr
+    assert "Matplotlib" not in render_proc.stderr
+    assert "MPLCONFIGDIR" not in render_proc.stderr
+    assert (bundle_dir / "payload.job" / "payload_replay.pdf").exists()

@@ -102,6 +102,8 @@ def test_find_undeclared_cross_tool_imports_allows_ops_to_infer_default_edge(tmp
 @pytest.mark.parametrize(
     ("owner_tool", "imported_tool"),
     (
+        ("baserender", "contracts"),
+        ("cruncher", "contracts"),
         ("notify", "construct"),
         ("notify", "densegen"),
         ("notify", "infer"),
@@ -245,6 +247,16 @@ def test_find_legacy_surface_violations_flags_removed_repo_root_contract_paths(t
         "src/dnadesign/_contracts",
         "src/dnadesign/usr_roots.py",
     ]
+
+
+def test_find_legacy_surface_violations_ignores_cache_only_legacy_directory(tmp_path: Path) -> None:
+    cache_dir = tmp_path / "src" / "dnadesign" / "_contracts" / "__pycache__"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / "__init__.cpython-312.pyc").write_bytes(b"cache")
+
+    violations = find_legacy_surface_violations(repo_root=tmp_path)
+
+    assert violations == []
 
 
 def test_find_legacy_surface_violations_flags_removed_ops_study_paths(tmp_path: Path) -> None:

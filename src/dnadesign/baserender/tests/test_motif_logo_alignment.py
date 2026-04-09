@@ -75,6 +75,54 @@ def test_motif_logo_geometry_aligns_to_feature_span_grid() -> None:
     assert geometry.columns[-1] == layout_span_to_x(layout, 9, 10)
 
 
+def test_motif_logo_geometry_can_render_against_explicit_payload_wide_span() -> None:
+    sequence = "TTACGTACGTTT"
+    record = Record(
+        id="align_payload_wide",
+        alphabet="DNA",
+        sequence=sequence,
+        features=(
+            Feature(
+                id="k1",
+                kind="kmer",
+                span=Span(start=4, end=8, strand="fwd"),
+                label=sequence[4:8],
+                tags=("tf:lexA",),
+                attrs={},
+                render={},
+            ),
+        ),
+        effects=(
+            Effect(
+                kind="motif_logo",
+                target={"feature_id": "k1"},
+                params={
+                    "matrix": _logo_matrix(len(sequence)),
+                    "render_span": {"start": 0, "end": len(sequence)},
+                    "observed_sequence_5to3": sequence,
+                },
+                render={},
+            ),
+        ),
+        display=Display(),
+        meta={},
+    )
+    style = resolve_style(
+        preset=None,
+        overrides={"motif_logo": {"layout": "stack", "lane_mode": "follow_feature_track"}},
+    )
+    layout = compute_layout(record, style)
+
+    geometry = compute_motif_logo_geometry(record=record, effect_index=0, layout=layout, style=style)
+    expected_x0, expected_x1 = layout_span_to_x(layout, 0, len(sequence))
+    assert geometry.render_start == 0
+    assert geometry.render_end == len(sequence)
+    assert geometry.x0 == expected_x0
+    assert geometry.x1 == expected_x1
+    assert geometry.columns[0] == layout_span_to_x(layout, 0, 1)
+    assert geometry.columns[-1] == layout_span_to_x(layout, len(sequence) - 1, len(sequence))
+
+
 def test_overlapping_motif_logos_use_distinct_lanes_in_stack_mode() -> None:
     sequence = "CTGCATATATTTACAG"
     record = Record(
@@ -629,6 +677,45 @@ def test_overlay_title_gap_is_stable_when_only_antisense_layers_increase() -> No
     base_gap = _overlay_y(base) - _actual_content_top(base_layout)
     stacked_gap = _overlay_y(stacked_antisense) - _actual_content_top(stacked_layout)
     assert stacked_gap == pytest.approx(base_gap, abs=1e-6)
+
+
+def test_overlay_title_gap_reduction_style_lowers_sequence_rows_overlay() -> None:
+    overlay_text = "Overlay Title"
+    record = Record(
+        id="overlay_compact_gap",
+        alphabet="DNA",
+        sequence="TTGACAAAAAAAAAAAAAAAATATAAT",
+        features=(),
+        effects=(),
+        display=Display(overlay_text=overlay_text),
+        meta={},
+    )
+    base_style = resolve_style(preset=None, overrides=None)
+    compact_style = resolve_style(preset=None, overrides={"overlay_title_gap_reduction_px": 18.0})
+
+    def _actual_content_top(layout) -> float:
+        return max(
+            float(layout.y_forward + layout.sequence_extent_up),
+            float(layout.y_reverse + layout.sequence_extent_up),
+        )
+
+    def _overlay_gap(style) -> float:
+        initialize_runtime()
+        layout = compute_layout(record, style)
+        fig = SequenceRowsRenderer().render(record, style, Palette(style.palette))
+        ax = fig.axes[0]
+        try:
+            overlays = [text for text in ax.texts if text.get_text() == overlay_text]
+            assert len(overlays) == 1
+            return float(overlays[0].get_position()[1]) - _actual_content_top(layout)
+        finally:
+            plt.close(fig)
+
+    base_gap = _overlay_gap(base_style)
+    compact_gap = _overlay_gap(compact_style)
+
+    assert compact_gap < base_gap
+    assert compact_gap <= (base_gap - 12.0)
 
 
 def test_style_accepts_new_logo_coloring_and_scale_bar_location() -> None:

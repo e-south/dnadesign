@@ -5,7 +5,7 @@ src/dnadesign/infer/src/features/__init__.py
 
 Feature-contract helpers for higher-level infer workflows.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

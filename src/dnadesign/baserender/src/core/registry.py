@@ -79,6 +79,28 @@ class _RegulatorWindowFeatureContract:
 
 
 @dataclass(frozen=True)
+class _IntervalAnnotationFeatureContract:
+    kind: str = "interval_annotation"
+
+    def validate_feature(self, feature: Feature, record: Record) -> None:
+        reject_unknown_keys(
+            feature.attrs,
+            {"lane", "shape", "semantic", "intent", "style_token"},
+            "interval_annotation.attrs",
+        )
+        lane = str(feature.attrs.get("lane", "")).strip().lower()
+        ensure(lane != "", "interval_annotation.attrs.lane is required", ContractError)
+        shape = str(feature.attrs.get("shape", "")).strip().lower()
+        ensure(
+            shape in {"rounded_rect", "band", "underline"},
+            "interval_annotation.attrs.shape is invalid",
+            ContractError,
+        )
+        semantic = str(feature.attrs.get("semantic", "")).strip()
+        ensure(semantic != "", "interval_annotation.attrs.semantic is required", ContractError)
+
+
+@dataclass(frozen=True)
 class _SpanLinkEffectContract:
     kind: str = "span_link"
 
@@ -136,9 +158,34 @@ class _MotifLogoEffectContract:
             "motif_logo target feature must be kind='kmer' or 'regulator_window'",
             ContractError,
         )
-        reject_unknown_keys(effect.params, {"matrix", "motif_ref"}, "motif_logo.params")
+        reject_unknown_keys(
+            effect.params,
+            {"matrix", "motif_ref", "render_span", "observed_sequence_5to3"},
+            "motif_logo.params",
+        )
         matrix = effect.params.get("matrix")
         motif_ref = effect.params.get("motif_ref")
+        render_span = effect.params.get("render_span")
+        expected_length = feat.span.length()
+        if render_span is not None:
+            ensure(isinstance(render_span, Mapping), "motif_logo params.render_span must be a mapping", ContractError)
+            reject_unknown_keys(render_span, {"start", "end"}, "motif_logo.params.render_span")
+            ensure(
+                "start" in render_span and "end" in render_span,
+                "motif_logo params.render_span must include start and end",
+                ContractError,
+            )
+            try:
+                render_start = int(render_span["start"])
+                render_end = int(render_span["end"])
+            except Exception as exc:
+                raise ContractError("motif_logo params.render_span start/end must be integers") from exc
+            ensure(
+                0 <= render_start < render_end <= len(record.sequence),
+                "motif_logo params.render_span must fit within the record sequence",
+                ContractError,
+            )
+            expected_length = render_end - render_start
         ensure(
             matrix is not None or motif_ref is not None,
             "motif_logo params must include matrix and/or motif_ref",
@@ -151,8 +198,8 @@ class _MotifLogoEffectContract:
                 ContractError,
             )
             ensure(
-                len(matrix) == feat.span.length(),
-                "motif_logo matrix length must match target feature span length",
+                len(matrix) == expected_length,
+                "motif_logo matrix length must match target render span length",
                 ContractError,
             )
             for row in matrix:
@@ -174,6 +221,75 @@ class _MotifLogoEffectContract:
                 "motif_logo params.motif_ref.motif_id is required",
                 ContractError,
             )
+        observed_sequence = effect.params.get("observed_sequence_5to3")
+        if observed_sequence is not None:
+            ensure(
+                isinstance(observed_sequence, str) and observed_sequence != "",
+                "motif_logo params.observed_sequence_5to3 must be a non-empty string",
+                ContractError,
+            )
+            ensure(
+                len(observed_sequence) == expected_length,
+                "motif_logo params.observed_sequence_5to3 length must match target render span length",
+                ContractError,
+            )
+
+
+@dataclass(frozen=True)
+class _BoundaryMarkerEffectContract:
+    kind: str = "boundary_marker"
+
+    def validate_effect(self, effect: Effect, record: Record) -> None:
+        target = effect.target
+        reject_unknown_keys(target, {"boundary", "lane"}, "boundary_marker.target")
+        ensure("boundary" in target, "boundary_marker target must include boundary", ContractError)
+        ensure("lane" in target, "boundary_marker target must include lane", ContractError)
+        ensure(
+            isinstance(target["boundary"], int),
+            "boundary_marker.target.boundary must be int",
+            ContractError,
+        )
+        ensure(
+            int(target["boundary"]) >= 0,
+            "boundary_marker.target.boundary must be >= 0",
+            ContractError,
+        )
+        ensure(
+            int(target["boundary"]) <= len(record.sequence),
+            "boundary_marker.target.boundary must be within sequence boundaries",
+            ContractError,
+        )
+        ensure(
+            str(target["lane"]).lower() in {"primary", "complement"},
+            "boundary_marker.target.lane is invalid",
+            ContractError,
+        )
+        reject_unknown_keys(effect.params, {"label", "semantic", "intent"}, "boundary_marker.params")
+
+
+@dataclass(frozen=True)
+class _PairMapEffectContract:
+    kind: str = "pair_map"
+
+    def validate_effect(self, effect: Effect, record: Record) -> None:
+        target = effect.target
+        reject_unknown_keys(target, {"pairs"}, "pair_map.target")
+        ensure("pairs" in target, "pair_map target must include pairs", ContractError)
+        pairs = target["pairs"]
+        ensure(
+            isinstance(pairs, list) and len(pairs) > 0,
+            "pair_map.target.pairs must be a non-empty list",
+            ContractError,
+        )
+        for index, pair in enumerate(pairs):
+            ensure(isinstance(pair, Mapping), f"pair_map.target.pairs[{index}] must be a mapping", ContractError)
+            reject_unknown_keys(pair, {"left_index", "right_index"}, f"pair_map.target.pairs[{index}]")
+            ensure(
+                "left_index" in pair and "right_index" in pair,
+                f"pair_map.target.pairs[{index}] must include left_index and right_index",
+                ContractError,
+            )
+        reject_unknown_keys(effect.params, {"semantic"}, "pair_map.params")
 
 
 _FEATURE_CONTRACTS: dict[str, FeatureKindContract] = {}
@@ -217,5 +333,8 @@ def validate_record_kinds(record: Record) -> None:
 def register_builtin_contracts() -> None:
     register_feature_contract(_KmerFeatureContract())
     register_feature_contract(_RegulatorWindowFeatureContract())
+    register_feature_contract(_IntervalAnnotationFeatureContract())
     register_effect_contract(_SpanLinkEffectContract())
     register_effect_contract(_MotifLogoEffectContract())
+    register_effect_contract(_BoundaryMarkerEffectContract())
+    register_effect_contract(_PairMapEffectContract())

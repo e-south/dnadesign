@@ -20,6 +20,7 @@ from dnadesign.cruncher.core.selection.mmr import (
     compute_core_distance,
     compute_position_weights,
     select_mmr_elites,
+    select_ranked_mmr,
     select_score_elites,
     tfbs_cores_from_scorer,
 )
@@ -114,6 +115,55 @@ def test_score_selection_is_greedy_on_joint_score() -> None:
     assert [row["candidate_id"] for row in result.meta] == ["0:1", "0:2"]
     assert result.alpha == pytest.approx(1.0)
     assert result.constraint_policy == "disabled"
+
+
+def test_select_ranked_mmr_caches_pairwise_metric_lookups() -> None:
+    similarity_calls = 0
+    distance_calls = 0
+    similarity_map = {
+        (0, 1): 0.9,
+        (0, 2): 0.1,
+        (0, 3): 0.2,
+        (1, 2): 0.3,
+        (1, 3): 0.4,
+        (2, 3): 0.8,
+    }
+    distance_map = {
+        (0, 1): 1.0,
+        (0, 2): 4.0,
+        (0, 3): 3.0,
+        (1, 2): 3.0,
+        (1, 3): 2.0,
+        (2, 3): 1.0,
+    }
+
+    def _lookup(table: dict[tuple[int, int], float], left: int, right: int) -> float:
+        key = (left, right) if left < right else (right, left)
+        return table[key]
+
+    def _similarity_at(left: int, right: int) -> float:
+        nonlocal similarity_calls
+        similarity_calls += 1
+        return _lookup(similarity_map, left, right)
+
+    def _distance_at(left: int, right: int) -> float:
+        nonlocal distance_calls
+        distance_calls += 1
+        return _lookup(distance_map, left, right)
+
+    result = select_ranked_mmr(
+        item_count=4,
+        k=3,
+        alpha=0.65,
+        relevance=[1.0, 0.9, 0.8, 0.8],
+        similarity_at=_similarity_at,
+        min_distance=0.0,
+        distance_at=_distance_at,
+    )
+
+    assert result.selected_indices == [0, 2, 1]
+    assert similarity_calls <= 6
+    assert distance_calls <= 6
 
 
 def test_mmr_dedupes_reverse_complements() -> None:

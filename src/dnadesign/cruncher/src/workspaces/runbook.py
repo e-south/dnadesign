@@ -23,29 +23,11 @@ import yaml
 from pydantic import field_validator, model_validator
 
 from dnadesign.cruncher.config.schema_v3 import StrictBaseModel
+from dnadesign.cruncher.viz.mpl import ensure_workspace_mpl_cache
+from dnadesign.cruncher.workspaces.families import allowed_runbook_command_roots
 
 _STEP_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-_ALLOWED_COMMANDS = {
-    "analyze",
-    "cache",
-    "catalog",
-    "config",
-    "discover",
-    "doctor",
-    "export",
-    "fetch",
-    "lock",
-    "optimizers",
-    "parse",
-    "portfolio",
-    "runs",
-    "sample",
-    "sources",
-    "status",
-    "study",
-    "targets",
-    "workspaces",
-}
+_ALLOWED_COMMANDS = set(allowed_runbook_command_roots())
 
 
 class WorkspaceRunbookStep(StrictBaseModel):
@@ -179,14 +161,32 @@ def _is_writable_directory(path: Path) -> bool:
         return False
 
 
+def _normalize_runbook_locale_env(env: dict[str, str]) -> None:
+    """Avoid leaking unsupported locale tags into render subprocesses."""
+    normalized = False
+    for key in ("LANG", "LC_ALL", "LANGUAGE"):
+        value = str(env.get(key, "")).strip()
+        if value.casefold() != "c.utf-8":
+            continue
+        if key == "LANGUAGE":
+            env.pop(key, None)
+        else:
+            env[key] = "C"
+        normalized = True
+    if normalized:
+        env.setdefault("PYTHONUTF8", "1")
+
+
 def _runbook_subprocess_env(*, workspace_root: Path) -> dict[str, str]:
     env = dict(os.environ)
+    _normalize_runbook_locale_env(env)
     home_raw = str(env.get("HOME", "")).strip()
     home_path = Path(home_raw).expanduser() if home_raw else Path.home()
     if not _is_writable_directory(home_path):
         runtime_home = (workspace_root / ".cruncher" / ".runtime_home").resolve()
         runtime_home.mkdir(parents=True, exist_ok=True)
         env["HOME"] = str(runtime_home)
+    ensure_workspace_mpl_cache(workspace_root, environ=env)
     return env
 
 

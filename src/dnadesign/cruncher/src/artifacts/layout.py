@@ -208,6 +208,14 @@ def random_baseline_hits_path(run_dir: Path) -> Path:
     return run_optimize_tables_dir(run_dir) / "random_baseline_hits.parquet"
 
 
+def random_baseline_objective_scores_path(run_dir: Path) -> Path:
+    return run_optimize_tables_dir(run_dir) / "random_baseline_objective_scores.parquet"
+
+
+def random_baseline_occurrences_path(run_dir: Path) -> Path:
+    return run_optimize_tables_dir(run_dir) / "random_baseline_occurrences.parquet"
+
+
 def elites_path(run_dir: Path) -> Path:
     return run_optimize_tables_dir(run_dir) / "elites.parquet"
 
@@ -218,6 +226,14 @@ def elites_mmr_meta_path(run_dir: Path) -> Path:
 
 def elites_hits_path(run_dir: Path) -> Path:
     return run_optimize_tables_dir(run_dir) / "elites_hits.parquet"
+
+
+def elites_objective_scores_path(run_dir: Path) -> Path:
+    return run_optimize_tables_dir(run_dir) / "elites_objective_scores.parquet"
+
+
+def elites_occurrences_path(run_dir: Path) -> Path:
+    return run_optimize_tables_dir(run_dir) / "elites_occurrences.parquet"
 
 
 def elites_json_path(run_dir: Path) -> Path:

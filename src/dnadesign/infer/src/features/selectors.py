@@ -5,7 +5,7 @@ src/dnadesign/infer/src/features/selectors.py
 
 Canonical selector resolution for Evo2 promoter feature extraction.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

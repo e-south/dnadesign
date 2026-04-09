@@ -4,7 +4,7 @@
 **Last verified:** 2026-02-27
 
 
-**Last updated by:** cruncher-maintainers on 2026-02-23
+**Last updated by:** cruncher-maintainers on 2026-04-05
 
 ### Contents
 - [Overview](#overview)
@@ -17,6 +17,88 @@ This table is generated from workspace machine runbooks and is the standard cros
 <!-- docs:runbook-steps:start -->
 | Workspace | Step ID | Description | Command |
 | --- | --- | --- | --- |
+| `demo_monotypic_baer` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
+| `demo_monotypic_baer` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
+| `demo_monotypic_baer` | `fetch_sites_regulondb` |  | `cruncher fetch sites --source regulondb --tf baeR --update -c configs/config.yaml` |
+| `demo_monotypic_baer` | `fetch_sites_baer_chip_exo` |  | `cruncher fetch sites --source baer_chip_exo --tf baeR --update -c configs/config.yaml` |
+| `demo_monotypic_baer` | `discover_motifs` |  | `cruncher discover motifs --set 1 --tool meme --meme-mod oops --source-id demo_baer_multiplicity_meme_oops -c configs/config.yaml` |
+| `demo_monotypic_baer` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
+| `demo_monotypic_baer` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_baer` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_baer` | `analyze_summary` | Analyze the occurrence-aware run and render the standard static plot suite, including the multi-offset elite showcase. | `cruncher analyze --summary -c configs/config.yaml` |
+| `demo_monotypic_baer` | `show_sample_outputs` | Show the occurrence-aware run manifest and artifact inventory for the workspace root run. | `cruncher runs show outputs -c configs/config.yaml` |
+| `demo_monotypic_baer` | `render_logos` |  | `cruncher catalog logos --source demo_baer_multiplicity_meme_oops --set 1 -c configs/config.yaml` |
+| `demo_monotypic_baer` | `yiu_validate` | Validate the sample-backed YIU payload handoff against the selected occurrence-aware elite. | `cruncher yiu validate --spec configs/yiu/baer_monotypic_hit.yiu.yaml` |
+| `demo_monotypic_baer` | `yiu_render` | Publish the YIU payload bundle under outputs/plots without a redundant workspace-level mirror. | `cruncher yiu render --spec configs/yiu/baer_monotypic_hit.yiu.yaml --force-overwrite --emit-renders` |
+| `demo_monotypic_baer` | `yiu_show` | Inspect the published YIU payload bundle and integrity checks. | `cruncher yiu show --bundle outputs/plots/yiu__baer_monotypic_hit` |
+| `demo_monotypic_cpxr` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
+| `demo_monotypic_cpxr` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
+| `demo_monotypic_cpxr` | `fetch_sites_demo_local_meme` |  | `cruncher fetch sites --source demo_local_meme --tf cpxR --update -c configs/config.yaml` |
+| `demo_monotypic_cpxr` | `fetch_sites_regulondb` |  | `cruncher fetch sites --source regulondb --tf cpxR --update -c configs/config.yaml` |
+| `demo_monotypic_cpxr` | `discover_motifs` |  | `cruncher discover motifs --set 1 --tool meme --meme-mod oops --source-id demo_cpxr_multiplicity_meme_oops -c configs/config.yaml` |
+| `demo_monotypic_cpxr` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
+| `demo_monotypic_cpxr` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_cpxr` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_cpxr` | `analyze_summary` | Analyze the occurrence-aware run and render the standard static plot suite, including the multi-offset elite showcase. | `cruncher analyze --summary -c configs/config.yaml` |
+| `demo_monotypic_cpxr` | `show_sample_outputs` | Show the occurrence-aware run manifest and artifact inventory for the workspace root run. | `cruncher runs show outputs -c configs/config.yaml` |
+| `demo_monotypic_cpxr` | `render_logos` |  | `cruncher catalog logos --source demo_cpxr_multiplicity_meme_oops --set 1 -c configs/config.yaml` |
+| `demo_monotypic_cpxr` | `yiu_validate` | Validate the sample-backed YIU payload handoff against the selected occurrence-aware elite. | `cruncher yiu validate --spec configs/yiu/cpxr_monotypic_hit.yiu.yaml` |
+| `demo_monotypic_cpxr` | `yiu_render` | Publish the YIU payload bundle under outputs/plots without a redundant workspace-level mirror. | `cruncher yiu render --spec configs/yiu/cpxr_monotypic_hit.yiu.yaml --force-overwrite --emit-renders` |
+| `demo_monotypic_cpxr` | `yiu_show` | Inspect the published YIU payload bundle and integrity checks. | `cruncher yiu show --bundle outputs/plots/yiu__cpxr_monotypic_hit` |
+| `demo_monotypic_lexa` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
+| `demo_monotypic_lexa` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
+| `demo_monotypic_lexa` | `fetch_sites_demo_local_meme` |  | `cruncher fetch sites --source demo_local_meme --tf lexA --update -c configs/config.yaml` |
+| `demo_monotypic_lexa` | `fetch_sites_regulondb` |  | `cruncher fetch sites --source regulondb --tf lexA --update -c configs/config.yaml` |
+| `demo_monotypic_lexa` | `discover_motifs` |  | `cruncher discover motifs --set 1 --tool meme --meme-mod oops --source-id demo_lexa_multiplicity_meme_oops -c configs/config.yaml` |
+| `demo_monotypic_lexa` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
+| `demo_monotypic_lexa` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_lexa` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_lexa` | `analyze_summary` | Analyze the occurrence-aware run and render the standard static plot suite, including the multi-offset elite showcase. | `cruncher analyze --summary -c configs/config.yaml` |
+| `demo_monotypic_lexa` | `show_sample_outputs` | Show the occurrence-aware run manifest and artifact inventory for the workspace root run. | `cruncher runs show outputs -c configs/config.yaml` |
+| `demo_monotypic_lexa` | `render_logos` |  | `cruncher catalog logos --source demo_lexa_multiplicity_meme_oops --set 1 -c configs/config.yaml` |
+| `demo_monotypic_lexa` | `yiu_validate` | Validate the sample-backed YIU payload handoff against the selected occurrence-aware elite. | `cruncher yiu validate --spec configs/yiu/lexa_monotypic_hit.yiu.yaml` |
+| `demo_monotypic_lexa` | `yiu_render` | Publish the YIU payload bundle under outputs/plots without a redundant workspace-level mirror. | `cruncher yiu render --spec configs/yiu/lexa_monotypic_hit.yiu.yaml --force-overwrite --emit-renders` |
+| `demo_monotypic_lexa` | `yiu_show` | Inspect the published YIU payload bundle and integrity checks. | `cruncher yiu show --bundle outputs/plots/yiu__lexa_monotypic_hit` |
+| `demo_monotypic_soxr` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
+| `demo_monotypic_soxr` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
+| `demo_monotypic_soxr` | `fetch_sites_demo_local_meme` |  | `cruncher fetch sites --source demo_local_meme --tf soxR --update -c configs/config.yaml` |
+| `demo_monotypic_soxr` | `fetch_sites_regulondb` |  | `cruncher fetch sites --source regulondb --tf soxR --update -c configs/config.yaml` |
+| `demo_monotypic_soxr` | `discover_motifs` |  | `cruncher discover motifs --set 1 --tool meme --meme-mod oops --source-id demo_soxr_multiplicity_meme_oops -c configs/config.yaml` |
+| `demo_monotypic_soxr` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
+| `demo_monotypic_soxr` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_soxr` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_soxr` | `analyze_summary` | Analyze the occurrence-aware run and render the standard static plot suite, including the multi-offset elite showcase. | `cruncher analyze --summary -c configs/config.yaml` |
+| `demo_monotypic_soxr` | `show_sample_outputs` | Show the occurrence-aware run manifest and artifact inventory for the workspace root run. | `cruncher runs show outputs -c configs/config.yaml` |
+| `demo_monotypic_soxr` | `render_logos` |  | `cruncher catalog logos --source demo_soxr_multiplicity_meme_oops --set 1 -c configs/config.yaml` |
+| `demo_monotypic_soxr` | `yiu_validate` | Validate the sample-backed YIU payload handoff against the selected occurrence-aware elite. | `cruncher yiu validate --spec configs/yiu/soxr_monotypic_hit.yiu.yaml` |
+| `demo_monotypic_soxr` | `yiu_render` | Publish the YIU payload bundle under outputs/plots without a redundant workspace-level mirror. | `cruncher yiu render --spec configs/yiu/soxr_monotypic_hit.yiu.yaml --force-overwrite --emit-renders` |
+| `demo_monotypic_soxr` | `yiu_show` | Inspect the published YIU payload bundle and integrity checks. | `cruncher yiu show --bundle outputs/plots/yiu__soxr_monotypic_hit` |
+| `demo_monotypic_soxs` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
+| `demo_monotypic_soxs` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
+| `demo_monotypic_soxs` | `fetch_sites_regulondb` |  | `cruncher fetch sites --source regulondb --tf soxS --update -c configs/config.yaml` |
+| `demo_monotypic_soxs` | `discover_motifs` |  | `cruncher discover motifs --set 1 --tool meme --meme-mod oops --source-id demo_soxs_multiplicity_meme_oops -c configs/config.yaml` |
+| `demo_monotypic_soxs` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
+| `demo_monotypic_soxs` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_soxs` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_soxs` | `analyze_summary` | Analyze the occurrence-aware run and render the standard static plot suite, including the multi-offset elite showcase. | `cruncher analyze --summary -c configs/config.yaml` |
+| `demo_monotypic_soxs` | `show_sample_outputs` | Show the occurrence-aware run manifest and artifact inventory for the workspace root run. | `cruncher runs show outputs -c configs/config.yaml` |
+| `demo_monotypic_soxs` | `render_logos` |  | `cruncher catalog logos --source demo_soxs_multiplicity_meme_oops --set 1 -c configs/config.yaml` |
+| `demo_monotypic_soxs` | `yiu_validate` | Validate the sample-backed YIU payload handoff against the selected occurrence-aware elite. | `cruncher yiu validate --spec configs/yiu/soxs_monotypic_hit.yiu.yaml` |
+| `demo_monotypic_soxs` | `yiu_render` | Publish the YIU payload bundle under outputs/plots without a redundant workspace-level mirror. | `cruncher yiu render --spec configs/yiu/soxs_monotypic_hit.yiu.yaml --force-overwrite --emit-renders` |
+| `demo_monotypic_soxs` | `yiu_show` | Inspect the published YIU payload bundle and integrity checks. | `cruncher yiu show --bundle outputs/plots/yiu__soxs_monotypic_hit` |
+| `demo_monotypic_tetr` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
+| `demo_monotypic_tetr` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `fetch_motifs_westmann` |  | `cruncher fetch motifs --source westmann_tetr_mitomi --tf tetR --update -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `analyze_summary` | Analyze the occurrence-aware run and render the standard static plot suite, including the multi-offset elite showcase. | `cruncher analyze --summary -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `show_sample_outputs` | Show the occurrence-aware run manifest and artifact inventory for the workspace root run. | `cruncher runs show outputs -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `render_logos` |  | `cruncher catalog logos --source westmann_tetr_mitomi --set 1 -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `export_meme` | Export the normalized TetR PWM as a minimal MEME artifact under outputs/artifacts/meme for downstream motif-tool interoperability. | `cruncher catalog export-meme --set 1 --source westmann_tetr_mitomi -c configs/config.yaml` |
+| `demo_monotypic_tetr` | `yiu_validate` | Validate the sample-backed YIU payload handoff against the selected occurrence-aware elite. | `cruncher yiu validate --spec configs/yiu/tetr_monotypic_hit.yiu.yaml` |
+| `demo_monotypic_tetr` | `yiu_render` | Publish the YIU payload bundle under outputs/plots without a redundant workspace-level mirror. | `cruncher yiu render --spec configs/yiu/tetr_monotypic_hit.yiu.yaml --force-overwrite --emit-renders` |
+| `demo_monotypic_tetr` | `yiu_show` | Inspect the published YIU payload bundle and integrity checks. | `cruncher yiu show --bundle outputs/plots/yiu__tetr_monotypic_hit` |
 | `demo_multitf` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
 | `demo_multitf` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
 | `demo_multitf` | `fetch_sites_demo_local_meme` |  | `cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c configs/config.yaml` |
@@ -39,11 +121,14 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `demo_pairwise` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `demo_pairwise` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `demo_pairwise` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `demo_pairwise` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
+| `demo_pairwise` | `analyze_summary` | Analyze run outputs and emit plots/chain_trajectory_video.mp4 from the enabled trajectory_video config. | `cruncher analyze --summary -c configs/config.yaml` |
 | `demo_pairwise` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `demo_pairwise` | `render_logos` |  | `cruncher catalog logos --source demo_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `demo_pairwise` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
 | `demo_pairwise` | `study_run_diversity_vs_score` | Sweep diversity from 0.00 to 1.00 at fixed workspace sequence_length and emit diversity-vs-score aggregates. | `cruncher study run --spec configs/studies/diversity_vs_score.study.yaml --force-overwrite` |
+| `demo_yiu_payload` | `yiu_validate` | Validate the checked-in user-sequence YIU demo spec. | `cruncher yiu validate --spec configs/yiu/example_payload.yiu.yaml` |
+| `demo_yiu_payload` | `yiu_render` | Publish the deterministic user-sequence YIU v4 payload bundle and render the standard views. | `cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml --force-overwrite --emit-renders` |
+| `demo_yiu_payload` | `yiu_show` | Inspect the published user-sequence payload bundle and integrity checks. | `cruncher yiu show --bundle outputs/example_payload` |
 | `multitf_baer_lexa_soxr` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
 | `multitf_baer_lexa_soxr` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
 | `multitf_baer_lexa_soxr` | `fetch_sites_demo_local_meme` |  | `cruncher fetch sites --source demo_local_meme --tf lexA --tf soxR --update -c configs/config.yaml` |

@@ -22,7 +22,10 @@ from matplotlib.textpath import TextPath
 from ..config import Style
 from ..core import BoundsError, Effect, Feature, Record
 
-_DNA_COMP = str.maketrans("ACGTacgtNn", "TGCAtgcaNn")
+_DNA_COMP = str.maketrans(
+    "ACGTRYSWKMBDHVNacgtryswkmbdhvn",  # pragma: allowlist secret
+    "TGCAYRSWMKVHDBNtgcayrswmkvhdbn",  # pragma: allowlist secret
+)
 
 
 def comp(seq: str) -> str:
@@ -130,6 +133,15 @@ def measure_char_cell(font_family: str, font_size: int, dpi: int) -> CharCell:
     cw_pt = bbox_w.width / 64
     ch_pt = TextPath((0, 0), "Ag", prop=prop).get_extents().height
     return CharCell(width=cw_pt / 72.0 * dpi, height=ch_pt / 72.0 * dpi)
+
+
+@lru_cache(maxsize=128)
+def measure_text_width_px(text: str, font_family: str, font_size: int, dpi: int) -> float:
+    if not text:
+        return 0.0
+    prop = FontProperties(family=font_family, size=font_size)
+    bbox = TextPath((0, 0), text, prop=prop).get_extents()
+    return max(0.0, bbox.width * (dpi / 72.0))
 
 
 @lru_cache(maxsize=64)
@@ -306,6 +318,18 @@ def assign_tracks(
     return [lane_map[idx] for idx in range(len(features))]
 
 
+def _row_label_width_px(record: Record, style: Style) -> float:
+    if not isinstance(record.meta, Mapping):
+        return 0.0
+    row_labels = record.meta.get("row_labels")
+    if not isinstance(row_labels, Mapping):
+        return 0.0
+    labels = [str(value).strip() for value in row_labels.values() if str(value).strip()]
+    if not labels:
+        return 0.0
+    return max(measure_text_width_px(text, style.font_label, style.font_size_label, style.dpi) for text in labels)
+
+
 def _effect_priority(effect: Effect) -> int:
     raw = effect.render.get("priority", 10)
     try:
@@ -444,7 +468,7 @@ def compute_layout(
     cw, ch = cell.width, cell.height
     n = len(record.sequence) if fixed_n is None else max(len(record.sequence), int(fixed_n))
 
-    show_two = bool(style.show_reverse_complement and record.alphabet == "DNA")
+    show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
     sequence_extent_up, sequence_extent_down = measure_sequence_extents(style.font_mono, style.font_size_seq, style.dpi)
     sequence_half_height = max(sequence_extent_up, sequence_extent_down)
     strand_gap = style.sequence.strand_gap_cells * ch
@@ -469,9 +493,17 @@ def compute_layout(
     feature_track_base_offset_down = sequence_extent_down + sequence_to_kmer_gap + (0.5 * kmer_box_height)
     feature_track_base_offset = feature_track_base_offset_up
 
-    label_pad_x = style.font_size_label / 72.0 * style.dpi * 1.6
-    x_left = style.padding_x + label_pad_x
-    width = x_left + n * cw + style.padding_x + label_pad_x
+    terminal_label_dx = style.font_size_label / 72.0 * style.dpi * 0.8
+    terminal_label_width = max(
+        measure_text_width_px("5'", style.font_label, style.font_size_label, style.dpi),
+        measure_text_width_px("3'", style.font_label, style.font_size_label, style.dpi),
+    )
+    row_label_width = _row_label_width_px(record, style)
+    row_label_gap = max(8.0, style.font_size_label / 72.0 * style.dpi * 0.35) if row_label_width > 0 else 0.0
+    left_gutter = terminal_label_dx + terminal_label_width + row_label_gap + row_label_width
+    right_gutter = terminal_label_dx + terminal_label_width
+    x_left = style.padding_x + left_gutter
+    width = x_left + n * cw + style.padding_x + right_gutter
 
     up_indices = [i for i, feat in enumerate(record.features) if feat.span.strand == "fwd"]
     dn_indices = [i for i, feat in enumerate(record.features) if feat.span.strand == "rev"]

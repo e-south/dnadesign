@@ -40,6 +40,7 @@ def _write_run_fixture(
     *,
     duplicate_hits: bool = False,
     include_third_tf: bool = False,
+    representative_hit_contract: bool = True,
 ) -> Path:
     run_dir = tmp_path / "outputs" / "sample_export"
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -145,6 +146,7 @@ def _write_run_fixture(
         "created_at": "2026-02-14T00:00:00+00:00",
         "artifacts": [],
         "motif_store": {"catalog_root": str((tmp_path / ".cruncher").resolve()), "pwm_source": "matrix"},
+        "objective": {"representative_hit_contract": representative_hit_contract},
     }
     manifest_path(run_dir).parent.mkdir(parents=True, exist_ok=True)
     manifest_path(run_dir).write_text(json.dumps(manifest_payload, indent=2))
@@ -239,4 +241,11 @@ def test_export_sequences_for_run_requires_combined_score_final(tmp_path: Path) 
     elites_df.to_parquet(elites_path(run_dir), engine="fastparquet")
 
     with pytest.raises(ValueError, match="combined_score_final"):
+        export_sequences_for_run(run_dir, run_name="sample_export")
+
+
+def test_export_sequences_for_run_rejects_occurrence_aware_runs_without_representative_hits(tmp_path: Path) -> None:
+    run_dir = _write_run_fixture(tmp_path, representative_hit_contract=False)
+
+    with pytest.raises(ValueError, match="representative_hit_contract=false"):
         export_sequences_for_run(run_dir, run_name="sample_export")

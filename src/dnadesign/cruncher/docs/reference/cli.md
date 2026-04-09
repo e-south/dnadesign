@@ -1,26 +1,32 @@
 ## Cruncher CLI
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-03-26
 
 
-**Last updated by:** cruncher-maintainers on 2026-02-28
+**Last updated by:** cruncher-maintainers on 2026-03-26
 
 ### Contents
 - [Cruncher CLI](#cruncher-cli)
 - [Workspace discovery and config resolution](#workspace-discovery-and-config-resolution)
 - [Quick command map](#quick-command-map)
 - [Core lifecycle commands](#core-lifecycle-commands)
+- [Cassette workflows](#cassette-workflows)
+- [YIU workflows](#yiu-workflows)
 - [Study workflows](#study-workflows)
 - [Portfolio workflows](#portfolio-workflows)
 - [Discovery and inspection](#discovery-and-inspection)
 - [Global options](#global-options)
 
-This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage and workflow.
+This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage and workflow family.
 
-> **Intent:** Cruncher is an optimization engine for **fixed-length** multi-TF PWM sequence design that returns a **diverse elite set** - not posterior inference.
+> **Workflow families:** Cruncher currently has three first-class command families.
 >
-> **When to use:** design under tight length constraints; explore motif compatibility tradeoffs; generate a small candidate set for assays; run workspace-scoped studies and summarize aggregate outcomes.
+> - `fetch|lock|parse|sample|analyze|export` plus `study` and `portfolio` cover fixed-length PWM optimization workspaces. This lane uses Gibbs annealing MCMC plus MMR elite selection and is not posterior inference.
+> - `cassette init-workspace|validate|design|solve|show` cover cassette workspaces. This lane uses explicit cassette planning plus bounded solve search and keeps separate artifact contracts.
+> - `yiu init-workspace|validate|render|show` cover payload-centric YIU workflows. This lane uses the strict `split_yiu_payload_rendering_v4` contract, deterministic exhaustive optimization over a 4 nt junction, three published payload views, and one bundle-local `visual_inventory.json`.
+>
+> Choose the command family by the workspace contract you need. `cassette` and `yiu` do not fall back to `sample`, and `sample` runs do not reuse cassette or YIU artifacts.
 
 #### Workspace discovery and config resolution
 
@@ -47,8 +53,10 @@ cruncher study list
 * **Pin TFs** → `lock`
 * **Validate motifs** → `parse`
 * **Render logos** → `catalog logos`
-* **Optimize** → `sample`
-* **Analyze** → `analyze`, `notebook`
+* **Optimize fixed-length sequences** → `sample`
+* **Analyze optimization runs** → `analyze`, `notebook`
+* **Design and search cassettes** → `cassette init-workspace|validate|design|solve|show`
+* **Render split YIU payloads** → `yiu init-workspace|validate|render|show`
 * **Study sweeps** → `study list|run|summarize|show|clean`
 * **Cross-workspace handoff aggregation** → `portfolio run|show`
 * **Export sequences** → `export sequences`
@@ -278,29 +286,330 @@ Preconditions:
 * run selection preflight happens before plotting/cache initialization, so missing/incomplete runs fail quickly with no Matplotlib/ArviZ cache setup
 * trace-dependent plots require `optimize/trace.nc`
 * each sample run snapshots the lockfile under `provenance/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
-* if `analysis` is omitted from config, analyze uses schema defaults (including `run_selector=latest`)
-* if `analysis.fimo_compare.enabled=true`, MEME Suite `fimo` must be resolvable via `discover.tool_path`, `MEME_BIN`, or `PATH`
+
+---
+
+#### Cassette workflows
+
+The cassette workflow is separate from `sample`. It expects an explicit spec file at
+`<workspace>/configs/cassettes/<name>.cassette.yaml` plus a local nickase catalog, validates the dual-context invariant set,
+and writes cassette-specific artifacts under `outputs/cassettes/`.
+
+Current scope:
+
+* deterministic validation/materialization of an authored cassette spec
+* strict local nickase catalog loading
+* explicit unsatisfied reports when no valid left/right nick pair exists
+* separate solve/search entrypoint for patterned stem/loop exploration
+
+Current non-scope:
+
+* no downstream excision/removal semantics after nicking
+
+Deep contracts live in:
+
+* [`../demos/demo_cassette_workspace.md`](../demos/demo_cassette_workspace.md)
+* [`reference/cassette_spec.md`](cassette_spec.md)
+* [`reference/cassette_solve_spec.md`](cassette_solve_spec.md)
+* [`reference/nickase_catalog.md`](nickase_catalog.md)
+* [`reference/cassette_artifacts.md`](cassette_artifacts.md)
+* [`../guides/cassette_workflow.md`](../guides/cassette_workflow.md)
+* [`../guides/cassette_solve_workflow.md`](../guides/cassette_solve_workflow.md)
+
+#### `cruncher cassette init-workspace`
+
+Scaffold a cassette-specific workspace root with pressure-tested solve specs for different runtime budgets.
+
+Inputs:
+
+* required `WORKSPACE` or `--output <path>`
+* optional `--root <dir>` when using `WORKSPACE`
+* optional `--force-overwrite` to replace a scaffold previously generated by this command
+
+Network:
+
+* no
+
+Examples:
+
+* `uv run cruncher cassette init-workspace cassette_lab`
+* `uv run cruncher cassette init-workspace cassette_lab --root ./workspaces`
+* `uv run cruncher cassette init-workspace --output ./cassette_lab --force-overwrite`
 
 Outputs:
 
-* tables: `analysis/tables/table__scores_summary.parquet`, `analysis/tables/table__elites_topk.parquet`,
-  `analysis/tables/table__metrics_joint.parquet`, `analysis/tables/table__chain_trajectory_points.parquet`,
-  `analysis/tables/table__chain_trajectory_lines.parquet`,
-  `analysis/tables/table__diagnostics_summary.json`, `analysis/tables/table__objective_components.json`,
-  `analysis/tables/table__elites_mmr_summary.parquet`, `analysis/tables/table__elites_nn_distance.parquet`,
-  `analysis/tables/table__elites_mmr_sweep.parquet` (when `analysis.mmr_sweep.enabled=true`)
-* plots: `plots/elite_score_space_context.<plot_format>`,
-  `plots/chain_trajectory_sweep.<plot_format>`,
-  `plots/elites_nn_distance.<plot_format>`, `plots/elites_showcase.<plot_format>`,
-  `plots/health_panel.<plot_format>` (trace only), `plots/chain_trajectory_video.mp4` (optional, when `analysis.trajectory_video.enabled=true`)
-* reports: `analysis/reports/report.json`, `analysis/reports/report.md`
-* summaries: `analysis/reports/summary.json`, `analysis/manifests/manifest.json`, `analysis/manifests/plot_manifest.json`, `analysis/manifests/table_manifest.json`
+* writes `README.md`
+* writes `runbook.md`
+* writes `cassette_workspace_manifest.json`
+* writes `configs/runbook.yaml`
+* writes `configs/cassettes/demo_hairpin_fast.cassette.solve.yaml`
+* writes `configs/cassettes/demo_hairpin_balanced.cassette.solve.yaml`
+* writes `configs/cassettes/demo_hairpin_deep_mmr.cassette.solve.yaml`
+* creates `inputs/nickases/`, `outputs/cassettes/`, and `outputs/cassette_solves/`
 
-Note:
+Notes:
 
-* Analyze rewrites the latest analysis outputs each run; set `analysis.archive=true` to keep prior reports.
-* Analyze uses `<run_dir>/analysis/state/tmp` as a run-local lock. Stale temp locks from interrupted runs are auto-pruned; active locks still fail fast.
-* Use `cruncher analyze --summary` to print the highlights from `report.json`.
+* this is a cassette-specific scaffold, not a full general Cruncher sampling workspace
+* the scaffold stays isolated and refuses to overwrite a non-empty unowned root
+* the scaffold rejects symlinked output roots and symlinked ancestor directories so it writes only to the path you named
+* generated solve specs are pressure-tested profiles for fast, balanced, and deeper MMR-biased search runs
+* `cassette_workspace_manifest.json` records the profile search/selection settings so operators can diff fast vs balanced vs deep MMR without reopening each YAML
+* `configs/runbook.yaml` makes the scaffold discoverable through `cruncher workspaces list` as `runbook-only`
+* use the explicit `configs/cassettes/*.cassette.solve.yaml` paths for balanced and deep cassette runs; the runbook keeps the fast smoke path discoverable through `workspaces run`
+* emitted solve jobs keep the `views/` -> `baserender_jobs/` -> `renders/` flow inside the scaffold root
+* use `cruncher cassette catalog init-neb --output inputs/nickases/neb_nicking_v1.yaml` if you want a local editable copy of the built-in preset
+* see [`../demos/demo_cassette_workspace.md`](../demos/demo_cassette_workspace.md) for the shortest end-to-end tutorial
+
+#### `cruncher cassette validate`
+
+Validate one cassette spec and print a deterministic planning report.
+
+Inputs:
+
+* `--spec <workspace>/configs/cassettes/<name>.cassette.yaml`
+* local catalog path from `cassette.catalog.path`
+
+Network:
+
+* no
+
+Examples:
+
+* `uv run cruncher cassette validate --spec configs/cassettes/demo_hairpin.cassette.yaml`
+* `uv run cruncher cassette validate --spec configs/cassettes/demo_hairpin.cassette.yaml --json`
+
+Notes:
+
+* `--spec` must point to a `.cassette.yaml` file path under a workspace `configs/` tree.
+* Nick windows are matched against cassette-relative reported nick boundaries.
+* The report distinguishes `bounded_segment` from downstream removal/excision semantics.
+* `--json` prints machine-readable JSON with no Rich formatting.
+* Unsupported tracer-bullet mode flags fail at load time rather than degrading silently.
+
+#### `cruncher cassette design`
+
+Validate a cassette spec and write deterministic cassette artifacts.
+
+Inputs:
+
+* `--spec <workspace>/configs/cassettes/<name>.cassette.yaml`
+* optional `--force-overwrite` to replace an existing deterministic run directory
+
+Network:
+
+* no
+
+Examples:
+
+* `uv run cruncher cassette design --spec configs/cassettes/demo_hairpin.cassette.yaml`
+* `uv run cruncher cassette design --spec configs/cassettes/demo_hairpin.cassette.yaml --force-overwrite`
+
+Outputs:
+
+* writes under `<workspace>/outputs/cassettes/<spec.name>/<design_id>/`
+* writes `meta/cassette_manifest.json`, `meta/cassette_status.json`, `analysis/reports/report.{json,md}`
+* writes `export/table__candidates.csv`
+* writes `views/linear_duplex.v1.json`, `views/ssdna_hairpin.v1.json`, and `views/views_manifest.v1.json` when `output.emit_visual_contracts: true` and the explicit planner materializes a concrete candidate
+* writes `baserender_jobs/linear_duplex.job.yaml` and `baserender_jobs/ssdna_hairpin.job.yaml` when `output.emit_baserender_jobs: true` and the corresponding view files were published
+* `--json` prints the machine-readable report only; the run directory is included at `report.run_dir`
+
+Notes:
+
+* cassette runs are additive and do **not** register in workspace `run_index.json`
+* unsatisfied specs still write a cassette run directory with explicit issue codes, but view/job publication is skipped when no concrete candidate is available
+* there is no fallback to `sample`
+* unsupported tracer-bullet mode flags fail before materialization
+
+#### `cruncher cassette solve`
+
+Search for ranked cassette hits from a separate `.cassette.solve.yaml` spec and optionally materialize the top hits as
+explicit cassette bundles.
+
+Inputs:
+
+* `--spec <workspace>/configs/cassettes/<name>.cassette.solve.yaml`
+* built-in preset catalog via `catalog.preset`, optional overlays via `catalog.additional_paths`
+* optional `--force-overwrite` to replace an existing deterministic solve directory
+
+Network:
+
+* no
+
+Examples:
+
+* `uv run cruncher cassette solve --spec configs/cassettes/demo_hairpin.cassette.solve.yaml`
+* `uv run cruncher cassette solve --spec configs/cassettes/demo_hairpin.cassette.solve.yaml --json`
+
+Outputs:
+
+* writes under `<workspace>/outputs/cassette_solves/<solve_id>/`
+* writes `solve_report.{json,md}`, `table__hits.csv`, `solve_manifest.json`, `solve_status.json`
+* writes `views/top_hits.linear_duplex.v1.jsonl` and `views/top_hits.ssdna_hairpin.v1.jsonl` when `output.emit_visual_contracts: true`
+* writes `baserender_jobs/top_hits_duplex.job.yaml` and `baserender_jobs/top_hits_hairpin.job.yaml` when `output.emit_baserender_jobs: true`
+* writes per-hit explicit bundles, view bundles, and job files under `hits/hit_<rank>_<solution_id>/...`
+* `invalid_spec` and `invalid_catalog` preflight failures still write a top-level solve bundle when a workspace can be derived, but they do not write per-hit bundles
+* `--json` prints the machine-readable solve report only; the run directory is included at `report.run_dir`
+
+Notes:
+
+* `nick_goal.target_strand` is required in solve mode; there is no implicit default
+* solve mode is bounded by `search.max_enumerated_candidates` and `search.max_search_nodes`
+* final hit selection is controlled by `search.selection.policy`:
+  `score_only`, `greedy_hamming` (compatibility default), or opt-in `mmr`
+* `search.selection.pool_size` bounds the accepted pool retained before final selection
+* plain CLI output now surfaces selected-hit ids, default-vs-explicit policy status, pool/search boundedness, and policy-limited underfill
+* solve warnings are surfaced in plain CLI output and in `solve_report.json`
+* `solve_status.json` also preserves warning details, accepted-pool telemetry, `search_truncated`, policy-underfill flags, and the top-hit JSONL/job paths for lightweight machine consumers
+* warning codes include `ACCEPTED_POOL_TRUNCATED`, `SELECTION_RESULTS_POOL_BOUNDED`, `SELECTION_RESULTS_SEARCH_BOUNDED`, and `SELECTION_POLICY_LIMITED_HITS` when the returned hit set is constrained below the available accepted pool
+* each accepted hit round-trips through the explicit cassette planner
+* shared view contracts are file-based handoffs for baserender; Cruncher does not import baserender internals
+* there is no fallback from `solve` into `sample`
+
+#### `cruncher cassette catalog init-neb`
+
+Write the built-in `neb_nicking_v1` cassette nickase preset to a local YAML path.
+
+Inputs:
+
+* `--output <path>`
+* optional `--force-overwrite` to replace an existing output file
+
+Network:
+
+* no
+
+Examples:
+
+* `uv run cruncher cassette catalog init-neb --output configs/catalogs/neb_nicking_v1.yaml`
+
+Outputs:
+
+* writes the packaged preset YAML to the requested path
+
+Notes:
+
+* the command exports the built-in packaged preset exactly as shipped
+* this is a convenience helper for local inspection or overlay authoring; `cassette solve` can still reference `catalog.preset: neb_nicking_v1` directly
+
+#### `cruncher cassette show`
+
+Read one cassette run directory and print its key artifact paths.
+
+Inputs:
+
+* `--run <workspace>/outputs/cassettes/<spec.name>/<design_id>`
+
+Network:
+
+* no
+
+Example:
+
+* `uv run cruncher cassette show --run outputs/cassettes/demo_hairpin/<design_id>`
+
+Outputs:
+
+* prints the explicit cassette run directory
+* prints `meta/cassette_manifest.json`
+* prints `meta/cassette_status.json`
+* prints `analysis/reports/report.json`
+* prints `analysis/reports/report.md`
+* prints `views/views_manifest.v1.json` when present
+* prints `baserender_jobs/linear_duplex.job.yaml` and `baserender_jobs/ssdna_hairpin.job.yaml` when present
+
+Notes:
+
+* `show` remains an explicit-lane inspection command; solve runs are inspected via the solve report bundle
+* `show` does not read from the workspace `run_index.json`
+
+---
+
+#### YIU workflows
+
+The YIU workflow is separate from both `sample` and `cassette`. It expects one payload-centric spec file at
+`<workspace>/configs/yiu/<name>.yiu.yaml`, validates the `split_yiu_payload_rendering_v4` contract, and writes a single payload bundle under the workspace-relative `output.bundle_dir` path, typically `<workspace>/outputs/<name>/`.
+Treat the bundle directory as the source of truth; the mirrored operator PDF is optional and follows `output.published_plot_path` only when configured.
+
+Deep contracts live in:
+
+* [`../demos/demo_yiu_workspace.md`](../demos/demo_yiu_workspace.md)
+* [`../guides/yiu_workflow.md`](../guides/yiu_workflow.md)
+* [`reference/yiu_spec.md`](yiu_spec.md)
+* [`reference/yiu_artifacts.md`](yiu_artifacts.md)
+
+#### `cruncher yiu init-workspace`
+
+Scaffold a YIU workspace root with one checked-in payload example spec, one machine runbook, and an `outputs/` surface for generated YIU artifacts.
+
+Examples:
+
+* `uv run cruncher yiu init-workspace yiu_lab`
+* `uv run cruncher yiu init-workspace --output ./yiu_lab --force-overwrite`
+
+Outputs:
+
+* writes `configs/runbook.yaml`
+* writes one payload-centric YIU spec under `configs/yiu/*.yiu.yaml`
+* creates `outputs/`
+
+#### `cruncher yiu validate`
+
+Validate one payload-centric YIU spec, normalize it to one optimized payload object, and print the selected plan summary.
+
+Examples:
+
+* `uv run cruncher yiu validate --spec configs/yiu/<workflow>.yiu.yaml`
+* `uv run cruncher yiu validate --spec configs/yiu/<workflow>.yiu.yaml --json`
+
+#### `cruncher yiu render`
+
+Validate a payload-centric YIU spec, publish the bundle, and optionally render the three payload views through BaseRender.
+
+Examples:
+
+* `uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml`
+* `uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml --emit-renders`
+* `uv run cruncher yiu render --spec configs/yiu/<workflow>.yiu.yaml --json`
+
+Outputs:
+
+* writes under the workspace-relative `output.bundle_dir` path, usually `<workspace>/outputs/<workflow>/`
+* writes the operator-facing handoff summary `bundle_summary.json`
+* writes the machine-facing bundle ledgers `bundle_manifest.json`, `normalized_payload.json`, and `visual_inventory.json`
+* writes the published render contracts `payload_view.json`, `split_payload_view.jsonl` (JSONL rows), and `assembled_payload_view.json`
+* writes one composite operator render `payload_views.pdf` when `--emit-renders` is set
+* mirrors that composite PDF to `output.published_plot_path` when configured
+* writes optional debug jobs under `baserender_jobs/` only when `output.emit_render_jobs_debug: true`
+
+#### `cruncher yiu show`
+
+Show the normalized payload bundle summary for one published YIU bundle directory.
+
+Example:
+
+* `uv run cruncher yiu show --bundle outputs/<workflow>`
+* `uv run cruncher yiu show --bundle outputs/<workflow> --json`
+
+Notes:
+
+* text output surfaces one ligation summary line, one overhang summary, payload/split-left/split-right/assembled 5' to 3' reference-vs-mismatch-present rows, compact strand-aware mismatch edits (`PS` = payload strand, `AS` = opposite strand, 1-based payload positions), and PWM status; `--verbose` adds provenance, bundle contract, render/integrity detail, machine-facing artifact paths, and split-row debug lines
+* default `--json` stays operator-focused and omits machine ledger paths plus normalized payload detail; `--verbose` additionally includes those paths, `motif_context`, `optimization_decision`, and `split_row_debug`
+
+#### `cruncher visuals validate`
+
+Validate a published render job through the public `dnadesign.baserender` API.
+
+Example:
+
+* `uv run cruncher visuals validate --job outputs/<workflow>/baserender_jobs/<view>.job.yaml`
+
+#### `cruncher visuals run`
+
+Run a published render job through the public `dnadesign.baserender` API.
+
+Example:
+
+* `uv run cruncher visuals run --job outputs/<workflow>/baserender_jobs/<view>.job.yaml`
 
 ---
 
@@ -612,6 +921,7 @@ Example:
 
 Notes:
 
+* `workspaces list` is Cruncher's tool-local workspace and machine-runbook inventory. For repo-wide runbook discovery across tools, start with `docs/runbooks/README.md` or `uv run ops catalog list --section tool-sources`.
 * `workspaces list` includes Study inventory columns: `Study Specs` and `Study Runs`, and reports workspace kind (`config+runbook` or `runbook-only`).
 * `workspaces run` executes typed runbook steps from `configs/runbook.yaml` in fail-fast order.
 * runbook steps are strict CLI-args only (`run: [<cruncher-subcommand>, ...]`); arbitrary shell is not supported.

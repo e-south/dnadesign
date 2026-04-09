@@ -1,0 +1,117 @@
+catalog_version: 1
+preset_id: neb_nicking_v1
+generated_from: NEB public nicking enzyme resources
+generated_on: 2026-03-24
+normalization_policy: raw_cut_notation_is_authoritative
+
+variants:
+  - id: Nt.BspQI
+    specificity_id: BspQI
+    motif_top_5to3: GCTCTTC
+    raw_cut_notation: GCTCTTC(1/none)
+    vendor: NEB
+    vendor_catalog_number: R0644
+    origin_class: engineered
+    source_family: nicking_endonuclease
+
+  - id: Nt.CviPII
+    specificity_id: CviPII
+    motif_top_5to3: CCD
+    raw_cut_notation: CCD(-3/none)
+    vendor: NEB
+    vendor_catalog_number: R0626
+    origin_class: naturally_occurring
+    source_family: nicking_endonuclease
+
+  - id: Nt.BstNBI
+    specificity_id: BstNBI
+    motif_top_5to3: GAGTC
+    raw_cut_notation: GAGTC(4/none)
+    vendor: NEB
+    vendor_catalog_number: R0607
+    origin_class: naturally_occurring
+    source_family: nicking_endonuclease
+
+  - id: Nb.BsrDI
+    specificity_id: BsrDI
+    motif_top_5to3: GCAATG
+    raw_cut_notation: GCAATG(none/0)
+    vendor: NEB
+    vendor_catalog_number: R0648
+    origin_class: naturally_occurring
+    source_family: nicking_endonuclease
+
+  - id: Nb.BtsI
+    specificity_id: BtsI
+    motif_top_5to3: GCAGTG
+    raw_cut_notation: GCAGTG(none/0)
+    vendor: NEB
+    vendor_catalog_number: R0707
+    origin_class: naturally_occurring
+    source_family: nicking_endonuclease
+
+  - id: Nt.AlwI
+    specificity_id: AlwI
+    motif_top_5to3: GGATC
+    raw_cut_notation: GGATC(4/none)
+    vendor: NEB
+    vendor_catalog_number: R0627
+    origin_class: engineered
+    source_family: nicking_endonuclease
+
+  - id: Nb.BbvCI
+    specificity_id: BbvCI
+    motif_top_5to3: CCTCAGC
+    raw_cut_notation: CCTCAGC(none/-2)
+    vendor: NEB
+    vendor_catalog_number: R0631
+    origin_class: engineered
+    source_family: nicking_endonuclease
+
+  - id: Nt.BbvCI
+    specificity_id: BbvCI
+    motif_top_5to3: CCTCAGC
+    raw_cut_notation: CCTCAGC(-5/none)
+    vendor: NEB
+    vendor_catalog_number: R0632
+    origin_class: engineered
+    source_family: nicking_endonuclease
+
+  - id: Nb.BsmI
+    specificity_id: BsmI
+    motif_top_5to3: GAATGC
+    raw_cut_notation: GAATGC(none/-1)
+    vendor: NEB
+    vendor_catalog_number: R0706
+    origin_class: engineered
+    source_family: nicking_endonuclease
+
+  - id: Nb.BssSI
+    specificity_id: BssSI
+    motif_top_5to3: CACGAG
+    raw_cut_notation: CACGAG(none/-1)
+    vendor: NEB
+    vendor_catalog_number: R0681
+    origin_class: engineered
+    source_family: nicking_endonuclease
+    notes:
+      - NEB notes a more robust related enzyme BssSI-v2 for the wild-type specificity, but this preset keeps the nicking variant entry as listed.
+
+  - id: Nt.BsmAI
+    specificity_id: BsmAI
+    motif_top_5to3: GTCTC
+    raw_cut_notation: GTCTC(1/none)
+    vendor: NEB
+    vendor_catalog_number: R0121
+    origin_class: engineered
+    source_family: nicking_endonuclease
+
+product_aliases:
+  - alias_id: WarmStart Nt.BstNBI
+    canonical_variant_id: Nt.BstNBI
+    vendor: NEB
+    vendor_catalog_number: R0725
+    alias_kind: formulation
+    notes:
+      - WarmStart formulation of Nt.BstNBI, not a distinct catalytic recognition or cut rule.
+      - NEB states the WarmStart formulation is inactive below 40 C due to aptamer-based inhibition.

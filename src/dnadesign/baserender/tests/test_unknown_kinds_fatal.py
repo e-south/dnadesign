@@ -17,9 +17,11 @@ from dnadesign.baserender.src.config import resolve_style
 from dnadesign.baserender.src.core import Record, RenderingError, Span
 from dnadesign.baserender.src.core.record import Display, Effect, Feature
 from dnadesign.baserender.src.render import Palette, render_record
+from dnadesign.baserender.src.runtime import initialize_runtime
 
 
 def _style_palette():
+    initialize_runtime()
     style = resolve_style(preset=None, overrides={})
     return style, Palette(style.palette)
 
@@ -244,4 +246,30 @@ def test_motif_logo_unknown_params_keys_are_fatal() -> None:
     )
 
     with pytest.raises(RenderingError, match="Unknown keys in motif_logo.params"):
+        render_record(record, renderer_name="sequence_rows", style=style, palette=palette)
+
+
+def test_boundary_marker_negative_boundary_is_fatal() -> None:
+    style, palette = _style_palette()
+    record = Record(
+        id="r1",
+        alphabet="DNA",
+        sequence="ACGTACGT",
+        features=(
+            Feature(
+                id="f1",
+                kind="kmer",
+                span=Span(start=0, end=4, strand="fwd"),
+                label="ACGT",
+                tags=("tf:x",),
+                attrs={},
+                render={},
+            ),
+        ),
+        effects=(Effect(kind="boundary_marker", target={"boundary": -1, "lane": "primary"}, params={}, render={}),),
+        display=Display(),
+        meta={},
+    )
+
+    with pytest.raises(RenderingError, match="boundary_marker.target.boundary must be >= 0"):
         render_record(record, renderer_name="sequence_rows", style=style, palette=palette)

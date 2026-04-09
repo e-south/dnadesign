@@ -174,6 +174,7 @@ def workspace_init(
     typer.echo(f"- job: {workspace.job_path}")
     typer.echo(f"- inputs: {workspace.inputs_dir}")
     typer.echo(f"- outputs: {workspace.outputs_dir}")
+    typer.echo("- next: add inputs/input.parquet or edit job.yaml input.path before validate/run")
 
 
 def _main() -> None:

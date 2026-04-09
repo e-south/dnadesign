@@ -3,7 +3,8 @@
 <dnadesign project>
 src/dnadesign/baserender/src/config/adapter_contracts.py
 
-Canonical adapter contracts used by job parsing and adapter registry wiring.
+Canonical adapter descriptor registry used by job parsing, public inspection,
+and runtime adapter construction.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -15,9 +16,18 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from dnadesign.contracts.visual import (
+    SequenceEvidenceMapV1,
+    YiuHairpinTopologyV1,
+    YiuLinearStateV1,
+    YiuPayloadVisualV1,
+    YiuTopologyCartoonV1,
+)
+
 from ..core import SchemaError, ensure, require_one_of
 
 PolicyNormalizer = Callable[[Mapping[str, Any], str], dict[str, Any]]
+AdapterFactory = Callable[[Any, str], Any]
 
 
 def _normalize_policies_passthrough(policies: Mapping[str, Any], _ctx: str) -> dict[str, Any]:
@@ -85,8 +95,82 @@ def _normalize_cruncher_policies(policies: Mapping[str, Any], ctx: str) -> dict[
     return parsed
 
 
+def _build_densegen(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.densegen_tfbs import DensegenTfbsAdapter
+
+    return DensegenTfbsAdapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_generic(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.generic_features import GenericFeaturesAdapter
+
+    return GenericFeaturesAdapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_cruncher(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.cruncher_best_window import CruncherBestWindowAdapter
+
+    return CruncherBestWindowAdapter.from_config(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_sequence_windows(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.sequence_windows_v1 import SequenceWindowsV1Adapter
+
+    return SequenceWindowsV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_sequence_evidence_map(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.sequence_evidence_map_v1 import SequenceEvidenceMapV1Adapter
+
+    return SequenceEvidenceMapV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_duplex_sequence(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.duplex_sequence_v1 import DuplexSequenceV1Adapter
+
+    return DuplexSequenceV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_hairpin_topology(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.hairpin_topology_v1 import HairpinTopologyV1Adapter
+
+    return HairpinTopologyV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_yiu_linear_state(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.yiu_linear_state_v1 import YiuLinearStateV1Adapter
+
+    return YiuLinearStateV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_yiu_payload_visual(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.yiu_payload_visual_v1 import YiuPayloadVisualV1Adapter
+
+    return YiuPayloadVisualV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_yiu_hairpin_topology(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.yiu_hairpin_topology_v1 import YiuHairpinTopologyV1Adapter
+
+    return YiuHairpinTopologyV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
+def _build_yiu_topology_cartoon(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.yiu_topology_cartoon_v1 import YiuTopologyCartoonV1Adapter
+
+    return YiuTopologyCartoonV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
 @dataclass(frozen=True)
-class AdapterContract:
+class AdapterDescriptor:
+    kind: str
+    owner_tool: str | None
+    contract_kind: str
+    schema_model: type | None
+    supported_renderers: tuple[str, ...]
+    supported_alphabets: tuple[str, ...]
+    factory: AdapterFactory
+    docs_slug: str
     allowed_config_columns: tuple[str, ...]
     required_config_columns: tuple[str, ...]
     required_source_columns: tuple[str, ...]
@@ -94,6 +178,9 @@ class AdapterContract:
     allowed_policy_keys: tuple[str, ...] = ()
     resolved_path_columns: tuple[str, ...] = ()
     normalize_policies: PolicyNormalizer = _normalize_policies_passthrough
+
+
+AdapterContract = AdapterDescriptor
 
 
 _DENSEGEN_POLICY_KEYS = (
@@ -110,8 +197,16 @@ _DENSEGEN_POLICY_KEYS = (
 _CRUNCHER_POLICY_KEYS = ("on_missing_hit", "on_missing_pwm")
 
 
-ADAPTER_CONTRACTS: dict[str, AdapterContract] = {
-    "densegen_tfbs": AdapterContract(
+ADAPTER_DESCRIPTORS: dict[str, AdapterDescriptor] = {
+    "densegen_tfbs": AdapterDescriptor(
+        kind="densegen_tfbs",
+        owner_tool="densegen",
+        contract_kind="densegen_tfbs",
+        schema_model=None,
+        supported_renderers=("sequence_rows",),
+        supported_alphabets=("DNA",),
+        factory=_build_densegen,
+        docs_slug="densegen-tfbs",
         allowed_config_columns=("sequence", "annotations", "promoter_detail", "id", "overlay_text"),
         required_config_columns=("sequence", "annotations"),
         required_source_columns=("sequence", "annotations"),
@@ -119,14 +214,29 @@ ADAPTER_CONTRACTS: dict[str, AdapterContract] = {
         allowed_policy_keys=_DENSEGEN_POLICY_KEYS,
         normalize_policies=_normalize_densegen_policies,
     ),
-    "generic_features": AdapterContract(
+    "generic_features": AdapterDescriptor(
+        kind="generic_features",
+        owner_tool=None,
+        contract_kind="generic_features",
+        schema_model=None,
+        supported_renderers=("sequence_rows",),
+        supported_alphabets=("DNA", "IUPAC_DNA"),
+        factory=_build_generic,
+        docs_slug="generic-features",
         allowed_config_columns=("sequence", "features", "effects", "display", "id"),
         required_config_columns=("sequence", "features"),
         required_source_columns=("sequence", "features"),
         optional_source_columns=("effects", "display", "id"),
-        normalize_policies=_normalize_policies_passthrough,
     ),
-    "cruncher_best_window": AdapterContract(
+    "cruncher_best_window": AdapterDescriptor(
+        kind="cruncher_best_window",
+        owner_tool="cruncher",
+        contract_kind="cruncher_best_window",
+        schema_model=None,
+        supported_renderers=("sequence_rows",),
+        supported_alphabets=("DNA",),
+        factory=_build_cruncher,
+        docs_slug="cruncher-best-window",
         allowed_config_columns=(
             "sequence",
             "id",
@@ -145,22 +255,128 @@ ADAPTER_CONTRACTS: dict[str, AdapterContract] = {
         resolved_path_columns=("hits_path", "config_path"),
         normalize_policies=_normalize_cruncher_policies,
     ),
-    "sequence_windows_v1": AdapterContract(
+    "sequence_windows_v1": AdapterDescriptor(
+        kind="sequence_windows_v1",
+        owner_tool=None,
+        contract_kind="sequence_windows_v1",
+        schema_model=None,
+        supported_renderers=("sequence_rows",),
+        supported_alphabets=("DNA", "IUPAC_DNA"),
+        factory=_build_sequence_windows,
+        docs_slug="sequence-windows-v1",
         allowed_config_columns=("id", "sequence", "regulator_windows", "motifs", "display"),
         required_config_columns=("sequence", "regulator_windows"),
         required_source_columns=("sequence", "regulator_windows"),
         optional_source_columns=("id", "motifs", "display"),
-        normalize_policies=_normalize_policies_passthrough,
+    ),
+    "sequence_evidence_map_v1": AdapterDescriptor(
+        kind="sequence_evidence_map_v1",
+        owner_tool=None,
+        contract_kind="sequence_evidence_map_v1",
+        schema_model=SequenceEvidenceMapV1,
+        supported_renderers=("nucleotide_evidence_map",),
+        supported_alphabets=("DNA", "IUPAC_DNA"),
+        factory=_build_sequence_evidence_map,
+        docs_slug="sequence-evidence-map-v1",
+        allowed_config_columns=(),
+        required_config_columns=(),
+        required_source_columns=(),
+    ),
+    "duplex_sequence_v1": AdapterDescriptor(
+        kind="duplex_sequence_v1",
+        owner_tool="cassette",
+        contract_kind="duplex_sequence_v1",
+        schema_model=None,
+        supported_renderers=("sequence_rows",),
+        supported_alphabets=("DNA", "IUPAC_DNA"),
+        factory=_build_duplex_sequence,
+        docs_slug="duplex-sequence-v1",
+        allowed_config_columns=(),
+        required_config_columns=(),
+        required_source_columns=(),
+    ),
+    "hairpin_topology_v1": AdapterDescriptor(
+        kind="hairpin_topology_v1",
+        owner_tool="cassette",
+        contract_kind="hairpin_topology_v1",
+        schema_model=None,
+        supported_renderers=("hairpin_cartoon",),
+        supported_alphabets=("DNA",),
+        factory=_build_hairpin_topology,
+        docs_slug="hairpin-topology-v1",
+        allowed_config_columns=(),
+        required_config_columns=(),
+        required_source_columns=(),
+    ),
+    "yiu_linear_state_v1": AdapterDescriptor(
+        kind="yiu_linear_state_v1",
+        owner_tool="yiu",
+        contract_kind="yiu_linear_state_v1",
+        schema_model=YiuLinearStateV1,
+        supported_renderers=("sequence_rows",),
+        supported_alphabets=("DNA", "IUPAC_DNA"),
+        factory=_build_yiu_linear_state,
+        docs_slug="yiu-linear-state-v1",
+        allowed_config_columns=(),
+        required_config_columns=(),
+        required_source_columns=(),
+    ),
+    "yiu_payload_visual_v1": AdapterDescriptor(
+        kind="yiu_payload_visual_v1",
+        owner_tool="yiu",
+        contract_kind="yiu_payload_visual_v1",
+        schema_model=YiuPayloadVisualV1,
+        supported_renderers=("nucleotide_evidence_map",),
+        supported_alphabets=("DNA", "IUPAC_DNA"),
+        factory=_build_yiu_payload_visual,
+        docs_slug="yiu-payload-visual-v1",
+        allowed_config_columns=(),
+        required_config_columns=(),
+        required_source_columns=(),
+    ),
+    "yiu_hairpin_topology_v1": AdapterDescriptor(
+        kind="yiu_hairpin_topology_v1",
+        owner_tool="yiu",
+        contract_kind="yiu_hairpin_topology_v1",
+        schema_model=YiuHairpinTopologyV1,
+        supported_renderers=("hairpin_cartoon",),
+        supported_alphabets=("DNA",),
+        factory=_build_yiu_hairpin_topology,
+        docs_slug="yiu-hairpin-topology-v1",
+        allowed_config_columns=(),
+        required_config_columns=(),
+        required_source_columns=(),
+    ),
+    "yiu_topology_cartoon_v1": AdapterDescriptor(
+        kind="yiu_topology_cartoon_v1",
+        owner_tool="yiu",
+        contract_kind="yiu_topology_cartoon_v1",
+        schema_model=YiuTopologyCartoonV1,
+        supported_renderers=("topology_cartoon",),
+        supported_alphabets=("DNA", "IUPAC_DNA"),
+        factory=_build_yiu_topology_cartoon,
+        docs_slug="yiu-topology-cartoon-v1",
+        allowed_config_columns=(),
+        required_config_columns=(),
+        required_source_columns=(),
     ),
 }
 
 
 def adapter_kinds() -> set[str]:
-    return set(ADAPTER_CONTRACTS.keys())
+    return set(ADAPTER_DESCRIPTORS.keys())
+
+
+def adapter_descriptors() -> tuple[AdapterDescriptor, ...]:
+    return tuple(ADAPTER_DESCRIPTORS[kind] for kind in sorted(ADAPTER_DESCRIPTORS))
+
+
+def adapter_descriptor(kind: str) -> AdapterDescriptor:
+    descriptor = ADAPTER_DESCRIPTORS.get(kind)
+    if descriptor is None:
+        raise SchemaError(f"Unsupported adapter kind: {kind}")
+    return descriptor
 
 
 def adapter_contract(kind: str) -> AdapterContract:
-    contract = ADAPTER_CONTRACTS.get(kind)
-    if contract is None:
-        raise SchemaError(f"Unsupported adapter kind: {kind}")
-    return contract
+    return adapter_descriptor(kind)

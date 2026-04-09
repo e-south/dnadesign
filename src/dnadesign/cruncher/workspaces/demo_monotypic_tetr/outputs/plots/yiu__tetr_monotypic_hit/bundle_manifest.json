@@ -1,0 +1,329 @@
+{
+  "bundle_contract": "split_yiu_payload_bundle_v4",
+  "input_contract": "split_yiu_payload_rendering_v4",
+  "spec_name": "tetr_monotypic_hit",
+  "input_kind": "sample_hit",
+  "payload_label": "tetr_payload",
+  "payload_length": 19,
+  "selected_payload_sequence": "CTCTATATTTGATATAGAG",
+  "selected_complement_sequence": "GAGATATAGATTATATCTC",
+  "junction": {
+    "start": 8,
+    "end": 12,
+    "offsets": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "mode": "optimize",
+    "left_body_length": 8,
+    "right_body_length": 7
+  },
+  "mismatches": [
+    {
+      "payload_index": 8,
+      "junction_offset": 0,
+      "mutated_strand": "payload",
+      "native_base": "C",
+      "mutated_base": "T",
+      "opposing_base": "G"
+    },
+    {
+      "payload_index": 10,
+      "junction_offset": 2,
+      "mutated_strand": "complement",
+      "native_base": "C",
+      "mutated_base": "T",
+      "opposing_base": "G"
+    }
+  ],
+  "pwm_mode": "require",
+  "pwm_effective": true,
+  "worst_loss": 0.27692070770870103,
+  "total_loss": 0.5538414154174021,
+  "provenance": {
+    "spec_name": "tetr_monotypic_hit",
+    "sample_name": "demo_monotypic_tetr",
+    "hit_id": "demo_monotypic_tetr_elite_c4c42365d66b",
+    "source_artifact_path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_monotypic_tetr/outputs/optimize/tables/elites.parquet",
+    "source_workspace": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_monotypic_tetr",
+    "metadata": {
+      "site_label": "tetr_site",
+      "payload_label": "tetr_payload"
+    }
+  },
+  "payload_view_requires_motif_layers": true,
+  "view_contracts": [
+    {
+      "view_id": "payload",
+      "visual_direction": "evidence_ribbon",
+      "contract_kind": "yiu_payload_visual_v1",
+      "schema_version": 1,
+      "input_kind": "json",
+      "view_contract_path": "payload_view.json",
+      "render_artifact_path": "payload_views.pdf",
+      "renderer_kind": "nucleotide_evidence_map",
+      "style_preset": null,
+      "style_overrides": {
+        "padding_y": 24.0,
+        "overlay_align": "center",
+        "layout": {
+          "outer_pad_cells": 0.18
+        },
+        "sequence": {
+          "strand_gap_cells": 0.22,
+          "to_kmer_gap_cells": 0.18,
+          "bold_consensus_bases": true,
+          "non_consensus_color": "#9AA4B3",
+          "tone_quantile_low": 0.1,
+          "tone_quantile_high": 0.9
+        },
+        "palette": {
+          "tf:acrR": "#4C8E7F",
+          "tf:araC": "#B86E8D",
+          "tf:baeR": "#5E84B8",
+          "tf:lexA": "#A87644",
+          "tf:cpxR": "#3E927F",
+          "tf:fnr": "#B89756",
+          "tf:fur": "#5B98A5",
+          "tf:lacI": "#6B84B8",
+          "tf:lrp": "#789A63",
+          "tf:rcdA": "#A29070",
+          "tf:soxR": "#B66F8C",
+          "tf:soxS": "#BC8466"
+        },
+        "connectors": true,
+        "legend_mode": "none",
+        "legend_inline_side": "auto",
+        "legend_inline_margin_cells": 0.24,
+        "legend_font_size": 10,
+        "kmer": {
+          "box_height_cells": 1.02,
+          "fill_alpha": 0.94,
+          "text_y_nudge_cells": 0.0,
+          "to_logo_gap_cells": 0.1
+        },
+        "motif_logo": {
+          "layout": "stack",
+          "lane_mode": "follow_feature_track",
+          "display_mode": "information",
+          "height_bits": 2.0,
+          "bits_to_cells": 1.28,
+          "y_pad_cells": 0.0,
+          "letter_x_pad_frac": 0.05,
+          "alpha_other": 0.82,
+          "alpha_observed": 1.0,
+          "debug_bounds": false,
+          "letter_coloring": {
+            "mode": "match_window_seq",
+            "other_color": "#D1D5DB",
+            "observed_color_source": "feature_fill"
+          },
+          "scale_bar": {
+            "enabled": true,
+            "location": "left_of_logo"
+          }
+        },
+        "figure_scale": 1.24,
+        "padding_x": 42.0,
+        "track_spacing": 20.0,
+        "font_size_seq": 13,
+        "font_size_label": 11,
+        "legend_gap_x": 10.0,
+        "legend_height_px": 52.0,
+        "overlay_title_color": "#111827",
+        "overlay_title_gap_reduction_px": 8.0,
+        "connector_width": 1.1,
+        "connector_alpha": 0.78,
+        "connector_dash": [],
+        "legend": false
+      },
+      "render_requested": true,
+      "render_completed": true,
+      "last_rendered_at": "2026-04-08T18:00:07.145315+00:00",
+      "motif_layers_required": true
+    },
+    {
+      "view_id": "split_payload",
+      "visual_direction": "operator_strip",
+      "contract_kind": "sequence_evidence_map_v1",
+      "schema_version": 1,
+      "input_kind": "jsonl",
+      "view_contract_path": "split_payload_view.jsonl",
+      "render_artifact_path": "payload_views.pdf",
+      "renderer_kind": "sequence_rows",
+      "style_preset": null,
+      "style_overrides": {
+        "padding_y": 24.0,
+        "overlay_align": "center",
+        "layout": {
+          "outer_pad_cells": 0.18
+        },
+        "sequence": {
+          "strand_gap_cells": 0.22,
+          "to_kmer_gap_cells": 0.18,
+          "bold_consensus_bases": true,
+          "non_consensus_color": "#9AA4B3",
+          "tone_quantile_low": 0.1,
+          "tone_quantile_high": 0.9
+        },
+        "palette": {
+          "tf:acrR": "#4C8E7F",
+          "tf:araC": "#B86E8D",
+          "tf:baeR": "#5E84B8",
+          "tf:lexA": "#A87644",
+          "tf:cpxR": "#3E927F",
+          "tf:fnr": "#B89756",
+          "tf:fur": "#5B98A5",
+          "tf:lacI": "#6B84B8",
+          "tf:lrp": "#789A63",
+          "tf:rcdA": "#A29070",
+          "tf:soxR": "#B66F8C",
+          "tf:soxS": "#BC8466"
+        },
+        "connectors": true,
+        "legend_mode": "none",
+        "legend_inline_side": "auto",
+        "legend_inline_margin_cells": 0.24,
+        "legend_font_size": 10,
+        "kmer": {
+          "box_height_cells": 1.02,
+          "fill_alpha": 0.94,
+          "text_y_nudge_cells": 0.0,
+          "to_logo_gap_cells": 0.1
+        },
+        "motif_logo": {
+          "layout": "stack",
+          "lane_mode": "follow_feature_track",
+          "display_mode": "information",
+          "height_bits": 2.0,
+          "bits_to_cells": 1.28,
+          "y_pad_cells": 0.0,
+          "letter_x_pad_frac": 0.05,
+          "alpha_other": 0.82,
+          "alpha_observed": 1.0,
+          "debug_bounds": false,
+          "letter_coloring": {
+            "mode": "match_window_seq",
+            "other_color": "#D1D5DB",
+            "observed_color_source": "feature_fill"
+          },
+          "scale_bar": {
+            "enabled": true,
+            "location": "left_of_logo"
+          }
+        },
+        "figure_scale": 1.24,
+        "padding_x": 42.0,
+        "track_spacing": 20.0,
+        "font_size_seq": 13,
+        "font_size_label": 11,
+        "legend_gap_x": 10.0,
+        "legend_height_px": 52.0,
+        "overlay_title_color": "#111827",
+        "overlay_title_gap_reduction_px": 24.0,
+        "connector_width": 1.1,
+        "connector_alpha": 0.78,
+        "connector_dash": [],
+        "legend": false
+      },
+      "render_requested": true,
+      "render_completed": true,
+      "last_rendered_at": "2026-04-08T18:00:07.215849+00:00",
+      "motif_layers_required": false
+    },
+    {
+      "view_id": "assembled_payload",
+      "visual_direction": "operator_strip",
+      "contract_kind": "sequence_evidence_map_v1",
+      "schema_version": 1,
+      "input_kind": "json",
+      "view_contract_path": "assembled_payload_view.json",
+      "render_artifact_path": "payload_views.pdf",
+      "renderer_kind": "nucleotide_evidence_map",
+      "style_preset": null,
+      "style_overrides": {
+        "padding_y": 28.0,
+        "overlay_align": "center",
+        "layout": {
+          "outer_pad_cells": 0.18
+        },
+        "sequence": {
+          "strand_gap_cells": 0.22,
+          "to_kmer_gap_cells": 0.18,
+          "bold_consensus_bases": true,
+          "non_consensus_color": "#9AA4B3",
+          "tone_quantile_low": 0.1,
+          "tone_quantile_high": 0.9
+        },
+        "palette": {
+          "tf:acrR": "#4C8E7F",
+          "tf:araC": "#B86E8D",
+          "tf:baeR": "#5E84B8",
+          "tf:lexA": "#A87644",
+          "tf:cpxR": "#3E927F",
+          "tf:fnr": "#B89756",
+          "tf:fur": "#5B98A5",
+          "tf:lacI": "#6B84B8",
+          "tf:lrp": "#789A63",
+          "tf:rcdA": "#A29070",
+          "tf:soxR": "#B66F8C",
+          "tf:soxS": "#BC8466"
+        },
+        "connectors": true,
+        "legend_mode": "none",
+        "legend_inline_side": "auto",
+        "legend_inline_margin_cells": 0.24,
+        "legend_font_size": 10,
+        "kmer": {
+          "box_height_cells": 1.02,
+          "fill_alpha": 0.94,
+          "text_y_nudge_cells": 0.0,
+          "to_logo_gap_cells": 0.1
+        },
+        "motif_logo": {
+          "layout": "stack",
+          "lane_mode": "follow_feature_track",
+          "display_mode": "information",
+          "height_bits": 2.0,
+          "bits_to_cells": 1.28,
+          "y_pad_cells": 0.0,
+          "letter_x_pad_frac": 0.05,
+          "alpha_other": 0.82,
+          "alpha_observed": 1.0,
+          "debug_bounds": false,
+          "letter_coloring": {
+            "mode": "match_window_seq",
+            "other_color": "#D1D5DB",
+            "observed_color_source": "feature_fill"
+          },
+          "scale_bar": {
+            "enabled": true,
+            "location": "left_of_logo"
+          }
+        },
+        "figure_scale": 1.24,
+        "padding_x": 42.0,
+        "track_spacing": 20.0,
+        "font_size_seq": 13,
+        "font_size_label": 11,
+        "legend_gap_x": 10.0,
+        "legend_height_px": 52.0,
+        "overlay_title_color": "#111827",
+        "overlay_title_gap_reduction_px": 24.0,
+        "connector_width": 1.1,
+        "connector_alpha": 0.78,
+        "connector_dash": [],
+        "legend": false
+      },
+      "render_requested": true,
+      "render_completed": true,
+      "last_rendered_at": "2026-04-08T18:00:07.239672+00:00",
+      "motif_layers_required": false
+    }
+  ],
+  "composite_render_artifact_path": "payload_views.pdf",
+  "published_plot_artifact_path": null,
+  "render_status": "rendered"
+}

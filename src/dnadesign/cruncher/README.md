@@ -1,22 +1,13 @@
 ![Cruncher banner](assets/cruncher-banner.svg)
 
-Cruncher designs short, fixed-length DNA sequences that score highly across one or more transcription factor (TF) position weight matrices (PWMs), using Gibbs annealing and transcription-factor-binding-site core maximal marginal relevance (MMR) to select a diverse elite set. Use the demos for end-to-end workflows and the references for precise schema/command-line behavior.
+Cruncher is the DNA design package in `dnadesign`. It groups the workspace-based
+workflows for sequence optimization, cassette design, and YIU payload work, plus
+the study and portfolio flows that build on those runs.
 
-- **What it is:** an optimization engine for designing **short, fixed-length DNA** sequences that jointly satisfy one or more transcription factor position weight matrices, then returning a **diverse elite set**.
-- **When to use:** multi-transcription-factor promoter/operator design under tight length constraints; motif-compatibility tradeoff exploration; producing a small, diverse candidate set for assays; workspace-scoped parameter studies with aggregate comparison.
-- **Mental model:** deterministic data prep (`fetch`/`lock`) + strict Gibbs annealing optimization (`sample`) + artifact-native analytics (`analyze`).
+### Start here
 
-### Documentation map
-
-Use the workflow docs first, then targeted references:
-
-1. [Docs map](docs/README.md): route to demos, guides, and references by workflow.
-2. [Two-transcription-factor demo](docs/demos/demo_pairwise.md): run the pairwise optimization path end to end.
-3. [Three-transcription-factor demo](docs/demos/demo_multitf.md): run a multitf optimization workflow with full outputs.
-4. [Project workspace (all TFs)](docs/demos/project_all_tfs.md): execute the full-project workspace flow across all TFs.
-5. [Intent and lifecycle](docs/guides/intent_and_lifecycle.md): understand stage order and artifact expectations.
-6. [Sampling and analysis](docs/guides/sampling_and_analysis.md): tune sampling runs and post-run analysis.
-7. [Ingestion guide](docs/guides/ingestion.md): prepare and validate upstream motif inputs.
-8. [MEME Suite guide](docs/guides/meme_suite.md): run MEME/FIMO integration paths and expected artifacts.
-9. [Studies guide](docs/guides/studies.md): orchestrate repeatable study runs.
-10. [Portfolio aggregation](docs/guides/portfolio_aggregation.md): combine study outputs into portfolio-level summaries.
+1. [Docs map](docs/README.md): full routing by workflow family and doc type.
+2. [Sampling and analysis](docs/guides/sampling_and_analysis.md): start here for the core optimization lane and its downstream study outputs.
+3. [Cassette workspace demo](docs/demos/demo_cassette_workspace.md): run the cassette lane end to end from a packaged workspace.
+4. [YIU workflow](docs/guides/yiu_workflow.md): follow the YIU lane from validation through bundle inspection.
+5. [CLI reference](docs/reference/cli.md): look up command contracts and flags across Cruncher.

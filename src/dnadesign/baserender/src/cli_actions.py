@@ -19,7 +19,7 @@ import yaml
 from .api import run_job as run_job_public
 from .api import validate_job as validate_job_public
 from .config import (
-    SequenceRowsJobV3,
+    RenderJobV3,
     list_style_presets,
     resolve_preset_path,
 )
@@ -42,10 +42,10 @@ def validate_job_action(
     workspace_root: Path | None,
     *,
     caller_root: Path | None = None,
-) -> SequenceRowsJobV3:
+) -> RenderJobV3:
     return validate_job_public(
         resolve_job_spec(job, workspace, workspace_root),
-        kind="sequence_rows_v3",
+        kind="render_job_v3",
         caller_root=caller_root,
     )
 
@@ -59,12 +59,12 @@ def run_job_action(
 ):
     return run_job_public(
         resolve_job_spec(job, workspace, workspace_root),
-        kind="sequence_rows_v3",
+        kind="render_job_v3",
         caller_root=caller_root,
     )
 
 
-def _job_to_mapping(parsed: SequenceRowsJobV3) -> dict[str, Any]:
+def _job_to_mapping(parsed: RenderJobV3) -> dict[str, Any]:
     return {
         "version": 3,
         "results_root": str(parsed.results_root),
@@ -116,7 +116,8 @@ def _job_to_mapping(parsed: SequenceRowsJobV3) -> dict[str, Any]:
             (
                 {
                     "kind": "images",
-                    "dir": str(cfg.dir),
+                    "dir": (str(cfg.dir) if cfg.dir is not None else None),
+                    "path": (str(cfg.path) if cfg.path is not None else None),
                     "fmt": cfg.fmt,
                 }
                 if cfg.kind == "images"
@@ -154,7 +155,7 @@ def normalize_job_action(
 ) -> Path:
     parsed = validate_job_public(
         resolve_job_spec(job, workspace, workspace_root),
-        kind="sequence_rows_v3",
+        kind="render_job_v3",
         caller_root=caller_root,
     )
     data = _job_to_mapping(parsed)

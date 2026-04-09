@@ -18,6 +18,8 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.cruncher.workspaces.families import workflow_family_descriptors
+
 DOCS_MAP_MARKER = "docs:map"
 RUNBOOK_STEPS_MARKER = "docs:runbook-steps"
 
@@ -114,24 +116,43 @@ def _write_if_changed(path: Path, new_text: str) -> None:
 
 def _render_docs_map(catalog: DocsCatalog) -> str:
     page_by_path = {page.path: page for page in catalog.pages}
-    flow_sections: tuple[tuple[str, tuple[str, ...]], ...] = (
-        (
-            "Run End-to-End Workflows",
-            ("demos/demo_pairwise.md", "demos/demo_multitf.md", "demos/project_all_tfs.md"),
-        ),
-        (
-            "Ingest and Prepare Inputs",
-            ("guides/ingestion.md", "guides/meme_suite.md", "guides/troubleshooting.md"),
-        ),
-        (
-            "Optimize and Analyze Outputs",
+    family_sections: dict[str, tuple[str, tuple[str, ...]]] = {
+        "fixed_length": (
+            "Optimize Fixed-Length Sequences",
             (
+                "demos/demo_pairwise.md",
+                "demos/demo_multitf.md",
+                "demos/project_all_tfs.md",
                 "guides/intent_and_lifecycle.md",
                 "guides/sampling_and_analysis.md",
+                "guides/ingestion.md",
+                "guides/meme_suite.md",
                 "reference/artifacts.md",
             ),
         ),
-        (
+        "cassette": (
+            "Design and Search Cassettes",
+            (
+                "demos/demo_cassette_workspace.md",
+                "guides/cassette_workflow.md",
+                "guides/cassette_solve_workflow.md",
+                "reference/cassette_spec.md",
+                "reference/cassette_solve_spec.md",
+                "reference/nickase_catalog.md",
+                "reference/cassette_artifacts.md",
+            ),
+        ),
+        "yiu": (
+            "Payload-Centric YIU Workflows",
+            (
+                "demos/demo_yiu_workspace.md",
+                "guides/yiu_workflow.md",
+                "reference/yiu_spec.md",
+                "reference/yiu_artifacts.md",
+                "reference/yiu_visual_system.md",
+            ),
+        ),
+        "study": (
             "Run Studies and Portfolio Aggregation",
             (
                 "guides/studies.md",
@@ -140,26 +161,43 @@ def _render_docs_map(catalog: DocsCatalog) -> str:
                 "guides/portfolio_aggregation.md",
             ),
         ),
-        (
-            "Reference Contracts",
+    }
+    flow_sections: list[tuple[str, tuple[str, ...]]] = []
+    for family in workflow_family_descriptors():
+        section = family_sections.get(family.docs_section_id)
+        if section is not None:
+            flow_sections.append(section)
+    flow_sections.extend(
+        [
+            ("Troubleshooting and Support", ("guides/troubleshooting.md",)),
             (
-                "reference/config.md",
-                "reference/cli.md",
-                "reference/architecture.md",
-                "reference/glossary.md",
-                "reference/runbook_steps.md",
-                "reference/doc_conventions.md",
+                "Reference contracts",
+                (
+                    "reference/config.md",
+                    "reference/cli.md",
+                    "reference/architecture.md",
+                    "reference/cassette_spec.md",
+                    "reference/cassette_solve_spec.md",
+                    "reference/nickase_catalog.md",
+                    "reference/cassette_artifacts.md",
+                    "reference/yiu_spec.md",
+                    "reference/yiu_artifacts.md",
+                    "reference/yiu_visual_system.md",
+                    "reference/glossary.md",
+                    "reference/runbook_steps.md",
+                    "reference/doc_conventions.md",
+                ),
             ),
-        ),
-        (
-            "Maintainer Internals",
             (
-                "internals/spec.md",
-                "internals/optimizer_improvements_plan.md",
-                "dev/journal.md",
-                "meta/style_guide.md",
+                "Maintainer Internals",
+                (
+                    "internals/spec.md",
+                    "internals/optimizer_improvements_plan.md",
+                    "dev/journal.md",
+                    "meta/style_guide.md",
+                ),
             ),
-        ),
+        ]
     )
     lines: list[str] = []
     for heading, paths in flow_sections:

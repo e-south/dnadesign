@@ -12,12 +12,14 @@ Each workspace contains:
 - `job.yaml`
 - `inputs/`
 - `outputs/`
+- `README.md`
 
 Operational behavior:
 - `job.yaml` relative paths resolve from the workspace root.
 - If `results_root` is omitted, runtime defaults to `outputs/`.
 - For `images` output with no explicit `dir`, workspace jobs default to `outputs/plots/`.
 - `run_report.json` is optional and emitted only when `run.emit_report: true`.
+- `workspace init` creates an empty generic scaffold on purpose; populate `inputs/input.parquet` or edit `job.yaml` before validate/run.
 
 ## Workspace Commands
 
@@ -31,9 +33,20 @@ uv run baserender job validate --workspace demo_run
 # Execute the BaseRender job for the selected workspace.
 uv run baserender job run --workspace demo_run
 
-# if workspaces are outside the default root:
+# if the workspace root is outside the default <cwd>/workspaces:
+# Initialize the workspace under a non-default parent directory.
+uv run baserender workspace init --root /path/to/workspaces demo_run
+# List workspaces from that same explicit parent directory.
+uv run baserender workspace list --root /path/to/workspaces
+# Run the selected workspace while pointing the CLI at the same explicit root.
 uv run baserender job run --workspace demo_run --workspace-root /path/to/workspaces
 ```
+
+## Generic Scaffold Vs Demos Vs Cassette Jobs
+
+- `baserender workspace init` creates a generic standalone scaffold. Its `inputs/` directory starts empty.
+- The checked-in package demos live under `src/dnadesign/baserender/workspaces/`.
+- Cruncher cassette solve/design jobs are not BaseRender workspaces. They are emitted inside the owning Cruncher workspace and should be run by job-file path.
 
 ## Curated Demos
 

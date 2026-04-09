@@ -23,6 +23,12 @@ def _demo_workspace_config_paths() -> list[Path]:
     return [
         root / "demo_pairwise" / "configs" / "config.yaml",
         root / "demo_multitf" / "configs" / "config.yaml",
+        root / "demo_monotypic_baer" / "configs" / "config.yaml",
+        root / "demo_monotypic_cpxr" / "configs" / "config.yaml",
+        root / "demo_monotypic_lexa" / "configs" / "config.yaml",
+        root / "demo_monotypic_soxr" / "configs" / "config.yaml",
+        root / "demo_monotypic_soxs" / "configs" / "config.yaml",
+        root / "demo_monotypic_tetr" / "configs" / "config.yaml",
     ]
 
 
@@ -118,6 +124,36 @@ def test_demo_configs_use_tuned_gibbs_annealing_defaults() -> None:
         assert optimizer_cfg.cooling.stages[-1].beta == values["final_beta"]
 
 
+def test_demo_monotypic_configs_use_right_sized_multiplicity_budgets() -> None:
+    root = Path(__file__).resolve().parents[2] / "workspaces"
+    expected_copies = {
+        root / "demo_monotypic_baer" / "configs" / "config.yaml": 3,
+        root / "demo_monotypic_cpxr" / "configs" / "config.yaml": 3,
+        root / "demo_monotypic_lexa" / "configs" / "config.yaml": 2,
+        root / "demo_monotypic_soxr" / "configs" / "config.yaml": 3,
+        root / "demo_monotypic_soxs" / "configs" / "config.yaml": 3,
+        root / "demo_monotypic_tetr" / "configs" / "config.yaml": 2,
+    }
+
+    for config_path, copies in expected_copies.items():
+        cfg = load_config(config_path)
+        assert cfg.sample is not None
+        budget = cfg.sample.budget
+        optimizer_cfg = cfg.sample.optimizer
+        objective_cfg = cfg.sample.objective
+
+        assert budget.tune == 15000
+        assert budget.draws == 90000
+        assert optimizer_cfg.chains == 8
+        assert cfg.sample.elites.k == 1
+        assert optimizer_cfg.cooling.kind == "piecewise"
+        assert optimizer_cfg.cooling.stages[-1].sweeps == budget.draws
+        assert optimizer_cfg.cooling.stages[-1].beta == 24.0
+        assert objective_cfg.multiplicity.enabled is True
+        assert objective_cfg.multiplicity.copies == copies
+        assert objective_cfg.multiplicity.distinctness.mode == "offset"
+
+
 def test_project_workspace_defaults_match_tuned_surface() -> None:
     config_path = (
         Path(__file__).resolve().parents[2]
@@ -182,13 +218,52 @@ def test_demo_configs_use_modern_schema_keys() -> None:
         assert "trajectory_sweep_mode" in analysis, f"{config_path} should set analysis.trajectory_sweep_mode."
         assert "trajectory_slot_overlay" not in analysis, f"{config_path} must not use trajectory_slot_overlay."
 
-        catalog = cruncher["catalog"]
-        assert "pwm_window_lengths" not in catalog, (
-            f"{config_path} must not include removed catalog.pwm_window_lengths."
-        )
-        assert "pwm_window_strategy" not in catalog, (
-            f"{config_path} must not include removed catalog.pwm_window_strategy."
-        )
+
+def test_checked_in_yiu_demo_specs_publish_into_outputs_not_bundles() -> None:
+    root = Path(__file__).resolve().parents[2] / "workspaces"
+    expected = {
+        root / "demo_yiu_payload" / "configs" / "yiu" / "example_payload.yiu.yaml": (
+            "outputs/example_payload",
+            "outputs/example_payload__payload_views.pdf",
+        ),
+        root / "demo_monotypic_baer" / "configs" / "yiu" / "baer_monotypic_hit.yiu.yaml": (
+            "outputs/plots/yiu__baer_monotypic_hit",
+            None,
+        ),
+        root / "demo_monotypic_cpxr" / "configs" / "yiu" / "cpxr_monotypic_hit.yiu.yaml": (
+            "outputs/plots/yiu__cpxr_monotypic_hit",
+            None,
+        ),
+        root / "demo_monotypic_lexa" / "configs" / "yiu" / "lexa_monotypic_hit.yiu.yaml": (
+            "outputs/plots/yiu__lexa_monotypic_hit",
+            None,
+        ),
+        root / "demo_monotypic_soxr" / "configs" / "yiu" / "soxr_monotypic_hit.yiu.yaml": (
+            "outputs/plots/yiu__soxr_monotypic_hit",
+            None,
+        ),
+        root / "demo_monotypic_soxs" / "configs" / "yiu" / "soxs_monotypic_hit.yiu.yaml": (
+            "outputs/plots/yiu__soxs_monotypic_hit",
+            None,
+        ),
+        root / "demo_monotypic_tetr" / "configs" / "yiu" / "tetr_monotypic_hit.yiu.yaml": (
+            "outputs/plots/yiu__tetr_monotypic_hit",
+            None,
+        ),
+        root / "demo_monotypic_tetr" / "configs" / "yiu" / "tetr_teto2_wt_direct.yiu.yaml": (
+            "outputs/plots/yiu__tetr_teto2_wt_direct",
+            None,
+        ),
+    }
+
+    for spec_path, (bundle_dir, published_plot_path) in expected.items():
+        payload = yaml.safe_load(spec_path.read_text())
+        output = payload["output"]
+        assert output["bundle_dir"] == bundle_dir
+        assert output.get("published_plot_path") == published_plot_path
+        assert not str(output["bundle_dir"]).startswith("bundles/")
+        if output.get("published_plot_path") is not None:
+            assert not str(output["published_plot_path"]).startswith("bundles/")
 
 
 def test_lexa_cpxr_local_meme_inputs_match_across_workspaces() -> None:
