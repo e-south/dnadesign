@@ -138,7 +138,20 @@ where = ["src"]
 addopts = "-ra -q --strict-markers --import-mode=importlib"
 testpaths = ["src/dnadesign"]
 pythonpath = ["src"]
-norecursedirs = ["*/archived/*", ".venv", "venv", "build", "dist", "*.egg-info"]
+# Do not collect tests from generated workspace/runtime artifacts.
+norecursedirs = [
+  "*/archived/*",
+  ".venv",
+  "venv",
+  "build",
+  "dist",
+  "*.egg-info",
+  ".hypothesis",
+  ".pytest_cache",
+  "outputs",
+  "batch_results",
+  "runs",
+]
 markers = [
   "slow: sampling-heavy tests (>10 s)",
   "fimo: tests requiring MEME/FIMO external tooling",
