@@ -247,7 +247,7 @@ Under the strict `hard_ligation_filter` defaults, YIU keeps only candidates that
 - no `(1,2)` double-middle geometry
 - no `TNNA`-like final overhang
 
-The first rule dominates. At a single chosen site there are `6` local mutation choices: `2` strand choices times `3` non-native bases. In the standard Watson-Crick background, only one of those six yields canonical `GT`, so `hard_ligation_filter` often removes `97%` to `98%` of a two-mismatch pool. PWM still matters after that, but only for ranking the survivors. It does not inflate or shrink the `before` or `after` counts in `hard_ligation_filter`.
+The first rule dominates. At a single chosen site there are `6` local mutation choices: `2` strand choices times `3` non-native bases. In the standard Watson-Crick background, only one of those six yields top-tier `GT`, so `hard_ligation_filter` often removes `97%` to `98%` of a two-mismatch pool. PWM still matters after that, but only for ranking the survivors. It does not inflate or shrink the `before` or `after` counts in `hard_ligation_filter`.
 
 The paper does not isolate every exact two-mismatch geometry that YIU can generate. The strongest direct support is for G:T dominance, edge better than middle, T4/T7 versus T3/PBCV-1/hLig3 permissiveness differences, and TNNA inefficiency. Penalties such as `double_middle_flag` are engineering extrapolations grounded in the paper, not direct one-to-one measurements for every possible YIU candidate geometry.
 

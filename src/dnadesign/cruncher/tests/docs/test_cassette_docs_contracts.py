@@ -46,7 +46,8 @@ def test_top_level_docs_route_both_workflow_families() -> None:
     assert "docs/guides/sampling_and_analysis.md" in package_readme
     assert "docs/guides/yiu_workflow.md" in package_readme
     assert "docs/reference/cli.md" in package_readme
-    assert "This README stays light on purpose." in package_readme
+    assert "This README stays light on purpose." not in package_readme
+    assert "Studies and portfolio aggregation build on the fixed-length optimization lane." in package_readme
 
     for content in (docs_readme, docs_index):
         assert "Optimize Fixed-Length Sequences" in content

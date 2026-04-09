@@ -1,4 +1,4 @@
-## Cruncher Documentation Index
+## Cruncher docs
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-04-07
@@ -6,62 +6,26 @@
 
 **Last updated by:** cruncher-maintainers on 2026-04-07
 
-Cruncher currently has three first-class workflow families:
+Cruncher has three workflow families:
 
-- fixed-length PWM optimization workspaces built around `fetch -> lock -> parse -> sample -> analyze`
-- cassette workspaces built around `cassette init-workspace|validate|design|solve|show`
-- payload-centric YIU v4 workspaces built around `yiu init-workspace|validate|render|show`
+- fixed-length optimization workspaces for sequence sampling, analysis, studies, and aggregation
+- cassette workspaces for cassette design and ranked search
+- payload-centric YIU workspaces for payload validation, rendering, and bundle inspection
 
-Studies and portfolios build on the fixed-length optimization lane. Cassette and YIU runs keep their own workspace and artifact contracts. Future lanes should sit beside these families rather than overload them.
+Studies and portfolio aggregation build on the fixed-length optimization lane.
 
-For YIU, the shortest mental model is five steps:
+### Start here
 
-- start from either `user_sequence` or `sample_hit`
-- validate and normalize the payload
-- search valid 4 nt internal junction and mismatch plans
-- publish one deterministic bundle of three views
-- optionally render `payload_views.pdf`
-
-### Quick routes
-
-- Checked-in user-sequence demo: [YIU Workspace Demo](demos/demo_yiu_workspace.md)
-- Sample-backed YIU example that starts from `sample` outputs:
-  [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md) and
-  [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md)
-- Public YIU command flow: [YIU Workflow](guides/yiu_workflow.md)
-- Strict input contract: [YIU Spec Reference](reference/yiu_spec.md)
-- Emitted files and `show` semantics: [YIU Artifacts](reference/yiu_artifacts.md)
-- Render hierarchy and view emphasis: [YIU Visual System](reference/yiu_visual_system.md)
-- Upstream Sample lane: [Sampling and Analysis](guides/sampling_and_analysis.md)
-
-### YIU docs route
-Read the YIU pages in this order when you are new to the lane:
-
-1. [YIU Workspace Demo](demos/demo_yiu_workspace.md) for one checked-in workspace and the shortest runnable path.
-2. [YIU Workflow](guides/yiu_workflow.md) for command flow and the solver's behavioral logic.
-3. [YIU Spec Reference](reference/yiu_spec.md) for field-level schema, defaults, and degraded-mode rules.
-4. [YIU Artifacts](reference/yiu_artifacts.md) for bundle files, `show`, and integrity semantics.
-5. [YIU Visual System](reference/yiu_visual_system.md) for payload/split/assembled hierarchy and render emphasis.
-
-Use the sample-backed monotypic runbooks when you need `sample_hit` examples beside real Sample outputs.
-
-### Progressive disclosure route
-1. Choose one workflow family under **Choose a workflow family**.
-2. Start with one demo or guide from that family.
-3. Use **Reference contracts** when you need strict CLI, schema, or artifact behavior.
+- **Fixed-length optimization:** [Pairwise Demo](demos/demo_pairwise.md), [Sampling and Analysis](guides/sampling_and_analysis.md), and [Intent and Lifecycle](guides/intent_and_lifecycle.md)
+- **Cassette workflows:** [Cassette Workspace Demo](demos/demo_cassette_workspace.md), [Cassette Workflow](guides/cassette_workflow.md), and [Cassette Solve Workflow](guides/cassette_solve_workflow.md)
+- **Payload-Centric YIU Workflows:** [YIU Workspace Demo](demos/demo_yiu_workspace.md), [YIU Workflow](guides/yiu_workflow.md), [YIU Spec Reference](reference/yiu_spec.md), [YIU Artifacts](reference/yiu_artifacts.md), and [YIU Visual System](reference/yiu_visual_system.md)
+- **Sample-backed YIU examples:** [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md) and [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md)
+- **Studies and aggregation:** [Studies](guides/studies.md) and [Portfolio Aggregation](guides/portfolio_aggregation.md)
+- **Tool-wide references:** [CLI Reference](reference/cli.md), [Architecture](reference/architecture.md), [Config Reference](reference/config.md), [Glossary](reference/glossary.md), and [Runbook Step Reference](reference/runbook_steps.md)
 
 <!-- docs:toc:off -->
 
-### Choose a workflow family
-
-- **Fixed-length optimization workspaces:** start with [Pairwise Demo](demos/demo_pairwise.md), then move to [Sampling and Analysis](guides/sampling_and_analysis.md) and [Intent and Lifecycle](guides/intent_and_lifecycle.md).
-- **Cassette workspaces:** start with [Cassette Workspace Demo](demos/demo_cassette_workspace.md), then use [Cassette Workflow](guides/cassette_workflow.md) or [Cassette Solve Workflow](guides/cassette_solve_workflow.md).
-- **Payload-Centric YIU Workflows:** start with [YIU Workspace Demo](demos/demo_yiu_workspace.md), then follow the [YIU docs route](#yiu-docs-route). Public CLI: `yiu init-workspace|validate|render|show` with `split_yiu_payload_rendering_v4`.
-  Use the demo for the checked-in workspace, the workflow guide for command flow and solver behavior, the spec reference for schema and normalization, the artifacts page for emitted files and `show`, and the visual-system page for view hierarchy.
-- **Study and aggregation workflows:** use [Studies](guides/studies.md) for workspace-scoped sweeps and [Portfolio Aggregation](guides/portfolio_aggregation.md) for cross-workspace handoff packages.
-- **Reference contracts:** use [CLI Reference](reference/cli.md), [Architecture](reference/architecture.md), and the relevant schema/artifact reference for your lane.
-
-### Documentation by workflow
+### Documentation map
 <!-- docs:map:start -->
 #### Optimize Fixed-Length Sequences
 - [Pairwise Demo](demos/demo_pairwise.md)

@@ -191,7 +191,7 @@ Tip: `cd` into a fixed-length optimization workspace and run cruncher commands w
 discovery across tools, use [`docs/runbooks/README.md`](../../../docs/runbooks/README.md)
 or `uv run ops catalog list --section tool-sources`.
 
-For packaged YIU demo workspaces, treat `output.bundle_dir` as the generated YIU bundle home. YIU-only workspaces can mirror the operator PDF directly under `outputs/`, while sample-backed workspaces should consolidate the whole YIU bundle under `outputs/plots/yiu__<workflow>/` with no second workspace-level mirror. `demo_yiu_payload/` is now the user-sequence-only YIU demo; sample-hit YIU handoffs live with the monotypic Sample workspaces that own the source payloads.
+YIU bundle layout and sample-backed handoff rules live in [YIU Workflow](../docs/guides/yiu_workflow.md), [YIU Artifacts](../docs/reference/yiu_artifacts.md), and the relevant workspace runbook.
 
 Packaged workspace configs resolve `discover.tool_path` relative to their `configs/config.yaml`, so keep packaged workspaces under the repository layout (`src/dnadesign/cruncher/workspaces/...`). If you copy a workspace elsewhere, update `discover.tool_path` explicitly before running `discover motifs`.
 

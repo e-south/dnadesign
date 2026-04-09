@@ -184,12 +184,12 @@ Strict mode is the `hard_ligation_filter` policy with these defaults:
 
 In practice, that means:
 
-- every mismatch must score as canonical `GT`
+- every mismatch must land in the top-tier `GT` class
 - a two-mismatch plan may use at most one middle offset
 - the `(1,2)` double-middle geometry is rejected
 - a final overhang shaped like `T N N A` is rejected
 
-The GT rule does most of the work. At one chosen site there are `6` local mutation choices: `2` strand choices times `3` non-native bases. In the standard Watson-Crick background YIU operates on, only one of those six local choices produces canonical `GT`. Most of the raw pool disappears right there, before middle-position and TNNA checks have a chance to act.
+The GT rule does most of the work. At one chosen site there are `6` local mutation choices: `2` strand choices times `3` non-native bases. In the standard Watson-Crick background YIU operates on, only one of those six local choices lands in that top-tier `GT` class. Most of the raw pool disappears right there, before middle-position and TNNA checks have a chance to act.
 
 For the full two-mismatch pool, the best-case strict ceiling is still small:
 

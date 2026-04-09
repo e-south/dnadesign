@@ -8,57 +8,24 @@
 
 ### Contents
 - [Overview](#overview)
-- [Choose your path](#choose-your-path)
-- [YIU docs route](#yiu-docs-route)
+- [Workflow families](#workflow-families)
 - [Docs map](#docs-map)
-- [Demos](#demos)
-- [Guides](#guides)
-- [References](#references)
-- [Internals and dev notes](#internals-and-dev-notes)
 
 ### Overview
-This index is the browsing map for Cruncher docs. Start with the package-level [Cruncher README](../README.md) for the short operational map, then route into one workflow family.
-
-YIU is its own workflow family, not a special case of `sample` or cassette work. It accepts either an exact payload sequence or a `sample_hit` resolved from public Sample outputs, searches a 4 nt internal junction plus allowed mismatch plans, and publishes a deterministic three-view bundle. Use the demo for the checked-in workspace, the workflow guide for command flow and solver behavior, the spec reference for schema and normalization, the artifacts page for emitted files and `show`, and the visual-system page for view hierarchy.
-
-Cruncher has three first-class workflow families today:
+Cruncher has three workflow families:
 
 - fixed-length optimization workspaces built around `fetch -> lock -> parse -> sample -> analyze`
 - cassette workspaces built around `cassette init-workspace|validate|design|solve|show`
-- payload-centric YIU v4 workspaces built around `yiu init-workspace|validate|render|show`
+- payload-centric YIU workspaces for payload validation, rendering, and bundle inspection
 
-Studies and portfolios extend the fixed-length optimization lane. Cassette and YIU runs keep separate workspace and artifact contracts. More families can be added beside these lanes without rewriting the existing ones.
+Studies and portfolio aggregation extend the fixed-length optimization lane. Use the package-level [Cruncher README](../README.md) for the short package overview.
 
-### Choose your path
-- Run the core fixed-length optimization lane: [`demos/demo_pairwise.md`](demos/demo_pairwise.md)
-- Run the three-TF optimization lane: [`demos/demo_multitf.md`](demos/demo_multitf.md)
-- Run the larger study-ready optimization workspace: [`demos/project_all_tfs.md`](demos/project_all_tfs.md)
-- Run a cassette workspace end to end: [`demos/demo_cassette_workspace.md`](demos/demo_cassette_workspace.md)
-- Run a YIU workspace end to end: [`demos/demo_yiu_workspace.md`](demos/demo_yiu_workspace.md)
-- Run a sample-backed YIU example beside the upstream Sample outputs:
-  [`../workspaces/demo_monotypic_tetr/runbook.md`](../workspaces/demo_monotypic_tetr/runbook.md) or
-  [`../workspaces/demo_monotypic_lexa/runbook.md`](../workspaces/demo_monotypic_lexa/runbook.md)
-- Design a cassette from an authored spec: [`guides/cassette_workflow.md`](guides/cassette_workflow.md)
-- Search for ranked cassette hits: [`guides/cassette_solve_workflow.md`](guides/cassette_solve_workflow.md)
-- Run payload-centric YIU workflows: [`guides/yiu_workflow.md`](guides/yiu_workflow.md)
-  Use the demo for the checked-in workspace, the workflow guide for command flow, the spec reference for schema and normalization, the artifacts page for emitted files and `show`, and the visual-system page for view hierarchy.
-- Understand sample/Gibbs analysis outputs: [`guides/sampling_and_analysis.md`](guides/sampling_and_analysis.md)
-- Run study sweeps: [`guides/studies.md`](guides/studies.md)
-- Aggregate a portfolio: [`guides/portfolio_aggregation.md`](guides/portfolio_aggregation.md)
-- Debug failures quickly: [`guides/troubleshooting.md`](guides/troubleshooting.md)
-
-### YIU docs route
-Read the YIU pages in this order when you want the shortest path from first run to contract detail:
-
-1. [`demos/demo_yiu_workspace.md`](demos/demo_yiu_workspace.md) for one checked-in user-sequence workspace.
-2. [`guides/yiu_workflow.md`](guides/yiu_workflow.md) for command flow and the optimizer's behavioral logic.
-3. [`reference/yiu_spec.md`](reference/yiu_spec.md) for `.yiu.yaml` fields, defaults, and failure rules.
-4. [`reference/yiu_artifacts.md`](reference/yiu_artifacts.md) for bundle contents, `show`, and integrity checks.
-5. [`reference/yiu_visual_system.md`](reference/yiu_visual_system.md) for the payload/split/assembled layout hierarchy.
-
-Use the monotypic runbooks when you need `sample_hit` examples that stay beside the upstream Sample outputs:
-- [`../workspaces/demo_monotypic_tetr/runbook.md`](../workspaces/demo_monotypic_tetr/runbook.md)
-- [`../workspaces/demo_monotypic_lexa/runbook.md`](../workspaces/demo_monotypic_lexa/runbook.md)
+### Workflow families
+- **Fixed-length optimization:** [`demos/demo_pairwise.md`](demos/demo_pairwise.md), [`demos/demo_multitf.md`](demos/demo_multitf.md), [`demos/project_all_tfs.md`](demos/project_all_tfs.md), [`guides/sampling_and_analysis.md`](guides/sampling_and_analysis.md), [`guides/studies.md`](guides/studies.md), and [`guides/portfolio_aggregation.md`](guides/portfolio_aggregation.md)
+- **Cassette workflows:** [`demos/demo_cassette_workspace.md`](demos/demo_cassette_workspace.md), [`guides/cassette_workflow.md`](guides/cassette_workflow.md), [`guides/cassette_solve_workflow.md`](guides/cassette_solve_workflow.md), [`reference/cassette_spec.md`](reference/cassette_spec.md), and [`reference/cassette_artifacts.md`](reference/cassette_artifacts.md)
+- **Payload-Centric YIU Workflows:** [`demos/demo_yiu_workspace.md`](demos/demo_yiu_workspace.md), [`guides/yiu_workflow.md`](guides/yiu_workflow.md), [`reference/yiu_spec.md`](reference/yiu_spec.md), [`reference/yiu_artifacts.md`](reference/yiu_artifacts.md), and [`reference/yiu_visual_system.md`](reference/yiu_visual_system.md)
+- **Sample-backed YIU examples:** [`../workspaces/demo_monotypic_tetr/runbook.md`](../workspaces/demo_monotypic_tetr/runbook.md) and [`../workspaces/demo_monotypic_lexa/runbook.md`](../workspaces/demo_monotypic_lexa/runbook.md)
+- **Tool-wide references:** [`reference/cli.md`](reference/cli.md), [`reference/architecture.md`](reference/architecture.md), [`reference/config.md`](reference/config.md), [`reference/glossary.md`](reference/glossary.md), [`reference/runbook_steps.md`](reference/runbook_steps.md), and [`guides/troubleshooting.md`](guides/troubleshooting.md)
 
 ### Docs map
 <!-- docs:map:start -->
@@ -118,46 +85,3 @@ Use the monotypic runbooks when you need `sample_hit` examples that stay beside 
 - [Dev Journal](dev/journal.md)
 - [Docs Style Guide](meta/style_guide.md)
 <!-- docs:map:end -->
-
-### Demos
-- [`demos/demo_pairwise.md`](demos/demo_pairwise.md)
-- [`demos/demo_multitf.md`](demos/demo_multitf.md)
-- [`demos/project_all_tfs.md`](demos/project_all_tfs.md)
-- [`demos/demo_cassette_workspace.md`](demos/demo_cassette_workspace.md)
-- [`demos/demo_yiu_workspace.md`](demos/demo_yiu_workspace.md)
-
-### Guides
-- [`guides/cassette_workflow.md`](guides/cassette_workflow.md)
-- [`guides/cassette_solve_workflow.md`](guides/cassette_solve_workflow.md)
-- [`guides/yiu_workflow.md`](guides/yiu_workflow.md)
-- [`guides/intent_and_lifecycle.md`](guides/intent_and_lifecycle.md)
-- [`guides/ingestion.md`](guides/ingestion.md)
-- [`guides/meme_suite.md`](guides/meme_suite.md)
-- [`guides/sampling_and_analysis.md`](guides/sampling_and_analysis.md)
-- [`guides/studies.md`](guides/studies.md)
-- [`guides/study_length_vs_score.md`](guides/study_length_vs_score.md)
-- [`guides/study_diversity_vs_score.md`](guides/study_diversity_vs_score.md)
-- [`guides/portfolio_aggregation.md`](guides/portfolio_aggregation.md)
-- [`guides/troubleshooting.md`](guides/troubleshooting.md)
-
-### References
-- [`reference/config.md`](reference/config.md)
-- [`reference/cli.md`](reference/cli.md)
-- [`reference/architecture.md`](reference/architecture.md)
-- [`reference/artifacts.md`](reference/artifacts.md)
-- [`reference/cassette_spec.md`](reference/cassette_spec.md)
-- [`reference/cassette_solve_spec.md`](reference/cassette_solve_spec.md)
-- [`reference/nickase_catalog.md`](reference/nickase_catalog.md)
-- [`reference/cassette_artifacts.md`](reference/cassette_artifacts.md)
-- [`reference/yiu_spec.md`](reference/yiu_spec.md)
-- [`reference/yiu_artifacts.md`](reference/yiu_artifacts.md)
-- [`reference/yiu_visual_system.md`](reference/yiu_visual_system.md)
-- [`reference/glossary.md`](reference/glossary.md)
-- [`reference/doc_conventions.md`](reference/doc_conventions.md)
-- [`reference/runbook_steps.md`](reference/runbook_steps.md)
-
-### Internals and dev notes
-- [`internals/spec.md`](internals/spec.md)
-- [`internals/optimizer_improvements_plan.md`](internals/optimizer_improvements_plan.md)
-- [`dev/journal.md`](dev/journal.md)
-- [`meta/style_guide.md`](meta/style_guide.md)

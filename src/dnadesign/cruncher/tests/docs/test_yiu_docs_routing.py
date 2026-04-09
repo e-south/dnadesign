@@ -25,14 +25,14 @@ def test_top_level_docs_route_readers_to_yiu_surfaces() -> None:
     docs_readme = _read("docs/README.md")
     docs_index = _read("docs/index.md")
 
-    assert "payload-centric YIU" in package_readme
+    assert "payload-centric YIU workflows" in package_readme
     assert "`sample` and fixed-length optimization" in package_readme
     assert "docs/README.md" in package_readme
     assert "docs/guides/yiu_workflow.md" in package_readme
     assert "docs/guides/sampling_and_analysis.md" in package_readme
-    assert "sample_hit" in package_readme
-    assert "This README stays light on purpose." in package_readme
-    assert "[Docs map](docs/README.md): the comprehensive index." in package_readme
+    assert "docs/demos/demo_cassette_workspace.md" in package_readme
+    assert "This README stays light on purpose." not in package_readme
+    assert "full routing by workflow family and doc type" in package_readme
 
     for content in (docs_readme, docs_index):
         assert "Payload-Centric YIU Workflows" in content
@@ -41,9 +41,9 @@ def test_top_level_docs_route_readers_to_yiu_surfaces() -> None:
         assert "reference/yiu_spec.md" in content
         assert "reference/yiu_artifacts.md" in content
         assert "reference/yiu_visual_system.md" in content
-        assert "YIU docs route" in content
-        assert "yiu init-workspace|validate|render|show" in content
         assert "workspaces/demo_monotypic_tetr/runbook.md" in content
+        assert "split_yiu_payload_rendering_v4" not in content
+        assert "yiu init-workspace|validate|render|show" not in content
         assert "trace|solve" not in content
 
 
