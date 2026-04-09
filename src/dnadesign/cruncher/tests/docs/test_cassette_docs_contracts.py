@@ -38,27 +38,37 @@ def test_top_level_docs_route_both_workflow_families() -> None:
     docs_readme = _read("docs/README.md")
     docs_index = _read("docs/index.md")
 
-    assert "`sample` and fixed-length optimization" in package_readme
-    assert "Cassette workflows" in package_readme
-    assert "payload-centric YIU" in package_readme
+    assert "Cruncher is the DNA design package in `dnadesign`." in package_readme
+    assert "cassette design" in package_readme
+    assert "YIU payload work" in package_readme
     assert "docs/README.md" in package_readme
     assert "docs/demos/demo_cassette_workspace.md" in package_readme
     assert "docs/guides/sampling_and_analysis.md" in package_readme
     assert "docs/guides/yiu_workflow.md" in package_readme
     assert "docs/reference/cli.md" in package_readme
     assert "This README stays light on purpose." not in package_readme
-    assert "Studies and portfolio aggregation build on the fixed-length optimization lane." in package_readme
+    assert "study and portfolio flows" in package_readme
 
-    for content in (docs_readme, docs_index):
-        assert "Optimize Fixed-Length Sequences" in content
-        assert "Design and Search Cassettes" in content
-        assert "demos/demo_pairwise.md" in content
-        assert "demos/demo_multitf.md" in content
-        assert "demos/project_all_tfs.md" in content
-        assert "demos/demo_cassette_workspace.md" in content
-        assert "guides/sampling_and_analysis.md" in content
-        assert "guides/studies.md" in content
-        assert "guides/portfolio_aggregation.md" in content
+    assert "Optimize Fixed-Length Sequences" in docs_readme
+    assert "Design and Search Cassettes" in docs_readme
+    assert "demos/demo_pairwise.md" in docs_readme
+    assert "demos/demo_multitf.md" in docs_readme
+    assert "demos/project_all_tfs.md" in docs_readme
+    assert "demos/demo_cassette_workspace.md" in docs_readme
+    assert "guides/sampling_and_analysis.md" in docs_readme
+    assert "guides/studies.md" in docs_readme
+    assert "guides/portfolio_aggregation.md" in docs_readme
+
+    assert "Design or search cassettes" in docs_index
+    assert "Run the fixed-length optimization lane" in docs_index
+    assert "Run studies and portfolio aggregation" in docs_index
+    assert "demos/demo_pairwise.md" in docs_index
+    assert "demos/demo_multitf.md" in docs_index
+    assert "demos/project_all_tfs.md" in docs_index
+    assert "demos/demo_cassette_workspace.md" in docs_index
+    assert "guides/sampling_and_analysis.md" in docs_index
+    assert "guides/studies.md" in docs_index
+    assert "guides/portfolio_aggregation.md" in docs_index
 
 
 def test_cassette_demo_defines_scaffolded_workspace_flow() -> None:

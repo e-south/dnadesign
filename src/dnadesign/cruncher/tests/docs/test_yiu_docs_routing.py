@@ -25,26 +25,36 @@ def test_top_level_docs_route_readers_to_yiu_surfaces() -> None:
     docs_readme = _read("docs/README.md")
     docs_index = _read("docs/index.md")
 
-    assert "payload-centric YIU workflows" in package_readme
-    assert "`sample` and fixed-length optimization" in package_readme
+    assert "Cruncher is the DNA design package in `dnadesign`." in package_readme
+    assert "workspace-based" in package_readme
     assert "docs/README.md" in package_readme
     assert "docs/guides/yiu_workflow.md" in package_readme
     assert "docs/guides/sampling_and_analysis.md" in package_readme
     assert "docs/demos/demo_cassette_workspace.md" in package_readme
     assert "This README stays light on purpose." not in package_readme
-    assert "full routing by workflow family and doc type" in package_readme
+    assert "sequence optimization, cassette design, and YIU payload work" in package_readme
 
-    for content in (docs_readme, docs_index):
-        assert "Payload-Centric YIU Workflows" in content
-        assert "demos/demo_yiu_workspace.md" in content
-        assert "guides/yiu_workflow.md" in content
-        assert "reference/yiu_spec.md" in content
-        assert "reference/yiu_artifacts.md" in content
-        assert "reference/yiu_visual_system.md" in content
-        assert "workspaces/demo_monotypic_tetr/runbook.md" in content
-        assert "split_yiu_payload_rendering_v4" not in content
-        assert "yiu init-workspace|validate|render|show" not in content
-        assert "trace|solve" not in content
+    assert "Payload-Centric YIU Workflows" in docs_readme
+    assert "demos/demo_yiu_workspace.md" in docs_readme
+    assert "guides/yiu_workflow.md" in docs_readme
+    assert "reference/yiu_spec.md" in docs_readme
+    assert "reference/yiu_artifacts.md" in docs_readme
+    assert "reference/yiu_visual_system.md" in docs_readme
+    assert "workspaces/demo_monotypic_tetr/runbook.md" in docs_readme
+    assert "split_yiu_payload_rendering_v4" not in docs_readme
+    assert "yiu init-workspace|validate|render|show" not in docs_readme
+
+    assert "Run YIU workflows" in docs_index
+    assert "Reuse Sample outputs in YIU" in docs_index
+    assert "demos/demo_yiu_workspace.md" in docs_index
+    assert "guides/yiu_workflow.md" in docs_index
+    assert "reference/yiu_spec.md" in docs_index
+    assert "reference/yiu_artifacts.md" in docs_index
+    assert "reference/yiu_visual_system.md" in docs_index
+    assert "workspaces/demo_monotypic_tetr/runbook.md" in docs_index
+    assert "split_yiu_payload_rendering_v4" not in docs_index
+    assert "yiu init-workspace|validate|render|show" not in docs_index
+    assert "trace|solve" not in docs_index
 
 
 def test_cli_reference_lists_public_yiu_surface() -> None:
