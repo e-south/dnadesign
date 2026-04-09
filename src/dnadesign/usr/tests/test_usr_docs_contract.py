@@ -449,6 +449,9 @@ def test_promoter_study_record_is_checked_in_for_stress_ethanol_cipro_growth() -
     assert "157160" in status
     assert "157164" in status
     assert "100000" in status
+    assert "`anchor_only_7b=1024`, `anchor_plus_template_7b=128`" in status
+    assert "`anchor_only_20b=256`, `anchor_plus_template_20b=48`" in status
+    assert "`h_rt=24:00:00`" in status
 
 
 def test_usr_reference_docs_cover_core_contracts() -> None:

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from .errors import SchemaError
-from .overlays import overlay_metadata, overlay_parts
+from .overlays import overlay_metadata, overlay_parts, overlay_schema
 
 _OVERLAY_PART_CREATED_AT_CACHE: dict[str, tuple[int, int, str]] = {}
 _OVERLAY_PART_CREATED_AT_CACHE_MAX = 20_000
@@ -38,7 +38,7 @@ def _read_parquet_with_filename_sql(paths: tuple[Path, ...]) -> str:
     if len(paths) == 1:
         return f"read_parquet('{sql_str(str(paths[0]))}', filename=true)"
     path_list = ", ".join(f"'{sql_str(str(path))}'" for path in paths)
-    return f"read_parquet([{path_list}], filename=true)"
+    return f"read_parquet([{path_list}], filename=true, union_by_name=true)"
 
 
 def _sql_values_rows(rows: tuple[tuple[str, str, str], ...]) -> str:
@@ -171,14 +171,22 @@ def create_overlay_view(
 
     con.execute(
         f"CREATE TEMP VIEW {view_name} AS "
-        "SELECT * EXCLUDE (__usr_overlay_rownum, __usr_overlay_created_at, __usr_overlay_filename) "
-        "FROM ("
-        "SELECT r.*, "
-        "ROW_NUMBER() OVER ("
-        f"PARTITION BY {key_q} "
-        "ORDER BY __usr_overlay_created_at DESC, __usr_overlay_filename DESC"
+        "WITH ranked AS ("
+        "SELECT *, "
+        "concat(__usr_overlay_created_at, '\x1f', __usr_overlay_filename) AS __usr_overlay_sort_key "
+        f"FROM {staging_view}"
         ") "
-        f"AS __usr_overlay_rownum FROM {staging_view} r"
-        ") ranked WHERE __usr_overlay_rownum = 1"
+        "SELECT "
+        + ", ".join(
+            [f"{key_q}"]
+            + [
+                f"arg_max({sql_ident(column_name)}, __usr_overlay_sort_key) AS {sql_ident(column_name)}"
+                for column_name in overlay_schema(path).names
+                if column_name != key
+            ]
+        )
+        + " "
+        "FROM ranked "
+        f"GROUP BY {key_q}"
     )
     return view_name

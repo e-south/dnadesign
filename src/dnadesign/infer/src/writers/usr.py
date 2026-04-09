@@ -25,6 +25,7 @@ import pyarrow.parquet as pq
 from dnadesign.usr.src.dataset import MUTATION_RESERVED_NAMESPACES
 from dnadesign.usr.src.dataset_overlay_ops import _attach_frame_dataset
 from dnadesign.usr.src.errors import SchemaError
+from dnadesign.usr.src.overlays import overlay_parts, overlay_schema
 
 from .._logging import get_logger
 from ..contracts import infer_usr_column_name
@@ -178,12 +179,37 @@ def _read_overlay_subset(*, overlay_path: Path, read_cols: List[str], ids: List[
     unique_ids = _dedupe_ids(ids)
     if not unique_ids:
         return pd.DataFrame(columns=read_cols)
+    parts = [Path(part) for part in overlay_parts(overlay_path)]
+    if not parts:
+        return pd.DataFrame(columns=read_cols)
+    if len(parts) == 1:
+        frames: List[pd.DataFrame] = []
+        for start in range(0, len(unique_ids), _OVERLAY_GUARD_FILTER_CHUNK_SIZE):
+            id_chunk = unique_ids[start : start + _OVERLAY_GUARD_FILTER_CHUNK_SIZE]
+            try:
+                table = pq.read_table(parts[0], columns=read_cols, filters=[("id", "in", id_chunk)])
+            except Exception as error:
+                raise WriteBackError(f"Unable to scan existing infer overlay: {error}") from error
+            if table.num_rows == 0:
+                continue
+            frames.append(table.to_pandas())
+        if not frames:
+            return pd.DataFrame(columns=read_cols)
+        return pd.concat(frames, ignore_index=True)
+    try:
+        dataset = pa_dataset.dataset(
+            [str(part) for part in parts],
+            format="parquet",
+            schema=overlay_schema(overlay_path),
+        )
+    except Exception as error:
+        raise WriteBackError(f"Unable to inspect existing infer overlay schema: {error}") from error
 
-    frames: List[pd.DataFrame] = []
+    frames = []
     for start in range(0, len(unique_ids), _OVERLAY_GUARD_FILTER_CHUNK_SIZE):
         id_chunk = unique_ids[start : start + _OVERLAY_GUARD_FILTER_CHUNK_SIZE]
         try:
-            table = pq.read_table(overlay_path, columns=read_cols, filters=[("id", "in", id_chunk)])
+            table = dataset.to_table(columns=read_cols, filter=pa_dataset.field("id").isin(id_chunk))
         except Exception as error:
             raise WriteBackError(f"Unable to scan existing infer overlay: {error}") from error
         if table.num_rows == 0:
@@ -203,7 +229,7 @@ def _guard_usr_overwrite(ds, *, ids: List[str], out_cols: List[str], overwrite: 
         return
 
     try:
-        schema_names = set(pa_dataset.dataset(overlay_path, format="parquet").schema.names)
+        schema_names = set(overlay_schema(overlay_path).names)
     except Exception as error:
         raise WriteBackError(f"Unable to inspect existing infer overlay schema: {error}") from error
     if "id" not in schema_names:

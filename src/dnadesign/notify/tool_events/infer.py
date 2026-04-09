@@ -153,6 +153,21 @@ def _ordered_family_progress_parts(progress: dict[str, Any]) -> list[str]:
     return parts
 
 
+def _grouped_family_progress_semantics_line(
+    *,
+    progress: dict[str, Any],
+    output_id: str,
+) -> str | None:
+    if output_id:
+        return None
+    if not _ordered_family_progress_parts(progress):
+        return None
+    return (
+        "- Grouped writeback: family percentages reflect persisted rows still missing each family, "
+        "not per-family GPU compute"
+    )
+
+
 def _infer_attach_signature(event: dict[str, Any], *, progress_step_pct: int) -> tuple[object, ...]:
     progress = _infer_progress(event)
     overall_progress_pct = _to_float_or_none(progress.get("overall_progress_pct")) or 0.0
@@ -241,6 +256,9 @@ def _infer_attach_message(
     if family_parts:
         lines.append(f"- Families: {' | '.join(family_parts)}")
     output_id = str(output.get("id") or "").strip()
+    grouped_semantics_line = _grouped_family_progress_semantics_line(progress=progress, output_id=output_id)
+    if grouped_semantics_line is not None:
+        lines.append(grouped_semantics_line)
     output_progress_pct = _to_float_or_none(progress.get("output_progress_pct"))
     completed_rows = _to_int_or_none(progress.get("completed_rows"))
     target_rows = _to_int_or_none(progress.get("target_rows"))

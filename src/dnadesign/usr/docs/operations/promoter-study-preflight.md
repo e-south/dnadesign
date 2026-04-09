@@ -141,5 +141,6 @@ longer hides a second imperative readiness graph behind the contract.
    - materialize Construct contexts
    - fix Notify secret/profile contracts
    - move Infer execution to a GPU node that satisfies the checked-in 20B
-     contract (`gpu_capability >= 9.0` with sufficient memory), such as H200
-     or newer higher-capability lanes
+     contract. For a generic model-fit route that can be `gpu_capability >= 9.0`
+     with sufficient memory; for the current Blackwell-pinned stress study on
+     SCC, use the exact lane `gpu_t=RTXP6000` with `gpu_capability=12.0`

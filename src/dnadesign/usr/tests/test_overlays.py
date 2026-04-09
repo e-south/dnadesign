@@ -22,7 +22,7 @@ from dnadesign.usr import Dataset, NamespaceError, SchemaError
 from dnadesign.usr.src import dataset_overlay_ops as dataset_overlay_ops_module
 from dnadesign.usr.src.dataset_query import create_overlay_view
 from dnadesign.usr.src.duckdb_runtime import connect_duckdb_utc
-from dnadesign.usr.src.overlays import OVERLAY_META_CREATED, with_overlay_metadata
+from dnadesign.usr.src.overlays import OVERLAY_META_CREATED, overlay_schema, with_overlay_metadata
 from dnadesign.usr.src.storage.parquet import now_utc
 from dnadesign.usr.tests.registry_helpers import register_test_namespace
 
@@ -375,6 +375,82 @@ def test_overlay_parts_last_writer_wins_on_materialize(tmp_path: Path, monkeypat
 
     materialized = ds.head(1, include_derived=False)
     assert materialized.loc[0, "mock__score"] == 7.0
+
+
+def test_overlay_schema_unifies_columns_across_mixed_schema_parts(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    register_test_namespace(
+        root,
+        namespace="mock",
+        columns_spec="mock__score:float64,mock__label:string",
+        overwrite=True,
+    )
+    ds = Dataset(root, "demo")
+    ds.init(source="test")
+    ds.import_rows(
+        [
+            {"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "test"},
+            {"sequence": "GGGG", "bio_type": "dna", "alphabet": "dna_4", "source": "test"},
+        ],
+        source="test",
+    )
+    ids = ds.head(2)["id"].tolist()
+
+    ds.write_overlay_part("mock", pa.table({"id": [ids[0]], "mock__score": [1.0]}), key="id")
+    ds.write_overlay_part("mock", pa.table({"id": [ids[1]], "mock__label": ["late-column"]}), key="id")
+
+    overlay_path = ds.dir / "_derived" / "mock"
+    assert set(overlay_schema(overlay_path).names) == {"id", "mock__score", "mock__label"}
+    assert "mock__label" in ds.schema().names
+    assert "mock__label" in ds.info().columns
+
+    head = ds.head(2)
+    rows = {row["id"]: row for row in head[["id", "mock__score", "mock__label"]].to_dict(orient="records")}
+    assert rows[ids[0]]["mock__score"] == pytest.approx(1.0)
+    assert pd.isna(rows[ids[0]]["mock__label"])
+    assert rows[ids[1]]["mock__label"] == "late-column"
+
+
+def test_overlay_parts_coalesce_latest_non_null_values_per_column_for_same_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "datasets"
+    register_test_namespace(
+        root,
+        namespace="mock",
+        columns_spec="mock__score:float64,mock__label:string",
+        overwrite=True,
+    )
+    ds = Dataset(root, "demo")
+    ds.init(source="test")
+    ds.import_rows(
+        [{"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "test"}],
+        source="test",
+    )
+    row_id = ds.head(1)["id"].iloc[0]
+    counter = {"step": 0}
+
+    def _next_time() -> str:
+        base = datetime(2026, 2, 6, tzinfo=timezone.utc)
+        value = base + timedelta(seconds=counter["step"])
+        counter["step"] += 1
+        return value.isoformat()
+
+    monkeypatch.setattr(dataset_overlay_ops_module, "now_utc", _next_time)
+
+    ds.write_overlay_part("mock", pa.table({"id": [row_id], "mock__score": [1.0]}), key="id")
+    ds.write_overlay_part("mock", pa.table({"id": [row_id], "mock__label": ["late-column"]}), key="id")
+    ds.write_overlay_part("mock", pa.table({"id": [row_id], "mock__score": [9.0]}), key="id")
+    ds.write_overlay_part(
+        "mock",
+        pa.table({"id": [row_id], "mock__label": pa.array([None], type=pa.string())}),
+        key="id",
+    )
+
+    head = ds.head(1)
+    assert head.loc[0, "mock__score"] == pytest.approx(9.0)
+    assert head.loc[0, "mock__label"] == "late-column"
 
 
 def test_overlay_read_handles_many_parts_when_duckdb_expression_depth_is_low(

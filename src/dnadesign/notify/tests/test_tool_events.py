@@ -183,6 +183,40 @@ def test_tool_event_message_override_formats_infer_write_overlay_part_message() 
     assert "incoming=12 matched=11 missing=1" in msg
 
 
+def test_tool_event_message_override_explains_grouped_infer_writeback_semantics() -> None:
+    event = _event("write_overlay_part")
+    event["actor"] = {"tool": "infer", "run_id": "infer-run-1", "host": "host", "pid": 123}
+    event["args"] = {
+        "rows_incoming": 256,
+        "rows_matched": 256,
+        "rows_missing": 0,
+        "infer_progress": {
+            "overall_target_units": 502760,
+            "overall_completed_units": 218112,
+            "overall_progress_pct": 43.38292624711592,
+            "family_progress_pct_map": {
+                "log_likelihood": 46.3,
+                "output_layer_mean": 46.3,
+                "intermediate_embedding": 0.0,
+            },
+        },
+    }
+
+    msg = tool_event_message_override("write_overlay_part", event, run_id="infer-run-1", duration_seconds=915.0)
+
+    assert msg is not None
+    assert "- Overall requested outputs: 43.4% (218112/502760 units)" in msg
+    assert "- Families: LL 46.3% | output_layer_mean 46.3% | intermediate_embedding 0.0%" in msg
+    assert (
+        "- Grouped writeback: family percentages reflect persisted rows still missing each family, "
+        "not per-family GPU compute"
+    ) in msg
+    assert "- Current output:" not in msg
+    assert "- ETA to overall complete: 0.3h" in msg
+    assert "incoming=256 matched=256 missing=0" in msg
+    assert "- Elapsed: 00:15:15" in msg
+
+
 def test_evaluate_tool_event_infer_attach_exposes_elapsed_duration() -> None:
     state = ToolEventState()
     first = _event("attach", timestamp="2026-02-06T00:00:00+00:00")

@@ -193,6 +193,14 @@ uv run notify spool drain --profile "$PROFILE" --fail-fast
 - `Session throughput` and `ETA to quota` are computed from `rows_written_session` and `run_elapsed_seconds`.
 - Running updates emit on quota-step changes or heartbeat cadence (`progress_heartbeat_seconds`, default 1800 seconds).
 
+### Infer progress semantics
+
+`infer` progress messages are rendered from `args.infer_progress` in the USR event stream.
+
+- `Families` reports persisted writeback coverage across rows still missing or stale for each feature family.
+- On grouped infer `write_overlay_part` events, Notify can omit `Current output` because the event covers multiple columns at once; treat that update as aggregate writeback progress, not per-family GPU compute.
+- A flat family percentage during a repair or resume pass can mean the current rows already had that family populated even while other families are still being repaired.
+
 ### Event schema source of truth
 
 - USR event contract: [USR event log reference](../../src/dnadesign/usr/docs/reference/event-log.md)

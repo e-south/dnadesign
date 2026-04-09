@@ -75,10 +75,13 @@ repo-summary scope from `ops.study.yaml`, reports the current phase from the
 checked-in record, and highlights the next ready phase without submitting jobs
 or mutating USR. Host-local readiness such as GPU visibility remains advisory
 here and moves into preflight for hard blockers.
-For `evo2_20b`, describe GPU readiness from the declared capability floor
-(`gpu_capability >= 9.0` plus the study memory floor), not from one exact BU
-queue name; H200 is one valid lane, but newer higher-capability lanes also
-satisfy the same contract.
+For `evo2_20b`, describe GPU readiness from the checked-in runbook contract,
+not from a guessed BU queue name. If the study record or live operator
+evidence says the current `.venv` is GPU-family-pinned, report the exact
+selector as part of readiness. For the active stress-ethanol-cipro study on
+BU SCC, the current Blackwell-family lane is `gpu_t=RTXP6000` with
+`gpu_capability=12.0`; a generic `gpu_capability >= 9.0` request is a looser
+model-fit floor and can still land on H200.
 The snapshot now also calls out stale downstream handoffs when merged anchor or
 Construct context datasets trail the upstream DenseGen source even though those
 datasets still exist.

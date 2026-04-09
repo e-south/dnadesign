@@ -20,7 +20,7 @@ from dnadesign.infer import export_evo2_promoter_opal_matrix
 from dnadesign.infer.src.config import JobConfig, ModelConfig
 from dnadesign.infer.src.contracts import infer_usr_column_name
 from dnadesign.infer.src.engine import run_extract_job
-from dnadesign.infer.src.errors import CapabilityError
+from dnadesign.infer.src.errors import CapabilityError, RuntimeOOMError
 from dnadesign.infer.src.features.context import resolve_sequence_contexts
 from dnadesign.infer.src.features.execution import (
     _LOG_LIKELIHOOD_MEAN,
@@ -80,6 +80,51 @@ class _CombinedFeatureAdapter(_FeatureAdapter):
         logits = [torch.arange(len(seq) * 2, dtype=torch.float32).reshape(len(seq), 2) for seq in seqs]
         embeddings = [torch.arange(len(seq) * 3, dtype=torch.float32).reshape(len(seq), 3) for seq in seqs]
         return logits, embeddings
+
+
+class _BatchSensitiveFeatureAdapter(_FeatureAdapter):
+    def __init__(self) -> None:
+        super().__init__()
+        self.log_likelihood_batch_sizes: list[tuple[str, int]] = []
+        self.logits_batch_sizes: list[int] = []
+        self.embedding_batch_sizes: list[int] = []
+
+    def log_likelihood(self, seqs, *, method: str = "native", reduction: str = "sum"):
+        assert method == "native"
+        self.log_likelihood_batch_sizes.append((reduction, len(seqs)))
+        if reduction == "sum":
+            return [float(len(seqs) * 10 + idx) for idx, _seq in enumerate(seqs)]
+        return [float(len(seqs)) + float(idx) / 100.0 for idx, _seq in enumerate(seqs)]
+
+    def logits(self, seqs, *, fmt: str):
+        assert fmt == "tensor"
+        self.logits_batch_sizes.append(len(seqs))
+        tensors = []
+        for idx, seq in enumerate(seqs):
+            base = float(1000 + len(seqs) + idx)
+            tensors.append(torch.tensor([[base, base + 0.5]], dtype=torch.float32).repeat(len(seq), 1))
+        return tensors
+
+    def embedding(self, seqs, *, layer: str, fmt: str):
+        assert fmt == "tensor"
+        self.embedding_layers.append(layer)
+        self.embedding_batch_sizes.append(len(seqs))
+        tensors = []
+        for idx, seq in enumerate(seqs):
+            base = float(2000 + len(seqs) + idx)
+            tensors.append(torch.tensor([[base, base + 0.5, base + 1.0]], dtype=torch.float32).repeat(len(seq), 1))
+        return tensors
+
+
+class _OOMOnFixedBatchFeatureAdapter(_FeatureAdapter):
+    def __init__(self) -> None:
+        super().__init__()
+        self.batch_sizes: list[int] = []
+
+    def log_likelihood(self, seqs, *, method: str = "native", reduction: str = "sum"):
+        assert method == "native"
+        self.batch_sizes.append(len(seqs))
+        raise RuntimeError("CUDA out of memory")
 
 
 def _anchor_only_bundle():
@@ -265,6 +310,31 @@ def test_run_extract_job_feature_bundle_anchor_only_20b_uses_model_specific_sele
     assert adapter.embedding_layers == ["block23_mlp_out"]
     assert adapter.log_likelihood_reductions == ["sum", "mean"]
     assert out["metadata__intermediate_selector"] == ["block23_mlp_out"]
+
+
+def test_run_extract_job_feature_bundle_anchor_only_20b_preserves_configured_eval_batch_size_for_small_inputs(
+    monkeypatch,
+) -> None:
+    adapter = _BatchSensitiveFeatureAdapter()
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: adapter)
+
+    model = ModelConfig(id="evo2_20b", device="cpu", precision="fp32", alphabet="dna", batch_size=256)
+    job = JobConfig(
+        id="anchor_only_20b_features",
+        operation="extract",
+        ingest={"source": "sequences"},
+        feature_bundle={"context": {"kind": "anchor_only"}},
+    )
+
+    out = run_extract_job(inputs=["ACGT", "GGGG", "TTTT"], model=model, job=job, progress_factory=None)
+
+    assert adapter.log_likelihood_batch_sizes == [("sum", 256), ("mean", 256)]
+    assert adapter.logits_batch_sizes == [256]
+    assert adapter.embedding_batch_sizes == [256]
+    assert out["log_likelihood__total"] == [2560.0, 2561.0, 2562.0]
+    assert out["log_likelihood__mean_per_token"] == pytest.approx([256.0, 256.01, 256.02])
+    _assert_list_close(out["output_layer_mean__seq_mean"][0], [1256.0, 1256.5])
+    _assert_list_close(out["intermediate_embedding__block23_mlp_out__seq_mean"][0], [2256.0, 2256.5, 2257.0])
 
 
 def test_existing_feature_metadata_values_reads_usr_metadata_columns_in_single_scan(monkeypatch) -> None:
@@ -819,6 +889,46 @@ def test_execute_feature_bundle_backfills_missing_metadata_without_recomputing(m
     assert columnar["metadata__provider_version"] == [None]
 
 
+def test_execute_feature_bundle_anchor_only_20b_fixed_eval_batch_fails_fast_on_oom(monkeypatch) -> None:
+    adapter = _OOMOnFixedBatchFeatureAdapter()
+    bundle = _anchor_only_bundle()
+    feature_out_ids = [payload["id"] for payload in build_feature_bundle_outputs(bundle=bundle, model_id="evo2_20b")]
+    existing = {out_id: [None, None, None] for out_id in feature_out_ids}
+
+    monkeypatch.setattr(
+        "dnadesign.infer.src.features.execution._apply_digest_resume_guard",
+        lambda **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        "dnadesign.infer.src.features.execution._existing_feature_metadata_values",
+        lambda **_kwargs: {out_id: ["present", "present", "present"] for out_id in feature_metadata_output_ids()},
+    )
+
+    with pytest.raises(RuntimeOOMError, match="fixed evaluation batch size 256"):
+        execute_feature_bundle(
+            seqs=["ACGT", "GGGG", "TTTT"],
+            source="sequences",
+            ids=None,
+            records=None,
+            ds=None,
+            model_id="evo2_20b",
+            job_id="anchor_only_20b_features",
+            bundle=bundle,
+            existing=existing,
+            need_idx=[0, 1, 2],
+            adapter=adapter,
+            micro_batch_size=256,
+            default_batch_size=64,
+            auto_derate=True,
+            is_oom=lambda exc: "out of memory" in str(exc).lower(),
+            on_progress=lambda _count: None,
+            on_chunk_by_output={out_id: None for out_id in feature_out_ids},
+            on_chunk_by_metadata={out_id: None for out_id in feature_metadata_output_ids()},
+        )
+
+    assert adapter.batch_sizes == [256]
+
+
 def test_execute_feature_bundle_groups_metadata_chunk_writes_when_group_writer_is_available(monkeypatch) -> None:
     adapter = _FeatureAdapter()
     bundle = _anchor_only_bundle()
@@ -1023,3 +1133,160 @@ def test_execute_feature_bundle_combines_feature_and_metadata_chunk_writes_when_
     assert infer_progress["overall_target_units"] == 6
     assert infer_progress["overall_completed_units"] == 6
     assert metadata_group_calls == []
+
+
+def test_execute_feature_bundle_grouped_output_path_skips_per_column_metadata_writers(monkeypatch) -> None:
+    adapter = _CombinedFeatureAdapter()
+    bundle = JobConfig(
+        id="templated_group_bundle_with_metadata",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={"context": {"kind": "template_1kb"}},
+    ).feature_bundle
+    assert bundle is not None
+    feature_out_ids = [payload["id"] for payload in build_feature_bundle_outputs(bundle=bundle, model_id="evo2_20b")]
+    existing = {out_id: [None] for out_id in feature_out_ids}
+
+    monkeypatch.setattr(
+        "dnadesign.infer.src.features.execution._apply_digest_resume_guard",
+        lambda **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        "dnadesign.infer.src.features.execution._existing_feature_metadata_values",
+        lambda **_kwargs: {out_id: [None] for out_id in feature_metadata_output_ids()},
+    )
+
+    output_group_calls: list[tuple[list[int], dict[str, list[object]], bool | None, dict[str, object] | None]] = []
+    metadata_calls: dict[str, list[tuple[list[int], list[object], bool | None]]] = {
+        out_id: [] for out_id in feature_metadata_output_ids()
+    }
+
+    def _output_group_writer(idx_chunk, columnar, *, overwrite_override=None, event_args=None):
+        output_group_calls.append((list(idx_chunk), dict(columnar), overwrite_override, dict(event_args or {})))
+
+    def _metadata_writer(out_id: str):
+        def _writer(idx_chunk, values, *, overwrite_override=None, progress=None):
+            metadata_calls[out_id].append((list(idx_chunk), list(values), overwrite_override))
+
+        return _writer
+
+    execute_feature_bundle(
+        seqs=["AAAACGTTTT"],
+        source="records",
+        ids=["row-1"],
+        records=[
+            {
+                "id": "row-1",
+                "sequence": "AAAACGTTTT",
+                "construct__context_id": "construct:template_1kb:row-1",
+                "construct__template_id": "default_1kb",
+                "construct__anchor_id": "row-1",
+                "construct__anchor_start": 4,
+                "construct__anchor_end": 8,
+                "construct__anchor_orientation": "forward",
+                "construct__resolved_length": 10,
+                "construct__spec_id": "construct-spec-v1",
+                "is_wildtype": True,
+            }
+        ],
+        ds=None,
+        model_id="evo2_20b",
+        job_id="templated_group_bundle_with_metadata",
+        bundle=bundle,
+        existing=existing,
+        need_idx=[0],
+        adapter=adapter,
+        micro_batch_size=1,
+        default_batch_size=64,
+        auto_derate=True,
+        is_oom=lambda _exc: False,
+        on_progress=lambda _count: None,
+        on_chunk_by_output={out_id: None for out_id in feature_out_ids},
+        on_chunk_by_metadata={out_id: _metadata_writer(out_id) for out_id in feature_metadata_output_ids()},
+        on_chunk_output_group=_output_group_writer,
+    )
+
+    assert len(output_group_calls) == 1
+    assert sorted(output_group_calls[0][1]) == sorted([*feature_out_ids, *feature_metadata_output_ids()])
+    assert all(not calls for calls in metadata_calls.values())
+
+
+def test_execute_feature_bundle_grouped_output_path_handles_later_micro_batches(monkeypatch) -> None:
+    adapter = _CombinedFeatureAdapter()
+    bundle = JobConfig(
+        id="templated_group_bundle_with_metadata",
+        operation="extract",
+        ingest={"source": "records", "field": "sequence"},
+        feature_bundle={"context": {"kind": "template_1kb"}},
+    ).feature_bundle
+    assert bundle is not None
+    feature_out_ids = [payload["id"] for payload in build_feature_bundle_outputs(bundle=bundle, model_id="evo2_20b")]
+    existing = {out_id: [None, None] for out_id in feature_out_ids}
+
+    monkeypatch.setattr(
+        "dnadesign.infer.src.features.execution._apply_digest_resume_guard",
+        lambda **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        "dnadesign.infer.src.features.execution._existing_feature_metadata_values",
+        lambda **_kwargs: {out_id: [None, None] for out_id in feature_metadata_output_ids()},
+    )
+
+    output_group_calls: list[tuple[list[int], dict[str, list[object]], bool | None, dict[str, object] | None]] = []
+
+    def _output_group_writer(idx_chunk, columnar, *, overwrite_override=None, event_args=None):
+        output_group_calls.append((list(idx_chunk), dict(columnar), overwrite_override, dict(event_args or {})))
+
+    execute_feature_bundle(
+        seqs=["AAAACGTTTT", "AACCGGTTAA"],
+        source="records",
+        ids=["row-1", "row-2"],
+        records=[
+            {
+                "id": "row-1",
+                "sequence": "AAAACGTTTT",
+                "construct__context_id": "construct:template_1kb:row-1",
+                "construct__template_id": "default_1kb",
+                "construct__anchor_id": "row-1",
+                "construct__anchor_start": 4,
+                "construct__anchor_end": 8,
+                "construct__anchor_orientation": "forward",
+                "construct__resolved_length": 10,
+                "construct__spec_id": "construct-spec-v1",
+                "is_wildtype": True,
+            },
+            {
+                "id": "row-2",
+                "sequence": "AACCGGTTAA",
+                "construct__context_id": "construct:template_1kb:row-2",
+                "construct__template_id": "default_1kb",
+                "construct__anchor_id": "row-2",
+                "construct__anchor_start": 3,
+                "construct__anchor_end": 7,
+                "construct__anchor_orientation": "forward",
+                "construct__resolved_length": 10,
+                "construct__spec_id": "construct-spec-v1",
+                "is_wildtype": False,
+            },
+        ],
+        ds=None,
+        model_id="evo2_20b",
+        job_id="templated_group_bundle_with_metadata",
+        bundle=bundle,
+        existing=existing,
+        need_idx=[0, 1],
+        adapter=adapter,
+        micro_batch_size=1,
+        default_batch_size=64,
+        auto_derate=True,
+        is_oom=lambda _exc: False,
+        on_progress=lambda _count: None,
+        on_chunk_by_output={out_id: None for out_id in feature_out_ids},
+        on_chunk_by_metadata={out_id: None for out_id in feature_metadata_output_ids()},
+        on_chunk_output_group=_output_group_writer,
+    )
+
+    assert [call[0] for call in output_group_calls] == [[0], [1]]
+    assert all(
+        sorted(call[1]) == sorted([*feature_out_ids, *feature_metadata_output_ids()]) for call in output_group_calls
+    )

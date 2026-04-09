@@ -24,7 +24,14 @@ OVERLAY_META_CREATED = "usr:overlay_created_at"
 OVERLAY_META_REGISTRY_HASH = "usr:registry_hash"
 OVERLAY_META_NAMESPACE_CONTRACT_HASH = "usr:namespace_contract_hash"
 OVERLAY_PART_PREFIX = "part-"
-_OVERLAY_HEAD_CACHE: dict[str, tuple[int, int, dict[str, Optional[str]], pa.Schema]] = {}
+_OVERLAY_HEAD_CACHE: dict[
+    str,
+    tuple[
+        tuple[tuple[str, int, int], ...],
+        dict[str, Optional[str]],
+        pa.Schema,
+    ],
+] = {}
 _OVERLAY_HEAD_CACHE_MAX = 20_000
 _OVERLAY_PARTS_CACHE: dict[str, tuple[int, int, tuple[str, ...]]] = {}
 _OVERLAY_PARTS_CACHE_MAX = 20_000
@@ -119,37 +126,61 @@ def _meta_get(md: Optional[Dict[bytes, bytes]], key: str) -> Optional[str]:
     return raw.decode("utf-8")
 
 
-def _overlay_head(path: Path) -> tuple[dict[str, Optional[str]], pa.Schema]:
+def _overlay_signature(path: Path) -> tuple[tuple[str, int, int], ...]:
     parts = overlay_parts(path)
     if not parts:
         raise FileNotFoundError(f"Overlay has no parquet parts: {path}")
-    part = Path(parts[0]).absolute()
-    try:
-        stat = part.stat()
-    except FileNotFoundError as exc:
-        raise FileNotFoundError(f"Overlay has no parquet parts: {path}") from exc
+    signature_rows: list[tuple[str, int, int]] = []
+    for part in parts:
+        resolved = Path(part).absolute()
+        try:
+            stat = resolved.stat()
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(f"Overlay has no parquet parts: {path}") from exc
+        signature_rows.append((str(resolved), int(stat.st_mtime_ns), int(stat.st_size)))
+    return tuple(signature_rows)
 
-    cache_key = str(part)
+
+def _overlay_head(path: Path) -> tuple[dict[str, Optional[str]], pa.Schema]:
+    signature = _overlay_signature(path)
+    cache_key = str(Path(path).absolute())
     cached = _OVERLAY_HEAD_CACHE.get(cache_key)
     if cached is not None:
-        cached_mtime_ns, cached_size, cached_meta, cached_schema = cached
-        if cached_mtime_ns == int(stat.st_mtime_ns) and cached_size == int(stat.st_size):
+        cached_signature, cached_meta, cached_schema = cached
+        if cached_signature == signature:
             return dict(cached_meta), cached_schema
 
-    pf = pq.ParquetFile(str(part))
-    schema = pf.schema_arrow
-    md = schema.metadata
-    meta = {
-        "namespace": _meta_get(md, OVERLAY_META_NAMESPACE),
-        "key": _meta_get(md, OVERLAY_META_KEY),
-        "created_at": _meta_get(md, OVERLAY_META_CREATED),
-        "registry_hash": _meta_get(md, OVERLAY_META_REGISTRY_HASH),
-        "namespace_contract_hash": _meta_get(md, OVERLAY_META_NAMESPACE_CONTRACT_HASH),
+    schema_parts: list[pa.Schema] = []
+    meta: dict[str, Optional[str]] | None = None
+    schema_metadata: dict[bytes, bytes] | None = None
+    for part_path, _mtime_ns, _size in signature:
+        pf = pq.ParquetFile(part_path)
+        part_schema = pf.schema_arrow
+        schema_parts.append(part_schema)
+        if meta is None:
+            md = part_schema.metadata
+            meta = {
+                "namespace": _meta_get(md, OVERLAY_META_NAMESPACE),
+                "key": _meta_get(md, OVERLAY_META_KEY),
+                "created_at": _meta_get(md, OVERLAY_META_CREATED),
+                "registry_hash": _meta_get(md, OVERLAY_META_REGISTRY_HASH),
+                "namespace_contract_hash": _meta_get(md, OVERLAY_META_NAMESPACE_CONTRACT_HASH),
+            }
+            schema_metadata = dict(md or {})
+    schema = pa.unify_schemas(schema_parts, promote_options="permissive") if len(schema_parts) > 1 else schema_parts[0]
+    if schema_metadata:
+        schema = schema.with_metadata(schema_metadata)
+    resolved_meta = meta or {
+        "namespace": None,
+        "key": None,
+        "created_at": None,
+        "registry_hash": None,
+        "namespace_contract_hash": None,
     }
-    _OVERLAY_HEAD_CACHE[cache_key] = (int(stat.st_mtime_ns), int(stat.st_size), dict(meta), schema)
+    _OVERLAY_HEAD_CACHE[cache_key] = (signature, dict(resolved_meta), schema)
     if len(_OVERLAY_HEAD_CACHE) > _OVERLAY_HEAD_CACHE_MAX:
         _OVERLAY_HEAD_CACHE.clear()
-    return meta, schema
+    return dict(resolved_meta), schema
 
 
 def overlay_metadata(path: Path) -> Dict[str, Optional[str]]:

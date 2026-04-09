@@ -22,6 +22,7 @@ import pytest
 from dnadesign.infer.src.config import JobConfig, ModelConfig
 from dnadesign.infer.src.engine import _plan_resume_for_usr, run_extract_job
 from dnadesign.infer.src.errors import RuntimeOOMError, WriteBackError
+from dnadesign.infer.src.runtime.resume_planner import read_usr_columns
 from dnadesign.infer.src.writers.usr import write_back_usr
 from dnadesign.usr import Dataset
 from dnadesign.usr.tests.registry_helpers import register_test_namespace
@@ -391,6 +392,52 @@ def test_write_back_usr_overwrite_guard_allows_new_columns_missing_from_existing
     assert todo_idx == []
     assert existing["ll_mean"] == [1.0]
     assert existing["logits_mean"] == [2.0]
+
+
+def test_write_back_usr_overwrite_guard_detects_existing_values_in_later_overlay_parts(tmp_path: Path) -> None:
+    root = tmp_path / "usr_root"
+    register_test_namespace(
+        root,
+        namespace="infer",
+        columns_spec="infer__evo2_7b__job_a__ll_mean:float64,infer__evo2_7b__job_a__logits_mean:float64",
+        overwrite=True,
+    )
+    ds = Dataset(root, "demo")
+    ds.init(source="unit-test")
+    ds.import_rows(
+        [
+            {"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"},
+        ],
+        source="unit",
+    )
+    one_id = ds.head(1, columns=["id"])["id"].tolist()
+
+    write_back_usr(
+        ds,
+        ids=one_id,
+        model_id="evo2_7b",
+        job_id="job_a",
+        columnar={"ll_mean": [1.0]},
+        overwrite=False,
+    )
+    write_back_usr(
+        ds,
+        ids=one_id,
+        model_id="evo2_7b",
+        job_id="job_a",
+        columnar={"logits_mean": [2.0]},
+        overwrite=False,
+    )
+
+    with pytest.raises(WriteBackError, match="Refusing overwrite"):
+        write_back_usr(
+            ds,
+            ids=one_id,
+            model_id="evo2_7b",
+            job_id="job_a",
+            columnar={"logits_mean": [3.0]},
+            overwrite=False,
+        )
 
 
 def test_write_back_usr_overwrite_false_allows_existing_null_values(tmp_path: Path) -> None:
@@ -939,3 +986,285 @@ def test_run_extract_job_usr_resume_recovers_after_interrupted_partial_write(
 
     assert resumed_calls["count"] == 1
     assert list(resumed["ll_mean"]) == [10.0, 11.0, 99.0]
+
+
+def test_run_extract_job_usr_subset_outputs_backfill_only_missing_target_columns(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "usr_root"
+    register_test_namespace(
+        root,
+        namespace="infer",
+        columns_spec=(
+            "infer__evo2_20b__anchor_only_20b_features__log_likelihood__total:float64,"
+            "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token:float64,"
+            "infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean:list<float64>,"
+            "infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean:list<float64>,"
+            "infer__evo2_20b__anchor_only_20b_features__metadata__feature_request_digest:string"
+        ),
+        overwrite=True,
+    )
+    ds = Dataset(root, "demo")
+    ds.init(source="unit-test")
+    ds.import_rows(
+        [
+            {"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"},
+            {"sequence": "TGCA", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"},
+        ],
+        source="unit",
+    )
+    ids = ds.head(2, columns=["id"])["id"].tolist()
+    seqs = ds.head(2, columns=["sequence"])["sequence"].tolist()
+
+    ds.write_overlay_part(
+        "infer",
+        pa.table(
+            {
+                "id": ids,
+                "infer__evo2_20b__anchor_only_20b_features__log_likelihood__total": pa.array(
+                    [1.0, None],
+                    type=pa.float64(),
+                ),
+                "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token": pa.array(
+                    [None, None],
+                    type=pa.float64(),
+                ),
+                "infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean": pa.array(
+                    [None, None],
+                    type=pa.list_(pa.float64()),
+                ),
+                (
+                    "infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean"
+                ): pa.array(
+                    [[7.0, 8.0], [9.0, 10.0]],
+                    type=pa.list_(pa.float64()),
+                ),
+                "infer__evo2_20b__anchor_only_20b_features__metadata__feature_request_digest": ["digest-a", "digest-b"],
+            }
+        ),
+        key="id",
+    )
+
+    monkeypatch.setattr(
+        "dnadesign.infer.src.runtime.ingest_loading.load_usr_input",
+        lambda **_kwargs: (seqs, ids, ds),
+    )
+    monkeypatch.setattr("dnadesign.infer.src.engine._validate_alphabet", lambda *_args, **_kwargs: None)
+
+    observed: dict[str, list[list[str]]] = {"sum": [], "mean": [], "logits": []}
+
+    class _Adapter:
+        @staticmethod
+        def log_likelihood(chunk, *, method="native", reduction="sum"):
+            assert method == "native"
+            if reduction == "sum":
+                observed["sum"].append(list(chunk))
+                return [200.0 + float(index) for index, _seq in enumerate(chunk)]
+            if reduction == "mean":
+                observed["mean"].append(list(chunk))
+                return [0.5 + float(index) for index, _seq in enumerate(chunk)]
+            raise AssertionError(f"unexpected reduction {reduction}")
+
+        @staticmethod
+        def logits(chunk, *, pool, fmt):
+            observed["logits"].append(list(chunk))
+            assert pool == {"method": "mean", "dim": 1}
+            assert fmt == "list"
+            return [[11.0 + float(index), 21.0 + float(index)] for index, _seq in enumerate(chunk)]
+
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: _Adapter())
+
+    model = ModelConfig(id="evo2_20b", device="cpu", precision="fp32", alphabet="dna", batch_size=2)
+    job = JobConfig(
+        id="anchor_only_20b_features",
+        operation="extract",
+        ingest={"source": "usr", "dataset": "demo", "root": str(root)},
+        outputs=[
+            {
+                "id": "log_likelihood__total",
+                "fn": "evo2.log_likelihood",
+                "format": "float",
+                "params": {"method": "native", "reduction": "sum"},
+            },
+            {
+                "id": "log_likelihood__mean_per_token",
+                "fn": "evo2.log_likelihood",
+                "format": "float",
+                "params": {"method": "native", "reduction": "mean"},
+            },
+            {
+                "id": "output_layer_mean__seq_mean",
+                "fn": "evo2.logits",
+                "format": "list",
+                "params": {"pool": {"method": "mean", "dim": 1}},
+            },
+        ],
+        io={"write_back": True, "overwrite": False},
+    )
+
+    result = run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+
+    assert observed["sum"] == [[seqs[1]]]
+    assert observed["mean"] == [seqs]
+    assert observed["logits"] == [seqs]
+    assert list(result["log_likelihood__total"]) == [1.0, 200.0]
+    assert list(result["log_likelihood__mean_per_token"]) == [0.5, 1.5]
+    assert list(result["output_layer_mean__seq_mean"]) == [[11.0, 21.0], [12.0, 22.0]]
+
+    repaired = read_usr_columns(
+        ds=ds,
+        ids=ids,
+        column_names=[
+            "infer__evo2_20b__anchor_only_20b_features__log_likelihood__total",
+            "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token",
+            "infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean",
+            "infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean",
+            "infer__evo2_20b__anchor_only_20b_features__metadata__feature_request_digest",
+        ],
+    )
+
+    assert repaired == {
+        "infer__evo2_20b__anchor_only_20b_features__log_likelihood__total": [1.0, 200.0],
+        "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token": [0.5, 1.5],
+        "infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean": [[11.0, 21.0], [12.0, 22.0]],
+        "infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean": [
+            [7.0, 8.0],
+            [9.0, 10.0],
+        ],
+        "infer__evo2_20b__anchor_only_20b_features__metadata__feature_request_digest": ["digest-a", "digest-b"],
+    }
+
+
+def test_run_extract_job_usr_subset_overwrite_preserves_unrelated_infer_columns(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "usr_root"
+    register_test_namespace(
+        root,
+        namespace="infer",
+        columns_spec=(
+            "infer__evo2_20b__anchor_only_20b_features__log_likelihood__total:float64,"
+            "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token:float64,"
+            "infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean:list<float64>,"
+            "infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean:list<float64>,"
+            "infer__evo2_20b__anchor_only_20b_features__metadata__feature_request_digest:string"
+        ),
+        overwrite=True,
+    )
+    ds = Dataset(root, "demo")
+    ds.init(source="unit-test")
+    ds.import_rows(
+        [
+            {"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"},
+            {"sequence": "TGCA", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"},
+        ],
+        source="unit",
+    )
+    ids = ds.head(2, columns=["id"])["id"].tolist()
+    seqs = ds.head(2, columns=["sequence"])["sequence"].tolist()
+
+    ds.write_overlay_part(
+        "infer",
+        pa.table(
+            {
+                "id": ids,
+                "infer__evo2_20b__anchor_only_20b_features__log_likelihood__total": [10.0, 11.0],
+                "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token": [0.1, 0.2],
+                "infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean": pa.array(
+                    [[1.0, 2.0], [3.0, 4.0]],
+                    type=pa.list_(pa.float64()),
+                ),
+                (
+                    "infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean"
+                ): pa.array(
+                    [[7.0, 8.0], [9.0, 10.0]],
+                    type=pa.list_(pa.float64()),
+                ),
+                "infer__evo2_20b__anchor_only_20b_features__metadata__feature_request_digest": ["digest-a", "digest-b"],
+            }
+        ),
+        key="id",
+    )
+
+    monkeypatch.setattr(
+        "dnadesign.infer.src.runtime.ingest_loading.load_usr_input",
+        lambda **_kwargs: (seqs, ids, ds),
+    )
+    monkeypatch.setattr("dnadesign.infer.src.engine._validate_alphabet", lambda *_args, **_kwargs: None)
+
+    class _Adapter:
+        @staticmethod
+        def log_likelihood(chunk, *, method="native", reduction="sum"):
+            assert method == "native"
+            if reduction == "sum":
+                return [300.0 + float(index) for index, _seq in enumerate(chunk)]
+            if reduction == "mean":
+                return [0.9 + float(index) for index, _seq in enumerate(chunk)]
+            raise AssertionError(f"unexpected reduction {reduction}")
+
+        @staticmethod
+        def logits(chunk, *, pool, fmt):
+            assert pool == {"method": "mean", "dim": 1}
+            assert fmt == "list"
+            return [[31.0 + float(index), 41.0 + float(index)] for index, _seq in enumerate(chunk)]
+
+    monkeypatch.setattr("dnadesign.infer.src.engine._get_adapter", lambda _model: _Adapter())
+
+    model = ModelConfig(id="evo2_20b", device="cpu", precision="fp32", alphabet="dna", batch_size=2)
+    job = JobConfig(
+        id="anchor_only_20b_features",
+        operation="extract",
+        ingest={"source": "usr", "dataset": "demo", "root": str(root)},
+        outputs=[
+            {
+                "id": "log_likelihood__total",
+                "fn": "evo2.log_likelihood",
+                "format": "float",
+                "params": {"method": "native", "reduction": "sum"},
+            },
+            {
+                "id": "log_likelihood__mean_per_token",
+                "fn": "evo2.log_likelihood",
+                "format": "float",
+                "params": {"method": "native", "reduction": "mean"},
+            },
+            {
+                "id": "output_layer_mean__seq_mean",
+                "fn": "evo2.logits",
+                "format": "list",
+                "params": {"pool": {"method": "mean", "dim": 1}},
+            },
+        ],
+        io={"write_back": True, "overwrite": True},
+    )
+
+    result = run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+
+    assert list(result["log_likelihood__total"]) == [300.0, 301.0]
+    assert list(result["log_likelihood__mean_per_token"]) == [0.9, 1.9]
+    assert list(result["output_layer_mean__seq_mean"]) == [[31.0, 41.0], [32.0, 42.0]]
+
+    repaired = read_usr_columns(
+        ds=ds,
+        ids=ids,
+        column_names=[
+            "infer__evo2_20b__anchor_only_20b_features__log_likelihood__total",
+            "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token",
+            "infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean",
+            "infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean",
+            "infer__evo2_20b__anchor_only_20b_features__metadata__feature_request_digest",
+        ],
+    )
+
+    assert repaired == {
+        "infer__evo2_20b__anchor_only_20b_features__log_likelihood__total": [300.0, 301.0],
+        "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token": [0.9, 1.9],
+        "infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean": [[31.0, 41.0], [32.0, 42.0]],
+        "infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean": [
+            [7.0, 8.0],
+            [9.0, 10.0],
+        ],
+        "infer__evo2_20b__anchor_only_20b_features__metadata__feature_request_digest": ["digest-a", "digest-b"],
+    }

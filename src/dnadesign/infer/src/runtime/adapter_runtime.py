@@ -81,7 +81,8 @@ def get_adapter(model: ModelConfig, resolver: Callable[[str], object] = get_adap
 
 
 def is_oom(error: BaseException) -> bool:
-    return "out of memory" in str(error).lower()
+    text = str(error).lower()
+    return "out of memory" in text or "canuse32bitindexmath" in text
 
 
 def auto_derate_enabled() -> bool:
