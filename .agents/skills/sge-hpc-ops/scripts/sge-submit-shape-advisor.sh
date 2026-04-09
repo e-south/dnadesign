@@ -26,6 +26,19 @@ Options:
 USAGE
 }
 
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+json_int_or_null() {
+  local value="${1:-}"
+  if [[ "$value" =~ ^[0-9]+$ ]]; then
+    printf '%s' "$value"
+  else
+    printf 'null'
+  fi
+}
+
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -107,19 +120,32 @@ main() {
 
   status_output="$("${status_cmd[@]}")"
 
-  local jobs_line running eqw threshold
+  local tools_line jobs_line queue_probe running eqw threshold
+  tools_line="$(printf '%s\n' "$status_output" | rg -m 1 '^SGE_TOOLS ' || true)"
   jobs_line="$(printf '%s\n' "$status_output" | rg -m 1 '^JOBS ' || true)"
 
+  queue_probe="$(extract_field "$tools_line" "queue_probe")"
   running="$(extract_field "$jobs_line" "running_jobs")"
   eqw="$(extract_field "$jobs_line" "eqw_jobs")"
   threshold="$(extract_field "$jobs_line" "threshold")"
 
-  [[ -n "$running" ]] || running=0
-  [[ -n "$eqw" ]] || eqw=0
+  [[ -n "$queue_probe" ]] || queue_probe="unknown"
+  [[ -n "$running" ]] || running="unknown"
+  [[ -n "$eqw" ]] || eqw="unknown"
   [[ -n "$threshold" ]] || threshold="$warn_over_running"
 
-  local advisor reason recommended_action
-  if ((eqw > 0)); then
+  local advisor reason recommended_action queue_policy
+  queue_policy="respect_queue"
+  if [[ "$queue_probe" == "host_denied" ]]; then
+    advisor="blocked"
+    reason="submit_host_required"
+    recommended_action="use_submit_host"
+    queue_policy="submit_host_required"
+  elif [[ "$queue_probe" != "ok" ]]; then
+    advisor="unknown"
+    reason="queue_probe_unavailable"
+    recommended_action="reprobe_on_submit_host"
+  elif [[ "$eqw" =~ ^[0-9]+$ ]] && ((eqw > 0)); then
     advisor="hold"
     reason="eqw_present"
     recommended_action="triage_eqw_before_submit"
@@ -139,7 +165,7 @@ main() {
     fi
   fi
 
-  if ((running > threshold)) && ((eqw == 0)); then
+  if [[ "$running" =~ ^[0-9]+$ ]] && [[ "$eqw" =~ ^[0-9]+$ ]] && ((running > threshold)) && ((eqw == 0)); then
     reason="${reason};running_jobs_over_threshold"
     case "$advisor" in
       single)
@@ -155,12 +181,18 @@ main() {
   fi
 
   if [[ "$json_output" -eq 1 ]]; then
-    printf '{"advisor":"%s","reason":"%s","recommended_action":"%s","running_jobs":%d,"threshold":%d,"planned_submits":%d,"requires_order":%s,"queue_policy":"respect_queue"}\n' \
-      "$advisor" "$reason" "$recommended_action" "$running" "$threshold" "$planned_submits" "$([[ "$requires_order" -eq 1 ]] && echo true || echo false)"
+    printf '{"advisor":"%s","reason":"%s","recommended_action":"%s","running_jobs":%s,"threshold":%d,"planned_submits":%d,"requires_order":%s,"queue_probe":"%s","queue_policy":"%s"}\n' \
+      "$advisor" "$(json_escape "$reason")" "$(json_escape "$recommended_action")" "$(json_int_or_null "$running")" "$threshold" "$planned_submits" "$([[ "$requires_order" -eq 1 ]] && echo true || echo false)" "$queue_probe" "$queue_policy"
   else
-    printf 'ADVISOR advisor=%s running_jobs=%d threshold=%d planned_submits=%d requires_order=%s queue_policy=respect_queue\n' \
-      "$advisor" "$running" "$threshold" "$planned_submits" "$([[ "$requires_order" -eq 1 ]] && echo yes || echo no)"
+    printf 'ADVISOR advisor=%s running_jobs=%s threshold=%d planned_submits=%d requires_order=%s queue_probe=%s queue_policy=%s\n' \
+      "$advisor" "$running" "$threshold" "$planned_submits" "$([[ "$requires_order" -eq 1 ]] && echo yes || echo no)" "$queue_probe" "$queue_policy"
     case "$reason" in
+      submit_host_required)
+        printf 'REASON current host is not submit-capable for SCC batch submission\n'
+        ;;
+      queue_probe_unavailable)
+        printf 'REASON queue probe is unavailable; running-job counts are not authoritative\n'
+        ;;
       eqw_present)
         printf 'REASON Eqw jobs present\n'
         ;;
@@ -187,6 +219,12 @@ main() {
         ;;
     esac
     case "$recommended_action" in
+      use_submit_host)
+        printf 'RECOMMENDATION Switch to a submit-capable SCC shell or OnDemand app shell.\n'
+        ;;
+      reprobe_on_submit_host)
+        printf 'RECOMMENDATION Re-run the queue probe on a submit-capable shell before additional submissions.\n'
+        ;;
       triage_eqw_before_submit)
         printf 'RECOMMENDATION Resolve Eqw before additional submissions.\n'
         ;;

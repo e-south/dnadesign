@@ -101,7 +101,7 @@ if model_id == "evo2_20b" and gpu_cc_tuple < (9, 0):
         file=sys.stderr,
     )
     print(
-        "Use gpu_c=9.0 on SCC and schedule onto a Hopper lane such as H200 for evo2_20b.",
+        "Use gpu_c=9.0 as the generic evo2_20b model floor on SCC. For the current Blackwell-pinned dnadesign environment, request gpu_t=RTXP6000 and gpu_c=12.0.",
         file=sys.stderr,
     )
     raise SystemExit(2)
@@ -149,7 +149,10 @@ This SCC runbook documents the promoted Evo2 lane set for `infer`: `evo2_7b` and
 
 Use `evo2_7b` as the default SCC smoke and pressure-test lane. Use `evo2_20b`
 only on GPU lanes that satisfy `gpu_c >= 9.0`; H200 is common on SCC, but
-newer higher-capability lanes also qualify when memory is sufficient.
+newer higher-capability lanes also qualify when memory is sufficient. When the
+current `.venv` is family-pinned, add an exact selector; on the current SCC
+probe surface, the visible Blackwell lane is `gpu_t=RTXP6000` with
+`gpu_c=12.0`.
 
 Model fit and environment portability are separate. Passing the capacity gate
 does not prove that the current `.venv` can execute there. If this environment

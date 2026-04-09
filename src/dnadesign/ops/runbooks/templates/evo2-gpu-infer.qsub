@@ -46,9 +46,13 @@ if torch.cuda.is_available():
     print('device:', torch.cuda.get_device_name(0), 'cc:', torch.cuda.get_device_capability(0))
 PY
 
-if ! uv run infer validate config --config "$INFER_CONFIG"; then
-  echo "infer validate config failed" >&2
-  exit 3
+set +e
+uv run infer validate config --config "$INFER_CONFIG"
+validate_rc=$?
+set -e
+if [[ "$validate_rc" -ne 0 ]]; then
+  echo "infer validate config failed (exit=$validate_rc)" >&2
+  exit "$validate_rc"
 fi
 
 export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-infer}"
@@ -66,7 +70,11 @@ if [[ -n "${INFER_RUN_ARGS:-}" ]]; then
   infer_run_args=($INFER_RUN_ARGS)
 fi
 
-if ! uv run infer run --config "$INFER_CONFIG" "${infer_run_args[@]}"; then
-  echo "infer run failed" >&2
-  exit 4
+set +e
+uv run infer run --config "$INFER_CONFIG" "${infer_run_args[@]}"
+infer_rc=$?
+set -e
+if [[ "$infer_rc" -ne 0 ]]; then
+  echo "infer run failed (exit=$infer_rc)" >&2
+  exit "$infer_rc"
 fi

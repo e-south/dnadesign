@@ -437,7 +437,8 @@ PY
 
 - 7B checkpoints (`evo2_7b`, `evo2_7b_base`, `evo2_7b_262k`) can run without Transformer Engine and fit the default L40S-style lane (`gpu_c=8.9`).
 - FP8 checkpoints (`evo2_20b`, `evo2_40b`, `evo2_40b_base`, `evo2_1b_base`) require Transformer Engine and Hopper-class-or-newer GPUs.
-- On BU SCC, use `qgpus` and request `gpu_c=9.0` for `evo2_20b`; H200 is a common visible lane, but newer higher-capability lanes such as Blackwell also satisfy the same floor when memory is sufficient.
+- On BU SCC, `gpu_c=9.0` is the generic model-fit floor for `evo2_20b`; H200 is a common visible lane, but newer higher-capability lanes also satisfy the same floor when memory is sufficient.
+- If the current `dnadesign` Evo2 environment is family-pinned, also request an exact GPU type. On the current SCC probe surface, the visible Blackwell-family lane is `gpu_t=RTXP6000` with `gpu_c=12.0` and `96 GiB` VRAM.
 - `dnadesign` currently pins torch in the infer extra to `2.8.x`; Evo2 upstream docs recommend `2.6.x` or `2.7.x`. Always run smoke tests after sync on the target host.
 - `infer` currently supports `evo2_7b`, `evo2_20b`, and `evo2_40b`; 400B is not a supported `model.id` in this stack.
 
@@ -542,7 +543,7 @@ if model_id in {"evo2_20b", "evo2_40b"} and gpu_cc_tuple < (9, 0):
         file=sys.stderr,
     )
     print(
-        "Use gpu_c=9.0 on SCC and schedule onto a Hopper-class-or-newer lane such as H200 or Blackwell for evo2_20b.",
+        "Use gpu_c=9.0 as the generic evo2_20b model floor on SCC. For the current Blackwell-pinned dnadesign environment, request gpu_t=RTXP6000 and gpu_c=12.0.",
         file=sys.stderr,
     )
     raise SystemExit(2)

@@ -152,5 +152,28 @@ Resume semantics:
   than feature duplication
 
 Use the matching `anchor_only` and `anchor_plus_template` 20B presets only on
-GPU lanes that satisfy the checked-in 20B floor (`gpu_capability >= 9.0` and
-sufficient memory), such as H200 or newer higher-capability lanes.
+GPU lanes that satisfy the checked-in 20B contract. For the current
+Blackwell-pinned study environment on SCC, that means the exact selector
+`gpu_t=RTXP6000` with `gpu_capability=12.0`; a generic `gpu_capability >= 9.0`
+request can still land on H200 instead.
+
+Current Blackwell operating points:
+
+- verified on 2026-04-07 with three read-only repeats per lane on the local
+  RTX PRO 6000 Blackwell GPU
+- `anchor_only_7b`: `batch_size=1024`, mean wall time about `21.0s`,
+  observed peak residency about `15.4 GiB`
+- `anchor_plus_template_7b`: `batch_size=128`, mean wall time about `16.7s`,
+  observed peak residency about `15.4 GiB`
+- `anchor_only_20b`: `batch_size=256`, mean wall time about `44.9s`,
+  observed peak residency about `44.9 GiB`
+- `anchor_plus_template_20b`: `batch_size=48`, mean wall time about `51.1s`,
+  observed peak residency about `44.9 GiB`
+- none of those repeats hit `RuntimeOOMError` or auto-derated
+
+Walltime note:
+
+- the `anchor_plus_template_20b` zero-start SCC preset should use
+  `h_rt=24:00:00`
+- the last full-dataset `12h` run reached only `53.27%`, which projects to
+  about `22.5h` from zero on the current lane

@@ -235,13 +235,16 @@ qsub -P <project> \
 ```
 
 For runbook-based infer submits, set `runbook.resources.gpus`, `runbook.resources.gpu_capability`, and optionally
-`runbook.resources.gpu_memory_gib` so `ops runbook plan` can fail fast on infeasible multi-GPU model requests before submit.
+`runbook.resources.gpu_type` plus `runbook.resources.gpu_memory_gib` so `ops runbook plan` can fail fast on infeasible
+or misrouted GPU requests before submit.
 
 Use:
 - `gpu_capability: 8.9` and `gpu_memory_gib: 45.0` for `evo2_7b`
 - `gpu_capability: 9.0` and `gpu_memory_gib: 80.0` for `evo2_20b`; H200 is
   the common SCC lane, but any newer higher-capability GPU lane that meets the
   same floor also qualifies
+- for family-pinned Evo2 environments on the current SCC Blackwell lane, use
+  `gpu_capability: 12.0`, `gpu_type: RTXP6000`, and `gpu_memory_gib: 80.0`
 
 Template details and overrides:
 [BU SCC job templates](jobs/README.md)

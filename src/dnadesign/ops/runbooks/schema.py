@@ -265,6 +265,7 @@ class NotifyContract(StrictBaseModel):
 class ResourceContract(CpuResourceContract):
     gpus: int | None = Field(default=None, ge=1)
     gpu_capability: str | None = None
+    gpu_type: str | None = None
     gpu_memory_gib: float | None = Field(default=None, gt=0)
 
     @field_validator("gpu_capability")
@@ -277,8 +278,22 @@ class ResourceContract(CpuResourceContract):
             raise ValueError("resources.gpu_capability must be non-empty when provided")
         return text
 
+    @field_validator("gpu_type")
+    @classmethod
+    def _validate_gpu_type(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        text = str(value).strip()
+        if not text:
+            raise ValueError("resources.gpu_type must be non-empty when provided")
+        return text
+
     @model_validator(mode="after")
-    def _validate_gpu_memory_contract(self) -> "ResourceContract":
+    def _validate_gpu_contract(self) -> "ResourceContract":
+        if self.gpu_capability is not None and self.gpus is None:
+            raise ValueError("resources.gpu_capability requires resources.gpus")
+        if self.gpu_type is not None and self.gpus is None:
+            raise ValueError("resources.gpu_type requires resources.gpus")
         if self.gpu_memory_gib is not None and self.gpus is None:
             raise ValueError("resources.gpu_memory_gib requires resources.gpus")
         return self
@@ -349,6 +364,7 @@ class OrchestrationRunbookV1(StrictBaseModel):
             notify_policy=(self.notify.policy if self.notify is not None else None),
             has_gpus=self.resources.gpus is not None,
             has_gpu_capability=self.resources.gpu_capability is not None,
+            has_gpu_type=self.resources.gpu_type is not None,
             has_gpu_memory=self.resources.gpu_memory_gib is not None,
         )
         return self

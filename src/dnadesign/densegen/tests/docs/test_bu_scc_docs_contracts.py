@@ -158,6 +158,7 @@ def test_bu_scc_docs_define_canonical_repo_venv_and_model_cache_split_policy() -
     assert "/project/<your_project>/$USER/cache/huggingface/evo2_20b" in install_doc
     assert "gpu_c=9.0" in bundle
     assert "H200" in bundle
+    assert "RTXP6000" in bundle
 
 
 def test_bu_scc_install_doc_includes_deterministic_flash_attn_source_build_controls() -> None:

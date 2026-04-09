@@ -854,6 +854,11 @@ def runbook_execute(
         )
     except ValueError as exc:
         raise_contract_error(f"Runbook contract error: {exc}")
+    if submit and plan.runtime_visibility.scheduler_probe_state == "host_denied":
+        raise_contract_error(
+            "Runbook contract error: current host is not a submit host for SCC batch submission; "
+            "use a submit-capable SCC shell or OnDemand app shell."
+        )
     if submit and not allow_unknown_active_jobs and plan.runtime_visibility.active_job_resolution_state == "unknown":
         raise_contract_error(
             "Runbook contract error: active-job visibility is unavailable; "

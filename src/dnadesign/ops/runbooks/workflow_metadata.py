@@ -136,6 +136,7 @@ def validate_workflow_contract(
     notify_policy: NotifyPolicy | None,
     has_gpus: bool,
     has_gpu_capability: bool,
+    has_gpu_type: bool,
     has_gpu_memory: bool,
 ) -> None:
     metadata = resolve_workflow_metadata(workflow_id)
@@ -155,10 +156,10 @@ def validate_workflow_contract(
             raise ValueError(f"{expected_tool} workflow requires resources.gpus")
         if not has_gpu_capability:
             raise ValueError(f"{expected_tool} workflow requires resources.gpu_capability")
-    elif has_gpus or has_gpu_capability or has_gpu_memory:
+    elif has_gpus or has_gpu_capability or has_gpu_type or has_gpu_memory:
         raise ValueError(
             f"{expected_tool} workflow does not accept resources.gpus, "
-            "resources.gpu_capability, or resources.gpu_memory_gib"
+            "resources.gpu_capability, resources.gpu_type, or resources.gpu_memory_gib"
         )
 
     if metadata.requires_notify:

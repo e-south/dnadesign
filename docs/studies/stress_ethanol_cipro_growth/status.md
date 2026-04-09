@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-04-01
+- Last verified: 2026-04-07
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Study execution map: `pipeline.yaml`
@@ -36,7 +36,8 @@ implicit. The study-owned Construct surface is one
 checked-in Construct config and workspace registry rather than being duplicated
 throughout the study note.
 Blackwell tuning note: current checked-in lane defaults follow the latest
-pressure-test operating points on the Blackwell Evo2 environment:
+pressure-test operating points on the Blackwell Evo2 environment, re-verified
+on 2026-04-07 with three read-only GPU repeats per lane:
 `anchor_only_7b=1024`, `anchor_plus_template_7b=128`,
 `anchor_only_20b=256`, `anchor_plus_template_20b=48`. The local-only
 full-lane configs inherit the tighter templated limit for each model family
@@ -56,6 +57,10 @@ The current working Evo2 environment should be treated as Blackwell-pinned
 until a real `infer extract` smoke proves portability on another GPU family.
 `evo2_7b` being eligible for smaller GPUs is not enough to assume that this
 specific `.venv` will run there.
+Current SCC selector note: the visible Blackwell-family batch lane is
+`gpu_t=RTXP6000` with `gpu_capability=12.0` and `gpu_memory=96 GiB`. A generic
+`gpu_c=9.0` request can land on H200 instead and is no longer the safe default
+for the study's 20B batch presets.
 
 ### Infer matrix status
 
@@ -66,7 +71,7 @@ specific `.venv` will run there.
   - preferred 20B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml`
   - alternate 7B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml`
   - dataset: `promoter/stress_ethanol_cipro_anchor_set`
-  - readiness note: `promoter-study-preflight --scope next --json` is green on a GPU host when `NOTIFY_WEBHOOK_FILE` or `NOTIFY_WEBHOOK` plus `SSL_CERT_FILE` are exported.
+  - readiness note: `promoter-study-preflight --scope next --json` is green on a GPU host when `NOTIFY_WEBHOOK_FILE` or `NOTIFY_WEBHOOK` plus `SSL_CERT_FILE` are exported and the 20B preset verifies against `gpu_t=RTXP6000`.
   - live run note: canonical 20B write-back has already started on the shared anchor dataset; inspect the target dataset `.events.log` or infer overlay counts for the current checkpoint before resuming or submitting another anchor-only lane.
   - cold-start signals: treat `nvidia-smi` memory growth, first `attach` events with `completed_rows`, watcher cursor movement, and `spool_files=0` as the healthy startup sequence.
   - outputs expected: `log_likelihood__total`, `log_likelihood__mean_per_token`, `output_layer_mean__seq_mean`, `intermediate_embedding__block23_mlp_out__seq_mean`
@@ -77,7 +82,8 @@ specific `.venv` will run there.
   - preferred 20B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml`
   - alternate 7B batch route: `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml`
   - dataset: `promoter/stress_ethanol_cipro_construct_contexts`
-  - readiness note: preflight is green on a GPU host with notify env exported; this is the next recommended lane after the active anchor-only collection or via the notify-enabled batch preset.
+  - readiness note: preflight is green on a GPU host with notify env exported when the preset verifies against `gpu_t=RTXP6000`; this is the next recommended lane after the active anchor-only collection or via the notify-enabled batch preset.
+  - runtime note: use `h_rt=24:00:00` for the zero-start Blackwell batch preset. The last full dataset run reached `53.27%` at the `12h` cap, which projects to about `22.5h` from zero on the current lane.
   - outputs expected: `log_likelihood__total`, `log_likelihood__mean_per_token`, `output_layer_mean__seq_mean`, `output_layer_mean__anchor_mean`, `intermediate_embedding__block23_mlp_out__seq_mean`, `intermediate_embedding__block23_mlp_out__anchor_mean`
 - `full_lane_set`: `local-only`
   - config: `src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.yaml`
@@ -132,11 +138,20 @@ specific `.venv` will run there.
 - Current pragmatic routing note: keep the current working `.venv` pinned to
   Blackwell-family submit routes for both `evo2_20b` and `evo2_7b` until a
   different GPU family is intentionally rebuilt or proven with a real runtime
-  smoke.
+  smoke. For the checked-in 7B and 20B batch presets on SCC, that now means
+  the exact selector `gpu_t=RTXP6000` with `gpu_capability=12.0`.
+- Empirical runtime note: the 2026-04-07 read-only Blackwell pressure test
+  completed all four checked-in operating points without OOM or auto-derate.
+  Mean wall times were about `21.0s` for `anchor_only_7b=1024`, `16.7s` for
+  `anchor_plus_template_7b=128`, `44.9s` for `anchor_only_20b=256`, and
+  `51.1s` for `anchor_plus_template_20b=48`. Observed peak GPU residency was
+  about `15.4 GiB` for the 7B lanes and `44.9 GiB` for the 20B lanes on the
+  RTX PRO 6000 Blackwell lane.
 
 ### Next actions
 
 - The source assembly and Construct context phases are already materialized locally. Additional DenseGen growth can continue in parallel if desired, but the checked-in study focus is now active Infer collection.
-- Resume the lane-specific Blackwell 20B batch presets from the current shared dataset checkpoints; keep one live writer per target dataset.
+- Resume the lane-specific Blackwell 20B batch presets from the current shared dataset checkpoints, using the exact SCC selector `gpu_t=RTXP6000`; keep one live writer per target dataset.
+- Keep the `anchor_plus_template_20b` preset at `h_rt=24:00:00` for zero-start work; `12:00:00` is still acceptable only when a deliberate resume chain is already planned.
 - Use the tuned batch defaults for new resumes (`anchor_only_20b=256`, `anchor_plus_template_20b=48`, `anchor_only_7b=1024`, `anchor_plus_template_7b=128`) and keep the full-lane configs for local composition or dry-runs only.
 - On any new GPU host, follow the strict cold-start gate in the Infer workspace docs: current snapshot, green preflight, verified Evo2 runtime import/load, then explicit `infer` namespace registration before first real write-back.

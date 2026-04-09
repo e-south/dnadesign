@@ -112,8 +112,8 @@ def _write_ops_audit(path: Path, *, ok: bool, queue_probe: str | None = None) ->
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
-def _write_sync_audit(path: Path, *, transfer_state: str, primary_changed: bool) -> None:
-    payload = {
+def _write_sync_audit(path: Path, *, transfer_state: str, primary_changed: bool, wrapped: bool = False) -> None:
+    data = {
         "action": "pull",
         "dataset": "demo_dataset",
         "transfer_state": transfer_state,
@@ -125,6 +125,7 @@ def _write_sync_audit(path: Path, *, transfer_state: str, primary_changed: bool)
         "_derived": {"changed": False, "local_files": 1, "remote_files": 1, "local_only": [], "remote_only": []},
         "_auxiliary": {"changed": False, "local_files": 0, "remote_files": 0, "local_only": [], "remote_only": []},
     }
+    payload = {"usr_output_version": 1, "data": data} if wrapped else data
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
@@ -1006,6 +1007,35 @@ def test_cli_progress_show_reports_usr_sync_audit_surface() -> None:
         assert payload["status_kind"] == "usr-sync-audit"
         assert payload["state"] == "attention"
         assert payload["evidence"]["transfer_state"] == "DRY-RUN"
+
+
+def test_cli_progress_show_reports_wrapped_usr_diff_sync_audit_surface() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        audit_path = Path("sync") / "diff.json"
+        _write_sync_audit(audit_path, transfer_state="DIFF-ONLY", primary_changed=False, wrapped=True)
+
+        result = runner.invoke(
+            app,
+            [
+                "progress",
+                "show",
+                "usr.data-plane.hpc-sync",
+                "--repo-root",
+                str(_repo_root()),
+                "--sync-audit-json",
+                str(audit_path),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status_kind"] == "usr-sync-audit"
+        assert payload["state"] == "ok"
+        assert payload["summary"] == "demo_dataset: DIFF-ONLY"
+        assert payload["evidence"]["dataset"] == "demo_dataset"
+        assert payload["evidence"]["transfer_state"] == "DIFF-ONLY"
 
 
 def test_cli_progress_show_reports_usr_dataset_surface() -> None:

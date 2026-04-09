@@ -33,7 +33,7 @@ Use this with:
 | DenseGen batch (CBC/GUROBI) | batch CPU | `-l h_rt=08:00:00 -pe omp 12 -l mem_per_core=8G` | Scale slots with plan complexity; keep solver threads aligned. |
 | Notify watcher | batch CPU | `-l h_rt=24:00:00 -pe omp 1 -l mem_per_core=2G` | Low-footprint long-running watcher. |
 | Evo2 7B inference/smoke | batch GPU | `-l h_rt=04:00:00 -pe omp 4 -l mem_per_core=8G -l gpus=1 -l gpu_c=8.9` | Default SCC lane for `evo2_7b`. |
-| Evo2 20B inference | batch GPU | `-l h_rt=04:00:00 -pe omp 4 -l mem_per_core=8G -l gpus=1 -l gpu_c=9.0` | Hopper-class-or-newer lane for `evo2_20b`; H200 is common on SCC, but newer higher-capability lanes also qualify. |
+| Evo2 20B inference | batch GPU | `-l h_rt=04:00:00 -pe omp 4 -l mem_per_core=8G -l gpus=1 -l gpu_c=9.0` | Model-fit floor for `evo2_20b`. If the current `.venv` is family-pinned, also pass an exact selector such as `-l gpu_t=RTXP6000 -l gpu_c=12.0` for the visible SCC Blackwell lane. |
 | Large downloads / model prefetch / dataset transfer | transfer-node | `-l download -l h_rt=24:00:00 -pe omp 1` | Do not run compute-heavy tasks here. |
 
 ### Copy/paste commands
@@ -70,7 +70,7 @@ qsub -P <project> \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
 ```
 
-For `evo2_20b`, prefer the ops runbook path so the resource declaration stays attached to the run config. If you submit directly, add `-l gpus=1 -l gpu_c=9.0`.
+For `evo2_20b`, prefer the ops runbook path so the resource declaration stays attached to the run config. If you submit directly, add `-l gpus=1 -l gpu_c=9.0` for the generic model floor, or `-l gpus=1 -l gpu_c=12.0 -l gpu_t=RTXP6000` for the current SCC Blackwell lane.
 
 #### 5) Notify profile setup + watcher submit
 

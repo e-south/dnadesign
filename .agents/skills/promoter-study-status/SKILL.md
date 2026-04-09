@@ -81,9 +81,10 @@ Out of scope:
 - Distinguish model-fit from environment portability for GPU-backed Infer.
   Scheduler eligibility or `gpu_c` floors do not prove that the currently
   compiled `.venv` can execute on the landed GPU family. If the checked-in
-  study record or recent operator evidence shows a GPU-family-specific build,
-  report that explicitly instead of assuming a valid `evo2_7b` or `evo2_20b`
-  config is portable across Hopper, Blackwell, or smaller lanes.
+  study record or recent operator evidence shows a GPU-family-specific build or
+  exact scheduler selector such as `gpu_t`, report that explicitly instead of
+  assuming a valid `evo2_7b` or `evo2_20b` config is portable across Hopper,
+  Blackwell, or smaller lanes.
 - Treat `promoter-study-status` as the repo-backed snapshot surface and
   `promoter-study-preflight` as the execution-readiness surface. Do not answer
   "what should run next?" from snapshot alone when preflight blockers are in

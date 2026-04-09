@@ -901,6 +901,29 @@ def test_mode_auto_with_active_jobs_normalizes_comma_delimited_ids(tmp_path: Pat
     assert decision.hold_jid == "81001,81002"
 
 
+def test_mode_auto_blocks_submit_when_current_host_is_not_submit_host_even_with_override(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    decision = resolve_mode_decision(
+        runbook=runbook,
+        requested_mode=None,
+        active_job_ids=(),
+        runtime_visibility=orchestrator_state.RuntimeVisibility(
+            scheduler_probe_state=orchestrator_state.SchedulerProbeState.HOST_DENIED,
+            active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.UNKNOWN,
+            degraded=True,
+            degraded_reasons=('denied: host "scc1.bu.edu" is no submit host',),
+        ),
+        allow_unknown_active_jobs=True,
+    )
+
+    assert decision.submit_behavior == "blocked"
+    assert decision.hold_jid is None
+    assert "current_host_not_submit_host" in decision.reason
+    assert "submission_override_allow_unknown_active_jobs=true" not in decision.reason
+
+
 def test_build_batch_plan_forwards_allow_fresh_reset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     runbook_path = _write_runbook(tmp_path)
     runbook = load_orchestration_runbook(runbook_path)
@@ -1098,6 +1121,31 @@ def test_discover_active_job_ids_raises_clean_error_when_qstat_times_out(
 
     with pytest.raises(RuntimeError, match=r"qstat unavailable: timed out after 10 seconds"):
         discover_active_job_ids_for_runbook(runbook, max_jobs=12)
+
+
+def test_probe_active_jobs_for_runbook_classifies_submit_host_denial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    monkeypatch.setattr(
+        orchestrator_state,
+        "_run_probe",
+        lambda argv: (1, "", 'error: denied: host "scc1.bu.edu" is neither submit nor admin host'),
+    )
+
+    resolution = orchestrator_state.probe_active_jobs_for_runbook(runbook, max_jobs=12)
+
+    assert resolution.discovered_job_ids == ()
+    assert resolution.runtime_visibility.scheduler_probe_state == orchestrator_state.SchedulerProbeState.HOST_DENIED
+    assert (
+        resolution.runtime_visibility.active_job_resolution_state == orchestrator_state.ActiveJobResolutionState.UNKNOWN
+    )
+    assert resolution.runtime_visibility.degraded is True
+    assert resolution.runtime_visibility.degraded_reasons == (
+        'error: denied: host "scc1.bu.edu" is neither submit nor admin host',
+    )
 
 
 def test_batch_plan_uses_dry_smoke_by_default(tmp_path: Path) -> None:
@@ -1735,8 +1783,21 @@ def test_infer_qsub_template_exports_usr_actor_tags() -> None:
 
     assert 'export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-infer}"' in template_text
     assert 'DEFAULT_RUN_ID="${OPS_JOB_NAME_SLUG:-$JOB_ID_VALUE}"' in template_text
-    assert 'if [[ -n "$TASK_ID_VALUE" && "$TASK_ID_VALUE" != "undefined" && "$TASK_ID_VALUE" != "NONE" ]]; then' in template_text
+    assert (
+        'if [[ -n "$TASK_ID_VALUE" && "$TASK_ID_VALUE" != "undefined" && "$TASK_ID_VALUE" != "NONE" ]]; then'
+        in template_text
+    )
     assert 'export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-$DEFAULT_RUN_ID}"' in template_text
+
+
+def test_infer_qsub_template_preserves_infer_exit_codes() -> None:
+    repo_root = Path(__file__).resolve().parents[4]
+    template_text = (repo_root / "docs" / "bu-scc" / "jobs" / "evo2-gpu-infer.qsub").read_text(encoding="utf-8")
+
+    assert 'echo "infer validate config failed (exit=$validate_rc)" >&2' in template_text
+    assert 'exit "$validate_rc"' in template_text
+    assert 'echo "infer run failed (exit=$infer_rc)" >&2' in template_text
+    assert 'exit "$infer_rc"' in template_text
 
 
 def test_densegen_analysis_template_requires_records_for_placement_map() -> None:
@@ -1835,6 +1896,23 @@ def test_infer_preflight_uses_run_dry_run_contract(tmp_path: Path) -> None:
     assert "uv run infer run --config" in preflight_block
     assert "--dry-run" in preflight_block
     assert "uv run infer validate config --config" not in preflight_block
+
+
+def test_infer_runbook_plan_emits_exact_gpu_type_when_declared(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "infer_workspace"
+    payload = _infer_runbook_payload(workspace_root, runbook_id="infer_blackwell_pin")
+    payload["runbook"]["resources"]["gpu_capability"] = "12.0"
+    payload["runbook"]["resources"]["gpu_type"] = "RTXP6000"
+    runbook = load_orchestration_runbook(Path("infer-runbook.yaml"), raw=payload)
+
+    plan = build_batch_plan(runbook=runbook, requested_mode="fresh", requested_smoke=None, active_job_ids=())
+    preflight_block = _render_block(plan.preflight_commands)
+    submit_block = _render_block(plan.submit_commands)
+
+    assert "gpu_c=12.0" in preflight_block
+    assert "gpu_t=RTXP6000" in preflight_block
+    assert "gpu_c=12.0" in submit_block
+    assert "gpu_t=RTXP6000" in submit_block
 
 
 def test_infer_workflow_rejects_notify_tool_mismatch() -> None:
@@ -2453,12 +2531,16 @@ def test_densegen_workflow_rejects_gpu_fields() -> None:
                 "mem_per_core": "8G",
                 "gpus": 1,
                 "gpu_capability": "8.9",
+                "gpu_type": "RTXP6000",
             },
         }
     }
     with pytest.raises(
         ValueError,
-        match="densegen workflow does not accept resources.gpus, resources.gpu_capability, or resources.gpu_memory_gib",
+        match=(
+            "densegen workflow does not accept resources.gpus, "
+            "resources.gpu_capability, resources.gpu_type, or resources.gpu_memory_gib"
+        ),
     ):
         load_orchestration_runbook(Path("densegen-runbook.yaml"), raw=payload)
 
@@ -3145,6 +3227,55 @@ def test_cli_execute_blocks_submit_when_active_job_visibility_is_unknown(
 
     assert result.exit_code == 2
     assert "active-job visibility is unavailable" in result.output
+    assert execute_called is False
+
+
+def test_cli_execute_blocks_submit_when_current_host_is_not_submit_host(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    audit_path = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "audit" / "result.json"
+    execute_called = False
+
+    monkeypatch.setattr(
+        "dnadesign.ops.api.resolve_active_job_resolution",
+        lambda **kwargs: orchestrator_state.ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=(),
+            effective_job_ids=(),
+            runtime_visibility=orchestrator_state.RuntimeVisibility(
+                scheduler_probe_state=orchestrator_state.SchedulerProbeState.HOST_DENIED,
+                active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.UNKNOWN,
+                degraded=True,
+                degraded_reasons=('error: denied: host "scc1.bu.edu" is neither submit nor admin host',),
+            ),
+        ),
+    )
+
+    def _fake_execute_batch_plan(*, plan, audit_json_path, submit, command_timeout_seconds):
+        nonlocal execute_called
+        execute_called = True
+        raise AssertionError("execute_batch_plan should not be called when current host is not a submit host")
+
+    monkeypatch.setattr("dnadesign.ops.api.execute_batch_plan", _fake_execute_batch_plan)
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "execute",
+            "--runbook",
+            str(runbook_path),
+            "--audit-json",
+            str(audit_path),
+            "--submit",
+            "--allow-unknown-active-jobs",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "current host is not a submit host for SCC batch submission" in result.output
     assert execute_called is False
 
 
@@ -3872,6 +4003,66 @@ def test_densegen_packaged_presets_use_repo_default_qsub_tokens() -> None:
     assert notify_payload["runbook"]["densegen"]["qsub_template"] == expected_densegen
     assert notify_payload["runbook"]["densegen"]["post_run"]["qsub_template"] == expected_post_run
     assert notify_payload["runbook"]["notify"]["qsub_template"] == expected_notify
+
+
+def test_stress_ethanol_cipro_infer_presets_are_blackwell_pinned() -> None:
+    repo_root = Path(__file__).resolve()
+    for parent in repo_root.parents:
+        if (parent / "pyproject.toml").exists():
+            repo_root = parent
+            break
+    preset_dir = repo_root / "src" / "dnadesign" / "ops" / "runbooks" / "presets"
+
+    for preset_name in (
+        "infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml",
+        "infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml",
+        "infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml",
+        "infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml",
+    ):
+        payload = yaml.safe_load((preset_dir / preset_name).read_text(encoding="utf-8"))
+        resources = payload["runbook"]["resources"]
+        assert resources["gpu_capability"] == "12.0"
+        assert resources["gpu_type"] == "RTXP6000"
+        assert resources["gpu_memory_gib"] == 80.0
+
+
+def test_stress_ethanol_cipro_infer_configs_match_pressure_test_matrix() -> None:
+    repo_root = Path(__file__).resolve()
+    for parent in repo_root.parents:
+        if (parent / "pyproject.toml").exists():
+            repo_root = parent
+            break
+    config_dir = repo_root / "src" / "dnadesign" / "infer" / "workspaces" / "study_stress_ethanol_cipro"
+    expected = {
+        "config.anchor_only.evo2_7b.yaml": 1024,
+        "config.anchor_plus_template.evo2_7b.yaml": 128,
+        "config.anchor_only.evo2_20b.yaml": 256,
+        "config.anchor_plus_template.evo2_20b.yaml": 48,
+    }
+
+    for config_name, batch_size in expected.items():
+        payload = yaml.safe_load((config_dir / config_name).read_text(encoding="utf-8"))
+        assert payload["model"]["batch_size"] == batch_size
+
+
+def test_stress_ethanol_cipro_anchor_plus_template_20b_preset_uses_24h_walltime() -> None:
+    repo_root = Path(__file__).resolve()
+    for parent in repo_root.parents:
+        if (parent / "pyproject.toml").exists():
+            repo_root = parent
+            break
+    preset_path = (
+        repo_root
+        / "src"
+        / "dnadesign"
+        / "ops"
+        / "runbooks"
+        / "presets"
+        / "infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml"
+    )
+    payload = yaml.safe_load(preset_path.read_text(encoding="utf-8"))
+
+    assert payload["runbook"]["resources"]["h_rt"] == "24:00:00"
 
 
 def test_packaged_runbook_preset_path_is_rejected_without_repo_checkout(
