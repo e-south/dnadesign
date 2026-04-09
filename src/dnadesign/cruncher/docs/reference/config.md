@@ -290,7 +290,7 @@ Notes:
 - Multiplicity v1 requires exactly one TF in the active regulator set, an occurrence-safe per-window score scale, `sample.elites.select.diversity: 0.0`, and `sample.elites.postprocess.trim_uncovered_internal: false`.
 - `objective.multiplicity.copies` requests the number of distinct selected occurrences.
 - `objective.multiplicity.distinctness.mode: interval` requires non-overlapping windows, expanded by `objective.multiplicity.distinctness.min_gap`.
-- `objective.multiplicity.distinctness.mode: offset` requires distinct window starts, so partial overlap is allowed; `min_gap` becomes a minimum start-offset separation.
+- `objective.multiplicity.distinctness.mode: offset` requires distinct window starts, so partial overlap is allowed; `min_gap: 0` permits adjacent starts, and larger values require at least `min_gap + 1` bp between starts.
 - `objective.multiplicity.aggregation.selector: top_k_distinct` uses exact selection for the configured distinctness mode rather than greedy overlap masking.
 - `objective.multiplicity.aggregation.scalar: weakest_selected` exposes the weakest selected occurrence as the scalar objective value seen by the optimizer.
 - Same-locus `+` and `-` hits count once when `objective.multiplicity.distinctness.strand_rule=collapse_same_locus`.

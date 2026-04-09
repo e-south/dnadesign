@@ -170,6 +170,23 @@ def test_top_k_distinct_selector_supports_overlap_tolerant_offset_mode() -> None
     assert [(hit.start, hit.end, hit.strand) for hit in selected] == [(0, 4, "+"), (1, 5, "+"), (2, 6, "+")]
 
 
+def test_top_k_distinct_selector_offset_mode_requires_min_gap_plus_one_start_delta() -> None:
+    selector = TopKDistinctSelector()
+    hits = (
+        WindowHit(tf="lexA", start=0, end=4, width=4, strand="+", raw_score=9.0, scaled_score=9.0),
+        WindowHit(tf="lexA", start=1, end=5, width=4, strand="+", raw_score=8.9, scaled_score=8.9),
+        WindowHit(tf="lexA", start=2, end=6, width=4, strand="+", raw_score=8.8, scaled_score=8.8),
+    )
+    spec = TopKDistinctSelectorSpec(
+        copies=2,
+        distinctness=DistinctnessSpec(mode="offset", min_gap=1, strand_rule="collapse_same_locus"),
+    )
+
+    selected = selector.select(hits, spec)
+
+    assert [(hit.start, hit.end, hit.strand) for hit in selected] == [(0, 4, "+"), (2, 6, "+")]
+
+
 def test_top_k_distinct_selector_breaks_ties_by_earliest_interval_signature() -> None:
     selector = TopKDistinctSelector()
     hits = (

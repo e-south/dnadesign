@@ -258,6 +258,8 @@ class TopKDistinctSelector:
             predecessor = -1
             for i in range(j - 1, -1, -1):
                 earlier = hits[i]
+                # Offset mode still requires distinct starts, so min_gap adds
+                # extra separation beyond the first 1 bp start offset.
                 if earlier.start + min_gap < hit.start:
                     predecessor = i
                     break
