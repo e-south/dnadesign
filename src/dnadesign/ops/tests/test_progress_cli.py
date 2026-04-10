@@ -591,7 +591,10 @@ def _write_promoter_study_record(study_dir: Path, *, densegen_rows: int, densege
     repo_root = study_dir.parents[2]
     study_dir.mkdir(parents=True, exist_ok=True)
     (study_dir / "campaign.yaml").write_text("campaign_id: demo_study\nsteps: []\n", encoding="utf-8")
-    (study_dir / "status.md").write_text("## demo_study\n\n- Current shared feature dataset: `n/a`\n", encoding="utf-8")
+    (study_dir / "status.md").write_text(
+        "## demo_study\n\n- Canonical consolidated feature dataset: `n/a`\n",
+        encoding="utf-8",
+    )
     (study_dir / "datasets.yaml").write_text(
         yaml.safe_dump(
             {
@@ -699,7 +702,10 @@ def _write_promoter_study_preflight_record(
     repo_root = study_dir.parents[2]
     study_dir.mkdir(parents=True, exist_ok=True)
     (study_dir / "campaign.yaml").write_text("campaign_id: demo_study\nsteps: []\n", encoding="utf-8")
-    (study_dir / "status.md").write_text("## demo_study\n\n- Current shared feature dataset: `n/a`\n", encoding="utf-8")
+    (study_dir / "status.md").write_text(
+        "## demo_study\n\n- Canonical consolidated feature dataset: `n/a`\n",
+        encoding="utf-8",
+    )
     (study_dir / "datasets.yaml").write_text(
         yaml.safe_dump(
             {
@@ -1102,9 +1108,13 @@ def test_cli_progress_show_reports_promoter_study_record_surface() -> None:
         assert payload["evidence"]["densegen_rows"] == 2
         assert payload["evidence"]["densegen_row_target"] == 5
         assert payload["evidence"]["densegen_row_gap"] == 3
+        assert payload["evidence"]["source_growth_state"]["state"] == "attention"
+        assert payload["evidence"]["handoff_readiness_state"]["state"] == "attention"
+        assert payload["evidence"]["planned_outputs_state"]["state"] == "ok"
         assert payload["evidence"]["next_ready_phase"]["id"] == "merged_anchor_set"
         assert payload["evidence"]["datasets"][0]["dataset"] == "densegen/demo_anchor"
-        assert "pending promoter/demo_anchor_set" in payload["summary"]
+        assert "source gate active densegen/demo_anchor 2/5 rows (gap=3)" in payload["summary"]
+        assert "handoff outputs pending promoter/demo_anchor_set" in payload["summary"]
 
 
 def test_cli_progress_show_marks_pipeline_only_execution_surfaces_as_derived() -> None:
@@ -1167,7 +1177,8 @@ def test_promoter_study_progress_discovers_active_study_from_repo_root() -> None
         assert evidence["study_dir"] == str(study_dir)
         assert evidence["infer_notify_profiles"] == {}
         assert evidence["infer_notify_profile_errors"] == {}
-        assert "pending promoter/demo_anchor_set" in summary
+        assert "source gate active densegen/demo_anchor 2/5 rows (gap=3)" in summary
+        assert "handoff outputs pending promoter/demo_anchor_set" in summary
 
 
 def test_promoter_study_progress_resolves_relative_study_dir_against_repo_root() -> None:
@@ -1192,6 +1203,46 @@ def test_promoter_study_progress_resolves_relative_study_dir_against_repo_root()
         assert evidence["study_dir"] == str(study_dir)
 
 
+def test_promoter_study_progress_demotes_source_gate_once_handoffs_exceed_target() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        repo_root = Path.cwd()
+        (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
+        (repo_root / "src" / "dnadesign").mkdir(parents=True, exist_ok=True)
+        study_dir = repo_root / "docs" / "studies" / "demo_study"
+        promoter_index = repo_root / "docs" / "studies" / "index.yaml"
+        _write_study_index(promoter_index)
+        _write_promoter_study_preflight_record(study_dir, densegen_rows=2, anchor_rows=7, construct_rows=7)
+
+        pipeline_path = study_dir / "pipeline.yaml"
+        pipeline_payload = yaml.safe_load(pipeline_path.read_text(encoding="utf-8"))
+        pipeline_payload["study_pipeline"]["row_targets"] = {
+            "densegen_anchor_minimum_before_first_full_lane_infer": 5,
+        }
+        pipeline_path.write_text(yaml.safe_dump(pipeline_payload, sort_keys=False), encoding="utf-8")
+        datasets_path = study_dir / "datasets.yaml"
+        datasets_payload = yaml.safe_load(datasets_path.read_text(encoding="utf-8"))
+        for entry in datasets_payload["datasets"]:
+            if entry["dataset"] in {
+                "promoter/demo_anchor_set",
+                "promoter/demo_construct_contexts",
+            }:
+                entry["status"] = "present"
+        datasets_path.write_text(yaml.safe_dump(datasets_payload, sort_keys=False), encoding="utf-8")
+
+        state, summary, evidence = _promoter_study_status(None, repo_root=repo_root)
+
+        assert state == "ok"
+        assert "handoffs ready anchor=7 construct=7" in summary
+        assert "source gate superseded by downstream handoffs densegen/demo_anchor 2/5 rows (gap=3)" in summary
+        assert "attention_reasons" not in evidence
+        assert evidence["source_growth_state"]["state"] == "ok"
+        assert evidence["source_growth_state"]["target_met"] is False
+        assert evidence["source_growth_state"]["gates_current_phase"] is False
+        assert evidence["source_growth_state"]["superseded_by_handoffs"] is True
+        assert evidence["planned_outputs_state"]["state"] == "ok"
+
+
 def test_promoter_study_status_surfaces_stale_construct_handoff() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -1206,7 +1257,10 @@ def test_promoter_study_status_surfaces_stale_construct_handoff() -> None:
         state, summary, evidence = _promoter_study_status(None, repo_root=repo_root)
 
         assert state == "attention"
-        assert "stale promoter/demo_anchor_set, promoter/demo_construct_contexts" in summary
+        assert "source rows visible densegen/demo_anchor 5 rows" in summary
+        assert "handoff lag promoter/demo_anchor_set, promoter/demo_construct_contexts" in summary
+        assert evidence["source_growth_state"]["state"] == "ok"
+        assert evidence["handoff_readiness_state"]["state"] == "attention"
         refresh_states = {item["id"]: item for item in evidence["dataset_refresh_states"]}
         assert refresh_states["merged_anchor_from_densegen"]["state"] == "attention"
         assert refresh_states["construct_contexts_from_merged_anchor"]["state"] == "attention"

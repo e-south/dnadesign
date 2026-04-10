@@ -8,21 +8,30 @@ placeholder behind.
 - Owner:
 - Affiliated dataset registry: `datasets.yaml`
 - USR root:
-- Target row count:
-- Current shared feature dataset: `<dataset>` or `n/a`
-- Current feature-dataset row count:
+- DenseGen source row target:
+- Current infer-bearing shared handoff datasets: `<dataset>`, `<dataset>` or `n/a`
+- Canonical consolidated feature dataset: `<dataset>` or `n/a`
+- Current consolidated feature-dataset row count:
+
+Treat the DenseGen source target as an early-phase gate, not as the universal
+headline forever. Once the study has advanced and the shared infer-bearing
+handoff datasets already exceed that threshold, keep the target as historical
+context and report the current phase from the live handoff plane.
 
 ### Source datasets
 
-- DenseGen anchor shared dataset: `<dataset>` (`<rows>` rows, last batch audit: `<path or runbook id>`)
+- DenseGen anchor shared dataset: `<dataset>` (source-growth plane; use `promoter-study-status` for live rows and target gap, last batch audit: `<path or runbook id>`)
 - Wildtype or manual dataset: `<dataset>` (`<rows>` rows)
 - Construct template seed dataset: `<dataset>` (`<rows>` rows) or `n/a`
-- Optional construct context dataset: `<dataset>` (`<rows>` rows) or `n/a`
 
-### Canonical downstream datasets
+### Shared infer-bearing handoff datasets
 
-- Anchor-only feature dataset: `<dataset>` or `n/a`
-- Construct-expanded feature dataset: `<dataset>` or `n/a`
+- Anchor-only handoff dataset: `<dataset>` or `n/a`
+- Construct-expanded handoff dataset: `<dataset>` or `n/a`
+
+### Planned consolidated outputs
+
+- Canonical full-lane feature dataset: `<dataset>` or `n/a`
 - Cluster results root: `<path>` or `n/a`
 - OPAL config: `<path>` or `n/a`
 

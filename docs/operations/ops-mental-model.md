@@ -41,6 +41,11 @@ OPS uses one global state lattice:
 - `attention`: evidence exists, but it shows an unsatisfactory or action-needed posture
 - `missing`: required evidence or artifact is absent or unreadable
 
+For snapshot-style study records, `ok` means the record-backed posture is
+coherent for the current phase. It does not imply that all future phases are
+complete. Planned future outputs and historical upstream targets can remain in
+evidence without escalating the current phase to `attention`.
+
 Severity order is global, not subsystem-local:
 
 `missing > attention > ok`

@@ -147,9 +147,9 @@ Out of scope:
   `uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/campaign.yaml`
 - If `status.md` names a current canonical feature dataset, run:
   `uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <repo-root> --usr-root <usr-root> --dataset <feature-dataset>`
-- If the study record says the canonical feature dataset is still `n/a`, report
-  that the study is still in source-assembly mode and skip the feature-matrix
-  refresh instead of inventing one.
+- If the study record says the canonical consolidated feature dataset is still
+  `planned` or `n/a`, report that the study is still in source/handoff mode and
+  skip the feature-matrix refresh instead of inventing one.
 
 3. Refresh the data-plane evidence
 - Run `uv run usr --root <usr-root> validate <feature-dataset> --strict`.

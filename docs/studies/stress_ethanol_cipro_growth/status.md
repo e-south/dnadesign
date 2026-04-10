@@ -1,40 +1,46 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-04-07
+- Last verified: 2026-04-09
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Study execution map: `pipeline.yaml`
 - USR root: `src/dnadesign/usr/datasets`
-- Target row count: at least `100000` DenseGen anchor rows before the first shared feature-matrix realization
-- Current shared feature dataset: `n/a` (lane-specific Infer outputs are still being attached directly to the shared anchor and Construct-context datasets first)
-- Current feature-dataset row count: `n/a`
+- DenseGen source row target: at least `100000` anchor rows before the first canonical consolidated feature-matrix realization
+- Current infer-bearing shared handoff datasets: `promoter/stress_ethanol_cipro_anchor_set`, `promoter/stress_ethanol_cipro_construct_contexts`
+- Canonical consolidated feature dataset: `promoter/stress_ethanol_cipro_feature_matrix` (`planned`; current Infer writes land on the two shared handoff datasets)
+- Current consolidated feature-dataset row count: `n/a`
 - Preferred infer model family: `evo2_20b`
 - Alternate infer model family: `evo2_7b`
 
 ### Source datasets
 
-- DenseGen anchor shared dataset: `densegen/study_stress_ethanol_cipro` (`157160` rows, written directly to the shared USR root)
+- DenseGen anchor shared dataset: `densegen/study_stress_ethanol_cipro` (upstream source dataset; use `promoter-study-status` for live local rows, target gap, and sync posture)
 - Wildtype or manual dataset: `mg1655_promoters` (`4` rows: `spyp`, `sulAp`, `soxSp`, `J23105`)
 - Construct template seed dataset: `plasmids` (`1` row)
-- Shared merged anchor dataset: `promoter/stress_ethanol_cipro_anchor_set` (`157164` rows)
-- Shared Construct context dataset: `promoter/stress_ethanol_cipro_construct_contexts` (`157164` rows)
 
-### Shared downstream datasets
+### Shared infer-bearing handoff datasets
 
-- Merged anchor dataset: `promoter/stress_ethanol_cipro_anchor_set` (`157164` rows)
-- Construct-expanded context dataset: `promoter/stress_ethanol_cipro_construct_contexts` (`157164` rows, 1 kb realized outputs)
-- Canonical full-lane feature dataset: `promoter/stress_ethanol_cipro_feature_matrix` or `n/a`
+- Anchor-only handoff dataset: `promoter/stress_ethanol_cipro_anchor_set` (shared anchor-only Infer surface; use `promoter-study-status` for live rows and sync audits)
+- Construct-expanded handoff dataset: `promoter/stress_ethanol_cipro_construct_contexts` (shared 1 kb template-backed Infer surface; use `promoter-study-status` for live rows and sync audits)
+
+### Planned consolidated outputs
+
+- Canonical full-lane feature dataset: `promoter/stress_ethanol_cipro_feature_matrix` (`planned`)
 - Cluster results root: `n/a`
 - OPAL config: `n/a`
 
-Current design note: the checked-in Infer full-lane configs keep `anchor_only`
-and `template_1kb` as separate jobs and dataset planes. The study still tracks
-`promoter/stress_ethanol_cipro_feature_matrix` as the planned shared downstream
-feature surface, but the pre-infer execution path is explicit rather than
-implicit. The study-owned Construct surface is one
-`forward_anchor_window` workspace project; the placement contract lives in the
-checked-in Construct config and workspace registry rather than being duplicated
-throughout the study note.
+Infer runs are split across two dataset planes: `anchor_only` writes to
+`promoter/stress_ethanol_cipro_anchor_set`, and `template_1kb` writes to
+`promoter/stress_ethanol_cipro_construct_contexts`. The consolidated feature
+matrix remains a later handoff step rather than the current write path. The
+Construct side still uses the single `forward_anchor_window` workspace
+contract.
+Read the row counts by plane. DenseGen source rows measure upstream growth.
+Handoff rows measure the shared Infer surfaces. A large handoff row count does
+not prove that the DenseGen source target has been met. For this study,
+that DenseGen target is now historical context rather than the main status
+gate: the current record-backed phase is driven by the shared handoff datasets
+and the active Infer lane routing.
 Blackwell tuning note: current checked-in lane defaults follow the latest
 pressure-test operating points on the Blackwell Evo2 environment, re-verified
 on 2026-04-07 with three read-only GPU repeats per lane:

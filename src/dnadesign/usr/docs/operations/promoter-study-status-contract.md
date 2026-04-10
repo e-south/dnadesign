@@ -4,7 +4,7 @@
 **Plane:** data-plane
 **Owner-boundary:** usr
 **Entry artifact:** one checked-in promoter-study directory selected through docs/studies/index.yaml
-**Exit artifact:** one read-only summary of dataset presence, phase posture, and study-owned execution surfaces
+**Exit artifact:** one read-only summary of source growth, shared handoff readiness, planned outputs, and study-owned execution surfaces
 **Registry-id:** usr.data-plane.promoter-study-status
 **Summary:** Read one checked-in promoter-study record and summarize dataset, phase, and execution-surface readiness without reconstructing the workflow by hand.
 **Execution-kind:** iterative
@@ -75,6 +75,17 @@ repo-summary scope from `ops.study.yaml`, reports the current phase from the
 checked-in record, and highlights the next ready phase without submitting jobs
 or mutating USR. Host-local readiness such as GPU visibility remains advisory
 here and moves into preflight for hard blockers.
+The snapshot contract is explicit about which plane each row count belongs to:
+it reports source-growth, shared-handoff readiness, and planned consolidated
+outputs as separate evidence axes so operators do not have to infer readiness
+from one overloaded `attention` summary.
+Snapshot `ok` means the checked-in record is coherent for the current phase; it
+does not mean every future phase is finished. Future planned outputs stay in
+evidence without forcing `attention`, and an upstream DenseGen row target only
+drives `attention` while it is still a live gate for the current study phase.
+Once the study has advanced and the canonical shared handoff datasets already
+exceed that source threshold, the source target remains visible as historical
+context instead of overriding the current phase summary.
 For `evo2_20b`, describe GPU readiness from the checked-in runbook contract,
 not from a guessed BU queue name. If the study record or live operator
 evidence says the current `.venv` is GPU-family-pinned, report the exact
@@ -205,16 +216,17 @@ Discovery rules:
 uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/campaign.yaml
 ```
 
-2. Refresh the current feature-dataset summary only when a shared feature
-   dataset already exists:
+2. Refresh the current consolidated feature-dataset summary only when a
+   canonical consolidated feature dataset already exists:
 
 ```bash
 # Summarize the live feature dataset from explicit USR artifacts.
 uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <repo-root> --usr-root <usr-root> --dataset <feature-dataset>
 ```
 
-If `status.md` still marks the shared feature dataset as `n/a`, skip this
-step and report that the study is still in source-assembly mode.
+If `status.md` still marks the canonical consolidated feature dataset as
+`planned` or `n/a`, skip this step and report that the study is still in
+source/handoff mode.
 
 3. Validate the dataset and inspect lineage plus one explicit infer column:
 

@@ -361,13 +361,18 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "strict_bootstrap_id: true" in datasets_template
     assert "remote_root_kind: shared|workspace_local_export|external_usr" in datasets_template
     assert "remote_path: n/a" in datasets_template
-    assert "Target row count:" in template
-    assert "Current shared feature dataset:" in template
-    assert "Current feature-dataset row count:" in template
+    assert "DenseGen source row target:" in template
+    assert "Current infer-bearing shared handoff datasets:" in template
+    assert "Canonical consolidated feature dataset:" in template
+    assert "Current consolidated feature-dataset row count:" in template
+    assert "historical" in template
+    assert "live handoff plane" in template
     assert "Affiliated dataset registry: `datasets.yaml`" in template
     assert "DenseGen anchor shared dataset:" in template
     assert "Wildtype or manual dataset:" in template
     assert "Construct template seed dataset:" in template
+    assert "Shared infer-bearing handoff datasets" in template
+    assert "Planned consolidated outputs" in template
     assert "anchor_only" in template
     assert "anchor_plus_template" in template
     assert "full_lane_set" in template
@@ -378,7 +383,8 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "usr.data-plane.hpc-sync" in contract
     assert "root_kind" in contract
     assert "workspace_local_export" in contract
-    assert "If `status.md` still marks the shared feature dataset as `n/a`, skip this" in contract
+    assert "canonical consolidated feature dataset" in contract
+    assert "source/handoff mode" in contract
     assert "uv run usr --root <usr-root> info <dataset-id> --format json" in contract
     assert "--audit-json-out docs/studies/<study-id>/audits/<dataset-id>--<remote-name>-diff.json" in contract
     assert "ops progress show usr.data-plane.hpc-sync --sync-audit-json" in contract
@@ -386,7 +392,7 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "onboard_mode: existing_remote" in skill
     assert "docs/studies/<study-id>/datasets.yaml" in skill
     assert "usr.data-plane.hpc-sync" in skill
-    assert "source-assembly mode" in skill
+    assert "source/handoff mode" in skill
     assert "promoter-study-preflight --scope next --json" in skill
     assert not (_repo_root() / "docs" / "studies" / "promoter").exists()
     assert not (_repo_root() / "src/dnadesign/usr/skills/promoter-study-status/SKILL.md").exists()
@@ -446,12 +452,36 @@ def test_promoter_study_record_is_checked_in_for_stress_ethanol_cipro_growth() -
     assert "group_phase_bindings:" in ops_study
     assert "runtime_shared_groups: [notify_environment]" in ops_study
     assert "densegen/study_stress_ethanol_cipro" in status
-    assert "157160" in status
-    assert "157164" in status
+    assert "DenseGen source row target:" in status
+    assert "Current infer-bearing shared handoff datasets:" in status
+    assert "Canonical consolidated feature dataset:" in status
+    assert "Read the row counts by plane." in status
+    assert "historical context rather than the main status" in status
     assert "100000" in status
     assert "`anchor_only_7b=1024`, `anchor_plus_template_7b=128`" in status
     assert "`anchor_only_20b=256`, `anchor_plus_template_20b=48`" in status
     assert "`h_rt=24:00:00`" in status
+
+
+def test_promoter_study_status_note_separates_row_target_from_live_handoff_counts() -> None:
+    pipeline_payload = yaml.safe_load(_read("docs/studies/stress_ethanol_cipro_growth/pipeline.yaml"))
+    ops_payload = yaml.safe_load(_read("docs/studies/stress_ethanol_cipro_growth/ops.study.yaml"))
+    status = _read("docs/studies/stress_ethanol_cipro_growth/status.md")
+
+    row_target = pipeline_payload["study_pipeline"]["row_targets"][
+        "densegen_anchor_minimum_before_first_full_lane_infer"
+    ]
+    summary_inputs = ops_payload["snapshot"]["summary_inputs"]
+    densegen_target = next(
+        item["target_rows"] for item in summary_inputs if item["artifact"] == "densegen_anchor_source"
+    )
+
+    assert row_target == densegen_target == 100000
+    assert "Current infer-bearing shared handoff datasets:" in status
+    assert "Canonical consolidated feature dataset:" in status
+    assert "historical context rather than the main status" in status
+    assert "`157160`" not in status
+    assert "`157164`" not in status
 
 
 def test_usr_reference_docs_cover_core_contracts() -> None:

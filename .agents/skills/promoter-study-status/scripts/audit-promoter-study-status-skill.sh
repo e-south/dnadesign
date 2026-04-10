@@ -83,7 +83,7 @@ require_pattern 'ops progress show usr\.data-plane\.promoter-study-preflight --s
 require_pattern 'ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/campaign\.yaml' "skill includes campaign refresh command"
 require_pattern 'usr\.data-plane\.hpc-sync' "skill includes sync audit status route"
 require_pattern 'onboard_mode: existing_remote' "skill documents strict remote bootstrap posture"
-require_pattern 'source-assembly mode' "skill preserves source-phase reporting guidance"
+require_pattern 'source-assembly mode|source/handoff mode' "skill preserves source-phase reporting guidance"
 require_pattern 'what should run next\?' "skill differentiates next-step questions"
 require_pattern 'ops\.study\.yaml now owns|ops\.study\.yaml' "skill uses checked-in ops study contract"
 require_pattern 'strict submit-readiness|strict submit readiness|default notify-enabled Infer presets' "skill documents strict notify-enabled submit readiness"
