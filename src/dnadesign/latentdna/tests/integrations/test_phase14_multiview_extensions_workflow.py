@@ -1,0 +1,265 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/integrations/test_phase14_multiview_extensions_workflow.py
+
+Phase 14 workflow tests for matrix-bundle views and extended derived/scalar
+operations.
+
+Module Author(s): OpenAI Codex
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import numpy as np
+import pyarrow as pa
+import pyarrow.parquet as pq
+import yaml
+from typer.testing import CliRunner
+
+from dnadesign.latentdna.cli import app
+
+_RUNNER = CliRunner()
+
+
+def _write_parquet(path: Path, rows: list[dict[str, object]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pq.write_table(pa.Table.from_pylist(rows), path)
+
+
+def _write_matrix_bundle(bundle_dir: Path) -> None:
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+    rows = pa.Table.from_pylist(
+        [
+            {"id": "bundle_01", "subject_id": "subject_01", "cohort": "a"},
+            {"id": "bundle_02", "subject_id": "subject_02", "cohort": "a"},
+            {"id": "bundle_03", "subject_id": "subject_03", "cohort": "b"},
+        ]
+    )
+    pq.write_table(rows, bundle_dir / "rows.parquet")
+    np.save(
+        bundle_dir / "matrix.npy",
+        np.asarray(
+            [
+                [3.0, 4.0, 0.0, 0.0],
+                [0.0, 5.0, 12.0, 0.0],
+                [8.0, 15.0, 0.0, 0.0],
+            ],
+            dtype=np.float32,
+        ),
+    )
+
+
+def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path: Path) -> None:
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "latentdna_ext_demo", "output_root": "./outputs/latentdna"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg", "png"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "bundle_source": {
+                        "kind": "matrix_bundle",
+                        "path": bundle_dir.as_posix(),
+                        "record_key": "id",
+                        "subject_key": "subject_id",
+                    },
+                    "context_source": {
+                        "kind": "parquet",
+                        "path": context_path.as_posix(),
+                        "record_key": "id",
+                        "subject_key": "subject_id",
+                        "context_key": "context_id",
+                    },
+                },
+                "metadata": {"include": ["cohort", "label"]},
+                "views": {
+                    "bundle_view": {
+                        "source": "bundle_source",
+                        "vector": {"kind": "bundle_matrix"},
+                        "coordinate_space_id": "bundle_space",
+                        "tags": {"model": "bundle"},
+                        "role": "primary",
+                    },
+                    "bundle_norm": {
+                        "derive": {"kind": "normalize", "view": "bundle_view", "method": "l2"},
+                        "coordinate_space_id": "bundle_space",
+                        "tags": {"operation": "normalize"},
+                        "role": "primary",
+                    },
+                    "context_view": {
+                        "source": "context_source",
+                        "vector": {"kind": "column", "name": "embedding_context"},
+                        "coordinate_space_id": "context_space",
+                        "tags": {"model": "context"},
+                        "role": "primary",
+                    },
+                    "context_by_subject": {
+                        "derive": {
+                            "kind": "aggregate_by_key",
+                            "view": "context_view",
+                            "key": "subject_key",
+                            "aggregation": "mean",
+                        },
+                        "coordinate_space_id": "context_space",
+                        "tags": {"operation": "aggregate"},
+                        "role": "primary",
+                    },
+                    "bundle_reduced": {
+                        "derive": {"kind": "apply_reducer", "view": "bundle_view", "reducer": "bundle_pca"},
+                        "coordinate_space_id": "bundle_space_pca",
+                        "tags": {"operation": "apply_reducer"},
+                        "role": "primary",
+                    },
+                    "bundle_concat": {
+                        "derive": {
+                            "kind": "concatenate",
+                            "inputs": ["bundle_norm", "bundle_reduced"],
+                        },
+                        "coordinate_space_id": "bundle_concat_space",
+                        "tags": {"operation": "concatenate"},
+                        "role": "primary",
+                    },
+                },
+                "scalars": {
+                    "bundle_norm_scalar": {"derive": {"kind": "vector_norm", "view": "bundle_view", "norm": "l2"}},
+                    "bundle_norm_selected": {
+                        "derive": {
+                            "kind": "select_columns",
+                            "source": "bundle_norm_scalar",
+                            "columns": ["bundle_norm_scalar"],
+                        }
+                    },
+                    "bundle_norm_renamed": {
+                        "derive": {
+                            "kind": "rename_columns",
+                            "source": "bundle_norm_selected",
+                            "renames": {"bundle_norm_scalar": "bundle_norm_value"},
+                        }
+                    },
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_phase14_matrix_bundle_and_extended_derive_flow(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    bundle_dir = tmp_path / "bundle_source"
+    _write_matrix_bundle(bundle_dir)
+    context_path = tmp_path / "inputs" / "context.parquet"
+    _write_parquet(
+        context_path,
+        [
+            {
+                "id": "ctx_01",
+                "subject_id": "subject_01",
+                "context_id": "a",
+                "label": "spyP",
+                "embedding_context": [1.0, 0.0],
+            },
+            {
+                "id": "ctx_02",
+                "subject_id": "subject_01",
+                "context_id": "b",
+                "label": "spyP",
+                "embedding_context": [3.0, 2.0],
+            },
+            {
+                "id": "ctx_03",
+                "subject_id": "subject_02",
+                "context_id": "a",
+                "label": "sulAp",
+                "embedding_context": [10.0, 0.0],
+            },
+            {
+                "id": "ctx_04",
+                "subject_id": "subject_02",
+                "context_id": "b",
+                "label": "sulAp",
+                "embedding_context": [14.0, 4.0],
+            },
+        ],
+    )
+    _write_workspace_config(workspace_dir, bundle_dir, context_path)
+
+    for view_id in ["bundle_view", "context_view"]:
+        result = _RUNNER.invoke(
+            app,
+            ["view", "materialize", view_id, "--workspace", workspace_dir.as_posix(), "--json"],
+        )
+        assert result.exit_code == 0, result.stdout
+
+    reduce_result = _RUNNER.invoke(
+        app,
+        [
+            "view",
+            "reduce",
+            "bundle_view",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--run-id",
+            "bundle_pca",
+            "--dims",
+            "2",
+            "--json",
+        ],
+    )
+    assert reduce_result.exit_code == 0, reduce_result.stdout
+
+    for view_id in ["bundle_norm", "context_by_subject", "bundle_reduced", "bundle_concat"]:
+        result = _RUNNER.invoke(
+            app,
+            ["view", "derive", view_id, "--workspace", workspace_dir.as_posix(), "--json"],
+        )
+        assert result.exit_code == 0, result.stdout
+
+    for scalar_id in ["bundle_norm_scalar", "bundle_norm_selected", "bundle_norm_renamed"]:
+        result = _RUNNER.invoke(
+            app,
+            ["scalar", "derive", scalar_id, "--workspace", workspace_dir.as_posix(), "--json"],
+        )
+        assert result.exit_code == 0, result.stdout
+
+    inspect_result = _RUNNER.invoke(
+        app,
+        ["inspect", "source", "bundle_source", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert inspect_result.exit_code == 0, inspect_result.stdout
+    inspect_payload = json.loads(inspect_result.stdout)
+    assert "bundle_matrix" in inspect_payload["data"]["vector_columns"]
+
+    outputs = workspace_dir / "outputs" / "latentdna"
+    bundle_matrix = np.load(outputs / "views" / "bundle_view" / "matrix.npy")
+    assert bundle_matrix.shape == (3, 4)
+
+    normalized_matrix = np.load(outputs / "views" / "bundle_norm" / "matrix.npy")
+    assert normalized_matrix.shape == (3, 4)
+    assert np.allclose(np.linalg.norm(normalized_matrix, axis=1), 1.0)
+
+    aggregated_rows = pq.read_table(outputs / "views" / "context_by_subject" / "rows.parquet").to_pylist()
+    aggregated_matrix = np.load(outputs / "views" / "context_by_subject" / "matrix.npy")
+    assert [row["subject_id"] for row in aggregated_rows] == ["subject_01", "subject_02"]
+    assert np.allclose(aggregated_matrix, np.asarray([[2.0, 1.0], [12.0, 2.0]], dtype=np.float32))
+
+    reduced_matrix = np.load(outputs / "views" / "bundle_reduced" / "matrix.npy")
+    assert reduced_matrix.shape == (3, 2)
+
+    concatenated_matrix = np.load(outputs / "views" / "bundle_concat" / "matrix.npy")
+    assert concatenated_matrix.shape == (3, 6)
+
+    renamed_table = pq.read_table(outputs / "scalars" / "bundle_norm_renamed" / "table.parquet")
+    assert "bundle_norm_value" in renamed_table.column_names
