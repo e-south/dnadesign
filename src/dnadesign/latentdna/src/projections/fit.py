@@ -1,0 +1,67 @@
+"""
+Projection fitting helpers for latentdna.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pyarrow as pa
+
+from ..contracts.errors import BackendUnavailableError, ContractViolationError
+from ..io.matrix_io import read_matrix
+from ..io.parquet_io import read_table, write_table
+from ..workspaces.loader import WorkspaceContext
+
+
+def _ordered_indices(view_rows: list[dict], sample_rows: list[dict], *, record_key: str) -> list[int]:
+    index_by_key = {row[record_key]: index for index, row in enumerate(view_rows)}
+    indices: list[int] = []
+    missing: list[str] = []
+    for row in sample_rows:
+        key = row[record_key]
+        if key not in index_by_key:
+            missing.append(str(key))
+            continue
+        indices.append(index_by_key[key])
+    if missing:
+        raise ContractViolationError(f"sample rows are not aligned to view on {record_key}: missing {missing[:5]}")
+    return indices
+
+
+def fit_projection_artifact(
+    context: WorkspaceContext,
+    *,
+    view_id: str,
+    projection_id: str,
+    sample_id: str,
+    metric: str,
+    seed: int,
+) -> tuple[Path, int]:
+    try:
+        import umap
+    except Exception as exc:  # pragma: no cover - dependency controlled by env
+        raise BackendUnavailableError(f"UMAP backend is unavailable: {exc}") from exc
+
+    view_manifest = context.read_manifest(context.output_root / "views" / view_id / "manifest.json")
+    record_key = str(view_manifest["params"]["record_key"])
+
+    matrix = read_matrix(context.output_root / "views" / view_id / "matrix.npy")
+    view_rows = read_table(context.output_root / "views" / view_id / "rows.parquet").to_pylist()
+    sample_rows = read_table(context.output_root / "samples" / sample_id / "rows.parquet").to_pylist()
+    if len(sample_rows) < 3:
+        raise ContractViolationError("projection fitting requires at least 3 sampled rows")
+
+    indices = _ordered_indices(view_rows, sample_rows, record_key=record_key)
+    subset = np.asarray(matrix[indices], dtype=np.float32)
+    n_neighbors = max(2, min(15, subset.shape[0] - 1))
+    reducer = umap.UMAP(n_components=2, metric=metric, n_neighbors=n_neighbors, random_state=seed)
+    coords = reducer.fit_transform(subset)
+
+    table = pa.Table.from_pylist(
+        [{**row, "x": float(coord[0]), "y": float(coord[1])} for row, coord in zip(sample_rows, coords, strict=True)]
+    )
+    artifact_dir = context.output_root / "projections" / projection_id
+    write_table(table, artifact_dir / "coords.parquet")
+    return artifact_dir, table.num_rows
