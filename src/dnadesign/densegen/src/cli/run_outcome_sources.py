@@ -19,7 +19,8 @@ from typing import Mapping, Sequence
 from ..core.pipeline.attempts import _load_attempts_snapshot
 from ..core.run_paths import run_manifest_path, run_state_path
 from ..core.run_state import load_run_state
-from .run_intro import RunContractSummary, RunOutcomeSummary, extract_outcome
+from .run_intro import RunContractSummary, RunOutcomeSummary
+from .run_outcome_extract import extract_outcome
 
 
 def _safe_int(value: object) -> int | None:
