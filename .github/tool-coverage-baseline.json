@@ -9,6 +9,7 @@
   "densegen": 70.0,
   "infer": 32.0,
   "latdna": 0.0,
+  "latentdna": 0.0,
   "libshuffle": 0.0,
   "nmf": 0.0,
   "notify": 80.0,
