@@ -87,10 +87,6 @@ component_management:
       name: nmf
       paths:
         - src/dnadesign/nmf/**
-    - component_id: latdna
-      name: latdna
-      paths:
-        - src/dnadesign/latdna/**
     - component_id: latentdna
       name: latentdna
       paths:
