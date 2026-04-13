@@ -22,6 +22,66 @@ EOF
 }
 
 
+_densegen_log_contains_any() {
+  local log_path="$1"
+  shift
+  local needle
+  for needle in "$@"; do
+    if grep -Fqi "$needle" "$log_path"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+
+_densegen_resolve_analysis_records_path() {
+  local config="$1"
+  local workspace_dir="$2"
+  uv run python -c '
+import sys
+from pathlib import Path
+
+from dnadesign.densegen.src.config.base import resolve_outputs_scoped_path, resolve_usr_root_scoped_path
+from dnadesign.densegen.src.config.root import load_config
+
+cfg_path = Path(sys.argv[1]).resolve()
+workspace_dir = Path(sys.argv[2]).resolve()
+loaded = load_config(cfg_path)
+out_cfg = loaded.root.densegen.output
+targets = list(out_cfg.targets)
+if not targets:
+    raise SystemExit("output.targets must contain at least one sink")
+if len(targets) > 1:
+    plots_cfg = loaded.root.plots
+    if plots_cfg is None or plots_cfg.source is None:
+        raise SystemExit("plots.source must be set when output.targets has multiple sinks")
+    source = str(plots_cfg.source).strip()
+    if source not in targets:
+        raise SystemExit("plots.source must be one of output.targets")
+else:
+    source = str(targets[0]).strip()
+
+if source == "parquet":
+    pq_cfg = out_cfg.parquet
+    if pq_cfg is None:
+        raise SystemExit("output.parquet is required when analysis source resolves to parquet")
+    print(resolve_outputs_scoped_path(cfg_path, workspace_dir, pq_cfg.path, label="output.parquet.path"))
+elif source == "usr":
+    usr_cfg = out_cfg.usr
+    if usr_cfg is None:
+        raise SystemExit("output.usr is required when analysis source resolves to usr")
+    dataset = str(usr_cfg.dataset or "").strip()
+    if not dataset:
+        raise SystemExit("output.usr.dataset must be a non-empty string")
+    usr_root = resolve_usr_root_scoped_path(cfg_path, usr_cfg.root, label="output.usr.root")
+    print(usr_root / dataset / "records.parquet")
+else:
+    raise SystemExit(f"unsupported analysis source: {source}")
+' "$config" "$workspace_dir"
+}
+
+
 densegen_workspace_runbook_flow() {
   local config=""
   local notebook=""
@@ -135,23 +195,50 @@ print((workspace_dir / Path(root)).resolve())
   fi
 
   if [[ "$run_mode" == "analysis" ]]; then
-    local records_table
-    records_table="$(dirname "$config")/outputs/tables/records.parquet"
-    if [[ ! -f "$records_table" ]]; then
-      echo "Analysis mode requires existing outputs at: $records_table" >&2
+    local records_source_path
+    local plot_manifest
+    records_source_path="$(_densegen_resolve_analysis_records_path "$config" "$PWD")"
+    plot_manifest="$(dirname "$config")/outputs/plots/plot_manifest.json"
+    if [[ ! -f "$records_source_path" ]]; then
+      echo "Analysis mode requires existing outputs at: $records_source_path" >&2
       echo "Run ./runbook.sh --mode fresh first to generate artifacts, then rerun with --mode analysis." >&2
       return 2
     fi
+    local inspect_log
+    inspect_log="$(mktemp)"
     set +e
-    "${dense_cmd[@]}" inspect run --events --library -c "$config"
+    "${dense_cmd[@]}" inspect run --events --library -c "$config" >"$inspect_log" 2>&1
     local inspect_status=$?
     set -e
+    cat "$inspect_log"
     if [[ $inspect_status -ne 0 ]]; then
-      echo "Analysis mode inspection failed. Existing artifacts may be stale or schema-incompatible." >&2
-      echo "Run ./runbook.sh --mode fresh, then retry --mode analysis." >&2
-      return "$inspect_status"
+      if _densegen_log_contains_any "$inspect_log" "Run manifest not found" "run_manifest.json"; then
+        echo "Analysis mode inspection skipped: workspace lacks finalized run metadata, but records-derived analysis can continue." >&2
+        echo "Continuing with plots and notebook refresh from existing records artifacts." >&2
+      else
+        echo "Analysis mode inspection failed. Existing artifacts may be stale or schema-incompatible." >&2
+        echo "Run ./runbook.sh --mode fresh, then retry --mode analysis." >&2
+        rm -f "$inspect_log"
+        return "$inspect_status"
+      fi
     fi
-    "${dense_cmd[@]}" plot -c "$config"
+    rm -f "$inspect_log"
+    local plot_log
+    plot_log="$(mktemp)"
+    set +e
+    "${dense_cmd[@]}" plot -c "$config" >"$plot_log" 2>&1
+    local plot_status=$?
+    set -e
+    cat "$plot_log"
+    if [[ $plot_status -ne 0 ]]; then
+      if [[ -f "$plot_manifest" ]] && _densegen_log_contains_any "$plot_log" "pool manifest not found" "pool_manifest.json" "attempts.parquet not found" "composition.parquet not found"; then
+        echo "Analysis mode plot refresh completed with partial success; notebook will show generated plots and explicit local-artifact gaps." >&2
+      else
+        rm -f "$plot_log"
+        return "$plot_status"
+      fi
+    fi
+    rm -f "$plot_log"
     "${dense_cmd[@]}" notebook generate --force -c "$config"
   else
     "${dense_cmd[@]}" validate-config --probe-solver -c "$config"

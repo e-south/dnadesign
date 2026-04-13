@@ -13,43 +13,14 @@ from __future__ import annotations
 
 NOTEBOOK_TEMPLATE_CELLS_GALLERY = r"""
 @app.cell
-def _(Path, json, plot_manifest_path):
+def _(Path, json, plot_manifest_path, resolve_plot_record):
     plot_entries = []
     plot_manifest_load_error = None
     plot_root = plot_manifest_path.parent
     image_suffixes = {".png", ".jpg", ".jpeg", ".svg", ".webp", ".gif"}
-    supported_suffixes = image_suffixes | {".pdf"}
+    video_suffixes = {".mp4", ".webm", ".ogg"}
+    supported_suffixes = image_suffixes | video_suffixes | {".pdf"}
     seen_paths = set()
-
-    def _infer_plot_id_from_path(relative_parts: tuple[str, ...], stem: str) -> str:
-        if not relative_parts:
-            return ""
-        _head = str(relative_parts[0]).strip().lower()
-        _stem = str(stem).strip().lower()
-        if _head == "stage_a":
-            return "stage_a_summary"
-        if _head == "stage_b":
-            if "usage" in _stem:
-                return "tfbs_usage"
-            return "placement_map"
-        if _head == "run_health":
-            return "run_health"
-        return ""
-
-    def _visual_plot_type(plot_id: str, *, plot_name: str, variant: str, stem: str) -> str:
-        _base = str(plot_id or "").strip()
-        _variant = str(variant or "").strip()
-        _plot_name = str(plot_name or "").strip()
-        _stem = str(stem or "").strip()
-        if _base and _variant and _variant != _base:
-            return f"{_base}/{_variant}"
-        if _base:
-            return _base
-        if _variant:
-            return _variant
-        if _plot_name:
-            return _plot_name
-        return _stem
 
     if plot_manifest_path.exists():
         try:
@@ -71,46 +42,13 @@ def _(Path, json, plot_manifest_path):
                 if _key in seen_paths:
                     continue
                 seen_paths.add(_key)
-                _rel_parts = tuple(str(_part) for _part in Path(_rel_path).parts)
-                _plot_id = str(_entry.get("plot_id") or _entry.get("name") or "").strip()
-                if not _plot_id:
-                    _plot_id = _infer_plot_id_from_path(_rel_parts, _candidate.stem)
-                _plan_name = str(_entry.get("plan_name") or "").strip()
-                if not _plan_name:
-                    if len(_rel_parts) >= 2 and _rel_parts[0] == "stage_b":
-                        _plan_name = str(_rel_parts[1]).strip() or "unscoped"
-                    elif len(_rel_parts) >= 1 and _rel_parts[0] == "stage_a":
-                        _plan_name = "stage_a"
-                    else:
-                        _plan_name = "unscoped"
-                _input_name = str(_entry.get("input_name") or "").strip()
-                if not _input_name and len(_rel_parts) >= 4 and _rel_parts[0] == "stage_b":
-                    _input_name = str(_rel_parts[2]).strip()
-                if not _input_name and len(_rel_parts) >= 2 and _rel_parts[0] == "stage_a":
-                    _stem = str(_candidate.stem)
-                    if _stem == "background_logo":
-                        _input_name = "background"
-                    elif _stem.endswith("__background_logo"):
-                        _input_name = _stem[: -len("__background_logo")].strip()
-                _plot_name = str(_entry.get("name") or _candidate.stem)
-                _variant = str(_entry.get("variant") or _candidate.stem or "")
                 plot_entries.append(
-                    {
-                        "path": _candidate,
-                        "plot_id": _plot_id,
-                        "visual_plot_type": _visual_plot_type(
-                            _plot_id,
-                            plot_name=_plot_name,
-                            variant=_variant,
-                            stem=_candidate.stem,
-                        ),
-                        "plan_name": _plan_name,
-                        "input_name": _input_name,
-                        "plot_name": _plot_name,
-                        "variant": _variant,
-                        "description": str(_entry.get("description") or ""),
-                        "_source_rank": 0,
-                    }
+                    resolve_plot_record(
+                        plot_root=plot_root,
+                        plot_path=_candidate,
+                        manifest_entry=_entry,
+                        source_rank=0,
+                    )
                 )
 
     for _candidate in sorted(plot_root.rglob("*")):
@@ -127,39 +65,12 @@ def _(Path, json, plot_manifest_path):
         _relative_parts = tuple(str(_part) for _part in _resolved.relative_to(plot_root.resolve()).parts)
         if any(str(_part).startswith(".") for _part in _relative_parts):
             continue
-        _plan_name = "unscoped"
-        _input_name = ""
-        if len(_relative_parts) >= 2 and _relative_parts[0] == "stage_b":
-            _plan_name = str(_relative_parts[1])
-            if len(_relative_parts) >= 3:
-                _input_name = str(_relative_parts[2]).strip()
-        elif len(_relative_parts) >= 1 and _relative_parts[0] == "stage_a":
-            _plan_name = "stage_a"
-            _stem = str(_resolved.stem)
-            if _stem == "background_logo":
-                _input_name = "background"
-            elif _stem.endswith("__background_logo"):
-                _input_name = _stem[: -len("__background_logo")].strip()
-        _inferred_plot_id = _infer_plot_id_from_path(_relative_parts, _resolved.stem)
-        _plot_name = str(_resolved.stem)
-        _variant = str(_resolved.stem)
         plot_entries.append(
-            {
-                "path": _resolved,
-                "plot_id": _inferred_plot_id,
-                "visual_plot_type": _visual_plot_type(
-                    _inferred_plot_id,
-                    plot_name=_plot_name,
-                    variant=_variant,
-                    stem=_resolved.stem,
-                ),
-                "plan_name": _plan_name,
-                "input_name": _input_name,
-                "plot_name": _plot_name,
-                "variant": _variant,
-                "description": "",
-                "_source_rank": 1,
-            }
+            resolve_plot_record(
+                plot_root=plot_root,
+                plot_path=_resolved,
+                source_rank=1,
+            )
         )
 
     def _stem_priority(entry: dict[str, object]) -> tuple[int, int, int, str]:
@@ -175,7 +86,9 @@ def _(Path, json, plot_manifest_path):
             return (0, _suffix)
         if _suffix == ".pdf":
             return (1, _suffix)
-        return (2, _suffix)
+        if _suffix in video_suffixes:
+            return (2, _suffix)
+        return (3, _suffix)
 
     def _entry_priority(entry: dict[str, object]) -> tuple[int, tuple[int, str], tuple[int, int, int, str]]:
         _source_rank = int(entry.get("_source_rank", 1))
@@ -204,9 +117,10 @@ def _(Path, json, plot_manifest_path):
 
 
 @app.cell
-def _(PLOT_SPECS, mo, plot_entries, plot_manifest_load_error, require):
+def _(PLOT_SPECS, mo, plot_entries, plot_manifest_load_error, require, workspace_plan_names):
     require(plot_manifest_load_error is not None, plot_manifest_load_error or "Plot manifest is invalid.")
     plot_gallery_notice = ""
+    available_but_not_generated_notice = ""
     if not plot_entries:
         plot_gallery_notice = (
             "No `outputs/plots/plot_manifest.json` plots found yet. "
@@ -223,7 +137,7 @@ def _(PLOT_SPECS, mo, plot_entries, plot_manifest_load_error, require):
     missing_plot_names = [name for name in available_plot_names if name not in generated_plot_names]
     if missing_plot_names:
         _joined = ",".join(missing_plot_names)
-        mo.md(
+        available_but_not_generated_notice = (
             "Available but not generated: "
             + ", ".join(f"`{name}`" for name in missing_plot_names)
             + f". Run `uv run dense plot --only {_joined}` to generate them."
@@ -259,7 +173,14 @@ def _(PLOT_SPECS, mo, plot_entries, plot_manifest_load_error, require):
         _variant_label = " ".join(_variant_tokens)
         return f"{_base_label} [{_variant_label}]"
 
-    _plan_names = sorted({str(entry["plan_name"]) for entry in plot_entries})
+    _plan_names = sorted(
+        {
+            str(entry["plan_name"])
+            for entry in plot_entries
+            if str(entry.get("plan_name") or "").strip()
+        }
+        | {str(name).strip() for name in workspace_plan_names if str(name).strip()}
+    )
     all_scope_label = "all scopes (all plots)"
     plan_label_to_name = {all_scope_label: "all"}
     for _plan_name in _plan_names:
@@ -270,84 +191,60 @@ def _(PLOT_SPECS, mo, plot_entries, plot_manifest_load_error, require):
 
     plan_options = list(plan_label_to_name.keys())
     plot_scope_filter = mo.ui.dropdown(options=plan_options, value=plan_options[0], label="")
-    return all_scope_label, compact_plan_label, plan_label_to_name, plot_gallery_notice, plot_scope_filter
+    return (
+        all_scope_label,
+        available_but_not_generated_notice,
+        compact_plan_label,
+        plan_label_to_name,
+        plot_gallery_notice,
+        plot_scope_filter,
+    )
 
 
 @app.cell
-def _(PLOT_SPECS, all_scope_label, mo, pd, plan_label_to_name, plot_entries, plot_scope_filter):
+def _(
+    PLOT_SPECS,
+    HIDDEN_VISUAL_PLOT_TYPES,
+    all_scope_label,
+    base_plot_id,
+    build_plot_ids_by_scope,
+    mo,
+    pd,
+    plan_label_to_name,
+    plot_missing_hint,
+    plot_required_artifacts,
+    plot_entries,
+    plot_scope_filter,
+    resolve_plot_availability,
+    workspace_plan_names,
+):
     selected_scope_label = str(plot_scope_filter.value or all_scope_label)
     selected_plot_scope = str(plan_label_to_name.get(selected_scope_label, "all"))
-    hidden_plot_types = {"run_health/summary_table"}
     entries_for_scope = list(plot_entries)
     if selected_plot_scope != "all":
         entries_for_scope = [_entry for _entry in plot_entries if str(_entry["plan_name"]) == selected_plot_scope]
     entries_for_scope = [
         _entry
         for _entry in entries_for_scope
-        if str(_entry.get("visual_plot_type") or "").strip() not in hidden_plot_types
+        if str(_entry.get("visual_plot_type") or "").strip() not in HIDDEN_VISUAL_PLOT_TYPES
     ]
 
     known_plot_ids = sorted([str(_name) for _name in PLOT_SPECS.keys()])
-
-    def base_plot_id(plot_type: str) -> str:
-        _token = str(plot_type or "").strip()
-        if "/" in _token:
-            return str(_token.split("/", 1)[0]).strip()
-        return _token
-
-    def _ordered_unique(values: list[str]) -> list[str]:
-        ordered: list[str] = []
-        seen: set[str] = set()
-        for value in values:
-            token = str(value).strip()
-            if not token or token in seen:
-                continue
-            ordered.append(token)
-            seen.add(token)
-        return ordered
-
-    plot_ids_by_scope = {}
-    generated_plot_ids_by_scope: dict[str, list[str]] = {}
-    _plot_ids_all_generated_raw = []
-    for entry in plot_entries:
-        _plot_id = str(entry.get("visual_plot_type") or "").strip()
-        if not _plot_id:
-            continue
-        if _plot_id in hidden_plot_types:
-            continue
-        _plot_ids_all_generated_raw.append(_plot_id)
-    _plot_ids_all_generated = sorted(set(_plot_ids_all_generated_raw))
-    generated_plot_ids_by_scope["all"] = _plot_ids_all_generated
-    plot_ids_by_scope["all"] = _ordered_unique(_plot_ids_all_generated)
-    for _plan_name in sorted({str(entry["plan_name"]) for entry in plot_entries}):
-        _plot_ids_scope_generated_raw = []
-        for entry in plot_entries:
-            if str(entry["plan_name"]) != _plan_name:
-                continue
-            _plot_id = str(entry.get("visual_plot_type") or "").strip()
-            if not _plot_id:
-                continue
-            if _plot_id in hidden_plot_types:
-                continue
-            _plot_ids_scope_generated_raw.append(_plot_id)
-        _plot_ids_scope_generated = sorted(set(_plot_ids_scope_generated_raw))
-        generated_plot_ids_by_scope[_plan_name] = _plot_ids_scope_generated
-        plot_ids_by_scope[_plan_name] = _ordered_unique(_plot_ids_scope_generated)
-
-    def _format_plot_id_list(values: list[str]) -> str:
-        if not values:
-            return "`(none)`"
-        return ", ".join(f"`{plot_id}`" for plot_id in values)
+    plot_ids_by_scope, generated_plot_ids_by_scope = build_plot_ids_by_scope(
+        plot_entries,
+        stage_b_scope_names=workspace_plan_names,
+        known_plot_ids=known_plot_ids,
+    )
 
     _scope_available_ids = list(plot_ids_by_scope.get(selected_plot_scope, []))
 
     plot_id_label_to_id = {}
-    _generated_set = set(generated_plot_ids_by_scope.get(selected_plot_scope, []))
-    _generated_set.update(
-        base_plot_id(_plot_id) for _plot_id in list(_generated_set) if base_plot_id(_plot_id)
-    )
+    _scope_generated_ids = list(generated_plot_ids_by_scope.get(selected_plot_scope, []))
     for _plot_id in _scope_available_ids:
-        _status = "generated" if _plot_id in _generated_set else "available"
+        _status = resolve_plot_availability(
+            _plot_id,
+            generated_plot_ids=_scope_generated_ids,
+        )
         _label = f"{_plot_id} [{_status}]"
         plot_id_label_to_id[_label] = _plot_id
 
@@ -361,18 +258,25 @@ def _(PLOT_SPECS, all_scope_label, mo, pd, plan_label_to_name, plot_entries, plo
         plot_id_label_to_id["(no plot types)"] = "(no plot types)"
 
     _generated_counts = {}
+    _generated_base_counts = {}
     for _entry in entries_for_scope:
         _plot_id = str(_entry.get("visual_plot_type") or "").strip()
         if not _plot_id:
             continue
         _generated_counts[_plot_id] = int(_generated_counts.get(_plot_id, 0)) + 1
+        _generated_base = base_plot_id(_plot_id)
+        if _generated_base:
+            _generated_base_counts[_generated_base] = int(_generated_base_counts.get(_generated_base, 0)) + 1
     plot_availability_rows = []
     for _plot_id in _scope_available_ids:
-        _count = int(_generated_counts.get(_plot_id, 0))
+        _count = int(_generated_counts.get(_plot_id, _generated_base_counts.get(_plot_id, 0)))
         plot_availability_rows.append(
             {
                 "Plot type": _plot_id,
-                "Status": "generated" if _count > 0 else "available",
+                "Status": resolve_plot_availability(
+                    _plot_id,
+                    generated_plot_ids=_scope_generated_ids,
+                ),
                 "Generated files": _count,
             }
         )
@@ -416,7 +320,9 @@ def _(
         _visual_plot_type = str(_entry.get("visual_plot_type") or "").strip()
         if not _visual_plot_type:
             return False
-        return _visual_plot_type == selected_plot_id
+        if _visual_plot_type == selected_plot_id:
+            return True
+        return base_plot_id(_visual_plot_type) == selected_plot_id
 
     _filtered_entries = [
         _entry
@@ -452,6 +358,16 @@ def _(
         ):
             _base_id = base_plot_id(selected_plot_id)
             _generation_hint = _base_id if _base_id else selected_plot_id
+            _availability = resolve_plot_availability(
+                selected_plot_id,
+                generated_plot_ids=_generated_plot_ids,
+            )
+            _required_artifacts = [
+                str(_item).strip()
+                for _item in plot_required_artifacts(selected_plot_id)
+                if str(_item).strip()
+            ]
+            _missing_hint = str(plot_missing_hint(selected_plot_id) or "").strip()
             plot_filter_message = (
                 "No generated plots for scope `"
                 + selected_scope_label
@@ -461,6 +377,14 @@ def _(
                 + _generation_hint
                 + "` to generate it."
             )
+            if _availability != "generated":
+                plot_filter_message += " Availability: `" + _availability + "`."
+            if _required_artifacts:
+                plot_filter_message += " Required artifacts: " + ", ".join(
+                    f"`{_item}`" for _item in _required_artifacts
+                ) + "."
+            if _missing_hint:
+                plot_filter_message += " " + _missing_hint
         else:
             plot_filter_message = (
                 "No plots found for scope `"
@@ -607,16 +531,20 @@ def _(Path, hashlib, plot_manifest_path, shutil, subprocess):
 def _(
     active_plot_entry,
     active_plot_error,
+    available_but_not_generated_notice,
     label_to_entry,
     mo,
     plot_availability_table,
     plot_id_label_to_id,
     plot_id_filter,
     plot_gallery_notice,
+    plot_missing_hint,
+    plot_required_artifacts,
     plot_scope_filter,
     plot_selector,
     resolve_plot_preview_image,
 ):
+    _video_suffixes = {".mp4", ".webm", ".ogg"}
     _selected_scope_label = str(plot_scope_filter.value or "")
     _selected_plot_type_label = str(plot_id_filter.value or "")
     _selected_plot_type = str(plot_id_label_to_id.get(_selected_plot_type_label, _selected_plot_type_label))
@@ -647,6 +575,8 @@ def _(
     _content = [mo.md("### Plot gallery"), _filters_summary, gallery_metadata]
     if str(plot_gallery_notice).strip():
         _content.append(mo.md(str(plot_gallery_notice)))
+    if str(available_but_not_generated_notice).strip():
+        _content.append(mo.md(str(available_but_not_generated_notice)))
     _content.append(_controls)
     if active_plot_entry is None:
         _content.append(mo.md(str(active_plot_error or "No plot selected.")))
@@ -656,7 +586,13 @@ def _(
         _plot_name = str(active_plot_entry["plot_name"])
         _variant = str(active_plot_entry["variant"]).strip()
         _plot_path = active_plot_entry["path"]
+        _plot_suffix = str(getattr(_plot_path, "suffix", "")).lower()
         _variant_text = _variant if _variant else "none"
+        _required_artifacts = [
+            str(_item).strip() for _item in plot_required_artifacts(_plot_id) if str(_item).strip()
+        ]
+        _required_artifacts_text = ", ".join(f"`{_item}`" for _item in _required_artifacts) or "none"
+        _missing_hint = str(plot_missing_hint(_plot_id) or "").strip()
         _content.append(
             mo.accordion(
                 {
@@ -667,7 +603,10 @@ def _(
                                 f"- Plot id: `{_plot_id or 'n/a'}`",
                                 f"- Plot name: `{_plot_name}`",
                                 f"- Variant: `{_variant_text}`",
+                                "- Availability: `generated`",
+                                f"- Required artifacts: {_required_artifacts_text}",
                                 f"- File: `{str(_plot_path)}`",
+                                *([f"- Contract hint: {_missing_hint}"] if _missing_hint else []),
                             ]
                         )
                     )
@@ -675,47 +614,57 @@ def _(
                 multiple=True,
             )
         )
-        try:
-            _preview_path = resolve_plot_preview_image(_plot_path)
-            _preview_error = ""
-        except Exception as exc:
-            _preview_path = None
-            _preview_error = str(exc)
-        if _preview_path is not None:
+        if _plot_suffix in _video_suffixes:
             _content.append(
-                mo.image(
-                    str(_preview_path),
+                mo.video(
+                    str(_plot_path),
+                    controls=True,
+                    width="100%",
                     rounded=True,
-                    style={
-                        "border-radius": "14px",
-                        "width": "100%",
-                        "max-width": "860px",
-                        "max-height": "560px",
-                        "height": "auto",
-                        "object-fit": "contain",
-                        "margin": "0 auto",
-                        "display": "block",
-                    },
                 )
             )
         else:
-            if str(getattr(_plot_path, "suffix", "")).lower() == ".pdf":
-                _content.append(mo.pdf(str(_plot_path)))
+            try:
+                _preview_path = resolve_plot_preview_image(_plot_path)
+                _preview_error = ""
+            except Exception as exc:
+                _preview_path = None
+                _preview_error = str(exc)
+            if _preview_path is not None:
                 _content.append(
-                    mo.md(
-                        "PNG preview unavailable: "
-                        + _preview_error
-                        + ". Showing PDF directly for this plot."
+                    mo.image(
+                        str(_preview_path),
+                        rounded=True,
+                        style={
+                            "border-radius": "14px",
+                            "width": "100%",
+                            "max-width": "860px",
+                            "max-height": "560px",
+                            "height": "auto",
+                            "object-fit": "contain",
+                            "margin": "0 auto",
+                            "display": "block",
+                        },
                     )
                 )
             else:
-                _content.append(
-                    mo.md(
-                        "Preview unavailable: "
-                        + _preview_error
-                        + ". Install `gs`, `pdftoppm`, `magick`, `convert`, or `sips` for PNG plot previews."
+                if _plot_suffix == ".pdf":
+                    _content.append(mo.pdf(str(_plot_path)))
+                    _content.append(
+                        mo.md(
+                            "PNG preview unavailable: "
+                            + _preview_error
+                            + ". Showing PDF directly for this plot."
+                        )
                     )
-                )
+                else:
+                    _content.append(
+                        mo.md(
+                            "Preview unavailable: "
+                            + _preview_error
+                            + ". Install `gs`, `pdftoppm`, `magick`, `convert`, or `sips` for PNG plot previews."
+                        )
+                    )
     mo.vstack(_content)
     return
 

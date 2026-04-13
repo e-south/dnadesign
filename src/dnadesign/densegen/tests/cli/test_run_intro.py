@@ -184,6 +184,60 @@ def test_render_intro_groups_large_plan_sets_and_nests_raw_plan_list() -> None:
     assert "| Plan | Variants | Quota | Generated | Progress | Raw plan id |" in rendered
 
 
+def test_render_intro_grouped_scope_table_sums_quota_and_progress_across_variants() -> None:
+    plans = tuple(
+        PlanContract(
+            name=f"sigma70_panel__sig35={letter}__sig10={digit}",
+            quota=1,
+            acceptance_detail="promoter upstream/downstream motifs with a 16–18 bp spacer",
+        )
+        for letter in ("a", "b")
+        for digit in ("A", "B")
+    )
+    outcome = RunOutcomeSummary(
+        available=True,
+        message="",
+        generated_total=4,
+        quota_total=4,
+        progress_pct=100.0,
+        per_plan=tuple(
+            PlanOutcome(
+                name=plan.name,
+                generated=1,
+                quota=1,
+                stall_events=0,
+                total_resamples=0,
+                failed_solutions=0,
+            )
+            for plan in plans
+        ),
+        stall_events=0,
+        total_resamples=0,
+        failed_solutions=0,
+    )
+    contract = RunContractSummary(
+        sequence_length_bp=60,
+        plans=plans,
+        total_quota=4,
+        global_acceptance_detail="1 forbid_kmers rule",
+        inputs_used=("Background",),
+        max_accepted_per_library=2,
+        round_robin=True,
+        solver_backend="CBC",
+        solver_strategy="iterate",
+        solver_attempt_timeout_seconds=10,
+        no_progress_seconds_before_resample=10,
+        max_consecutive_no_progress_resamples=25,
+    )
+
+    rendered = render_intro_md(contract, outcome, style="didactic")
+
+    assert (
+        "| sigma70_panel (promoter upstream/downstream motifs with a 16–18 bp spacer) | 4 | 4 | 4/4 | all complete |"
+        in rendered
+    )
+
+
 def test_extract_contract_renders_sigma_name_negative_selection_and_expansion_details() -> None:
     payload = {
         "densegen": {
@@ -353,8 +407,13 @@ def test_sources_and_freshness_marks_manifest_newer_than_notebook(tmp_path: Path
     assert "- Config:" in rendered
     assert "- Records path:" in rendered
     assert "- Manifest:" in rendered
+    assert "- Run state:" in rendered
+    assert "- Attempts tables:" in rendered
+    assert "- Events log:" in rendered
     assert "- Notebook:" in rendered
     assert "`[config]`" in rendered
     assert "`[manifest]`" in rendered
-    assert "Manifest is newer than this notebook file. Regenerate the notebook to update the narrative." in rendered
+    assert (
+        "Manifest evidence is newer than this notebook file. Regenerate the notebook to update the narrative."
+    ) in rendered
     assert manifest_path.stat().st_mtime >= notebook_mtime

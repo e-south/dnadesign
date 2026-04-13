@@ -19,6 +19,7 @@ cd src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro
 ```
 
 Use `--mode resume` to continue generation, or `--mode analysis` when you only need plots/notebook refresh.
+For shared records-only study state, analysis mode still refreshes recoverable Stage-B plots instead of requiring a full local rerun.
 
 ### Prerequisites
 
@@ -149,6 +150,8 @@ Use this mode when generation is complete or paused and you only need plots and 
 
 ```bash
 # Render DenseGen analysis artifacts from current run outputs.
+# Records-only analysis still recovers Stage-B placement, TFBS usage, and showcase video plots.
+# `stage_a_summary` requires pool artifacts and `run_health` requires attempts artifacts.
 pixi run dense plot -c "$CONFIG"
 # Optional analysis shortcut: render only the Stage-B showcase video artifact.
 # pixi run dense plot --only dense_array_video_showcase -c "$CONFIG"
@@ -174,6 +177,8 @@ Durability knobs for interruption tolerance:
 # Enter the workspace directory so relative paths resolve correctly.
 cd src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro
 # Rebuild plots/notebook from existing run artifacts without regenerating sequences.
+# If finalized run metadata is absent, the runbook still uses checkpointed state and records artifacts
+# to refresh recoverable diagnostics, Stage-B plots, and the notebook gallery.
 ./runbook.sh --mode analysis
 # Open the generated notebook in marimo app mode.
 pixi run dense notebook run -c "$PWD/config.yaml"

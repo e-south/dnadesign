@@ -26,6 +26,8 @@ from typing_extensions import Literal
 from ..adapters.outputs import load_records_from_config
 from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
 from ..core.artifacts.pool import POOL_MODE_TFBS, TFBSPoolArtifact, load_pool_artifact
+from ..core.pipeline.attempts import _load_attempts_snapshot
+from ..core.record_values import require_list_of_dicts as _require_list_of_dicts
 from ..utils.rich_style import make_panel, make_table
 from .dense_array_video import plot_dense_array_video_showcase
 from .plot_common import (  # noqa: F401
@@ -36,6 +38,7 @@ from .plot_common import (  # noqa: F401
     _palette,
     plan_group_from_name,
 )
+from .plot_inventory import manifest_path_fields
 from .plot_registry import PLOT_SPECS
 from .plot_run import plot_run_health, plot_tfbs_usage
 from .plot_stage_a import plot_stage_a_summary  # noqa: F401
@@ -152,14 +155,8 @@ def _resolve_analysis_table_paths(
 
 def _load_attempts(run_root: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame:
     tables_root = run_root / "outputs" / "tables"
-    attempts_paths = _resolve_analysis_table_paths(
-        tables_root,
-        final_name="attempts.parquet",
-        part_glob="attempts_part-*.parquet",
-    )
     projected_columns = _read_columns(columns)
-    frames = [pd.read_parquet(path, columns=projected_columns) for path in attempts_paths]
-    return pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
+    return _load_attempts_snapshot(tables_root, columns=projected_columns)
 
 
 def _load_events(run_root: Path) -> pd.DataFrame:
@@ -285,6 +282,76 @@ def _load_composition(run_root: Path, *, columns: Iterable[str] | None = None) -
     return frame
 
 
+def _is_missing_composition_artifact_error(exc: Exception) -> bool:
+    message = str(exc).strip().lower()
+    return "composition.parquet not found:" in message
+
+
+def _recover_composition_from_output_records(
+    dense_arrays_df: pd.DataFrame,
+    *,
+    columns: Iterable[str] | None = None,
+) -> pd.DataFrame:
+    required = {"id", "densegen__input_name", "densegen__plan", "densegen__used_tfbs_detail"}
+    missing = required - set(dense_arrays_df.columns)
+    if missing:
+        raise ValueError(
+            f"Output records are missing the columns required to recover composition data: {sorted(missing)}"
+        )
+    rows: list[dict[str, object]] = []
+    for _, row in dense_arrays_df.iterrows():
+        solution_id = str(row.get("id") or "").strip()
+        input_name = str(row.get("densegen__input_name") or "").strip()
+        plan_name = str(row.get("densegen__plan") or "").strip()
+        if not solution_id or not input_name or not plan_name:
+            raise ValueError(
+                "Output records are missing id/input_name/plan metadata required for composition recovery."
+            )
+        library_hash = str(row.get("densegen__sampling_library_hash") or "").strip() or None
+        library_index = row.get("densegen__sampling_library_index")
+        for item in _require_list_of_dicts(row.get("densegen__used_tfbs_detail")):
+            part_kind = str(item.get("part_kind") or "tfbs").strip().lower()
+            if part_kind != "tfbs":
+                continue
+            tf = str(item.get("regulator") or "").strip()
+            tfbs = str(item.get("sequence") or "").strip()
+            if not tf or not tfbs:
+                continue
+            rows.append(
+                {
+                    "solution_id": solution_id,
+                    "input_name": input_name,
+                    "plan_name": plan_name,
+                    "library_hash": library_hash,
+                    "library_index": library_index,
+                    "part_kind": "tfbs",
+                    "tf": tf,
+                    "tfbs": tfbs,
+                    "regulator": tf,
+                    "sequence": tfbs,
+                    "offset": item.get("offset"),
+                    "offset_raw": item.get("offset_raw"),
+                    "length": item.get("length"),
+                    "end": item.get("end"),
+                    "orientation": item.get("orientation"),
+                    "source": item.get("source"),
+                    "motif_id": item.get("motif_id"),
+                    "tfbs_id": item.get("tfbs_id"),
+                    "site_id": item.get("site_id"),
+                }
+            )
+    if not rows:
+        raise ValueError("Output records include no TFBS placement annotations to recover composition data.")
+    recovered = pd.DataFrame(rows)
+    requested = _read_columns(columns)
+    if requested is None:
+        return recovered
+    missing_requested = sorted(set(requested) - set(recovered.columns))
+    if missing_requested:
+        raise ValueError(f"Recovered composition data is missing required columns: {missing_requested}")
+    return recovered[requested].copy()
+
+
 def _maybe_load_composition(run_root: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame | None:
     tables_root = run_root / "outputs" / "tables"
     final_path = tables_root / "composition.parquet"
@@ -335,6 +402,18 @@ def _load_effective_config(run_root: Path) -> dict:
     if not path.exists():
         raise ValueError(f"effective_config.json not found: {path}")
     return json.loads(path.read_text())
+
+
+def _model_to_dict(model: object) -> dict:
+    if hasattr(model, "model_dump"):
+        return dict(model.model_dump(mode="python", exclude_none=True))
+    if hasattr(model, "dict"):
+        return dict(model.dict(exclude_none=True))
+    raise TypeError("DenseGen config model does not support dict export for plotting fallback.")
+
+
+def _root_config_to_dict(root_cfg: RootConfig) -> dict:
+    return {"config": _model_to_dict(root_cfg.densegen)}
 
 
 def _load_dense_arrays(run_root: Path, *, columns: Iterable[str] | None = None) -> pd.DataFrame:
@@ -439,7 +518,7 @@ def _plot_required_sources(selected: Iterable[str]) -> set[str]:
 
 _OUTPUT_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
     "dense_array_video_showcase": {"id", "sequence", "densegen__plan", "densegen__used_tfbs_detail"},
-    "placement_map": {"id", "sequence", "densegen__input_name", "densegen__plan"},
+    "placement_map": {"id", "sequence", "densegen__input_name", "densegen__plan", "densegen__used_tfbs_detail"},
     "run_health": {"densegen__compression_ratio", "densegen__plan"},
 }
 _COMPOSITION_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
@@ -477,6 +556,11 @@ _POOL_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
         "nearest_selected_distance_norm",
         "selection_rank",
     }
+}
+_COMPOSITION_RECOVERY_OUTPUT_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
+    "placement_map": {"id", "densegen__input_name", "densegen__plan", "densegen__used_tfbs_detail"},
+    "tfbs_usage": {"id", "densegen__input_name", "densegen__plan", "densegen__used_tfbs_detail"},
+    "run_health": {"id", "densegen__input_name", "densegen__plan", "densegen__used_tfbs_detail"},
 }
 
 
@@ -644,57 +728,6 @@ def _top_stage_b_drilldown_plans(
     return ordered["plan"].head(int(limit)).astype(str).tolist()
 
 
-def _manifest_path_fields(name: str, rel_path: Path) -> dict:
-    fields: dict[str, str] = {"plot_id": str(name)}
-    parts = rel_path.parts
-    stem = rel_path.stem
-    if name == "dense_array_video_showcase":
-        fields["group"] = "stage_b"
-        fields["family"] = "showcase"
-        if len(parts) >= 2:
-            fields["plan_name"] = parts[1]
-        fields["variant"] = stem
-        return fields
-    if name == "stage_a_summary":
-        fields["group"] = "stage_a"
-        fields["family"] = "stage_a"
-        fields["plan_name"] = "stage_a"
-        if stem == "background_logo":
-            fields["variant"] = "background_logo"
-            fields["input_name"] = "background"
-        elif stem.endswith("__background_logo"):
-            fields["variant"] = "background_logo"
-            fields["input_name"] = stem[: -len("__background_logo")]
-        else:
-            fields["variant"] = stem
-        return fields
-    if name == "placement_map":
-        fields["group"] = "stage_b"
-        fields["family"] = "plan"
-        if len(parts) >= 3:
-            fields["plan_name"] = parts[1]
-        if len(parts) >= 4:
-            fields["input_name"] = parts[2]
-        fields["variant"] = stem
-        return fields
-    if name == "tfbs_usage":
-        fields["group"] = "stage_b"
-        fields["family"] = "plan"
-        if len(parts) >= 3:
-            fields["plan_name"] = parts[1]
-        if len(parts) >= 4:
-            fields["input_name"] = parts[2]
-        fields["variant"] = stem
-        return fields
-    if name == "run_health":
-        fields["group"] = "run"
-        fields["family"] = "run_health"
-        fields["variant"] = stem
-        return fields
-    fields["variant"] = stem
-    return fields
-
-
 def run_plots_from_config(
     root_cfg: RootConfig,
     cfg_path: Path,
@@ -730,6 +763,10 @@ def run_plots_from_config(
     library_member_cols = _required_columns_for_selected(selected, mapping=_LIBRARY_MEMBERS_COLUMNS_BY_PLOT)
     dense_array_cols = _required_columns_for_selected(selected, mapping=_DENSE_ARRAY_COLUMNS_BY_PLOT)
     pool_cols = _required_columns_for_selected(selected, mapping=_POOL_COLUMNS_BY_PLOT)
+    composition_recovery_output_cols = _required_columns_for_selected(
+        selected,
+        mapping=_COMPOSITION_RECOVERY_OUTPUT_COLUMNS_BY_PLOT,
+    )
     max_rows = plots_cfg.sample_rows if plots_cfg else None
     allow_truncated_records = bool(
         allow_truncated or (plots_cfg is not None and bool(getattr(plots_cfg, "allow_truncated", False)))
@@ -744,64 +781,107 @@ def run_plots_from_config(
     library_builds_df: pd.DataFrame | None = None
     library_members_df: pd.DataFrame | None = None
     cfg_effective: dict | None = None
+    source_errors: dict[str, Exception] = {}
 
     if "outputs" in required_sources:
-        df, src_label = load_records_from_config(
-            root_cfg,
-            cfg_path,
-            columns=cols,
-            max_rows=max_rows,
-            allow_truncated=allow_truncated_records,
-        )
-        src_label = _format_source_label(src_label, run_root, absolute)
-        row_count = len(df)
+        try:
+            df, src_label = load_records_from_config(
+                root_cfg,
+                cfg_path,
+                columns=cols,
+                max_rows=max_rows,
+                allow_truncated=allow_truncated_records,
+            )
+            src_label = _format_source_label(src_label, run_root, absolute)
+            row_count = len(df)
+        except Exception as exc:
+            source_errors["outputs"] = exc
     if "composition" in required_sources:
-        composition_df = _load_composition(run_root, columns=composition_cols)
-        if row_count == 0:
+        try:
+            composition_df = _load_composition(run_root, columns=composition_cols)
+        except Exception as exc:
+            try:
+                if not _is_missing_composition_artifact_error(exc) or not composition_recovery_output_cols:
+                    raise
+                recovery_cols = sorted(set(cols) | set(composition_recovery_output_cols))
+                if df.empty or any(column not in df.columns for column in composition_recovery_output_cols):
+                    df, src_label = load_records_from_config(
+                        root_cfg,
+                        cfg_path,
+                        columns=recovery_cols,
+                        max_rows=max_rows,
+                        allow_truncated=allow_truncated_records,
+                    )
+                    src_label = _format_source_label(src_label, run_root, absolute)
+                    row_count = len(df)
+                    source_errors.pop("outputs", None)
+                composition_df = _recover_composition_from_output_records(df, columns=composition_cols)
+            except Exception as recovery_exc:
+                source_errors["composition"] = recovery_exc
+        if composition_df is not None and row_count == 0:
             row_count = len(composition_df)
             src_label = _format_source_label(
                 f"composition:{run_root / 'outputs' / 'tables' / 'composition.parquet'}", run_root, absolute
             )
     if "libraries" in required_sources:
-        library_builds_df, library_members_df = _load_libraries(
-            run_root,
-            builds_columns=library_build_cols,
-            members_columns=library_member_cols,
-        )
-        if row_count == 0:
-            row_count = len(library_members_df)
-            src_label = _format_source_label(f"libraries:{run_root / 'outputs' / 'libraries'}", run_root, absolute)
-    if "config" in required_sources:
-        cfg_effective = _load_effective_config(run_root)
-        if row_count == 0:
-            row_count = 1
-            src_label = _format_source_label(
-                f"config:{run_root / 'outputs' / 'meta' / 'effective_config.json'}", run_root, absolute
+        try:
+            library_builds_df, library_members_df = _load_libraries(
+                run_root,
+                builds_columns=library_build_cols,
+                members_columns=library_member_cols,
             )
-    if "attempts" in required_sources:
-        attempts_df = _load_attempts(run_root, columns=attempt_cols)
-        if row_count == 0:
-            row_count = len(attempts_df)
-            src_label = _format_source_label(
-                f"attempts:{run_root / 'outputs' / 'tables' / 'attempts.parquet'}", run_root, absolute
-            )
-        events_path = run_root / "outputs" / "meta" / "events.jsonl"
-        if events_path.exists():
-            events_df = _load_events(run_root)
             if row_count == 0:
-                row_count = len(events_df)
-                src_label = _format_source_label(f"events:{events_path}", run_root, absolute)
+                row_count = len(library_members_df)
+                src_label = _format_source_label(f"libraries:{run_root / 'outputs' / 'libraries'}", run_root, absolute)
+        except Exception:
+            library_builds_df = None
+            library_members_df = None
+    if "config" in required_sources:
+        try:
+            cfg_effective = _load_effective_config(run_root)
+            if row_count == 0:
+                row_count = 1
+                src_label = _format_source_label(
+                    f"config:{run_root / 'outputs' / 'meta' / 'effective_config.json'}", run_root, absolute
+                )
+        except Exception as exc:
+            if "effective_config.json not found:" in str(exc):
+                cfg_effective = _root_config_to_dict(root_cfg)
+                if row_count == 0:
+                    row_count = 1
+                    src_label = _format_source_label(f"config:{cfg_path}", run_root, absolute)
+            else:
+                source_errors["config"] = exc
+    if "attempts" in required_sources:
+        try:
+            attempts_df = _load_attempts(run_root, columns=attempt_cols)
+            if row_count == 0:
+                row_count = len(attempts_df)
+                src_label = _format_source_label(
+                    f"attempts:{run_root / 'outputs' / 'tables' / 'attempts.parquet'}", run_root, absolute
+                )
+            events_path = run_root / "outputs" / "meta" / "events.jsonl"
+            if events_path.exists():
+                events_df = _load_events(run_root)
+                if row_count == 0:
+                    row_count = len(events_df)
+                    src_label = _format_source_label(f"events:{events_path}", run_root, absolute)
+        except Exception as exc:
+            source_errors["attempts"] = exc
     pools: dict[str, pd.DataFrame] | None = None
     pool_manifest: TFBSPoolArtifact | None = None
     if "pools" in required_sources:
-        pool_manifest, pools = _load_stage_a_pools(run_root, columns=pool_cols)
-        if row_count == 0:
-            row_count = sum(
-                int(entry.rows)
-                for entry in pool_manifest.inputs.values()
-                if str(entry.pool_mode or "") == POOL_MODE_TFBS
-            )
-            src_label = _format_source_label(f"pools:{run_root / 'outputs' / 'pools'}", run_root, absolute)
+        try:
+            pool_manifest, pools = _load_stage_a_pools(run_root, columns=pool_cols)
+            if row_count == 0:
+                row_count = sum(
+                    int(entry.rows)
+                    for entry in pool_manifest.inputs.values()
+                    if str(entry.pool_mode or "") == POOL_MODE_TFBS
+                )
+                src_label = _format_source_label(f"pools:{run_root / 'outputs' / 'pools'}", run_root, absolute)
+        except Exception as exc:
+            source_errors["pools"] = exc
     if "tfbs_usage" in selected and library_members_df is None:
         libs = _maybe_load_libraries(
             run_root,
@@ -832,6 +912,14 @@ def run_plots_from_config(
     for name in selected:
         fn = AVAILABLE_PLOTS[name]["fn"]
         raw = (options.get(name, {}) or {}).copy()
+        plot_source_error = next(
+            (
+                source_errors[source_name]
+                for source_name in _plot_required_sources([name])
+                if source_name in source_errors
+            ),
+            None,
+        )
 
         # absorb dims/palette into style
         dims = raw.pop("dims", None)
@@ -856,6 +944,8 @@ def run_plots_from_config(
 
         out_path = out_dir / f"{name}.{plot_format}"
         try:
+            if plot_source_error is not None:
+                raise plot_source_error
             if name == "dense_array_video_showcase":
                 if plots_cfg is None:
                     raise ValueError("dense_array_video_showcase requires plots.video configuration.")
@@ -863,6 +953,7 @@ def run_plots_from_config(
                     df,
                     out_path,
                     video_cfg=plots_cfg.video,
+                    workspace_name=cfg_path.parent.name,
                     **kwargs,
                 )
             elif name == "placement_map":
@@ -1024,7 +1115,7 @@ def run_plots_from_config(
             created_at = datetime.now(timezone.utc).isoformat()
             for path in paths:
                 rel_path = path.relative_to(out_dir)
-                manifest_fields = _manifest_path_fields(name, rel_path)
+                manifest_fields = manifest_path_fields(name, rel_path)
                 manifest_entries.append(
                     {
                         "name": name,
@@ -1041,8 +1132,7 @@ def run_plots_from_config(
             errors.append((name, e))
 
     _console.print(summary)
+    _write_plot_manifest(out_dir, entries=manifest_entries, run_root=run_root, cfg_path=cfg_path, source=source)
     if errors:
         details = "; ".join(f"{name}: {err}" for name, err in errors)
         raise RuntimeError(f"{len(errors)} plot(s) failed: {details}")
-
-    _write_plot_manifest(out_dir, entries=manifest_entries, run_root=run_root, cfg_path=cfg_path, source=source)

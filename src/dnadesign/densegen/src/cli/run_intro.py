@@ -76,6 +76,11 @@ class RunOutcomeSummary:
     total_resamples: int
     failed_solutions: int
     created_at: str | None = None
+    outcome_source: str = "manifest"
+    pressure_source: str = "manifest"
+    notes: tuple[str, ...] = tuple()
+    pressure_available: bool = True
+    pressure_message: str = ""
 
 
 @dataclass(frozen=True)
@@ -1064,7 +1069,14 @@ def extract_outcome(
     *,
     plan_order: Sequence[str],
     error_message: str | None = None,
+    outcome_source: str = "manifest",
+    pressure_source: str | None = None,
+    notes: Sequence[str] = (),
+    pressure_available: bool | None = None,
+    pressure_message: str = "",
 ) -> RunOutcomeSummary:
+    resolved_pressure_source = str(pressure_source or outcome_source)
+    note_items = tuple(str(item).strip() for item in notes if str(item).strip())
     if error_message is not None:
         return RunOutcomeSummary(
             available=False,
@@ -1077,6 +1089,11 @@ def extract_outcome(
             total_resamples=0,
             failed_solutions=0,
             created_at=None,
+            outcome_source=str(outcome_source),
+            pressure_source=resolved_pressure_source,
+            notes=note_items,
+            pressure_available=False if pressure_available is None else bool(pressure_available),
+            pressure_message=str(pressure_message or "").strip(),
         )
 
     if not isinstance(manifest_payload, Mapping):
@@ -1091,6 +1108,11 @@ def extract_outcome(
             total_resamples=0,
             failed_solutions=0,
             created_at=None,
+            outcome_source=str(outcome_source),
+            pressure_source=resolved_pressure_source,
+            notes=note_items,
+            pressure_available=False if pressure_available is None else bool(pressure_available),
+            pressure_message=str(pressure_message or "").strip(),
         )
 
     generated_total = _safe_int(manifest_payload.get("total_generated"))
@@ -1106,6 +1128,11 @@ def extract_outcome(
             total_resamples=0,
             failed_solutions=0,
             created_at=None,
+            outcome_source=str(outcome_source),
+            pressure_source=resolved_pressure_source,
+            notes=note_items,
+            pressure_available=False if pressure_available is None else bool(pressure_available),
+            pressure_message=str(pressure_message or "").strip(),
         )
 
     per_plan, stall_events, total_resamples, failed_solutions = _aggregate_per_plan(
@@ -1133,6 +1160,11 @@ def extract_outcome(
         total_resamples=int(total_resamples),
         failed_solutions=int(failed_solutions),
         created_at=created_at,
+        outcome_source=str(outcome_source),
+        pressure_source=resolved_pressure_source,
+        notes=note_items,
+        pressure_available=True if pressure_available is None else bool(pressure_available),
+        pressure_message=str(pressure_message or "").strip(),
     )
 
 

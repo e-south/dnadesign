@@ -48,9 +48,13 @@ Use `--mode resume` to continue generation without wiping outputs, or `--mode an
     # Inspect run diagnostics and per-plan library progress.
     pixi run dense inspect run --events --library -c "$CONFIG"
     # Render DenseGen analysis artifacts from current run outputs.
-    # `dense plot` is the analysis entry point; static plots always render.
-    # This workspace enables plots.video.enabled: true by default, emitting a sampled
-    # Stage-B showcase video at outputs/plots/stage_b/all_plans/showcase.mp4.
+    # `dense plot` is the analysis entry point for any DenseGen records dataset.
+    # On records-only workspaces, DenseGen recovers Stage-B `placement_map`,
+    # `tfbs_usage`, and the `dense_array_video_showcase` video directly from
+    # shared records. `stage_a_summary` still requires pool artifacts and
+    # `run_health` still requires attempts artifacts under outputs/.
+    # This workspace enables plots.video.enabled: true by default, emitting a
+    # sampled Stage-B showcase video at outputs/plots/stage_b/all_plans/showcase.mp4.
     # Disable by setting plots.video.enabled: false in config.
     pixi run dense plot -c "$CONFIG"
     # Optional analysis shortcut: render only the Stage-B showcase video artifact.
@@ -95,10 +99,12 @@ Queue contract:
 
 ### Optional analysis mode (existing outputs)
 
-Mode C: post-run analysis only.
+    Mode C: post-run analysis only.
 
-    # Rebuild plots/notebook from existing run artifacts without regenerating sequences.
-    ./runbook.sh --mode analysis
+        # Rebuild plots/notebook from existing run artifacts without regenerating sequences.
+        # Records-only state is acceptable here: the shared runbook continues when
+        # finalized run metadata is absent and still refreshes recoverable diagnostics and Stage-B plots.
+        ./runbook.sh --mode analysis
 
 ### Optional notebook open
 

@@ -58,6 +58,31 @@ def _write_attempts(path: Path) -> None:
     df.to_parquet(path, index=False)
 
 
+def _write_run_state(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "run_id": "demo",
+                "created_at": "2026-01-14T00:00:00+00:00",
+                "updated_at": "2026-01-14T00:05:00+00:00",
+                "schema_version": "2.9",
+                "config_sha256": "dummy",
+                "accepted_config_sha256": ["dummy"],
+                "run_root": str(path.parent.parent.parent),
+                "total_generated": 1,
+                "items": [
+                    {
+                        "input_name": PLAN_POOL_LABEL,
+                        "plan_name": "demo_plan",
+                        "generated": 1,
+                    }
+                ],
+            }
+        )
+    )
+
+
 def test_inspect_run_library_summary_hides_tfbs_sequences(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.yaml"
     write_minimal_config(cfg_path)
@@ -105,6 +130,54 @@ def test_inspect_run_library_summary_hides_tfbs_sequences(tmp_path: Path) -> Non
     assert "TF usage summary" in result.output
     assert "TFBS usage summary" in result.output
     assert "AAA" not in result.output
+
+
+def test_inspect_run_library_summary_reads_attempt_parts_when_final_file_is_missing(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
+    _write_attempts(tmp_path / "outputs" / "tables" / "attempts_part-000.parquet")
+    meta_root = tmp_path / "outputs" / "meta"
+    meta_root.mkdir(parents=True, exist_ok=True)
+    run_manifest = {
+        "run_id": "demo",
+        "created_at": "2026-01-14T00:00:00+00:00",
+        "schema_version": "2.9",
+        "config_sha256": "dummy",
+        "run_root": str(tmp_path),
+        "random_seed": 0,
+        "seed_stage_a": 0,
+        "seed_stage_b": 0,
+        "seed_solver": 0,
+        "solver_backend": "CBC",
+        "solver_strategy": "iterate",
+        "solver_attempt_timeout_seconds": None,
+        "solver_threads": None,
+        "solver_strands": "double",
+        "dense_arrays_version": None,
+        "dense_arrays_version_source": "unknown",
+        "total_quota": 1,
+        "items": [
+            {
+                "input_name": PLAN_POOL_LABEL,
+                "plan_name": "demo_plan",
+                "quota": 1,
+                "generated": 1,
+                "duplicates_skipped": 0,
+                "failed_solutions": 0,
+                "total_resamples": 0,
+                "libraries_built": 1,
+                "stall_events": 0,
+            }
+        ],
+    }
+    (meta_root / "run_manifest.json").write_text(json.dumps(run_manifest))
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["inspect", "run", "--library", "--allow-partial", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert "TF usage summary" in result.output
+    assert "TFBS usage summary" in result.output
 
 
 def test_inspect_run_library_summary_fails_closed_without_allow_partial(tmp_path: Path) -> None:
@@ -174,3 +247,33 @@ def test_inspect_run_library_summary_allow_partial_opt_in(tmp_path: Path) -> Non
     result = runner.invoke(app, ["inspect", "run", "--library", "--allow-partial", "-c", str(cfg_path)])
     assert result.exit_code == 0, result.output
     assert "No library usage summaries found" in result.output
+
+
+def test_inspect_run_keeps_events_and_library_summary_when_manifest_is_missing(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
+    _write_attempts(tmp_path / "outputs" / "tables" / "attempts.parquet")
+    meta_root = tmp_path / "outputs" / "meta"
+    _write_run_state(meta_root / "run_state.json")
+    (meta_root / "events.jsonl").write_text(
+        json.dumps(
+            {
+                "event": "STALL_DETECTED",
+                "created_at": "2026-01-14T00:06:00+00:00",
+                "plan_name": "demo_plan",
+            }
+        )
+        + "\n"
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["inspect", "run", "--events", "--library", "--allow-partial", "-c", str(cfg_path)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "checkpointed run_state" in result.output
+    assert "STALL_DETECTED" in result.output
+    assert "TF usage summary" in result.output

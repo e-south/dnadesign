@@ -12,12 +12,12 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from importlib import metadata as importlib_metadata
 from pathlib import Path
 
 from ..config.root import load_config
+from ..integrations.baserender.notebook_contract import format_densegen_workspace_heading
 from .notebook_cells_template import notebook_template_cells
 from .notebook_template_cells import baserender_export_cell_template as _baserender_export_cell_template
 from .notebook_template_cells import records_export_cell_template as _records_export_cell_template
@@ -25,8 +25,8 @@ from .run_intro import (
     RunDetailsPathsContext,
     build_run_details_payload,
     extract_contract,
-    extract_outcome,
 )
+from .run_outcome_sources import resolve_workspace_outcome
 
 
 @dataclass(frozen=True)
@@ -40,33 +40,8 @@ class NotebookTemplateContext:
     notebook_path: Path | None = None
 
 
-_KNOWN_ACRONYMS = {
-    "cbc": "CBC",
-    "dna": "DNA",
-    "fimo": "FIMO",
-    "gurobi": "GUROBI",
-    "pwm": "PWM",
-    "tfbs": "TFBS",
-    "usr": "USR",
-}
-
-
 def _format_workspace_heading(raw_name: str) -> str:
-    text = str(raw_name or "").strip()
-    if not text:
-        return "DenseGen Workspace"
-    tokens = [token for token in re.split(r"[_\-\s]+", text) if token]
-    if not tokens:
-        return "DenseGen Workspace"
-    words: list[str] = []
-    for token in tokens:
-        normalized = token.strip()
-        lower = normalized.lower()
-        if lower in _KNOWN_ACRONYMS:
-            words.append(_KNOWN_ACRONYMS[lower])
-            continue
-        words.append(normalized[:1].upper() + normalized[1:])
-    return " ".join(words)
+    return format_densegen_workspace_heading(raw_name)
 
 
 def _build_workspace_intro(context: NotebookTemplateContext) -> str:
@@ -101,28 +76,12 @@ def _build_workspace_intro_payload(context: NotebookTemplateContext) -> dict[str
             f"config could not be validated against schema at notebook generation time ({exc.__class__.__name__})."
         )
 
-    manifest_path = context.run_root / "outputs" / "meta" / "run_manifest.json"
-    manifest_payload: dict[str, object] | None = None
-    outcome_error: str | None = None
-    if not manifest_path.exists():
-        outcome_error = (
-            "run outcomes are not available yet; run `dense run` to materialize `outputs/meta/run_manifest.json`."
-        )
-    else:
-        try:
-            parsed = json.loads(manifest_path.read_text())
-            if isinstance(parsed, dict):
-                manifest_payload = parsed
-            else:
-                outcome_error = "run outcomes are unavailable because run_manifest.json is not a JSON object."
-        except Exception:
-            outcome_error = "run outcomes are unavailable because run_manifest.json could not be parsed."
-
     contract = extract_contract(payload, config_error=config_error)
-    outcome = extract_outcome(
-        manifest_payload,
-        plan_order=[plan.name for plan in contract.plans],
-        error_message=outcome_error,
+    manifest_path = context.run_root / "outputs" / "meta" / "run_manifest.json"
+    outcome = resolve_workspace_outcome(
+        contract,
+        run_root=context.run_root,
+        records_path=context.records_path,
     )
     return build_run_details_payload(
         contract,
@@ -135,6 +94,18 @@ def _build_workspace_intro_payload(context: NotebookTemplateContext) -> dict[str
             notebook_path=context.notebook_path,
         ),
     )
+
+
+def _build_workspace_plan_names(context: NotebookTemplateContext) -> list[str]:
+    try:
+        loaded = load_config(context.cfg_path)
+    except Exception:
+        return []
+    return [
+        str(plan.name).strip()
+        for plan in loaded.root.densegen.generation.resolve_plan()
+        if str(getattr(plan, "name", "")).strip()
+    ]
 
 
 def _template_header() -> str:
@@ -178,6 +149,7 @@ def render_notebook_template(context: NotebookTemplateContext) -> str:
     usr_dataset_text = json.dumps(str(context.usr_dataset or ""))
     workspace_raw_name = str(context.cfg_path.parent.name or context.run_root.name)
     workspace_heading_text = json.dumps(_format_workspace_heading(workspace_raw_name))
+    workspace_plan_names_text = json.dumps(_build_workspace_plan_names(context))
     workspace_intro_payload_text = json.dumps(_build_workspace_intro_payload(context))
     generated_with = "unknown"
     try:
@@ -196,5 +168,6 @@ def render_notebook_template(context: NotebookTemplateContext) -> str:
         .replace("__USR_ROOT__", usr_root_text)
         .replace("__USR_DATASET__", usr_dataset_text)
         .replace("__WORKSPACE_HEADING__", workspace_heading_text)
+        .replace("__WORKSPACE_PLAN_NAMES__", workspace_plan_names_text)
         .replace("__WORKSPACE_RUN_DETAILS_PAYLOAD__", workspace_intro_payload_text)
     )

@@ -293,6 +293,74 @@ def _summary_bullets(intro: str) -> list[str]:
     return bullets
 
 
+def _write_records_by_plan(records_path: Path, generated_by_plan: dict[str, int]) -> None:
+    import pandas as pd
+
+    records_path.parent.mkdir(parents=True, exist_ok=True)
+    plans = [plan_name for plan_name, count in generated_by_plan.items() for _ in range(int(count))]
+    pd.DataFrame({"densegen__plan": plans}).to_parquet(records_path, index=False)
+
+
+def _write_run_state_checkpoint(run_root: Path, generated_by_plan: dict[str, int]) -> None:
+    path = run_root / "outputs" / "meta" / "run_state.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "run_id": "demo_sampling_baseline",
+                "created_at": "2026-04-13T00:00:00+00:00",
+                "updated_at": "2026-04-13T00:05:00+00:00",
+                "schema_version": "1",
+                "config_sha256": "demo-config",
+                "accepted_config_sha256": ["demo-config"],
+                "run_root": str(run_root),
+                "total_generated": int(sum(generated_by_plan.values())),
+                "items": [
+                    {
+                        "input_name": "",
+                        "plan_name": plan_name,
+                        "generated": int(count),
+                    }
+                    for plan_name, count in generated_by_plan.items()
+                ],
+            }
+        )
+    )
+
+
+def _write_pressure_artifacts(
+    run_root: Path,
+    *,
+    failed_by_plan: dict[str, int] | None = None,
+    stall_by_plan: dict[str, int] | None = None,
+    resample_by_plan: dict[str, int] | None = None,
+) -> None:
+    import pandas as pd
+
+    failed_by_plan = failed_by_plan or {}
+    stall_by_plan = stall_by_plan or {}
+    resample_by_plan = resample_by_plan or {}
+    attempts_path = run_root / "outputs" / "tables" / "attempts_part-000.parquet"
+    attempts_path.parent.mkdir(parents=True, exist_ok=True)
+    attempts_rows = [
+        {"plan_name": plan_name, "status": "rejected"}
+        for plan_name, count in failed_by_plan.items()
+        for _ in range(int(count))
+    ]
+    pd.DataFrame(attempts_rows or [{"plan_name": "ethanol", "status": "ok"}]).to_parquet(attempts_path, index=False)
+
+    events_path = run_root / "outputs" / "meta" / "events.jsonl"
+    events_path.parent.mkdir(parents=True, exist_ok=True)
+    event_lines = []
+    for plan_name, count in stall_by_plan.items():
+        event_lines.extend(json.dumps({"event": "STALL_DETECTED", "plan_name": plan_name}) for _ in range(int(count)))
+    for plan_name, count in resample_by_plan.items():
+        event_lines.extend(
+            json.dumps({"event": "RESAMPLE_TRIGGERED", "plan_name": plan_name}) for _ in range(int(count))
+        )
+    events_path.write_text("\n".join(event_lines) + ("\n" if event_lines else ""))
+
+
 def test_format_workspace_heading_converts_workspace_id_to_readable_title() -> None:
     assert _format_workspace_heading("study_constitutive_sigma_panel") == "Study Constitutive Sigma Panel"
 
@@ -307,9 +375,9 @@ def test_build_workspace_intro_reports_missing_manifest_with_source_tagged_summa
     bullets = _summary_bullets(intro)
     assert len(bullets) == 0
     assert "Outcome: run outcomes are not available yet;" in intro
-    assert "outputs/meta/run_manifest.json" in intro
-    assert "Pressure: run outcomes are not available yet;" in intro
-    assert "manifest not found" not in intro
+    assert "no `run_manifest.json`, `run_state.json`, or records-derived plan counts" in intro
+    assert "Pressure: workspace pressure counters are unavailable;" in intro
+    assert "[analysis]" in intro
     expected = [
         "### Definitions",
         "### Scope and quotas (2 plans)",
@@ -326,6 +394,42 @@ def test_build_workspace_intro_reports_missing_manifest_with_source_tagged_summa
     assert "### Execution policy" in intro
     assert "### Outcome and pressure" in intro
     assert "### Sources and freshness" in intro
+
+
+def test_build_workspace_intro_recovers_outcome_and_pressure_from_run_state_artifacts(tmp_path: Path) -> None:
+    context = _make_context(tmp_path)
+    _write_run_state_checkpoint(tmp_path, {"ethanol": 6, "ciprofloxacin": 3})
+    _write_pressure_artifacts(
+        tmp_path,
+        failed_by_plan={"ciprofloxacin": 4},
+        stall_by_plan={"ciprofloxacin": 2},
+        resample_by_plan={"ciprofloxacin": 1},
+    )
+
+    intro = _build_workspace_intro(context)
+
+    assert "Outcome: 9/12 generated (75.0%). [run_state]" in intro
+    assert "Plans at quota: 1/2. [run_state]" in intro
+    assert "Pressure: stall events=2; resamples=1; failed solves=4. [attempts/events]" in intro
+    assert (
+        "finalized run manifest is unavailable; showing checkpointed progress from `outputs/meta/run_state.json`"
+    ) in intro
+
+
+def test_build_workspace_intro_recovers_outcome_from_records_when_run_state_is_missing(tmp_path: Path) -> None:
+    context = _make_context(tmp_path)
+    _write_records_by_plan(context.records_path, {"ethanol": 6, "ciprofloxacin": 3})
+
+    intro = _build_workspace_intro(context)
+
+    assert "Outcome: 9/12 generated (75.0%). [records]" in intro
+    assert "Plans at quota: 1/2. [records]" in intro
+    assert (
+        "Pressure: workspace pressure counters are unavailable; attempts/events artifacts are missing. [analysis]"
+    ) in intro
+    assert (
+        "finalized run manifest is unavailable; showing output counts from the selected notebook records source"
+    ) in intro
 
 
 def test_build_workspace_intro_reports_run_outcomes_when_manifest_exists(tmp_path: Path) -> None:
@@ -524,6 +628,7 @@ def test_build_workspace_intro_uses_grouped_plan_table_for_small_plan_sets(tmp_p
     )
     intro = _build_workspace_intro(context)
     assert "| Group | Plans | Quota | Progress | Status |" in intro
+    assert "| baseline | 1 | 50 | 50/50 | all complete |" in intro
     assert "### All plans (raw list" not in intro
 
 

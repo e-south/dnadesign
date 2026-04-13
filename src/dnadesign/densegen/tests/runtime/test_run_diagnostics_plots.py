@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
+from matplotlib.colors import to_rgba
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.patches import ConnectionPatch
@@ -570,6 +571,7 @@ def test_plot_required_columns_for_new_plots() -> None:
         "densegen__compression_ratio",
         "densegen__input_name",
         "densegen__plan",
+        "densegen__used_tfbs_detail",
         "id",
         "sequence",
     }
@@ -852,13 +854,15 @@ def test_run_health_tfbs_length_single_regulator_uses_length_axis() -> None:
 
 
 def test_run_health_outcomes_attempts_per_row_scales_by_workload() -> None:
-    assert _outcomes_attempts_per_row_for_workload(9999) == 10
-    assert _outcomes_attempts_per_row_for_workload(10_000) == 100
+    assert _outcomes_attempts_per_row_for_workload(999) == 10
+    assert _outcomes_attempts_per_row_for_workload(1_000) == 50
+    assert _outcomes_attempts_per_row_for_workload(19_999) == 50
+    assert _outcomes_attempts_per_row_for_workload(20_000) == 100
     assert _outcomes_attempts_per_row_for_workload(999_999) == 500
     assert _outcomes_attempts_per_row_for_workload(1_000_000) == 1000
 
 
-def test_run_health_outcomes_auto_scales_by_total_workload_across_plans() -> None:
+def test_run_health_outcomes_auto_scales_by_per_plan_workload() -> None:
     matplotlib.use("Agg", force=True)
     rows = []
     attempt_index = 1
@@ -883,8 +887,11 @@ def test_run_health_outcomes_auto_scales_by_total_workload_across_plans() -> Non
         plan_quotas={plan: 3000 for plan in ("plan_a", "plan_b", "plan_c", "plan_d")},
     )
     try:
+        assert len(fig.axes) == 4
         x_lim = axes["outcome"].get_xlim()
-        assert x_lim[1] == pytest.approx(400.0)
+        assert x_lim[0] < 0.0
+        assert x_lim[1] > 50.0
+        assert all(len(ax.images) == 1 for ax in fig.axes)
     finally:
         fig.clf()
 
@@ -903,25 +910,32 @@ def test_run_health_outcomes_legend_and_waste_subtitle() -> None:
     )
     try:
         ax = axes["outcome"]
-        legend = ax.get_legend()
+        assert fig._suptitle is not None
+        assert fig._suptitle.get_text() == "Attempt outcomes by plan"
+        assert not ax.get_xlabel()
+        assert ax.get_ylabel() == "Per-plan attempt index"
+        assert ax._left_title.get_text() == ""
+        assert fig.legends
+        legend = fig.legends[0]
         assert legend is not None
         legend_labels = [text.get_text() for text in legend.get_texts()]
         assert "Accepted" in legend_labels
         assert "Rejected" in legend_labels
         assert "Failed" in legend_labels
         assert "duplicate" not in legend_labels
-        assert ax.get_xlabel() == "Plan"
-        assert ax.get_ylabel() == "Attempt index"
-        assert ax._left_title.get_text() == ""
-        label_size = ax.xaxis.label.get_size()
+        label_size = ax.yaxis.label.get_size()
         assert all(text.get_size() == pytest.approx(label_size) for text in legend.get_texts())
-        assert legend.get_bbox_to_anchor()._bbox.x0 >= 1.0
+        assert legend.get_bbox_to_anchor()._bbox.x0 >= 0.9
+        failed_handle = legend.legend_handles[legend_labels.index("Failed")]
+        assert isinstance(failed_handle, Line2D)
+        assert failed_handle.get_marker() == "X"
+        assert to_rgba(failed_handle.get_markerfacecolor()) == pytest.approx(to_rgba("#C62828"))
         assert len(ax.get_lines()) == 0
     finally:
         fig.clf()
 
 
-def test_run_health_outcomes_plot_is_single_panel_event_map() -> None:
+def test_run_health_outcomes_single_plan_panel_keeps_event_map() -> None:
     matplotlib.use("Agg", force=True)
     attempts = _attempts_df().copy()
     attempts.loc[1, "status"] = "rejected"
@@ -934,16 +948,19 @@ def test_run_health_outcomes_plot_is_single_panel_event_map() -> None:
         plan_quotas={"demo_plan": 12},
     )
     try:
-        assert fig._suptitle is None
+        assert fig._suptitle is not None
+        assert fig._suptitle.get_text() == "Attempt outcomes by plan"
         assert set(axes.keys()) == {"outcome"}
+        assert len(fig.axes) == 1
         ax = axes["outcome"]
-        assert ax.get_title() == "Attempt outcomes by plan"
+        assert ax.get_title() == "Demo_plan"
         assert ax._left_title.get_text() == ""
-        assert ax.get_xlabel() == "Plan"
-        assert ax.get_ylabel() == "Attempt index"
+        assert not ax.get_xlabel()
+        assert ax.get_ylabel() == "Per-plan attempt index"
         assert all("Rejected/failed reason composition" not in t.get_text() for t in ax.texts)
         assert all("Quota attainment by plan" not in t.get_text() for t in ax.texts)
-        legend = ax.get_legend()
+        assert fig.legends
+        legend = fig.legends[0]
         assert legend is not None
         labels = [text.get_text() for text in legend.get_texts()]
         assert labels == ["Accepted", "Rejected", "Failed"]
@@ -952,15 +969,18 @@ def test_run_health_outcomes_plot_is_single_panel_event_map() -> None:
         y_lim = ax.get_ylim()
         assert float(y_lim[0]) > float(y_lim[1])
         assert len(ax.get_lines()) == 0
-        assert ax.get_aspect() == pytest.approx(1.0)
+        assert ax.get_aspect() == "auto"
         assert not ax.patches
         assert len(ax.images) == 1
         image_data = np.asarray(ax.images[0].get_array(), dtype=int)
         assert int(np.count_nonzero(image_data == 1)) >= 1
         assert int(np.count_nonzero(image_data == 2)) >= 1
         assert ax.collections
+        failed_collection = next(coll for coll in ax.collections if len(coll.get_offsets()) > 0)
         marker_offsets = [coll.get_offsets() for coll in ax.collections if len(coll.get_offsets()) > 0]
         assert marker_offsets
+        assert tuple(failed_collection.get_facecolors()[0]) == pytest.approx(to_rgba("#C62828"))
+        assert tuple(failed_collection.get_edgecolors()[0]) == pytest.approx(to_rgba("#ffffff"))
         first_offsets = np.asarray(marker_offsets[0], dtype=float)
         assert any(
             float(point[0]) == pytest.approx(2.5, abs=1e-6) and float(point[1]) == pytest.approx(0.5, abs=1e-6)
@@ -1049,16 +1069,18 @@ def test_run_health_outcomes_points_follow_actual_run_order() -> None:
         plan_quotas={"plan_a": 12, "plan_b": 12},
     )
     try:
-        image_data = np.asarray(axes["outcome"].images[0].get_array(), dtype=int)
-        row_positions, col_positions = np.where(image_data == 1)
-        centers = [
-            (float(col_pos) + 0.5, float(row_pos) + 0.5) for row_pos, col_pos in zip(row_positions, col_positions)
-        ]
-        assert len(centers) == 4
-        y_values = {round(y, 3) for _, y in centers}
-        assert y_values == {0.5}
-        x_values = sorted(round(x, 3) for x, _ in centers)
-        assert x_values == [0.5, 1.5, 2.5, 3.5]
+        assert len(fig.axes) == 2
+        for ax in fig.axes:
+            image_data = np.asarray(ax.images[0].get_array(), dtype=int)
+            row_positions, col_positions = np.where(image_data == 1)
+            centers = [
+                (float(col_pos) + 0.5, float(row_pos) + 0.5) for row_pos, col_pos in zip(row_positions, col_positions)
+            ]
+            assert len(centers) == 2
+            y_values = {round(y, 3) for _, y in centers}
+            assert y_values == {0.5}
+            x_values = sorted(round(x, 3) for x, _ in centers)
+            assert x_values == [0.5, 1.5]
     finally:
         fig.clf()
 
@@ -1101,11 +1123,12 @@ def test_run_health_outcomes_tiles_attempts_by_plan_row() -> None:
         tick_labels = [tick.get_text().strip() for tick in axes["outcome"].get_yticklabels() if tick.get_text().strip()]
         assert "1" in tick_labels
         assert "11" in tick_labels
+        assert axes["outcome"].get_ylabel() == "Per-plan attempt index\n(10 attempts per row)"
     finally:
         fig.clf()
 
 
-def test_run_health_outcomes_xticks_use_regular_spacing() -> None:
+def test_run_health_outcomes_titles_identify_plan_pillars() -> None:
     matplotlib.use("Agg", force=True)
     attempts = pd.DataFrame(
         [
@@ -1128,15 +1151,13 @@ def test_run_health_outcomes_xticks_use_regular_spacing() -> None:
     )
     try:
         ticks = axes["outcome"].get_xticks()
-        assert len(ticks) == 1
-        labels = [tick.get_text() for tick in axes["outcome"].get_xticklabels()]
-        assert labels
-        assert "Plan_a" in labels[0]
+        assert len(ticks) == 0
+        assert axes["outcome"].get_title() == "Plan_a"
     finally:
         fig.clf()
 
 
-def test_run_health_outcomes_xtick_labels_are_angled_for_readability() -> None:
+def test_run_health_outcomes_hides_xticks_for_pillar_layout() -> None:
     matplotlib.use("Agg", force=True)
     attempts = pd.DataFrame(
         [
@@ -1158,9 +1179,9 @@ def test_run_health_outcomes_xtick_labels_are_angled_for_readability() -> None:
         plan_quotas={"plan_alpha": 10, "plan_beta": 10},
     )
     try:
-        rotations = [float(tick.get_rotation()) for tick in axes["outcome"].get_xticklabels()]
-        assert rotations
-        assert all(rotation == pytest.approx(45.0) for rotation in rotations)
+        assert len(fig.axes) == 2
+        for ax in fig.axes:
+            assert len(ax.get_xticks()) == 0
     finally:
         fig.clf()
 
@@ -1193,10 +1214,10 @@ def test_run_health_outcomes_auto_groups_expanded_plans() -> None:
         plan_quotas=quotas,
     )
     try:
-        labels = [tick.get_text() for tick in axes["outcome"].get_xticklabels()]
-        assert len(labels) == 2
-        assert any("Sigma70_panel" in label for label in labels)
-        assert any("Sigma70_topup" in label for label in labels)
+        titles = [ax.get_title() for ax in fig.axes]
+        assert len(titles) == 2
+        assert any("Sigma70_panel" in title for title in titles)
+        assert any("Sigma70_topup" in title for title in titles)
     finally:
         fig.clf()
 
@@ -1229,10 +1250,10 @@ def test_run_health_outcomes_defaults_to_parent_plan_ticks() -> None:
         plan_quotas=quotas,
     )
     try:
-        labels = [tick.get_text() for tick in axes["outcome"].get_xticklabels()]
-        assert len(labels) == 2
-        assert any("Sigma70_panel" in label for label in labels)
-        assert any("Sigma70_topup" in label for label in labels)
+        titles = [ax.get_title() for ax in fig.axes]
+        assert len(titles) == 2
+        assert any("Sigma70_panel" in title for title in titles)
+        assert any("Sigma70_topup" in title for title in titles)
     finally:
         fig.clf()
 
@@ -1269,9 +1290,9 @@ def test_run_health_outcomes_per_plan_scope_keeps_expanded_plan_ticks() -> None:
         },
     )
     try:
-        labels = [tick.get_text() for tick in axes["outcome"].get_xticklabels()]
-        assert len(labels) == 2
-        assert all("Sigma70_panel" in label for label in labels)
+        titles = [ax.get_title() for ax in fig.axes]
+        assert len(titles) == 2
+        assert all("Sigma70_panel" in title for title in titles)
     finally:
         fig.clf()
 

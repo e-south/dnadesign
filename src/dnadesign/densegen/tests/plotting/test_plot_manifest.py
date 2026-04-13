@@ -706,6 +706,140 @@ def test_tfbs_usage_does_not_eager_load_stage_a_pools(tmp_path: Path, monkeypatc
     run_plots_from_config(loaded.root, cfg_path, only="tfbs_usage")
 
 
+def test_placement_map_recovers_composition_from_output_records(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_config(cfg_path, plots_default=["placement_map"])
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    dense_arrays_df = pd.DataFrame(
+        {
+            "id": ["sol-1"],
+            "sequence": ["ACGTACGTAA"],
+            "densegen__input_name": ["demo_input"],
+            "densegen__plan": ["demo_plan"],
+            "densegen__used_tfbs_detail": [
+                [
+                    {
+                        "part_kind": "tfbs",
+                        "regulator": "TF_A",
+                        "sequence": "AAAA",
+                        "offset": 2,
+                        "offset_raw": 2,
+                        "length": 4,
+                        "end": 6,
+                        "orientation": "fwd",
+                        "source": "demo_source",
+                        "motif_id": "motif-1",
+                        "tfbs_id": "tfbs-1",
+                        "site_id": "site-1",
+                    }
+                ]
+            ],
+        }
+    )
+
+    loaded = load_config(cfg_path)
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.viz.plotting.load_records_from_config",
+        lambda *_args, **_kwargs: (dense_arrays_df.copy(), "usr:densegen/demo"),
+    )
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.viz.plotting._load_effective_config",
+        lambda *_args, **_kwargs: {"densegen": {"generation": {"sequence_length": 10}}},
+    )
+
+    def _fake_placement_map(
+        _df: pd.DataFrame,
+        out_path: Path,
+        *,
+        composition_df: pd.DataFrame,
+        dense_arrays_df: pd.DataFrame,
+        cfg: dict,
+        **_kwargs,
+    ) -> list[Path]:
+        assert list(dense_arrays_df["id"]) == ["sol-1"]
+        assert list(composition_df["solution_id"]) == ["sol-1"]
+        assert list(composition_df["tf"]) == ["TF_A"]
+        assert list(composition_df["tfbs"]) == ["AAAA"]
+        assert list(composition_df["offset"]) == [2]
+        assert int(cfg["densegen"]["generation"]["sequence_length"]) == 10
+        target = out_path.parent / "stage_b" / "demo_plan" / "demo_input" / "occupancy.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("plot")
+        return [target]
+
+    monkeypatch.setitem(plotting_module.AVAILABLE_PLOTS["placement_map"], "fn", _fake_placement_map)
+
+    run_plots_from_config(loaded.root, cfg_path, only="placement_map")
+
+
+def test_tfbs_usage_recovers_composition_from_output_records(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_config(cfg_path, plots_default=["tfbs_usage"])
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    dense_arrays_df = pd.DataFrame(
+        {
+            "id": ["sol-1"],
+            "densegen__input_name": ["demo_input"],
+            "densegen__plan": ["demo_plan"],
+            "densegen__used_tfbs_detail": [
+                [
+                    {
+                        "part_kind": "tfbs",
+                        "regulator": "TF_A",
+                        "sequence": "AAAA",
+                        "offset": 2,
+                        "offset_raw": 2,
+                        "length": 4,
+                        "end": 6,
+                        "orientation": "fwd",
+                        "source": "demo_source",
+                        "motif_id": "motif-1",
+                        "tfbs_id": "tfbs-1",
+                        "site_id": "site-1",
+                    }
+                ]
+            ],
+        }
+    )
+
+    loaded = load_config(cfg_path)
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.viz.plotting.load_records_from_config",
+        lambda *_args, **_kwargs: (dense_arrays_df.copy(), "usr:densegen/demo"),
+    )
+
+    def _fake_tfbs_usage(
+        _df: pd.DataFrame,
+        out_path: Path,
+        *,
+        pools=None,
+        composition_df: pd.DataFrame | None = None,
+        **_kwargs,
+    ) -> list[Path]:
+        assert pools is None
+        assert composition_df is not None
+        assert list(composition_df["input_name"]) == ["demo_input"]
+        assert list(composition_df["plan_name"]) == ["demo_plan"]
+        assert list(composition_df["tf"]) == ["TF_A"]
+        assert list(composition_df["tfbs"]) == ["AAAA"]
+        target = out_path.parent / "stage_b" / "demo_plan" / "demo_input" / "tfbs_usage.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("plot")
+        return [target]
+
+    monkeypatch.setitem(plotting_module.AVAILABLE_PLOTS["tfbs_usage"], "fn", _fake_tfbs_usage)
+
+    run_plots_from_config(loaded.root, cfg_path, only="tfbs_usage")
+
+
 def test_load_composition_reads_part_files_when_final_file_missing(tmp_path: Path) -> None:
     run_root = tmp_path / "run"
     tables_dir = run_root / "outputs" / "tables"
@@ -804,8 +938,42 @@ def test_load_attempts_reads_part_files_without_mutating_read_only_tables_dir(tm
 
     assert sorted(attempts_df["status"].astype(str).tolist()) == ["ok", "rejected"]
     assert not (tables_dir / "attempts.parquet").exists()
-    assert part_a.exists()
-    assert part_b.exists()
+
+
+def test_load_attempts_dedupes_mixed_final_and_part_artifacts_by_attempt_id(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    tables_dir = run_root / "outputs" / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "attempt_id": ["a1"],
+            "status": ["ok"],
+            "reason": [None],
+            "plan_name": ["demo_plan"],
+            "created_at": ["2026-03-01T00:00:00+00:00"],
+            "detail_json": [None],
+        }
+    ).to_parquet(tables_dir / "attempts.parquet", index=False)
+    pd.DataFrame(
+        {
+            "attempt_id": ["a1"],
+            "status": ["rejected"],
+            "reason": ["duplicate"],
+            "plan_name": ["demo_plan"],
+            "created_at": ["2026-03-01T00:01:00+00:00"],
+            "detail_json": [None],
+        }
+    ).to_parquet(tables_dir / "attempts_part-a.parquet", index=False)
+
+    attempts_df = plotting_module._load_attempts(
+        run_root,
+        columns=["status", "reason", "plan_name", "created_at", "detail_json"],
+    )
+
+    assert len(attempts_df) == 1
+    assert attempts_df.iloc[0]["status"] == "rejected"
+    assert (tables_dir / "attempts.parquet").exists()
+    assert (tables_dir / "attempts_part-a.parquet").exists()
 
 
 def test_load_composition_reads_pending_part_files_with_final_file(tmp_path: Path) -> None:
@@ -838,6 +1006,71 @@ def test_load_composition_reads_pending_part_files_with_final_file(tmp_path: Pat
     assert set(composition_df["tf"].astype(str)) == {"TF_A", "TF_B"}
     assert (tables_dir / "composition.parquet").exists()
     assert len(list(tables_dir.glob("composition_part-*.parquet"))) == 1
+
+
+def test_run_plots_writes_manifest_for_partial_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_config(cfg_path, plots_default=["placement_map", "tfbs_usage"])
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    dense_arrays_df = pd.DataFrame(
+        {
+            "id": ["sol-1"],
+            "sequence": ["ACGTACGTAA"],
+            "densegen__input_name": ["demo_input"],
+            "densegen__plan": ["demo_plan"],
+            "densegen__used_tfbs_detail": [
+                [
+                    {
+                        "part_kind": "tfbs",
+                        "regulator": "TF_A",
+                        "sequence": "AAAA",
+                        "offset": 2,
+                        "offset_raw": 2,
+                        "length": 4,
+                        "end": 6,
+                        "orientation": "fwd",
+                        "source": "demo_source",
+                        "motif_id": "motif-1",
+                        "tfbs_id": "tfbs-1",
+                        "site_id": "site-1",
+                    }
+                ]
+            ],
+        }
+    )
+
+    loaded = load_config(cfg_path)
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.viz.plotting.load_records_from_config",
+        lambda *_args, **_kwargs: (dense_arrays_df.copy(), "usr:densegen/demo"),
+    )
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.viz.plotting._load_effective_config",
+        lambda *_args, **_kwargs: {"densegen": {"generation": {"sequence_length": 10}}},
+    )
+
+    def _fake_placement_map(_df: pd.DataFrame, out_path: Path, **_kwargs) -> list[Path]:
+        target = out_path.parent / "stage_b" / "demo_plan" / "demo_input" / "occupancy.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("plot")
+        return [target]
+
+    def _fake_tfbs_usage(*_args, **_kwargs) -> list[Path]:
+        raise ValueError("synthetic failure")
+
+    monkeypatch.setitem(plotting_module.AVAILABLE_PLOTS["placement_map"], "fn", _fake_placement_map)
+    monkeypatch.setitem(plotting_module.AVAILABLE_PLOTS["tfbs_usage"], "fn", _fake_tfbs_usage)
+
+    with pytest.raises(RuntimeError, match="1 plot\\(s\\) failed"):
+        run_plots_from_config(loaded.root, cfg_path)
+
+    manifest_path = run_root / "outputs" / "plots" / "plot_manifest.json"
+    payload = json.loads(manifest_path.read_text())
+    paths = {item["path"] for item in payload.get("plots", [])}
+    assert "stage_b/demo_plan/demo_input/occupancy.png" in paths
 
 
 def test_stage_a_summary_reads_projected_pool_columns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -29,6 +29,7 @@ from ..core.artifacts.pool import pool_status_by_input
 from ..core.event_log import load_events
 from ..core.motif_labels import input_motifs
 from ..core.pipeline import resolve_plan
+from ..core.pipeline.attempts import _load_attempts_snapshot
 from ..core.reporting import collect_report_data
 from ..core.run_manifest import load_run_manifest
 from ..core.run_paths import run_manifest_path, run_state_path
@@ -91,11 +92,9 @@ def _print_failure_outcomes(
     context: CliContext,
     run_root: Path,
 ) -> None:
-    attempts_path = run_root / "outputs" / "tables" / "attempts.parquet"
-    if not attempts_path.exists():
-        return
+    tables_root = run_root / "outputs" / "tables"
     try:
-        attempts_df = pd.read_parquet(attempts_path, columns=["plan_name", "status", "reason"])
+        attempts_df = _load_attempts_snapshot(tables_root, columns=["plan_name", "status", "reason"])
     except Exception:
         return
     if attempts_df.empty:
@@ -199,7 +198,7 @@ def _print_inputs_summary(
 
 
 def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) -> None:
-    @inspect_app.command("run", help="Summarize a run manifest or list workspaces.")
+    @inspect_app.command("run", help="Summarize a run or list workspaces.")
     def inspect_run(
         ctx: typer.Context,
         run: Optional[Path] = typer.Option(None, "--run", "-r", help="Run directory (defaults to config run root)."),
@@ -278,116 +277,118 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             typer.echo(str(events_log_path))
             return
         manifest_path = run_manifest_path(run_root)
+        state_mode = False
         if not manifest_path.exists():
             state_path = run_state_path(run_root)
             if state_path.exists():
                 state = load_run_state(state_path)
-                context.console.print("[yellow]Run manifest missing; showing checkpointed run_state.[/]")
+                state_mode = True
+                context.console.print("[yellow]Finalized run manifest missing; showing checkpointed run_state.[/]")
                 root_label = context.display_path(run_root, run_root, absolute=absolute)
+                config_label = f"{state.config_sha256[:8]}…" if str(state.config_sha256).strip() else "-"
                 context.console.print(
                     f"[bold]Run:[/] {state.run_id}  [bold]Root:[/] {root_label}  "
-                    f"[bold]Schema:[/] {state.schema_version}  [bold]Config:[/] {state.config_sha256[:8]}…"
+                    f"[bold]Schema:[/] {state.schema_version}  [bold]Config:[/] {config_label}"
                 )
                 table = context.make_table("input", "plan", "generated")
                 for item in state.items:
                     table.add_row(item.input_name, item.plan_name, str(item.generated))
                 context.console.print(table)
+                _print_failure_outcomes(context=context, run_root=run_root)
+            else:
+                missing_manifest = context.display_path(manifest_path, run_root, absolute=absolute)
+                context.console.print(f"[bold red]Run manifest not found:[/] {missing_manifest}")
+                entries = context.list_dir_entries(run_root, limit=8)
+                if entries:
+                    context.console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
                 context.console.print("[bold]Next steps[/]:")
                 context.console.print(context.workspace_command("dense run", cfg_path=cfg_path, run_root=run_root))
-                return
+                raise typer.Exit(code=1)
 
-            missing_manifest = context.display_path(manifest_path, run_root, absolute=absolute)
-            context.console.print(f"[bold red]Run manifest not found:[/] {missing_manifest}")
-            entries = context.list_dir_entries(run_root, limit=8)
-            if entries:
-                context.console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
-            context.console.print("[bold]Next steps[/]:")
-            context.console.print(context.workspace_command("dense run", cfg_path=cfg_path, run_root=run_root))
-            raise typer.Exit(code=1)
-
-        manifest = load_run_manifest(manifest_path)
-        schema_label = manifest.schema_version or "-"
-        dense_arrays_label = manifest.dense_arrays_version or "-"
-        dense_arrays_source = manifest.dense_arrays_version_source or "-"
-        if dense_arrays_label != "-" and dense_arrays_source != "-":
-            dense_arrays_label = f"{dense_arrays_label} ({dense_arrays_source})"
-        root_label = context.display_path(run_root, run_root, absolute=absolute)
-        context.console.print(
-            f"[bold]Run:[/] {manifest.run_id}  [bold]Root:[/] {root_label}  "
-            f"[bold]Schema:[/] {schema_label}  [bold]dense-arrays:[/] {dense_arrays_label}"
-        )
-        total_generated = int(sum(int(item.generated) for item in manifest.items))
-        total_quota = int(manifest.total_quota)
-        total_progress_pct = (float(total_generated) / float(total_quota) * 100.0) if total_quota > 0 else 0.0
-        context.console.print(f"[bold]Quota:[/] {total_generated}/{total_quota} ({total_progress_pct:.2f}%)")
-        if verbose:
-            table = context.make_table(
-                "input",
-                "plan",
-                "generated",
-                "quota",
-                "progress",
-                "dup_out",
-                "dup_sol",
-                "failed",
-                "fail_tf",
-                "fail_req",
-                "fail_min",
-                "fail_k",
-                "resamples",
-                "libraries",
-                "stalls",
+        if not state_mode:
+            manifest = load_run_manifest(manifest_path)
+            schema_label = manifest.schema_version or "-"
+            dense_arrays_label = manifest.dense_arrays_version or "-"
+            dense_arrays_source = manifest.dense_arrays_version_source or "-"
+            if dense_arrays_label != "-" and dense_arrays_source != "-":
+                dense_arrays_label = f"{dense_arrays_label} ({dense_arrays_source})"
+            root_label = context.display_path(run_root, run_root, absolute=absolute)
+            context.console.print(
+                f"[bold]Run:[/] {manifest.run_id}  [bold]Root:[/] {root_label}  "
+                f"[bold]Schema:[/] {schema_label}  [bold]dense-arrays:[/] {dense_arrays_label}"
             )
-        else:
-            table = context.make_table(
-                "input",
-                "plan",
-                "generated",
-                "quota",
-                "progress",
-                "duplicates",
-                "failed",
-                "resamples",
-                "libraries",
-                "stalls",
-            )
-        for item in manifest.items:
-            quota = int(item.quota)
-            progress_pct = (float(item.generated) / float(quota) * 100.0) if quota > 0 else 0.0
-            progress_label = f"{int(item.generated)}/{quota} ({progress_pct:.2f}%)"
+            total_generated = int(sum(int(item.generated) for item in manifest.items))
+            total_quota = int(manifest.total_quota)
+            total_progress_pct = (float(total_generated) / float(total_quota) * 100.0) if total_quota > 0 else 0.0
+            context.console.print(f"[bold]Quota:[/] {total_generated}/{total_quota} ({total_progress_pct:.2f}%)")
             if verbose:
-                table.add_row(
-                    item.input_name,
-                    item.plan_name,
-                    str(item.generated),
-                    str(quota),
-                    progress_label,
-                    str(item.duplicates_skipped),
-                    str(item.duplicate_solutions),
-                    str(item.failed_solutions),
-                    str(item.failed_min_count_per_tf),
-                    str(item.failed_required_regulators),
-                    str(item.failed_min_count_by_regulator),
-                    str(item.failed_min_required_regulators),
-                    str(item.total_resamples),
-                    str(item.libraries_built),
-                    str(item.stall_events),
+                table = context.make_table(
+                    "input",
+                    "plan",
+                    "generated",
+                    "quota",
+                    "progress",
+                    "dup_out",
+                    "dup_sol",
+                    "failed",
+                    "fail_tf",
+                    "fail_req",
+                    "fail_min",
+                    "fail_k",
+                    "resamples",
+                    "libraries",
+                    "stalls",
                 )
             else:
-                table.add_row(
-                    item.input_name,
-                    item.plan_name,
-                    str(item.generated),
-                    str(quota),
-                    progress_label,
-                    str(item.duplicates_skipped),
-                    str(item.failed_solutions),
-                    str(item.total_resamples),
-                    str(item.libraries_built),
-                    str(item.stall_events),
+                table = context.make_table(
+                    "input",
+                    "plan",
+                    "generated",
+                    "quota",
+                    "progress",
+                    "duplicates",
+                    "failed",
+                    "resamples",
+                    "libraries",
+                    "stalls",
                 )
-        context.console.print(table)
-        _print_failure_outcomes(context=context, run_root=run_root)
+            for item in manifest.items:
+                quota = int(item.quota)
+                progress_pct = (float(item.generated) / float(quota) * 100.0) if quota > 0 else 0.0
+                progress_label = f"{int(item.generated)}/{quota} ({progress_pct:.2f}%)"
+                if verbose:
+                    table.add_row(
+                        item.input_name,
+                        item.plan_name,
+                        str(item.generated),
+                        str(quota),
+                        progress_label,
+                        str(item.duplicates_skipped),
+                        str(item.duplicate_solutions),
+                        str(item.failed_solutions),
+                        str(item.failed_min_count_per_tf),
+                        str(item.failed_required_regulators),
+                        str(item.failed_min_count_by_regulator),
+                        str(item.failed_min_required_regulators),
+                        str(item.total_resamples),
+                        str(item.libraries_built),
+                        str(item.stall_events),
+                    )
+                else:
+                    table.add_row(
+                        item.input_name,
+                        item.plan_name,
+                        str(item.generated),
+                        str(quota),
+                        progress_label,
+                        str(item.duplicates_skipped),
+                        str(item.failed_solutions),
+                        str(item.total_resamples),
+                        str(item.libraries_built),
+                        str(item.stall_events),
+                    )
+            context.console.print(table)
+            _print_failure_outcomes(context=context, run_root=run_root)
 
         if events:
             events_path = run_root / "outputs" / "meta" / "events.jsonl"

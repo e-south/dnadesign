@@ -27,6 +27,7 @@ from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root, 
 from .artifacts.pool import POOL_MODE_TFBS, load_pool_data
 from .event_log import load_events
 from .motif_labels import input_motifs, motif_display_name
+from .pipeline.attempts import _attempts_artifact_paths, _load_attempts_snapshot
 from .pipeline.plan_pools import build_plan_pools, plan_pool_label
 from .record_values import (
     coerce_list as _ensure_list,
@@ -218,18 +219,22 @@ def collect_report_data(
         output_records_path = None
 
     used_df = _explode_used(df)
-    attempts_path = tables_root / "attempts.parquet"
-    if not attempts_path.exists():
-        message = "outputs/tables/attempts.parquet is missing; library utilization summaries may be incomplete."
+    attempt_paths = _attempts_artifact_paths(tables_root)
+    attempts_path = attempt_paths[0] if attempt_paths else tables_root / "attempts.parquet"
+    if not attempt_paths:
+        message = (
+            "outputs/tables/attempts.parquet or attempts_part-*.parquet are missing; "
+            "library utilization summaries may be incomplete."
+        )
         if strict:
             raise ValueError(message)
         warnings.append(message)
         attempts_df = pd.DataFrame()
     else:
         try:
-            attempts_df = pd.read_parquet(attempts_path, columns=_ATTEMPTS_REPORT_COLUMNS)
+            attempts_df = _load_attempts_snapshot(tables_root, columns=_ATTEMPTS_REPORT_COLUMNS)
         except Exception as exc:
-            message = f"Failed to load attempts.parquet; library utilization summaries will be incomplete. ({exc})"
+            message = f"Failed to load attempts artifacts; library utilization summaries will be incomplete. ({exc})"
             if strict:
                 raise ValueError(message) from exc
             warnings.append(message)

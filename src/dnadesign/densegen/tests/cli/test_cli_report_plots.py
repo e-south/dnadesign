@@ -61,15 +61,24 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         "resolve_records_export_destination,",
         "from dnadesign.densegen.src.cli.notebook_records_projection import (",
         "build_records_preview_table,",
+        "from dnadesign.densegen.src.viz.plot_inventory import (",
+        "HIDDEN_VISUAL_PLOT_TYPES,",
+        "build_plot_ids_by_scope,",
+        "plot_missing_hint,",
+        "plot_required_artifacts,",
+        "resolve_plot_availability,",
+        "resolve_plot_record,",
         "from functools import lru_cache",
         "record_window_limit = int(contract.record_window_limit)",
         "workspace_name = str(config_path.parent.name or run_root.name)",
+        "workspace_plan_names = ",
         "Failed to parse `run_manifest.json`",
         "Failed to parse `plot_manifest.json`",
         'contract.adapter_columns["id"]',
         'contract.adapter_columns["sequence"]',
         'contract.adapter_columns["annotations"]',
         "Duplicate record ids detected in the notebook preview window",
+        "def prepare_usr_preview_records(",
         '_default_plan_value = "all"',
         'record_plan_filter = mo.ui.dropdown(options=_plan_options, value=_default_plan_value, label="Record plan")',
         "prev_record_button = mo.ui.button(",
@@ -141,7 +150,7 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         "compact_plan_name",
         'plot_selector = mo.ui.dropdown(options=plot_options, value=plot_options[0], label="")',
         'plot_scope_filter = mo.ui.dropdown(options=plan_options, value=plan_options[0], label="")',
-        "plot_ids_by_scope = {}",
+        "plot_ids_by_scope, generated_plot_ids_by_scope = build_plot_ids_by_scope(",
         'plot_id_filter = mo.ui.dropdown(options=plot_id_options, value=plot_id_options[0], label="")',
         'plot_filter_message = ""',
         "if not _filtered_entries:",
@@ -151,13 +160,17 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         "active_plot_entry = None",
         'preview_dir = plot_manifest_path.parent / ".preview_png"',
         "resolve_plot_preview_image",
+        'video_suffixes = {".mp4", ".webm", ".ogg"}',
+        'supported_suffixes = image_suffixes | video_suffixes | {".pdf"}',
+        '_video_suffixes = {".mp4", ".webm", ".ogg"}',
         'ghostscript = shutil.which("gs")',
         "plot_filter_message,",
         "mo.image(",
+        "mo.video(",
         "rounded=True,",
         "mo.pdf(str(_plot_path))",
-        'hidden_plot_types = {"run_health/summary_table"}',
-        "if _plot_id in hidden_plot_types:",
+        "plot_ids_by_scope, generated_plot_ids_by_scope = build_plot_ids_by_scope(",
+        "resolve_plot_availability(",
         "plot_export_target = mo.ui.dropdown(",
         'plot_export_format = mo.ui.dropdown(options=["pdf", "png", "svg"], value="png", label="")',
         '"Dataset export details": mo.md(',
@@ -182,6 +195,7 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         "__USR_ROOT__",
         "__USR_DATASET__",
         "__WORKSPACE_HEADING__",
+        "__WORKSPACE_PLAN_NAMES__",
         "__WORKSPACE_RUN_DETAILS_PAYLOAD__",
         "Dataset export format",
         "Use **Refresh**",
@@ -337,11 +351,15 @@ def test_notebook_generate_includes_available_plot_ids_even_when_not_generated(t
     content = notebook_path.read_text()
 
     assert "known_plot_ids = sorted([str(_name) for _name in PLOT_SPECS.keys()])" in content
-    assert "generated_plot_ids_by_scope: dict[str, list[str]] = {}" in content
-    assert 'plot_ids_by_scope["all"] = _ordered_unique(_plot_ids_all_generated)' in content
+    assert "plot_ids_by_scope, generated_plot_ids_by_scope = build_plot_ids_by_scope(" in content
+    assert "stage_b_scope_names=workspace_plan_names," in content
+    assert "known_plot_ids=known_plot_ids," in content
     assert "No generated plots for scope `" in content
     assert "Run `uv run dense plot --only " in content
-    assert "def _infer_plot_id_from_path(relative_parts: tuple[str, ...], stem: str) -> str:" in content
+    assert "Available but not generated: " in content
+    assert "Required artifacts:" in content
+    assert "Availability: `" in content
+    assert "resolve_plot_record(" in content
 
 
 def test_notebook_generate_formats_plot_availability_in_gallery_filters(tmp_path: Path) -> None:
@@ -359,6 +377,9 @@ def test_notebook_generate_formats_plot_availability_in_gallery_filters(tmp_path
     assert '_label = f"{_plot_id} [{_status}]"' in content
     assert "plot_availability_rows = []" in content
     assert "plot_availability_table = pd.DataFrame(" in content
+    assert "resolve_plot_availability(" in content
+    assert "stage_b_scope_names=workspace_plan_names," in content
+    assert "known_plot_ids=known_plot_ids," in content
     assert '"Plot type"' in content
     assert '"Status"' in content
     assert '"Generated files"' in content
@@ -367,7 +388,7 @@ def test_notebook_generate_formats_plot_availability_in_gallery_filters(tmp_path
     assert "_selected_plot_type = str(plot_id_label_to_id.get(" in content
 
 
-def test_notebook_generate_uses_first_class_visual_plot_types_in_gallery_filters(tmp_path: Path) -> None:
+def test_notebook_generate_uses_shared_plot_inventory_helpers_in_gallery_filters(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.yaml"
     write_minimal_config(cfg_path)
     (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
@@ -378,17 +399,11 @@ def test_notebook_generate_uses_first_class_visual_plot_types_in_gallery_filters
     notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
     content = notebook_path.read_text()
 
-    assert "def _visual_plot_type(plot_id: str, *, plot_name: str, variant: str, stem: str) -> str:" in content
-    assert '"visual_plot_type": _visual_plot_type(' in content
-    assert "if _base and _variant and _variant != _base:" in content
-    assert 'return f"{_base}/{_variant}"' in content
-    assert "if _base:" in content
-    assert "return _base" in content
-    assert '_variant = str(_entry.get("variant") or _candidate.stem or "")' in content
-    assert "_variant = str(_resolved.stem)" in content
-    assert 'if _stem.endswith("__background_logo"):' in content
+    assert "resolve_plot_record(" in content
+    assert "resolve_plot_availability(" in content
+    assert "build_plot_ids_by_scope(" in content
     assert "def _entry_matches_selected_plot_id(_entry: dict[str, object]) -> bool:" in content
-    assert "return _visual_plot_type == selected_plot_id" in content
+    assert "return base_plot_id(_visual_plot_type) == selected_plot_id" in content
 
 
 def test_notebook_generate_constrains_plot_preview_image_size(tmp_path: Path) -> None:
@@ -513,7 +528,7 @@ def test_notebook_generate_streamlines_summary_and_adds_plot_export_controls(tmp
     assert '{"Field": "Quota progress", "Value": str(run_manifest.get("quota_progress_pct", "-"))}' not in content
     assert 'mo.md("### Plot gallery")' in content
     assert 'plot_scope_filter = mo.ui.dropdown(options=plan_options, value=plan_options[0], label="")' in content
-    assert "plot_ids_by_scope = {}" in content
+    assert "plot_ids_by_scope, generated_plot_ids_by_scope = build_plot_ids_by_scope(" in content
     assert "plot_export_target = mo.ui.dropdown(" in content
     assert 'label="",' in content
     assert 'plot_export_format = mo.ui.dropdown(options=["pdf", "png", "svg"], value="png", label="")' in content
@@ -615,6 +630,7 @@ def test_notebook_generate_supports_usr_output_target(tmp_path: Path) -> None:
     assert "__USR_ROOT__" not in content
     assert "__USR_DATASET__" not in content
     assert 'output_source = "usr"' in content
+    assert 'workspace_plan_names = ["demo_plan"]' in content
     assert '"records_with_overlays.parquet"' in content
 
 

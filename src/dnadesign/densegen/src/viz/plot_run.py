@@ -82,8 +82,12 @@ def _plan_markers(plan_names: list[str]) -> dict[str, str]:
 
 def _outcomes_attempts_per_row_for_workload(max_plan_attempts: int) -> int:
     attempts = max(1, int(max_plan_attempts))
-    if attempts < 10_000:
+    # Rows wrap within each plan, so pack by the largest per-plan workload instead
+    # of the total run size; otherwise multi-plan runs collapse into a thin ribbon.
+    if attempts < 1_000:
         return 10
+    if attempts < 20_000:
+        return 50
     if attempts < 100_000:
         return 100
     if attempts < 1_000_000:
@@ -224,12 +228,10 @@ def _build_run_health_outcomes_figure(
     )
     plan_counts = attempts_df["plan_name"].astype(str).value_counts()
     max_plan_attempts = int(plan_counts.max()) if not plan_counts.empty else int(len(attempts_df))
-    total_attempts = int(len(attempts_df))
-    workload_attempts = max(max_plan_attempts, total_attempts)
     try:
         attempts_per_row_raw = _style_cfg.get("run_health_outcomes_attempts_per_row")
         if attempts_per_row_raw is None:
-            attempts_per_row = _outcomes_attempts_per_row_for_workload(workload_attempts)
+            attempts_per_row = _outcomes_attempts_per_row_for_workload(max_plan_attempts)
         else:
             attempts_per_row = max(1, int(attempts_per_row_raw))
     except Exception as exc:
@@ -238,93 +240,47 @@ def _build_run_health_outcomes_figure(
     fig_size = _style_cfg.get("run_health_outcomes_figsize")
     if fig_size is None:
         max_rows_estimate = max(1, int(np.ceil(float(max_plan_attempts) / float(attempts_per_row))))
-        max_cols_estimate = max(1, int(len(plan_names)) * int(attempts_per_row))
-        fig_height = max(2.8, min(6.2, 0.11 * float(max_rows_estimate) + 2.1))
-        fig_width = max(
-            5.4,
-            min(
-                12.0,
-                max(
-                    0.16 * float(max_cols_estimate) + 1.8,
-                    (float(max_cols_estimate) / max(1.0, float(max_rows_estimate))) * 1.8,
-                ),
-            ),
-        )
+        panel_width = max(2.3, min(3.6, 0.035 * float(attempts_per_row) + 1.1))
+        fig_height = max(5.6, min(13.8, 0.028 * float(max_rows_estimate) + 3.0))
+        fig_width = max(6.8, min(22.0, panel_width * float(len(plan_names)) + 2.5))
         fig_size = (fig_width, fig_height)
-    fig, ax = plt.subplots(figsize=(float(fig_size[0]), float(fig_size[1])), constrained_layout=True)
+    fig, axes_grid = plt.subplots(
+        1,
+        len(plan_names),
+        figsize=(float(fig_size[0]), float(fig_size[1])),
+        squeeze=False,
+        sharey=True,
+        constrained_layout=False,
+    )
+    axes = [axis for axis in axes_grid[0]]
+    fig.subplots_adjust(left=0.09, right=0.88, bottom=0.12, top=0.84, wspace=0.06)
 
-    plan_to_col = {name: i for i, name in enumerate(plan_names)}
     plot_df = attempts_df.copy()
-    plot_df["_plan_col"] = plot_df["plan_name"].astype(str).map(plan_to_col).fillna(0).astype(float)
     plot_df["_plan_attempt_rank"] = plot_df.groupby("plan_name", sort=False).cumcount().astype(int) + 1
     plot_df["_attempt_row"] = ((plot_df["_plan_attempt_rank"] - 1) // attempts_per_row + 1).astype(float)
     plot_df["_attempt_slot"] = ((plot_df["_plan_attempt_rank"] - 1) % attempts_per_row).astype(float)
     max_attempt_rank = int(plot_df["_plan_attempt_rank"].max()) if not plot_df.empty else 0
     max_rows = int(plot_df["_attempt_row"].max()) if not plot_df.empty else 1
-    total_columns = max(1, int(len(plan_names)) * int(attempts_per_row))
     status_groups = {"accepted": {"ok", "duplicate"}, "rejected": {"rejected"}, "failed": {"failed"}}
-    plan_col_idx = plot_df["_plan_col"].astype(int).to_numpy()
+    plan_values = np.asarray(plot_df["plan_name"].astype(str).to_numpy(), dtype=str)
     row_idx = plot_df["_attempt_row"].astype(int).to_numpy() - 1
     slot_idx = plot_df["_attempt_slot"].astype(int).to_numpy()
-    col_idx = plan_col_idx * int(attempts_per_row) + slot_idx
     status_values = np.asarray(plot_df["status"].astype(str).to_numpy(), dtype=str)
-    valid = (row_idx >= 0) & (row_idx < max_rows) & (col_idx >= 0) & (col_idx < total_columns)
+    valid = (row_idx >= 0) & (row_idx < max_rows) & (slot_idx >= 0) & (slot_idx < int(attempts_per_row))
     normalized_status = np.char.lower(np.char.strip(status_values))
     is_rejected = np.isin(normalized_status, list(status_groups["rejected"]))
     is_failed = np.isin(normalized_status, list(status_groups["failed"]))
     is_accepted = ~(is_rejected | is_failed)
 
-    tile_grid = np.zeros((max_rows, total_columns), dtype=np.uint8)
-    accepted_mask = valid & is_accepted
-    rejected_mask = valid & is_rejected
-    failed_mask = valid & is_failed
-    tile_grid[row_idx[accepted_mask], col_idx[accepted_mask]] = 1
-    tile_grid[row_idx[rejected_mask], col_idx[rejected_mask]] = 2
-
-    cmap = ListedColormap(["#ffffff", "#d9d9d9", "#D55E00"])
+    rejected_color = "#D55E00"
+    failed_color = "#C62828"
+    cmap = ListedColormap(["#ffffff", "#d9d9d9", rejected_color])
     norm = BoundaryNorm(boundaries=[-0.5, 0.5, 1.5, 2.5], ncolors=cmap.N)
-    ax.imshow(
-        tile_grid,
-        cmap=cmap,
-        norm=norm,
-        interpolation="nearest",
-        origin="upper",
-        extent=(0.0, float(total_columns), float(max_rows), 0.0),
-        zorder=2,
-        aspect="equal",
-    )
-
-    if np.any(failed_mask):
-        failed_x = col_idx[failed_mask].astype(float) + 0.5
-        failed_y = row_idx[failed_mask].astype(float) + 0.5
-        ax.scatter(
-            failed_x,
-            failed_y,
-            marker="x",
-            s=20.0,
-            linewidths=1.0,
-            color="#D55E00",
-            zorder=3,
-        )
-
     try:
         rows_per_block = max(1, int(_style_cfg.get("run_health_outcomes_rows_per_block", 50)))
     except Exception as exc:
         raise ValueError("run_health_outcomes_rows_per_block must be an integer > 0") from exc
-    for block_start in range(rows_per_block, max_attempt_rank + 1, rows_per_block):
-        boundary_row = int(np.ceil(float(block_start) / float(attempts_per_row)))
-        if boundary_row <= int(max_rows):
-            ax.axhline(float(boundary_row), color="#ececec", linewidth=0.65, alpha=0.9, zorder=3)
-    plan_centers = np.array(
-        [idx * int(attempts_per_row) + float(attempts_per_row) / 2.0 for idx in range(len(plan_names))],
-        dtype=float,
-    )
-    ax.set_xticks(plan_centers)
-    ax.set_xticklabels(
-        [_capitalize_first(_ellipsize(name, max_len=22)) for name in plan_names],
-        rotation=45,
-        ha="right",
-    )
+
     if max_attempt_rank > 0:
         try:
             max_yticks = max(2, int(_style_cfg.get("run_health_outcomes_max_yticks", 12)))
@@ -335,16 +291,89 @@ def _build_run_health_outcomes_figure(
         if max_rows not in tick_rows:
             tick_rows.append(max_rows)
         tick_rows = sorted(set(tick_rows))
-        tick_labels = [str((row - 1) * attempts_per_row + 1) for row in tick_rows]
-        ax.set_yticks([float(item) - 0.5 for item in tick_rows])
-        ax.set_yticklabels(tick_labels)
-    ax.set_xlim(0.0, float(total_columns))
-    ax.set_ylim(float(max_rows), 0.0)
-    ax.set_xlabel("Plan")
-    ax.set_ylabel("Attempt index")
-    ax.set_aspect("equal", adjustable="box")
-    ax.grid(False)
-    ax.set_title("Attempt outcomes by plan", pad=17.0)
+        tick_labels = [f"{((row - 1) * attempts_per_row + 1):,}" for row in tick_rows]
+        y_tick_positions = [float(item) - 0.5 for item in tick_rows]
+    else:
+        y_tick_positions = []
+        tick_labels = []
+
+    y_label = "Per-plan attempt index"
+    if max_rows > 1:
+        y_label = f"{y_label}\n({attempts_per_row:,} attempts per row)"
+    try:
+        x_pad = max(0.0, float(_style_cfg.get("run_health_outcomes_panel_xpad", 0.7)))
+        y_pad = max(0.0, float(_style_cfg.get("run_health_outcomes_panel_ypad", 0.6)))
+    except Exception as exc:
+        raise ValueError("run_health_outcomes panel padding must be numeric >= 0") from exc
+
+    for axis_idx, (ax, plan_name) in enumerate(zip(axes, plan_names)):
+        panel_mask = plan_values == str(plan_name)
+        panel_valid = valid & panel_mask
+        panel_row_idx = row_idx[panel_valid]
+        panel_slot_idx = slot_idx[panel_valid]
+        panel_grid = np.zeros((max_rows, int(attempts_per_row)), dtype=np.uint8)
+        panel_accepted = is_accepted[panel_valid]
+        panel_rejected = is_rejected[panel_valid]
+        panel_failed = is_failed[panel_valid]
+        panel_grid[panel_row_idx[panel_accepted], panel_slot_idx[panel_accepted]] = 1
+        panel_grid[panel_row_idx[panel_rejected], panel_slot_idx[panel_rejected]] = 2
+
+        ax.imshow(
+            panel_grid,
+            cmap=cmap,
+            norm=norm,
+            interpolation="nearest",
+            origin="upper",
+            extent=(0.0, float(attempts_per_row), float(max_rows), 0.0),
+            zorder=2,
+            aspect="auto",
+        )
+
+        if np.any(panel_failed):
+            failed_x = panel_slot_idx[panel_failed].astype(float) + 0.5
+            failed_y = panel_row_idx[panel_failed].astype(float) + 0.5
+            ax.scatter(
+                failed_x,
+                failed_y,
+                marker="X",
+                s=56.0,
+                linewidths=0.65,
+                facecolors=failed_color,
+                edgecolors="#ffffff",
+                zorder=4,
+                clip_on=False,
+            )
+
+        for block_start in range(rows_per_block, max_attempt_rank + 1, rows_per_block):
+            boundary_row = int(np.ceil(float(block_start) / float(attempts_per_row)))
+            if boundary_row <= int(max_rows):
+                ax.axhline(float(boundary_row), color="#ececec", linewidth=0.65, alpha=0.9, zorder=3)
+
+        ax.set_xlim(-x_pad, float(attempts_per_row) + x_pad)
+        ax.set_ylim(float(max_rows) + y_pad, -y_pad)
+        ax.set_xticks([])
+        ax.tick_params(axis="x", bottom=False, labelbottom=False)
+        ax.set_title(_capitalize_first(_ellipsize(plan_name, max_len=22)), pad=12.0)
+        _apply_style(ax, _style_cfg)
+        ax.grid(False)
+        if "top" in ax.spines:
+            ax.spines["top"].set_visible(False)
+        if "right" in ax.spines:
+            ax.spines["right"].set_visible(False)
+        if "left" in ax.spines:
+            ax.spines["left"].set_visible(False)
+        if "bottom" in ax.spines:
+            ax.spines["bottom"].set_visible(True)
+        if axis_idx == 0:
+            ax.set_yticks(y_tick_positions)
+            ax.set_yticklabels(tick_labels)
+            ax.set_ylabel(y_label)
+        else:
+            ax.tick_params(axis="y", left=False, labelleft=False)
+
+    title_size = float(_style_cfg.get("title_size", _style_cfg.get("font_size", 13) * 1.1))
+    text_color = str(_style_cfg.get("text_color", "#111111"))
+    fig.suptitle("Attempt outcomes by plan", y=0.96, fontsize=title_size, color=text_color)
 
     legend_handles = [
         Line2D(
@@ -363,7 +392,7 @@ def _build_run_health_outcomes_figure(
             [0],
             marker="s",
             linestyle="None",
-            markerfacecolor="#D55E00",
+            markerfacecolor=rejected_color,
             markeredgecolor="none",
             markeredgewidth=0.0,
             markersize=6.0,
@@ -372,25 +401,29 @@ def _build_run_health_outcomes_figure(
         Line2D(
             [0],
             [0],
-            marker="x",
+            marker="X",
             linestyle="None",
-            color="#D55E00",
-            markersize=6.5,
+            markerfacecolor=failed_color,
+            markeredgecolor="#ffffff",
+            markeredgewidth=0.65,
+            color=failed_color,
+            markersize=7.5,
             label="Failed",
         ),
     ]
     label_size = float(_style_cfg.get("label_size", _style_cfg.get("font_size", 13)))
-    ax.legend(
+    legend = fig.legend(
         handles=legend_handles,
         loc="center left",
-        bbox_to_anchor=(1.01, 0.5),
+        bbox_to_anchor=(0.905, 0.5),
         frameon=False,
         fontsize=label_size,
         ncol=1,
         borderaxespad=0.0,
     )
-    _apply_style(ax, _style_cfg)
-    return fig, {"outcome": ax}
+    for text in legend.get_texts():
+        text.set_color(text_color)
+    return fig, {"outcome": axes[0]}
 
 
 def _build_run_health_detail_figure(

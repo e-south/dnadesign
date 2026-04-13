@@ -37,19 +37,55 @@ def _():
     from dnadesign.densegen.src.cli.notebook_records_projection import (
         build_records_preview_table,
     )
+    from dnadesign.densegen.src.viz.plot_inventory import (
+        HIDDEN_VISUAL_PLOT_TYPES,
+        base_plot_id,
+        build_plot_ids_by_scope,
+        plot_missing_hint,
+        plot_required_artifacts,
+        resolve_plot_availability,
+        resolve_plot_record,
+    )
 
     def require(condition: bool, message: str) -> None:
         if bool(condition):
             raise RuntimeError(message)
 
+    def prepare_usr_preview_records(
+        *,
+        ParquetFile,
+        required_columns,
+        run_root: Path,
+        usr_root: Path,
+        usr_dataset: str,
+    ):
+        usr_export_path = run_root / "outputs" / "notebooks" / "records_with_overlays.parquet"
+        from dnadesign.usr import Dataset
+
+        ds = Dataset(usr_root, str(usr_dataset))
+        require(not ds.records_path.exists(), f"USR records not found: {ds.records_path}")
+        ds.export("parquet", usr_export_path, include_deleted=False)
+        parquet_file = ParquetFile(usr_export_path)
+        schema_names = set(parquet_file.schema_arrow.names)
+        missing = sorted(required_columns - schema_names)
+        return missing, parquet_file, usr_export_path
+
     return (
+        HIDDEN_VISUAL_PLOT_TYPES,
         ParquetFile,
         Path,
+        base_plot_id,
+        build_plot_ids_by_scope,
         lru_cache,
         hashlib,
         densegen_notebook_render_contract,
         json,
         PLOT_SPECS,
+        prepare_usr_preview_records,
+        plot_missing_hint,
+        plot_required_artifacts,
+        resolve_plot_availability,
+        resolve_plot_record,
         resolve_baserender_export_destination,
         resolve_records_export_destination,
         build_records_preview_table,
@@ -87,6 +123,7 @@ def _(Path, densegen_notebook_render_contract):
             return str(resolved)
     workspace_name = str(config_path.parent.name or run_root.name)
     workspace_heading = __WORKSPACE_HEADING__
+    workspace_plan_names = __WORKSPACE_PLAN_NAMES__
     workspace_run_details_payload = __WORKSPACE_RUN_DETAILS_PAYLOAD__
     records_path = Path(__RECORDS_PATH__)
     output_source = __OUTPUT_SOURCE__
@@ -109,6 +146,7 @@ def _(Path, densegen_notebook_render_contract):
         run_root,
         to_repo_relative_path,
         workspace_heading,
+        workspace_plan_names,
         workspace_run_details_payload,
         usr_dataset,
         usr_root,
@@ -187,6 +225,7 @@ def _(
     contract,
     output_source,
     pd,
+    prepare_usr_preview_records,
     record_window_limit,
     records_path,
     require,
@@ -215,17 +254,15 @@ def _(
             usr_root is None or not str(usr_dataset or "").strip(),
             "Notebook source is USR but generation context does not include a dataset path.",
         )
-        usr_export_path = run_root / "outputs" / "notebooks" / "records_with_overlays.parquet"
         try:
-            from dnadesign.usr import Dataset
-
-            ds = Dataset(usr_root, str(usr_dataset))
-            require(not ds.records_path.exists(), f"USR records not found: {ds.records_path}")
-            ds.export("parquet", usr_export_path, include_deleted=False)
-            preview_records_path = usr_export_path
-            parquet_file = ParquetFile(preview_records_path)
+            missing, parquet_file, preview_records_path = prepare_usr_preview_records(
+                ParquetFile=ParquetFile,
+                required_columns=required,
+                run_root=run_root,
+                usr_root=usr_root,
+                usr_dataset=str(usr_dataset),
+            )
             schema_names = set(parquet_file.schema_arrow.names)
-            missing = sorted(required - schema_names)
         except Exception as exc:
             raise RuntimeError(f"Failed to build merged USR records for notebook preview: {exc}") from exc
     require(
