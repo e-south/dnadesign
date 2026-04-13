@@ -38,6 +38,7 @@ from .plot_common import (  # noqa: F401
     _palette,
     plan_group_from_name,
 )
+from .plot_dataset import plot_dataset_metadata_heatmap, plot_dataset_source_inventory
 from .plot_inventory import manifest_path_fields
 from .plot_registry import PLOT_SPECS
 from .plot_run import plot_run_health, plot_tfbs_usage
@@ -69,6 +70,8 @@ def _is_supported_plot_path(rel_path: str) -> bool:
     if parts[0] == "stage_b":
         return len(parts) >= 3
     if parts[0] == "run_health":
+        return len(parts) >= 2
+    if parts[0] == "dataset":
         return len(parts) >= 2
     return False
 
@@ -424,6 +427,8 @@ def _load_dense_arrays(run_root: Path, *, columns: Iterable[str] | None = None) 
 
 
 _PLOT_FNS = {
+    "dataset_source_inventory": plot_dataset_source_inventory,
+    "dataset_metadata_heatmap": plot_dataset_metadata_heatmap,
     "dense_array_video_showcase": plot_dense_array_video_showcase,
     "placement_map": plot_placement_map,
     "tfbs_usage": plot_tfbs_usage,
@@ -447,6 +452,8 @@ for _name, _spec in PLOT_SPECS.items():
 
 # Options explicitly supported by each plot; unknown options raise errors (strict).
 _ALLOWED_OPTIONS = {
+    "dataset_source_inventory": {"max_sources"},
+    "dataset_metadata_heatmap": {"max_sources", "max_plans", "max_inputs"},
     "dense_array_video_showcase": set(),
     "placement_map": {"occupancy_alpha", "occupancy_max_categories", "scope", "max_plans", "drilldown_plans"},
     "tfbs_usage": {"scope", "max_plans", "drilldown_plans"},
@@ -517,6 +524,8 @@ def _plot_required_sources(selected: Iterable[str]) -> set[str]:
 
 
 _OUTPUT_COLUMNS_BY_PLOT: Dict[str, set[str]] = {
+    "dataset_source_inventory": {"source", "densegen__plan", "densegen__input_name"},
+    "dataset_metadata_heatmap": {"source", "densegen__plan", "densegen__input_name"},
     "dense_array_video_showcase": {"id", "sequence", "densegen__plan", "densegen__used_tfbs_detail"},
     "placement_map": {"id", "sequence", "densegen__input_name", "densegen__plan", "densegen__used_tfbs_detail"},
     "run_health": {"densegen__compression_ratio", "densegen__plan"},
@@ -755,6 +764,8 @@ def run_plots_from_config(
     _cleanup_legacy_flat_outputs(out_dir, selected, plot_format)
     if "placement_map" in selected or "tfbs_usage" in selected:
         _clean_plot_subdir(out_dir, "stage_b")
+    if "dataset_source_inventory" in selected or "dataset_metadata_heatmap" in selected:
+        _clean_plot_subdir(out_dir, "dataset")
     required_sources = _plot_required_sources(selected)
     cols = _plot_required_columns(selected, options)
     composition_cols = _required_columns_for_selected(selected, mapping=_COMPOSITION_COLUMNS_BY_PLOT)

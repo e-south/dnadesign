@@ -13,6 +13,36 @@ Dunlop Lab
 from __future__ import annotations
 
 PLOT_SPECS = {
+    "dataset_source_inventory": {
+        "fn": "plot_dataset_source_inventory",
+        "description": "Dataset-native source inventory and DenseGen metadata coverage summary.",
+        "requires": ["outputs"],
+        "missing_state": "recoverable_read_only",
+        "seed_stage_b_scope_when_missing": False,
+        "required_artifacts": [
+            "selected output records source with source/densegen__plan/densegen__input_name columns",
+        ],
+        "missing_hint": (
+            "This plot reads the selected DenseGen output records source directly. "
+            "Verify `plots.source` resolves to parquet or USR records, then run "
+            "`uv run dense plot --only dataset_source_inventory`."
+        ),
+    },
+    "dataset_metadata_heatmap": {
+        "fn": "plot_dataset_metadata_heatmap",
+        "description": "Dataset-native provenance heatmaps for source-to-plan and source-to-input relationships.",
+        "requires": ["outputs"],
+        "missing_state": "recoverable_read_only",
+        "seed_stage_b_scope_when_missing": False,
+        "required_artifacts": [
+            "selected output records source with source/densegen__plan/densegen__input_name columns",
+        ],
+        "missing_hint": (
+            "This plot reads the selected DenseGen output records source directly. "
+            "Verify `plots.source` resolves to parquet or USR records, then run "
+            "`uv run dense plot --only dataset_metadata_heatmap`."
+        ),
+    },
     "dense_array_video_showcase": {
         "fn": "plot_dense_array_video_showcase",
         "description": "Stage-B showcase video: sampled accepted outputs rendered as an MP4 timeline.",

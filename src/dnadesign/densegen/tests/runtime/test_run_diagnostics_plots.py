@@ -575,6 +575,8 @@ def test_plot_required_columns_for_new_plots() -> None:
         "id",
         "sequence",
     }
+    dataset_cols = _plot_required_columns(["dataset_source_inventory", "dataset_metadata_heatmap"], {})
+    assert set(dataset_cols) == {"source", "densegen__plan", "densegen__input_name"}
 
 
 def test_load_dense_arrays_requires_dense_arrays_table(tmp_path: Path) -> None:

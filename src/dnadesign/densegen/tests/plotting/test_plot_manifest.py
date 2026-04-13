@@ -186,6 +186,74 @@ def _write_config(
     )
 
 
+def _write_usr_source_config(
+    path: Path,
+    *,
+    usr_root: Path,
+    dataset: str,
+    plots_default: list[str],
+) -> None:
+    path.write_text(
+        textwrap.dedent(
+            f"""
+            densegen:
+              schema_version: "2.9"
+              run:
+                id: demo
+                root: "."
+              inputs:
+                - name: demo_input
+                  type: binding_sites
+                  path: inputs.csv
+              output:
+                targets: [usr]
+                schema:
+                  bio_type: dna
+                  alphabet: dna_4
+                usr:
+                  root: "{usr_root}"
+                  dataset: {dataset}
+              generation:
+                sequence_length: 30
+                plan:
+                  - name: demo_plan
+                    sequences: 1
+                    sampling:
+                      include_inputs: [demo_input]
+                    fixed_elements:
+                      promoter_constraints:
+                        - upstream: TTGACA
+                          downstream: TATAAT
+                          spacer_length: [16, 16]
+                    regulator_constraints:
+                      groups: []
+              solver:
+                backend: CBC
+                strategy: iterate
+              logging:
+                log_dir: outputs/logs
+            plots:
+              source: usr
+              out_dir: outputs/plots
+              format: png
+              default: {json.dumps(plots_default)}
+              options: {{}}
+              video:
+                enabled: false
+                mode: all_plans_round_robin_single_video
+                sampling:
+                  stride: 5
+                  max_source_rows: 100
+                  max_snapshots: 10
+                playback:
+                  target_duration_sec: 3
+                  fps: 8
+            """
+        ).strip()
+        + "\n"
+    )
+
+
 def _write_pool_manifest(run_root: Path) -> None:
     pools_dir = run_root / "outputs" / "pools"
     pools_dir.mkdir(parents=True, exist_ok=True)
@@ -522,6 +590,63 @@ def test_run_health_plot_requests_projected_output_columns(tmp_path: Path, monke
     assert captured["columns"] is not None
     assert "densegen__compression_ratio" in (captured["columns"] or [])
     assert "densegen__plan" in (captured["columns"] or [])
+
+
+def test_dataset_plot_uses_selected_output_source_rows_and_writes_dataset_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_config(cfg_path, plots_default=["dataset_source_inventory"])
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    loaded = load_config(cfg_path)
+    captured: dict[str, list[str] | None] = {"columns": None}
+
+    def _fake_load_records_from_config(*_args, **kwargs):
+        cols = kwargs.get("columns")
+        captured["columns"] = list(cols) if cols is not None else None
+        return (
+            pd.DataFrame(
+                {
+                    "source": ["plan_pool__demo_plan", "plan_pool__demo_plan", "plan_pool__other_plan"],
+                    "densegen__plan": ["demo_plan", None, "other_plan"],
+                    "densegen__input_name": ["plan_pool__demo_plan", None, "plan_pool__other_plan"],
+                }
+            ),
+            "parquet:outputs/tables/records.parquet",
+        )
+
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.viz.plotting.load_records_from_config",
+        _fake_load_records_from_config,
+    )
+
+    def _fake_dataset_plot(df: pd.DataFrame, out_path: Path, **_kwargs) -> list[Path]:
+        assert set(df.columns) >= {"source", "densegen__plan", "densegen__input_name"}
+        target = out_path.parent / "dataset" / "dataset_source_inventory.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("plot")
+        return [target]
+
+    monkeypatch.setitem(plotting_module.AVAILABLE_PLOTS["dataset_source_inventory"], "fn", _fake_dataset_plot)
+
+    run_plots_from_config(loaded.root, cfg_path, only="dataset_source_inventory")
+
+    assert captured["columns"] is not None
+    assert set(captured["columns"] or []) == {"source", "densegen__plan", "densegen__input_name"}
+
+    manifest_path = run_root / "outputs" / "plots" / "plot_manifest.json"
+    payload = json.loads(manifest_path.read_text())
+    entries = [item for item in payload.get("plots", []) if item.get("name") == "dataset_source_inventory"]
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry["path"] == "dataset/dataset_source_inventory.png"
+    assert entry["group"] == "dataset"
+    assert entry["family"] == "dataset"
+    assert entry["plan_name"] == "unscoped"
+    assert entry["plot_id"] == "dataset_source_inventory"
 
 
 def test_placement_map_uses_selected_output_source_for_solutions(

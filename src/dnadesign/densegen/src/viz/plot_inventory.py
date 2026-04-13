@@ -84,6 +84,10 @@ def infer_plot_id_from_path(relative_parts: Sequence[str], stem: str) -> str:
         return "placement_map"
     if head == "run_health":
         return "run_health"
+    if head == "dataset":
+        if "heatmap" in normalized_stem:
+            return "dataset_metadata_heatmap"
+        return "dataset_source_inventory"
     return ""
 
 
@@ -151,6 +155,18 @@ def manifest_path_fields(name: str, rel_path: Path) -> dict[str, str]:
         fields["group"] = "run"
         fields["family"] = "run_health"
         fields["variant"] = stem
+        return fields
+    if name == "dataset_source_inventory":
+        fields["group"] = "dataset"
+        fields["family"] = "dataset"
+        fields["plan_name"] = "unscoped"
+        fields["variant"] = "source_inventory"
+        return fields
+    if name == "dataset_metadata_heatmap":
+        fields["group"] = "dataset"
+        fields["family"] = "dataset"
+        fields["plan_name"] = "unscoped"
+        fields["variant"] = "metadata_heatmap"
         return fields
     fields["variant"] = stem
     return fields

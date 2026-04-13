@@ -16,6 +16,25 @@ Run from this directory:
 ./runbook.sh --mode analysis
 ```
 
+Read-only local analysis over the shared DenseGen source dataset uses the same
+workspace through the public DenseGen CLI:
+
+```bash
+uv run dense plot -c "$PWD/config.yaml"
+uv run dense notebook generate -c "$PWD/config.yaml"
+uv run dense notebook run -c "$PWD/config.yaml"
+```
+
+Those commands read `densegen/study_stress_ethanol_cipro` through the existing
+workspace config and only write local plot/notebook artifacts under `outputs/`.
+The workspace resolves `output.usr.root` against the git common repo root, so
+the same config works from a normal checkout and from an isolated worktree.
+
+This workspace now defaults `dense plot` to the dataset-native
+`dataset_source_inventory` and `dataset_metadata_heatmap` views plus the core
+local diagnostics. The Stage-B showcase video remains explicit-only through
+`uv run dense plot --only dense_array_video_showcase`.
+
 - Runbook: [runbook.md](runbook.md)
 - Config: [config.yaml](config.yaml)
 - All workspaces: [../README.md](../README.md)

@@ -138,7 +138,8 @@ densegen:
       deduplicate: true
       chunk_size: 8192
     usr:
-      root: ../../../usr/datasets
+      root: src/dnadesign/usr/datasets
+      root_scope: git_common_repo_root
       dataset: densegen/study_stress_ethanol_cipro
       chunk_size: 8192
       health_event_interval_seconds: 60
@@ -308,11 +309,19 @@ plots:
   source: usr
   out_dir: outputs/plots
   format: pdf
-  default: [stage_a_summary, placement_map, run_health, tfbs_usage]
+  sample_rows: 200000
+  default:
+    [
+      dataset_source_inventory,
+      dataset_metadata_heatmap,
+      stage_a_summary,
+      placement_map,
+      run_health,
+      tfbs_usage,
+    ]
   allow_truncated: true
-  # Stage-B showcase video (single all-plan MP4 by default).
   video:
-    enabled: true
+    enabled: false
     mode: all_plans_round_robin_single_video
     sampling:
       stride: 5

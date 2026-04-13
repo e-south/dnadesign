@@ -22,6 +22,8 @@ def test_plot_registry_has_descriptions() -> None:
 
 def test_plot_registry_is_canonical_set() -> None:
     assert set(PLOT_SPECS.keys()) == {
+        "dataset_metadata_heatmap",
+        "dataset_source_inventory",
         "dense_array_video_showcase",
         "placement_map",
         "tfbs_usage",

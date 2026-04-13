@@ -516,13 +516,27 @@ def test_packaged_workspace_plot_defaults_cover_primary_runtime_diagnostics() ->
         "demo_tfbs_baseline": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
         "demo_sampling_baseline": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
         "study_constitutive_sigma_panel": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
-        "study_stress_ethanol_cipro": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
+        "study_stress_ethanol_cipro": {
+            "dataset_source_inventory",
+            "dataset_metadata_heatmap",
+            "stage_a_summary",
+            "placement_map",
+            "run_health",
+            "tfbs_usage",
+        },
     }
     for workspace_id, expected in expected_defaults.items():
         cfg = load_config(_demo_config_path(workspace_id))
         plots = cfg.root.plots
         assert plots is not None
         assert set(plots.default) == expected
+
+
+def test_study_stress_ethanol_cipro_disables_default_video_for_read_only_analysis() -> None:
+    cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
+    plots = cfg.root.plots
+    assert plots is not None
+    assert plots.video.enabled is False
 
 
 def test_matrix_studies_use_auto_scoped_stage_b_plot_defaults() -> None:
@@ -545,7 +559,8 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     assert output.targets == ["parquet", "usr"]
     assert output.usr is not None
     assert output.usr.dataset == "densegen/study_stress_ethanol_cipro"
-    assert output.usr.root == "../../../usr/datasets"
+    assert output.usr.root == "src/dnadesign/usr/datasets"
+    assert output.usr.root_scope == "git_common_repo_root"
     assert float(output.usr.health_event_interval_seconds) > 0
     assert solver.backend == "GUROBI"
     assert solver.strategy == "iterate"
