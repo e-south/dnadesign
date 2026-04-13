@@ -649,6 +649,72 @@ def test_dataset_plot_uses_selected_output_source_rows_and_writes_dataset_manife
     assert entry["plot_id"] == "dataset_source_inventory"
 
 
+def test_dataset_plot_rerun_preserves_sibling_dataset_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_config(
+        cfg_path,
+        plots_default=["dataset_source_inventory", "dataset_metadata_heatmap"],
+    )
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    loaded = load_config(cfg_path)
+
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.viz.plotting.load_records_from_config",
+        lambda *_args, **_kwargs: (
+            pd.DataFrame(
+                {
+                    "source": ["plan_pool__demo_plan", "plan_pool__other_plan"],
+                    "densegen__plan": ["demo_plan", "other_plan"],
+                    "densegen__input_name": ["plan_pool__demo_plan", "plan_pool__other_plan"],
+                }
+            ),
+            "parquet:outputs/tables/records.parquet",
+        ),
+    )
+
+    def _fake_dataset_inventory_plot(_df: pd.DataFrame, out_path: Path, **_kwargs) -> list[Path]:
+        target = out_path.parent / "dataset" / "dataset_source_inventory.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("inventory")
+        return [target]
+
+    def _fake_dataset_heatmap_plot(_df: pd.DataFrame, out_path: Path, **_kwargs) -> list[Path]:
+        target = out_path.parent / "dataset" / "dataset_metadata_heatmap.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("heatmap")
+        return [target]
+
+    monkeypatch.setitem(
+        plotting_module.AVAILABLE_PLOTS["dataset_source_inventory"],
+        "fn",
+        _fake_dataset_inventory_plot,
+    )
+    monkeypatch.setitem(
+        plotting_module.AVAILABLE_PLOTS["dataset_metadata_heatmap"],
+        "fn",
+        _fake_dataset_heatmap_plot,
+    )
+
+    run_plots_from_config(loaded.root, cfg_path, only="dataset_source_inventory")
+    run_plots_from_config(loaded.root, cfg_path, only="dataset_metadata_heatmap")
+
+    inventory_path = run_root / "outputs" / "plots" / "dataset" / "dataset_source_inventory.png"
+    heatmap_path = run_root / "outputs" / "plots" / "dataset" / "dataset_metadata_heatmap.png"
+    assert inventory_path.exists()
+    assert heatmap_path.exists()
+
+    manifest_path = run_root / "outputs" / "plots" / "plot_manifest.json"
+    payload = json.loads(manifest_path.read_text())
+    names = sorted(item.get("name") for item in payload.get("plots", []))
+    assert names.count("dataset_source_inventory") == 1
+    assert names.count("dataset_metadata_heatmap") == 1
+
+
 def test_placement_map_uses_selected_output_source_for_solutions(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

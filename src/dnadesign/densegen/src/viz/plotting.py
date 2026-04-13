@@ -511,6 +511,24 @@ def _clean_plot_subdir(out_dir: Path, subdir: str) -> None:
         shutil.rmtree(target)
 
 
+def _clean_selected_plot_files(out_dir: Path, *, subdir: str, plot_ids: Iterable[str]) -> None:
+    target = out_dir / subdir
+    if not target.exists():
+        return
+    selected = {str(plot_id).strip() for plot_id in plot_ids if str(plot_id).strip()}
+    if not selected:
+        return
+    for path in target.iterdir():
+        if not path.is_file():
+            continue
+        rel_path = str(path.relative_to(out_dir))
+        if path.stem not in selected or not _is_supported_plot_path(rel_path):
+            continue
+        path.unlink(missing_ok=True)
+    if not any(target.iterdir()):
+        target.rmdir()
+
+
 def _plot_required_sources(selected: Iterable[str]) -> set[str]:
     sources: set[str] = set()
     for name in selected:
@@ -764,8 +782,9 @@ def run_plots_from_config(
     _cleanup_legacy_flat_outputs(out_dir, selected, plot_format)
     if "placement_map" in selected or "tfbs_usage" in selected:
         _clean_plot_subdir(out_dir, "stage_b")
-    if "dataset_source_inventory" in selected or "dataset_metadata_heatmap" in selected:
-        _clean_plot_subdir(out_dir, "dataset")
+    dataset_plots = [name for name in selected if name in {"dataset_source_inventory", "dataset_metadata_heatmap"}]
+    if dataset_plots:
+        _clean_selected_plot_files(out_dir, subdir="dataset", plot_ids=dataset_plots)
     required_sources = _plot_required_sources(selected)
     cols = _plot_required_columns(selected, options)
     composition_cols = _required_columns_for_selected(selected, mapping=_COMPOSITION_COLUMNS_BY_PLOT)
