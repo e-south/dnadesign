@@ -95,6 +95,17 @@ class DensegenTfbsAdapter:
         merged.update(dict(self.policies or {}))
         object.__setattr__(self, "policies", merged)
 
+    @staticmethod
+    def _normalize_annotation_item(item: dict[str, Any]) -> dict[str, Any]:
+        normalized = dict(item)
+        regulator = str(normalized.get("regulator") or "").strip()
+        sequence = str(normalized.get("sequence") or "").strip()
+        if regulator == "" and str(normalized.get("tf") or "").strip():
+            normalized["regulator"] = str(normalized.get("tf") or "").strip()
+        if sequence == "" and str(normalized.get("tfbs") or "").strip():
+            normalized["sequence"] = str(normalized.get("tfbs") or "").strip()
+        return normalized
+
     def _parse_annotations(
         self,
         obj: Any,
@@ -131,6 +142,7 @@ class DensegenTfbsAdapter:
         for idx, item in enumerate(obj):
             if not isinstance(item, dict):
                 raise SchemaError("DenseGen annotation entries must be dicts")
+            item = self._normalize_annotation_item(item)
 
             part_kind = str(item.get("part_kind") or "tfbs").strip().lower()
             if part_kind == "fixed_element":

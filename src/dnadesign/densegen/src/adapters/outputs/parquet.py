@@ -158,6 +158,55 @@ def _schema_mismatch_details(expected, existing) -> tuple[list[str], list[str], 
     return missing, extra, mismatched
 
 
+def _field_type_map(schema) -> dict[str, object]:
+    return {field.name: field.type for field in schema}
+
+
+def _is_legacy_used_tfbs_detail_type(field_type, pa) -> bool:
+    if not pa.types.is_list(field_type):
+        return False
+    value_type = field_type.value_type
+    if not pa.types.is_struct(value_type):
+        return False
+    field_names = {field.name for field in value_type}
+    required_legacy_fields = {
+        "part_kind",
+        "sequence",
+        "tf",
+        "tfbs",
+        "orientation",
+        "offset",
+        "offset_raw",
+        "length",
+        "end",
+        "stage_a_tfbs_core",
+    }
+    return required_legacy_fields.issubset(field_names) and "regulator" not in field_names
+
+
+def is_legacy_used_tfbs_detail_schema_compatible(path: Path, *, namespace: str = DEFAULT_NAMESPACE) -> bool:
+    if not path.exists() or path.is_dir():
+        return False
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except Exception:
+        return False
+
+    expected = _build_schema(namespace, pa)
+    existing = pq.ParquetFile(path).schema_arrow
+    exp_map = _field_type_map(expected)
+    got_map = _field_type_map(existing)
+    if set(exp_map) != set(got_map):
+        return False
+
+    used_tfbs_detail_name = f"{namespace}__used_tfbs_detail"
+    mismatched_names = [name for name in sorted(exp_map) if exp_map[name] != got_map[name]]
+    if mismatched_names != [used_tfbs_detail_name]:
+        return False
+    return _is_legacy_used_tfbs_detail_type(got_map[used_tfbs_detail_name], pa)
+
+
 def validate_parquet_schema(path: Path, *, namespace: str = DEFAULT_NAMESPACE) -> None:
     if not path.exists():
         return

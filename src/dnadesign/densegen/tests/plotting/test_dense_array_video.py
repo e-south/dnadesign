@@ -304,6 +304,27 @@ def test_dense_array_video_uses_shared_densegen_presentation_contract(monkeypatc
 
     records_df = _base_records_df().copy()
     records_df.loc[1, "id"] = "abcdefghijklmnopqrstu"
+    records_df.loc[0, "densegen__used_tfbs_detail"] = [
+        {"tf": "lexA", "orientation": "fwd", "tfbs": "TTTT", "offset": 0}
+    ]
+    records_df["densegen__promoter_detail"] = [
+        {
+            "placements": [
+                {
+                    "name": "sigma70_core",
+                    "upstream_seq": "TTTT",
+                    "downstream_seq": "ACGT",
+                    "upstream_start": 0,
+                    "downstream_start": 4,
+                    "spacer_length": 0,
+                    "variant_ids": {"up_id": "a", "down_id": "B"},
+                }
+            ]
+        },
+        None,
+        None,
+        None,
+    ]
     _patch_records_loader(monkeypatch, records_df, records_path)
 
     captured: dict[str, object] = {}
@@ -314,10 +335,17 @@ def test_dense_array_video_uses_shared_densegen_presentation_contract(monkeypatc
 
     assert "overlay_text" not in captured["adapter_columns"]
     assert captured["adapter_columns"]["video_subtitle"] == "densegen__video_subtitle"
+    assert captured["adapter_columns"]["promoter_detail"] == "densegen__promoter_detail"
     assert captured["job_mapping"]["outputs"][0]["title_text"] == "Run"
     assert captured["job_mapping"]["render"]["style"]["overrides"]["palette"]["tf:lexA"] == "#5DADE2"
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_mode"] == "inline"
     assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_font_size"] == 14
     rendered_df = captured["records_df"]
+    assert "densegen__promoter_detail" in rendered_df.columns
+    legacy_row = rendered_df.loc[rendered_df["id"].astype(str) == "rec_b_1"].iloc[0]
+    normalized_annotations = json.loads(legacy_row["densegen__used_tfbs_detail"])
+    assert normalized_annotations[0]["regulator"] == "lexA"
+    assert normalized_annotations[0]["sequence"] == "TTTT"
     assert rendered_df["densegen__video_subtitle"].tolist() == [
         "Sequence abcdefgh...rstu | Plan plan a",
         "Sequence rec_b_1 | Plan plan b",

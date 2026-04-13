@@ -15,10 +15,9 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
-import pytest
 from matplotlib import colors as mcolors
 
-from dnadesign.baserender import DENSEGEN_TFBS_REQUIRED_KEYS, SchemaError, render_parquet_record_figure
+from dnadesign.baserender import DENSEGEN_TFBS_REQUIRED_KEYS, render_parquet_record_figure
 from dnadesign.densegen.src.integrations.baserender.notebook_contract import (
     REQUIRED_TFBS_ENTRY_KEYS,
     densegen_notebook_render_contract,
@@ -72,6 +71,7 @@ def test_notebook_render_contract_is_explicit_and_complete() -> None:
     assert palette.get("tf:background") == "#C3CAD3"
     assert palette.get("promoter:sigma70_core:upstream") == "#7D86D1"
     assert palette.get("promoter:sigma70_core:downstream") == "#C886D1"
+    assert contract.style_overrides.get("legend_mode") == "inline"
     assert contract.record_window_limit == 500
     assert REQUIRED_TFBS_ENTRY_KEYS == DENSEGEN_TFBS_REQUIRED_KEYS
 
@@ -137,7 +137,7 @@ def test_notebook_render_contract_keeps_background_cpxr_baer_visually_separated(
     assert _distance(cpxr, baer) >= 0.20
 
 
-def test_notebook_render_contract_rejects_legacy_tf_tfbs_keys(tmp_path: Path) -> None:
+def test_notebook_render_contract_renders_legacy_tf_tfbs_keys(tmp_path: Path) -> None:
     records_path = tmp_path / "records.parquet"
     pd.DataFrame(
         [
@@ -152,13 +152,14 @@ def test_notebook_render_contract_rejects_legacy_tf_tfbs_keys(tmp_path: Path) ->
     ).to_parquet(records_path)
 
     contract = densegen_notebook_render_contract()
-    with pytest.raises(SchemaError, match="regulator"):
-        render_parquet_record_figure(
-            dataset_path=records_path,
-            record_id="row1",
-            adapter_kind=contract.adapter_kind,
-            adapter_columns=contract.adapter_columns,
-            adapter_policies=contract.adapter_policies,
-            style_preset=contract.style_preset,
-            style_overrides=contract.style_overrides,
-        )
+    fig = render_parquet_record_figure(
+        dataset_path=records_path,
+        record_id="row1",
+        adapter_kind=contract.adapter_kind,
+        adapter_columns=contract.adapter_columns,
+        adapter_policies=contract.adapter_policies,
+        style_preset=contract.style_preset,
+        style_overrides=contract.style_overrides,
+    )
+    assert fig is not None
+    plt.close(fig)

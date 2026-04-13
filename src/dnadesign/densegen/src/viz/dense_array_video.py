@@ -22,6 +22,7 @@ import pandas as pd
 
 from dnadesign.baserender import run_job
 from dnadesign.densegen.src.config.plots import PlotVideoConfig
+from dnadesign.densegen.src.core.record_values import normalize_used_tfbs_entries
 from dnadesign.densegen.src.integrations.baserender.notebook_contract import (
     densegen_notebook_render_contract,
     densegen_video_subtitle_text,
@@ -34,6 +35,7 @@ _REQUIRED_COLUMNS = (
     "densegen__plan",
     "densegen__used_tfbs_detail",
 )
+_OPTIONAL_SOURCE_COLUMNS = ("densegen__promoter_detail",)
 _VIDEO_SUBTITLE_COLUMN = "densegen__video_subtitle"
 _SAFE_SEGMENT_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -54,7 +56,8 @@ def _require_columns(df: pd.DataFrame) -> None:
 
 def _normalize_source_rows(df: pd.DataFrame) -> pd.DataFrame:
     _require_columns(df)
-    frame = df.loc[:, list(_REQUIRED_COLUMNS)].copy()
+    selected_columns = [*_REQUIRED_COLUMNS, *[name for name in _OPTIONAL_SOURCE_COLUMNS if name in df.columns]]
+    frame = df.loc[:, selected_columns].copy()
     for col in ("id", "sequence", "densegen__plan"):
         if frame[col].isna().any():
             raise ValueError(f"Dense-array video source rows include null {col} values.")
@@ -91,16 +94,22 @@ def _normalize_source_rows(df: pd.DataFrame) -> pd.DataFrame:
                 raise ValueError(
                     "Dense-array video densegen__used_tfbs_detail strings must be valid JSON list/dict values."
                 ) from exc
-            if not isinstance(parsed, (list, dict)):
-                raise ValueError("Dense-array video densegen__used_tfbs_detail must encode a JSON list/dict per row.")
-            encoded_annotations.append(json.dumps(parsed, separators=(",", ":"), allow_nan=False))
-            continue
-        if not isinstance(value, (list, dict)):
+        else:
+            parsed = value
+        if isinstance(parsed, dict):
+            parsed = [parsed]
+        if not isinstance(parsed, (list, tuple)):
             raise ValueError(
                 "Dense-array video densegen__used_tfbs_detail must be a JSON string, list, or dict per row."
             )
         try:
-            encoded_annotations.append(json.dumps(value, separators=(",", ":"), allow_nan=False))
+            parsed_items = list(parsed)
+            normalized_items = normalize_used_tfbs_entries(
+                [dict(item) for item in parsed_items if isinstance(item, dict)]
+            )
+            if len(normalized_items) != len(parsed_items):
+                raise ValueError("Dense-array video densegen__used_tfbs_detail must contain dict items only.")
+            encoded_annotations.append(json.dumps(normalized_items, separators=(",", ":"), allow_nan=False))
         except (TypeError, ValueError) as exc:
             raise ValueError("Dense-array video densegen__used_tfbs_detail includes non-JSON values.") from exc
     frame["densegen__used_tfbs_detail"] = encoded_annotations
@@ -336,6 +345,8 @@ def plot_dense_array_video_showcase(
             ],
             "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
         }
+        if "densegen__promoter_detail" in sampled.columns:
+            job_mapping["input"]["adapter"]["columns"]["promoter_detail"] = "densegen__promoter_detail"
         run_job(job_mapping, kind="sequence_rows_v3", caller_root=tmp_root)
 
     if not out_file.exists():

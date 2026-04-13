@@ -110,6 +110,27 @@ def densegen_notebook_render_contract() -> DenseGenNotebookRenderContract:
     showcase_style = dict(cruncher_showcase_style_overrides())
     showcase_palette = dict(showcase_style.get("palette") or {})
     showcase_palette.update(_NOTEBOOK_COLORBLIND_PASTEL_PALETTE)
+    style_overrides = dict(showcase_style)
+    style_overrides["palette"] = showcase_palette
+    style_overrides["layout"] = {
+        **dict(showcase_style.get("layout") or {}),
+        "outer_pad_cells": 0.62,
+    }
+    style_overrides["sequence"] = {
+        **dict(showcase_style.get("sequence") or {}),
+        "to_kmer_gap_cells": 0.38,
+    }
+    style_overrides.update(
+        {
+            "legend_mode": "inline",
+            "legend_pad_px": 24.0,
+            "legend_patch_w": 28.0,
+            "legend_patch_h": 13.0,
+            "legend_font_size": 14,
+            "legend_gap_patch_text": 11.0,
+            "legend_gap_x": 44.0,
+        }
+    )
     contract = DenseGenNotebookRenderContract(
         adapter_kind="densegen_tfbs",
         adapter_columns={
@@ -119,17 +140,7 @@ def densegen_notebook_render_contract() -> DenseGenNotebookRenderContract:
         },
         adapter_policies={"on_invalid_row": "error"},
         style_preset="presentation_default",
-        style_overrides={
-            "palette": showcase_palette,
-            "layout": {"outer_pad_cells": 0.62},
-            "sequence": {"to_kmer_gap_cells": 0.38},
-            "legend_pad_px": 24.0,
-            "legend_patch_w": 28.0,
-            "legend_patch_h": 13.0,
-            "legend_font_size": 14,
-            "legend_gap_patch_text": 11.0,
-            "legend_gap_x": 44.0,
-        },
+        style_overrides=style_overrides,
         record_window_limit=500,
     )
     _validate_notebook_render_contract(contract)

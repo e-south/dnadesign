@@ -24,8 +24,9 @@ if TYPE_CHECKING:
     import pandas as pd
 
 from ...config import RootConfig, resolve_outputs_scoped_path, resolve_run_root, resolve_usr_root_scoped_path
+from ...core.record_values import coerce_list_of_dicts
 from .base import DEFAULT_NAMESPACE
-from .parquet import validate_parquet_schema
+from .parquet import is_legacy_used_tfbs_detail_schema_compatible, validate_parquet_schema
 
 log = logging.getLogger(__name__)
 DEFAULT_RECORD_LOAD_LIMIT = 100_000
@@ -163,7 +164,16 @@ def scan_records_from_config(
         if root.exists():
             import pyarrow.parquet as pq
 
-            validate_parquet_schema(root, namespace=DEFAULT_NAMESPACE)
+            try:
+                validate_parquet_schema(root, namespace=DEFAULT_NAMESPACE)
+            except RuntimeError:
+                if not is_legacy_used_tfbs_detail_schema_compatible(root, namespace=DEFAULT_NAMESPACE):
+                    raise
+                log.warning(
+                    "Loading legacy DenseGen parquet schema for compatibility: %s. "
+                    "Only densegen__used_tfbs_detail uses the legacy field layout.",
+                    root,
+                )
             with _suppressed_pyarrow_sysctl_warnings():
                 pf = pq.ParquetFile(root)
             if pf.metadata is not None and pf.metadata.num_rows == 0:
@@ -238,6 +248,10 @@ def load_records_from_config(
     df = pd.DataFrame.from_records(materialized_rows)
     if df.empty:
         raise RuntimeError("Output records dataframe is empty after materialization.")
+    if "densegen__used_tfbs_detail" in df.columns:
+        df["densegen__used_tfbs_detail"] = [
+            coerce_list_of_dicts(value) for value in df["densegen__used_tfbs_detail"].tolist()
+        ]
 
     if truncated:
         message = (
