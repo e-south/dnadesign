@@ -162,3 +162,60 @@ def test_apply_selection_sequence_rejects_duplicate_record_sequences(tmp_path: P
 
     with pytest.raises(SchemaError, match="duplicate record keys"):
         apply_selection(records, cfg)
+
+
+def test_apply_selection_preserves_video_subtitle_without_injecting_default_overlay(tmp_path: Path) -> None:
+    record = Record(
+        id="a",
+        alphabet="DNA",
+        sequence="AAAA",
+        features=(),
+        effects=(),
+        display=Display(video_subtitle="Sequence a | Plan plan a"),
+        meta={"row_index": 0},
+    ).validate()
+    csv_path = _write_selection(tmp_path / "sel_id.csv", header="id", values=["a"])
+    cfg = SelectionCfg(
+        path=csv_path,
+        match_on="id",
+        column="id",
+        overlay_column=None,
+        keep_order=False,
+        on_missing="error",
+    )
+
+    selected, missing = apply_selection([record], cfg)
+
+    assert missing == []
+    assert len(selected) == 1
+    assert selected[0].display.video_subtitle == "Sequence a | Plan plan a"
+    assert selected[0].display.overlay_text is None
+
+
+def test_apply_selection_preserves_video_subtitle_when_csv_overlay_is_present(tmp_path: Path) -> None:
+    record = Record(
+        id="a",
+        alphabet="DNA",
+        sequence="AAAA",
+        features=(),
+        effects=(),
+        display=Display(video_subtitle="Sequence a | Plan plan a"),
+        meta={"row_index": 0},
+    ).validate()
+    csv_path = tmp_path / "sel_overlay.csv"
+    csv_path.write_text("id,label\na,Chosen frame\n")
+    cfg = SelectionCfg(
+        path=csv_path,
+        match_on="id",
+        column="id",
+        overlay_column="label",
+        keep_order=False,
+        on_missing="error",
+    )
+
+    selected, missing = apply_selection([record], cfg)
+
+    assert missing == []
+    assert len(selected) == 1
+    assert selected[0].display.overlay_text == "Chosen frame"
+    assert selected[0].display.video_subtitle == "Sequence a | Plan plan a"

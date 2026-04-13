@@ -22,7 +22,11 @@ import pandas as pd
 
 from dnadesign.baserender import run_job
 from dnadesign.densegen.src.config.plots import PlotVideoConfig
-from dnadesign.densegen.src.integrations.baserender.notebook_contract import densegen_notebook_render_contract
+from dnadesign.densegen.src.integrations.baserender.notebook_contract import (
+    densegen_notebook_render_contract,
+    densegen_video_subtitle_text,
+    format_densegen_workspace_heading,
+)
 
 _REQUIRED_COLUMNS = (
     "id",
@@ -30,7 +34,7 @@ _REQUIRED_COLUMNS = (
     "densegen__plan",
     "densegen__used_tfbs_detail",
 )
-_OVERLAY_TEXT_COLUMN = "densegen__video_overlay_text"
+_VIDEO_SUBTITLE_COLUMN = "densegen__video_subtitle"
 _SAFE_SEGMENT_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
@@ -103,19 +107,22 @@ def _normalize_source_rows(df: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
-def _display_record_id(record_id: str) -> str:
-    record_text = str(record_id or "unknown")
-    if len(record_text) > 16:
-        return f"{record_text[:8]}...{record_text[-4:]}"
-    return record_text
-
-
-def _attach_overlay_text(frame: pd.DataFrame) -> pd.DataFrame:
+def _attach_video_display_metadata(
+    frame: pd.DataFrame,
+    *,
+    workspace_name: str | None,
+) -> tuple[pd.DataFrame, str]:
     enriched = frame.copy()
-    enriched[_OVERLAY_TEXT_COLUMN] = [
-        f"TFBS arrangement {_display_record_id(record_id)}" for record_id in enriched["id"].astype(str).tolist()
+    enriched[_VIDEO_SUBTITLE_COLUMN] = [
+        densegen_video_subtitle_text(record_id=record_id, plan_name=plan_name)
+        for record_id, plan_name in zip(
+            enriched["id"].astype(str).tolist(),
+            enriched["densegen__plan"].astype(str).tolist(),
+            strict=True,
+        )
     ]
-    return enriched
+    workspace_title = format_densegen_workspace_heading(str(workspace_name or "").strip())
+    return enriched, workspace_title
 
 
 def _ordered_rows_for_mode(frame: pd.DataFrame, *, video_cfg: PlotVideoConfig) -> pd.DataFrame:
@@ -241,6 +248,7 @@ def plot_dense_array_video_showcase(
     out_path: Path,
     *,
     video_cfg: PlotVideoConfig,
+    workspace_name: str | None = None,
 ) -> Path:
     if dense_arrays_df is None or dense_arrays_df.empty:
         raise ValueError("Dense-array video requires non-empty accepted output rows.")
@@ -263,7 +271,7 @@ def plot_dense_array_video_showcase(
         max_source_rows=int(video_cfg.sampling.max_source_rows),
         max_snapshots=snapshot_cap,
     )
-    sampled = _attach_overlay_text(sampled)
+    sampled, workspace_title = _attach_video_display_metadata(sampled, workspace_name=workspace_name)
     if len(sampled) > target_total_frames:
         raise ValueError(
             "Dense-array video snapshot count exceeds playback frame budget; "
@@ -295,7 +303,7 @@ def plot_dense_array_video_showcase(
                     "kind": str(contract.adapter_kind),
                     "columns": {
                         **dict(contract.adapter_columns),
-                        "overlay_text": _OVERLAY_TEXT_COLUMN,
+                        "video_subtitle": _VIDEO_SUBTITLE_COLUMN,
                     },
                     "policies": dict(contract.adapter_policies),
                 },
@@ -312,10 +320,7 @@ def plot_dense_array_video_showcase(
                 "renderer": "sequence_rows",
                 "style": {
                     "preset": str(contract.style_preset),
-                    "overrides": {
-                        "overlay_align": "center",
-                        "font_size_label": 15,
-                    },
+                    "overrides": dict(contract.style_overrides),
                 },
             },
             "outputs": [
@@ -326,6 +331,7 @@ def plot_dense_array_video_showcase(
                     "fps": int(video_cfg.playback.fps),
                     "frames_per_record": 1,
                     "total_duration": float(video_cfg.playback.target_duration_sec),
+                    "title_text": workspace_title,
                 }
             ],
             "run": {"strict": True, "fail_on_skips": True, "emit_report": False},

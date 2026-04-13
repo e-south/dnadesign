@@ -526,6 +526,7 @@ class DensegenTfbsAdapter:
         ann_col = str(self.columns.get("annotations"))
         id_col = self.columns.get("id")
         overlay_text_col = self.columns.get("overlay_text")
+        video_subtitle_col = self.columns.get("video_subtitle")
 
         sequence_raw = row.get(sequence_col)
         if sequence_raw is None or str(sequence_raw).strip() == "":
@@ -607,6 +608,11 @@ class DensegenTfbsAdapter:
             overlay_text_raw = row.get(str(overlay_text_col))
             if overlay_text_raw is not None and str(overlay_text_raw).strip() != "":
                 overlay_text = str(overlay_text_raw).strip()
+        video_subtitle = None
+        if video_subtitle_col is not None:
+            video_subtitle_raw = row.get(str(video_subtitle_col))
+            if video_subtitle_raw is not None and str(video_subtitle_raw).strip() != "":
+                video_subtitle = str(video_subtitle_raw).strip()
 
         record = Record(
             id=record_id,
@@ -614,7 +620,7 @@ class DensegenTfbsAdapter:
             sequence=sequence,
             features=tuple(features),
             effects=tuple([*promoter_effects, *fixed_effects]),
-            display=Display(overlay_text=overlay_text, tag_labels=tag_labels),
+            display=Display(overlay_text=overlay_text, video_subtitle=video_subtitle, tag_labels=tag_labels),
             meta={"row_index": row_index, "adapter": "densegen_tfbs"},
         )
         return record.validate()

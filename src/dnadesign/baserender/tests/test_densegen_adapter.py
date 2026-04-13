@@ -105,6 +105,34 @@ def test_densegen_adapter_yields_valid_record_and_renderer_works(tmp_path) -> No
     plt.close(fig)
 
 
+def test_densegen_adapter_accepts_video_subtitle_column() -> None:
+    row = {
+        "id": "row1",
+        "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+        "densegen__used_tfbs_detail": [
+            {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
+        ],
+        "details": "demo row",
+        "subtitle": "Sequence row1 | Plan background only",
+    }
+
+    adapter = DensegenTfbsAdapter(
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+            "overlay_text": "details",
+            "video_subtitle": "subtitle",
+        },
+        policies={},
+        alphabet="DNA",
+    )
+
+    record = adapter.apply(row, row_index=0)
+    assert record.display.overlay_text == "demo row"
+    assert record.display.video_subtitle == "Sequence row1 | Plan background only"
+
+
 def test_densegen_adapter_treats_zero_offset_as_explicit_coordinate() -> None:
     row = {
         "id": "row1",

@@ -291,7 +291,7 @@ playback:
     assert len(captured["selection_ids"]) <= 24
 
 
-def test_dense_array_video_uses_notebook_style_overlay_titles(monkeypatch, tmp_path: Path) -> None:
+def test_dense_array_video_uses_shared_densegen_presentation_contract(monkeypatch, tmp_path: Path) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
     cfg_path = run_root / "config.yaml"
@@ -312,15 +312,17 @@ def test_dense_array_video_uses_notebook_style_overlay_titles(monkeypatch, tmp_p
     loaded = load_config(cfg_path)
     run_plots_from_config(loaded.root, cfg_path, only="dense_array_video_showcase")
 
-    assert captured["adapter_columns"]["overlay_text"] == "densegen__video_overlay_text"
-    assert captured["job_mapping"]["render"]["style"]["overrides"]["overlay_align"] == "center"
-    assert captured["job_mapping"]["render"]["style"]["overrides"]["font_size_label"] == 15
+    assert "overlay_text" not in captured["adapter_columns"]
+    assert captured["adapter_columns"]["video_subtitle"] == "densegen__video_subtitle"
+    assert captured["job_mapping"]["outputs"][0]["title_text"] == "Run"
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["palette"]["tf:lexA"] == "#5DADE2"
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["legend_font_size"] == 14
     rendered_df = captured["records_df"]
-    assert rendered_df["densegen__video_overlay_text"].tolist() == [
-        "TFBS arrangement abcdefgh...rstu",
-        "TFBS arrangement rec_b_1",
-        "TFBS arrangement rec_a_2",
-        "TFBS arrangement rec_b_2",
+    assert rendered_df["densegen__video_subtitle"].tolist() == [
+        "Sequence abcdefgh...rstu | Plan plan a",
+        "Sequence rec_b_1 | Plan plan b",
+        "Sequence rec_a_2 | Plan plan a",
+        "Sequence rec_b_2 | Plan plan b",
     ]
 
 

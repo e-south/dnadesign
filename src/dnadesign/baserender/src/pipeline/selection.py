@@ -74,6 +74,7 @@ def _with_overlay(record: Record, text: str | None) -> Record:
         effects=record.effects,
         display=Display(
             overlay_text=text,
+            video_subtitle=record.display.video_subtitle,
             tag_labels=dict(record.display.tag_labels),
             trajectory_panel=record.display.trajectory_panel,
         ),
@@ -149,7 +150,7 @@ def apply_selection(records: Sequence[Record], selection: SelectionCfg) -> tuple
         else:
             overlay = rows.overlay_by_key.get(key)
 
-        if overlay is None and rec.display.overlay_text is None:
+        if overlay is None and rec.display.overlay_text is None and rec.display.video_subtitle is None:
             overlay = _default_overlay(selection, sel_row=i, key=key, record=rec)
         selected.append(_with_overlay(rec, overlay))
 

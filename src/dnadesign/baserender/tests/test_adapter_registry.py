@@ -47,10 +47,11 @@ def test_required_source_columns_densegen_includes_optional_present_columns() ->
             "annotations": "densegen__used_tfbs_detail",
             "id": "id",
             "overlay_text": "details",
+            "video_subtitle": "subtitle",
         },
         policies={},
     )
-    assert required_source_columns(cfg) == ["sequence", "densegen__used_tfbs_detail", "id", "details"]
+    assert required_source_columns(cfg) == ["sequence", "densegen__used_tfbs_detail", "id", "details", "subtitle"]
 
 
 def test_required_source_columns_generic_features_omits_missing_optional_columns() -> None:
@@ -93,6 +94,20 @@ def test_required_source_columns_densegen_accepts_overlay_text_optional_key() ->
         policies={},
     )
     assert required_source_columns(cfg) == ["sequence", "densegen__used_tfbs_detail", "id", "details"]
+
+
+def test_required_source_columns_densegen_accepts_video_subtitle_optional_key() -> None:
+    cfg = AdapterCfg(
+        kind="densegen_tfbs",
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+            "video_subtitle": "subtitle",
+        },
+        policies={},
+    )
+    assert required_source_columns(cfg) == ["sequence", "densegen__used_tfbs_detail", "id", "subtitle"]
 
 
 def test_generic_features_adapter_accepts_display_video_subtitle() -> None:
