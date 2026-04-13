@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .notebook import NotebookConfig
 from .plot import PlotConfig
@@ -15,12 +15,16 @@ Identifier = Annotated[str, Field(min_length=1)]
 AggregationMode = Literal["error", "first", "mean", "medoid"]
 
 
-class WorkspaceSection(BaseModel):
+class StrictWorkspaceModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class WorkspaceSection(StrictWorkspaceModel):
     id: Identifier
     output_root: str
 
 
-class DefaultsSection(BaseModel):
+class DefaultsSection(StrictWorkspaceModel):
     analysis_dtype: Literal["float32", "float64"] = "float32"
     metric: str = "cosine"
     random_seed: int = 17
@@ -28,11 +32,11 @@ class DefaultsSection(BaseModel):
     neighbor_backend: str = "auto"
 
 
-class MetadataSection(BaseModel):
+class MetadataSection(StrictWorkspaceModel):
     include: list[str] = Field(default_factory=list)
 
 
-class SourceBase(BaseModel):
+class SourceBase(StrictWorkspaceModel):
     kind: str
     record_key: str
     subject_key: str
@@ -61,41 +65,41 @@ class MatrixBundleSourceConfig(SourceBase):
 SourceConfig = Annotated[USRSourceConfig | ParquetSourceConfig | MatrixBundleSourceConfig, Field(discriminator="kind")]
 
 
-class VectorColumnSpec(BaseModel):
+class VectorColumnSpec(StrictWorkspaceModel):
     kind: Literal["column"]
     name: str
 
 
-class BundleMatrixSpec(BaseModel):
+class BundleMatrixSpec(StrictWorkspaceModel):
     kind: Literal["bundle_matrix"]
 
 
-class VectorDifferenceSpec(BaseModel):
+class VectorDifferenceSpec(StrictWorkspaceModel):
     kind: Literal["vector_difference"]
     left: str
     right: str
     alignment: str
 
 
-class ConcatenateViewSpec(BaseModel):
+class ConcatenateViewSpec(StrictWorkspaceModel):
     kind: Literal["concatenate"]
     inputs: list[str] = Field(min_length=2)
 
 
-class AggregateByKeyViewSpec(BaseModel):
+class AggregateByKeyViewSpec(StrictWorkspaceModel):
     kind: Literal["aggregate_by_key"]
     view: str
     key: str
     aggregation: AggregationMode = "mean"
 
 
-class ApplyReducerViewSpec(BaseModel):
+class ApplyReducerViewSpec(StrictWorkspaceModel):
     kind: Literal["apply_reducer"]
     view: str
     reducer: str
 
 
-class NormalizeViewSpec(BaseModel):
+class NormalizeViewSpec(StrictWorkspaceModel):
     kind: Literal["normalize"]
     view: str
     method: Literal["l2", "zscore"] = "l2"
@@ -107,7 +111,7 @@ ViewDeriveSpec = Annotated[
 ]
 
 
-class SourceBackedViewConfig(BaseModel):
+class SourceBackedViewConfig(StrictWorkspaceModel):
     source: str
     vector: Annotated[VectorColumnSpec | BundleMatrixSpec, Field(discriminator="kind")]
     coordinate_space_id: str
@@ -115,7 +119,7 @@ class SourceBackedViewConfig(BaseModel):
     role: str | None = None
 
 
-class DerivedViewConfig(BaseModel):
+class DerivedViewConfig(StrictWorkspaceModel):
     derive: ViewDeriveSpec
     coordinate_space_id: str
     tags: dict[str, Any] = Field(default_factory=dict)
@@ -125,7 +129,7 @@ class DerivedViewConfig(BaseModel):
 ViewConfig = SourceBackedViewConfig | DerivedViewConfig
 
 
-class AlignmentConfig(BaseModel):
+class AlignmentConfig(StrictWorkspaceModel):
     left: str
     right: str
     on: Literal["record_key", "subject_key"] | list[str]
@@ -134,33 +138,33 @@ class AlignmentConfig(BaseModel):
     right_aggregation: AggregationMode = "error"
 
 
-class VectorNormScalarSpec(BaseModel):
+class VectorNormScalarSpec(StrictWorkspaceModel):
     kind: Literal["vector_norm"]
     view: str
     norm: Literal["l1", "l2"] = "l2"
     output_column: str | None = None
 
 
-class ColumnExpressionScalarSpec(BaseModel):
+class ColumnExpressionScalarSpec(StrictWorkspaceModel):
     kind: Literal["column_expression"]
     source: str
     expression: str
     output_column: str
 
 
-class SelectColumnsScalarSpec(BaseModel):
+class SelectColumnsScalarSpec(StrictWorkspaceModel):
     kind: Literal["select_columns"]
     source: str
     columns: list[str] = Field(min_length=1)
 
 
-class RenameColumnsScalarSpec(BaseModel):
+class RenameColumnsScalarSpec(StrictWorkspaceModel):
     kind: Literal["rename_columns"]
     source: str
     renames: dict[str, str] = Field(min_length=1)
 
 
-class JoinTablesScalarSpec(BaseModel):
+class JoinTablesScalarSpec(StrictWorkspaceModel):
     kind: Literal["join_tables"]
     sources: list[str] = Field(min_length=2)
     on: list[str] = Field(min_length=1)
@@ -176,30 +180,43 @@ ScalarDeriveSpec = Annotated[
 ]
 
 
-class ScalarConfig(BaseModel):
+class ScalarConfig(StrictWorkspaceModel):
     derive: ScalarDeriveSpec
 
 
-class LandmarkRepresentationConfig(BaseModel):
+class LandmarkRepresentationConfig(StrictWorkspaceModel):
     mode: Literal["rows", "centroid", "medoid"]
 
 
-class LandmarkConfig(BaseModel):
+class LandmarkConfig(StrictWorkspaceModel):
     source: str
     where: dict[str, Any]
     representation: LandmarkRepresentationConfig
 
 
-class ColumnCohortConfig(BaseModel):
+class ColumnCohortConfig(StrictWorkspaceModel):
     kind: Literal["column"]
     source: str
     column: str
 
 
-CohortConfig = Annotated[ColumnCohortConfig, Field(discriminator="kind")]
+class PromoterMetadataCohortConfig(StrictWorkspaceModel):
+    kind: Literal["promoter_metadata"]
+    source: str
+    derive: Literal[
+        "design_family",
+        "design_regulator_composition",
+        "sigma70_variant",
+        "campaign_prior",
+        "is_control",
+        "source_class",
+    ]
 
 
-class ReducedViewExportBlockConfig(BaseModel):
+CohortConfig = Annotated[ColumnCohortConfig | PromoterMetadataCohortConfig, Field(discriminator="kind")]
+
+
+class ReducedViewExportBlockConfig(StrictWorkspaceModel):
     kind: Literal["reduced_view"]
     block_id: str
     source: str
@@ -208,7 +225,7 @@ class ReducedViewExportBlockConfig(BaseModel):
     alignment_aggregation: AggregationMode = "error"
 
 
-class TableColumnsExportBlockConfig(BaseModel):
+class TableColumnsExportBlockConfig(StrictWorkspaceModel):
     kind: Literal["table_columns"]
     block_id: str
     source: str
@@ -224,33 +241,35 @@ ExportBlockConfig = Annotated[
 ]
 
 
-class ExportConfig(BaseModel):
+class ExportConfig(StrictWorkspaceModel):
     row_basis: str
     blocks: list[ExportBlockConfig] = Field(min_length=1)
     matrix_dtype: Literal["float32", "float64"] | None = None
     metadata_columns: list[str] = Field(default_factory=list)
 
 
-class RecipeStepConfig(BaseModel):
+class RecipeStepConfig(StrictWorkspaceModel):
     id: Identifier
     op: str
     depends_on: list[str] = Field(default_factory=list)
     params: dict[str, Any] = Field(default_factory=dict)
 
 
-class RecipeConfig(BaseModel):
+class RecipeConfig(StrictWorkspaceModel):
     steps: list[RecipeStepConfig] = Field(min_length=1)
 
 
-class DeliverableConfig(BaseModel):
+class DeliverableConfig(StrictWorkspaceModel):
     kind: str
     description: str
+    question: str | None = None
+    section: str | None = None
     recipe: str
     requires: dict[str, list[str]] = Field(default_factory=dict)
     outputs: dict[str, list[str]] = Field(default_factory=dict)
 
 
-class StudyBindingConfig(BaseModel):
+class StudyBindingConfig(StrictWorkspaceModel):
     kind: Literal["dnadesign_study"]
     study_dir: str
     readiness_vocabulary: list[Literal["missing", "attention", "ok"]] = Field(
@@ -258,7 +277,7 @@ class StudyBindingConfig(BaseModel):
     )
 
 
-class WorkspaceConfig(BaseModel):
+class WorkspaceConfig(StrictWorkspaceModel):
     schema_version: Literal["latentdna.workspace.v1"]
     workspace: WorkspaceSection
     defaults: DefaultsSection

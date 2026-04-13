@@ -66,12 +66,26 @@ def _write_workspace_config(workspace_dir: Path, *, anchor_path: Path, context_p
                     }
                 },
                 "views": {
+                    "z7_60": {
+                        "source": "anchor60",
+                        "vector": {"kind": "column", "name": "embedding_anchor_7b"},
+                        "coordinate_space_id": "demo_7b_anchor_space",
+                        "tags": {"model": "7b", "context": "anchor_only"},
+                        "role": "committee_member",
+                    },
                     "z20_60": {
                         "source": "anchor60",
                         "vector": {"kind": "column", "name": "embedding_anchor"},
                         "coordinate_space_id": "demo_20b_anchor_space",
                         "tags": {"model": "20b", "context": "anchor_only"},
                         "role": "primary",
+                    },
+                    "z7_1k_anchor": {
+                        "source": "ctx1k",
+                        "vector": {"kind": "column", "name": "embedding_context_7b"},
+                        "coordinate_space_id": "demo_7b_anchor_space",
+                        "tags": {"model": "7b", "context": "template_1kb"},
+                        "role": "committee_member",
                     },
                     "z20_1k_anchor": {
                         "source": "ctx1k",
@@ -141,17 +155,39 @@ def _write_workspace_config(workspace_dir: Path, *, anchor_path: Path, context_p
                 "recipes": {
                     "atlas_2x2_recipe": {
                         "steps": [
+                            {"id": "materialize_anchor_7b", "op": "view.materialize", "params": {"view": "z7_60"}},
                             {"id": "materialize_anchor", "op": "view.materialize", "params": {"view": "z20_60"}},
+                            {
+                                "id": "materialize_context_7b",
+                                "op": "view.materialize",
+                                "params": {"view": "z7_1k_anchor"},
+                            },
                             {
                                 "id": "materialize_context",
                                 "op": "view.materialize",
                                 "params": {"view": "z20_1k_anchor"},
                             },
                             {
+                                "id": "sample_anchor_7b",
+                                "op": "sample.build",
+                                "depends_on": ["materialize_anchor_7b"],
+                                "params": {"sample": "atlas_anchor_7b_sample", "view": "z7_60", "strategy": "all"},
+                            },
+                            {
                                 "id": "sample_anchor",
                                 "op": "sample.build",
                                 "depends_on": ["materialize_anchor"],
                                 "params": {"sample": "atlas_anchor_sample", "view": "z20_60", "strategy": "all"},
+                            },
+                            {
+                                "id": "sample_context_7b",
+                                "op": "sample.build",
+                                "depends_on": ["materialize_context_7b"],
+                                "params": {
+                                    "sample": "atlas_context_7b_sample",
+                                    "view": "z7_1k_anchor",
+                                    "strategy": "all",
+                                },
                             },
                             {
                                 "id": "sample_context",
@@ -164,6 +200,17 @@ def _write_workspace_config(workspace_dir: Path, *, anchor_path: Path, context_p
                                 },
                             },
                             {
+                                "id": "project_anchor_7b",
+                                "op": "projection.fit",
+                                "depends_on": ["sample_anchor_7b"],
+                                "params": {
+                                    "projection_id": "umap_z7_60",
+                                    "view": "z7_60",
+                                    "sample": "atlas_anchor_7b_sample",
+                                    "seed": 17,
+                                },
+                            },
+                            {
                                 "id": "project_anchor",
                                 "op": "projection.fit",
                                 "depends_on": ["sample_anchor"],
@@ -171,6 +218,17 @@ def _write_workspace_config(workspace_dir: Path, *, anchor_path: Path, context_p
                                     "projection_id": "umap_z20_60",
                                     "view": "z20_60",
                                     "sample": "atlas_anchor_sample",
+                                    "seed": 17,
+                                },
+                            },
+                            {
+                                "id": "project_context_7b",
+                                "op": "projection.fit",
+                                "depends_on": ["sample_context_7b"],
+                                "params": {
+                                    "projection_id": "umap_z7_1k_anchor",
+                                    "view": "z7_1k_anchor",
+                                    "sample": "atlas_context_7b_sample",
                                     "seed": 17,
                                 },
                             },
@@ -188,11 +246,30 @@ def _write_workspace_config(workspace_dir: Path, *, anchor_path: Path, context_p
                             {
                                 "id": "render_atlas",
                                 "op": "plot.render",
-                                "depends_on": ["project_anchor", "project_context"],
+                                "depends_on": [
+                                    "project_anchor_7b",
+                                    "project_anchor",
+                                    "project_context_7b",
+                                    "project_context",
+                                ],
                                 "params": {
                                     "plot_id": "atlas_2x2_main",
                                     "kind": "projection_grid",
-                                    "projections": ["umap_z20_60", "umap_z20_1k_anchor"],
+                                    "projections": [
+                                        "umap_z7_60",
+                                        "umap_z20_60",
+                                        "umap_z7_1k_anchor",
+                                        "umap_z20_1k_anchor",
+                                    ],
+                                    "panel_titles": [
+                                        "7B anchor-only (60 bp)",
+                                        "20B anchor-only (60 bp)",
+                                        "7B context-aware (1 kb anchor)",
+                                        "20B context-aware (1 kb anchor)",
+                                    ],
+                                    "color_column": "densegen__plan",
+                                    "label_column": "usr_label__primary",
+                                    "label_values": ["spyP", "sulAp"],
                                 },
                             },
                         ]
@@ -203,10 +280,15 @@ def _write_workspace_config(workspace_dir: Path, *, anchor_path: Path, context_p
                         "kind": "projection_grid",
                         "description": "Fixture-scale atlas deliverable.",
                         "recipe": "atlas_2x2_recipe",
-                        "requires": {"views": ["z20_60", "z20_1k_anchor"]},
+                        "requires": {"views": ["z7_60", "z20_60", "z7_1k_anchor", "z20_1k_anchor"]},
                         "outputs": {
-                            "samples": ["atlas_anchor_sample", "atlas_context_sample"],
-                            "projections": ["umap_z20_60", "umap_z20_1k_anchor"],
+                            "samples": [
+                                "atlas_anchor_7b_sample",
+                                "atlas_anchor_sample",
+                                "atlas_context_7b_sample",
+                                "atlas_context_sample",
+                            ],
+                            "projections": ["umap_z7_60", "umap_z20_60", "umap_z7_1k_anchor", "umap_z20_1k_anchor"],
                             "plots": ["atlas_2x2_main"],
                         },
                     }
@@ -231,6 +313,7 @@ def _build_workspace(tmp_path: Path, name: str) -> Path:
                 "subject_id": "subject_01",
                 "usr_label__primary": "spyP",
                 "densegen__plan": "plan_a",
+                "embedding_anchor_7b": [0.1, 0.0, 0.2],
                 "embedding_anchor": [0.0, 0.0, 0.0],
             },
             {
@@ -238,6 +321,7 @@ def _build_workspace(tmp_path: Path, name: str) -> Path:
                 "subject_id": "subject_02",
                 "usr_label__primary": "spyP",
                 "densegen__plan": "plan_a",
+                "embedding_anchor_7b": [0.2, 1.1, 0.0],
                 "embedding_anchor": [0.0, 1.0, 0.0],
             },
             {
@@ -245,6 +329,7 @@ def _build_workspace(tmp_path: Path, name: str) -> Path:
                 "subject_id": "subject_03",
                 "usr_label__primary": "sulAp",
                 "densegen__plan": "plan_b",
+                "embedding_anchor_7b": [4.2, 0.2, 0.9],
                 "embedding_anchor": [4.0, 0.0, 1.0],
             },
             {
@@ -252,6 +337,7 @@ def _build_workspace(tmp_path: Path, name: str) -> Path:
                 "subject_id": "subject_04",
                 "usr_label__primary": "sulAp",
                 "densegen__plan": "plan_b",
+                "embedding_anchor_7b": [4.3, 1.1, 1.2],
                 "embedding_anchor": [4.0, 1.0, 1.0],
             },
         ],
@@ -265,6 +351,7 @@ def _build_workspace(tmp_path: Path, name: str) -> Path:
                 "context_id": "template_1",
                 "usr_label__primary": "spyP",
                 "densegen__plan": "plan_a",
+                "embedding_context_7b": [1.1, 0.0, 1.0],
                 "embedding_context": [1.0, 0.0, 1.0],
             },
             {
@@ -273,6 +360,7 @@ def _build_workspace(tmp_path: Path, name: str) -> Path:
                 "context_id": "template_1",
                 "usr_label__primary": "spyP",
                 "densegen__plan": "plan_a",
+                "embedding_context_7b": [1.2, 2.1, 0.1],
                 "embedding_context": [1.0, 2.0, 0.0],
             },
             {
@@ -281,6 +369,7 @@ def _build_workspace(tmp_path: Path, name: str) -> Path:
                 "context_id": "template_1",
                 "usr_label__primary": "sulAp",
                 "densegen__plan": "plan_b",
+                "embedding_context_7b": [5.2, 1.1, 1.1],
                 "embedding_context": [5.0, 1.0, 1.0],
             },
             {
@@ -289,6 +378,7 @@ def _build_workspace(tmp_path: Path, name: str) -> Path:
                 "context_id": "template_1",
                 "usr_label__primary": "sulAp",
                 "densegen__plan": "plan_b",
+                "embedding_context_7b": [6.3, 1.1, 2.2],
                 "embedding_context": [6.0, 1.0, 2.0],
             },
         ],
@@ -492,7 +582,7 @@ def _bench_deliverable_atlas_2x2(tmp_path: Path) -> dict[str, object]:
     result = run_deliverable(workspace_dir, "atlas_2x2_intermediate")
     return _record(
         "bench_deliverable_atlas_2x2",
-        rows=8,
+        rows=16,
         outputs=result.outputs,
         correctness={"artifact_kind": result.artifact_kind, "outputs": result.metrics["outputs"]},
         started_at=started_at,
@@ -536,3 +626,39 @@ def test_benchmark_harness_emits_required_metrics(tmp_path: Path) -> None:
         assert entry["peak_rss_kib"] > 0
         assert entry["artifact_size_bytes"] > 0
         assert entry["correctness"]
+
+    atlas_manifest = json.loads(
+        (
+            tmp_path
+            / "bench_deliverable_atlas_2x2"
+            / "outputs"
+            / "latentdna"
+            / "plots"
+            / "atlas_2x2_main"
+            / "manifest.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert atlas_manifest["params"]["plot_kind"] == "projection_grid"
+    assert atlas_manifest["params"]["projection_ids"] == [
+        "umap_z7_60",
+        "umap_z20_60",
+        "umap_z7_1k_anchor",
+        "umap_z20_1k_anchor",
+    ]
+    assert atlas_manifest["params"]["color_column"] == "densegen__plan"
+    assert atlas_manifest["params"]["label_column"] == "usr_label__primary"
+    assert atlas_manifest["params"]["label_values"] == ["spyP", "sulAp"]
+    assert atlas_manifest["params"]["panel_titles"] == [
+        "7B anchor-only (60 bp)",
+        "20B anchor-only (60 bp)",
+        "7B context-aware (1 kb anchor)",
+        "20B context-aware (1 kb anchor)",
+    ]
+
+    atlas_svg = (
+        tmp_path / "bench_deliverable_atlas_2x2" / "outputs" / "latentdna" / "plots" / "atlas_2x2_main" / "plot.svg"
+    ).read_text(encoding="utf-8")
+    assert "7B anchor-only (60 bp)" in atlas_svg
+    assert "20B context-aware (1 kb anchor)" in atlas_svg
+    assert "plan_a" in atlas_svg
+    assert "plan_b" in atlas_svg

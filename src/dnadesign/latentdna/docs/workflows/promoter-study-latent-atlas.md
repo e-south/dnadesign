@@ -51,11 +51,12 @@ uv run latentdna projection fit z20_60 \
   --sample atlas_sample \
   --run-id umap_z20_60
 
-# Render the atlas panel from existing projection artifacts only.
-uv run latentdna plot render atlas_2x2_main \
+# Render one review scatter from the persisted projection artifact only.
+uv run latentdna plot render anchor_projection_review \
   --workspace workspaces/stress_ethanol_cipro_latent_atlas \
-  --kind projection_grid \
-  --projection umap_z20_60
+  --kind projection_scatter \
+  --projection umap_z20_60 \
+  --color-column densegen__plan
 ```
 
 ### Next artifact slice
@@ -97,6 +98,10 @@ uv run latentdna view reduce delta20 \
 
 # Export the configured low-rank matrix bundle for downstream supervised learning.
 uv run latentdna export matrix x1_primary_20b \
+  --workspace workspaces/stress_ethanol_cipro_latent_atlas
+
+# Once all four committee projections exist, render the named publication-style atlas recipe.
+uv run latentdna plot render atlas_2x2_main \
   --workspace workspaces/stress_ethanol_cipro_latent_atlas
 ```
 
@@ -174,12 +179,7 @@ uv run latentdna agreement compare agreement_20b_anchor_vs_context \
 ```bash
 # Render control-distance structure directly from the persisted distance table.
 uv run latentdna plot render primary_landmark_scatter \
-  --workspace workspaces/stress_ethanol_cipro_latent_atlas \
-  --kind distance_scatter \
-  --distance primary_landmark_distances \
-  --x-column d_spy_p \
-  --y-column d_sul_ap \
-  --color-column densegen__plan
+  --workspace workspaces/stress_ethanol_cipro_latent_atlas
 
 # Render one numeric artifact column as a read-only distribution plot.
 uv run latentdna plot render spy_distance_distribution \
@@ -211,10 +211,7 @@ uv run latentdna enrich score control_plan_enrichment \
 
 # Render the enrichment table as a read-only heatmap artifact.
 uv run latentdna plot render control_plan_heatmap \
-  --workspace workspaces/stress_ethanol_cipro_latent_atlas \
-  --kind heatmap \
-  --enrichment control_plan_enrichment \
-  --value-column enrichment_delta
+  --workspace workspaces/stress_ethanol_cipro_latent_atlas
 ```
 
 ### Thin orchestration slice

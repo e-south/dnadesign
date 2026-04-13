@@ -8,12 +8,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ..contracts.errors import SourceResolutionError, WorkspaceValidationError
 from ..contracts.workspace import MatrixBundleSourceConfig, ParquetSourceConfig, SourceConfig, USRSourceConfig
 from ..io.hashing import sha256_path, sha256_payload
+from ..io.matrix_io import read_matrix
 from ..io.parquet_io import read_row_count, read_schema, read_table
 from . import parquet_source, usr_source
 
@@ -26,6 +28,7 @@ class ResolvedSource:
     records_path: Path | None
     matrix_path: Path | None = None
     rows_path: Path | None = None
+    manifest_path: Path | None = None
 
 
 def _load_usr_dataset(resolved: ResolvedSource):
@@ -55,6 +58,7 @@ def resolve_source(source_id: str, source: SourceConfig, *, workspace_dir: Path)
             records_path=None,
             matrix_path=matrix_path,
             rows_path=rows_path,
+            manifest_path=bundle / "manifest.json",
         )
     raise SourceResolutionError(f"unsupported source kind for {source_id}: {source.kind}")
 
@@ -67,6 +71,21 @@ def require_records_path(resolved: ResolvedSource) -> Path:
             f"records.parquet not found for source {resolved.source_id}: {resolved.records_path}"
         )
     return resolved.records_path
+
+
+def require_matrix_bundle_paths(resolved: ResolvedSource) -> tuple[Path, Path, Path]:
+    rows_path = resolved.rows_path
+    matrix_path = resolved.matrix_path
+    manifest_path = resolved.manifest_path
+    if rows_path is None or matrix_path is None or manifest_path is None:
+        raise SourceResolutionError(f"matrix bundle source {resolved.source_id} is missing rows/matrix/manifest paths")
+    if not rows_path.exists():
+        raise SourceResolutionError(f"rows.parquet not found for source {resolved.source_id}: {rows_path}")
+    if not matrix_path.exists():
+        raise SourceResolutionError(f"matrix file not found for source {resolved.source_id}: {matrix_path}")
+    if not manifest_path.exists():
+        raise SourceResolutionError(f"manifest.json not found for source {resolved.source_id}: {manifest_path}")
+    return rows_path, matrix_path, manifest_path
 
 
 def inspect_source_schema(resolved: ResolvedSource) -> dict[str, Any]:
@@ -90,15 +109,16 @@ def inspect_source_schema(resolved: ResolvedSource) -> dict[str, Any]:
             "vector_columns": vector_columns,
         }
 
-    rows_path = resolved.rows_path
-    matrix_path = resolved.matrix_path
-    if rows_path is None or matrix_path is None:
-        raise SourceResolutionError(f"matrix bundle source {resolved.source_id} is missing rows/matrix paths")
-    if not rows_path.exists():
-        raise SourceResolutionError(f"rows.parquet not found for source {resolved.source_id}: {rows_path}")
-    if not matrix_path.exists():
-        raise SourceResolutionError(f"matrix file not found for source {resolved.source_id}: {matrix_path}")
+    rows_path, matrix_path, _ = require_matrix_bundle_paths(resolved)
     schema = read_schema(rows_path)
+    matrix = np.asarray(read_matrix(matrix_path))
+    if matrix.ndim != 2:
+        raise SourceResolutionError(f"matrix bundle source {resolved.source_id} must expose a 2D matrix")
+    if matrix.shape[0] != read_row_count(rows_path):
+        raise SourceResolutionError(
+            f"matrix bundle source {resolved.source_id} row count mismatch: "
+            f"matrix has {matrix.shape[0]} rows but rows.parquet has {read_row_count(rows_path)}"
+        )
     return {
         "path": rows_path.parent.as_posix(),
         "row_count": read_row_count(rows_path),
@@ -167,20 +187,25 @@ def source_provenance(
     if isinstance(resolved.source, ParquetSourceConfig):
         return parquet_source.source_provenance(resolved.source.path, workspace_dir=resolved.workspace_dir)
     if isinstance(resolved.source, MatrixBundleSourceConfig):
-        if resolved.rows_path is None or resolved.matrix_path is None:
-            raise SourceResolutionError(f"matrix bundle source {resolved.source_id} is missing rows/matrix paths")
+        rows_path, matrix_path, manifest_path = require_matrix_bundle_paths(resolved)
         return [
             {
                 "kind": "file",
-                "id": resolved.rows_path.name,
-                "path": resolved.rows_path.as_posix(),
+                "id": rows_path.name,
+                "path": rows_path.as_posix(),
                 "role": "rows",
             },
             {
                 "kind": "file",
-                "id": resolved.matrix_path.name,
-                "path": resolved.matrix_path.as_posix(),
+                "id": matrix_path.name,
+                "path": matrix_path.as_posix(),
                 "role": "matrix",
+            },
+            {
+                "kind": "file",
+                "id": manifest_path.name,
+                "path": manifest_path.as_posix(),
+                "role": "manifest",
             },
         ]
     raise SourceResolutionError(f"unsupported source kind for provenance: {resolved.source.kind}")

@@ -91,6 +91,10 @@ component_management:
       name: latdna
       paths:
         - src/dnadesign/latdna/**
+    - component_id: latentdna
+      name: latentdna
+      paths:
+        - src/dnadesign/latentdna/**
     - component_id: cruncher
       name: cruncher
       paths:

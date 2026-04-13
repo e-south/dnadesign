@@ -676,8 +676,50 @@ def test_single_file_overlay_uses_inline_relation_without_temp_view(tmp_path: Pa
     )
     counting_con = _CountingConnection(con)
     source_sql = create_overlay_view(counting_con, view_name="overlay_inline", path=overlay_path, key="id")
-    assert source_sql.startswith("read_parquet(")
+    assert "read_parquet(" in source_sql
     assert counting_con.temp_view_creates == 0
+
+
+def test_multi_part_overlay_avoids_materialized_staging_table(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ds = _make_dataset(tmp_path)
+    target_id = ds.head(1)["id"].iloc[0]
+    counter = {"step": 0}
+
+    def _next_time() -> str:
+        base = datetime(2026, 2, 7, tzinfo=timezone.utc)
+        value = base + timedelta(seconds=counter["step"])
+        counter["step"] += 1
+        return value.isoformat()
+
+    monkeypatch.setattr(dataset_overlay_ops_module, "now_utc", _next_time)
+
+    for score in range(3):
+        ds.write_overlay_part("mock", pa.table({"id": [target_id], "mock__score": [float(score)]}), key="id")
+
+    overlay_path = ds.dir / "_derived" / "mock"
+    assert overlay_path.is_dir()
+
+    class _CountingConnection:
+        def __init__(self, inner) -> None:
+            self._inner = inner
+            self.calls: list[str] = []
+
+        def execute(self, sql: str):
+            self.calls.append(sql)
+            return self._inner.execute(sql)
+
+    con = connect_duckdb_utc(
+        missing_dependency_message="duckdb is required for overlay joins (install duckdb).",
+        error_context="overlay staging test",
+    )
+    counting_con = _CountingConnection(con)
+    create_overlay_view(counting_con, view_name="overlay_lazy", path=overlay_path, key="id")
+
+    assert not any(sql.startswith("CREATE TEMP TABLE overlay_lazy_staging AS") for sql in counting_con.calls)
+    assert any(sql.startswith("CREATE TEMP VIEW overlay_lazy_staging AS") for sql in counting_con.calls)
 
 
 def test_multi_part_overlay_duplicate_key_validation_is_reused_across_calls(

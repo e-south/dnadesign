@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from .errors import SchemaError
 from .overlays import overlay_metadata, overlay_parts, overlay_schema
@@ -112,19 +112,29 @@ def create_overlay_view(
     view_name: str,
     path: Path,
     key: str,
+    columns: Sequence[str] | None = None,
 ) -> str:
     key_q = sql_ident(key)
     raw_parts = overlay_parts(path)
     parts = tuple(Path(part).absolute() for part in raw_parts)
     if not parts:
         raise SchemaError(f"Overlay has no parquet parts: {path}")
+    schema_names = list(overlay_schema(path).names)
+    requested_columns = list(dict.fromkeys(columns or schema_names))
+    if key not in requested_columns:
+        requested_columns.insert(0, key)
+    missing_columns = [name for name in requested_columns if name not in schema_names]
+    if missing_columns:
+        raise SchemaError(f"Overlay is missing requested columns: {', '.join(missing_columns)}")
+    data_columns = [name for name in requested_columns if name != key]
+    projection_sql = ", ".join(sql_ident(name) for name in requested_columns)
 
     if len(parts) == 1:
         part = parts[0]
         part_stat_key = _overlay_part_stat_key(part)
         _overlay_part_created_at(part, stat_key=part_stat_key)
         _assert_single_overlay_key_unique(con, part=part, key_q=key_q, key=key, stat_key=part_stat_key)
-        return f"read_parquet('{sql_str(str(part))}')"
+        return f"(SELECT {projection_sql} FROM read_parquet('{sql_str(str(part))}'))"
 
     part_rows: list[tuple[str, str, str]] = []
     part_signature_rows: list[tuple[str, int, int]] = []
@@ -160,9 +170,12 @@ def create_overlay_view(
     for offset in range(0, len(part_rows), 256):
         batch = tuple(part_rows[offset : offset + 256])
         con.execute(f"INSERT INTO {metadata_view} VALUES {_sql_values_rows(batch)}")
+    # Keep the wide overlay payload lazy here. Materializing a temporary staging
+    # table doubles peak memory for large vector columns before the final
+    # arg_max/group-by collapse chooses the newest row per key.
     con.execute(
-        f"CREATE TEMP TABLE {staging_view} AS "
-        "SELECT p.* EXCLUDE(filename), "
+        f"CREATE TEMP VIEW {staging_view} AS "
+        f"SELECT {', '.join(f'p.{sql_ident(name)}' for name in requested_columns)}, "
         "m.__usr_overlay_created_at, "
         "m.__usr_overlay_filename "
         f"FROM {source_sql} p "
@@ -181,8 +194,7 @@ def create_overlay_view(
             [f"{key_q}"]
             + [
                 f"arg_max({sql_ident(column_name)}, __usr_overlay_sort_key) AS {sql_ident(column_name)}"
-                for column_name in overlay_schema(path).names
-                if column_name != key
+                for column_name in data_columns
             ]
         )
         + " "

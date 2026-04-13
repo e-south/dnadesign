@@ -263,6 +263,7 @@ def preview_cluster_fit(
     view_id: str,
     sample_id: str | None,
     alignment_id: str | None,
+    method: str,
     force: bool,
 ) -> dict[str, Any]:
     context = load_workspace_config(workspace)
@@ -275,7 +276,7 @@ def preview_cluster_fit(
         artifact_kind="cluster_set",
         artifact_id=cluster_id,
         outputs=[output_dir],
-        inputs={"view": view_id, "sample": sample_id, "alignment": alignment_id},
+        inputs={"view": view_id, "sample": sample_id, "alignment": alignment_id, "method": method},
     )
 
 
@@ -388,14 +389,21 @@ def preview_plot_render(
     *,
     kind: str | None,
     projection_ids: list[str],
+    panel_titles: list[str],
     enrichment_id: str | None,
     distance_id: str | None,
     scalar_id: str | None,
     agreement_id: str | None,
+    reducer_id: str | None,
+    left_cluster_id: str | None,
+    right_cluster_id: str | None,
     value_column: str | None,
     x_column: str | None,
     y_column: str | None,
     color_column: str | None,
+    render_mode: str | None,
+    label_column: str | None,
+    label_values: list[str],
     force: bool,
 ) -> dict[str, Any]:
     context, spec = resolve_plot_request(
@@ -403,24 +411,38 @@ def preview_plot_render(
         plot_id,
         kind=kind,
         projection_ids=projection_ids,
+        panel_titles=panel_titles,
         enrichment_id=enrichment_id,
         distance_id=distance_id,
         scalar_id=scalar_id,
         agreement_id=agreement_id,
+        reducer_id=reducer_id,
+        left_cluster_id=left_cluster_id,
+        right_cluster_id=right_cluster_id,
         value_column=value_column,
         x_column=x_column,
         y_column=y_column,
         color_column=color_column,
+        render_mode=render_mode,
+        label_column=label_column,
+        label_values=label_values,
     )
     output_dir = artifact_dir(context, artifact_kind="plot", artifact_id=plot_id)
     _ensure_preview_targets_available([output_dir], artifact_kind="plot", force=force)
     inputs = {
         "kind": spec.kind,
         "projections": spec.projection_ids,
+        "panel_titles": spec.panel_titles,
         "enrichment": spec.enrichment_id,
         "distance": spec.distance_id,
         "scalar": spec.scalar_id,
         "agreement": spec.agreement_id,
+        "reducer": spec.reducer_id,
+        "left_cluster": spec.left_cluster_id,
+        "right_cluster": spec.right_cluster_id,
+        "render_mode": spec.render_mode,
+        "label_column": spec.label_column,
+        "label_values": spec.label_values,
     }
     if spec.config_id is not None:
         inputs["plot_recipe"] = spec.config_id
@@ -460,13 +482,17 @@ def preview_notebook_generate(workspace: str | Path, notebook_id: str, *, force:
     notebook = context.require_notebook(notebook_id)
     output_dir = artifact_dir(context, artifact_kind="notebook", artifact_id=notebook_id)
     _ensure_preview_targets_available([output_dir], artifact_kind="notebook", force=force)
+    if hasattr(notebook, "artifacts"):
+        inputs = {"notebook": notebook_id, "artifacts": [artifact.id for artifact in notebook.artifacts]}
+    else:
+        inputs = {"notebook": notebook_id, "default_deliverable": notebook.default_deliverable}
     return _preview_payload(
         workspace_id=context.workspace_id,
         command="notebook generate",
         artifact_kind="notebook",
         artifact_id=notebook_id,
         outputs=[output_dir],
-        inputs={"notebook": notebook_id, "artifacts": [artifact.id for artifact in notebook.artifacts]},
+        inputs=inputs,
     )
 
 

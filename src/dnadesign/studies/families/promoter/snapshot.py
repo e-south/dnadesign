@@ -23,10 +23,16 @@ from .infer_runtime import (
 from .record_normalizer import PromoterStudyResolvedContext
 
 
+def _inspect_no_latentdna_readiness(**_: object) -> dict[str, object] | None:
+    return None
+
+
 @dataclass(frozen=True)
 class PromoterStudyStatusDependencies:
     infer_runtime: PromoterStudyInferRuntimeDependencies
     phase_matches_infer_model_family: Callable[..., bool]
+    inspect_semantic_completeness: Callable[..., dict[str, object] | None]
+    inspect_latentdna_readiness: Callable[..., dict[str, object] | None] = _inspect_no_latentdna_readiness
 
 
 @dataclass(frozen=True)
@@ -61,6 +67,8 @@ def build_promoter_study_status(
         handoff_readiness_state=handoff_readiness_state,
     )
     planned_outputs_state = _build_planned_outputs_state(study_context=study_context)
+    semantic_completeness_state = dependencies.inspect_semantic_completeness(study_context=study_context)
+    latentdna_state = dependencies.inspect_latentdna_readiness(study_context=study_context)
     evidence = dict(study_context.evidence)
     evidence.update(
         {
@@ -70,6 +78,7 @@ def build_promoter_study_status(
             "source_growth_state": source_growth_state,
             "handoff_readiness_state": handoff_readiness_state,
             "planned_outputs_state": planned_outputs_state,
+            "semantic_completeness_state": semantic_completeness_state,
             "infer_runtime_models": [
                 summary.as_dict() for summary in status_context.infer_runtime.runtime_model_summaries
             ],
@@ -79,6 +88,8 @@ def build_promoter_study_status(
             "infer_notify_profile_errors": dict(status_context.infer_runtime.infer_notify_profile_errors),
         }
     )
+    if latentdna_state is not None:
+        evidence["latentdna"] = latentdna_state
 
     summary_parts = [f"{study_context.resolved_study_dir.name}: phase {study_context.current_phase or 'unknown'}"]
     if status_context.infer_runtime.preferred_model_family is not None:
@@ -89,6 +100,8 @@ def build_promoter_study_status(
         summary_parts.append(str(handoff_readiness_state["summary"]))
     if source_growth_state is not None and not bool(source_growth_state.get("drives_top_level_attention")):
         summary_parts.append(str(source_growth_state["summary"]))
+    if semantic_completeness_state is not None:
+        summary_parts.append(str(semantic_completeness_state["summary"]))
     if planned_outputs_state is not None and bool(planned_outputs_state.get("include_in_summary")):
         summary_parts.append(str(planned_outputs_state["summary"]))
     if study_context.next_ready_phase is not None:
@@ -107,6 +120,8 @@ def build_promoter_study_status(
         attention_reasons.append("DenseGen source gate is still active")
     if handoff_readiness_state is not None and bool(handoff_readiness_state.get("drives_top_level_attention")):
         attention_reasons.append("shared handoff outputs are pending or stale")
+    if semantic_completeness_state is not None and bool(semantic_completeness_state.get("drives_top_level_attention")):
+        attention_reasons.append("shared handoff metadata is semantically incomplete")
     if planned_outputs_state is not None and bool(planned_outputs_state.get("drives_top_level_attention")):
         attention_reasons.append("planned shared outputs remain pending")
     if status_context.infer_runtime.preferred_model_family is not None and any(

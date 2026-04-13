@@ -10,6 +10,7 @@ from pathlib import Path
 from ..contracts.errors import ArtifactConflictError
 from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
+from ..io.artifact_dirs import commit_staged_artifact_dirs, stage_artifact_dir
 from ..io.hashing import sha256_file
 from ..io.manifest_io import write_manifest
 from ..projections.fit import fit_projection_artifact
@@ -32,20 +33,25 @@ def fit_projection(
     projection_dir = context.output_root / "projections" / projection_id
     if projection_dir.exists() and not force:
         raise ArtifactConflictError(f"projection artifact already exists: {projection_dir}")
-    if force and projection_dir.exists():
-        import shutil
-
-        shutil.rmtree(projection_dir)
+    staging_dir = stage_artifact_dir(context.output_root / "projections", projection_id)
 
     metric_value = metric or context.config.defaults.metric
-    artifact_dir, rows = fit_projection_artifact(
-        context,
-        view_id=view_id,
-        projection_id=projection_id,
-        sample_id=sample_id,
-        metric=metric_value,
-        seed=seed,
-    )
+    try:
+        artifact_dir, rows = fit_projection_artifact(
+            context,
+            view_id=view_id,
+            projection_id=projection_id,
+            sample_id=sample_id,
+            metric=metric_value,
+            seed=seed,
+            artifact_dir=staging_dir,
+        )
+        assert artifact_dir == staging_dir
+    except Exception:
+        import shutil
+
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
     manifest = ArtifactManifest(
         artifact_kind="projection",
         artifact_id=projection_id,
@@ -69,14 +75,15 @@ def fit_projection(
         outputs=[ArtifactOutput(path="coords.parquet", media_type="application/x-parquet")],
         stats={"rows": rows, "dims": 2},
     )
-    write_manifest(artifact_dir / "manifest.json", manifest.model_dump(mode="json"))
+    write_manifest(staging_dir / "manifest.json", manifest.model_dump(mode="json"))
+    commit_staged_artifact_dirs([(staging_dir, projection_dir)], force=force)
     result = CommandResult(
         command="projection fit",
         workspace_id=context.workspace_id,
         status="ok",
         artifact_kind="projection",
         artifact_id=projection_id,
-        outputs=[artifact_dir.as_posix()],
+        outputs=[projection_dir.as_posix()],
         inputs={"view": view_id, "sample": sample_id},
         metrics={"rows": rows},
     )

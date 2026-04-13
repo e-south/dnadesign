@@ -289,6 +289,128 @@ def test_phase1_plot_render_force_preserves_existing_artifact_on_failure(tmp_pat
     assert (plot_dir / "manifest.json").is_file()
 
 
+def test_phase1_view_materialize_force_preserves_existing_artifact_on_failure(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    dataset = "promoter/demo_anchor_set"
+    _write_usr_dataset(usr_root, dataset)
+    _write_workspace_config(workspace_dir, usr_root)
+
+    first_materialize = _RUNNER.invoke(
+        app,
+        ["view", "materialize", "z20_60", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert first_materialize.exit_code == 0, first_materialize.stdout
+
+    view_dir = workspace_dir / "outputs" / "latentdna" / "views" / "z20_60"
+    assert (view_dir / "matrix.npy").is_file()
+    assert (view_dir / "rows.parquet").is_file()
+    assert (view_dir / "manifest.json").is_file()
+
+    broken_rows = pa.Table.from_pylist(
+        [
+            {
+                "id": f"row_{index:02d}",
+                "subject_id": f"subject_{index:02d}",
+                "usr_label__primary": "spyP" if index % 2 == 0 else "sulAp",
+                "densegen__plan": "plan_a" if index % 3 == 0 else "plan_b",
+            }
+            for index in range(18)
+        ]
+    )
+    pq.write_table(broken_rows, usr_root / dataset / "records.parquet")
+
+    failed_force = _RUNNER.invoke(
+        app,
+        ["view", "materialize", "z20_60", "--workspace", workspace_dir.as_posix(), "--force", "--json"],
+    )
+    assert failed_force.exit_code != 0
+    assert "vector column is missing" in failed_force.stdout
+    assert (view_dir / "matrix.npy").is_file()
+    assert (view_dir / "rows.parquet").is_file()
+    assert (view_dir / "manifest.json").is_file()
+
+
+def test_phase1_projection_fit_force_preserves_existing_artifact_on_failure(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(usr_root, "promoter/demo_anchor_set")
+    _write_workspace_config(workspace_dir, usr_root)
+
+    assert (
+        _RUNNER.invoke(
+            app,
+            ["view", "materialize", "z20_60", "--workspace", workspace_dir.as_posix(), "--json"],
+        ).exit_code
+        == 0
+    )
+    assert (
+        _RUNNER.invoke(
+            app,
+            [
+                "sample",
+                "build",
+                "atlas_sample",
+                "--workspace",
+                workspace_dir.as_posix(),
+                "--view",
+                "z20_60",
+                "--strategy",
+                "all",
+                "--json",
+            ],
+        ).exit_code
+        == 0
+    )
+
+    first_projection = _RUNNER.invoke(
+        app,
+        [
+            "projection",
+            "fit",
+            "z20_60",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--sample",
+            "atlas_sample",
+            "--run-id",
+            "umap_z20_60",
+            "--json",
+        ],
+    )
+    assert first_projection.exit_code == 0, first_projection.stdout
+
+    projection_dir = workspace_dir / "outputs" / "latentdna" / "projections" / "umap_z20_60"
+    assert (projection_dir / "coords.parquet").is_file()
+    assert (projection_dir / "manifest.json").is_file()
+
+    sample_rows_path = workspace_dir / "outputs" / "latentdna" / "samples" / "atlas_sample" / "rows.parquet"
+    pq.write_table(pq.read_table(sample_rows_path).slice(0, 2), sample_rows_path)
+
+    failed_force = _RUNNER.invoke(
+        app,
+        [
+            "projection",
+            "fit",
+            "z20_60",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--sample",
+            "atlas_sample",
+            "--run-id",
+            "umap_z20_60",
+            "--force",
+            "--json",
+        ],
+    )
+    assert failed_force.exit_code != 0
+    assert "at least 3 sampled rows" in failed_force.stdout
+    assert (projection_dir / "coords.parquet").is_file()
+    assert (projection_dir / "manifest.json").is_file()
+
+
 def test_phase1_plot_render_rejects_non_identifier_plot_id(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()

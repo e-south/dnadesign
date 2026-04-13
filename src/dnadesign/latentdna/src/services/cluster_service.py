@@ -24,11 +24,16 @@ def fit_cluster(
     cluster_id: str,
     *,
     view_id: str,
-    n_clusters: int,
+    method: str,
+    n_clusters: int | None,
     seed: int | None,
     max_iter: int,
     sample_id: str | None,
     alignment_id: str | None,
+    neighbor_set_id: str | None,
+    metric: str | None,
+    k: int,
+    resolution: float,
     force: bool = False,
 ) -> CommandResult:
     context = load_workspace_config(workspace)
@@ -41,15 +46,21 @@ def fit_cluster(
         shutil.rmtree(cluster_dir)
 
     seed_value = seed if seed is not None else context.config.defaults.random_seed
-    artifact_dir, rows, scope_kind, scope_id, iterations, converged, cluster_sizes = fit_cluster_artifact(
+    metric_value = metric or context.config.defaults.metric
+    artifact_dir, summary = fit_cluster_artifact(
         context,
         cluster_id=cluster_id,
         view_id=view_id,
+        method=method,
         n_clusters=n_clusters,
         seed=seed_value,
         max_iter=max_iter,
         sample_id=sample_id,
         alignment_id=alignment_id,
+        neighbor_set_id=neighbor_set_id,
+        metric=metric_value,
+        k=k,
+        resolution=resolution,
     )
     scope_kind_input, scope_id_input, scope_digest_path = scope_input_digest_path(
         context,
@@ -73,21 +84,28 @@ def fit_cluster(
             ArtifactInput(kind=scope_kind_input, id=scope_id_input, digest=sha256_file(scope_digest_path)),
         ],
         params={
-            "method": "kmeans",
+            "method": summary["method"],
             "view_id": view_id,
-            "scope_kind": scope_kind,
-            "scope_id": scope_id,
+            "scope_kind": summary["scope_kind"],
+            "scope_id": summary["scope_id"],
             "n_clusters": n_clusters,
             "seed": seed_value,
             "max_iter": max_iter,
-            "iterations": iterations,
-            "converged": converged,
+            "metric": metric_value,
+            "k": summary.get("k"),
+            "resolution": summary.get("resolution"),
+            "neighbor_set_id": neighbor_set_id,
+            "iterations": summary.get("iterations"),
+            "converged": summary.get("converged"),
         },
         outputs=[
             ArtifactOutput(path="assignments.parquet", media_type="application/x-parquet"),
+            ArtifactOutput(path="cluster_sizes.parquet", media_type="application/x-parquet"),
+            ArtifactOutput(path="medoids.parquet", media_type="application/x-parquet"),
+            ArtifactOutput(path="nearest_landmarks.parquet", media_type="application/x-parquet"),
             ArtifactOutput(path="summary.json", media_type="application/json"),
         ],
-        stats={"rows": rows, "n_clusters": n_clusters},
+        stats={"rows": summary["rows"], "n_clusters": len(summary["cluster_sizes"])},
     )
     write_manifest(artifact_dir / "manifest.json", manifest.model_dump(mode="json"))
     result = CommandResult(
@@ -97,13 +115,19 @@ def fit_cluster(
         artifact_kind="cluster_set",
         artifact_id=cluster_id,
         outputs=[artifact_dir.as_posix()],
-        inputs={"view": view_id, "sample": sample_id, "alignment": alignment_id},
+        inputs={
+            "view": view_id,
+            "sample": sample_id,
+            "alignment": alignment_id,
+            "neighbor_set": neighbor_set_id,
+            "method": method,
+        },
         metrics={
-            "rows": rows,
-            "n_clusters": n_clusters,
-            "iterations": iterations,
-            "converged": converged,
-            "cluster_sizes": cluster_sizes,
+            "rows": summary["rows"],
+            "n_clusters": len(summary["cluster_sizes"]),
+            "iterations": summary.get("iterations"),
+            "converged": summary.get("converged"),
+            "cluster_sizes": summary["cluster_sizes"],
         },
     )
     record_audit(

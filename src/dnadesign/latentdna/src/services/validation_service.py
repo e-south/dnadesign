@@ -7,9 +7,23 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..contracts.errors import WorkspaceValidationError
-from ..contracts.workspace import SourceBackedViewConfig
+from ..contracts.workspace import ColumnCohortConfig, PromoterMetadataCohortConfig, SourceBackedViewConfig
 from ..sources.resolver import inspect_source_schema, resolve_source
 from ..workspaces.loader import load_workspace_config, resolve_repo_path
+
+_PROMOTER_METADATA_REQUIRED_COLUMNS: dict[str, set[str]] = {
+    "design_family": {"densegen__plan", "usr_label__primary", "template_id"},
+    "design_regulator_composition": {
+        "densegen__plan",
+        "densegen__required_regulators",
+        "usr_label__primary",
+        "template_id",
+    },
+    "sigma70_variant": {"densegen__plan", "usr_label__primary", "template_id"},
+    "campaign_prior": {"densegen__plan", "usr_label__primary", "template_id"},
+    "is_control": {"densegen__plan", "usr_label__primary", "template_id"},
+    "source_class": {"densegen__plan", "usr_label__primary", "template_id"},
+}
 
 
 def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
@@ -45,19 +59,20 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
         view = context.require_view(view_id)
         if isinstance(view, SourceBackedViewConfig):
             columns = source_columns[view.source]
-            if view.vector.name not in columns:
+            view_detail = {
+                "view_id": view_id,
+                "declaration_kind": "source_backed",
+                "source": view.source,
+                "vector_kind": view.vector.kind,
+                "coordinate_space_id": view.coordinate_space_id,
+            }
+            if view.vector.kind == "column" and view.vector.name not in columns:
                 raise WorkspaceValidationError(
                     f"view {view_id} vector column is missing from source {view.source}: {view.vector.name}"
                 )
-            view_details.append(
-                {
-                    "view_id": view_id,
-                    "declaration_kind": "source_backed",
-                    "source": view.source,
-                    "vector_column": view.vector.name,
-                    "coordinate_space_id": view.coordinate_space_id,
-                }
-            )
+            if view.vector.kind == "column":
+                view_detail["vector_column"] = view.vector.name
+            view_details.append(view_detail)
             continue
         view_details.append(
             {
@@ -88,15 +103,32 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
     cohort_details: list[dict[str, object]] = []
     for cohort_id in sorted(context.config.cohorts):
         cohort = context.require_cohort(cohort_id)
-        if cohort.column not in source_columns[cohort.source]:
+        if isinstance(cohort, ColumnCohortConfig):
+            if cohort.column not in source_columns[cohort.source]:
+                raise WorkspaceValidationError(
+                    f"cohort {cohort_id} column is missing from source {cohort.source}: {cohort.column}"
+                )
+            cohort_details.append(
+                {
+                    "cohort_id": cohort_id,
+                    "source": cohort.source,
+                    "kind": cohort.kind,
+                    "column": cohort.column,
+                }
+            )
+            continue
+        assert isinstance(cohort, PromoterMetadataCohortConfig)
+        missing = sorted(_PROMOTER_METADATA_REQUIRED_COLUMNS[cohort.derive] - source_columns[cohort.source])
+        if missing:
             raise WorkspaceValidationError(
-                f"cohort {cohort_id} column is missing from source {cohort.source}: {cohort.column}"
+                f"cohort {cohort_id} promoter metadata inputs are missing from source {cohort.source}: {missing}"
             )
         cohort_details.append(
             {
                 "cohort_id": cohort_id,
                 "source": cohort.source,
-                "column": cohort.column,
+                "kind": cohort.kind,
+                "derive": cohort.derive,
             }
         )
 

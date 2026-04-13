@@ -80,6 +80,7 @@ Use these when the next step is orchestration, environment setup, or audit outpu
 | `construct` | `uv run construct --help` | [construct README](../src/dnadesign/construct/README.md) |
 | `infer` | `uv run infer --help` | [infer README](../src/dnadesign/infer/README.md) |
 | `latdna` | n/a | [latdna README](../src/dnadesign/latdna/README.md) |
+| `latentdna` | `uv run latentdna --help` | [latentdna README](../src/dnadesign/latentdna/README.md) |
 | `libshuffle` | n/a | [libshuffle README](../src/dnadesign/libshuffle/README.md) |
 | `nmf` | n/a | [nmf README](../src/dnadesign/nmf/README.md) |
 | `ops` | `uv run ops --help` | [ops README](../src/dnadesign/ops/README.md) |

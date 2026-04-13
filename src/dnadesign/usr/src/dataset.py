@@ -418,8 +418,9 @@ class Dataset:
         view_name: str,
         path: Path,
         key: str,
+        columns: Sequence[str] | None = None,
     ) -> str:
-        return create_overlay_view(con, view_name=view_name, path=path, key=key)
+        return create_overlay_view(con, view_name=view_name, path=path, key=key, columns=columns)
 
     def _duckdb_query(
         self,

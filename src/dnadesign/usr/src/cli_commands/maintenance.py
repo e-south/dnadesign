@@ -18,6 +18,7 @@ from typing import Callable
 from ..dataset import Dataset
 from ..errors import SequencesError
 from ..overlay_maintenance import remove_dataset_overlay
+from ..overlay_projection import project_namespace_overlay
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,50 @@ def cmd_overlay_remove(args, *, deps: MaintenanceDeps) -> None:
         print(f"[overlay-remove] removed namespace={result['namespace']} mode={mode}")
         return
     print(f"[overlay-remove] no-op namespace={result['namespace']} mode={mode}")
+
+
+def cmd_overlay_project(args, *, deps: MaintenanceDeps) -> None:
+    del deps
+    columns_text = str(getattr(args, "columns", "") or "")
+    columns = [value.strip() for value in columns_text.split(",") if value.strip()] if columns_text else None
+    preview = project_namespace_overlay(
+        root=args.root,
+        src_dataset_name=str(args.src),
+        dest_dataset_name=str(args.dest),
+        namespace=str(args.namespace),
+        src_join=str(getattr(args, "src_join", "id") or "id"),
+        dest_join=str(getattr(args, "dest_join", "id") or "id"),
+        columns=columns,
+        overwrite=bool(getattr(args, "overwrite", True)),
+        allow_missing=bool(getattr(args, "allow_missing", False)),
+        dry_run=bool(getattr(args, "dry_run", False)),
+    )
+
+    action = "DRY-RUN" if bool(getattr(args, "dry_run", False)) else "PROJECTED"
+    cols = ",".join(preview.source_columns)
+    print(
+        f"[{action}] src='{preview.src_dataset}' dest='{preview.dest_dataset}' "
+        f"namespace={preview.namespace} src_join={preview.src_join} dest_join={preview.dest_join} "
+        f"columns={cols} matched={preview.matched_rows} missing={preview.missing_rows} dest_rows={preview.dest_rows}"
+    )
+
+    if bool(getattr(args, "dry_run", False)):
+        return
+
+    note = (
+        f"usr maintenance overlay-project --src {preview.src_dataset} --dest {preview.dest_dataset} "
+        f"--namespace {preview.namespace} --src-join {preview.src_join} --dest-join {preview.dest_join}"
+    )
+    if columns_text:
+        note += f' --columns "{columns_text}"'
+    if bool(getattr(args, "allow_missing", False)):
+        note += " --allow-missing"
+    if not bool(getattr(args, "overwrite", True)):
+        note += " --no-overwrite"
+    Dataset(args.root, preview.dest_dataset).append_meta_note(
+        f"Projected namespace '{preview.namespace}' from '{preview.src_dataset}' ({preview.matched_rows} matched rows)",
+        note,
+    )
 
 
 def cmd_snapshot(args, *, deps: MaintenanceDeps) -> None:

@@ -96,6 +96,7 @@ Workspace-specific flags:
 - `latentdna plot render <plot-id>` supports two explicit modes.
 - Named mode: resolve `plot-id` from `plots.<plot-id>` in the workspace config and render from that declared recipe.
 - Inline mode: provide `--kind` plus the required artifact flags such as `--projection`, `--distance`, `--scalar`, `--enrichment`, or `--agreement`.
+- Projection plots may also declare `color_column`, `panel_titles`, and optional `label_column` plus `label_values` to keep multi-panel atlases visually comparable.
 - Mixing named and inline plot specs in one invocation is rejected.
 
 ### Real-study pressure path

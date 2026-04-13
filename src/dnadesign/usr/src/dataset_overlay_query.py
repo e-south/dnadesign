@@ -44,6 +44,7 @@ class DatasetOverlayQueryHost(Protocol):
         view_name: str,
         path: Path,
         key: str,
+        columns: Sequence[str] | None = None,
     ) -> str: ...
 
 
@@ -87,6 +88,12 @@ def build_overlay_query(
         missing_dependency_message="duckdb is required for overlay joins (install duckdb).",
         error_context="overlay joins",
     )
+    if limit is None:
+        # Full dataset scans do not need source-row insertion order, and forcing
+        # a single worker keeps DuckDB from multiplying the memory pressure of
+        # wide overlay vector columns during materialization/export-style reads.
+        con.execute("SET threads TO 1")
+        con.execute("SET preserve_insertion_order TO false")
     base_sql = str(dataset.records_path).replace("'", "''")
     con.execute(f"CREATE TEMP VIEW base AS SELECT * FROM read_parquet('{base_sql}')")
     base_view = "base"
@@ -149,7 +156,13 @@ def build_overlay_query(
                 raise NamespaceError(f"Derived columns must be namespaced (got '{col}').")
 
         view_name = f"overlay_{idx}"
-        overlay_source = dataset._create_overlay_view(con, view_name=view_name, path=overlay["path"], key=key)
+        overlay_source = dataset._create_overlay_view(
+            con,
+            view_name=view_name,
+            path=overlay["path"],
+            key=key,
+            columns=[key, *derived_cols],
+        )
 
         if key in {"sequence", "sequence_norm", "sequence_ci"}:
             bio_type_count = int(con.execute(f"SELECT COUNT(DISTINCT bio_type) FROM {base_view}").fetchone()[0])

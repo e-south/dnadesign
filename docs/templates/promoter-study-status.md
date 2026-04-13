@@ -28,6 +28,7 @@ context and report the current phase from the live handoff plane.
 
 - Anchor-only handoff dataset: `<dataset>` or `n/a`
 - Construct-expanded handoff dataset: `<dataset>` or `n/a`
+- Semantic completeness note: critical downstream metadata such as `densegen__plan` and `densegen__required_regulators` should be present for all DenseGen-derived rows on the shared handoff datasets; use `promoter-study-status` to confirm this plane explicitly instead of relying on row counts alone.
 
 ### Planned consolidated outputs
 
@@ -53,6 +54,7 @@ context and report the current phase from the live handoff plane.
 - Infer reset: `uv run infer prune --usr <dataset> --usr-root <usr-root>`
 - Infer namespace archive: `uv run usr maintenance overlay-remove <dataset> --namespace infer --mode archive`
 - DenseGen overlay compaction: `uv run usr maintenance overlay-compact <dataset> --namespace densegen`
+- DenseGen overlay projection repair: `uv run usr maintenance overlay-project --src <densegen-source-dataset> --dest <handoff-dataset> --namespace densegen --src-join id --dest-join <id|construct__anchor_id> --allow-missing`
 
 ### Batch and notify
 

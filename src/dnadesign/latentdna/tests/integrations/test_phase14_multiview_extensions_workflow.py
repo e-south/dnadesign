@@ -31,7 +31,7 @@ def _write_parquet(path: Path, rows: list[dict[str, object]]) -> None:
     pq.write_table(pa.Table.from_pylist(rows), path)
 
 
-def _write_matrix_bundle(bundle_dir: Path) -> None:
+def _write_matrix_bundle(bundle_dir: Path, *, include_manifest: bool = True) -> None:
     bundle_dir.mkdir(parents=True, exist_ok=True)
     rows = pa.Table.from_pylist(
         [
@@ -52,6 +52,26 @@ def _write_matrix_bundle(bundle_dir: Path) -> None:
             dtype=np.float32,
         ),
     )
+    if include_manifest:
+        (bundle_dir / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": "latentdna.manifest.v1",
+                    "artifact_kind": "export_bundle",
+                    "artifact_id": "bundle_source",
+                    "workspace_id": "fixture_workspace",
+                    "command": "fixture",
+                    "status": "ok",
+                    "outputs": [
+                        {"path": "matrix.npy", "media_type": "application/x-npy"},
+                        {"path": "rows.parquet", "media_type": "application/x-parquet"},
+                    ],
+                    "stats": {"rows": 3, "dims": 4},
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
 
 
 def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path: Path) -> None:
@@ -121,10 +141,16 @@ def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path:
                         "tags": {"operation": "apply_reducer"},
                         "role": "primary",
                     },
+                    "bundle_reduced_norm": {
+                        "derive": {"kind": "normalize", "view": "bundle_reduced", "method": "l2"},
+                        "coordinate_space_id": "bundle_space_pca",
+                        "tags": {"operation": "normalize"},
+                        "role": "primary",
+                    },
                     "bundle_concat": {
                         "derive": {
                             "kind": "concatenate",
-                            "inputs": ["bundle_norm", "bundle_reduced"],
+                            "inputs": ["bundle_reduced", "bundle_reduced_norm"],
                         },
                         "coordinate_space_id": "bundle_concat_space",
                         "tags": {"operation": "concatenate"},
@@ -220,7 +246,19 @@ def test_phase14_matrix_bundle_and_extended_derive_flow(tmp_path: Path) -> None:
     )
     assert reduce_result.exit_code == 0, reduce_result.stdout
 
-    for view_id in ["bundle_norm", "context_by_subject", "bundle_reduced", "bundle_concat"]:
+    validate_result = _RUNNER.invoke(
+        app,
+        ["validate", "workspace", "--workspace", workspace_dir.as_posix(), "--deep", "--json"],
+    )
+    assert validate_result.exit_code == 0, validate_result.stdout
+    validate_payload = json.loads(validate_result.stdout)
+    assert validate_payload["status"] == "ok"
+    assert any(
+        detail["view_id"] == "bundle_view" and detail["declaration_kind"] == "source_backed"
+        for detail in validate_payload["view_details"]
+    )
+
+    for view_id in ["bundle_norm", "context_by_subject", "bundle_reduced", "bundle_reduced_norm", "bundle_concat"]:
         result = _RUNNER.invoke(
             app,
             ["view", "derive", view_id, "--workspace", workspace_dir.as_posix(), "--json"],
@@ -259,7 +297,35 @@ def test_phase14_matrix_bundle_and_extended_derive_flow(tmp_path: Path) -> None:
     assert reduced_matrix.shape == (3, 2)
 
     concatenated_matrix = np.load(outputs / "views" / "bundle_concat" / "matrix.npy")
-    assert concatenated_matrix.shape == (3, 6)
+    assert concatenated_matrix.shape == (3, 4)
 
     renamed_table = pq.read_table(outputs / "scalars" / "bundle_norm_renamed" / "table.parquet")
     assert "bundle_norm_value" in renamed_table.column_names
+
+
+def test_phase14_matrix_bundle_view_requires_manifest(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    bundle_dir = tmp_path / "bundle_source"
+    _write_matrix_bundle(bundle_dir, include_manifest=False)
+    context_path = tmp_path / "inputs" / "context.parquet"
+    _write_parquet(
+        context_path,
+        [
+            {
+                "id": "ctx_01",
+                "subject_id": "subject_01",
+                "context_id": "a",
+                "label": "spyP",
+                "embedding_context": [1.0, 0.0],
+            }
+        ],
+    )
+    _write_workspace_config(workspace_dir, bundle_dir, context_path)
+
+    materialize_result = _RUNNER.invoke(
+        app,
+        ["view", "materialize", "bundle_view", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert materialize_result.exit_code != 0
+    assert "manifest.json" in materialize_result.stdout

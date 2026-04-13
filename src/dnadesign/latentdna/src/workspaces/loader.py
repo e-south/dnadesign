@@ -14,7 +14,12 @@ import yaml
 from ..contracts.deliverable import ARTIFACT_REFERENCE_CATEGORIES, SUPPORTED_DELIVERABLE_REFERENCE_CATEGORIES
 from ..contracts.errors import CoordinateSpaceError, WorkspaceValidationError
 from ..contracts.ids import validate_identifier
-from ..contracts.notebook import SUPPORTED_NOTEBOOK_ARTIFACT_KINDS, NotebookConfig
+from ..contracts.notebook import (
+    SUPPORTED_NOTEBOOK_ARTIFACT_KINDS,
+    ArtifactReviewNotebookConfig,
+    NotebookConfig,
+    WorkspaceBrowserNotebookConfig,
+)
 from ..contracts.recipe import SUPPORTED_RECIPE_OPS, expected_step_artifacts, topological_step_order
 from ..contracts.workspace import (
     AlignmentConfig,
@@ -77,6 +82,37 @@ def resolve_workspace_path(workspace: str | Path) -> Path:
     raise WorkspaceValidationError(f"workspace not found: {workspace}")
 
 
+def _view_declares_reduced_space(config: WorkspaceConfig, view_id: str, *, _seen: set[str] | None = None) -> bool:
+    if _seen is None:
+        _seen = set()
+    if view_id in _seen:
+        return False
+    _seen.add(view_id)
+
+    view = config.views[view_id]
+    if not isinstance(view, DerivedViewConfig):
+        return False
+    if view.derive.kind == "apply_reducer":
+        return True
+    if view.derive.kind in {"normalize", "aggregate_by_key"}:
+        return _view_declares_reduced_space(config, view.derive.view, _seen=_seen)
+    if view.derive.kind == "vector_difference":
+        return _view_declares_reduced_space(
+            config,
+            view.derive.left,
+            _seen=set(_seen),
+        ) and _view_declares_reduced_space(
+            config,
+            view.derive.right,
+            _seen=set(_seen),
+        )
+    if view.derive.kind == "concatenate":
+        return all(
+            _view_declares_reduced_space(config, input_view, _seen=set(_seen)) for input_view in view.derive.inputs
+        )
+    return False
+
+
 def _validate_workspace_config(config: WorkspaceConfig) -> None:
     validate_identifier(config.workspace.id, label="workspace.id")
     for source_id in config.sources:
@@ -134,6 +170,19 @@ def _validate_workspace_config(config: WorkspaceConfig) -> None:
                 missing = [input_view for input_view in derive.inputs if input_view not in config.views]
                 if missing:
                     raise WorkspaceValidationError(f"derived view {view_id} references unknown input views {missing!r}")
+                input_spaces = {
+                    input_view: config.views[input_view].coordinate_space_id for input_view in derive.inputs
+                }
+                unique_spaces = set(input_spaces.values())
+                if len(unique_spaces) > 1 and not all(
+                    _view_declares_reduced_space(config, input_view) for input_view in derive.inputs
+                ):
+                    rendered = ", ".join(f"{input_view}={space}" for input_view, space in input_spaces.items())
+                    raise CoordinateSpaceError(
+                        "derived view "
+                        f"{view_id} concatenate inputs must share one coordinate "
+                        f"space or all be reduced; got {rendered}"
+                    )
             elif derive.kind in {"aggregate_by_key", "apply_reducer", "normalize"}:
                 if derive.view not in config.views:
                     raise WorkspaceValidationError(
@@ -192,6 +241,15 @@ def _validate_workspace_config(config: WorkspaceConfig) -> None:
     for notebook_id, notebook in config.notebooks.items():
         _validate_notebook(notebook_id, notebook)
 
+    for notebook_id, notebook in config.notebooks.items():
+        if (
+            isinstance(notebook, WorkspaceBrowserNotebookConfig)
+            and notebook.default_deliverable not in config.deliverables
+        ):
+            raise WorkspaceValidationError(
+                f"notebook {notebook_id} references unknown default deliverable {notebook.default_deliverable!r}"
+            )
+
     for recipe_id, recipe in config.recipes.items():
         _validate_recipe(recipe_id, recipe)
 
@@ -223,6 +281,11 @@ def _validate_recipe(recipe_id: str, recipe: RecipeConfig) -> None:
 
 
 def _validate_notebook(notebook_id: str, notebook: NotebookConfig) -> None:
+    if isinstance(notebook, WorkspaceBrowserNotebookConfig):
+        validate_identifier(notebook.default_deliverable, label=f"notebook {notebook_id} default deliverable")
+        return
+
+    assert isinstance(notebook, ArtifactReviewNotebookConfig)
     aliases: set[str] = set()
     for artifact in notebook.artifacts:
         validate_identifier(artifact.id, label=f"notebook {notebook_id} artifact id")
@@ -251,6 +314,11 @@ def _validate_plot(plot_id: str, plot) -> None:
     if plot.kind == "distance_scatter":
         validate_identifier(plot.distance, label=f"plot {plot_id} distance")
         return
+    if plot.kind == "xy_scatter":
+        for label, value in (("scalar", plot.scalar), ("distance", plot.distance)):
+            if value is not None:
+                validate_identifier(value, label=f"plot {plot_id} {label}")
+        return
     if plot.kind == "distribution":
         for label, value in (
             ("scalar", plot.scalar),
@@ -260,6 +328,14 @@ def _validate_plot(plot_id: str, plot) -> None:
         ):
             if value is not None:
                 validate_identifier(value, label=f"plot {plot_id} {label}")
+        return
+    if plot.kind == "curve":
+        if plot.reducer is not None:
+            validate_identifier(plot.reducer, label=f"plot {plot_id} reducer")
+        return
+    if plot.kind == "correspondence_heatmap":
+        validate_identifier(plot.left_cluster, label=f"plot {plot_id} left_cluster")
+        validate_identifier(plot.right_cluster, label=f"plot {plot_id} right_cluster")
         return
     validate_identifier(plot.agreement, label=f"plot {plot_id} agreement")
 

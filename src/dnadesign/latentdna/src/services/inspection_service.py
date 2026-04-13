@@ -7,9 +7,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..distances.score import _select_indices
+from ..io.json_io import read_json
 from ..sources.resolver import inspect_source_schema, read_records_table, resolve_source
 from ..workspaces.loader import load_workspace_config
 from ._artifacts import artifact_dir, artifact_exists, artifact_manifest_path
+from .plot_service import write_plot_index
 from .run_service import artifact_inventory
 
 
@@ -157,4 +159,30 @@ def inspect_artifacts(workspace: str | Path) -> dict[str, object]:
         "workspace_id": context.workspace_id,
         "status": "ok",
         "data": {"artifacts": artifact_inventory(context)},
+    }
+
+
+def inspect_plots(workspace: str | Path) -> dict[str, object]:
+    context = load_workspace_config(workspace)
+    index_path = context.output_root / "plots" / "index.json"
+    payload = read_json(index_path) if index_path.is_file() else write_plot_index(context)
+    return {
+        "schema_version": "latentdna.inspect_result.v1",
+        "workspace_id": context.workspace_id,
+        "status": "ok",
+        "data": {"plots": payload.get("plots", [])},
+    }
+
+
+def inspect_notebook_health(workspace: str | Path) -> dict[str, object]:
+    context = load_workspace_config(workspace)
+    health_path = context.output_root / "notebooks" / "health.json"
+    if not health_path.is_file():
+        raise FileNotFoundError(f"notebook health artifact not found: {health_path}")
+    payload = read_json(health_path)
+    return {
+        "schema_version": "latentdna.inspect_result.v1",
+        "workspace_id": context.workspace_id,
+        "status": "ok",
+        "data": {"health": payload},
     }

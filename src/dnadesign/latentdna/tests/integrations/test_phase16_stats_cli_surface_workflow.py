@@ -53,6 +53,25 @@ def _write_matrix_bundle(bundle_dir: Path) -> None:
             dtype=np.float32,
         ),
     )
+    (bundle_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "latentdna.manifest.v1",
+                "artifact_kind": "export_bundle",
+                "artifact_id": "bundle_source",
+                "workspace_id": "fixture_workspace",
+                "command": "fixture",
+                "status": "ok",
+                "outputs": [
+                    {"path": "matrix.npy", "media_type": "application/x-npy"},
+                    {"path": "rows.parquet", "media_type": "application/x-parquet"},
+                ],
+                "stats": {"rows": 3, "dims": 4},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
 
 
 def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path: Path) -> None:

@@ -38,6 +38,7 @@ def fit_projection_artifact(
     sample_id: str,
     metric: str,
     seed: int,
+    artifact_dir: Path | None = None,
 ) -> tuple[Path, int]:
     try:
         import umap
@@ -62,6 +63,6 @@ def fit_projection_artifact(
     table = pa.Table.from_pylist(
         [{**row, "x": float(coord[0]), "y": float(coord[1])} for row, coord in zip(sample_rows, coords, strict=True)]
     )
-    artifact_dir = context.output_root / "projections" / projection_id
-    write_table(table, artifact_dir / "coords.parquet")
-    return artifact_dir, table.num_rows
+    target_dir = artifact_dir or (context.output_root / "projections" / projection_id)
+    write_table(table, target_dir / "coords.parquet")
+    return target_dir, table.num_rows

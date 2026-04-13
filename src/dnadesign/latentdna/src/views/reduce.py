@@ -149,6 +149,8 @@ def fit_pca_reducer_artifacts(
     sample_id: str | None,
     alignment_id: str | None,
     reduced_view_id: str | None,
+    reducer_dir: Path | None = None,
+    reduced_view_dir: Path | None = None,
 ) -> tuple[Path, Path | None, int, int, str, str | None]:
     if sample_id and alignment_id:
         raise ContractViolationError("view reduce accepts at most one fit scope of --sample or --alignment")
@@ -164,17 +166,17 @@ def fit_pca_reducer_artifacts(
         transform_scope = fit_scope
 
     mean, components, explained_variance, explained_variance_ratio = _fit_pca(fit_scope.matrix, dims=dims)
-    reducer_dir = context.output_root / "reducers" / reducer_id
-    reducer_dir.mkdir(parents=True, exist_ok=True)
+    target_reducer_dir = reducer_dir or (context.output_root / "reducers" / reducer_id)
+    target_reducer_dir.mkdir(parents=True, exist_ok=True)
     np.savez(
-        reducer_dir / "state.npz",
+        target_reducer_dir / "state.npz",
         mean=mean,
         components=components,
         explained_variance=explained_variance,
         explained_variance_ratio=explained_variance_ratio,
     )
     write_json(
-        reducer_dir / "summary.json",
+        target_reducer_dir / "summary.json",
         {
             "method": "pca",
             "fit_rows": int(fit_scope.matrix.shape[0]),
@@ -186,16 +188,16 @@ def fit_pca_reducer_artifacts(
         },
     )
 
-    reduced_view_dir: Path | None = None
+    target_reduced_view_dir = reduced_view_dir
     if reduced_view_id is not None:
-        reduced_view_dir = context.output_root / "reduced_views" / reduced_view_id
+        target_reduced_view_dir = target_reduced_view_dir or (context.output_root / "reduced_views" / reduced_view_id)
         reduced_matrix = _transform(transform_scope.matrix, mean=mean, components=components)
-        write_matrix(reduced_view_dir / "matrix.npy", reduced_matrix)
-        write_table(transform_scope.rows, reduced_view_dir / "rows.parquet")
+        write_matrix(target_reduced_view_dir / "matrix.npy", reduced_matrix)
+        write_table(transform_scope.rows, target_reduced_view_dir / "rows.parquet")
 
     return (
-        reducer_dir,
-        reduced_view_dir,
+        target_reducer_dir,
+        target_reduced_view_dir,
         int(fit_scope.matrix.shape[0]),
         int(components.shape[0]),
         fit_scope.scope_kind,

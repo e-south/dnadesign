@@ -15,6 +15,15 @@ uv run usr maintenance registry-freeze densegen/demo
 # Compact overlay parts for one namespace.
 uv run usr maintenance overlay-compact densegen/demo --namespace densegen
 
+# Project one namespace from a source dataset onto a downstream dataset by join key.
+uv run usr maintenance overlay-project \
+  --src densegen/demo \
+  --dest promoter/demo_anchor_set \
+  --namespace densegen \
+  --src-join id \
+  --dest-join id \
+  --allow-missing
+
 # Remove or archive one derived namespace.
 uv run usr maintenance overlay-remove densegen/demo --namespace densegen --mode archive
 ```
@@ -25,6 +34,7 @@ Compaction retention contract:
 - Previous part snapshots are dropped by default (no lingering compact archives).
 - Overlay archive retention is bounded: `overlay-remove --mode archive` keeps only the latest archived snapshot.
 - Reserved system namespaces such as `usr_state` are only mutated through dedicated command groups such as `uv run usr state ...`.
+- `overlay-project` is the safe repair path when downstream handoff datasets must inherit authoritative overlay metadata after merge, construct, or infer without rewriting `records.parquet` or disturbing unrelated namespaces such as `infer`.
 
 ## De-duplication
 

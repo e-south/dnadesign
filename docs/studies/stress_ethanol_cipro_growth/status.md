@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-04-09
+- Last verified: 2026-04-13
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Study execution map: `pipeline.yaml`
@@ -22,6 +22,7 @@
 
 - Anchor-only handoff dataset: `promoter/stress_ethanol_cipro_anchor_set` (shared anchor-only Infer surface; use `promoter-study-status` for live rows and sync audits)
 - Construct-expanded handoff dataset: `promoter/stress_ethanol_cipro_construct_contexts` (shared 1 kb template-backed Infer surface; use `promoter-study-status` for live rows and sync audits)
+- Semantic completeness note: as of 2026-04-13 the shared handoff datasets carry the repaired `densegen` namespace as overlays, so `densegen__plan` and `densegen__required_regulators` are visible for all DenseGen-derived rows on both handoff planes while the WT/manual controls remain intentionally unmatched.
 
 ### Planned consolidated outputs
 
@@ -108,6 +109,8 @@ for the study's 20B batch presets.
 - Infer namespace archive, anchor-only lane: `uv run usr maintenance overlay-remove promoter/stress_ethanol_cipro_anchor_set --namespace infer --mode archive`
 - Infer namespace archive, anchor-plus-template lane: `uv run usr maintenance overlay-remove promoter/stress_ethanol_cipro_construct_contexts --namespace infer --mode archive`
 - DenseGen overlay compaction: `uv run usr maintenance overlay-compact densegen/study_stress_ethanol_cipro --namespace densegen`
+- DenseGen overlay repair, anchor handoff: `uv run usr maintenance overlay-project --src densegen/study_stress_ethanol_cipro --dest promoter/stress_ethanol_cipro_anchor_set --namespace densegen --src-join id --dest-join id --allow-missing`
+- DenseGen overlay repair, construct handoff: `uv run usr maintenance overlay-project --src densegen/study_stress_ethanol_cipro --dest promoter/stress_ethanol_cipro_construct_contexts --namespace densegen --src-join id --dest-join construct__anchor_id --allow-missing`
 
 ### Batch and notify
 

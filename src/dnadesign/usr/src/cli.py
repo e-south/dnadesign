@@ -284,6 +284,7 @@ cmd_cell = _bindings.cmd_cell
 cmd_validate = _bindings.cmd_validate
 cmd_registry_freeze = _bindings.cmd_registry_freeze
 cmd_overlay_compact = _bindings.cmd_overlay_compact
+cmd_overlay_project = _bindings.cmd_overlay_project
 cmd_overlay_remove = _bindings.cmd_overlay_remove
 cmd_events_tail = _bindings.cmd_events_tail
 cmd_get = _bindings.cmd_get
@@ -389,6 +390,7 @@ register_ops_commands(
     cmd_dedupe_sequences=cmd_dedupe_sequences,
     cmd_registry_freeze=cmd_registry_freeze,
     cmd_overlay_compact=cmd_overlay_compact,
+    cmd_overlay_project=cmd_overlay_project,
     cmd_overlay_remove=cmd_overlay_remove,
     cmd_repair_densegen=cmd_repair_densegen,
     cmd_make_mock=cmd_make_mock,

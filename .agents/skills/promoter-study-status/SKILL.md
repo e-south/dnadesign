@@ -48,6 +48,9 @@ Out of scope:
   with this skill: snapshot is the record-plane summary, preflight is the
   execution-readiness summary, and `missing > attention > ok` is the global
   severity order.
+- Treat the promoter snapshot as multi-plane evidence, not just row counts:
+  source growth, shared handoff readiness, semantic completeness of critical
+  downstream metadata, and planned outputs are separate signals.
 - For the active `stress_ethanol_cipro_growth` study, treat
   `promoter-study-preflight` as strict submit-readiness for the default
   notify-enabled Infer presets: missing notify env/TLS wiring, failed notify
@@ -71,6 +74,11 @@ Out of scope:
 - Use `root_kind` and `status` in `datasets.yaml` to tell canonical shared USR
   roots apart from workspace-local export roots and planned-but-not-yet-created
   datasets.
+- Do not equate DenseGen shared row counts with workspace-local analysis
+  completeness. A shared DenseGen dataset can be current while workspace-local
+  `outputs/meta`, `outputs/pools`, or `outputs/tables/attempts.parquet` are
+  missing, which means notebook/plot questions still need explicit workspace
+  plot-manifest or runbook inspection.
 - Use `ops progress ...` and `usr ...` commands only to refresh those checked-in
   study records; do not infer live study state from demo workspaces, journal
   notes, or generic runbooks.
@@ -119,6 +127,9 @@ Out of scope:
 - Snapshot means repo-backed study posture: declared datasets, row targets,
   lifecycle state, study-owned execution surfaces, and sync evidence already
   checked in.
+- When the study depends on downstream DenseGen metadata, check whether the
+  snapshot exposes a `semantic_completeness_state` and report it explicitly
+  instead of treating green row counts as sufficient.
 - Preflight is the escalation path when a user asks for blockers, failed
   commands, missing artifacts, or scheduler/readiness posture right now.
 - When the user needs command-level blockers rather than the cheap snapshot,
@@ -192,6 +203,8 @@ Return:
 - whether each answer came from snapshot posture or preflight readiness
 - live feature dataset and row count, or an explicit statement that the study is
   still source-phase with no canonical feature dataset yet
+- semantic-completeness posture for critical downstream metadata when the
+  snapshot provides it
 - source datasets named in the checked-in study record
 - affiliated dataset registry entries and sync posture
 - study-owned Construct, Infer, and batch surfaces from `ops.study.yaml`, plus

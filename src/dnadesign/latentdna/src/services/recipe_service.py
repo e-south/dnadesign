@@ -148,11 +148,20 @@ def _fit_cluster_step(workspace: str | Path, params: dict[str, Any], *, force: b
         workspace,
         str(_require_param(params, "cluster_id", "cluster")),
         view_id=str(_require_param(params, "view_id", "view")),
-        n_clusters=int(_require_param(params, "n_clusters")),
+        method=str(_optional_param(params, "method", default="kmeans")),
+        n_clusters=(
+            int(_require_param(params, "n_clusters"))
+            if _optional_param(params, "n_clusters", default=None) is not None
+            else None
+        ),
         seed=_optional_param(params, "seed", default=None),
         max_iter=int(_optional_param(params, "max_iter", default=100)),
         sample_id=_optional_param(params, "sample_id", "sample", default=None),
         alignment_id=_optional_param(params, "alignment_id", "alignment", default=None),
+        neighbor_set_id=_optional_param(params, "neighbor_set_id", "neighbor_set", default=None),
+        metric=_optional_param(params, "metric", default=None),
+        k=int(_optional_param(params, "k", default=30)),
+        resolution=float(_optional_param(params, "resolution", default=1.0)),
         force=force,
     )
 
@@ -176,14 +185,21 @@ def _render_plot_step(workspace: str | Path, params: dict[str, Any], *, force: b
         str(_require_param(params, "plot_id", "plot")),
         kind=(_optional_param(params, "kind", default=None)),
         projection_ids=_list_param(params, "projection_ids", "projections", "projection"),
+        panel_titles=_list_param(params, "panel_titles", "panel_title"),
         enrichment_id=_optional_param(params, "enrichment_id", "enrichment", default=None),
         distance_id=_optional_param(params, "distance_id", "distance", default=None),
         scalar_id=_optional_param(params, "scalar_id", "scalar", default=None),
         agreement_id=_optional_param(params, "agreement_id", "agreement", default=None),
+        reducer_id=_optional_param(params, "reducer_id", "reducer", default=None),
+        left_cluster_id=_optional_param(params, "left_cluster_id", "left_cluster", default=None),
+        right_cluster_id=_optional_param(params, "right_cluster_id", "right_cluster", default=None),
         value_column=_optional_param(params, "value_column", default=None),
         x_column=_optional_param(params, "x_column", default=None),
         y_column=_optional_param(params, "y_column", default=None),
         color_column=_optional_param(params, "color_column", default=None),
+        render_mode=_optional_param(params, "render_mode", default=None),
+        label_column=_optional_param(params, "label_column", default=None),
+        label_values=_list_param(params, "label_values", "label_value"),
         force=force,
     )
 

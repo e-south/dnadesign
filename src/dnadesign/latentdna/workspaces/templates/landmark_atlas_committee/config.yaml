@@ -30,6 +30,9 @@ metadata:
   include:
     - usr_label__primary
     - densegen__plan
+    - densegen__required_regulators
+    - construct__template_id
+    - template_id
     - construct__template_id
 
 alignments:
@@ -55,7 +58,7 @@ views:
       encoder: evo2
       model: 7b
       family: intermediate
-      context: anchor_only
+      context: 60bp
     role: committee_member
   z20_60:
     source: anchor60
@@ -67,7 +70,7 @@ views:
       encoder: evo2
       model: 20b
       family: intermediate
-      context: anchor_only
+      context: 60bp
     role: primary
   z7_1k_anchor:
     source: ctx1k
@@ -79,7 +82,7 @@ views:
       encoder: evo2
       model: 7b
       family: intermediate
-      context: template_1kb
+      context: 1kb_anchor
     role: committee_member
   z20_1k_anchor:
     source: ctx1k
@@ -91,8 +94,44 @@ views:
       encoder: evo2
       model: 20b
       family: intermediate
-      context: template_1kb
+      context: 1kb_anchor
     role: primary
+  z20_1k_seq:
+    source: ctx1k
+    vector:
+      kind: column
+      name: infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__seq_mean
+    coordinate_space_id: evo2_20b_intermediate_block23_mlp_out
+    tags:
+      encoder: evo2
+      model: 20b
+      family: intermediate
+      context: 1kb_seq
+    role: challenger
+  logits20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean
+    coordinate_space_id: evo2_20b_output_layer_mean
+    tags:
+      encoder: evo2
+      model: 20b
+      family: pooled_logits
+      context: 60bp
+    role: challenger
+  logits20_1k_anchor:
+    source: ctx1k
+    vector:
+      kind: column
+      name: infer__evo2_20b__template_1kb_20b_features__output_layer_mean__anchor_mean
+    coordinate_space_id: evo2_20b_output_layer_mean
+    tags:
+      encoder: evo2
+      model: 20b
+      family: pooled_logits
+      context: 1kb_anchor
+    role: challenger
   delta20:
     derive:
       kind: vector_difference
@@ -102,6 +141,7 @@ views:
     coordinate_space_id: evo2_20b_intermediate_block23_mlp_out
     tags:
       operation: difference
+      family: intermediate
     role: primary
   delta7:
     derive:
@@ -112,6 +152,7 @@ views:
     coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
     tags:
       operation: difference
+      family: intermediate
     role: committee_member
 
 scalars:
@@ -129,25 +170,25 @@ scalars:
     derive:
       kind: column_expression
       source: primary_landmark_distances
-      expression: d_sul_ap - d_spy_p
+      expression: d_sulap - d_spyp
       output_column: ethanol_vs_cipro
 
 landmarks:
-  spy_p:
+  spyp:
     source: anchor60
     where:
       column: usr_label__primary
-      equals: spyp
+      equals: spyP
     representation:
       mode: centroid
-  sul_ap:
+  sulap:
     source: anchor60
     where:
       column: usr_label__primary
       equals: sulAp
     representation:
       mode: centroid
-  sox_sp:
+  soxsp:
     source: anchor60
     where:
       column: usr_label__primary
@@ -167,37 +208,59 @@ cohorts:
     kind: column
     source: anchor60
     column: densegen__plan
+  design_family:
+    kind: promoter_metadata
+    source: anchor60
+    derive: design_family
+  design_regulator_composition:
+    kind: promoter_metadata
+    source: anchor60
+    derive: design_regulator_composition
+  sigma70_variant:
+    kind: promoter_metadata
+    source: anchor60
+    derive: sigma70_variant
+  campaign_prior:
+    kind: promoter_metadata
+    source: anchor60
+    derive: campaign_prior
+  is_control:
+    kind: promoter_metadata
+    source: anchor60
+    derive: is_control
+  source_class:
+    kind: promoter_metadata
+    source: anchor60
+    derive: source_class
 
 plots:
-  atlas_2x2_main:
+  atlas_2x2_intermediate_main:
     kind: projection_grid
     projections: [umap_z7_60, umap_z20_60, umap_z7_1k_anchor, umap_z20_1k_anchor]
-  control_plan_heatmap:
-    kind: heatmap
-    enrichment: control_plan_enrichment
-    value_column: enrichment_delta
-  primary_landmark_scatter:
-    kind: distance_scatter
-    distance: primary_landmark_distances
-    x_column: d_spy_p
-    y_column: d_sul_ap
-    color_column: densegen__plan
-  control_distance_margins_distribution:
-    kind: distribution
-    scalar: ethanol_vs_cipro
-    value_column: ethanol_vs_cipro
-    color_column: densegen__plan
-  delta20_norm_distribution:
-    kind: distribution
-    scalar: delta20_norm
-    value_column: delta20_norm
-  delta7_norm_distribution:
-    kind: distribution
-    scalar: delta7_norm
-    value_column: delta7_norm
+    panel_titles:
+      - 7B anchor-only (60 bp)
+      - 20B anchor-only (60 bp)
+      - 7B context-aware (1 kb anchor)
+      - 20B context-aware (1 kb anchor)
+    color_column: design_family
+    label_column: usr_label__primary
+    label_values: [spyP, sulAp, soxSp, J23105]
+  control_neighborhood_enrichment_curve_family:
+    kind: curve
+    reducer: z20_60_pca
+  cluster_correspondence_primary:
+    kind: correspondence_heatmap
+    left_cluster: leiden_z20_60
+    right_cluster: leiden_z20_1k_anchor
   agreement_7b_vs_20b_summary:
     kind: agreement_summary
     agreement: agreement_7b_vs_20b
+  context_shift_primary_distribution:
+    kind: distribution
+    scalar: delta20_norm
+    value_column: delta20_norm
+    color_column: design_family
+    render_mode: ecdf
 
 exports:
   x0_primary_20b:
@@ -210,7 +273,7 @@ exports:
       - kind: table_columns
         block_id: landmark_distances
         source: primary_landmark_distances
-        columns: [d_spy_p, d_sul_ap, d_sox_sp, d_j23105]
+        columns: [d_spyp, d_sulap, d_soxsp, d_j23105]
   x1_primary_20b:
     row_basis: delta20_pc32
     blocks:
@@ -237,7 +300,7 @@ exports:
       - kind: table_columns
         block_id: landmark_distances
         source: primary_landmark_distances
-        columns: [d_spy_p, d_sul_ap, d_sox_sp, d_j23105]
+        columns: [d_spyp, d_sulap, d_soxsp, d_j23105]
         alignment: anchor_ctx_20b
       - kind: table_columns
         block_id: delta20_scalars
@@ -257,50 +320,11 @@ exports:
         feature_prefix: delta7
 
 notebooks:
-  atlas_committee_review:
-    kind: artifact_review
-    title: Atlas committee projection review
-    description: Load the persisted committee atlas projections and plot outputs without recomputing them.
-    artifacts:
-      - kind: projection
-        id: umap_z7_60
-      - kind: projection
-        id: umap_z20_60
-      - kind: projection
-        id: umap_z7_1k_anchor
-      - kind: projection
-        id: umap_z20_1k_anchor
-      - kind: plot
-        id: atlas_2x2_main
-  control_plan_review:
-    kind: artifact_review
-    title: Control plan enrichment review
-    description: Load the persisted enrichment and plot artifacts without recomputing them.
-    artifacts:
-      - kind: view
-        id: z20_60
-      - kind: neighbor_set
-        id: z20_60_knn
-      - kind: enrichment_set
-        id: control_plan_enrichment
-      - kind: plot
-        id: control_plan_heatmap
-  agreement_7b_vs_20b_review:
-    kind: artifact_review
-    title: 7B vs 20B agreement review
-    description: Load the persisted agreement metrics and summary plot without recomputing them.
-    artifacts:
-      - kind: agreement_set
-        id: agreement_7b_vs_20b
-      - kind: plot
-        id: agreement_7b_vs_20b_summary
-  x2_primary_20b_review:
-    kind: artifact_review
-    title: Primary 20B export review
-    description: Load the persisted aligned export bundle without recomputing upstream artifacts.
-    artifacts:
-      - kind: export_bundle
-        id: x2_primary_20b
+  browser:
+    kind: workspace_browser
+    title: Promoter atlas browser
+    description: Consolidated read-only browser for promoter atlas artifacts.
+    default_deliverable: atlas_2x2_intermediate_main
 
 recipes:
   atlas_2x2_recipe:
@@ -328,7 +352,7 @@ recipes:
           sample: atlas_anchor_sample
           view: z20_60
           strategy: stratified
-          group_by: densegen__plan
+          group_by: design_family
           n: 20000
           seed: 17
       - id: sample_context_atlas
@@ -338,7 +362,7 @@ recipes:
           sample: atlas_context_sample
           view: z20_1k_anchor
           strategy: stratified
-          group_by: densegen__plan
+          group_by: design_family
           n: 20000
           seed: 17
       - id: project_z7_60
@@ -381,72 +405,30 @@ recipes:
         op: plot.render
         depends_on: [project_z7_60, project_z20_60, project_z7_1k_anchor, project_z20_1k_anchor]
         params:
-          plot_id: atlas_2x2_main
-      - id: generate_atlas_review
+          plot_id: atlas_2x2_intermediate_main
+      - id: generate_browser
         op: notebook.generate
         depends_on: [render_atlas_grid]
         params:
-          notebook: atlas_committee_review
+          notebook: browser
   control_plan_heatmap_recipe:
     steps:
       - id: materialize_anchor_view
         op: view.materialize
         params:
           view: z20_60
-      - id: build_anchor_neighbors
-        op: neighbors.fit
+      - id: reduce_anchor_view
+        op: view.reduce
         depends_on: [materialize_anchor_view]
         params:
-          neighbors: z20_60_knn
           view: z20_60
-          k: 15
-          backend: auto
-      - id: score_control_enrichment
-        op: enrich.score
-        depends_on: [build_anchor_neighbors]
-        params:
-          enrichment: control_plan_enrichment
-          neighbors: z20_60_knn
-          cohort: plan
-          landmark: [spy_p, sul_ap, sox_sp, j23105]
-      - id: render_control_heatmap
+          run_id: z20_60_pca
+          dims: 32
+      - id: render_control_curve
         op: plot.render
-        depends_on: [score_control_enrichment]
+        depends_on: [reduce_anchor_view]
         params:
-          plot_id: control_plan_heatmap
-      - id: generate_control_notebook
-        op: notebook.generate
-        depends_on: [render_control_heatmap]
-        params:
-          notebook: control_plan_review
-  control_distance_margins_recipe:
-    steps:
-      - id: materialize_control_view
-        op: view.materialize
-        params:
-          view: z20_60
-      - id: score_control_distances
-        op: distance.score
-        depends_on: [materialize_control_view]
-        params:
-          distance: primary_landmark_distances
-          view: z20_60
-          landmark: [spy_p, sul_ap, sox_sp, j23105]
-      - id: derive_control_margin
-        op: scalar.derive
-        depends_on: [score_control_distances]
-        params:
-          scalar: ethanol_vs_cipro
-      - id: render_control_scatter
-        op: plot.render
-        depends_on: [score_control_distances]
-        params:
-          plot_id: primary_landmark_scatter
-      - id: render_control_distribution
-        op: plot.render
-        depends_on: [derive_control_margin]
-        params:
-          plot_id: control_distance_margins_distribution
+          plot_id: control_neighborhood_enrichment_curve_family
   context_shift_primary_recipe:
     steps:
       - id: materialize_primary_anchor
@@ -472,6 +454,14 @@ recipes:
         depends_on: [derive_primary_delta]
         params:
           scalar: delta20_norm
+      - id: reduce_primary_anchor
+        op: view.reduce
+        depends_on: [materialize_primary_anchor]
+        params:
+          view: z20_60
+          run_id: z20_60_pca
+          dims: 32
+          reduced_view_id: z20_60_pc32
       - id: reduce_primary_delta
         op: view.reduce
         depends_on: [derive_primary_delta_norm]
@@ -484,7 +474,7 @@ recipes:
         op: plot.render
         depends_on: [derive_primary_delta_norm]
         params:
-          plot_id: delta20_norm_distribution
+          plot_id: context_shift_primary_distribution
   drag_qc_recipe:
     steps:
       - id: materialize_qc_anchor
@@ -510,11 +500,22 @@ recipes:
         depends_on: [derive_qc_delta]
         params:
           scalar: delta7_norm
-      - id: render_qc_distribution
-        op: plot.render
+      - id: reduce_qc_anchor
+        op: view.reduce
+        depends_on: [materialize_qc_anchor]
+        params:
+          view: z7_60
+          run_id: z7_60_pca
+          dims: 32
+          reduced_view_id: z7_60_pc32
+      - id: reduce_qc_delta
+        op: view.reduce
         depends_on: [derive_qc_delta_norm]
         params:
-          plot_id: delta7_norm_distribution
+          view: delta7
+          run_id: delta7_pca
+          dims: 32
+          reduced_view_id: delta7_pc32
   agreement_7b_vs_20b_recipe:
     steps:
       - id: materialize_agreement_z7
@@ -532,7 +533,7 @@ recipes:
           sample: agreement_anchor_sample
           view: z20_60
           strategy: stratified
-          group_by: densegen__plan
+          group_by: design_family
           n: 20000
           seed: 17
       - id: fit_agreement_neighbors_z7
@@ -560,6 +561,7 @@ recipes:
           cluster: z7_60_kmeans
           view: z7_60
           sample: agreement_anchor_sample
+          method: kmeans
           n_clusters: 8
           seed: 17
       - id: fit_agreement_clusters_z20
@@ -569,6 +571,7 @@ recipes:
           cluster: z20_60_kmeans
           view: z20_60
           sample: agreement_anchor_sample
+          method: kmeans
           n_clusters: 8
           seed: 17
       - id: compare_agreement_committee
@@ -586,27 +589,21 @@ recipes:
         depends_on: [compare_agreement_committee]
         params:
           plot_id: agreement_7b_vs_20b_summary
-      - id: generate_agreement_review
-        op: notebook.generate
-        depends_on: [render_agreement_summary]
+  cluster_correspondence_recipe:
+    steps:
+      - id: render_cluster_correspondence
+        op: plot.render
         params:
-          notebook: agreement_7b_vs_20b_review
+          plot_id: cluster_correspondence_primary
   x0_primary_20b_recipe:
     steps:
       - id: materialize_x0_primary
         op: view.materialize
         params:
           view: z20_60
-      - id: score_x0_distances
-        op: distance.score
-        depends_on: [materialize_x0_primary]
-        params:
-          distance: primary_landmark_distances
-          view: z20_60
-          landmark: [spy_p, sul_ap, sox_sp, j23105]
       - id: reduce_x0_primary
         op: view.reduce
-        depends_on: [score_x0_distances]
+        depends_on: [materialize_x0_primary]
         params:
           view: z20_60
           run_id: z20_60_pca
@@ -680,16 +677,9 @@ recipes:
         depends_on: [derive_x2_delta]
         params:
           scalar: delta20_norm
-      - id: score_x2_distances
-        op: distance.score
-        depends_on: [materialize_x2_anchor]
-        params:
-          distance: primary_landmark_distances
-          view: z20_60
-          landmark: [spy_p, sul_ap, sox_sp, j23105]
       - id: reduce_x2_primary
         op: view.reduce
-        depends_on: [score_x2_distances]
+        depends_on: [materialize_x2_anchor]
         params:
           view: z20_60
           run_id: z20_60_pca
@@ -708,11 +698,6 @@ recipes:
         depends_on: [reduce_x2_primary, reduce_x2_delta]
         params:
           export: x2_primary_20b
-      - id: generate_x2_review
-        op: notebook.generate
-        depends_on: [export_x2_primary]
-        params:
-          notebook: x2_primary_20b_review
   x3_ablation_7b_recipe:
     steps:
       - id: materialize_x3_anchor
@@ -759,42 +744,62 @@ deliverables:
   atlas_2x2_intermediate:
     kind: projection_grid
     description: Render the committee atlas across 7B/20B anchor and context intermediate views.
+    question: Do the four promoter design families separate in latent space at all?
+    section: Atlas
     recipe: atlas_2x2_recipe
     requires:
       views: [z7_60, z20_60, z7_1k_anchor, z20_1k_anchor]
-      cohorts: [plan]
+      cohorts: [design_family]
     outputs:
       samples: [atlas_anchor_sample, atlas_context_sample]
       projections: [umap_z7_60, umap_z20_60, umap_z7_1k_anchor, umap_z20_1k_anchor]
-      plots: [atlas_2x2_main]
-      notebooks: [atlas_committee_review]
+      plots: [atlas_2x2_intermediate_main]
+      notebooks: [browser]
+  atlas_2x2_intermediate_main:
+    kind: projection_grid
+    description: Primary manuscript-facing atlas across 20B and 7B intermediate views.
+    question: Do the four promoter design families separate in latent space at all?
+    section: Atlas
+    recipe: atlas_2x2_recipe
+    requires:
+      views: [z7_60, z20_60, z7_1k_anchor, z20_1k_anchor]
+      cohorts: [design_family]
+    outputs:
+      samples: [atlas_anchor_sample, atlas_context_sample]
+      projections: [umap_z7_60, umap_z20_60, umap_z7_1k_anchor, umap_z20_1k_anchor]
+      plots: [atlas_2x2_intermediate_main]
+      notebooks: [browser]
   control_neighborhood_enrichment:
-    kind: enrichment_heatmap
-    description: Persist the control-neighborhood cohort summary and render it as a heatmap.
+    kind: enrichment_curve
+    description: Persist WT-neighborhood family enrichment summaries.
+    question: Do WT neighborhoods recover expected design families?
+    section: Landmarks
     recipe: control_plan_heatmap_recipe
     requires:
       views: [z20_60]
-      landmarks: [spy_p, sul_ap, sox_sp, j23105]
-      cohorts: [plan]
+      landmarks: [spyp, sulap, soxsp, j23105]
+      cohorts: [design_family]
     outputs:
-      neighbors: [z20_60_knn]
-      enrichments: [control_plan_enrichment]
-      plots: [control_plan_heatmap]
-      notebooks: [control_plan_review]
-  control_distance_margins:
-    kind: control_distance
-    description: Persist primary landmark distances plus the signed control margin diagnostics.
-    recipe: control_distance_margins_recipe
+      reducers: [z20_60_pca]
+      plots: [control_neighborhood_enrichment_curve_family]
+  control_neighborhood_enrichment_curve_family:
+    kind: enrichment_curve
+    description: Enrichment-versus-neighborhood-size family summary.
+    question: Do WT neighborhoods recover expected design families?
+    section: Landmarks
+    recipe: control_plan_heatmap_recipe
     requires:
       views: [z20_60]
-      landmarks: [spy_p, sul_ap, sox_sp, j23105]
+      landmarks: [spyp, sulap, soxsp, j23105]
+      cohorts: [design_family]
     outputs:
-      distances: [primary_landmark_distances]
-      scalars: [ethanol_vs_cipro]
-      plots: [primary_landmark_scatter, control_distance_margins_distribution]
+      reducers: [z20_60_pca]
+      plots: [control_neighborhood_enrichment_curve_family]
   context_shift_primary:
     kind: context_shift
     description: Materialize the primary 20B context-shift view, scalar summary, and low-rank delta artifact.
+    question: Does anchor-plus-context materially shift promoter representation?
+    section: Context
     recipe: context_shift_primary_recipe
     requires:
       views: [z20_60, z20_1k_anchor]
@@ -802,12 +807,14 @@ deliverables:
     outputs:
       views: [delta20]
       scalars: [delta20_norm]
-      reducers: [delta20_pca]
-      reduced_views: [delta20_pc32]
-      plots: [delta20_norm_distribution]
+      reducers: [z20_60_pca, delta20_pca]
+      reduced_views: [z20_60_pc32, delta20_pc32]
+      plots: [context_shift_primary_distribution]
   drag_qc:
     kind: drag_qc
-    description: Materialize the 7B challenger context-shift QC scalar and distribution plot.
+    description: Materialize the 7B challenger context-shift QC scalar and low-rank artifacts.
+    question: Does full 1 kb context add drag beyond anchor-aware context?
+    section: Context
     recipe: drag_qc_recipe
     requires:
       views: [z7_60, z7_1k_anchor]
@@ -815,37 +822,51 @@ deliverables:
     outputs:
       views: [delta7]
       scalars: [delta7_norm]
-      plots: [delta7_norm_distribution]
+      reducers: [z7_60_pca, delta7_pca]
+      reduced_views: [z7_60_pc32, delta7_pc32]
   agreement_7b_vs_20b:
     kind: agreement_summary
     description: Compare 7B and 20B anchor-only structure on a shared sampled support.
+    question: Is 7B adding specialist signal beyond 20B, or mostly redundancy?
+    section: Agreement
     recipe: agreement_7b_vs_20b_recipe
     requires:
       views: [z7_60, z20_60]
-      cohorts: [plan]
+      cohorts: [design_family]
     outputs:
       samples: [agreement_anchor_sample]
       neighbors: [z7_60_knn, z20_60_knn]
       clusters: [z7_60_kmeans, z20_60_kmeans]
       agreements: [agreement_7b_vs_20b]
       plots: [agreement_7b_vs_20b_summary]
-      notebooks: [agreement_7b_vs_20b_review]
+  cluster_correspondence_primary:
+    kind: correspondence_heatmap
+    description: Compare aligned Leiden cluster assignments between anchor-only and anchor-aware 20B views.
+    question: Does anchor-plus-context change promoter organization?
+    section: Clusters
+    recipe: cluster_correspondence_recipe
+    requires:
+      clusters: [leiden_z20_60, leiden_z20_1k_anchor]
+    outputs:
+      plots: [cluster_correspondence_primary]
   x0_primary_20b:
     kind: export_bundle
     description: Export the primary 20B low-rank bundle plus landmark distances.
+    question: Is the anchor-only 20B view a useful baseline export?
+    section: Exports
     recipe: x0_primary_20b_recipe
     requires:
       views: [z20_60]
       exports: [x0_primary_20b]
-      landmarks: [spy_p, sul_ap, sox_sp, j23105]
     outputs:
-      distances: [primary_landmark_distances]
       reducers: [z20_60_pca]
       reduced_views: [z20_60_pc32]
       exports: [x0_primary_20b]
   x1_primary_20b:
     kind: export_bundle
     description: Export the primary 20B delta-only low-rank bundle.
+    question: Is the delta-only 20B export stable enough to stand on its own?
+    section: Exports
     recipe: x1_primary_20b_recipe
     requires:
       views: [z20_60, z20_1k_anchor]
@@ -860,23 +881,24 @@ deliverables:
   x2_primary_20b:
     kind: export_bundle
     description: Export the aligned primary 20B multiblock bundle for downstream supervised learning.
+    question: Is x2_primary_20b still the deterministic primary supervised export?
+    section: Exports
     recipe: x2_primary_20b_recipe
     requires:
       views: [z20_60, z20_1k_anchor]
       alignments: [anchor_ctx_20b]
       exports: [x2_primary_20b]
-      landmarks: [spy_p, sul_ap, sox_sp, j23105]
     outputs:
       views: [delta20]
       scalars: [delta20_norm]
-      distances: [primary_landmark_distances]
       reducers: [z20_60_pca, delta20_pca]
       reduced_views: [z20_60_pc32, delta20_pc32]
       exports: [x2_primary_20b]
-      notebooks: [x2_primary_20b_review]
   x3_ablation_7b:
     kind: export_bundle
     description: Export the aligned 7B ablation bundle for challenger comparisons.
+    question: Does the 7B committee member add useful ablation structure?
+    section: Exports
     recipe: x3_ablation_7b_recipe
     requires:
       views: [z7_60, z7_1k_anchor]

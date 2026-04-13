@@ -202,10 +202,18 @@ views:
     coordinate_space_id: bundle_space_pca
     tags: {operation: apply_reducer}
     role: primary
+  reduced_bundle_norm:
+    derive:
+      kind: normalize
+      view: reduced_bundle
+      method: l2
+    coordinate_space_id: bundle_space_pca
+    tags: {operation: normalize}
+    role: primary
   concatenated_bundle:
     derive:
       kind: concatenate
-      inputs: [normalized_bundle, reduced_bundle]
+      inputs: [reduced_bundle, reduced_bundle_norm]
     coordinate_space_id: concatenated_space
     tags: {operation: concatenate}
     role: primary
@@ -237,10 +245,109 @@ scalars:
     assert context.config.views["normalized_bundle"].derive.kind == "normalize"
     assert context.config.views["context_by_subject"].derive.kind == "aggregate_by_key"
     assert context.config.views["reduced_bundle"].derive.kind == "apply_reducer"
+    assert context.config.views["reduced_bundle_norm"].derive.kind == "normalize"
     assert context.config.views["concatenated_bundle"].derive.kind == "concatenate"
     assert context.config.scalars["selected_scalars"].derive.kind == "select_columns"
     assert context.config.scalars["renamed_scalars"].derive.kind == "rename_columns"
     assert context.config.scalars["joined_scalars"].derive.kind == "join_tables"
+
+
+def test_load_workspace_config_rejects_unknown_view_key(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs/latentdna
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  z20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: shared_space
+    tags: {model: demo}
+    role: primary
+    typo_field: true
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_cross_space_concatenate_of_raw_views(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs/latentdna
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  z7_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding_7b
+    coordinate_space_id: evo2_7b_space
+    tags: {model: 7b}
+    role: primary
+  z20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding_20b
+    coordinate_space_id: evo2_20b_space
+    tags: {model: 20b}
+    role: primary
+  bad_concat:
+    derive:
+      kind: concatenate
+      inputs: [z7_60, z20_60]
+    coordinate_space_id: mixed_space
+    tags: {operation: concatenate}
+    role: primary
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CoordinateSpaceError, match="concatenate"):
+        load_workspace_config(workspace_dir)
 
 
 def test_load_workspace_config_rejects_unknown_cohort_source(tmp_path) -> None:
@@ -630,6 +737,8 @@ plots:
     kind: projection_scatter
     projection: umap_z20_60
     color_column: usr_label__primary
+    label_column: usr_label__primary
+    label_values: [spyP, sulAp]
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -639,6 +748,72 @@ plots:
     plot = context.require_plot("atlas_scatter")
     assert plot.kind == "projection_scatter"
     assert plot.projection == "umap_z20_60"
+    assert plot.label_column == "usr_label__primary"
+    assert plot.label_values == ["spyP", "sulAp"]
+
+
+def test_load_workspace_config_rejects_projection_grid_with_misaligned_panel_titles(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs/latentdna
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources: {}
+metadata:
+  include: []
+plots:
+  atlas_grid:
+    kind: projection_grid
+    projections: [umap_a, umap_b]
+    panel_titles: [left only]
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="projection_grid panel_titles must match projections length"):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_projection_scatter_label_values_without_column(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs/latentdna
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources: {}
+metadata:
+  include: []
+plots:
+  atlas_scatter:
+    kind: projection_scatter
+    projection: umap_z20_60
+    label_values: [spyP]
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="projection_scatter label_values require label_column"):
+        load_workspace_config(workspace_dir)
 
 
 def test_load_workspace_config_rejects_distribution_plot_with_multiple_inputs(tmp_path) -> None:

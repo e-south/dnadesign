@@ -11,6 +11,7 @@ from ..contracts.errors import ArtifactConflictError, ContractViolationError
 from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
 from ..contracts.workspace import DerivedViewConfig
+from ..io.artifact_dirs import commit_staged_artifact_dirs, stage_artifact_dir
 from ..io.hashing import sha256_file
 from ..io.manifest_io import write_manifest
 from ..io.parquet_io import read_table
@@ -29,18 +30,19 @@ def materialize_view(workspace: str | Path, view_id: str, *, force: bool = False
     view_dir = context.output_root / "views" / view_id
     if view_dir.exists() and not force:
         raise ArtifactConflictError(f"view artifact already exists: {view_dir}")
-    if force and view_dir.exists():
-        import shutil
-
-        shutil.rmtree(view_dir)
+    staging_dir = stage_artifact_dir(context.output_root / "views", view_id)
 
     try:
-        artifact_dir, rows, dims, record_key, row_columns = materialize_view_artifact(context, view_id=view_id)
+        artifact_dir, rows, dims, record_key, row_columns = materialize_view_artifact(
+            context,
+            view_id=view_id,
+            artifact_dir=staging_dir,
+        )
+        assert artifact_dir == staging_dir
     except Exception:
-        if view_dir.exists():
-            import shutil
+        import shutil
 
-            shutil.rmtree(view_dir, ignore_errors=True)
+        shutil.rmtree(staging_dir, ignore_errors=True)
         raise
     view = context.require_source_view(view_id)
     source = context.require_source(view.source)
@@ -83,14 +85,15 @@ def materialize_view(workspace: str | Path, view_id: str, *, force: bool = False
         ],
         stats={"rows": rows, "dims": dims},
     )
-    write_manifest(artifact_dir / "manifest.json", manifest.model_dump(mode="json"))
+    write_manifest(staging_dir / "manifest.json", manifest.model_dump(mode="json"))
+    commit_staged_artifact_dirs([(staging_dir, view_dir)], force=force)
     result = CommandResult(
         command="view materialize",
         workspace_id=context.workspace_id,
         status="ok",
         artifact_kind="view",
         artifact_id=view_id,
-        outputs=[artifact_dir.as_posix()],
+        outputs=[view_dir.as_posix()],
         inputs={"view": view_id, "source": view.source},
         input_digests=input_digests,
         metrics={"rows": rows, "dims": dims},
@@ -114,12 +117,20 @@ def derive_view(workspace: str | Path, view_id: str, *, force: bool = False) -> 
     view_dir = context.output_root / "views" / view_id
     if view_dir.exists() and not force:
         raise ArtifactConflictError(f"view artifact already exists: {view_dir}")
-    if force and view_dir.exists():
+    staging_dir = stage_artifact_dir(context.output_root / "views", view_id)
+
+    try:
+        artifact_dir, rows, dims, record_key, row_columns = derive_view_artifact(
+            context,
+            view_id=view_id,
+            artifact_dir=staging_dir,
+        )
+        assert artifact_dir == staging_dir
+    except Exception:
         import shutil
 
-        shutil.rmtree(view_dir)
-
-    artifact_dir, rows, dims, record_key, row_columns = derive_view_artifact(context, view_id=view_id)
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
     input_entries: list[ArtifactInput]
     params = {
         "analysis_dtype": context.analysis_dtype,
@@ -238,14 +249,15 @@ def derive_view(workspace: str | Path, view_id: str, *, force: bool = False) -> 
         ],
         stats={"rows": rows, "dims": dims},
     )
-    write_manifest(artifact_dir / "manifest.json", manifest.model_dump(mode="json"))
+    write_manifest(staging_dir / "manifest.json", manifest.model_dump(mode="json"))
+    commit_staged_artifact_dirs([(staging_dir, view_dir)], force=force)
     result = CommandResult(
         command="view derive",
         workspace_id=context.workspace_id,
         status="ok",
         artifact_kind="view",
         artifact_id=view_id,
-        outputs=[artifact_dir.as_posix()],
+        outputs=[view_dir.as_posix()],
         inputs=input_payload,
         metrics={"rows": rows, "dims": dims},
     )
@@ -273,28 +285,43 @@ def reduce_view(
     reducer_dir = context.output_root / "reducers" / reducer_id
     if reducer_dir.exists() and not force:
         raise ArtifactConflictError(f"reducer artifact already exists: {reducer_dir}")
-    if force and reducer_dir.exists():
-        import shutil
-
-        shutil.rmtree(reducer_dir)
 
     reduced_view_dir = None if reduced_view_id is None else context.output_root / "reduced_views" / reduced_view_id
     if reduced_view_dir is not None and reduced_view_dir.exists() and not force:
         raise ArtifactConflictError(f"reduced view artifact already exists: {reduced_view_dir}")
-    if force and reduced_view_dir is not None and reduced_view_dir.exists():
+    reducer_staging_dir = stage_artifact_dir(context.output_root / "reducers", reducer_id)
+    reduced_view_staging_dir = (
+        None if reduced_view_id is None else stage_artifact_dir(context.output_root / "reduced_views", reduced_view_id)
+    )
+
+    try:
+        (
+            staged_reducer_dir,
+            staged_reduced_view_dir,
+            fit_rows,
+            output_dims,
+            scope_kind,
+            scope_id,
+        ) = fit_pca_reducer_artifacts(
+            context,
+            view_id=view_id,
+            reducer_id=reducer_id,
+            dims=dims,
+            sample_id=sample_id,
+            alignment_id=alignment_id,
+            reduced_view_id=reduced_view_id,
+            reducer_dir=reducer_staging_dir,
+            reduced_view_dir=reduced_view_staging_dir,
+        )
+        assert staged_reducer_dir == reducer_staging_dir
+        assert staged_reduced_view_dir == reduced_view_staging_dir
+    except Exception:
         import shutil
 
-        shutil.rmtree(reduced_view_dir)
-
-    reducer_dir, reduced_view_dir, fit_rows, output_dims, scope_kind, scope_id = fit_pca_reducer_artifacts(
-        context,
-        view_id=view_id,
-        reducer_id=reducer_id,
-        dims=dims,
-        sample_id=sample_id,
-        alignment_id=alignment_id,
-        reduced_view_id=reduced_view_id,
-    )
+        shutil.rmtree(reducer_staging_dir, ignore_errors=True)
+        if reduced_view_staging_dir is not None:
+            shutil.rmtree(reduced_view_staging_dir, ignore_errors=True)
+        raise
 
     reducer_manifest = ArtifactManifest(
         artifact_kind="reducer",
@@ -324,12 +351,13 @@ def reduce_view(
         ],
         stats={"rows": fit_rows, "dims": output_dims},
     )
-    write_manifest(reducer_dir / "manifest.json", reducer_manifest.model_dump(mode="json"))
+    write_manifest(reducer_staging_dir / "manifest.json", reducer_manifest.model_dump(mode="json"))
 
     outputs = [reducer_dir.as_posix()]
     metrics: dict[str, int | str | None] = {"fit_rows": fit_rows, "dims": output_dims}
-    if reduced_view_dir is not None and reduced_view_id is not None:
-        reduced_rows = read_table(reduced_view_dir / "rows.parquet").num_rows
+    staged_pairs: list[tuple[Path, Path]] = [(reducer_staging_dir, reducer_dir)]
+    if reduced_view_staging_dir is not None and reduced_view_dir is not None and reduced_view_id is not None:
+        reduced_rows = read_table(reduced_view_staging_dir / "rows.parquet").num_rows
         reduced_manifest = ArtifactManifest(
             artifact_kind="reduced_view",
             artifact_id=reduced_view_id,
@@ -341,7 +369,7 @@ def reduce_view(
                 ArtifactInput(
                     kind="reducer",
                     id=reducer_id,
-                    digest=sha256_file(reducer_dir / "state.npz"),
+                    digest=sha256_file(reducer_staging_dir / "state.npz"),
                     path=(reducer_dir / "state.npz").as_posix(),
                 ),
                 ArtifactInput(
@@ -364,9 +392,12 @@ def reduce_view(
             ],
             stats={"rows": reduced_rows, "dims": output_dims},
         )
-        write_manifest(reduced_view_dir / "manifest.json", reduced_manifest.model_dump(mode="json"))
+        write_manifest(reduced_view_staging_dir / "manifest.json", reduced_manifest.model_dump(mode="json"))
+        staged_pairs.append((reduced_view_staging_dir, reduced_view_dir))
         outputs.append(reduced_view_dir.as_posix())
         metrics["reduced_view_rows"] = reduced_rows
+
+    commit_staged_artifact_dirs(staged_pairs, force=force)
 
     result = CommandResult(
         command="view reduce",

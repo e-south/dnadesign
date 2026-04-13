@@ -473,3 +473,139 @@ def render_artifact_review_notebook(
         .replace("__NOTEBOOK_ID__", repr(notebook_id))
         .replace("__ARTIFACTS_JSON__", repr(artifact_payload))
     )
+
+
+def render_workspace_browser_notebook(
+    *,
+    workspace_id: str,
+    notebook_id: str,
+    title: str,
+    description: str | None,
+    default_deliverable: str,
+) -> str:
+    description_text = description or "Read-only workspace browser for persisted latentdna artifacts."
+    template = dedent(
+        """\
+        import marimo
+
+        __generated_with = "__GENERATED_WITH__"
+
+        app = marimo.App(width="full")
+
+
+        @app.cell
+        def _():
+            import json
+            from pathlib import Path
+
+            import marimo as mo
+
+            TITLE = __TITLE__
+            DESCRIPTION = __DESCRIPTION__
+            WORKSPACE_ID = __WORKSPACE_ID__
+            NOTEBOOK_ID = __NOTEBOOK_ID__
+            DEFAULT_DELIVERABLE = __DEFAULT_DELIVERABLE__
+            WORKSPACE_DIR = Path(__file__).resolve().parents[3]
+            OUTPUT_ROOT = WORKSPACE_DIR / "outputs" / "latentdna"
+            PLOTS_INDEX_PATH = OUTPUT_ROOT / "plots" / "index.json"
+            HEALTH_PATH = OUTPUT_ROOT / "notebooks" / "health.json"
+            SECTION_NAMES = [
+                "Overview",
+                "Atlas",
+                "Landmarks",
+                "Context",
+                "Clusters",
+                "Agreement",
+                "Exports",
+                "Inventory",
+            ]
+
+            def load_json(path: Path) -> dict[str, object]:
+                if not path.is_file():
+                    return {}
+                return json.loads(path.read_text(encoding="utf-8"))
+
+            plot_index = load_json(PLOTS_INDEX_PATH)
+            health = load_json(HEALTH_PATH)
+            plots = plot_index.get("plots", []) if isinstance(plot_index, dict) else []
+            matching = [
+                plot for plot in plots if isinstance(plot, dict) and plot.get("deliverable_id") == DEFAULT_DELIVERABLE
+            ]
+            deliverable_options = {DEFAULT_DELIVERABLE: DEFAULT_DELIVERABLE}
+            for plot in plots:
+                if isinstance(plot, dict):
+                    deliverable_id = str(plot.get("deliverable_id") or "").strip()
+                    if deliverable_id:
+                        deliverable_options.setdefault(deliverable_id, deliverable_id)
+            deliverable_selector = mo.ui.dropdown(
+                options=deliverable_options,
+                value=DEFAULT_DELIVERABLE,
+                label="Deliverable",
+            )
+
+            overview = mo.vstack(
+                [
+                    mo.md(f"# {TITLE}"),
+                    mo.md(DESCRIPTION),
+                    mo.md(
+                        "\\n".join(
+                            [
+                                f"- Workspace: `{WORKSPACE_ID}`",
+                                f"- Notebook: `{NOTEBOOK_ID}`",
+                                f"- Default deliverable: `{DEFAULT_DELIVERABLE}`",
+                                f"- Plot catalog: `{PLOTS_INDEX_PATH}`",
+                                f"- Health artifact: `{HEALTH_PATH}`",
+                            ]
+                        )
+                    ),
+                    deliverable_selector,
+                ]
+            )
+
+            inventory_lines = []
+            for plot in matching:
+                plot_id = str(plot.get("plot_id") or "")
+                status = str(plot.get("status") or "unknown")
+                inventory_lines.append(f"- `{plot_id}`: {status}")
+            if not inventory_lines:
+                inventory_lines = ["- No rendered plots indexed for the default deliverable yet."]
+
+            tabs = {
+                "Overview": overview,
+                "Atlas": mo.md("Atlas views and high-signal primary projections."),
+                "Landmarks": mo.md("Landmarks and WT/manual reference neighborhoods."),
+                "Context": mo.md("Context shift, delta, and drag diagnostics."),
+                "Clusters": mo.md("Clusters, correspondence, and enrichment summaries."),
+                "Agreement": mo.md("Committee and challenger agreement summaries."),
+                "Exports": mo.md("Export bundles and OPAL-facing feature blocks."),
+                "Inventory": mo.vstack(
+                    [
+                        mo.md("\\n".join(inventory_lines)),
+                        mo.md(f"```json\\n{json.dumps(health, indent=2, sort_keys=True)}\\n```"),
+                    ]
+                ),
+            }
+            return (
+                mo,
+                SECTION_NAMES,
+                tabs,
+            )
+
+
+        @app.cell
+        def _(mo, tabs):
+            return mo.ui.tabs(tabs)
+
+
+        if __name__ == "__main__":
+            app.run()
+        """
+    )
+    return (
+        template.replace("__GENERATED_WITH__", _marimo_version())
+        .replace("__TITLE__", repr(title))
+        .replace("__DESCRIPTION__", repr(description_text))
+        .replace("__WORKSPACE_ID__", repr(workspace_id))
+        .replace("__NOTEBOOK_ID__", repr(notebook_id))
+        .replace("__DEFAULT_DELIVERABLE__", repr(default_deliverable))
+    )

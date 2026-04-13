@@ -55,6 +55,7 @@ Current runtime limits:
 - `agreement compare` now supports kNN-overlap plus optional cluster agreement and landmark-neighborhood overlap; cluster fitting from projections and richer agreement recipes remain deferred.
 - `plot render` now supports `projection_scatter`, `projection_grid`, `heatmap`, `distance_scatter`, `distribution`, and `agreement_summary`.
 - `plot render` now accepts either a named `plots.<id>` recipe with no inline plot flags, or an ad hoc inline spec; mixing the two modes is rejected.
+- Projection plot recipes may declare a shared `color_column`, explicit `panel_titles`, and optional highlighted label subsets through `label_column` plus `label_values`.
 - `snapshot build` now writes `rows.parquet` for the stable row basis plus `metadata.parquet` for copied metadata columns; recipes and deliverables still use live sources unless the workspace explicitly chooses snapshot-backed flows.
 - `notebook generate` currently emits interactive marimo artifact-review apps with inline plot viewing plus a runtime scan over `outputs/latentdna/plots`, so persisted plot artifacts remain viewable even when they are not explicitly declared in `notebooks.<id>.artifacts`; richer notebook template families remain deferred.
 - `workspace init --from-study-dir` currently hydrates the checked-in promoter-study committee template by binding `anchor60` to the study's merged-anchor dataset, `ctx1k` to the construct-context dataset, and writing a typed `study_binding` block.

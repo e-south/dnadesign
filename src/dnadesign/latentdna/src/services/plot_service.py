@@ -15,12 +15,14 @@ from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.plot import ResolvedPlotSpec
 from ..contracts.result import CommandResult
 from ..io.hashing import sha256_file
+from ..io.json_io import write_json
 from ..io.manifest_io import write_manifest
 from ..plots.recipes import resolve_plot_spec
 from ..plots.render import render_plot_artifact
 from ..runs.recorder import record_audit
 from ..version import __version__
 from ..workspaces.loader import WorkspaceContext, load_workspace_config
+from .freshness_service import FreshnessCache, evaluate_artifact_freshness
 
 
 def _artifact_input(kind: str, artifact_id: str, path: Path) -> ArtifactInput:
@@ -58,6 +60,23 @@ def _artifact_inputs_for_plot(context, spec: ResolvedPlotSpec) -> list[ArtifactI
                 "distance_set",
                 spec.distance_id,
                 context.output_root / "distances" / spec.distance_id / "table.parquet",
+            )
+        ]
+    if spec.kind == "xy_scatter":
+        if spec.distance_id is not None:
+            return [
+                _artifact_input(
+                    "distance_set",
+                    spec.distance_id,
+                    context.output_root / "distances" / spec.distance_id / "table.parquet",
+                )
+            ]
+        assert spec.scalar_id is not None
+        return [
+            _artifact_input(
+                "scalar_table",
+                spec.scalar_id,
+                context.output_root / "scalars" / spec.scalar_id / "table.parquet",
             )
         ]
     if spec.kind == "distribution":
@@ -99,6 +118,29 @@ def _artifact_inputs_for_plot(context, spec: ResolvedPlotSpec) -> list[ArtifactI
         if len(selected) != 1:
             raise ContractViolationError("distribution rendering requires exactly one table-backed artifact input")
         return selected
+    if spec.kind == "curve":
+        assert spec.reducer_id is not None
+        return [
+            _artifact_input(
+                "reducer",
+                spec.reducer_id,
+                context.output_root / "reducers" / spec.reducer_id / "summary.json",
+            )
+        ]
+    if spec.kind == "correspondence_heatmap":
+        assert spec.left_cluster_id is not None and spec.right_cluster_id is not None
+        return [
+            _artifact_input(
+                "cluster_set",
+                spec.left_cluster_id,
+                context.output_root / "clusters" / spec.left_cluster_id / "assignments.parquet",
+            ),
+            _artifact_input(
+                "cluster_set",
+                spec.right_cluster_id,
+                context.output_root / "clusters" / spec.right_cluster_id / "assignments.parquet",
+            ),
+        ]
 
     assert spec.agreement_id is not None
     return [
@@ -114,6 +156,8 @@ def _input_payload(spec: ResolvedPlotSpec) -> dict[str, object]:
     payload: dict[str, object] = {"kind": spec.kind}
     if spec.projection_ids:
         payload["projections"] = spec.projection_ids
+    if spec.panel_titles:
+        payload["panel_titles"] = spec.panel_titles
     if spec.enrichment_id is not None:
         payload["enrichment"] = spec.enrichment_id
     if spec.distance_id is not None:
@@ -122,6 +166,18 @@ def _input_payload(spec: ResolvedPlotSpec) -> dict[str, object]:
         payload["scalar"] = spec.scalar_id
     if spec.agreement_id is not None:
         payload["agreement"] = spec.agreement_id
+    if spec.reducer_id is not None:
+        payload["reducer"] = spec.reducer_id
+    if spec.left_cluster_id is not None:
+        payload["left_cluster"] = spec.left_cluster_id
+    if spec.right_cluster_id is not None:
+        payload["right_cluster"] = spec.right_cluster_id
+    if spec.render_mode is not None:
+        payload["render_mode"] = spec.render_mode
+    if spec.label_column is not None:
+        payload["label_column"] = spec.label_column
+    if spec.label_values:
+        payload["label_values"] = spec.label_values
     if spec.config_id is not None:
         payload["plot_recipe"] = spec.config_id
     return payload
@@ -139,6 +195,12 @@ def _manifest_params(spec: ResolvedPlotSpec) -> dict[str, object]:
         params["scalar_id"] = spec.scalar_id
     if spec.agreement_id is not None:
         params["agreement_id"] = spec.agreement_id
+    if spec.reducer_id is not None:
+        params["reducer_id"] = spec.reducer_id
+    if spec.left_cluster_id is not None:
+        params["left_cluster_id"] = spec.left_cluster_id
+    if spec.right_cluster_id is not None:
+        params["right_cluster_id"] = spec.right_cluster_id
     if spec.value_column is not None:
         params["value_column"] = spec.value_column
     if spec.x_column is not None:
@@ -147,6 +209,14 @@ def _manifest_params(spec: ResolvedPlotSpec) -> dict[str, object]:
         params["y_column"] = spec.y_column
     if spec.color_column is not None:
         params["color_column"] = spec.color_column
+    if spec.render_mode is not None:
+        params["render_mode"] = spec.render_mode
+    if spec.label_column is not None:
+        params["label_column"] = spec.label_column
+    if spec.label_values:
+        params["label_values"] = spec.label_values
+    if spec.panel_titles:
+        params["panel_titles"] = spec.panel_titles
     if spec.kind == "distribution":
         if spec.scalar_id is not None:
             params["input_kind"] = "scalar_table"
@@ -165,6 +235,56 @@ def _manifest_params(spec: ResolvedPlotSpec) -> dict[str, object]:
     return params
 
 
+def _plot_deliverable_id(context: WorkspaceContext, *, plot_id: str) -> str | None:
+    for deliverable_id, deliverable in context.config.deliverables.items():
+        if plot_id in deliverable.outputs.get("plots", []):
+            return deliverable_id
+    return None
+
+
+def write_plot_index(context: WorkspaceContext) -> dict[str, object]:
+    plots_root = context.output_root / "plots"
+    cache = FreshnessCache()
+    items: list[dict[str, object]] = []
+    if plots_root.is_dir():
+        for plot_dir in sorted(candidate for candidate in plots_root.iterdir() if candidate.is_dir()):
+            manifest_path = plot_dir / "manifest.json"
+            if not manifest_path.is_file():
+                continue
+            manifest = context.read_manifest(manifest_path)
+            plot_id = str(manifest["artifact_id"])
+            freshness = evaluate_artifact_freshness(context, artifact_kind="plot", artifact_id=plot_id, cache=cache)
+            rendered_formats = [
+                Path(str(output.get("path") or "")).suffix.lstrip(".")
+                for output in manifest.get("outputs", [])
+                if isinstance(output, dict) and output.get("path")
+            ]
+            output_paths = [
+                (plot_dir / str(output.get("path"))).relative_to(context.output_root).as_posix()
+                for output in manifest.get("outputs", [])
+                if isinstance(output, dict) and output.get("path")
+            ]
+            items.append(
+                {
+                    "plot_id": plot_id,
+                    "deliverable_id": _plot_deliverable_id(context, plot_id=plot_id),
+                    "status": manifest.get("status", freshness["status"]),
+                    "rendered_formats": rendered_formats,
+                    "output_paths": output_paths,
+                    "input_artifact_ids": [
+                        f"{entry.get('kind')}:{entry.get('id')}"
+                        for entry in manifest.get("inputs", [])
+                        if isinstance(entry, dict)
+                    ],
+                    "created_at": manifest.get("created_at"),
+                    "stale": freshness["status"] != "ok",
+                }
+            )
+    payload = {"workspace_id": context.workspace_id, "plots": items}
+    write_json(plots_root / "index.json", payload)
+    return payload
+
+
 def _stage_plot_dir(parent_dir: Path, plot_id: str) -> Path:
     parent_dir.mkdir(parents=True, exist_ok=True)
     return Path(tempfile.mkdtemp(prefix=f".{plot_id}_", dir=parent_dir))
@@ -176,14 +296,21 @@ def resolve_plot_request(
     *,
     kind: str | None,
     projection_ids: list[str],
+    panel_titles: list[str],
     enrichment_id: str | None,
     distance_id: str | None,
     scalar_id: str | None,
     agreement_id: str | None,
+    reducer_id: str | None,
+    left_cluster_id: str | None,
+    right_cluster_id: str | None,
     value_column: str | None,
     x_column: str | None,
     y_column: str | None,
     color_column: str | None,
+    render_mode: str | None,
+    label_column: str | None,
+    label_values: list[str],
 ) -> tuple[WorkspaceContext, ResolvedPlotSpec]:
     validate_identifier(plot_id, label="plot id")
     context = load_workspace_config(workspace)
@@ -192,14 +319,21 @@ def resolve_plot_request(
         plot_id=plot_id,
         kind=kind,
         projection_ids=projection_ids,
+        panel_titles=panel_titles,
         enrichment_id=enrichment_id,
         distance_id=distance_id,
         scalar_id=scalar_id,
         agreement_id=agreement_id,
+        reducer_id=reducer_id,
+        left_cluster_id=left_cluster_id,
+        right_cluster_id=right_cluster_id,
         value_column=value_column,
         x_column=x_column,
         y_column=y_column,
         color_column=color_column,
+        render_mode=render_mode,
+        label_column=label_column,
+        label_values=label_values,
     )
     return context, spec
 
@@ -210,14 +344,21 @@ def render_plot(
     *,
     kind: str | None,
     projection_ids: list[str],
+    panel_titles: list[str],
     enrichment_id: str | None,
     distance_id: str | None,
     scalar_id: str | None,
     agreement_id: str | None,
+    reducer_id: str | None,
+    left_cluster_id: str | None,
+    right_cluster_id: str | None,
     value_column: str | None,
     x_column: str | None,
     y_column: str | None,
     color_column: str | None,
+    render_mode: str | None,
+    label_column: str | None,
+    label_values: list[str],
     force: bool = False,
 ) -> CommandResult:
     context, spec = resolve_plot_request(
@@ -225,14 +366,21 @@ def render_plot(
         plot_id,
         kind=kind,
         projection_ids=projection_ids,
+        panel_titles=panel_titles,
         enrichment_id=enrichment_id,
         distance_id=distance_id,
         scalar_id=scalar_id,
         agreement_id=agreement_id,
+        reducer_id=reducer_id,
+        left_cluster_id=left_cluster_id,
+        right_cluster_id=right_cluster_id,
         value_column=value_column,
         x_column=x_column,
         y_column=y_column,
         color_column=color_column,
+        render_mode=render_mode,
+        label_column=label_column,
+        label_values=label_values,
     )
     plot_dir = context.output_root / "plots" / plot_id
     if plot_dir.exists() and not force:
@@ -286,4 +434,5 @@ def render_plot(
         command="plot_render",
         artifact_id=plot_id,
     )
+    write_plot_index(context)
     return result

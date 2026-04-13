@@ -4,9 +4,9 @@ Notebook scaffold contracts for latentdna.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 SUPPORTED_NOTEBOOK_ARTIFACT_KINDS: frozenset[str] = frozenset(
     {
@@ -28,14 +28,31 @@ SUPPORTED_NOTEBOOK_ARTIFACT_KINDS: frozenset[str] = frozenset(
 )
 
 
-class NotebookArtifactReference(BaseModel):
+class StrictNotebookModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class NotebookArtifactReference(StrictNotebookModel):
     kind: str
     id: str
     alias: str | None = None
 
 
-class NotebookConfig(BaseModel):
+class ArtifactReviewNotebookConfig(StrictNotebookModel):
     kind: Literal["artifact_review"]
     title: str
     description: str | None = None
     artifacts: list[NotebookArtifactReference] = Field(min_length=1)
+
+
+class WorkspaceBrowserNotebookConfig(StrictNotebookModel):
+    kind: Literal["workspace_browser"]
+    title: str
+    description: str | None = None
+    default_deliverable: str
+
+
+NotebookConfig = Annotated[
+    ArtifactReviewNotebookConfig | WorkspaceBrowserNotebookConfig,
+    Field(discriminator="kind"),
+]

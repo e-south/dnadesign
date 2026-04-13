@@ -128,3 +128,83 @@ def test_cli_overlay_remove_rejects_reserved_namespace(tmp_path: Path) -> None:
     assert result.exit_code != 0
     assert result.exception is not None
     assert "reserved" in str(result.exception).lower()
+
+
+def test_cli_overlay_project_projects_namespace_without_touching_other_overlays(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    register_test_namespace(
+        root,
+        namespace="densegen",
+        columns_spec="densegen__plan:string,densegen__required_regulators:list<string>",
+    )
+    register_test_namespace(root, namespace="infer", columns_spec="infer__score:float64")
+
+    src = Dataset(root, "densegen_source")
+    dest = Dataset(root, "anchor_dest")
+    src.init(source="test")
+    dest.init(source="test")
+    src.import_rows(
+        [{"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"}],
+        source="unit",
+    )
+    dest.import_rows(
+        [
+            {"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"},
+            {"sequence": "GGGG", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"},
+        ],
+        source="unit",
+    )
+
+    src_id = str(src.head(1, columns=["id"]).iloc[0]["id"])
+    dest_rows = dest.head(10, columns=["id", "sequence"]).to_dict(orient="records")
+    dest_by_sequence = {str(row["sequence"]): str(row["id"]) for row in dest_rows}
+
+    src.write_overlay(
+        "densegen",
+        pa.table(
+            {
+                "id": [src_id],
+                "densegen__plan": ["ethanol_f"],
+                "densegen__required_regulators": [["cpxR"]],
+            }
+        ),
+        key="id",
+        overwrite=True,
+    )
+    dest.write_overlay(
+        "infer",
+        pa.table(
+            {
+                "id": [dest_by_sequence["ACGT"], dest_by_sequence["GGGG"]],
+                "infer__score": [0.25, 0.5],
+            }
+        ),
+        key="id",
+        overwrite=True,
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "--root",
+            str(root),
+            "maintenance",
+            "overlay-project",
+            "--src",
+            "densegen_source",
+            "--dest",
+            "anchor_dest",
+            "--namespace",
+            "densegen",
+            "--allow-missing",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "[PROJECTED]" in result.output
+    rows = dest.head(10, columns=["sequence", "densegen__plan", "infer__score"]).to_dict(orient="records")
+    by_sequence = {str(row["sequence"]): row for row in rows}
+    assert by_sequence["ACGT"]["densegen__plan"] == "ethanol_f"
+    assert by_sequence["ACGT"]["infer__score"] == 0.25
+    assert by_sequence["GGGG"]["infer__score"] == 0.5

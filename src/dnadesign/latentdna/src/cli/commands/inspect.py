@@ -11,6 +11,8 @@ from ...services.inspection_service import (
     inspect_artifacts,
     inspect_landmarks,
     inspect_missingness,
+    inspect_notebook_health,
+    inspect_plots,
     inspect_source,
     inspect_views,
 )
@@ -102,6 +104,34 @@ def artifacts(
 ) -> None:
     try:
         payload = inspect_artifacts(workspace)
+    except Exception as exc:
+        fail(exc)
+    emit(payload, format_name=resolve_format(json_output=json_output, format_name=format_name), quiet=quiet)
+
+
+@app.command("plots")
+def plots(
+    workspace: str = typer.Option(..., "--workspace"),
+    format_name: str = typer.Option("text", "--format"),
+    json_output: bool = typer.Option(False, "--json"),
+    quiet: bool = typer.Option(False, "--quiet"),
+) -> None:
+    try:
+        payload = inspect_plots(workspace)
+    except Exception as exc:
+        fail(exc)
+    emit(payload, format_name=resolve_format(json_output=json_output, format_name=format_name), quiet=quiet)
+
+
+@app.command("notebook-health")
+def notebook_health(
+    workspace: str = typer.Option(..., "--workspace"),
+    format_name: str = typer.Option("text", "--format"),
+    json_output: bool = typer.Option(False, "--json"),
+    quiet: bool = typer.Option(False, "--quiet"),
+) -> None:
+    try:
+        payload = inspect_notebook_health(workspace)
     except Exception as exc:
         fail(exc)
     emit(payload, format_name=resolve_format(json_output=json_output, format_name=format_name), quiet=quiet)
