@@ -20,8 +20,11 @@ Read-only local analysis over the shared DenseGen source dataset uses the same
 workspace through the public DenseGen CLI:
 
 ```bash
+# Render the workspace's default analysis plots from the shared dataset inputs.
 uv run dense plot -c "$PWD/config.yaml"
+# Regenerate the read-only marimo notebook that browses the persisted artifacts.
 uv run dense notebook generate -c "$PWD/config.yaml"
+# Launch the generated notebook locally without recomputing upstream datasets.
 uv run dense notebook run -c "$PWD/config.yaml"
 ```
 
