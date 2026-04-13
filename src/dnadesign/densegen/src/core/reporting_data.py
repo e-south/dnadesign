@@ -38,6 +38,7 @@ from .reporting_transforms import (
     _dg,
     _explode_library_from_attempts,
     _explode_used,
+    _explode_used_from_composition,
     _normalized_entropy_from_counts,
     _usage_stats_from_counts,
 )
@@ -75,9 +76,15 @@ _COMPOSITION_REPORT_COLUMNS = [
     "solution_id",
     "input_name",
     "plan_name",
+    "library_index",
+    "library_hash",
     "tf",
     "tfbs",
+    "offset",
     "length",
+    "end",
+    "site_id",
+    "source",
 ]
 
 
@@ -219,6 +226,32 @@ def collect_report_data(
         output_records_path = None
 
     used_df = _explode_used(df)
+    composition_path = tables_root / "composition.parquet"
+    composition = pd.DataFrame()
+    if composition_path.exists():
+        try:
+            composition = _read_composition_parquet(composition_path, columns=_COMPOSITION_REPORT_COLUMNS)
+        except Exception as exc:
+            message = f"Failed to load composition.parquet; composition summaries will be incomplete. ({exc})"
+            if strict:
+                raise ValueError(message) from exc
+            warnings.append(message)
+            composition = pd.DataFrame()
+    if used_df.empty and not composition.empty:
+        try:
+            recovered_used_df = _explode_used_from_composition(composition)
+        except Exception as exc:
+            message = f"Failed to recover used TFBS placements from composition.parquet. ({exc})"
+            if strict:
+                raise ValueError(message) from exc
+            warnings.append(message)
+        else:
+            if not recovered_used_df.empty:
+                used_df = recovered_used_df
+                warnings.append(
+                    "Output records did not include used TFBS detail; recovered library utilization from "
+                    "outputs/tables/composition.parquet."
+                )
     attempt_paths = _attempts_artifact_paths(tables_root)
     attempts_path = attempt_paths[0] if attempt_paths else tables_root / "attempts.parquet"
     if not attempt_paths:
@@ -618,20 +651,14 @@ def collect_report_data(
         tables["tf_cooccurrence"] = _compute_cooccurrence(used_df)
         tables["tf_adjacency"] = _compute_adjacency(used_df)
 
-    composition_path = tables_root / "composition.parquet"
-    if composition_path.exists():
-        try:
-            composition = _read_composition_parquet(composition_path, columns=_COMPOSITION_REPORT_COLUMNS)
-            if not composition.empty and "tf" in composition.columns and "input_name" in composition.columns:
-                composition["tf"] = composition.apply(
-                    lambda row: _display_tf_label(str(row.get("input_name") or ""), str(row.get("tf") or "")),
-                    axis=1,
-                )
-            tables["composition"] = composition
-        except Exception as exc:
-            if strict:
-                raise ValueError(f"Failed to load composition.parquet for report tables. ({exc})") from exc
-            log.warning("Failed to load composition.parquet for report tables.", exc_info=True)
+    if not composition.empty:
+        composition_table = composition.copy()
+        if "tf" in composition_table.columns and "input_name" in composition_table.columns:
+            composition_table["tf"] = composition_table.apply(
+                lambda row: _display_tf_label(str(row.get("input_name") or ""), str(row.get("tf") or "")),
+                axis=1,
+            )
+        tables["composition"] = composition_table
 
     library_hashes = used_df["library_hash"].dropna().unique().tolist() if "library_hash" in used_df.columns else []
     tf_counts = used_df["tf"].value_counts().to_dict() if not used_df.empty else {}
