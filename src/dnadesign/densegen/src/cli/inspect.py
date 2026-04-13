@@ -71,7 +71,12 @@ def _resolve_usr_events_log_path(loaded, *, context: CliContext) -> Path:
     usr_cfg = out_cfg.usr
     if "usr" not in out_cfg.targets or usr_cfg is None:
         raise ValueError("output.targets must include 'usr' with output.usr configured.")
-    usr_root = resolve_usr_root_scoped_path(loaded.path, usr_cfg.root, label="output.usr.root")
+    usr_root = resolve_usr_root_scoped_path(
+        loaded.path,
+        usr_cfg.root,
+        label="output.usr.root",
+        scope=usr_cfg.root_scope,
+    )
     dataset = str(usr_cfg.dataset).strip()
     if not dataset:
         raise ValueError("output.usr.dataset must be a non-empty string.")

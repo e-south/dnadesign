@@ -130,7 +130,12 @@ def scan_records_from_config(
         usr_cfg = out_cfg.usr
         if usr_cfg is None:
             raise ValueError("output.usr is required when source='usr'")
-        root = resolve_usr_root_scoped_path(cfg_path, usr_cfg.root, label="output.usr.root")
+        root = resolve_usr_root_scoped_path(
+            cfg_path,
+            usr_cfg.root,
+            label="output.usr.root",
+            scope=usr_cfg.root_scope,
+        )
         try:
             from dnadesign.usr import Dataset
         except Exception as e:

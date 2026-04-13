@@ -35,6 +35,7 @@ class OutputUSRConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     dataset: str
     root: str
+    root_scope: Literal["config", "git_common_repo_root"] = "config"
     chunk_size: int = 128
     health_event_interval_seconds: float = 60.0
     npz_fields: List[str] = Field(default_factory=list)
@@ -59,6 +60,14 @@ class OutputUSRConfig(BaseModel):
         value = str(v).strip()
         if not value:
             raise ValueError("output.usr.root must be a non-empty string")
+        return value
+
+    @field_validator("root_scope")
+    @classmethod
+    def _root_scope_supported(cls, v: str):
+        value = str(v).strip()
+        if value not in {"config", "git_common_repo_root"}:
+            raise ValueError("output.usr.root_scope must be one of: config, git_common_repo_root")
         return value
 
     @field_validator("chunk_size")

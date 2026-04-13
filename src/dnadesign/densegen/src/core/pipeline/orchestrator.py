@@ -89,7 +89,12 @@ def _replay_usr_overlay_backlog_for_resume(
     if not dataset_name:
         raise RuntimeError("output.usr.dataset must be a non-empty string.")
 
-    usr_root = resolve_usr_root_scoped_path(cfg_path, usr_cfg.root, label="output.usr.root")
+    usr_root = resolve_usr_root_scoped_path(
+        cfg_path,
+        usr_cfg.root,
+        label="output.usr.root",
+        scope=usr_cfg.root_scope,
+    )
     dataset_dir = (usr_root / dataset_name).resolve()
     pending_before = _pending_usr_overlay_backlog_parts(dataset_dir)
     if not pending_before:

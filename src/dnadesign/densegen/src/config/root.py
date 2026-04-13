@@ -217,7 +217,12 @@ def _validate_run_scoped_paths(cfg_path: Path, root_cfg: RootConfig) -> None:
             label="output.parquet.path",
         )
     if out_cfg.usr is not None:
-        resolve_usr_root_scoped_path(cfg_path, out_cfg.usr.root, label="output.usr.root")
+        resolve_usr_root_scoped_path(
+            cfg_path,
+            out_cfg.usr.root,
+            label="output.usr.root",
+            scope=out_cfg.usr.root_scope,
+        )
 
     log_dir = root_cfg.densegen.logging.log_dir
     resolve_outputs_scoped_path(cfg_path, run_root, log_dir, label="logging.log_dir")

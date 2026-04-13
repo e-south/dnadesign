@@ -13,11 +13,13 @@ from __future__ import annotations
 
 import copy
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
 
 from dnadesign.densegen.src.config import ConfigError, load_config
+from dnadesign.densegen.src.config.base import resolve_usr_root_scoped_path
 
 MIN_CONFIG = {
     "densegen": {
@@ -684,6 +686,28 @@ def test_usr_root_can_live_outside_outputs(tmp_path: Path) -> None:
     loaded = load_config(cfg_path)
     assert loaded.root.densegen.output.usr is not None
     assert loaded.root.densegen.output.usr.root == "../usr_root"
+
+
+def test_usr_root_scope_can_resolve_from_git_common_repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo_root = tmp_path / "repo"
+    shared_usr_root = repo_root / "src" / "dnadesign" / "usr" / "datasets"
+    shared_usr_root.mkdir(parents=True)
+    cfg_path = repo_root / ".worktrees" / "audit-wt" / "cfg.yaml"
+    cfg_path.parent.mkdir(parents=True)
+    cfg_path.write_text("densegen: {}\n")
+
+    def _fake_run(*args, **kwargs):
+        return SimpleNamespace(returncode=0, stdout=str(repo_root / ".git") + "\n", stderr="")
+
+    monkeypatch.setattr("dnadesign.densegen.src.config.base.subprocess.run", _fake_run)
+    resolved = resolve_usr_root_scoped_path(
+        cfg_path,
+        "src/dnadesign/usr/datasets",
+        label="output.usr.root",
+        scope="git_common_repo_root",
+    )
+
+    assert resolved == shared_usr_root.resolve()
 
 
 def test_logging_dir_must_live_under_outputs(tmp_path: Path) -> None:

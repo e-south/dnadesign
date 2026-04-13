@@ -74,7 +74,9 @@ elif source == "usr":
     dataset = str(usr_cfg.dataset or "").strip()
     if not dataset:
         raise SystemExit("output.usr.dataset must be a non-empty string")
-    usr_root = resolve_usr_root_scoped_path(cfg_path, usr_cfg.root, label="output.usr.root")
+    usr_root = resolve_usr_root_scoped_path(
+        cfg_path, usr_cfg.root, label="output.usr.root", scope=usr_cfg.root_scope
+    )
     print(usr_root / dataset / "records.parquet")
 else:
     raise SystemExit(f"unsupported analysis source: {source}")

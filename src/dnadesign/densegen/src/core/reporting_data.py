@@ -158,7 +158,12 @@ def _resolve_output_records_path(root_cfg: RootConfig, cfg_path: Path, run_root:
         usr_cfg = out_cfg.usr
         if usr_cfg is None:
             raise ValueError("output.usr is required when selected output source is usr")
-        usr_root = resolve_usr_root_scoped_path(cfg_path, usr_cfg.root, label="output.usr.root")
+        usr_root = resolve_usr_root_scoped_path(
+            cfg_path,
+            usr_cfg.root,
+            label="output.usr.root",
+            scope=usr_cfg.root_scope,
+        )
         return os.path.relpath(usr_root / usr_cfg.dataset / "records.parquet", run_root)
 
     if source == "parquet":
