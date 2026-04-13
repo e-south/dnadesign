@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import shutil
 from dataclasses import dataclass
+from os.path import relpath
 from pathlib import Path
 from typing import Any
 
@@ -518,7 +519,7 @@ def _read_study_datasets(study_dir: Path) -> dict[str, dict[str, Any]]:
     return by_role
 
 
-def _hydrate_template_from_study(payload: dict[str, Any], *, study_dir: Path) -> None:
+def _hydrate_template_from_study(payload: dict[str, Any], *, study_dir: Path, workspace_dir: Path) -> None:
     datasets = _read_study_datasets(study_dir)
     source_role_map = {
         "anchor60": "merged_anchor_source",
@@ -537,13 +538,19 @@ def _hydrate_template_from_study(payload: dict[str, Any], *, study_dir: Path) ->
             raise WorkspaceValidationError(f"study dataset role {role!r} is missing usr_root")
         if not isinstance(dataset_id, str) or not dataset_id:
             raise WorkspaceValidationError(f"study dataset role {role!r} is missing dataset")
+        resolved_usr_root = resolve_repo_path(usr_root)
         source_payload["kind"] = "usr"
-        source_payload["root"] = resolve_repo_path(usr_root).as_posix()
+        source_payload["root"] = Path(relpath(resolved_usr_root, workspace_dir)).as_posix()
         source_payload["dataset"] = dataset_id
 
+    study_dir_text: str
+    try:
+        study_dir_text = study_dir.relative_to(project_root()).as_posix()
+    except ValueError:
+        study_dir_text = study_dir.as_posix()
     payload["study_binding"] = {
         "kind": "dnadesign_study",
-        "study_dir": study_dir.resolve().as_posix(),
+        "study_dir": study_dir_text,
         "readiness_vocabulary": ["missing", "attention", "ok"],
     }
 
@@ -568,7 +575,11 @@ def scaffold_workspace(*, workspace_dir: Path, template: str, from_study_dir: st
         payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
         payload["workspace"]["id"] = workspace_dir.name
         if from_study_dir is not None:
-            _hydrate_template_from_study(payload, study_dir=resolve_repo_path(from_study_dir))
+            _hydrate_template_from_study(
+                payload,
+                study_dir=resolve_repo_path(from_study_dir),
+                workspace_dir=workspace_dir,
+            )
         config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
         (workspace_dir / "outputs" / "latentdna" / "logs" / "audit").mkdir(parents=True, exist_ok=True)
         return workspace_dir

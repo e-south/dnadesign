@@ -11,6 +11,7 @@ Module Author(s): OpenAI Codex
 
 from __future__ import annotations
 
+from os.path import relpath
 from pathlib import Path
 
 import pyarrow as pa
@@ -80,8 +81,11 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
             [
                 "infer__evo2_7b__anchor_only_7b_features__intermediate_embedding__block26_mlp_out__seq_mean:list<float32>",
                 "infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean:list<float32>",
+                "infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean:list<float32>",
                 "infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__anchor_mean:list<float32>",
                 "infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__anchor_mean:list<float32>",
+                "infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__seq_mean:list<float32>",
+                "infer__evo2_20b__template_1kb_20b_features__output_layer_mean__anchor_mean:list<float32>",
             ]
         ),
     )
@@ -93,7 +97,7 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
     register_test_namespace(
         usr_root,
         namespace="densegen",
-        columns_spec="densegen__plan:string",
+        columns_spec="densegen__plan:string,densegen__required_regulators:string",
     )
     register_test_namespace(
         usr_root,
@@ -114,6 +118,12 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
     )
 
     anchor_dataset = Dataset(usr_root, "promoter/test_anchor")
+    anchor_records_path = usr_root / "promoter" / "test_anchor" / "records.parquet"
+    anchor_records = pq.read_table(anchor_records_path)
+    pq.write_table(
+        anchor_records.append_column("template_id", pa.array(["tpl0", "tpl1", "tpl2"])),
+        anchor_records_path,
+    )
     anchor_ids = anchor_dataset.head(n=3, columns=["id"], include_derived=False)["id"].tolist()
     anchor_dataset.write_overlay_part(
         "infer",
@@ -132,13 +142,23 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
                     [[1.0, 1.1], [1.2, 1.3], [1.4, 1.5]],
                     type=pa.list_(pa.float32()),
                 ),
+                ("infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean"): pa.array(
+                    [[2.0, 2.1], [2.2, 2.3], [2.4, 2.5]],
+                    type=pa.list_(pa.float32()),
+                ),
             }
         ),
         key="id",
     )
     anchor_dataset.write_overlay_part(
         "densegen",
-        pa.table({"id": anchor_ids, "densegen__plan": ["plan_a", "plan_b", "plan_a"]}),
+        pa.table(
+            {
+                "id": anchor_ids,
+                "densegen__plan": ["ethanol__sigma70_b", "ciprofloxacin__sigma70_c", "background_only__sigma70_d"],
+                "densegen__required_regulators": ["cpxR", "lexA", "background"],
+            }
+        ),
         key="id",
     )
     anchor_dataset.write_overlay_part(
@@ -146,7 +166,6 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
         pa.table({"id": anchor_ids, "usr_label__primary": ["spyP", "sulAp", "J23105"]}),
         key="id",
     )
-
     context_dataset = Dataset(usr_root, "promoter/test_contexts")
     context_ids = context_dataset.head(n=3, columns=["id"], include_derived=False)["id"].tolist()
     context_dataset.write_overlay_part(
@@ -164,6 +183,16 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
                     "infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__anchor_mean"
                 ): pa.array(
                     [[1.5, 1.4], [1.3, 1.2], [1.1, 1.0]],
+                    type=pa.list_(pa.float32()),
+                ),
+                (
+                    "infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__seq_mean"
+                ): pa.array(
+                    [[1.6, 1.5], [1.4, 1.3], [1.2, 1.1]],
+                    type=pa.list_(pa.float32()),
+                ),
+                ("infer__evo2_20b__template_1kb_20b_features__output_layer_mean__anchor_mean"): pa.array(
+                    [[2.5, 2.4], [2.3, 2.2], [2.1, 2.0]],
                     type=pa.list_(pa.float32()),
                 ),
             }
@@ -279,9 +308,10 @@ def test_workspace_init_from_study_dir_hydrates_committee_template(tmp_path: Pat
     assert payload["artifact_id"] == "study_bound_latentdna"
 
     config_payload = yaml.safe_load((workspace_dir / "config.yaml").read_text(encoding="utf-8"))
-    assert config_payload["sources"]["anchor60"]["root"] == usr_root.resolve().as_posix()
+    expected_usr_root = Path(relpath(usr_root.resolve(), workspace_dir.resolve())).as_posix()
+    assert config_payload["sources"]["anchor60"]["root"] == expected_usr_root
     assert config_payload["sources"]["anchor60"]["dataset"] == "promoter/test_anchor"
-    assert config_payload["sources"]["ctx1k"]["root"] == usr_root.resolve().as_posix()
+    assert config_payload["sources"]["ctx1k"]["root"] == expected_usr_root
     assert config_payload["sources"]["ctx1k"]["dataset"] == "promoter/test_contexts"
     assert config_payload["study_binding"]["kind"] == "dnadesign_study"
     assert config_payload["study_binding"]["study_dir"] == study_dir.resolve().as_posix()
@@ -530,7 +560,8 @@ def test_workspace_init_committee_template_validates_with_realish_promoter_study
     assert validate_result.exit_code == 0, validate_result.stdout
     validate_payload = yaml.safe_load(validate_result.stdout)
     assert validate_payload["status"] == "ok"
-    assert validate_payload["cohort_details"][0]["column"] == "densegen__plan"
+    plan_cohort = next(detail for detail in validate_payload["cohort_details"] if detail["cohort_id"] == "plan")
+    assert plan_cohort["column"] == "densegen__plan"
     z7_view = next(detail for detail in validate_payload["view_details"] if detail["view_id"] == "z7_60")
     assert z7_view["vector_column"].endswith("block26_mlp_out__seq_mean")
 

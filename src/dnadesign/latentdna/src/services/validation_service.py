@@ -12,17 +12,16 @@ from ..sources.resolver import inspect_source_schema, resolve_source
 from ..workspaces.loader import load_workspace_config, resolve_repo_path
 
 _PROMOTER_METADATA_REQUIRED_COLUMNS: dict[str, set[str]] = {
-    "design_family": {"densegen__plan", "usr_label__primary", "template_id"},
+    "design_family": {"densegen__plan", "usr_label__primary"},
     "design_regulator_composition": {
         "densegen__plan",
         "densegen__required_regulators",
         "usr_label__primary",
-        "template_id",
     },
-    "sigma70_variant": {"densegen__plan", "usr_label__primary", "template_id"},
-    "campaign_prior": {"densegen__plan", "usr_label__primary", "template_id"},
-    "is_control": {"densegen__plan", "usr_label__primary", "template_id"},
-    "source_class": {"densegen__plan", "usr_label__primary", "template_id"},
+    "sigma70_variant": {"densegen__plan", "usr_label__primary"},
+    "campaign_prior": {"densegen__plan", "usr_label__primary"},
+    "is_control": {"densegen__plan", "usr_label__primary"},
+    "source_class": {"densegen__plan", "usr_label__primary"},
 }
 
 
