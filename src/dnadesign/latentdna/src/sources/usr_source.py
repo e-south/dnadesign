@@ -6,9 +6,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.usr.src.dataset import RESERVED_NAMESPACES, Dataset
-from dnadesign.usr.src.dataset_overlay_catalog import load_overlay_catalog
-from dnadesign.usr.src.overlays import overlay_parts
+from dnadesign.usr import Dataset
+from dnadesign.usr.dataset import RESERVED_NAMESPACES
+from dnadesign.usr.dataset_overlay_catalog import load_overlay_catalog
+from dnadesign.usr.overlays import overlay_parts
 
 
 def records_path(root: str, dataset: str, *, workspace_dir: Path) -> Path:

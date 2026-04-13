@@ -41,6 +41,7 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("densegen", "cruncher"),
     ("densegen", "usr"),
     ("infer", "usr"),
+    ("latentdna", "usr"),
     ("libshuffle", "aligner"),
     ("libshuffle", "billboard"),
     ("libshuffle", "nmf"),

@@ -84,6 +84,15 @@ def test_find_undeclared_cross_tool_imports_allows_construct_to_usr_default_edge
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_allows_latentdna_to_usr_default_edge(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "latentdna" / "runtime.py", "from dnadesign.usr import Dataset\n")
+    _write(tmp_path / "src" / "dnadesign" / "usr" / "__init__.py", "class Dataset:\n    pass\n")
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
 def test_find_undeclared_cross_tool_imports_allows_ops_to_infer_default_edge(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "ops" / "plan.py",

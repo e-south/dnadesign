@@ -20,6 +20,34 @@ def test_storage_package_exports_expected_symbols() -> None:
     assert hasattr(module, "iter_parquet_batches")
 
 
+def test_public_dataset_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.dataset")
+    assert hasattr(module, "Dataset")
+    assert hasattr(module, "RESERVED_NAMESPACES")
+    assert hasattr(module, "MUTATION_RESERVED_NAMESPACES")
+
+
+def test_public_overlay_catalog_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.dataset_overlay_catalog")
+    assert hasattr(module, "load_overlay_catalog")
+    assert hasattr(module, "build_dataset_info")
+    assert hasattr(module, "merge_dataset_schema")
+
+
+def test_public_overlay_ops_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.dataset_overlay_ops")
+    assert hasattr(module, "attach_frame_dataset")
+    assert hasattr(module, "write_overlay_dataset")
+    assert hasattr(module, "write_overlay_part_dataset")
+
+
+def test_public_overlays_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.overlays")
+    assert hasattr(module, "overlay_metadata")
+    assert hasattr(module, "overlay_parts")
+    assert hasattr(module, "overlay_schema")
+
+
 def test_cli_commands_dataset_helpers_available() -> None:
     module = importlib.import_module("dnadesign.usr.src.cli_commands.datasets")
     assert hasattr(module, "list_datasets")

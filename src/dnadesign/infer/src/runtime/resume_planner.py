@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-from dnadesign.usr.src.overlays import overlay_metadata, overlay_parts
+from dnadesign.usr.overlays import overlay_metadata, overlay_parts
 
 from ..contracts import infer_usr_column_name
 from ..errors import WriteBackError
