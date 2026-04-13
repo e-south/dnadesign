@@ -135,6 +135,34 @@ def _apply_output_mode(
     return out
 
 
+def _note_missing_usr_registry(*, run_dir: Path, output: dict, console, display_path: Callable[..., str]) -> None:
+    targets = output.get("targets")
+    if not isinstance(targets, list) or "usr" not in targets:
+        return
+    usr_cfg = output.get("usr")
+    if not isinstance(usr_cfg, dict):
+        return
+    root_raw = usr_cfg.get("root")
+    if not isinstance(root_raw, str) or not root_raw.strip():
+        return
+    usr_root = resolve_usr_root_from_config(
+        root_raw,
+        config_path=run_dir / "config.yaml",
+        label="output.usr.root",
+    )
+    if usr_root is None:
+        return
+    registry_path = usr_root / "registry.yaml"
+    if registry_path.exists():
+        return
+    console.print(
+        "[yellow]Shared USR registry is not present yet.[/] "
+        "Workspace init leaves shared dataset roots unchanged; create "
+        f"{display_path(registry_path, run_dir, absolute=False)} manually or let "
+        "`uv run dense run` seed it when writes are intended."
+    )
+
+
 def _seed_usr_registry(*, run_dir: Path, output: dict, console, display_path: Callable[..., str]) -> None:
     targets = output.get("targets")
     if not isinstance(targets, list) or "usr" not in targets:
@@ -362,7 +390,7 @@ def register_workspace_commands(
             logging_cfg = dense.get("logging") or {}
             logging_cfg["log_dir"] = "outputs/logs"
             dense["logging"] = logging_cfg
-            _seed_usr_registry(
+            _note_missing_usr_registry(
                 run_dir=workspace_dir,
                 output=output,
                 console=console,

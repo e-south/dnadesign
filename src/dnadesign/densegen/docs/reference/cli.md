@@ -179,7 +179,7 @@ Notes:
 - Outside a source checkout, pass `--usr-root` or set `DNADESIGN_USR_ROOT`;
   the command does not guess a writable shared root from an installed package
   path.
-- `--output-mode usr|both` seeds the configured shared USR root `registry.yaml` when a seed file is available.
+- `--output-mode usr|both` leaves the shared USR root unchanged during workspace initialization; create the shared `registry.yaml` manually or let `dense run` seed it when a write path is intended.
 - `--output-mode usr|both` sets `output.usr.dataset` to the workspace id so each initialized workspace writes to its own USR dataset path.
 
 ### `dense workspace where`
