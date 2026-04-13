@@ -1,6 +1,6 @@
 study_pipeline:
   study_id: stress_ethanol_cipro_growth
-  last_verified: 2026-03-25
+  last_verified: 2026-04-13
   row_targets:
     densegen_anchor_minimum_before_first_full_lane_infer: 100000
   execution_surfaces:
@@ -32,3 +32,20 @@ study_pipeline:
       anchor_plus_template_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml
       full_lane_set_7b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_7b.yaml
       full_lane_set_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_20b.yaml
+  latentdna:
+    workspace: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth
+    notebook: browser
+    expected_deliverables:
+      - atlas_2x2_intermediate_main
+      - control_neighborhood_enrichment_family
+      - control_neighborhood_enrichment_curve_family
+      - landmark_distance_margins_primary
+      - context_shift_primary
+      - leiden_primary_20b
+      - cluster_correspondence_primary
+    required_leiden_runs:
+      - leiden_z20_60
+      - leiden_z20_1k_anchor
+      - leiden_logits20_60
+    required_exports:
+      - x2_primary_20b
