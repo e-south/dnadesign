@@ -97,14 +97,7 @@ class DensegenTfbsAdapter:
 
     @staticmethod
     def _normalize_annotation_item(item: dict[str, Any]) -> dict[str, Any]:
-        normalized = dict(item)
-        regulator = str(normalized.get("regulator") or "").strip()
-        sequence = str(normalized.get("sequence") or "").strip()
-        if regulator == "" and str(normalized.get("tf") or "").strip():
-            normalized["regulator"] = str(normalized.get("tf") or "").strip()
-        if sequence == "" and str(normalized.get("tfbs") or "").strip():
-            normalized["sequence"] = str(normalized.get("tfbs") or "").strip()
-        return normalized
+        return dict(item)
 
     def _parse_annotations(
         self,

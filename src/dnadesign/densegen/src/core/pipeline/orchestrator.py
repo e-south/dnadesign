@@ -93,7 +93,7 @@ def _replay_usr_overlay_backlog_for_resume(
         cfg_path,
         usr_cfg.root,
         label="output.usr.root",
-        scope=usr_cfg.root_scope,
+        scope=getattr(usr_cfg, "root_scope", "config"),
     )
     dataset_dir = (usr_root / dataset_name).resolve()
     pending_before = _pending_usr_overlay_backlog_parts(dataset_dir)

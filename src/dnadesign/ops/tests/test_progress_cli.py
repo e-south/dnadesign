@@ -20,12 +20,15 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
+import dnadesign.usr as usr_pkg
 from dnadesign.ops.cli import app
 from dnadesign.ops.preflight import CommandExecution
 from dnadesign.studies.families.promoter.ops.provider import (
     provide_promoter_preflight,
     provide_promoter_status,
 )
+from dnadesign.usr.src.overlays import with_overlay_metadata
+from dnadesign.usr.tests.registry_helpers import register_test_namespace
 
 
 def _repo_root() -> Path:
@@ -131,6 +134,16 @@ def _write_sync_audit(path: Path, *, transfer_state: str, primary_changed: bool,
 
 
 def _write_usr_dataset(root: Path, dataset: str, *, rows: int = 2) -> None:
+    registry_src = Path(usr_pkg.__file__).resolve().parent / "datasets" / "registry.yaml"
+    registry_path = root / "registry.yaml"
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    if not registry_path.exists():
+        registry_path.write_text(registry_src.read_text(encoding="utf-8"), encoding="utf-8")
+    register_test_namespace(
+        root,
+        namespace="densegen",
+        columns_spec="densegen__plan:string,densegen__required_regulators:list<string>",
+    )
     dataset_dir = root / dataset
     dataset_dir.mkdir(parents=True, exist_ok=True)
     derived_dir = dataset_dir / "_derived"
@@ -146,10 +159,21 @@ def _write_usr_dataset(root: Path, dataset: str, *, rows: int = 2) -> None:
         }
     )
     pq.write_table(table, dataset_dir / "records.parquet")
-    pq.write_table(
-        pa.table({"id": ids[:1] or ["placeholder"], "infer__score": [0.1]}),
-        derived_dir / "infer.parquet",
-    )
+    if dataset == "densegen/demo_anchor" or dataset.startswith("promoter/"):
+        densegen_overlay = pa.table(
+            {
+                "id": ids,
+                "densegen__plan": ["ethanol__sigma70_b"] * rows,
+                "densegen__required_regulators": [["cpxR"]] * rows,
+            }
+        )
+        densegen_overlay = with_overlay_metadata(
+            densegen_overlay,
+            namespace="densegen",
+            key="id",
+            created_at="2026-04-13T00:00:00Z",
+        )
+        pq.write_table(densegen_overlay, derived_dir / "densegen.parquet")
     (dataset_dir / ".events.log").write_text("{}\n{}\n", encoding="utf-8")
 
 

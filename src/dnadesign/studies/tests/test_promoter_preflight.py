@@ -128,6 +128,12 @@ def test_resolve_promoter_preflight_context_uses_contract_scope_groups_and_runti
         densegen_rows=None,
         densegen_row_target=None,
         densegen_row_gap=None,
+        merged_anchor_dataset_id=None,
+        merged_anchor_rows=None,
+        construct_context_dataset_id=None,
+        construct_context_rows=None,
+        dataset_refresh_states=(),
+        stale_dataset_ids=(),
         evidence={},
     )
 
@@ -375,6 +381,7 @@ def test_build_promoter_preflight_progress_uses_only_contract_declared_generic_c
             phase_states=tuple(phase.as_dict() for phase in contract.phases),
             current_phase="densegen_growth",
             next_ready_phase=None,
+            dataset_refresh_states=(),
             infer_runtime=SimpleNamespace(
                 preferred_model_family=None,
                 supported_model_families=(),
@@ -489,6 +496,7 @@ def test_build_promoter_preflight_progress_resolves_command_cwd_from_resolved_st
             phase_states=tuple(phase.as_dict() for phase in contract.phases),
             current_phase="infer_batch_preparation",
             next_ready_phase=None,
+            dataset_refresh_states=(),
             infer_runtime=SimpleNamespace(
                 preferred_model_family=None,
                 supported_model_families=(),

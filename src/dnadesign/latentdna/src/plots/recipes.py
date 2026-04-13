@@ -156,17 +156,19 @@ def _inline_payload(
             "color_column": color_column,
         }
     if kind == "xy_scatter":
-        return {
+        payload = {
             "kind": kind,
             "scalar": scalar_id,
             "distance": distance_id,
             "x_column": x_column,
             "y_column": y_column,
             "color_column": color_column,
-            "render_mode": render_mode,
         }
+        if render_mode is not None:
+            payload["render_mode"] = render_mode
+        return payload
     if kind == "distribution":
-        return {
+        payload = {
             "kind": kind,
             "scalar": scalar_id,
             "distance": distance_id,
@@ -174,8 +176,10 @@ def _inline_payload(
             "agreement": agreement_id,
             "value_column": value_column,
             "color_column": color_column,
-            "render_mode": render_mode,
         }
+        if render_mode is not None:
+            payload["render_mode"] = render_mode
+        return payload
     if kind == "curve":
         return {"kind": kind, "reducer": reducer_id}
     if kind == "correspondence_heatmap":
