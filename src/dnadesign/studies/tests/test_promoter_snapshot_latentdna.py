@@ -288,6 +288,40 @@ def test_inspect_promoter_latentdna_readiness_reports_workspace_evidence(tmp_pat
     }
 
 
+def test_inspect_promoter_latentdna_readiness_resolves_repo_relative_workspace_path(tmp_path: Path) -> None:
+    workspace_dir = _write_latentdna_workspace_fixture(tmp_path)
+    base_context = _make_study_context(tmp_path)
+    study_context = replace(
+        base_context,
+        study_pipeline={
+            **dict(base_context.study_pipeline),
+            "latentdna": {
+                "workspace": workspace_dir.relative_to(tmp_path).as_posix(),
+                "expected_deliverables": [
+                    "atlas_2x2_intermediate_main",
+                    "cluster_correspondence_primary",
+                ],
+                "required_leiden_runs": [
+                    "leiden_z20_60",
+                    "leiden_z20_1k_anchor",
+                    "leiden_logits20_60",
+                ],
+                "required_exports": ["x2_primary_20b"],
+                "notebook": "browser",
+            },
+        },
+    )
+
+    readiness = inspect_promoter_latentdna_readiness(study_context=study_context)
+
+    assert readiness is not None
+    assert readiness["latentdna_workspace_id"] == "stress_ethanol_cipro_growth"
+    assert readiness["latentdna_state"] == "attention"
+    assert readiness["latentdna_notebook_smoke_ok"] is True
+    assert readiness["latentdna_leiden_runs_ok"] is True
+    assert readiness["latentdna_exports_ok"] is True
+
+
 def test_adapter_build_snapshot_includes_real_latentdna_readiness(tmp_path: Path, monkeypatch) -> None:
     workspace_dir = _write_latentdna_workspace_fixture(tmp_path)
     study_context = replace(
