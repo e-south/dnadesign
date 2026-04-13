@@ -5,7 +5,7 @@ type: contract
 plane: data-plane
 owner_boundary: usr
 entry_artifact: one checked-in promoter-study directory selected through docs/studies/index.yaml
-exit_artifact: one read-only summary of source growth, shared handoff readiness, planned outputs, and study-owned execution surfaces
+exit_artifact: one read-only summary of source growth, shared handoff readiness, semantic completeness of critical handoff metadata, planned outputs, and study-owned execution surfaces
 summary: Read one checked-in promoter-study record and summarize dataset, phase, and execution-surface readiness without reconstructing the workflow by hand.
 execution_kind: iterative
 status_kind: promoter-study-status
