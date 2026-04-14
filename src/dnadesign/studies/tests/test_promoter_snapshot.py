@@ -308,6 +308,9 @@ def test_build_promoter_study_status_preserves_summary_and_attention_contract(tm
         "summary": "future outputs still planned promoter/demo_feature_matrix",
     }
     assert evidence["semantic_completeness_state"] is None
+    assert evidence["latentdna"]["state"] == "not_configured"
+    assert evidence["cluster"]["state"] == "planned"
+    assert evidence["opal"]["state"] == "not_configured"
     assert "local_advisories" not in evidence
 
 

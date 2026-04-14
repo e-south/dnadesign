@@ -13,6 +13,7 @@ import yaml
 
 from dnadesign.studies.core.models import StudyOpsContract, StudyPreflightContract, StudyStatusContext
 from dnadesign.studies.families.promoter.adapter import STUDY_FAMILY_ADAPTER, PromoterFamilyContext
+from dnadesign.studies.families.promoter.downstream_surfaces import inspect_promoter_downstream_surfaces
 from dnadesign.studies.families.promoter.infer_runtime import (
     PromoterStudyInferRuntimeDependencies,
     PromoterStudyInferRuntimeResolvedContext,
@@ -269,22 +270,31 @@ def test_inspect_promoter_latentdna_readiness_reports_workspace_evidence(tmp_pat
     readiness = inspect_promoter_latentdna_readiness(study_context=study_context)
 
     assert readiness == {
-        "latentdna_workspace_id": "stress_ethanol_cipro_growth",
-        "latentdna_state": "attention",
-        "latentdna_expected_deliverables": [
+        "configured": True,
+        "state": "attention",
+        "doc": "src/dnadesign/latentdna/docs/workflows/promoter-study-latent-atlas.md",
+        "surface_ref": str(workspace_dir),
+        "workspace_id": "stress_ethanol_cipro_growth",
+        "expected_deliverables": [
             "atlas_2x2_intermediate_main",
             "cluster_correspondence_primary",
         ],
-        "latentdna_ok_deliverables": [],
-        "latentdna_missing_deliverables": [
+        "ok_deliverables": [],
+        "missing_deliverables": [
             "atlas_2x2_intermediate_main",
             "cluster_correspondence_primary",
         ],
-        "latentdna_rendered_plot_count": 1,
-        "latentdna_notebook_generated": True,
-        "latentdna_notebook_smoke_ok": True,
-        "latentdna_leiden_runs_ok": True,
-        "latentdna_exports_ok": True,
+        "rendered_plot_count": 1,
+        "notebook_generated": True,
+        "notebook_smoke_ok": True,
+        "leiden_runs_ok": True,
+        "exports_ok": True,
+        "required_leiden_runs": [
+            "leiden_z20_60",
+            "leiden_z20_1k_anchor",
+            "leiden_logits20_60",
+        ],
+        "required_exports": ["x2_primary_20b"],
     }
 
 
@@ -315,11 +325,52 @@ def test_inspect_promoter_latentdna_readiness_resolves_repo_relative_workspace_p
     readiness = inspect_promoter_latentdna_readiness(study_context=study_context)
 
     assert readiness is not None
-    assert readiness["latentdna_workspace_id"] == "stress_ethanol_cipro_growth"
-    assert readiness["latentdna_state"] == "attention"
-    assert readiness["latentdna_notebook_smoke_ok"] is True
-    assert readiness["latentdna_leiden_runs_ok"] is True
-    assert readiness["latentdna_exports_ok"] is True
+    assert readiness["workspace_id"] == "stress_ethanol_cipro_growth"
+    assert readiness["state"] == "attention"
+    assert readiness["notebook_smoke_ok"] is True
+    assert readiness["leiden_runs_ok"] is True
+    assert readiness["exports_ok"] is True
+
+
+def test_inspect_promoter_downstream_surfaces_reports_cluster_and_opal_explicitly(tmp_path: Path) -> None:
+    study_context = replace(
+        _make_study_context(tmp_path),
+        study_pipeline={
+            "cluster": {
+                "doc": "src/dnadesign/cluster/docs/workflows/exploratory-clustering.md",
+                "entry_artifact": "promoter/demo_feature_matrix",
+                "results_root": "n/a",
+                "state": "planned",
+            },
+            "opal": {
+                "doc": "src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md",
+                "entry_artifact": "promoter/demo_feature_matrix",
+                "config": "n/a",
+                "state": "not_configured",
+            },
+        },
+    )
+
+    downstream = inspect_promoter_downstream_surfaces(study_context=study_context)
+
+    assert downstream == {
+        "cluster": {
+            "configured": False,
+            "state": "planned",
+            "doc": "src/dnadesign/cluster/docs/workflows/exploratory-clustering.md",
+            "surface_ref": None,
+            "entry_artifact": "promoter/demo_feature_matrix",
+            "results_root": "n/a",
+        },
+        "opal": {
+            "configured": False,
+            "state": "not_configured",
+            "doc": "src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md",
+            "surface_ref": None,
+            "entry_artifact": "promoter/demo_feature_matrix",
+            "config": "n/a",
+        },
+    }
 
 
 def test_adapter_build_snapshot_includes_real_latentdna_readiness(tmp_path: Path, monkeypatch) -> None:
@@ -404,11 +455,13 @@ def test_adapter_build_snapshot_includes_real_latentdna_readiness(tmp_path: Path
     state, _, evidence = STUDY_FAMILY_ADAPTER.build_snapshot(adapter_context)
 
     assert state == "attention"
-    assert evidence["latentdna"]["latentdna_state"] == "attention"
-    assert evidence["latentdna"]["latentdna_workspace_id"] == "stress_ethanol_cipro_growth"
-    assert evidence["latentdna"]["latentdna_rendered_plot_count"] == 1
-    assert evidence["latentdna"]["latentdna_leiden_runs_ok"] is True
-    assert evidence["latentdna"]["latentdna_exports_ok"] is True
+    assert evidence["latentdna"]["state"] == "attention"
+    assert evidence["latentdna"]["workspace_id"] == "stress_ethanol_cipro_growth"
+    assert evidence["latentdna"]["rendered_plot_count"] == 1
+    assert evidence["latentdna"]["leiden_runs_ok"] is True
+    assert evidence["latentdna"]["exports_ok"] is True
+    assert evidence["cluster"]["state"] == "planned"
+    assert evidence["opal"]["state"] == "not_configured"
 
 
 def test_build_promoter_study_status_exposes_latentdna_readiness_without_gating_snapshot(tmp_path: Path) -> None:
@@ -467,16 +520,37 @@ def test_build_promoter_study_status_exposes_latentdna_readiness_without_gating_
             ),
             inspect_semantic_completeness=lambda **kwargs: None,
             inspect_latentdna_readiness=lambda **kwargs: {
-                "latentdna_workspace_id": "stress_ethanol_cipro_growth",
-                "latentdna_state": "ok",
-                "latentdna_expected_deliverables": ["atlas_2x2_intermediate_main"],
-                "latentdna_ok_deliverables": ["atlas_2x2_intermediate_main"],
-                "latentdna_missing_deliverables": [],
-                "latentdna_rendered_plot_count": 1,
-                "latentdna_notebook_generated": True,
-                "latentdna_notebook_smoke_ok": True,
-                "latentdna_leiden_runs_ok": True,
-                "latentdna_exports_ok": True,
+                "configured": True,
+                "state": "ok",
+                "doc": "src/dnadesign/latentdna/docs/workflows/promoter-study-latent-atlas.md",
+                "surface_ref": str(workspace_dir),
+                "workspace_id": "stress_ethanol_cipro_growth",
+                "expected_deliverables": ["atlas_2x2_intermediate_main"],
+                "ok_deliverables": ["atlas_2x2_intermediate_main"],
+                "missing_deliverables": [],
+                "rendered_plot_count": 1,
+                "notebook_generated": True,
+                "notebook_smoke_ok": True,
+                "leiden_runs_ok": True,
+                "exports_ok": True,
+                "required_leiden_runs": [],
+                "required_exports": [],
+            },
+            inspect_additional_downstream_surfaces=lambda **kwargs: {
+                "cluster": {
+                    "configured": False,
+                    "state": "planned",
+                    "doc": "src/dnadesign/cluster/docs/workflows/exploratory-clustering.md",
+                    "surface_ref": None,
+                    "results_root": None,
+                },
+                "opal": {
+                    "configured": False,
+                    "state": "not_configured",
+                    "doc": "src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md",
+                    "surface_ref": None,
+                    "config": None,
+                },
             },
         ),
         summary_scope="repo",
@@ -484,15 +558,101 @@ def test_build_promoter_study_status_exposes_latentdna_readiness_without_gating_
 
     assert state == "attention"
     assert evidence["latentdna"] == {
-        "latentdna_workspace_id": "stress_ethanol_cipro_growth",
-        "latentdna_state": "ok",
-        "latentdna_expected_deliverables": ["atlas_2x2_intermediate_main"],
-        "latentdna_ok_deliverables": ["atlas_2x2_intermediate_main"],
-        "latentdna_missing_deliverables": [],
-        "latentdna_rendered_plot_count": 1,
-        "latentdna_notebook_generated": True,
-        "latentdna_notebook_smoke_ok": True,
-        "latentdna_leiden_runs_ok": True,
-        "latentdna_exports_ok": True,
+        "configured": True,
+        "state": "ok",
+        "doc": "src/dnadesign/latentdna/docs/workflows/promoter-study-latent-atlas.md",
+        "surface_ref": str(workspace_dir),
+        "workspace_id": "stress_ethanol_cipro_growth",
+        "expected_deliverables": ["atlas_2x2_intermediate_main"],
+        "ok_deliverables": ["atlas_2x2_intermediate_main"],
+        "missing_deliverables": [],
+        "rendered_plot_count": 1,
+        "notebook_generated": True,
+        "notebook_smoke_ok": True,
+        "leiden_runs_ok": True,
+        "exports_ok": True,
+        "required_leiden_runs": [],
+        "required_exports": [],
     }
+    assert evidence["cluster"]["state"] == "planned"
+    assert evidence["opal"]["state"] == "not_configured"
     assert evidence["attention_reasons"] == ["DenseGen source gate is still active"]
+
+
+def test_build_promoter_study_status_keeps_planned_downstream_surfaces_out_of_top_level_state(tmp_path: Path) -> None:
+    study_context = replace(_make_study_context(tmp_path), densegen_row_target=8, densegen_row_gap=0)
+
+    state, _, evidence = build_promoter_study_status(
+        study_context=study_context,
+        status_context=PromoterStudyStatusResolvedContext(
+            infer_runtime=PromoterStudyInferRuntimeResolvedContext(
+                preferred_model_family="evo2_20b",
+                supported_model_families=("evo2_20b", "evo2_7b"),
+                infer_config_paths={},
+                runtime_lane_contracts=(),
+                runtime_config_paths={},
+                phase_targets=(),
+                phase_targets_by_id={},
+                config_phase_ids={},
+                runtime_phase_ids={},
+                infer_notify_profile_paths={},
+                infer_notify_profile_errors={},
+                runtime_model_summaries=(),
+                gpu_required_runtime_labels=(),
+            ),
+        ),
+        dependencies=PromoterStudyStatusDependencies(
+            infer_runtime=PromoterStudyInferRuntimeDependencies(
+                resolve_named_path_mapping=lambda *args, **kwargs: {},
+                resolve_infer_runtime_lane_contracts=lambda *args, **kwargs: (),
+                derive_infer_notify_profile_paths=lambda config_paths: ({}, {}),
+                load_infer_model_summary=lambda config_path: {"model_id": "demo", "device": "cuda:0"},
+                string_or_none=_string_or_none,
+                string_list_or_empty=_string_list_or_empty,
+            ),
+            phase_matches_infer_model_family=lambda *, phase_id, model_family: bool(
+                model_family and model_family in phase_id
+            ),
+            inspect_semantic_completeness=lambda **kwargs: None,
+            inspect_latentdna_readiness=lambda **kwargs: {
+                "configured": True,
+                "state": "missing",
+                "doc": "src/dnadesign/latentdna/docs/workflows/promoter-study-latent-atlas.md",
+                "surface_ref": str(tmp_path / "src" / "dnadesign" / "latentdna" / "workspaces" / "demo"),
+                "workspace_id": "demo",
+                "expected_deliverables": [],
+                "ok_deliverables": [],
+                "missing_deliverables": [],
+                "rendered_plot_count": 0,
+                "notebook_generated": False,
+                "notebook_smoke_ok": False,
+                "leiden_runs_ok": True,
+                "exports_ok": True,
+                "required_leiden_runs": [],
+                "required_exports": [],
+            },
+            inspect_additional_downstream_surfaces=lambda **kwargs: {
+                "cluster": {
+                    "configured": False,
+                    "state": "planned",
+                    "doc": "src/dnadesign/cluster/docs/workflows/exploratory-clustering.md",
+                    "surface_ref": None,
+                    "results_root": None,
+                },
+                "opal": {
+                    "configured": False,
+                    "state": "not_configured",
+                    "doc": "src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md",
+                    "surface_ref": None,
+                    "config": None,
+                },
+            },
+        ),
+        summary_scope="repo",
+    )
+
+    assert state == "ok"
+    assert evidence["latentdna"]["state"] == "missing"
+    assert evidence["cluster"]["state"] == "planned"
+    assert evidence["opal"]["state"] == "not_configured"
+    assert "attention_reasons" not in evidence

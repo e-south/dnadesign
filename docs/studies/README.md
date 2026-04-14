@@ -15,15 +15,17 @@ planning and execution.
 Authority chain: `docs/studies/index.yaml` selects the active study,
 the matching `docs/studies/<study-id>/` directory holds the required
 `campaign.yaml`, `datasets.yaml`, `status.md`, and `ops.study.yaml`, and may
-also carry an optional `pipeline.yaml` when the study needs extra study-owned
-runtime context that should not be reconstructed from generic tool docs.
+also carry optional `routes.md` and `pipeline.yaml` surfaces when the study
+needs explicit cross-tool handoff navigation plus study-owned runtime context
+that should not be reconstructed from generic tool docs.
 
 Keep four complementary artifacts for each real study:
 
 - `campaign.yaml`: workflow progress and registered procedure evidence
 - `datasets.yaml`: machine-readable registry of affiliated USR datasets and
   sync posture across local and remote locations
-- `status.md`: human-readable current state, row targets, and next actions
+- `status.md`: human-readable current datasets, current phase, current row
+  counts, downstream posture, and next actions
 - `ops.study.yaml`: OPS-facing study contract for lifecycle order, record
   sources, artifacts, execution surfaces, and explicit preflight scope/check
   planning. Declare generic readiness kinds there, such as `path_exists`,
@@ -43,6 +45,12 @@ artifact:
   Infer, batch, or Notify paths that complement `ops.study.yaml` without
   replacing its lifecycle or preflight authority
 
+When a study already spans several owner surfaces, add one optional sixth
+artifact:
+
+- `routes.md`: optional study-owned one-hop route map for DenseGen, Construct,
+  Infer, LatentDNA, Cluster, and OPAL handoffs
+
 Use the study record even when the effort is still in the source-assembly phase.
 An active study does not need to wait until the final feature matrix already
 exists, but the record must say explicitly whether the current shared feature
@@ -61,6 +69,7 @@ docs/studies/<study-id>/
   datasets.yaml
   status.md
   ops.study.yaml
+  routes.md    # optional but recommended once the study spans multiple owner surfaces
   pipeline.yaml  # optional but recommended once the study owns execution surfaces
   audits/
 ```
@@ -79,12 +88,14 @@ docs/studies/index.yaml
   location is a shared USR root or a workspace-local export root, how
   it should be onboarded, and how it syncs to remotes such as `cluster` or a
   study-specific workspace-export remote.
-- `status.md` is the human-readable note that records row targets, source
-  datasets, infer slice status, rollback paths, and next actions.
+- `status.md` is the human-readable note that records current datasets, current
+  phase, current row counts, downstream posture, and concise next actions.
 - `ops.study.yaml` is the machine-readable OPS contract for lifecycle
   ordering, record sources, artifacts, execution surfaces, repo-scoped
   snapshot posture, and explicit preflight scope/check planning. Snapshot stays
   repo-backed and cheap; preflight is the execution-readiness surface.
+- `routes.md`, when present, is the study-owned one-hop handoff page for the
+  current DenseGen, Construct, Infer, LatentDNA, Cluster, and OPAL surfaces.
 - `pipeline.yaml`, when present, records study-owned runtime context that is
   useful outside the OPS preflight contract, such as exact Construct workspace
   mappings or lane-specific Infer details. Keep OPS-facing lifecycle order,
@@ -109,10 +120,13 @@ docs/studies/index.yaml
 7. Create the audit directory:
    `mkdir -p docs/studies/<study-id>/audits`
 8. Edit the checked-in `index.yaml` plus the new `campaign.yaml`, `datasets.yaml`, `status.md`, and `ops.study.yaml` so they point at the real study ids, paths, and commands.
-9. If the study already has concrete Construct, Infer, or batch surfaces,
+9. If the study already spans several owner surfaces, add
+   `docs/studies/<study-id>/routes.md` and use it as the study-owned handoff
+   page.
+10. If the study already has concrete Construct, Infer, or batch surfaces,
    add `docs/studies/<study-id>/pipeline.yaml` and record those exact
    paths there.
-10. Refresh evidence with:
+11. Refresh evidence with:
    `uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/campaign.yaml`
 
 ### Dataset registry contract
@@ -174,6 +188,8 @@ for the first pull rather than relying on local name guessing.
 - `ops.study.yaml` is the OPS-facing source of lifecycle phase order, record
   sources, declared execution surfaces, repo snapshot summary scope, and
   preflight scope/check posture.
+- If `routes.md` exists, treat it as the study-owned cross-tool handoff page
+  rather than expanding the status note into a workflow encyclopedia.
 - If `pipeline.yaml` exists, treat it as supplemental study-owned runtime
   context for exact Construct, Infer, batch, or Notify details that are not
   already declared in `ops.study.yaml`; do not reconstruct those paths from
@@ -192,6 +208,7 @@ for the first pull rather than relying on local name guessing.
 
 - [Promoter study status contract](../../src/dnadesign/usr/docs/operations/promoter-study-status-contract.md)
 - [Promoter study preflight contract](../../src/dnadesign/usr/docs/operations/promoter-study-preflight.md)
+- [stress_ethanol_cipro_growth route map](stress_ethanol_cipro_growth/routes.md)
 - [Promoter study index template](../templates/promoter-study-index.yaml)
 - [Promoter study datasets template](../templates/promoter-study-datasets.yaml)
 - [Promoter study status template](../templates/promoter-study-status.md)

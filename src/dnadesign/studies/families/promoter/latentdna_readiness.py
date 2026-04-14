@@ -20,41 +20,46 @@ from .record_normalizer import PromoterStudyResolvedContext
 
 _STATUS_KIND = "promoter-study-status"
 _DEFAULT_NOTEBOOK_ID = "browser"
+_DEFAULT_DOC_PATH = "src/dnadesign/latentdna/docs/workflows/promoter-study-latent-atlas.md"
 
 
 def inspect_promoter_latentdna_readiness(
     *,
     study_context: PromoterStudyResolvedContext,
-) -> dict[str, object] | None:
+) -> dict[str, object]:
     latentdna_config = study_context.study_pipeline.get("latentdna")
     if not isinstance(latentdna_config, Mapping):
-        return None
+        return _build_empty_payload(doc_path=_DEFAULT_DOC_PATH)
     workspace_raw = _string_or_none(latentdna_config.get("workspace"))
-    if workspace_raw is None or study_context.study_repo_root is None:
-        return None
+    doc_path = _string_or_none(latentdna_config.get("doc")) or _DEFAULT_DOC_PATH
 
     expected_deliverables = _string_list(latentdna_config.get("expected_deliverables"))
     required_leiden_runs = _string_list(latentdna_config.get("required_leiden_runs"))
     required_exports = _string_list(latentdna_config.get("required_exports"))
     notebook_id = _string_or_none(latentdna_config.get("notebook")) or _DEFAULT_NOTEBOOK_ID
+    if workspace_raw is None or study_context.study_repo_root is None:
+        return _build_empty_payload(
+            doc_path=doc_path,
+            expected_deliverables=expected_deliverables,
+            required_leiden_runs=required_leiden_runs,
+            required_exports=required_exports,
+        )
 
     workspace_path = resolve_repo_relative_path(
         repo_root=study_context.study_repo_root,
         raw_path=workspace_raw,
         status_kind=_STATUS_KIND,
     )
-    payload: dict[str, object] = {
-        "latentdna_workspace_id": workspace_path.name,
-        "latentdna_state": "missing",
-        "latentdna_expected_deliverables": list(expected_deliverables),
-        "latentdna_ok_deliverables": [],
-        "latentdna_missing_deliverables": list(expected_deliverables),
-        "latentdna_rendered_plot_count": 0,
-        "latentdna_notebook_generated": False,
-        "latentdna_notebook_smoke_ok": False,
-        "latentdna_leiden_runs_ok": False if required_leiden_runs else True,
-        "latentdna_exports_ok": False if required_exports else True,
-    }
+    payload = _build_empty_payload(
+        doc_path=doc_path,
+        surface_ref=str(workspace_path),
+        configured=True,
+        state="missing",
+        workspace_id=workspace_path.name,
+        expected_deliverables=expected_deliverables,
+        required_leiden_runs=required_leiden_runs,
+        required_exports=required_exports,
+    )
     if not workspace_path.exists():
         return payload
 
@@ -65,14 +70,14 @@ def inspect_promoter_latentdna_readiness(
     try:
         context = load_workspace_config(workspace_path)
     except Exception:
-        payload["latentdna_state"] = "error"
+        payload["state"] = "error"
         return payload
 
-    payload["latentdna_workspace_id"] = context.workspace_id
+    payload["workspace_id"] = context.workspace_id
     if not expected_deliverables:
         expected_deliverables = sorted(context.config.deliverables)
-        payload["latentdna_expected_deliverables"] = list(expected_deliverables)
-        payload["latentdna_missing_deliverables"] = list(expected_deliverables)
+        payload["expected_deliverables"] = list(expected_deliverables)
+        payload["missing_deliverables"] = list(expected_deliverables)
 
     ok_deliverables: list[str] = []
     missing_deliverables: list[str] = []
@@ -93,39 +98,39 @@ def inspect_promoter_latentdna_readiness(
         if status == "error":
             deliverable_error = True
         missing_deliverables.append(deliverable_id)
-    payload["latentdna_ok_deliverables"] = ok_deliverables
-    payload["latentdna_missing_deliverables"] = missing_deliverables
+    payload["ok_deliverables"] = ok_deliverables
+    payload["missing_deliverables"] = missing_deliverables
 
-    payload["latentdna_rendered_plot_count"] = _rendered_plot_count(
+    payload["rendered_plot_count"] = _rendered_plot_count(
         plots_root=context.output_root / "plots",
         read_json=read_json,
     )
-    payload["latentdna_notebook_generated"] = (context.output_root / "notebooks" / f"{notebook_id}.py").is_file()
+    payload["notebook_generated"] = (context.output_root / "notebooks" / f"{notebook_id}.py").is_file()
     notebook_smoke_ok, notebook_error = _notebook_smoke_ok(
         health_path=context.output_root / "notebooks" / "health.json",
         read_json=read_json,
     )
-    payload["latentdna_notebook_smoke_ok"] = notebook_smoke_ok
+    payload["notebook_smoke_ok"] = notebook_smoke_ok
 
     leiden_runs_ok, any_leiden_artifacts, leiden_error = _required_artifacts_ok(
         artifacts_root=context.output_root / "clusters",
         artifact_ids=required_leiden_runs,
         read_json=read_json,
     )
-    payload["latentdna_leiden_runs_ok"] = leiden_runs_ok
+    payload["leiden_runs_ok"] = leiden_runs_ok
 
     exports_ok, any_export_artifacts, export_error = _required_artifacts_ok(
         artifacts_root=context.output_root / "exports",
         artifact_ids=required_exports,
         read_json=read_json,
     )
-    payload["latentdna_exports_ok"] = exports_ok
+    payload["exports_ok"] = exports_ok
 
     has_materialized_outputs = any(
         (
             bool(ok_deliverables),
-            bool(payload["latentdna_rendered_plot_count"]),
-            bool(payload["latentdna_notebook_generated"]),
+            bool(payload["rendered_plot_count"]),
+            bool(payload["notebook_generated"]),
             any_leiden_artifacts,
             any_export_artifacts,
             _has_any_artifact_manifests(context.output_root),
@@ -133,19 +138,52 @@ def inspect_promoter_latentdna_readiness(
     )
     all_main_ready = (
         len(ok_deliverables) == len(expected_deliverables)
-        and payload["latentdna_notebook_smoke_ok"] is True
-        and payload["latentdna_leiden_runs_ok"] is True
-        and payload["latentdna_exports_ok"] is True
+        and payload["notebook_smoke_ok"] is True
+        and payload["leiden_runs_ok"] is True
+        and payload["exports_ok"] is True
     )
     if deliverable_error or notebook_error or leiden_error or export_error:
-        payload["latentdna_state"] = "error"
+        payload["state"] = "error"
     elif all_main_ready:
-        payload["latentdna_state"] = "ok"
+        payload["state"] = "ok"
     elif has_materialized_outputs:
-        payload["latentdna_state"] = "attention"
+        payload["state"] = "attention"
     else:
-        payload["latentdna_state"] = "missing"
+        payload["state"] = "missing"
     return payload
+
+
+def _build_empty_payload(
+    *,
+    doc_path: str,
+    surface_ref: str | None = None,
+    configured: bool = False,
+    state: str = "not_configured",
+    workspace_id: str | None = None,
+    expected_deliverables: list[str] | None = None,
+    required_leiden_runs: list[str] | None = None,
+    required_exports: list[str] | None = None,
+) -> dict[str, object]:
+    expected = list(expected_deliverables or [])
+    leiden_runs = list(required_leiden_runs or [])
+    exports = list(required_exports or [])
+    return {
+        "configured": configured,
+        "state": state,
+        "doc": doc_path,
+        "surface_ref": surface_ref,
+        "workspace_id": workspace_id,
+        "expected_deliverables": expected,
+        "ok_deliverables": [],
+        "missing_deliverables": list(expected),
+        "rendered_plot_count": 0,
+        "notebook_generated": False,
+        "notebook_smoke_ok": False,
+        "leiden_runs_ok": False if leiden_runs else True,
+        "exports_ok": False if exports else True,
+        "required_leiden_runs": leiden_runs,
+        "required_exports": exports,
+    }
 
 
 def _has_any_artifact_manifests(output_root: Path) -> bool:

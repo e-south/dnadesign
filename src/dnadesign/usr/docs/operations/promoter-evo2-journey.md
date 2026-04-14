@@ -29,7 +29,9 @@ If you need the current study status rather than route discovery, keep one check
    Use [Evo2 provider reference](../../../infer/docs/reference/evo2-provider.md) for `evo2_7b`, `evo2_20b`, the model-aware intermediate default, pooling, and stored output names.
 5. Validate the optional Notify side branch only when watcher behavior matters.
    Use [Notify operations route](../../../../../docs/notify/README.md) or the operator manual [Notify: consuming Universal Sequence Record events](../../../../../docs/notify/usr-events.md).
-6. Hand off into the cross-tool feature-matrix route, then branch downstream.
+6. Hand off into the next study-owned downstream branch.
+   Use [Promoter study status contract](promoter-study-status-contract.md) plus the checked-in study `routes.md` when you need the live study-specific DenseGen, Construct, Infer, LatentDNA, Cluster, or OPAL handoff rather than the generic route.
+   Use [Promoter-study latent atlas workflow](../../../latentdna/docs/workflows/promoter-study-latent-atlas.md) when the study-bound anchor and construct-context datasets already carry the vector columns you want to analyze in latent space.
    Use [Promoter characterization feature matrix](promoter-characterization-feature-matrix.md) once the study should become one infer-annotated USR dataset.
    Continue to [cluster exploratory clustering workflow](../../../cluster/docs/workflows/exploratory-clustering.md) when you want exploratory analysis next.
    Continue to [USR dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/usr-infer-x-active-learning.md) only after one explicit `infer__...` column is chosen as `X` and OPAL is pointed at that dataset.
@@ -46,6 +48,7 @@ If you need the current study status rather than route discovery, keep one check
 
 - If you already have one merged anchor-only dataset and need infer-derived columns next, use [Promoter characterization feature matrix](promoter-characterization-feature-matrix.md).
 - If you need one maintained study snapshot for current-status checks, use [Promoter study status contract](promoter-study-status-contract.md).
+- If you need the study-bound latent atlas workspace and workflow next, use [Promoter-study latent atlas workflow](../../../latentdna/docs/workflows/promoter-study-latent-atlas.md).
 - If you need template-backed contexts such as `template_1kb` before feature extraction, use [Construct -> USR -> Infer shared dataset runbook](construct-infer-shared-dataset-runbook.md).
 - If DenseGen, manual, and wildtype sources still need explicit merge/carry setup, use [Multi-source shared dataset assembly](multi-source-shared-dataset-assembly.md).
 - If the data-plane handoff is already clear and you only need the infer-owned Evo2 contract, use [Evo2 promoter-study feature runbook](../../../infer/docs/operations/evo2-promoter-features.md).
@@ -58,4 +61,5 @@ If you need the current study status rather than route discovery, keep one check
 - DenseGen docs: [../../../densegen/docs/README.md](../../../densegen/docs/README.md)
 - Construct docs: [../../../construct/docs/README.md](../../../construct/docs/README.md)
 - Infer docs: [../../../infer/docs/README.md](../../../infer/docs/README.md)
+- LatentDNA docs: [../../../latentdna/docs/README.md](../../../latentdna/docs/README.md)
 - Notify operations route: [../../../../../docs/notify/README.md](../../../../../docs/notify/README.md)

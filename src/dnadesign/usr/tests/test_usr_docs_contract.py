@@ -255,11 +255,36 @@ def test_promoter_study_index_and_status_are_checked_in_for_stress_ethanol_cipro
 
     assert "promoter/stress_ethanol_cipro_anchor_set" in datasets
     assert "promoter/stress_ethanol_cipro_construct_contexts" in datasets
-    assert "pipeline.yaml" in status
+    assert "Route map: `routes.md`" in status
+    assert "Study execution map: `pipeline.yaml`" in status
     assert "construct_workspace:" in pipeline
     assert "study_stress_ethanol_cipro_pdual10" in pipeline
     assert "infer_batch_7b_with_notify:" in pipeline
     assert "anchor_only:" in pipeline
+    assert "latentdna:" in pipeline
+    assert "cluster:" in pipeline
+    assert "opal:" in pipeline
+
+
+def test_promoter_study_route_map_exposes_owner_surfaces() -> None:
+    routes = _read("docs/studies/stress_ethanol_cipro_growth/routes.md")
+    latentdna_validate_command = (
+        "uv run latentdna validate workspace --workspace "
+        "src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth "
+        "--deep"
+    )
+
+    assert "### DenseGen EDA" in routes
+    assert "### Construct lineage" in routes
+    assert "### Infer lanes" in routes
+    assert "### LatentDNA atlas" in routes
+    assert "### Cluster exploration" in routes
+    assert "### OPAL campaigns" in routes
+    assert "src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/README.md" in routes
+    assert latentdna_validate_command in routes
+    assert "Configured/planned/not configured: `configured`" in routes
+    assert "Configured/planned/not configured: `planned`" in routes
+    assert "Configured/planned/not configured: `not configured`" in routes
 
 
 def test_promoter_study_ops_contract_marks_default_notify_submit_path_as_required() -> None:
@@ -284,6 +309,8 @@ def test_usr_promoter_journey_doc_links_cross_tool_owner_surfaces() -> None:
     assert "evo2-promoter-features.md" in journey
     assert "evo2-provider.md" in journey
     assert "promoter-study-status-contract.md" in journey
+    assert "promoter-study-latent-atlas.md" in journey
+    assert "checked-in study `routes.md`" in journey
     assert "docs/notify/README.md" in journey
     assert "usr-infer-x-active-learning.md" in journey
     assert "only after one explicit `infer__...` column is chosen as `X`" in journey
@@ -303,6 +330,9 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     root_agents = _read("AGENTS.md")
     usr_agents = _read("src/dnadesign/usr/AGENTS.md")
     skill = _read(".agents/skills/promoter-study-status/SKILL.md")
+    study_surfaces = _read(".agents/skills/promoter-study-status/references/study-surfaces.md")
+    route_matrix = _read(".agents/skills/promoter-study-status/references/route-matrix.md")
+    refresh_reference = _read(".agents/skills/promoter-study-status/references/refresh-loop.md")
 
     assert "promoter-study-status-contract.md" in docs_index
     assert "promoter-study-status-contract.md" in usr_docs
@@ -319,16 +349,20 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "docs/studies/promoter/index.yaml" not in usr_agents
     assert "docs/studies/README.md" in skill
     assert "docs/studies/index.yaml" in skill
-    assert "docs/studies/<study-id>/campaign.yaml" in skill
-    assert "docs/studies/<study-id>/datasets.yaml" in skill
-    assert "docs/studies/<study-id>/status.md" in skill
-    assert "docs/studies/<study-id>/ops.study.yaml" in skill
+    assert "docs/studies/<study-id>/routes.md" in skill
+    assert "## Required Deliverables" in skill
+    assert "references/route-matrix.md" in skill
+    assert "references/refresh-loop.md" in skill
+    assert "docs/studies/<study-id>/datasets.yaml" in study_surfaces
+    assert "docs/studies/<study-id>/status.md" in study_surfaces
+    assert "docs/studies/<study-id>/ops.study.yaml" in study_surfaces
     assert "docs/studies/index.yaml" in contract
     assert "docs/studies/<study-id>/" in contract
     assert "docs/studies/README.md" in contract
     assert "docs/templates/promoter-study-index.yaml" in contract
     assert "docs/templates/promoter-study-datasets.yaml" in contract
     assert "docs/templates/promoter-study-status.md" in contract
+    assert "routes.md" in contract
     assert "ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix" in contract
     assert "ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/campaign.yaml" in contract
     assert "ops progress show usr.data-plane.promoter-feature-matrix" in contract
@@ -340,6 +374,7 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "record_root: docs/studies/<study-id>" in index_template
     assert "docs/studies/<study-id>/datasets.yaml" in studies_index
     assert "docs/studies/<study-id>/ops.study.yaml" in studies_index
+    assert "docs/studies/<study-id>/routes.md" in studies_index
     assert "If `docs/studies/index.yaml` is missing" in studies_index
     assert "cp docs/templates/promoter-study-index.yaml docs/studies/index.yaml" in studies_index
     assert "cp docs/templates/promoter-study-datasets.yaml docs/studies/<study-id>/datasets.yaml" in studies_index
@@ -361,38 +396,32 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "strict_bootstrap_id: true" in datasets_template
     assert "remote_root_kind: shared|workspace_local_export|external_usr" in datasets_template
     assert "remote_path: n/a" in datasets_template
-    assert "DenseGen source row target:" in template
-    assert "Current infer-bearing shared handoff datasets:" in template
+    assert "Route map: `routes.md` or `n/a`" in template
+    assert "Study execution map: `pipeline.yaml` or `n/a`" in template
+    assert "### Current datasets" in template
+    assert "### Current phase" in template
+    assert "### Current row counts" in template
+    assert "### Current downstream posture" in template
+    assert "DenseGen anchor source:" in template
+    assert "Anchor-only handoff:" in template
     assert "Canonical consolidated feature dataset:" in template
-    assert "Current consolidated feature-dataset row count:" in template
-    assert "historical" in template
-    assert "live handoff plane" in template
-    assert "Affiliated dataset registry: `datasets.yaml`" in template
-    assert "DenseGen anchor shared dataset:" in template
-    assert "Wildtype or manual dataset:" in template
-    assert "Construct template seed dataset:" in template
-    assert "Shared infer-bearing handoff datasets" in template
-    assert "Planned consolidated outputs" in template
-    assert "anchor_only" in template
-    assert "anchor_plus_template" in template
-    assert "full_lane_set" in template
-    assert "uv run infer prune --usr <dataset> --usr-root <usr-root>" in template
-    assert "uv run usr maintenance overlay-remove <dataset> --namespace infer --mode archive" in template
-    assert "uv run usr maintenance overlay-compact <dataset> --namespace densegen" in template
-    assert "notify usr-events watch --events <usr-root>/<feature-dataset>/.events.log --dry-run" in template
+    assert "LatentDNA:" in template
+    assert "Cluster:" in template
+    assert "OPAL:" in template
+    assert "Use `routes.md` for owner tool" in template
     assert "usr.data-plane.hpc-sync" in contract
     assert "root_kind" in contract
     assert "workspace_local_export" in contract
-    assert "canonical consolidated feature dataset" in contract
-    assert "source/handoff mode" in contract
+    assert "current downstream posture" in contract
+    assert "source/handoff mode" in refresh_reference
     assert "uv run usr --root <usr-root> info <dataset-id> --format json" in contract
     assert "--audit-json-out docs/studies/<study-id>/audits/<dataset-id>--<remote-name>-diff.json" in contract
     assert "ops progress show usr.data-plane.hpc-sync --sync-audit-json" in contract
     assert "strict_bootstrap_id: true" in contract
-    assert "onboard_mode: existing_remote" in skill
-    assert "docs/studies/<study-id>/datasets.yaml" in skill
-    assert "usr.data-plane.hpc-sync" in skill
-    assert "source/handoff mode" in skill
+    assert "onboard_mode: existing_remote" in refresh_reference
+    assert "docs/studies/<study-id>/datasets.yaml" in refresh_reference
+    assert "usr.data-plane.hpc-sync" in refresh_reference
+    assert "source/handoff mode" in route_matrix
     assert "promoter-study-preflight --scope next --json" in skill
     assert not (_repo_root() / "docs" / "studies" / "promoter").exists()
     assert not (_repo_root() / "src/dnadesign/usr/skills/promoter-study-status/SKILL.md").exists()
@@ -405,6 +434,10 @@ def test_repo_local_promoter_skill_audit_is_documented_and_present() -> None:
     assert ".agents/skills/promoter-study-status/scripts/audit-promoter-study-status-skill.sh" in dev_docs
     assert (skill_root / "SKILL.md").exists()
     assert (skill_root / "scripts" / "audit-promoter-study-status-skill.sh").exists()
+    assert (skill_root / "references" / "route-matrix.md").exists()
+    assert (skill_root / "references" / "refresh-loop.md").exists()
+    assert (skill_root / "references" / "study-surfaces.md").exists()
+    assert (skill_root / "references" / "external-sources.md").exists()
 
 
 def test_repo_local_promoter_skill_audit_passes() -> None:
@@ -452,15 +485,20 @@ def test_promoter_study_record_is_checked_in_for_stress_ethanol_cipro_growth() -
     assert "group_phase_bindings:" in ops_study
     assert "runtime_shared_groups: [notify_environment]" in ops_study
     assert "densegen/study_stress_ethanol_cipro" in status
-    assert "DenseGen source row target:" in status
-    assert "Current infer-bearing shared handoff datasets:" in status
+    assert "Route map: `routes.md`" in status
+    assert "Study execution map: `pipeline.yaml`" in status
+    assert "### Current datasets" in status
+    assert "### Current phase" in status
+    assert "### Current row counts" in status
+    assert "### Current downstream posture" in status
     assert "Canonical consolidated feature dataset:" in status
-    assert "Read the row counts by plane." in status
-    assert "historical context rather than the main status" in status
-    assert "100000" in status
-    assert "`anchor_only_7b=1024`, `anchor_plus_template_7b=128`" in status
-    assert "`anchor_only_20b=256`, `anchor_plus_template_20b=48`" in status
-    assert "`h_rt=24:00:00`" in status
+    assert "Declared phase: `infer_batch_preparation`" in status
+    assert "LatentDNA: `configured`;" in status
+    assert "Cluster: `planned`;" in status
+    assert "OPAL: `not configured`;" in status
+    assert re.search(r"`densegen/study_stress_ethanol_cipro`: `\d+`", status)
+    assert re.search(r"`promoter/stress_ethanol_cipro_anchor_set`: `\d+`", status)
+    assert re.search(r"`promoter/stress_ethanol_cipro_construct_contexts`: `\d+`", status)
 
 
 def test_promoter_study_status_note_separates_row_target_from_live_handoff_counts() -> None:
@@ -477,11 +515,13 @@ def test_promoter_study_status_note_separates_row_target_from_live_handoff_count
     )
 
     assert row_target == densegen_target == 100000
-    assert "Current infer-bearing shared handoff datasets:" in status
+    assert "### Current row counts" in status
     assert "Canonical consolidated feature dataset:" in status
-    assert "historical context rather than the main status" in status
-    assert "`157160`" not in status
-    assert "`157164`" not in status
+    assert "DenseGen source row target:" in status
+    assert "historical context rather than the main status" not in status
+    assert re.search(r"`densegen/study_stress_ethanol_cipro`: `\d+`", status)
+    assert re.search(r"`promoter/stress_ethanol_cipro_anchor_set`: `\d+`", status)
+    assert re.search(r"`promoter/stress_ethanol_cipro_construct_contexts`: `\d+`", status)
 
 
 def test_usr_reference_docs_cover_core_contracts() -> None:

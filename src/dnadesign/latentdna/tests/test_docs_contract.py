@@ -103,26 +103,29 @@ def test_latentdna_docs_tree_exposes_workflow_reference_and_dev_surfaces() -> No
     assert "**Owner-boundary:** latentdna" in workflow
     assert "**Registry-id:** latentdna.promoter-study.latent-atlas" in workflow
     assert "### First tracer-bullet path" in workflow
-    assert "--from-study-dir docs/studies/stress_ethanol_cipro_growth" in workflow
+    assert "src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth" in workflow
     assert "uv run latentdna validate workspace" in workflow
     assert "--deep" in workflow
     assert "uv run latentdna view materialize z20_60" in workflow
-    assert "uv run latentdna sample build atlas_sample" in workflow
-    assert "densegen__plan" in workflow
-    assert "densegen__base_plan" not in workflow
+    assert "uv run latentdna sample build atlas_anchor_sample" in workflow
+    assert "--group-column design_family" in workflow
+    assert "densegen__plan" not in workflow
     assert "uv run latentdna projection fit z20_60" in workflow
-    assert "uv run latentdna plot render anchor_projection_review" in workflow
-    assert "--kind projection_scatter" in workflow
-    assert "uv run latentdna plot render atlas_2x2_main" in workflow
-    assert "uv run latentdna plot render primary_landmark_scatter" in workflow
-    assert "uv run latentdna plot render agreement_20b_anchor_vs_context_summary" in workflow
-    assert "--kind agreement_summary" in workflow
-    assert "uv run latentdna enrich score control_plan_enrichment" in workflow
-    assert "uv run latentdna recipe validate control_plan_heatmap_recipe" in workflow
+    assert "uv run latentdna deliverable status atlas_2x2_intermediate_main" in workflow
+    assert "uv run latentdna deliverable run atlas_2x2_intermediate_main" in workflow
+    assert "uv run latentdna deliverable run context_shift_primary" in workflow
+    assert "uv run latentdna deliverable run agreement_7b_vs_20b" in workflow
+    assert "uv run latentdna cluster fit leiden_z20_60" in workflow
+    assert "uv run latentdna cluster fit leiden_z20_1k_anchor" in workflow
+    assert "--method leiden" in workflow
+    assert "kmeans" not in workflow
+    assert "uv run latentdna deliverable run cluster_correspondence_primary" in workflow
     assert "uv run latentdna deliverable run control_neighborhood_enrichment" in workflow
-    assert "uv run latentdna notebook generate control_plan_review" in workflow
+    assert "uv run latentdna export matrix x2_primary_20b" in workflow
+    assert "uv run latentdna export matrix x3_ablation_7b" in workflow
+    assert "uv run latentdna notebook generate browser" in workflow
     assert "uv run marimo run" in workflow
-    assert "outputs/latentdna/notebooks/control_plan_review/notebook.py" in workflow
+    assert "outputs/latentdna/notebooks/browser.py" in workflow
     assert "outputs/latentdna/plots" in workflow
     assert "--backend exact" not in workflow
 

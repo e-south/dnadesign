@@ -39,6 +39,7 @@ from dnadesign.studies.core.models import StudyFamilyAdapter, StudyStatusContext
 from dnadesign.studies.core.record_locator import discover_active_study_selection
 from dnadesign.usr import Dataset
 
+from .downstream_surfaces import inspect_promoter_downstream_surfaces
 from .infer_runtime import PromoterStudyInferRuntimeDependencies
 from .latentdna_readiness import inspect_promoter_latentdna_readiness
 from .preflight import (
@@ -119,6 +120,7 @@ class PromoterStudyFamilyAdapter(StudyFamilyAdapter):
             phase_matches_infer_model_family=phase_matches_infer_model_family,
             inspect_semantic_completeness=inspect_promoter_study_semantic_completeness,
             inspect_latentdna_readiness=inspect_promoter_latentdna_readiness,
+            inspect_additional_downstream_surfaces=inspect_promoter_downstream_surfaces,
         )
         status_context = resolve_promoter_study_status_context(
             study_context=study_context,

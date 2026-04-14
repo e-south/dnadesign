@@ -1,5 +1,5 @@
 schema_version: 1
-catalog_order: 7
+catalog_order: 8
 tool: notify
 summary: Tool-owned operator routes for watcher setup, delivery validation, recovery, and scheduler-adjacent notification flows.
 keywords:

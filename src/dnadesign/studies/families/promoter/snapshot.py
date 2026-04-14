@@ -24,7 +24,42 @@ from .record_normalizer import PromoterStudyResolvedContext
 
 
 def _inspect_no_latentdna_readiness(**_: object) -> dict[str, object] | None:
-    return None
+    return {
+        "configured": False,
+        "state": "not_configured",
+        "doc": "src/dnadesign/latentdna/docs/workflows/promoter-study-latent-atlas.md",
+        "surface_ref": None,
+        "workspace_id": None,
+        "expected_deliverables": [],
+        "ok_deliverables": [],
+        "missing_deliverables": [],
+        "rendered_plot_count": 0,
+        "notebook_generated": False,
+        "notebook_smoke_ok": False,
+        "leiden_runs_ok": True,
+        "exports_ok": True,
+        "required_leiden_runs": [],
+        "required_exports": [],
+    }
+
+
+def _inspect_no_additional_downstream_surfaces(**_: object) -> dict[str, dict[str, object]]:
+    return {
+        "cluster": {
+            "configured": False,
+            "state": "planned",
+            "doc": "src/dnadesign/cluster/docs/workflows/exploratory-clustering.md",
+            "surface_ref": None,
+            "results_root": None,
+        },
+        "opal": {
+            "configured": False,
+            "state": "not_configured",
+            "doc": "src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md",
+            "surface_ref": None,
+            "config": None,
+        },
+    }
 
 
 @dataclass(frozen=True)
@@ -33,6 +68,9 @@ class PromoterStudyStatusDependencies:
     phase_matches_infer_model_family: Callable[..., bool]
     inspect_semantic_completeness: Callable[..., dict[str, object] | None]
     inspect_latentdna_readiness: Callable[..., dict[str, object] | None] = _inspect_no_latentdna_readiness
+    inspect_additional_downstream_surfaces: Callable[..., dict[str, dict[str, object]]] = (
+        _inspect_no_additional_downstream_surfaces
+    )
 
 
 @dataclass(frozen=True)
@@ -69,6 +107,7 @@ def build_promoter_study_status(
     planned_outputs_state = _build_planned_outputs_state(study_context=study_context)
     semantic_completeness_state = dependencies.inspect_semantic_completeness(study_context=study_context)
     latentdna_state = dependencies.inspect_latentdna_readiness(study_context=study_context)
+    additional_downstream_surfaces = dependencies.inspect_additional_downstream_surfaces(study_context=study_context)
     evidence = dict(study_context.evidence)
     evidence.update(
         {
@@ -88,8 +127,12 @@ def build_promoter_study_status(
             "infer_notify_profile_errors": dict(status_context.infer_runtime.infer_notify_profile_errors),
         }
     )
-    if latentdna_state is not None:
-        evidence["latentdna"] = latentdna_state
+    evidence["latentdna"] = latentdna_state
+    evidence.update(additional_downstream_surfaces)
+    evidence["downstream_surfaces"] = {
+        "latentdna": latentdna_state,
+        **additional_downstream_surfaces,
+    }
 
     summary_parts = [f"{study_context.resolved_study_dir.name}: phase {study_context.current_phase or 'unknown'}"]
     if status_context.infer_runtime.preferred_model_family is not None:

@@ -7,61 +7,45 @@ placeholder behind.
 - Last verified:
 - Owner:
 - Affiliated dataset registry: `datasets.yaml`
+- Route map: `routes.md` or `n/a`
+- Study execution map: `pipeline.yaml` or `n/a`
 - USR root:
-- DenseGen source row target:
-- Current infer-bearing shared handoff datasets: `<dataset>`, `<dataset>` or `n/a`
-- Canonical consolidated feature dataset: `<dataset>` or `n/a`
-- Current consolidated feature-dataset row count:
 
-Treat the DenseGen source target as an early-phase gate, not as the universal
-headline forever. Once the study has advanced and the shared infer-bearing
-handoff datasets already exceed that threshold, keep the target as historical
-context and report the current phase from the live handoff plane.
+### Current datasets
 
-### Source datasets
+- DenseGen anchor source: `<dataset>` (`present|planned`, shared source or `n/a`)
+- Wildtype or manual controls: `<dataset>` (`<rows>` rows) or `n/a`
+- Construct template seed: `<dataset>` (`<rows>` rows) or `n/a`
+- Anchor-only handoff: `<dataset>` (`present|planned`, shared infer plane or `n/a`)
+- Construct-expanded handoff: `<dataset>` (`present|planned`, shared infer plane or `n/a`)
+- Canonical consolidated feature dataset: `<dataset>` (`present|planned` or `n/a`)
 
-- DenseGen anchor shared dataset: `<dataset>` (source-growth plane; use `promoter-study-status` for live rows and target gap, last batch audit: `<path or runbook id>`)
-- Wildtype or manual dataset: `<dataset>` (`<rows>` rows)
-- Construct template seed dataset: `<dataset>` (`<rows>` rows) or `n/a`
+### Current phase
 
-### Shared infer-bearing handoff datasets
+- Declared phase: `<phase-id>`
+- DenseGen growth: `<pending|running|complete|parallel_optional>`
+- Merged anchor set: `<pending|running|complete|n/a>`
+- Construct context expansion: `<pending|running|complete|n/a>`
+- Next in-progress surface: `<doc path or workspace>`
+- Preferred infer family: `<model family>` or `n/a`
+- Supported infer families: `<family>`, `<family>` or `n/a`
 
-- Anchor-only handoff dataset: `<dataset>` or `n/a`
-- Construct-expanded handoff dataset: `<dataset>` or `n/a`
-- Semantic completeness note: critical downstream metadata such as `densegen__plan` and `densegen__required_regulators` should be present for all DenseGen-derived rows on the shared handoff datasets; use `promoter-study-status` to confirm this plane explicitly instead of relying on row counts alone.
+### Current row counts
 
-### Planned consolidated outputs
+- `<dataset>`: `<rows>`
+- `<dataset>`: `<rows>`
+- `<dataset>`: `<rows>`
+- `<dataset>`: `n/a` (`planned`) or `<rows>`
+- DenseGen source row target: `<rows>`
+- Current DenseGen row gap: `<rows>`
+- Shared handoff metadata posture: `densegen__plan` and `densegen__required_regulators` are complete for all DenseGen-derived handoff rows, or describe the exact missing metadata surface
 
-- Canonical full-lane feature dataset: `<dataset>` or `n/a`
-- Cluster results root: `<path>` or `n/a`
-- OPAL config: `<path>` or `n/a`
+### Current downstream posture
 
-### Infer matrix status
-
-- `anchor_only`: `pending|dry-run-green|written`
-  - config: `<path>`
-  - outputs expected: `ll`, `output_layer_mean`, `intermediate_embedding`
-- `anchor_plus_template`: `pending|dry-run-green|written`
-  - config: `<path>`
-  - outputs expected: `ll`, `output_layer_mean`, `intermediate_embedding`
-- `full_lane_set`: `pending|dry-run-green|written`
-  - config: `<path>`
-  - outputs expected: `ll`, `output_layer_mean`, `intermediate_embedding`
-  - model lanes: `evo2_7b`, `evo2_20b`
-
-### Rollback and maintenance
-
-- Infer reset: `uv run infer prune --usr <dataset> --usr-root <usr-root>`
-- Infer namespace archive: `uv run usr maintenance overlay-remove <dataset> --namespace infer --mode archive`
-- DenseGen overlay compaction: `uv run usr maintenance overlay-compact <dataset> --namespace densegen`
-- DenseGen overlay projection repair: `uv run usr maintenance overlay-project --src <densegen-source-dataset> --dest <handoff-dataset> --namespace densegen --src-join id --dest-join <id|construct__anchor_id> --allow-missing`
-
-### Batch and notify
-
-- DenseGen batch route: `<ops runbook path or qsub command>`
-- Infer batch route: `<ops runbook path or qsub command>`
-- Notify profile or config: `<path>`
-- Watch command: `uv run notify usr-events watch --events <usr-root>/<feature-dataset>/.events.log --dry-run --no-advance-cursor-on-dry-run`
+- LatentDNA: `configured|planned|not configured`; `<one-line readiness note>`
+- Cluster: `configured|planned|not configured`; `<one-line readiness note>`
+- OPAL: `configured|planned|not configured`; `<one-line readiness note>`
+- Use `routes.md` for owner tool, entry artifact, primary doc or workspace, and first command per downstream branch
 
 ### Next actions
 

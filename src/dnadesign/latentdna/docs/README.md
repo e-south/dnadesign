@@ -1,4 +1,4 @@
-# latentdna Docs
+# LatentDNA Docs
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-04-11

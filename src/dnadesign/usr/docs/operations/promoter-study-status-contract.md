@@ -15,7 +15,7 @@
 
 Use this contract when the question is not only "which runbook applies?" but
 "what is the current status of the actual DenseGen/manual/wildtype ->
-optional Construct -> Infer -> Cluster or OPAL study?"
+optional Construct -> Infer -> LatentDNA, Cluster, or OPAL study?"
 This is an observation-plane surface: it reads the checked-in study record and
 does not replace the control-plane `ops runbook` routes that plan or execute
 batch work.
@@ -41,6 +41,7 @@ docs/studies/<study-id>/
   campaign.yaml
   datasets.yaml
   ops.study.yaml
+  routes.md
   pipeline.yaml
   status.md
   audits/
@@ -123,6 +124,9 @@ uv run ops progress show usr.data-plane.promoter-study-preflight --json
    record sources, execution surfaces, snapshot scope, and next-scope
    preflight posture without hard-coding workflow taxonomy in core code.
 5. When the study has real downstream execution surfaces, an optional
+   `routes.md` that points to the current DenseGen, Construct, Infer,
+   LatentDNA, Cluster, and OPAL owner surfaces without bloating `status.md`.
+6. When the study has real downstream execution surfaces, an optional
    `pipeline.yaml` that names the exact Construct, Infer, and batch surfaces
    plus any minimal runtime mappings the live study still needs. Infer Notify
    profile paths should derive from the checked-in lane configs instead of
@@ -187,8 +191,12 @@ Keep the semantics explicit:
   repo-owned shared path and must stay explicit in the study record
 
 Keep a filled `status.md` next to the manifest. Read it first when the question
-is "where are we now?" or "what should run next?" Copy the template from
+is "where are we now?" Copy the template from
 [docs/templates/promoter-study-status.md](../../../../../docs/templates/promoter-study-status.md).
+Keep it factual and short: current datasets, current phase, current row counts,
+current downstream posture, and concise next actions.
+When the study spans several owner surfaces, add `routes.md` next to the status
+note and use it as the one-hop handoff page.
 
 Discovery rules:
 
@@ -197,6 +205,9 @@ Discovery rules:
 - The selected study entry must declare `family` and `record_root`.
 - The corresponding study directory must contain `campaign.yaml`,
   `datasets.yaml`, `status.md`, and `ops.study.yaml`.
+- If `routes.md` exists in the study directory, treat it as the study-owned
+  one-hop handoff page for DenseGen, Construct, Infer, LatentDNA, Cluster, and
+  OPAL instead of expanding `status.md` into a workflow encyclopedia.
 - `ops.study.yaml` is the OPS-facing source of lifecycle phase order, record
   sources, execution surfaces, repo snapshot scope, and next-scope routing.
   Keep it checked in with the study record.
@@ -298,11 +309,11 @@ From `datasets.yaml`:
 
 From `status.md`:
 
-- which DenseGen dataset is being grown toward the current row target
-- which wildtype or manual dataset is merged into the study
-- whether construct expansion is required or optional
-- which infer slices are already written versus only preflighted
-- the next concrete batch call to run
+- current source and handoff dataset ids
+- current phase
+- current row counts
+- current downstream posture
+- concise next actions
 
 From `ops.study.yaml`:
 
@@ -318,6 +329,8 @@ From `pipeline.yaml` when present:
 - the expected phase order from source assembly through Infer write-back
 - whether anchor-only and template-backed Infer lanes are modeled as one plane
   or as explicit separate dataset planes
+- study-bound downstream structural bindings such as LatentDNA workspace,
+  Cluster results root, or OPAL config
 
 ### Failure and rollback reminders
 

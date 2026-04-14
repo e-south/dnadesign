@@ -1,0 +1,14 @@
+schema_version: 1
+catalog_order: 7
+tool: latentdna
+summary: Tool-owned latent atlas workflows, workspace contracts, and downstream export handoffs for promoter studies.
+keywords:
+  - promoter
+  - latent atlas
+  - downstream
+  - exports
+  - embeddings
+routes:
+  - id: promoter-study-latent-atlas
+    path: workflows/promoter-study-latent-atlas.md
+    summary: Study-bound LatentDNA atlas route for promoter anchor and construct-context datasets once vector-bearing USR surfaces exist.

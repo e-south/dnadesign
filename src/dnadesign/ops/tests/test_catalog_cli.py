@@ -40,6 +40,7 @@ def test_load_runbook_catalog_reads_shared_registry() -> None:
     assert catalog.find_procedure("ops.control-plane.orchestration") is not None
     assert catalog.find_procedure("cluster.downstream.exploratory-clustering") is not None
     assert catalog.find_tool_source("usr") is not None
+    assert catalog.find_tool_source("latentdna") is not None
 
 
 def test_ops_package_data_declares_packaged_runbook_presets() -> None:
@@ -255,6 +256,41 @@ def test_cli_catalog_list_supports_related_tool_sources() -> None:
     assert "procedures" not in payload
 
 
+def test_cli_catalog_list_supports_related_tool_sources_for_promoter_study_status() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--section",
+            "tool-sources",
+            "--related-to",
+            "usr.data-plane.promoter-study-status",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["filters"] == {"related_to": "usr.data-plane.promoter-study-status"}
+    assert payload["counts"] == {"tool_sources": 8}
+    assert [entry["tool"] for entry in payload["tool_sources"]] == [
+        "densegen",
+        "construct",
+        "infer",
+        "cluster",
+        "opal",
+        "latentdna",
+        "notify",
+        "ops",
+    ]
+    assert "procedures" not in payload
+
+
 def test_cli_catalog_list_supports_related_to_filter() -> None:
     runner = CliRunner()
 
@@ -450,6 +486,39 @@ def test_cli_catalog_show_json_includes_related_procedures() -> None:
         ("depends-on", "usr.data-plane.construct-infer-source-of-truth"),
         ("handoff-to", "cluster.downstream.exploratory-clustering"),
         ("handoff-to", "opal.downstream.usr-infer-x-active-learning"),
+    ]
+
+
+def test_cli_catalog_show_json_exposes_latentdna_route_from_promoter_study_status() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "show",
+            "usr.data-plane.promoter-study-status",
+            "--repo-root",
+            str(_repo_root()),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["owner_boundary"] == "usr"
+    assert [entry["tool"] for entry in payload["related_tool_sources"]] == [
+        "densegen",
+        "construct",
+        "infer",
+        "latentdna",
+        "cluster",
+        "opal",
+        "notify",
+        "ops",
+    ]
+    assert ("latentdna", "promoter-study-latent-atlas") in [
+        (entry["tool"], entry["route_id"]) for entry in payload["related_tool_routes"]
     ]
 
 

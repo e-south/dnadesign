@@ -34,18 +34,25 @@ study_pipeline:
       full_lane_set_20b: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.full_lane_set.evo2_20b.yaml
   latentdna:
     workspace: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth
+    doc: src/dnadesign/latentdna/docs/workflows/promoter-study-latent-atlas.md
     notebook: browser
     expected_deliverables:
       - atlas_2x2_intermediate_main
-      - control_neighborhood_enrichment_family
       - control_neighborhood_enrichment_curve_family
-      - landmark_distance_margins_primary
       - context_shift_primary
-      - leiden_primary_20b
       - cluster_correspondence_primary
     required_leiden_runs:
       - leiden_z20_60
       - leiden_z20_1k_anchor
-      - leiden_logits20_60
     required_exports:
       - x2_primary_20b
+  cluster:
+    doc: src/dnadesign/cluster/docs/workflows/exploratory-clustering.md
+    entry_artifact: promoter/stress_ethanol_cipro_feature_matrix
+    results_root: n/a
+    state: planned
+  opal:
+    doc: src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md
+    entry_artifact: promoter/stress_ethanol_cipro_feature_matrix
+    config: n/a
+    state: not_configured
