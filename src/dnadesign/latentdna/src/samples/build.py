@@ -96,6 +96,7 @@ def build_sample_artifact(
     seed: int,
     explicit_ids: list[str] | None = None,
     input_sample_ids: list[str] | None = None,
+    reference_set_id: str | None = None,
 ) -> tuple[Path, int]:
     if strategy in {"union", "intersection"}:
         sample_table = _combine_sample_sets(
@@ -157,6 +158,29 @@ def build_sample_artifact(
                 raise ContractViolationError(f"explicit_ids sampling could not find ids in {key_column!r}: {missing}")
         else:
             raise ContractViolationError(f"unsupported sampling strategy: {strategy}")
+
+        if reference_set_id is not None:
+            if reference_set_id not in context.config.reference_sets:
+                raise ContractViolationError(f"unknown reference_set for sampling: {reference_set_id}")
+            reference_set = context.config.reference_sets[reference_set_id]
+            match_column = reference_set.match_column
+            if match_column not in rows.column_names:
+                raise ContractViolationError(f"reference_set match column is missing from row ledger: {match_column!r}")
+            value_to_index: dict[str, int] = {}
+            for index, value in enumerate(rows[match_column].combine_chunks().to_pylist()):
+                value_to_index.setdefault(str(value), index)
+            missing_ids = [str(value) for value in reference_set.ids if str(value) not in value_to_index]
+            if missing_ids:
+                missing = ", ".join(missing_ids)
+                raise ContractViolationError(
+                    f"reference_set sampling could not find ids in {match_column!r}: {missing}"
+                )
+            selected_indices = sorted(
+                {
+                    *selected_indices,
+                    *(value_to_index[str(value)] for value in reference_set.ids),
+                }
+            )
 
         if selected_indices:
             sample_table = rows.take(pa.array(selected_indices, type=pa.int64()))

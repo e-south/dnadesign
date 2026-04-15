@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -36,7 +36,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "euclidean",
@@ -232,8 +232,8 @@ def test_phase4_neighbors_and_agreement_flow(tmp_path: Path) -> None:
     )
     assert context_neighbors_result.exit_code == 0, context_neighbors_result.stdout
 
-    anchor_indices = np.load(workspace_dir / "outputs" / "latentdna" / "neighbors" / "anchor_knn" / "indices.npy")
-    context_indices = np.load(workspace_dir / "outputs" / "latentdna" / "neighbors" / "context_knn" / "indices.npy")
+    anchor_indices = np.load(workspace_dir / "outputs" / "neighbors" / "anchor_knn" / "indices.npy")
+    context_indices = np.load(workspace_dir / "outputs" / "neighbors" / "context_knn" / "indices.npy")
     assert anchor_indices.shape == (4, 1)
     assert context_indices.shape == (4, 1)
 
@@ -256,7 +256,7 @@ def test_phase4_neighbors_and_agreement_flow(tmp_path: Path) -> None:
     agreement_payload = json.loads(agreement_result.stdout)
     assert agreement_payload["artifact_kind"] == "agreement_set"
 
-    agreement_dir = workspace_dir / "outputs" / "latentdna" / "agreements" / "anchor_vs_context_knn"
+    agreement_dir = workspace_dir / "outputs" / "agreements" / "anchor_vs_context_knn"
     agreement_table = pq.read_table(agreement_dir / "table.parquet")
     assert agreement_table.column("shared_neighbor_count").to_pylist() == [0, 0, 0, 0]
     assert agreement_table.column("overlap_fraction").to_pylist() == [0.0, 0.0, 0.0, 0.0]

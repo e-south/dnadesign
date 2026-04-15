@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import typer
 
-from ...services.notebook_service import generate_notebook, smoke_workspace_browser
+from ...contracts.errors import ContractViolationError
+from ...services.notebook_service import generate_notebook, smoke_workspace_notebook
 from ..common import emit, fail, resolve_format
 from ..previews import preview_notebook_generate
 
@@ -42,7 +43,9 @@ def smoke(
     quiet: bool = typer.Option(False, "--quiet"),
 ) -> None:
     try:
-        payload = smoke_workspace_browser(workspace)
+        payload = smoke_workspace_notebook(workspace)
     except Exception as exc:
         fail(exc)
     emit(payload, format_name=resolve_format(json_output=json_output, format_name=format_name), quiet=quiet)
+    if str(payload.get("status") or "").strip() == "error":
+        raise typer.Exit(code=ContractViolationError.exit_code)

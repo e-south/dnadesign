@@ -17,6 +17,7 @@ app = typer.Typer(help="Export commands for latentdna.")
 def matrix(
     export_id: str = typer.Argument(...),
     workspace: str = typer.Option(..., "--workspace"),
+    allow_memory_overage: bool = typer.Option(False, "--allow-memory-overage"),
     force: bool = typer.Option(False, "--force"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     format_name: str = typer.Option("text", "--format"),
@@ -27,7 +28,12 @@ def matrix(
         payload = (
             preview_export(workspace, export_id, command="export matrix", force=force)
             if dry_run
-            else export_matrix(workspace, export_id, force=force).model_dump(mode="json")
+            else export_matrix(
+                workspace,
+                export_id,
+                allow_memory_overage=allow_memory_overage,
+                force=force,
+            ).model_dump(mode="json")
         )
     except Exception as exc:
         fail(exc)
@@ -38,6 +44,7 @@ def matrix(
 def table(
     export_id: str = typer.Argument(...),
     workspace: str = typer.Option(..., "--workspace"),
+    allow_memory_overage: bool = typer.Option(False, "--allow-memory-overage"),
     force: bool = typer.Option(False, "--force"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     format_name: str = typer.Option("text", "--format"),
@@ -48,7 +55,12 @@ def table(
         payload = (
             preview_export(workspace, export_id, command="export table", force=force)
             if dry_run
-            else export_table(workspace, export_id, force=force).model_dump(mode="json")
+            else export_table(
+                workspace,
+                export_id,
+                allow_memory_overage=allow_memory_overage,
+                force=force,
+            ).model_dump(mode="json")
         )
     except Exception as exc:
         fail(exc)

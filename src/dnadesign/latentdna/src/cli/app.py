@@ -12,6 +12,7 @@ from .commands.cluster import app as cluster_app
 from .commands.deliverable import app as deliverable_app
 from .commands.distance import app as distance_app
 from .commands.enrich import app as enrich_app
+from .commands.explain import app as explain_app
 from .commands.export import app as export_app
 from .commands.inspect import app as inspect_app
 from .commands.neighbors import app as neighbors_app
@@ -42,6 +43,7 @@ app.add_typer(notebook_app, name="notebook")
 app.add_typer(projection_app, name="projection")
 app.add_typer(distance_app, name="distance")
 app.add_typer(enrich_app, name="enrich")
+app.add_typer(explain_app, name="explain")
 app.add_typer(agreement_app, name="agreement")
 app.add_typer(plot_app, name="plot")
 app.add_typer(export_app, name="export")

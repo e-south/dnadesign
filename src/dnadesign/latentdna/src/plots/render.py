@@ -161,6 +161,58 @@ def _draw_label_overlay(
         )
 
 
+def _resolve_annotation_rows(
+    context: WorkspaceContext,
+    rows: list[dict],
+    *,
+    spec: ResolvedPlotSpec,
+) -> tuple[list[dict], str | None, list[str], dict[str, object]]:
+    if spec.annotation is None:
+        selected_rows = _selected_label_rows(rows, label_column=spec.label_column, label_values=spec.label_values)
+        return (
+            selected_rows,
+            spec.label_column,
+            list(spec.label_values),
+            {
+                "reference_set": None,
+                "expected_ids": list(spec.label_values),
+                "matched_ids": (
+                    [str(row[spec.label_column]) for row in selected_rows] if spec.label_column is not None else []
+                ),
+                "complete": True,
+            },
+        )
+
+    reference_set = context.config.reference_sets[spec.annotation.reference_set]
+    match_column = reference_set.match_column
+    label_column = reference_set.label_column or match_column
+    if rows and match_column not in rows[0]:
+        raise ContractViolationError(f"reference_set match column is missing: {match_column!r}")
+    if rows and label_column not in rows[0]:
+        raise ContractViolationError(f"reference_set label column is missing: {label_column!r}")
+    expected_ids = [str(value) for value in reference_set.ids]
+    selected_by_id = {str(row[match_column]): row for row in rows if str(row[match_column]) in set(expected_ids)}
+    missing_ids = [value for value in expected_ids if value not in selected_by_id]
+    if missing_ids and spec.annotation.missing_policy == "fail":
+        raise ContractViolationError(
+            f"reference_set {spec.annotation.reference_set!r} is missing required ids: {missing_ids}"
+        )
+    selected = [selected_by_id[value] for value in expected_ids if value in selected_by_id]
+    return (
+        selected,
+        label_column,
+        expected_ids,
+        {
+            "reference_set": spec.annotation.reference_set,
+            "match_column": match_column,
+            "label_column": label_column,
+            "expected_ids": expected_ids,
+            "matched_ids": [value for value in expected_ids if value in selected_by_id],
+            "complete": not missing_ids,
+        },
+    )
+
+
 def _table_artifact_path(context: WorkspaceContext, spec: ResolvedPlotSpec) -> tuple[str, str, Path]:
     candidates = [
         (
@@ -256,10 +308,12 @@ def _agreement_summary_metrics(summary: dict[str, object]) -> list[tuple[str, fl
 def _write_plot_outputs(fig: Any, artifact_dir: Path, *, formats: list[str]) -> list[str]:
     outputs: list[str] = []
     for format_name in formats:
-        if format_name not in {"svg", "png"}:
+        if format_name not in {"svg", "pdf", "png"}:
             raise ContractViolationError(f"unsupported plot output format: {format_name!r}")
         output_path = artifact_dir / f"plot.{format_name}"
         if format_name == "svg":
+            fig.savefig(output_path)
+        elif format_name == "pdf":
             fig.savefig(output_path)
         else:
             fig.savefig(output_path, dpi=150)
@@ -272,7 +326,7 @@ def render_plot_artifact(
     *,
     spec: ResolvedPlotSpec,
     output_dir: Path,
-) -> tuple[Path, list[str]]:
+) -> tuple[Path, list[str], dict[str, object]]:
     if spec.kind not in SUPPORTED_PLOT_KINDS:
         raise ContractViolationError(f"unsupported plot kind: {spec.kind}")
     if spec.kind in {"projection_scatter", "projection_grid"} and not spec.projection_ids:
@@ -291,6 +345,8 @@ def render_plot_artifact(
         raise ContractViolationError("agreement_summary rendering requires an agreement artifact")
 
     plt = _pyplot()
+
+    plot_metadata: dict[str, object] = {}
 
     if spec.kind == "heatmap":
         from matplotlib import colors as mcolors
@@ -620,14 +676,46 @@ def render_plot_artifact(
             ax.set_ylabel("UMAP-2")
             ax.set_title(spec.projection_ids[0])
             _apply_axes_style(ax, grid=False)
-            _draw_label_overlay(
-                ax,
+            selected_rows, resolved_label_column, _, annotation_state = _resolve_annotation_rows(
+                context,
                 rows,
-                label_column=spec.label_column,
-                label_values=spec.label_values,
-                color_column=spec.color_column,
-                color_map=color_map,
+                spec=spec,
             )
+            if selected_rows and resolved_label_column is not None:
+                highlight_colors, _ = _color_series(
+                    selected_rows,
+                    spec.color_column,
+                    color_map=color_map if color_map else None,
+                )
+                ax.scatter(
+                    [float(row["x"]) for row in selected_rows],
+                    [float(row["y"]) for row in selected_rows],
+                    c=highlight_colors,
+                    s=135,
+                    marker="*",
+                    edgecolors="#111111",
+                    linewidths=0.8,
+                    zorder=5,
+                )
+                label_mode = (
+                    "label_and_highlight"
+                    if spec.annotation is None
+                    else context.config.reference_sets[spec.annotation.reference_set].label_mode
+                )
+                if label_mode == "label_and_highlight":
+                    for row in selected_rows:
+                        ax.annotate(
+                            str(row[resolved_label_column]),
+                            (float(row["x"]), float(row["y"])),
+                            xytext=(6, 6),
+                            textcoords="offset points",
+                            fontsize=9,
+                            fontweight="semibold",
+                            color=_TEXT_COLOR,
+                            bbox={"boxstyle": "round,pad=0.15", "fc": "white", "ec": "none", "alpha": 0.78},
+                            zorder=6,
+                        )
+            plot_metadata["reference_panels"] = {spec.projection_ids[0]: annotation_state}
             if categories:
                 ax.legend(handles=_legend_handles(plt, categories, color_map), title=spec.color_column, frameon=False)
         else:
@@ -665,14 +753,46 @@ def render_plot_artifact(
                 axis.set_xlabel("UMAP-1")
                 axis.set_ylabel("UMAP-2")
                 _apply_axes_style(axis, grid=False)
-                _draw_label_overlay(
-                    axis,
+                selected_rows, resolved_label_column, _, annotation_state = _resolve_annotation_rows(
+                    context,
                     projection_rows,
-                    label_column=spec.label_column,
-                    label_values=spec.label_values,
-                    color_column=spec.color_column,
-                    color_map=color_map,
+                    spec=spec,
                 )
+                if selected_rows and resolved_label_column is not None:
+                    highlight_colors, _ = _color_series(
+                        selected_rows,
+                        spec.color_column,
+                        color_map=color_map if color_map else None,
+                    )
+                    axis.scatter(
+                        [float(row["x"]) for row in selected_rows],
+                        [float(row["y"]) for row in selected_rows],
+                        c=highlight_colors,
+                        s=135,
+                        marker="*",
+                        edgecolors="#111111",
+                        linewidths=0.8,
+                        zorder=5,
+                    )
+                    label_mode = (
+                        "label_and_highlight"
+                        if spec.annotation is None
+                        else context.config.reference_sets[spec.annotation.reference_set].label_mode
+                    )
+                    if label_mode == "label_and_highlight":
+                        for row in selected_rows:
+                            axis.annotate(
+                                str(row[resolved_label_column]),
+                                (float(row["x"]), float(row["y"])),
+                                xytext=(6, 6),
+                                textcoords="offset points",
+                                fontsize=9,
+                                fontweight="semibold",
+                                color=_TEXT_COLOR,
+                                bbox={"boxstyle": "round,pad=0.15", "fc": "white", "ec": "none", "alpha": 0.78},
+                                zorder=6,
+                            )
+                plot_metadata.setdefault("reference_panels", {})[projection_id] = annotation_state
             if categories:
                 fig.legend(
                     handles=_legend_handles(plt, categories, color_map),
@@ -692,4 +812,9 @@ def render_plot_artifact(
         outputs = _write_plot_outputs(fig, output_dir, formats=context.config.defaults.plot_formats)
     finally:
         plt.close(fig)
-    return output_dir, outputs
+    if spec.annotation is not None:
+        panel_states = list((plot_metadata.get("reference_panels") or {}).values())
+        plot_metadata["reference_set_complete"] = bool(panel_states) and all(
+            bool(panel.get("complete")) for panel in panel_states
+        )
+    return output_dir, outputs, plot_metadata

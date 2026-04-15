@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import typer
 
+from ...contracts.errors import ContractViolationError
 from ...services.inspection_service import (
     inspect_alignment,
     inspect_artifacts,
@@ -135,3 +136,6 @@ def notebook_health(
     except Exception as exc:
         fail(exc)
     emit(payload, format_name=resolve_format(json_output=json_output, format_name=format_name), quiet=quiet)
+    health = payload.get("data", {}).get("health", {}) if isinstance(payload, dict) else {}
+    if isinstance(health, dict) and str(health.get("status") or "").strip() == "error":
+        raise typer.Exit(code=ContractViolationError.exit_code)

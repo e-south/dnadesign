@@ -19,7 +19,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -34,7 +34,7 @@ def _write_workspace_config(workspace_dir: Path, *, anchor_path: Path, context_p
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "latentdna_primary_export_demo", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "latentdna_primary_export_demo", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -209,8 +209,10 @@ def _write_workspace_config(workspace_dir: Path, *, anchor_path: Path, context_p
                 },
                 "deliverables": {
                     "x2_primary_20b": {
-                        "kind": "export_bundle",
-                        "description": "Aligned primary 20B export bundle.",
+                        "title": "X2 primary 20B",
+                        "summary": "Aligned primary 20B export bundle.",
+                        "question": "Is x2_primary_20b still the deterministic primary supervised export?",
+                        "section": "Exports",
                         "recipe": "x2_primary_20b_recipe",
                         "requires": {
                             "views": ["z20_60", "z20_1k_anchor"],
@@ -226,6 +228,8 @@ def _write_workspace_config(workspace_dir: Path, *, anchor_path: Path, context_p
                             "reduced_views": ["z20_60_pc02", "delta20_pc02"],
                             "exports": ["x2_primary_20b"],
                         },
+                        "docs_refs": [],
+                        "acceptance_checks": [],
                     }
                 },
             },
@@ -330,7 +334,7 @@ def test_phase15_primary_export_deliverable_flow(tmp_path: Path) -> None:
     assert run_payload["metrics"]["executed_steps"] == 9
     assert run_payload["metrics"]["skipped_steps"] == 0
 
-    export_dir = workspace_dir / "outputs" / "latentdna" / "exports" / "x2_primary_20b"
+    export_dir = workspace_dir / "outputs" / "exports" / "x2_primary_20b"
     assert (export_dir / "matrix.npy").is_file()
     assert (export_dir / "rows.parquet").is_file()
     assert (export_dir / "features.parquet").is_file()

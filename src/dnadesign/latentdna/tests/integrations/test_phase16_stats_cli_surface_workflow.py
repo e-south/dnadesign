@@ -22,7 +22,7 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -79,7 +79,7 @@ def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "latentdna_phase16_demo", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "latentdna_phase16_demo", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -234,10 +234,8 @@ def test_phase16_view_stats_scalar_join_and_common_cli_flags(tmp_path: Path) -> 
     assert preview_payload["dry_run"] is True
     assert preview_payload["artifact_kind"] == "view"
     assert preview_payload["artifact_id"] == "bundle_view"
-    assert preview_payload["outputs"] == [
-        (workspace_dir / "outputs" / "latentdna" / "views" / "bundle_view").as_posix()
-    ]
-    assert not (workspace_dir / "outputs" / "latentdna" / "views" / "bundle_view").exists()
+    assert preview_payload["outputs"] == [(workspace_dir / "outputs" / "views" / "bundle_view").as_posix()]
+    assert not (workspace_dir / "outputs" / "views" / "bundle_view").exists()
 
     for view_id in ["bundle_view", "context_view"]:
         result = _RUNNER.invoke(
@@ -304,7 +302,7 @@ def test_phase16_view_stats_scalar_join_and_common_cli_flags(tmp_path: Path) -> 
     assert len(reduced_stats_payload["explained_variance_ratio"]) == 2
     assert reduced_stats_payload["source_view_id"] == "bundle_view"
 
-    joined_table = pq.read_table(workspace_dir / "outputs" / "latentdna" / "scalars" / "joined_norms" / "table.parquet")
+    joined_table = pq.read_table(workspace_dir / "outputs" / "scalars" / "joined_norms" / "table.parquet")
     assert joined_table.column_names == ["id", "subject_id", "cohort", "bundle_norm", "label", "context_norm"]
     assert joined_table.to_pylist() == [
         {

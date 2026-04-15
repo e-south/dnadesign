@@ -6,13 +6,15 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .notebook import NotebookConfig
 from .plot import PlotConfig
 
 Identifier = Annotated[str, Field(min_length=1)]
+NonEmptyText = Annotated[str, Field(min_length=1)]
 AggregationMode = Literal["error", "first", "mean", "medoid"]
+AlignmentKeyBasis = Literal["record_key", "subject_key"]
 
 
 class StrictWorkspaceModel(BaseModel):
@@ -21,6 +23,7 @@ class StrictWorkspaceModel(BaseModel):
 
 class WorkspaceSection(StrictWorkspaceModel):
     id: Identifier
+    title: str | None = None
     output_root: str
 
 
@@ -28,8 +31,21 @@ class DefaultsSection(StrictWorkspaceModel):
     analysis_dtype: Literal["float32", "float64"] = "float32"
     metric: str = "cosine"
     random_seed: int = 17
-    plot_formats: list[str] = Field(default_factory=lambda: ["svg", "png"])
+    plot_formats: list[str] = Field(default_factory=lambda: ["svg", "pdf", "png"])
     neighbor_backend: str = "auto"
+    memory_policy: "MemoryPolicyConfig" = Field(default_factory=lambda: MemoryPolicyConfig())
+
+
+class MemoryPolicyConfig(StrictWorkspaceModel):
+    warn_fraction_of_system_ram: float = Field(default=0.50, gt=0.0, lt=1.0)
+    fail_fraction_of_system_ram: float = Field(default=0.75, gt=0.0, lt=1.0)
+    require_override_above_fail: bool = True
+
+    @model_validator(mode="after")
+    def _validate_thresholds(self) -> "MemoryPolicyConfig":
+        if self.warn_fraction_of_system_ram > self.fail_fraction_of_system_ram:
+            raise ValueError("memory_policy warn_fraction_of_system_ram must be <= fail_fraction_of_system_ram")
+        return self
 
 
 class MetadataSection(StrictWorkspaceModel):
@@ -132,10 +148,31 @@ ViewConfig = SourceBackedViewConfig | DerivedViewConfig
 class AlignmentConfig(StrictWorkspaceModel):
     left: str
     right: str
-    on: Literal["record_key", "subject_key"] | list[str]
+    on: AlignmentKeyBasis | list[str] | None = None
+    left_on: list[str] | None = None
+    right_on: list[str] | None = None
     support: Literal["intersection"] = "intersection"
     left_aggregation: AggregationMode = "error"
     right_aggregation: AggregationMode = "error"
+
+    @model_validator(mode="after")
+    def _validate_key_contract(self) -> "AlignmentConfig":
+        has_explicit_pair = self.left_on is not None or self.right_on is not None
+        if has_explicit_pair:
+            if self.left_on is None or self.right_on is None:
+                raise ValueError("alignments must declare both left_on and right_on together")
+            if self.on is not None:
+                raise ValueError("alignments cannot declare both on and left_on/right_on")
+            if not self.left_on or not self.right_on:
+                raise ValueError("alignments must declare at least one key column per side")
+            if len(self.left_on) != len(self.right_on):
+                raise ValueError("alignments left_on and right_on must have the same number of columns")
+            return self
+        if self.on is None:
+            raise ValueError("alignments must declare either on or left_on/right_on")
+        if isinstance(self.on, list) and not self.on:
+            raise ValueError("alignments with explicit on columns must declare at least one key column")
+        return self
 
 
 class VectorNormScalarSpec(StrictWorkspaceModel):
@@ -248,6 +285,22 @@ class ExportConfig(StrictWorkspaceModel):
     metadata_columns: list[str] = Field(default_factory=list)
 
 
+class ReferenceSetConfig(StrictWorkspaceModel):
+    ids: list[str] = Field(min_length=1)
+    match_column: str = "id"
+    label_column: str | None = None
+    label_mode: Literal["label_and_highlight", "highlight_only"] = "label_and_highlight"
+
+
+class AcceptanceCheckConfig(StrictWorkspaceModel):
+    kind: Literal[
+        "required_plot_kind",
+        "required_reference_set",
+        "require_reference_set_in_every_panel",
+    ]
+    value: str | bool
+
+
 class RecipeStepConfig(StrictWorkspaceModel):
     id: Identifier
     op: str
@@ -260,21 +313,29 @@ class RecipeConfig(StrictWorkspaceModel):
 
 
 class DeliverableConfig(StrictWorkspaceModel):
-    kind: str
-    description: str
-    question: str | None = None
-    section: str | None = None
+    title: NonEmptyText
+    section: NonEmptyText
+    question: NonEmptyText
+    summary: NonEmptyText
     recipe: str
-    requires: dict[str, list[str]] = Field(default_factory=dict)
-    outputs: dict[str, list[str]] = Field(default_factory=dict)
+    requires: dict[str, list[str]]
+    outputs: dict[str, list[str]]
+    docs_refs: list[str]
+    acceptance_checks: list[AcceptanceCheckConfig]
+
+    @model_validator(mode="after")
+    def _validate_declared_references(self) -> "DeliverableConfig":
+        if not self.requires:
+            raise ValueError("deliverables must declare at least one requires entry")
+        if not self.outputs:
+            raise ValueError("deliverables must declare at least one outputs entry")
+        return self
 
 
 class StudyBindingConfig(StrictWorkspaceModel):
-    kind: Literal["dnadesign_study"]
-    study_dir: str
-    readiness_vocabulary: list[Literal["missing", "attention", "ok"]] = Field(
-        default_factory=lambda: ["missing", "attention", "ok"]
-    )
+    study_id: NonEmptyText
+    docs_root: NonEmptyText
+    readiness_vocabulary: list[Literal["missing", "attention", "ok"]] = Field(default_factory=list)
 
 
 class WorkspaceConfig(StrictWorkspaceModel):
@@ -287,6 +348,7 @@ class WorkspaceConfig(StrictWorkspaceModel):
     views: dict[str, ViewConfig] = Field(default_factory=dict)
     scalars: dict[str, ScalarConfig] = Field(default_factory=dict)
     landmarks: dict[str, LandmarkConfig] = Field(default_factory=dict)
+    reference_sets: dict[str, ReferenceSetConfig] = Field(default_factory=dict)
     plots: dict[str, PlotConfig] = Field(default_factory=dict)
     exports: dict[str, ExportConfig] = Field(default_factory=dict)
     cohorts: dict[str, CohortConfig] = Field(default_factory=dict)

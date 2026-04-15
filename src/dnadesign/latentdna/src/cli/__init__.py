@@ -4,4 +4,9 @@ Internal CLI for latentdna.
 
 from .app import app
 
-__all__ = ["app"]
+
+def main() -> None:
+    app()
+
+
+__all__ = ["app", "main"]

@@ -17,7 +17,8 @@ app = typer.Typer(help="Cluster commands for latentdna.")
 def fit(
     cluster_id: str = typer.Argument(...),
     workspace: str = typer.Option(..., "--workspace"),
-    view: str = typer.Option(..., "--view"),
+    view: str | None = typer.Option(None, "--view"),
+    reduced_view: str | None = typer.Option(None, "--reduced-view"),
     method: str = typer.Option("kmeans", "--method"),
     n_clusters: int | None = typer.Option(None, "--n-clusters"),
     sample: str | None = typer.Option(None, "--sample"),
@@ -28,6 +29,7 @@ def fit(
     resolution: float = typer.Option(1.0, "--resolution"),
     seed: int | None = typer.Option(None, "--seed"),
     max_iter: int = typer.Option(100, "--max-iter"),
+    allow_memory_overage: bool = typer.Option(False, "--allow-memory-overage"),
     force: bool = typer.Option(False, "--force"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     format_name: str = typer.Option("text", "--format"),
@@ -40,6 +42,7 @@ def fit(
                 workspace,
                 cluster_id,
                 view_id=view,
+                reduced_view_id=reduced_view,
                 sample_id=sample,
                 alignment_id=alignment,
                 method=method,
@@ -50,6 +53,7 @@ def fit(
                 workspace,
                 cluster_id,
                 view_id=view,
+                reduced_view_id=reduced_view,
                 method=method,
                 n_clusters=n_clusters,
                 seed=seed,
@@ -60,6 +64,7 @@ def fit(
                 metric=metric,
                 k=k,
                 resolution=resolution,
+                allow_memory_overage=allow_memory_overage,
                 force=force,
             ).model_dump(mode="json")
         )

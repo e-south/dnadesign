@@ -5,6 +5,7 @@ Deliverable list, status, and run services for latentdna.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Callable
 
 from ..contracts.deliverable import (
     ARTIFACT_REFERENCE_CATEGORIES,
@@ -14,9 +15,11 @@ from ..contracts.deliverable import (
 )
 from ..contracts.result import CommandResult
 from ..runs.recorder import record_audit
+from ..studies.docs_refs import resolve_docs_ref
 from ..workspaces.loader import WorkspaceContext, load_workspace_config
 from ._artifacts import artifact_dir, artifact_exists, artifact_kind_for_category
 from .freshness_service import FreshnessCache, evaluate_artifact_freshness
+from .progress_service import build_run_id, heartbeat_scope, start_run_progress
 from .recipe_service import run_recipe
 
 
@@ -112,9 +115,13 @@ def list_deliverables(workspace: str | Path) -> dict[str, object]:
     deliverables = [
         {
             "deliverable_id": deliverable_id,
-            "kind": deliverable.kind,
-            "description": deliverable.description,
+            "title": deliverable.title,
+            "section": deliverable.section,
+            "question": deliverable.question,
+            "summary": deliverable.summary,
             "recipe": deliverable.recipe,
+            "docs_refs": list(deliverable.docs_refs),
+            "acceptance_checks": [item.model_dump(mode="json") for item in deliverable.acceptance_checks],
         }
         for deliverable_id, deliverable in sorted(context.config.deliverables.items())
     ]
@@ -139,33 +146,132 @@ def deliverable_status(workspace: str | Path, deliverable_id: str) -> Deliverabl
         for category, ids in deliverable.outputs.items()
         for item_id in ids
     ]
+    acceptance_results: list[dict[str, object]] = []
+    warnings: list[str] = []
+    for acceptance_check in deliverable.acceptance_checks:
+        result = _evaluate_acceptance_check(context, deliverable, acceptance_check)
+        acceptance_results.append(result)
+        if result["status"] != "ok":
+            warnings.append(str(result["reason"]))
+    base_status = _status_from_entries(checks, outputs)
     return DeliverableStatusResult(
         deliverable_id=deliverable_id,
-        status=_status_from_entries(checks, outputs),
+        title=deliverable.title,
+        section=deliverable.section,
+        question=deliverable.question,
+        summary=deliverable.summary,
+        status="attention" if warnings and base_status == "ok" else base_status,
         checks=checks,
         outputs=outputs,
+        docs_refs=[resolve_docs_ref(context, docs_ref) for docs_ref in deliverable.docs_refs],
+        acceptance_checks=acceptance_results,
+        warnings=warnings,
     )
 
 
-def run_deliverable(workspace: str | Path, deliverable_id: str, *, force: bool = False) -> CommandResult:
+def _evaluate_acceptance_check(context: WorkspaceContext, deliverable, acceptance_check) -> dict[str, object]:
+    result: dict[str, object] = {
+        "kind": acceptance_check.kind,
+        "value": acceptance_check.value,
+        "status": "ok",
+    }
+    if acceptance_check.kind == "required_plot_kind":
+        plot_ids = deliverable.outputs.get("plots", [])
+        mismatched = [
+            plot_id for plot_id in plot_ids if context.require_plot(plot_id).kind != str(acceptance_check.value)
+        ]
+        if mismatched:
+            result["status"] = "error"
+            result["reason"] = f"plots do not match required kind {acceptance_check.value!r}: {mismatched}"
+        return result
+    if acceptance_check.kind == "required_reference_set":
+        plot_ids = deliverable.outputs.get("plots", [])
+        mismatched = []
+        for plot_id in plot_ids:
+            annotation = getattr(context.require_plot(plot_id), "annotation", None)
+            if annotation is None or annotation.reference_set != str(acceptance_check.value):
+                mismatched.append(plot_id)
+        if mismatched:
+            result["status"] = "error"
+            result["reason"] = f"plots do not declare reference_set {acceptance_check.value!r}: {mismatched}"
+        return result
+    if acceptance_check.kind == "require_reference_set_in_every_panel":
+        if bool(acceptance_check.value) is False:
+            return result
+        incomplete = []
+        for plot_id in deliverable.outputs.get("plots", []):
+            manifest_path = artifact_dir(context, artifact_kind="plot", artifact_id=plot_id) / "manifest.json"
+            if not manifest_path.is_file():
+                incomplete.append(plot_id)
+                continue
+            manifest = context.read_manifest(manifest_path)
+            if not bool(manifest.get("stats", {}).get("reference_set_complete")):
+                incomplete.append(plot_id)
+        if incomplete:
+            result["status"] = "attention"
+            result["reason"] = f"reference_set completeness not satisfied for plots: {incomplete}"
+        return result
+    result["status"] = "error"
+    result["reason"] = f"unsupported acceptance check: {acceptance_check.kind}"
+    return result
+
+
+def run_deliverable(
+    workspace: str | Path,
+    deliverable_id: str,
+    *,
+    force: bool = False,
+    allow_memory_overage: bool = False,
+    event_sink: Callable[[dict[str, object]], None] | None = None,
+) -> CommandResult:
     context = load_workspace_config(workspace)
     deliverable = context.require_deliverable(deliverable_id)
-    recipe_result = run_recipe(context.workspace_dir, deliverable.recipe, force=force)
-    status = deliverable_status(context.workspace_dir, deliverable_id)
+    run_id = build_run_id(kind="deliverable", name=deliverable_id)
+    progress = start_run_progress(
+        context,
+        command="deliverable run",
+        run_id=run_id,
+        current_stage=deliverable_id,
+        expected_steps=1,
+        event_sink=event_sink,
+    )
+    try:
+        progress.step_started(current_step=deliverable.recipe)
+        with heartbeat_scope(progress, current_step=deliverable.recipe):
+            recipe_result = run_recipe(
+                context.workspace_dir,
+                deliverable.recipe,
+                force=force,
+                allow_memory_overage=allow_memory_overage,
+                refresh_catalog=False,
+                event_sink=event_sink,
+            )
+        progress.step_finished(current_step=deliverable.recipe, status=recipe_result.status)
+        status = deliverable_status(context.workspace_dir, deliverable_id)
+    except Exception as exc:
+        progress.fail(current_step=deliverable.recipe, message=str(exc))
+        raise
     output_paths = [entry.path for entry in status.outputs if entry.path is not None and entry.status == "ok"]
+    warnings = [*recipe_result.warnings, *status.warnings]
+    result_status = status.status
+    if warnings and result_status == "ok":
+        result_status = "attention"
     result = CommandResult(
         command="deliverable run",
         workspace_id=context.workspace_id,
-        status=status.status,
+        status=result_status,
+        run_id=run_id,
         artifact_kind="deliverable",
         artifact_id=deliverable_id,
         outputs=output_paths,
         inputs={"deliverable": deliverable_id, "recipe": deliverable.recipe},
+        warnings=warnings,
         metrics={
             "executed_steps": recipe_result.metrics["executed_steps"],
             "skipped_steps": recipe_result.metrics["skipped_steps"],
             "steps": recipe_result.metrics["steps"],
             "outputs": len(output_paths),
+            "recipe_warnings": len(recipe_result.warnings),
         },
     )
     record_audit(
@@ -174,4 +280,8 @@ def run_deliverable(workspace: str | Path, deliverable_id: str, *, force: bool =
         command="deliverable_run",
         artifact_id=deliverable_id,
     )
+    progress.succeed()
+    from .catalog_service import workspace_catalog
+
+    workspace_catalog(context.workspace_dir)
     return result

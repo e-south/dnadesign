@@ -23,6 +23,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig) -> ResolvedPlotSpec:
             color_column=config.color_column,
             label_column=config.label_column,
             label_values=list(config.label_values),
+            annotation=config.annotation,
             config_id=plot_id,
         )
     if config.kind == "projection_grid":
@@ -34,6 +35,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig) -> ResolvedPlotSpec:
             label_column=config.label_column,
             label_values=list(config.label_values),
             panel_titles=list(config.panel_titles or []),
+            annotation=config.annotation,
             config_id=plot_id,
         )
     if config.kind == "heatmap":
@@ -131,6 +133,7 @@ def _inline_payload(
             "color_column": color_column,
             "label_column": label_column,
             "label_values": label_values,
+            "annotation": None,
         }
     if kind == "projection_grid":
         return {
@@ -140,6 +143,7 @@ def _inline_payload(
             "color_column": color_column,
             "label_column": label_column,
             "label_values": label_values,
+            "annotation": None,
         }
     if kind == "heatmap":
         return {

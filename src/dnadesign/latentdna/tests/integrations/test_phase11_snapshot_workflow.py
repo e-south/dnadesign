@@ -19,7 +19,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -58,7 +58,7 @@ def test_phase11_snapshot_build_persists_key_rows_without_vectors(tmp_path: Path
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -100,7 +100,7 @@ def test_phase11_snapshot_build_persists_key_rows_without_vectors(tmp_path: Path
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
     assert payload["artifact_kind"] == "snapshot"
-    snapshot_dir = workspace_dir / "outputs" / "latentdna" / "snapshots" / "anchor60_snapshot"
+    snapshot_dir = workspace_dir / "outputs" / "snapshots" / "anchor60_snapshot"
     rows_table = pq.read_table(snapshot_dir / "rows.parquet")
     assert rows_table.column_names == ["id", "subject_id"]
     assert rows_table.num_rows == 2

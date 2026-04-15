@@ -16,9 +16,9 @@ import shutil
 import pytest
 from pydantic import ValidationError
 
-from dnadesign.latentdna import load_workspace_config
-from dnadesign.latentdna.api import CoordinateSpaceError, WorkspaceValidationError
-from dnadesign.latentdna.src.workspaces.loader import builtin_templates_dir
+from dnadesign.latentdna.src.contracts.errors import CoordinateSpaceError, WorkspaceValidationError
+from dnadesign.latentdna.src.workspaces import load_workspace_config
+from dnadesign.latentdna.src.workspaces.paths import builtin_templates_dir
 
 
 def test_load_workspace_config_rejects_cross_space_vector_difference(tmp_path) -> None:
@@ -29,7 +29,7 @@ def test_load_workspace_config_rejects_cross_space_vector_difference(tmp_path) -
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -82,7 +82,7 @@ def test_load_workspace_config_rejects_unknown_alignment_reference(tmp_path) -> 
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -140,7 +140,7 @@ def test_load_workspace_config_accepts_matrix_bundle_and_extended_derivations(tm
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -260,7 +260,7 @@ def test_load_workspace_config_rejects_unknown_view_key(tmp_path) -> None:
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -302,7 +302,7 @@ def test_load_workspace_config_rejects_cross_space_concatenate_of_raw_views(tmp_
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -358,7 +358,7 @@ def test_load_workspace_config_rejects_unknown_cohort_source(tmp_path) -> None:
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -404,7 +404,7 @@ def test_load_workspace_config_rejects_cyclic_recipe_graph(tmp_path) -> None:
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -460,7 +460,7 @@ def test_load_workspace_config_rejects_unknown_deliverable_recipe(tmp_path) -> N
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -486,14 +486,18 @@ views:
     role: primary
 deliverables:
   atlas_demo:
-    kind: projection_panel
-    description: Demo deliverable.
+    title: Demo deliverable
+    section: Atlas
+    question: Does the demo deliverable validate?
+    summary: Minimal deliverable fixture for recipe validation.
     recipe: missing_recipe
     requires:
       views: [z20_60]
     outputs:
       projections: [umap_z20_60]
       plots: [atlas_demo_plot]
+    docs_refs: []
+    acceptance_checks: []
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -511,7 +515,7 @@ def test_load_workspace_config_rejects_unknown_config_backed_deliverable_output(
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -544,13 +548,17 @@ recipes:
           view: z20_60
 deliverables:
   atlas_demo:
-    kind: projection_panel
-    description: Demo deliverable.
+    title: Demo deliverable
+    section: Atlas
+    question: Does the demo deliverable validate?
+    summary: Minimal deliverable fixture for config-backed output validation.
     recipe: atlas_recipe
     requires:
       views: [z20_60]
     outputs:
       views: [missing_view]
+    docs_refs: []
+    acceptance_checks: []
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -568,7 +576,7 @@ def test_load_workspace_config_rejects_declared_deliverable_output_missing_from_
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -615,14 +623,18 @@ recipes:
           view: z20_60
 deliverables:
   atlas_demo:
-    kind: projection_panel
-    description: Demo deliverable.
+    title: Demo deliverable
+    section: Atlas
+    question: Does the demo deliverable validate?
+    summary: Minimal deliverable fixture for recipe-output validation.
     recipe: atlas_recipe
     requires:
       views: [z20_60]
     outputs:
       views: [delta20]
       scalars: [delta20_norm]
+    docs_refs: []
+    acceptance_checks: []
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -640,8 +652,8 @@ def test_load_workspace_config_accepts_landmark_atlas_committee_template(tmp_pat
     context = load_workspace_config(workspace_dir)
 
     assert context.workspace_id == "stress_ethanol_cipro_latent_atlas"
-    assert "atlas_2x2_intermediate" in context.config.deliverables
-    assert "control_neighborhood_enrichment" in context.config.deliverables
+    assert "atlas_2x2_intermediate_main" in context.config.deliverables
+    assert "control_pca_explained_variance_curve" in context.config.deliverables
     assert "context_shift_primary" in context.config.deliverables
     assert "agreement_7b_vs_20b" in context.config.deliverables
     assert "x2_primary_20b" in context.config.deliverables
@@ -655,7 +667,7 @@ def test_load_workspace_config_accepts_notebook_declarations(tmp_path) -> None:
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -681,14 +693,39 @@ views:
     role: primary
 notebooks:
   atlas_review:
-    kind: artifact_review
-    title: Demo artifact review
-    artifacts:
-      - kind: view
-        id: z20_60
-      - kind: projection
-        id: umap_z20_60
-        alias: atlas_projection
+    kind: workspace
+    title: Demo workspace notebook
+    default_deliverable: atlas_review_bundle
+plots:
+  atlas_scatter:
+    kind: projection_scatter
+    projection: umap_z20_60
+deliverables:
+  atlas_review_bundle:
+    title: Demo workspace deliverable
+    section: Atlas
+    question: Does the atlas render cleanly?
+    summary: Minimal workspace notebook surface.
+    recipe: atlas_recipe
+    requires:
+      views: [z20_60]
+    outputs:
+      plots: [atlas_scatter]
+      notebooks: [atlas_review]
+    docs_refs: []
+    acceptance_checks: []
+recipes:
+  atlas_recipe:
+    steps:
+      - id: render_atlas
+        op: plot.render
+        params:
+          plot: atlas_scatter
+      - id: generate_notebook
+        op: notebook.generate
+        depends_on: [render_atlas]
+        params:
+          notebook: atlas_review
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -696,8 +733,151 @@ notebooks:
 
     context = load_workspace_config(workspace_dir)
     notebook = context.require_notebook("atlas_review")
-    assert notebook.title == "Demo artifact review"
-    assert [artifact.id for artifact in notebook.artifacts] == ["z20_60", "umap_z20_60"]
+    assert notebook.title == "Demo workspace notebook"
+    assert notebook.default_deliverable == "atlas_review_bundle"
+
+
+def test_load_workspace_config_rejects_legacy_deliverable_shape(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  z20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: shared_space
+    tags: {model: demo}
+    role: primary
+recipes:
+  atlas_recipe:
+    steps:
+      - id: materialize_view
+        op: view.materialize
+        params:
+          view: z20_60
+deliverables:
+  atlas_demo:
+    kind: projection_panel
+    description: Legacy deliverable.
+    recipe: atlas_recipe
+    requires:
+      views: [z20_60]
+    outputs:
+      views: [z20_60]
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_legacy_study_binding_shape(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources: {}
+metadata:
+  include: []
+study_binding:
+  study_dir: src/dnadesign/studies/stress_ethanol_cipro_growth
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_legacy_output_root_location(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs/latentdna
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources: {}
+metadata:
+  include: []
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(WorkspaceValidationError, match="legacy output_root is not supported"):
+        load_workspace_config(workspace_dir)
+
+
+def test_load_workspace_config_rejects_populated_legacy_output_tree(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources: {}
+metadata:
+  include: []
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    legacy_plot_dir = workspace_dir / "outputs" / "latentdna" / "plots" / "atlas_demo"
+    legacy_plot_dir.mkdir(parents=True)
+    (legacy_plot_dir / "manifest.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(WorkspaceValidationError, match="legacy output tree is not supported"):
+        load_workspace_config(workspace_dir)
 
 
 def test_load_workspace_config_accepts_plot_registry(tmp_path) -> None:
@@ -708,7 +888,7 @@ def test_load_workspace_config_accepts_plot_registry(tmp_path) -> None:
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -760,7 +940,7 @@ def test_load_workspace_config_rejects_projection_grid_with_misaligned_panel_tit
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -792,7 +972,7 @@ def test_load_workspace_config_rejects_projection_scatter_label_values_without_c
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -824,7 +1004,7 @@ def test_load_workspace_config_rejects_distribution_plot_with_multiple_inputs(tm
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -848,7 +1028,7 @@ plots:
         load_workspace_config(workspace_dir)
 
 
-def test_load_workspace_config_rejects_unknown_notebook_artifact_kind(tmp_path) -> None:
+def test_load_workspace_config_rejects_unknown_notebook_default_deliverable(tmp_path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
     (workspace_dir / "config.yaml").write_text(
@@ -856,7 +1036,7 @@ def test_load_workspace_config_rejects_unknown_notebook_artifact_kind(tmp_path) 
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -882,17 +1062,15 @@ views:
     role: primary
 notebooks:
   atlas_review:
-    kind: artifact_review
-    title: Demo artifact review
-    artifacts:
-      - kind: made_up_kind
-        id: z20_60
+    kind: workspace
+    title: Demo workspace notebook
+    default_deliverable: missing_bundle
         """.strip()
         + "\n",
         encoding="utf-8",
     )
 
-    with pytest.raises(WorkspaceValidationError, match="unsupported notebook artifact kind"):
+    with pytest.raises(WorkspaceValidationError, match="references unknown default deliverable"):
         load_workspace_config(workspace_dir)
 
 
@@ -904,7 +1082,7 @@ def test_load_workspace_config_rejects_unknown_export_block_alignment(tmp_path) 
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine

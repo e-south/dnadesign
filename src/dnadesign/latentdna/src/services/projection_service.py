@@ -17,6 +17,7 @@ from ..projections.fit import fit_projection_artifact
 from ..runs.recorder import record_audit
 from ..version import __version__
 from ..workspaces.loader import load_workspace_config
+from .memory_service import apply_memory_preflight, evaluate_projection_preflight
 
 
 def fit_projection(
@@ -27,6 +28,7 @@ def fit_projection(
     sample_id: str,
     metric: str | None,
     seed: int,
+    allow_memory_overage: bool = False,
     force: bool = False,
 ) -> CommandResult:
     context = load_workspace_config(workspace)
@@ -36,6 +38,8 @@ def fit_projection(
     staging_dir = stage_artifact_dir(context.output_root / "projections", projection_id)
 
     metric_value = metric or context.config.defaults.metric
+    preflight = evaluate_projection_preflight(context, view_id=view_id, sample_id=sample_id)
+    status, warnings = apply_memory_preflight(preflight, allow_memory_overage=allow_memory_overage)
     try:
         artifact_dir, rows = fit_projection_artifact(
             context,
@@ -59,6 +63,7 @@ def fit_projection(
         created_at=datetime.now(UTC).isoformat(),
         tool_version=__version__,
         command="projection fit",
+        status=status,
         inputs=[
             ArtifactInput(
                 kind="view_matrix",
@@ -71,21 +76,29 @@ def fit_projection(
                 digest=sha256_file(context.output_root / "samples" / sample_id / "rows.parquet"),
             ),
         ],
-        params={"method": "umap", "metric": metric_value, "random_seed": seed, "dimensionality": 2},
+        params={
+            "method": "umap",
+            "metric": metric_value,
+            "random_seed": seed,
+            "dimensionality": 2,
+            "memory_preflight": preflight.as_payload(),
+        },
         outputs=[ArtifactOutput(path="coords.parquet", media_type="application/x-parquet")],
         stats={"rows": rows, "dims": 2},
+        warnings=warnings,
     )
     write_manifest(staging_dir / "manifest.json", manifest.model_dump(mode="json"))
     commit_staged_artifact_dirs([(staging_dir, projection_dir)], force=force)
     result = CommandResult(
         command="projection fit",
         workspace_id=context.workspace_id,
-        status="ok",
+        status=status,
         artifact_kind="projection",
         artifact_id=projection_id,
         outputs=[projection_dir.as_posix()],
         inputs={"view": view_id, "sample": sample_id},
-        metrics={"rows": rows},
+        warnings=warnings,
+        metrics={"rows": rows, "memory_preflight": preflight.as_payload()},
     )
     record_audit(
         context.output_root / "logs" / "audit",

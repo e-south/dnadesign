@@ -20,7 +20,8 @@
 - Reference router: [reference router](reference/README.md)
 - Concepts router: [concepts router](concepts/README.md)
 - By-type index: [docs index](index.md)
-- Public API surface: [api.py](../api.py)
+- Workspace/config package surface: [src/workspaces/__init__.py](../src/workspaces/__init__.py)
+- Execution-helper surface: [src/api.py](../src/api.py)
 - Package README: [../README.md](../README.md)
 
 ### Adjacent handoffs

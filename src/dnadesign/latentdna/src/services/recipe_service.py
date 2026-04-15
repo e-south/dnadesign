@@ -4,6 +4,7 @@ Recipe validation and execution services for latentdna.
 
 from __future__ import annotations
 
+import inspect
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -24,6 +25,7 @@ from .freshness_service import FreshnessCache, evaluate_artifact_freshness
 from .neighbors_service import fit_neighbors
 from .notebook_service import generate_notebook
 from .plot_service import render_plot
+from .progress_service import build_run_id, heartbeat_scope, start_run_progress
 from .projection_service import fit_projection
 from .sample_service import build_sample
 from .scalar_service import derive_scalar
@@ -55,23 +57,58 @@ def _list_param(params: dict[str, Any], *keys: str) -> list[str]:
     return [str(value)]
 
 
-def _materialize_view_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _materialize_view_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    del allow_memory_overage
     return materialize_view(workspace, str(_require_param(params, "view_id", "view")), force=force)
 
 
-def _derive_view_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _derive_view_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    del allow_memory_overage
     return derive_view(workspace, str(_require_param(params, "view_id", "view")), force=force)
 
 
-def _build_alignment_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _build_alignment_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    del allow_memory_overage
     return build_alignment(workspace, str(_require_param(params, "alignment_id", "alignment")), force=force)
 
 
-def _derive_scalar_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _derive_scalar_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    del allow_memory_overage
     return derive_scalar(workspace, str(_require_param(params, "scalar_id", "scalar")), force=force)
 
 
-def _build_sample_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _build_sample_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    del allow_memory_overage
     return build_sample(
         workspace,
         str(_require_param(params, "sample_id", "sample")),
@@ -80,13 +117,20 @@ def _build_sample_step(workspace: str | Path, params: dict[str, Any], *, force: 
         n=_optional_param(params, "n", default=None),
         group_column=_optional_param(params, "group_column", "group_by", default=None),
         seed=int(_optional_param(params, "seed", default=17)),
+        reference_set_id=_optional_param(params, "reference_set_id", "reference_set", default=None),
         explicit_ids=_list_param(params, "explicit_ids", "record_ids", "record_id"),
         input_sample_ids=_list_param(params, "input_sample_ids", "input_samples", "input_sample"),
         force=force,
     )
 
 
-def _fit_projection_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _fit_projection_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
     return fit_projection(
         workspace,
         str(_require_param(params, "view_id", "view")),
@@ -94,34 +138,57 @@ def _fit_projection_step(workspace: str | Path, params: dict[str, Any], *, force
         sample_id=str(_require_param(params, "sample_id", "sample")),
         metric=_optional_param(params, "metric", default=None),
         seed=int(_optional_param(params, "seed", default=17)),
+        allow_memory_overage=allow_memory_overage,
         force=force,
     )
 
 
-def _fit_neighbors_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _fit_neighbors_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
     return fit_neighbors(
         workspace,
         str(_require_param(params, "neighbor_id", "neighbors_id", "neighbors")),
-        view_id=str(_require_param(params, "view_id", "view")),
+        view_id=_optional_param(params, "view_id", "view", default=None),
+        reduced_view_id=_optional_param(params, "reduced_view_id", "reduced_view", default=None),
         k=int(_require_param(params, "k")),
         metric=_optional_param(params, "metric", default=None),
         backend=_optional_param(params, "backend", default=None),
         sample_id=_optional_param(params, "sample_id", "sample", default=None),
         alignment_id=_optional_param(params, "alignment_id", "alignment", default=None),
         seed=_optional_param(params, "seed", default=None),
+        allow_memory_overage=allow_memory_overage,
         force=force,
     )
 
 
-def _generate_notebook_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _generate_notebook_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    del allow_memory_overage
     return generate_notebook(
         workspace,
         str(_require_param(params, "notebook_id", "notebook")),
-        force=force,
+        force=bool(_optional_param(params, "force", default=force)),
     )
 
 
-def _score_distance_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _score_distance_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    del allow_memory_overage
     return score_distance(
         workspace,
         str(_require_param(params, "distance_id", "distance")),
@@ -132,7 +199,14 @@ def _score_distance_step(workspace: str | Path, params: dict[str, Any], *, force
     )
 
 
-def _score_enrichment_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _score_enrichment_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    del allow_memory_overage
     return score_enrichment(
         workspace,
         str(_require_param(params, "enrichment_id", "enrichment")),
@@ -143,11 +217,18 @@ def _score_enrichment_step(workspace: str | Path, params: dict[str, Any], *, for
     )
 
 
-def _fit_cluster_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _fit_cluster_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
     return fit_cluster(
         workspace,
         str(_require_param(params, "cluster_id", "cluster")),
-        view_id=str(_require_param(params, "view_id", "view")),
+        view_id=_optional_param(params, "view_id", "view", default=None),
+        reduced_view_id=_optional_param(params, "reduced_view_id", "reduced_view", default=None),
         method=str(_optional_param(params, "method", default="kmeans")),
         n_clusters=(
             int(_require_param(params, "n_clusters"))
@@ -162,11 +243,19 @@ def _fit_cluster_step(workspace: str | Path, params: dict[str, Any], *, force: b
         metric=_optional_param(params, "metric", default=None),
         k=int(_optional_param(params, "k", default=30)),
         resolution=float(_optional_param(params, "resolution", default=1.0)),
+        allow_memory_overage=allow_memory_overage,
         force=force,
     )
 
 
-def _compare_agreement_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _compare_agreement_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    del allow_memory_overage
     return compare_agreement(
         workspace,
         str(_require_param(params, "agreement_id", "agreement")),
@@ -179,7 +268,14 @@ def _compare_agreement_step(workspace: str | Path, params: dict[str, Any], *, fo
     )
 
 
-def _render_plot_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _render_plot_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    del allow_memory_overage
     return render_plot(
         workspace,
         str(_require_param(params, "plot_id", "plot")),
@@ -204,7 +300,13 @@ def _render_plot_step(workspace: str | Path, params: dict[str, Any], *, force: b
     )
 
 
-def _reduce_view_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _reduce_view_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
     return reduce_view(
         workspace,
         str(_require_param(params, "view_id", "view")),
@@ -213,19 +315,49 @@ def _reduce_view_step(workspace: str | Path, params: dict[str, Any], *, force: b
         sample_id=_optional_param(params, "sample_id", "sample", default=None),
         alignment_id=_optional_param(params, "alignment_id", "alignment", default=None),
         reduced_view_id=_optional_param(params, "reduced_view_id", default=None),
+        allow_memory_overage=allow_memory_overage,
         force=force,
     )
 
 
-def _export_matrix_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
-    return export_matrix(workspace, str(_require_param(params, "export_id", "export")), force=force)
+def _export_matrix_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    return export_matrix(
+        workspace,
+        str(_require_param(params, "export_id", "export")),
+        allow_memory_overage=allow_memory_overage,
+        force=force,
+    )
 
 
-def _export_table_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
-    return export_table(workspace, str(_require_param(params, "export_id", "export")), force=force)
+def _export_table_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    return export_table(
+        workspace,
+        str(_require_param(params, "export_id", "export")),
+        allow_memory_overage=allow_memory_overage,
+        force=force,
+    )
 
 
-def _build_snapshot_step(workspace: str | Path, params: dict[str, Any], *, force: bool) -> CommandResult:
+def _build_snapshot_step(
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    del allow_memory_overage
     return build_snapshot(
         workspace,
         str(_require_param(params, "snapshot_id", "snapshot")),
@@ -234,7 +366,7 @@ def _build_snapshot_step(workspace: str | Path, params: dict[str, Any], *, force
     )
 
 
-STEP_EXECUTORS: dict[str, Callable[[str | Path, dict[str, Any]], CommandResult]] = {
+STEP_EXECUTORS: dict[str, Callable[..., CommandResult]] = {
     "agreement.compare": _compare_agreement_step,
     "alignment.build": _build_alignment_step,
     "cluster.fit": _fit_cluster_step,
@@ -255,6 +387,19 @@ STEP_EXECUTORS: dict[str, Callable[[str | Path, dict[str, Any]], CommandResult]]
 }
 
 
+def _invoke_executor(
+    executor: Callable[..., CommandResult],
+    workspace: str | Path,
+    params: dict[str, Any],
+    *,
+    force: bool,
+    allow_memory_overage: bool,
+) -> CommandResult:
+    if "allow_memory_overage" in inspect.signature(executor).parameters:
+        return executor(workspace, params, force=force, allow_memory_overage=allow_memory_overage)
+    return executor(workspace, params, force=force)
+
+
 def validate_recipe(workspace: str | Path, recipe_id: str) -> RecipeValidationResult:
     context = load_workspace_config(workspace)
     recipe = context.require_recipe(recipe_id)
@@ -266,8 +411,17 @@ def validate_recipe(workspace: str | Path, recipe_id: str) -> RecipeValidationRe
     )
 
 
-def run_recipe(workspace: str | Path, recipe_id: str, *, force: bool = False) -> CommandResult:
+def run_recipe(
+    workspace: str | Path,
+    recipe_id: str,
+    *,
+    force: bool = False,
+    allow_memory_overage: bool = False,
+    refresh_catalog: bool = True,
+    event_sink: Callable[[dict[str, object]], None] | None = None,
+) -> CommandResult:
     context = load_workspace_config(workspace)
+    run_id = build_run_id(kind="recipe", name=recipe_id)
     recipe = context.require_recipe(recipe_id)
     steps_by_id = {step.id: step for step in recipe.steps}
     order = topological_step_order(recipe.steps)
@@ -275,67 +429,104 @@ def run_recipe(workspace: str | Path, recipe_id: str, *, force: bool = False) ->
     executed_steps = 0
     rebuilt_steps = 0
     skipped_steps = 0
+    warnings: list[str] = []
     step_summaries: list[dict[str, Any]] = []
     freshness_cache = FreshnessCache()
+    progress = start_run_progress(
+        context,
+        command="recipe run",
+        run_id=run_id,
+        current_stage=recipe_id,
+        expected_steps=len(order),
+        event_sink=event_sink,
+    )
 
-    for step_id in order:
-        step = steps_by_id[step_id]
-        try:
-            refs = expected_step_artifacts(step.op, step.params)
-        except ValueError as exc:
-            raise ContractViolationError(str(exc)) from exc
-        existence = [
-            artifact_exists(context, artifact_kind=kind, artifact_id=artifact_id) for kind, artifact_id in refs
-        ]
-        step_force = force
-        rebuild_reasons: list[str] = []
-        if not force and existence and all(existence):
-            freshness = [
-                evaluate_artifact_freshness(
-                    context,
-                    artifact_kind=kind,
-                    artifact_id=artifact_id,
-                    cache=freshness_cache,
-                )
-                for kind, artifact_id in refs
+    try:
+        for step_id in order:
+            step = steps_by_id[step_id]
+            progress.step_started(current_step=step_id)
+            try:
+                refs = expected_step_artifacts(step.op, step.params)
+            except ValueError as exc:
+                raise ContractViolationError(str(exc)) from exc
+            existence = [
+                artifact_exists(context, artifact_kind=kind, artifact_id=artifact_id) for kind, artifact_id in refs
             ]
-            if all(entry["status"] == "ok" for entry in freshness):
-                skipped_steps += 1
-                step_summaries.append({"step_id": step_id, "op": step.op, "status": "skipped"})
-                continue
-            step_force = True
-            rebuild_reasons = [str(entry.get("reason") or "freshness requires attention") for entry in freshness]
-        if not force and any(existence) and not all(existence):
-            raise ArtifactConflictError(
-                f"recipe step {step_id} has partial existing outputs; rerun with --force to rebuild"
-            )
+            step_force = force or bool(step.params.get("force", False))
+            rebuild_reasons: list[str] = []
+            if not step_force and existence and all(existence):
+                freshness = [
+                    evaluate_artifact_freshness(
+                        context,
+                        artifact_kind=kind,
+                        artifact_id=artifact_id,
+                        cache=freshness_cache,
+                    )
+                    for kind, artifact_id in refs
+                ]
+                if all(entry["status"] == "ok" for entry in freshness):
+                    skipped_steps += 1
+                    step_summaries.append({"step_id": step_id, "op": step.op, "status": "skipped"})
+                    progress.step_finished(current_step=step_id, status="skipped")
+                    continue
+                step_force = True
+                rebuild_reasons = [str(entry.get("reason") or "freshness requires attention") for entry in freshness]
+            if not step_force and any(existence) and not all(existence):
+                raise ArtifactConflictError(
+                    f"recipe step {step_id} has partial existing outputs; rerun with --force to rebuild"
+                )
 
-        executor = STEP_EXECUTORS[step.op]
-        step_result = executor(context.workspace_dir, dict(step.params), force=step_force)
-        executed_steps += 1
-        rebuilt = bool(rebuild_reasons)
-        if rebuilt:
-            rebuilt_steps += 1
-        outputs.extend(step_result.outputs)
-        summary = {
-            "step_id": step_id,
-            "op": step.op,
-            "status": "rebuilt" if rebuilt else "ok",
-            "artifact_kind": step_result.artifact_kind,
-            "artifact_id": step_result.artifact_id,
-        }
-        if rebuilt:
-            summary["rebuild_reasons"] = rebuild_reasons
-        step_summaries.append(summary)
+            executor = STEP_EXECUTORS[step.op]
+            if rebuild_reasons:
+                progress.step_progress(
+                    current_step=step_id,
+                    message="rebuild required because upstream freshness needs attention",
+                )
+            with heartbeat_scope(progress, current_step=step_id):
+                step_result = _invoke_executor(
+                    executor,
+                    context.workspace_dir,
+                    dict(step.params),
+                    force=step_force,
+                    allow_memory_overage=allow_memory_overage,
+                )
+            executed_steps += 1
+            rebuilt = bool(rebuild_reasons)
+            if rebuilt:
+                rebuilt_steps += 1
+            outputs.extend(step_result.outputs)
+            summary_status = "attention" if step_result.status == "attention" else ("rebuilt" if rebuilt else "ok")
+            summary = {
+                "step_id": step_id,
+                "op": step.op,
+                "status": summary_status,
+                "artifact_kind": step_result.artifact_kind,
+                "artifact_id": step_result.artifact_id,
+            }
+            if rebuilt:
+                summary["rebuild_reasons"] = rebuild_reasons
+            if step_result.warnings:
+                step_warnings = [f"{step_id}: {warning}" for warning in step_result.warnings]
+                warnings.extend(step_warnings)
+                summary["warnings"] = step_result.warnings
+                for warning in step_warnings:
+                    progress.warning(warning)
+            step_summaries.append(summary)
+            progress.step_finished(current_step=step_id, status=str(summary_status))
+    except Exception as exc:
+        progress.fail(current_step=step_id if "step_id" in locals() else None, message=str(exc))
+        raise
 
     result = CommandResult(
         command="recipe run",
         workspace_id=context.workspace_id,
-        status="ok",
+        status="attention" if warnings else "ok",
+        run_id=run_id,
         artifact_kind="recipe",
         artifact_id=recipe_id,
         outputs=outputs,
         inputs={"recipe": recipe_id},
+        warnings=warnings,
         metrics={
             "steps": len(order),
             "executed_steps": executed_steps,
@@ -352,4 +543,9 @@ def run_recipe(workspace: str | Path, recipe_id: str, *, force: bool = False) ->
         command="recipe_run",
         artifact_id=recipe_id,
     )
+    progress.succeed()
+    if refresh_catalog:
+        from .catalog_service import workspace_catalog
+
+        workspace_catalog(context.workspace_dir)
     return result

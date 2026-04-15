@@ -73,6 +73,8 @@ def inspect_alignment(workspace: str | Path, alignment_id: str) -> dict[str, obj
                 "left": alignment.left,
                 "right": alignment.right,
                 "on": alignment.on,
+                "left_on": alignment.left_on,
+                "right_on": alignment.right_on,
                 "support": alignment.support,
                 "left_aggregation": alignment.left_aggregation,
                 "right_aggregation": alignment.right_aggregation,

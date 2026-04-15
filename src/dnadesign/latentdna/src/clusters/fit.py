@@ -15,7 +15,7 @@ from ..contracts.workspace import SourceBackedViewConfig
 from ..distances.score import _select_indices
 from ..io.json_io import write_json
 from ..io.parquet_io import write_table
-from ..views.scopes import resolve_view_scope
+from ..views.scopes import resolve_feature_scope
 from ..workspaces.loader import WorkspaceContext
 
 
@@ -234,12 +234,14 @@ def _cluster_medoids_table(
 def _nearest_landmarks_table(
     context: WorkspaceContext,
     *,
-    view_id: str,
+    view_id: str | None,
     matrix: np.ndarray,
     rows: list[dict[str, object]],
     labels: np.ndarray,
     metric: str,
 ) -> pa.Table:
+    if view_id is None:
+        return pa.Table.from_pylist([])
     view = context.require_view(view_id)
     if not isinstance(view, SourceBackedViewConfig):
         return pa.Table.from_pylist([])
@@ -298,7 +300,8 @@ def fit_cluster_artifact(
     context: WorkspaceContext,
     *,
     cluster_id: str,
-    view_id: str,
+    view_id: str | None,
+    reduced_view_id: str | None,
     method: str,
     n_clusters: int | None,
     seed: int,
@@ -310,9 +313,10 @@ def fit_cluster_artifact(
     k: int,
     resolution: float,
 ) -> tuple[Path, dict[str, object]]:
-    matrix, rows_table, scope_kind, scope_id = resolve_view_scope(
+    matrix, rows_table, scope_kind, scope_id = resolve_feature_scope(
         context,
         view_id=view_id,
+        reduced_view_id=reduced_view_id,
         sample_id=sample_id,
         alignment_id=alignment_id,
     )
@@ -328,6 +332,7 @@ def fit_cluster_artifact(
         summary: dict[str, object] = {
             "method": "kmeans",
             "view_id": view_id,
+            "reduced_view_id": reduced_view_id,
             "rows": row_count,
             "scope_kind": scope_kind,
             "scope_id": scope_id,
@@ -363,6 +368,7 @@ def fit_cluster_artifact(
         summary = {
             "method": "leiden",
             "view_id": view_id,
+            "reduced_view_id": reduced_view_id,
             "rows": row_count,
             "scope_kind": scope_kind,
             "scope_id": scope_id,

@@ -74,7 +74,11 @@ def test_latentdna_docs_tree_exposes_workflow_reference_and_dev_surfaces() -> No
     assert "reference/cli-contracts.md" in workflow_index
     assert "reference/workspace-schema.md" in workflow_index
     assert "reference/performance-budgets.md" in workflow_index
-    assert "../api.py" in workflow_index or "api.py" in workflow_index
+    assert "src/workspaces/__init__.py" in workflow_index
+    assert "Execution-helper surface" in workflow_index
+    assert "src/api.py" in workflow_index
+    assert "src/workspaces/api.py" not in workflow_index
+    assert "../api.py" not in workflow_index
     assert "../../infer/docs/README.md" in workflow_index
     assert "../../opal/README.md" in workflow_index
     assert "../../usr/README.md" in workflow_index
@@ -102,31 +106,55 @@ def test_latentdna_docs_tree_exposes_workflow_reference_and_dev_surfaces() -> No
     assert "**Plane:** downstream-tool" in workflow
     assert "**Owner-boundary:** latentdna" in workflow
     assert "**Registry-id:** latentdna.promoter-study.latent-atlas" in workflow
+    assert "### View taxonomy for the active study" in workflow
+    assert "z20_1k_seq" in workflow
+    assert "logits7_60" in workflow
+    assert "logits7_1k_anchor" in workflow
+    assert "logits20_60" in workflow
+    assert "logits20_1k_anchor" in workflow
+    assert "pooled logits" in workflow
+    assert "2 x 3" in workflow
     assert "### First tracer-bullet path" in workflow
     assert "src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth" in workflow
+    assert "uv run latentdna workspace refresh" in workflow
     assert "uv run latentdna validate workspace" in workflow
     assert "--deep" in workflow
     assert "uv run latentdna view materialize z20_60" in workflow
     assert "uv run latentdna sample build atlas_anchor_sample" in workflow
     assert "--group-column design_family" in workflow
+    assert "--reference-set promoter_wt_core" in workflow
     assert "densegen__plan" not in workflow
     assert "uv run latentdna projection fit z20_60" in workflow
     assert "uv run latentdna deliverable status atlas_2x2_intermediate_main" in workflow
     assert "uv run latentdna deliverable run atlas_2x2_intermediate_main" in workflow
     assert "uv run latentdna deliverable run context_shift_primary" in workflow
     assert "uv run latentdna deliverable run agreement_7b_vs_20b" in workflow
+    assert "### Context-audit and browser control-plane slice" in workflow
+    assert "uv run latentdna deliverable status geometry_switchboard_20b" in workflow
+    assert "uv run latentdna deliverable run geometry_switchboard_20b" in workflow
+    assert "uv run latentdna deliverable status context_audit_primary_20b" in workflow
+    assert "uv run latentdna deliverable run context_audit_primary_20b" in workflow
+    assert "uv run latentdna view reduce z20_60" in workflow
+    assert "uv run latentdna view reduce z20_1k_anchor" in workflow
+    assert "--reduced-view-id z20_60_anchor_ctx_pc32" in workflow
+    assert "--reduced-view-id z20_1k_anchor_anchor_ctx_pc32" in workflow
+    assert "uv run latentdna neighbors fit leiden_z20_60_knn" in workflow
+    assert "uv run latentdna neighbors fit leiden_z20_1k_anchor_knn" in workflow
     assert "uv run latentdna cluster fit leiden_z20_60" in workflow
     assert "uv run latentdna cluster fit leiden_z20_1k_anchor" in workflow
     assert "--method leiden" in workflow
     assert "kmeans" not in workflow
     assert "uv run latentdna deliverable run cluster_correspondence_primary" in workflow
-    assert "uv run latentdna deliverable run control_neighborhood_enrichment" in workflow
+    assert "uv run latentdna deliverable run control_pca_explained_variance_curve" in workflow
     assert "uv run latentdna export matrix x2_primary_20b" in workflow
     assert "uv run latentdna export matrix x3_ablation_7b" in workflow
     assert "uv run latentdna notebook generate browser" in workflow
+    assert "controls.json" in workflow
+    assert "uv run latentdna notebook smoke" in workflow
     assert "uv run marimo run" in workflow
-    assert "outputs/latentdna/notebooks/browser.py" in workflow
-    assert "outputs/latentdna/plots" in workflow
+    assert "outputs/notebooks/browser/notebook.py" in workflow
+    assert "outputs/plots" in workflow
+    assert "outputs/latentdna" in workflow
     assert "--backend exact" not in workflow
 
     assert "x2_primary_20b" in export_workflow
@@ -136,6 +164,7 @@ def test_latentdna_docs_tree_exposes_workflow_reference_and_dev_surfaces() -> No
     assert "### Common flags" in reference
     assert "### Primitive command groups" in reference
     assert "`latentdna workspace init`" in reference
+    assert "`latentdna workspace refresh`" in reference
     assert "`latentdna validate workspace`" in reference
     assert "`latentdna workspace init --from-study-dir <path>`" in reference
     assert "`latentdna validate workspace --deep`" in reference
@@ -147,19 +176,31 @@ def test_latentdna_docs_tree_exposes_workflow_reference_and_dev_surfaces() -> No
     assert "`latentdna enrich score`" in reference
     assert "`latentdna plot render`" in reference
     assert "`latentdna notebook generate`" in reference
+    assert "`latentdna notebook smoke`" in reference
     assert "`latentdna recipe validate`" in reference
     assert "`latentdna deliverable status`" in reference
+    assert "`latentdna inspect notebook-health`" in reference
     assert "`latentdna.command_result.v1`" in reference
     assert "`latentdna.deliverable_status.v1`" in reference
     assert "`--quiet`" in reference
     assert "`--dry-run`" in reference
     assert "distance_scatter" in reference
+    assert "xy_scatter" in reference
     assert "distribution" in reference
+    assert "curve" in reference
+    assert "correspondence_heatmap" in reference
     assert "agreement_summary" in reference
     assert "workspace-wide plot browser" in reference
+    assert "controls.json" in reference
+    assert "status=attention" in reference
 
-    assert "outputs/latentdna/plots" in workspace_schema
-    assert "notebooks.<id>.artifacts" in workspace_schema
+    assert "outputs/plots" in workspace_schema
+    assert "notebooks.<id>.default_deliverable" in workspace_schema
+    assert "outputs/notebooks/<id>/controls.json" in workspace_schema
+    assert "reference_set" in workspace_schema
+    assert "xy_scatter" in workspace_schema
+    assert "curve" in workspace_schema
+    assert "correspondence_heatmap" in workspace_schema
 
     assert "bench_view_materialize" in performance
     assert "bench_export_x2" in performance

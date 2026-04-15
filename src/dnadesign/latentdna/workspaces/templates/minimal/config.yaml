@@ -2,7 +2,7 @@ schema_version: latentdna.workspace.v1
 
 workspace:
   id: latentdna_workspace
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 
 defaults:
   analysis_dtype: float32
@@ -10,6 +10,10 @@ defaults:
   random_seed: 17
   plot_formats: [svg, png]
   neighbor_backend: auto
+  memory_policy:
+    warn_fraction_of_system_ram: 0.5
+    fail_fraction_of_system_ram: 0.75
+    require_override_above_fail: true
 
 sources:
   anchor60:

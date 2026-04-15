@@ -12,6 +12,8 @@ Module Author(s): OpenAI Codex
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pyarrow as pa
@@ -19,7 +21,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -35,7 +37,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "euclidean",
@@ -58,20 +60,22 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                         "source": "anchor60",
                         "vector": {"kind": "column", "name": "embedding_anchor"},
                         "coordinate_space_id": "demo_space_anchor",
-                        "tags": {"model": "demo", "context": "anchor_only"},
+                        "tags": {"model": "20b", "family": "intermediate", "context": "60bp"},
                         "role": "primary",
                     }
                 },
                 "notebooks": {
                     "atlas_review": {
-                        "kind": "artifact_review",
-                        "title": "Atlas artifact review",
-                        "description": "Load persisted atlas artifacts without recomputing them.",
-                        "artifacts": [
-                            {"kind": "view", "id": "z20_60"},
-                            {"kind": "sample_set", "id": "atlas_sample"},
-                            {"kind": "projection", "id": "umap_z20_60"},
-                        ],
+                        "kind": "workspace",
+                        "title": "Atlas workspace notebook",
+                        "description": "Review persisted atlas artifacts without recomputing them.",
+                        "default_deliverable": "atlas_review_bundle",
+                    }
+                },
+                "plots": {
+                    "atlas_demo_plot": {
+                        "kind": "projection_scatter",
+                        "projection": "umap_z20_60",
                     }
                 },
                 "recipes": {
@@ -109,11 +113,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                                 "id": "render_plot",
                                 "op": "plot.render",
                                 "depends_on": ["fit_projection"],
-                                "params": {
-                                    "plot_id": "atlas_demo_plot",
-                                    "kind": "projection_scatter",
-                                    "projection": ["umap_z20_60"],
-                                },
+                                "params": {"plot_id": "atlas_demo_plot"},
                             },
                             {
                                 "id": "generate_notebook",
@@ -128,16 +128,29 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                 },
                 "deliverables": {
                     "atlas_review_bundle": {
-                        "kind": "notebook_bundle",
-                        "description": "Projection plot plus persisted artifact notebook scaffold.",
                         "recipe": "atlas_notebook_recipe",
-                        "requires": {"views": ["z20_60"]},
+                        "title": "Atlas review notebook bundle",
+                        "section": "atlas",
+                        "question": "Can the persisted atlas artifacts be reviewed without recomputation?",
+                        "summary": (
+                            "Projection plot plus persisted artifact notebook scaffold for the atlas review workflow."
+                        ),
+                        "requires": {
+                            "sources": ["anchor60"],
+                            "views": ["z20_60"],
+                            "recipes": ["atlas_notebook_recipe"],
+                        },
                         "outputs": {
+                            "views": ["z20_60"],
                             "samples": ["atlas_sample"],
                             "projections": ["umap_z20_60"],
                             "plots": ["atlas_demo_plot"],
                             "notebooks": ["atlas_review"],
                         },
+                        "docs_refs": [],
+                        "acceptance_checks": [
+                            {"kind": "required_plot_kind", "value": "projection_scatter"},
+                        ],
                     }
                 },
             },
@@ -191,8 +204,30 @@ def test_phase7_notebook_generation_flow(tmp_path: Path) -> None:
         app,
         ["notebook", "generate", "atlas_review", "--workspace", workspace_dir.as_posix(), "--json"],
     )
-    assert missing_notebook_result.exit_code != 0
-    assert "artifact is missing for notebook generation" in missing_notebook_result.stdout
+    assert missing_notebook_result.exit_code == 0, missing_notebook_result.stdout
+    missing_notebook_payload = json.loads(missing_notebook_result.stdout)
+    assert missing_notebook_payload["status"] == "attention"
+    assert "atlas_demo_plot" in "".join(missing_notebook_payload["warnings"])
+
+    smoke_result = _RUNNER.invoke(
+        app,
+        ["notebook", "smoke", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert smoke_result.exit_code == 18, smoke_result.stdout
+    smoke_payload = json.loads(smoke_result.stdout)
+    assert smoke_payload["status"] == "error"
+    assert smoke_payload["checks"]["notebook_exists"] is True
+    assert smoke_payload["checks"]["control_plane_loads"] is True
+    assert smoke_payload["checks"]["default_deliverable_ready"] is False
+
+    inspect_health_result = _RUNNER.invoke(
+        app,
+        ["inspect", "notebook-health", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert inspect_health_result.exit_code == 18, inspect_health_result.stdout
+    inspect_health_payload = json.loads(inspect_health_result.stdout)
+    assert inspect_health_payload["data"]["health"]["status"] == "error"
+    assert inspect_health_payload["data"]["health"]["checks"]["notebook_exists"] is True
 
     status_before = _RUNNER.invoke(
         app,
@@ -200,7 +235,7 @@ def test_phase7_notebook_generation_flow(tmp_path: Path) -> None:
     )
     assert status_before.exit_code == 0, status_before.stdout
     status_before_payload = json.loads(status_before.stdout)
-    assert status_before_payload["status"] == "missing"
+    assert status_before_payload["status"] == "attention"
 
     run_result = _RUNNER.invoke(
         app,
@@ -210,26 +245,65 @@ def test_phase7_notebook_generation_flow(tmp_path: Path) -> None:
     run_payload = json.loads(run_result.stdout)
     assert run_payload["artifact_kind"] == "deliverable"
     assert run_payload["artifact_id"] == "atlas_review_bundle"
+    assert run_payload["run_id"].startswith("deliverable__atlas_review_bundle__")
     assert run_payload["metrics"]["executed_steps"] == 5
     assert run_payload["metrics"]["skipped_steps"] == 0
 
-    notebook_dir = workspace_dir / "outputs" / "latentdna" / "notebooks" / "atlas_review"
+    recipe_run_path = next(
+        path
+        for path in (workspace_dir / "outputs" / "runs").iterdir()
+        if path.name.startswith("recipe__atlas_notebook_recipe__")
+    )
+
+    deliverable_run_json = workspace_dir / "outputs" / "runs" / run_payload["run_id"] / "run.json"
+    recipe_run_json = recipe_run_path / "run.json"
+    catalog_json = workspace_dir / "outputs" / "catalog.json"
+    assert deliverable_run_json.is_file()
+    assert recipe_run_json.is_file()
+    assert catalog_json.is_file()
+    assert json.loads(deliverable_run_json.read_text(encoding="utf-8"))["state"] == "succeeded"
+    assert json.loads(recipe_run_json.read_text(encoding="utf-8"))["state"] == "succeeded"
+    catalog_payload = json.loads(catalog_json.read_text(encoding="utf-8"))
+    assert catalog_payload["workspace_id"] == "stress_ethanol_cipro_latent_atlas"
+    assert any(row["deliverable_id"] == "atlas_review_bundle" for row in catalog_payload["deliverables"])
+
+    notebook_dir = workspace_dir / "outputs" / "notebooks" / "atlas_review"
     notebook_path = notebook_dir / "notebook.py"
+    controls_path = notebook_dir / "controls.json"
     assert notebook_path.is_file()
+    assert controls_path.is_file()
     notebook_text = notebook_path.read_text(encoding="utf-8")
     assert "import marimo" in notebook_text
     assert "__generated_with" in notebook_text
-    assert 'app = marimo.App(width="full")' in notebook_text
-    assert "Atlas artifact review" in notebook_text
-    assert '"id": "z20_60"' in notebook_text
-    assert "def load_artifact" in notebook_text
-    assert "def discover_plot_artifacts" in notebook_text
-    assert "def render_file" in notebook_text
-    assert 'label="Artifact"' in notebook_text
-    assert 'label="Workspace plot"' in notebook_text
-    assert '"Workspace plots": workspace_plot_browser_panel' in notebook_text
-    assert 'PLOT_ARTIFACT_ROOT = WORKSPACE_DIR / "outputs" / "latentdna" / "plots"' in notebook_text
+    assert 'app = marimo.App(width="medium")' in notebook_text
+    assert "Atlas workspace notebook" in notebook_text
+    assert "load_workspace_notebook_controls(CONTROL_PATH)" in notebook_text
+    assert "build_workspace_browser_runtime(" in notebook_text
+    assert "_identity = runtime.identity" in notebook_text
+    assert "_catalog = runtime.catalog" in notebook_text
+    assert "_geometry = runtime.geometry" in notebook_text
+    assert "_support = runtime.support" in notebook_text
+    assert 'runtime["' not in notebook_text
+    assert "WORKSPACE_DIR = Path(__file__).resolve().parents[3]" in notebook_text
+    assert "catalog.json" in notebook_text
+    assert 'label="Section"' in notebook_text
+    assert 'label="Deliverable"' in notebook_text
+    assert 'label="Plot"' in notebook_text
+    assert 'label="Model"' in notebook_text
+    assert 'label="Layout"' in notebook_text
+    assert 'label="Hue"' in notebook_text
+    assert 'label="Left geometry"' in notebook_text
+    assert 'label="Right geometry"' in notebook_text
+    assert "What this shows" in notebook_text
+    assert "Manifest and QA Details" in notebook_text
+    assert "Atlas Viewer" in notebook_text
+    assert "Compare Views" in notebook_text
+    assert "Inventory" in notebook_text
     assert (notebook_dir / "manifest.json").is_file()
+    controls_payload = json.loads(controls_path.read_text(encoding="utf-8"))
+    assert controls_payload["schema_version"] == "latentdna.workspace_notebook_controls.v1"
+    assert controls_payload["workspace_id"] == "stress_ethanol_cipro_latent_atlas"
+    assert controls_payload["notebook_id"] == "atlas_review"
 
     rerun_result = _RUNNER.invoke(
         app,
@@ -249,3 +323,43 @@ def test_phase7_notebook_generation_flow(tmp_path: Path) -> None:
     assert status_after_payload["status"] == "ok"
     outputs = {entry["name"]: entry for entry in status_after_payload["outputs"]}
     assert outputs["notebook:atlas_review"]["status"] == "ok"
+
+    export_path = workspace_dir / "atlas_review.html"
+    export_result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "marimo",
+            "export",
+            "html",
+            notebook_path.as_posix(),
+            "-o",
+            export_path.as_posix(),
+            "-f",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert export_result.returncode == 0, export_result.stderr or export_result.stdout
+    assert export_path.is_file()
+
+    controls_path.write_text('{"schema_version":"latentdna.workspace_notebook_controls.v1"}', encoding="utf-8")
+    invalid_export_result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "marimo",
+            "export",
+            "html",
+            notebook_path.as_posix(),
+            "-o",
+            export_path.as_posix(),
+            "-f",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert invalid_export_result.returncode != 0
+    assert "WorkspaceNotebookControls" in (invalid_export_result.stderr + invalid_export_result.stdout)

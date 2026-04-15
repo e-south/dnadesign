@@ -7,12 +7,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..contracts.errors import ArtifactConflictError, MissingArtifactError, WorkspaceValidationError
+from ..contracts.errors import (
+    ArtifactConflictError,
+    ContractViolationError,
+    MissingArtifactError,
+    WorkspaceValidationError,
+)
 from ..contracts.recipe import expected_step_artifacts, topological_step_order
 from ..contracts.result import CommandResult
 from ..services._artifacts import artifact_dir, artifact_kind_for_category
-from ..services.plot_service import resolve_plot_request
-from ..workspaces.loader import builtin_templates_dir, load_workspace_config, resolve_repo_path
+from ..services.plot_service import plot_input_payload, resolve_plot_request
+from ..workspaces.loader import load_workspace_config
+from ..workspaces.paths import builtin_templates_dir, resolve_repo_path
 
 _ARTIFACT_LABELS = {
     "alignment_set": "alignment",
@@ -43,6 +49,23 @@ def _ensure_preview_targets_available(output_paths: list[Path], *, artifact_kind
     for output_path in output_paths:
         if output_path.exists():
             raise ArtifactConflictError(f"{_artifact_label(artifact_kind)} artifact already exists: {output_path}")
+
+
+def _resolve_matrix_source_preview(
+    context,
+    *,
+    view_id: str | None,
+    reduced_view_id: str | None,
+) -> dict[str, str | None]:
+    if (view_id is None) == (reduced_view_id is None):
+        raise ContractViolationError("exactly one of --view or --reduced-view is required")
+    if reduced_view_id is not None:
+        reduced_view_dir = artifact_dir(context, artifact_kind="reduced_view", artifact_id=reduced_view_id)
+        if not reduced_view_dir.is_dir():
+            raise MissingArtifactError(f"reduced view artifact is missing: {reduced_view_id}")
+        return {"view": None, "reduced_view": reduced_view_id}
+    context.require_view(str(view_id))
+    return {"view": str(view_id), "reduced_view": None}
 
 
 def _preview_payload(
@@ -93,10 +116,7 @@ def preview_workspace_init(
         artifact_kind="workspace",
         artifact_id=workspace_dir.name,
         outputs=[workspace_dir],
-        inputs={
-            "template": template,
-            **({"study_dir": str(from_study_dir)} if from_study_dir is not None else {}),
-        },
+        inputs={"template": template},
     )
     payload["config_path"] = (workspace_dir / "config.yaml").as_posix()
     return payload
@@ -209,6 +229,7 @@ def preview_sample_build(
     *,
     view_id: str | None,
     strategy: str,
+    reference_set_id: str | None,
     explicit_ids: list[str] | None,
     input_sample_ids: list[str] | None,
     force: bool,
@@ -227,6 +248,7 @@ def preview_sample_build(
         inputs={
             "view": view_id,
             "strategy": strategy,
+            "reference_set": reference_set_id,
             "explicit_ids": explicit_ids or [],
             "input_samples": input_sample_ids or [],
         },
@@ -237,13 +259,19 @@ def preview_neighbors_fit(
     workspace: str | Path,
     neighbors_id: str,
     *,
-    view_id: str,
+    view_id: str | None,
+    reduced_view_id: str | None,
     sample_id: str | None,
     alignment_id: str | None,
     force: bool,
 ) -> dict[str, Any]:
     context = load_workspace_config(workspace)
-    context.require_view(view_id)
+    source_inputs = _resolve_matrix_source_preview(context, view_id=view_id, reduced_view_id=reduced_view_id)
+    if source_inputs["reduced_view"] is not None and (sample_id is not None or alignment_id is not None):
+        raise ContractViolationError(
+            "reduced-view previews do not accept sample or alignment; "
+            "reduce the scoped view first and pass --reduced-view"
+        )
     output_dir = artifact_dir(context, artifact_kind="neighbor_set", artifact_id=neighbors_id)
     _ensure_preview_targets_available([output_dir], artifact_kind="neighbor_set", force=force)
     return _preview_payload(
@@ -252,7 +280,7 @@ def preview_neighbors_fit(
         artifact_kind="neighbor_set",
         artifact_id=neighbors_id,
         outputs=[output_dir],
-        inputs={"view": view_id, "sample": sample_id, "alignment": alignment_id},
+        inputs={**source_inputs, "sample": sample_id, "alignment": alignment_id},
     )
 
 
@@ -260,14 +288,20 @@ def preview_cluster_fit(
     workspace: str | Path,
     cluster_id: str,
     *,
-    view_id: str,
+    view_id: str | None,
+    reduced_view_id: str | None,
     sample_id: str | None,
     alignment_id: str | None,
     method: str,
     force: bool,
 ) -> dict[str, Any]:
     context = load_workspace_config(workspace)
-    context.require_view(view_id)
+    source_inputs = _resolve_matrix_source_preview(context, view_id=view_id, reduced_view_id=reduced_view_id)
+    if source_inputs["reduced_view"] is not None and (sample_id is not None or alignment_id is not None):
+        raise ContractViolationError(
+            "reduced-view previews do not accept sample or alignment; "
+            "reduce the scoped view first and pass --reduced-view"
+        )
     output_dir = artifact_dir(context, artifact_kind="cluster_set", artifact_id=cluster_id)
     _ensure_preview_targets_available([output_dir], artifact_kind="cluster_set", force=force)
     return _preview_payload(
@@ -276,7 +310,7 @@ def preview_cluster_fit(
         artifact_kind="cluster_set",
         artifact_id=cluster_id,
         outputs=[output_dir],
-        inputs={"view": view_id, "sample": sample_id, "alignment": alignment_id, "method": method},
+        inputs={**source_inputs, "sample": sample_id, "alignment": alignment_id, "method": method},
     )
 
 
@@ -429,30 +463,13 @@ def preview_plot_render(
     )
     output_dir = artifact_dir(context, artifact_kind="plot", artifact_id=plot_id)
     _ensure_preview_targets_available([output_dir], artifact_kind="plot", force=force)
-    inputs = {
-        "kind": spec.kind,
-        "projections": spec.projection_ids,
-        "panel_titles": spec.panel_titles,
-        "enrichment": spec.enrichment_id,
-        "distance": spec.distance_id,
-        "scalar": spec.scalar_id,
-        "agreement": spec.agreement_id,
-        "reducer": spec.reducer_id,
-        "left_cluster": spec.left_cluster_id,
-        "right_cluster": spec.right_cluster_id,
-        "render_mode": spec.render_mode,
-        "label_column": spec.label_column,
-        "label_values": spec.label_values,
-    }
-    if spec.config_id is not None:
-        inputs["plot_recipe"] = spec.config_id
     return _preview_payload(
         workspace_id=context.workspace_id,
         command="plot render",
         artifact_kind="plot",
         artifact_id=plot_id,
         outputs=[output_dir],
-        inputs=inputs,
+        inputs=plot_input_payload(spec),
     )
 
 
@@ -482,10 +499,7 @@ def preview_notebook_generate(workspace: str | Path, notebook_id: str, *, force:
     notebook = context.require_notebook(notebook_id)
     output_dir = artifact_dir(context, artifact_kind="notebook", artifact_id=notebook_id)
     _ensure_preview_targets_available([output_dir], artifact_kind="notebook", force=force)
-    if hasattr(notebook, "artifacts"):
-        inputs = {"notebook": notebook_id, "artifacts": [artifact.id for artifact in notebook.artifacts]}
-    else:
-        inputs = {"notebook": notebook_id, "default_deliverable": notebook.default_deliverable}
+    inputs = {"notebook": notebook_id, "default_deliverable": notebook.default_deliverable}
     return _preview_payload(
         workspace_id=context.workspace_id,
         command="notebook generate",

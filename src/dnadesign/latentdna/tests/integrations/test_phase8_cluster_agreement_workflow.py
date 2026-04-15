@@ -20,7 +20,7 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -36,7 +36,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "euclidean",
@@ -271,7 +271,7 @@ def test_phase8_cluster_and_rich_agreement_flow(tmp_path: Path) -> None:
     agreement_payload = json.loads(agreement_result.stdout)
     assert agreement_payload["artifact_kind"] == "agreement_set"
 
-    agreement_dir = workspace_dir / "outputs" / "latentdna" / "agreements" / "anchor_vs_context_rich"
+    agreement_dir = workspace_dir / "outputs" / "agreements" / "anchor_vs_context_rich"
     agreement_rows = pq.read_table(agreement_dir / "table.parquet").to_pylist()
 
     knn_rows = [row for row in agreement_rows if row["method"] == "knn_overlap"]

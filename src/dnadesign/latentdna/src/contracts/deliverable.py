@@ -53,7 +53,13 @@ class DeliverableEntryStatus(BaseModel):
 class DeliverableStatusResult(BaseModel):
     schema_version: Literal["latentdna.deliverable_status.v1"] = "latentdna.deliverable_status.v1"
     deliverable_id: str
+    title: str
+    section: str
+    question: str
+    summary: str
     status: Literal["ok", "attention", "missing", "error"]
     checks: list[DeliverableEntryStatus] = Field(default_factory=list)
     outputs: list[DeliverableEntryStatus] = Field(default_factory=list)
+    docs_refs: list[dict[str, str]] = Field(default_factory=list)
+    acceptance_checks: list[dict[str, object]] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)

@@ -25,7 +25,7 @@ Prove the first artifact-first downstream loop:
 - Internal workspace/config loader with coordinate-space validation for declared vector differences
 - Source inspection and read-only adapters for `usr`, `parquet`, and `matrix_bundle`
 - Persisted `view`, `sample_set`, `projection`, and `plot` artifact families with `manifest.json`
-- Structured mutating command results plus audit records under `outputs/latentdna/logs/audit/`
+- Structured mutating command results plus audit records under `outputs/logs/audit/`
 - Docs skeleton, workspace templates, and targeted tests for layout, docs routing, CLI, config validation, and the first USR-backed integration path
 
 ### Constraints and deliberate deferrals
@@ -192,7 +192,7 @@ Finish the control-neighborhood workflow as an artifact-owned path by adding:
 ### Implemented in this slice
 
 - Typed `cohorts` support for `kind: column` declarations with workspace validation for referenced sources
-- `latentdna enrich score` with persisted `table.parquet` and `summary.json` outputs under `outputs/latentdna/enrichments/`
+- `latentdna enrich score` with persisted `table.parquet` and `summary.json` outputs under `outputs/enrichments/`
 - Landmark-neighborhood cohort summaries over existing `neighbor_set` artifacts, including deterministic `neighbor_fraction`, `background_fraction`, `enrichment_delta`, and `enrichment_ratio` columns
 - `heatmap` support in `latentdna plot render` via `--enrichment` and `--value-column`
 - Promoter-study template, workflow docs, CLI contracts, and docs tests updated to route the new control-neighborhood slice
@@ -472,7 +472,7 @@ Close the next spec-level public-surface gaps after alignment-backed exports:
   - `latentdna inspect landmarks`
   - `latentdna inspect missingness`
   - `latentdna inspect artifacts`
-- New `snapshot build` primitive with workspace-owned `snapshot` artifacts under `outputs/latentdna/snapshots/`
+- New `snapshot build` primitive with workspace-owned `snapshot` artifacts under `outputs/snapshots/`
 - Recipe support extended so the new `export.table` and `snapshot.build` primitives can participate in thin orchestration instead of staying ad hoc only
 - Phase-10 and phase-11 integration coverage for:
   - alignment-backed tabular exports
@@ -1127,10 +1127,10 @@ Upgrade the notebook review surface from a passive Python scaffold to an interac
   - `uv run ruff format --check src/dnadesign/latentdna/src/notebooks/scaffold.py src/dnadesign/latentdna/src/services/notebook_service.py src/dnadesign/latentdna/tests/integrations/test_phase7_notebook_workflow.py src/dnadesign/latentdna/tests/test_docs_contract.py`
   - `uv run pytest -q src/dnadesign/latentdna/tests/integrations/test_phase7_notebook_workflow.py src/dnadesign/latentdna/tests/test_docs_contract.py`
   - `uv run python -m dnadesign.devtools.docs_checks`
-  - `uvx marimo check /tmp/latentdna_marimo_ui.MyW53d/workspace/outputs/latentdna/notebooks/atlas_review/notebook.py`
+  - `uvx marimo check /tmp/latentdna_marimo_ui.MyW53d/workspace/outputs/notebooks/atlas_review/notebook.py`
 - Browser/runtime evidence:
   - generated a real fixture notebook via `uv run latentdna deliverable run atlas_review_bundle --workspace /tmp/latentdna_marimo_ui.MyW53d/workspace --json`
-  - launched it with `MPLCONFIGDIR=/tmp/latentdna_mpl uv run marimo run /tmp/latentdna_marimo_ui.MyW53d/workspace/outputs/latentdna/notebooks/atlas_review/notebook.py --headless --host 127.0.0.1 --port 27189`
+  - launched it with `MPLCONFIGDIR=/tmp/latentdna_mpl uv run marimo run /tmp/latentdna_marimo_ui.MyW53d/workspace/outputs/notebooks/atlas_review/notebook.py --headless --host 127.0.0.1 --port 27189`
   - the first Chrome DevTools pass caught the invalid dropdown initialization bug above
   - after switching the picker to alias-valued options, regenerating the notebook, and re-running `marimo check`, the notebook launched cleanly with no follow-on server-side execution errors observed during the fixed app run
 
@@ -1148,13 +1148,13 @@ Upgrade the notebook review surface from a passive Python scaffold to an interac
 Finish the first marimo review surface so it can act as a durable plot browser instead of only replaying the notebook-declared artifact list:
 
 - keep the declared-artifact review path unchanged
-- make every persisted `plot` artifact under `outputs/latentdna/plots` viewable from the notebook UI
+- make every persisted `plot` artifact under `outputs/plots` viewable from the notebook UI
 - confirm the updated marimo UX in a real browser pass rather than relying on static text generation alone
 
 ### Implemented in this slice
 
 - Extended `src/dnadesign/latentdna/src/notebooks/scaffold.py` so generated notebooks now:
-  - scan `outputs/latentdna/plots` at runtime for plot artifacts with `manifest.json`
+  - scan `outputs/plots` at runtime for plot artifacts with `manifest.json`
   - expose a dedicated `Workspace plots` browser tab alongside the existing declared-artifact tab
   - render discovered plot artifacts with the same manifest/file/preview surface used for declared artifacts
   - keep the scan read-only, so newly rendered plot artifacts appear without regenerating the notebook
@@ -1173,14 +1173,14 @@ Finish the first marimo review surface so it can act as a durable plot browser i
   - `uv run ruff format --check src/dnadesign/latentdna/src/notebooks/scaffold.py src/dnadesign/latentdna/tests/integrations/test_phase7_notebook_workflow.py src/dnadesign/latentdna/tests/test_docs_contract.py`
   - `uv run pytest -q src/dnadesign/latentdna/tests/integrations/test_phase7_notebook_workflow.py src/dnadesign/latentdna/tests/test_docs_contract.py`
   - `uv run python -m dnadesign.devtools.docs_checks`
-  - `uv run marimo check /tmp/latentdna_marimo_workspace.BQpUW0/workspace/outputs/latentdna/notebooks/atlas_review/notebook.py`
+  - `uv run marimo check /tmp/latentdna_marimo_workspace.BQpUW0/workspace/outputs/notebooks/atlas_review/notebook.py`
 - Browser/runtime evidence:
   - generated a fixture notebook whose declared artifacts omit the plot artifact via:
     - `MPLCONFIGDIR=/tmp/latentdna_mpl uv run latentdna deliverable run atlas_review_bundle --workspace /tmp/latentdna_marimo_workspace.BQpUW0/workspace --json`
   - rendered an additional plot artifact into the same workspace via:
     - `MPLCONFIGDIR=/tmp/latentdna_mpl uv run latentdna plot render atlas_secondary_plot --workspace /tmp/latentdna_marimo_workspace.BQpUW0/workspace --kind projection_scatter --projection umap_z20_60 --json`
   - launched the regenerated notebook in app mode via:
-    - `MPLCONFIGDIR=/tmp/latentdna_mpl uv run marimo run /tmp/latentdna_marimo_workspace.BQpUW0/workspace/outputs/latentdna/notebooks/atlas_review/notebook.py --headless --host 127.0.0.1 --port 27189`
+    - `MPLCONFIGDIR=/tmp/latentdna_mpl uv run marimo run /tmp/latentdna_marimo_workspace.BQpUW0/workspace/outputs/notebooks/atlas_review/notebook.py --headless --host 127.0.0.1 --port 27189`
   - the first Chrome DevTools pass caught a real marimo runtime error:
     - `RuntimeError: Accessing the value of a UIElement in the cell that created it is not allowed`
     - fixed by splitting the workspace-plot picker creation and value consumption into separate cells

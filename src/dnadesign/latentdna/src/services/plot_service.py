@@ -152,7 +152,7 @@ def _artifact_inputs_for_plot(context, spec: ResolvedPlotSpec) -> list[ArtifactI
     ]
 
 
-def _input_payload(spec: ResolvedPlotSpec) -> dict[str, object]:
+def plot_input_payload(spec: ResolvedPlotSpec) -> dict[str, object]:
     payload: dict[str, object] = {"kind": spec.kind}
     if spec.projection_ids:
         payload["projections"] = spec.projection_ids
@@ -217,6 +217,8 @@ def _manifest_params(spec: ResolvedPlotSpec) -> dict[str, object]:
         params["label_values"] = spec.label_values
     if spec.panel_titles:
         params["panel_titles"] = spec.panel_titles
+    if spec.annotation is not None:
+        params["annotation"] = spec.annotation.model_dump(mode="json")
     if spec.kind == "distribution":
         if spec.scalar_id is not None:
             params["input_kind"] = "scalar_table"
@@ -286,8 +288,10 @@ def write_plot_index(context: WorkspaceContext) -> dict[str, object]:
 
 
 def _stage_plot_dir(parent_dir: Path, plot_id: str) -> Path:
-    parent_dir.mkdir(parents=True, exist_ok=True)
-    return Path(tempfile.mkdtemp(prefix=f".{plot_id}_", dir=parent_dir))
+    output_root = parent_dir.parent
+    staging_root = output_root / "runs" / "_staging" / parent_dir.name
+    staging_root.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix=f"{plot_id}_", dir=staging_root))
 
 
 def resolve_plot_request(
@@ -388,7 +392,7 @@ def render_plot(
 
     staging_dir = _stage_plot_dir(context.output_root / "plots", plot_id)
     try:
-        _, outputs = render_plot_artifact(context, spec=spec, output_dir=staging_dir)
+        _, outputs, plot_metadata = render_plot_artifact(context, spec=spec, output_dir=staging_dir)
         inputs = _artifact_inputs_for_plot(context, spec)
         manifest = ArtifactManifest(
             artifact_kind="plot",
@@ -402,17 +406,24 @@ def render_plot(
             outputs=[
                 ArtifactOutput(
                     path=Path(output).name,
-                    media_type="image/svg+xml" if output.endswith(".svg") else "image/png",
+                    media_type=(
+                        "image/svg+xml"
+                        if output.endswith(".svg")
+                        else "application/pdf"
+                        if output.endswith(".pdf")
+                        else "image/png"
+                    ),
                 )
                 for output in outputs
             ],
-            stats={"outputs": len(outputs)},
+            stats={"outputs": len(outputs), **plot_metadata},
         )
         write_manifest(staging_dir / "manifest.json", manifest.model_dump(mode="json"))
         if force and plot_dir.exists():
             shutil.rmtree(plot_dir)
         if plot_dir.exists():
             raise ArtifactConflictError(f"plot artifact already exists: {plot_dir}")
+        plot_dir.parent.mkdir(parents=True, exist_ok=True)
         staging_dir.rename(plot_dir)
     except Exception:
         shutil.rmtree(staging_dir, ignore_errors=True)
@@ -425,7 +436,7 @@ def render_plot(
         artifact_kind="plot",
         artifact_id=plot_id,
         outputs=[plot_dir.as_posix()],
-        inputs=_input_payload(spec),
+        inputs=plot_input_payload(spec),
         metrics={"outputs": len(outputs)},
     )
     record_audit(

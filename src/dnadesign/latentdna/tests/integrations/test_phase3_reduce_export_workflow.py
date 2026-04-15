@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -36,7 +36,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -265,7 +265,7 @@ def test_phase3_reduce_and_export_flow(tmp_path: Path) -> None:
     assert reduce_payload["metrics"]["fit_rows"] == 3
     assert reduce_payload["metrics"]["reduced_view_rows"] == 4
 
-    reduced_matrix = np.load(workspace_dir / "outputs" / "latentdna" / "reduced_views" / "delta20_pc2" / "matrix.npy")
+    reduced_matrix = np.load(workspace_dir / "outputs" / "reduced_views" / "delta20_pc2" / "matrix.npy")
     assert reduced_matrix.shape == (4, 2)
 
     export_result = _RUNNER.invoke(
@@ -276,7 +276,7 @@ def test_phase3_reduce_and_export_flow(tmp_path: Path) -> None:
     export_payload = json.loads(export_result.stdout)
     assert export_payload["artifact_kind"] == "export_bundle"
 
-    export_dir = workspace_dir / "outputs" / "latentdna" / "exports" / "x_demo"
+    export_dir = workspace_dir / "outputs" / "exports" / "x_demo"
     matrix = np.load(export_dir / "matrix.npy")
     features = pq.read_table(export_dir / "features.parquet").to_pylist()
     rows = pq.read_table(export_dir / "rows.parquet")
@@ -284,6 +284,6 @@ def test_phase3_reduce_and_export_flow(tmp_path: Path) -> None:
     assert matrix.dtype == np.float32
     assert rows.num_rows == 4
     assert [row["feature_name"] for row in features] == ["delta20_pc_001", "delta20_pc_002", "delta20_norm"]
-    assert (workspace_dir / "outputs" / "latentdna" / "reducers" / "delta20_pca" / "manifest.json").is_file()
-    assert (workspace_dir / "outputs" / "latentdna" / "reduced_views" / "delta20_pc2" / "manifest.json").is_file()
+    assert (workspace_dir / "outputs" / "reducers" / "delta20_pca" / "manifest.json").is_file()
+    assert (workspace_dir / "outputs" / "reduced_views" / "delta20_pc2" / "manifest.json").is_file()
     assert (export_dir / "manifest.json").is_file()

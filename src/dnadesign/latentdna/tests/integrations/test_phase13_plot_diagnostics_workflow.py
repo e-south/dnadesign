@@ -19,7 +19,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -35,7 +35,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "euclidean",
@@ -218,6 +218,23 @@ def test_phase13_distance_distribution_and_agreement_summary_plots(tmp_path: Pat
     assert distance_scatter_result.exit_code == 0, distance_scatter_result.stdout
     distance_scatter_payload = json.loads(distance_scatter_result.stdout)
     assert distance_scatter_payload["artifact_kind"] == "plot"
+    distance_scatter_preview_result = _RUNNER.invoke(
+        app,
+        [
+            "plot",
+            "render",
+            "primary_landmark_scatter",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--dry-run",
+            "--force",
+            "--json",
+        ],
+    )
+    assert distance_scatter_preview_result.exit_code == 0, distance_scatter_preview_result.stdout
+    distance_scatter_preview_payload = json.loads(distance_scatter_preview_result.stdout)
+    assert distance_scatter_preview_payload["dry_run"] is True
+    assert distance_scatter_preview_payload["inputs"] == distance_scatter_payload["inputs"]
 
     distribution_result = _RUNNER.invoke(
         app,
@@ -233,6 +250,23 @@ def test_phase13_distance_distribution_and_agreement_summary_plots(tmp_path: Pat
     assert distribution_result.exit_code == 0, distribution_result.stdout
     distribution_payload = json.loads(distribution_result.stdout)
     assert distribution_payload["artifact_kind"] == "plot"
+    distribution_preview_result = _RUNNER.invoke(
+        app,
+        [
+            "plot",
+            "render",
+            "spy_distance_distribution",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--dry-run",
+            "--force",
+            "--json",
+        ],
+    )
+    assert distribution_preview_result.exit_code == 0, distribution_preview_result.stdout
+    distribution_preview_payload = json.loads(distribution_preview_result.stdout)
+    assert distribution_preview_payload["dry_run"] is True
+    assert distribution_preview_payload["inputs"] == distribution_payload["inputs"]
 
     agreement_plot_result = _RUNNER.invoke(
         app,
@@ -249,7 +283,7 @@ def test_phase13_distance_distribution_and_agreement_summary_plots(tmp_path: Pat
     agreement_plot_payload = json.loads(agreement_plot_result.stdout)
     assert agreement_plot_payload["artifact_kind"] == "plot"
 
-    output_root = workspace_dir / "outputs" / "latentdna" / "plots"
+    output_root = workspace_dir / "outputs" / "plots"
     for plot_id in ["primary_landmark_scatter", "spy_distance_distribution", "primary_agreement_summary"]:
         plot_dir = output_root / plot_id
         assert (plot_dir / "plot.svg").is_file()

@@ -21,7 +21,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -79,7 +79,7 @@ def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "latentdna_ext_demo", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "latentdna_ext_demo", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -280,7 +280,7 @@ def test_phase14_matrix_bundle_and_extended_derive_flow(tmp_path: Path) -> None:
     inspect_payload = json.loads(inspect_result.stdout)
     assert "bundle_matrix" in inspect_payload["data"]["vector_columns"]
 
-    outputs = workspace_dir / "outputs" / "latentdna"
+    outputs = workspace_dir / "outputs"
     bundle_matrix = np.load(outputs / "views" / "bundle_view" / "matrix.npy")
     assert bundle_matrix.shape == (3, 4)
 

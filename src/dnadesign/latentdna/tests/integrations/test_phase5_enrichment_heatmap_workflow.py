@@ -19,7 +19,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -35,7 +35,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "euclidean",
@@ -178,7 +178,7 @@ def test_phase5_landmark_enrichment_and_heatmap_flow(tmp_path: Path) -> None:
     enrichment_payload = json.loads(enrichment_result.stdout)
     assert enrichment_payload["artifact_kind"] == "enrichment_set"
 
-    enrichment_dir = workspace_dir / "outputs" / "latentdna" / "enrichments" / "landmark_plan_enrichment"
+    enrichment_dir = workspace_dir / "outputs" / "enrichments" / "landmark_plan_enrichment"
     enrichment_rows = {
         (row["landmark_id"], row["cohort_value"]): row
         for row in pq.read_table(enrichment_dir / "table.parquet").to_pylist()
@@ -218,6 +218,6 @@ def test_phase5_landmark_enrichment_and_heatmap_flow(tmp_path: Path) -> None:
     plot_payload = json.loads(plot_result.stdout)
     assert plot_payload["artifact_kind"] == "plot"
 
-    plot_dir = workspace_dir / "outputs" / "latentdna" / "plots" / "landmark_plan_heatmap"
+    plot_dir = workspace_dir / "outputs" / "plots" / "landmark_plan_heatmap"
     assert (plot_dir / "plot.svg").is_file()
     assert (plot_dir / "plot.png").is_file()

@@ -11,7 +11,7 @@ import numpy as np
 from ..contracts.errors import BackendUnavailableError, ContractViolationError
 from ..io.matrix_io import write_matrix
 from ..io.parquet_io import write_table
-from ..views.scopes import resolve_view_scope
+from ..views.scopes import resolve_feature_scope
 from ..workspaces.loader import WorkspaceContext
 from .backends import fit_neighbors_with_backend
 from .backends.approximate import approximate_backend_available
@@ -24,7 +24,8 @@ def fit_neighbor_artifact(
     context: WorkspaceContext,
     *,
     neighbor_id: str,
-    view_id: str,
+    view_id: str | None,
+    reduced_view_id: str | None,
     k: int,
     metric: str,
     backend: str,
@@ -32,9 +33,10 @@ def fit_neighbor_artifact(
     sample_id: str | None,
     alignment_id: str | None,
 ) -> tuple[Path, int, str, bool, str, str | None]:
-    matrix, rows, scope_kind, scope_id = resolve_view_scope(
+    matrix, rows, scope_kind, scope_id = resolve_feature_scope(
         context,
         view_id=view_id,
+        reduced_view_id=reduced_view_id,
         sample_id=sample_id,
         alignment_id=alignment_id,
     )

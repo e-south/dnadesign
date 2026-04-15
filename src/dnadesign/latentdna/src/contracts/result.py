@@ -14,6 +14,7 @@ class CommandResult(BaseModel):
     command: str
     workspace_id: str
     status: Literal["ok", "attention", "missing", "error"]
+    run_id: str | None = None
     dry_run: bool = False
     artifact_kind: str | None = None
     artifact_id: str | None = None

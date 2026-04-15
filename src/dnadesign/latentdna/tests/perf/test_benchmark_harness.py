@@ -33,7 +33,7 @@ def _write_workspace_config(workspace_dir: Path, *, anchor_path: Path, context_p
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": workspace_dir.name, "output_root": "./outputs/latentdna"},
+                "workspace": {"id": workspace_dir.name, "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -276,9 +276,11 @@ def _write_workspace_config(workspace_dir: Path, *, anchor_path: Path, context_p
                     }
                 },
                 "deliverables": {
-                    "atlas_2x2_intermediate": {
-                        "kind": "projection_grid",
-                        "description": "Fixture-scale atlas deliverable.",
+                    "atlas_2x2_intermediate_main": {
+                        "title": "Fixture atlas 2x2 intermediate main",
+                        "section": "Atlas",
+                        "question": "Does the fixture-scale atlas render cleanly?",
+                        "summary": "Fixture-scale atlas deliverable for the benchmark harness.",
                         "recipe": "atlas_2x2_recipe",
                         "requires": {"views": ["z7_60", "z20_60", "z7_1k_anchor", "z20_1k_anchor"]},
                         "outputs": {
@@ -291,6 +293,8 @@ def _write_workspace_config(workspace_dir: Path, *, anchor_path: Path, context_p
                             "projections": ["umap_z7_60", "umap_z20_60", "umap_z7_1k_anchor", "umap_z20_1k_anchor"],
                             "plots": ["atlas_2x2_main"],
                         },
+                        "docs_refs": [],
+                        "acceptance_checks": [],
                     }
                 },
             },
@@ -465,6 +469,7 @@ def _bench_neighbors_fit(tmp_path: Path) -> dict[str, object]:
         workspace_dir,
         "z20_60_knn",
         view_id="z20_60",
+        reduced_view_id=None,
         k=2,
         metric="cosine",
         backend="exact",
@@ -579,7 +584,7 @@ def _bench_export_x2(tmp_path: Path) -> dict[str, object]:
 def _bench_deliverable_atlas_2x2(tmp_path: Path) -> dict[str, object]:
     workspace_dir = _build_workspace(tmp_path, "bench_deliverable_atlas_2x2")
     started_at = time.perf_counter()
-    result = run_deliverable(workspace_dir, "atlas_2x2_intermediate")
+    result = run_deliverable(workspace_dir, "atlas_2x2_intermediate_main")
     return _record(
         "bench_deliverable_atlas_2x2",
         rows=16,
@@ -628,15 +633,9 @@ def test_benchmark_harness_emits_required_metrics(tmp_path: Path) -> None:
         assert entry["correctness"]
 
     atlas_manifest = json.loads(
-        (
-            tmp_path
-            / "bench_deliverable_atlas_2x2"
-            / "outputs"
-            / "latentdna"
-            / "plots"
-            / "atlas_2x2_main"
-            / "manifest.json"
-        ).read_text(encoding="utf-8")
+        (tmp_path / "bench_deliverable_atlas_2x2" / "outputs" / "plots" / "atlas_2x2_main" / "manifest.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert atlas_manifest["params"]["plot_kind"] == "projection_grid"
     assert atlas_manifest["params"]["projection_ids"] == [
@@ -656,7 +655,7 @@ def test_benchmark_harness_emits_required_metrics(tmp_path: Path) -> None:
     ]
 
     atlas_svg = (
-        tmp_path / "bench_deliverable_atlas_2x2" / "outputs" / "latentdna" / "plots" / "atlas_2x2_main" / "plot.svg"
+        tmp_path / "bench_deliverable_atlas_2x2" / "outputs" / "plots" / "atlas_2x2_main" / "plot.svg"
     ).read_text(encoding="utf-8")
     assert "7B anchor-only (60 bp)" in atlas_svg
     assert "20B context-aware (1 kb anchor)" in atlas_svg

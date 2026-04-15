@@ -19,7 +19,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -60,7 +60,7 @@ def test_phase12_snapshot_build_persists_metadata_companion_without_vectors(tmp_
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -103,7 +103,7 @@ def test_phase12_snapshot_build_persists_metadata_companion_without_vectors(tmp_
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
     assert payload["artifact_kind"] == "snapshot"
-    snapshot_dir = workspace_dir / "outputs" / "latentdna" / "snapshots" / "ctx1k_snapshot"
+    snapshot_dir = workspace_dir / "outputs" / "snapshots" / "ctx1k_snapshot"
     metadata_table = pq.read_table(snapshot_dir / "metadata.parquet")
     manifest = json.loads((snapshot_dir / "manifest.json").read_text(encoding="utf-8"))
 

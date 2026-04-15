@@ -11,6 +11,7 @@ Module Author(s): OpenAI Codex
 
 from __future__ import annotations
 
+import json
 from os.path import relpath
 from pathlib import Path
 
@@ -19,7 +20,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 from dnadesign.usr.src.dataset import Dataset
 from dnadesign.usr.src.mock import MockSpec, create_mock_dataset
 from dnadesign.usr.tests.registry_helpers import register_test_namespace
@@ -81,9 +82,12 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
             [
                 "infer__evo2_7b__anchor_only_7b_features__intermediate_embedding__block26_mlp_out__seq_mean:list<float32>",
                 "infer__evo2_20b__anchor_only_20b_features__intermediate_embedding__block23_mlp_out__seq_mean:list<float32>",
+                "infer__evo2_7b__anchor_only_7b_features__output_layer_mean__seq_mean:list<float32>",
                 "infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean:list<float32>",
                 "infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__anchor_mean:list<float32>",
                 "infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__anchor_mean:list<float32>",
+                "infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__seq_mean:list<float32>",
+                "infer__evo2_7b__template_1kb_7b_features__output_layer_mean__anchor_mean:list<float32>",
                 "infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__seq_mean:list<float32>",
                 "infer__evo2_20b__template_1kb_20b_features__output_layer_mean__anchor_mean:list<float32>",
             ]
@@ -142,6 +146,10 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
                     [[1.0, 1.1], [1.2, 1.3], [1.4, 1.5]],
                     type=pa.list_(pa.float32()),
                 ),
+                ("infer__evo2_7b__anchor_only_7b_features__output_layer_mean__seq_mean"): pa.array(
+                    [[1.8, 1.9], [2.0, 2.1], [2.2, 2.3]],
+                    type=pa.list_(pa.float32()),
+                ),
                 ("infer__evo2_20b__anchor_only_20b_features__output_layer_mean__seq_mean"): pa.array(
                     [[2.0, 2.1], [2.2, 2.3], [2.4, 2.5]],
                     type=pa.list_(pa.float32()),
@@ -183,6 +191,16 @@ def _build_committee_usr_sources(tmp_path: Path) -> Path:
                     "infer__evo2_20b__template_1kb_20b_features__intermediate_embedding__block23_mlp_out__anchor_mean"
                 ): pa.array(
                     [[1.5, 1.4], [1.3, 1.2], [1.1, 1.0]],
+                    type=pa.list_(pa.float32()),
+                ),
+                (
+                    "infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__seq_mean"
+                ): pa.array(
+                    [[0.7, 0.6], [0.5, 0.4], [0.3, 0.2]],
+                    type=pa.list_(pa.float32()),
+                ),
+                ("infer__evo2_7b__template_1kb_7b_features__output_layer_mean__anchor_mean"): pa.array(
+                    [[2.0, 1.9], [1.8, 1.7], [1.6, 1.5]],
                     type=pa.list_(pa.float32()),
                 ),
                 (
@@ -244,7 +262,7 @@ def test_workspace_init_creates_default_layout_and_config(tmp_path: Path) -> Non
     assert result.exit_code == 0, result.stdout
     assert (workspace_dir / "config.yaml").is_file()
     assert (workspace_dir / "README.md").is_file()
-    assert (workspace_dir / "outputs" / "latentdna" / "logs" / "audit").is_dir()
+    assert (workspace_dir / "outputs").is_dir()
 
     payload = yaml.safe_load((workspace_dir / "config.yaml").read_text(encoding="utf-8"))
     assert payload["schema_version"] == "latentdna.workspace.v1"
@@ -313,8 +331,8 @@ def test_workspace_init_from_study_dir_hydrates_committee_template(tmp_path: Pat
     assert config_payload["sources"]["anchor60"]["dataset"] == "promoter/test_anchor"
     assert config_payload["sources"]["ctx1k"]["root"] == expected_usr_root
     assert config_payload["sources"]["ctx1k"]["dataset"] == "promoter/test_contexts"
-    assert config_payload["study_binding"]["kind"] == "dnadesign_study"
-    assert config_payload["study_binding"]["study_dir"] == study_dir.resolve().as_posix()
+    assert config_payload["study_binding"]["study_id"] == "stress_ethanol_cipro_growth"
+    assert config_payload["study_binding"]["docs_root"] == "src/dnadesign/studies/stress_ethanol_cipro_growth"
 
 
 def test_workspace_show_reports_workspace_summary(tmp_path: Path) -> None:
@@ -324,7 +342,7 @@ def test_workspace_show_reports_workspace_summary(tmp_path: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "demo_latentdna", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "demo_latentdna", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -369,7 +387,7 @@ def test_validate_workspace_deep_checks_declared_source_schema(tmp_path: Path) -
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "demo_latentdna", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "demo_latentdna", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -438,7 +456,7 @@ def test_inspect_and_validate_workspace_use_usr_overlay_columns(tmp_path: Path) 
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "overlay_latentdna", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "overlay_latentdna", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -602,7 +620,7 @@ def test_validate_workspace_accepts_minimal_config(tmp_path: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "demo_latentdna", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "demo_latentdna", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -638,3 +656,169 @@ def test_validate_workspace_accepts_minimal_config(tmp_path: Path) -> None:
 
     assert result.exit_code == 0, result.stdout
     assert '"status":"ok"' in (result.stdout or "").replace(" ", "")
+
+
+def test_workspace_refresh_removes_local_outputs_and_preserves_sources(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "demo_latentdna"
+    workspace_dir.mkdir(parents=True)
+    source_path = tmp_path / "source_data" / "anchor.parquet"
+    source_path.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.table({"id": ["a"], "subject_id": ["a"], "embedding": [[0.1, 0.2]]}),
+        source_path,
+    )
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "demo_latentdna", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg", "png"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "anchor60": {
+                        "kind": "parquet",
+                        "path": source_path.as_posix(),
+                        "record_key": "id",
+                        "subject_key": "subject_id",
+                    }
+                },
+                "metadata": {"include": []},
+                "views": {},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (workspace_dir / "outputs" / "views" / "z20_60").mkdir(parents=True)
+    (workspace_dir / "outputs" / "views" / "z20_60" / "manifest.json").write_text("{}", encoding="utf-8")
+    (workspace_dir / "outputs" / "plots" / "atlas").mkdir(parents=True)
+    (workspace_dir / "outputs" / "plots" / "index.json").write_text("{}", encoding="utf-8")
+    (workspace_dir / "outputs" / "catalog.json").write_text("{}", encoding="utf-8")
+    (workspace_dir / "outputs" / "runs" / "_staging" / "scratch").mkdir(parents=True)
+    (workspace_dir / "outputs" / "runs" / "_staging" / "scratch" / "marker.txt").write_text("tmp", encoding="utf-8")
+    (workspace_dir / "outputs" / "logs" / "audit").mkdir(parents=True)
+    (workspace_dir / "outputs" / "logs" / "audit" / "event.json").write_text("{}", encoding="utf-8")
+    (workspace_dir / "outputs" / "latentdna" / "plots").mkdir(parents=True)
+    (workspace_dir / "outputs" / "latentdna" / "plots" / "legacy.txt").write_text("legacy", encoding="utf-8")
+
+    result = _RUNNER.invoke(app, ["workspace", "refresh", "--workspace", workspace_dir.as_posix(), "--json"])
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["command"] == "workspace refresh"
+    assert payload["inputs"]["targets"] == [
+        "agreements",
+        "alignments",
+        "clusters",
+        "distances",
+        "enrichments",
+        "exports",
+        "neighbors",
+        "notebooks",
+        "plots",
+        "projections",
+        "reduced_views",
+        "reducers",
+        "samples",
+        "scalars",
+        "snapshots",
+        "views",
+        "runs",
+        "catalog",
+        "legacy",
+    ]
+    assert payload["post_refresh_validation"] == "ok"
+    assert not (workspace_dir / "outputs" / "views").exists()
+    assert not (workspace_dir / "outputs" / "plots").exists()
+    assert not (workspace_dir / "outputs" / "catalog.json").exists()
+    assert not (workspace_dir / "outputs" / "runs").exists()
+    assert not (workspace_dir / "outputs" / "latentdna").exists()
+    assert (workspace_dir / "outputs").is_dir()
+    assert (workspace_dir / "outputs" / "logs" / "audit" / "event.json").is_file()
+    assert source_path.is_file()
+    assert source_path.as_posix() in payload["protected_paths"]
+
+
+def test_workspace_refresh_dry_run_leaves_outputs_in_place(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "demo_latentdna"
+    workspace_dir.mkdir(parents=True)
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "demo_latentdna", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg", "png"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {},
+                "metadata": {"include": []},
+                "views": {},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (workspace_dir / "outputs" / "latentdna" / "notebooks").mkdir(parents=True)
+    (workspace_dir / "outputs" / "latentdna" / "notebooks" / "browser.py").write_text(
+        "print('legacy')", encoding="utf-8"
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "workspace",
+            "refresh",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--target",
+            "legacy",
+            "--dry-run",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["dry_run"] is True
+    assert payload["post_refresh_validation"] == "skipped"
+    assert payload["removed_paths"] == []
+    assert (workspace_dir / "outputs" / "latentdna").exists()
+
+
+def test_workspace_refresh_rejects_configured_legacy_output_root(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "demo_latentdna"
+    workspace_dir.mkdir(parents=True)
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "demo_latentdna", "output_root": "./outputs/latentdna"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg", "png"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {},
+                "metadata": {"include": []},
+                "views": {},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(app, ["workspace", "refresh", "--workspace", workspace_dir.as_posix(), "--json"])
+
+    assert result.exit_code != 0
+    assert "workspace refresh does not support configured legacy output_root" in result.stdout

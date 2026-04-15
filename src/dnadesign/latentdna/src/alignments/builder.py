@@ -25,7 +25,9 @@ class AlignmentInput:
     key_columns: list[str]
 
 
-def _key_columns(alignment: AlignmentConfig, *, record_key: str, subject_key: str) -> list[str]:
+def _shared_key_columns(alignment: AlignmentConfig, *, record_key: str, subject_key: str) -> list[str]:
+    if alignment.on is None:
+        raise ContractViolationError("alignment key basis is undefined")
     if isinstance(alignment.on, list):
         return alignment.on
     if alignment.on == "record_key":
@@ -35,11 +37,34 @@ def _key_columns(alignment: AlignmentConfig, *, record_key: str, subject_key: st
     raise ContractViolationError(f"unsupported alignment key basis: {alignment.on!r}")
 
 
-def _load_alignment_input(context: WorkspaceContext, ref_id: str, alignment: AlignmentConfig) -> AlignmentInput:
+def _key_columns_for_side(
+    alignment: AlignmentConfig,
+    *,
+    side: str,
+    record_key: str,
+    subject_key: str,
+) -> list[str]:
+    if alignment.left_on is not None and alignment.right_on is not None:
+        return alignment.left_on if side == "left" else alignment.right_on
+    return _shared_key_columns(alignment, record_key=record_key, subject_key=subject_key)
+
+
+def _load_alignment_input(
+    context: WorkspaceContext,
+    ref_id: str,
+    alignment: AlignmentConfig,
+    *,
+    side: str,
+) -> AlignmentInput:
     if ref_id in context.config.sources:
         source = context.require_source(ref_id)
         resolved = resolve_source(ref_id, source, workspace_dir=context.workspace_dir)
-        key_columns = _key_columns(alignment, record_key=source.record_key, subject_key=source.subject_key)
+        key_columns = _key_columns_for_side(
+            alignment,
+            side=side,
+            record_key=source.record_key,
+            subject_key=source.subject_key,
+        )
         rows = read_records_table(resolved, columns=key_columns)
         if resolved.records_path is None:
             raise ContractViolationError(f"source {ref_id} does not expose a records table for alignment")
@@ -50,7 +75,12 @@ def _load_alignment_input(context: WorkspaceContext, ref_id: str, alignment: Ali
     rows_path = context.output_root / "views" / ref_id / "rows.parquet"
     if not rows_path.exists():
         raise MissingArtifactError(f"alignment input view is not materialized: {ref_id}")
-    key_columns = _key_columns(alignment, record_key=source.record_key, subject_key=source.subject_key)
+    key_columns = _key_columns_for_side(
+        alignment,
+        side=side,
+        record_key=source.record_key,
+        subject_key=source.subject_key,
+    )
     rows = read_table(rows_path, columns=key_columns)
     return AlignmentInput(ref_id=ref_id, rows=rows, input_path=rows_path, key_columns=key_columns)
 
@@ -80,11 +110,11 @@ def build_alignment_artifact(
     context: WorkspaceContext,
     *,
     alignment_id: str,
-) -> tuple[Path, int, int, int, Path, Path, list[str]]:
+) -> tuple[Path, int, int, int, Path, Path, list[str], list[str]]:
     alignment = context.require_alignment(alignment_id)
-    left = _load_alignment_input(context, alignment.left, alignment)
-    right = _load_alignment_input(context, alignment.right, alignment)
-    if left.key_columns != right.key_columns:
+    left = _load_alignment_input(context, alignment.left, alignment, side="left")
+    right = _load_alignment_input(context, alignment.right, alignment, side="right")
+    if len(left.key_columns) != len(right.key_columns):
         raise AlignmentError(
             f"alignment {alignment_id} resolved mismatched key columns: {left.key_columns!r} vs {right.key_columns!r}"
         )
@@ -138,4 +168,5 @@ def build_alignment_artifact(
         left.input_path,
         right.input_path,
         left.key_columns,
+        right.key_columns,
     )

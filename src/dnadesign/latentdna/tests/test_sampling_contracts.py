@@ -14,7 +14,7 @@ from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 def _write_workspace(tmp_path) -> tuple[object, str]:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
-    outputs = workspace_dir / "outputs" / "latentdna" / "views" / "z20_60"
+    outputs = workspace_dir / "outputs" / "views" / "z20_60"
     outputs.mkdir(parents=True)
     rows = pa.table(
         {
@@ -30,7 +30,7 @@ def _write_workspace(tmp_path) -> tuple[object, str]:
 schema_version: latentdna.workspace.v1
 workspace:
   id: demo
-  output_root: ./outputs/latentdna
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
@@ -54,6 +54,10 @@ views:
     coordinate_space_id: demo
     tags: {model: demo}
     role: primary
+reference_sets:
+  promoter_wt_core:
+    ids: [row_01, row_04]
+    match_column: id
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -183,3 +187,24 @@ def test_sample_build_supports_union_and_intersection(tmp_path) -> None:
     assert union_sample_rows["id"] == ["row_01", "row_02", "row_04", "row_03"]
     assert intersection_rows == 1
     assert intersection_sample_rows["id"] == ["row_02"]
+
+
+def test_sample_build_stratified_preserves_reference_set_rows(tmp_path) -> None:
+    context, view_id = _write_workspace(tmp_path)
+
+    artifact_dir, rows = build_sample_artifact(
+        context,
+        sample_id="stratified_reference_rows",
+        view_id=view_id,
+        strategy="stratified",
+        n=1,
+        group_column="densegen__plan",
+        seed=17,
+        reference_set_id="promoter_wt_core",
+    )
+
+    from dnadesign.latentdna.src.io.parquet_io import read_table
+
+    sample_rows = read_table(artifact_dir / "rows.parquet").to_pydict()
+    assert rows >= 2
+    assert {"row_01", "row_04"}.issubset(set(sample_rows["id"]))

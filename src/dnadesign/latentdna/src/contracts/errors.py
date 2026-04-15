@@ -45,6 +45,10 @@ class ContractViolationError(LatentDNAError):
     exit_code = 18
 
 
+class MemoryPreflightError(LatentDNAError):
+    exit_code = 20
+
+
 def exit_code_for_error(exc: Exception) -> int:
     if isinstance(exc, LatentDNAError):
         return exc.exit_code

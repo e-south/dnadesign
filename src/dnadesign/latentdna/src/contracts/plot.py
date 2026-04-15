@@ -29,12 +29,20 @@ class StrictPlotModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class PlotAnnotationConfig(StrictPlotModel):
+    reference_set: Identifier
+    require_in_every_panel: bool = False
+    missing_policy: Literal["fail"] = "fail"
+    collision_policy: Literal["repel_then_callout", "direct_label"] = "repel_then_callout"
+
+
 class ProjectionScatterPlotConfig(StrictPlotModel):
     kind: Literal["projection_scatter"]
     projection: Identifier
     color_column: str | None = None
     label_column: str | None = None
     label_values: list[str] = Field(default_factory=list)
+    annotation: PlotAnnotationConfig | None = None
 
     @model_validator(mode="after")
     def _validate_label_selection(self) -> "ProjectionScatterPlotConfig":
@@ -50,6 +58,7 @@ class ProjectionGridPlotConfig(StrictPlotModel):
     panel_titles: list[str] | None = None
     label_column: str | None = None
     label_values: list[str] = Field(default_factory=list)
+    annotation: PlotAnnotationConfig | None = None
 
     @model_validator(mode="after")
     def _validate_grid_shape(self) -> "ProjectionGridPlotConfig":
@@ -188,4 +197,5 @@ class ResolvedPlotSpec(StrictPlotModel):
     label_column: str | None = None
     label_values: list[str] = Field(default_factory=list)
     panel_titles: list[str] = Field(default_factory=list)
+    annotation: PlotAnnotationConfig | None = None
     config_id: Identifier | None = None

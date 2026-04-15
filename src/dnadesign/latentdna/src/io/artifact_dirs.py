@@ -9,10 +9,14 @@ import tempfile
 import uuid
 from pathlib import Path
 
+from ..contracts.errors import ArtifactConflictError
+
 
 def stage_artifact_dir(parent_dir: Path, artifact_id: str) -> Path:
-    parent_dir.mkdir(parents=True, exist_ok=True)
-    return Path(tempfile.mkdtemp(prefix=f".{artifact_id}_", dir=parent_dir))
+    output_root = parent_dir.parent
+    staging_root = output_root / "runs" / "_staging" / parent_dir.name
+    staging_root.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix=f"{artifact_id}_", dir=staging_root))
 
 
 def commit_staged_artifact_dirs(pairs: list[tuple[Path, Path]], *, force: bool) -> None:
@@ -27,9 +31,18 @@ def commit_staged_artifact_dirs(pairs: list[tuple[Path, Path]], *, force: bool) 
                     backups[final_dir] = backup_dir
 
         for staging_dir, final_dir in pairs:
+            final_dir.parent.mkdir(parents=True, exist_ok=True)
             if final_dir.exists():
                 raise FileExistsError(final_dir)
-            staging_dir.rename(final_dir)
+            try:
+                staging_dir.rename(final_dir)
+            except OSError as exc:
+                if final_dir.exists():
+                    raise ArtifactConflictError(
+                        "artifact materialization raced with another run: "
+                        f"{final_dir}; rerun the deliverable or serialize concurrent runs"
+                    ) from exc
+                raise
             committed.append(final_dir)
     except Exception:
         for final_dir in reversed(committed):

@@ -9,7 +9,8 @@ from pathlib import Path
 from ..contracts.errors import WorkspaceValidationError
 from ..contracts.workspace import ColumnCohortConfig, PromoterMetadataCohortConfig, SourceBackedViewConfig
 from ..sources.resolver import inspect_source_schema, resolve_source
-from ..workspaces.loader import load_workspace_config, resolve_repo_path
+from ..workspaces.loader import load_workspace_config
+from ..workspaces.paths import resolve_repo_path
 
 _PROMOTER_METADATA_REQUIRED_COLUMNS: dict[str, set[str]] = {
     "design_family": {"densegen__plan", "usr_label__primary"},
@@ -133,16 +134,16 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
 
     study_binding = None
     if context.config.study_binding is not None:
-        study_dir = resolve_repo_path(context.config.study_binding.study_dir)
-        required_files = ["campaign.yaml", "datasets.yaml", "status.md", "ops.study.yaml"]
-        missing = [name for name in required_files if not (study_dir / name).exists()]
+        docs_root = resolve_repo_path(context.config.study_binding.docs_root)
+        required_files = ["study.yaml"]
+        missing = [name for name in required_files if not (docs_root / name).exists()]
         if missing:
             raise WorkspaceValidationError(
-                f"study binding directory is missing required files: {study_dir} ({', '.join(sorted(missing))})"
+                f"study docs_root is missing required files: {docs_root} ({', '.join(sorted(missing))})"
             )
         study_binding = {
-            "kind": context.config.study_binding.kind,
-            "study_dir": study_dir.as_posix(),
+            "study_id": context.config.study_binding.study_id,
+            "docs_root": docs_root.as_posix(),
             "required_files": required_files,
         }
 

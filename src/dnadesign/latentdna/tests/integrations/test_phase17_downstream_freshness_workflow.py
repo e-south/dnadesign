@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -36,7 +36,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "latentdna_phase17_demo", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "latentdna_phase17_demo", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "euclidean",
@@ -87,13 +87,10 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                 },
                 "notebooks": {
                     "agreement_review": {
-                        "kind": "artifact_review",
+                        "kind": "workspace",
                         "title": "Agreement review",
-                        "description": "Load the agreement artifact and summary plot without recomputing them.",
-                        "artifacts": [
-                            {"kind": "agreement_set", "id": "primary_vs_primary"},
-                            {"kind": "plot", "id": "primary_agreement_summary"},
-                        ],
+                        "description": "Read-only workspace notebook for downstream agreement diagnostics.",
+                        "default_deliverable": "downstream_freshness_bundle",
                     }
                 },
                 "recipes": {
@@ -190,10 +187,18 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                 },
                 "deliverables": {
                     "downstream_freshness_bundle": {
-                        "kind": "diagnostic_bundle",
-                        "description": "Fresh downstream scalar and agreement diagnostics.",
                         "recipe": "downstream_freshness_recipe",
-                        "requires": {"sources": ["anchor60"]},
+                        "title": "Downstream freshness bundle",
+                        "section": "freshness",
+                        "question": (
+                            "Do downstream scalar and agreement artifacts stay fresh when inputs are unchanged?"
+                        ),
+                        "summary": "Fresh downstream scalar and agreement diagnostics.",
+                        "requires": {
+                            "sources": ["anchor60"],
+                            "views": ["z20_60"],
+                            "recipes": ["downstream_freshness_recipe"],
+                        },
                         "outputs": {
                             "views": ["z20_60"],
                             "distances": ["primary_landmark_distances"],
@@ -205,6 +210,8 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                             ],
                             "notebooks": ["agreement_review"],
                         },
+                        "docs_refs": [],
+                        "acceptance_checks": [],
                     }
                 },
             },

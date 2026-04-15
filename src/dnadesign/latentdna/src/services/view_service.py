@@ -23,6 +23,7 @@ from ..views.materialize import materialize_view_artifact
 from ..views.reduce import fit_pca_reducer_artifacts
 from ..views.stats import compute_view_stats
 from ..workspaces.loader import load_workspace_config
+from .memory_service import apply_memory_preflight, evaluate_reduce_preflight
 
 
 def materialize_view(workspace: str | Path, view_id: str, *, force: bool = False) -> CommandResult:
@@ -279,6 +280,7 @@ def reduce_view(
     sample_id: str | None,
     alignment_id: str | None,
     reduced_view_id: str | None,
+    allow_memory_overage: bool = False,
     force: bool = False,
 ) -> CommandResult:
     context = load_workspace_config(workspace)
@@ -293,6 +295,15 @@ def reduce_view(
     reduced_view_staging_dir = (
         None if reduced_view_id is None else stage_artifact_dir(context.output_root / "reduced_views", reduced_view_id)
     )
+    preflight = evaluate_reduce_preflight(
+        context,
+        view_id=view_id,
+        dims=dims,
+        sample_id=sample_id,
+        alignment_id=alignment_id,
+        reduced_view_id=reduced_view_id,
+    )
+    status, warnings = apply_memory_preflight(preflight, allow_memory_overage=allow_memory_overage)
 
     try:
         (
@@ -302,6 +313,7 @@ def reduce_view(
             output_dims,
             scope_kind,
             scope_id,
+            pca_method,
         ) = fit_pca_reducer_artifacts(
             context,
             view_id=view_id,
@@ -330,6 +342,7 @@ def reduce_view(
         created_at=datetime.now(UTC).isoformat(),
         tool_version=__version__,
         command="view reduce",
+        status=status,
         inputs=[
             ArtifactInput(
                 kind="view_matrix",
@@ -340,16 +353,19 @@ def reduce_view(
         ],
         params={
             "method": "pca",
+            "pca_method": pca_method,
             "view_id": view_id,
             "fit_scope_kind": scope_kind,
             "fit_scope_id": scope_id,
             "output_dims": output_dims,
+            "memory_preflight": preflight.as_payload(),
         },
         outputs=[
             ArtifactOutput(path="state.npz", media_type="application/x-npz"),
             ArtifactOutput(path="summary.json", media_type="application/json"),
         ],
         stats={"rows": fit_rows, "dims": output_dims},
+        warnings=warnings,
     )
     write_manifest(reducer_staging_dir / "manifest.json", reducer_manifest.model_dump(mode="json"))
 
@@ -385,12 +401,15 @@ def reduce_view(
                 "coordinate_space_id": f"pca_{reducer_id}",
                 "fit_scope_kind": scope_kind,
                 "fit_scope_id": scope_id,
+                "memory_preflight": preflight.as_payload(),
             },
             outputs=[
                 ArtifactOutput(path="matrix.npy", media_type="application/x-npy"),
                 ArtifactOutput(path="rows.parquet", media_type="application/x-parquet"),
             ],
             stats={"rows": reduced_rows, "dims": output_dims},
+            status=status,
+            warnings=warnings,
         )
         write_manifest(reduced_view_staging_dir / "manifest.json", reduced_manifest.model_dump(mode="json"))
         staged_pairs.append((reduced_view_staging_dir, reduced_view_dir))
@@ -402,13 +421,15 @@ def reduce_view(
     result = CommandResult(
         command="view reduce",
         workspace_id=context.workspace_id,
-        status="ok",
+        status=status,
         artifact_kind="reducer",
         artifact_id=reducer_id,
         outputs=outputs,
         inputs={"view": view_id, "sample": sample_id, "alignment": alignment_id, "reduced_view": reduced_view_id},
+        warnings=warnings,
         metrics=metrics,
     )
+    result.metrics["memory_preflight"] = preflight.as_payload()
     record_audit(
         context.output_root / "logs" / "audit",
         payload=result.model_dump(mode="json"),

@@ -15,7 +15,8 @@ from ..contracts.errors import ContractViolationError, MissingArtifactError
 from ..contracts.workspace import DerivedViewConfig
 from ..io.matrix_io import read_matrix, write_matrix
 from ..io.parquet_io import read_table, write_table
-from ..workspaces.loader import WorkspaceContext, _view_declares_reduced_space
+from ..workspaces.loader import WorkspaceContext
+from ..workspaces.validation import _view_declares_reduced_space
 
 
 def _view_artifact_paths(context: WorkspaceContext, view_id: str) -> tuple[Path, Path, Path]:
@@ -32,7 +33,7 @@ def _view_artifact_paths(context: WorkspaceContext, view_id: str) -> tuple[Path,
 def _load_view_artifact(context: WorkspaceContext, view_id: str) -> tuple[np.ndarray, pa.Table, dict[str, Any]]:
     matrix_path, rows_path, manifest_path = _view_artifact_paths(context, view_id)
     return (
-        np.asarray(read_matrix(matrix_path), dtype=np.float32),
+        read_matrix(matrix_path),
         read_table(rows_path),
         context.read_manifest(manifest_path),
     )
@@ -98,14 +99,14 @@ def _derive_vector_difference_artifact(
     right_rows = right_rows_table.to_pylist()
     left_mode = str(alignment_manifest["params"]["left_aggregation"])
     right_mode = str(alignment_manifest["params"]["right_aggregation"])
-    output_matrix = np.vstack(
-        [
-            aggregate_rows(left_matrix, list(row["left_indices"]), mode=left_mode)
-            - aggregate_rows(right_matrix, list(row["right_indices"]), mode=right_mode)
-            for row in mapping_rows
-        ]
-    ).astype(np.float32, copy=False)
-    output_matrix = np.ascontiguousarray(output_matrix)
+    output_matrix = _vector_difference_matrix(
+        left_matrix,
+        right_matrix,
+        mapping_rows=mapping_rows,
+        left_mode=left_mode,
+        right_mode=right_mode,
+        output_path=artifact_dir / "matrix.npy",
+    )
 
     output_rows: list[dict[str, Any]] = []
     for key_row, mapping_row in zip(rows_table.to_pylist(), mapping_rows, strict=True):
@@ -124,9 +125,71 @@ def _derive_vector_difference_artifact(
         output_rows.append(output_row)
     rows_table = pa.Table.from_pylist(output_rows)
 
-    write_matrix(artifact_dir / "matrix.npy", output_matrix)
     write_table(rows_table, artifact_dir / "rows.parquet")
     return artifact_dir, output_matrix.shape[0], output_matrix.shape[1], key_columns[0], list(rows_table.column_names)
+
+
+def _difference_batch_rows(*, dims: int) -> int:
+    target_bytes = 128 * 1024**2
+    row_bytes = max(dims, 1) * np.dtype(np.float32).itemsize * 3
+    return max(int(target_bytes // max(row_bytes, 1)), 128)
+
+
+def _single_index_pairs(mapping_rows: list[dict[str, Any]]) -> tuple[np.ndarray, np.ndarray] | None:
+    left_indices: list[int] = []
+    right_indices: list[int] = []
+    for row in mapping_rows:
+        left = list(row["left_indices"])
+        right = list(row["right_indices"])
+        if len(left) != 1 or len(right) != 1:
+            return None
+        left_indices.append(int(left[0]))
+        right_indices.append(int(right[0]))
+    return np.asarray(left_indices, dtype=np.int64), np.asarray(right_indices, dtype=np.int64)
+
+
+def _vector_difference_matrix(
+    left_matrix: np.ndarray,
+    right_matrix: np.ndarray,
+    *,
+    mapping_rows: list[dict[str, Any]],
+    left_mode: str,
+    right_mode: str,
+    output_path: Path,
+) -> np.ndarray:
+    direct_pairs = None
+    if left_mode == "error" and right_mode == "error":
+        direct_pairs = _single_index_pairs(mapping_rows)
+    if direct_pairs is None:
+        output_matrix = np.vstack(
+            [
+                aggregate_rows(left_matrix, list(row["left_indices"]), mode=left_mode)
+                - aggregate_rows(right_matrix, list(row["right_indices"]), mode=right_mode)
+                for row in mapping_rows
+            ]
+        ).astype(np.float32, copy=False)
+        output_matrix = np.ascontiguousarray(output_matrix)
+        write_matrix(output_path, output_matrix)
+        return output_matrix
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    left_indices, right_indices = direct_pairs
+    output = np.lib.format.open_memmap(
+        output_path,
+        mode="w+",
+        dtype=np.float32,
+        shape=(int(left_indices.shape[0]), int(left_matrix.shape[1])),
+    )
+    batch_rows = _difference_batch_rows(dims=int(left_matrix.shape[1]))
+    for start in range(0, int(left_indices.shape[0]), batch_rows):
+        stop = min(start + batch_rows, int(left_indices.shape[0]))
+        output[start:stop] = np.asarray(left_matrix[left_indices[start:stop]], dtype=np.float32) - np.asarray(
+            right_matrix[right_indices[start:stop]],
+            dtype=np.float32,
+        )
+    output.flush()
+    del output
+    return np.load(output_path, mmap_mode="r")
 
 
 def _derive_normalize_artifact(

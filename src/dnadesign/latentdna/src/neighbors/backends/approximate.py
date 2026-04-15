@@ -52,9 +52,11 @@ def fit_neighbors_approximate(matrix: np.ndarray, *, k: int, metric: str, seed: 
     if metric not in {"euclidean", "cosine"}:
         raise ContractViolationError(f"unsupported neighbor metric: {metric!r}")
 
-    n_rows = matrix.shape[0]
+    matrix32 = np.asarray(matrix, dtype=np.float32)
+    if not matrix32.flags.c_contiguous or not matrix32.flags.writeable:
+        matrix32 = np.array(matrix32, dtype=np.float32, copy=True, order="C")
+    n_rows = matrix32.shape[0]
     n_neighbors = min(n_rows, max(k + 1, 5))
-    index = NNDescent(np.asarray(matrix, dtype=np.float32), metric=metric, n_neighbors=n_neighbors, random_state=seed)
-    query_k = min(n_rows, max(k + 1, n_neighbors))
-    indices, distances = index.query(np.asarray(matrix, dtype=np.float32), k=query_k)
+    index = NNDescent(matrix32, metric=metric, n_neighbors=n_neighbors, random_state=seed)
+    indices, distances = index.neighbor_graph
     return _strip_self_neighbors(indices, distances, k=k)

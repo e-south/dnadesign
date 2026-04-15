@@ -31,15 +31,44 @@ def _ordered_indices(view_rows: list[dict], sample_rows: list[dict], *, record_k
     return indices
 
 
-def view_artifact_paths(context: WorkspaceContext, view_id: str) -> tuple[Path, Path, dict[str, object]]:
-    view_dir = context.output_root / "views" / view_id
-    matrix_path = view_dir / "matrix.npy"
-    rows_path = view_dir / "rows.parquet"
-    manifest_path = view_dir / "manifest.json"
+def _matrix_source_paths(
+    context: WorkspaceContext,
+    *,
+    view_id: str | None,
+    reduced_view_id: str | None,
+) -> tuple[Path, Path, dict[str, object], str, str]:
+    if (view_id is None) == (reduced_view_id is None):
+        raise ContractViolationError("matrix scope requires exactly one of view_id or reduced_view_id")
+    artifact_kind = "view" if view_id is not None else "reduced_view"
+    artifact_id = str(view_id if view_id is not None else reduced_view_id)
+    artifact_dir = context.output_root / ("views" if artifact_kind == "view" else "reduced_views") / artifact_id
+    matrix_path = artifact_dir / "matrix.npy"
+    rows_path = artifact_dir / "rows.parquet"
+    manifest_path = artifact_dir / "manifest.json"
     for required in [matrix_path, rows_path, manifest_path]:
         if not required.exists():
             raise MissingArtifactError(f"view artifact is missing for scoped view access: {required}")
-    return matrix_path, rows_path, context.read_manifest(manifest_path)
+    return matrix_path, rows_path, context.read_manifest(manifest_path), artifact_kind, artifact_id
+
+
+def view_artifact_paths(context: WorkspaceContext, view_id: str) -> tuple[Path, Path, dict[str, object]]:
+    matrix_path, rows_path, manifest, _, _ = _matrix_source_paths(context, view_id=view_id, reduced_view_id=None)
+    return matrix_path, rows_path, manifest
+
+
+def matrix_input_digest_path(
+    context: WorkspaceContext,
+    *,
+    view_id: str | None,
+    reduced_view_id: str | None,
+) -> tuple[str, str, Path]:
+    matrix_path, _, _, artifact_kind, artifact_id = _matrix_source_paths(
+        context,
+        view_id=view_id,
+        reduced_view_id=reduced_view_id,
+    )
+    input_kind = "view_matrix" if artifact_kind == "view" else "reduced_view"
+    return input_kind, artifact_id, matrix_path
 
 
 def _full_scope(context: WorkspaceContext, view_id: str) -> tuple[np.ndarray, pa.Table, str, str | None]:
@@ -115,15 +144,63 @@ def resolve_view_scope(
     return _full_scope(context, view_id)
 
 
+def resolve_feature_scope(
+    context: WorkspaceContext,
+    *,
+    view_id: str | None,
+    reduced_view_id: str | None,
+    sample_id: str | None,
+    alignment_id: str | None,
+) -> tuple[np.ndarray, pa.Table, str, str | None]:
+    if reduced_view_id is not None:
+        if sample_id is not None or alignment_id is not None:
+            raise ContractViolationError(
+                "reduced-view scoped access does not accept sample or alignment; "
+                "reduce the scoped view first and pass --reduced-view"
+            )
+        matrix_path, rows_path, _, _, artifact_id = _matrix_source_paths(
+            context,
+            view_id=None,
+            reduced_view_id=reduced_view_id,
+        )
+        return (
+            np.asarray(read_matrix(matrix_path), dtype=np.float32),
+            read_table(rows_path),
+            "reduced_view",
+            artifact_id,
+        )
+    if view_id is None:
+        raise ContractViolationError("scope-aware matrix access requires exactly one of view_id or reduced_view_id")
+    return resolve_view_scope(
+        context,
+        view_id=view_id,
+        sample_id=sample_id,
+        alignment_id=alignment_id,
+    )
+
+
 def scope_input_digest_path(
     context: WorkspaceContext,
     *,
-    view_id: str,
+    view_id: str | None,
+    reduced_view_id: str | None,
     sample_id: str | None,
     alignment_id: str | None,
 ) -> tuple[str, str, Path]:
+    if reduced_view_id is not None:
+        if sample_id is not None or alignment_id is not None:
+            raise ContractViolationError(
+                "reduced-view digest scope does not accept sample or alignment; "
+                "reduce the scoped view first and pass --reduced-view"
+            )
+        _, rows_path, _, artifact_kind, artifact_id = _matrix_source_paths(
+            context,
+            view_id=None,
+            reduced_view_id=reduced_view_id,
+        )
+        return artifact_kind, artifact_id, rows_path
     if alignment_id is not None:
         return "alignment_set", alignment_id, context.output_root / "alignments" / alignment_id / "rows.parquet"
     if sample_id is not None:
         return "sample_set", sample_id, context.output_root / "samples" / sample_id / "rows.parquet"
-    return "view_rows", view_id, context.output_root / "views" / view_id / "rows.parquet"
+    return "view_rows", str(view_id), context.output_root / "views" / str(view_id) / "rows.parquet"

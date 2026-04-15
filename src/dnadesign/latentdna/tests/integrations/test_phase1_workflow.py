@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -47,7 +47,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -106,7 +106,7 @@ def test_phase1_usr_to_view_to_projection_to_plot_flow(tmp_path: Path) -> None:
     materialize_payload = json.loads(materialize_result.stdout)
     assert materialize_payload["artifact_kind"] == "view"
 
-    view_dir = workspace_dir / "outputs" / "latentdna" / "views" / "z20_60"
+    view_dir = workspace_dir / "outputs" / "views" / "z20_60"
     assert (view_dir / "matrix.npy").is_file()
     assert (view_dir / "rows.parquet").is_file()
 
@@ -161,7 +161,7 @@ def test_phase1_usr_to_view_to_projection_to_plot_flow(tmp_path: Path) -> None:
     projection_payload = json.loads(projection_result.stdout)
     assert projection_payload["artifact_kind"] == "projection"
 
-    projection_dir = workspace_dir / "outputs" / "latentdna" / "projections" / "umap_z20_60"
+    projection_dir = workspace_dir / "outputs" / "projections" / "umap_z20_60"
     coords = pq.read_table(projection_dir / "coords.parquet").to_pydict()
     assert len(coords["x"]) == 10
     assert len(coords["y"]) == 10
@@ -187,7 +187,7 @@ def test_phase1_usr_to_view_to_projection_to_plot_flow(tmp_path: Path) -> None:
     plot_payload = json.loads(plot_result.stdout)
     assert plot_payload["artifact_kind"] == "plot"
 
-    plot_dir = workspace_dir / "outputs" / "latentdna" / "plots" / "atlas_scatter"
+    plot_dir = workspace_dir / "outputs" / "plots" / "atlas_scatter"
     assert (plot_dir / "plot.svg").is_file()
     assert (plot_dir / "plot.png").is_file()
     assert (plot_dir / "manifest.json").is_file()
@@ -261,7 +261,7 @@ def test_phase1_plot_render_force_preserves_existing_artifact_on_failure(tmp_pat
     )
     assert first_render.exit_code == 0, first_render.stdout
 
-    plot_dir = workspace_dir / "outputs" / "latentdna" / "plots" / "atlas_scatter"
+    plot_dir = workspace_dir / "outputs" / "plots" / "atlas_scatter"
     assert (plot_dir / "plot.svg").is_file()
     assert (plot_dir / "plot.png").is_file()
     assert (plot_dir / "manifest.json").is_file()
@@ -303,7 +303,7 @@ def test_phase1_view_materialize_force_preserves_existing_artifact_on_failure(tm
     )
     assert first_materialize.exit_code == 0, first_materialize.stdout
 
-    view_dir = workspace_dir / "outputs" / "latentdna" / "views" / "z20_60"
+    view_dir = workspace_dir / "outputs" / "views" / "z20_60"
     assert (view_dir / "matrix.npy").is_file()
     assert (view_dir / "rows.parquet").is_file()
     assert (view_dir / "manifest.json").is_file()
@@ -382,11 +382,11 @@ def test_phase1_projection_fit_force_preserves_existing_artifact_on_failure(tmp_
     )
     assert first_projection.exit_code == 0, first_projection.stdout
 
-    projection_dir = workspace_dir / "outputs" / "latentdna" / "projections" / "umap_z20_60"
+    projection_dir = workspace_dir / "outputs" / "projections" / "umap_z20_60"
     assert (projection_dir / "coords.parquet").is_file()
     assert (projection_dir / "manifest.json").is_file()
 
-    sample_rows_path = workspace_dir / "outputs" / "latentdna" / "samples" / "atlas_sample" / "rows.parquet"
+    sample_rows_path = workspace_dir / "outputs" / "samples" / "atlas_sample" / "rows.parquet"
     pq.write_table(pq.read_table(sample_rows_path).slice(0, 2), sample_rows_path)
 
     failed_force = _RUNNER.invoke(

@@ -17,6 +17,7 @@ from ..io.manifest_io import write_manifest
 from ..runs.recorder import record_audit
 from ..version import __version__
 from ..workspaces.loader import load_workspace_config
+from .memory_service import apply_memory_preflight, evaluate_export_preflight
 
 
 def _prepare_export_dir(context, export_id: str, *, force: bool) -> Path:
@@ -70,10 +71,18 @@ def _build_export_inputs(export, basis_path: Path, block_rows: list[dict[str, ob
     return inputs
 
 
-def export_matrix(workspace: str | Path, export_id: str, *, force: bool = False) -> CommandResult:
+def export_matrix(
+    workspace: str | Path,
+    export_id: str,
+    *,
+    allow_memory_overage: bool = False,
+    force: bool = False,
+) -> CommandResult:
     context = load_workspace_config(workspace)
     export = context.require_export(export_id)
     _prepare_export_dir(context, export_id, force=force)
+    preflight = evaluate_export_preflight(context, export_id=export_id, export_kind="matrix")
+    status, warnings = apply_memory_preflight(preflight, allow_memory_overage=allow_memory_overage)
 
     export_dir, basis_path, rows, dims, feature_rows, block_rows = build_export_matrix_artifact(
         context,
@@ -87,12 +96,14 @@ def export_matrix(workspace: str | Path, export_id: str, *, force: bool = False)
         created_at=datetime.now(UTC).isoformat(),
         tool_version=__version__,
         command="export matrix",
+        status=status,
         inputs=inputs,
         params={
             "row_basis": export.row_basis,
             "block_count": len(export.blocks),
             "blocks": block_rows,
             "output_matrix_dtype": export.matrix_dtype or context.analysis_dtype,
+            "memory_preflight": preflight.as_payload(),
         },
         outputs=[
             ArtifactOutput(path="matrix.npy", media_type="application/x-npy"),
@@ -100,17 +111,19 @@ def export_matrix(workspace: str | Path, export_id: str, *, force: bool = False)
             ArtifactOutput(path="features.parquet", media_type="application/x-parquet"),
         ],
         stats={"rows": rows, "dims": dims, "features": len(feature_rows)},
+        warnings=warnings,
     )
     write_manifest(export_dir / "manifest.json", manifest.model_dump(mode="json"))
     result = CommandResult(
         command="export matrix",
         workspace_id=context.workspace_id,
-        status="ok",
+        status=status,
         artifact_kind="export_bundle",
         artifact_id=export_id,
         outputs=[export_dir.as_posix()],
         inputs={"export": export_id, "row_basis": export.row_basis},
-        metrics={"rows": rows, "dims": dims, "features": len(feature_rows)},
+        warnings=warnings,
+        metrics={"rows": rows, "dims": dims, "features": len(feature_rows), "memory_preflight": preflight.as_payload()},
     )
     record_audit(
         context.output_root / "logs" / "audit",
@@ -121,10 +134,18 @@ def export_matrix(workspace: str | Path, export_id: str, *, force: bool = False)
     return result
 
 
-def export_table(workspace: str | Path, export_id: str, *, force: bool = False) -> CommandResult:
+def export_table(
+    workspace: str | Path,
+    export_id: str,
+    *,
+    allow_memory_overage: bool = False,
+    force: bool = False,
+) -> CommandResult:
     context = load_workspace_config(workspace)
     export = context.require_export(export_id)
     _prepare_export_dir(context, export_id, force=force)
+    preflight = evaluate_export_preflight(context, export_id=export_id, export_kind="table")
+    status, warnings = apply_memory_preflight(preflight, allow_memory_overage=allow_memory_overage)
 
     export_dir, basis_path, rows, features, feature_rows, block_rows = build_export_table_artifact(
         context,
@@ -138,12 +159,14 @@ def export_table(workspace: str | Path, export_id: str, *, force: bool = False) 
         created_at=datetime.now(UTC).isoformat(),
         tool_version=__version__,
         command="export table",
+        status=status,
         inputs=inputs,
         params={
             "row_basis": export.row_basis,
             "block_count": len(export.blocks),
             "blocks": block_rows,
             "output_table_kind": "aligned_table",
+            "memory_preflight": preflight.as_payload(),
         },
         outputs=[
             ArtifactOutput(path="rows.parquet", media_type="application/x-parquet"),
@@ -151,17 +174,19 @@ def export_table(workspace: str | Path, export_id: str, *, force: bool = False) 
             ArtifactOutput(path="features.parquet", media_type="application/x-parquet"),
         ],
         stats={"rows": rows, "features": features},
+        warnings=warnings,
     )
     write_manifest(export_dir / "manifest.json", manifest.model_dump(mode="json"))
     result = CommandResult(
         command="export table",
         workspace_id=context.workspace_id,
-        status="ok",
+        status=status,
         artifact_kind="export_bundle",
         artifact_id=export_id,
         outputs=[export_dir.as_posix()],
         inputs={"export": export_id, "row_basis": export.row_basis},
-        metrics={"rows": rows, "features": features},
+        warnings=warnings,
+        metrics={"rows": rows, "features": features, "memory_preflight": preflight.as_payload()},
     )
     record_audit(
         context.output_root / "logs" / "audit",

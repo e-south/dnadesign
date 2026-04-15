@@ -64,6 +64,7 @@ def reduce(
     sample: str | None = typer.Option(None, "--sample"),
     alignment: str | None = typer.Option(None, "--alignment"),
     reduced_view_id: str | None = typer.Option(None, "--reduced-view-id"),
+    allow_memory_overage: bool = typer.Option(False, "--allow-memory-overage"),
     force: bool = typer.Option(False, "--force"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     format_name: str = typer.Option("text", "--format"),
@@ -90,6 +91,7 @@ def reduce(
                 sample_id=sample,
                 alignment_id=alignment,
                 reduced_view_id=reduced_view_id,
+                allow_memory_overage=allow_memory_overage,
                 force=force,
             ).model_dump(mode="json")
         )

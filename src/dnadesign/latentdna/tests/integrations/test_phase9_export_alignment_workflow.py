@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -36,7 +36,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -333,7 +333,7 @@ def test_phase9_alignment_backed_export_flow(tmp_path: Path) -> None:
     )
     assert x3_result.exit_code == 0, x3_result.stdout
 
-    output_root = workspace_dir / "outputs" / "latentdna"
+    output_root = workspace_dir / "outputs"
     basis_20b = pq.read_table(output_root / "alignments" / "anchor_ctx_20b" / "rows.parquet")
     basis_7b = pq.read_table(output_root / "alignments" / "anchor_ctx_7b" / "rows.parquet")
     assert _subject_ids(basis_20b) == ["subject_01", "subject_02", "subject_04"]

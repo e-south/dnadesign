@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -36,7 +36,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "euclidean",
@@ -111,8 +111,10 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                 },
                 "deliverables": {
                     "atlas_demo": {
-                        "kind": "projection_panel",
-                        "description": "Demo projection deliverable.",
+                        "title": "Demo projection deliverable",
+                        "summary": "Demo projection deliverable.",
+                        "question": "How does the demo projection materialize a view and notebook?",
+                        "section": "Demo",
                         "recipe": "atlas_recipe",
                         "requires": {"views": ["z20_60"]},
                         "outputs": {
@@ -120,6 +122,8 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                             "projections": ["umap_z20_60"],
                             "plots": ["atlas_demo_plot"],
                         },
+                        "docs_refs": [],
+                        "acceptance_checks": [],
                     }
                 },
             },
@@ -223,7 +227,7 @@ def test_phase6_recipe_and_deliverable_flow(tmp_path: Path) -> None:
     assert run_payload["metrics"]["executed_steps"] == 4
     assert run_payload["metrics"]["skipped_steps"] == 0
 
-    plot_dir = workspace_dir / "outputs" / "latentdna" / "plots" / "atlas_demo_plot"
+    plot_dir = workspace_dir / "outputs" / "plots" / "atlas_demo_plot"
     assert (plot_dir / "plot.svg").is_file()
     assert (plot_dir / "plot.png").is_file()
 

@@ -13,7 +13,7 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 from dnadesign.latentdna.src.services import freshness_service as freshness_service_module
 from dnadesign.latentdna.src.services.deliverable_service import deliverable_status
 from dnadesign.latentdna.src.services.run_service import list_runs
@@ -75,7 +75,7 @@ def _build_overlay_backed_workspace(tmp_path: Path) -> tuple[Path, Path]:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "demo_workspace", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "demo_workspace", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -115,11 +115,15 @@ def _build_overlay_backed_workspace(tmp_path: Path) -> tuple[Path, Path]:
                 },
                 "deliverables": {
                     "view_bundle": {
-                        "kind": "view_bundle",
-                        "description": "One materialized view",
                         "recipe": "materialize_only",
-                        "requires": {"sources": ["anchor60"]},
+                        "title": "View bundle",
+                        "section": "freshness",
+                        "question": "Does the materialized view respond to overlay changes?",
+                        "summary": "One materialized view used to exercise freshness propagation.",
+                        "requires": {"sources": ["anchor60"], "views": ["z20_60"], "recipes": ["materialize_only"]},
                         "outputs": {"views": ["z20_60"]},
+                        "docs_refs": [],
+                        "acceptance_checks": [],
                     }
                 },
             },
@@ -150,7 +154,7 @@ def _build_projection_bundle_workspace(tmp_path: Path) -> Path:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "projection_workspace", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "projection_workspace", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "euclidean",
@@ -213,15 +217,23 @@ def _build_projection_bundle_workspace(tmp_path: Path) -> Path:
                 },
                 "deliverables": {
                     "projection_bundle": {
-                        "kind": "projection_bundle",
-                        "description": "One source-backed projection bundle.",
                         "recipe": "projection_bundle_recipe",
-                        "requires": {"sources": ["anchor60"]},
+                        "title": "Projection bundle",
+                        "section": "freshness",
+                        "question": "Does the projection bundle stay fresh when upstream sample or view changes?",
+                        "summary": "One source-backed projection bundle used to verify freshness hashing.",
+                        "requires": {
+                            "sources": ["anchor60"],
+                            "views": ["z20_60"],
+                            "recipes": ["projection_bundle_recipe"],
+                        },
                         "outputs": {
                             "views": ["z20_60"],
                             "samples": ["all_rows"],
                             "projections": ["umap_z20_60"],
                         },
+                        "docs_refs": [],
+                        "acceptance_checks": [],
                     }
                 },
             },
@@ -296,7 +308,7 @@ def test_view_manifest_records_overlay_part_provenance(tmp_path: Path) -> None:
     )
     assert materialize_result.exit_code == 0, materialize_result.stdout
 
-    manifest_path = workspace_dir / "outputs" / "latentdna" / "views" / "z20_60" / "manifest.json"
+    manifest_path = workspace_dir / "outputs" / "views" / "z20_60" / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     provenance = manifest["source_provenance"]
 

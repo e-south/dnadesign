@@ -14,6 +14,9 @@ Current status vocabulary:
 
 Important current behavior:
 
+- deliverables must declare explicit `title`, `section`, `question`, `summary`,
+  `requires`, `outputs`, `docs_refs`, and `acceptance_checks` fields; legacy
+  `kind` and `description` fallbacks are rejected.
 - `requires` must reference declared config objects or artifact families.
 - `outputs` must reference declared objects where relevant and must also be produced by the linked recipe.
 - deliverable status evaluates artifact freshness where manifests provide path-backed provenance.

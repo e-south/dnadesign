@@ -19,7 +19,7 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.latentdna.cli import app
+from dnadesign.latentdna.src.cli import app
 
 _RUNNER = CliRunner()
 
@@ -35,7 +35,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs/latentdna"},
+                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"},
                 "defaults": {
                     "analysis_dtype": "float32",
                     "metric": "cosine",
@@ -264,7 +264,7 @@ def test_phase10_tabular_export_preserves_feature_order_and_alignment(tmp_path: 
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
     assert payload["artifact_kind"] == "export_bundle"
-    export_dir = workspace_dir / "outputs" / "latentdna" / "exports" / "x2_primary_20b_table"
+    export_dir = workspace_dir / "outputs" / "exports" / "x2_primary_20b_table"
     export_table = pq.read_table(export_dir / "table.parquet")
     feature_table = pq.read_table(export_dir / "features.parquet")
     rows_table = pq.read_table(export_dir / "rows.parquet")
@@ -389,4 +389,4 @@ def test_phase10_runs_inventory_and_artifact_inspection_cover_new_export(tmp_pat
         ["runs", "prune", "export_bundle", "x2_primary_20b_table", "--workspace", workspace_dir.as_posix(), "--json"],
     )
     assert prune_result.exit_code == 0, prune_result.stdout
-    assert not (workspace_dir / "outputs" / "latentdna" / "exports" / "x2_primary_20b_table").exists()
+    assert not (workspace_dir / "outputs" / "exports" / "x2_primary_20b_table").exists()

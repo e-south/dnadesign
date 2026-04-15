@@ -37,6 +37,7 @@ def build_alignment(workspace: str | Path, alignment_id: str, *, force: bool = F
         left_input_path,
         right_input_path,
         key_columns,
+        right_key_columns,
     ) = build_alignment_artifact(context, alignment_id=alignment_id)
 
     manifest = ArtifactManifest(
@@ -64,7 +65,14 @@ def build_alignment(workspace: str | Path, alignment_id: str, *, force: bool = F
             "left": alignment.left,
             "right": alignment.right,
             "key_basis": alignment.on,
+            "left_key_basis": alignment.left_on,
+            "right_key_basis": alignment.right_on,
             "key_columns": key_columns,
+            "right_key_columns": right_key_columns,
+            "key_pairs": [
+                f"{left_name}={right_name}"
+                for left_name, right_name in zip(key_columns, right_key_columns, strict=True)
+            ],
             "support": alignment.support,
             "left_aggregation": alignment.left_aggregation,
             "right_aggregation": alignment.right_aggregation,

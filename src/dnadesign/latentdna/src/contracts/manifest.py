@@ -29,6 +29,7 @@ class ArtifactManifest(BaseModel):
     created_at: str
     tool_version: str
     git_commit: str | None = None
+    run_id: str | None = None
     command: str
     status: Literal["ok", "attention", "missing", "error"] = "ok"
     inputs: list[ArtifactInput] = Field(default_factory=list)

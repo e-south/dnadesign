@@ -41,10 +41,6 @@ def test_latentdna_root_keeps_minimal_top_level_surface() -> None:
     }
     assert observed == {
         "README.md",
-        "__init__.py",
-        "api.py",
-        "cli.py",
-        "contracts.py",
         "docs",
         "src",
         "tests",
@@ -57,6 +53,7 @@ def test_latentdna_internal_cli_is_nested_under_src() -> None:
     cli_dir = latentdna_src / "cli"
     cluster_dir = latentdna_src / "clusters"
     notebook_dir = latentdna_src / "notebooks"
+    workspaces_dir = latentdna_src / "workspaces"
     assert cli_dir.is_dir()
     assert (cli_dir / "__init__.py").is_file()
     assert (cli_dir / "app.py").is_file()
@@ -66,7 +63,20 @@ def test_latentdna_internal_cli_is_nested_under_src() -> None:
     assert (cluster_dir / "fit.py").is_file()
     assert notebook_dir.is_dir()
     assert (notebook_dir / "__init__.py").is_file()
+    assert (notebook_dir / "browser_runtime.py").is_file()
+    assert (notebook_dir / "browser_runtime_compare.py").is_file()
+    assert (notebook_dir / "browser_runtime_projection.py").is_file()
+    assert (notebook_dir / "browser_runtime_support.py").is_file()
     assert (notebook_dir / "scaffold.py").is_file()
+    assert (notebook_dir / "scaffold_panels.py").is_file()
+    assert (notebook_dir / "scaffold_pages.py").is_file()
+    assert (notebook_dir / "scaffold_selectors.py").is_file()
+    assert workspaces_dir.is_dir()
+    assert (workspaces_dir / "__init__.py").is_file()
+    assert (workspaces_dir / "loader.py").is_file()
+    assert (workspaces_dir / "paths.py").is_file()
+    assert (workspaces_dir / "scaffold.py").is_file()
+    assert (workspaces_dir / "validation.py").is_file()
 
 
 def test_latentdna_package_data_uses_workspace_shape_globs() -> None:

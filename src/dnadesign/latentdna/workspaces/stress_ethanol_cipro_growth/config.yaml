@@ -1,15 +1,21 @@
 schema_version: latentdna.workspace.v1
 workspace:
   id: stress_ethanol_cipro_growth
-  output_root: ./outputs/latentdna
+  title: Stress / ethanol / ciprofloxacin growth promoter study
+  output_root: ./outputs
 defaults:
   analysis_dtype: float32
   metric: cosine
   random_seed: 17
   plot_formats:
   - svg
+  - pdf
   - png
   neighbor_backend: auto
+  memory_policy:
+    warn_fraction_of_system_ram: 0.5
+    fail_fraction_of_system_ram: 0.75
+    require_override_above_fail: true
 sources:
   anchor60:
     kind: usr
@@ -32,16 +38,36 @@ metadata:
   - construct__template_id
   - template_id
   - construct__template_id
+  - infer__evo2_7b__anchor_only_7b_features__log_likelihood__mean_per_token
+  - infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token
+  - infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token
+  - infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token
 alignments:
   anchor_ctx_20b:
     left: z20_1k_anchor
     right: z20_60
-    'on': subject_key
+    left_on:
+    - construct__anchor_id
+    right_on:
+    - id
     support: intersection
   anchor_ctx_7b:
     left: z7_1k_anchor
     right: z7_60
-    'on': subject_key
+    left_on:
+    - construct__anchor_id
+    right_on:
+    - id
+    support: intersection
+  anchor_seq_20b:
+    left: z20_1k_seq
+    right: z20_1k_anchor
+    "on": subject_key
+    support: intersection
+  anchor_seq_7b:
+    left: z7_1k_seq
+    right: z7_1k_anchor
+    "on": subject_key
     support: intersection
 views:
   z7_60:
@@ -104,6 +130,18 @@ views:
       family: intermediate
       context: 1kb_seq
     role: challenger
+  z7_1k_seq:
+    source: ctx1k
+    vector:
+      kind: column
+      name: infer__evo2_7b__template_1kb_7b_features__intermediate_embedding__block26_mlp_out__seq_mean
+    coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
+    tags:
+      encoder: evo2
+      model: 7b
+      family: intermediate
+      context: 1kb_seq
+    role: challenger
   logits20_60:
     source: anchor60
     vector:
@@ -116,6 +154,18 @@ views:
       family: pooled_logits
       context: 60bp
     role: challenger
+  logits7_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: infer__evo2_7b__anchor_only_7b_features__output_layer_mean__seq_mean
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags:
+      encoder: evo2
+      model: 7b
+      family: pooled_logits
+      context: 60bp
+    role: challenger
   logits20_1k_anchor:
     source: ctx1k
     vector:
@@ -125,6 +175,18 @@ views:
     tags:
       encoder: evo2
       model: 20b
+      family: pooled_logits
+      context: 1kb_anchor
+    role: challenger
+  logits7_1k_anchor:
+    source: ctx1k
+    vector:
+      kind: column
+      name: infer__evo2_7b__template_1kb_7b_features__output_layer_mean__anchor_mean
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags:
+      encoder: evo2
+      model: 7b
       family: pooled_logits
       context: 1kb_anchor
     role: challenger
@@ -150,6 +212,30 @@ views:
       operation: difference
       family: intermediate
     role: committee_member
+  drag20:
+    derive:
+      kind: vector_difference
+      left: z20_1k_seq
+      right: z20_1k_anchor
+      alignment: anchor_seq_20b
+    coordinate_space_id: evo2_20b_intermediate_block23_mlp_out
+    tags:
+      operation: difference
+      family: intermediate
+      context: 1kb_drag
+    role: challenger
+  drag7:
+    derive:
+      kind: vector_difference
+      left: z7_1k_seq
+      right: z7_1k_anchor
+      alignment: anchor_seq_7b
+    coordinate_space_id: evo2_7b_intermediate_block26_mlp_out
+    tags:
+      operation: difference
+      family: intermediate
+      context: 1kb_drag
+    role: challenger
 scalars:
   delta7_norm:
     derive:
@@ -161,6 +247,31 @@ scalars:
       kind: vector_norm
       view: delta20
       norm: l2
+  drag7_norm:
+    derive:
+      kind: vector_norm
+      view: drag7
+      norm: l2
+  drag20_norm:
+    derive:
+      kind: vector_norm
+      view: drag20
+      norm: l2
+  drag20_norm_for_context_audit:
+    derive:
+      kind: select_columns
+      source: drag20_norm
+      columns:
+      - construct__anchor_id
+      - drag20_norm
+  context_audit_20b:
+    derive:
+      kind: join_tables
+      sources:
+      - delta20_norm
+      - drag20_norm_for_context_audit
+      "on":
+      - construct__anchor_id
   ethanol_vs_cipro:
     derive:
       kind: column_expression
@@ -172,7 +283,7 @@ landmarks:
     source: anchor60
     where:
       column: usr_label__primary
-      equals: spyP
+      equals: spyp
     representation:
       mode: centroid
   sulap:
@@ -225,6 +336,16 @@ cohorts:
     kind: promoter_metadata
     source: anchor60
     derive: source_class
+reference_sets:
+  promoter_wt_core:
+    ids:
+    - spyp
+    - sulAp
+    - soxSp
+    - J23105
+    match_column: usr_label__primary
+    label_column: usr_label__primary
+    label_mode: label_and_highlight
 plots:
   atlas_2x2_intermediate_main:
     kind: projection_grid
@@ -239,13 +360,34 @@ plots:
     - 7B context-aware (1 kb anchor)
     - 20B context-aware (1 kb anchor)
     color_column: design_family
-    label_column: usr_label__primary
-    label_values:
-    - spyP
-    - sulAp
-    - soxSp
-    - J23105
-  control_neighborhood_enrichment_curve_family:
+    annotation:
+      reference_set: promoter_wt_core
+      require_in_every_panel: true
+      missing_policy: fail
+      collision_policy: repel_then_callout
+  atlas_2x3_model_family:
+    kind: projection_grid
+    projections:
+    - umap_z7_60
+    - umap_z20_60
+    - umap_z7_1k_anchor
+    - umap_z20_1k_anchor
+    - umap_logits7_1k_anchor
+    - umap_logits20_1k_anchor
+    panel_titles:
+    - 7B anchor-only intermediate
+    - 20B anchor-only intermediate
+    - 7B anchor-aware intermediate
+    - 20B anchor-aware intermediate
+    - 7B anchor-aware pooled logits
+    - 20B anchor-aware pooled logits
+    color_column: design_family
+    annotation:
+      reference_set: promoter_wt_core
+      require_in_every_panel: true
+      missing_policy: fail
+      collision_policy: repel_then_callout
+  control_pca_explained_variance_curve:
     kind: curve
     reducer: z20_60_pca
   cluster_correspondence_primary:
@@ -261,6 +403,19 @@ plots:
     value_column: delta20_norm
     color_column: design_family
     render_mode: ecdf
+  drag_qc_distribution:
+    kind: distribution
+    scalar: drag20_norm
+    value_column: drag20_norm
+    color_column: design_family
+    render_mode: ecdf
+  context_shift_vs_drag_primary:
+    kind: xy_scatter
+    scalar: context_audit_20b
+    x_column: delta20_norm
+    y_column: drag20_norm
+    color_column: design_family
+    render_mode: hexbin
 exports:
   x0_primary_20b:
     row_basis: z20_60_pc32
@@ -329,7 +484,7 @@ exports:
       feature_prefix: delta7
 notebooks:
   browser:
-    kind: workspace_browser
+    kind: workspace
     title: Promoter atlas browser
     description: Consolidated read-only browser for promoter atlas artifacts.
     default_deliverable: atlas_2x2_intermediate_main
@@ -364,6 +519,7 @@ recipes:
         group_by: design_family
         n: 20000
         seed: 17
+        reference_set: promoter_wt_core
     - id: sample_context_atlas
       op: sample.build
       depends_on:
@@ -376,6 +532,7 @@ recipes:
         group_by: design_family
         n: 20000
         seed: 17
+        reference_set: promoter_wt_core
     - id: project_z7_60
       op: projection.fit
       depends_on:
@@ -431,7 +588,201 @@ recipes:
       - render_atlas_grid
       params:
         notebook: browser
-  control_plan_heatmap_recipe:
+  geometry_switchboard_20b_recipe:
+    steps:
+    - id: materialize_switchboard_z20_60
+      op: view.materialize
+      params:
+        view: z20_60
+    - id: materialize_switchboard_z7_60
+      op: view.materialize
+      params:
+        view: z7_60
+    - id: materialize_switchboard_z20_1k_anchor
+      op: view.materialize
+      params:
+        view: z20_1k_anchor
+    - id: materialize_switchboard_z7_1k_anchor
+      op: view.materialize
+      params:
+        view: z7_1k_anchor
+    - id: materialize_switchboard_z20_1k_seq
+      op: view.materialize
+      params:
+        view: z20_1k_seq
+    - id: materialize_switchboard_z7_1k_seq
+      op: view.materialize
+      params:
+        view: z7_1k_seq
+    - id: materialize_switchboard_logits20_60
+      op: view.materialize
+      params:
+        view: logits20_60
+    - id: materialize_switchboard_logits7_60
+      op: view.materialize
+      params:
+        view: logits7_60
+    - id: materialize_switchboard_logits20_1k_anchor
+      op: view.materialize
+      params:
+        view: logits20_1k_anchor
+    - id: materialize_switchboard_logits7_1k_anchor
+      op: view.materialize
+      params:
+        view: logits7_1k_anchor
+    - id: sample_switchboard_anchor
+      op: sample.build
+      depends_on:
+      - materialize_switchboard_z20_60
+      params:
+        sample: atlas_anchor_sample
+        view: z20_60
+        strategy: stratified
+        group_by: design_family
+        n: 20000
+        seed: 17
+        reference_set: promoter_wt_core
+    - id: sample_switchboard_context
+      op: sample.build
+      depends_on:
+      - materialize_switchboard_z20_1k_anchor
+      params:
+        sample: atlas_context_sample
+        view: z20_1k_anchor
+        strategy: stratified
+        group_by: design_family
+        n: 20000
+        seed: 17
+        reference_set: promoter_wt_core
+    - id: project_switchboard_z20_60
+      op: projection.fit
+      depends_on:
+      - sample_switchboard_anchor
+      params:
+        projection_id: umap_z20_60
+        view: z20_60
+        sample: atlas_anchor_sample
+        metric: cosine
+        seed: 17
+    - id: project_switchboard_z7_60
+      op: projection.fit
+      depends_on:
+      - sample_switchboard_anchor
+      params:
+        projection_id: umap_z7_60
+        view: z7_60
+        sample: atlas_anchor_sample
+        metric: cosine
+        seed: 17
+    - id: project_switchboard_z20_1k_anchor
+      op: projection.fit
+      depends_on:
+      - sample_switchboard_context
+      params:
+        projection_id: umap_z20_1k_anchor
+        view: z20_1k_anchor
+        sample: atlas_context_sample
+        metric: cosine
+        seed: 17
+    - id: project_switchboard_z7_1k_anchor
+      op: projection.fit
+      depends_on:
+      - sample_switchboard_context
+      params:
+        projection_id: umap_z7_1k_anchor
+        view: z7_1k_anchor
+        sample: atlas_context_sample
+        metric: cosine
+        seed: 17
+    - id: project_switchboard_z20_1k_seq
+      op: projection.fit
+      depends_on:
+      - sample_switchboard_context
+      params:
+        projection_id: umap_z20_1k_seq
+        view: z20_1k_seq
+        sample: atlas_context_sample
+        metric: cosine
+        seed: 17
+    - id: project_switchboard_z7_1k_seq
+      op: projection.fit
+      depends_on:
+      - sample_switchboard_context
+      params:
+        projection_id: umap_z7_1k_seq
+        view: z7_1k_seq
+        sample: atlas_context_sample
+        metric: cosine
+        seed: 17
+    - id: project_switchboard_logits20_60
+      op: projection.fit
+      depends_on:
+      - sample_switchboard_anchor
+      params:
+        projection_id: umap_logits20_60
+        view: logits20_60
+        sample: atlas_anchor_sample
+        metric: cosine
+        seed: 17
+    - id: project_switchboard_logits7_60
+      op: projection.fit
+      depends_on:
+      - sample_switchboard_anchor
+      params:
+        projection_id: umap_logits7_60
+        view: logits7_60
+        sample: atlas_anchor_sample
+        metric: cosine
+        seed: 17
+    - id: project_switchboard_logits20_1k_anchor
+      op: projection.fit
+      depends_on:
+      - sample_switchboard_context
+      params:
+        projection_id: umap_logits20_1k_anchor
+        view: logits20_1k_anchor
+        sample: atlas_context_sample
+        metric: cosine
+        seed: 17
+    - id: project_switchboard_logits7_1k_anchor
+      op: projection.fit
+      depends_on:
+      - sample_switchboard_context
+      params:
+        projection_id: umap_logits7_1k_anchor
+        view: logits7_1k_anchor
+        sample: atlas_context_sample
+        metric: cosine
+        seed: 17
+    - id: render_switchboard_atlas_2x3
+      op: plot.render
+      depends_on:
+      - project_switchboard_z7_60
+      - project_switchboard_z20_60
+      - project_switchboard_z7_1k_anchor
+      - project_switchboard_z20_1k_anchor
+      - project_switchboard_logits7_1k_anchor
+      - project_switchboard_logits20_1k_anchor
+      params:
+        plot_id: atlas_2x3_model_family
+    - id: generate_switchboard_browser
+      op: notebook.generate
+      depends_on:
+      - render_switchboard_atlas_2x3
+      - project_switchboard_z20_60
+      - project_switchboard_z7_60
+      - project_switchboard_z20_1k_anchor
+      - project_switchboard_z7_1k_anchor
+      - project_switchboard_z20_1k_seq
+      - project_switchboard_z7_1k_seq
+      - project_switchboard_logits20_60
+      - project_switchboard_logits7_60
+      - project_switchboard_logits20_1k_anchor
+      - project_switchboard_logits7_1k_anchor
+      params:
+        notebook: browser
+        force: true
+  control_pca_curve_recipe:
     steps:
     - id: materialize_anchor_view
       op: view.materialize
@@ -450,7 +801,7 @@ recipes:
       depends_on:
       - reduce_anchor_view
       params:
-        plot_id: control_neighborhood_enrichment_curve_family
+        plot_id: control_pca_explained_variance_curve
   context_shift_primary_recipe:
     steps:
     - id: materialize_primary_anchor
@@ -506,51 +857,129 @@ recipes:
         plot_id: context_shift_primary_distribution
   drag_qc_recipe:
     steps:
-    - id: materialize_qc_anchor
+    - id: materialize_drag_anchor
       op: view.materialize
       params:
-        view: z7_60
-    - id: materialize_qc_context
+        view: z20_1k_anchor
+    - id: materialize_drag_seq
       op: view.materialize
       params:
-        view: z7_1k_anchor
-    - id: build_qc_alignment
+        view: z20_1k_seq
+    - id: build_drag_alignment
       op: alignment.build
       depends_on:
-      - materialize_qc_anchor
-      - materialize_qc_context
+      - materialize_drag_anchor
+      - materialize_drag_seq
       params:
-        alignment: anchor_ctx_7b
-    - id: derive_qc_delta
+        alignment: anchor_seq_20b
+    - id: derive_drag20
       op: view.derive
       depends_on:
-      - build_qc_alignment
+      - build_drag_alignment
       params:
-        view: delta7
-    - id: derive_qc_delta_norm
+        view: drag20
+    - id: derive_drag20_norm
       op: scalar.derive
       depends_on:
-      - derive_qc_delta
+      - derive_drag20
       params:
-        scalar: delta7_norm
-    - id: reduce_qc_anchor
-      op: view.reduce
+        scalar: drag20_norm
+    - id: render_drag_distribution
+      op: plot.render
       depends_on:
-      - materialize_qc_anchor
+      - derive_drag20_norm
       params:
-        view: z7_60
-        run_id: z7_60_pca
-        dims: 32
-        reduced_view_id: z7_60_pc32
-    - id: reduce_qc_delta
-      op: view.reduce
+        plot_id: drag_qc_distribution
+  context_audit_primary_20b_recipe:
+    steps:
+    - id: materialize_audit_anchor
+      op: view.materialize
+      params:
+        view: z20_60
+    - id: materialize_audit_context
+      op: view.materialize
+      params:
+        view: z20_1k_anchor
+    - id: materialize_audit_seq
+      op: view.materialize
+      params:
+        view: z20_1k_seq
+    - id: build_audit_anchor_ctx
+      op: alignment.build
       depends_on:
-      - derive_qc_delta_norm
+      - materialize_audit_anchor
+      - materialize_audit_context
       params:
-        view: delta7
-        run_id: delta7_pca
-        dims: 32
-        reduced_view_id: delta7_pc32
+        alignment: anchor_ctx_20b
+    - id: build_audit_anchor_seq
+      op: alignment.build
+      depends_on:
+      - materialize_audit_context
+      - materialize_audit_seq
+      params:
+        alignment: anchor_seq_20b
+    - id: derive_audit_delta
+      op: view.derive
+      depends_on:
+      - build_audit_anchor_ctx
+      params:
+        view: delta20
+    - id: derive_audit_drag
+      op: view.derive
+      depends_on:
+      - build_audit_anchor_seq
+      params:
+        view: drag20
+    - id: derive_audit_delta_norm
+      op: scalar.derive
+      depends_on:
+      - derive_audit_delta
+      params:
+        scalar: delta20_norm
+    - id: derive_audit_drag_norm
+      op: scalar.derive
+      depends_on:
+      - derive_audit_drag
+      params:
+        scalar: drag20_norm
+    - id: derive_audit_drag_norm_selected
+      op: scalar.derive
+      depends_on:
+      - derive_audit_drag_norm
+      params:
+        scalar: drag20_norm_for_context_audit
+    - id: derive_audit_joined_table
+      op: scalar.derive
+      depends_on:
+      - derive_audit_delta_norm
+      - derive_audit_drag_norm_selected
+      params:
+        scalar: context_audit_20b
+    - id: render_audit_delta_distribution
+      op: plot.render
+      depends_on:
+      - derive_audit_delta_norm
+      params:
+        plot_id: context_shift_primary_distribution
+    - id: render_audit_drag_distribution
+      op: plot.render
+      depends_on:
+      - derive_audit_drag_norm
+      params:
+        plot_id: drag_qc_distribution
+    - id: render_audit_scatter
+      op: plot.render
+      depends_on:
+      - derive_audit_joined_table
+      params:
+        plot_id: context_shift_vs_drag_primary
+    - id: generate_audit_browser
+      op: notebook.generate
+      depends_on:
+      - render_audit_scatter
+      params:
+        notebook: browser
+        force: true
   agreement_7b_vs_20b_recipe:
     steps:
     - id: materialize_agreement_z7
@@ -636,8 +1065,86 @@ recipes:
         plot_id: agreement_7b_vs_20b_summary
   cluster_correspondence_recipe:
     steps:
+    - id: materialize_cluster_anchor
+      op: view.materialize
+      params:
+        view: z20_60
+    - id: materialize_cluster_context
+      op: view.materialize
+      params:
+        view: z20_1k_anchor
+    - id: build_cluster_alignment
+      op: alignment.build
+      depends_on:
+      - materialize_cluster_anchor
+      - materialize_cluster_context
+      params:
+        alignment: anchor_ctx_20b
+    - id: reduce_cluster_anchor
+      op: view.reduce
+      depends_on:
+      - build_cluster_alignment
+      params:
+        view: z20_60
+        run_id: z20_60_anchor_ctx_pca
+        alignment: anchor_ctx_20b
+        dims: 32
+        reduced_view_id: z20_60_anchor_ctx_pc32
+    - id: reduce_cluster_context
+      op: view.reduce
+      depends_on:
+      - build_cluster_alignment
+      params:
+        view: z20_1k_anchor
+        run_id: z20_1k_anchor_anchor_ctx_pca
+        alignment: anchor_ctx_20b
+        dims: 32
+        reduced_view_id: z20_1k_anchor_anchor_ctx_pc32
+    - id: fit_cluster_neighbors_anchor
+      op: neighbors.fit
+      depends_on:
+      - reduce_cluster_anchor
+      params:
+        neighbors: leiden_z20_60_knn
+        reduced_view: z20_60_anchor_ctx_pc32
+        k: 15
+        backend: approximate
+    - id: fit_cluster_neighbors_context
+      op: neighbors.fit
+      depends_on:
+      - reduce_cluster_context
+      params:
+        neighbors: leiden_z20_1k_anchor_knn
+        reduced_view: z20_1k_anchor_anchor_ctx_pc32
+        k: 15
+        backend: approximate
+    - id: fit_cluster_leiden_anchor
+      op: cluster.fit
+      depends_on:
+      - fit_cluster_neighbors_anchor
+      params:
+        cluster: leiden_z20_60
+        reduced_view: z20_60_anchor_ctx_pc32
+        method: leiden
+        neighbor_set: leiden_z20_60_knn
+        k: 15
+        resolution: 0.6
+    - id: fit_cluster_leiden_context
+      op: cluster.fit
+      depends_on:
+      - fit_cluster_neighbors_context
+      params:
+        cluster: leiden_z20_1k_anchor
+        reduced_view: z20_1k_anchor_anchor_ctx_pc32
+        method: leiden
+        neighbor_set: leiden_z20_1k_anchor_knn
+        k: 15
+        resolution: 1.0
     - id: render_cluster_correspondence
       op: plot.render
+      depends_on:
+      - fit_cluster_leiden_anchor
+      - fit_cluster_leiden_context
       params:
         plot_id: cluster_correspondence_primary
   x0_primary_20b_recipe:
@@ -808,37 +1315,9 @@ recipes:
       params:
         export: x3_ablation_7b
 deliverables:
-  atlas_2x2_intermediate:
-    kind: projection_grid
-    description: Render the committee atlas across 7B/20B anchor and context intermediate
-      views.
-    question: Do the four promoter design families separate in latent space at all?
-    section: Atlas
-    recipe: atlas_2x2_recipe
-    requires:
-      views:
-      - z7_60
-      - z20_60
-      - z7_1k_anchor
-      - z20_1k_anchor
-      cohorts:
-      - design_family
-    outputs:
-      samples:
-      - atlas_anchor_sample
-      - atlas_context_sample
-      projections:
-      - umap_z7_60
-      - umap_z20_60
-      - umap_z7_1k_anchor
-      - umap_z20_1k_anchor
-      plots:
-      - atlas_2x2_intermediate_main
-      notebooks:
-      - browser
   atlas_2x2_intermediate_main:
-    kind: projection_grid
-    description: Primary manuscript-facing atlas across 20B and 7B intermediate views.
+    title: Atlas 2x2 intermediate main
+    summary: Four-panel aligned projection colored by design family with required WT and reference promoter labels.
     question: Do the four promoter design families separate in latent space at all?
     section: Atlas
     recipe: atlas_2x2_recipe
@@ -863,52 +1342,37 @@ deliverables:
       - atlas_2x2_intermediate_main
       notebooks:
       - browser
-  control_neighborhood_enrichment:
-    kind: enrichment_curve
-    description: Persist WT-neighborhood family enrichment summaries.
-    question: Do WT neighborhoods recover expected design families?
-    section: Landmarks
-    recipe: control_plan_heatmap_recipe
+    docs_refs:
+    - study:stress_ethanol_cipro_growth/deliverables/atlas_2x2_intermediate_main
+    - study:stress_ethanol_cipro_growth/figures/atlas_2x2_intermediate_main
+    acceptance_checks:
+    - kind: required_plot_kind
+      value: projection_grid
+    - kind: required_reference_set
+      value: promoter_wt_core
+    - kind: require_reference_set_in_every_panel
+      value: true
+  control_pca_explained_variance_curve:
+    title: Control PCA explained variance curve
+    summary: PCA explained-variance scree curve for the primary 20B anchor-only view.
+    question: How much anchor-only variance does each principal component explain in the primary 20B view?
+    section: Reduction
+    recipe: control_pca_curve_recipe
     requires:
       views:
       - z20_60
-      landmarks:
-      - spyp
-      - sulap
-      - soxsp
-      - j23105
-      cohorts:
-      - design_family
     outputs:
       reducers:
       - z20_60_pca
       plots:
-      - control_neighborhood_enrichment_curve_family
-  control_neighborhood_enrichment_curve_family:
-    kind: enrichment_curve
-    description: Enrichment-versus-neighborhood-size family summary.
-    question: Do WT neighborhoods recover expected design families?
-    section: Landmarks
-    recipe: control_plan_heatmap_recipe
-    requires:
-      views:
-      - z20_60
-      landmarks:
-      - spyp
-      - sulap
-      - soxsp
-      - j23105
-      cohorts:
-      - design_family
-    outputs:
-      reducers:
-      - z20_60_pca
-      plots:
-      - control_neighborhood_enrichment_curve_family
+      - control_pca_explained_variance_curve
+    docs_refs: []
+    acceptance_checks:
+    - kind: required_plot_kind
+      value: curve
   context_shift_primary:
-    kind: context_shift
-    description: Materialize the primary 20B context-shift view, scalar summary, and
-      low-rank delta artifact.
+    title: Context shift primary
+    summary: Primary 20B context-shift view, scalar summary, and low-rank delta artifacts.
     question: Does anchor-plus-context materially shift promoter representation?
     section: Context
     recipe: context_shift_primary_recipe
@@ -931,33 +1395,99 @@ deliverables:
       - delta20_pc32
       plots:
       - context_shift_primary_distribution
+    docs_refs: []
+    acceptance_checks: []
+  geometry_switchboard_20b:
+    title: Geometry switchboard multiview
+    summary: Materialize the core 7B and 20B intermediate and pooled-logit projections that drive the browser atlas viewer and comparison tab.
+    question: Can the browser switch across the core 7B and 20B geometries without requiring one static plot per hue?
+    section: Atlas
+    recipe: geometry_switchboard_20b_recipe
+    requires:
+      views:
+      - z7_60
+      - z20_60
+      - z7_1k_anchor
+      - z20_1k_anchor
+      - z7_1k_seq
+      - z20_1k_seq
+      - logits7_60
+      - logits20_60
+      - logits7_1k_anchor
+      - logits20_1k_anchor
+      cohorts:
+      - design_family
+    outputs:
+      samples:
+      - atlas_anchor_sample
+      - atlas_context_sample
+      projections:
+      - umap_z7_60
+      - umap_z20_60
+      - umap_z7_1k_anchor
+      - umap_z20_1k_anchor
+      - umap_z7_1k_seq
+      - umap_z20_1k_seq
+      - umap_logits7_60
+      - umap_logits20_60
+      - umap_logits7_1k_anchor
+      - umap_logits20_1k_anchor
+      plots:
+      - atlas_2x3_model_family
+      notebooks:
+      - browser
+    docs_refs: []
+    acceptance_checks: []
   drag_qc:
-    kind: drag_qc
-    description: Materialize the 7B challenger context-shift QC scalar and low-rank
-      artifacts.
-    question: Does full 1 kb context add drag beyond anchor-aware context?
+    title: Drag QC
+    summary: 20B full-context drag scalar that measures how much the full 1 kb sequence departs from anchor-aware pooling.
+    question: Does full 1 kb context add drag beyond anchor-aware context in the primary 20B lane?
     section: Context
     recipe: drag_qc_recipe
     requires:
       views:
-      - z7_60
-      - z7_1k_anchor
+      - z20_1k_anchor
+      - z20_1k_seq
       alignments:
-      - anchor_ctx_7b
+      - anchor_seq_20b
     outputs:
       views:
-      - delta7
+      - drag20
       scalars:
-      - delta7_norm
-      reducers:
-      - z7_60_pca
-      - delta7_pca
-      reduced_views:
-      - z7_60_pc32
-      - delta7_pc32
+      - drag20_norm
+      plots:
+      - drag_qc_distribution
+    docs_refs: []
+    acceptance_checks: []
+  context_audit_primary_20b:
+    title: Context audit primary 20B
+    summary: Persist the 20B context audit surfaces needed to decide whether delta20 remains a primary export feature or gets demoted behind drag-aware QC.
+    question: Should delta20 remain in x2_primary_20b, or be demoted because full-context drag carries the stronger signal?
+    section: Context
+    recipe: context_audit_primary_20b_recipe
+    requires:
+      views:
+      - z20_60
+      - z20_1k_anchor
+      - z20_1k_seq
+      alignments:
+      - anchor_ctx_20b
+      - anchor_seq_20b
+    outputs:
+      views:
+      - delta20
+      - drag20
+      scalars:
+      - delta20_norm
+      - drag20_norm
+      - context_audit_20b
+      plots:
+      - context_shift_vs_drag_primary
+    docs_refs: []
+    acceptance_checks: []
   agreement_7b_vs_20b:
-    kind: agreement_summary
-    description: Compare 7B and 20B anchor-only structure on a shared sampled support.
+    title: Agreement 7B vs 20B
+    summary: Compare 7B and 20B anchor-only structure on a shared sampled support.
     question: Is 7B adding specialist signal beyond 20B, or mostly redundancy?
     section: Agreement
     recipe: agreement_7b_vs_20b_recipe
@@ -980,10 +1510,11 @@ deliverables:
       - agreement_7b_vs_20b
       plots:
       - agreement_7b_vs_20b_summary
+    docs_refs: []
+    acceptance_checks: []
   cluster_correspondence_primary:
-    kind: correspondence_heatmap
-    description: Compare aligned Leiden cluster assignments between anchor-only and
-      anchor-aware 20B views.
+    title: Cluster correspondence primary
+    summary: Compare aligned Leiden cluster assignments between anchor-only and anchor-aware 20B views.
     question: Does anchor-plus-context change promoter organization?
     section: Clusters
     recipe: cluster_correspondence_recipe
@@ -994,9 +1525,13 @@ deliverables:
     outputs:
       plots:
       - cluster_correspondence_primary
+    docs_refs: []
+    acceptance_checks:
+    - kind: required_plot_kind
+      value: correspondence_heatmap
   x0_primary_20b:
-    kind: export_bundle
-    description: Export the primary 20B low-rank bundle plus landmark distances.
+    title: X0 primary 20B
+    summary: Export the primary 20B low-rank bundle plus landmark distances.
     question: Is the anchor-only 20B view a useful baseline export?
     section: Exports
     recipe: x0_primary_20b_recipe
@@ -1012,9 +1547,11 @@ deliverables:
       - z20_60_pc32
       exports:
       - x0_primary_20b
+    docs_refs: []
+    acceptance_checks: []
   x1_primary_20b:
-    kind: export_bundle
-    description: Export the primary 20B delta-only low-rank bundle.
+    title: X1 primary 20B
+    summary: Export the primary 20B delta-only low-rank bundle.
     question: Is the delta-only 20B export stable enough to stand on its own?
     section: Exports
     recipe: x1_primary_20b_recipe
@@ -1037,11 +1574,12 @@ deliverables:
       - delta20_pc32
       exports:
       - x1_primary_20b
+    docs_refs: []
+    acceptance_checks: []
   x2_primary_20b:
-    kind: export_bundle
-    description: Export the aligned primary 20B multiblock bundle for downstream supervised
-      learning.
-    question: Is x2_primary_20b still the deterministic primary supervised export?
+    title: X2 primary 20B
+    summary: Export the aligned primary 20B multiblock bundle for downstream supervised learning, while keeping the delta block explicitly provisional pending the context audit.
+    question: Does x2_primary_20b remain the deterministic primary supervised export once the context audit is complete?
     section: Exports
     recipe: x2_primary_20b_recipe
     requires:
@@ -1065,9 +1603,11 @@ deliverables:
       - delta20_pc32
       exports:
       - x2_primary_20b
+    docs_refs: []
+    acceptance_checks: []
   x3_ablation_7b:
-    kind: export_bundle
-    description: Export the aligned 7B ablation bundle for challenger comparisons.
+    title: X3 ablation 7B
+    summary: Export the aligned 7B ablation bundle for challenger comparisons.
     question: Does the 7B committee member add useful ablation structure?
     section: Exports
     recipe: x3_ablation_7b_recipe
@@ -1090,10 +1630,8 @@ deliverables:
       - delta7_pc32
       exports:
       - x3_ablation_7b
+    docs_refs: []
+    acceptance_checks: []
 study_binding:
-  kind: dnadesign_study
-  study_dir: docs/studies/stress_ethanol_cipro_growth
-  readiness_vocabulary:
-  - missing
-  - attention
-  - ok
+  study_id: stress_ethanol_cipro_growth
+  docs_root: src/dnadesign/studies/stress_ethanol_cipro_growth
