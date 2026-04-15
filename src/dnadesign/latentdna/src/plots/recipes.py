@@ -66,6 +66,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig) -> ResolvedPlotSpec:
             y_column=config.y_column,
             color_column=config.color_column,
             render_mode=config.render_mode,
+            annotation=config.annotation,
             config_id=plot_id,
         )
     if config.kind == "distribution":

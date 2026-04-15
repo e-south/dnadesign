@@ -284,8 +284,12 @@ def test_phase7_notebook_generation_flow(tmp_path: Path) -> None:
     assert "_geometry = runtime.geometry" in notebook_text
     assert "_support = runtime.support" in notebook_text
     assert 'runtime["' not in notebook_text
-    assert "WORKSPACE_DIR = Path(__file__).resolve().parents[3]" in notebook_text
-    assert "catalog.json" in notebook_text
+    assert 'runtime_paths = controls["runtime_paths"]' in notebook_text
+    assert 'runtime_paths["workspace_relative_path"]' in notebook_text
+    assert 'runtime_paths["output_relative_path"]' in notebook_text
+    assert 'runtime_paths["catalog_relative_path"]' in notebook_text
+    assert 'runtime_paths["health_relative_path"]' in notebook_text
+    assert "parents[3]" not in notebook_text
     assert 'label="Section"' in notebook_text
     assert 'label="Deliverable"' in notebook_text
     assert 'label="Plot"' in notebook_text
@@ -296,14 +300,18 @@ def test_phase7_notebook_generation_flow(tmp_path: Path) -> None:
     assert 'label="Right geometry"' in notebook_text
     assert "What this shows" in notebook_text
     assert "Manifest and QA Details" in notebook_text
-    assert "Atlas Viewer" in notebook_text
+    assert "Geometry Views" in notebook_text
     assert "Compare Views" in notebook_text
-    assert "Inventory" in notebook_text
+    assert "Catalog" in notebook_text
     assert (notebook_dir / "manifest.json").is_file()
     controls_payload = json.loads(controls_path.read_text(encoding="utf-8"))
-    assert controls_payload["schema_version"] == "latentdna.workspace_notebook_controls.v1"
+    assert controls_payload["schema_version"] == "latentdna.workspace_notebook_controls.v2"
     assert controls_payload["workspace_id"] == "stress_ethanol_cipro_latent_atlas"
     assert controls_payload["notebook_id"] == "atlas_review"
+    assert controls_payload["runtime_paths"]["workspace_relative_path"] == "../../.."
+    assert controls_payload["runtime_paths"]["output_relative_path"] == "../.."
+    assert controls_payload["runtime_paths"]["catalog_relative_path"] == "../../catalog.json"
+    assert controls_payload["runtime_paths"]["health_relative_path"] == "../health.json"
 
     rerun_result = _RUNNER.invoke(
         app,
@@ -363,3 +371,10 @@ def test_phase7_notebook_generation_flow(tmp_path: Path) -> None:
     )
     assert invalid_export_result.returncode != 0
     assert "WorkspaceNotebookControls" in (invalid_export_result.stderr + invalid_export_result.stdout)
+
+    invalid_validate_result = _RUNNER.invoke(
+        app,
+        ["validate", "workspace", "--workspace", workspace_dir.as_posix(), "--deep", "--json"],
+    )
+    assert invalid_validate_result.exit_code != 0
+    assert "workspace notebook controls are invalid for atlas_review" in invalid_validate_result.stdout

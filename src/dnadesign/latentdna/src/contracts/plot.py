@@ -91,6 +91,7 @@ class XYScatterPlotConfig(StrictPlotModel):
     y_column: str | None = None
     color_column: str | None = None
     render_mode: Literal["points", "hexbin", "density_contour"] = "points"
+    annotation: PlotAnnotationConfig | None = None
 
     @model_validator(mode="after")
     def _validate_single_input(self) -> "XYScatterPlotConfig":

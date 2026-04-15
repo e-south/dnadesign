@@ -194,6 +194,7 @@ def _score_distance_step(
         str(_require_param(params, "distance_id", "distance")),
         view_id=str(_require_param(params, "view_id", "view")),
         landmark_ids=_list_param(params, "landmark_ids", "landmarks", "landmark"),
+        alignment_id=_optional_param(params, "alignment_id", "alignment", default=None),
         metric=_optional_param(params, "metric", default=None),
         force=force,
     )

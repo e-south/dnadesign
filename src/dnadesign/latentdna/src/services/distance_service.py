@@ -25,6 +25,7 @@ def score_distance(
     view_id: str,
     landmark_ids: list[str],
     metric: str | None,
+    alignment_id: str | None = None,
     force: bool = False,
 ) -> CommandResult:
     context = load_workspace_config(workspace)
@@ -43,6 +44,7 @@ def score_distance(
         view_id=view_id,
         landmark_ids=landmark_ids,
         metric=metric_value,
+        alignment_id=alignment_id,
     )
     manifest = ArtifactManifest(
         artifact_kind="distance_set",
@@ -62,6 +64,7 @@ def score_distance(
             "view_id": view_id,
             "landmark_ids": landmark_ids,
             "metric": metric_value,
+            "alignment_id": alignment_id,
             "representation_modes": representation_modes,
             "member_counts": member_counts,
         },
@@ -76,7 +79,7 @@ def score_distance(
         artifact_kind="distance_set",
         artifact_id=distance_id,
         outputs=[artifact_dir.as_posix()],
-        inputs={"view": view_id, "landmarks": landmark_ids},
+        inputs={"view": view_id, "landmarks": landmark_ids, "alignment": alignment_id},
         metrics={"rows": rows, "columns": len(columns)},
     )
     record_audit(

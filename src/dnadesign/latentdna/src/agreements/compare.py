@@ -32,6 +32,13 @@ def _select_indices(rows: list[dict[str, Any]], where: dict[str, Any]) -> list[i
     raise ContractViolationError("landmark where clause requires either 'equals' or 'in'")
 
 
+def _alignment_input_uses_source(context: WorkspaceContext, ref_id: str, source_id: str) -> bool:
+    if ref_id == source_id:
+        return True
+    view = context.config.views.get(ref_id)
+    return bool(view is not None and getattr(view, "source", None) == source_id)
+
+
 def _neighbor_artifact_paths(context: WorkspaceContext, neighbor_id: str) -> tuple[Path, Path, Path]:
     artifact_dir = context.output_root / "neighbors" / neighbor_id
     indices_path = artifact_dir / "indices.npy"
@@ -141,30 +148,45 @@ def _landmark_seed_indices(
         if indices:
             return indices
 
-    if scope_kind != "alignment_set" or scope_id is None:
+    resolved_scope_kind = scope_kind
+    resolved_scope_id = scope_id
+    if scope_kind == "reduced_view" and scope_id is not None:
+        reduced_manifest = context.read_manifest(context.output_root / "reduced_views" / scope_id / "manifest.json")
+        upstream_scope_kind = reduced_manifest["params"].get("fit_scope_kind")
+        upstream_scope_id = reduced_manifest["params"].get("fit_scope_id")
+        if isinstance(upstream_scope_kind, str):
+            resolved_scope_kind = upstream_scope_kind
+            resolved_scope_id = str(upstream_scope_id) if upstream_scope_id is not None else None
+
+    if resolved_scope_kind != "alignment_set" or resolved_scope_id is None:
         raise ContractViolationError(
             "landmark "
             f"{landmark_id} cannot be selected from neighbor rows without "
             f"{selector_column!r} in scope {scope_kind!r}"
         )
 
-    alignment_manifest = context.read_manifest(context.output_root / "alignments" / scope_id / "manifest.json")
-    key_columns = [str(name) for name in alignment_manifest["params"]["key_columns"]]
+    alignment_manifest = context.read_manifest(context.output_root / "alignments" / resolved_scope_id / "manifest.json")
+    left_key_columns = [str(name) for name in alignment_manifest["params"]["key_columns"]]
+    right_key_columns = [str(name) for name in alignment_manifest["params"].get("right_key_columns", left_key_columns)]
+    right_ref = str(alignment_manifest["params"]["right"])
+    source_key_columns = (
+        right_key_columns if _alignment_input_uses_source(context, right_ref, landmark.source) else left_key_columns
+    )
     source = context.require_source(landmark.source)
     resolved = resolve_source(landmark.source, source, workspace_dir=context.workspace_dir)
     source_rows = read_records_table(
         resolved,
-        columns=list(dict.fromkeys([*key_columns, selector_column])),
+        columns=list(dict.fromkeys([*source_key_columns, selector_column])),
     ).to_pylist()
     matched_source_indices = _select_indices(source_rows, landmark.where)
     if not matched_source_indices:
         raise ContractViolationError(f"landmark {landmark_id} matched no rows in source {landmark.source!r}")
-    key_set = {tuple(source_rows[index][column] for column in key_columns) for index in matched_source_indices}
+    key_set = {tuple(source_rows[index][column] for column in source_key_columns) for index in matched_source_indices}
     aligned_indices = [
-        index for index, row in enumerate(rows) if tuple(row.get(column) for column in key_columns) in key_set
+        index for index, row in enumerate(rows) if tuple(row.get(column) for column in left_key_columns) in key_set
     ]
     if not aligned_indices:
-        raise ContractViolationError(f"landmark {landmark_id} matched no rows in agreement scope {scope_id!r}")
+        raise ContractViolationError(f"landmark {landmark_id} matched no rows in agreement scope {resolved_scope_id!r}")
     return aligned_indices
 
 

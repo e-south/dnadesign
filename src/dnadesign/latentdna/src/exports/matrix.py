@@ -4,6 +4,7 @@ Matrix export builders for latentdna.
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -86,15 +87,16 @@ def _load_alignment_projection(
     context: WorkspaceContext,
     *,
     alignment_id: str,
-) -> tuple[Path, pa.Table, list[str]]:
+) -> tuple[Path, pa.Table, list[str], list[str]]:
     alignment_dir = context.output_root / "alignments" / alignment_id
     manifest_path = alignment_dir / "manifest.json"
     rows_path = alignment_dir / "rows.parquet"
     if not manifest_path.exists() or not rows_path.exists():
         raise MissingArtifactError(f"alignment artifact not found for export projection: {alignment_id}")
     manifest = context.read_manifest(manifest_path)
-    key_columns = [str(name) for name in manifest["params"]["key_columns"]]
-    return rows_path, read_table(rows_path), key_columns
+    left_key_columns = [str(name) for name in manifest["params"]["key_columns"]]
+    right_key_columns = [str(name) for name in manifest["params"].get("right_key_columns", left_key_columns)]
+    return rows_path, read_table(rows_path), left_key_columns, right_key_columns
 
 
 def _group_candidate_rows(candidate_rows: pa.Table, *, key_columns: list[str]) -> dict[tuple[Any, ...], list[int]]:
@@ -110,14 +112,15 @@ def _project_rows_to_alignment(
     alignment_rows: pa.Table,
     candidate_rows: pa.Table,
     *,
-    key_columns: list[str],
+    alignment_key_columns: list[str],
+    candidate_key_columns: list[str],
     label: str,
 ) -> list[list[int]]:
-    grouped = _group_candidate_rows(candidate_rows, key_columns=key_columns)
+    grouped = _group_candidate_rows(candidate_rows, key_columns=candidate_key_columns)
     index_groups: list[list[int]] = []
     missing: list[tuple[Any, ...]] = []
-    for row in alignment_rows.select(key_columns).to_pylist():
-        key = tuple(row[name] for name in key_columns)
+    for row in alignment_rows.select(alignment_key_columns).to_pylist():
+        key = tuple(row[name] for name in alignment_key_columns)
         indices = grouped.get(key)
         if indices is None:
             missing.append(key)
@@ -143,14 +146,27 @@ def _reduced_view_block_payload(
     source_path, rows_path, matrix, rows_table = _resolve_reduced_view(context, block.source)
     alignment_path: Path | None = None
     if block.alignment is not None:
-        alignment_path, aligned_rows, key_columns = _load_alignment_projection(
+        alignment_path, aligned_rows, left_key_columns, right_key_columns = _load_alignment_projection(
             context,
             alignment_id=block.alignment,
         )
+        candidate_key_columns = (
+            left_key_columns
+            if set(left_key_columns).issubset(set(rows_table.column_names))
+            else right_key_columns
+            if set(right_key_columns).issubset(set(rows_table.column_names))
+            else []
+        )
+        if not candidate_key_columns:
+            raise ContractViolationError(
+                f"export block {block.block_id} shares neither alignment key columns "
+                f"{left_key_columns} nor {right_key_columns} with the candidate rows"
+            )
         index_groups = _project_rows_to_alignment(
             aligned_rows,
             rows_table,
-            key_columns=key_columns,
+            alignment_key_columns=left_key_columns,
+            candidate_key_columns=candidate_key_columns,
             label=f"export block {block.block_id}",
         )
         matrix = np.vstack(
@@ -200,14 +216,27 @@ def _table_columns_block_payload(
     rows_table = table
     alignment_path = None
     if block.alignment is not None:
-        alignment_path, aligned_rows, key_columns = _load_alignment_projection(
+        alignment_path, aligned_rows, left_key_columns, right_key_columns = _load_alignment_projection(
             context,
             alignment_id=block.alignment,
         )
+        candidate_key_columns = (
+            left_key_columns
+            if set(left_key_columns).issubset(set(rows_table.column_names))
+            else right_key_columns
+            if set(right_key_columns).issubset(set(rows_table.column_names))
+            else []
+        )
+        if not candidate_key_columns:
+            raise ContractViolationError(
+                f"export block {block.block_id} shares neither alignment key columns "
+                f"{left_key_columns} nor {right_key_columns} with the candidate rows"
+            )
         index_groups = _project_rows_to_alignment(
             aligned_rows,
             rows_table,
-            key_columns=key_columns,
+            alignment_key_columns=left_key_columns,
+            candidate_key_columns=candidate_key_columns,
             label=f"export block {block.block_id}",
         )
         matrix = np.vstack(
@@ -287,6 +316,10 @@ def build_export_matrix_artifact(
     matrices = [block.matrix for block in blocks]
     feature_rows = [row for block in blocks for row in block.feature_rows]
     block_rows = [row for block in blocks for row in block.block_row]
+    feature_names = [str(row["feature_name"]) for row in feature_rows]
+    duplicates = sorted(name for name, count in Counter(feature_names).items() if count > 1)
+    if duplicates:
+        raise ContractViolationError(f"export {export_id} defines duplicate feature names: {duplicates[:5]}")
     export = context.require_export(export_id)
     export_matrix = np.ascontiguousarray(np.column_stack(matrices), dtype=export.matrix_dtype or context.analysis_dtype)
     export_dir = context.output_root / "exports" / export_id

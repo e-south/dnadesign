@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth Routes
 
-**Last verified:** 2026-04-14
+**Last verified:** 2026-04-15
 
 Open this page after status answers `where is the study now?` and preflight
 answers `what blocks execution here?`
@@ -52,7 +52,7 @@ tool-local workflow docs.
 
 ### LatentDNA atlas
 
-- Current state: `attention`; the study-bound workspace now loads on the canonical `outputs/` root, the single browser notebook has a geometry switchboard for the core 20B intermediate and pooled-logit projections, and the export lane still treats `delta20` as provisional pending the explicit context audit.
+- Current state: `attention`; the study-bound workspace validates on the canonical `outputs/` root, the browser notebook now has the geometry switchboard plus context-audit controls, and the open gap is still the missing `x2_primary_20b` export bundle rather than notebook or plot materialization.
 - Owner tool: `latentdna`
 - Entry artifact: `promoter/stress_ethanol_cipro_anchor_set` and `promoter/stress_ethanol_cipro_construct_contexts`
 - Primary doc: `src/dnadesign/latentdna/docs/workflows/promoter-study-latent-atlas.md`
@@ -66,12 +66,33 @@ tool-local workflow docs.
   `context_shift_primary_distribution`, `drag_qc_distribution`,
   `context_shift_vs_drag_primary`, `cluster_correspondence_primary`,
   `agreement_7b_vs_20b_summary`
+- Materialized now: `atlas_2x2_intermediate_main`, `atlas_2x3_model_family`,
+  `control_pca_explained_variance_curve`,
+  `context_shift_primary_distribution`, `drag_qc_distribution`,
+  `context_shift_vs_drag_primary`, `agreement_7b_vs_20b_summary`,
+  `cluster_correspondence_primary`, the browser notebook, and
+  `outputs/scalars/context_audit_20b/table.parquet`
 - Deliverables currently declared in the workspace include:
   `atlas_2x2_intermediate_main`, `geometry_switchboard_20b`,
   `control_pca_explained_variance_curve`, `drag_qc`,
   `context_shift_primary`, `context_audit_primary_20b`, `agreement_7b_vs_20b`,
   `cluster_correspondence_primary`, `x0_primary_20b`, `x1_primary_20b`,
   `x2_primary_20b`, `x3_ablation_7b`
+- Still missing: export bundles `x0_primary_20b`, `x1_primary_20b`,
+  `x2_primary_20b`, and `x3_ablation_7b`; treat `x2_primary_20b` as the open
+  export gate rather than a live downstream handoff
+- Interpretation boundary: the saved study artifacts support pooled
+  expanded-context representation analysis, not token-level hidden states,
+  per-position logits, or anchor-only slices inside the 1 kb construct
+- Planned next analysis pack, not yet materialized: reference-centric
+  `d_E`/`d_C` similarity maps against WT controls and synthetic centroids,
+  paired anchor-to-full-context shift summaries, geometry-preservation
+  scorecards, and grouped-CV or precision-at-K leaderboards
+- Decision rule for the next slice: `z20_60` and `z20_1k_seq` intermediate
+  embeddings are the primary candidate space, pooled logits stay as
+  benchmarks, per-base likelihood stays a scalar side channel, and
+  `z20_1k_anchor`, `drag20`, and Leiden correspondence stay QC until the new
+  reference and prediction plots exist
 - Review loop: `workspace refresh` -> `deliverable status` or `recipe run` -> `notebook generate` (allowed to be `attention`) -> `notebook smoke` -> `marimo run`
 - Browser control-plane artifact: `outputs/notebooks/browser/controls.json`
 - Context-audit decision artifact: `outputs/scalars/context_audit_20b/table.parquet` plus the browser `context_audit` summary
@@ -86,7 +107,7 @@ tool-local workflow docs.
 
 - Current state: `planned`; no study-owned cluster results root is configured yet.
 - Owner tool: `cluster`
-- Entry artifact: `promoter/stress_ethanol_cipro_feature_matrix` or a later explicit latent export such as `x2_primary_20b`
+- Entry artifact: `promoter/stress_ethanol_cipro_feature_matrix` or a later explicit latent export once a canonical export bundle is materialized (current gap: `x2_primary_20b`)
 - Primary doc/workspace: `src/dnadesign/cluster/docs/workflows/exploratory-clustering.md`
 - First command: `uv run ops catalog show cluster.downstream.exploratory-clustering`
 - Status JSON route: `evidence.analysis_surfaces.cluster`
@@ -101,7 +122,7 @@ tool-local workflow docs.
 
 - Current state: `not configured`; no study-owned OPAL campaign config is checked in yet.
 - Owner tool: `opal`
-- Entry artifact: `promoter/stress_ethanol_cipro_feature_matrix` or a later explicit latent export such as `x2_primary_20b`
+- Entry artifact: `promoter/stress_ethanol_cipro_feature_matrix` or a later explicit latent export once a canonical export bundle is materialized (current gap: `x2_primary_20b`)
 - Primary doc/workspace: `src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md`
 - First command: `uv run ops catalog show opal.downstream.usr-infer-x-active-learning`
 - Configured/planned/not configured: `not configured`

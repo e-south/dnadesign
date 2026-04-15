@@ -95,11 +95,19 @@ class WorkspaceNotebookContextAudit(StrictNotebookModel):
     metrics: dict[str, object] | None = None
 
 
+class WorkspaceNotebookRuntimePaths(StrictNotebookModel):
+    workspace_relative_path: str
+    output_relative_path: str
+    catalog_relative_path: str
+    health_relative_path: str
+
+
 class WorkspaceNotebookControls(StrictNotebookModel):
-    schema_version: Literal["latentdna.workspace_notebook_controls.v1"]
+    schema_version: Literal["latentdna.workspace_notebook_controls.v2"]
     workspace_id: str
     notebook_id: str
     generated_at: str
+    runtime_paths: WorkspaceNotebookRuntimePaths
     geometry_switchboard: WorkspaceNotebookSwitchboardControls
     context_audit: WorkspaceNotebookContextAudit
 

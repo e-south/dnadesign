@@ -1,7 +1,7 @@
 # Promoter-Study Latent Atlas
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-14
+**Last verified:** 2026-04-15
 
 **Type:** workflow
 **Plane:** downstream-tool
@@ -39,6 +39,44 @@ running the workflow.
   and plot labels. They are not described as hidden-state embeddings.
 - The browser atlas viewer now supports single-view, side-by-side, `2 x 2`
   intermediate, and `2 x 3` model-by-family layouts over persisted projections.
+
+### Interpretation Boundary For The Saved Outputs
+
+- The saved study artifacts support pooled 60 bp anchor views, pooled 1 kb
+  anchor views, pooled full-sequence views, pooled logits, and per-sequence
+  likelihood scalars.
+- They do not support token-level hidden-state analysis, per-position logits,
+  or anchor-only slices inside the 1 kb construct.
+- The current study question for this workspace is: when a 60 bp anchor is
+  replaced by the full 1 kb construct, do pooled representations move in a
+  structured, biologically coherent way, and does that improve downstream
+  prediction?
+- Treat `z20_60` and `z20_1k_seq` as the primary candidate space, keep pooled
+  logits as benchmarks, and keep per-base likelihood columns as scalar side
+  channels rather than the main story.
+- `z20_1k_anchor`, `drag20`, and aligned Leiden correspondence remain useful QC
+  surfaces, but they are not the main decision surfaces for the current study
+  question.
+
+### Planned Next Figure Pack
+
+- Reference-centric similarity maps: compute `d_E` and `d_C` from the pooled
+  spaces, plot ethanol and ciprofloxacin reference alignment first, and pair
+  that with a synthetic-centroid control version to check whether the WT
+  references are off-manifold.
+- Structured context-shift summary: compare `z20_60` to `z20_1k_seq` with
+  paired anchor-to-expanded-context arrows, self cosine, L2 shift,
+  distance-matrix correlation, and kNN overlap so common scaffold shifts can be
+  separated from promoter-specific reorganization.
+- Representation scorecard: rank candidate spaces by reference alignment,
+  centroid agreement, geometry preservation, and top-level neighborhood
+  enrichment before relying on UMAP panels.
+- Grouped benchmark slice: treat supervised ranking as the actual decision
+  point, with grouped CV plus AUROC, AUPRC, precision-at-K, or enrichment-at-K
+  over the pooled representations and scalar baselines.
+- The currently materialized atlas, agreement, cluster, and scree surfaces are
+  still useful, but they should be treated as appendix or QC surfaces until the
+  reference and benchmark slices exist.
 
 ### First tracer-bullet path
 
@@ -91,6 +129,9 @@ uv run latentdna deliverable run atlas_2x2_intermediate_main \
 
 ### Current deliverable slices
 
+These are the current materialized or checked-in slices. They are not, by
+themselves, the final decision ladder for the study question above.
+
 ```bash
 # Refresh the primary context-shift deliverable once the paired 20B views are ready.
 # On a 16 GiB workstation this lane may require `--allow-memory-overage`
@@ -126,15 +167,20 @@ uv run latentdna deliverable run agreement_7b_vs_20b \
 uv run latentdna view materialize logits7_60 \
   --workspace "$LATENTDNA_WORKSPACE"
 
+# Materialize the full-sequence 20B intermediate view used as QC against the
+# anchor-aware pooled representation.
 uv run latentdna view materialize z20_1k_seq \
   --workspace "$LATENTDNA_WORKSPACE"
 
+# Materialize the 7B anchor-aware pooled-logit benchmark lane.
 uv run latentdna view materialize logits7_1k_anchor \
   --workspace "$LATENTDNA_WORKSPACE"
 
+# Materialize the 20B anchor-only pooled-logit benchmark lane.
 uv run latentdna view materialize logits20_60 \
   --workspace "$LATENTDNA_WORKSPACE"
 
+# Materialize the 20B anchor-aware pooled-logit benchmark lane.
 uv run latentdna view materialize logits20_1k_anchor \
   --workspace "$LATENTDNA_WORKSPACE"
 
@@ -198,6 +244,7 @@ uv run latentdna neighbors fit leiden_z20_60_knn \
   --k 15 \
   --backend approximate
 
+# Build the matching reduced-view neighbor graph for the 20B context-aware lane.
 uv run latentdna neighbors fit leiden_z20_1k_anchor_knn \
   --workspace "$LATENTDNA_WORKSPACE" \
   --reduced-view z20_1k_anchor_anchor_ctx_pc32 \
@@ -213,6 +260,7 @@ uv run latentdna cluster fit leiden_z20_60 \
   --k 15 \
   --resolution 0.6
 
+# Fit the paired reduced-view Leiden clustering for the context-aware 20B lane.
 uv run latentdna cluster fit leiden_z20_1k_anchor \
   --workspace "$LATENTDNA_WORKSPACE" \
   --reduced-view z20_1k_anchor_anchor_ctx_pc32 \

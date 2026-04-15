@@ -75,7 +75,7 @@ def render_projection_grid(
     workspace_dir: Path,
 ):
     if not panel_specs:
-        return mo.callout("No persisted projection coordinates are available for this atlas layout.", kind="warn")
+        return mo.callout("No persisted projection coordinates are available for this geometry layout.", kind="warn")
     frames = []
     for spec in panel_specs:
         projection_id = str(spec.get("projection_id") or "")
@@ -86,7 +86,7 @@ def render_projection_grid(
         frames.append(load_projection_frame(view_id, projection_id, joinable_tables, output_root=output_root))
     if not any(not frame.empty for frame in frames):
         return mo.callout(
-            "The selected atlas layout is declared, but none of its projections are materialized yet.",
+            "The selected geometry layout is declared, but none of its projections are materialized yet.",
             kind="warn",
         )
 
@@ -179,8 +179,8 @@ def render_projection_grid(
             fontsize=11,
             fontweight="semibold",
         )
-        ax.set_xlabel("UMAP-1")
-        ax.set_ylabel("UMAP-2")
+        ax.set_xlabel("Projection 1")
+        ax.set_ylabel("Projection 2")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.grid(True, color="#D5DCE4", linewidth=0.7, alpha=0.55)

@@ -201,6 +201,100 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
     )
 
 
+def _write_workspace_config_explicit_alignment_projection(workspace_dir: Path, usr_root: Path) -> None:
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg", "png"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "anchor60": {
+                        "kind": "usr",
+                        "root": usr_root.as_posix(),
+                        "dataset": "promoter/demo_anchor_set",
+                        "record_key": "id",
+                        "subject_key": "id",
+                    },
+                    "ctx1k": {
+                        "kind": "usr",
+                        "root": usr_root.as_posix(),
+                        "dataset": "promoter/demo_context_set",
+                        "record_key": "id",
+                        "subject_key": "construct__anchor_id",
+                        "context_key": "context_id",
+                    },
+                },
+                "metadata": {"include": ["usr_label__primary", "construct__anchor_id"]},
+                "alignments": {
+                    "anchor_ctx_explicit": {
+                        "left": "z20_1k_anchor",
+                        "right": "z20_60",
+                        "left_on": ["construct__anchor_id"],
+                        "right_on": ["id"],
+                        "support": "intersection",
+                    }
+                },
+                "views": {
+                    "z20_60": {
+                        "source": "anchor60",
+                        "vector": {"kind": "column", "name": "embedding_anchor_20b"},
+                        "coordinate_space_id": "demo_space_20b",
+                        "tags": {"model": "20b", "context": "anchor_only"},
+                        "role": "primary",
+                    },
+                    "z20_1k_anchor": {
+                        "source": "ctx1k",
+                        "vector": {"kind": "column", "name": "embedding_context_20b"},
+                        "coordinate_space_id": "demo_space_20b",
+                        "tags": {"model": "20b", "context": "template_1kb"},
+                        "role": "primary",
+                    },
+                },
+                "scalars": {
+                    "anchor20_norm": {
+                        "derive": {
+                            "kind": "vector_norm",
+                            "view": "z20_60",
+                            "norm": "l2",
+                            "output_column": "anchor20_norm",
+                        }
+                    }
+                },
+                "exports": {
+                    "x0_alignment_projection": {
+                        "row_basis": "anchor_ctx_explicit",
+                        "blocks": [
+                            {
+                                "kind": "reduced_view",
+                                "block_id": "z20_60_pc",
+                                "source": "z20_60_pc2",
+                                "feature_prefix": "z20_60",
+                                "alignment": "anchor_ctx_explicit",
+                            },
+                            {
+                                "kind": "table_columns",
+                                "block_id": "anchor20_scalars",
+                                "source": "anchor20_norm",
+                                "columns": ["anchor20_norm"],
+                                "alignment": "anchor_ctx_explicit",
+                            },
+                        ],
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+
 def _subject_ids(table: pa.Table) -> list[str]:
     return [str(value) for value in table["subject_id"].to_pylist()]
 
@@ -383,3 +477,99 @@ def test_phase9_alignment_backed_export_flow(tmp_path: Path) -> None:
     z7_anchor_index = {subject_id: index for index, subject_id in enumerate(_subject_ids(z7_anchor_rows))}
     expected_z7_anchor_block = z7_anchor_matrix[[z7_anchor_index[subject_id] for subject_id in _subject_ids(basis_7b)]]
     np.testing.assert_allclose(x3_matrix[:, :2], expected_z7_anchor_block)
+
+
+def test_phase9_export_projects_blocks_with_explicit_alignment_side_keys(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(
+        usr_root,
+        "promoter/demo_anchor_set",
+        [
+            {
+                "id": "anchor_01",
+                "usr_label__primary": "spyP",
+                "embedding_anchor_20b": [1.0, 0.0, 0.0],
+            },
+            {
+                "id": "anchor_02",
+                "usr_label__primary": "sulAp",
+                "embedding_anchor_20b": [2.0, 1.0, 0.0],
+            },
+            {
+                "id": "anchor_03",
+                "usr_label__primary": "soxSp",
+                "embedding_anchor_20b": [3.0, 1.0, 1.0],
+            },
+        ],
+    )
+    _write_usr_dataset(
+        usr_root,
+        "promoter/demo_context_set",
+        [
+            {
+                "id": "ctx_03",
+                "construct__anchor_id": "anchor_03",
+                "context_id": "c1",
+                "usr_label__primary": "soxSp",
+                "embedding_context_20b": [3.1, 1.1, 1.0],
+            },
+            {
+                "id": "ctx_01",
+                "construct__anchor_id": "anchor_01",
+                "context_id": "c1",
+                "usr_label__primary": "spyP",
+                "embedding_context_20b": [1.1, 0.0, 0.0],
+            },
+            {
+                "id": "ctx_02",
+                "construct__anchor_id": "anchor_02",
+                "context_id": "c1",
+                "usr_label__primary": "sulAp",
+                "embedding_context_20b": [2.1, 1.0, 0.0],
+            },
+        ],
+    )
+    _write_workspace_config_explicit_alignment_projection(workspace_dir, usr_root)
+
+    for command in [
+        ["view", "materialize", "z20_60"],
+        ["view", "materialize", "z20_1k_anchor"],
+        ["alignment", "build", "anchor_ctx_explicit"],
+        ["scalar", "derive", "anchor20_norm"],
+        ["view", "reduce", "z20_60", "--run-id", "z20_60_pca", "--dims", "2", "--reduced-view-id", "z20_60_pc2"],
+    ]:
+        result = _RUNNER.invoke(app, [*command, "--workspace", workspace_dir.as_posix(), "--json"])
+        assert result.exit_code == 0, result.stdout
+
+    export_result = _RUNNER.invoke(
+        app,
+        ["export", "matrix", "x0_alignment_projection", "--workspace", workspace_dir.as_posix(), "--json"],
+    )
+    assert export_result.exit_code == 0, export_result.stdout
+
+    output_root = workspace_dir / "outputs"
+    basis_rows = pq.read_table(output_root / "alignments" / "anchor_ctx_explicit" / "rows.parquet")
+    export_dir = output_root / "exports" / "x0_alignment_projection"
+    export_rows = pq.read_table(export_dir / "rows.parquet")
+    export_matrix = np.load(export_dir / "matrix.npy")
+    export_features = pq.read_table(export_dir / "features.parquet").to_pylist()
+
+    assert basis_rows.column_names == ["construct__anchor_id", "left_count", "right_count"]
+    assert export_rows.column_names == ["construct__anchor_id", "left_count", "right_count"]
+    assert [row["feature_name"] for row in export_features] == [
+        "z20_60_pc_001",
+        "z20_60_pc_002",
+        "anchor20_norm",
+    ]
+    assert export_matrix.shape == (3, 3)
+    assert export_rows["construct__anchor_id"].to_pylist() == ["anchor_01", "anchor_02", "anchor_03"]
+
+    reduced_rows = pq.read_table(output_root / "reduced_views" / "z20_60_pc2" / "rows.parquet")
+    reduced_matrix = np.load(output_root / "reduced_views" / "z20_60_pc2" / "matrix.npy")
+    reduced_index = {str(row["id"]): index for index, row in enumerate(reduced_rows.to_pylist())}
+    expected_block = reduced_matrix[
+        [reduced_index[anchor_id] for anchor_id in export_rows["construct__anchor_id"].to_pylist()]
+    ]
+    np.testing.assert_allclose(export_matrix[:, :2], expected_block)

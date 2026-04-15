@@ -1,6 +1,6 @@
 study_pipeline:
   study_id: stress_ethanol_cipro_growth
-  last_verified: 2026-04-13
+  last_verified: 2026-04-15
   row_targets:
     densegen_anchor_minimum_before_first_full_lane_infer: 100000
   densegen:
@@ -49,14 +49,21 @@ study_pipeline:
     workspace: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth
     doc: src/dnadesign/latentdna/docs/workflows/promoter-study-latent-atlas.md
     notebook: browser
+    # The current study question is pooled 60 bp anchor versus pooled 1 kb
+    # context movement plus downstream prediction, not token-level mechanism.
     expected_deliverables:
       - atlas_2x2_intermediate_main
+      - geometry_switchboard_20b
       - control_pca_explained_variance_curve
       - context_shift_primary
+      - context_audit_primary_20b
+      - agreement_7b_vs_20b
       - cluster_correspondence_primary
     required_leiden_runs:
       - leiden_z20_60
       - leiden_z20_1k_anchor
+    # `x2_primary_20b` remains the open export gate, but the bundle is not yet
+    # materialized under the current saved outputs.
     required_exports:
       - x2_primary_20b
   cluster:

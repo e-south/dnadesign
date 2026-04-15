@@ -342,12 +342,15 @@ def preview_distance_score(
     *,
     view_id: str,
     landmark_ids: list[str],
+    alignment_id: str | None,
     force: bool,
 ) -> dict[str, Any]:
     context = load_workspace_config(workspace)
     context.require_view(view_id)
     for landmark_id in landmark_ids:
         context.require_landmark(landmark_id)
+    if alignment_id is not None:
+        context.require_alignment(alignment_id)
     output_dir = artifact_dir(context, artifact_kind="distance_set", artifact_id=distance_id)
     _ensure_preview_targets_available([output_dir], artifact_kind="distance_set", force=force)
     return _preview_payload(
@@ -356,7 +359,7 @@ def preview_distance_score(
         artifact_kind="distance_set",
         artifact_id=distance_id,
         outputs=[output_dir],
-        inputs={"view": view_id, "landmarks": landmark_ids},
+        inputs={"view": view_id, "landmarks": landmark_ids, "alignment": alignment_id},
     )
 
 

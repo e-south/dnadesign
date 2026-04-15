@@ -21,6 +21,7 @@ Key constraints:
 - block order is stable and encoded in `features.parquet`.
 - alignment-backed block projection is explicit.
 - feature names use deterministic prefixes such as `z20_60_pc_001`.
+- feature names must be unique across the full bundle; ambiguous ledgers fail fast.
 
 See also:
 

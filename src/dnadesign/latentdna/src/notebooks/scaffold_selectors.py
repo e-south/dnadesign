@@ -25,12 +25,13 @@ def render_bootstrap_cell() -> str:
             NOTEBOOK_ID = __NOTEBOOK_ID__
             DEFAULT_DELIVERABLE = __DEFAULT_DELIVERABLE__
             NOTEBOOK_DIR = Path(__file__).resolve().parent
-            WORKSPACE_DIR = Path(__file__).resolve().parents[3]
-            OUTPUT_ROOT = WORKSPACE_DIR / "outputs"
-            CATALOG_PATH = OUTPUT_ROOT / "catalog.json"
-            HEALTH_PATH = OUTPUT_ROOT / "notebooks" / "health.json"
             CONTROL_PATH = NOTEBOOK_DIR / "controls.json"
             controls = load_workspace_notebook_controls(CONTROL_PATH)
+            runtime_paths = controls["runtime_paths"]
+            WORKSPACE_DIR = (NOTEBOOK_DIR / str(runtime_paths["workspace_relative_path"])).resolve()
+            OUTPUT_ROOT = (NOTEBOOK_DIR / str(runtime_paths["output_relative_path"])).resolve()
+            CATALOG_PATH = (NOTEBOOK_DIR / str(runtime_paths["catalog_relative_path"])).resolve()
+            HEALTH_PATH = (NOTEBOOK_DIR / str(runtime_paths["health_relative_path"])).resolve()
             runtime = build_workspace_browser_runtime(
                 title=TITLE,
                 description=DESCRIPTION,
@@ -276,10 +277,10 @@ def render_selector_cells() -> tuple[str, ...]:
                 )
                 _context_options = {
                     {
-                        "60bp": "60 bp",
-                        "1kb_anchor": "1 kb anchor",
-                        "1kb_seq": "1 kb seq",
-                        "1kb_drag": "1 kb drag",
+                        "60bp": "60 bp anchor-only",
+                        "1kb_anchor": "1 kb anchor-aligned context",
+                        "1kb_seq": "1 kb expanded-context",
+                        "1kb_drag": "1 kb context shift",
                     }.get(value, value): value
                     for value in context_values
                 }

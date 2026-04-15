@@ -71,6 +71,38 @@ alignments:
     right: z7_1k_anchor
     "on": subject_key
     support: intersection
+  anchor_ctx_seq_20b:
+    left: z20_1k_seq
+    right: z20_60
+    left_on:
+      - construct__anchor_id
+    right_on:
+      - id
+    support: intersection
+  anchor_ctx_seq_7b:
+    left: z7_1k_seq
+    right: z7_60
+    left_on:
+      - construct__anchor_id
+    right_on:
+      - id
+    support: intersection
+  anchor_ctx_seq_logits20:
+    left: logits20_1k_seq
+    right: logits20_60
+    left_on:
+      - construct__anchor_id
+    right_on:
+      - id
+    support: intersection
+  anchor_ctx_seq_logits7:
+    left: logits7_1k_seq
+    right: logits7_60
+    left_on:
+      - construct__anchor_id
+    right_on:
+      - id
+    support: intersection
 
 views:
   z7_60:
@@ -108,7 +140,7 @@ views:
       model: 7b
       family: intermediate
       context: 1kb_anchor
-    role: committee_member
+    role: challenger
   z20_1k_anchor:
     source: ctx1k
     vector:
@@ -120,7 +152,7 @@ views:
       model: 20b
       family: intermediate
       context: 1kb_anchor
-    role: primary
+    role: challenger
   z20_1k_seq:
     source: ctx1k
     vector:
@@ -132,7 +164,7 @@ views:
       model: 20b
       family: intermediate
       context: 1kb_seq
-    role: challenger
+    role: primary
   z7_1k_seq:
     source: ctx1k
     vector:
@@ -144,7 +176,7 @@ views:
       model: 7b
       family: intermediate
       context: 1kb_seq
-    role: challenger
+    role: committee_member
   logits20_60:
     source: anchor60
     vector:
@@ -193,6 +225,56 @@ views:
       family: pooled_logits
       context: 1kb_anchor
     role: challenger
+  logits20_1k_seq:
+    source: ctx1k
+    vector:
+      kind: column
+      name: infer__evo2_20b__template_1kb_20b_features__output_layer_mean__seq_mean
+    coordinate_space_id: evo2_20b_output_layer_mean
+    tags:
+      encoder: evo2
+      model: 20b
+      family: pooled_logits
+      context: 1kb_seq
+    role: challenger
+  logits7_1k_seq:
+    source: ctx1k
+    vector:
+      kind: column
+      name: infer__evo2_7b__template_1kb_7b_features__output_layer_mean__seq_mean
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags:
+      encoder: evo2
+      model: 7b
+      family: pooled_logits
+      context: 1kb_seq
+    role: challenger
+  z20_60_l2:
+    derive:
+      kind: normalize
+      view: z20_60
+      method: l2
+    coordinate_space_id: evo2_20b_intermediate_block23_mlp_out
+    tags:
+      encoder: evo2
+      model: 20b
+      family: intermediate
+      context: 60bp
+      normalization: l2
+    role: appendix
+  z20_1k_seq_l2:
+    derive:
+      kind: normalize
+      view: z20_1k_seq
+      method: l2
+    coordinate_space_id: evo2_20b_intermediate_block23_mlp_out
+    tags:
+      encoder: evo2
+      model: 20b
+      family: intermediate
+      context: 1kb_seq
+      normalization: l2
+    role: appendix
   delta20:
     derive:
       kind: vector_difference
@@ -239,6 +321,31 @@ views:
       family: intermediate
       context: 1kb_drag
     role: challenger
+  construct_shift20:
+    derive:
+      kind: vector_difference
+      left: z20_1k_seq
+      right: z20_60
+      alignment: anchor_ctx_seq_20b
+    coordinate_space_id: evo2_20b_intermediate_block23_mlp_out
+    tags:
+      operation: difference
+      family: intermediate
+      context: 60bp_to_1kb_seq
+    role: primary
+  construct_shift20_unit:
+    derive:
+      kind: vector_difference
+      left: z20_1k_seq_l2
+      right: z20_60_l2
+      alignment: anchor_ctx_seq_20b
+    coordinate_space_id: evo2_20b_intermediate_block23_mlp_out
+    tags:
+      operation: difference
+      family: intermediate
+      context: 60bp_to_1kb_seq
+      normalization: l2
+    role: appendix
 
 scalars:
   delta7_norm:
@@ -261,6 +368,44 @@ scalars:
       kind: vector_norm
       view: drag20
       norm: l2
+  construct_shift20_norm:
+    derive:
+      kind: vector_norm
+      view: construct_shift20
+      norm: l2
+  construct_shift20_unit_norm:
+    derive:
+      kind: vector_norm
+      view: construct_shift20_unit
+      norm: l2
+  construct_self_cosine20:
+    derive:
+      kind: column_expression
+      source: construct_shift20_unit_norm
+      expression: 1 - (construct_shift20_unit_norm * construct_shift20_unit_norm) / 2
+      output_column: construct_self_cosine20
+  construct_self_cosine20_context_meta:
+    derive:
+      kind: select_columns
+      source: construct_self_cosine20
+      columns:
+        - construct__anchor_id
+        - usr_label__primary
+        - design_family
+        - design_regulator_composition
+        - sigma70_variant
+        - campaign_prior
+        - source_class
+        - infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token
+        - infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token
+        - construct_self_cosine20
+  construct_shift20_norm_for_context_audit:
+    derive:
+      kind: select_columns
+      source: construct_shift20_norm
+      columns:
+        - construct__anchor_id
+        - construct_shift20_norm
   drag20_norm_for_context_audit:
     derive:
       kind: select_columns
@@ -272,15 +417,75 @@ scalars:
     derive:
       kind: join_tables
       sources:
-        - delta20_norm
-        - drag20_norm_for_context_audit
+        - construct_self_cosine20_context_meta
+        - construct_shift20_norm_for_context_audit
       "on":
         - construct__anchor_id
+  anchor20_ref_margins_spyp:
+    derive:
+      kind: column_expression
+      source: anchor20_reference_distances
+      expression: d_spyp - d_j23105
+      output_column: d_spyp_centered
+  anchor20_ref_margins_sulap:
+    derive:
+      kind: column_expression
+      source: anchor20_ref_margins_spyp
+      expression: d_sulap - d_j23105
+      output_column: d_sulap_centered
+  anchor20_ref_margins:
+    derive:
+      kind: column_expression
+      source: anchor20_ref_margins_sulap
+      expression: d_soxsp - d_j23105
+      output_column: d_soxsp_centered
+  anchor20_ref_margins_export_select:
+    derive:
+      kind: select_columns
+      source: anchor20_ref_margins
+      columns:
+        - id
+        - d_spyp_centered
+        - d_sulap_centered
+        - d_soxsp_centered
+  anchor20_ref_margins_export:
+    derive:
+      kind: rename_columns
+      source: anchor20_ref_margins_export_select
+      renames:
+        id: construct__anchor_id
+  seq20_ref_margins_spyp:
+    derive:
+      kind: column_expression
+      source: seq20_reference_distances
+      expression: d_spyp - d_j23105
+      output_column: d_spyp_centered
+  seq20_ref_margins_sulap:
+    derive:
+      kind: column_expression
+      source: seq20_ref_margins_spyp
+      expression: d_sulap - d_j23105
+      output_column: d_sulap_centered
+  seq20_ref_margins:
+    derive:
+      kind: column_expression
+      source: seq20_ref_margins_sulap
+      expression: d_soxsp - d_j23105
+      output_column: d_soxsp_centered
+  seq20_ref_margins_export:
+    derive:
+      kind: select_columns
+      source: seq20_ref_margins
+      columns:
+        - construct__anchor_id
+        - d_spyp_centered
+        - d_sulap_centered
+        - d_soxsp_centered
   ethanol_vs_cipro:
     derive:
       kind: column_expression
-      source: primary_landmark_distances
-      expression: d_sulap - d_spyp
+      source: anchor20_ref_margins
+      expression: d_sulap_centered - d_spyp_centered
       output_column: ethanol_vs_cipro
 
 landmarks:
@@ -353,12 +558,12 @@ reference_sets:
 plots:
   atlas_2x2_intermediate_main:
     kind: projection_grid
-    projections: [umap_z7_60, umap_z20_60, umap_z7_1k_anchor, umap_z20_1k_anchor]
+    projections: [umap_z7_60, umap_z20_60, umap_z7_1k_seq, umap_z20_1k_seq]
     panel_titles:
       - 7B anchor-only (60 bp)
       - 20B anchor-only (60 bp)
-      - 7B context-aware (1 kb anchor)
-      - 20B context-aware (1 kb anchor)
+      - 7B expanded-context (1 kb)
+      - 20B expanded-context (1 kb)
     color_column: design_family
     annotation:
       reference_set: promoter_wt_core
@@ -368,14 +573,14 @@ plots:
   atlas_2x3_model_family:
     kind: projection_grid
     projections:
-      [umap_z7_60, umap_z20_60, umap_z7_1k_anchor, umap_z20_1k_anchor, umap_logits7_1k_anchor, umap_logits20_1k_anchor]
+      [umap_z7_60, umap_z20_60, umap_z7_1k_seq, umap_z20_1k_seq, umap_logits7_1k_seq, umap_logits20_1k_seq]
     panel_titles:
       - 7B anchor-only intermediate
       - 20B anchor-only intermediate
-      - 7B anchor-aware intermediate
-      - 20B anchor-aware intermediate
-      - 7B anchor-aware pooled logits
-      - 20B anchor-aware pooled logits
+      - 7B expanded-context intermediate
+      - 20B expanded-context intermediate
+      - 7B expanded-context pooled logits
+      - 20B expanded-context pooled logits
     color_column: design_family
     annotation:
       reference_set: promoter_wt_core
@@ -392,25 +597,58 @@ plots:
   agreement_7b_vs_20b_summary:
     kind: agreement_summary
     agreement: agreement_7b_vs_20b
+  reference_alignment_anchor20b:
+    kind: xy_scatter
+    scalar: anchor20_ref_margins
+    x_column: d_spyp_centered
+    y_column: d_sulap_centered
+    color_column: design_family
+    render_mode: points
+    annotation:
+      reference_set: promoter_wt_core
+      require_in_every_panel: true
+      missing_policy: fail
+      collision_policy: repel_then_callout
+  reference_alignment_seq20b:
+    kind: xy_scatter
+    scalar: seq20_ref_margins
+    x_column: d_spyp_centered
+    y_column: d_sulap_centered
+    color_column: design_family
+    render_mode: points
+    annotation:
+      reference_set: promoter_wt_core
+      require_in_every_panel: true
+      missing_policy: fail
+      collision_policy: repel_then_callout
   context_shift_primary_distribution:
     kind: distribution
-    scalar: delta20_norm
-    value_column: delta20_norm
+    scalar: construct_shift20_norm
+    value_column: construct_shift20_norm
     color_column: design_family
     render_mode: ecdf
+  context_shift_self_cosine_primary:
+    kind: distribution
+    scalar: context_audit_20b
+    value_column: construct_self_cosine20
+    color_column: design_family
+    render_mode: violin_box
   drag_qc_distribution:
     kind: distribution
     scalar: drag20_norm
     value_column: drag20_norm
     color_column: design_family
     render_mode: ecdf
+  context_geometry_primary_summary:
+    kind: agreement_summary
+    agreement: context_geometry_primary_20b
   context_shift_vs_drag_primary:
     kind: xy_scatter
     scalar: context_audit_20b
-    x_column: delta20_norm
-    y_column: drag20_norm
+    x_column: construct_shift20_norm
+    y_column: construct_self_cosine20
     color_column: design_family
-    render_mode: hexbin
+    render_mode: points
 
 exports:
   x0_primary_20b:
@@ -422,59 +660,69 @@ exports:
         feature_prefix: z20_60
       - kind: table_columns
         block_id: landmark_distances
-        source: primary_landmark_distances
-        columns: [d_spyp, d_sulap, d_soxsp, d_j23105]
+        source: anchor20_ref_margins
+        columns: [d_spyp_centered, d_sulap_centered, d_soxsp_centered]
   x1_primary_20b:
-    row_basis: delta20_pc32
+    row_basis: construct_shift20_pc32
     blocks:
       - kind: reduced_view
-        block_id: delta20_pc
-        source: delta20_pc32
-        feature_prefix: delta20
+        block_id: construct_shift20_pc
+        source: construct_shift20_pc32
+        feature_prefix: construct_shift20
       - kind: table_columns
-        block_id: delta20_scalars
-        source: delta20_norm
-        columns: [delta20_norm]
+        block_id: construct_shift20_scalars
+        source: construct_shift20_norm
+        columns: [construct_shift20_norm]
   x2_primary_20b:
-    row_basis: anchor_ctx_20b
+    row_basis: anchor_ctx_seq_20b
     blocks:
       - kind: reduced_view
         block_id: z20_60_pc
-        source: z20_60_pc32
+        source: z20_60_anchor_ctx_seq_pc32
         feature_prefix: z20_60
-        alignment: anchor_ctx_20b
       - kind: reduced_view
-        block_id: delta20_pc
-        source: delta20_pc32
-        feature_prefix: delta20
+        block_id: z20_1k_seq_pc
+        source: z20_1k_seq_anchor_ctx_seq_pc32
+        feature_prefix: z20_1k_seq
       - kind: table_columns
-        block_id: landmark_distances
-        source: primary_landmark_distances
-        columns: [d_spyp, d_sulap, d_soxsp, d_j23105]
-        alignment: anchor_ctx_20b
+        block_id: anchor_ref_margins
+        source: anchor20_ref_margins_export
+        columns: [d_spyp_centered, d_sulap_centered, d_soxsp_centered]
+        feature_prefix: anchor_ref
+        alignment: anchor_ctx_seq_20b
       - kind: table_columns
-        block_id: delta20_scalars
-        source: delta20_norm
-        columns: [delta20_norm]
+        block_id: seq_ref_margins
+        source: seq20_ref_margins_export
+        columns: [d_spyp_centered, d_sulap_centered, d_soxsp_centered]
+        feature_prefix: seq_ref
+        alignment: anchor_ctx_seq_20b
+      - kind: table_columns
+        block_id: context_metrics
+        source: context_audit_20b
+        columns:
+          [
+            infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token,
+            infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token,
+          ]
+        alignment: anchor_ctx_seq_20b
   x3_ablation_7b:
-    row_basis: anchor_ctx_7b
+    row_basis: anchor_ctx_seq_7b
     blocks:
       - kind: reduced_view
         block_id: z7_60_pc
-        source: z7_60_pc32
+        source: z7_60_anchor_ctx_seq_pc32
         feature_prefix: z7_60
-        alignment: anchor_ctx_7b
       - kind: reduced_view
-        block_id: delta7_pc
-        source: delta7_pc32
-        feature_prefix: delta7
+        block_id: z7_1k_seq_pc
+        source: z7_1k_seq_anchor_ctx_seq_pc32
+        feature_prefix: z7_1k_seq
 
 notebooks:
   browser:
     kind: workspace
-    title: Promoter atlas browser
-    description: Consolidated read-only browser for promoter atlas artifacts.
-    default_deliverable: atlas_2x2_intermediate_main
+    title: Expanded-context browser
+    description: Consolidated read-only browser for reference alignment, context shift, benchmark export, and appendix QC artifacts.
+    default_deliverable: reference_alignment_primary_20b
 
 recipes:
   atlas_2x2_recipe:
@@ -487,14 +735,14 @@ recipes:
         op: view.materialize
         params:
           view: z20_60
-      - id: materialize_z7_1k_anchor
+      - id: materialize_z7_1k_seq
         op: view.materialize
         params:
-          view: z7_1k_anchor
-      - id: materialize_z20_1k_anchor
+          view: z7_1k_seq
+      - id: materialize_z20_1k_seq
         op: view.materialize
         params:
-          view: z20_1k_anchor
+          view: z20_1k_seq
       - id: sample_anchor_atlas
         op: sample.build
         depends_on: [materialize_z7_60, materialize_z20_60]
@@ -508,10 +756,10 @@ recipes:
           reference_set: promoter_wt_core
       - id: sample_context_atlas
         op: sample.build
-        depends_on: [materialize_z7_1k_anchor, materialize_z20_1k_anchor]
+        depends_on: [materialize_z7_1k_seq, materialize_z20_1k_seq]
         params:
           sample: atlas_context_sample
-          view: z20_1k_anchor
+          view: z20_1k_seq
           strategy: stratified
           group_by: design_family
           n: 20000
@@ -535,27 +783,27 @@ recipes:
           sample: atlas_anchor_sample
           metric: cosine
           seed: 17
-      - id: project_z7_1k_anchor
+      - id: project_z7_1k_seq
         op: projection.fit
         depends_on: [sample_context_atlas]
         params:
-          projection_id: umap_z7_1k_anchor
-          view: z7_1k_anchor
+          projection_id: umap_z7_1k_seq
+          view: z7_1k_seq
           sample: atlas_context_sample
           metric: cosine
           seed: 17
-      - id: project_z20_1k_anchor
+      - id: project_z20_1k_seq
         op: projection.fit
         depends_on: [sample_context_atlas]
         params:
-          projection_id: umap_z20_1k_anchor
-          view: z20_1k_anchor
+          projection_id: umap_z20_1k_seq
+          view: z20_1k_seq
           sample: atlas_context_sample
           metric: cosine
           seed: 17
       - id: render_atlas_grid
         op: plot.render
-        depends_on: [project_z7_60, project_z20_60, project_z7_1k_anchor, project_z20_1k_anchor]
+        depends_on: [project_z7_60, project_z20_60, project_z7_1k_seq, project_z20_1k_seq]
         params:
           plot_id: atlas_2x2_intermediate_main
       - id: generate_browser
@@ -605,6 +853,14 @@ recipes:
         op: view.materialize
         params:
           view: logits20_1k_anchor
+      - id: materialize_switchboard_logits7_1k_seq
+        op: view.materialize
+        params:
+          view: logits7_1k_seq
+      - id: materialize_switchboard_logits20_1k_seq
+        op: view.materialize
+        params:
+          view: logits20_1k_seq
       - id: sample_switchboard_anchor
         op: sample.build
         depends_on: [materialize_switchboard_z20_60]
@@ -618,10 +874,10 @@ recipes:
           reference_set: promoter_wt_core
       - id: sample_switchboard_context
         op: sample.build
-        depends_on: [materialize_switchboard_z20_1k_anchor]
+        depends_on: [materialize_switchboard_z20_1k_seq]
         params:
           sample: atlas_context_sample
-          view: z20_1k_anchor
+          view: z20_1k_seq
           strategy: stratified
           group_by: design_family
           n: 20000
@@ -717,16 +973,34 @@ recipes:
           sample: atlas_context_sample
           metric: cosine
           seed: 17
+      - id: project_switchboard_logits7_1k_seq
+        op: projection.fit
+        depends_on: [sample_switchboard_context]
+        params:
+          projection_id: umap_logits7_1k_seq
+          view: logits7_1k_seq
+          sample: atlas_context_sample
+          metric: cosine
+          seed: 17
+      - id: project_switchboard_logits20_1k_seq
+        op: projection.fit
+        depends_on: [sample_switchboard_context]
+        params:
+          projection_id: umap_logits20_1k_seq
+          view: logits20_1k_seq
+          sample: atlas_context_sample
+          metric: cosine
+          seed: 17
       - id: render_switchboard_atlas_2x3
         op: plot.render
         depends_on:
           [
             project_switchboard_z7_60,
             project_switchboard_z20_60,
-            project_switchboard_z7_1k_anchor,
-            project_switchboard_z20_1k_anchor,
-            project_switchboard_logits7_1k_anchor,
-            project_switchboard_logits20_1k_anchor,
+            project_switchboard_z7_1k_seq,
+            project_switchboard_z20_1k_seq,
+            project_switchboard_logits7_1k_seq,
+            project_switchboard_logits20_1k_seq,
           ]
         params:
           plot_id: atlas_2x3_model_family
@@ -745,6 +1019,8 @@ recipes:
             project_switchboard_logits20_60,
             project_switchboard_logits7_1k_anchor,
             project_switchboard_logits20_1k_anchor,
+            project_switchboard_logits7_1k_seq,
+            project_switchboard_logits20_1k_seq,
           ]
         params:
           notebook: browser
@@ -767,52 +1043,132 @@ recipes:
         depends_on: [reduce_anchor_view]
         params:
           plot_id: control_pca_explained_variance_curve
+  reference_alignment_primary_20b_recipe:
+    steps:
+      - id: materialize_reference_anchor20
+        op: view.materialize
+        params:
+          view: z20_60
+      - id: materialize_reference_seq20
+        op: view.materialize
+        params:
+          view: z20_1k_seq
+      - id: build_reference_alignment20
+        op: alignment.build
+        depends_on:
+        - materialize_reference_anchor20
+        - materialize_reference_seq20
+        params:
+          alignment: anchor_ctx_seq_20b
+      - id: score_anchor20_reference_distances
+        op: distance.score
+        depends_on:
+        - materialize_reference_anchor20
+        params:
+          distance: anchor20_reference_distances
+          view: z20_60
+          landmarks:
+          - spyp
+          - sulap
+          - soxsp
+          - j23105
+      - id: derive_anchor20_ref_margins_spyp
+        op: scalar.derive
+        depends_on:
+        - score_anchor20_reference_distances
+        params:
+          scalar: anchor20_ref_margins_spyp
+      - id: derive_anchor20_ref_margins_sulap
+        op: scalar.derive
+        depends_on:
+        - derive_anchor20_ref_margins_spyp
+        params:
+          scalar: anchor20_ref_margins_sulap
+      - id: derive_anchor20_ref_margins
+        op: scalar.derive
+        depends_on:
+        - derive_anchor20_ref_margins_sulap
+        params:
+          scalar: anchor20_ref_margins
+      - id: score_seq20_reference_distances
+        op: distance.score
+        depends_on:
+        - build_reference_alignment20
+        - materialize_reference_seq20
+        params:
+          distance: seq20_reference_distances
+          view: z20_1k_seq
+          alignment: anchor_ctx_seq_20b
+          landmarks:
+          - spyp
+          - sulap
+          - soxsp
+          - j23105
+      - id: derive_seq20_ref_margins_spyp
+        op: scalar.derive
+        depends_on:
+        - score_seq20_reference_distances
+        params:
+          scalar: seq20_ref_margins_spyp
+      - id: derive_seq20_ref_margins_sulap
+        op: scalar.derive
+        depends_on:
+        - derive_seq20_ref_margins_spyp
+        params:
+          scalar: seq20_ref_margins_sulap
+      - id: derive_seq20_ref_margins
+        op: scalar.derive
+        depends_on:
+        - derive_seq20_ref_margins_sulap
+        params:
+          scalar: seq20_ref_margins
+      - id: render_reference_alignment_anchor20
+        op: plot.render
+        depends_on:
+        - derive_anchor20_ref_margins
+        params:
+          plot_id: reference_alignment_anchor20b
+      - id: render_reference_alignment_seq20
+        op: plot.render
+        depends_on:
+        - derive_seq20_ref_margins
+        params:
+          plot_id: reference_alignment_seq20b
   context_shift_primary_recipe:
     steps:
-      - id: materialize_primary_anchor
-        op: view.materialize
-        params:
-          view: z20_60
-      - id: materialize_primary_context
-        op: view.materialize
-        params:
-          view: z20_1k_anchor
-      - id: build_primary_alignment
-        op: alignment.build
-        depends_on: [materialize_primary_anchor, materialize_primary_context]
-        params:
-          alignment: anchor_ctx_20b
-      - id: derive_primary_delta
-        op: view.derive
-        depends_on: [build_primary_alignment]
-        params:
-          view: delta20
-      - id: derive_primary_delta_norm
-        op: scalar.derive
-        depends_on: [derive_primary_delta]
-        params:
-          scalar: delta20_norm
-      - id: reduce_primary_anchor
-        op: view.reduce
-        depends_on: [materialize_primary_anchor]
-        params:
-          view: z20_60
-          run_id: z20_60_pca
-          dims: 32
-          reduced_view_id: z20_60_pc32
-      - id: reduce_primary_delta
-        op: view.reduce
-        depends_on: [derive_primary_delta_norm]
-        params:
-          view: delta20
-          run_id: delta20_pca
-          dims: 32
-          reduced_view_id: delta20_pc32
-      - id: render_primary_delta_distribution
-        op: plot.render
-        depends_on: [derive_primary_delta_norm]
-        params:
-          plot_id: context_shift_primary_distribution
+    - id: materialize_primary_anchor
+      op: view.materialize
+      params:
+        view: z20_60
+    - id: materialize_primary_seq
+      op: view.materialize
+      params:
+        view: z20_1k_seq
+    - id: build_primary_seq_alignment
+      op: alignment.build
+      depends_on:
+      - materialize_primary_anchor
+      - materialize_primary_seq
+      params:
+        alignment: anchor_ctx_seq_20b
+    - id: derive_primary_construct_shift
+      op: view.derive
+      depends_on:
+      - build_primary_seq_alignment
+      params:
+        view: construct_shift20
+    - id: derive_primary_construct_shift_norm
+      op: scalar.derive
+      depends_on:
+      - derive_primary_construct_shift
+      params:
+        scalar: construct_shift20_norm
+    - id: render_primary_construct_shift_distribution
+      op: plot.render
+      depends_on:
+      - derive_primary_construct_shift_norm
+      params:
+        plot_id: context_shift_primary_distribution
   drag_qc_recipe:
     steps:
       - id: materialize_drag_anchor
@@ -845,79 +1201,168 @@ recipes:
           plot_id: drag_qc_distribution
   context_audit_primary_20b_recipe:
     steps:
-      - id: materialize_audit_anchor
-        op: view.materialize
-        params:
-          view: z20_60
-      - id: materialize_audit_context
-        op: view.materialize
-        params:
-          view: z20_1k_anchor
-      - id: materialize_audit_seq
-        op: view.materialize
-        params:
-          view: z20_1k_seq
-      - id: build_audit_anchor_ctx
-        op: alignment.build
-        depends_on: [materialize_audit_anchor, materialize_audit_context]
-        params:
-          alignment: anchor_ctx_20b
-      - id: build_audit_anchor_seq
-        op: alignment.build
-        depends_on: [materialize_audit_context, materialize_audit_seq]
-        params:
-          alignment: anchor_seq_20b
-      - id: derive_audit_delta
-        op: view.derive
-        depends_on: [build_audit_anchor_ctx]
-        params:
-          view: delta20
-      - id: derive_audit_drag
-        op: view.derive
-        depends_on: [build_audit_anchor_seq]
-        params:
-          view: drag20
-      - id: derive_audit_delta_norm
-        op: scalar.derive
-        depends_on: [derive_audit_delta]
-        params:
-          scalar: delta20_norm
-      - id: derive_audit_drag_norm
-        op: scalar.derive
-        depends_on: [derive_audit_drag]
-        params:
-          scalar: drag20_norm
-      - id: derive_audit_drag_norm_selected
-        op: scalar.derive
-        depends_on: [derive_audit_drag_norm]
-        params:
-          scalar: drag20_norm_for_context_audit
-      - id: derive_audit_joined_table
-        op: scalar.derive
-        depends_on: [derive_audit_delta_norm, derive_audit_drag_norm_selected]
-        params:
-          scalar: context_audit_20b
-      - id: render_audit_delta_distribution
-        op: plot.render
-        depends_on: [derive_audit_delta_norm]
-        params:
-          plot_id: context_shift_primary_distribution
-      - id: render_audit_drag_distribution
-        op: plot.render
-        depends_on: [derive_audit_drag_norm]
-        params:
-          plot_id: drag_qc_distribution
-      - id: render_audit_scatter
-        op: plot.render
-        depends_on: [derive_audit_joined_table]
-        params:
-          plot_id: context_shift_vs_drag_primary
-      - id: generate_audit_browser
-        op: notebook.generate
-        depends_on: [render_audit_scatter]
-        params:
-          notebook: browser
-          force: true
+    - id: materialize_audit_anchor
+      op: view.materialize
+      params:
+        view: z20_60
+    - id: materialize_audit_seq
+      op: view.materialize
+      params:
+        view: z20_1k_seq
+    - id: derive_audit_anchor_unit
+      op: view.derive
+      depends_on:
+      - materialize_audit_anchor
+      params:
+        view: z20_60_l2
+    - id: derive_audit_seq_unit
+      op: view.derive
+      depends_on:
+      - materialize_audit_seq
+      params:
+        view: z20_1k_seq_l2
+    - id: build_audit_anchor_seq
+      op: alignment.build
+      depends_on:
+      - materialize_audit_anchor
+      - materialize_audit_seq
+      params:
+        alignment: anchor_ctx_seq_20b
+    - id: derive_audit_construct_shift
+      op: view.derive
+      depends_on:
+      - build_audit_anchor_seq
+      params:
+        view: construct_shift20
+    - id: derive_audit_construct_shift_unit
+      op: view.derive
+      depends_on:
+      - build_audit_anchor_seq
+      - derive_audit_anchor_unit
+      - derive_audit_seq_unit
+      params:
+        view: construct_shift20_unit
+    - id: derive_audit_construct_shift_norm
+      op: scalar.derive
+      depends_on:
+      - derive_audit_construct_shift
+      params:
+        scalar: construct_shift20_norm
+    - id: derive_audit_construct_shift_unit_norm
+      op: scalar.derive
+      depends_on:
+      - derive_audit_construct_shift_unit
+      params:
+        scalar: construct_shift20_unit_norm
+    - id: derive_audit_self_cosine
+      op: scalar.derive
+      depends_on:
+      - derive_audit_construct_shift_unit_norm
+      params:
+        scalar: construct_self_cosine20
+    - id: derive_audit_self_cosine_context_meta
+      op: scalar.derive
+      depends_on:
+      - derive_audit_self_cosine
+      params:
+        scalar: construct_self_cosine20_context_meta
+    - id: derive_audit_construct_shift_selected
+      op: scalar.derive
+      depends_on:
+      - derive_audit_construct_shift_norm
+      params:
+        scalar: construct_shift20_norm_for_context_audit
+    - id: derive_audit_joined_table
+      op: scalar.derive
+      depends_on:
+      - derive_audit_self_cosine_context_meta
+      - derive_audit_construct_shift_selected
+      params:
+        scalar: context_audit_20b
+    - id: reduce_audit_anchor
+      op: view.reduce
+      depends_on:
+      - build_audit_anchor_seq
+      params:
+        view: z20_60
+        run_id: z20_60_anchor_ctx_seq_pca
+        alignment: anchor_ctx_seq_20b
+        dims: 32
+        reduced_view_id: z20_60_anchor_ctx_seq_pc32
+    - id: reduce_audit_seq
+      op: view.reduce
+      depends_on:
+      - build_audit_anchor_seq
+      params:
+        view: z20_1k_seq
+        run_id: z20_1k_seq_anchor_ctx_seq_pca
+        alignment: anchor_ctx_seq_20b
+        dims: 32
+        reduced_view_id: z20_1k_seq_anchor_ctx_seq_pc32
+    - id: fit_context_geometry_neighbors_anchor
+      op: neighbors.fit
+      depends_on:
+      - reduce_audit_anchor
+      params:
+        neighbors: z20_60_anchor_ctx_seq_knn
+        reduced_view: z20_60_anchor_ctx_seq_pc32
+        k: 15
+        backend: approximate
+    - id: fit_context_geometry_neighbors_seq
+      op: neighbors.fit
+      depends_on:
+      - reduce_audit_seq
+      params:
+        neighbors: z20_1k_seq_anchor_ctx_seq_knn
+        reduced_view: z20_1k_seq_anchor_ctx_seq_pc32
+        k: 15
+        backend: approximate
+    - id: compare_context_geometry
+      op: agreement.compare
+      depends_on:
+      - fit_context_geometry_neighbors_anchor
+      - fit_context_geometry_neighbors_seq
+      params:
+        agreement: context_geometry_primary_20b
+        left_neighbors: z20_60_anchor_ctx_seq_knn
+        right_neighbors: z20_1k_seq_anchor_ctx_seq_knn
+        landmarks:
+        - spyp
+        - sulap
+        - soxsp
+        - j23105
+    - id: render_audit_shift_distribution
+      op: plot.render
+      depends_on:
+      - derive_audit_construct_shift_norm
+      params:
+        plot_id: context_shift_primary_distribution
+    - id: render_audit_self_cosine_distribution
+      op: plot.render
+      depends_on:
+      - derive_audit_joined_table
+      params:
+        plot_id: context_shift_self_cosine_primary
+    - id: render_audit_scatter
+      op: plot.render
+      depends_on:
+      - derive_audit_joined_table
+      params:
+        plot_id: context_shift_vs_drag_primary
+    - id: render_context_geometry_summary
+      op: plot.render
+      depends_on:
+      - compare_context_geometry
+      params:
+        plot_id: context_geometry_primary_summary
+    - id: generate_audit_browser
+      op: notebook.generate
+      depends_on:
+      - render_audit_scatter
+      - render_context_geometry_summary
+      params:
+        notebook: browser
+        force: true
   agreement_7b_vs_20b_recipe:
     steps:
       - id: materialize_agreement_z7
@@ -1067,229 +1512,504 @@ recipes:
           plot_id: cluster_correspondence_primary
   x0_primary_20b_recipe:
     steps:
-      - id: materialize_x0_primary
-        op: view.materialize
-        params:
-          view: z20_60
-      - id: reduce_x0_primary
-        op: view.reduce
-        depends_on: [materialize_x0_primary]
-        params:
-          view: z20_60
-          run_id: z20_60_pca
-          dims: 32
-          reduced_view_id: z20_60_pc32
-      - id: export_x0_primary
-        op: export.matrix
-        depends_on: [reduce_x0_primary]
-        params:
-          export: x0_primary_20b
+    - id: materialize_x0_primary
+      op: view.materialize
+      params:
+        view: z20_60
+    - id: score_x0_reference_distances
+      op: distance.score
+      depends_on:
+      - materialize_x0_primary
+      params:
+        distance: anchor20_reference_distances
+        view: z20_60
+        landmarks:
+        - spyp
+        - sulap
+        - soxsp
+        - j23105
+    - id: derive_x0_ref_margins_spyp
+      op: scalar.derive
+      depends_on:
+      - score_x0_reference_distances
+      params:
+        scalar: anchor20_ref_margins_spyp
+    - id: derive_x0_ref_margins_sulap
+      op: scalar.derive
+      depends_on:
+      - derive_x0_ref_margins_spyp
+      params:
+        scalar: anchor20_ref_margins_sulap
+    - id: derive_x0_ref_margins
+      op: scalar.derive
+      depends_on:
+      - derive_x0_ref_margins_sulap
+      params:
+        scalar: anchor20_ref_margins
+    - id: reduce_x0_primary
+      op: view.reduce
+      depends_on:
+      - derive_x0_ref_margins
+      params:
+        view: z20_60
+        run_id: z20_60_pca
+        dims: 32
+        reduced_view_id: z20_60_pc32
+    - id: export_x0_primary
+      op: export.matrix
+      depends_on:
+      - reduce_x0_primary
+      params:
+        export: x0_primary_20b
   x1_primary_20b_recipe:
     steps:
-      - id: materialize_x1_anchor
-        op: view.materialize
-        params:
-          view: z20_60
-      - id: materialize_x1_context
-        op: view.materialize
-        params:
-          view: z20_1k_anchor
-      - id: build_x1_alignment
-        op: alignment.build
-        depends_on: [materialize_x1_anchor, materialize_x1_context]
-        params:
-          alignment: anchor_ctx_20b
-      - id: derive_x1_delta
-        op: view.derive
-        depends_on: [build_x1_alignment]
-        params:
-          view: delta20
-      - id: derive_x1_delta_norm
-        op: scalar.derive
-        depends_on: [derive_x1_delta]
-        params:
-          scalar: delta20_norm
-      - id: reduce_x1_delta
-        op: view.reduce
-        depends_on: [derive_x1_delta_norm]
-        params:
-          view: delta20
-          run_id: delta20_pca
-          dims: 32
-          reduced_view_id: delta20_pc32
-      - id: export_x1_primary
-        op: export.matrix
-        depends_on: [reduce_x1_delta]
-        params:
-          export: x1_primary_20b
+    - id: materialize_x1_anchor
+      op: view.materialize
+      params:
+        view: z20_60
+    - id: materialize_x1_seq
+      op: view.materialize
+      params:
+        view: z20_1k_seq
+    - id: build_x1_alignment
+      op: alignment.build
+      depends_on:
+      - materialize_x1_anchor
+      - materialize_x1_seq
+      params:
+        alignment: anchor_ctx_seq_20b
+    - id: derive_x1_construct_shift
+      op: view.derive
+      depends_on:
+      - build_x1_alignment
+      params:
+        view: construct_shift20
+    - id: derive_x1_construct_shift_norm
+      op: scalar.derive
+      depends_on:
+      - derive_x1_construct_shift
+      params:
+        scalar: construct_shift20_norm
+    - id: reduce_x1_construct_shift
+      op: view.reduce
+      depends_on:
+      - derive_x1_construct_shift_norm
+      params:
+        view: construct_shift20
+        run_id: construct_shift20_pca
+        dims: 32
+        reduced_view_id: construct_shift20_pc32
+    - id: export_x1_primary
+      op: export.matrix
+      depends_on:
+      - reduce_x1_construct_shift
+      params:
+        export: x1_primary_20b
   x2_primary_20b_recipe:
     steps:
-      - id: materialize_x2_anchor
-        op: view.materialize
-        params:
-          view: z20_60
-      - id: materialize_x2_context
-        op: view.materialize
-        params:
-          view: z20_1k_anchor
-      - id: build_x2_alignment
-        op: alignment.build
-        depends_on: [materialize_x2_anchor, materialize_x2_context]
-        params:
-          alignment: anchor_ctx_20b
-      - id: derive_x2_delta
-        op: view.derive
-        depends_on: [build_x2_alignment]
-        params:
-          view: delta20
-      - id: derive_x2_delta_norm
-        op: scalar.derive
-        depends_on: [derive_x2_delta]
-        params:
-          scalar: delta20_norm
-      - id: reduce_x2_primary
-        op: view.reduce
-        depends_on: [materialize_x2_anchor]
-        params:
-          view: z20_60
-          run_id: z20_60_pca
-          dims: 32
-          reduced_view_id: z20_60_pc32
-      - id: reduce_x2_delta
-        op: view.reduce
-        depends_on: [derive_x2_delta_norm]
-        params:
-          view: delta20
-          run_id: delta20_pca
-          dims: 32
-          reduced_view_id: delta20_pc32
-      - id: export_x2_primary
-        op: export.matrix
-        depends_on: [reduce_x2_primary, reduce_x2_delta]
-        params:
-          export: x2_primary_20b
+    - id: materialize_x2_anchor
+      op: view.materialize
+      params:
+        view: z20_60
+    - id: materialize_x2_seq
+      op: view.materialize
+      params:
+        view: z20_1k_seq
+    - id: build_x2_alignment
+      op: alignment.build
+      depends_on:
+      - materialize_x2_anchor
+      - materialize_x2_seq
+      params:
+        alignment: anchor_ctx_seq_20b
+    - id: score_x2_anchor_reference_distances
+      op: distance.score
+      depends_on:
+      - materialize_x2_anchor
+      params:
+        distance: anchor20_reference_distances
+        view: z20_60
+        landmarks:
+        - spyp
+        - sulap
+        - soxsp
+        - j23105
+    - id: derive_x2_anchor_ref_margins_spyp
+      op: scalar.derive
+      depends_on:
+      - score_x2_anchor_reference_distances
+      params:
+        scalar: anchor20_ref_margins_spyp
+    - id: derive_x2_anchor_ref_margins_sulap
+      op: scalar.derive
+      depends_on:
+      - derive_x2_anchor_ref_margins_spyp
+      params:
+        scalar: anchor20_ref_margins_sulap
+    - id: derive_x2_anchor_ref_margins
+      op: scalar.derive
+      depends_on:
+      - derive_x2_anchor_ref_margins_sulap
+      params:
+        scalar: anchor20_ref_margins
+    - id: derive_x2_anchor_ref_margins_export_select
+      op: scalar.derive
+      depends_on:
+      - derive_x2_anchor_ref_margins
+      params:
+        scalar: anchor20_ref_margins_export_select
+    - id: derive_x2_anchor_ref_margins_export
+      op: scalar.derive
+      depends_on:
+      - derive_x2_anchor_ref_margins_export_select
+      params:
+        scalar: anchor20_ref_margins_export
+    - id: score_x2_seq_reference_distances
+      op: distance.score
+      depends_on:
+      - build_x2_alignment
+      - materialize_x2_seq
+      params:
+        distance: seq20_reference_distances
+        view: z20_1k_seq
+        alignment: anchor_ctx_seq_20b
+        landmarks:
+        - spyp
+        - sulap
+        - soxsp
+        - j23105
+    - id: derive_x2_seq_ref_margins_spyp
+      op: scalar.derive
+      depends_on:
+      - score_x2_seq_reference_distances
+      params:
+        scalar: seq20_ref_margins_spyp
+    - id: derive_x2_seq_ref_margins_sulap
+      op: scalar.derive
+      depends_on:
+      - derive_x2_seq_ref_margins_spyp
+      params:
+        scalar: seq20_ref_margins_sulap
+    - id: derive_x2_seq_ref_margins
+      op: scalar.derive
+      depends_on:
+      - derive_x2_seq_ref_margins_sulap
+      params:
+        scalar: seq20_ref_margins
+    - id: derive_x2_seq_ref_margins_export
+      op: scalar.derive
+      depends_on:
+      - derive_x2_seq_ref_margins
+      params:
+        scalar: seq20_ref_margins_export
+    - id: derive_x2_anchor_unit
+      op: view.derive
+      depends_on:
+      - materialize_x2_anchor
+      params:
+        view: z20_60_l2
+    - id: derive_x2_seq_unit
+      op: view.derive
+      depends_on:
+      - materialize_x2_seq
+      params:
+        view: z20_1k_seq_l2
+    - id: derive_x2_construct_shift
+      op: view.derive
+      depends_on:
+      - build_x2_alignment
+      params:
+        view: construct_shift20
+    - id: derive_x2_construct_shift_unit
+      op: view.derive
+      depends_on:
+      - build_x2_alignment
+      - derive_x2_anchor_unit
+      - derive_x2_seq_unit
+      params:
+        view: construct_shift20_unit
+    - id: derive_x2_construct_shift_norm
+      op: scalar.derive
+      depends_on:
+      - derive_x2_construct_shift
+      params:
+        scalar: construct_shift20_norm
+    - id: derive_x2_construct_shift_unit_norm
+      op: scalar.derive
+      depends_on:
+      - derive_x2_construct_shift_unit
+      params:
+        scalar: construct_shift20_unit_norm
+    - id: derive_x2_self_cosine
+      op: scalar.derive
+      depends_on:
+      - derive_x2_construct_shift_unit_norm
+      params:
+        scalar: construct_self_cosine20
+    - id: derive_x2_self_cosine_context_meta
+      op: scalar.derive
+      depends_on:
+      - derive_x2_self_cosine
+      params:
+        scalar: construct_self_cosine20_context_meta
+    - id: derive_x2_construct_shift_selected
+      op: scalar.derive
+      depends_on:
+      - derive_x2_construct_shift_norm
+      params:
+        scalar: construct_shift20_norm_for_context_audit
+    - id: derive_x2_context_audit
+      op: scalar.derive
+      depends_on:
+      - derive_x2_self_cosine_context_meta
+      - derive_x2_construct_shift_selected
+      params:
+        scalar: context_audit_20b
+    - id: reduce_x2_anchor
+      op: view.reduce
+      depends_on:
+      - build_x2_alignment
+      params:
+        view: z20_60
+        run_id: z20_60_anchor_ctx_seq_pca
+        alignment: anchor_ctx_seq_20b
+        dims: 32
+        reduced_view_id: z20_60_anchor_ctx_seq_pc32
+    - id: reduce_x2_seq
+      op: view.reduce
+      depends_on:
+      - build_x2_alignment
+      params:
+        view: z20_1k_seq
+        run_id: z20_1k_seq_anchor_ctx_seq_pca
+        alignment: anchor_ctx_seq_20b
+        dims: 32
+        reduced_view_id: z20_1k_seq_anchor_ctx_seq_pc32
+    - id: export_x2_primary
+      op: export.matrix
+      depends_on:
+      - reduce_x2_anchor
+      - reduce_x2_seq
+      - derive_x2_anchor_ref_margins_export
+      - derive_x2_seq_ref_margins_export
+      - derive_x2_context_audit
+      params:
+        export: x2_primary_20b
   x3_ablation_7b_recipe:
     steps:
-      - id: materialize_x3_anchor
-        op: view.materialize
-        params:
-          view: z7_60
-      - id: materialize_x3_context
-        op: view.materialize
-        params:
-          view: z7_1k_anchor
-      - id: build_x3_alignment
-        op: alignment.build
-        depends_on: [materialize_x3_anchor, materialize_x3_context]
-        params:
-          alignment: anchor_ctx_7b
-      - id: derive_x3_delta
-        op: view.derive
-        depends_on: [build_x3_alignment]
-        params:
-          view: delta7
-      - id: reduce_x3_primary
-        op: view.reduce
-        depends_on: [materialize_x3_anchor]
-        params:
-          view: z7_60
-          run_id: z7_60_pca
-          dims: 32
-          reduced_view_id: z7_60_pc32
-      - id: reduce_x3_delta
-        op: view.reduce
-        depends_on: [derive_x3_delta]
-        params:
-          view: delta7
-          run_id: delta7_pca
-          dims: 32
-          reduced_view_id: delta7_pc32
-      - id: export_x3_ablation
-        op: export.matrix
-        depends_on: [reduce_x3_primary, reduce_x3_delta]
-        params:
-          export: x3_ablation_7b
+    - id: materialize_x3_anchor
+      op: view.materialize
+      params:
+        view: z7_60
+    - id: materialize_x3_seq
+      op: view.materialize
+      params:
+        view: z7_1k_seq
+    - id: build_x3_alignment
+      op: alignment.build
+      depends_on:
+      - materialize_x3_anchor
+      - materialize_x3_seq
+      params:
+        alignment: anchor_ctx_seq_7b
+    - id: reduce_x3_primary
+      op: view.reduce
+      depends_on:
+      - build_x3_alignment
+      params:
+        view: z7_60
+        run_id: z7_60_anchor_ctx_seq_pca
+        alignment: anchor_ctx_seq_7b
+        dims: 32
+        reduced_view_id: z7_60_anchor_ctx_seq_pc32
+    - id: reduce_x3_seq
+      op: view.reduce
+      depends_on:
+      - build_x3_alignment
+      params:
+        view: z7_1k_seq
+        run_id: z7_1k_seq_anchor_ctx_seq_pca
+        alignment: anchor_ctx_seq_7b
+        dims: 32
+        reduced_view_id: z7_1k_seq_anchor_ctx_seq_pc32
+    - id: export_x3_ablation
+      op: export.matrix
+      depends_on:
+      - reduce_x3_primary
+      - reduce_x3_seq
+      params:
+        export: x3_ablation_7b
 
 deliverables:
   atlas_2x2_intermediate_main:
-    title: Atlas 2x2 intermediate main
-    summary: Four-panel aligned projection colored by design family with required WT and reference promoter labels.
-    question: Do the four promoter design families separate in latent space at all?
-    section: Atlas
+    title: 2x2 intermediate geometry
+    summary: Four-panel anchor-versus-1 kb expanded-context projection colored by design family with required WT and reference promoter labels.
+    question: Do pooled anchor-only and 1 kb expanded-context views separate the promoter design families in a structured way?
+    section: Appendix
     recipe: atlas_2x2_recipe
     requires:
-      views: [z7_60, z20_60, z7_1k_anchor, z20_1k_anchor]
-      cohorts: [design_family]
+      views:
+      - z7_60
+      - z20_60
+      - z7_1k_seq
+      - z20_1k_seq
+      cohorts:
+      - design_family
     outputs:
-      samples: [atlas_anchor_sample, atlas_context_sample]
-      projections: [umap_z7_60, umap_z20_60, umap_z7_1k_anchor, umap_z20_1k_anchor]
-      plots: [atlas_2x2_intermediate_main]
-      notebooks: [browser]
+      samples:
+      - atlas_anchor_sample
+      - atlas_context_sample
+      projections:
+      - umap_z7_60
+      - umap_z20_60
+      - umap_z7_1k_seq
+      - umap_z20_1k_seq
+      plots:
+      - atlas_2x2_intermediate_main
+      notebooks:
+      - browser
     docs_refs:
-      - study:stress_ethanol_cipro_growth/deliverables/atlas_2x2_intermediate_main
-      - study:stress_ethanol_cipro_growth/figures/atlas_2x2_intermediate_main
+    - study:stress_ethanol_cipro_growth/deliverables/geometry_switchboard_20b
+    - study:stress_ethanol_cipro_growth/figures/atlas_2x2_intermediate_main
     acceptance_checks:
-      - kind: required_plot_kind
-        value: projection_grid
-      - kind: required_reference_set
-        value: promoter_wt_core
-      - kind: require_reference_set_in_every_panel
-        value: true
+    - kind: required_plot_kind
+      value: projection_grid
+    - kind: required_reference_set
+      value: promoter_wt_core
+    - kind: require_reference_set_in_every_panel
+      value: true
   control_pca_explained_variance_curve:
     title: Control PCA explained variance curve
     summary: PCA explained-variance scree curve for the primary 20B anchor-only view.
     question: How much anchor-only variance does each principal component explain in the primary 20B view?
-    section: Reduction
+    section: QC
     recipe: control_pca_curve_recipe
     requires:
-      views: [z20_60]
+      views:
+      - z20_60
     outputs:
-      reducers: [z20_60_pca]
-      plots: [control_pca_explained_variance_curve]
+      reducers:
+      - z20_60_pca
+      plots:
+      - control_pca_explained_variance_curve
     docs_refs: []
     acceptance_checks:
-      - kind: required_plot_kind
-        value: curve
+    - kind: required_plot_kind
+      value: curve
+  reference_alignment_primary_20b:
+    title: Reference alignment primary 20B
+    summary: Score centered WT-reference margins for the 20B anchor-only and 1 kb expanded-context pooled spaces.
+    question: Do the pooled 20B representations move toward the expected WT references when the 1 kb expanded-context is used?
+    section: Reference alignment
+    recipe: reference_alignment_primary_20b_recipe
+    requires:
+      views:
+      - z20_60
+      - z20_1k_seq
+      landmarks:
+      - spyp
+      - sulap
+      - soxsp
+      - j23105
+    outputs:
+      distances:
+      - anchor20_reference_distances
+      - seq20_reference_distances
+      scalars:
+      - anchor20_ref_margins
+      - seq20_ref_margins
+      plots:
+      - reference_alignment_anchor20b
+      - reference_alignment_seq20b
+    docs_refs:
+    - study:stress_ethanol_cipro_growth/deliverables/reference_alignment_primary_20b
+    - study:stress_ethanol_cipro_growth/reference_sets/promoter_wt_core
+    acceptance_checks:
+    - kind: required_plot_kind
+      value: xy_scatter
+    - kind: required_reference_set
+      value: promoter_wt_core
+    - kind: require_reference_set_in_every_panel
+      value: true
   context_shift_primary:
     title: Context shift primary
-    summary: Primary 20B context-shift view, scalar summary, and low-rank delta artifacts.
-    question: Does anchor-plus-context materially shift promoter representation?
-    section: Context
+    summary: Primary 20B shift summary from the 60 bp anchor lane to the 1 kb expanded-context pooled sequence lane.
+    question: Does replacing the 60 bp anchor with the full 1 kb construct materially shift promoter representation?
+    section: Context shift
     recipe: context_shift_primary_recipe
     requires:
-      views: [z20_60, z20_1k_anchor]
-      alignments: [anchor_ctx_20b]
+      views:
+      - z20_60
+      - z20_1k_seq
+      alignments:
+      - anchor_ctx_seq_20b
     outputs:
-      views: [delta20]
-      scalars: [delta20_norm]
-      reducers: [z20_60_pca, delta20_pca]
-      reduced_views: [z20_60_pc32, delta20_pc32]
-      plots: [context_shift_primary_distribution]
+      views:
+      - construct_shift20
+      scalars:
+      - construct_shift20_norm
+      plots:
+      - context_shift_primary_distribution
     docs_refs: []
     acceptance_checks: []
   geometry_switchboard_20b:
     title: Geometry switchboard multiview
-    summary: Materialize the core 7B and 20B intermediate and pooled-logit projections that drive the browser atlas viewer and comparison tab.
+    summary: Materialize the core 7B and 20B intermediate and pooled-logit projections that drive the browser geometry views and appendix comparison tab.
     question: Can the browser switch across the core 7B and 20B geometries without requiring one static plot per hue?
-    section: Atlas
+    section: Appendix
     recipe: geometry_switchboard_20b_recipe
     requires:
       views:
-        [z7_60, z20_60, z7_1k_anchor, z20_1k_anchor, z7_1k_seq, z20_1k_seq, logits7_60, logits20_60, logits7_1k_anchor, logits20_1k_anchor]
-      cohorts: [design_family]
+      - z7_60
+      - z20_60
+      - z7_1k_anchor
+      - z20_1k_anchor
+      - z7_1k_seq
+      - z20_1k_seq
+      - logits7_60
+      - logits20_60
+      - logits7_1k_anchor
+      - logits20_1k_anchor
+      - logits7_1k_seq
+      - logits20_1k_seq
+      cohorts:
+      - design_family
     outputs:
-      samples: [atlas_anchor_sample, atlas_context_sample]
+      samples:
+      - atlas_anchor_sample
+      - atlas_context_sample
       projections:
-        [umap_z7_60, umap_z20_60, umap_z7_1k_anchor, umap_z20_1k_anchor, umap_z7_1k_seq, umap_z20_1k_seq, umap_logits7_60, umap_logits20_60, umap_logits7_1k_anchor, umap_logits20_1k_anchor]
-      plots: [atlas_2x3_model_family]
-      notebooks: [browser]
-    docs_refs: []
-    acceptance_checks: []
+      - umap_z7_60
+      - umap_z20_60
+      - umap_z7_1k_anchor
+      - umap_z20_1k_anchor
+      - umap_z7_1k_seq
+      - umap_z20_1k_seq
+      - umap_logits7_60
+      - umap_logits20_60
+      - umap_logits7_1k_anchor
+      - umap_logits20_1k_anchor
+      - umap_logits7_1k_seq
+      - umap_logits20_1k_seq
+      plots:
+      - atlas_2x3_model_family
+      notebooks:
+      - browser
+    docs_refs:
+    - study:stress_ethanol_cipro_growth/deliverables/geometry_switchboard_20b
+    - study:stress_ethanol_cipro_growth/figures/atlas_2x2_intermediate_main
+    acceptance_checks:
+    - kind: required_plot_kind
+      value: projection_grid
+    - kind: required_reference_set
+      value: promoter_wt_core
+    - kind: require_reference_set_in_every_panel
+      value: true
   drag_qc:
     title: Drag QC
-    summary: 20B full-context drag scalar that measures how much the full 1 kb sequence departs from anchor-aware pooling.
+    summary: 20B expanded-context drag scalar that measures how much the 1 kb context window departs from anchor-aware pooling.
     question: Does full 1 kb context add drag beyond anchor-aware context in the primary 20B lane?
-    section: Context
+    section: QC
     recipe: drag_qc_recipe
     requires:
       views: [z20_1k_anchor, z20_1k_seq]
@@ -1302,24 +2022,41 @@ deliverables:
     acceptance_checks: []
   context_audit_primary_20b:
     title: Context audit primary 20B
-    summary: Persist the 20B context audit surfaces needed to decide whether delta20 remains a primary export feature or gets demoted behind drag-aware QC.
-    question: Should delta20 remain in x2_primary_20b, or be demoted because full-context drag carries the stronger signal?
-    section: Context
+    summary: Persist self-cosine, L2 shift, and neighborhood-preservation surfaces for the 20B anchor-versus-expanded-context comparison.
+    question: Does the full 1 kb construct preserve biologically meaningful neighborhood geometry while moving pooled representations away from the 60 bp anchor-only baseline?
+    section: Context shift
     recipe: context_audit_primary_20b_recipe
     requires:
-      views: [z20_60, z20_1k_anchor, z20_1k_seq]
-      alignments: [anchor_ctx_20b, anchor_seq_20b]
+      views:
+      - z20_60
+      - z20_1k_seq
+      alignments:
+      - anchor_ctx_seq_20b
     outputs:
-      views: [delta20, drag20]
-      scalars: [delta20_norm, drag20_norm, context_audit_20b]
-      plots: [context_shift_vs_drag_primary]
-    docs_refs: []
+      views:
+      - construct_shift20
+      - construct_shift20_unit
+      scalars:
+      - construct_shift20_norm
+      - construct_self_cosine20
+      - context_audit_20b
+      neighbors:
+      - z20_60_anchor_ctx_seq_knn
+      - z20_1k_seq_anchor_ctx_seq_knn
+      agreements:
+      - context_geometry_primary_20b
+      plots:
+      - context_shift_self_cosine_primary
+      - context_shift_vs_drag_primary
+      - context_geometry_primary_summary
+    docs_refs:
+    - study:stress_ethanol_cipro_growth/deliverables/context_audit_primary_20b
     acceptance_checks: []
   agreement_7b_vs_20b:
     title: Agreement 7B vs 20B
     summary: Compare 7B and 20B anchor-only structure on a shared sampled support.
     question: Is 7B adding specialist signal beyond 20B, or mostly redundancy?
-    section: Agreement
+    section: Appendix
     recipe: agreement_7b_vs_20b_recipe
     requires:
       views: [z7_60, z20_60]
@@ -1336,7 +2073,7 @@ deliverables:
     title: Cluster correspondence primary
     summary: Compare aligned Leiden cluster assignments between anchor-only and anchor-aware 20B views.
     question: Does anchor-plus-context change promoter organization?
-    section: Clusters
+    section: QC
     recipe: cluster_correspondence_recipe
     requires:
       clusters: [leiden_z20_60, leiden_z20_1k_anchor]
@@ -1344,74 +2081,115 @@ deliverables:
       plots: [cluster_correspondence_primary]
     docs_refs: []
     acceptance_checks:
-      - kind: required_plot_kind
-        value: correspondence_heatmap
+    - kind: required_plot_kind
+      value: correspondence_heatmap
   x0_primary_20b:
     title: X0 primary 20B
-    summary: Export the primary 20B low-rank bundle plus landmark distances.
+    summary: Export the primary 20B anchor-only low-rank bundle plus centered WT-reference margins.
     question: Is the anchor-only 20B view a useful baseline export?
-    section: Exports
+    section: Benchmark export
     recipe: x0_primary_20b_recipe
     requires:
-      views: [z20_60]
-      exports: [x0_primary_20b]
+      views:
+      - z20_60
+      exports:
+      - x0_primary_20b
     outputs:
-      reducers: [z20_60_pca]
-      reduced_views: [z20_60_pc32]
-      exports: [x0_primary_20b]
+      distances:
+      - anchor20_reference_distances
+      scalars:
+      - anchor20_ref_margins
+      reducers:
+      - z20_60_pca
+      reduced_views:
+      - z20_60_pc32
+      exports:
+      - x0_primary_20b
     docs_refs: []
     acceptance_checks: []
   x1_primary_20b:
     title: X1 primary 20B
-    summary: Export the primary 20B delta-only low-rank bundle.
-    question: Is the delta-only 20B export stable enough to stand on its own?
-    section: Exports
+    summary: Export the primary 20B shift bundle from anchor-only to 1 kb expanded-context.
+    question: Is the 20B expanded-context shift bundle stable enough to stand on its own?
+    section: Benchmark export
     recipe: x1_primary_20b_recipe
     requires:
-      views: [z20_60, z20_1k_anchor]
-      alignments: [anchor_ctx_20b]
-      exports: [x1_primary_20b]
+      views:
+      - z20_60
+      - z20_1k_seq
+      alignments:
+      - anchor_ctx_seq_20b
+      exports:
+      - x1_primary_20b
     outputs:
-      views: [delta20]
-      scalars: [delta20_norm]
-      reducers: [delta20_pca]
-      reduced_views: [delta20_pc32]
-      exports: [x1_primary_20b]
+      views:
+      - construct_shift20
+      scalars:
+      - construct_shift20_norm
+      reducers:
+      - construct_shift20_pca
+      reduced_views:
+      - construct_shift20_pc32
+      exports:
+      - x1_primary_20b
     docs_refs: []
     acceptance_checks: []
   x2_primary_20b:
     title: X2 primary 20B
-    summary: Export the aligned primary 20B multiblock bundle for downstream supervised learning, while keeping the delta block explicitly provisional pending the context audit.
-    question: Does x2_primary_20b remain the deterministic primary supervised export once the context audit is complete?
-    section: Exports
+    summary: Export the aligned primary 20B multiblock bundle for downstream supervised learning using anchor-only and 1 kb expanded-context pooled views plus centered WT-reference margins and per-token log-likelihood side channels.
+    question: Does x2_primary_20b provide the right pooled anchor-plus-expanded-context feature set for grouped supervised benchmarking?
+    section: Benchmark export
     recipe: x2_primary_20b_recipe
     requires:
-      views: [z20_60, z20_1k_anchor]
-      alignments: [anchor_ctx_20b]
-      exports: [x2_primary_20b]
+      views:
+      - z20_60
+      - z20_1k_seq
+      alignments:
+      - anchor_ctx_seq_20b
+      exports:
+      - x2_primary_20b
     outputs:
-      views: [delta20]
-      scalars: [delta20_norm]
-      reducers: [z20_60_pca, delta20_pca]
-      reduced_views: [z20_60_pc32, delta20_pc32]
-      exports: [x2_primary_20b]
-    docs_refs: []
+      scalars:
+      - anchor20_ref_margins_export
+      - seq20_ref_margins_export
+      - context_audit_20b
+      distances:
+      - anchor20_reference_distances
+      - seq20_reference_distances
+      reducers:
+      - z20_60_anchor_ctx_seq_pca
+      - z20_1k_seq_anchor_ctx_seq_pca
+      reduced_views:
+      - z20_60_anchor_ctx_seq_pc32
+      - z20_1k_seq_anchor_ctx_seq_pc32
+      exports:
+      - x2_primary_20b
+    docs_refs:
+    - study:stress_ethanol_cipro_growth/deliverables/x2_primary_20b
     acceptance_checks: []
   x3_ablation_7b:
     title: X3 ablation 7B
-    summary: Export the aligned 7B ablation bundle for challenger comparisons.
+    summary: Export the aligned 7B anchor-only versus 1 kb expanded-context ablation bundle for 7B-versus-20B ablation comparisons.
     question: Does the 7B committee member add useful ablation structure?
-    section: Exports
+    section: Benchmark export
     recipe: x3_ablation_7b_recipe
     requires:
-      views: [z7_60, z7_1k_anchor]
-      alignments: [anchor_ctx_7b]
-      exports: [x3_ablation_7b]
+      views:
+      - z7_60
+      - z7_1k_seq
+      alignments:
+      - anchor_ctx_seq_7b
+      exports:
+      - x3_ablation_7b
     outputs:
-      views: [delta7]
-      reducers: [z7_60_pca, delta7_pca]
-      reduced_views: [z7_60_pc32, delta7_pc32]
-      exports: [x3_ablation_7b]
+      reducers:
+      - z7_60_anchor_ctx_seq_pca
+      - z7_1k_seq_anchor_ctx_seq_pca
+      reduced_views:
+      - z7_60_anchor_ctx_seq_pc32
+      - z7_1k_seq_anchor_ctx_seq_pc32
+      exports:
+      - x3_ablation_7b
     docs_refs: []
     acceptance_checks: []
 study_binding:

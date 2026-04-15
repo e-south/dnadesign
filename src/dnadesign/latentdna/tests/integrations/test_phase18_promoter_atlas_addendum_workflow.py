@@ -13,6 +13,7 @@ import yaml
 from typer.testing import CliRunner
 
 from dnadesign.latentdna.src.cli import app
+from dnadesign.latentdna.src.workspaces.paths import builtin_templates_dir
 
 _RUNNER = CliRunner()
 
@@ -23,701 +24,52 @@ def _write_usr_dataset(root: Path, dataset: str, rows: list[dict[str, object]]) 
     pq.write_table(pa.Table.from_pylist(rows), dataset_dir / "records.parquet")
 
 
-def _write_addendum_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
-    (workspace_dir / "config.yaml").write_text(
-        yaml.safe_dump(
-            {
-                "schema_version": "latentdna.workspace.v1",
-                "workspace": {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"},
-                "defaults": {
-                    "analysis_dtype": "float32",
-                    "metric": "cosine",
-                    "random_seed": 17,
-                    "plot_formats": ["svg", "png"],
-                    "neighbor_backend": "exact",
-                },
-                "sources": {
-                    "anchor60": {
-                        "kind": "usr",
-                        "root": usr_root.as_posix(),
-                        "dataset": "promoter/demo_anchor_set",
-                        "record_key": "id",
-                        "subject_key": "subject_id",
-                    },
-                    "ctx1k": {
-                        "kind": "usr",
-                        "root": usr_root.as_posix(),
-                        "dataset": "promoter/demo_context_set",
-                        "record_key": "id",
-                        "subject_key": "subject_id",
-                        "context_key": "context_id",
-                    },
-                },
-                "metadata": {
-                    "include": [
-                        "usr_label__primary",
-                        "densegen__plan",
-                        "densegen__required_regulators",
-                        "template_id",
-                        "infer__evo2_7b__anchor_only_7b_features__log_likelihood__mean_per_token",
-                        "infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token",
-                        "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token",
-                        "infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token",
-                    ]
-                },
-                "alignments": {
-                    "anchor_ctx_20b": {
-                        "left": "z20_1k_anchor",
-                        "right": "z20_60",
-                        "on": "subject_key",
-                        "support": "intersection",
-                    },
-                    "anchor_seq_20b": {
-                        "left": "z20_1k_seq",
-                        "right": "z20_1k_anchor",
-                        "on": "subject_key",
-                        "support": "intersection",
-                    },
-                    "anchor_ctx_7b": {
-                        "left": "z7_1k_anchor",
-                        "right": "z7_60",
-                        "on": "subject_key",
-                        "support": "intersection",
-                    },
-                    "anchor_seq_7b": {
-                        "left": "z7_1k_seq",
-                        "right": "z7_1k_anchor",
-                        "on": "subject_key",
-                        "support": "intersection",
-                    },
-                },
-                "views": {
-                    "z7_60": {
-                        "source": "anchor60",
-                        "vector": {"kind": "column", "name": "z7_60"},
-                        "coordinate_space_id": "evo2_7b_intermediate",
-                        "tags": {"model": "7B", "family": "intermediate", "context": "60bp"},
-                        "role": "committee_member",
-                    },
-                    "z20_60": {
-                        "source": "anchor60",
-                        "vector": {"kind": "column", "name": "z20_60"},
-                        "coordinate_space_id": "evo2_20b_intermediate",
-                        "tags": {"model": "20B", "family": "intermediate", "context": "60bp"},
-                        "role": "primary",
-                    },
-                    "z7_1k_anchor": {
-                        "source": "ctx1k",
-                        "vector": {"kind": "column", "name": "z7_1k_anchor"},
-                        "coordinate_space_id": "evo2_7b_intermediate",
-                        "tags": {"model": "7B", "family": "intermediate", "context": "1kb_anchor"},
-                        "role": "committee_member",
-                    },
-                    "z20_1k_anchor": {
-                        "source": "ctx1k",
-                        "vector": {"kind": "column", "name": "z20_1k_anchor"},
-                        "coordinate_space_id": "evo2_20b_intermediate",
-                        "tags": {"model": "20B", "family": "intermediate", "context": "1kb_anchor"},
-                        "role": "primary",
-                    },
-                    "z7_1k_seq": {
-                        "source": "ctx1k",
-                        "vector": {"kind": "column", "name": "z7_1k_seq"},
-                        "coordinate_space_id": "evo2_7b_intermediate",
-                        "tags": {"model": "7B", "family": "intermediate", "context": "1kb_seq"},
-                        "role": "challenger",
-                    },
-                    "z20_1k_seq": {
-                        "source": "ctx1k",
-                        "vector": {"kind": "column", "name": "z20_1k_seq"},
-                        "coordinate_space_id": "evo2_20b_intermediate",
-                        "tags": {"model": "20B", "family": "intermediate", "context": "1kb_seq"},
-                        "role": "challenger",
-                    },
-                    "logits7_60": {
-                        "source": "anchor60",
-                        "vector": {"kind": "column", "name": "logits7_60"},
-                        "coordinate_space_id": "evo2_7b_pooled_logits",
-                        "tags": {"model": "7B", "family": "pooled_logits", "context": "60bp"},
-                        "role": "challenger",
-                    },
-                    "logits20_60": {
-                        "source": "anchor60",
-                        "vector": {"kind": "column", "name": "logits20_60"},
-                        "coordinate_space_id": "evo2_20b_pooled_logits",
-                        "tags": {"model": "20B", "family": "pooled_logits", "context": "60bp"},
-                        "role": "challenger",
-                    },
-                    "logits7_1k_anchor": {
-                        "source": "ctx1k",
-                        "vector": {"kind": "column", "name": "logits7_1k_anchor"},
-                        "coordinate_space_id": "evo2_7b_pooled_logits",
-                        "tags": {"model": "7B", "family": "pooled_logits", "context": "1kb_anchor"},
-                        "role": "challenger",
-                    },
-                    "logits20_1k_anchor": {
-                        "source": "ctx1k",
-                        "vector": {"kind": "column", "name": "logits20_1k_anchor"},
-                        "coordinate_space_id": "evo2_20b_pooled_logits",
-                        "tags": {"model": "20B", "family": "pooled_logits", "context": "1kb_anchor"},
-                        "role": "challenger",
-                    },
-                    "delta20": {
-                        "derive": {
-                            "kind": "vector_difference",
-                            "left": "z20_1k_anchor",
-                            "right": "z20_60",
-                            "alignment": "anchor_ctx_20b",
-                        },
-                        "coordinate_space_id": "evo2_20b_intermediate",
-                        "tags": {"family": "intermediate", "context": "delta"},
-                        "role": "primary",
-                    },
-                    "drag20": {
-                        "derive": {
-                            "kind": "vector_difference",
-                            "left": "z20_1k_seq",
-                            "right": "z20_1k_anchor",
-                            "alignment": "anchor_seq_20b",
-                        },
-                        "coordinate_space_id": "evo2_20b_intermediate",
-                        "tags": {"family": "intermediate", "context": "drag"},
-                        "role": "challenger",
-                    },
-                },
-                "scalars": {
-                    "delta20_norm": {"derive": {"kind": "vector_norm", "view": "delta20", "norm": "l2"}},
-                    "drag20_norm": {"derive": {"kind": "vector_norm", "view": "drag20", "norm": "l2"}},
-                    "drag20_norm_for_context_audit": {
-                        "derive": {
-                            "kind": "select_columns",
-                            "source": "drag20_norm",
-                            "columns": ["subject_id", "drag20_norm"],
-                        }
-                    },
-                    "context_audit_20b": {
-                        "derive": {
-                            "kind": "join_tables",
-                            "sources": ["delta20_norm", "drag20_norm_for_context_audit"],
-                            "on": ["subject_id"],
-                        }
-                    },
-                },
-                "landmarks": {
-                    "spyp": {
-                        "source": "anchor60",
-                        "where": {"column": "usr_label__primary", "equals": "spyP"},
-                        "representation": {"mode": "centroid"},
-                    },
-                    "sulap": {
-                        "source": "anchor60",
-                        "where": {"column": "usr_label__primary", "equals": "sulAp"},
-                        "representation": {"mode": "centroid"},
-                    },
-                    "soxsp": {
-                        "source": "anchor60",
-                        "where": {"column": "usr_label__primary", "equals": "soxSp"},
-                        "representation": {"mode": "centroid"},
-                    },
-                    "j23105": {
-                        "source": "anchor60",
-                        "where": {"column": "usr_label__primary", "equals": "J23105"},
-                        "representation": {"mode": "centroid"},
-                    },
-                },
-                "cohorts": {
-                    "design_family": {
-                        "kind": "promoter_metadata",
-                        "source": "anchor60",
-                        "derive": "design_family",
-                    },
-                    "design_regulator_composition": {
-                        "kind": "promoter_metadata",
-                        "source": "anchor60",
-                        "derive": "design_regulator_composition",
-                    },
-                    "sigma70_variant": {
-                        "kind": "promoter_metadata",
-                        "source": "anchor60",
-                        "derive": "sigma70_variant",
-                    },
-                    "campaign_prior": {
-                        "kind": "promoter_metadata",
-                        "source": "anchor60",
-                        "derive": "campaign_prior",
-                    },
-                    "is_control": {
-                        "kind": "promoter_metadata",
-                        "source": "anchor60",
-                        "derive": "is_control",
-                    },
-                    "source_class": {
-                        "kind": "promoter_metadata",
-                        "source": "anchor60",
-                        "derive": "source_class",
-                    },
-                },
-                "plots": {
-                    "atlas_primary": {
-                        "kind": "projection_scatter",
-                        "projection": "umap_z20_60",
-                        "color_column": "design_family",
-                        "label_column": "usr_label__primary",
-                        "label_values": ["spyP", "sulAp", "soxSp", "J23105"],
-                    },
-                    "atlas_2x3_model_family": {
-                        "kind": "projection_grid",
-                        "projections": [
-                            "umap_z7_60",
-                            "umap_z20_60",
-                            "umap_z7_1k_anchor",
-                            "umap_z20_1k_anchor",
-                            "umap_logits7_1k_anchor",
-                            "umap_logits20_1k_anchor",
-                        ],
-                        "panel_titles": [
-                            "7B anchor-only intermediate",
-                            "20B anchor-only intermediate",
-                            "7B anchor-aware intermediate",
-                            "20B anchor-aware intermediate",
-                            "7B anchor-aware pooled logits",
-                            "20B anchor-aware pooled logits",
-                        ],
-                        "color_column": "design_family",
-                        "label_column": "usr_label__primary",
-                        "label_values": ["spyP", "sulAp", "soxSp", "J23105"],
-                    },
-                    "drag_qc_distribution": {
-                        "kind": "distribution",
-                        "scalar": "drag20_norm",
-                        "value_column": "drag20_norm",
-                        "color_column": "design_family",
-                        "render_mode": "ecdf",
-                    },
-                    "context_shift_vs_drag_primary": {
-                        "kind": "xy_scatter",
-                        "scalar": "context_audit_20b",
-                        "x_column": "delta20_norm",
-                        "y_column": "drag20_norm",
-                        "color_column": "design_family",
-                        "render_mode": "hexbin",
-                    },
-                },
-                "notebooks": {
-                    "browser": {
-                        "kind": "workspace",
-                        "title": "Promoter atlas browser",
-                        "description": "Read-only promoter atlas browser.",
-                        "default_deliverable": "atlas_2x2_intermediate_main",
-                    }
-                },
-                "deliverables": {
-                    "atlas_2x2_intermediate_main": {
-                        "recipe": "atlas_recipe",
-                        "title": "Atlas 2x2 intermediate main",
-                        "section": "atlas",
-                        "question": "Do the design families separate in latent space at all?",
-                        "summary": "Primary atlas panel for the promoter addendum browser and companion artifacts.",
-                        "requires": {
-                            "sources": ["anchor60"],
-                            "views": ["z20_60"],
-                            "recipes": ["atlas_recipe"],
-                        },
-                        "outputs": {
-                            "views": ["z20_60"],
-                            "samples": ["atlas_sample"],
-                            "projections": ["umap_z20_60"],
-                            "plots": ["atlas_primary"],
-                            "notebooks": ["browser"],
-                        },
-                        "docs_refs": [],
-                        "acceptance_checks": [
-                            {"kind": "required_plot_kind", "value": "projection_scatter"},
-                        ],
-                    },
-                    "geometry_switchboard_20b": {
-                        "recipe": "geometry_switchboard_recipe",
-                        "title": "Geometry switchboard multiview",
-                        "section": "atlas",
-                        "question": (
-                            "Can the browser switch across the core 7B and 20B geometries "
-                            "without one static plot per hue?"
-                        ),
-                        "summary": (
-                            "Persist the 7B and 20B intermediate and pooled-logit projections "
-                            "needed by the browser atlas viewer."
-                        ),
-                        "requires": {
-                            "sources": ["anchor60", "ctx1k"],
-                            "views": [
-                                "z7_60",
-                                "z20_60",
-                                "z7_1k_anchor",
-                                "z20_1k_anchor",
-                                "z7_1k_seq",
-                                "z20_1k_seq",
-                                "logits7_60",
-                                "logits20_60",
-                                "logits7_1k_anchor",
-                                "logits20_1k_anchor",
-                            ],
-                        },
-                        "outputs": {
-                            "views": [
-                                "z7_60",
-                                "z20_60",
-                                "z7_1k_anchor",
-                                "z20_1k_anchor",
-                                "z7_1k_seq",
-                                "z20_1k_seq",
-                                "logits7_60",
-                                "logits20_60",
-                                "logits7_1k_anchor",
-                                "logits20_1k_anchor",
-                            ],
-                            "samples": ["atlas_sample", "context_sample"],
-                            "projections": [
-                                "umap_z7_60",
-                                "umap_z20_60",
-                                "umap_z7_1k_anchor",
-                                "umap_z20_1k_anchor",
-                                "umap_z7_1k_seq",
-                                "umap_z20_1k_seq",
-                                "umap_logits7_60",
-                                "umap_logits20_60",
-                                "umap_logits7_1k_anchor",
-                                "umap_logits20_1k_anchor",
-                            ],
-                            "plots": ["atlas_2x3_model_family"],
-                            "notebooks": ["browser"],
-                        },
-                        "docs_refs": [],
-                        "acceptance_checks": [],
-                    },
-                    "context_audit_primary_20b": {
-                        "recipe": "context_audit_recipe",
-                        "title": "Context audit primary 20B",
-                        "section": "context",
-                        "question": "Should delta20 remain in x2, or be demoted behind drag-aware QC?",
-                        "summary": (
-                            "Persist delta20, drag20, and the joined audit table that drives "
-                            "the browser decision summary."
-                        ),
-                        "requires": {
-                            "sources": ["anchor60", "ctx1k"],
-                            "views": ["z20_60", "z20_1k_anchor", "z20_1k_seq"],
-                        },
-                        "outputs": {
-                            "views": ["delta20", "drag20"],
-                            "scalars": ["delta20_norm", "drag20_norm", "context_audit_20b"],
-                            "plots": ["drag_qc_distribution", "context_shift_vs_drag_primary"],
-                            "notebooks": ["browser"],
-                        },
-                        "docs_refs": [],
-                        "acceptance_checks": [],
-                    },
-                },
-                "recipes": {
-                    "atlas_recipe": {
-                        "steps": [
-                            {"id": "materialize_z20_60", "op": "view.materialize", "params": {"view": "z20_60"}},
-                            {
-                                "id": "sample_all",
-                                "op": "sample.build",
-                                "depends_on": ["materialize_z20_60"],
-                                "params": {"sample": "atlas_sample", "view": "z20_60", "strategy": "all"},
-                            },
-                            {
-                                "id": "fit_projection",
-                                "op": "projection.fit",
-                                "depends_on": ["sample_all"],
-                                "params": {"view": "z20_60", "sample": "atlas_sample", "run_id": "umap_z20_60"},
-                            },
-                            {
-                                "id": "render_atlas",
-                                "op": "plot.render",
-                                "depends_on": ["fit_projection"],
-                                "params": {"plot": "atlas_primary"},
-                            },
-                            {
-                                "id": "generate_browser",
-                                "op": "notebook.generate",
-                                "depends_on": ["render_atlas"],
-                                "params": {"notebook": "browser"},
-                            },
-                        ]
-                    },
-                    "geometry_switchboard_recipe": {
-                        "steps": [
-                            {
-                                "id": "materialize_z7_60_switchboard",
-                                "op": "view.materialize",
-                                "params": {"view": "z7_60"},
-                            },
-                            {
-                                "id": "materialize_z20_60_switchboard",
-                                "op": "view.materialize",
-                                "params": {"view": "z20_60"},
-                            },
-                            {
-                                "id": "materialize_z7_1k_anchor_switchboard",
-                                "op": "view.materialize",
-                                "params": {"view": "z7_1k_anchor"},
-                            },
-                            {
-                                "id": "materialize_z20_1k_anchor_switchboard",
-                                "op": "view.materialize",
-                                "params": {"view": "z20_1k_anchor"},
-                            },
-                            {
-                                "id": "materialize_z7_1k_seq_switchboard",
-                                "op": "view.materialize",
-                                "params": {"view": "z7_1k_seq"},
-                            },
-                            {
-                                "id": "materialize_z20_1k_seq_switchboard",
-                                "op": "view.materialize",
-                                "params": {"view": "z20_1k_seq"},
-                            },
-                            {
-                                "id": "materialize_logits7_60_switchboard",
-                                "op": "view.materialize",
-                                "params": {"view": "logits7_60"},
-                            },
-                            {
-                                "id": "materialize_logits20_60_switchboard",
-                                "op": "view.materialize",
-                                "params": {"view": "logits20_60"},
-                            },
-                            {
-                                "id": "materialize_logits7_1k_anchor_switchboard",
-                                "op": "view.materialize",
-                                "params": {"view": "logits7_1k_anchor"},
-                            },
-                            {
-                                "id": "materialize_logits20_1k_anchor_switchboard",
-                                "op": "view.materialize",
-                                "params": {"view": "logits20_1k_anchor"},
-                            },
-                            {
-                                "id": "sample_anchor_switchboard",
-                                "op": "sample.build",
-                                "depends_on": ["materialize_z20_60_switchboard", "materialize_logits20_60_switchboard"],
-                                "params": {"sample": "atlas_sample", "view": "z20_60", "strategy": "all"},
-                            },
-                            {
-                                "id": "sample_context_switchboard",
-                                "op": "sample.build",
-                                "depends_on": ["materialize_z20_1k_anchor_switchboard"],
-                                "params": {"sample": "context_sample", "view": "z20_1k_anchor", "strategy": "all"},
-                            },
-                            {
-                                "id": "fit_projection_z7_60_switchboard",
-                                "op": "projection.fit",
-                                "depends_on": ["sample_anchor_switchboard"],
-                                "params": {"view": "z7_60", "sample": "atlas_sample", "run_id": "umap_z7_60"},
-                            },
-                            {
-                                "id": "fit_projection_z20_60_switchboard",
-                                "op": "projection.fit",
-                                "depends_on": ["sample_anchor_switchboard"],
-                                "params": {"view": "z20_60", "sample": "atlas_sample", "run_id": "umap_z20_60"},
-                            },
-                            {
-                                "id": "fit_projection_z7_1k_anchor_switchboard",
-                                "op": "projection.fit",
-                                "depends_on": ["sample_context_switchboard"],
-                                "params": {
-                                    "view": "z7_1k_anchor",
-                                    "sample": "context_sample",
-                                    "run_id": "umap_z7_1k_anchor",
-                                },
-                            },
-                            {
-                                "id": "fit_projection_z20_1k_anchor_switchboard",
-                                "op": "projection.fit",
-                                "depends_on": ["sample_context_switchboard"],
-                                "params": {
-                                    "view": "z20_1k_anchor",
-                                    "sample": "context_sample",
-                                    "run_id": "umap_z20_1k_anchor",
-                                },
-                            },
-                            {
-                                "id": "fit_projection_z7_1k_seq_switchboard",
-                                "op": "projection.fit",
-                                "depends_on": ["sample_context_switchboard"],
-                                "params": {"view": "z7_1k_seq", "sample": "context_sample", "run_id": "umap_z7_1k_seq"},
-                            },
-                            {
-                                "id": "fit_projection_z20_1k_seq_switchboard",
-                                "op": "projection.fit",
-                                "depends_on": ["sample_context_switchboard"],
-                                "params": {
-                                    "view": "z20_1k_seq",
-                                    "sample": "context_sample",
-                                    "run_id": "umap_z20_1k_seq",
-                                },
-                            },
-                            {
-                                "id": "fit_projection_logits7_60_switchboard",
-                                "op": "projection.fit",
-                                "depends_on": ["sample_anchor_switchboard"],
-                                "params": {"view": "logits7_60", "sample": "atlas_sample", "run_id": "umap_logits7_60"},
-                            },
-                            {
-                                "id": "fit_projection_logits20_60_switchboard",
-                                "op": "projection.fit",
-                                "depends_on": ["sample_anchor_switchboard"],
-                                "params": {
-                                    "view": "logits20_60",
-                                    "sample": "atlas_sample",
-                                    "run_id": "umap_logits20_60",
-                                },
-                            },
-                            {
-                                "id": "fit_projection_logits7_1k_anchor_switchboard",
-                                "op": "projection.fit",
-                                "depends_on": ["sample_context_switchboard"],
-                                "params": {
-                                    "view": "logits7_1k_anchor",
-                                    "sample": "context_sample",
-                                    "run_id": "umap_logits7_1k_anchor",
-                                },
-                            },
-                            {
-                                "id": "fit_projection_logits20_1k_anchor_switchboard",
-                                "op": "projection.fit",
-                                "depends_on": ["sample_context_switchboard"],
-                                "params": {
-                                    "view": "logits20_1k_anchor",
-                                    "sample": "context_sample",
-                                    "run_id": "umap_logits20_1k_anchor",
-                                },
-                            },
-                            {
-                                "id": "render_atlas_2x3_model_family",
-                                "op": "plot.render",
-                                "depends_on": [
-                                    "fit_projection_z7_60_switchboard",
-                                    "fit_projection_z20_60_switchboard",
-                                    "fit_projection_z7_1k_anchor_switchboard",
-                                    "fit_projection_z20_1k_anchor_switchboard",
-                                    "fit_projection_logits7_1k_anchor_switchboard",
-                                    "fit_projection_logits20_1k_anchor_switchboard",
-                                ],
-                                "params": {"plot_id": "atlas_2x3_model_family"},
-                            },
-                            {
-                                "id": "generate_browser_switchboard",
-                                "op": "notebook.generate",
-                                "depends_on": [
-                                    "render_atlas_2x3_model_family",
-                                    "fit_projection_z7_60_switchboard",
-                                    "fit_projection_z20_60_switchboard",
-                                    "fit_projection_z7_1k_anchor_switchboard",
-                                    "fit_projection_z20_1k_anchor_switchboard",
-                                    "fit_projection_z7_1k_seq_switchboard",
-                                    "fit_projection_z20_1k_seq_switchboard",
-                                    "fit_projection_logits7_60_switchboard",
-                                    "fit_projection_logits20_60_switchboard",
-                                    "fit_projection_logits7_1k_anchor_switchboard",
-                                    "fit_projection_logits20_1k_anchor_switchboard",
-                                ],
-                                "params": {"notebook": "browser", "force": True},
-                            },
-                        ]
-                    },
-                    "context_audit_recipe": {
-                        "steps": [
-                            {"id": "materialize_z20_60_audit", "op": "view.materialize", "params": {"view": "z20_60"}},
-                            {
-                                "id": "materialize_z20_1k_anchor_audit",
-                                "op": "view.materialize",
-                                "params": {"view": "z20_1k_anchor"},
-                            },
-                            {
-                                "id": "materialize_z20_1k_seq_audit",
-                                "op": "view.materialize",
-                                "params": {"view": "z20_1k_seq"},
-                            },
-                            {
-                                "id": "build_anchor_ctx_audit",
-                                "op": "alignment.build",
-                                "depends_on": ["materialize_z20_60_audit", "materialize_z20_1k_anchor_audit"],
-                                "params": {"alignment": "anchor_ctx_20b"},
-                            },
-                            {
-                                "id": "build_anchor_seq_audit",
-                                "op": "alignment.build",
-                                "depends_on": ["materialize_z20_1k_anchor_audit", "materialize_z20_1k_seq_audit"],
-                                "params": {"alignment": "anchor_seq_20b"},
-                            },
-                            {
-                                "id": "derive_delta20_audit",
-                                "op": "view.derive",
-                                "depends_on": ["build_anchor_ctx_audit"],
-                                "params": {"view": "delta20"},
-                            },
-                            {
-                                "id": "derive_drag20_audit",
-                                "op": "view.derive",
-                                "depends_on": ["build_anchor_seq_audit"],
-                                "params": {"view": "drag20"},
-                            },
-                            {
-                                "id": "derive_delta20_norm_audit",
-                                "op": "scalar.derive",
-                                "depends_on": ["derive_delta20_audit"],
-                                "params": {"scalar": "delta20_norm"},
-                            },
-                            {
-                                "id": "derive_drag20_norm_audit",
-                                "op": "scalar.derive",
-                                "depends_on": ["derive_drag20_audit"],
-                                "params": {"scalar": "drag20_norm"},
-                            },
-                            {
-                                "id": "derive_drag20_norm_selected_audit",
-                                "op": "scalar.derive",
-                                "depends_on": ["derive_drag20_norm_audit"],
-                                "params": {"scalar": "drag20_norm_for_context_audit"},
-                            },
-                            {
-                                "id": "derive_context_audit_join",
-                                "op": "scalar.derive",
-                                "depends_on": [
-                                    "derive_delta20_norm_audit",
-                                    "derive_drag20_norm_selected_audit",
-                                ],
-                                "params": {"scalar": "context_audit_20b"},
-                            },
-                            {
-                                "id": "render_drag_distribution",
-                                "op": "plot.render",
-                                "depends_on": ["derive_drag20_norm_audit"],
-                                "params": {"plot_id": "drag_qc_distribution"},
-                            },
-                            {
-                                "id": "render_context_shift_vs_drag",
-                                "op": "plot.render",
-                                "depends_on": ["derive_context_audit_join"],
-                                "params": {"plot_id": "context_shift_vs_drag_primary"},
-                            },
-                            {
-                                "id": "generate_browser_audit",
-                                "op": "notebook.generate",
-                                "depends_on": ["render_context_shift_vs_drag"],
-                                "params": {"notebook": "browser", "force": True},
-                            },
-                        ]
-                    },
-                },
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
+def _write_addendum_workspace_config(
+    workspace_dir: Path, usr_root: Path, *, include_study_binding: bool = True
+) -> None:
+    template_path = builtin_templates_dir() / "landmark_atlas_committee" / "config.yaml"
+    payload = yaml.safe_load(template_path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    payload["workspace"] = {"id": "stress_ethanol_cipro_latent_atlas", "output_root": "./outputs"}
+    payload.setdefault("defaults", {})
+    payload["defaults"]["plot_formats"] = ["svg", "png"]
+    payload["defaults"]["neighbor_backend"] = "exact"
+    payload["sources"]["anchor60"]["root"] = usr_root.as_posix()
+    payload["sources"]["anchor60"]["dataset"] = "promoter/demo_anchor_set"
+    payload["sources"]["ctx1k"]["root"] = usr_root.as_posix()
+    payload["sources"]["ctx1k"]["dataset"] = "promoter/demo_context_set"
+    payload["landmarks"]["spyp"]["where"]["equals"] = "spyP"
+    payload["reference_sets"]["promoter_wt_core"]["ids"][0] = "spyP"
+    for view_id in [
+        "z7_60",
+        "z20_60",
+        "z7_1k_anchor",
+        "z20_1k_anchor",
+        "z7_1k_seq",
+        "z20_1k_seq",
+        "logits7_60",
+        "logits20_60",
+        "logits7_1k_anchor",
+        "logits20_1k_anchor",
+        "logits7_1k_seq",
+        "logits20_1k_seq",
+    ]:
+        payload["views"][view_id]["vector"]["name"] = view_id
+    for recipe in payload["recipes"].values():
+        for step in recipe.get("steps", []):
+            params = step.get("params", {})
+            dims = params.get("dims")
+            if isinstance(dims, int) and dims > 3:
+                params["dims"] = 3
+            k = params.get("k")
+            if isinstance(k, int) and k > 7:
+                params["k"] = 7
+    if not include_study_binding:
+        payload.pop("study_binding", None)
+        for deliverable in payload.get("deliverables", {}).values():
+            if isinstance(deliverable, dict):
+                deliverable["docs_refs"] = []
+    (workspace_dir / "config.yaml").write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
 
 def _anchor_rows() -> list[dict[str, object]]:
@@ -792,6 +144,48 @@ def _anchor_rows() -> list[dict[str, object]]:
             "logits7_60": [1.4, 1.4, 1.5],
             "logits20_60": [1.5, 1.4, 1.6],
         },
+        {
+            "id": "anchor_06",
+            "subject_id": "subject_06",
+            "usr_label__primary": "spyP",
+            "densegen__plan": None,
+            "densegen__required_regulators": None,
+            "template_id": "wt",
+            "infer__evo2_7b__anchor_only_7b_features__log_likelihood__mean_per_token": -0.22,
+            "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token": -0.19,
+            "z7_60": [0.8, 0.9, 0.9],
+            "z20_60": [0.9, 1.0, 1.0],
+            "logits7_60": [0.75, 0.85, 0.9],
+            "logits20_60": [0.82, 0.95, 0.98],
+        },
+        {
+            "id": "anchor_07",
+            "subject_id": "subject_07",
+            "usr_label__primary": "sulAp",
+            "densegen__plan": None,
+            "densegen__required_regulators": None,
+            "template_id": "wt",
+            "infer__evo2_7b__anchor_only_7b_features__log_likelihood__mean_per_token": -0.15,
+            "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token": -0.13,
+            "z7_60": [2.4, 2.6, 2.7],
+            "z20_60": [2.6, 2.7, 2.8],
+            "logits7_60": [2.3, 2.5, 2.6],
+            "logits20_60": [2.45, 2.6, 2.7],
+        },
+        {
+            "id": "anchor_08",
+            "subject_id": "subject_08",
+            "usr_label__primary": "soxSp",
+            "densegen__plan": None,
+            "densegen__required_regulators": None,
+            "template_id": "wt",
+            "infer__evo2_7b__anchor_only_7b_features__log_likelihood__mean_per_token": -0.11,
+            "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token": -0.09,
+            "z7_60": [3.3, 3.1, 3.2],
+            "z20_60": [3.5, 3.3, 3.4],
+            "logits7_60": [3.1, 3.0, 3.1],
+            "logits20_60": [3.3, 3.15, 3.2],
+        },
     ]
 
 
@@ -800,11 +194,14 @@ def _context_rows() -> list[dict[str, object]]:
         {
             "id": "ctx_01",
             "subject_id": "subject_01",
+            "construct__anchor_id": "anchor_01",
             "context_id": "ctx_a",
+            "construct__context_id": "ctx_a",
             "usr_label__primary": "dense_01",
             "densegen__plan": "background_only__sigma70_b",
             "densegen__required_regulators": [],
             "template_id": "tpl_a",
+            "construct__template_id": "tpl_a",
             "infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token": -0.39,
             "infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token": -0.35,
             "z7_1k_anchor": [0.0, 0.1, 0.0001],
@@ -813,15 +210,20 @@ def _context_rows() -> list[dict[str, object]]:
             "z20_1k_seq": [0.9, 0.0, 0.1],
             "logits7_1k_anchor": [0.05, 0.0, -0.03],
             "logits20_1k_anchor": [0.1, 0.0, -0.05],
+            "logits7_1k_seq": [0.2, 0.02, -0.01],
+            "logits20_1k_seq": [0.3, 0.03, 0.0],
         },
         {
             "id": "ctx_02",
             "subject_id": "subject_02",
+            "construct__anchor_id": "anchor_02",
             "context_id": "ctx_a",
+            "construct__context_id": "ctx_a",
             "usr_label__primary": "dense_02",
             "densegen__plan": "ethanol__cpxR__sigma70_c",
             "densegen__required_regulators": ["cpxR"],
             "template_id": "tpl_a",
+            "construct__template_id": "tpl_a",
             "infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token": -0.29,
             "infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token": -0.25,
             "z7_1k_anchor": [0.1001, 0.0, 0.0],
@@ -830,15 +232,20 @@ def _context_rows() -> list[dict[str, object]]:
             "z20_1k_seq": [1.0, 0.2, 0.0],
             "logits7_1k_anchor": [0.12, 0.06, -0.06],
             "logits20_1k_anchor": [0.2, 0.1, -0.05],
+            "logits7_1k_seq": [0.25, 0.12, -0.02],
+            "logits20_1k_seq": [0.34, 0.18, 0.0],
         },
         {
             "id": "ctx_03",
             "subject_id": "subject_03",
+            "construct__anchor_id": "anchor_03",
             "context_id": "ctx_a",
+            "construct__context_id": "ctx_a",
             "usr_label__primary": "dense_03",
             "densegen__plan": "ciprofloxacin__lexA__sigma70_d",
             "densegen__required_regulators": ["lexA"],
             "template_id": "tpl_b",
+            "construct__template_id": "tpl_b",
             "infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token": -0.17,
             "infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token": -0.14,
             "z7_1k_anchor": [2.8001, 2.9, 3.0],
@@ -847,15 +254,20 @@ def _context_rows() -> list[dict[str, object]]:
             "z20_1k_seq": [4.0, 3.0, 3.1],
             "logits7_1k_anchor": [2.7, 3.0, 3.0],
             "logits20_1k_anchor": [2.8, 3.1, 3.1],
+            "logits7_1k_seq": [3.3, 3.0, 3.1],
+            "logits20_1k_seq": [3.45, 3.08, 3.15],
         },
         {
             "id": "ctx_04",
             "subject_id": "subject_04",
+            "construct__anchor_id": "anchor_04",
             "context_id": "ctx_a",
+            "construct__context_id": "ctx_a",
             "usr_label__primary": "dense_04",
             "densegen__plan": "ethanol_ciprofloxacin__baeR_lexA__sigma70_e",
             "densegen__required_regulators": ["baeR", "lexA"],
             "template_id": "tpl_b",
+            "construct__template_id": "tpl_b",
             "infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token": -0.13,
             "infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token": -0.10,
             "z7_1k_anchor": [3.0001, 3.0, 2.9],
@@ -864,15 +276,20 @@ def _context_rows() -> list[dict[str, object]]:
             "z20_1k_seq": [4.2, 3.0, 3.2],
             "logits7_1k_anchor": [2.9, 3.1, 2.9],
             "logits20_1k_anchor": [3.0, 3.2, 3.0],
+            "logits7_1k_seq": [3.5, 3.1, 3.0],
+            "logits20_1k_seq": [3.7, 3.18, 3.12],
         },
         {
             "id": "ctx_05",
             "subject_id": "subject_05",
+            "construct__anchor_id": "anchor_05",
             "context_id": "ctx_a",
+            "construct__context_id": "ctx_a",
             "usr_label__primary": "J23105",
             "densegen__plan": None,
             "densegen__required_regulators": None,
             "template_id": "wt",
+            "construct__template_id": "wt",
             "infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token": -0.23,
             "infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token": -0.20,
             "z7_1k_anchor": [1.4001, 1.5, 1.5],
@@ -881,6 +298,74 @@ def _context_rows() -> list[dict[str, object]]:
             "z20_1k_seq": [2.0, 1.4, 1.6],
             "logits7_1k_anchor": [1.4, 1.5, 1.5],
             "logits20_1k_anchor": [1.5, 1.5, 1.55],
+            "logits7_1k_seq": [1.6, 1.45, 1.52],
+            "logits20_1k_seq": [1.72, 1.5, 1.58],
+        },
+        {
+            "id": "ctx_06",
+            "subject_id": "subject_06",
+            "construct__anchor_id": "anchor_06",
+            "context_id": "ctx_a",
+            "construct__context_id": "ctx_a",
+            "usr_label__primary": "spyP",
+            "densegen__plan": None,
+            "densegen__required_regulators": None,
+            "template_id": "wt",
+            "construct__template_id": "wt",
+            "infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token": -0.2,
+            "infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token": -0.17,
+            "z7_1k_anchor": [0.8001, 0.9, 0.9],
+            "z7_1k_seq": [1.3, 0.95, 0.95],
+            "z20_1k_anchor": [0.9, 1.0, 1.0001],
+            "z20_1k_seq": [1.45, 1.05, 1.05],
+            "logits7_1k_anchor": [0.75, 0.85, 0.9],
+            "logits20_1k_anchor": [0.82, 0.95, 0.98],
+            "logits7_1k_seq": [0.95, 0.9, 0.94],
+            "logits20_1k_seq": [1.02, 1.01, 1.0],
+        },
+        {
+            "id": "ctx_07",
+            "subject_id": "subject_07",
+            "construct__anchor_id": "anchor_07",
+            "context_id": "ctx_a",
+            "construct__context_id": "ctx_a",
+            "usr_label__primary": "sulAp",
+            "densegen__plan": None,
+            "densegen__required_regulators": None,
+            "template_id": "wt",
+            "construct__template_id": "wt",
+            "infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token": -0.14,
+            "infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token": -0.12,
+            "z7_1k_anchor": [2.4001, 2.6, 2.7],
+            "z7_1k_seq": [3.0, 2.75, 2.8],
+            "z20_1k_anchor": [2.6, 2.7, 2.8001],
+            "z20_1k_seq": [3.2, 2.85, 2.95],
+            "logits7_1k_anchor": [2.3, 2.5, 2.6],
+            "logits20_1k_anchor": [2.45, 2.6, 2.7],
+            "logits7_1k_seq": [2.65, 2.62, 2.7],
+            "logits20_1k_seq": [2.82, 2.75, 2.82],
+        },
+        {
+            "id": "ctx_08",
+            "subject_id": "subject_08",
+            "construct__anchor_id": "anchor_08",
+            "context_id": "ctx_a",
+            "construct__context_id": "ctx_a",
+            "usr_label__primary": "soxSp",
+            "densegen__plan": None,
+            "densegen__required_regulators": None,
+            "template_id": "wt",
+            "construct__template_id": "wt",
+            "infer__evo2_7b__template_1kb_7b_features__log_likelihood__mean_per_token": -0.1,
+            "infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token": -0.08,
+            "z7_1k_anchor": [3.3001, 3.1, 3.2],
+            "z7_1k_seq": [4.0, 3.2, 3.3],
+            "z20_1k_anchor": [3.5, 3.3, 3.4001],
+            "z20_1k_seq": [4.25, 3.45, 3.55],
+            "logits7_1k_anchor": [3.1, 3.0, 3.1],
+            "logits20_1k_anchor": [3.3, 3.15, 3.2],
+            "logits7_1k_seq": [3.6, 3.25, 3.25],
+            "logits20_1k_seq": [3.82, 3.38, 3.32],
         },
     ]
 
@@ -888,9 +373,14 @@ def _context_rows() -> list[dict[str, object]]:
 def _context_rows_no_signal() -> list[dict[str, object]]:
     rows = _context_rows()
     for row, anchor_row in zip(rows, _anchor_rows(), strict=True):
-        base = list(anchor_row["z20_60"])
-        row["z20_1k_anchor"] = [value + 1e-11 for value in base]
-        row["z20_1k_seq"] = [value + 2e-11 for value in base]
+        row["z7_1k_anchor"] = [float(value) + 1e-11 for value in anchor_row["z7_60"]]
+        row["z7_1k_seq"] = [float(value) + 2e-11 for value in anchor_row["z7_60"]]
+        row["z20_1k_anchor"] = [float(value) + 1e-11 for value in anchor_row["z20_60"]]
+        row["z20_1k_seq"] = [float(value) + 2e-11 for value in anchor_row["z20_60"]]
+        row["logits7_1k_anchor"] = [float(value) + 1e-11 for value in anchor_row["logits7_60"]]
+        row["logits7_1k_seq"] = [float(value) + 2e-11 for value in anchor_row["logits7_60"]]
+        row["logits20_1k_anchor"] = [float(value) + 1e-11 for value in anchor_row["logits20_60"]]
+        row["logits20_1k_seq"] = [float(value) + 2e-11 for value in anchor_row["logits20_60"]]
     return rows
 
 
@@ -925,41 +415,9 @@ def test_phase18_promoter_addendum_derives_cohorts_and_builds_browser_health(tmp
 
     for argv in [
         [
-            "sample",
-            "build",
-            "atlas_sample",
-            "--workspace",
-            workspace_dir.as_posix(),
-            "--view",
-            "z20_60",
-            "--strategy",
-            "all",
-            "--json",
-        ],
-        [
-            "projection",
-            "fit",
-            "z20_60",
-            "--workspace",
-            workspace_dir.as_posix(),
-            "--sample",
-            "atlas_sample",
-            "--run-id",
-            "umap_z20_60",
-            "--json",
-        ],
-        [
-            "plot",
-            "render",
-            "atlas_primary",
-            "--workspace",
-            workspace_dir.as_posix(),
-            "--json",
-        ],
-        [
-            "notebook",
-            "generate",
-            "browser",
+            "deliverable",
+            "run",
+            "atlas_2x2_intermediate_main",
             "--workspace",
             workspace_dir.as_posix(),
             "--json",
@@ -993,7 +451,8 @@ def test_phase18_promoter_addendum_derives_cohorts_and_builds_browser_health(tmp
     assert 'label="Right geometry"' in browser_text
 
     controls_payload = json.loads(controls_path.read_text(encoding="utf-8"))
-    assert controls_payload["schema_version"] == "latentdna.workspace_notebook_controls.v1"
+    assert controls_payload["schema_version"] == "latentdna.workspace_notebook_controls.v2"
+    assert controls_payload["runtime_paths"]["workspace_relative_path"] == "../../.."
     assert controls_payload["geometry_switchboard"]["default_model"] == "20b"
     assert controls_payload["context_audit"]["status"] == "missing"
     assert any(
@@ -1003,7 +462,7 @@ def test_phase18_promoter_addendum_derives_cohorts_and_builds_browser_health(tmp
 
     plots_index = json.loads((workspace_dir / "outputs" / "plots" / "index.json").read_text(encoding="utf-8"))
     assert plots_index["workspace_id"] == "stress_ethanol_cipro_latent_atlas"
-    index_entry = next(item for item in plots_index["plots"] if item["plot_id"] == "atlas_primary")
+    index_entry = next(item for item in plots_index["plots"] if item["plot_id"] == "atlas_2x2_intermediate_main")
     assert index_entry["deliverable_id"] == "atlas_2x2_intermediate_main"
     assert index_entry["status"] == "ok"
     assert index_entry["rendered_formats"] == ["svg", "png"]
@@ -1024,7 +483,8 @@ def test_phase18_promoter_addendum_derives_cohorts_and_builds_browser_health(tmp
     )
     assert inspect_plots.exit_code == 0, inspect_plots.stdout
     inspect_plots_payload = json.loads(inspect_plots.stdout)
-    assert inspect_plots_payload["data"]["plots"][0]["plot_id"] == "atlas_primary"
+    plot_ids = {item["plot_id"] for item in inspect_plots_payload["data"]["plots"]}
+    assert "atlas_2x2_intermediate_main" in plot_ids
 
     inspect_health = _RUNNER.invoke(
         app,
@@ -1053,6 +513,7 @@ def test_phase18_promoter_addendum_builds_geometry_switchboard_and_context_audit
     controls_payload = json.loads(
         (workspace_dir / "outputs" / "notebooks" / "browser" / "controls.json").read_text(encoding="utf-8")
     )
+    assert controls_payload["geometry_switchboard"]["reference_labels"] == ["spyP", "sulAp", "soxSp", "J23105"]
     geometry_rows = {row["view_id"]: row for row in controls_payload["geometry_switchboard"]["geometries"]}
     assert {
         "z7_60",
@@ -1065,6 +526,8 @@ def test_phase18_promoter_addendum_builds_geometry_switchboard_and_context_audit
         "logits20_60",
         "logits7_1k_anchor",
         "logits20_1k_anchor",
+        "logits7_1k_seq",
+        "logits20_1k_seq",
     } <= set(geometry_rows)
     assert geometry_rows["z7_60"]["projection_ids"] == ["umap_z7_60"]
     assert geometry_rows["z20_60"]["projection_ids"] == ["umap_z20_60"]
@@ -1082,31 +545,46 @@ def test_phase18_promoter_addendum_builds_geometry_switchboard_and_context_audit
     assert model_pair_preset["view_order"] == [
         "z7_60",
         "z20_60",
-        "z7_1k_anchor",
-        "z20_1k_anchor",
         "z7_1k_seq",
         "z20_1k_seq",
         "logits7_60",
         "logits20_60",
+        "logits7_1k_seq",
+        "logits20_1k_seq",
+        "z7_1k_anchor",
+        "z20_1k_anchor",
         "logits7_1k_anchor",
         "logits20_1k_anchor",
     ]
     assert any(
-        basis["alignment_id"] == "anchor_ctx_20b"
+        basis["alignment_id"] == "anchor_ctx_seq_20b"
         for basis in controls_payload["geometry_switchboard"]["comparison_bases"]
     )
     assert controls_payload["context_audit"]["status"] == "ok"
-    assert controls_payload["context_audit"]["decision"] == "demote_delta_in_x2"
-    assert (
-        controls_payload["context_audit"]["metrics"]["drag20_median"]
-        > controls_payload["context_audit"]["metrics"]["delta20_median"]
-    )
+    assert controls_payload["context_audit"]["decision"] == "whole_sequence_primary"
+    assert controls_payload["context_audit"]["metrics"]["construct_shift20_norm_median"] > 0.0
+    assert controls_payload["context_audit"]["metrics"]["construct_self_cosine20_median"] < 1.0
+    assert controls_payload["context_audit"]["metrics"]["anchor20_log_likelihood_per_token_median"] < 0.0
+    assert controls_payload["context_audit"]["metrics"]["expanded_context20_log_likelihood_per_token_median"] < 0.0
+    assert controls_payload["context_audit"]["metrics"]["mean_knn_overlap"] >= 0.0
+    assert geometry_rows["z20_1k_seq"]["label"] == "20B intermediate 1 kb expanded context"
 
     audit_table = pq.read_table(
         workspace_dir / "outputs" / "scalars" / "context_audit_20b" / "table.parquet"
     ).to_pylist()
-    assert len(audit_table) == 5
-    assert {"delta20_norm", "drag20_norm", "subject_id"} <= set(audit_table[0])
+    assert len(audit_table) == len(_anchor_rows())
+    assert {
+        "construct_shift20_norm",
+        "construct_self_cosine20",
+        "construct__anchor_id",
+        "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token",
+        "infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token",
+    } <= set(audit_table[0])
+
+    anchor_rows = pq.read_table(workspace_dir / "outputs" / "views" / "z20_60" / "rows.parquet").to_pylist()
+    seq_rows = pq.read_table(workspace_dir / "outputs" / "views" / "z20_1k_seq" / "rows.parquet").to_pylist()
+    assert "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token" in anchor_rows[0]
+    assert "infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token" in seq_rows[0]
 
     for projection_id in [
         "umap_z7_60",
@@ -1119,10 +597,18 @@ def test_phase18_promoter_addendum_builds_geometry_switchboard_and_context_audit
         "umap_logits20_60",
         "umap_logits7_1k_anchor",
         "umap_logits20_1k_anchor",
+        "umap_logits7_1k_seq",
+        "umap_logits20_1k_seq",
     ]:
         assert (workspace_dir / "outputs" / "projections" / projection_id / "coords.parquet").is_file()
 
-    for plot_id in ["atlas_2x3_model_family", "drag_qc_distribution", "context_shift_vs_drag_primary"]:
+    for plot_id in [
+        "atlas_2x3_model_family",
+        "context_shift_primary_distribution",
+        "context_shift_self_cosine_primary",
+        "context_shift_vs_drag_primary",
+        "context_geometry_primary_summary",
+    ]:
         assert (workspace_dir / "outputs" / "plots" / plot_id / "plot.svg").is_file()
 
     smoke_result = _RUNNER.invoke(
@@ -1156,8 +642,66 @@ def test_phase18_promoter_addendum_marks_numerically_null_context_lane(tmp_path:
     )
     assert controls_payload["context_audit"]["status"] == "ok"
     assert controls_payload["context_audit"]["decision"] == "no_context_signal"
-    assert controls_payload["context_audit"]["metrics"]["delta20_median"] < 1e-8
-    assert controls_payload["context_audit"]["metrics"]["drag20_median"] < 1e-8
+    assert controls_payload["context_audit"]["metrics"]["construct_shift20_norm_median"] < 1e-8
+    assert controls_payload["context_audit"]["metrics"]["construct_self_cosine20_median"] > 0.999999
+
+
+def test_phase18_promoter_addendum_runs_reference_alignment_and_x2_whole_sequence_export(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(usr_root, "promoter/demo_anchor_set", _anchor_rows())
+    _write_usr_dataset(usr_root, "promoter/demo_context_set", _context_rows())
+    _write_addendum_workspace_config(workspace_dir, usr_root)
+
+    for deliverable_id in ["reference_alignment_primary_20b", "x2_primary_20b"]:
+        result = _RUNNER.invoke(
+            app,
+            ["deliverable", "run", deliverable_id, "--workspace", workspace_dir.as_posix(), "--json"],
+        )
+        assert result.exit_code == 0, result.stdout
+
+    output_root = workspace_dir / "outputs"
+    reference_table = pq.read_table(output_root / "distances" / "seq20_reference_distances" / "table.parquet")
+    assert {"d_spyp", "d_sulap", "d_soxsp", "d_j23105"} <= set(reference_table.column_names)
+    assert (output_root / "plots" / "reference_alignment_seq20b" / "plot.svg").is_file()
+    assert (output_root / "plots" / "reference_alignment_anchor20b" / "plot.svg").is_file()
+
+    x2_dir = output_root / "exports" / "x2_primary_20b"
+    x2_matrix = pq.read_table(x2_dir / "features.parquet").to_pylist()
+    feature_names = [row["feature_name"] for row in x2_matrix]
+    assert "z20_60_pc_001" in feature_names
+    assert "z20_1k_seq_pc_001" in feature_names
+    assert "anchor_ref_d_spyp_centered" in feature_names
+    assert "seq_ref_d_spyp_centered" in feature_names
+    assert "construct_shift20_norm" in feature_names
+    assert "construct_self_cosine20" in feature_names
+    assert "infer__evo2_20b__anchor_only_20b_features__log_likelihood__mean_per_token" in feature_names
+    assert "infer__evo2_20b__template_1kb_20b_features__log_likelihood__mean_per_token" in feature_names
+    assert len(feature_names) == len(set(feature_names))
+
+
+def test_phase18_promoter_addendum_runs_without_study_binding(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = tmp_path / "usr_root"
+    _write_usr_dataset(usr_root, "promoter/demo_anchor_set", _anchor_rows())
+    _write_usr_dataset(usr_root, "promoter/demo_context_set", _context_rows())
+    _write_addendum_workspace_config(workspace_dir, usr_root, include_study_binding=False)
+
+    for argv in [
+        ["deliverable", "run", "atlas_2x2_intermediate_main", "--workspace", workspace_dir.as_posix(), "--json"],
+        ["deliverable", "run", "x2_primary_20b", "--workspace", workspace_dir.as_posix(), "--json"],
+        ["notebook", "smoke", "--workspace", workspace_dir.as_posix(), "--json"],
+        ["validate", "workspace", "--workspace", workspace_dir.as_posix(), "--deep", "--json"],
+    ]:
+        result = _RUNNER.invoke(app, argv)
+        assert result.exit_code == 0, result.stdout
+
+    controls_payload = json.loads(
+        (workspace_dir / "outputs" / "notebooks" / "browser" / "controls.json").read_text(encoding="utf-8")
+    )
+    assert controls_payload["geometry_switchboard"]["reference_labels"] == ["spyP", "sulAp", "soxSp", "J23105"]
 
 
 def test_phase18_promoter_addendum_supports_leiden_xy_curve_and_correspondence_plots(tmp_path: Path) -> None:
@@ -1359,7 +903,7 @@ def test_phase18_promoter_addendum_supports_leiden_xy_curve_and_correspondence_p
         [
             "plot",
             "render",
-            "cluster_correspondence_primary",
+            "cluster_correspondence_manual",
             "--workspace",
             workspace_dir.as_posix(),
             "--kind",
@@ -1410,7 +954,7 @@ def test_phase18_promoter_addendum_supports_leiden_xy_curve_and_correspondence_p
     for plot_id in [
         "distance_margin_hexbin",
         "scree_curve",
-        "cluster_correspondence_primary",
+        "cluster_correspondence_manual",
         "context_shift_ecdf",
     ]:
         plot_dir = workspace_dir / "outputs" / "plots" / plot_id

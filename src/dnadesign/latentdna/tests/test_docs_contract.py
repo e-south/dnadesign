@@ -58,6 +58,11 @@ def test_latentdna_docs_tree_exposes_workflow_reference_and_dev_surfaces() -> No
     export_workflow = (repo_root / "src/dnadesign/latentdna/docs/workflows/export-opal-x.md").read_text(
         encoding="utf-8"
     )
+    workspace_readme = (
+        repo_root / "src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/README.md"
+    ).read_text(encoding="utf-8")
+    study_routes = (repo_root / "docs/studies/stress_ethanol_cipro_growth/routes.md").read_text(encoding="utf-8")
+    study_status = (repo_root / "docs/studies/stress_ethanol_cipro_growth/status.md").read_text(encoding="utf-8")
     performance = (repo_root / "src/dnadesign/latentdna/docs/reference/performance-budgets.md").read_text(
         encoding="utf-8"
     )
@@ -75,8 +80,10 @@ def test_latentdna_docs_tree_exposes_workflow_reference_and_dev_surfaces() -> No
     assert "reference/workspace-schema.md" in workflow_index
     assert "reference/performance-budgets.md" in workflow_index
     assert "src/workspaces/__init__.py" in workflow_index
-    assert "Execution-helper surface" in workflow_index
-    assert "src/api.py" in workflow_index
+    assert "CLI command surface" in workflow_index
+    assert "src/cli/app.py" in workflow_index
+    assert "Execution-helper surface" not in workflow_index
+    assert "src/api.py" not in workflow_index
     assert "src/workspaces/api.py" not in workflow_index
     assert "../api.py" not in workflow_index
     assert "../../infer/docs/README.md" in workflow_index
@@ -108,6 +115,9 @@ def test_latentdna_docs_tree_exposes_workflow_reference_and_dev_surfaces() -> No
     assert "**Registry-id:** latentdna.promoter-study.latent-atlas" in workflow
     assert "### View taxonomy for the active study" in workflow
     assert "z20_1k_seq" in workflow
+    assert "Treat `z20_60` and `z20_1k_seq` as the primary candidate space" in workflow
+    assert "Treat `z20_60` and `z20_1k_anchor` as the primary candidate space" not in workflow
+    assert "compare `z20_60` to `z20_1k_seq`" in workflow
     assert "logits7_60" in workflow
     assert "logits7_1k_anchor" in workflow
     assert "logits20_60" in workflow
@@ -161,6 +171,14 @@ def test_latentdna_docs_tree_exposes_workflow_reference_and_dev_surfaces() -> No
     assert "x3_ablation_7b" in export_workflow
     assert "feature names are stable" in export_workflow.lower()
 
+    assert "Treat `z20_60` and `z20_1k_seq` as the primary comparison" in workspace_readme
+    assert "Treat `z20_60` and `z20_1k_anchor` as the primary comparison" not in workspace_readme
+    assert "`z20_60` and `z20_1k_seq` intermediate" in study_routes
+    assert "primary candidate space" in study_routes
+    assert "`z20_60` and `z20_1k_anchor` intermediate embeddings are the primary candidate space" not in study_routes
+    assert "For LatentDNA, treat `z20_60` and `z20_1k_seq` as the primary study question" in study_status
+    assert "For LatentDNA, treat `z20_60` and `z20_1k_anchor` as the primary study question" not in study_status
+
     assert "### Common flags" in reference
     assert "### Primitive command groups" in reference
     assert "`latentdna workspace init`" in reference
@@ -212,3 +230,6 @@ def test_latentdna_docs_tree_exposes_workflow_reference_and_dev_surfaces() -> No
     assert "Recipe and Deliverable Slice" in journal
     assert "Workspace Plot Browser Follow-On Slice" in journal
     assert "Next steps" in journal
+    assert "explicit CLI entrypoints" in journal
+    assert "the early `api.py` barrel was later removed" in journal
+    assert "public package surface with `api.py`, `cli.py`, and `contracts.py`" not in journal

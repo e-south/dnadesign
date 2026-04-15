@@ -109,7 +109,7 @@ def display_reference_label(value) -> str:
 def display_hue_label(column: str) -> str:
     if column.startswith("infer__evo2_") and "__log_likelihood__mean_per_token" in column:
         model = "7B" if "__7b__" in column else "20B"
-        scope = "1 kb" if "__template_1kb_" in column else "60 bp"
+        scope = "1 kb expanded-context" if "__template_1kb_" in column else "60 bp anchor-only"
         return f"{model} log likelihood / token ({scope})"
     if column.startswith("cluster_label__"):
         return column.replace("cluster_label__", "").replace("_", " ")

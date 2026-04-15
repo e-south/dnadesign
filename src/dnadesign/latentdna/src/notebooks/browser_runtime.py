@@ -212,9 +212,7 @@ def build_workspace_browser_runtime(
     }
     compare_metrics = geometry_control.get("compare_metrics", {})
     preferred_hues = [str(item) for item in geometry_control.get("preferred_hues", []) if isinstance(item, str)]
-    reference_labels = [
-        str(item) for item in geometry_control.get("reference_labels", []) if isinstance(item, str)
-    ] or ["spyP", "sulAp", "soxSp", "J23105"]
+    reference_labels = [str(item) for item in geometry_control.get("reference_labels", []) if isinstance(item, str)]
     global_hue_columns = unique_in_order(
         preferred_hues
         + [

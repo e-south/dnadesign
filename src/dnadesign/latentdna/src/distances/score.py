@@ -16,6 +16,13 @@ from ..io.parquet_io import read_table, write_table
 from ..workspaces.loader import WorkspaceContext
 
 
+def _alignment_input_uses_source(context: WorkspaceContext, ref_id: str, source_id: str) -> bool:
+    if ref_id == source_id:
+        return True
+    view = context.config.views.get(ref_id)
+    return bool(view is not None and getattr(view, "source", None) == source_id)
+
+
 def _select_indices(rows: list[dict[str, Any]], where: dict[str, Any]) -> list[int]:
     column = where.get("column")
     if not isinstance(column, str):
@@ -81,6 +88,86 @@ def _medoid_vector(vectors: np.ndarray, *, metric: str) -> np.ndarray:
     return vectors[medoid_index]
 
 
+def _alignment_projected_indices(
+    context: WorkspaceContext,
+    *,
+    alignment_id: str,
+    view_id: str,
+    landmark_id: str,
+    selector_column: str,
+    where: dict[str, Any],
+) -> list[int]:
+    alignment = context.require_alignment(alignment_id)
+    if view_id not in {alignment.left, alignment.right}:
+        raise ContractViolationError(f"alignment {alignment_id} does not include view {view_id!r}")
+
+    landmark = context.require_landmark(landmark_id)
+    left_matches = _alignment_input_uses_source(context, alignment.left, landmark.source)
+    right_matches = _alignment_input_uses_source(context, alignment.right, landmark.source)
+    if left_matches == right_matches:
+        raise ContractViolationError(
+            f"alignment {alignment_id} cannot resolve landmark source {landmark.source!r} for view {view_id!r}"
+        )
+
+    matched_side = "left" if left_matches else "right"
+    target_side = "left" if alignment.left == view_id else "right"
+
+    if matched_side == "left":
+        matched_rows_path = (
+            context.output_root / "views" / alignment.left / "rows.parquet"
+            if alignment.left in context.config.views
+            else None
+        )
+    else:
+        matched_rows_path = (
+            context.output_root / "views" / alignment.right / "rows.parquet"
+            if alignment.right in context.config.views
+            else None
+        )
+
+    if matched_rows_path is not None and matched_rows_path.is_file():
+        matched_rows_table = read_table(matched_rows_path)
+    else:
+        source = context.require_source(landmark.source)
+        from ..sources.resolver import read_records_table, resolve_source
+
+        resolved = resolve_source(landmark.source, source, workspace_dir=context.workspace_dir)
+        matched_rows_table = read_records_table(resolved, columns=[selector_column])
+
+    if selector_column not in matched_rows_table.column_names:
+        raise ContractViolationError(
+            "landmark "
+            f"{landmark_id} selector column {selector_column!r} is not present "
+            f"in alignment input {landmark.source!r}"
+        )
+
+    matched_rows = matched_rows_table.to_pylist()
+    matched_indices = _select_indices(matched_rows, where)
+    if not matched_indices:
+        matched_indices = _fallback_control_indices(matched_rows)
+    if not matched_indices:
+        raise ContractViolationError(f"landmark {landmark_id} matched no rows in alignment input for {alignment_id!r}")
+
+    mapping_path = context.output_root / "alignments" / alignment_id / "mapping.parquet"
+    if not mapping_path.is_file():
+        raise MissingArtifactError(f"alignment mapping artifact is missing: {alignment_id}")
+    mapping_rows = read_table(mapping_path).to_pylist()
+
+    matched_index_set = set(matched_indices)
+    target_indices: set[int] = set()
+    matched_column = f"{matched_side}_indices"
+    target_column = f"{target_side}_indices"
+    for row in mapping_rows:
+        current_matched = {int(index) for index in row.get(matched_column, [])}
+        if current_matched.intersection(matched_index_set):
+            target_indices.update(int(index) for index in row.get(target_column, []))
+    if not target_indices:
+        raise ContractViolationError(
+            f"landmark {landmark_id} matched no aligned rows in {alignment_id!r} for view {view_id!r}"
+        )
+    return sorted(target_indices)
+
+
 def score_distance_artifact(
     context: WorkspaceContext,
     *,
@@ -88,6 +175,7 @@ def score_distance_artifact(
     view_id: str,
     landmark_ids: list[str],
     metric: str,
+    alignment_id: str | None = None,
 ) -> tuple[Path, int, list[str], dict[str, str], dict[str, int]]:
     view = context.require_source_view(view_id)
     if not landmark_ids:
@@ -107,13 +195,24 @@ def score_distance_artifact(
 
     for landmark_id in landmark_ids:
         landmark = context.require_landmark(landmark_id)
-        if landmark.source != view.source:
-            raise ContractViolationError(
-                f"landmark {landmark_id} uses source {landmark.source!r} but view {view_id} uses {view.source!r}"
+        if landmark.source == view.source:
+            indices = _select_indices(rows, landmark.where)
+            if not indices:
+                indices = _fallback_control_indices(rows)
+        elif alignment_id is not None:
+            indices = _alignment_projected_indices(
+                context,
+                alignment_id=alignment_id,
+                view_id=view_id,
+                landmark_id=landmark_id,
+                selector_column=str(landmark.where["column"]),
+                where=landmark.where,
             )
-        indices = _select_indices(rows, landmark.where)
-        if not indices:
-            indices = _fallback_control_indices(rows)
+        else:
+            raise ContractViolationError(
+                f"landmark {landmark_id} uses source {landmark.source!r} but view {view_id} uses {view.source!r}; "
+                "rerun with --alignment to project landmark rows onto the view support explicitly"
+            )
         if not indices:
             raise ContractViolationError(f"landmark {landmark_id} matched no rows in view {view_id}")
         representation_modes[landmark_id] = landmark.representation.mode

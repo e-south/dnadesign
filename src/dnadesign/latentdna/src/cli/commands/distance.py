@@ -19,6 +19,7 @@ def score(
     workspace: str = typer.Option(..., "--workspace"),
     view: str = typer.Option(..., "--view"),
     landmark: list[str] = typer.Option([], "--landmark"),
+    alignment: str | None = typer.Option(None, "--alignment"),
     metric: str | None = typer.Option(None, "--metric"),
     force: bool = typer.Option(False, "--force"),
     dry_run: bool = typer.Option(False, "--dry-run"),
@@ -28,7 +29,14 @@ def score(
 ) -> None:
     try:
         payload = (
-            preview_distance_score(workspace, distance_id, view_id=view, landmark_ids=landmark, force=force)
+            preview_distance_score(
+                workspace,
+                distance_id,
+                view_id=view,
+                landmark_ids=landmark,
+                alignment_id=alignment,
+                force=force,
+            )
             if dry_run
             else score_distance(
                 workspace,
@@ -36,6 +44,7 @@ def score(
                 view_id=view,
                 landmark_ids=landmark,
                 metric=metric,
+                alignment_id=alignment,
                 force=force,
             ).model_dump(mode="json")
         )

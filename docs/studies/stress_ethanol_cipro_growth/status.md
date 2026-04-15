@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-04-13
+- Last verified: 2026-04-15
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `routes.md`
@@ -38,7 +38,7 @@
 
 ### Current downstream posture
 
-- LatentDNA: `configured`; the study-bound workspace now loads on the canonical `outputs/` root, the primary atlas plot plus browser notebook have been regenerated, and current readiness is `attention` because the remaining full-view PCA and export lanes are still pending on this host
+- LatentDNA: `configured`; the study-bound workspace validates on the canonical `outputs/` root and the atlas, geometry switchboard, context-audit, agreement, cluster-correspondence, and PCA scree surfaces are materialized. Current readiness is `attention` because the required export bundle `x2_primary_20b` is still missing and the next analysis slice should shift from `delta20`-centric interpretation toward reference alignment, structured anchor-to-context movement, and grouped prediction benchmarking on the pooled representations already saved
 - Cluster: `planned`; no study-owned results root is configured yet
 - OPAL: `not configured`; no study-owned campaign config is checked in yet
 - Use `routes.md` for owner tool, entry artifact, primary doc or workspace, and first command per downstream branch
@@ -51,5 +51,6 @@
 
 - Use `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json` before submitting or resuming live Infer work
 - Use `routes.md` for downstream owner handoff, first commands, and tool-local cleanup or notebook workflow steps
+- For LatentDNA, treat `z20_60` and `z20_1k_seq` as the primary study question, keep pooled logits as benchmarks, keep per-base likelihood as a scalar side channel, and treat `z20_1k_anchor`, `drag20`, and Leiden correspondence as QC until the reference-alignment and grouped-benchmark plots are added
 - Keep Infer as lane-specific work: start from `anchor_only` or `anchor_plus_template` lane configs or the matching notify-enabled batch presets
 - Do not treat Cluster or OPAL as active until a canonical feature matrix or explicit export surface is checked in

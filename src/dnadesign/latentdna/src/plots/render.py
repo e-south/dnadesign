@@ -672,8 +672,8 @@ def render_plot_artifact(
                 linewidths=0.2,
                 rasterized=len(rows) > 5_000,
             )
-            ax.set_xlabel("UMAP-1")
-            ax.set_ylabel("UMAP-2")
+            ax.set_xlabel("Projection 1")
+            ax.set_ylabel("Projection 2")
             ax.set_title(spec.projection_ids[0])
             _apply_axes_style(ax, grid=False)
             selected_rows, resolved_label_column, _, annotation_state = _resolve_annotation_rows(
@@ -750,8 +750,8 @@ def render_plot_artifact(
                     rasterized=len(projection_rows) > 5_000,
                 )
                 axis.set_title(panel_title)
-                axis.set_xlabel("UMAP-1")
-                axis.set_ylabel("UMAP-2")
+                axis.set_xlabel("Projection 1")
+                axis.set_ylabel("Projection 2")
                 _apply_axes_style(axis, grid=False)
                 selected_rows, resolved_label_column, _, annotation_state = _resolve_annotation_rows(
                     context,

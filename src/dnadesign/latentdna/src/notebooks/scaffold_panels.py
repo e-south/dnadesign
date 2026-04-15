@@ -17,9 +17,9 @@ def render_context_audit_cell() -> str:
 
             context_audit = _catalog.controls.get("context_audit", {})
             context_audit_kind = (
-                "warn"
-                if str(context_audit.get("decision")) != "retain_delta_candidate"
-                else "info"
+                "info"
+                if str(context_audit.get("decision")) == "whole_sequence_primary"
+                else "warn"
             )
             context_audit_md = _support.mo.callout(
                 "\\n".join(
@@ -27,20 +27,47 @@ def render_context_audit_cell() -> str:
                         f"Context audit status: `{context_audit.get('status', 'missing')}`",
                         f"Decision: `{context_audit.get('decision', 'not_evaluated')}`",
                         (
-                            f"Median delta20_norm: `{context_audit.get('metrics', {}).get('delta20_median')}`"
+                            "Median construct_shift20_norm: "
+                            f"`{context_audit.get('metrics', {}).get('construct_shift20_norm_median')}`"
                             if isinstance(context_audit.get("metrics"), dict)
-                            else "Median delta20_norm: unavailable"
+                            else "Median construct_shift20_norm: unavailable"
                         ),
                         (
-                            f"Median drag20_norm: `{context_audit.get('metrics', {}).get('drag20_median')}`"
+                            "Median construct_self_cosine20: "
+                            f"`{context_audit.get('metrics', {}).get('construct_self_cosine20_median')}`"
                             if isinstance(context_audit.get("metrics"), dict)
-                            else "Median drag20_norm: unavailable"
+                            else "Median construct_self_cosine20: unavailable"
                         ),
                         (
-                            "Median ratio delta/drag: "
-                            f"`{context_audit.get('metrics', {}).get('delta20_to_drag20_median_ratio')}`"
+                            "Median 20B log likelihood / token (60 bp anchor-only): "
+                            f"`{context_audit.get('metrics', {}).get('anchor20_log_likelihood_per_token_median')}`"
                             if isinstance(context_audit.get("metrics"), dict)
-                            else "Median ratio delta/drag: unavailable"
+                            and context_audit.get("metrics", {}).get("anchor20_log_likelihood_per_token_median")
+                            is not None
+                            else "Median 20B log likelihood / token (60 bp anchor-only): unavailable"
+                        ),
+                        (
+                            "Median 20B log likelihood / token (1 kb expanded-context): "
+                            f"`{context_audit.get('metrics', {}).get("
+                            "'expanded_context20_log_likelihood_per_token_median')}`"
+                            if isinstance(context_audit.get("metrics"), dict)
+                            and context_audit.get("metrics", {}).get(
+                                "expanded_context20_log_likelihood_per_token_median"
+                            )
+                            is not None
+                            else "Median 20B log likelihood / token (1 kb expanded-context): unavailable"
+                        ),
+                        (
+                            "Mean kNN overlap: "
+                            f"`{context_audit.get('metrics', {}).get('mean_knn_overlap')}`"
+                            if isinstance(context_audit.get("metrics"), dict)
+                            else "Mean kNN overlap: unavailable"
+                        ),
+                        (
+                            "Mean landmark Jaccard: "
+                            f"`{context_audit.get('metrics', {}).get('mean_jaccard_overlap')}`"
+                            if isinstance(context_audit.get("metrics"), dict)
+                            else "Mean landmark Jaccard: unavailable"
                         ),
                     ]
                 ),
@@ -205,7 +232,7 @@ def render_geometry_cell() -> str:
                         }
                     )
 
-            atlas_plot = _renderers.render_projection_grid(
+            geometry_plot = _renderers.render_projection_grid(
                 panel_specs,
                 hue_column=selected_hue or None,
                 joinable_tables=_geometry.joinable_tables,
@@ -214,7 +241,7 @@ def render_geometry_cell() -> str:
 
             geometry_controls = _support.mo.vstack(
                 [
-                    _support.mo.md("## Atlas Viewer"),
+                    _support.mo.md("## Geometry Views"),
                     model_selector,
                     family_selector,
                     context_selector,
@@ -272,7 +299,7 @@ def render_geometry_cell() -> str:
                     geometry_controls,
                     context_audit_md,
                     geometry_status,
-                    atlas_plot,
+                    geometry_plot,
                 ]
             )
             return (geometry_panel,)
@@ -612,10 +639,10 @@ def render_page_tabs_cell() -> str:
             page_tabs = _support.mo.ui.tabs(
                 {
                     "Overview": overview_panel,
-                    "Atlas": geometry_panel,
+                    "Geometry": geometry_panel,
                     "Compare": compare_panel,
                     "Deliverables": deliverable_panel,
-                    "Inventory": inventory,
+                    "Catalog": inventory,
                 }
             )
             return (page_tabs,)
