@@ -21,7 +21,7 @@
 - Concepts router: [concepts router](concepts/README.md)
 - By-type index: [docs index](index.md)
 - Workspace/config package surface: [src/workspaces/__init__.py](../src/workspaces/__init__.py)
-- Execution-helper surface: [src/api.py](../src/api.py)
+- CLI command surface: [src/cli/app.py](../src/cli/app.py)
 - Package README: [../README.md](../README.md)
 
 ### Adjacent handoffs

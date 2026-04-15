@@ -1,7 +1,7 @@
 ## latentdna Development Journal
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-12
+**Last verified:** 2026-04-15
 
 This journal tracks `dnadesign.latentdna` implementation progress against the clean-slate build spec.
 
@@ -21,7 +21,7 @@ Prove the first artifact-first downstream loop:
 
 ### Implemented in this slice
 
-- New `dnadesign.latentdna` public package surface with `api.py`, `cli.py`, and `contracts.py`
+- New `dnadesign.latentdna` package surface with explicit CLI entrypoints, contracts, and internal service modules; the early `api.py` barrel was later removed
 - Internal workspace/config loader with coordinate-space validation for declared vector differences
 - Source inspection and read-only adapters for `usr`, `parquet`, and `matrix_bundle`
 - Persisted `view`, `sample_set`, `projection`, and `plot` artifact families with `manifest.json`

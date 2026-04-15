@@ -54,6 +54,7 @@ def test_latentdna_internal_cli_is_nested_under_src() -> None:
     cluster_dir = latentdna_src / "clusters"
     notebook_dir = latentdna_src / "notebooks"
     workspaces_dir = latentdna_src / "workspaces"
+    assert not (latentdna_src / "api.py").exists()
     assert cli_dir.is_dir()
     assert (cli_dir / "__init__.py").is_file()
     assert (cli_dir / "app.py").is_file()
