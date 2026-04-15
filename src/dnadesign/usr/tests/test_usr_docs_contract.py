@@ -257,12 +257,16 @@ def test_promoter_study_index_and_status_are_checked_in_for_stress_ethanol_cipro
     assert "promoter/stress_ethanol_cipro_construct_contexts" in datasets
     assert "Route map: `routes.md`" in status
     assert "Study execution map: `pipeline.yaml`" in status
+    assert "evidence.analysis_surfaces" in status
     assert "construct_workspace:" in pipeline
     assert "study_stress_ethanol_cipro_pdual10" in pipeline
+    assert "densegen:" in pipeline
+    assert "default_plot_ids:" in pipeline
     assert "infer_batch_7b_with_notify:" in pipeline
     assert "anchor_only:" in pipeline
     assert "latentdna:" in pipeline
     assert "cluster:" in pipeline
+    assert "workspace_example:" in pipeline
     assert "opal:" in pipeline
 
 
@@ -280,6 +284,12 @@ def test_promoter_study_route_map_exposes_owner_surfaces() -> None:
     assert "### LatentDNA atlas" in routes
     assert "### Cluster exploration" in routes
     assert "### OPAL campaigns" in routes
+    assert "analysis_surfaces.{densegen,latentdna,cluster}" in routes
+    assert "Status JSON route: `evidence.analysis_surfaces.densegen`" in routes
+    assert "Status JSON route: `evidence.analysis_surfaces.latentdna`" in routes
+    assert "Status JSON route: `evidence.analysis_surfaces.cluster`" in routes
+    assert "plot_manifest.json" in routes
+    assert "src/dnadesign/latentdna/docs/workflows/promoter-study-latent-atlas.md" in routes
     assert "src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/README.md" in routes
     assert latentdna_validate_command in routes
     assert "Configured/planned/not configured: `configured`" in routes
@@ -318,6 +328,7 @@ def test_usr_promoter_journey_doc_links_cross_tool_owner_surfaces() -> None:
 
 def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() -> None:
     contract = _read("src/dnadesign/usr/docs/operations/promoter-study-status-contract.md")
+    preflight_contract = _read("src/dnadesign/usr/docs/operations/promoter-study-preflight.md")
     docs_index = _read("docs/README.md")
     usr_docs = _read("src/dnadesign/usr/docs/README.md")
     ops_index = _read("src/dnadesign/usr/docs/operations/README.md")
@@ -333,10 +344,13 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     study_surfaces = _read(".agents/skills/promoter-study-status/references/study-surfaces.md")
     route_matrix = _read(".agents/skills/promoter-study-status/references/route-matrix.md")
     refresh_reference = _read(".agents/skills/promoter-study-status/references/refresh-loop.md")
+    study_routes = _read("docs/studies/stress_ethanol_cipro_growth/routes.md")
 
     assert "promoter-study-status-contract.md" in docs_index
     assert "promoter-study-status-contract.md" in usr_docs
     assert "promoter-study-status-contract.md" in ops_index
+    assert "promoter-study-preflight.md" in ops_index
+    assert "../../../../../docs/studies/README.md" in ops_index
     assert "studies/README.md" in docs_index
     assert "promoter-study-index.yaml" in templates_index
     assert "promoter-study-datasets.yaml" in templates_index
@@ -350,6 +364,7 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "docs/studies/README.md" in skill
     assert "docs/studies/index.yaml" in skill
     assert "docs/studies/<study-id>/routes.md" in skill
+    assert "Do not use for blockers or next-run readiness" in skill
     assert "## Required Deliverables" in skill
     assert "references/route-matrix.md" in skill
     assert "references/refresh-loop.md" in skill
@@ -359,14 +374,36 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "docs/studies/index.yaml" in contract
     assert "docs/studies/<study-id>/" in contract
     assert "docs/studies/README.md" in contract
+    assert "### Choose the next surface" in contract
+    assert "### First-thread bootstrap" in contract
+    assert "Promoter Study Preflight" in contract
     assert "docs/templates/promoter-study-index.yaml" in contract
     assert "docs/templates/promoter-study-datasets.yaml" in contract
     assert "docs/templates/promoter-study-status.md" in contract
     assert "routes.md" in contract
+    assert "routes.md    # optional" in contract
+    assert "pipeline.yaml  # optional" in contract
     assert "ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix" in contract
     assert "ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/campaign.yaml" in contract
     assert "ops progress show usr.data-plane.promoter-feature-matrix" in contract
+    assert "promoter-study-preflight --scope next --json" in contract
+    assert "Minimum evidence by question" in contract
+    assert "evidence.analysis_surfaces" in contract
+    assert "analysis_surfaces.densegen" in contract
+    assert "analysis_surfaces.latentdna" in contract
+    assert "analysis_surfaces.cluster" in contract
+    assert "gpu_t=RTXP6000" not in contract
+    assert "stress_ethanol_cipro_growth" not in contract
+    assert "### Choose the next surface" in preflight_contract
+    assert "### First-thread bootstrap" in preflight_contract
+    assert "This page is the blocker surface, not the downstream route map." in preflight_contract
+    assert "Minimum blocker evidence" in preflight_contract
+    assert "stress_ethanol_cipro_growth" not in preflight_contract
+    assert "gpu_t=RTXP6000" not in preflight_contract
     assert "docs/studies/index.yaml" in studies_index
+    assert "### Quick route" in studies_index
+    assert "### Fresh-thread bootstrap" in studies_index
+    assert "docs/studies/<study-id>/routes.md" in studies_index
     assert "active_study_id: stress_ethanol_cipro_growth" in promoter_index
     assert "record_root: docs/studies/stress_ethanol_cipro_growth" in promoter_index
     assert "version: 1" in index_template
@@ -413,7 +450,14 @@ def test_promoter_study_status_contract_documents_manifest_and_refresh_loop() ->
     assert "root_kind" in contract
     assert "workspace_local_export" in contract
     assert "current downstream posture" in contract
+    assert "I just started a fresh thread or the skill is not visible." in route_matrix
+    assert "campaign.yaml" in route_matrix
     assert "source/handoff mode" in refresh_reference
+    assert "Blank-thread bootstrap" in refresh_reference
+    assert "Fail visibly when" in refresh_reference
+    assert "Status:" in study_routes
+    assert "Preflight:" in study_routes
+    assert "This page: downstream owner handoff" in study_routes
     assert "uv run usr --root <usr-root> info <dataset-id> --format json" in contract
     assert "--audit-json-out docs/studies/<study-id>/audits/<dataset-id>--<remote-name>-diff.json" in contract
     assert "ops progress show usr.data-plane.hpc-sync --sync-audit-json" in contract

@@ -62,6 +62,10 @@ def _inspect_no_additional_downstream_surfaces(**_: object) -> dict[str, dict[st
     }
 
 
+def _inspect_no_exploratory_analysis(**_: object) -> dict[str, dict[str, object]]:
+    return {}
+
+
 @dataclass(frozen=True)
 class PromoterStudyStatusDependencies:
     infer_runtime: PromoterStudyInferRuntimeDependencies
@@ -71,6 +75,7 @@ class PromoterStudyStatusDependencies:
     inspect_additional_downstream_surfaces: Callable[..., dict[str, dict[str, object]]] = (
         _inspect_no_additional_downstream_surfaces
     )
+    inspect_exploratory_analysis: Callable[..., dict[str, dict[str, object]]] = _inspect_no_exploratory_analysis
 
 
 @dataclass(frozen=True)
@@ -108,6 +113,11 @@ def build_promoter_study_status(
     semantic_completeness_state = dependencies.inspect_semantic_completeness(study_context=study_context)
     latentdna_state = dependencies.inspect_latentdna_readiness(study_context=study_context)
     additional_downstream_surfaces = dependencies.inspect_additional_downstream_surfaces(study_context=study_context)
+    exploratory_analysis = dependencies.inspect_exploratory_analysis(
+        study_context=study_context,
+        latentdna_state=latentdna_state,
+        downstream_surfaces=additional_downstream_surfaces,
+    )
     evidence = dict(study_context.evidence)
     evidence.update(
         {
@@ -133,6 +143,7 @@ def build_promoter_study_status(
         "latentdna": latentdna_state,
         **additional_downstream_surfaces,
     }
+    evidence["analysis_surfaces"] = exploratory_analysis
 
     summary_parts = [f"{study_context.resolved_study_dir.name}: phase {study_context.current_phase or 'unknown'}"]
     if status_context.infer_runtime.preferred_model_family is not None:

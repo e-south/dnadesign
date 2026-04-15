@@ -311,6 +311,7 @@ def test_build_promoter_study_status_preserves_summary_and_attention_contract(tm
     assert evidence["latentdna"]["state"] == "not_configured"
     assert evidence["cluster"]["state"] == "planned"
     assert evidence["opal"]["state"] == "not_configured"
+    assert evidence["analysis_surfaces"] == {}
     assert "local_advisories" not in evidence
 
 

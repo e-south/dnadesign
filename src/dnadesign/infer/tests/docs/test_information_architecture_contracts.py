@@ -165,6 +165,13 @@ def test_infer_workspaces_readme_mentions_workspace_inventory_command() -> None:
     assert "uv run infer workspace list" in workspaces
 
 
+def test_stress_ethanol_cipro_workspace_readme_uses_repo_root_placeholder_for_runbook_plan() -> None:
+    readme = _read("src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/README.md")
+
+    assert "--repo-root <repo-root>" in readme
+    assert "/project/dunlop/esouth/dnadesign" not in readme
+
+
 def test_infer_docs_excluding_journal_avoid_legacy_flat_module_paths() -> None:
     docs_root = _repo_root() / "src" / "dnadesign" / "infer" / "docs"
     legacy_tokens = [

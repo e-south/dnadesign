@@ -1,8 +1,8 @@
 ---
 name: promoter-study-status
-description: Answer or refresh the checked-in promoter-study status for one live study, then route agents to preflight or the study-owned route map when the question is really about blockers or the next owner surface. Use when the user asks where the promoter study stands, what phase or datasets are current, whether the checked-in study record needs a refresh, or which study-owned route doc to open next for DenseGen, Construct, Infer, LatentDNA, Cluster, or OPAL. Do not use for tool-local operational walkthroughs or generic workflow discovery when no checked-in study record exists.
+description: Report record-backed promoter-study status for one live study. Use when the user asks where the promoter study stands, what phase or datasets are current, whether the checked-in study record needs a refresh, which study files are authoritative, which dataset sync posture is current, or whether the study is still source-phase versus downstream. Do not use for blockers or next-run readiness; use `promoter-study-preflight`. Do not use for tool-local operational walkthroughs or generic workflow discovery when no checked-in study record exists.
 metadata:
-  version: 0.4.0
+  version: 0.5.0
   category: workflow-automation
   tags: [usr, promoter-study, status, routes, preflight]
 ---
@@ -11,9 +11,9 @@ metadata:
 
 ## Purpose
 
-Give one repo-backed answer to `where is the live promoter study now?` and one
-clean handoff to `promoter-study-preflight` or the study's `routes.md` when the
-user is really asking about blockers or downstream branching.
+Answer `where is the live promoter study now?` from the checked-in study
+record. Route blocker questions to `promoter-study-preflight` and owner-surface
+questions to the study's `routes.md`.
 
 ## Scope
 
@@ -21,12 +21,14 @@ In scope:
 - active-study selection from `docs/studies/index.yaml`
 - checked-in snapshot refresh through
   `ops progress show usr.data-plane.promoter-study-status --json`
-- explicit escalation to `promoter-study-preflight` for blockers or next-run
-  readiness
+- study-record questions about authoritative files, sync posture, or
+  source/handoff mode
 - short routing to `docs/studies/<study-id>/routes.md` and the owning study or
   tool docs
 
 Out of scope:
+- blocker or next-run readiness questions that belong to
+  `promoter-study-preflight`
 - tool-local DenseGen, Construct, Infer, LatentDNA, Cluster, or OPAL
   operational walkthroughs
 - reconstructing live study state from generic runbooks, workspaces, or
@@ -54,30 +56,24 @@ Out of scope:
 - Use [study-surfaces.md](references/study-surfaces.md) for ownership
   boundaries.
 
-2. Refresh the cheap record-plane snapshot first.
-- Run `uv run ops progress show usr.data-plane.promoter-study-status --json`.
-- Use [refresh-loop.md](references/refresh-loop.md) for the exact refresh
-  contract.
-- Do not infer live status from demo workspaces, journal notes, or generic tool
-  docs.
-
-3. Escalate only when the user is asking about blockers or next-run readiness.
-- Run
+2. Route the question through one ladder.
+- Run `uv run ops progress show usr.data-plane.promoter-study-status --json`
+  for `where is the study now?`
+- Use `evidence.analysis_surfaces` in that same snapshot when the follow-up is
+  really `which DenseGen plots, LatentDNA deliverables, notebooks, or Cluster
+  artifact paths are available?`
+- Route `what blocks execution here?` or `what should run next on this host?`
+  to
   `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
-  when the question is really `what blocks execution here?` or `what should run
-  next on this host?`.
-- Keep snapshot and preflight separate. Snapshot is repo-backed study posture;
-  preflight is command-level execution readiness.
-
-4. Route follow-up intent to the study-owned handoff surfaces.
+  instead of answering from this skill.
 - Use `docs/studies/<study-id>/routes.md` for DenseGen, Construct, Infer,
-  LatentDNA, Cluster, and OPAL entrypoints.
-- Use [route-matrix.md](references/route-matrix.md) when the user intent is
-  ambiguous.
-- Keep tool-owned operational detail in the owning workspace README, runbook,
-  or workflow doc.
+  LatentDNA, Cluster, and OPAL handoff after the state or blocker question is
+  answered.
+- Use [route-matrix.md](references/route-matrix.md) and
+  [refresh-loop.md](references/refresh-loop.md) for authoritative files, sync
+  posture, source/handoff mode, and blank-thread bootstrap.
 
-5. If the checked-in record is missing or inconsistent, fail visibly.
+3. If the checked-in record is missing or inconsistent, fail visibly.
 - Report which record files or selector fields are missing.
 - Route the user to
   `src/dnadesign/usr/docs/operations/promoter-study-status-contract.md`
@@ -85,15 +81,17 @@ Out of scope:
 
 ## Guardrails
 
-- `promoter-study-status` is the record-plane router;
-  `promoter-study-preflight` is the execution-readiness router.
+- `promoter-study-status` is the record-plane router.
+- `promoter-study-preflight` is the execution-readiness router.
 - Keep `status.md` factual and short; keep lifecycle and preflight authority in
   `ops.study.yaml`; keep structural workspace or config bindings in
   `pipeline.yaml`.
+- Keep `campaign.yaml`, `datasets.yaml`, `status.md`, and `ops.study.yaml` as
+  the core checked-in evidence bundle.
 - Treat `datasets.yaml` as the source of affiliated dataset ids, root
   semantics, and sync posture.
-- Treat `routes.md` as the one-hop study handoff page for downstream analysis
-  and campaigns.
+- Treat `routes.md` as the study handoff page for downstream analysis and
+  campaigns.
 - Use repo-backed status commands only; do not reconstruct current state from
   stale notes.
 - When this skill changes, run
@@ -105,6 +103,8 @@ Out of scope:
 - snapshot vs preflight distinction for the answer path used
 - current phase, key datasets, row counts, and downstream posture from the
   checked-in record
+- exploratory-analysis route inventory only through snapshot
+  `analysis_surfaces` plus `routes.md`, not by inventing tool-local state
 - next route surface: `routes.md`, `promoter-study-preflight`, or the owning
   tool doc or workspace
 - explicit assumptions or missing artifacts when the record is incomplete
@@ -126,11 +126,15 @@ Return:
 Should trigger:
 - "Check where the promoter study stands right now."
 - "Refresh the checked-in promoter study status."
+- "Which study files are authoritative for this promoter study?"
+- "Which dataset sync posture is current for the live study?"
 - "Which study route should I open next for LatentDNA or OPAL?"
 - "Is the live promoter study still in infer preparation or already downstream?"
 - "Show the current promoter-study record and the next owner surface."
 
 Should not trigger:
+- "What blocks execution here?"
+- "What should run next on this host?"
 - "Which runbook should I use for infer?"
 - "Show me DenseGen workspace commands."
 - "Explain the cluster workflow."

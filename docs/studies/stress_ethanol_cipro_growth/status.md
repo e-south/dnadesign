@@ -38,14 +38,18 @@
 
 ### Current downstream posture
 
-- LatentDNA: `configured`; the study-bound workspace exists and current readiness is `missing` because no downstream artifacts are materialized yet
+- LatentDNA: `configured`; the study-bound workspace now loads on the canonical `outputs/` root, the primary atlas plot plus browser notebook have been regenerated, and current readiness is `attention` because the remaining full-view PCA and export lanes are still pending on this host
 - Cluster: `planned`; no study-owned results root is configured yet
 - OPAL: `not configured`; no study-owned campaign config is checked in yet
 - Use `routes.md` for owner tool, entry artifact, primary doc or workspace, and first command per downstream branch
+- Use `uv run ops progress show usr.data-plane.promoter-study-status --json`
+  plus `evidence.analysis_surfaces` when you need DenseGen plot ids, LatentDNA
+  deliverable ids, notebook paths, or Cluster artifact-layout templates from
+  one snapshot
 
 ### Next actions
 
 - Use `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json` before submitting or resuming live Infer work
+- Use `routes.md` for downstream owner handoff, first commands, and tool-local cleanup or notebook workflow steps
 - Keep Infer as lane-specific work: start from `anchor_only` or `anchor_plus_template` lane configs or the matching notify-enabled batch presets
-- Materialize the LatentDNA scaffold only after the Infer outputs you want to analyze are stable
 - Do not treat Cluster or OPAL as active until a canonical feature matrix or explicit export surface is checked in

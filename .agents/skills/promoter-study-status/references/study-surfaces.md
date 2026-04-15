@@ -1,6 +1,6 @@
 # Study Surfaces
 
-Keep ownership boundaries explicit.
+Keep ownership boundaries clear.
 
 ## Checked-in study surfaces
 
@@ -13,7 +13,9 @@ Keep ownership boundaries explicit.
 - `docs/studies/<study-id>/ops.study.yaml`: lifecycle order, snapshot scope,
   execution surfaces, and next-scope preflight grouping
 - `docs/studies/<study-id>/pipeline.yaml`: structural workspace, config, and
-  downstream surface bindings that complement `ops.study.yaml`
+  downstream surface bindings that complement `ops.study.yaml`, including any
+  study-bound exploratory-analysis route inventory surfaced through snapshot
+  `analysis_surfaces`
 - `docs/studies/<study-id>/campaign.yaml`: tracked procedure set for
   `ops progress campaign`
 

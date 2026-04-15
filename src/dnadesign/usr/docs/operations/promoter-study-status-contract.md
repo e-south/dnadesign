@@ -11,20 +11,44 @@
 **Status-kind:** promoter-study-status
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-25
+**Last verified:** 2026-04-13
 
-Use this contract when the question is not only "which runbook applies?" but
-"what is the current status of the actual DenseGen/manual/wildtype ->
-optional Construct -> Infer -> LatentDNA, Cluster, or OPAL study?"
-This is an observation-plane surface: it reads the checked-in study record and
-does not replace the control-plane `ops runbook` routes that plan or execute
-batch work.
+Use this for the current state of the live DenseGen/manual/wildtype ->
+optional Construct -> Infer -> LatentDNA, Cluster, or OPAL study.
+It reads the checked-in study record. It does not replace the control-plane
+`ops runbook` routes that plan or execute batch work.
 
-The shared runbooks explain procedure. They do not carry your real dataset ids,
-shared-root versus workspace-export semantics, local-vs-remote sync posture,
-row targets, completed infer slices, or the next batch call. Without a
-maintained study record, the docs explain how the workflow works but not where
-the live study stands.
+### Choose the next surface
+
+Use this page for the cheap snapshot.
+
+| Need | Surface | Why |
+| --- | --- | --- |
+| Where is the live study right now? | `uv run ops progress show usr.data-plane.promoter-study-status --json` | Cheap checked-in snapshot of study phase, datasets, row counts, and downstream posture. |
+| What blocks execution on this host? | [Promoter Study Preflight](promoter-study-preflight.md) | Command-level readiness for the next actionable phase. |
+| Which owner doc or workspace should I open next? | `docs/studies/<study-id>/routes.md` | Study-owned one-hop handoff for DenseGen, Construct, Infer, LatentDNA, Cluster, and OPAL. |
+| Which plots, notebooks, deliverables, or artifact roots are available? | `uv run ops progress show usr.data-plane.promoter-study-status --json` and read `evidence.analysis_surfaces` | One snapshot now exposes DenseGen live plot inventory, LatentDNA deliverable ids plus artifact roots, and Cluster artifact-layout templates without guessing. |
+
+This page is a router, not the full workflow doc.
+
+Shared runbooks explain the procedure. They do not carry the live dataset ids,
+root semantics, sync posture, row targets, completed infer slices, or the next
+batch call. Without the study record, they tell you how the workflow works but
+not where the study stands today.
+
+### First-thread bootstrap
+
+Use this order when a thread starts cold or the repo-local skill is not
+visible:
+
+1. Read [Study records](../../../../../docs/studies/README.md), then
+   `docs/studies/index.yaml`.
+2. Run `uv run ops progress show usr.data-plane.promoter-study-status --json`.
+3. Run
+   `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+   only when the question is blocker or next-run readiness.
+4. Open `docs/studies/<study-id>/routes.md` after the state or blocker question
+   is answered and the next owner surface is the real need.
 
 ### Canonical checked-in location
 
@@ -41,16 +65,16 @@ docs/studies/<study-id>/
   campaign.yaml
   datasets.yaml
   ops.study.yaml
-  routes.md
-  pipeline.yaml
+  routes.md    # optional when the study spans owner surfaces
+  pipeline.yaml  # optional when the study owns execution surfaces
   status.md
   audits/
 ```
 
 Read [Study records](../../../../../docs/studies/README.md) first, then
-`docs/studies/index.yaml`, when the question is "which study record
-should I trust?" rather than "which workflow route applies?"
-`index.yaml` selects the active study, the matching study directory holds the
+`docs/studies/index.yaml`, when the question is `which study record should I
+trust?` rather than `which workflow route applies?`
+`index.yaml` selects the active study. The matching study directory holds the
 record, and this contract explains how to refresh it.
 
 Fastest read-only summary once the checked-in directory exists:
@@ -70,16 +94,14 @@ uv run ops progress show usr.data-plane.promoter-study-status \
   --study-dir docs/studies/<study-id>
 ```
 
-That surface reads the checked-in study directory, validates that the declared
-source datasets and study-owned execution surfaces exist, reads phase order and
-repo-summary scope from `ops.study.yaml`, reports the current phase from the
-checked-in record, and highlights the next ready phase without submitting jobs
-or mutating USR. Host-local readiness such as GPU visibility remains advisory
-here and moves into preflight for hard blockers.
-The snapshot contract is explicit about which plane each row count belongs to:
-it reports source-growth, shared-handoff readiness, semantic completeness for
-critical downstream metadata, and planned consolidated outputs as separate
-evidence axes so operators do not have to infer readiness from one overloaded
+That surface reads the study directory, checks the declared source datasets and
+execution surfaces, reads phase order and repo-summary scope from
+`ops.study.yaml`, reports the current phase, and highlights the next ready
+phase without submitting jobs or mutating USR. Host-local readiness such as GPU
+visibility stays advisory here and moves into preflight for hard blockers.
+The snapshot keeps each evidence axis separate: source growth, shared handoff
+readiness, semantic completeness for critical downstream metadata, and planned
+outputs. Operators should not have to infer readiness from one overloaded
 `attention` summary.
 Snapshot `ok` means the checked-in record is coherent for the current phase; it
 does not mean every future phase is finished. Future planned outputs stay in
@@ -91,46 +113,67 @@ context instead of overriding the current phase summary.
 For promoter studies that depend on DenseGen design metadata downstream, the
 snapshot should also treat missing or stale `densegen__*` metadata on shared
 handoff datasets as semantic incompleteness even when the row counts are green.
-For `evo2_20b`, describe GPU readiness from the checked-in runbook contract,
-not from a guessed BU queue name. If the study record or live operator
-evidence says the current `.venv` is GPU-family-pinned, report the exact
-selector as part of readiness. For the active stress-ethanol-cipro study on
-BU SCC, the current Blackwell-family lane is `gpu_t=RTXP6000` with
-`gpu_capability=12.0`; a generic `gpu_capability >= 9.0` request is a looser
-model-fit floor and can still land on H200.
+Describe GPU or notify readiness from the checked-in study contract and live
+operator evidence, not from guessed queue names or shared-doc examples. If the
+study record pins one lane or environment contract, report that exact selector
+or required check from the study-owned surface instead of hard-coding it here.
 The snapshot now also calls out stale downstream handoffs when merged anchor or
 Construct context datasets trail the upstream DenseGen source even though those
 datasets still exist.
-The implementation boundary is explicit: OPS resolves the registered provider,
-and the stress-promoter family code that assembles the snapshot lives under
-`src/dnadesign/studies/families/promoter/`.
+OPS resolves the registered provider. The promoter-family code that assembles
+the snapshot lives under `src/dnadesign/studies/families/promoter/`.
 
-When you need deeper, command-level blockers across the same checked-in study,
-continue to [Promoter Study Preflight](promoter-study-preflight.md):
+### Exploratory-analysis route inventory
+
+The snapshot keeps exploratory-analysis discovery in a separate
+`evidence.analysis_surfaces` section so record-plane status stays distinct from
+tool-local execution.
+
+- `analysis_surfaces.densegen` exposes the checked-in DenseGen workspace,
+  default plot ids, live rendered plot inventory from
+  `outputs/plots/plot_manifest.json`, and the generated notebook path when
+  present.
+- `analysis_surfaces.latentdna` exposes the checked-in workspace, notebook id,
+  plot ids, deliverable ids, export ids, and the
+  `outputs/<artifact-kind>/<artifact-id>/manifest.json` path
+  contract plus `outputs/notebooks/<notebook-id>/notebook.py` for the generated
+  workspace notebook.
+- `analysis_surfaces.cluster` exposes the study entry artifact, workflow doc,
+  one workspace example, and the explicit results-root layout template because
+  the current study does not yet own a checked-in cluster results root.
+
+This surface is intentionally route-oriented:
+
+- it reports explicit ids, commands, and path conventions
+- it does not fabricate missing LatentDNA or Cluster artifacts
+- it keeps blocker and host-readiness questions in preflight instead of mixing
+  them into exploratory-analysis discovery
+
+Need command-level blockers for the same study? Open
+[Promoter Study Preflight](promoter-study-preflight.md):
 
 ```bash
 # Escalate from the cheap snapshot to the command-level preflight surface.
-uv run ops progress show usr.data-plane.promoter-study-preflight --json
+uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json
 ```
 
 ### Keep these artifacts for every real study
 
-1. A checked-in campaign manifest that names the real artifacts.
+1. A campaign manifest that names the real artifacts.
 2. A machine-readable dataset registry that names the affiliated USR datasets,
    onboarding mode, root semantics, and sync posture.
-3. A checked-in status note that answers the human questions the manifest and
+3. A status note that answers the human questions the manifest and
    dataset registry do not encode.
-4. A checked-in `ops.study.yaml` that tells OPS the study-family lifecycle,
-   record sources, execution surfaces, snapshot scope, and next-scope
-   preflight posture without hard-coding workflow taxonomy in core code.
-5. When the study has real downstream execution surfaces, an optional
-   `routes.md` that points to the current DenseGen, Construct, Infer,
+4. `ops.study.yaml`, which tells OPS the study-family lifecycle, record
+   sources, execution surfaces, snapshot scope, and next-scope preflight
+   posture without hard-coding workflow taxonomy in core code.
+5. When downstream execution surfaces exist, an optional `routes.md` that points to the current DenseGen, Construct, Infer,
    LatentDNA, Cluster, and OPAL owner surfaces without bloating `status.md`.
-6. When the study has real downstream execution surfaces, an optional
-   `pipeline.yaml` that names the exact Construct, Infer, and batch surfaces
-   plus any minimal runtime mappings the live study still needs. Infer Notify
-   profile paths should derive from the checked-in lane configs instead of
-   being duplicated there.
+6. When downstream execution surfaces exist, an optional `pipeline.yaml` that
+   names the exact Construct, Infer, and batch surfaces plus any minimal
+   runtime mappings the live study still needs. Infer Notify profile paths
+   should derive from the checked-in lane configs instead of being duplicated
+   there.
 
 Recommended bootstrap for the manifest:
 
@@ -160,7 +203,7 @@ downstream Construct or Infer surface to record.
 
 ### Dataset registry, status template, and discovery rules
 
-Keep a filled `datasets.yaml` next to the manifest. Copy the template from
+Keep `datasets.yaml` next to the manifest. Copy the template from
 [docs/templates/promoter-study-datasets.yaml](../../../../../docs/templates/promoter-study-datasets.yaml).
 
 Each dataset entry should declare:
@@ -180,7 +223,7 @@ Each dataset entry should declare:
   which remote root kind applies, and whether explicit `remote_path` mapping is
   needed
 
-Keep the semantics explicit:
+Semantics:
 
 - `workspace_local_export` means the dataset is owned by a tool workspace such
   as `outputs/usr_datasets/` and is not automatically the cross-tool study
@@ -190,8 +233,8 @@ Keep the semantics explicit:
 - `external_usr` means the dataset is still a USR root, but lives outside the
   repo-owned shared path and must stay explicit in the study record
 
-Keep a filled `status.md` next to the manifest. Read it first when the question
-is "where are we now?" Copy the template from
+Keep `status.md` next to the manifest. Read it first for `where are we now?`
+Copy the template from
 [docs/templates/promoter-study-status.md](../../../../../docs/templates/promoter-study-status.md).
 Keep it factual and short: current datasets, current phase, current row counts,
 current downstream posture, and concise next actions.
@@ -227,7 +270,7 @@ Discovery rules:
 1. Refresh the campaign summary:
 
 ```bash
-# Summarize every tracked step in the checked-in study manifest.
+# Summarize every tracked step in the study manifest.
 uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/campaign.yaml
 ```
 
@@ -242,6 +285,16 @@ uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <rep
 If `status.md` still marks the canonical consolidated feature dataset as
 `planned` or `n/a`, skip this step and report that the study is still in
 source/handoff mode.
+
+### Minimum evidence by question
+
+| Question | Primary surface | Minimum evidence | Fail visibly when |
+| --- | --- | --- | --- |
+| Where is the live study right now? | `usr.data-plane.promoter-study-status --json` | study id, current phase, dataset ids, row counts, downstream posture, next surface | selector fields or required record files are missing |
+| What blocks execution on this host? | `usr.data-plane.promoter-study-preflight --scope next --json` | `scope`, `phase_id`, `check_group`, `kind`, `surface_id`, `artifact_id` | `ops.study.yaml` or declared execution surfaces are missing |
+| Which owner doc or workspace should I open next? | `docs/studies/<study-id>/routes.md` | owner tool, entry artifact, primary doc or workspace, first command | the study spans owner surfaces but no route map is checked in |
+| Which dataset sync posture is current? | `datasets.yaml` plus `usr.data-plane.hpc-sync` | dataset id, remote profile, audit JSON path, explicit drift summary | sync-enabled dataset entries or audit evidence are missing |
+| Which exploratory-analysis artifacts exist or are declared? | `usr.data-plane.promoter-study-status --json` `analysis_surfaces` plus `docs/studies/<study-id>/routes.md` | DenseGen plot ids or rendered plot paths, LatentDNA deliverable/export ids plus artifact roots, Cluster results-layout template | the study record omits the owning workspace/doc path or the tool-local contract is missing |
 
 3. Validate the dataset and inspect lineage plus one explicit infer column:
 

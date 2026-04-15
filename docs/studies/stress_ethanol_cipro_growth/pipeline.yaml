@@ -3,6 +3,19 @@ study_pipeline:
   last_verified: 2026-04-13
   row_targets:
     densegen_anchor_minimum_before_first_full_lane_infer: 100000
+  densegen:
+    workspace: src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro
+    doc: src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/README.md
+    notebook: densegen_run_overview
+    default_plot_ids:
+      - dataset_source_inventory
+      - dataset_metadata_heatmap
+      - stage_a_summary
+      - placement_map
+      - run_health
+      - tfbs_usage
+    optional_plot_ids:
+      - dense_array_video_showcase
   execution_surfaces:
     construct_workspace: src/dnadesign/construct/workspaces/study_stress_ethanol_cipro_pdual10
     infer_workspace: src/dnadesign/infer/workspaces/study_stress_ethanol_cipro
@@ -38,7 +51,7 @@ study_pipeline:
     notebook: browser
     expected_deliverables:
       - atlas_2x2_intermediate_main
-      - control_neighborhood_enrichment_curve_family
+      - control_pca_explained_variance_curve
       - context_shift_primary
       - cluster_correspondence_primary
     required_leiden_runs:
@@ -49,6 +62,7 @@ study_pipeline:
   cluster:
     doc: src/dnadesign/cluster/docs/workflows/exploratory-clustering.md
     entry_artifact: promoter/stress_ethanol_cipro_feature_matrix
+    workspace_example: src/dnadesign/cluster/workspaces/promoter_clusters_v1/config.yaml
     results_root: n/a
     state: planned
   opal:

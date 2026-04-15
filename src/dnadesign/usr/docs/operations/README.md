@@ -36,10 +36,11 @@ Use this index to pick the next dataset, sync, or handoff step.
 
 | Need | Runbook |
 | --- | --- |
-| Review the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL path before choosing one branch | [promoter-evo2-journey.md](promoter-evo2-journey.md) |
-| Keep one checked-in promoter-study record for current-status checks | [promoter-study-status-contract.md](promoter-study-status-contract.md) |
-| Run one read-only command preflight across the checked-in promoter-study surfaces | [promoter-study-preflight.md](promoter-study-preflight.md) |
+| Bootstrap a fresh thread, recover a missing study record, or find the next study-owned handoff | [../../../../../docs/studies/README.md](../../../../../docs/studies/README.md) |
+| Current study status | [promoter-study-status-contract.md](promoter-study-status-contract.md) |
+| Current study preflight | [promoter-study-preflight.md](promoter-study-preflight.md) |
 | Build one infer-annotated promoter-study feature dataset, then continue to cluster or prepare OPAL after choosing one explicit `X` column | [promoter-characterization-feature-matrix.md](promoter-characterization-feature-matrix.md) |
+| Review the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL path before choosing one branch | [promoter-evo2-journey.md](promoter-evo2-journey.md) |
 
 ## Validation and drills
 

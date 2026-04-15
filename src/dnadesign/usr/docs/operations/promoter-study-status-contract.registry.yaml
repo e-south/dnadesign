@@ -38,6 +38,8 @@ related_tool_routes:
   - tool: opal
     route: usr-infer-x-active-learning
 relations:
+  - type: handoff-to
+    target: usr.data-plane.promoter-study-preflight
   - type: execution-support
     target: usr.data-plane.multi-source-source-of-truth
   - type: execution-support

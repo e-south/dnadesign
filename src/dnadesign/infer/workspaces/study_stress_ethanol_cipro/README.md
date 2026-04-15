@@ -52,11 +52,11 @@ configs because ops auto/resume requires one USR destination per runbook:
 ```bash
 uv run ops runbook plan \
   --runbook src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_7b_batch_with_notify.yaml \
-  --repo-root /project/dunlop/esouth/dnadesign
+  --repo-root <repo-root>
 
 uv run ops runbook plan \
   --runbook src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_7b_batch_with_notify.yaml \
-  --repo-root /project/dunlop/esouth/dnadesign
+  --repo-root <repo-root>
 ```
 
 Planning those presets on this node requires the same webhook secret-file

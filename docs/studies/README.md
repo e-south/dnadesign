@@ -1,16 +1,38 @@
 ## Study Records
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-26
+**Last verified:** 2026-04-13
 
-Use this index when the question is "where is the real study right now?" rather
-than "which generic workflow should I use?"
+Use this index for `where is the real study right now?`, not for generic
+workflow routing.
 
 Study records are checked-in status artifacts for one live effort. They are not
-runbooks, and they are not generated outputs.
-They are the record plane: `ops progress` reads these checked-in artifacts as
-observation surfaces, while `ops runbook` stays in the control plane for
-planning and execution.
+runbooks or generated outputs.
+They are the record plane: `ops progress` reads them as observation surfaces,
+while `ops runbook` stays in the control plane for planning and execution.
+
+### Quick route
+
+Use these surfaces in order:
+
+| Need | Surface | Why |
+| --- | --- | --- |
+| Where is the live study right now? | `uv run ops progress show usr.data-plane.promoter-study-status --json` | Cheap checked-in snapshot of the active study record. |
+| What blocks the next execution step here? | `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json` | Command-level readiness for the next actionable phase on this host. |
+| Which owner doc or workspace should I open next? | `docs/studies/<study-id>/routes.md` | Study-owned one-hop handoff for DenseGen, Construct, Infer, LatentDNA, Cluster, and OPAL. |
+
+### Fresh-thread bootstrap
+
+Use this sequence when a new thread starts cold or the repo-local skill is not
+visible:
+
+1. Read `docs/studies/index.yaml`.
+2. Run `uv run ops progress show usr.data-plane.promoter-study-status --json`.
+3. Run
+   `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+   only when the question is blocker or next-run readiness.
+4. Open `docs/studies/<study-id>/routes.md` after the state or blocker question
+   is answered and the next owner surface is the real need.
 
 Authority chain: `docs/studies/index.yaml` selects the active study,
 the matching `docs/studies/<study-id>/` directory holds the required
@@ -33,10 +55,10 @@ Keep four complementary artifacts for each real study:
   `command`, `scheduler_queue`, and `runbook_plan`, then bind them to explicit
   artifact ids and execution-surface ids.
 
-Keep the code boundary equally explicit: study-family implementation code lives
-under `src/dnadesign/studies/`, not under `src/dnadesign/ops/`. OPS reads the
-checked-in record and dispatches the provider, but the family-owned snapshot
-and preflight logic stays with the family package.
+Keep the code boundary clear: study-family implementation code lives under
+`src/dnadesign/studies/`, not under `src/dnadesign/ops/`. OPS reads the
+checked-in record and dispatches the provider, but the snapshot and preflight
+logic stay with the family package.
 
 When a study already owns concrete execution surfaces, add one optional fifth
 artifact:
@@ -51,13 +73,13 @@ artifact:
 - `routes.md`: optional study-owned one-hop route map for DenseGen, Construct,
   Infer, LatentDNA, Cluster, and OPAL handoffs
 
-Use the study record even when the effort is still in the source-assembly phase.
-An active study does not need to wait until the final feature matrix already
-exists, but the record must say explicitly whether the current shared feature
-dataset is materialized or still pending.
+Use the study record even while the effort is still in source assembly.
+An active study does not need to wait for the final feature matrix, but the
+record must say whether the current shared feature dataset is materialized or
+still pending.
 
-Use `docs/studies/index.yaml` to declare which checked-in study record is
-active and which study family owns its adapter.
+Use `docs/studies/index.yaml` to declare the active study record and the study
+family that owns its adapter.
 
 ### Declared layout
 
@@ -173,10 +195,10 @@ for the first pull rather than relying on local name guessing.
 
 ### Status lookup rules
 
-- One-command checked-in status summary:
-  `uv run ops progress show usr.data-plane.promoter-study-status`
-- One-command checked-in command preflight:
-  `uv run ops progress show usr.data-plane.promoter-study-preflight`
+- Status summary:
+  `uv run ops progress show usr.data-plane.promoter-study-status --json`
+- Command preflight:
+  `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
 - To pin a non-active study or run from outside the repo checkout, add:
   `--repo-root <repo-root> --study-dir docs/studies/<study-id>`
 - The repo-local promoter-study skill lives at `.agents/skills/promoter-study-status/SKILL.md`, but native project-scope skill discovery only picks it up when Codex is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the two `ops progress` commands above directly.

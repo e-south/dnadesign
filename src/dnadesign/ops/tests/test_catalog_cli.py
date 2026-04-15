@@ -322,6 +322,37 @@ def test_cli_catalog_list_supports_related_to_filter() -> None:
     assert "tool_sources" not in payload
 
 
+def test_cli_catalog_list_supports_related_to_filter_for_promoter_study_status() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--section",
+            "procedures",
+            "--related-to",
+            "usr.data-plane.promoter-study-status",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["filters"] == {"related_to": "usr.data-plane.promoter-study-status"}
+    assert payload["counts"] == {"procedures": 4}
+    assert {entry["registry_id"] for entry in payload["procedures"]} == {
+        "usr.data-plane.promoter-study-preflight",
+        "usr.data-plane.multi-source-source-of-truth",
+        "usr.data-plane.construct-infer-source-of-truth",
+        "usr.data-plane.promoter-feature-matrix",
+    }
+    assert "tool_sources" not in payload
+
+
 def test_cli_catalog_list_tool_sources_suggests_tool_source_specific_next_steps() -> None:
     runner = CliRunner()
 
@@ -519,6 +550,9 @@ def test_cli_catalog_show_json_exposes_latentdna_route_from_promoter_study_statu
     ]
     assert ("latentdna", "promoter-study-latent-atlas") in [
         (entry["tool"], entry["route_id"]) for entry in payload["related_tool_routes"]
+    ]
+    assert ("handoff-to", "usr.data-plane.promoter-study-preflight") in [
+        (entry["relation_type"], entry["registry_id"]) for entry in payload["related_procedures"]
     ]
 
 

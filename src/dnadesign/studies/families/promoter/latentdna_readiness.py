@@ -69,8 +69,9 @@ def inspect_promoter_latentdna_readiness(
 
     try:
         context = load_workspace_config(workspace_path)
-    except Exception:
+    except Exception as exc:
         payload["state"] = "error"
+        payload["error"] = str(exc)
         return payload
 
     payload["workspace_id"] = context.workspace_id
@@ -105,7 +106,7 @@ def inspect_promoter_latentdna_readiness(
         plots_root=context.output_root / "plots",
         read_json=read_json,
     )
-    payload["notebook_generated"] = (context.output_root / "notebooks" / f"{notebook_id}.py").is_file()
+    payload["notebook_generated"] = (context.output_root / "notebooks" / notebook_id / "notebook.py").is_file()
     notebook_smoke_ok, notebook_error = _notebook_smoke_ok(
         health_path=context.output_root / "notebooks" / "health.json",
         read_json=read_json,
