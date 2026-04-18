@@ -1,33 +1,21 @@
-# Dataset overview
+# Dataset inventory by cohort dimension
 
-This deliverable is the trust gate for everything that follows. It answers whether the checked-in anchor-only and full-context populations are symmetric enough that later comparison plots are worth reading.
+LatentDNA is a downstream comparison surface over the current `infer_batch_preparation` record. DenseGen remains the upstream source of cohort semantics. This deliverable fixes the denominator before any geometry or reference-margin plot is interpreted.
 
-## Why this deliverable exists
+The current population is one shared promoter set: `157,160` DenseGen rows plus `4` manual or wildtype controls, for `N = 157,164`. The 60 bp anchor handoff and the 1 kb construct-context handoff contain the same promoters.
 
-Later plots are only persuasive if they are built on comparable populations. This deliverable keeps the population accounting visible before any geometry or candidate-comparison surface is interpreted.
+### dataset_overview | Dataset inventory by cohort dimension
 
-## Plot guide
+#### Plot details
 
-Read the dataset overview first. If scope coverage, controls, or reference cohorts are visibly unbalanced here, keep that caveat in mind when reading every downstream plot.
+**Data.** This is one promoter population viewed through several cohort partitions. The denominator for each partition is \(N = 157{,}164\): \(157{,}160\) DenseGen designs plus \(4\) manual or wildtype controls. The 60 bp anchor handoff and the 1 kb construct-context handoff contain the same promoter population, so this plot does not facet by anchor versus context.
 
-### dataset_overview | Dataset overview
+**Definition.** Each subpanel is a separate partition of the same \(N\) records. Within a subpanel, category fractions are computed as
 
-#### Why this plot exists
+$$
+\mathrm{fraction}(c) = \frac{n_c}{157{,}164}.
+$$
 
-This plot makes the study inventory concrete. It shows whether the declared cohorts, controls, and reference promoters are all present across the anchor-only and full-context branches.
+The categories in each subpanel should sum to one, up to rounding.
 
-#### How to read it
-
-Look for the same major families, regulator compositions, sigma-axis groups, and source classes on both scopes. Confirm that the expected controls and wildtype references are present before treating downstream comparison patterns as trustworthy.
-
-#### What would worry us
-
-Missing or sharply asymmetric cohorts are the main failure mode. If one scope is underrepresented, or if `spyP`, `sulAp`, or `J23105` coverage looks incomplete, later plots may still be descriptive but they stop being a clean apples-to-apples comparison.
-
-#### Limits / guardrails
-
-This plot is inventory only. It does not prove model readiness, biological separation, or representation quality.
-
-#### What to look at next
-
-Move to `reference_margin_gallery_wildtype` in the reference-margin analysis deliverable.
+**Interpretation.** Read each subpanel independently. The plot answers whether the study population is balanced enough for downstream comparisons across provenance, generation plan, and Sigma-35 variant. It is not a stacked list of unrelated scalar counts.

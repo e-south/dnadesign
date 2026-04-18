@@ -1,77 +1,81 @@
 # Context geometry audit
 
-This deliverable asks whether candidate representations stay scientifically usable when the same promoter is read as `anchor_60bp` versus `full_context_1kb`. It is a secondary but important guardrail after the reference-margin analysis.
+This deliverable measures what survives when the same promoter is embedded as a 60 bp anchor and as a 1 kb construct context. The paired comparisons are downstream LatentDNA checks over the shared handoff population, not a study-status authority.
 
-## Why this deliverable exists
+### context_shift_reference_plane | Context-shift margin plane
 
-A representation can look attractive on biology-facing evidence and still be unstable when extra sequence context is added. This deliverable makes that tradeoff visible before a candidate is treated as trustworthy.
+#### Plot details
 
-## Plot guide
+**Data.** Each point is an aligned anchor/context pair for the same promoter, keyed by `construct__anchor_id`. The anchor embedding comes from the 60 bp handoff and the context embedding comes from the 1 kb construct-context handoff.
 
-Read the paired context-shift plane first, then the metric distributions, then the compact summary metrics. Harmless scaffold shift usually means a consistent offset with limited subgroup breakup. Worrying representation change usually means larger subgroup-specific movement, heavier tails, weaker neighbor preservation, or movement that changes the biology-facing interpretation.
+**Definition.** The plotted coordinates are signed changes in the wildtype-reference margins:
 
-### context_shift_reference_plane | Context-shift reference plane
+$$
+\Delta m_{\mathrm{eth}} =
+m_{\mathrm{eth}}(\mathrm{full\_context}) -
+m_{\mathrm{eth}}(\mathrm{anchor})
+$$
 
-#### Why this plot exists
+and
 
-This plot keeps the anchor-only versus full-context comparison explicit at the level of paired promoter points in the reference-margin plane.
+$$
+\Delta m_{\mathrm{cipro}} =
+m_{\mathrm{cipro}}(\mathrm{full\_context}) -
+m_{\mathrm{cipro}}(\mathrm{anchor}).
+$$
 
-#### How to read it
+**Interpretation.** Positive \(\Delta m_{\mathrm{eth}}\) means the promoter becomes more `spyP`-like relative to `J23105` in the full construct context. Positive \(\Delta m_{\mathrm{cipro}}\) means it becomes more `sulAp`-like relative to `J23105`. Values near zero mean the wildtype-margin readout is stable across added context.
 
-Look for whether the context-expanded points move in a small, consistent way or whether they scatter into a different geometry. Small, coherent movement that preserves the basic relative ordering is more reassuring than large, subgroup-specific displacement.
+### context_delta_distributions | Context-shift distributions
 
-#### What would worry us
+#### Plot details
 
-Large rotations, subgroup-dependent drift, or movement that changes which promoters sit near the relevant reference surfaces are the main warning patterns. A context shift that pushes apparent winners toward the wrong biological interpretation is especially concerning.
+**Data.** Each distribution summarizes anchor-to-context changes for matched promoter records. The matched anchor and context embeddings refer to the same promoter under different sequence context.
 
-#### Limits / guardrails
+**Definition.** The plotted metrics are
 
-This plot shows paired movement, not proof of robustness. It also does not prove mechanism: pooled full-context vectors can reflect broader scaffold changes rather than anchor-local biology.
+$$
+\mathrm{context\_self\_cosine}
+=
+\cos(z_{\mathrm{anchor}}, z_{\mathrm{context}}),
+$$
 
-#### What to look at next
+$$
+\mathrm{context\_shift\_l2}
+=
+\left\lVert
+z_{\mathrm{context}} - z_{\mathrm{anchor}}
+\right\rVert_2,
+$$
 
-Use `context_delta_distributions` to see whether the center, spread, and tails support the visual impression from the paired plane.
+plus the signed margin changes \(\Delta m_{\mathrm{eth}}\) and \(\Delta m_{\mathrm{cipro}}\).
 
-### context_delta_distributions | Context-delta distributions
+**Interpretation.** Read the center, spread, and tails of each distribution. High `context_self_cosine` and low `context_shift_l2` indicate stable embeddings under added context. Wide or shifted \(\Delta m\) distributions indicate that the wildtype-margin readout changes when the construct context is included.
 
-#### Why this plot exists
+### context_geometry_summary | Context stability summary
 
-This plot turns the paired context shifts into explicit metric distributions so the reader can inspect center, spread, tails, and subgroup separation directly.
+#### Plot details
 
-#### How to read it
+**Data.** Each row or point summarizes one candidate representation space across matched anchor/context promoter pairs.
 
-Read the center of each distribution as the typical context effect, the spread as heterogeneity across promoters, the tails as the risk of large context failures, and subgroup separation as evidence that some promoter families respond differently from others. The important question is whether the distributions stay tight enough that the biology-facing comparisons remain interpretable.
+**Definition.** The stability summaries include median `context_self_cosine`, median `context_shift_l2` distance,
 
-#### What would worry us
+$$
+\mathrm{neighbor\_overlap\_fraction}
+=
+\frac{
+|\mathcal{N}_a(x) \cap \mathcal{N}_b(x)|
+}{k},
+$$
 
-Heavy tails, strongly shifted centers, or clear subgroup bifurcation are warning patterns. A small average shift with a long harmful tail is still a problem if it can move the promoters that matter most.
+and
 
-#### Limits / guardrails
+$$
+\mathrm{geometry\_distance\_correlation}
+=
+\mathrm{Spearman}(d_{\mathrm{anchor}}, d_{\mathrm{context}}).
+$$
 
-These panels summarize distributions; they do not show per-pair trajectories. Read them together with the paired plane rather than treating them as a replacement.
+Here \(\mathcal{N}_a(x)\) and \(\mathcal{N}_b(x)\) are the anchor-space and context-space neighbor sets for the same promoter.
 
-#### What to look at next
-
-Use `context_geometry_summary` for the compact candidate-by-candidate comparison once the raw distributions look reasonable.
-
-### context_geometry_summary | Context-geometry summary
-
-#### Why this plot exists
-
-This plot pulls the most useful context-stability metrics into one compact candidate comparison so the reader can see whether the same representation still looks acceptable once stability is considered.
-
-#### How to read it
-
-Read the metrics as a set: self-cosine describes within-promoter alignment across contexts, shift magnitude describes the absolute size of the change, and neighborhood or geometry-preservation metrics describe whether local relationships survive the context change. Together they answer whether the candidate is merely moving or actually losing structure.
-
-#### What would worry us
-
-Candidates that look strong on the biology-facing deliverable but weak here deserve skepticism. Low self-cosine, large shift magnitude, and weak neighborhood preservation together are the clearest warning combination.
-
-#### Limits / guardrails
-
-This is a summary surface, not a hidden score. It compresses several stability questions into one view, so the labels and preferred directions matter more than any single bar ranking.
-
-#### What to look at next
-
-Move to `representation_tradeoff_scatter` to compare biology-facing evidence against these stability costs directly.
+**Interpretation.** This is a compact metric panel, not a hidden combined score. Higher self-cosine, higher `neighbor_overlap_fraction`, and higher `geometry_distance_correlation` indicate more stable geometry across context. Lower `context_shift_l2` indicates smaller embedding displacement.
