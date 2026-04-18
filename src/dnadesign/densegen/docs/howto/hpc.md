@@ -74,7 +74,7 @@ This section runs analysis after generation is complete (or paused), without mod
 # Render DenseGen analysis artifacts from current outputs.
 uv run dense plot -c "$CONFIG"
 # Optional analysis shortcut: render only the Stage-B showcase video artifact.
-# uv run dense plot --only dense_array_video_showcase -c "$CONFIG"
+# uv run dense plot --only dense_array_showcase_video -c "$CONFIG"
 # Generate the run-overview marimo notebook artifact.
 uv run dense notebook generate -c "$CONFIG"
 # Validate the generated notebook before sharing.

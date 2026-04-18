@@ -41,11 +41,11 @@ This section lists dated entries so you can jump to a specific investigation win
   - Extend wizard and docs to select policy first, then provider and secret wiring.
   - Add regression tests proving infer events are not silently filtered by DenseGen defaults.
 
-- Plan slice 3 (error expressivity + human/agent output surfaces):
+- Plan slice 3 (error expressivity + user/agent output surfaces):
   - Preserve concise Slack text for routine progress, but include compact actionable failure detail.
   - Add structured machine-readable CLI outputs (`--json`) for profile wizard/doctor and watcher setup status.
   - Ensure failure events can surface key error context without requiring full raw event payloads.
-  - Add tests for both human-readable and machine-readable output contracts.
+  - Add tests for both plain-text and machine-readable output contracts.
 
 - Plan slice 4 (operational robustness):
   - Harden secret backend probing beyond command existence so `auto` does not produce false positives in batch contexts.

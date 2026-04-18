@@ -33,10 +33,10 @@ workspace config and only write local plot/notebook artifacts under `outputs/`.
 The workspace resolves `output.usr.root` against the git common repo root, so
 the same config works from a normal checkout and from an isolated worktree.
 
-This workspace now defaults `dense plot` to the dataset-native
-`dataset_source_inventory` and `dataset_metadata_heatmap` views plus the core
-local diagnostics. The Stage-B showcase video remains explicit-only through
-`uv run dense plot --only dense_array_video_showcase`.
+This workspace now defaults `dense plot` to the full notebook-visible review
+surface. The happy path is that a default plot run materializes every plot the
+generated notebook expects to show, including the former drilldown views and
+the Stage-B showcase video.
 
 - Runbook: [runbook.md](runbook.md)
 - Config: [config.yaml](config.yaml)

@@ -51,8 +51,8 @@ Use `--mode resume` to continue generation without wiping outputs, or `--mode an
     # The default catalog now includes dataset-native read-only analysis plots
     # over the selected records source plus the core local diagnostics.
     pixi run dense plot -c "$CONFIG"
-    # Optional analysis shortcut: render only the Stage-B showcase video artifact.
-    # pixi run dense plot --only dense_array_video_showcase -c "$CONFIG"
+    # Optional analysis shortcut: re-render only the Stage-B showcase video artifact.
+    # pixi run dense plot --only dense_array_showcase_video -c "$CONFIG"
     # Generate the run-overview marimo notebook artifact.
     pixi run dense notebook generate -c "$CONFIG"
     # Validate the generated notebook before opening or sharing it.
@@ -75,12 +75,10 @@ from an isolated worktree.
     # Launch the notebook in marimo app mode.
     uv run dense notebook run -c "$CONFIG"
 
-The default plot catalog for this workspace covers the dataset-native
-`dataset_source_inventory` and `dataset_metadata_heatmap` views plus the core
-DenseGen diagnostics. `stage_a_summary`, `placement_map`, `tfbs_usage`, and
-`run_health` render whenever their required local artifacts already exist under
-`outputs/`. The Stage-B showcase video remains opt-in through explicit
-`--only dense_array_video_showcase`.
+The default plot catalog for this workspace now renders the full
+notebook-visible plot surface required for notebook launch. The happy path is
+that `dense plot` materializes every plot shown in the generated notebook,
+including the drilldown panels and the Stage-B showcase video.
 
 ### Mode B: BU SCC batch loop (generation only)
 

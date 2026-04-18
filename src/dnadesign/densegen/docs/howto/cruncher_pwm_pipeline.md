@@ -82,11 +82,11 @@ uv run dense inspect run --events --library
 
 # Render DenseGen analysis artifacts.
 # `dense plot` is the analysis entry point; static plots always render.
-# Set plots.video.enabled: true in config to also emit a sampled Stage-B showcase video
-# at outputs/plots/stage_b/all_plans/showcase.mp4.
+# The Stage-B showcase video is optional. Enable plots.video and either add
+# dense_array_showcase_video to plots.default or render it explicitly with --only.
 uv run dense plot
 # Optional analysis shortcut: render only the Stage-B showcase video artifact.
-# uv run dense plot --only dense_array_video_showcase
+# uv run dense plot --only dense_array_showcase_video
 
 # Generate notebook.
 uv run dense notebook generate

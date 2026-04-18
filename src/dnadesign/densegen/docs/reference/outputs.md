@@ -194,7 +194,7 @@ DenseGen writes `outputs/tables/solutions.parquet` (append-only) with the soluti
 
 - `<run_root>/outputs/notebooks/densegen_run_overview.py` (default path)
 
-The notebook reads run artifacts (`outputs/meta/*`, `outputs/tables/*`, `outputs/plots/plot_manifest.json`) and reflects the current persisted run state each time you open or rerun notebook cells.
+The notebook reads run artifacts (`outputs/meta/*`, `outputs/tables/*`, `outputs/plots/current_inventory.json`) and reflects the current persisted run state each time you open or rerun notebook cells. Notebook startup is read-only and `current_inventory.json` is the only normal-path inventory source for notebook display; missing or incompatible inventories fail with a regenerate-plots diagnostic instead of falling back to filesystem discovery.
 
 DenseGen -> BaseRender contract for the scaffolded notebook:
 
@@ -237,92 +237,99 @@ DenseGen -> BaseRender contract for the scaffolded notebook:
 - `Plot export`: export `selected|filtered|all` plots to one format (`pdf|png|svg`) under a target directory.
 - Plot scope labels:
   - `all scopes (all plots)` includes run-level, stage-a, and plan-scoped artifacts.
-  - `run-level` refers to unscoped run diagnostics (for example `run_health`).
-  - `stage-a` refers to Stage-A pool diagnostics (`stage_a_summary`).
-  - plan-scoped entries map to concrete plan names from `plot_manifest.json`.
+  - `run-level` refers to unscoped run diagnostics such as `attempt_outcome_timeline`.
+  - `stage-a` refers to concrete Stage-A plot ids such as `stage_a_sampling_yield`.
+  - plan-scoped entries map to concrete plan names from `current_inventory.json`.
 
 ---
 
 ### Plot output
 
-`dense plot` writes plot images under `outputs/plots/` (format controlled by `plots.format`). `outputs/plots/plot_manifest.json` records the plot inventory and structured placement metadata for notebooks.
+`dense plot` writes plot images under `outputs/plots/` (format controlled by `plots.format`).
+
+- `outputs/plots/current_inventory.json` is the authoritative current snapshot for the configured render surface.
+- `outputs/plots/artifact_ledger.json` is the optional historical ledger when cumulative history is retained.
+- `outputs/plots/plot_manifest.json` may remain as a compatibility ledger mirror, but notebooks and status consumers should treat `current_inventory.json` as the authoritative current surface.
 
 Run diagnostics metrics are summarized in `outputs/tables/run_metrics.parquet` (aggregated from pools, libraries, attempts, and composition). Plots below are generated from run artifacts plus accepted-sequence records loaded from the configured plot source (`plots.source`: parquet or usr), not candidate/debug logs.
 
-Core diagnostics plots:
+Concrete plot outputs:
 
-- `stage_a_summary` — Stage-A pool diagnostics (interpretation in the sampling guide).
-- `placement_map` — Stage-B fingerprint: per-position occupancy/event counts across the final
-  accepted sequences from `plots.source`, with overlaid categories for regulators and fixed elements (e.g., promoter -35/-10),
-  showing where motifs land along the sequence.
-- `run_health` — adaptive run diagnostics dashboard:
-  attempt outcomes panel, acceptance/waste/duplicate rates, rejected/failed reason Pareto, quota-aware accepted progress by plan,
-  compression-ratio distribution by plan, and regulator-by-length TFBS usage counts.
-  `outcomes_over_time` specifically renders an attempt-by-plan matrix (`x=plan`, `y=attempt index descending`) with status markers,
-  intermittent attempt-index ticks, and optional block guides for long runs.
-- `tfbs_usage` — TFBS usage diagnostics from accepted placements: specific TFBS rank-count curve
-  plus a per-regulator rank-share heatmap.
-- `dense_array_video_showcase` — optional Stage-B MP4 montage from sampled accepted outputs.
-  Default video mode is a single all-plan round-robin timeline (`plots.video.mode: all_plans_round_robin_single_video`).
+- `source_cohort_concentration` — provenance summary for final-record source cohorts.
+- `source_plan_input_heatmap` — provenance drilldown across source, plan, and input metadata.
+- `stage_a_sampling_yield` — retained Stage-A yield and sampling bias.
+- `stage_a_pool_diversity` — retained Stage-A diversity.
+- `background_sequence_logo` — background-pool sequence logo.
+- `stage_a_pool_score_strata` — Stage-A score/tier strata summary.
+- `plan_regulator_deployment_heatmap` — Stage-B deployment mix across plans and regulators.
+- `placement_occupancy_map` — Stage-B positional occupancy map for accepted placements.
+- `tfbs_concentration_profile` — rank concentration and share-decay profile for deployed TFBS usage.
+- `retained_pool_coverage_by_regulator` — core Stage-B bridge view from retained pool to deployed coverage.
+- `retained_vs_deployed_tier_mix_by_regulator` — optional tier-mix bridge drilldown.
+- `retained_vs_deployed_length_mix_by_regulator` — optional length-mix bridge drilldown.
+- `upstream_motif_supply_and_pwm_strength` — upstream motif-supply and PWM-strength context.
+- `attempt_outcome_timeline` — attempt status timeline across plans.
+- `solve_pressure_and_progress` — solver pressure, waste, and accepted-progress dashboard.
+- `compression_ratio_by_plan` — compression-ratio drilldown by plan.
+- `dense_array_showcase_video` — optional Stage-B MP4 montage from sampled accepted outputs.
 
-Packaged DenseGen workspaces default to all four core plot families (`stage_a_summary`, `placement_map`, `run_health`, `tfbs_usage`).
-Video output is opt-in via `plots.video.enabled: true`.
+Notebook launch requires the full notebook-visible surface. The happy path is
+that `dense plot` renders every notebook-visible plot id listed in
+`plots.default`, and `dense notebook run` then opens a notebook whose gallery
+contains that full review surface.
 
-`stage_a_summary` consolidates PWM inputs into one image per plot type (one row per input),
-with outputs under `outputs/plots/stage_a/`:
-- `pool_tiers.pdf`
-- `yield_bias.pdf`
-- `diversity.pdf`
-- `<input>__background_logo.pdf` (background pools only)
-- `no_stage_a_panels.pdf` (explicit no-op artifact when no Stage-A diagnostics apply to available pools)
+Stage-A plots write under `outputs/plots/stage_a/`:
+- `stage_a_sampling_yield.pdf`
+- `stage_a_pool_diversity.pdf`
+- `stage_a_pool_score_strata.pdf`
+- `<input>__background_sequence_logo.pdf` for background pools
+- `no_stage_a_panels.pdf` when no Stage-A diagnostics apply
 
-`placement_map` writes one image under:
-`outputs/plots/stage_b/<plan>/` (or `outputs/plots/stage_b/<plan>/<input>/` when multiple non-redundant inputs map to the same plan)
-- `occupancy.pdf`
+`placement_occupancy_map` writes one image under:
+`outputs/plots/stage_b/<plan>/placement_occupancy_map.pdf` (or `outputs/plots/stage_b/<plan>/<input>/` when multiple non-redundant inputs map to the same plan)
 
-`tfbs_usage` writes one image into the same plan directory:
-`outputs/plots/stage_b/<plan>/tfbs_usage.pdf` (or under `<input>/` for multi-input plans)
+`tfbs_concentration_profile` writes one image into the same plan directory:
+`outputs/plots/stage_b/<plan>/tfbs_concentration_profile.pdf` (or under `<input>/` for multi-input plans)
 
-`dense_array_video_showcase` writes one MP4 under:
+`dense_array_showcase_video` writes one MP4 under:
 - all-plan mode: `outputs/plots/stage_b/all_plans/showcase.mp4`
 - single-plan mode: `outputs/plots/stage_b/<plan>/showcase.mp4`
 
 Stage-B scoping options are strict and per-plot:
-- `plots.options.placement_map.scope: auto|per_plan|per_group`
-- `plots.options.tfbs_usage.scope: auto|per_plan|per_group`
+- `plots.options.placement_occupancy_map.scope: auto|per_plan|per_group`
+- `plots.options.tfbs_concentration_profile.scope: auto|per_plan|per_group`
 - `max_plans` (used by `auto`)
 - `drilldown_plans` (optional per-plan detail count when grouped)
 
 With `scope: auto`, DenseGen emits per-plan outputs for small plan sets and switches to grouped outputs when plan count exceeds `max_plans`. When grouping applies, plan-pool internal inputs are normalized to grouped plan scopes, so matrix-expanded runs do not fan out into one Stage-B file per expanded variant unless you request per-plan drilldowns.
 
-`run_health` writes:
-`outputs/plots/run_health/outcomes_over_time.pdf`
-`outputs/plots/run_health/run_health.pdf`
-`outputs/plots/run_health/compression_ratio_distribution.pdf`
-`outputs/plots/run_health/tfbs_length_by_regulator.pdf`
-`outputs/plots/run_health/summary_table.pdf`
-`outputs/plots/run_health/summary.csv`
+Run diagnostics write:
+- `outputs/plots/run_health/attempt_outcome_timeline.pdf`
+- `outputs/plots/run_health/solve_pressure_and_progress.pdf`
+- `outputs/plots/run_health/compression_ratio_by_plan.pdf`
+- `outputs/plots/run_health/summary.csv`
 
-`run_health` uses status taxonomy `ok|rejected|duplicate|failed` from
+Run diagnostics use status taxonomy `ok|rejected|duplicate|failed` from
 `outputs/tables/attempts.parquet` and plan quotas from
 `outputs/meta/effective_config.json` (`generation.plan[].sequences`).
-`summary.csv` is a compact numeric table with run-level totals and per-plan accepted/quota ratios.
-For large expanded runs, `run_health.pdf` plan rows auto-collapse to base plan groups unless overridden with plot style options (`run_health_plan_scope: per_plan|auto|per_group`, `run_health_plan_max_labels`).
-`outcomes_over_time.pdf` has independent plan scoping controls (`run_health_outcomes_plan_scope: per_plan|auto|per_group`, `run_health_outcomes_plan_max_labels`).
-`outcomes_over_time.pdf` tiles attempts into per-plan rows (first attempts at top) with optional packing controls (`run_health_outcomes_attempts_per_row`, `run_health_outcomes_rows_per_block`).
+`summary.csv` is a compact support table with run-level totals and per-plan accepted/quota ratios.
+For large expanded runs, `solve_pressure_and_progress.pdf` plan rows auto-collapse to base plan groups unless overridden with plot style options (`run_health_plan_scope: per_plan|auto|per_group`, `run_health_plan_max_labels`).
+`attempt_outcome_timeline.pdf` has independent plan scoping controls (`run_health_outcomes_plan_scope: per_plan|auto|per_group`, `run_health_outcomes_plan_max_labels`).
+`attempt_outcome_timeline.pdf` tiles attempts into per-plan rows (first attempts at top) with optional packing controls (`run_health_outcomes_attempts_per_row`, `run_health_outcomes_rows_per_block`).
 
 See `../concepts/sampling.md` for plot interpretation context.
 
-`stage_a_summary` requires diversity metrics in `pool_manifest.json`. If your pool manifest predates
+`stage_a_sampling_yield`, `stage_a_pool_diversity`, and `stage_a_pool_score_strata`
+require diversity metrics in `pool_manifest.json`. If your pool manifest predates
 diversity metrics, rerun `dense stage-a build-pool --fresh` to regenerate it.
 
 ---
 
-#### How `placement_map` shows fixed elements
+#### How `placement_occupancy_map` shows fixed elements
 
-`placement_map` visualizes 1-nt occupancy across binding-site types (regulators and fixed elements).
+`placement_occupancy_map` visualizes 1-nt occupancy across binding-site types (regulators and fixed elements).
 
-When your plan includes `fixed_elements.promoter_constraints`, `placement_map` renders the promoter
+When your plan includes `fixed_elements.promoter_constraints`, `placement_occupancy_map` renders the promoter
 as fixed-element bands overlaid alongside regulator occupancy so you can see how fixed constraints
 consume positional budget relative to sampled sites.
 Fixed elements are shown in the legend as `<name> -35` and `<name> -10`.

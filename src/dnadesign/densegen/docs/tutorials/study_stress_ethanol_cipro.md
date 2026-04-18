@@ -150,11 +150,12 @@ Use this mode when generation is complete or paused and you only need plots and 
 
 ```bash
 # Render DenseGen analysis artifacts from current run outputs.
-# Records-only analysis still recovers Stage-B placement, TFBS usage, and showcase video plots.
-# `stage_a_summary` requires pool artifacts and `run_health` requires attempts artifacts.
+# Records-only analysis still recovers Stage-B placement and TFBS concentration plots.
+# The Stage-B showcase video remains available when dense_array_showcase_video is selected explicitly.
+# Stage-A context/bridge plots require pool artifacts, and run diagnostics require attempts artifacts.
 pixi run dense plot -c "$CONFIG"
 # Optional analysis shortcut: render only the Stage-B showcase video artifact.
-# pixi run dense plot --only dense_array_video_showcase -c "$CONFIG"
+# pixi run dense plot --only dense_array_showcase_video -c "$CONFIG"
 # Generate the run-overview marimo notebook artifact.
 pixi run dense notebook generate -c "$CONFIG"
 # Run notebook validation before opening or sharing it.

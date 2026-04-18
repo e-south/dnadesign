@@ -55,14 +55,15 @@ Override command args at submit time when needed:
 
 `densegen-analysis.qsub` command defaults:
 - analysis chain: `uv run dense plot -c "$DENSEGEN_CONFIG" --only "$DENSEGEN_ANALYSIS_PLOTS"`
-- default `DENSEGEN_ANALYSIS_PLOTS`: `stage_a_summary,placement_map,run_health,tfbs_usage` (static plots only)
+- default `DENSEGEN_ANALYSIS_PLOTS`: `source_cohort_concentration,stage_a_sampling_yield,stage_a_pool_diversity,plan_regulator_deployment_heatmap,placement_occupancy_map,retained_pool_coverage_by_regulator,attempt_outcome_timeline,solve_pressure_and_progress`
 - fail-fast gate: `DENSEGEN_ANALYSIS_PLOTS` must be non-empty
 - preflight gate: only the selected plots that depend on attempts/composition
   require those artifacts to exist as finalized parquet or part files
 - read behavior: when part files exist, `dense plot` reads finalized tables
   and part files directly without mutating on-disk artifacts
-- optional video plot: include `dense_array_video_showcase` only when FFmpeg is available in the queue environment
-- fail-fast gate: if `DENSEGEN_ANALYSIS_PLOTS` includes `dense_array_video_showcase` and `ffmpeg` is unavailable, the job exits with an explicit error
+- optional drilldown/video plots: append ids such as `source_plan_input_heatmap`, `tfbs_concentration_profile`, or `dense_array_showcase_video` only when they are explicitly needed
+- optional video plot: include `dense_array_showcase_video` only when FFmpeg is available in the queue environment
+- fail-fast gate: if `DENSEGEN_ANALYSIS_PLOTS` includes `dense_array_showcase_video` and `ffmpeg` is unavailable, the job exits with an explicit error
 
 Resume + quota extension submission:
 

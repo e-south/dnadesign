@@ -56,8 +56,12 @@ Runbook mode is explicit: `fresh|resume|analysis`. Wrappers default to `fresh` a
 - Workspace layout contract: [workspace model](../docs/concepts/workspace.md)
 - Output artifact contract: [outputs reference](../docs/reference/outputs.md)
 
-### Optional Stage-B Showcase Video
-Enable this in a workspace `config.yaml` under `plots`:
+### Stage-B Showcase Video
+When `dense_array_showcase_video` is included in `plots.default` or passed through
+`dense plot --only`, DenseGen writes:
+`outputs/plots/stage_b/all_plans/showcase.mp4`.
+
+Enable video rendering in a workspace `config.yaml` under `plots`:
 
 ```yaml
 plots:
@@ -66,5 +70,4 @@ plots:
     mode: all_plans_round_robin_single_video  # single round-robin MP4 across plans
 ```
 
-Then run `dense plot` (or `dense plot --only dense_array_video_showcase`) to produce:
-`outputs/plots/stage_b/all_plans/showcase.mp4`.
+Then run `dense plot` (or `dense plot --only dense_array_showcase_video`).

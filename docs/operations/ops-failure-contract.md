@@ -19,7 +19,7 @@ OPS does not use a large custom exit-code taxonomy.
 
 For failures:
 
-- human-readable error text belongs on stderr
+- plain-text error text belongs on stderr
 - messages should be plain text
 - the message should not depend on TTY-only formatting
 - stdout should stay empty unless the command intentionally emits a machine-readable failure payload
@@ -75,4 +75,4 @@ uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k capture
 uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "active_job_visibility_is_unknown or named_preset_for_project_defaults"
 ```
 
-Keep `CliRunner` checks and subprocess-facing checks aligned so human-facing and machine-captured failures report the same truth.
+Keep `CliRunner` checks and subprocess-facing checks aligned so operator-facing and machine-captured failures report the same truth.

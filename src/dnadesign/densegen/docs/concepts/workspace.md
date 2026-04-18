@@ -6,7 +6,7 @@ This concept page explains the expected DenseGen workspace layout and why DenseG
 
 ### Expected layout
 
-```text
+```
 workspace/
   config.yaml
   inputs/
