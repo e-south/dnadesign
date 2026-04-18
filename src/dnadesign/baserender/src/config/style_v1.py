@@ -127,6 +127,8 @@ class Style:
     legend_height_px: float = 40.0
     legend_gap_patch_text: float = 6.0
     legend_center: bool = True
+    legend_vertical_align: float = 0.5
+    uniform_display_font_size: bool = False
 
     connectors: bool = True
     connector_alpha: float = 0.45
@@ -135,9 +137,18 @@ class Style:
 
     palette: Mapping[str, str] = field(default_factory=dict)
     span_link_inner_margin_bp: float = 0.25
+    span_link_line_width: float = 1.1
+    span_link_tick_line_width: float = 1.1
 
     kmer: GlyphStyle = field(default_factory=GlyphStyle)
     motif_logo: MotifLogoStyle = field(default_factory=MotifLogoStyle)
+
+    def display_font_size(self) -> float:
+        return float(max(self.font_size_seq, self.font_size_label, self.legend_font_size))
+
+    def legend_origin_y(self, *, total_rows_height: float) -> float:
+        free_height = max(0.0, float(self.legend_height_px) - float(total_rows_height))
+        return float(self.legend_pad_px) + free_height * float(self.legend_vertical_align)
 
     def __post_init__(self) -> None:
         if isinstance(self.layout, dict):
@@ -222,6 +233,11 @@ class Style:
             "style.legend_inline_margin_cells must be >= 0",
             SchemaError,
         )
+        ensure(
+            0.0 <= float(self.legend_vertical_align) <= 1.0,
+            "style.legend_vertical_align must be between 0 and 1",
+            SchemaError,
+        )
         ensure(self.sequence.strand_gap_cells >= 0, "style.sequence.strand_gap_cells must be >= 0", SchemaError)
         ensure(self.sequence.to_kmer_gap_cells >= 0, "style.sequence.to_kmer_gap_cells must be >= 0", SchemaError)
         dash_raw = self.connector_dash
@@ -269,6 +285,8 @@ class Style:
         ensure(self.kmer.pad_x_px >= 0, "style.kmer.pad_x_px must be >= 0", SchemaError)
         ensure(self.kmer.to_logo_gap_cells >= 0, "style.kmer.to_logo_gap_cells must be >= 0", SchemaError)
         ensure(self.span_link_inner_margin_bp >= 0, "style.span_link_inner_margin_bp must be >= 0", SchemaError)
+        ensure(self.span_link_line_width > 0, "style.span_link_line_width must be > 0", SchemaError)
+        ensure(self.span_link_tick_line_width > 0, "style.span_link_tick_line_width must be > 0", SchemaError)
         ensure(self.motif_logo.height_bits > 0, "style.motif_logo.height_bits must be > 0", SchemaError)
         ensure(self.motif_logo.bits_to_cells > 0, "style.motif_logo.bits_to_cells must be > 0", SchemaError)
         ensure(self.motif_logo.y_pad_cells >= 0, "style.motif_logo.y_pad_cells must be >= 0", SchemaError)

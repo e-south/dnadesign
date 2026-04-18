@@ -225,6 +225,34 @@ def test_densegen_adapter_title_cases_lowercase_tf_legend_labels() -> None:
     assert record.display.tag_labels.get("tf:lexA") == "LexA"
 
 
+def test_densegen_adapter_compacts_iupac_suffix_in_tf_legend_labels() -> None:
+    row = {
+        "id": "row1",
+        "sequence": "AAAAGGGGCCCC",
+        "densegen__used_tfbs_detail": [
+            {"regulator": "lexA_CTGTATAWAWWHACA", "orientation": "fwd", "sequence": "AAA", "offset": 0},
+            {"regulator": "cpxR_MANWWHTTTAM", "orientation": "fwd", "sequence": "GGG", "offset": 4},
+            {"regulator": "baeR_TTTCTSCVHNA", "orientation": "fwd", "sequence": "CCC", "offset": 8},
+        ],
+    }
+    adapter = DensegenTfbsAdapter(
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+        },
+        policies={},
+        alphabet="DNA",
+    )
+
+    record = adapter.apply(row, row_index=0)
+    legend_labels = {label for _, label in legend_entries_for_record(record)}
+    assert "LexA" in legend_labels
+    assert "CpxR" in legend_labels
+    assert "BaeR" in legend_labels
+    assert all("CTGTATAWAWWHACA" not in label for label in legend_labels)
+
+
 def test_densegen_adapter_includes_promoter_components_in_features_and_legend() -> None:
     row = {
         "id": "row1",
@@ -608,7 +636,14 @@ def test_densegen_spacer_annotation_is_centered_on_promoter_feature_track() -> N
     record = adapter.apply(row, row_index=0)
     style = resolve_style(
         preset="presentation_default",
-        overrides={"show_reverse_complement": False, "connectors": False},
+        overrides={
+            "show_reverse_complement": False,
+            "connectors": False,
+            "font_size_seq": 20,
+            "font_size_label": 20,
+            "legend_font_size": 20,
+            "uniform_display_font_size": True,
+        },
     )
     layout = compute_layout(record, style)
     expected_y = layout.y_forward + layout.feature_track_base_offset_up
@@ -667,7 +702,14 @@ def test_densegen_spacer_interval_reserves_promoter_track_for_span_annotation() 
     record = adapter.apply(row, row_index=0)
     style = resolve_style(
         preset="presentation_default",
-        overrides={"show_reverse_complement": False, "connectors": False},
+        overrides={
+            "show_reverse_complement": False,
+            "connectors": False,
+            "font_size_seq": 20,
+            "font_size_label": 20,
+            "legend_font_size": 20,
+            "uniform_display_font_size": True,
+        },
     )
     layout = compute_layout(record, style)
 
@@ -711,7 +753,14 @@ def test_densegen_fixed_element_annotations_prefer_top_lane_before_side_fallback
     record = adapter.apply(row, row_index=0)
     style = resolve_style(
         preset="presentation_default",
-        overrides={"show_reverse_complement": False, "connectors": False},
+        overrides={
+            "show_reverse_complement": False,
+            "connectors": False,
+            "font_size_seq": 20,
+            "font_size_label": 20,
+            "legend_font_size": 20,
+            "uniform_display_font_size": True,
+        },
     )
     layout = compute_layout(record, style)
     upstream_box = layout.feature_boxes["row1:promoter:sigma70_core:0:upstream"]
@@ -736,8 +785,67 @@ def test_densegen_fixed_element_annotations_prefer_top_lane_before_side_fallback
         span_font_size = float(span_labels[0].get_fontsize())
         assert float(annotation_texts[0].get_fontsize()) == pytest.approx(span_font_size)
         assert float(downstream_labels[0].get_fontsize()) == pytest.approx(span_font_size)
+        assert span_font_size == pytest.approx(20.0)
     finally:
         plt.close(fig)
+
+
+def test_densegen_bottom_legend_can_be_lifted_with_vertical_align() -> None:
+    row = {
+        "id": "row1",
+        "sequence": ("AAAAAA" + ("T" * 14) + "CCCCCC" + ("T" * 14) + "GGGGGG" + ("T" * 14)).upper(),
+        "densegen__used_tfbs_detail": [
+            {"regulator": "lexA", "orientation": "fwd", "sequence": "AAAAAA", "offset": 0},
+            {"regulator": "AraC", "orientation": "fwd", "sequence": "CCCCCC", "offset": 20},
+            {"regulator": "LacI", "orientation": "fwd", "sequence": "GGGGGG", "offset": 40},
+        ],
+    }
+    adapter = DensegenTfbsAdapter(
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+        },
+        policies={},
+        alphabet="DNA",
+    )
+    record = adapter.apply(row, row_index=0)
+    initialize_runtime()
+
+    def _legend_text_props(vertical_align: float) -> tuple[float, float]:
+        style = resolve_style(
+            preset="presentation_default",
+            overrides={
+                "show_reverse_complement": True,
+                "legend": True,
+                "legend_mode": "bottom",
+                "font_size_seq": 20,
+                "font_size_label": 20,
+                "legend_font_size": 20,
+                "legend_height_px": 78.0,
+                "legend_pad_px": 20.0,
+                "legend_vertical_align": vertical_align,
+                "uniform_display_font_size": True,
+            },
+        )
+        palette = Palette(style.palette)
+        fig = render_record(record, renderer_name="sequence_rows", style=style, palette=palette)
+        try:
+            axis = fig.axes[0]
+            legend_texts = [text for text in axis.texts if float(text.get_zorder()) == 10.0]
+            assert legend_texts
+            return (
+                min(float(text.get_position()[1]) for text in legend_texts),
+                min(float(text.get_fontsize()) for text in legend_texts),
+            )
+        finally:
+            plt.close(fig)
+
+    centered_y, centered_font = _legend_text_props(0.5)
+    lifted_y, lifted_font = _legend_text_props(0.95)
+    assert lifted_y > centered_y
+    assert centered_font == pytest.approx(20.0)
+    assert lifted_font == pytest.approx(20.0)
 
 
 def test_densegen_layout_keeps_strand_centerline_balanced_with_asymmetric_feature_density() -> None:
@@ -957,6 +1065,114 @@ def test_densegen_bottom_legend_wraps_rows_for_long_labels() -> None:
 
         unique_text_rows = {round(float(text.get_position()[1]), 3) for text in legend_texts}
         assert len(unique_text_rows) >= 2
+    finally:
+        plt.close(fig)
+
+
+def test_densegen_bottom_legend_keeps_marker_scale_and_spacing_for_densegen_contract() -> None:
+    row = {
+        "id": "row1",
+        "sequence": ("ACGATTGACATGCTCCATTATAAT" + ("G" * 40)).upper(),
+        "densegen__used_tfbs_detail": [
+            {
+                "regulator": "lexA_CTGTATAWAWWHACA",
+                "orientation": "fwd",
+                "sequence": "ACGA",
+                "offset": 0,
+            },
+            {
+                "regulator": "cpxR_MANWWHTTTAM",
+                "orientation": "fwd",
+                "sequence": "TGCT",
+                "offset": 10,
+            },
+            {
+                "regulator": "baeR_TTTCTSCVHNA",
+                "orientation": "fwd",
+                "sequence": "CCAT",
+                "offset": 14,
+            },
+            {
+                "part_kind": "fixed_element",
+                "role": "upstream",
+                "constraint_name": "sigma70_core",
+                "sequence": "TTGACA",
+                "offset": 4,
+                "length": 6,
+                "spacer_length": 8,
+            },
+            {
+                "part_kind": "fixed_element",
+                "role": "downstream",
+                "constraint_name": "sigma70_core",
+                "sequence": "TATAAT",
+                "offset": 18,
+                "length": 6,
+                "spacer_length": 8,
+            },
+        ],
+    }
+    adapter = DensegenTfbsAdapter(
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+        },
+        policies={},
+        alphabet="DNA",
+    )
+    record = adapter.apply(row, row_index=0)
+    style = resolve_style(
+        preset="presentation_default",
+        overrides={
+            "show_reverse_complement": True,
+            "legend": True,
+            "legend_mode": "bottom",
+            "font_size_seq": 24,
+            "font_size_label": 24,
+            "legend_font_size": 24,
+            "legend_height_px": 136.0,
+            "legend_pad_px": 36.0,
+            "legend_patch_w": 96.0,
+            "legend_patch_h": 34.0,
+            "legend_gap_patch_text": 22.0,
+            "legend_gap_x": 60.0,
+            "legend_vertical_align": 1.0,
+            "uniform_display_font_size": True,
+        },
+    )
+    palette = Palette(style.palette)
+    initialize_runtime()
+    fig = render_record(record, renderer_name="sequence_rows", style=style, palette=palette)
+    try:
+        axis = fig.axes[0]
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        legend_patches = sorted(
+            [
+                patch
+                for patch in axis.patches
+                if isinstance(patch, FancyBboxPatch) and float(patch.get_zorder()) == 10.0
+            ],
+            key=lambda patch: float(patch.get_x()),
+        )
+        legend_texts = sorted(
+            [text for text in axis.texts if float(text.get_zorder()) == 10.0],
+            key=lambda text: float(text.get_position()[0]),
+        )
+        assert len(legend_patches) >= 5
+        assert len(legend_texts) >= 5
+        assert len({round(float(text.get_position()[1]), 3) for text in legend_texts}) == 1
+        patch_bboxes = [patch.get_window_extent(renderer=renderer) for patch in legend_patches]
+        text_bboxes = [text.get_window_extent(renderer=renderer) for text in legend_texts]
+        assert min(bbox.width for bbox in patch_bboxes) >= 72.0
+        assert min(bbox.height for bbox in patch_bboxes) >= 28.0
+        inter_item_gaps = [
+            float(next_patch.x0 - current_text.x1)
+            for current_text, next_patch in zip(text_bboxes[:-1], patch_bboxes[1:], strict=False)
+        ]
+        assert inter_item_gaps
+        assert min(inter_item_gaps) >= 28.0
     finally:
         plt.close(fig)
 

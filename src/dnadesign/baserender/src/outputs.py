@@ -630,7 +630,12 @@ def write_video(
     dynamic_subtitle_enabled = any(subtitle_values)
     has_title = output.title_text is not None
     has_header_block = bool(has_title or dynamic_subtitle_enabled)
-    frame_vertical_align = "bottom" if has_header_block else "center"
+    # Sequence-row renders already include their own footer legend geometry. When
+    # the video frame pins that content block to the bottom, the legend drifts to
+    # the crop edge and picks up excess white space below the annotations.
+    frame_vertical_align = (
+        "center" if renderer_name == "sequence_rows" else ("bottom" if has_header_block else "center")
+    )
     frame_w, frame_h = _target_frame_size(natural_w=natural_w, natural_h=natural_h, output=output)
     if has_header_block:
         min_header_frame_height = _even_ceil(int(round(float(style.dpi) * 1.2)))
@@ -698,10 +703,11 @@ def write_video(
     else:
         x = 0.5
         ha = "center"
+    header_font_size = int(round(style.display_font_size()))
     if output.title_font_size is not None:
         title_size = int(output.title_font_size)
     else:
-        title_size = max(12, style.font_size_label + 4)
+        title_size = max(12, header_font_size)
 
     title_artist = None
     if output.title_text is not None:
@@ -729,9 +735,12 @@ def write_video(
             ),
         )
     if dynamic_subtitle_enabled:
-        subtitle_size = max(7, title_size - 2)
-        if title_artist is not None:
-            subtitle_size = min(subtitle_size, max(7, int(title_artist.get_fontsize()) - 1))
+        if bool(style.uniform_display_font_size):
+            subtitle_size = int(title_size)
+        else:
+            subtitle_size = max(8, header_font_size - 1)
+            if title_artist is not None:
+                subtitle_size = min(subtitle_size, max(8, int(title_artist.get_fontsize()) - 1))
         subtitle_y = 0.985
         subtitle_artist = fig.text(
             x,
@@ -753,8 +762,12 @@ def write_video(
         side_margin = 0.01
         top_margin = 0.024
         line_gap = 0.008
-        min_title_font = 8.0
-        min_subtitle_font = 7.0
+        if bool(style.uniform_display_font_size):
+            min_title_font = float(title_size)
+            min_subtitle_font = float(subtitle_size)
+        else:
+            min_title_font = 9.0
+            min_subtitle_font = 8.0
 
         def _wrap_artist_text_to_fit(artist, *, renderer) -> bool:
             raw_text = str(artist.get_text())
@@ -808,7 +821,9 @@ def write_video(
             if title_artist is not None and subtitle_artist is not None:
                 title_font = float(title_artist.get_fontsize())
                 subtitle_font = float(subtitle_artist.get_fontsize())
-                subtitle_cap = max(min_subtitle_font, title_font - 1.0)
+                subtitle_cap = (
+                    title_font if bool(style.uniform_display_font_size) else max(min_subtitle_font, title_font - 1.0)
+                )
                 if subtitle_font > (subtitle_cap + 1.0e-6):
                     subtitle_artist.set_fontsize(subtitle_cap)
                     changed = True
@@ -856,11 +871,15 @@ def write_video(
             return
         if content_top_norm is None:
             return
-        top_margin = 0.020
-        content_gap = 0.008
+        top_margin = 0.016
+        content_gap = 0.012
         line_gap = 0.006
-        min_title_font = 8.0
-        min_subtitle_font = 7.0
+        if bool(style.uniform_display_font_size):
+            min_title_font = float(title_size)
+            min_subtitle_font = float(subtitle_size)
+        else:
+            min_title_font = 9.0
+            min_subtitle_font = 8.0
         max_top = float(1.0 - top_margin)
         target_bottom = max(float(content_top_norm) + content_gap, 0.08)
         if target_bottom >= max_top:
@@ -919,7 +938,9 @@ def write_video(
                 title_font = (
                     float(title_artist.get_fontsize()) if title_artist is not None else (min_subtitle_font + 1.0)
                 )
-                subtitle_cap = max(min_subtitle_font, title_font - 1.0)
+                subtitle_cap = (
+                    title_font if bool(style.uniform_display_font_size) else max(min_subtitle_font, title_font - 1.0)
+                )
                 current = float(subtitle_artist.get_fontsize())
                 updated = max(min_subtitle_font, min(subtitle_cap, current * scale))
                 if abs(updated - current) > 1.0e-6:
@@ -930,12 +951,38 @@ def write_video(
 
         _block_bottom, block_top = _position_block()
         if block_top > max_top:
-            shift = float(block_top - max_top)
-            for artist in layout_artists:
-                artist.set_y(float(artist.get_position()[1]) - shift)
+            allowed_shift = max(0.0, float(_block_bottom - target_bottom))
+            shift = min(float(block_top - max_top), allowed_shift)
+            if shift > 0.0:
+                for artist in layout_artists:
+                    artist.set_y(float(artist.get_position()[1]) - shift)
+
+    def _clamp_text_layout_to_frame() -> None:
+        if not layout_artists:
+            return
+        top_margin = 0.01
+        min_bottom = 0.0
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        bboxes = [
+            artist.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+            for artist in layout_artists
+        ]
+        block_top = max(float(bbox.y1) for bbox in bboxes)
+        block_bottom = min(float(bbox.y0) for bbox in bboxes)
+        downward_shift = max(0.0, float(block_top - (1.0 - top_margin)))
+        upward_shift = max(0.0, float(min_bottom - block_bottom))
+        if downward_shift <= 0.0 and upward_shift <= 0.0:
+            return
+        net_shift = downward_shift - upward_shift
+        if abs(net_shift) <= 1.0e-6:
+            return
+        for artist in layout_artists:
+            artist.set_y(float(artist.get_position()[1]) - net_shift)
 
     _fit_text_layout()
     _anchor_text_layout_to_content()
+    _clamp_text_layout_to_frame()
     if subtitle_artist is not None:
         subtitle_artist.set_text("")
         subtitle_artist.set_visible(False)

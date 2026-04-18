@@ -103,7 +103,13 @@ def draw_span_link(
 
     label = str(effect.params.get("label", "")).strip()
     color = "#9CA3AF"
-    base_fs = max(6, style.font_size_label - 2)
+    line_width = max(0.8, float(getattr(style, "span_link_line_width", 1.1)))
+    tick_line_width = max(0.8, float(getattr(style, "span_link_tick_line_width", line_width)))
+    base_fs = (
+        max(6, int(round(style.display_font_size())))
+        if bool(style.uniform_display_font_size)
+        else max(6, style.font_size_label - 2)
+    )
 
     if label:
         label_w = _text_px_width(label, style.font_label, base_fs, style.dpi)
@@ -119,12 +125,12 @@ def draw_span_link(
         left_end = mid - gap / 2.0
         right_start = mid + gap / 2.0
 
-        ax.plot([x1, left_end], [y, y], color=color, lw=1.1, zorder=5)
-        ax.plot([right_start, x2], [y, y], color=color, lw=1.1, zorder=5)
+        ax.plot([x1, left_end], [y, y], color=color, lw=line_width, zorder=5)
+        ax.plot([right_start, x2], [y, y], color=color, lw=line_width, zorder=5)
         ax.text(mid, y, label, ha="center", va="center", fontsize=fs, family=style.font_label, color=color, zorder=6)
     else:
-        ax.plot([x1, x2], [y, y], color=color, lw=1.1, zorder=5)
+        ax.plot([x1, x2], [y, y], color=color, lw=line_width, zorder=5)
 
     tick = 6.0
-    ax.plot([x1, x1], [y - tick / 2, y + tick / 2], color=color, lw=1.1, zorder=5)
-    ax.plot([x2, x2], [y - tick / 2, y + tick / 2], color=color, lw=1.1, zorder=5)
+    ax.plot([x1, x1], [y - tick / 2, y + tick / 2], color=color, lw=tick_line_width, zorder=5)
+    ax.plot([x2, x2], [y - tick / 2, y + tick / 2], color=color, lw=tick_line_width, zorder=5)

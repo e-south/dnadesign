@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -28,6 +29,8 @@ _DENSEGEN_POLICY_DEFAULTS: dict[str, object] = {
     "require_non_null_cols": (),
     "on_invalid_row": "skip",
 }
+
+_IUPAC_MOTIF_SUFFIX_RE = re.compile(r"^[ACGTRYSWKMBDHVN]+$", re.IGNORECASE)
 
 
 def _find_all(haystack: str, needle: str) -> list[int]:
@@ -82,6 +85,16 @@ def _title_case_first(value: str) -> str:
     if raw == "":
         return raw
     return raw[:1].upper() + raw[1:]
+
+
+def _densegen_tf_display_label(value: str) -> str:
+    raw = str(value).strip()
+    if raw == "":
+        return raw
+    head, sep, suffix = raw.partition("_")
+    if sep and len(suffix) >= 6 and _IUPAC_MOTIF_SUFFIX_RE.fullmatch(suffix):
+        raw = head
+    return _title_case_first(raw)
 
 
 @dataclass(frozen=True)
@@ -602,8 +615,7 @@ class DensegenTfbsAdapter:
         for feat in features:
             for tag in feat.tags:
                 if tag.startswith("tf:") and tag not in tag_labels:
-                    tf_label = tag[3:]
-                    tf_label = _title_case_first(tf_label)
+                    tf_label = _densegen_tf_display_label(tag[3:])
                     tag_labels[tag] = tf_label
         tag_labels.update(promoter_labels)
         tag_labels.update(fixed_labels)
