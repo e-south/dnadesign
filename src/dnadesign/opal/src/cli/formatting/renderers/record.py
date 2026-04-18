@@ -16,7 +16,7 @@ from typing import Any, Mapping
 from ..core import _truncate, bullet_list, kv_block
 
 
-def render_record_report_human(report: Mapping[str, Any]) -> str:
+def render_record_report_text(report: Mapping[str, Any]) -> str:
     if report.get("error"):
         return kv_block("record-show", {"error": report.get("error")})
 

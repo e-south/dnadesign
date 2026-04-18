@@ -17,7 +17,7 @@ import typer
 from ...core.rounds import resolve_round_index_from_state
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...reporting.status import build_status
-from ..formatting import render_status_human
+from ..formatting import render_status_text
 from ..registry import cli_command
 from ._common import (
     internal_error,
@@ -65,7 +65,7 @@ def cmd_status(
         if json or all:
             json_out(st)
         else:
-            print_stdout(render_status_human(st))
+            print_stdout(render_status_text(st))
     except OpalError as e:
         opal_error("status", e)
         raise typer.Exit(code=e.exit_code)

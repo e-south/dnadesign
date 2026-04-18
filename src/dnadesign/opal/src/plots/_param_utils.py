@@ -68,7 +68,7 @@ def reject_params(d: Mapping[str, Any], keys: Sequence[str], *, ctx: str) -> Non
 
 def normalize_metric_field(field: Optional[str]) -> Optional[str]:
     """
-    Normalize human-friendly metric names to canonical ledger column names.
+    Normalize readable metric aliases to canonical ledger column names.
     Accepts dotted or double-underscore forms; keeps explicit obj__/pred__/sel__.
     """
     if field is None:

@@ -22,7 +22,7 @@ from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...runtime.run_round import RunRoundRequest, run_round
 from ...storage.locks import CampaignLock
 from ...storage.state import CampaignState
-from ..formatting import render_run_summary_human
+from ..formatting import render_run_summary_text
 from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
 from ..tui import progress_factory as tui_progress_factory
@@ -62,8 +62,8 @@ def cmd_run(
     ),
     score_batch_size: Optional[int] = typer.Option(None, "--score-batch-size", help="Override batch size."),
     verbose: bool = typer.Option(True, "--verbose/--quiet"),
-    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in human output."),
-    json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
+    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in text output."),
+    json: bool = typer.Option(False, "--json/--text", help="Output format (default: text)"),
 ) -> None:
     try:
         cfg_path = resolve_config_path(config)
@@ -121,7 +121,7 @@ def cmd_run(
         if json:
             json_out(summary)
         else:
-            print_stdout(render_run_summary_human(summary))
+            print_stdout(render_run_summary_text(summary))
             maybe_print_hints(
                 command_name="run",
                 cfg_path=cfg_path,

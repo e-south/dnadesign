@@ -22,7 +22,7 @@ from ...core.rounds import resolve_round_index_from_state
 from ...core.utils import ExitCodes, OpalError, ensure_dir, print_stdout
 from ...registries.models import load_model
 from ...storage.state import CampaignState
-from ..formatting import render_model_show_human
+from ..formatting import render_model_show_text
 from ..registry import cli_command
 from ._common import (
     internal_error,
@@ -55,7 +55,7 @@ def cmd_model_show(
         "--model-params",
         help="Optional JSON file (.json) with model params (used with --model-name).",
     ),
-    json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
+    json: bool = typer.Option(False, "--json/--text", help="Output format (default: text)"),
 ):
     try:
         import numpy as np
@@ -117,7 +117,7 @@ def cmd_model_show(
         if json:
             json_out(info)
         else:
-            print_stdout(render_model_show_human(info))
+            print_stdout(render_model_show_text(info))
     except OpalError as e:
         opal_error("model-show", e)
         raise typer.Exit(code=e.exit_code)

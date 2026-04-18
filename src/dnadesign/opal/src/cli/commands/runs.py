@@ -19,7 +19,7 @@ from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...reporting.summary import list_runs, select_run_meta, summarize_run_meta
 from ...storage.ledger import LedgerReader
 from ...storage.workspace import CampaignWorkspace
-from ..formatting import render_run_meta_human, render_runs_list_human
+from ..formatting import render_run_meta_text, render_runs_list_text
 from ..registry import cli_group
 from ._common import (
     internal_error,
@@ -38,7 +38,7 @@ cli_group("runs", help="Inspect ledger run_meta entries.")(runs_app)
 def runs_list(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
     round: Optional[str] = typer.Option(None, "--round", "-r", help="Round selector: int or 'latest'."),
-    json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)."),
+    json: bool = typer.Option(False, "--json/--text", help="Output format (default: text)."),
 ) -> None:
     try:
         cfg_path = resolve_config_path(config)
@@ -54,7 +54,7 @@ def runs_list(
         else:
             print_config_context(cfg_path, cfg=cfg)
             summary_rows = [summarize_run_meta(r) for _, r in runs_df.iterrows()]
-            print_stdout(render_runs_list_human(summary_rows))
+            print_stdout(render_runs_list_text(summary_rows))
     except OpalError as e:
         opal_error("runs list", e)
         raise typer.Exit(code=e.exit_code)
@@ -68,7 +68,7 @@ def runs_show(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
     round: Optional[str] = typer.Option(None, "--round", "-r", help="Round selector: int or 'latest'."),
     run_id: Optional[str] = typer.Option(None, "--run-id", help="Explicit run_id to display."),
-    json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)."),
+    json: bool = typer.Option(False, "--json/--text", help="Output format (default: text)."),
 ) -> None:
     try:
         if round and run_id:
@@ -84,7 +84,7 @@ def runs_show(
             json_out(row.to_dict())
         else:
             print_config_context(cfg_path, cfg=cfg)
-            print_stdout(render_run_meta_human(row.to_dict()))
+            print_stdout(render_run_meta_text(row.to_dict()))
     except OpalError as e:
         opal_error("runs show", e)
         raise typer.Exit(code=e.exit_code)

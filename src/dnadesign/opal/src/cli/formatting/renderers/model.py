@@ -18,7 +18,7 @@ from ...tui import kv_table, tui_enabled
 from ..core import _fmt_params, bullet_list, kv_block
 
 
-def render_model_show_human(info: Mapping[str, Any]) -> str:
+def render_model_show_text(info: Mapping[str, Any]) -> str:
     if tui_enabled():
         from rich import box
         from rich.console import Group

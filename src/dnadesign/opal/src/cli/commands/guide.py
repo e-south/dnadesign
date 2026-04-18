@@ -21,7 +21,7 @@ from ...core.utils import ExitCodes, OpalError, print_stdout
 from ..formatting.renderers.guide import (
     render_guide_markdown,
     render_guide_text,
-    render_next_human,
+    render_next_text,
 )
 from ..guidance import build_guidance_report, build_next_guidance
 from ..registry import cli_group
@@ -82,7 +82,7 @@ def cmd_guide_next(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
     observed_round: Optional[int] = typer.Option(None, "--observed-round", help="Observed round to inspect."),
     labels_as_of: Optional[int] = typer.Option(None, "--labels-as-of", help="Labels cutoff round to inspect."),
-    json: bool = typer.Option(False, "--json/--human", help="Output format."),
+    json: bool = typer.Option(False, "--json/--text", help="Output format."),
 ) -> None:
     try:
         cfg_path = resolve_config_path(config)
@@ -100,7 +100,7 @@ def cmd_guide_next(
         if json:
             json_out(report)
         else:
-            print_stdout(render_next_human(report))
+            print_stdout(render_next_text(report))
     except OpalError as e:
         opal_error("guide next", e)
         raise typer.Exit(code=e.exit_code)

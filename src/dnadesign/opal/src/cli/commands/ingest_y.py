@@ -31,8 +31,8 @@ from ...storage.workspace import CampaignWorkspace
 from ...storage.writebacks import build_label_events
 from ..formatting import (
     bullet_list,
-    render_ingest_commit_human,
-    render_ingest_preview_human,
+    render_ingest_commit_text,
+    render_ingest_preview_text,
 )
 from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
@@ -84,8 +84,8 @@ def cmd_ingest_y(
         help="Behavior if (id, round) already exists in label history: 'fail' (default), 'skip', or 'replace'.",
         case_sensitive=False,
     ),
-    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in human output."),
-    json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
+    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in text output."),
+    json: bool = typer.Option(False, "--json/--text", help="Output format (default: text)"),
 ):
     try:
         import pandas as pd
@@ -186,7 +186,7 @@ def cmd_ingest_y(
         if json:
             json_out({"preview": asdict(preview), "sample": sample})
         else:
-            print_stdout(render_ingest_preview_human(preview, sample, transform_name=t_name))
+            print_stdout(render_ingest_preview_text(preview, sample, transform_name=t_name))
 
         # Required columns for new rows (used for nudges + strict checks below)
         required_cols = ["bio_type", "alphabet"]
@@ -542,7 +542,7 @@ def cmd_ingest_y(
             json_out(out)
         else:
             print_stdout(
-                render_ingest_commit_human(
+                render_ingest_commit_text(
                     round_index=out["round"],
                     labels_appended=out["labels_appended"],
                     labels_skipped=out["labels_skipped"],

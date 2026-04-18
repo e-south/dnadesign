@@ -113,7 +113,7 @@ def _validate_selection_channel_refs(cfg) -> None:
 @cli_command("validate", help="End-to-end table checks (essentials present; X column present).")
 def cmd_validate(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
-    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in human output."),
+    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in text output."),
 ):
     try:
         cfg_path = resolve_config_path(config)

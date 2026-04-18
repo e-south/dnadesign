@@ -17,7 +17,7 @@ from ...tui import kv_table, list_table, tui_enabled
 from ..core import bullet_list, kv_block
 
 
-def render_round_log_summary_human(summary: Mapping[str, object]) -> str:
+def render_round_log_summary_text(summary: Mapping[str, object]) -> str:
     if tui_enabled():
         from rich.console import Group
 

@@ -46,7 +46,7 @@ def cmd_objective_meta(
         help="Round selector: integer or 'latest' (default: latest)",
     ),
     run_id: Optional[str] = typer.Option(None, "--run-id", help="Explicit run_id to inspect."),
-    json: bool = typer.Option(False, "--json/--human", help="Output as JSON"),
+    json: bool = typer.Option(False, "--json/--text", help="Output as JSON"),
     profile: bool = typer.Option(
         False,
         "--profile/--no-profile",

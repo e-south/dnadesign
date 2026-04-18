@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from dnadesign.opal.src.cli.formatting.renderers.ingest import render_ingest_preview_human
+from dnadesign.opal.src.cli.formatting.renderers.ingest import render_ingest_preview_text
 from dnadesign.opal.src.core.round_context import PluginRegistryView, RoundCtx
 from dnadesign.opal.src.registries.transforms_y import get_transform_y, register_transform_y
 from dnadesign.opal.src.runtime.ingest import IngestPreview, run_ingest
@@ -141,6 +141,6 @@ def test_ingest_preview_renders_unresolved_id_instead_of_nan() -> None:
         {"id": np.nan, "sequence": "AAA", "y": [0.1]},
         {"id": "known", "sequence": "BBB", "y": [0.2]},
     ]
-    rendered = render_ingest_preview_human(preview, sample_rows, transform_name="scalar_from_table_v1")
+    rendered = render_ingest_preview_text(preview, sample_rows, transform_name="scalar_from_table_v1")
     assert "id=<unresolved>" in rendered
     assert "id=nan" not in rendered

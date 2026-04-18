@@ -18,7 +18,7 @@ from ...tui import kv_table, tui_enabled
 from ..core import kv_block
 
 
-def render_init_human(*, workdir: Path) -> str:
+def render_init_text(*, workdir: Path) -> str:
     if tui_enabled():
         table = kv_table(
             "[ok] Initialized campaign workspace",

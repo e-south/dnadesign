@@ -32,7 +32,7 @@ def _render_id_value(value: Any) -> str:
     return text
 
 
-def render_ingest_preview_human(
+def render_ingest_preview_text(
     preview: Any,
     sample_rows: Sequence[Mapping[str, Any]],
     *,
@@ -109,7 +109,7 @@ def render_ingest_preview_human(
     return head + "\n\n" + bullet_list("Sample (first 5)", lines)
 
 
-def render_ingest_commit_human(
+def render_ingest_commit_text(
     *,
     round_index: int,
     labels_appended: int,

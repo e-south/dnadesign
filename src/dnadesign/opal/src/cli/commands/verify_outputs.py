@@ -53,8 +53,8 @@ def verify_outputs(
         help="Optional selection_top_k.csv path (defaults to run artifacts).",
     ),
     eps: float = typer.Option(1e-6, "--eps", help="Mismatch tolerance for numeric comparisons."),
-    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in human output."),
-    json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)."),
+    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in text output."),
+    json: bool = typer.Option(False, "--json/--text", help="Output format (default: text)."),
 ) -> None:
     try:
         if round and run_id:

@@ -39,7 +39,7 @@ def cmd_label_hist(
     apply: bool = typer.Option(False, "--apply", help="Apply changes (default: dry-run)."),
     round: Optional[int] = typer.Option(None, "--round", "-r", help="Round stamp for attach-from-y."),
     src: str = typer.Option("manual_attach", "--src", help="label_hist src tag for attach-from-y."),
-    json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)."),
+    json: bool = typer.Option(False, "--json/--text", help="Output format (default: text)."),
 ) -> None:
     try:
         cfg_path = resolve_config_path(config)
